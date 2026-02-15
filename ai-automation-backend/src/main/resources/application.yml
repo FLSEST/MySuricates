@@ -1,0 +1,59 @@
+spring:
+  application:
+    name: ai-automation-backend
+
+  datasource:
+    url: jdbc:sqlite:${AUTOMATION_DB_PATH:./data/automation.db}
+    driver-class-name: org.sqlite.JDBC
+    hikari:
+      maximum-pool-size: 1
+
+  jpa:
+    database-platform: org.hibernate.community.dialect.SQLiteDialect
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: ${AUTOMATION_PORT:9090}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+docker:
+  host: ${DOCKER_HOST:unix:///var/run/docker.sock}
+  container:
+    cpu-quota: 200000
+    memory-limit: 4000000000
+    pids-limit: 100
+    idle-timeout-minutes: 60
+
+automation:
+  security:
+    enabled: ${AUTOMATION_SECURITY_ENABLED:false}
+    api-key: ${AUTOMATION_API_KEY:}
+    rate-limit:
+      enabled: ${AUTOMATION_RATE_LIMIT_ENABLED:false}
+      requests-per-minute: ${AUTOMATION_RATE_LIMIT_RPM:120}
+  tailscale:
+    enabled: ${AUTOMATION_TAILSCALE_ENABLED:false}
+
+logging:
+  level:
+    com.automation: DEBUG
+    org.hibernate.SQL: WARN

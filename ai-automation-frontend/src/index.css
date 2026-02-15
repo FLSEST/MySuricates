@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Default theme tokens (dark) ───────────────────────── */
+:root {
+  --color-surface: #0f172a;
+  --color-surface-raised: #1e293b;
+  --color-surface-overlay: #1e293b;
+  --color-border: #334155;
+  --color-border-strong: #475569;
+  --color-text: #f1f5f9;
+  --color-text-secondary: #94a3b8;
+  --color-text-tertiary: #64748b;
+  --color-text-inverse: #0f172a;
+  --color-accent: #06b6d4;
+  --color-accent-hover: #22d3ee;
+  --color-accent-subtle: #083344;
+  --color-success: #34d399;
+  --color-success-subtle: #064e3b;
+  --color-warning: #fbbf24;
+  --color-warning-subtle: #451a03;
+  --color-danger: #f87171;
+  --color-danger-subtle: #450a0a;
+  --color-sidebar: #020617;
+  --color-sidebar-hover: #0f172a;
+  --color-sidebar-active: #1e293b;
+}
+
+/* ── Base styles ───────────────────────────────────────── */
+@layer base {
+  body {
+    @apply bg-surface text-text font-sans;
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-border-strong;
+  }
+
+  /* Selection */
+  ::selection {
+    @apply bg-accent/30;
+  }
+}
+
+/* ── Component layer ───────────────────────────────────── */
+@layer components {
+  .glass {
+    @apply bg-surface-raised/80 backdrop-blur-sm border border-border;
+  }
+
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-accent/40 focus:ring-offset-0;
+  }
+
+  .input-base {
+    @apply w-full px-3 py-2 rounded-lg bg-surface border border-border
+           text-text placeholder:text-text-tertiary
+           focus-ring transition-colors duration-150;
+  }
+
+  .btn-base {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2
+           rounded-lg font-medium text-sm transition-all duration-150
+           focus-ring disabled:opacity-50 disabled:pointer-events-none
+           active:scale-[0.98];
+  }
+}
+
+/* ── Utility layer ─────────────────────────────────────── */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .animate-stagger > * {
+    animation: slideUp 0.3s ease-out both;
+  }
+
+  .animate-stagger > *:nth-child(1) { animation-delay: 0ms; }
+  .animate-stagger > *:nth-child(2) { animation-delay: 50ms; }
+  .animate-stagger > *:nth-child(3) { animation-delay: 100ms; }
+  .animate-stagger > *:nth-child(4) { animation-delay: 150ms; }
+  .animate-stagger > *:nth-child(5) { animation-delay: 200ms; }
+  .animate-stagger > *:nth-child(6) { animation-delay: 250ms; }
+}

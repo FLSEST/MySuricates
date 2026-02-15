@@ -1,0 +1,33 @@
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### IDE ###
+.idea/
+*.iws
+*.iml
+*.ipr
+.vscode/
+.project
+.classpath
+.settings/
+*.swp
+*~
+
+### OS ###
+.DS_Store
+Thumbs.db
+
+### Application ###
+data/
+*.db
+*.db-journal
+*.db-wal
+logs/
+*.log
+
+### Maven ###
+.mvn/
+mvnw
+mvnw.cmd

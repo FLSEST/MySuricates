@@ -1,0 +1,265 @@
+import { useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+  ArrowLeft, Play, Square, Trash2, Pencil, GitBranch, Container as ContainerIcon,
+} from 'lucide-react';
+import { Card, CardHeader, Button, Input, Select, Modal, Spinner } from '../components/ui';
+import { StatusBadge } from '../components/shared/StatusBadge';
+import { ErrorState } from '../components/shared/ErrorState';
+import {
+  useProject, useUpdateProject, useDeleteProject,
+  useStartContainer, useStopContainer,
+} from '../hooks/useProjects';
+import { useWorkflows } from '../hooks/useWorkflows';
+import { useT } from '../i18n';
+import type { ProjectType } from '../types';
+
+const PROJECT_TYPES: ProjectType[] = ['CODE', 'RESEARCH', 'CONTENT', 'BUSINESS', 'PERSONAL'];
+
+export function ProjectDetail() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const t = useT();
+
+  const { data: project, isLoading, error, refetch } = useProject(id!);
+  const { data: workflows } = useWorkflows();
+  const updateProject = useUpdateProject();
+  const deleteProject = useDeleteProject();
+  const startContainer = useStartContainer();
+  const stopContainer = useStopContainer();
+
+  const [showEdit, setShowEdit] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+  const [editForm, setEditForm] = useState({ name: '', type: 'CODE' as ProjectType, path: '' });
+
+  const projectWorkflows = workflows?.filter((w) => w.projectId === id) ?? [];
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Spinner text={t.common.loading} />
+      </div>
+    );
+  }
+
+  if (error || !project) {
+    return <ErrorState message={error?.message} onRetry={() => refetch()} />;
+  }
+
+  const openEdit = () => {
+    setEditForm({ name: project.name, type: project.type, path: project.path });
+    setShowEdit(true);
+  };
+
+  const handleUpdate = () => {
+    updateProject.mutate(
+      { id: project.id, data: editForm },
+      { onSuccess: () => setShowEdit(false) }
+    );
+  };
+
+  const handleDelete = () => {
+    deleteProject.mutate(project.id, {
+      onSuccess: () => navigate('/projects'),
+    });
+  };
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* Back + Title */}
+      <div className="flex items-center gap-4">
+        <button
+          onClick={() => navigate('/projects')}
+          className="p-2 rounded-lg hover:bg-surface-raised text-text-secondary hover:text-text transition-colors"
+          aria-label={t.common.back}
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-text truncate">{project.name}</h1>
+            <StatusBadge status={project.status} />
+          </div>
+          <p className="text-sm text-text-tertiary font-mono mt-0.5">{project.path}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} onClick={openEdit}>
+            {t.common.edit}
+          </Button>
+          <Button variant="danger" size="sm" icon={<Trash2 className="w-4 h-4" />} onClick={() => setShowDelete(true)}>
+            {t.common.delete}
+          </Button>
+        </div>
+      </div>
+
+      {/* Info cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Project info */}
+        <Card>
+          <CardHeader title={t.projects.info} />
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-text-secondary">{t.projects.type}</span>
+              <span className="text-text font-medium">{t.projects.types[project.type]}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-text-secondary">{t.common.created}</span>
+              <span className="text-text">{new Date(project.createdAt).toLocaleDateString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-text-secondary">{t.common.updated}</span>
+              <span className="text-text">{new Date(project.updatedAt).toLocaleDateString()}</span>
+            </div>
+          </div>
+        </Card>
+
+        {/* Container status */}
+        <Card>
+          <CardHeader
+            title={t.projects.status}
+            subtitle={project.container?.dockerContainerId?.slice(0, 12) ?? '-'}
+          />
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-xl bg-surface">
+                <ContainerIcon className="w-5 h-5 text-text-secondary" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-text">
+                  {project.container?.imageName ?? 'No container'}
+                </p>
+                <StatusBadge status={project.container?.status ?? 'STOPPED'} />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {project.status === 'STOPPED' || project.status === 'ERROR' ? (
+                <Button
+                  size="sm"
+                  icon={<Play className="w-4 h-4" />}
+                  onClick={() => startContainer.mutate(project.id)}
+                  loading={startContainer.isPending}
+                >
+                  {t.projects.startContainer}
+                </Button>
+              ) : project.status === 'RUNNING' ? (
+                <Button
+                  variant="danger"
+                  size="sm"
+                  icon={<Square className="w-4 h-4" />}
+                  onClick={() => stopContainer.mutate(project.id)}
+                  loading={stopContainer.isPending}
+                >
+                  {t.projects.stopContainer}
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Workflows in project */}
+      <Card padding={false}>
+        <div className="p-5 pb-0">
+          <CardHeader
+            title={`${t.nav.workflows} (${projectWorkflows.length})`}
+            action={
+              <Button
+                size="sm"
+                variant="secondary"
+                icon={<GitBranch className="w-4 h-4" />}
+                onClick={() => navigate('/workflows')}
+              >
+                {t.workflows.create}
+              </Button>
+            }
+          />
+        </div>
+        {projectWorkflows.length === 0 ? (
+          <div className="px-5 py-12 text-center text-sm text-text-tertiary">
+            {t.workflows.noWorkflows}
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {projectWorkflows.map((wf) => (
+              <div
+                key={wf.id}
+                className="flex items-center justify-between px-5 py-3 hover:bg-surface transition-colors cursor-pointer"
+                onClick={() => navigate(`/workflows/${wf.id}`)}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-lg">{wf.icon || '📋'}</span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-text truncate">{wf.name}</p>
+                    <p className="text-xs text-text-tertiary">{wf.blocks.length} {t.workflows.blocks.toLowerCase()}</p>
+                  </div>
+                </div>
+                <span className="text-xs text-text-tertiary">{wf.runCount} {t.common.runs}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      {/* Edit Modal */}
+      <Modal
+        open={showEdit}
+        onClose={() => setShowEdit(false)}
+        title={`${t.common.edit} ${project.name}`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowEdit(false)}>
+              {t.common.cancel}
+            </Button>
+            <Button onClick={handleUpdate} loading={updateProject.isPending}>
+              {t.common.save}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Input
+            label={t.projects.name}
+            value={editForm.name}
+            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+          />
+          <Select
+            label={t.projects.type}
+            value={editForm.type}
+            onChange={(e) => setEditForm({ ...editForm, type: e.target.value as ProjectType })}
+            options={PROJECT_TYPES.map((type) => ({
+              value: type,
+              label: t.projects.types[type],
+            }))}
+          />
+          <Input
+            label={t.projects.path}
+            value={editForm.path}
+            onChange={(e) => setEditForm({ ...editForm, path: e.target.value })}
+          />
+        </div>
+      </Modal>
+
+      {/* Delete Confirmation */}
+      <Modal
+        open={showDelete}
+        onClose={() => setShowDelete(false)}
+        title={`${t.common.delete} "${project.name}"?`}
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowDelete(false)}>
+              {t.common.cancel}
+            </Button>
+            <Button variant="danger" onClick={handleDelete} loading={deleteProject.isPending}>
+              {t.common.delete}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-text-secondary">
+          {t.common.deleteConfirm} {t.projects.deleteConfirm}
+        </p>
+      </Modal>
+    </div>
+  );
+}

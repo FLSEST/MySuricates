@@ -1,0 +1,20 @@
+FROM node:21-alpine
+
+# Create non-root user
+RUN adduser -D -u 1000 aiuser
+
+# Install common tools
+RUN apk add --no-cache git curl bash jq
+
+# Install AI CLI tools (fail gracefully if not available)
+RUN npm install -g @anthropic-ai/claude-code 2>/dev/null || true
+
+# Create writable directories for container runtime
+RUN mkdir -p /home/aiuser/.cache /home/aiuser/.config && \
+    chown -R aiuser:aiuser /home/aiuser
+
+USER aiuser
+WORKDIR /workspace
+
+# Keep container alive for docker exec
+CMD ["tail", "-f", "/dev/null"]

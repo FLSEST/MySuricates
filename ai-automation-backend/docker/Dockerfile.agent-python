@@ -1,0 +1,21 @@
+FROM python:3.12-slim
+
+# Create non-root user
+RUN useradd -m -u 1000 aiuser
+
+# Install common tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git curl jq && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Python packages
+RUN pip install --no-cache-dir anthropic pandas numpy requests beautifulsoup4
+
+# Create writable directories for container runtime
+RUN mkdir -p /home/aiuser/.cache /home/aiuser/.config && \
+    chown -R aiuser:aiuser /home/aiuser
+
+USER aiuser
+WORKDIR /workspace
+
+CMD ["tail", "-f", "/dev/null"]

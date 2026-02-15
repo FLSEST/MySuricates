@@ -1,0 +1,221 @@
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+  ArrowLeft, Pause, Play, XCircle, Clock, CheckCircle2, AlertCircle,
+} from 'lucide-react';
+import { Card, CardHeader, Button, Spinner, Badge } from '../components/ui';
+import { StatusBadge } from '../components/shared/StatusBadge';
+import { ErrorState } from '../components/shared/ErrorState';
+import { LogViewer } from '../components/shared/LogViewer';
+import {
+  useWorkflow, useWorkflowRuns,
+  usePauseExecution, useResumeExecution, useCancelExecution,
+} from '../hooks/useWorkflows';
+import { useExecutionWebSocket } from '../hooks/useWebSocket';
+import { useRateRun } from '../hooks/useLearning';
+import { useT } from '../i18n';
+import type { WorkflowRun, StepResult } from '../types';
+
+function formatDuration(ms: number | null): string {
+  if (!ms) return '-';
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${(ms / 60_000).toFixed(1)}m`;
+}
+
+function StepCard({ step }: { step: StepResult }) {
+  return (
+    <div className="flex gap-3 py-3">
+      <div className="pt-0.5">
+        {step.status === 'COMPLETED' ? (
+          <CheckCircle2 className="w-5 h-5 text-[var(--color-success)]" />
+        ) : step.status === 'FAILED' ? (
+          <AlertCircle className="w-5 h-5 text-[var(--color-danger)]" />
+        ) : step.status === 'RUNNING' ? (
+          <div className="w-5 h-5 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+        ) : (
+          <div className="w-5 h-5 rounded-full border-2 border-border" />
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-xs font-mono text-text-tertiary">Step {step.stepIndex + 1}</span>
+          <Badge variant={step.status === 'COMPLETED' ? 'success' : step.status === 'FAILED' ? 'danger' : 'default'}>
+            {step.blockType}
+          </Badge>
+          {step.durationMs != null && (
+            <span className="text-xs text-text-tertiary flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {formatDuration(step.durationMs)}
+            </span>
+          )}
+        </div>
+        {step.input && (
+          <p className="text-xs text-text-secondary font-mono mb-1 truncate">{step.input}</p>
+        )}
+        {step.output && (
+          <pre className="text-xs text-text font-mono bg-surface rounded-lg p-3 overflow-x-auto max-h-40 whitespace-pre-wrap">
+            {step.output}
+          </pre>
+        )}
+        {step.error && (
+          <p className="text-xs text-danger mt-1">{step.error}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function WorkflowExecution() {
+  const { id, runId } = useParams<{ id: string; runId: string }>();
+  const navigate = useNavigate();
+  const t = useT();
+
+  const { data: workflow } = useWorkflow(id!);
+  const { data: runs, error: runsError, refetch: refetchRuns } = useWorkflowRuns(id!);
+  const { logs, connected } = useExecutionWebSocket(runId!);
+  const rateRun = useRateRun();
+  const pauseExecution = usePauseExecution();
+  const resumeExecution = useResumeExecution();
+  const cancelExecution = useCancelExecution();
+
+  const run: WorkflowRun | undefined = runs?.find((r) => r.id === runId);
+  const isRunning = run?.status === 'RUNNING' || run?.status === 'PAUSED';
+
+  const handleRate = (rating: number) => {
+    rateRun.mutate({ runId: runId!, rating });
+  };
+
+  if (runsError) {
+    return <ErrorState message={runsError.message} onRetry={() => refetchRuns()} />;
+  }
+
+  if (!run) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Spinner text={t.common.loading} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <button
+          onClick={() => navigate(`/workflows/${id}`)}
+          className="p-2 rounded-lg hover:bg-surface-raised text-text-secondary hover:text-text transition-colors"
+          aria-label={t.common.back}
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <div className="flex-1">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-text">{t.workflows.execution.title}</h1>
+            <StatusBadge status={run.status} />
+            {connected && isRunning && (
+              <span className="flex items-center gap-1 text-xs text-success">
+                <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
+                {t.common.live}
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-text-secondary mt-0.5">
+            {workflow?.name} &middot; {new Date(run.startedAt).toLocaleString()}
+          </p>
+        </div>
+        {isRunning && (
+          <div className="flex items-center gap-2">
+            {run.status === 'RUNNING' && (
+              <Button
+                variant="secondary" size="sm"
+                icon={<Pause className="w-4 h-4" />}
+                onClick={() => pauseExecution.mutate(runId!)}
+                loading={pauseExecution.isPending}
+              >
+                {t.workflows.execution.pause}
+              </Button>
+            )}
+            {run.status === 'PAUSED' && (
+              <Button
+                size="sm"
+                icon={<Play className="w-4 h-4" />}
+                onClick={() => resumeExecution.mutate(runId!)}
+                loading={resumeExecution.isPending}
+              >
+                {t.workflows.execution.resume}
+              </Button>
+            )}
+            <Button
+              variant="danger" size="sm"
+              icon={<XCircle className="w-4 h-4" />}
+              onClick={() => cancelExecution.mutate(runId!)}
+              loading={cancelExecution.isPending}
+            >
+              {t.workflows.execution.cancel}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Duration + rating */}
+      <div className="flex items-center gap-6 text-sm">
+        <div className="flex items-center gap-2 text-text-secondary">
+          <Clock className="w-4 h-4" />
+          <span>{t.workflows.execution.duration}: {formatDuration(run.durationMs)}</span>
+        </div>
+        {run.status === 'COMPLETED' && (
+          <div className="flex items-center gap-1">
+            <span className="text-text-secondary text-sm mr-1">{t.workflows.execution.rate}</span>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                key={star}
+                onClick={() => handleRate(star)}
+                aria-label={`${star}/5`}
+                className={`text-lg transition-colors ${
+                  run.userRating && star <= run.userRating ? 'text-warning' : 'text-text-tertiary hover:text-warning'
+                }`}
+              >
+                ★
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Steps */}
+        <Card padding={false}>
+          <div className="p-5 pb-0">
+            <CardHeader title={`${t.workflows.execution.steps} (${run.steps.length})`} />
+          </div>
+          <div className="px-5 pb-5 divide-y divide-border">
+            {run.steps.map((step) => (
+              <StepCard key={step.id} step={step} />
+            ))}
+            {run.steps.length === 0 && (
+              <div className="py-8 text-center text-sm text-text-tertiary">
+                {isRunning ? t.workflows.execution.waitingSteps : t.workflows.execution.noSteps}
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* Live logs */}
+        <Card>
+          <CardHeader title={t.workflows.execution.logs} />
+          <LogViewer logs={logs} maxHeight="500px" />
+        </Card>
+      </div>
+
+      {/* Error */}
+      {run.error && (
+        <Card className="border-danger/30 bg-danger-subtle">
+          <CardHeader title={t.workflows.execution.error} />
+          <pre className="text-sm text-danger font-mono whitespace-pre-wrap">
+            {JSON.stringify(run.error, null, 2)}
+          </pre>
+        </Card>
+      )}
+    </div>
+  );
+}

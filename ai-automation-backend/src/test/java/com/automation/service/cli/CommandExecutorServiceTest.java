@@ -1,0 +1,173 @@
+package com.automation.service.cli;
+
+import com.automation.entity.BlockDefinition;
+import com.automation.entity.Skill;
+import com.automation.entity.SkillCategory;
+import com.automation.entity.StepStatus;
+import com.automation.entity.StepResult;
+import com.automation.exception.WorkflowExecutionException;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class CommandExecutorServiceTest {
+
+    @Mock
+    private CliSessionManager sessionManager;
+
+    @Mock
+    private CliSession cliSession;
+
+    @InjectMocks
+    private CommandExecutorService commandExecutorService;
+
+    @BeforeEach
+    void setUp() throws IOException {
+        lenient().when(sessionManager.getOrCreateSession(anyString(), anyString())).thenReturn(cliSession);
+    }
+
+    @Test
+    void executeCommand_success_returnsResponse() throws IOException {
+        when(cliSession.sendCommand("echo hello")).thenReturn("hello");
+
+        String result = commandExecutorService.executeCommand("container-1", "claude", "echo hello");
+
+        assertThat(result).isEqualTo("hello");
+    }
+
+    @Test
+    void executeCommand_ioException_throwsWorkflowExecutionException() throws IOException {
+        when(sessionManager.getOrCreateSession(anyString(), anyString()))
+                .thenThrow(new IOException("Connection failed"));
+
+        assertThatThrownBy(() -> commandExecutorService.executeCommand("container-1", "claude", "cmd"))
+                .isInstanceOf(WorkflowExecutionException.class)
+                .hasMessageContaining("container-1");
+    }
+
+    @Test
+    void executeStep_successfulCommand_returnsCompletedStep() throws IOException {
+        when(cliSession.sendCommand("npm test")).thenReturn("All tests passed");
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("simple")
+                .config(Map.of("command", "npm test"))
+                .build();
+
+        StepResult result = commandExecutorService.executeStep("container-1", "claude", block, 0);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getOutput()).isEqualTo("All tests passed");
+        assertThat(result.getStepIndex()).isEqualTo(0);
+        assertThat(result.getInput()).isEqualTo("npm test");
+        assertThat(result.getDurationMs()).isNotNull();
+    }
+
+    @Test
+    void executeStep_responseContainsError_returnsFailedStep() throws IOException {
+        when(cliSession.sendCommand("npm test")).thenReturn("Error: test suite failed");
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("simple")
+                .config(Map.of("command", "npm test"))
+                .build();
+
+        StepResult result = commandExecutorService.executeStep("container-1", "claude", block, 0);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+    }
+
+    @Test
+    void executeStep_exception_returnsFailedWithErrorMessage() throws IOException {
+        when(cliSession.sendCommand(anyString())).thenThrow(new IOException("Session dead"));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("simple")
+                .config(Map.of("command", "some command"))
+                .build();
+
+        StepResult result = commandExecutorService.executeStep("container-1", "claude", block, 0);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getOutput()).contains("Session dead");
+    }
+
+    @Test
+    void executeStep_noCommandInConfig_throwsException() {
+        BlockDefinition block = BlockDefinition.builder()
+                .type("simple")
+                .config(Map.of())
+                .build();
+
+        assertThatThrownBy(() ->
+                commandExecutorService.executeStep("container-1", "claude", block, 0))
+                .isInstanceOf(WorkflowExecutionException.class)
+                .hasMessageContaining("command");
+    }
+
+    @Test
+    void injectSkillContext_withSkills_sendsAggregatedContext() throws IOException {
+        Skill skill = Skill.builder()
+                .id("skill-1")
+                .name("Code Reviewer")
+                .category(SkillCategory.CODE)
+                .aiContext("You are a code reviewer.")
+                .build();
+
+        commandExecutorService.injectSkillContext("container-1", "claude", List.of(skill));
+
+        verify(cliSession).sendCommand(contains("Code Reviewer"));
+    }
+
+    @Test
+    void injectSkillContext_nullSkills_doesNothing() throws IOException {
+        commandExecutorService.injectSkillContext("container-1", "claude", null);
+
+        verify(cliSession, never()).sendCommand(anyString());
+    }
+
+    @Test
+    void injectSkillContext_emptySkills_doesNothing() throws IOException {
+        commandExecutorService.injectSkillContext("container-1", "claude", List.of());
+
+        verify(cliSession, never()).sendCommand(anyString());
+    }
+
+    @Test
+    void buildSkillContext_combinesMultipleSkills() {
+        Skill skill1 = Skill.builder()
+                .id("s1").name("Skill A").category(SkillCategory.CODE)
+                .aiContext("Context A").build();
+        Skill skill2 = Skill.builder()
+                .id("s2").name("Skill B").category(SkillCategory.DOCUMENT)
+                .aiContext("Context B").build();
+
+        String context = commandExecutorService.buildSkillContext(List.of(skill1, skill2));
+
+        assertThat(context).contains("Skill A").contains("Context A");
+        assertThat(context).contains("Skill B").contains("Context B");
+    }
+
+    @Test
+    void buildSkillContext_skipsSkillsWithoutContext() {
+        Skill skill = Skill.builder()
+                .id("s1").name("No Context").category(SkillCategory.CODE)
+                .aiContext(null).build();
+
+        String context = commandExecutorService.buildSkillContext(List.of(skill));
+
+        assertThat(context).isEmpty();
+    }
+}

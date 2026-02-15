@@ -1,0 +1,18 @@
+FROM golang:1.22-alpine
+
+# Create non-root user
+RUN adduser -D -u 1000 aiuser
+
+# Install common tools
+RUN apk add --no-cache git curl bash jq
+
+# Create writable directories for container runtime
+RUN mkdir -p /home/aiuser/.cache /home/aiuser/go && \
+    chown -R aiuser:aiuser /home/aiuser
+
+ENV GOPATH=/home/aiuser/go
+
+USER aiuser
+WORKDIR /workspace
+
+CMD ["tail", "-f", "/dev/null"]

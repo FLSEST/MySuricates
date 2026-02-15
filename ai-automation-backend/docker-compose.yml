@@ -1,0 +1,58 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./data:/app/data
+      # WARNING: Docker socket gives the app full host Docker control.
+      # Enable API key auth (AUTOMATION_SECURITY_ENABLED=true) in production.
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - AUTOMATION_DB_PATH=/app/data/automation.db
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - AUTOMATION_SECURITY_ENABLED=false
+      - AUTOMATION_API_KEY=
+      - AUTOMATION_TAILSCALE_ENABLED=false
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/api/v1/system/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - automation
+
+  # Agent images - build only, not run via compose.
+  # The backend creates/manages agent containers via Docker API.
+  # Build all: docker compose --profile build-only build
+  agent-node:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.agent-node
+    image: automation-agent-node:latest
+    profiles:
+      - build-only
+
+  agent-python:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.agent-python
+    image: automation-agent-python:latest
+    profiles:
+      - build-only
+
+  agent-go:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.agent-go
+    image: automation-agent-go:latest
+    profiles:
+      - build-only
+
+networks:
+  automation:
+    driver: bridge

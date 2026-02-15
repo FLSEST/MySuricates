@@ -1,0 +1,15 @@
+spring:
+  datasource:
+    url: jdbc:sqlite:./data/automation-dev.db
+
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+logging:
+  level:
+    com.automation: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
