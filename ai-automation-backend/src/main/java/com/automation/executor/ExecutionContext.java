@@ -14,7 +14,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class ExecutionContext {
 
     private final String containerId;
-    private final String cliType;
     private final String workflowRunId;
 
     @Setter

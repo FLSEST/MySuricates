@@ -43,7 +43,6 @@ public class WorkflowExecutor {
 
         ExecutionContext context = ExecutionContext.builder()
                 .containerId(containerId)
-                .cliType("claude")
                 .workflowRunId(run.getId())
                 .build();
 
@@ -55,7 +54,7 @@ public class WorkflowExecutor {
         activeExecutions.put(run.getId(), context);
 
         try {
-            // Inject skill context
+            // Inject skill context into claude session
             commandExecutorService.injectSkillContext(
                     containerId, "claude", workflow.getActivatedSkills()
             );

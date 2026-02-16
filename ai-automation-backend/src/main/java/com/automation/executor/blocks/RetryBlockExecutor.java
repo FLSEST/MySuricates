@@ -50,7 +50,7 @@ public class RetryBlockExecutor implements BlockExecutor {
 
             lastResult = commandExecutor.executeStep(
                     context.getContainerId(),
-                    context.getCliType(),
+                    BlockExecutor.cliTypeFor("simple"),
                     BlockDefinition.builder()
                             .type("simple")
                             .config(Map.of("command", command))

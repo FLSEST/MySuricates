@@ -56,18 +56,20 @@
 
   /* Selection */
   ::selection {
-    @apply bg-accent/30;
+    background-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
   }
 }
 
 /* ── Component layer ───────────────────────────────────── */
 @layer components {
   .glass {
-    @apply bg-surface-raised/80 backdrop-blur-sm border border-border;
+    @apply backdrop-blur-sm border border-border;
+    background-color: color-mix(in srgb, var(--color-surface-raised) 80%, transparent);
   }
 
   .focus-ring {
-    @apply focus:outline-none focus:ring-2 focus:ring-accent/40 focus:ring-offset-0;
+    @apply focus:outline-none focus:ring-2 focus:ring-offset-0;
+    --tw-ring-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
   }
 
   .input-base {

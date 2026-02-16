@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
+import { useToast } from './useToast';
+import { useT } from '../i18n';
 import type { Project, CreateProjectRequest, UpdateProjectRequest } from '../types';
 
 export function useProjects() {
@@ -19,41 +21,71 @@ export function useProject(id: string) {
 
 export function useCreateProject() {
   const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
   return useMutation({
     mutationFn: (data: CreateProjectRequest) => api.post<Project>('/projects', data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projects'] });
+      toast.success(t.toast.projectCreated);
+    },
+    onError: () => toast.error(t.toast.projectCreateFailed),
   });
 }
 
 export function useUpdateProject() {
   const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateProjectRequest }) =>
       api.put<Project>(`/projects/${id}`, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projects'] });
+      toast.success(t.toast.projectUpdated);
+    },
+    onError: () => toast.error(t.toast.projectUpdateFailed),
   });
 }
 
 export function useDeleteProject() {
   const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
   return useMutation({
     mutationFn: (id: string) => api.delete(`/projects/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projects'] });
+      toast.success(t.toast.projectDeleted);
+    },
+    onError: () => toast.error(t.toast.projectDeleteFailed),
   });
 }
 
 export function useStartContainer() {
   const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
   return useMutation({
     mutationFn: (id: string) => api.post<Project>(`/projects/${id}/start`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projects'] });
+      toast.success(t.toast.containerStarted);
+    },
+    onError: () => toast.error(t.toast.containerStartFailed),
   });
 }
 
 export function useStopContainer() {
   const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
   return useMutation({
     mutationFn: (id: string) => api.post<Project>(`/projects/${id}/stop`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projects'] });
+      toast.success(t.toast.containerStopped);
+    },
+    onError: () => toast.error(t.toast.containerStopFailed),
   });
 }

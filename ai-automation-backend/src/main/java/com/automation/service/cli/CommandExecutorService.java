@@ -19,7 +19,7 @@ public class CommandExecutorService {
 
     private final CliSessionManager sessionManager;
 
-    public String executeCommand(String containerId, String cliType, String command) {
+    public CliSession.CommandResult executeCommand(String containerId, String cliType, String command) {
         try {
             CliSession session = sessionManager.getOrCreateSession(containerId, cliType);
             return session.sendCommand(command);
@@ -56,9 +56,9 @@ public class CommandExecutorService {
         step.setStatus(StepStatus.RUNNING);
 
         try {
-            String response = executeCommand(containerId, cliType, command);
-            step.setOutput(response);
-            step.setStatus(evaluateResponse(response));
+            CliSession.CommandResult result = executeCommand(containerId, cliType, command);
+            step.setOutput(result.output());
+            step.setStatus(result.exitCode() == 0 ? StepStatus.COMPLETED : StepStatus.FAILED);
         } catch (Exception e) {
             step.setOutput("Error: " + e.getMessage());
             step.setStatus(StepStatus.FAILED);
@@ -81,16 +81,4 @@ public class CommandExecutorService {
         return command.toString();
     }
 
-    private StepStatus evaluateResponse(String response) {
-        if (response == null || response.isBlank()) {
-            return StepStatus.COMPLETED;
-        }
-
-        String lower = response.toLowerCase();
-        if (lower.contains("error") || lower.contains("failed") || lower.contains("exception")) {
-            return StepStatus.FAILED;
-        }
-
-        return StepStatus.COMPLETED;
-    }
 }

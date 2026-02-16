@@ -5,6 +5,7 @@ import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.exception.WorkflowExecutionException;
 import com.automation.executor.ExecutionContext;
+import com.automation.service.cli.CliSession;
 import com.automation.service.cli.CommandExecutorService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,8 +37,7 @@ class SkillCapabilityBlockExecutorTest {
     void setUp() {
         context = ExecutionContext.builder()
                 .containerId("container-1")
-                .cliType("claude")
-                .workflowRunId("run-1")
+                                .workflowRunId("run-1")
                 .build();
     }
 
@@ -50,7 +50,7 @@ class SkillCapabilityBlockExecutorTest {
     @Test
     void execute_validCapability_returnsCompletedResult() {
         when(commandExecutor.executeCommand(eq("container-1"), eq("claude"), contains("fact_check")))
-                .thenReturn("Facts verified: 95% accuracy");
+                .thenReturn(new CliSession.CommandResult("Facts verified: 95% accuracy", 0));
 
         Map<String, Object> config = new HashMap<>();
         config.put("capability", "fact_check");
@@ -73,7 +73,7 @@ class SkillCapabilityBlockExecutorTest {
     void execute_resolvesInputTemplate() {
         context.setPreviousOutput("document content here");
         when(commandExecutor.executeCommand(eq("container-1"), eq("claude"), contains("document content here")))
-                .thenReturn("analyzed");
+                .thenReturn(new CliSession.CommandResult("analyzed", 0));
 
         Map<String, Object> config = new HashMap<>();
         config.put("capability", "analyze");
@@ -128,7 +128,7 @@ class SkillCapabilityBlockExecutorTest {
     @Test
     void execute_noInput_usesEmptyString() {
         when(commandExecutor.executeCommand(anyString(), anyString(), anyString()))
-                .thenReturn("processed");
+                .thenReturn(new CliSession.CommandResult("processed", 0));
 
         Map<String, Object> config = new HashMap<>();
         config.put("capability", "summarize");

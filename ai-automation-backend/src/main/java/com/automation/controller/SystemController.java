@@ -7,8 +7,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Stream;
 
 @RestController
 @RequestMapping("/api/v1/system")
@@ -24,7 +28,7 @@ public class SystemController {
         try {
             dockerClient.pingCmd().exec();
             dockerAvailable = true;
-        } catch (Exception e) {
+        } catch (Exception | Error e) {
             dockerAvailable = false;
         }
 
@@ -61,5 +65,62 @@ public class SystemController {
     public ResponseEntity<RemoteAccessResponse> remoteAccessStatus() {
         RemoteAccessResponse response = tailscaleService.getStatus();
         return ResponseEntity.ok(response);
+    }
+
+    private static final Set<String> BLOCKED_PREFIXES = Set.of(
+            "/etc", "/proc", "/sys", "/dev", "/var/run"
+    );
+
+    @GetMapping("/browse")
+    public ResponseEntity<Map<String, Object>> browseDirectory(
+            @RequestParam(required = false) String path) {
+
+        Path dirPath;
+        if (path == null || path.isBlank()) {
+            dirPath = Path.of(System.getProperty("user.home"));
+        } else {
+            dirPath = Path.of(path).normalize().toAbsolutePath();
+        }
+
+        String normalized = dirPath.toString();
+
+        // Block sensitive system directories
+        if (normalized.equals("/")) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Cannot browse root directory"));
+        }
+        for (String prefix : BLOCKED_PREFIXES) {
+            if (normalized.startsWith(prefix)) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "Access to system directory is restricted: " + prefix));
+            }
+        }
+
+        if (!Files.isDirectory(dirPath)) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Path is not a directory: " + normalized));
+        }
+
+        List<Map<String, String>> directories = new ArrayList<>();
+        try (Stream<Path> entries = Files.list(dirPath)) {
+            entries.filter(Files::isDirectory)
+                    .filter(p -> !p.getFileName().toString().startsWith("."))
+                    .sorted(Comparator.comparing(p -> p.getFileName().toString().toLowerCase()))
+                    .forEach(p -> directories.add(Map.of(
+                            "name", p.getFileName().toString(),
+                            "path", p.toAbsolutePath().toString()
+                    )));
+        } catch (IOException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Cannot read directory: " + e.getMessage()));
+        }
+
+        Path parent = dirPath.getParent();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("current", normalized);
+        result.put("parent", parent != null ? parent.toString() : null);
+        result.put("directories", directories);
+
+        return ResponseEntity.ok(result);
     }
 }

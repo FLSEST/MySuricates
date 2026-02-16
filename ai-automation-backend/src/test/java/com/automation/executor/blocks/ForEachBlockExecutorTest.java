@@ -4,6 +4,7 @@ import com.automation.entity.BlockDefinition;
 import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.executor.ExecutionContext;
+import com.automation.service.cli.CliSession;
 import com.automation.service.cli.CommandExecutorService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,8 +38,7 @@ class ForEachBlockExecutorTest {
     void setUp() {
         context = ExecutionContext.builder()
                 .containerId("container-1")
-                .cliType("claude")
-                .workflowRunId("run-1")
+                                .workflowRunId("run-1")
                 .build();
     }
 
@@ -75,7 +75,7 @@ class ForEachBlockExecutorTest {
     @Test
     void execute_withCommandSource_usesCommandOutput() {
         when(commandExecutor.executeCommand("container-1", "claude", "git diff --name-only"))
-                .thenReturn("file1.js\nfile2.js");
+                .thenReturn(new CliSession.CommandResult("file1.js\nfile2.js", 0));
         StepResult stepResult = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
         when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt()))

@@ -211,7 +211,19 @@ export interface RemoteAccessStatus {
   hostname: string | null;
 }
 
+export interface BrowseDirectoryResponse {
+  current: string;
+  parent: string | null;
+  directories: Array<{ name: string; path: string }>;
+}
+
 // ── Learning / Analytics ─────────────────────────────────
+
+export interface TimeSeriesPoint {
+  date: string;
+  count: number;
+  successRate: number;
+}
 
 export interface DashboardData {
   totalWorkflows: number;
@@ -222,6 +234,7 @@ export interface DashboardData {
   successRate: number;
   topWorkflows: Array<{ workflowId: string; workflowName: string; runCount: number }>;
   recentRuns: WorkflowRun[];
+  timeSeries?: TimeSeriesPoint[];
 }
 
 export interface WorkflowStats {

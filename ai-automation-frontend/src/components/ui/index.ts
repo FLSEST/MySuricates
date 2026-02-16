@@ -7,3 +7,5 @@ export { Select } from './Select';
 export { Toggle } from './Toggle';
 export { Spinner } from './Spinner';
 export { Table } from './Table';
+export { ToastContainer } from './ToastContainer';
+export { DirectoryPicker } from './DirectoryPicker';

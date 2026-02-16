@@ -19,8 +19,9 @@ public class CliSessionManager {
     private final Map<String, CliSession> activeSessions = new ConcurrentHashMap<>();
 
     public CliSession getOrCreateSession(String containerId, String cliType) throws IOException {
-        return activeSessions.computeIfAbsent(containerId, id -> {
-            CliSession session = new CliSession(id, cliType);
+        String sessionKey = containerId + ":" + cliType;
+        return activeSessions.computeIfAbsent(sessionKey, key -> {
+            CliSession session = new CliSession(containerId, cliType);
             try {
                 session.start();
             } catch (IOException e) {
@@ -31,15 +32,19 @@ public class CliSessionManager {
     }
 
     public void closeSession(String containerId) {
-        CliSession session = activeSessions.remove(containerId);
-        if (session != null) {
-            session.close();
-        }
+        // Close all sessions (bash + claude) for this container
+        activeSessions.entrySet().removeIf(entry -> {
+            if (entry.getKey().startsWith(containerId + ":")) {
+                entry.getValue().close();
+                return true;
+            }
+            return false;
+        });
     }
 
     public boolean hasActiveSession(String containerId) {
-        CliSession session = activeSessions.get(containerId);
-        return session != null && session.isAlive();
+        return activeSessions.entrySet().stream()
+                .anyMatch(e -> e.getKey().startsWith(containerId + ":") && e.getValue().isAlive());
     }
 
     @Scheduled(fixedRate = 60_000)

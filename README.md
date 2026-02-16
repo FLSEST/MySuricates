@@ -1,0 +1,63 @@
+# AI Automation Platform
+
+Eine Self-Hosted-Plattform zur Automatisierung von AI-gesteuerten Workflows. Projekte werden in isolierten Docker-Containern ausgeführt und über ein React-Frontend verwaltet.
+
+## Tech-Stack
+
+| Komponente | Technologie |
+|---|---|
+| Backend | Spring Boot 3.2.2, Java 21 |
+| Frontend | React 18, TypeScript, Vite 5 |
+| Datenbank | SQLite (WAL-Modus) + Flyway |
+| Container | Docker (Java Docker Client 3.3.4) |
+| Styling | Tailwind CSS 3.4, CSS-Variablen |
+| State | Zustand 4.4 + TanStack Query 5 |
+| WebSocket | STOMP über SockJS |
+| Sicherheit | API-Key-Auth, Rate Limiting |
+| i18n | Deutsch / Englisch |
+| PWA | Vite PWA Plugin |
+
+## Quickstart
+
+```bash
+# 1. Repository klonen
+git clone <repository-url>
+cd autotrigger
+
+# 2. Backend bauen und starten
+cd ai-automation-backend
+mvn clean package -DskipTests
+java -jar target/ai-automation-backend-0.1.0-SNAPSHOT.jar
+
+# 3. Frontend installieren und starten (neues Terminal)
+cd ai-automation-frontend
+npm install
+npm run dev
+
+# 4. Öffnen
+# Frontend: http://localhost:3000
+# Backend API: http://localhost:9090/api/v1
+```
+
+Alternativ mit Docker:
+
+```bash
+cd ai-automation-backend
+mvn clean package -DskipTests
+docker compose up --build
+# → http://localhost:9090
+```
+
+<!-- Screenshot-Platzhalter -->
+<!-- ![Dashboard](docs/screenshots/dashboard.png) -->
+
+## Dokumentation
+
+| Dokument | Inhalt |
+|---|---|
+| [Architektur](docs/architektur.md) | Systemübersicht, Schichten, Datenfluss, Sicherheit |
+| [API-Referenz](docs/api-referenz.md) | Alle REST-Endpunkte mit Request/Response |
+| [Datenmodell](docs/datenmodell.md) | Entities, DB-Schema, Migrationen |
+| [Frontend](docs/frontend.md) | Seiten, Komponenten, Hooks, Design-System |
+| [Deployment](docs/deployment.md) | Docker, Konfiguration, Umgebungsvariablen |
+| [Entwicklung](docs/entwicklung.md) | Lokales Setup, Build, Tests, Konventionen |

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Webhook, Plus, Trash2, Copy, Check } from 'lucide-react';
-import { Card, CardHeader, Button, Input, Select, Modal, Spinner, Table, Toggle, Badge } from '../components/ui';
+import { Card, Button, Input, Select, Modal, Spinner, Table, Toggle, Badge } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
 import { useWebhooks, useCreateWebhook, useToggleWebhook, useDeleteWebhook } from '../hooks/useWebhooks';

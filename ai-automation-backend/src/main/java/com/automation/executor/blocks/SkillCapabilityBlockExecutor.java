@@ -52,9 +52,9 @@ public class SkillCapabilityBlockExecutor implements BlockExecutor {
         try {
             String response = commandExecutor.executeCommand(
                     context.getContainerId(),
-                    context.getCliType(),
+                    BlockExecutor.cliTypeFor("skill-capability"),
                     prompt.toString()
-            );
+            ).output();
 
             result.setOutput(response);
             result.setStatus(StepStatus.COMPLETED);

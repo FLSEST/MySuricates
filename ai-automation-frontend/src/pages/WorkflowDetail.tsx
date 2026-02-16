@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Play, Plus, Trash2, Pencil, Zap, Clock, GripVertical,
+  ArrowLeft, Play, Plus, Trash2, Pencil, Zap, Clock,
 } from 'lucide-react';
-import { Card, CardHeader, Button, Input, Select, Modal, Spinner, Badge } from '../components/ui';
+import { Card, CardHeader, Button, Input, Select, Modal, Spinner } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ErrorState } from '../components/shared/ErrorState';
 import { MonacoEditor } from '../components/shared/MonacoEditor';
@@ -12,7 +12,7 @@ import {
   useDeleteWorkflow, useExecuteWorkflow,
 } from '../hooks/useWorkflows';
 import { useSkills, useActivateSkills, useDeactivateSkill } from '../hooks/useSkills';
-import { useSettingsStore } from '../stores/settingsStore';
+import { SortableBlockList } from '../components/workflow/SortableBlockList';
 import { useT } from '../i18n';
 import type { BlockDefinition, BlockType, WorkflowRun } from '../types';
 
@@ -29,8 +29,6 @@ export function WorkflowDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const t = useT();
-  const advancedMode = useSettingsStore((s) => s.advancedMode);
-
   const { data: workflow, isLoading, error, refetch } = useWorkflow(id!);
   const { data: runs } = useWorkflowRuns(id!);
   const { data: allSkills } = useSkills();
@@ -185,43 +183,11 @@ export function WorkflowDetail() {
                 {t.workflows.noBlocks}
               </div>
             ) : (
-              <div className="divide-y divide-border">
-                {workflow.blocks.map((block, idx) => (
-                  <div key={idx} className="flex items-start gap-3 px-5 py-4 group">
-                    <div className="pt-1 text-text-tertiary">
-                      <GripVertical className="w-4 h-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-mono px-2 py-0.5 rounded bg-surface text-text-secondary">
-                          #{idx + 1}
-                        </span>
-                        <Badge variant="accent">{t.workflows.blockTypes[block.type]}</Badge>
-                      </div>
-                      {advancedMode ? (
-                        <pre className="text-xs text-text-secondary font-mono bg-surface rounded-lg p-3 mt-2 overflow-x-auto">
-                          {JSON.stringify(block.config, null, 2)}
-                        </pre>
-                      ) : (
-                        <p className="text-sm text-text-secondary truncate">
-                          {'command' in block.config
-                            ? String(block.config.command)
-                            : 'capability' in block.config
-                              ? String(block.config.capability)
-                              : JSON.stringify(block.config)}
-                        </p>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => handleRemoveBlock(idx)}
-                      className="p-1.5 rounded-lg text-text-tertiary hover:text-danger opacity-0 group-hover:opacity-100 transition-all"
-                      aria-label={t.common.delete}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
+              <SortableBlockList
+                workflowId={workflow.id}
+                blocks={workflow.blocks}
+                onRemoveBlock={handleRemoveBlock}
+              />
             )}
           </Card>
         </div>

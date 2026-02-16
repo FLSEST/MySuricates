@@ -4,10 +4,14 @@ import { GitBranch, Plus, Search, Play } from 'lucide-react';
 import { Card, Button, Input, Select, Modal, Spinner } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
+import { TemplateSelector } from '../components/workflow/TemplateSelector';
 import { useWorkflows, useCreateWorkflow, useExecuteWorkflow } from '../hooks/useWorkflows';
 import { useProjects } from '../hooks/useProjects';
 import { useT } from '../i18n';
 import type { CreateWorkflowRequest } from '../types';
+import type { WorkflowTemplate } from '../data/workflowTemplates';
+
+type CreateStep = 'closed' | 'template' | 'details';
 
 export function Workflows() {
   const t = useT();
@@ -18,7 +22,8 @@ export function Workflows() {
   const executeWorkflow = useExecuteWorkflow();
 
   const [search, setSearch] = useState('');
-  const [showCreate, setShowCreate] = useState(false);
+  const [createStep, setCreateStep] = useState<CreateStep>('closed');
+  const [selectedTemplate, setSelectedTemplate] = useState<WorkflowTemplate | null>(null);
   const [form, setForm] = useState<CreateWorkflowRequest>({ projectId: '', name: '' });
 
   const filtered = workflows?.filter((w) =>
@@ -26,14 +31,43 @@ export function Workflows() {
     w.projectName.toLowerCase().includes(search.toLowerCase())
   ) ?? [];
 
+  const openCreate = () => {
+    setCreateStep('template');
+    setSelectedTemplate(null);
+    setForm({ projectId: '', name: '' });
+  };
+
+  const handleTemplateSelect = (template: WorkflowTemplate | null) => {
+    setSelectedTemplate(template);
+    if (template) {
+      setForm({
+        projectId: '',
+        name: t.templates[template.nameKey as keyof typeof t.templates] as string,
+        description: t.templates[template.descriptionKey as keyof typeof t.templates] as string,
+        icon: template.icon,
+        blocks: template.blocks,
+      });
+    } else {
+      setForm({ projectId: '', name: '' });
+    }
+    setCreateStep('details');
+  };
+
   const handleCreate = () => {
     createWorkflow.mutate(form, {
       onSuccess: (wf) => {
-        setShowCreate(false);
+        setCreateStep('closed');
         setForm({ projectId: '', name: '' });
+        setSelectedTemplate(null);
         navigate(`/workflows/${wf.id}`);
       },
     });
+  };
+
+  const handleClose = () => {
+    setCreateStep('closed');
+    setSelectedTemplate(null);
+    setForm({ projectId: '', name: '' });
   };
 
   const handleExecute = (e: React.MouseEvent, workflowId: string) => {
@@ -66,7 +100,7 @@ export function Workflows() {
           <h1 className="text-2xl font-bold text-text">{t.workflows.title}</h1>
           <p className="text-sm text-text-secondary mt-1">{t.workflows.subtitle}</p>
         </div>
-        <Button icon={<Plus className="w-4 h-4" />} onClick={() => setShowCreate(true)}>
+        <Button icon={<Plus className="w-4 h-4" />} onClick={openCreate}>
           {t.workflows.create}
         </Button>
       </div>
@@ -89,7 +123,7 @@ export function Workflows() {
           description={search ? undefined : t.workflows.noWorkflows}
           action={
             !search && (
-              <Button size="sm" onClick={() => setShowCreate(true)}>
+              <Button size="sm" onClick={openCreate}>
                 {t.workflows.create}
               </Button>
             )
@@ -105,7 +139,7 @@ export function Workflows() {
             >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-xl">{wf.icon || '📋'}</span>
+                  <span className="text-xl">{wf.icon || '\uD83D\uDCCB'}</span>
                   <div className="min-w-0">
                     <h3 className="font-semibold text-text truncate">{wf.name}</h3>
                     <p className="text-xs text-text-tertiary">{wf.projectName}</p>
@@ -144,15 +178,25 @@ export function Workflows() {
         </div>
       )}
 
-      {/* Create modal */}
+      {/* Step 1: Template selection modal */}
       <Modal
-        open={showCreate}
-        onClose={() => setShowCreate(false)}
+        open={createStep === 'template'}
+        onClose={handleClose}
+        title={t.workflows.create}
+        size="lg"
+      >
+        <TemplateSelector onSelect={handleTemplateSelect} />
+      </Modal>
+
+      {/* Step 2: Details modal */}
+      <Modal
+        open={createStep === 'details'}
+        onClose={handleClose}
         title={t.workflows.create}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setShowCreate(false)}>
-              {t.common.cancel}
+            <Button variant="secondary" onClick={() => setCreateStep('template')}>
+              {t.common.back}
             </Button>
             <Button
               onClick={handleCreate}
@@ -165,6 +209,19 @@ export function Workflows() {
         }
       >
         <div className="space-y-4">
+          {selectedTemplate && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/5 border border-accent/20">
+              <span className="text-xl">{selectedTemplate.icon}</span>
+              <div>
+                <p className="text-sm font-medium text-text">
+                  {t.templates[selectedTemplate.nameKey as keyof typeof t.templates]}
+                </p>
+                <p className="text-xs text-text-secondary">
+                  {selectedTemplate.blocks.length} {t.workflows.blocks.toLowerCase()}
+                </p>
+              </div>
+            </div>
+          )}
           <Select
             label={t.common.project}
             value={form.projectId}

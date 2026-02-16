@@ -1,0 +1,327 @@
+# Frontend
+
+## Routing
+
+| Pfad | Seite | Beschreibung |
+|---|---|---|
+| `/` | Dashboard | Statistiken, Charts, letzte Runs |
+| `/projects` | Projects | Projektliste, Erstellen |
+| `/projects/:id` | ProjectDetail | Projektdetails, Container, Workflows |
+| `/workflows` | Workflows | Workflow-Liste, Erstellen mit Templates |
+| `/workflows/:id` | WorkflowDetail | Block-Editor, Skills, Runs |
+| `/workflows/:id/run/:runId` | WorkflowExecution | Live-Ausführung, Logs, Steps |
+| `/skills` | Skills | Skill-Katalog mit Capabilities |
+| `/schedules` | Schedules | Cron-basierte Zeitpläne |
+| `/webhooks` | Webhooks | Webhook-Trigger-Verwaltung |
+| `/settings` | Settings | Sprache, Theme, API-Key, Tailscale |
+
+Alle Routen sind in `src/App.tsx` definiert und von einem `<Layout>`-Wrapper umgeben (Sidebar + Header).
+
+## Seiten
+
+### Dashboard (`/`)
+
+- 4 Stat-Cards: Aktive Projekte, Workflows, Runs heute, Erfolgsrate
+- 2 Recharts-Diagramme: Runs-Verlauf (AreaChart), Erfolgsrate (AreaChart)
+- Liste der letzten Runs (klickbar → Execution-Seite)
+- Top-Workflows nach Ausführungsanzahl
+
+### Projects (`/projects`, `/projects/:id`)
+
+- Suchfilter nach Name
+- Grid-Layout (1/2/3 Spalten je nach Bildschirmbreite)
+- Projekt-Cards mit Typ-Icon und Farbcodierung
+- Start/Stop-Buttons für Docker-Container
+- Detail-Seite: Projektinfo, Container-Status, zugehörige Workflows
+- Modals: Erstellen, Bearbeiten, Löschen-Bestätigung
+
+### Workflows (`/workflows`, `/workflows/:id`)
+
+- 2-Schritt-Erstellung: Template-Auswahl → Formular (Projekt, Name, Beschreibung)
+- 5 vorgefertigte Templates (Code Quality, Document Review, Deploy Pipeline, Research Assistant, Data Analysis)
+- Detail-Seite: 2/3-Spalte Block-Editor (Drag & Drop), 1/3-Sidebar (Skills, Runs, Info)
+- Block-Editor mit `@dnd-kit` für Drag-and-Drop-Sortierung
+- Modals: Block hinzufügen (Typ + JSON-Config via Monaco Editor), Skill aktivieren
+
+### WorkflowExecution (`/workflows/:id/run/:runId`)
+
+- Live-Status-Badge (PENDING, RUNNING, PAUSED, COMPLETED, FAILED, CANCELLED)
+- Split-View: Steps-Panel (Schritt-Indikatoren) + Live-Logs (WebSocket)
+- Pause/Resume/Cancel-Buttons während der Ausführung
+- Sternebewertung (1-5) nach Abschluss
+- Fehler-Panel bei fehlgeschlagenen Runs
+
+### Skills (`/skills`)
+
+- Suchfilter + Kategorie-Filter
+- Grid-Layout mit Skill-Cards
+- Detail-Slide-Over: Capabilities, Async-Badges, AI-Context-Vorschau
+- Kategorie-Icons und -Farben
+
+### Schedules (`/schedules`)
+
+- Tabelle: Workflow, Cron-Ausdruck, nächste/letzte Ausführung, Status-Toggle
+- Erstellen-Modal: Workflow-Auswahl + Cron-Ausdruck + Beschreibung
+
+### Webhooks (`/webhooks`)
+
+- Tabelle: Workflow, URL (kopierbar), Token (maskiert + kopierbar), Trigger-Count, Status
+- CopyButton-Komponente mit Erfolgsfeedback
+- Erstellen-Modal: Workflow-Auswahl + Beschreibung
+
+### Settings (`/settings`)
+
+- Allgemein: Sprache (EN/DE), Advanced Mode
+- Darstellung: Theme-Toggle (Light/Dark), Farbauswahl
+- Sicherheit: API-Key-Eingabe (maskiert)
+- Remote-Access: Tailscale-Status + Enable/Disable
+- System: Health-Status, Systeminfos, Docker-Status
+
+## UI-Komponentenbibliothek
+
+Alle Komponenten in `src/components/ui/`:
+
+| Komponente | Props | Beschreibung |
+|---|---|---|
+| `Button` | `variant` (primary/secondary/ghost/danger), `size` (sm/md/lg), `loading`, `icon` | Standard-Button mit Loading-State |
+| `Card` | `padding`, `className` | Container mit Border und Hintergrund |
+| `CardHeader` | `title`, `subtitle`, `action` | Card-Header mit optionaler Action |
+| `Modal` | `open`, `onClose`, `title`, `footer`, `size` (sm/md/lg) | Overlay-Modal mit Backdrop-Blur |
+| `Badge` | `variant` (default/success/warning/danger/accent), `dot` | Status-Badge mit optionalem Punkt |
+| `Input` | `label`, `error`, `hint`, `icon` + HTML-Attribute | Formular-Input mit Validierung |
+| `Select` | `label`, `options`, `error` | Dropdown-Auswahl |
+| `Toggle` | `enabled`, `onChange`, `label`, `disabled` | Switch-Element |
+| `Spinner` | `size` (sm/md/lg), `text` | Lade-Indikator |
+| `Table<T>` | `columns`, `data`, `keyExtractor`, `onRowClick`, `emptyText` | Generische Tabelle |
+| `ToastContainer` | (global) | Toast-Benachrichtigungen (max. 5) |
+
+### Shared-Komponenten (`src/components/shared/`)
+
+| Komponente | Beschreibung |
+|---|---|
+| `StatusBadge` | Mappt Status-Strings auf Badge-Varianten |
+| `LogViewer` | Log-Anzeige mit Level-Farben und Auto-Scroll |
+| `MonacoEditor` | JSON-Editor (Monaco, Dark Theme) |
+| `ErrorState` | Fehlermeldung mit Icon |
+| `EmptyState` | Leerer Zustand mit Beschreibung |
+
+## Design-System
+
+### CSS-Variablen
+
+Das Theme wird über CSS Custom Properties gesteuert (`src/index.css`, `src/theme/tokens.ts`):
+
+**Dark Theme (Standard):**
+
+| Variable | Wert | Verwendung |
+|---|---|---|
+| `--color-surface` | `#0f172a` | Seiten-Hintergrund |
+| `--color-surface-raised` | `#1e293b` | Cards, erhöhte Flächen |
+| `--color-surface-overlay` | `#1e293b` | Modal-Hintergrund |
+| `--color-border` | `#334155` | Standard-Rahmen |
+| `--color-border-strong` | `#475569` | Betonte Rahmen |
+| `--color-text` | `#f1f5f9` | Primärtext |
+| `--color-text-secondary` | `#94a3b8` | Sekundärtext |
+| `--color-text-tertiary` | `#64748b` | Tertiärtext |
+| `--color-accent` | `#06b6d4` | Akzentfarbe (Cyan) |
+| `--color-accent-hover` | `#22d3ee` | Akzent-Hover |
+| `--color-accent-subtle` | `#083344` | Akzent-Hintergrund |
+| `--color-success` | `#34d399` | Erfolg (Emerald) |
+| `--color-warning` | `#fbbf24` | Warnung (Amber) |
+| `--color-danger` | `#f87171` | Fehler (Rot) |
+| `--color-sidebar` | `#020617` | Sidebar-Hintergrund |
+
+**Light Theme:** Invertierte Varianten mit weißem Hintergrund und dunklem Text.
+
+### Tailwind-Konfiguration
+
+- **Dark Mode:** `class`-basiert (Toggle über Zustand-Store)
+- **Schriftarten:**
+  - Sans: Plus Jakarta Sans (System-UI Fallback)
+  - Mono: JetBrains Mono (Fira Code Fallback)
+- **Custom-Animationen:** `fade-in`, `slide-in`, `slide-up`, `pulse-subtle`, `slide-in-right`
+
+### CSS-Utility-Klassen (`index.css`)
+
+| Klasse | Beschreibung |
+|---|---|
+| `.glass` | Glasmorphism-Effekt (Blur + halbtransparent) |
+| `.focus-ring` | Focus-State mit Akzent-Ring |
+| `.input-base` | Standard-Input-Styling |
+| `.btn-base` | Standard-Button-Styling |
+| `.text-balance` | Ausgeglichener Textumbruch |
+| `.animate-stagger` | Gestaffelte Animation (50ms pro Kind) |
+
+## State Management
+
+### Zustand-Stores (`src/stores/`)
+
+| Store | State | Persistenz |
+|---|---|---|
+| `useSidebarStore` | `collapsed: boolean`, `toggle()`, `setCollapsed()` | `localStorage: sidebar-state` |
+| `useThemeStore` | `mode: 'light'\|'dark'`, `overrides`, `toggleMode()`, `apply()` | `localStorage: theme-settings` |
+| `useSettingsStore` | `apiKey: string`, `advancedMode: boolean` | `localStorage: app-settings` |
+| `useI18nStore` | `locale: 'en'\|'de'`, `setLocale()` | `localStorage: i18n-locale` |
+| `useToastStore` | `toasts[]`, `addToast()`, `removeToast()` | Kein (flüchtig) |
+
+### TanStack Query (Server State)
+
+Alle API-Daten werden über React Query verwaltet:
+
+- **Caching:** Automatisch mit Query-Keys
+- **Invalidierung:** Nach Mutations werden zugehörige Queries invalidiert
+- **Optimistic Updates:** Bei Drag-and-Drop-Sortierung der Blöcke
+- **Auto-Refetch:** Health-Check alle 30 Sekunden
+
+## API-Hooks (`src/hooks/`)
+
+### `useProjects.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useProjects()` | Query | Alle Projekte |
+| `useProject(id)` | Query | Einzelnes Projekt |
+| `useCreateProject()` | Mutation | Projekt erstellen |
+| `useUpdateProject()` | Mutation | Projekt aktualisieren |
+| `useDeleteProject()` | Mutation | Projekt löschen |
+| `useStartContainer(id)` | Mutation | Container starten |
+| `useStopContainer(id)` | Mutation | Container stoppen |
+
+### `useWorkflows.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useWorkflows()` | Query | Alle Workflows |
+| `useWorkflow(id)` | Query | Einzelner Workflow |
+| `useWorkflowRuns(workflowId)` | Query | Alle Runs eines Workflows |
+| `useCreateWorkflow()` | Mutation | Workflow erstellen |
+| `useUpdateWorkflow()` | Mutation | Workflow aktualisieren |
+| `useDeleteWorkflow()` | Mutation | Workflow löschen |
+| `useExecuteWorkflow()` | Mutation | Workflow ausführen |
+| `usePauseExecution(runId)` | Mutation | Ausführung pausieren |
+| `useResumeExecution(runId)` | Mutation | Ausführung fortsetzen |
+| `useCancelExecution(runId)` | Mutation | Ausführung abbrechen |
+
+### `useSkills.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useSkills()` | Query | Alle Skills |
+| `useSkill(id)` | Query | Einzelner Skill |
+| `useSkillCapabilities(skillId)` | Query | Capabilities eines Skills |
+| `useActivateSkills()` | Mutation | Skills für Workflow aktivieren |
+| `useDeactivateSkill()` | Mutation | Skill deaktivieren |
+
+### `useSchedules.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useSchedules()` | Query | Alle Schedules |
+| `useCreateSchedule()` | Mutation | Schedule erstellen |
+| `useToggleSchedule()` | Mutation | Schedule ein-/ausschalten |
+| `useDeleteSchedule()` | Mutation | Schedule löschen |
+
+### `useWebhooks.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useWebhooks()` | Query | Alle Webhooks |
+| `useCreateWebhook()` | Mutation | Webhook erstellen |
+| `useToggleWebhook()` | Mutation | Webhook ein-/ausschalten |
+| `useDeleteWebhook()` | Mutation | Webhook löschen |
+
+### `useSystem.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useSystemHealth()` | Query (30s) | Health-Check |
+| `useSystemInfo()` | Query | Systeminfos |
+| `useRemoteAccessStatus()` | Query | Tailscale-Status |
+| `useEnableRemoteAccess()` | Mutation | Tailscale aktivieren |
+| `useDisableRemoteAccess()` | Mutation | Tailscale deaktivieren |
+
+### `useExecutionWebSocket.ts`
+
+```typescript
+useExecutionWebSocket(runId: string | null) → {
+  logs: Array<{ timestamp, level, message }>,
+  connected: boolean,
+  clearLogs: () => void
+}
+```
+
+Verbindet sich über SockJS/STOMP mit dem Backend und empfängt Live-Logs.
+
+### `useToast.ts`
+
+```typescript
+useToast() → {
+  success(message), error(message), info(message), warning(message)
+}
+```
+
+## Internationalisierung (i18n)
+
+- **Sprachen:** Deutsch (`de`), Englisch (`en`)
+- **Dateien:** `src/i18n/de.ts`, `src/i18n/en.ts`
+- **Hook:** `useT()` → gibt das aktuelle Übersetzungsobjekt zurück
+- **Store:** `useI18nStore()` → `locale`, `setLocale()`
+- **Umschalten:** Button im Header
+
+### Übersetzungsstruktur
+
+```
+common (24 Keys) ─── Allgemeine Labels (Erstellen, Löschen, Suchen, ...)
+nav (7 Keys) ─────── Navigation (Dashboard, Projekte, ...)
+dashboard (8 Keys) ─ Dashboard-Texte
+projects (11 Keys) ─ Projekte + verschachtelte Typen & Status
+workflows (18 Keys)  Workflows + Block-Typen & Ausführung
+skills (10 Keys) ─── Skills + Kategorien
+schedules (7 Keys) ─ Zeitpläne
+webhooks (7 Keys) ── Webhooks
+settings (16 Keys) ─ Einstellungen
+toast (26 Keys) ──── Toast-Nachrichten
+templates (13 Keys)  Workflow-Templates
+charts (5 Keys) ──── Chart-Labels
+```
+
+## PWA-Konfiguration
+
+Konfiguriert über `vite-plugin-pwa` in `vite.config.ts`:
+
+- **Name:** AI Automation Platform
+- **Kurzname:** AutoPilot
+- **Display:** Standalone
+- **Theme-Color:** `#0f172a`
+- **Service Worker:** Auto-Update
+- **Icon:** `/icons/icon.svg` (SVG, maskierbar)
+
+## API-Client (`src/api/client.ts`)
+
+```typescript
+class ApiClient {
+  BASE_URL = '/api/v1'
+
+  getHeaders() → { Content-Type: application/json, X-API-Key: ... }
+
+  get<T>(path) → Promise<T>
+  post<T>(path, body?) → Promise<T>
+  put<T>(path, body?) → Promise<T>
+  delete<T>(path) → Promise<T>
+}
+```
+
+Fehler werden als `ApiError` geworfen mit `{ error, timestamp, fieldErrors? }`.
+
+Der API-Key wird aus dem `settingsStore` gelesen und automatisch an alle Requests angehängt.
+
+## Proxy-Konfiguration (Vite)
+
+In `vite.config.ts`:
+
+| Pfad | Ziel | Beschreibung |
+|---|---|---|
+| `/api/*` | `http://localhost:9090` | REST-API |
+| `/ws/*` | `ws://localhost:9090` | WebSocket (STOMP/SockJS) |
+
+Der Dev-Server läuft auf Port 3000 und proxied alle API-Anfragen an das Backend auf Port 9090.

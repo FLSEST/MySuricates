@@ -36,7 +36,7 @@ public class ForEachBlockExecutor implements BlockExecutor {
         if ("command".equals(itemsSource)) {
             String itemsCommand = context.resolveTemplate((String) config.get("items_command"));
             String output = commandExecutor.executeCommand(
-                    context.getContainerId(), context.getCliType(), itemsCommand);
+                    context.getContainerId(), BlockExecutor.cliTypeFor("foreach"), itemsCommand).output();
             items = Arrays.asList(output.split("\n"));
         } else {
             Object rawItems = config.get("items");
@@ -65,7 +65,7 @@ public class ForEachBlockExecutor implements BlockExecutor {
 
             StepResult itemResult = commandExecutor.executeStep(
                     context.getContainerId(),
-                    context.getCliType(),
+                    BlockExecutor.cliTypeFor("simple"),
                     BlockDefinition.builder()
                             .type("simple")
                             .config(Map.of("command", resolvedCommand))

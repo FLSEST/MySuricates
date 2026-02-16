@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Calendar, Plus, Trash2 } from 'lucide-react';
-import { Card, CardHeader, Button, Input, Select, Modal, Spinner, Table, Toggle } from '../components/ui';
+import { Card, Button, Input, Select, Modal, Spinner, Table, Toggle } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
 import { useSchedules, useCreateSchedule, useToggleSchedule, useDeleteSchedule } from '../hooks/useSchedules';

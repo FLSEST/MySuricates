@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Play, Square, Trash2, Pencil, GitBranch, Container as ContainerIcon,
 } from 'lucide-react';
-import { Card, CardHeader, Button, Input, Select, Modal, Spinner } from '../components/ui';
+import { Card, CardHeader, Button, Input, Select, Modal, Spinner, DirectoryPicker } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ErrorState } from '../components/shared/ErrorState';
 import {
@@ -231,10 +231,10 @@ export function ProjectDetail() {
               label: t.projects.types[type],
             }))}
           />
-          <Input
+          <DirectoryPicker
             label={t.projects.path}
             value={editForm.path}
-            onChange={(e) => setEditForm({ ...editForm, path: e.target.value })}
+            onChange={(path) => setEditForm({ ...editForm, path })}
           />
         </div>
       </Modal>

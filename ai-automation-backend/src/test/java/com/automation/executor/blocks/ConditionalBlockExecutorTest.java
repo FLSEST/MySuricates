@@ -4,6 +4,7 @@ import com.automation.entity.BlockDefinition;
 import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.executor.ExecutionContext;
+import com.automation.service.cli.CliSession;
 import com.automation.service.cli.CommandExecutorService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,8 +35,7 @@ class ConditionalBlockExecutorTest {
     void setUp() {
         context = ExecutionContext.builder()
                 .containerId("container-1")
-                .cliType("claude")
-                .workflowRunId("run-1")
+                                .workflowRunId("run-1")
                 .build();
     }
 
@@ -48,7 +48,7 @@ class ConditionalBlockExecutorTest {
     @Test
     void execute_conditionTrue_executesThenBranch() {
         when(commandExecutor.executeCommand(eq("container-1"), eq("claude"), contains("Evaluate")))
-                .thenReturn("true");
+                .thenReturn(new CliSession.CommandResult("true", 0));
         StepResult thenResult = StepResult.builder()
                 .stepIndex(1).status(StepStatus.COMPLETED).output("deployed").build();
         when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt()))
@@ -74,7 +74,7 @@ class ConditionalBlockExecutorTest {
     @Test
     void execute_conditionFalse_executesElseBranch() {
         when(commandExecutor.executeCommand(eq("container-1"), eq("claude"), contains("Evaluate")))
-                .thenReturn("false");
+                .thenReturn(new CliSession.CommandResult("false", 0));
         StepResult elseResult = StepResult.builder()
                 .stepIndex(1).status(StepStatus.COMPLETED).output("skipped").build();
         when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt()))
@@ -98,7 +98,7 @@ class ConditionalBlockExecutorTest {
     @Test
     void execute_conditionTrue_noElseBranch_skips() {
         when(commandExecutor.executeCommand(eq("container-1"), eq("claude"), contains("Evaluate")))
-                .thenReturn("false");
+                .thenReturn(new CliSession.CommandResult("false", 0));
 
         Map<String, Object> config = new HashMap<>();
         config.put("condition", "branch == 'main'");
@@ -119,7 +119,7 @@ class ConditionalBlockExecutorTest {
     @Test
     void execute_conditionFalse_noThenDefined_butThenWouldExecute() {
         when(commandExecutor.executeCommand(eq("container-1"), eq("claude"), contains("Evaluate")))
-                .thenReturn("true");
+                .thenReturn(new CliSession.CommandResult("true", 0));
 
         Map<String, Object> config = new HashMap<>();
         config.put("condition", "always true");

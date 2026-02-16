@@ -1,11 +1,13 @@
 import { useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, FolderKanban, GitBranch, Zap,
-  TrendingUp, Clock, CheckCircle2, XCircle,
+  FolderKanban, GitBranch, Zap,
+  TrendingUp, Clock,
 } from 'lucide-react';
 import { Card, CardHeader, Button, Spinner } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ErrorState } from '../components/shared/ErrorState';
+import { RunsChart } from '../components/dashboard/RunsChart';
+import { SuccessRateChart } from '../components/dashboard/SuccessRateChart';
 import { useDashboard } from '../hooks/useLearning';
 import { useProjects } from '../hooks/useProjects';
 import { useT } from '../i18n';
@@ -103,6 +105,12 @@ export function Dashboard() {
           value={stats?.successRate != null ? `${(stats.successRate * 100).toFixed(0)}%` : '-'}
           accent="bg-accent/10"
         />
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <RunsChart data={stats?.timeSeries} />
+        <SuccessRateChart data={stats?.timeSeries} />
       </div>
 
       {/* Two-column layout: recent runs + quick actions */}

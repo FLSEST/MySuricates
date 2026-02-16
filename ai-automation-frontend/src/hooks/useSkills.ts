@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
+import { useToast } from './useToast';
+import { useT } from '../i18n';
 import type { Skill, Capability } from '../types';
 
 export function useSkills() {
@@ -27,18 +29,30 @@ export function useSkillCapabilities(skillId: string) {
 
 export function useActivateSkills() {
   const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
   return useMutation({
     mutationFn: ({ workflowId, skillIds }: { workflowId: string; skillIds: string[] }) =>
       api.post(`/workflows/${workflowId}/skills`, { skillIds }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['workflows'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workflows'] });
+      toast.success(t.toast.skillsActivated);
+    },
+    onError: () => toast.error(t.toast.skillsActivateFailed),
   });
 }
 
 export function useDeactivateSkill() {
   const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
   return useMutation({
     mutationFn: ({ workflowId, skillId }: { workflowId: string; skillId: string }) =>
       api.delete(`/workflows/${workflowId}/skills/${skillId}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['workflows'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workflows'] });
+      toast.success(t.toast.skillDeactivated);
+    },
+    onError: () => toast.error(t.toast.skillDeactivateFailed),
   });
 }

@@ -3,15 +3,17 @@ spring:
     name: ai-automation-backend
 
   datasource:
-    url: jdbc:sqlite:${AUTOMATION_DB_PATH:./data/automation.db}
+    url: jdbc:sqlite:${AUTOMATION_DB_PATH:./data/automation.db}?journal_mode=WAL&busy_timeout=10000
     driver-class-name: org.sqlite.JDBC
     hikari:
-      maximum-pool-size: 1
+      maximum-pool-size: 3
+      minimum-idle: 1
+      connection-test-query: SELECT 1
 
   jpa:
     database-platform: org.hibernate.community.dialect.SQLiteDialect
     hibernate:
-      ddl-auto: validate
+      ddl-auto: none
     show-sql: false
     properties:
       hibernate:
@@ -44,6 +46,9 @@ docker:
     idle-timeout-minutes: 60
 
 automation:
+  cli:
+    host-home: ${AUTOMATION_HOST_HOME:}    # Default: System.getProperty("user.home")
+    host-uid: ${AUTOMATION_HOST_UID:}      # Default: detected via 'id -u'
   security:
     enabled: ${AUTOMATION_SECURITY_ENABLED:false}
     api-key: ${AUTOMATION_API_KEY:}

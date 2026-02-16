@@ -36,8 +36,7 @@ class RetryBlockExecutorTest {
     void setUp() {
         context = ExecutionContext.builder()
                 .containerId("container-1")
-                .cliType("claude")
-                .workflowRunId("run-1")
+                                .workflowRunId("run-1")
                 .build();
     }
 

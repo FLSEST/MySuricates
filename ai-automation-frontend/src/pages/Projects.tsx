@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FolderKanban, Plus, Search } from 'lucide-react';
-import { Card, Button, Input, Select, Modal, Spinner } from '../components/ui';
+import { Card, Button, Input, Select, Modal, Spinner, DirectoryPicker } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
@@ -170,10 +170,10 @@ export function Projects() {
               label: t.projects.types[type],
             }))}
           />
-          <Input
+          <DirectoryPicker
             label={t.projects.path}
             value={form.path}
-            onChange={(e) => setForm({ ...form, path: e.target.value })}
+            onChange={(path) => setForm({ ...form, path })}
             placeholder="/home/user/projects/my-project"
           />
         </div>

@@ -34,7 +34,7 @@ public class SimpleBlockExecutor implements BlockExecutor {
 
         return commandExecutor.executeStep(
                 context.getContainerId(),
-                context.getCliType(),
+                BlockExecutor.cliTypeFor("simple"),
                 resolved,
                 context.nextStepIndex()
         );

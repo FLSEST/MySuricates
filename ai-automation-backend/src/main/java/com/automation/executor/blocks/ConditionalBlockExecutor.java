@@ -31,11 +31,11 @@ public class ConditionalBlockExecutor implements BlockExecutor {
         result.setStepIndex(context.nextStepIndex());
         result.setStartedAt(Instant.now());
 
-        // Evaluate condition by asking CLI
+        // Evaluate condition by asking Claude
         String conditionResult = commandExecutor.executeCommand(
-                context.getContainerId(), context.getCliType(),
+                context.getContainerId(), "claude",
                 "Evaluate this condition and respond with only 'true' or 'false': " + condition
-        );
+        ).output();
 
         boolean conditionMet = conditionResult.trim().toLowerCase().contains("true");
         String commandToExecute = conditionMet ? thenCommand : elseCommand;
@@ -46,7 +46,7 @@ public class ConditionalBlockExecutor implements BlockExecutor {
             String resolved = context.resolveTemplate(commandToExecute);
             StepResult stepResult = commandExecutor.executeStep(
                     context.getContainerId(),
-                    context.getCliType(),
+                    BlockExecutor.cliTypeFor("simple"),
                     BlockDefinition.builder()
                             .type("simple")
                             .config(Map.of("command", resolved))

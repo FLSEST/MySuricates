@@ -41,9 +41,9 @@ public class WhileBlockExecutor implements BlockExecutor {
             // Check condition
             if (conditionCommand != null) {
                 String conditionResult = commandExecutor.executeCommand(
-                        context.getContainerId(), context.getCliType(),
+                        context.getContainerId(), BlockExecutor.cliTypeFor("while"),
                         context.resolveTemplate(conditionCommand)
-                );
+                ).output();
 
                 if ("false".equalsIgnoreCase(conditionResult.trim()) ||
                         "0".equals(conditionResult.trim()) ||
@@ -55,7 +55,7 @@ public class WhileBlockExecutor implements BlockExecutor {
             String resolvedCommand = context.resolveTemplate(command);
             StepResult stepResult = commandExecutor.executeStep(
                     context.getContainerId(),
-                    context.getCliType(),
+                    BlockExecutor.cliTypeFor("simple"),
                     BlockDefinition.builder()
                             .type("simple")
                             .config(Map.of("command", resolvedCommand))

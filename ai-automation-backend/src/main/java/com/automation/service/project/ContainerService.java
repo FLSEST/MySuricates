@@ -27,10 +27,14 @@ public class ContainerService {
 
     private final DockerClient dockerClient;
     private final ContainerRepository containerRepository;
+    private static final String CONTAINER_HOME = "/home/agent";
+
     private final long cpuQuota;
     private final long memoryLimit;
     private final long pidsLimit;
     private final int idleTimeoutMinutes;
+    private final String hostHome;
+    private final String hostUid;
 
     public ContainerService(
             DockerClient dockerClient,
@@ -38,13 +42,19 @@ public class ContainerService {
             @Value("${docker.container.cpu-quota}") long cpuQuota,
             @Value("${docker.container.memory-limit}") long memoryLimit,
             @Value("${docker.container.pids-limit}") long pidsLimit,
-            @Value("${docker.container.idle-timeout-minutes}") int idleTimeoutMinutes) {
+            @Value("${docker.container.idle-timeout-minutes}") int idleTimeoutMinutes,
+            @Value("${automation.cli.host-home:}") String hostHome,
+            @Value("${automation.cli.host-uid:}") String hostUid) {
         this.dockerClient = dockerClient;
         this.containerRepository = containerRepository;
         this.cpuQuota = cpuQuota;
         this.memoryLimit = memoryLimit;
         this.pidsLimit = pidsLimit;
         this.idleTimeoutMinutes = idleTimeoutMinutes;
+        this.hostHome = hostHome != null && !hostHome.isBlank()
+                ? hostHome : System.getProperty("user.home");
+        this.hostUid = hostUid != null && !hostUid.isBlank()
+                ? hostUid : detectHostUid();
     }
 
     @Transactional
@@ -53,32 +63,44 @@ public class ContainerService {
         var existing = containerRepository.findByProjectId(project.getId());
         if (existing.isPresent()) {
             Container container = existing.get();
-            if (container.getStatus() == ContainerStatus.RUNNING) {
+            if (container.getStatus() == ContainerStatus.RUNNING && isDockerContainerRunning(container.getDockerContainerId())) {
                 return container;
             }
-            // Remove old container
+            // Remove old/stale container
             removeDockerContainer(container.getDockerContainerId());
             containerRepository.delete(container);
+            containerRepository.flush();
         }
 
         String imageName = getImageForType(project.getType());
         String containerName = "automation-" + project.getId();
+
+        // Remove any leftover Docker container with the same name
+        removeDockerContainer(containerName);
 
         try {
             CreateContainerResponse response = dockerClient.createContainerCmd(imageName)
                     .withName(containerName)
                     .withHostConfig(
                             HostConfig.newHostConfig()
-                                    .withReadonlyRootfs(true)
-                                    .withTmpFs(Map.of("/tmp", "", "/home/aiuser/.cache", ""))
+                                    .withTmpFs(Map.of("/tmp", ""))
                                     .withCapDrop(com.github.dockerjava.api.model.Capability.ALL)
                                     .withSecurityOpts(List.of("no-new-privileges:true"))
                                     .withCpuQuota(cpuQuota)
                                     .withMemory(memoryLimit)
                                     .withPidsLimit(pidsLimit)
-                                    .withBinds(Bind.parse(project.getPath() + ":/workspace:rw"))
+                                    .withBinds(
+                                            // Project workspace
+                                            Bind.parse(project.getPath() + ":/workspace:rw"),
+                                            // Claude binary (read-only, from host)
+                                            Bind.parse(hostHome + "/.local/bin/claude:" + CONTAINER_HOME + "/.local/bin/claude:ro"),
+                                            Bind.parse(hostHome + "/.local/share/claude:" + CONTAINER_HOME + "/.local/share/claude:ro"),
+                                            // Claude config (read-write, needs token refresh)
+                                            Bind.parse(hostHome + "/.claude:" + CONTAINER_HOME + "/.claude"),
+                                            Bind.parse(hostHome + "/.claude.json:" + CONTAINER_HOME + "/.claude.json")
+                                    )
                     )
-                    .withUser("aiuser")
+                    .withUser(hostUid)
                     .withWorkingDir("/workspace")
                     .withCmd("tail", "-f", "/dev/null")
                     .exec();
@@ -145,6 +167,15 @@ public class ContainerService {
         }
     }
 
+    private boolean isDockerContainerRunning(String containerId) {
+        try {
+            var info = dockerClient.inspectContainerCmd(containerId).exec();
+            return Boolean.TRUE.equals(info.getState().getRunning());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private void removeDockerContainer(String containerId) {
         try {
             dockerClient.stopContainerCmd(containerId).withTimeout(10).exec();
@@ -163,5 +194,16 @@ public class ContainerService {
             case CODE, PERSONAL -> "automation-agent-node:latest";
             case RESEARCH, CONTENT, BUSINESS -> "automation-agent-python:latest";
         };
+    }
+
+    private static String detectHostUid() {
+        try {
+            Process p = new ProcessBuilder("id", "-u").start();
+            String uid = new String(p.getInputStream().readAllBytes()).trim();
+            p.waitFor();
+            return uid;
+        } catch (Exception e) {
+            return "1000";
+        }
     }
 }

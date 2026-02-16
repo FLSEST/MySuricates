@@ -40,11 +40,12 @@ class CommandExecutorServiceTest {
 
     @Test
     void executeCommand_success_returnsResponse() throws IOException {
-        when(cliSession.sendCommand("echo hello")).thenReturn("hello");
+        when(cliSession.sendCommand("echo hello")).thenReturn(new CliSession.CommandResult("hello", 0));
 
-        String result = commandExecutorService.executeCommand("container-1", "claude", "echo hello");
+        CliSession.CommandResult result = commandExecutorService.executeCommand("container-1", "claude", "echo hello");
 
-        assertThat(result).isEqualTo("hello");
+        assertThat(result.output()).isEqualTo("hello");
+        assertThat(result.exitCode()).isEqualTo(0);
     }
 
     @Test
@@ -59,7 +60,7 @@ class CommandExecutorServiceTest {
 
     @Test
     void executeStep_successfulCommand_returnsCompletedStep() throws IOException {
-        when(cliSession.sendCommand("npm test")).thenReturn("All tests passed");
+        when(cliSession.sendCommand("npm test")).thenReturn(new CliSession.CommandResult("All tests passed", 0));
 
         BlockDefinition block = BlockDefinition.builder()
                 .type("simple")
@@ -76,8 +77,8 @@ class CommandExecutorServiceTest {
     }
 
     @Test
-    void executeStep_responseContainsError_returnsFailedStep() throws IOException {
-        when(cliSession.sendCommand("npm test")).thenReturn("Error: test suite failed");
+    void executeStep_nonZeroExitCode_returnsFailedStep() throws IOException {
+        when(cliSession.sendCommand("npm test")).thenReturn(new CliSession.CommandResult("Error: test suite failed", 1));
 
         BlockDefinition block = BlockDefinition.builder()
                 .type("simple")
@@ -101,7 +102,7 @@ class CommandExecutorServiceTest {
         StepResult result = commandExecutorService.executeStep("container-1", "claude", block, 0);
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
-        assertThat(result.getOutput()).contains("Session dead");
+        assertThat(result.getOutput()).contains("container-1");
     }
 
     @Test
@@ -119,6 +120,9 @@ class CommandExecutorServiceTest {
 
     @Test
     void injectSkillContext_withSkills_sendsAggregatedContext() throws IOException {
+        when(cliSession.sendCommand(contains("Code Reviewer")))
+                .thenReturn(new CliSession.CommandResult("ok", 0));
+
         Skill skill = Skill.builder()
                 .id("skill-1")
                 .name("Code Reviewer")
