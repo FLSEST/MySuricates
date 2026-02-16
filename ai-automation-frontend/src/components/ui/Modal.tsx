@@ -43,6 +43,8 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
 
       {/* Content */}
       <div
+        role="dialog"
+        aria-modal="true"
         className={`relative w-full ${sizeStyles[size]} mx-4 bg-surface-overlay border border-border
                      rounded-xl shadow-2xl animate-slide-up`}
       >
