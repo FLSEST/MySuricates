@@ -4,9 +4,9 @@ describe('Webhooks', () => {
 
   before(() => {
     cy.apiCleanup();
-    cy.apiCreateProject('Webhook Test Project').then((project) => {
+    cy.apiCreateProject('Cypress Webhook Project').then((project) => {
       projectId = project.id;
-      cy.apiCreateWorkflow(projectId, 'Webhook Test Workflow').then((wf) => {
+      cy.apiCreateWorkflow(projectId, 'Cypress Webhook Workflow').then((wf) => {
         workflowId = wf.id;
       });
     });
@@ -29,7 +29,7 @@ describe('Webhooks', () => {
 
     cy.get('[role="dialog"]').within(() => {
       cy.get('select').select(workflowId);
-      cy.get('input').type('Cypress webhook test');
+      cy.get('input').type('Cypress test webhook');
       cy.contains('button', 'Create').click();
     });
 
@@ -38,7 +38,7 @@ describe('Webhooks', () => {
 
   it('shows the webhook in the table with URL and token', () => {
     cy.get('table').should('exist');
-    cy.contains('Webhook Test Workflow').should('be.visible');
+    cy.contains('Cypress Webhook Workflow').should('be.visible');
     // Trigger URL column
     cy.contains('Trigger URL').should('be.visible');
     // Secret Token column (shows first 8 chars + ...)

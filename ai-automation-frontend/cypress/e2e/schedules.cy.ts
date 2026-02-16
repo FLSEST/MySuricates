@@ -4,9 +4,9 @@ describe('Schedules', () => {
 
   before(() => {
     cy.apiCleanup();
-    cy.apiCreateProject('Schedule Test Project').then((project) => {
+    cy.apiCreateProject('Cypress Schedule Project').then((project) => {
       projectId = project.id;
-      cy.apiCreateWorkflow(projectId, 'Schedule Test Workflow').then((wf) => {
+      cy.apiCreateWorkflow(projectId, 'Cypress Schedule Workflow').then((wf) => {
         workflowId = wf.id;
       });
     });
@@ -30,7 +30,7 @@ describe('Schedules', () => {
     cy.get('[role="dialog"]').within(() => {
       cy.get('select').select(workflowId);
       cy.get('input').eq(0).type('0 0 * * *');
-      cy.get('input').eq(1).type('Daily test schedule');
+      cy.get('input').eq(1).type('Cypress daily schedule');
       cy.contains('button', 'Create').click();
     });
 
@@ -39,7 +39,7 @@ describe('Schedules', () => {
 
   it('shows the schedule in the table', () => {
     cy.get('table').should('exist');
-    cy.contains('Schedule Test Workflow').should('be.visible');
+    cy.contains('Cypress Schedule Workflow').should('be.visible');
     cy.contains('0 0 * * *').should('be.visible');
   });
 

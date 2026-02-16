@@ -43,32 +43,32 @@ describe('Projects', () => {
 
   it('filters projects by search', () => {
     // Create two projects via API
-    cy.apiCreateProject('Alpha Project');
-    cy.apiCreateProject('Beta Project');
+    cy.apiCreateProject('Cypress Alpha Project');
+    cy.apiCreateProject('Cypress Beta Project');
     cy.visit('/projects');
 
     cy.get('input[placeholder="Search..."]').type('Alpha');
-    cy.contains('Alpha Project').should('be.visible');
-    cy.contains('Beta Project').should('not.exist');
+    cy.contains('Cypress Alpha Project').should('be.visible');
+    cy.contains('Cypress Beta Project').should('not.exist');
   });
 
   it('navigates to project detail page', () => {
-    cy.apiCreateProject('Detail Test Project').then((project) => {
+    cy.apiCreateProject('Cypress Detail Project').then((project) => {
       cy.visit('/projects');
-      cy.contains('Detail Test Project').click();
+      cy.contains('Cypress Detail Project').click();
       cy.url().should('include', `/projects/${project.id}`);
     });
   });
 
   it('shows container start/stop buttons on project cards', () => {
-    cy.apiCreateProject('Container Test Project');
+    cy.apiCreateProject('Cypress Container Project');
     cy.visit('/projects');
     // Projects start in STOPPED state, so Start Container should be visible
     cy.contains('Start Container').should('be.visible');
   });
 
   it('deletes a project from the detail page', () => {
-    cy.apiCreateProject('Delete Me Project').then((project) => {
+    cy.apiCreateProject('Cypress Delete Project').then((project) => {
       cy.visit(`/projects/${project.id}`);
       // The page has Edit and Delete buttons; click the danger Delete button
       cy.contains('button', 'Delete').click();

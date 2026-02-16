@@ -3,7 +3,7 @@ describe('Workflows', () => {
 
   before(() => {
     cy.apiCleanup();
-    cy.apiCreateProject('Workflow Test Project').then((project) => {
+    cy.apiCreateProject('Cypress Workflow Project').then((project) => {
       projectId = project.id;
     });
   });
@@ -58,7 +58,7 @@ describe('Workflows', () => {
   });
 
   it('creates a workflow from Code Quality template', () => {
-    const name = `Template Workflow ${Date.now()}`;
+    const name = `Cypress Template Workflow ${Date.now()}`;
 
     cy.contains('button', 'New Workflow').click();
     // Click the Code Quality template card
@@ -78,7 +78,7 @@ describe('Workflows', () => {
     let workflowId: string;
 
     beforeEach(() => {
-      cy.apiCreateWorkflow(projectId, `Detail WF ${Date.now()}`).then((wf) => {
+      cy.apiCreateWorkflow(projectId, `Cypress Detail WF ${Date.now()}`).then((wf) => {
         workflowId = wf.id;
         cy.visit(`/workflows/${workflowId}`);
       });
@@ -99,11 +99,11 @@ describe('Workflows', () => {
       cy.contains('Edit Workflow').should('be.visible');
 
       cy.get('[role="dialog"]').within(() => {
-        cy.get('input').first().clear().type('Updated Workflow Name');
+        cy.get('input').first().clear().type('Cypress Updated Workflow');
         cy.contains('button', 'Save').click();
       });
 
-      cy.contains('Updated Workflow Name').should('be.visible');
+      cy.contains('Cypress Updated Workflow').should('be.visible');
     });
 
     it('adds a block to the workflow', () => {
@@ -142,20 +142,20 @@ describe('Workflows', () => {
   });
 
   it('shows workflow cards with run counts and skill badges', () => {
-    cy.apiCreateWorkflow(projectId, 'Card Display Test');
+    cy.apiCreateWorkflow(projectId, 'Cypress Card Display');
     cy.visit('/workflows');
 
-    cy.contains('Card Display Test').should('be.visible');
+    cy.contains('Cypress Card Display').should('be.visible');
     cy.contains('0 runs').should('be.visible');
   });
 
   it('filters workflows by search', () => {
-    cy.apiCreateWorkflow(projectId, 'Searchable Workflow');
-    cy.apiCreateWorkflow(projectId, 'Hidden Workflow');
+    cy.apiCreateWorkflow(projectId, 'Cypress Searchable WF');
+    cy.apiCreateWorkflow(projectId, 'Cypress Hidden WF');
     cy.visit('/workflows');
 
     cy.get('input[placeholder="Search..."]').type('Searchable');
-    cy.contains('Searchable Workflow').should('be.visible');
-    cy.contains('Hidden Workflow').should('not.exist');
+    cy.contains('Cypress Searchable WF').should('be.visible');
+    cy.contains('Cypress Hidden WF').should('not.exist');
   });
 });
