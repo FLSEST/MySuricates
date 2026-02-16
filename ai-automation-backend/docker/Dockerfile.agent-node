@@ -1,19 +1,22 @@
-FROM node:21-alpine
+FROM node:21-slim
 
-# Create non-root user
-RUN adduser -D -u 1000 aiuser
+# Create generic agent user - UID is overridden at runtime via --user
+RUN userdel -r node 2>/dev/null; useradd -m -u 1000 agent
 
 # Install common tools
-RUN apk add --no-cache git curl bash jq
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git curl jq && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install AI CLI tools (fail gracefully if not available)
-RUN npm install -g @anthropic-ai/claude-code 2>/dev/null || true
+# Prepare Claude CLI directories (binary + config mounted from host)
+RUN mkdir -p /home/agent/.claude /home/agent/.local/bin /home/agent/.local/share \
+             /home/agent/.cache /home/agent/.config && \
+    chown -R agent:agent /home/agent
 
-# Create writable directories for container runtime
-RUN mkdir -p /home/aiuser/.cache /home/aiuser/.config && \
-    chown -R aiuser:aiuser /home/aiuser
+ENV HOME="/home/agent"
+ENV PATH="/home/agent/.local/bin:${PATH}"
 
-USER aiuser
+USER agent
 WORKDIR /workspace
 
 # Keep container alive for docker exec
