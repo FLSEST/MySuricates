@@ -13,9 +13,11 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 
 @Service
 @RequiredArgsConstructor
@@ -27,13 +29,16 @@ public class WorkflowExecutor {
     private final CommandExecutorService commandExecutorService;
     private final WorkflowRunRepository runRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final ExecutorService virtualThreadExecutor;
 
     private final Map<String, ExecutionContext> activeExecutions = new ConcurrentHashMap<>();
 
+    /**
+     * Starts workflow execution asynchronously.
+     * Creates a WorkflowRun with RUNNING status and returns it immediately.
+     * The actual block execution happens in a background virtual thread.
+     */
     public WorkflowRun execute(Workflow workflow, Map<String, Object> inputContext) {
-        Project project = workflow.getProject();
-        String containerId = containerService.getDockerContainerId(project);
-
         WorkflowRun run = WorkflowRun.builder()
                 .workflow(workflow)
                 .status(RunStatus.RUNNING)
@@ -41,32 +46,44 @@ public class WorkflowExecutor {
                 .build();
         run = runRepository.save(run);
 
-        ExecutionContext context = ExecutionContext.builder()
-                .containerId(containerId)
-                .workflowRunId(run.getId())
-                .build();
+        // Eagerly initialize lazy collections before leaving the transaction/session
+        Project project = workflow.getProject();
+        List<BlockDefinition> blocks = List.copyOf(workflow.getBlocks());
+        List<Skill> skills = List.copyOf(workflow.getActivatedSkills());
 
-        // Set input context variables
-        if (inputContext != null) {
-            inputContext.forEach(context::setVariable);
-        }
+        Map<String, Object> contextVars = inputContext != null ? Map.copyOf(inputContext) : Map.of();
 
-        activeExecutions.put(run.getId(), context);
+        // Execute asynchronously — return the run immediately
+        final String runId = run.getId();
+        virtualThreadExecutor.submit(() -> executeBlocks(runId, project, blocks, skills, contextVars));
+
+        return run;
+    }
+
+    private void executeBlocks(String runId, Project project, List<BlockDefinition> blocks,
+                               List<Skill> skills, Map<String, Object> inputContext) {
+        WorkflowRun run = runRepository.findById(runId).orElseThrow();
+        // Replace lazy proxy with fresh list — run was just created with 0 steps
+        run.setSteps(new ArrayList<>());
 
         try {
-            // Inject skill context into claude session
-            commandExecutorService.injectSkillContext(
-                    containerId, "claude", workflow.getActivatedSkills()
-            );
+            String containerId = containerService.getDockerContainerId(project);
 
-            // Execute blocks sequentially
-            for (BlockDefinition block : workflow.getBlocks()) {
+            ExecutionContext context = ExecutionContext.builder()
+                    .containerId(containerId)
+                    .workflowRunId(runId)
+                    .build();
+            inputContext.forEach(context::setVariable);
+            activeExecutions.put(runId, context);
+
+            commandExecutorService.injectSkillContext(containerId, "claude", skills);
+
+            for (BlockDefinition block : blocks) {
                 if (context.shouldStop()) {
                     run.setStatus(RunStatus.CANCELLED);
                     break;
                 }
 
-                // Wait while paused
                 while (context.isPaused() && !context.shouldStop()) {
                     try {
                         Thread.sleep(500);
@@ -82,13 +99,9 @@ public class WorkflowExecutor {
                 run.addStep(step);
                 context.setPreviousOutput(step.getOutput());
 
-                // Broadcast step result via WebSocket
                 broadcastStepResult(run.getId(), step);
-
-                // Save intermediate state
                 runRepository.save(run);
 
-                // Stop on failure if configured
                 if (step.getStatus() == StepStatus.FAILED && block.shouldStopOnFailure()) {
                     run.setStatus(RunStatus.FAILED);
                     run.setError(Map.of("step", step.getStepIndex(), "message",
@@ -102,7 +115,7 @@ public class WorkflowExecutor {
             }
 
         } catch (Exception e) {
-            log.error("Workflow execution failed: {}", workflow.getId(), e);
+            log.error("Workflow execution failed: {}", runId, e);
             run.setStatus(RunStatus.FAILED);
             run.setError(Map.of("message", e.getMessage() != null ? e.getMessage() : e.getClass().getName()));
         } finally {
@@ -112,9 +125,10 @@ public class WorkflowExecutor {
             );
             runRepository.save(run);
             activeExecutions.remove(run.getId());
-        }
 
-        return run;
+            // Broadcast final status
+            broadcastStepResult(run.getId(), run.getStatus());
+        }
     }
 
     public void pauseExecution(String runId) {
@@ -163,6 +177,17 @@ public class WorkflowExecutor {
             );
         } catch (Exception e) {
             log.warn("Failed to broadcast step result: {}", e.getMessage());
+        }
+    }
+
+    private void broadcastStepResult(String runId, RunStatus status) {
+        try {
+            messagingTemplate.convertAndSend(
+                    "/topic/executions/" + runId + "/logs",
+                    Map.of("type", "status", "runId", runId, "status", status)
+            );
+        } catch (Exception e) {
+            log.warn("Failed to broadcast final status: {}", e.getMessage());
         }
     }
 }

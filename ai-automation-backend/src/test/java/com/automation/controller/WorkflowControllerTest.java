@@ -188,13 +188,13 @@ class WorkflowControllerTest {
         WorkflowRun run = WorkflowRun.builder()
                 .id("run-1")
                 .workflow(testWorkflow)
-                .status(RunStatus.COMPLETED)
+                .status(RunStatus.RUNNING)
                 .startedAt(Instant.now())
                 .build();
 
         WorkflowRunResponse runResponse = new WorkflowRunResponse(
-                "run-1", "wf-1", "Test Workflow", RunStatus.COMPLETED, List.of(),
-                Instant.now(), Instant.now(), 1000L, null, null, Map.of()
+                "run-1", "wf-1", "Test Workflow", RunStatus.RUNNING, List.of(),
+                Instant.now(), null, null, null, null, Map.of()
         );
 
         when(workflowService.findById("wf-1")).thenReturn(testWorkflow);
@@ -212,15 +212,15 @@ class WorkflowControllerTest {
                         .content(body))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("run-1"))
-                .andExpect(jsonPath("$.status").value("COMPLETED"));
+                .andExpect(jsonPath("$.status").value("RUNNING"));
     }
 
     @Test
     void executeWorkflow_withoutBody_returnsOk() throws Exception {
         WorkflowRun run = WorkflowRun.builder()
-                .id("run-1").workflow(testWorkflow).status(RunStatus.COMPLETED).build();
+                .id("run-1").workflow(testWorkflow).status(RunStatus.RUNNING).build();
         WorkflowRunResponse runResponse = new WorkflowRunResponse(
-                "run-1", "wf-1", "Test Workflow", RunStatus.COMPLETED, List.of(),
+                "run-1", "wf-1", "Test Workflow", RunStatus.RUNNING, List.of(),
                 null, null, null, null, null, null
         );
 

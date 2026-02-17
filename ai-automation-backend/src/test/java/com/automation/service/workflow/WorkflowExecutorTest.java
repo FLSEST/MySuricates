@@ -14,15 +14,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.ExecutorService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
+
+import org.mockito.ArgumentCaptor;
 
 @ExtendWith(MockitoExtension.class)
 class WorkflowExecutorTest {
@@ -40,6 +40,9 @@ class WorkflowExecutorTest {
     private SimpMessagingTemplate messagingTemplate;
 
     @Mock
+    private ExecutorService virtualThreadExecutor;
+
+    @Mock
     private BlockExecutor simpleBlockExecutor;
 
     private WorkflowExecutor workflowExecutor;
@@ -49,12 +52,19 @@ class WorkflowExecutorTest {
 
     @BeforeEach
     void setUp() {
+        // Run submitted tasks synchronously on the calling thread
+        lenient().doAnswer(inv -> {
+            ((Runnable) inv.getArgument(0)).run();
+            return null;
+        }).when(virtualThreadExecutor).submit(any(Runnable.class));
+
         workflowExecutor = new WorkflowExecutor(
                 List.of(simpleBlockExecutor),
                 containerService,
                 commandExecutorService,
                 runRepository,
-                messagingTemplate
+                messagingTemplate,
+                virtualThreadExecutor
         );
 
         testProject = Project.builder()
@@ -82,10 +92,23 @@ class WorkflowExecutorTest {
             if (run.getId() == null) run.setId("run-1");
             return run;
         });
+        lenient().when(runRepository.findById("run-1")).thenAnswer(inv -> {
+            WorkflowRun run = WorkflowRun.builder()
+                    .id("run-1").workflow(testWorkflow).status(RunStatus.RUNNING).startedAt(java.time.Instant.now()).build();
+            return Optional.of(run);
+        });
+    }
+
+    /** Captures the last WorkflowRun passed to runRepository.save() */
+    private WorkflowRun captureLastSavedRun() {
+        ArgumentCaptor<WorkflowRun> captor = ArgumentCaptor.forClass(WorkflowRun.class);
+        verify(runRepository, atLeastOnce()).save(captor.capture());
+        List<WorkflowRun> saved = captor.getAllValues();
+        return saved.get(saved.size() - 1);
     }
 
     @Test
-    void execute_allBlocksSucceed_returnsCompleted() {
+    void execute_returnsRunningImmediately() {
         StepResult step = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
@@ -93,23 +116,37 @@ class WorkflowExecutorTest {
 
         WorkflowRun result = workflowExecutor.execute(testWorkflow, null);
 
-        assertThat(result.getStatus()).isEqualTo(RunStatus.COMPLETED);
-        assertThat(result.getCompletedAt()).isNotNull();
-        assertThat(result.getDurationMs()).isNotNull();
+        // execute() returns immediately with RUNNING status
+        assertThat(result.getStatus()).isEqualTo(RunStatus.RUNNING);
     }
 
     @Test
-    void execute_blockFails_withStopOnFailure_returnsFailedRun() {
+    void execute_allBlocksSucceed_savesCompleted() {
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(step);
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
+        assertThat(saved.getCompletedAt()).isNotNull();
+        assertThat(saved.getDurationMs()).isNotNull();
+    }
+
+    @Test
+    void execute_blockFails_withStopOnFailure_savesFailedRun() {
         StepResult failed = StepResult.builder()
                 .stepIndex(0).status(StepStatus.FAILED).output("error").build();
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenReturn(failed);
 
-        // shouldStopOnFailure() returns true by default when on_failure is not set
-        WorkflowRun result = workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null);
 
-        assertThat(result.getStatus()).isEqualTo(RunStatus.FAILED);
-        assertThat(result.getError()).isNotNull();
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(saved.getError()).isNotNull();
     }
 
     @Test
@@ -132,9 +169,10 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenReturn(failed, success);
 
-        WorkflowRun result = workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null);
 
-        assertThat(result.getStatus()).isEqualTo(RunStatus.COMPLETED);
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
         verify(simpleBlockExecutor, times(2)).execute(any(), any());
     }
 
@@ -145,10 +183,11 @@ class WorkflowExecutorTest {
         )));
         when(simpleBlockExecutor.supports("unknown-type")).thenReturn(false);
 
-        WorkflowRun result = workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null);
 
-        assertThat(result.getStatus()).isEqualTo(RunStatus.FAILED);
-        assertThat(result.getError()).containsKey("message");
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(saved.getError()).containsKey("message");
     }
 
     @Test
@@ -161,7 +200,6 @@ class WorkflowExecutorTest {
         Map<String, Object> inputContext = Map.of("branch", "main", "env", "production");
         workflowExecutor.execute(testWorkflow, inputContext);
 
-        // Verify execution happened (context variables were set internally)
         verify(simpleBlockExecutor, times(2)).execute(any(), any());
     }
 
@@ -196,14 +234,12 @@ class WorkflowExecutorTest {
 
     @Test
     void pauseAndResumeExecution() {
-        // Start a workflow that will be paused
         StepResult step = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
         when(simpleBlockExecutor.execute(any(), any())).thenReturn(step);
 
         workflowExecutor.execute(testWorkflow, null);
 
-        // Pause/resume a non-active run does nothing but doesn't throw
         workflowExecutor.pauseExecution("non-existent-run");
         workflowExecutor.resumeExecution("non-existent-run");
     }
