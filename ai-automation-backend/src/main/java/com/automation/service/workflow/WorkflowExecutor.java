@@ -155,6 +155,31 @@ public class WorkflowExecutor {
         }
     }
 
+    public String executeAdHocCommand(String runId, String command) {
+        ExecutionContext context = activeExecutions.get(runId);
+        if (context == null) {
+            throw new WorkflowExecutionException("No active execution found for run: " + runId);
+        }
+        log.info("Executing ad-hoc command in run {}: {}", runId, command);
+        var result = commandExecutorService.executeCommand(context.getContainerId(), "claude", command);
+
+        // Broadcast as a log message
+        try {
+            messagingTemplate.convertAndSend(
+                    "/topic/executions/" + runId + "/logs",
+                    Map.of(
+                            "type", "command",
+                            "input", command,
+                            "output", result.output() != null ? result.output() : ""
+                    )
+            );
+        } catch (Exception e) {
+            log.warn("Failed to broadcast command result: {}", e.getMessage());
+        }
+
+        return result.output() != null ? result.output() : "";
+    }
+
     private BlockExecutor findExecutor(String blockType) {
         return blockExecutors.stream()
                 .filter(e -> e.supports(blockType))

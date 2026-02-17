@@ -5,10 +5,12 @@ import { Card, Button, Input, Select, Modal, Spinner } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
 import { TemplateSelector } from '../components/workflow/TemplateSelector';
+import { ExecuteDialog } from '../components/workflow/ExecuteDialog';
 import { useWorkflows, useCreateWorkflow, useExecuteWorkflow } from '../hooks/useWorkflows';
 import { useProjects } from '../hooks/useProjects';
 import { useT } from '../i18n';
-import type { CreateWorkflowRequest } from '../types';
+import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
+import type { CreateWorkflowRequest, Workflow } from '../types';
 import type { WorkflowTemplate } from '../data/workflowTemplates';
 
 type CreateStep = 'closed' | 'template' | 'details';
@@ -25,6 +27,11 @@ export function Workflows() {
   const [createStep, setCreateStep] = useState<CreateStep>('closed');
   const [selectedTemplate, setSelectedTemplate] = useState<WorkflowTemplate | null>(null);
   const [form, setForm] = useState<CreateWorkflowRequest>({ projectId: '', name: '' });
+  const [executeDialog, setExecuteDialog] = useState<{ open: boolean; workflow: Workflow | null; variables: string[] }>({
+    open: false,
+    workflow: null,
+    variables: [],
+  });
 
   const filtered = workflows?.filter((w) =>
     w.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -70,12 +77,29 @@ export function Workflows() {
     setForm({ projectId: '', name: '' });
   };
 
-  const handleExecute = (e: React.MouseEvent, workflowId: string) => {
+  const handleExecute = (e: React.MouseEvent, workflow: Workflow) => {
     e.stopPropagation();
+    const variables = extractWorkflowVariables(workflow.blocks);
+    if (variables.length > 0) {
+      setExecuteDialog({ open: true, workflow, variables });
+    } else {
+      executeWorkflow.mutate(
+        { id: workflow.id },
+        { onSuccess: (run) => navigate(`/workflows/${workflow.id}/run/${run.id}`) }
+      );
+    }
+  };
+
+  const handleExecuteWithContext = (context: Record<string, string>) => {
+    if (!executeDialog.workflow) return;
+    const workflowId = executeDialog.workflow.id;
     executeWorkflow.mutate(
-      { id: workflowId },
+      { id: workflowId, context },
       {
-        onSuccess: (run) => navigate(`/workflows/${workflowId}/run/${run.id}`),
+        onSuccess: (run) => {
+          setExecuteDialog({ open: false, workflow: null, variables: [] });
+          navigate(`/workflows/${workflowId}/run/${run.id}`);
+        },
       }
     );
   };
@@ -146,7 +170,7 @@ export function Workflows() {
                   </div>
                 </div>
                 <button
-                  onClick={(e) => handleExecute(e, wf.id)}
+                  onClick={(e) => handleExecute(e, wf)}
                   className="p-2 rounded-lg text-accent hover:bg-accent/10 transition-colors shrink-0"
                   title={t.workflows.execute}
                   aria-label={t.workflows.execute}
@@ -177,6 +201,15 @@ export function Workflows() {
           ))}
         </div>
       )}
+
+      {/* Execute with variables dialog */}
+      <ExecuteDialog
+        open={executeDialog.open}
+        onClose={() => setExecuteDialog({ open: false, workflow: null, variables: [] })}
+        onExecute={handleExecuteWithContext}
+        variables={executeDialog.variables}
+        loading={executeWorkflow.isPending}
+      />
 
       {/* Step 1: Template selection modal */}
       <Modal

@@ -1,14 +1,15 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Pause, Play, XCircle, Clock, CheckCircle2, AlertCircle,
+  ArrowLeft, Pause, Play, XCircle, Clock, CheckCircle2, AlertCircle, Send,
 } from 'lucide-react';
-import { Card, CardHeader, Button, Spinner, Badge } from '../components/ui';
+import { Card, CardHeader, Button, Spinner, Badge, Input } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ErrorState } from '../components/shared/ErrorState';
 import { LogViewer } from '../components/shared/LogViewer';
 import {
   useWorkflow, useWorkflowRuns,
-  usePauseExecution, useResumeExecution, useCancelExecution,
+  usePauseExecution, useResumeExecution, useCancelExecution, useRunCommand,
 } from '../hooks/useWorkflows';
 import { useExecutionWebSocket } from '../hooks/useWebSocket';
 import { useRateRun } from '../hooks/useLearning';
@@ -72,11 +73,14 @@ export function WorkflowExecution() {
 
   const { data: workflow } = useWorkflow(id!);
   const { data: runs, error: runsError, refetch: refetchRuns } = useWorkflowRuns(id!);
-  const { logs, connected } = useExecutionWebSocket(runId!);
+  const { logs, connected } = useExecutionWebSocket(runId!, id);
   const rateRun = useRateRun();
   const pauseExecution = usePauseExecution();
   const resumeExecution = useResumeExecution();
   const cancelExecution = useCancelExecution();
+  const runCommand = useRunCommand();
+
+  const [command, setCommand] = useState('');
 
   const run: WorkflowRun | undefined = runs?.find((r) => r.id === runId);
   const isRunning = run?.status === 'RUNNING' || run?.status === 'PAUSED';
@@ -206,6 +210,41 @@ export function WorkflowExecution() {
           <LogViewer logs={logs} maxHeight="500px" />
         </Card>
       </div>
+
+      {/* Command input — visible when running or paused */}
+      {isRunning && (
+        <Card>
+          <CardHeader title={t.workflows.execution.command} />
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <Input
+                value={command}
+                onChange={(e) => setCommand(e.target.value)}
+                placeholder={t.workflows.execution.commandPlaceholder}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && command.trim()) {
+                    runCommand.mutate({ runId: runId!, command: command.trim() });
+                    setCommand('');
+                  }
+                }}
+              />
+            </div>
+            <Button
+              icon={<Send className="w-4 h-4" />}
+              onClick={() => {
+                if (command.trim()) {
+                  runCommand.mutate({ runId: runId!, command: command.trim() });
+                  setCommand('');
+                }
+              }}
+              loading={runCommand.isPending}
+              disabled={!command.trim()}
+            >
+              {t.workflows.execution.sendCommand}
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* Error */}
       {run.error && (

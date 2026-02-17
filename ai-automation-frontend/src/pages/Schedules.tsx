@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Calendar, Plus, Trash2 } from 'lucide-react';
-import { Card, Button, Input, Select, Modal, Spinner, Table, Toggle } from '../components/ui';
+import { Card, Button, Input, Select, Modal, Spinner, Table, Toggle, CronPicker } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
 import { useSchedules, useCreateSchedule, useToggleSchedule, useDeleteSchedule } from '../hooks/useSchedules';
@@ -171,12 +171,10 @@ export function Schedules() {
               ...(workflows?.map((w) => ({ value: w.id, label: w.name })) ?? []),
             ]}
           />
-          <Input
+          <CronPicker
             label={t.schedules.cronExpression}
             value={form.cronExpression}
-            onChange={(e) => setForm({ ...form, cronExpression: e.target.value })}
-            placeholder="0 0 * * *"
-            hint={t.schedules.cronHint}
+            onChange={(cron) => setForm({ ...form, cronExpression: cron })}
           />
           <Input
             label={t.common.description}

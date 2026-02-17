@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 
@@ -23,10 +24,11 @@ function isStatusMessage(data: WsMessage): data is StatusMessage {
   return 'type' in data && data.type === 'status';
 }
 
-export function useExecutionWebSocket(runId: string | null) {
+export function useExecutionWebSocket(runId: string | null, workflowId?: string) {
   const [logs, setLogs] = useState<Array<{ timestamp: string; level: string; message: string }>>([]);
   const [connected, setConnected] = useState(false);
   const clientRef = useRef<Client | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!runId) return;
@@ -58,6 +60,11 @@ export function useExecutionWebSocket(runId: string | null) {
                   message: `[Step ${data.stepIndex}] ${data.output || data.input}`,
                 },
               ]);
+            }
+
+            // Invalidate run queries so steps update live
+            if (workflowId) {
+              queryClient.invalidateQueries({ queryKey: ['workflows', workflowId, 'runs'] });
             }
           } catch {
             setLogs((prev) => [

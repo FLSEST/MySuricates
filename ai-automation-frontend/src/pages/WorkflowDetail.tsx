@@ -13,7 +13,9 @@ import {
 } from '../hooks/useWorkflows';
 import { useSkills, useActivateSkills, useDeactivateSkill } from '../hooks/useSkills';
 import { SortableBlockList } from '../components/workflow/SortableBlockList';
+import { ExecuteDialog } from '../components/workflow/ExecuteDialog';
 import { useT } from '../i18n';
+import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
 import type { BlockDefinition, BlockType, WorkflowRun } from '../types';
 
 const BLOCK_TYPES: BlockType[] = ['simple', 'retry', 'foreach', 'while', 'conditional', 'skill-capability'];
@@ -48,6 +50,7 @@ export function WorkflowDetail() {
     config: JSON.stringify({ command: '' }, null, 2),
   });
   const [selectedSkillId, setSelectedSkillId] = useState('');
+  const [showExecuteDialog, setShowExecuteDialog] = useState(false);
 
   if (isLoading) {
     return (
@@ -79,10 +82,28 @@ export function WorkflowDetail() {
     });
   };
 
+  const workflowVariables = extractWorkflowVariables(workflow.blocks);
+
   const handleExecute = () => {
+    if (workflowVariables.length > 0) {
+      setShowExecuteDialog(true);
+    } else {
+      executeWorkflow.mutate(
+        { id: workflow.id },
+        { onSuccess: (run) => navigate(`/workflows/${workflow.id}/run/${run.id}`) }
+      );
+    }
+  };
+
+  const handleExecuteWithContext = (context: Record<string, string>) => {
     executeWorkflow.mutate(
-      { id: workflow.id },
-      { onSuccess: (run) => navigate(`/workflows/${workflow.id}/run/${run.id}`) }
+      { id: workflow.id, context },
+      {
+        onSuccess: (run) => {
+          setShowExecuteDialog(false);
+          navigate(`/workflows/${workflow.id}/run/${run.id}`);
+        },
+      }
     );
   };
 
@@ -404,6 +425,15 @@ export function WorkflowDetail() {
           {t.common.deleteConfirm} {t.workflows.deleteConfirm}
         </p>
       </Modal>
+
+      {/* Execute with variables dialog */}
+      <ExecuteDialog
+        open={showExecuteDialog}
+        onClose={() => setShowExecuteDialog(false)}
+        onExecute={handleExecuteWithContext}
+        variables={workflowVariables}
+        loading={executeWorkflow.isPending}
+      />
     </div>
   );
 }

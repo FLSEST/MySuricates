@@ -16,6 +16,7 @@ public record WorkflowResponse(
         String version,
         Map<String, Object> metadata,
         List<SkillResponse> activatedSkills,
+        long runCount,
         Instant createdAt,
         Instant updatedAt
 ) {}

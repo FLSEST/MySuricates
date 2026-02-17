@@ -17,4 +17,6 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
 
     @Query("SELECT wr FROM WorkflowRun wr LEFT JOIN FETCH wr.workflow")
     List<WorkflowRun> findAllWithWorkflow();
+
+    long countByWorkflowId(String workflowId);
 }

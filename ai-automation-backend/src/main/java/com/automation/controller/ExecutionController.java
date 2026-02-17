@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/v1/executions")
 @RequiredArgsConstructor
@@ -41,5 +43,17 @@ public class ExecutionController {
     public ResponseEntity<Void> cancelExecution(@PathVariable String id) {
         workflowExecutor.cancelExecution(id);
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{id}/command")
+    public ResponseEntity<Map<String, String>> executeCommand(
+            @PathVariable String id,
+            @RequestBody Map<String, String> body) {
+        String command = body.get("command");
+        if (command == null || command.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Command is required"));
+        }
+        String output = workflowExecutor.executeAdHocCommand(id, command);
+        return ResponseEntity.ok(Map.of("output", output));
     }
 }

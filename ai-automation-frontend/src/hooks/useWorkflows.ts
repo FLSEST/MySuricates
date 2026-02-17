@@ -14,6 +14,7 @@ interface WorkflowApiResponse {
   version: string;
   metadata: Record<string, unknown>;
   activatedSkills: Array<{ id: string; name: string }>;
+  runCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -24,7 +25,7 @@ function mapWorkflow(raw: WorkflowApiResponse): Workflow {
     projectName: '',
     activatedSkillIds: raw.activatedSkills?.map((s) => s.id) ?? [],
     activatedSkillNames: raw.activatedSkills?.map((s) => s.name) ?? [],
-    runCount: 0,
+    runCount: raw.runCount ?? 0,
   };
 }
 
@@ -132,5 +133,12 @@ export function useCancelExecution() {
   return useMutation({
     mutationFn: (runId: string) => api.post(`/executions/${runId}/cancel`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['workflows'] }),
+  });
+}
+
+export function useRunCommand() {
+  return useMutation({
+    mutationFn: ({ runId, command }: { runId: string; command: string }) =>
+      api.post<{ output: string }>(`/executions/${runId}/command`, { command }),
   });
 }
