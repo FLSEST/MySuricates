@@ -1,7 +1,10 @@
 package com.automation.service.learning;
 
+import com.automation.dto.response.DashboardResponse;
+import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.entity.*;
 import com.automation.exception.ResourceNotFoundException;
+import com.automation.mapper.WorkflowMapper;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import lombok.RequiredArgsConstructor;
@@ -9,6 +12,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -19,6 +24,7 @@ public class LearningService {
 
     private final WorkflowRunRepository runRepository;
     private final WorkflowRepository workflowRepository;
+    private final WorkflowMapper workflowMapper;
 
     @Transactional(readOnly = true)
     public Map<String, Object> getWorkflowStats(String workflowId) {
@@ -177,7 +183,7 @@ public class LearningService {
     }
 
     @Transactional(readOnly = true)
-    public Map<String, Object> getDashboard() {
+    public DashboardResponse getDashboard() {
         List<WorkflowRun> allRuns = runRepository.findAllWithWorkflow();
 
         RunStatistics stats = new RunStatistics(allRuns);
@@ -188,7 +194,7 @@ public class LearningService {
                 .filter(r -> r.getWorkflow() != null)
                 .collect(Collectors.groupingBy(r -> r.getWorkflow().getId(), Collectors.counting()));
 
-        List<Map<String, Object>> topWorkflows = runCountByWorkflow.entrySet().stream()
+        List<DashboardResponse.TopWorkflowEntry> topWorkflows = runCountByWorkflow.entrySet().stream()
                 .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
                 .limit(5)
                 .map(e -> {
@@ -197,25 +203,49 @@ public class LearningService {
                             .findFirst()
                             .map(r -> r.getWorkflow().getName())
                             .orElse("Unknown");
-                    return Map.<String, Object>of(
-                            "workflowId", e.getKey(),
-                            "workflowName", name,
-                            "runCount", e.getValue()
-                    );
+                    return new DashboardResponse.TopWorkflowEntry(e.getKey(), name, e.getValue());
                 })
                 .toList();
 
-        Map<String, Object> dashboard = new LinkedHashMap<>();
-        dashboard.put("totalWorkflows", totalWorkflows);
-        dashboard.put("totalRuns", (long) allRuns.size());
-        dashboard.put("completedRuns", stats.countByStatus(RunStatus.COMPLETED));
-        dashboard.put("failedRuns", stats.countByStatus(RunStatus.FAILED));
-        dashboard.put("runningRuns", stats.countByStatus(RunStatus.RUNNING));
-        dashboard.put("overallSuccessRate", stats.getSuccessRate());
-        dashboard.put("avgDurationMs", stats.getAvgDuration().orElse(0));
-        dashboard.put("topWorkflows", topWorkflows);
+        // Recent runs (newest 10)
+        List<WorkflowRunResponse> recentRuns = allRuns.stream()
+                .sorted(Comparator.comparing(
+                        WorkflowRun::getStartedAt,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .limit(10)
+                .map(workflowMapper::toRunResponse)
+                .toList();
 
-        return dashboard;
+        // Time series: runs per day for last 30 days
+        LocalDate today = LocalDate.now();
+        LocalDate thirtyDaysAgo = today.minusDays(30);
+
+        List<DashboardResponse.TimeSeriesPoint> timeSeries = allRuns.stream()
+                .filter(r -> r.getStartedAt() != null)
+                .filter(r -> !r.getStartedAt().atZone(ZoneId.systemDefault()).toLocalDate().isBefore(thirtyDaysAgo))
+                .collect(Collectors.groupingBy(r -> r.getStartedAt().atZone(ZoneId.systemDefault()).toLocalDate()))
+                .entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(e -> {
+                    long count = e.getValue().size();
+                    long completed = e.getValue().stream()
+                            .filter(r -> r.getStatus() == RunStatus.COMPLETED).count();
+                    double rate = count > 0 ? (double) completed / count : 0;
+                    return new DashboardResponse.TimeSeriesPoint(e.getKey().toString(), count, rate);
+                })
+                .toList();
+
+        return new DashboardResponse(
+                totalWorkflows,
+                allRuns.size(),
+                stats.countByStatus(RunStatus.COMPLETED),
+                stats.countByStatus(RunStatus.FAILED),
+                stats.getAvgDuration().orElse(0),
+                stats.getSuccessRate(),
+                topWorkflows,
+                recentRuns,
+                timeSeries
+        );
     }
 
     // --- Helper classes ---

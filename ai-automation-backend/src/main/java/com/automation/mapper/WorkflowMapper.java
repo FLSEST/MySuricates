@@ -20,6 +20,7 @@ public interface WorkflowMapper {
     List<WorkflowResponse> toResponseList(List<Workflow> workflows);
 
     @Mapping(source = "workflow.id", target = "workflowId")
+    @Mapping(source = "workflow.name", target = "workflowName")
     WorkflowRunResponse toRunResponse(WorkflowRun run);
 
     List<WorkflowRunResponse> toRunResponseList(List<WorkflowRun> runs);

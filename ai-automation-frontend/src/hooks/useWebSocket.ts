@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { Client } from '@stomp/stompjs';
+import SockJS from 'sockjs-client';
 
-interface WebSocketMessage {
+interface StepMessage {
   stepIndex: number;
   status: string;
   input: string;
@@ -8,49 +10,75 @@ interface WebSocketMessage {
   durationMs: number;
 }
 
+interface StatusMessage {
+  type: 'status';
+  runId: string;
+  status: string;
+  stepsCompleted?: number;
+}
+
+type WsMessage = StepMessage | StatusMessage;
+
+function isStatusMessage(data: WsMessage): data is StatusMessage {
+  return 'type' in data && data.type === 'status';
+}
+
 export function useExecutionWebSocket(runId: string | null) {
   const [logs, setLogs] = useState<Array<{ timestamp: string; level: string; message: string }>>([]);
   const [connected, setConnected] = useState(false);
-  const wsRef = useRef<WebSocket | null>(null);
-
-  const connect = useCallback(() => {
-    if (!runId) return;
-
-    const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/executions/${runId}/logs`;
-
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-
-    ws.onopen = () => setConnected(true);
-    ws.onclose = () => setConnected(false);
-    ws.onerror = () => setConnected(false);
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data) as WebSocketMessage;
-        setLogs((prev) => [
-          ...prev,
-          {
-            timestamp: new Date().toISOString(),
-            level: data.status === 'FAILED' ? 'ERROR' : 'INFO',
-            message: `[Step ${data.stepIndex}] ${data.output || data.input}`,
-          },
-        ]);
-      } catch {
-        setLogs((prev) => [
-          ...prev,
-          { timestamp: new Date().toISOString(), level: 'INFO', message: event.data },
-        ]);
-      }
-    };
-  }, [runId]);
+  const clientRef = useRef<Client | null>(null);
 
   useEffect(() => {
-    connect();
+    if (!runId) return;
+
+    const client = new Client({
+      webSocketFactory: () => new SockJS(`${window.location.origin}/ws`),
+      reconnectDelay: 5000,
+      onConnect: () => {
+        setConnected(true);
+        client.subscribe(`/topic/executions/${runId}/logs`, (message) => {
+          try {
+            const data = JSON.parse(message.body) as WsMessage;
+
+            if (isStatusMessage(data)) {
+              setLogs((prev) => [
+                ...prev,
+                {
+                  timestamp: new Date().toISOString(),
+                  level: 'INFO',
+                  message: `Run status: ${data.status}${data.stepsCompleted != null ? ` (${data.stepsCompleted} steps completed)` : ''}`,
+                },
+              ]);
+            } else {
+              setLogs((prev) => [
+                ...prev,
+                {
+                  timestamp: new Date().toISOString(),
+                  level: data.status === 'FAILED' ? 'ERROR' : 'INFO',
+                  message: `[Step ${data.stepIndex}] ${data.output || data.input}`,
+                },
+              ]);
+            }
+          } catch {
+            setLogs((prev) => [
+              ...prev,
+              { timestamp: new Date().toISOString(), level: 'INFO', message: message.body },
+            ]);
+          }
+        });
+      },
+      onDisconnect: () => setConnected(false),
+      onStompError: () => setConnected(false),
+    });
+
+    clientRef.current = client;
+    client.activate();
+
     return () => {
-      wsRef.current?.close();
+      client.deactivate();
+      clientRef.current = null;
     };
-  }, [connect]);
+  }, [runId]);
 
   const clearLogs = useCallback(() => setLogs([]), []);
 

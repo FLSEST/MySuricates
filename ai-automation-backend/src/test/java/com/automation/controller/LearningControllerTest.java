@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.dto.response.DashboardResponse;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.service.learning.LearningService;
@@ -31,10 +32,9 @@ class LearningControllerTest {
 
     @Test
     void getDashboard_returnsOk() throws Exception {
-        Map<String, Object> dashboard = Map.of(
-                "totalWorkflows", 5L,
-                "totalRuns", 20L,
-                "completedRuns", 15L
+        DashboardResponse dashboard = new DashboardResponse(
+                5L, 20L, 15L, 5L, 1500.0, 0.75,
+                List.of(), List.of(), List.of()
         );
         when(learningService.getDashboard()).thenReturn(dashboard);
 

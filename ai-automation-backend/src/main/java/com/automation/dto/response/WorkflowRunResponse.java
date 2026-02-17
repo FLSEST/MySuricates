@@ -9,6 +9,7 @@ import java.util.Map;
 public record WorkflowRunResponse(
         String id,
         String workflowId,
+        String workflowName,
         RunStatus status,
         List<StepResultResponse> steps,
         Instant startedAt,

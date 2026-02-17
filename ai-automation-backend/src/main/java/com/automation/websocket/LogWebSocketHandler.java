@@ -8,6 +8,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 import org.springframework.web.socket.messaging.SessionSubscribeEvent;
 
@@ -27,6 +28,7 @@ public class LogWebSocketHandler {
     private final Map<String, Set<String>> runSubscribers = new ConcurrentHashMap<>();
 
     @EventListener
+    @Transactional(readOnly = true)
     public void handleSubscribe(SessionSubscribeEvent event) {
         StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
         String destination = accessor.getDestination();
@@ -38,15 +40,19 @@ public class LogWebSocketHandler {
                 runSubscribers.computeIfAbsent(runId, k -> ConcurrentHashMap.newKeySet()).add(sessionId);
                 log.info("Client {} subscribed to execution logs: {}", sessionId, runId);
 
-                // Send current status immediately
-                runRepository.findById(runId).ifPresent(run -> {
-                    messagingTemplate.convertAndSend(destination, Map.of(
-                            "type", "status",
-                            "runId", runId,
-                            "status", run.getStatus(),
-                            "stepsCompleted", run.getSteps().size()
-                    ));
-                });
+                try {
+                    // Send current status immediately
+                    runRepository.findById(runId).ifPresent(run -> {
+                        messagingTemplate.convertAndSend(destination, Map.of(
+                                "type", "status",
+                                "runId", runId,
+                                "status", run.getStatus(),
+                                "stepsCompleted", run.getSteps().size()
+                        ));
+                    });
+                } catch (Exception e) {
+                    log.error("Failed to send initial status for run {}: {}", runId, e.getMessage());
+                }
             }
         }
     }

@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.dto.response.DashboardResponse;
 import com.automation.service.learning.LearningService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -18,7 +19,7 @@ public class LearningController {
     private final LearningService learningService;
 
     @GetMapping("/dashboard")
-    public Map<String, Object> getDashboard() {
+    public DashboardResponse getDashboard() {
         return learningService.getDashboard();
     }
 

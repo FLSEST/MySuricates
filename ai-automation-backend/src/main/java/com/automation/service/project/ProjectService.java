@@ -11,8 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 
 @Service
@@ -22,6 +20,7 @@ public class ProjectService {
 
     private final ProjectRepository projectRepository;
     private final ContainerService containerService;
+    private final PathValidator pathValidator;
 
     @Transactional(readOnly = true)
     public List<Project> findAll() {
@@ -112,18 +111,6 @@ public class ProjectService {
     }
 
     private void validatePath(String path) {
-        Path normalized = Path.of(path).normalize().toAbsolutePath();
-        String normalizedStr = normalized.toString();
-
-        // Block access to sensitive system directories
-        if (normalizedStr.equals("/") || normalizedStr.startsWith("/etc")
-                || normalizedStr.startsWith("/var/run") || normalizedStr.startsWith("/proc")
-                || normalizedStr.startsWith("/sys") || normalizedStr.startsWith("/dev")) {
-            throw new IllegalArgumentException("Path points to a restricted system directory: " + path);
-        }
-
-        if (!Files.isDirectory(normalized)) {
-            throw new IllegalArgumentException("Path must be an existing directory: " + path);
-        }
+        pathValidator.validate(path);
     }
 }

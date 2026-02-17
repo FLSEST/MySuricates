@@ -170,6 +170,14 @@ class WebhookControllerTest {
         testWebhook.setEnabled(false);
         when(webhookService.disable("wh-1")).thenReturn(testWebhook);
 
+        WebhookTriggerResponse disabledResponse = new WebhookTriggerResponse(
+                "wh-1", "wf-1", "Test Workflow",
+                "abc123def456ghi789jkl012mno345pq", null,
+                false, "Test webhook", new HashMap<>(),
+                testWebhook.getLastTriggeredAt(), 5, testWebhook.getCreatedAt()
+        );
+        when(webhookMapper.toResponse(any(WebhookTrigger.class))).thenReturn(disabledResponse);
+
         mockMvc.perform(post("/api/v1/webhooks/wh-1/disable"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.enabled").value(false));
@@ -192,7 +200,7 @@ class WebhookControllerTest {
                 .status(RunStatus.RUNNING)
                 .build();
         WorkflowRunResponse runResponse = new WorkflowRunResponse(
-                "run-1", "wf-1", RunStatus.RUNNING, List.of(),
+                "run-1", "wf-1", "Test Workflow", RunStatus.RUNNING, List.of(),
                 null, null, null, null, Map.of(), Map.of()
         );
 
@@ -237,7 +245,7 @@ class WebhookControllerTest {
     void triggerWebhook_noBody_returnsOk() throws Exception {
         WorkflowRun run = WorkflowRun.builder().id("run-1").status(RunStatus.RUNNING).build();
         WorkflowRunResponse runResponse = new WorkflowRunResponse(
-                "run-1", "wf-1", RunStatus.RUNNING, List.of(),
+                "run-1", "wf-1", "Test Workflow", RunStatus.RUNNING, List.of(),
                 null, null, null, null, Map.of(), Map.of()
         );
 

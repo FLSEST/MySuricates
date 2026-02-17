@@ -1,7 +1,9 @@
 package com.automation.service.learning;
 
+import com.automation.dto.response.DashboardResponse;
 import com.automation.entity.*;
 import com.automation.exception.ResourceNotFoundException;
+import com.automation.mapper.WorkflowMapper;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +30,9 @@ class LearningServiceTest {
 
     @Mock
     private WorkflowRepository workflowRepository;
+
+    @Mock
+    private WorkflowMapper workflowMapper;
 
     @InjectMocks
     private LearningService learningService;
@@ -253,17 +258,16 @@ class LearningServiceTest {
                 createRunForWorkflow(wf, RunStatus.COMPLETED, 2000L),
                 createRunForWorkflow(wf, RunStatus.FAILED, 500L)
         );
-        when(runRepository.findAll()).thenReturn(allRuns);
+        when(runRepository.findAllWithWorkflow()).thenReturn(allRuns);
         when(workflowRepository.count()).thenReturn(2L);
-        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(wf));
 
-        Map<String, Object> dashboard = learningService.getDashboard();
+        DashboardResponse dashboard = learningService.getDashboard();
 
-        assertThat(dashboard.get("totalWorkflows")).isEqualTo(2L);
-        assertThat(dashboard.get("totalRuns")).isEqualTo(3L);
-        assertThat(dashboard.get("completedRuns")).isEqualTo(2L);
-        assertThat(dashboard.get("failedRuns")).isEqualTo(1L);
-        assertThat((double) dashboard.get("overallSuccessRate")).isCloseTo(0.667, within(0.01));
+        assertThat(dashboard.totalWorkflows()).isEqualTo(2L);
+        assertThat(dashboard.totalRuns()).isEqualTo(3L);
+        assertThat(dashboard.successfulRuns()).isEqualTo(2L);
+        assertThat(dashboard.failedRuns()).isEqualTo(1L);
+        assertThat(dashboard.successRate()).isCloseTo(0.667, within(0.01));
     }
 
     // --- Helper methods ---

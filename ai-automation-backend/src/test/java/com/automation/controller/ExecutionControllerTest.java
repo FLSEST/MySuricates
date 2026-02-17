@@ -48,7 +48,7 @@ class ExecutionControllerTest {
         WorkflowRun run = WorkflowRun.builder()
                 .id("run-1").status(RunStatus.COMPLETED).build();
         WorkflowRunResponse response = new WorkflowRunResponse(
-                "run-1", "wf-1", RunStatus.COMPLETED, List.of(),
+                "run-1", "wf-1", "Test Workflow", RunStatus.COMPLETED, List.of(),
                 Instant.now(), Instant.now(), 1000L, null, null, Map.of()
         );
 

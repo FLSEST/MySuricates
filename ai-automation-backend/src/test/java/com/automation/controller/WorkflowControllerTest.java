@@ -193,7 +193,7 @@ class WorkflowControllerTest {
                 .build();
 
         WorkflowRunResponse runResponse = new WorkflowRunResponse(
-                "run-1", "wf-1", RunStatus.COMPLETED, List.of(),
+                "run-1", "wf-1", "Test Workflow", RunStatus.COMPLETED, List.of(),
                 Instant.now(), Instant.now(), 1000L, null, null, Map.of()
         );
 
@@ -220,7 +220,7 @@ class WorkflowControllerTest {
         WorkflowRun run = WorkflowRun.builder()
                 .id("run-1").workflow(testWorkflow).status(RunStatus.COMPLETED).build();
         WorkflowRunResponse runResponse = new WorkflowRunResponse(
-                "run-1", "wf-1", RunStatus.COMPLETED, List.of(),
+                "run-1", "wf-1", "Test Workflow", RunStatus.COMPLETED, List.of(),
                 null, null, null, null, null, null
         );
 
@@ -248,7 +248,7 @@ class WorkflowControllerTest {
         WorkflowRun run = WorkflowRun.builder()
                 .id("run-1").workflow(testWorkflow).status(RunStatus.COMPLETED).build();
         WorkflowRunResponse runResponse = new WorkflowRunResponse(
-                "run-1", "wf-1", RunStatus.COMPLETED, List.of(),
+                "run-1", "wf-1", "Test Workflow", RunStatus.COMPLETED, List.of(),
                 null, null, null, null, null, null
         );
 

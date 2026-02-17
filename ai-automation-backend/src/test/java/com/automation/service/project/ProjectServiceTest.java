@@ -32,6 +32,9 @@ class ProjectServiceTest {
     @Mock
     private ContainerService containerService;
 
+    @Mock
+    private PathValidator pathValidator;
+
     @InjectMocks
     private ProjectService projectService;
 
