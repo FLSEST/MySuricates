@@ -7,18 +7,22 @@ AI-powered workflow automation platform with a skill system, Docker-based execut
 ```
 ai-automation-backend/     Spring Boot 3.2 (Java 21) REST API
   src/main/java/com/automation/
-    controller/            REST controllers (Workflow, Skill, Execution, Learning, Schedule, Webhook, System, Project)
+    controller/            REST controllers (Workflow, Skill, Execution, Learning, Schedule, Webhook, System, Project, Conversion)
     entity/                JPA entities (Workflow, Skill, Project, Container, ScheduledWorkflow, WebhookTrigger, WorkflowRun, ...)
     dto/                   Request/response DTOs
     mapper/                MapStruct mappers (Entity <-> DTO)
     repository/            Spring Data JPA repositories
     service/               Business logic
     executor/              Docker-based skill execution
+    executor/blocks/       Block executors (Simple, Retry, Conditional, ForEach, While, Agentic, Approval)
+    service/ai/            Host Claude CLI integration (HostClaudeService)
+    service/cli/           Claude output parsing (ClaudeOutputParser, ClaudeJsonResponse)
+    service/conversion/    Agentic-to-workflow conversion (WorkflowConversionService)
     security/              API key auth, rate limiting, Tailscale
     config/                Spring configuration
     websocket/             WebSocket for real-time updates
   src/main/resources/
-    db/migration/          Flyway migrations (V1-V9, SQLite)
+    db/migration/          Flyway migrations (V1-V10, SQLite)
     application.yml        App config
   docker/                  Dockerfiles for agent containers (Python, Node, Go)
 
@@ -26,8 +30,10 @@ ai-automation-frontend/    React 18 SPA (TypeScript)
   src/
     api/client.ts          Shared API client (fetch-based, /api/v1 prefix)
     pages/                 Route pages (Dashboard, Projects, Workflows, Skills, Schedules, Webhooks, Settings, ...)
-    components/            UI components (ui/, layout/, dashboard/, workflow/, shared/)
-    hooks/                 TanStack Query hooks (useWorkflows, useSkills, useProjects, useSchedules, useWebhooks, ...)
+    components/            UI components (ui/, layout/, dashboard/, workflow/, shared/, skill/)
+    hooks/                 TanStack Query hooks (useWorkflows, useSkills, useProjects, useSchedules, useWebhooks, useConversion, useInsights, ...)
+    data/                  Skill catalog data, workflow templates
+    utils/                 Utility functions (formatTime, extractWorkflowVariables)
     stores/                Zustand stores (settings, sidebar, theme, toast)
     i18n/                  Translations (de.ts, en.ts)
     types/index.ts         Shared TypeScript types
@@ -74,3 +80,7 @@ npm run cy:open                          # Open Cypress UI
 - Skills are categorized (see `SkillCategory` enum) and run in isolated containers (Python/Node/Go)
 - Docker containers have resource limits: 4GB memory, CPU quota, 100 PIDs, 60min idle timeout
 - Security is optional (disabled by default): API key auth via `X-API-Key` header, rate limiting
+- Block types: simple, retry, conditional, forEach, while, agentic, approval
+- Agentic blocks use a Goal→Observe→Reason→Act loop powered by Host Claude CLI
+- Workflow Conversion: Successful agentic runs can be converted to deterministic workflows (rule-based + AI)
+- Terminal WebSocket at `/ws/terminal` for real-time container access
