@@ -57,7 +57,9 @@ public class WorkflowRun {
 
     public void addStep(StepResult step) {
         step.setWorkflowRun(this);
-        step.setStepIndex(steps.size());
+        if (step.getStepIndex() <= 0) {
+            step.setStepIndex(steps.size());
+        }
         steps.add(step);
     }
 }

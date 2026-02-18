@@ -255,6 +255,12 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string)
   const clientRef = useRef<Client | null>(null);
   const queryClient = useQueryClient();
 
+  const workflowIdRef = useRef(workflowId);
+  useEffect(() => { workflowIdRef.current = workflowId; }, [workflowId]);
+
+  const queryClientRef = useRef(queryClient);
+  useEffect(() => { queryClientRef.current = queryClient; }, [queryClient]);
+
   const appendLog = useCallback((entry: { timestamp: string; level: string; message: string }) => {
     setLogs((prev) => {
       const next = [...prev, entry];
@@ -323,9 +329,11 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string)
               });
             }
 
-            // Invalidate run queries so steps update live
-            if (workflowId) {
-              queryClient.invalidateQueries({ queryKey: ['workflows', workflowId, 'runs'] });
+            // Invalidate run queries only on terminal status changes
+            if (isStatusMessage(data) && ['COMPLETED', 'FAILED', 'CANCELLED'].includes(data.status)) {
+              if (workflowIdRef.current) {
+                queryClientRef.current.invalidateQueries({ queryKey: ['workflows', workflowIdRef.current, 'runs'] });
+              }
             }
           } catch {
             appendLog({ timestamp: new Date().toISOString(), level: 'INFO', message: message.body });

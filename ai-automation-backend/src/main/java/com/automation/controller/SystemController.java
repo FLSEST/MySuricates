@@ -4,6 +4,7 @@ import com.automation.dto.response.RemoteAccessResponse;
 import com.automation.service.system.TailscaleService;
 import com.github.dockerjava.api.DockerClient;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
@@ -12,6 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import javax.sql.DataSource;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -21,15 +23,16 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Stream;
-import java.util.stream.Stream;
 
 @RestController
 @RequestMapping("/api/v1/system")
 @RequiredArgsConstructor
+@Slf4j
 public class SystemController {
 
     private final DockerClient dockerClient;
     private final TailscaleService tailscaleService;
+    private final DataSource dataSource;
 
     @Value("${spring.datasource.url}")
     private String datasourceUrl;
@@ -94,6 +97,13 @@ public class SystemController {
         Path dbPath = Path.of(url).toAbsolutePath().normalize();
         if (!Files.exists(dbPath)) {
             return ResponseEntity.notFound().build();
+        }
+
+        // Flush WAL to main database file before copying
+        try (var conn = dataSource.getConnection(); var stmt = conn.createStatement()) {
+            stmt.execute("PRAGMA wal_checkpoint(FULL)");
+        } catch (Exception e) {
+            log.warn("WAL checkpoint before backup failed: {}", e.getMessage());
         }
 
         // Copy to temp file (WAL-safe snapshot)

@@ -105,6 +105,9 @@ public class WebhookService {
         // Merge default context with payload (payload overrides)
         Map<String, Object> context = new HashMap<>(webhook.getDefaultContext());
         if (payload != null) {
+            if (payload.size() > 50) {
+                throw new IllegalArgumentException("Webhook payload exceeds maximum of 50 fields");
+            }
             context.putAll(payload);
         }
 

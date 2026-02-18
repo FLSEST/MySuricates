@@ -14,21 +14,28 @@ class ApiClient {
   }
 
   private async request<T>(path: string, options?: RequestInit): Promise<T> {
-    const response = await fetch(`${BASE_URL}${path}`, {
-      ...options,
-      headers: { ...this.getHeaders(), ...options?.headers },
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30_000);
+    try {
+      const response = await fetch(`${BASE_URL}${path}`, {
+        ...options,
+        signal: options?.signal ?? controller.signal,
+        headers: { ...this.getHeaders(), ...options?.headers },
+      });
 
-    if (!response.ok) {
-      const error: ApiError = await response.json().catch(() => ({
-        error: `HTTP ${response.status}: ${response.statusText}`,
-        timestamp: new Date().toISOString(),
-      }));
-      throw error;
+      if (!response.ok) {
+        const error: ApiError = await response.json().catch(() => ({
+          error: `HTTP ${response.status}: ${response.statusText}`,
+          timestamp: new Date().toISOString(),
+        }));
+        throw error;
+      }
+
+      if (response.status === 204) return undefined as T;
+      return response.json();
+    } finally {
+      clearTimeout(timeout);
     }
-
-    if (response.status === 204) return undefined as T;
-    return response.json();
   }
 
   get<T>(path: string): Promise<T> {

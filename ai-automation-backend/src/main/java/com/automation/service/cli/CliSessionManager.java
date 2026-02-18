@@ -20,15 +20,22 @@ public class CliSessionManager {
 
     public CliSession getOrCreateSession(String containerId, String cliType) throws IOException {
         String sessionKey = containerId + ":" + cliType;
-        return activeSessions.computeIfAbsent(sessionKey, key -> {
-            CliSession session = new CliSession(containerId, cliType);
-            try {
-                session.start();
-            } catch (IOException e) {
-                throw new RuntimeException("Failed to start CLI session", e);
-            }
-            return session;
-        });
+        try {
+            return activeSessions.computeIfAbsent(sessionKey, key -> {
+                CliSession session = new CliSession(containerId, cliType);
+                try {
+                    session.start();
+                } catch (IOException e) {
+                    session.close();
+                    throw new RuntimeException("Failed to start CLI session", e);
+                }
+                return session;
+            });
+        } catch (RuntimeException e) {
+            activeSessions.remove(sessionKey);
+            if (e.getCause() instanceof IOException ioe) throw ioe;
+            throw e;
+        }
     }
 
     public void closeSession(String containerId) {

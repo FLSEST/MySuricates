@@ -186,7 +186,7 @@ class LearningServiceTest {
 
         assertThat(similar).hasSize(1);
         assertThat(similar.get(0).get("workflowId")).isEqualTo("wf-2");
-        assertThat(similar.get(0).get("similarity")).isEqualTo("100%");
+        assertThat(similar.get(0).get("similarity")).isEqualTo(100L);
     }
 
     @Test

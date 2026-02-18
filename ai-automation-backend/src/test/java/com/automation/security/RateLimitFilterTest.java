@@ -32,6 +32,7 @@ class RateLimitFilterTest {
     @BeforeEach
     void setUp() {
         filter = new RateLimitFilter();
+        ReflectionTestUtils.setField(filter, "trustedProxies", "127.0.0.1,::1");
     }
 
     @Test
@@ -80,6 +81,7 @@ class RateLimitFilterTest {
     void rateLimitEnabled_usesForwardedFor() throws Exception {
         ReflectionTestUtils.setField(filter, "rateLimitEnabled", true);
         ReflectionTestUtils.setField(filter, "requestsPerMinute", 1);
+        when(request.getRemoteAddr()).thenReturn("127.0.0.1");
         when(request.getHeader("X-Forwarded-For")).thenReturn("10.0.0.1, 10.0.0.2");
 
         StringWriter stringWriter = new StringWriter();

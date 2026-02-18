@@ -44,4 +44,6 @@ public class Container {
     private Instant startedAt;
 
     private Instant stoppedAt;
+
+    private Instant lastActivityAt;
 }

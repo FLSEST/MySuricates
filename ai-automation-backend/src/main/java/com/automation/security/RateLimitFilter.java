@@ -12,6 +12,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -24,6 +25,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     @Value("${automation.security.rate-limit.enabled:false}")
     private boolean rateLimitEnabled;
+
+    @Value("${automation.security.trusted-proxies:127.0.0.1,::1}")
+    private String trustedProxies;
 
     private final Map<String, ClientBucket> buckets = new ConcurrentHashMap<>();
 
@@ -54,11 +58,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private String getClientId(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
+        String remoteAddr = request.getRemoteAddr();
+        if (Set.of(trustedProxies.split(",")).contains(remoteAddr)) {
+            String forwarded = request.getHeader("X-Forwarded-For");
+            if (forwarded != null && !forwarded.isBlank()) {
+                return forwarded.split(",")[0].trim();
+            }
         }
-        return request.getRemoteAddr();
+        return remoteAddr;
     }
 
     private static class ClientBucket {

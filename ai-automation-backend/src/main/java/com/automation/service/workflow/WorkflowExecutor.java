@@ -5,11 +5,14 @@ import com.automation.exception.WorkflowExecutionException;
 import com.automation.executor.ApprovalRequest;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
+import com.automation.repository.ContainerRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.project.ContainerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
@@ -20,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Semaphore;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,8 +35,10 @@ public class WorkflowExecutor {
     private final ContainerService containerService;
     private final CommandExecutorService commandExecutorService;
     private final WorkflowRunRepository runRepository;
+    private final ContainerRepository containerRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final ExecutorService virtualThreadExecutor;
+    private final Semaphore executionSemaphore;
 
     private final Map<String, ExecutionContext> activeExecutions = new ConcurrentHashMap<>();
 
@@ -65,6 +71,18 @@ public class WorkflowExecutor {
 
     private void executeBlocks(String runId, Project project, List<BlockDefinition> blocks,
                                List<Skill> skills, Map<String, Object> inputContext) {
+        try {
+            executionSemaphore.acquire();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            WorkflowRun run = runRepository.findById(runId).orElseThrow();
+            run.setStatus(RunStatus.FAILED);
+            run.setCompletedAt(Instant.now());
+            run.setError(Map.of("message", "Interrupted while waiting for execution slot"));
+            runRepository.save(run);
+            return;
+        }
+
         WorkflowRun run = runRepository.findById(runId).orElseThrow();
         // Replace lazy proxy with fresh list — run was just created with 0 steps
         run.setSteps(new ArrayList<>());
@@ -102,6 +120,9 @@ public class WorkflowExecutor {
                 run.addStep(step);
                 context.setPreviousOutput(step.getOutput());
 
+                // Update container last activity
+                updateContainerActivity(containerId);
+
                 broadcastStepResult(run.getId(), step);
                 runRepository.save(run);
 
@@ -128,6 +149,7 @@ public class WorkflowExecutor {
             );
             runRepository.save(run);
             activeExecutions.remove(run.getId());
+            executionSemaphore.release();
 
             // Broadcast final status
             broadcastStepResult(run.getId(), run.getStatus());
@@ -232,6 +254,32 @@ public class WorkflowExecutor {
             );
         } catch (Exception e) {
             log.warn("Failed to broadcast step result: {}", e.getMessage());
+        }
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void recoverOrphanedRuns() {
+        List<WorkflowRun> orphaned = runRepository.findByStatus(RunStatus.RUNNING);
+        for (WorkflowRun run : orphaned) {
+            log.warn("Marking orphaned run {} as FAILED (server restart)", run.getId());
+            run.setStatus(RunStatus.FAILED);
+            run.setCompletedAt(Instant.now());
+            run.setError(Map.of("error", "Server restarted during execution"));
+            runRepository.save(run);
+        }
+        if (!orphaned.isEmpty()) {
+            log.info("Recovered {} orphaned runs", orphaned.size());
+        }
+    }
+
+    private void updateContainerActivity(String containerId) {
+        try {
+            containerRepository.findByDockerContainerId(containerId).ifPresent(container -> {
+                container.setLastActivityAt(Instant.now());
+                containerRepository.save(container);
+            });
+        } catch (Exception e) {
+            log.debug("Failed to update container activity: {}", e.getMessage());
         }
     }
 

@@ -4,6 +4,7 @@ import com.automation.entity.*;
 import com.automation.exception.WorkflowExecutionException;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
+import com.automation.repository.ContainerRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.project.ContainerService;
@@ -16,6 +17,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.util.*;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Semaphore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -35,6 +37,9 @@ class WorkflowExecutorTest {
 
     @Mock
     private WorkflowRunRepository runRepository;
+
+    @Mock
+    private ContainerRepository containerRepository;
 
     @Mock
     private SimpMessagingTemplate messagingTemplate;
@@ -63,8 +68,10 @@ class WorkflowExecutorTest {
                 containerService,
                 commandExecutorService,
                 runRepository,
+                containerRepository,
                 messagingTemplate,
-                virtualThreadExecutor
+                virtualThreadExecutor,
+                new Semaphore(10)
         );
 
         testProject = Project.builder()

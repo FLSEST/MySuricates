@@ -191,13 +191,13 @@ public class LearningService {
                 similar.add(Map.of(
                         "workflowId", other.getId(),
                         "workflowName", other.getName(),
-                        "similarity", Math.round(similarity * 100) + "%",
+                        "similarity", Math.round(similarity * 100),
                         "blockTypes", otherTypes
                 ));
             }
         }
 
-        similar.sort((a, b) -> ((String) b.get("similarity")).compareTo((String) a.get("similarity")));
+        similar.sort((a, b) -> Long.compare((Long) b.get("similarity"), (Long) a.get("similarity")));
         return similar;
     }
 

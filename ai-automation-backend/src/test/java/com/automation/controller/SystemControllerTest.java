@@ -6,6 +6,8 @@ import com.automation.exception.TailscaleException;
 import com.automation.service.system.TailscaleService;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.PingCmd;
+
+import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -31,6 +33,9 @@ class SystemControllerTest {
 
     @MockBean
     private TailscaleService tailscaleService;
+
+    @MockBean
+    private DataSource dataSource;
 
     @Test
     void health_dockerAvailable_returnsUp() throws Exception {

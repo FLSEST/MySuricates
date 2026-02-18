@@ -49,9 +49,14 @@ automation:
   cli:
     host-home: ${AUTOMATION_HOST_HOME:}    # Default: System.getProperty("user.home")
     host-uid: ${AUTOMATION_HOST_UID:}      # Default: detected via 'id -u'
+  cors:
+    allowed-origins: ${AUTOMATION_CORS_ORIGINS:http://localhost:3000,http://localhost:5173}
+  workspace:
+    root: ${AUTOMATION_WORKSPACE_ROOT:}
   security:
     enabled: ${AUTOMATION_SECURITY_ENABLED:false}
     api-key: ${AUTOMATION_API_KEY:}
+    trusted-proxies: ${AUTOMATION_TRUSTED_PROXIES:127.0.0.1,::1}
     rate-limit:
       enabled: ${AUTOMATION_RATE_LIMIT_ENABLED:false}
       requests-per-minute: ${AUTOMATION_RATE_LIMIT_RPM:120}
@@ -59,6 +64,8 @@ automation:
     enabled: ${AUTOMATION_TAILSCALE_ENABLED:false}
   host-claude:
     timeout-seconds: ${AUTOMATION_HOST_CLAUDE_TIMEOUT:300}
+  execution:
+    max-concurrent: ${AUTOMATION_MAX_CONCURRENT_RUNS:10}
 
 logging:
   level:

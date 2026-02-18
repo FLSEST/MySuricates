@@ -101,9 +101,9 @@ public class ContainerService {
                                             // Claude binary (read-only, from host)
                                             Bind.parse(hostHome + "/.local/bin/claude:" + CONTAINER_HOME + "/.local/bin/claude:ro"),
                                             Bind.parse(hostHome + "/.local/share/claude:" + CONTAINER_HOME + "/.local/share/claude:ro"),
-                                            // Claude config (read-write, needs token refresh)
-                                            Bind.parse(hostHome + "/.claude:" + CONTAINER_HOME + "/.claude"),
-                                            Bind.parse(hostHome + "/.claude.json:" + CONTAINER_HOME + "/.claude.json")
+                                            // Claude config (read-only)
+                                            Bind.parse(hostHome + "/.claude:" + CONTAINER_HOME + "/.claude:ro"),
+                                            Bind.parse(hostHome + "/.claude.json:" + CONTAINER_HOME + "/.claude.json:ro")
                                     )
                     )
                     .withUser(hostUid)
@@ -120,6 +120,7 @@ public class ContainerService {
                     .status(ContainerStatus.RUNNING)
                     .mounts(Map.of("workspace", project.getPath()))
                     .startedAt(Instant.now())
+                    .lastActivityAt(Instant.now())
                     .build();
 
             Container saved = containerRepository.save(container);
@@ -165,7 +166,10 @@ public class ContainerService {
                         container.getDockerContainerId());
                 continue;
             }
-            if (container.getStartedAt() != null && container.getStartedAt().isBefore(threshold)) {
+            Instant lastActivity = container.getLastActivityAt() != null
+                    ? container.getLastActivityAt()
+                    : container.getStartedAt();
+            if (lastActivity != null && lastActivity.isBefore(threshold)) {
                 log.info("Stopping idle container: {}", container.getDockerContainerId());
                 removeDockerContainer(container.getDockerContainerId());
                 container.setStatus(ContainerStatus.STOPPED);
