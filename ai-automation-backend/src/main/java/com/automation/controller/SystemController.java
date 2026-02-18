@@ -4,14 +4,23 @@ import com.automation.dto.response.RemoteAccessResponse;
 import com.automation.service.system.TailscaleService;
 import com.github.dockerjava.api.DockerClient;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Stream;
 import java.util.stream.Stream;
 
 @RestController
@@ -21,6 +30,9 @@ public class SystemController {
 
     private final DockerClient dockerClient;
     private final TailscaleService tailscaleService;
+
+    @Value("${spring.datasource.url}")
+    private String datasourceUrl;
 
     @GetMapping("/health")
     public Map<String, Object> health() {
@@ -65,6 +77,62 @@ public class SystemController {
     public ResponseEntity<RemoteAccessResponse> remoteAccessStatus() {
         RemoteAccessResponse response = tailscaleService.getStatus();
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/backup")
+    public ResponseEntity<Resource> backupDatabase() throws IOException {
+        // Extract DB path from JDBC URL like "jdbc:sqlite:./data/automation.db?..."
+        String url = datasourceUrl;
+        if (url.startsWith("jdbc:sqlite:")) {
+            url = url.substring("jdbc:sqlite:".length());
+        }
+        int queryIdx = url.indexOf('?');
+        if (queryIdx > 0) {
+            url = url.substring(0, queryIdx);
+        }
+
+        Path dbPath = Path.of(url).toAbsolutePath().normalize();
+        if (!Files.exists(dbPath)) {
+            return ResponseEntity.notFound().build();
+        }
+
+        // Copy to temp file (WAL-safe snapshot)
+        Path tempFile = Files.createTempFile("autopilot-backup-", ".db");
+        Files.copy(dbPath, tempFile, StandardCopyOption.REPLACE_EXISTING);
+
+        // Also copy WAL and SHM if they exist (for consistency)
+        Path walPath = Path.of(dbPath + "-wal");
+        Path shmPath = Path.of(dbPath + "-shm");
+        if (Files.exists(walPath)) {
+            Files.copy(walPath, Path.of(tempFile + "-wal"), StandardCopyOption.REPLACE_EXISTING);
+        }
+        if (Files.exists(shmPath)) {
+            Files.copy(shmPath, Path.of(tempFile + "-shm"), StandardCopyOption.REPLACE_EXISTING);
+        }
+
+        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm"));
+        String filename = "autopilot-backup-" + timestamp + ".db";
+
+        InputStreamResource resource = new InputStreamResource(new FileInputStream(tempFile.toFile())) {
+            @Override
+            public InputStream getInputStream() throws IOException {
+                return new FileInputStream(tempFile.toFile()) {
+                    @Override
+                    public void close() throws IOException {
+                        super.close();
+                        Files.deleteIfExists(tempFile);
+                        Files.deleteIfExists(Path.of(tempFile + "-wal"));
+                        Files.deleteIfExists(Path.of(tempFile + "-shm"));
+                    }
+                };
+            }
+        };
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .contentLength(Files.size(tempFile))
+                .body(resource);
     }
 
     private static final Set<String> BLOCKED_PREFIXES = Set.of(

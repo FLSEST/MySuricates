@@ -78,7 +78,7 @@ export interface UpdateWorkflowRequest {
   blocks?: BlockDefinition[];
 }
 
-export type BlockType = 'simple' | 'retry' | 'foreach' | 'while' | 'conditional' | 'skill-capability';
+export type BlockType = 'simple' | 'retry' | 'foreach' | 'while' | 'conditional' | 'skill-capability' | 'approval' | 'agentic';
 
 export interface BlockDefinition {
   type: BlockType;
@@ -89,7 +89,7 @@ export interface BlockDefinition {
 // ── Workflow Run ─────────────────────────────────────────
 
 export type RunStatus = 'PENDING' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
-export type StepStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'SKIPPED';
+export type StepStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'SKIPPED' | 'WAITING_APPROVAL';
 
 export interface WorkflowRun {
   id: string;
@@ -228,10 +228,13 @@ export interface TimeSeriesPoint {
 export interface DashboardData {
   totalWorkflows: number;
   totalRuns: number;
+  runsToday: number;
   successfulRuns: number;
   failedRuns: number;
   averageDurationMs: number;
   successRate: number;
+  totalCostUsd30d: number;
+  totalTokens30d: number;
   topWorkflows: Array<{ workflowId: string; workflowName: string; runCount: number }>;
   recentRuns: WorkflowRun[];
   timeSeries?: TimeSeriesPoint[];
@@ -244,6 +247,94 @@ export interface WorkflowStats {
   failedRuns: number;
   averageDurationMs: number;
   successRate: number;
+}
+
+// ── Agentic Loop ─────────────────────────────────────────
+
+export type AgenticPhase = 'reasoning' | 'acting' | 'acted' | 'approval' | 'completed' | 'error';
+
+export interface AgenticIteration {
+  iteration: number;
+  reasoning?: string;
+  action?: string;
+  output?: string;
+  exitCode?: number;
+  phase: AgenticPhase;
+  timestamp: string;
+}
+
+export interface AgenticState {
+  stepIndex: number;
+  goal: string;
+  maxIterations: number;
+  currentIteration: number;
+  iterations: AgenticIteration[];
+  goalAchieved: boolean | null;
+  finalSummary?: string;
+}
+
+// ── Execution Insights ──────────────────────────────────
+
+export interface StepInsight {
+  stepIndex: number;
+  status: string;
+  durationMs: number | null;
+  costUsd: number;
+  inputTokens: number;
+  outputTokens: number;
+  model: string | null;
+  numTurns: number | null;
+  toolNames: string[] | null;
+  toolUseCount: number | null;
+}
+
+export interface RunInsights {
+  runId: string;
+  status: string;
+  totalCostUsd: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalTokens: number;
+  durationMs: number | null;
+  steps: StepInsight[];
+}
+
+export interface ExecutionInsights {
+  totalRuns: number;
+  runsWithInsights: number;
+  totalCostUsd: number;
+  avgCostPerRunUsd: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalTokens: number;
+  modelsUsed: string[];
+}
+
+// ── Tool Patterns ───────────────────────────────────────
+
+export interface ToolPattern {
+  pattern: string[];
+  frequency: number;
+  avgCostUsd: number;
+  occurrences: number;
+}
+
+export interface ToolPatternsResponse {
+  workflowId: string;
+  totalAgenticRuns: number;
+  patterns: ToolPattern[];
+  topTools: Array<{ name: string; count: number }>;
+}
+
+// ── Agentic → Workflow Conversion ───────────────────────
+
+export interface WorkflowSuggestion {
+  suggestedName: string;
+  suggestedDescription: string;
+  blocks: BlockDefinition[];
+  originalGoal: string;
+  agenticStepsAnalyzed: number;
+  available: boolean;
 }
 
 // ── API Error ────────────────────────────────────────────

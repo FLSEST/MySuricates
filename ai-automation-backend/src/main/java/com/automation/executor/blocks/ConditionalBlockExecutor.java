@@ -34,10 +34,11 @@ public class ConditionalBlockExecutor implements BlockExecutor {
         // Evaluate condition by asking Claude
         String conditionResult = commandExecutor.executeCommand(
                 context.getContainerId(), "claude",
-                "Evaluate this condition and respond with only 'true' or 'false': " + condition
+                "Evaluate this condition and respond with ONLY the word TRUE or FALSE, nothing else: " + condition
         ).output();
 
-        boolean conditionMet = conditionResult.trim().toLowerCase().contains("true");
+        String trimmed = conditionResult.trim().toUpperCase();
+        boolean conditionMet = trimmed.equals("TRUE") || trimmed.startsWith("TRUE");
         String commandToExecute = conditionMet ? thenCommand : elseCommand;
 
         result.setInput("if (" + condition + ") → " + conditionMet);

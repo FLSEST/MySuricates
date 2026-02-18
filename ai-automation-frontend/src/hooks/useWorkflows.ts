@@ -7,6 +7,7 @@ import type { Workflow, WorkflowRun, CreateWorkflowRequest, UpdateWorkflowReques
 interface WorkflowApiResponse {
   id: string;
   projectId: string;
+  projectName: string;
   name: string;
   description: string;
   icon: string;
@@ -22,7 +23,7 @@ interface WorkflowApiResponse {
 function mapWorkflow(raw: WorkflowApiResponse): Workflow {
   return {
     ...raw,
-    projectName: '',
+    projectName: raw.projectName ?? '',
     activatedSkillIds: raw.activatedSkills?.map((s) => s.id) ?? [],
     activatedSkillNames: raw.activatedSkills?.map((s) => s.name) ?? [],
     runCount: raw.runCount ?? 0,
@@ -140,5 +141,16 @@ export function useRunCommand() {
   return useMutation({
     mutationFn: ({ runId, command }: { runId: string; command: string }) =>
       api.post<{ output: string }>(`/executions/${runId}/command`, { command }),
+  });
+}
+
+export function useSubmitApproval() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ runId, answer }: { runId: string; answer: string }) =>
+      api.post(`/executions/${runId}/approve`, { answer }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workflows'] });
+    },
   });
 }

@@ -1,29 +1,13 @@
 import { useState } from 'react';
-import { Zap, Search, FileCode2, FileText, Database, Pen, Microscope, Briefcase } from 'lucide-react';
+import { Zap, Search, Store } from 'lucide-react';
 import { Card, Button, Input, Badge, Spinner } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
+import { SkillCatalog } from '../components/skill/SkillCatalog';
 import { useSkills, useSkillCapabilities } from '../hooks/useSkills';
 import { useT } from '../i18n';
+import { CATEGORY_ICONS, CATEGORY_COLORS, SKILL_CATEGORIES } from '../data/skillConstants';
 import type { Skill, SkillCategory } from '../types';
-
-const CATEGORY_ICONS: Record<SkillCategory, React.ReactNode> = {
-  CODE: <FileCode2 className="w-5 h-5" />,
-  DOCUMENT: <FileText className="w-5 h-5" />,
-  DATA: <Database className="w-5 h-5" />,
-  CONTENT: <Pen className="w-5 h-5" />,
-  RESEARCH: <Microscope className="w-5 h-5" />,
-  BUSINESS: <Briefcase className="w-5 h-5" />,
-};
-
-const CATEGORY_COLORS: Record<SkillCategory, string> = {
-  CODE: 'text-accent',
-  DOCUMENT: 'text-[var(--color-warning)]',
-  DATA: 'text-[var(--color-success)]',
-  CONTENT: 'text-purple-400',
-  RESEARCH: 'text-blue-400',
-  BUSINESS: 'text-orange-400',
-};
 
 function SkillCard({ skill, onSelect }: { skill: Skill; onSelect: (s: Skill) => void }) {
   const t = useT();
@@ -129,8 +113,7 @@ export function Skills() {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<SkillCategory | 'ALL'>('ALL');
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
-
-  const categories: SkillCategory[] = ['CODE', 'DOCUMENT', 'DATA', 'CONTENT', 'RESEARCH', 'BUSINESS'];
+  const [catalogOpen, setCatalogOpen] = useState(false);
 
   const filtered = skills?.filter((s) => {
     const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -154,9 +137,17 @@ export function Skills() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-text">{t.skills.title}</h1>
-        <p className="text-sm text-text-secondary mt-1">{t.skills.subtitle}</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-text">{t.skills.title}</h1>
+          <p className="text-sm text-text-secondary mt-1">{t.skills.subtitle}</p>
+        </div>
+        <Button
+          icon={<Store className="w-4 h-4" />}
+          onClick={() => setCatalogOpen(true)}
+        >
+          {t.skills.catalog}
+        </Button>
       </div>
 
       {/* Filters */}
@@ -180,7 +171,7 @@ export function Skills() {
           >
             {t.common.all}
           </button>
-          {categories.map((cat) => (
+          {SKILL_CATEGORIES.map((cat) => (
             <button
               key={cat}
               onClick={() => setCategoryFilter(cat)}
@@ -214,6 +205,14 @@ export function Skills() {
       {/* Skill detail slide-over */}
       {selectedSkill && (
         <SkillDetail skill={selectedSkill} onClose={() => setSelectedSkill(null)} />
+      )}
+
+      {/* Skill catalog overlay */}
+      {catalogOpen && (
+        <SkillCatalog
+          installedSkills={skills ?? []}
+          onClose={() => setCatalogOpen(false)}
+        />
       )}
     </div>
   );

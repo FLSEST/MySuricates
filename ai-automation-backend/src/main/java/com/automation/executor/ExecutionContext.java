@@ -6,8 +6,11 @@ import lombok.Setter;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Getter
 @Builder
@@ -30,6 +33,15 @@ public class ExecutionContext {
 
     @Builder.Default
     private final AtomicBoolean cancelled = new AtomicBoolean(false);
+
+    @Builder.Default
+    private final AtomicReference<CompletableFuture<String>> pendingApproval = new AtomicReference<>();
+
+    @Builder.Default
+    private final AtomicReference<ApprovalRequest> currentApprovalRequest = new AtomicReference<>();
+
+    @Builder.Default
+    private final Map<String, String> approvalMemory = new ConcurrentHashMap<>();
 
     public int nextStepIndex() {
         return stepCounter.getAndIncrement();
@@ -76,5 +88,34 @@ public class ExecutionContext {
 
     public void cancel() {
         cancelled.set(true);
+        // Cancel any pending approval
+        CompletableFuture<String> future = pendingApproval.getAndSet(null);
+        if (future != null) {
+            future.completeExceptionally(new java.util.concurrent.CancellationException("Execution cancelled"));
+        }
+        currentApprovalRequest.set(null);
+    }
+
+    public CompletableFuture<String> requestApproval(ApprovalRequest request) {
+        CompletableFuture<String> future = new CompletableFuture<>();
+        currentApprovalRequest.set(request);
+        pendingApproval.set(future);
+        return future;
+    }
+
+    public void resolveApproval(String answer) {
+        CompletableFuture<String> future = pendingApproval.getAndSet(null);
+        currentApprovalRequest.set(null);
+        if (future != null) {
+            future.complete(answer);
+        }
+    }
+
+    public void rememberApproval(String question, String answer) {
+        approvalMemory.put(question, answer);
+    }
+
+    public String getRememberedApproval(String question) {
+        return approvalMemory.get(question);
     }
 }

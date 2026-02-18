@@ -57,6 +57,8 @@ automation:
       requests-per-minute: ${AUTOMATION_RATE_LIMIT_RPM:120}
   tailscale:
     enabled: ${AUTOMATION_TAILSCALE_ENABLED:false}
+  host-claude:
+    timeout-seconds: ${AUTOMATION_HOST_CLAUDE_TIMEOUT:300}
 
 logging:
   level:

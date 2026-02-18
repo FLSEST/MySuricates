@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -23,6 +24,15 @@ public class CommandExecutorService {
         try {
             CliSession session = sessionManager.getOrCreateSession(containerId, cliType);
             return session.sendCommand(command);
+        } catch (IOException e) {
+            throw new WorkflowExecutionException("Failed to execute command in container: " + containerId, e);
+        }
+    }
+
+    public CliSession.EnrichedCommandResult executeCommandEnriched(String containerId, String cliType, String command) {
+        try {
+            CliSession session = sessionManager.getOrCreateSession(containerId, cliType);
+            return session.sendCommandEnriched(command);
         } catch (IOException e) {
             throw new WorkflowExecutionException("Failed to execute command in container: " + containerId, e);
         }
@@ -56,9 +66,14 @@ public class CommandExecutorService {
         step.setStatus(StepStatus.RUNNING);
 
         try {
-            CliSession.CommandResult result = executeCommand(containerId, cliType, command);
+            CliSession.EnrichedCommandResult result = executeCommandEnriched(containerId, cliType, command);
             step.setOutput(result.output());
             step.setStatus(result.exitCode() == 0 ? StepStatus.COMPLETED : StepStatus.FAILED);
+
+            if (result.parsed() != null) {
+                Map<String, Object> meta = new LinkedHashMap<>(result.parsed().toMetadata());
+                step.setMetadata(meta);
+            }
         } catch (Exception e) {
             step.setOutput("Error: " + e.getMessage());
             step.setStatus(StepStatus.FAILED);

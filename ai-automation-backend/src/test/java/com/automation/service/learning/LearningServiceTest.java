@@ -13,6 +13,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -252,22 +253,107 @@ class LearningServiceTest {
 
     @Test
     void getDashboard_computesOverview() {
-        Workflow wf = Workflow.builder().id("wf-1").name("Test").build();
-        List<WorkflowRun> allRuns = List.of(
-                createRunForWorkflow(wf, RunStatus.COMPLETED, 1000L),
-                createRunForWorkflow(wf, RunStatus.COMPLETED, 2000L),
-                createRunForWorkflow(wf, RunStatus.FAILED, 500L)
-        );
-        when(runRepository.findAllWithWorkflow()).thenReturn(allRuns);
         when(workflowRepository.count()).thenReturn(2L);
+        when(runRepository.count()).thenReturn(3L);
+        when(runRepository.countByStatus(RunStatus.COMPLETED)).thenReturn(2L);
+        when(runRepository.countByStatus(RunStatus.FAILED)).thenReturn(1L);
+        when(runRepository.countByStartedAtAfter(any(Instant.class))).thenReturn(0L);
+        when(runRepository.findByStartedAtAfterOrderByStartedAtDesc(any(Instant.class))).thenReturn(List.of());
+        when(runRepository.findTopWorkflows()).thenReturn(List.of());
+        when(runRepository.findTop10ByOrderByStartedAtDesc()).thenReturn(List.of());
 
         DashboardResponse dashboard = learningService.getDashboard();
 
         assertThat(dashboard.totalWorkflows()).isEqualTo(2L);
         assertThat(dashboard.totalRuns()).isEqualTo(3L);
+        assertThat(dashboard.runsToday()).isEqualTo(0L);
         assertThat(dashboard.successfulRuns()).isEqualTo(2L);
         assertThat(dashboard.failedRuns()).isEqualTo(1L);
         assertThat(dashboard.successRate()).isCloseTo(0.667, within(0.01));
+    }
+
+    // --- getAgenticStrategyHistory ---
+
+    @Test
+    void getAgenticStrategyHistory_noAgenticSteps_returnsEmpty() {
+        WorkflowRun run = createRunWithSteps(List.of(
+                createStep(0, "npm test", StepStatus.COMPLETED, 1000L)
+        ));
+        when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of(run));
+
+        List<Map<String, Object>> history = learningService.getAgenticStrategyHistory("wf-1");
+
+        assertThat(history).isEmpty();
+    }
+
+    @Test
+    void getAgenticStrategyHistory_withAgenticSteps_extractsData() {
+        StepResult agenticStep = StepResult.builder()
+                .stepIndex(0)
+                .input("[Agentic] Fix tests")
+                .status(StepStatus.COMPLETED)
+                .durationMs(5000L)
+                .startedAt(java.time.Instant.now())
+                .metadata(Map.of(
+                        "blockType", "agentic",
+                        "goal", "Fix all tests",
+                        "totalIterations", 3,
+                        "goalAchieved", true,
+                        "iterations", List.of(
+                                Map.of("action", "Run tests", "exitCode", 1),
+                                Map.of("action", "Fix code", "exitCode", 0),
+                                Map.of("action", "Run tests again", "exitCode", 0)
+                        )
+                ))
+                .build();
+
+        WorkflowRun run = createRunWithSteps(List.of(agenticStep));
+        when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of(run));
+
+        List<Map<String, Object>> history = learningService.getAgenticStrategyHistory("wf-1");
+
+        assertThat(history).hasSize(1);
+        assertThat(history.get(0).get("goal")).isEqualTo("Fix all tests");
+        assertThat(history.get(0).get("totalIterations")).isEqualTo(3);
+        assertThat(history.get(0).get("goalAchieved")).isEqualTo(true);
+        assertThat(history.get(0).get("strategy").toString()).contains("Run tests");
+    }
+
+    // --- getAgenticAnalytics ---
+
+    @Test
+    void getAgenticAnalytics_noHistory_returnsZero() {
+        when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of());
+
+        Map<String, Object> analytics = learningService.getAgenticAnalytics("wf-1");
+
+        assertThat(analytics.get("totalAgenticRuns")).isEqualTo(0);
+    }
+
+    @Test
+    void getAgenticAnalytics_withHistory_computesStats() {
+        StepResult step1 = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).durationMs(5000L)
+                .startedAt(java.time.Instant.now())
+                .metadata(Map.of("blockType", "agentic", "goal", "Goal 1",
+                        "totalIterations", 2, "goalAchieved", true, "iterations", List.of()))
+                .build();
+        StepResult step2 = StepResult.builder()
+                .stepIndex(0).status(StepStatus.FAILED).durationMs(3000L)
+                .startedAt(java.time.Instant.now().minusSeconds(60))
+                .metadata(Map.of("blockType", "agentic", "goal", "Goal 2",
+                        "totalIterations", 5, "goalAchieved", false, "iterations", List.of()))
+                .build();
+
+        WorkflowRun run = createRunWithSteps(List.of(step1, step2));
+        when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of(run));
+
+        Map<String, Object> analytics = learningService.getAgenticAnalytics("wf-1");
+
+        assertThat(analytics.get("totalAgenticRuns")).isEqualTo(2L);
+        assertThat(analytics.get("achievedGoals")).isEqualTo(1L);
+        assertThat((double) analytics.get("agenticSuccessRate")).isCloseTo(0.5, within(0.01));
+        assertThat((double) analytics.get("avgIterationsToGoal")).isCloseTo(3.5, within(0.01));
     }
 
     // --- Helper methods ---

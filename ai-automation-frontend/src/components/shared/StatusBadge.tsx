@@ -18,6 +18,7 @@ const statusConfig: Record<string, { variant: 'success' | 'warning' | 'danger' |
   CANCELLED: { variant: 'default' },
   // Step
   SKIPPED: { variant: 'default' },
+  WAITING_APPROVAL: { variant: 'warning', label: 'Approval' },
 };
 
 interface StatusBadgeProps {

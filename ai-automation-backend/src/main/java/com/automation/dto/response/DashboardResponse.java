@@ -5,10 +5,13 @@ import java.util.List;
 public record DashboardResponse(
         long totalWorkflows,
         long totalRuns,
+        long runsToday,
         long successfulRuns,
         long failedRuns,
         double averageDurationMs,
         double successRate,
+        double totalCostUsd30d,
+        long totalTokens30d,
         List<TopWorkflowEntry> topWorkflows,
         List<WorkflowRunResponse> recentRuns,
         List<TimeSeriesPoint> timeSeries

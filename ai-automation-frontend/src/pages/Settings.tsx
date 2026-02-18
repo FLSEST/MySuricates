@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Card, CardHeader, Button, Input, Toggle, Select } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { useThemeStore } from '../stores/themeStore';
@@ -5,7 +6,7 @@ import { useSettingsStore } from '../stores/settingsStore';
 import { useI18nStore, type Locale } from '../i18n';
 import { useT } from '../i18n';
 import { useSystemHealth, useSystemInfo, useRemoteAccessStatus, useEnableRemoteAccess, useDisableRemoteAccess } from '../hooks/useSystem';
-import { Sun, Moon, Globe, Shield, Paintbrush, Wifi, Server, RotateCcw } from 'lucide-react';
+import { Sun, Moon, Globe, Shield, Paintbrush, Wifi, Server, RotateCcw, Database, Download } from 'lucide-react';
 import { lightTheme, darkTheme, type ThemeTokens } from '../theme/tokens';
 
 const COLOR_KEYS: Array<{ key: keyof ThemeTokens; label: string }> = [
@@ -26,12 +27,34 @@ export function Settings() {
   const { mode, setMode, overrides, setOverride, resetOverrides } = useThemeStore();
   const { apiKey, setApiKey, advancedMode, setAdvancedMode } = useSettingsStore();
   const { locale, setLocale } = useI18nStore();
+  const [backupLoading, setBackupLoading] = useState(false);
 
   const { data: health } = useSystemHealth();
   const { data: sysInfo } = useSystemInfo();
   const { data: remoteAccess } = useRemoteAccessStatus();
   const enableRemote = useEnableRemoteAccess();
   const disableRemote = useDisableRemoteAccess();
+
+  const handleBackup = async () => {
+    setBackupLoading(true);
+    try {
+      const res = await fetch('/api/v1/system/backup');
+      if (!res.ok) throw new Error('Backup failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = res.headers.get('content-disposition')?.match(/filename="(.+)"/)?.[1] ?? 'autopilot-backup.db';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      // silently fail — user sees no download
+    } finally {
+      setBackupLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in max-w-3xl">
@@ -206,6 +229,28 @@ export function Settings() {
               Hostname: {remoteAccess.hostname}
             </p>
           )}
+        </div>
+      </Card>
+
+      {/* Database Backup */}
+      <Card>
+        <CardHeader title={t.settings.backup} />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Database className="w-5 h-5 text-text-secondary" />
+            <div>
+              <p className="text-sm font-medium text-text">{t.settings.backup}</p>
+              <p className="text-xs text-text-tertiary">{t.settings.backupDescription}</p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            icon={<Download className="w-4 h-4" />}
+            onClick={handleBackup}
+            loading={backupLoading}
+          >
+            {t.settings.backupButton}
+          </Button>
         </div>
       </Card>
 

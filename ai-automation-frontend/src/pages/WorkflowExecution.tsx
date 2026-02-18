@@ -1,27 +1,28 @@
-import { useState } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Pause, Play, XCircle, Clock, CheckCircle2, AlertCircle, Send,
+  ArrowLeft, Pause, Play, XCircle, Clock, CheckCircle2, AlertCircle, Send, TerminalSquare,
 } from 'lucide-react';
 import { Card, CardHeader, Button, Spinner, Badge, Input } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ErrorState } from '../components/shared/ErrorState';
 import { LogViewer } from '../components/shared/LogViewer';
+import { ApprovalDialog } from '../components/shared/ApprovalDialog';
+import { AgenticStepCard } from '../components/shared/AgenticStepCard';
+import { InsightsPanel } from '../components/shared/InsightsPanel';
+import { ConversionSuggestion } from '../components/shared/ConversionSuggestion';
 import {
   useWorkflow, useWorkflowRuns,
-  usePauseExecution, useResumeExecution, useCancelExecution, useRunCommand,
+  usePauseExecution, useResumeExecution, useCancelExecution, useRunCommand, useSubmitApproval,
 } from '../hooks/useWorkflows';
 import { useExecutionWebSocket } from '../hooks/useWebSocket';
 import { useRateRun } from '../hooks/useLearning';
 import { useT } from '../i18n';
+import { formatDuration } from '../utils/formatTime';
+import { api } from '../api/client';
 import type { WorkflowRun, StepResult } from '../types';
 
-function formatDuration(ms: number | null): string {
-  if (!ms) return '-';
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
-  return `${(ms / 60_000).toFixed(1)}m`;
-}
+const TerminalPanel = lazy(() => import('../components/shared/TerminalPanel').then(m => ({ default: m.TerminalPanel })));
 
 function StepCard({ step }: { step: StepResult }) {
   return (
@@ -73,14 +74,38 @@ export function WorkflowExecution() {
 
   const { data: workflow } = useWorkflow(id!);
   const { data: runs, error: runsError, refetch: refetchRuns } = useWorkflowRuns(id!);
-  const { logs, connected } = useExecutionWebSocket(runId!, id);
+  const { logs, connected, pendingApproval, agenticStates } = useExecutionWebSocket(runId!, id);
   const rateRun = useRateRun();
   const pauseExecution = usePauseExecution();
   const resumeExecution = useResumeExecution();
   const cancelExecution = useCancelExecution();
   const runCommand = useRunCommand();
+  const submitApproval = useSubmitApproval();
 
   const [command, setCommand] = useState('');
+  const [containerTab, setContainerTab] = useState<'command' | 'terminal'>('command');
+  const [recoveredApproval, setRecoveredApproval] = useState<{
+    blockId: string; question: string; options: string[]; stepIndex: number;
+  } | null>(null);
+
+  // Recovery: check for pending approval on page load/reload
+  useEffect(() => {
+    if (!runId) return;
+    api.get<{ pending: boolean; blockId?: string; question?: string; options?: string[]; stepIndex?: number }>(
+      `/executions/${runId}/approval`
+    ).then((data) => {
+      if (data.pending && data.blockId) {
+        setRecoveredApproval({
+          blockId: data.blockId,
+          question: data.question!,
+          options: data.options!,
+          stepIndex: data.stepIndex!,
+        });
+      }
+    }).catch(() => { /* ignore */ });
+  }, [runId]);
+
+  const activeApproval = pendingApproval ?? recoveredApproval;
 
   const run: WorkflowRun | undefined = runs?.find((r) => r.id === runId);
   const isRunning = run?.status === 'RUNNING' || run?.status === 'PAUSED';
@@ -193,9 +218,13 @@ export function WorkflowExecution() {
             <CardHeader title={`${t.workflows.execution.steps} (${run.steps.length})`} />
           </div>
           <div className="px-5 pb-5 divide-y divide-border">
-            {run.steps.map((step) => (
-              <StepCard key={step.id} step={step} />
-            ))}
+            {run.steps.map((step) =>
+              step.blockType === 'agentic' ? (
+                <AgenticStepCard key={step.id} step={step} agenticState={agenticStates.get(step.stepIndex)} />
+              ) : (
+                <StepCard key={step.id} step={step} />
+              ),
+            )}
             {run.steps.length === 0 && (
               <div className="py-8 text-center text-sm text-text-tertiary">
                 {isRunning ? t.workflows.execution.waitingSteps : t.workflows.execution.noSteps}
@@ -211,39 +240,85 @@ export function WorkflowExecution() {
         </Card>
       </div>
 
-      {/* Command input — visible when running or paused */}
+      {/* Container interaction — visible when running or paused */}
       {isRunning && (
         <Card>
-          <CardHeader title={t.workflows.execution.command} />
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <Input
-                value={command}
-                onChange={(e) => setCommand(e.target.value)}
-                placeholder={t.workflows.execution.commandPlaceholder}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && command.trim()) {
+          <div className="flex items-center gap-1 mb-4 border-b border-border">
+            <button
+              onClick={() => setContainerTab('command')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                containerTab === 'command'
+                  ? 'border-accent text-accent'
+                  : 'border-transparent text-text-secondary hover:text-text'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Send className="w-4 h-4" />
+                {t.workflows.execution.command}
+              </span>
+            </button>
+            <button
+              onClick={() => setContainerTab('terminal')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                containerTab === 'terminal'
+                  ? 'border-accent text-accent'
+                  : 'border-transparent text-text-secondary hover:text-text'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <TerminalSquare className="w-4 h-4" />
+                {t.workflows.execution.terminal.title}
+              </span>
+            </button>
+          </div>
+
+          {containerTab === 'command' && (
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Input
+                  value={command}
+                  onChange={(e) => setCommand(e.target.value)}
+                  placeholder={t.workflows.execution.commandPlaceholder}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && command.trim()) {
+                      runCommand.mutate({ runId: runId!, command: command.trim() });
+                      setCommand('');
+                    }
+                  }}
+                />
+              </div>
+              <Button
+                icon={<Send className="w-4 h-4" />}
+                onClick={() => {
+                  if (command.trim()) {
                     runCommand.mutate({ runId: runId!, command: command.trim() });
                     setCommand('');
                   }
                 }}
-              />
+                loading={runCommand.isPending}
+                disabled={!command.trim()}
+              >
+                {t.workflows.execution.sendCommand}
+              </Button>
             </div>
-            <Button
-              icon={<Send className="w-4 h-4" />}
-              onClick={() => {
-                if (command.trim()) {
-                  runCommand.mutate({ runId: runId!, command: command.trim() });
-                  setCommand('');
-                }
-              }}
-              loading={runCommand.isPending}
-              disabled={!command.trim()}
-            >
-              {t.workflows.execution.sendCommand}
-            </Button>
-          </div>
+          )}
+
+          {containerTab === 'terminal' && (
+            <Suspense fallback={<Spinner text={t.common.loading} />}>
+              <TerminalPanel runId={runId!} />
+            </Suspense>
+          )}
         </Card>
+      )}
+
+      {/* Execution Insights */}
+      {!isRunning && run.steps.length > 0 && (
+        <InsightsPanel runId={runId!} />
+      )}
+
+      {/* Agentic-to-Workflow Conversion */}
+      {run.status === 'COMPLETED' && run.steps.some(s => s.blockType === 'agentic') && (
+        <ConversionSuggestion runId={runId!} />
       )}
 
       {/* Error */}
@@ -254,6 +329,21 @@ export function WorkflowExecution() {
             {JSON.stringify(run.error, null, 2)}
           </pre>
         </Card>
+      )}
+
+      {/* Approval Dialog */}
+      {activeApproval && (
+        <ApprovalDialog
+          approval={activeApproval}
+          loading={submitApproval.isPending}
+          onSubmit={(answer) => {
+            submitApproval.mutate({ runId: runId!, answer }, {
+              onSuccess: () => {
+                setRecoveredApproval(null);
+              },
+            });
+          }}
+        />
       )}
     </div>
   );

@@ -249,4 +249,30 @@ class WorkflowExecutorTest {
         workflowExecutor.cancelExecution("non-existent-run");
         // No exception expected
     }
+
+    @Test
+    void getContainerIdForRun_activeExecution_returnsContainerId() {
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+
+        // Make execution block so we can check mid-flight
+        // Since our mock runs synchronously, we check after execution
+        // (the activeExecutions map is only populated during execution)
+        // We need to capture the container ID during block execution
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenAnswer(inv -> {
+                    // During execution, the container ID should be accessible
+                    String containerId = workflowExecutor.getContainerIdForRun("run-1");
+                    assertThat(containerId).isEqualTo("docker-container-1");
+                    return step;
+                });
+
+        workflowExecutor.execute(testWorkflow, null);
+    }
+
+    @Test
+    void getContainerIdForRun_noActiveExecution_returnsNull() {
+        String result = workflowExecutor.getContainerIdForRun("non-existent-run");
+        assertThat(result).isNull();
+    }
 }

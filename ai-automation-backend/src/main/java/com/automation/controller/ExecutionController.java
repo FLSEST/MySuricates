@@ -2,6 +2,7 @@ package com.automation.controller;
 
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.exception.ResourceNotFoundException;
+import com.automation.executor.ApprovalRequest;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.workflow.WorkflowExecutor;
@@ -43,6 +44,33 @@ public class ExecutionController {
     public ResponseEntity<Void> cancelExecution(@PathVariable String id) {
         workflowExecutor.cancelExecution(id);
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{id}/approve")
+    public ResponseEntity<Void> approveExecution(
+            @PathVariable String id,
+            @RequestBody Map<String, String> body) {
+        String answer = body.get("answer");
+        if (answer == null || answer.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        workflowExecutor.resolveApproval(id, answer);
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/{id}/approval")
+    public ResponseEntity<Map<String, Object>> getPendingApproval(@PathVariable String id) {
+        ApprovalRequest request = workflowExecutor.getPendingApproval(id);
+        if (request == null) {
+            return ResponseEntity.ok(Map.of("pending", false));
+        }
+        return ResponseEntity.ok(Map.of(
+                "pending", true,
+                "blockId", request.getBlockId(),
+                "question", request.getQuestion(),
+                "options", request.getOptions(),
+                "stepIndex", request.getStepIndex()
+        ));
     }
 
     @PostMapping("/{id}/command")

@@ -1,7 +1,8 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FolderKanban, GitBranch, Zap,
-  TrendingUp, Clock,
+  TrendingUp, Clock, Coins,
 } from 'lucide-react';
 import { Card, CardHeader, Button, Spinner } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
@@ -10,7 +11,8 @@ import { RunsChart } from '../components/dashboard/RunsChart';
 import { SuccessRateChart } from '../components/dashboard/SuccessRateChart';
 import { useDashboard } from '../hooks/useLearning';
 import { useProjects } from '../hooks/useProjects';
-import { useT } from '../i18n';
+import { useT, useI18nStore } from '../i18n';
+import { formatDuration, formatRelativeTime, formatDateTime } from '../utils/formatTime';
 import type { WorkflowRun } from '../types';
 
 function StatCard({ icon, label, value, accent }: {
@@ -32,26 +34,21 @@ function StatCard({ icon, label, value, accent }: {
   );
 }
 
-function formatDuration(ms: number | null): string {
-  if (!ms) return '-';
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
-  return `${(ms / 60_000).toFixed(1)}m`;
-}
 
-function formatRelativeTime(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
+function useLiveClock() {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return now;
 }
 
 export function Dashboard() {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const navigate = useNavigate();
+  const now = useLiveClock();
   const { data: dashboard, isLoading: dashLoading, error, refetch } = useDashboard();
   const { data: projects } = useProjects();
 
@@ -74,13 +71,23 @@ export function Dashboard() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-bold text-text">{t.dashboard.title}</h1>
-        <p className="text-sm text-text-secondary mt-1">{t.dashboard.subtitle}</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-text">{t.dashboard.title}</h1>
+          <p className="text-sm text-text-secondary mt-1">{t.dashboard.subtitle}</p>
+        </div>
+        <div className="text-right shrink-0">
+          <p className="text-2xl font-bold text-text font-mono tabular-nums">
+            {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+          </p>
+          <p className="text-sm text-text-secondary">
+            {now.toLocaleDateString([], { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
+          </p>
+        </div>
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 animate-stagger">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 animate-stagger">
         <StatCard
           icon={<FolderKanban className="w-5 h-5 text-accent" />}
           label={t.dashboard.activeProjects}
@@ -96,7 +103,7 @@ export function Dashboard() {
         <StatCard
           icon={<Zap className="w-5 h-5 text-[var(--color-warning)]" />}
           label={t.dashboard.runsToday}
-          value={stats?.totalRuns ?? 0}
+          value={stats?.runsToday ?? 0}
           accent="bg-warning-subtle"
         />
         <StatCard
@@ -104,6 +111,14 @@ export function Dashboard() {
           label={t.dashboard.successRate}
           value={stats?.successRate != null ? `${(stats.successRate * 100).toFixed(0)}%` : '-'}
           accent="bg-accent/10"
+        />
+        <StatCard
+          icon={<Coins className="w-5 h-5 text-[var(--color-warning)]" />}
+          label={t.dashboard.totalCost}
+          value={stats?.totalCostUsd30d != null && stats.totalCostUsd30d > 0
+            ? `$${stats.totalCostUsd30d < 0.01 ? stats.totalCostUsd30d.toFixed(4) : stats.totalCostUsd30d.toFixed(2)}`
+            : '$0.00'}
+          accent="bg-warning-subtle"
         />
       </div>
 
@@ -143,7 +158,7 @@ export function Dashboard() {
                       <Clock className="w-3 h-3" />
                       {formatDuration(run.durationMs)}
                     </span>
-                    <span>{run.startedAt ? formatRelativeTime(run.startedAt) : '-'}</span>
+                    <span>{run.startedAt ? `${formatDateTime(run.startedAt)} · ${formatRelativeTime(run.startedAt, locale)}` : '-'}</span>
                   </div>
                 </div>
               ))}

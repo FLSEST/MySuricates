@@ -60,7 +60,8 @@ class CommandExecutorServiceTest {
 
     @Test
     void executeStep_successfulCommand_returnsCompletedStep() throws IOException {
-        when(cliSession.sendCommand("npm test")).thenReturn(new CliSession.CommandResult("All tests passed", 0));
+        when(cliSession.sendCommandEnriched("npm test"))
+                .thenReturn(new CliSession.EnrichedCommandResult("All tests passed", 0, null));
 
         BlockDefinition block = BlockDefinition.builder()
                 .type("simple")
@@ -78,7 +79,8 @@ class CommandExecutorServiceTest {
 
     @Test
     void executeStep_nonZeroExitCode_returnsFailedStep() throws IOException {
-        when(cliSession.sendCommand("npm test")).thenReturn(new CliSession.CommandResult("Error: test suite failed", 1));
+        when(cliSession.sendCommandEnriched("npm test"))
+                .thenReturn(new CliSession.EnrichedCommandResult("Error: test suite failed", 1, null));
 
         BlockDefinition block = BlockDefinition.builder()
                 .type("simple")
@@ -92,7 +94,7 @@ class CommandExecutorServiceTest {
 
     @Test
     void executeStep_exception_returnsFailedWithErrorMessage() throws IOException {
-        when(cliSession.sendCommand(anyString())).thenThrow(new IOException("Session dead"));
+        when(cliSession.sendCommandEnriched(anyString())).thenThrow(new IOException("Session dead"));
 
         BlockDefinition block = BlockDefinition.builder()
                 .type("simple")

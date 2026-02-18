@@ -9,6 +9,7 @@ import java.util.Map;
 public record WorkflowResponse(
         String id,
         String projectId,
+        String projectName,
         String name,
         String description,
         String icon,

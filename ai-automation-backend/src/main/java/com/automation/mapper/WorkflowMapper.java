@@ -20,6 +20,7 @@ public abstract class WorkflowMapper {
     protected WorkflowRunRepository workflowRunRepository;
 
     @Mapping(source = "project.id", target = "projectId")
+    @Mapping(source = "project.name", target = "projectName")
     @Mapping(target = "runCount", expression = "java(workflowRunRepository.countByWorkflowId(workflow.getId()))")
     public abstract WorkflowResponse toResponse(Workflow workflow);
 

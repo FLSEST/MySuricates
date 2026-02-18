@@ -15,17 +15,11 @@ import { useSkills, useActivateSkills, useDeactivateSkill } from '../hooks/useSk
 import { SortableBlockList } from '../components/workflow/SortableBlockList';
 import { ExecuteDialog } from '../components/workflow/ExecuteDialog';
 import { useT } from '../i18n';
+import { formatDuration } from '../utils/formatTime';
 import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
 import type { BlockDefinition, BlockType, WorkflowRun } from '../types';
 
-const BLOCK_TYPES: BlockType[] = ['simple', 'retry', 'foreach', 'while', 'conditional', 'skill-capability'];
-
-function formatDuration(ms: number | null): string {
-  if (!ms) return '-';
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
-  return `${(ms / 60_000).toFixed(1)}m`;
-}
+const BLOCK_TYPES: BlockType[] = ['simple', 'retry', 'foreach', 'while', 'conditional', 'skill-capability', 'approval', 'agentic'];
 
 export function WorkflowDetail() {
   const { id } = useParams<{ id: string }>();
@@ -360,6 +354,8 @@ export function WorkflowDetail() {
                 while: { condition_command: '', command: '', max_iterations: 10 },
                 conditional: { condition: '', then_command: '', else_command: '' },
                 'skill-capability': { capability: '', input: '{{ previous_output }}' },
+                approval: { question: '', options: ['Yes', 'Yes always', 'No'], mode: 'ask', auto_answer: null, on_no: 'continue', variable_name: 'approval_answer', timeout_minutes: 30 },
+                agentic: { goal: '', success_criteria: '', max_iterations: 10, iteration_timeout_seconds: 300, require_approval: false },
               };
               setNewBlock({ type, config: JSON.stringify(defaultConfig[type], null, 2) });
             }}

@@ -43,6 +43,31 @@ public class LearningController {
         return learningService.getSimilarWorkflows(workflowId);
     }
 
+    @GetMapping("/workflows/{workflowId}/agentic-history")
+    public List<Map<String, Object>> getAgenticStrategyHistory(@PathVariable String workflowId) {
+        return learningService.getAgenticStrategyHistory(workflowId);
+    }
+
+    @GetMapping("/workflows/{workflowId}/agentic-analytics")
+    public Map<String, Object> getAgenticAnalytics(@PathVariable String workflowId) {
+        return learningService.getAgenticAnalytics(workflowId);
+    }
+
+    @GetMapping("/workflows/{workflowId}/tool-patterns")
+    public Map<String, Object> getToolPatterns(@PathVariable String workflowId) {
+        return learningService.getToolPatterns(workflowId);
+    }
+
+    @GetMapping("/workflows/{workflowId}/execution-insights")
+    public Map<String, Object> getExecutionInsights(@PathVariable String workflowId) {
+        return learningService.getExecutionInsights(workflowId);
+    }
+
+    @GetMapping("/runs/{runId}/insights")
+    public Map<String, Object> getRunInsights(@PathVariable String runId) {
+        return learningService.getRunInsights(runId);
+    }
+
     @PostMapping("/runs/{runId}/rate")
     public ResponseEntity<Void> rateRun(
             @PathVariable String runId,

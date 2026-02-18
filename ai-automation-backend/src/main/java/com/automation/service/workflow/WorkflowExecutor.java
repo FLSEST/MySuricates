@@ -2,6 +2,7 @@ package com.automation.service.workflow;
 
 import com.automation.entity.*;
 import com.automation.exception.WorkflowExecutionException;
+import com.automation.executor.ApprovalRequest;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
 import com.automation.repository.WorkflowRunRepository;
@@ -16,8 +17,10 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -147,12 +150,39 @@ public class WorkflowExecutor {
         }
     }
 
+    public Set<String> getActiveContainerIds() {
+        return activeExecutions.values().stream()
+                .map(ExecutionContext::getContainerId)
+                .collect(Collectors.toSet());
+    }
+
+    public String getContainerIdForRun(String runId) {
+        ExecutionContext ctx = activeExecutions.get(runId);
+        return ctx != null ? ctx.getContainerId() : null;
+    }
+
     public void cancelExecution(String runId) {
         ExecutionContext context = activeExecutions.get(runId);
         if (context != null) {
             context.cancel();
             log.info("Cancelled execution: {}", runId);
         }
+    }
+
+    public void resolveApproval(String runId, String answer) {
+        ExecutionContext context = activeExecutions.get(runId);
+        if (context != null) {
+            context.resolveApproval(answer);
+            log.info("Resolved approval for run {}: {}", runId, answer);
+        }
+    }
+
+    public ApprovalRequest getPendingApproval(String runId) {
+        ExecutionContext context = activeExecutions.get(runId);
+        if (context != null) {
+            return context.getCurrentApprovalRequest().get();
+        }
+        return null;
     }
 
     public String executeAdHocCommand(String runId, String command) {

@@ -15,6 +15,12 @@ public class CliSession implements Closeable {
 
     public record CommandResult(String output, int exitCode) {}
 
+    public record EnrichedCommandResult(String output, int exitCode, ClaudeJsonResponse parsed) {
+        public CommandResult toCommandResult() {
+            return new CommandResult(output, exitCode);
+        }
+    }
+
     private static final Pattern DEFAULT_PROMPT_PATTERN = Pattern.compile(
             "\\$\\s*$|^>\\s*$|^claude>?\\s*$|^codex>?\\s*$|waiting for input",
             Pattern.MULTILINE
@@ -77,6 +83,10 @@ public class CliSession implements Closeable {
     }
 
     public CommandResult sendCommand(String command) throws IOException {
+        if ("claude".equals(cliType) && oneOffMode) {
+            return sendCommandEnriched(command).toCommandResult();
+        }
+
         if (!alive) {
             throw new IllegalStateException("CLI session is not alive");
         }
@@ -96,13 +106,27 @@ public class CliSession implements Closeable {
         return new CommandResult(response, 0);
     }
 
+    public EnrichedCommandResult sendCommandEnriched(String command) throws IOException {
+        if (!alive) {
+            throw new IllegalStateException("CLI session is not alive");
+        }
+
+        lastActivity = Instant.now();
+
+        if (!oneOffMode || !"claude".equals(cliType)) {
+            CommandResult basic = oneOffMode ? executeOneOff(command) : sendCommand(command);
+            return new EnrichedCommandResult(basic.output(), basic.exitCode(), null);
+        }
+
+        return executeOneOffEnriched(command);
+    }
+
     private CommandResult executeOneOff(String command) throws IOException {
         List<String> cmd;
         if ("claude".equals(cliType)) {
-            cmd = List.of("docker", "exec", containerId,
-                    "claude", "-p", command,
-                    "--output-format", "text",
-                    "--dangerously-skip-permissions");
+            // Use stream-json for Claude and extract text
+            EnrichedCommandResult enriched = executeOneOffEnriched(command);
+            return enriched.toCommandResult();
         } else {
             cmd = List.of("docker", "exec", containerId,
                     "bash", "-c", command);
@@ -122,6 +146,36 @@ public class CliSession implements Closeable {
             int exitCode = proc.exitValue();
             lastActivity = Instant.now();
             return new CommandResult(output, exitCode);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            proc.destroyForcibly();
+            throw new IOException("Command interrupted");
+        }
+    }
+
+    private EnrichedCommandResult executeOneOffEnriched(String command) throws IOException {
+        List<String> cmd = List.of("docker", "exec", containerId,
+                "claude", "-p", command,
+                "--output-format", "stream-json",
+                "--dangerously-skip-permissions");
+
+        ProcessBuilder pb = new ProcessBuilder(cmd);
+        pb.redirectErrorStream(true);
+
+        Process proc = pb.start();
+        try {
+            String rawOutput = new String(proc.getInputStream().readAllBytes()).trim();
+            boolean finished = proc.waitFor(READ_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+            if (!finished) {
+                proc.destroyForcibly();
+                throw new IOException("Command timed out after " + READ_TIMEOUT.toMinutes() + " minutes");
+            }
+            int exitCode = proc.exitValue();
+            lastActivity = Instant.now();
+
+            ClaudeJsonResponse parsed = ClaudeOutputParser.parseStreamJson(rawOutput);
+            String textOutput = parsed.result() != null ? parsed.result() : rawOutput;
+            return new EnrichedCommandResult(textOutput, exitCode, parsed);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             proc.destroyForcibly();

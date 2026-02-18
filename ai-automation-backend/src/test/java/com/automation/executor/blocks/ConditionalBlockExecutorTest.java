@@ -117,6 +117,34 @@ class ConditionalBlockExecutorTest {
     }
 
     @Test
+    void execute_ambiguousResponse_notTreatedAsTrue() {
+        // Edge case: response contains "true" but means false ("The condition is false, not true")
+        when(commandExecutor.executeCommand(eq("container-1"), eq("claude"), contains("Evaluate")))
+                .thenReturn(new CliSession.CommandResult("The condition is false, not true", 0));
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("condition", "branch == 'main'");
+        config.put("then_command", "npm run deploy");
+        config.put("else_command", "echo 'skipping'");
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("conditional")
+                .config(config)
+                .build();
+
+        StepResult elseResult = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("skipped").build();
+        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt()))
+                .thenReturn(elseResult);
+
+        StepResult result = executor.execute(block, context);
+
+        // Should evaluate as false (execute else branch), not true
+        assertThat(result.getInput()).contains("false");
+        assertThat(result.getOutput()).isEqualTo("skipped");
+    }
+
+    @Test
     void execute_conditionFalse_noThenDefined_butThenWouldExecute() {
         when(commandExecutor.executeCommand(eq("container-1"), eq("claude"), contains("Evaluate")))
                 .thenReturn(new CliSession.CommandResult("true", 0));

@@ -6,12 +6,14 @@ import com.automation.entity.Project;
 import com.automation.entity.ProjectType;
 import com.automation.exception.ContainerException;
 import com.automation.repository.ContainerRepository;
+import com.automation.service.workflow.WorkflowExecutor;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.CreateContainerResponse;
 import com.github.dockerjava.api.model.Bind;
 import com.github.dockerjava.api.model.HostConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +22,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @Slf4j
@@ -27,6 +30,7 @@ public class ContainerService {
 
     private final DockerClient dockerClient;
     private final ContainerRepository containerRepository;
+    private final WorkflowExecutor workflowExecutor;
     private static final String CONTAINER_HOME = "/home/agent";
 
     private final long cpuQuota;
@@ -39,6 +43,7 @@ public class ContainerService {
     public ContainerService(
             DockerClient dockerClient,
             ContainerRepository containerRepository,
+            @Lazy WorkflowExecutor workflowExecutor,
             @Value("${docker.container.cpu-quota}") long cpuQuota,
             @Value("${docker.container.memory-limit}") long memoryLimit,
             @Value("${docker.container.pids-limit}") long pidsLimit,
@@ -47,6 +52,7 @@ public class ContainerService {
             @Value("${automation.cli.host-uid:}") String hostUid) {
         this.dockerClient = dockerClient;
         this.containerRepository = containerRepository;
+        this.workflowExecutor = workflowExecutor;
         this.cpuQuota = cpuQuota;
         this.memoryLimit = memoryLimit;
         this.pidsLimit = pidsLimit;
@@ -151,8 +157,14 @@ public class ContainerService {
     public void cleanupIdleContainers() {
         List<Container> running = containerRepository.findByStatus(ContainerStatus.RUNNING);
         Instant threshold = Instant.now().minus(Duration.ofMinutes(idleTimeoutMinutes));
+        Set<String> activeContainers = workflowExecutor.getActiveContainerIds();
 
         for (Container container : running) {
+            if (activeContainers.contains(container.getDockerContainerId())) {
+                log.debug("Skipping cleanup for container with active execution: {}",
+                        container.getDockerContainerId());
+                continue;
+            }
             if (container.getStartedAt() != null && container.getStartedAt().isBefore(threshold)) {
                 log.info("Stopping idle container: {}", container.getDockerContainerId());
                 removeDockerContainer(container.getDockerContainerId());

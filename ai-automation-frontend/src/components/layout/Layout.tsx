@@ -1,6 +1,8 @@
+import { Suspense } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { Spinner } from '../ui';
 import { useSidebarStore } from '../../stores/sidebarStore';
 
 export function Layout() {
@@ -15,7 +17,9 @@ export function Layout() {
       >
         <Header />
         <main className="p-6">
-          <Outlet />
+          <Suspense fallback={<div className="flex items-center justify-center h-64"><Spinner /></div>}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

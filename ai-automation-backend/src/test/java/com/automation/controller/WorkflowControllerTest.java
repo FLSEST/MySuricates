@@ -70,7 +70,7 @@ class WorkflowControllerTest {
                 .build();
 
         testResponse = new WorkflowResponse(
-                "wf-1", "proj-1", "Test Workflow", "A test workflow",
+                "wf-1", "proj-1", "Test Project", "Test Workflow", "A test workflow",
                 null, List.of(), "1.0.0", Map.of(), List.of(), 0L,
                 Instant.now(), Instant.now()
         );
