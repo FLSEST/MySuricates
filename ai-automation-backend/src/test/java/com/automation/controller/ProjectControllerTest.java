@@ -9,6 +9,7 @@ import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.ProjectMapper;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.service.project.ProjectService;
+import com.automation.service.system.ApiKeyService;
 import com.automation.service.workflow.WorkflowService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,6 +55,9 @@ class ProjectControllerTest {
 
     @MockBean
     private WorkflowMapper workflowMapper;
+
+    @MockBean
+    private ApiKeyService apiKeyService;
 
     private Project testProject;
     private ProjectResponse testResponse;

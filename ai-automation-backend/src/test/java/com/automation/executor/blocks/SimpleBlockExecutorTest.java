@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -53,7 +54,7 @@ class SimpleBlockExecutorTest {
     void execute_validCommand_delegatesToCommandExecutor() {
         StepResult expected = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("success").build();
-        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(BlockDefinition.class), anyInt()))
+        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(BlockDefinition.class), anyInt(), isNull(), isNull()))
                 .thenReturn(expected);
 
         BlockDefinition block = BlockDefinition.builder()
@@ -72,7 +73,7 @@ class SimpleBlockExecutorTest {
         context.setPreviousOutput("previous result");
         StepResult expected = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("done").build();
-        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(BlockDefinition.class), anyInt()))
+        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(BlockDefinition.class), anyInt(), isNull(), isNull()))
                 .thenReturn(expected);
 
         BlockDefinition block = BlockDefinition.builder()

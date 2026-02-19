@@ -11,6 +11,7 @@ import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.SkillMapper;
 import com.automation.service.skill.SkillImportExportService;
 import com.automation.service.skill.SkillService;
+import com.automation.service.system.ApiKeyService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -50,6 +51,9 @@ class SkillControllerTest {
 
     @MockBean
     private SkillMapper skillMapper;
+
+    @MockBean
+    private ApiKeyService apiKeyService;
 
     private Skill testSkill;
     private SkillResponse testResponse;

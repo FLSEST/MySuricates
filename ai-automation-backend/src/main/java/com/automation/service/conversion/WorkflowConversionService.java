@@ -209,7 +209,9 @@ public class WorkflowConversionService {
                 suggestion.suggestedDescription(),
                 null,
                 suggestion.blocks(),
-                List.of()
+                List.of(),
+                null,
+                null
         );
 
         Workflow created = workflowService.create(request);

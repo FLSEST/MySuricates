@@ -8,6 +8,7 @@ import com.automation.repository.ContainerRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.project.ContainerService;
+import com.automation.service.workflow.AgentInstructionsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,6 +51,9 @@ class WorkflowExecutorTest {
     @Mock
     private BlockExecutor simpleBlockExecutor;
 
+    @Mock
+    private AgentInstructionsService agentInstructionsService;
+
     private WorkflowExecutor workflowExecutor;
 
     private Workflow testWorkflow;
@@ -71,7 +75,8 @@ class WorkflowExecutorTest {
                 containerRepository,
                 messagingTemplate,
                 virtualThreadExecutor,
-                new Semaphore(10)
+                new Semaphore(10),
+                agentInstructionsService
         );
 
         testProject = Project.builder()
@@ -93,6 +98,7 @@ class WorkflowExecutorTest {
                 .build();
 
         lenient().when(containerService.getDockerContainerId(any())).thenReturn("docker-container-1");
+        lenient().when(agentInstructionsService.buildInstructionPrefix(any())).thenReturn("");
         lenient().when(simpleBlockExecutor.supports("simple")).thenReturn(true);
         lenient().when(runRepository.save(any(WorkflowRun.class))).thenAnswer(inv -> {
             WorkflowRun run = inv.getArgument(0);

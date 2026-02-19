@@ -1,5 +1,6 @@
 package com.automation.security;
 
+import com.automation.service.system.ApiKeyService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -20,6 +21,9 @@ class ApiKeyAuthFilterTest {
     private ApiKeyAuthFilter filter;
 
     @Mock
+    private ApiKeyService apiKeyService;
+
+    @Mock
     private HttpServletRequest request;
 
     @Mock
@@ -30,14 +34,14 @@ class ApiKeyAuthFilterTest {
 
     @BeforeEach
     void setUp() {
-        filter = new ApiKeyAuthFilter();
+        filter = new ApiKeyAuthFilter(apiKeyService);
         SecurityContextHolder.clearContext();
     }
 
     @Test
     void securityDisabled_authenticatesAsAnonymous() throws Exception {
         ReflectionTestUtils.setField(filter, "securityEnabled", false);
-        ReflectionTestUtils.setField(filter, "configuredApiKey", "");
+        when(apiKeyService.getEffectiveApiKey()).thenReturn("");
 
         filter.doFilterInternal(request, response, filterChain);
 
@@ -50,7 +54,7 @@ class ApiKeyAuthFilterTest {
     @Test
     void securityEnabled_blankApiKey_authenticatesAsAnonymous() throws Exception {
         ReflectionTestUtils.setField(filter, "securityEnabled", true);
-        ReflectionTestUtils.setField(filter, "configuredApiKey", "");
+        when(apiKeyService.getEffectiveApiKey()).thenReturn("");
 
         filter.doFilterInternal(request, response, filterChain);
 
@@ -63,7 +67,7 @@ class ApiKeyAuthFilterTest {
     @Test
     void securityEnabled_validApiKey_authenticates() throws Exception {
         ReflectionTestUtils.setField(filter, "securityEnabled", true);
-        ReflectionTestUtils.setField(filter, "configuredApiKey", "my-secret-key");
+        when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
         when(request.getHeader("X-API-Key")).thenReturn("my-secret-key");
 
         filter.doFilterInternal(request, response, filterChain);
@@ -77,7 +81,7 @@ class ApiKeyAuthFilterTest {
     @Test
     void securityEnabled_invalidApiKey_doesNotAuthenticate() throws Exception {
         ReflectionTestUtils.setField(filter, "securityEnabled", true);
-        ReflectionTestUtils.setField(filter, "configuredApiKey", "my-secret-key");
+        when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
         when(request.getHeader("X-API-Key")).thenReturn("wrong-key");
 
         filter.doFilterInternal(request, response, filterChain);
@@ -89,7 +93,7 @@ class ApiKeyAuthFilterTest {
     @Test
     void securityEnabled_missingApiKey_doesNotAuthenticate() throws Exception {
         ReflectionTestUtils.setField(filter, "securityEnabled", true);
-        ReflectionTestUtils.setField(filter, "configuredApiKey", "my-secret-key");
+        when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
         when(request.getHeader("X-API-Key")).thenReturn(null);
 
         filter.doFilterInternal(request, response, filterChain);

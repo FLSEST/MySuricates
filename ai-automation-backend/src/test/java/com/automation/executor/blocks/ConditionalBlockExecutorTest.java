@@ -51,7 +51,7 @@ class ConditionalBlockExecutorTest {
                 .thenReturn(new CliSession.CommandResult("true", 0));
         StepResult thenResult = StepResult.builder()
                 .stepIndex(1).status(StepStatus.COMPLETED).output("deployed").build();
-        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt()))
+        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt(), isNull(), isNull()))
                 .thenReturn(thenResult);
 
         Map<String, Object> config = new HashMap<>();
@@ -77,7 +77,7 @@ class ConditionalBlockExecutorTest {
                 .thenReturn(new CliSession.CommandResult("false", 0));
         StepResult elseResult = StepResult.builder()
                 .stepIndex(1).status(StepStatus.COMPLETED).output("skipped").build();
-        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt()))
+        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt(), isNull(), isNull()))
                 .thenReturn(elseResult);
 
         Map<String, Object> config = new HashMap<>();
@@ -134,7 +134,7 @@ class ConditionalBlockExecutorTest {
 
         StepResult elseResult = StepResult.builder()
                 .stepIndex(1).status(StepStatus.COMPLETED).output("skipped").build();
-        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt()))
+        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt(), isNull(), isNull()))
                 .thenReturn(elseResult);
 
         StepResult result = executor.execute(block, context);

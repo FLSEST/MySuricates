@@ -39,6 +39,7 @@ public class WorkflowExecutor {
     private final SimpMessagingTemplate messagingTemplate;
     private final ExecutorService virtualThreadExecutor;
     private final Semaphore executionSemaphore;
+    private final AgentInstructionsService agentInstructionsService;
 
     private final Map<String, ExecutionContext> activeExecutions = new ConcurrentHashMap<>();
 
@@ -59,18 +60,21 @@ public class WorkflowExecutor {
         Project project = workflow.getProject();
         List<BlockDefinition> blocks = List.copyOf(workflow.getBlocks());
         List<Skill> skills = List.copyOf(workflow.getActivatedSkills());
+        String instructions = workflow.getInstructions();
+        String model = workflow.getModel();
 
         Map<String, Object> contextVars = inputContext != null ? Map.copyOf(inputContext) : Map.of();
 
         // Execute asynchronously — return the run immediately
         final String runId = run.getId();
-        virtualThreadExecutor.submit(() -> executeBlocks(runId, project, blocks, skills, contextVars));
+        virtualThreadExecutor.submit(() -> executeBlocks(runId, project, blocks, skills, contextVars, instructions, model));
 
         return run;
     }
 
     private void executeBlocks(String runId, Project project, List<BlockDefinition> blocks,
-                               List<Skill> skills, Map<String, Object> inputContext) {
+                               List<Skill> skills, Map<String, Object> inputContext,
+                               String instructions, String model) {
         try {
             executionSemaphore.acquire();
         } catch (InterruptedException e) {
@@ -95,6 +99,16 @@ public class WorkflowExecutor {
                     .workflowRunId(runId)
                     .build();
             inputContext.forEach(context::setVariable);
+
+            // Set instruction prefix and model from workflow
+            String instructionPrefix = agentInstructionsService.buildInstructionPrefix(instructions);
+            if (!instructionPrefix.isBlank()) {
+                context.setInstructionPrefix(instructionPrefix);
+            }
+            if (model != null && !model.isBlank()) {
+                context.setModel(model);
+            }
+
             activeExecutions.put(runId, context);
 
             commandExecutorService.injectSkillContext(containerId, "claude", skills);

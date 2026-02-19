@@ -55,7 +55,9 @@ public class RetryBlockExecutor implements BlockExecutor {
                             .type("simple")
                             .config(Map.of("command", command))
                             .build(),
-                    context.nextStepIndex()
+                    context.nextStepIndex(),
+                    context.getInstructionPrefix(),
+                    context.getModel()
             );
 
             if (lastResult.getStatus() == StepStatus.COMPLETED) {

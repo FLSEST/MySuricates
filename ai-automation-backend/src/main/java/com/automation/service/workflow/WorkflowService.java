@@ -53,6 +53,8 @@ public class WorkflowService {
                 .description(request.description())
                 .icon(request.icon())
                 .blocks(request.blocks() != null ? request.blocks() : new ArrayList<>())
+                .instructions(request.instructions())
+                .model(request.model())
                 .build();
 
         // Activate skills if provided
@@ -81,6 +83,12 @@ public class WorkflowService {
         }
         if (request.blocks() != null) {
             workflow.setBlocks(request.blocks());
+        }
+        if (request.instructions() != null) {
+            workflow.setInstructions(request.instructions());
+        }
+        if (request.model() != null) {
+            workflow.setModel(request.model());
         }
 
         Workflow saved = workflowRepository.save(workflow);

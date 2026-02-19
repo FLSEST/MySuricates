@@ -37,6 +37,14 @@ public class SystemController {
     @Value("${spring.datasource.url}")
     private String datasourceUrl;
 
+    @Value("${automation.security.enabled:true}")
+    private boolean securityEnabled;
+
+    @GetMapping("/auth-status")
+    public Map<String, Object> authStatus() {
+        return Map.of("securityEnabled", securityEnabled);
+    }
+
     @GetMapping("/health")
     public Map<String, Object> health() {
         boolean dockerAvailable;

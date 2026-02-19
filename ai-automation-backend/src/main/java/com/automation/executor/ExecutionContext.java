@@ -22,6 +22,12 @@ public class ExecutionContext {
     @Setter
     private String previousOutput;
 
+    @Setter
+    private String instructionPrefix;
+
+    @Setter
+    private String model;
+
     @Builder.Default
     private final Map<String, Object> variables = new HashMap<>();
 

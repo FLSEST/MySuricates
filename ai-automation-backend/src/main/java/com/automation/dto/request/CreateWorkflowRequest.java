@@ -11,7 +11,9 @@ public record CreateWorkflowRequest(
         String description,
         String icon,
         List<BlockDefinition> blocks,
-        List<String> activatedSkillIds
+        List<String> activatedSkillIds,
+        String instructions,
+        String model
 ) {
     public CreateWorkflowRequest {
         if (blocks == null) blocks = List.of();

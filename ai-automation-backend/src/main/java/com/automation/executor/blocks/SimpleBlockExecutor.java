@@ -36,7 +36,9 @@ public class SimpleBlockExecutor implements BlockExecutor {
                 context.getContainerId(),
                 BlockExecutor.cliTypeFor("simple"),
                 resolved,
-                context.nextStepIndex()
+                context.nextStepIndex(),
+                context.getInstructionPrefix(),
+                context.getModel()
         );
     }
 

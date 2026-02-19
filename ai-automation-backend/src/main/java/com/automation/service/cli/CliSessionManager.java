@@ -1,6 +1,8 @@
 package com.automation.service.cli;
 
+import com.automation.config.CliPermissionsConfig;
 import jakarta.annotation.PreDestroy;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -11,18 +13,22 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
+@RequiredArgsConstructor
 @Slf4j
 public class CliSessionManager {
 
     private static final Duration IDLE_TIMEOUT = Duration.ofMinutes(30);
 
+    private final CliPermissionsConfig cliPermissionsConfig;
     private final Map<String, CliSession> activeSessions = new ConcurrentHashMap<>();
 
     public CliSession getOrCreateSession(String containerId, String cliType) throws IOException {
         String sessionKey = containerId + ":" + cliType;
         try {
             return activeSessions.computeIfAbsent(sessionKey, key -> {
-                CliSession session = new CliSession(containerId, cliType);
+                CliSession session = new CliSession(containerId, cliType,
+                        cliPermissionsConfig.isSkipPermissions(),
+                        cliPermissionsConfig.getAllowedTools());
                 try {
                     session.start();
                 } catch (IOException e) {

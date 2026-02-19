@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Trash2 } from 'lucide-react';
+import { GripVertical, Pencil, Trash2, Link2 } from 'lucide-react';
 import { Badge } from '../ui';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useT } from '../../i18n';
@@ -10,10 +10,11 @@ interface SortableBlockProps {
   id: string;
   index: number;
   block: BlockDefinition;
+  onEdit: (index: number) => void;
   onRemove: (index: number) => void;
 }
 
-export function SortableBlock({ id, index, block, onRemove }: SortableBlockProps) {
+export function SortableBlock({ id, index, block, onEdit, onRemove }: SortableBlockProps) {
   const t = useT();
   const advancedMode = useSettingsStore((s) => s.advancedMode);
   const {
@@ -36,15 +37,17 @@ export function SortableBlock({ id, index, block, onRemove }: SortableBlockProps
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-start gap-3 px-5 py-4 group ${
+      className={`flex items-start gap-3 px-5 py-4 group cursor-pointer hover:bg-surface/50 transition-colors ${
         isDragging ? 'bg-surface-raised shadow-lg rounded-xl' : ''
       }`}
+      onClick={() => onEdit(index)}
     >
       <button
         {...attributes}
         {...listeners}
         className="pt-1 text-text-tertiary hover:text-text cursor-grab active:cursor-grabbing touch-none"
         aria-label="Drag to reorder"
+        onClick={(e) => e.stopPropagation()}
       >
         <GripVertical className="w-4 h-4" />
       </button>
@@ -59,18 +62,32 @@ export function SortableBlock({ id, index, block, onRemove }: SortableBlockProps
           <pre className="text-xs text-text-secondary font-mono bg-surface rounded-lg p-3 mt-2 overflow-x-auto">
             {JSON.stringify(block.config, null, 2)}
           </pre>
+        ) : block.type === 'sub-workflow' ? (
+          <p className="text-sm text-text-secondary truncate flex items-center gap-1.5">
+            <Link2 className="w-3.5 h-3.5 text-accent shrink-0" />
+            {String(block.config.workflow_id || t.workflows.selectSubWorkflow)}
+          </p>
         ) : (
           <p className="text-sm text-text-secondary truncate">
             {'command' in block.config
               ? String(block.config.command)
               : 'capability' in block.config
                 ? String(block.config.capability)
-                : JSON.stringify(block.config)}
+                : 'goal' in block.config
+                  ? String(block.config.goal)
+                  : JSON.stringify(block.config)}
           </p>
         )}
       </div>
       <button
-        onClick={() => onRemove(index)}
+        onClick={(e) => { e.stopPropagation(); onEdit(index); }}
+        className="p-1.5 rounded-lg text-text-tertiary hover:text-accent opacity-0 group-hover:opacity-100 transition-all"
+        aria-label={t.common.edit}
+      >
+        <Pencil className="w-4 h-4" />
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); onRemove(index); }}
         className="p-1.5 rounded-lg text-text-tertiary hover:text-danger opacity-0 group-hover:opacity-100 transition-all"
         aria-label={t.common.delete}
       >

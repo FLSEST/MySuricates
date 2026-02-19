@@ -1,9 +1,11 @@
 package com.automation.security;
 
+import com.automation.service.system.ApiKeyService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -18,15 +20,15 @@ import java.security.MessageDigest;
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor
 @Slf4j
 public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
     private static final String API_KEY_HEADER = "X-API-Key";
 
-    @Value("${automation.security.api-key:}")
-    private String configuredApiKey;
+    private final ApiKeyService apiKeyService;
 
-    @Value("${automation.security.enabled:false}")
+    @Value("${automation.security.enabled:true}")
     private boolean securityEnabled;
 
     @Override
@@ -34,8 +36,10 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
 
-        // If security is disabled, authenticate all requests
-        if (!securityEnabled || configuredApiKey.isBlank()) {
+        String effectiveApiKey = apiKeyService.getEffectiveApiKey();
+
+        // If security is disabled or no API key available, authenticate all requests
+        if (!securityEnabled || effectiveApiKey.isBlank()) {
             setAuthenticated("anonymous");
             filterChain.doFilter(request, response);
             return;
@@ -43,7 +47,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
         String apiKey = request.getHeader(API_KEY_HEADER);
 
-        if (apiKey != null && constantTimeEquals(apiKey, configuredApiKey)) {
+        if (apiKey != null && constantTimeEquals(apiKey, effectiveApiKey)) {
             setAuthenticated("api-key-user");
             filterChain.doFilter(request, response);
         } else {

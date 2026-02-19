@@ -10,6 +10,7 @@ import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.WebhookMapper;
 import com.automation.mapper.WorkflowMapper;
+import com.automation.service.system.ApiKeyService;
 import com.automation.service.webhook.WebhookService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,6 +52,9 @@ class WebhookControllerTest {
 
     @MockBean
     private WorkflowMapper workflowMapper;
+
+    @MockBean
+    private ApiKeyService apiKeyService;
 
     private Workflow testWorkflow;
     private WebhookTrigger testWebhook;

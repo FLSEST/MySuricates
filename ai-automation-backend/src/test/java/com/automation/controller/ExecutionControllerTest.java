@@ -7,6 +7,7 @@ import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.system.ApiKeyService;
 import com.automation.service.workflow.WorkflowExecutor;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +43,9 @@ class ExecutionControllerTest {
 
     @MockBean
     private WorkflowMapper workflowMapper;
+
+    @MockBean
+    private ApiKeyService apiKeyService;
 
     @Test
     void getExecution_existingId_returnsOk() throws Exception {

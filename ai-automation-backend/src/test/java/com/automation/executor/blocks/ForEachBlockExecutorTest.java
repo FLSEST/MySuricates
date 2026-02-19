@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -52,7 +53,7 @@ class ForEachBlockExecutorTest {
     void execute_withListItems_iteratesEachItem() {
         StepResult stepResult = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("linted").build();
-        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt()))
+        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt(), isNull(), isNull()))
                 .thenReturn(stepResult);
 
         Map<String, Object> config = new HashMap<>();
@@ -69,7 +70,7 @@ class ForEachBlockExecutorTest {
         StepResult result = executor.execute(block, context);
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
-        verify(commandExecutor, times(3)).executeStep(any(), any(), any(), anyInt());
+        verify(commandExecutor, times(3)).executeStep(any(), any(), any(), anyInt(), any(), any());
     }
 
     @Test
@@ -78,7 +79,7 @@ class ForEachBlockExecutorTest {
                 .thenReturn(new CliSession.CommandResult("file1.js\nfile2.js", 0));
         StepResult stepResult = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
-        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt()))
+        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt(), isNull(), isNull()))
                 .thenReturn(stepResult);
 
         Map<String, Object> config = new HashMap<>();
@@ -95,7 +96,7 @@ class ForEachBlockExecutorTest {
         StepResult result = executor.execute(block, context);
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
-        verify(commandExecutor, times(2)).executeStep(any(), any(), any(), anyInt());
+        verify(commandExecutor, times(2)).executeStep(any(), any(), any(), anyInt(), any(), any());
     }
 
     @Test
@@ -104,7 +105,7 @@ class ForEachBlockExecutorTest {
                 .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
         StepResult failed = StepResult.builder()
                 .stepIndex(1).status(StepStatus.FAILED).output("error").build();
-        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt()))
+        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt(), isNull(), isNull()))
                 .thenReturn(success, failed);
 
         Map<String, Object> config = new HashMap<>();
@@ -137,14 +138,14 @@ class ForEachBlockExecutorTest {
         StepResult result = executor.execute(block, context);
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
-        verify(commandExecutor, never()).executeStep(any(), any(), any(), anyInt());
+        verify(commandExecutor, never()).executeStep(any(), any(), any(), anyInt(), any(), any());
     }
 
     @Test
     void execute_cancelledDuringIteration_stopsEarly() {
         StepResult stepResult = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
-        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt()))
+        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt(), isNull(), isNull()))
                 .thenAnswer(inv -> {
                     context.cancel();
                     return stepResult;
@@ -162,14 +163,14 @@ class ForEachBlockExecutorTest {
 
         executor.execute(block, context);
 
-        verify(commandExecutor, times(1)).executeStep(any(), any(), any(), anyInt());
+        verify(commandExecutor, times(1)).executeStep(any(), any(), any(), anyInt(), any(), any());
     }
 
     @Test
     void execute_stringItems_splitsByNewline() {
         StepResult stepResult = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
-        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt()))
+        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt(), isNull(), isNull()))
                 .thenReturn(stepResult);
 
         Map<String, Object> config = new HashMap<>();
@@ -185,6 +186,6 @@ class ForEachBlockExecutorTest {
         StepResult result = executor.execute(block, context);
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
-        verify(commandExecutor, times(3)).executeStep(any(), any(), any(), anyInt());
+        verify(commandExecutor, times(3)).executeStep(any(), any(), any(), anyInt(), any(), any());
     }
 }

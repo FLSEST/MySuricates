@@ -7,6 +7,7 @@ import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.ScheduleMapper;
 import com.automation.service.scheduler.SchedulerService;
+import com.automation.service.system.ApiKeyService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,6 +44,9 @@ class ScheduleControllerTest {
 
     @MockBean
     private ScheduleMapper scheduleMapper;
+
+    @MockBean
+    private ApiKeyService apiKeyService;
 
     private Workflow testWorkflow;
     private ScheduledWorkflow testScheduled;

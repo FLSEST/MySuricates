@@ -70,7 +70,9 @@ public class ForEachBlockExecutor implements BlockExecutor {
                             .type("simple")
                             .config(Map.of("command", resolvedCommand))
                             .build(),
-                    context.nextStepIndex()
+                    context.nextStepIndex(),
+                    context.getInstructionPrefix(),
+                    context.getModel()
             );
 
             outputs.append("[").append(item).append("]: ").append(itemResult.getOutput()).append("\n");

@@ -6,6 +6,8 @@ export interface WorkflowTemplate {
   nameKey: string;
   descriptionKey: string;
   blocks: BlockDefinition[];
+  instructions?: string;
+  model?: string;
 }
 
 export const workflowTemplates: WorkflowTemplate[] = [
@@ -20,6 +22,7 @@ export const workflowTemplates: WorkflowTemplate[] = [
       { type: 'retry', config: { command: 'npm test', max_retries: 3, delay: 5 } },
       { type: 'simple', config: { command: 'npm run build' } },
     ],
+    instructions: 'Fuehre die Code-Qualitaetspruefungen der Reihe nach aus. Bei Fehlern gib klare Fehlermeldungen aus.',
   },
   {
     id: 'document-review',
@@ -31,6 +34,7 @@ export const workflowTemplates: WorkflowTemplate[] = [
       { type: 'skill-capability', config: { capability: 'fact_check', input: '{{ previous_output }}' } },
       { type: 'skill-capability', config: { capability: 'summarize', input: '{{ previous_output }}' } },
     ],
+    instructions: 'Pruefe das Dokument gruendlich. Achte auf Grammatik, Fakten und erstelle eine praegnante Zusammenfassung.',
   },
   {
     id: 'deploy-pipeline',
@@ -42,6 +46,7 @@ export const workflowTemplates: WorkflowTemplate[] = [
       { type: 'simple', config: { command: 'npm run build' } },
       { type: 'simple', config: { command: 'npm run deploy' } },
     ],
+    instructions: 'Fuehre die Deploy-Pipeline aus. Stoppe bei fehlgeschlagenen Tests.',
   },
   {
     id: 'research-assistant',
@@ -53,6 +58,7 @@ export const workflowTemplates: WorkflowTemplate[] = [
       { type: 'skill-capability', config: { capability: 'extract_key_points', input: '{{ previous_output }}' } },
       { type: 'skill-capability', config: { capability: 'cite_sources', input: '{{ previous_output }}' } },
     ],
+    instructions: 'Recherchiere gruendlich und stelle sicher dass alle Quellen korrekt zitiert werden.',
   },
   {
     id: 'data-analysis',
@@ -64,6 +70,7 @@ export const workflowTemplates: WorkflowTemplate[] = [
       { type: 'skill-capability', config: { capability: 'detect_anomalies', input: '{{ previous_output }}' } },
       { type: 'skill-capability', config: { capability: 'visualizations', input: '{{ previous_output }}' } },
     ],
+    instructions: 'Analysiere die Daten systematisch. Identifiziere Muster und Anomalien.',
   },
   {
     id: 'file-improve',
@@ -71,11 +78,12 @@ export const workflowTemplates: WorkflowTemplate[] = [
     nameKey: 'fileImprove',
     descriptionKey: 'fileImproveDescription',
     blocks: [
-      { type: 'simple', config: { command: 'ls -la /workspace/' } },
+      { type: 'simple', config: { command: 'ls -la .' } },
       { type: 'simple', config: { command: 'Schau dir die Dateien in deinem Projekt an. Lies die Datei {{ filepath }} und analysiere ihren Inhalt. Liste konkret auf: 1) Staerken 2) Schwaechen 3) Fehlende Aspekte' } },
       { type: 'simple', config: { command: 'Erstelle eine priorisierte Liste von Verbesserungsvorschlaegen. Sei konkret - keine vagen Hinweise, sondern umsetzbare Aenderungen.' } },
       { type: 'simple', config: { command: 'Wende die Verbesserungen an und gib die vollstaendig ueberarbeitete Version aus. Markiere die geaenderten Stellen.' } },
     ],
+    instructions: 'Analysiere die Datei gruendlich und erstelle konkrete, umsetzbare Verbesserungsvorschlaege.',
   },
   {
     id: 'research-enhance',
@@ -83,11 +91,12 @@ export const workflowTemplates: WorkflowTemplate[] = [
     nameKey: 'researchEnhance',
     descriptionKey: 'researchEnhanceDescription',
     blocks: [
-      { type: 'simple', config: { command: 'find /workspace -type f \\( -name "*.md" -o -name "*.txt" -o -name "*.rst" \\) | head -20' } },
+      { type: 'simple', config: { command: 'find . -type f \\( -name "*.md" -o -name "*.txt" -o -name "*.rst" \\) | head -20' } },
       { type: 'simple', config: { command: 'Lies die relevanten Dateien in deinem Projekt. Extrahiere die Kernaussagen und identifiziere inhaltliche Luecken oder Punkte die mehr Tiefe brauchen.' } },
       { type: 'simple', config: { command: 'Recherchiere zu den identifizierten Luecken. Finde aktuelle Fakten, Statistiken und Quellen die den Inhalt bereichern wuerden.' } },
       { type: 'simple', config: { command: 'Erstelle eine angereicherte Version der Hauptdatei. Integriere die recherchierten Informationen und fuege Quellenangaben hinzu.' } },
     ],
+    instructions: 'Scanne das Projekt rekursiv, finde inhaltliche Luecken und reichere die Texte mit Recherche an.',
   },
   {
     id: 'iterative-refine',
@@ -95,7 +104,7 @@ export const workflowTemplates: WorkflowTemplate[] = [
     nameKey: 'iterativeRefine',
     descriptionKey: 'iterativeRefineDescription',
     blocks: [
-      { type: 'simple', config: { command: 'cat /workspace/{{ filepath }}' } },
+      { type: 'simple', config: { command: 'Lies die Datei {{ filepath }} und gib den Inhalt aus.' } },
       { type: 'while', config: {
         condition_command: 'Bewerte die Qualitaet des Textes auf einer Skala von 1-10 (Klarheit, Vollstaendigkeit, Struktur). Antworte NUR mit "true" wenn unter 8, oder "false" wenn 8 oder hoeher.',
         command: 'Verbessere den Text. Fokussiere auf die groessten Schwaechen. Gib die vollstaendig ueberarbeitete Version aus.',
@@ -103,6 +112,7 @@ export const workflowTemplates: WorkflowTemplate[] = [
       }},
       { type: 'simple', config: { command: 'Erstelle eine Zusammenfassung: Was wurde verbessert? Wie ist die finale Qualitaetsbewertung?' } },
     ],
+    instructions: 'Verbessere den Text iterativ bis die Qualitaet mindestens 8/10 erreicht.',
   },
   {
     id: 'project-overview',
@@ -110,11 +120,12 @@ export const workflowTemplates: WorkflowTemplate[] = [
     nameKey: 'projectOverview',
     descriptionKey: 'projectOverviewDescription',
     blocks: [
-      { type: 'simple', config: { command: 'find /workspace -type f -not -path "*/node_modules/*" -not -path "*/.git/*" -not -name "*.lock" | head -50' } },
+      { type: 'simple', config: { command: 'find . -type f -not -path "*/node_modules/*" -not -path "*/.git/*" -not -name "*.lock" | head -50' } },
       { type: 'simple', config: { command: 'Verschaffe dir einen Ueberblick ueber das Projekt. Lies die wichtigsten Dateien (README, Konfigurationsdateien, Hauptdateien). Beschreibe: 1) Zweck des Projekts 2) Struktur 3) Verwendete Technologien' } },
       { type: 'simple', config: { command: 'Analysiere die Projektqualitaet: Was ist gut umgesetzt? Wo gibt es Verbesserungspotenzial? Fehlt Dokumentation?' } },
       { type: 'simple', config: { command: 'Erstelle eine strukturierte Zusammenfassung des Projekts mit konkreten Empfehlungen fuer naechste Schritte.' } },
     ],
+    instructions: 'Erstelle eine umfassende Projektanalyse mit konkreten Empfehlungen.',
   },
   {
     id: 'fact-check-pipeline',
@@ -122,7 +133,7 @@ export const workflowTemplates: WorkflowTemplate[] = [
     nameKey: 'factCheckPipeline',
     descriptionKey: 'factCheckPipelineDescription',
     blocks: [
-      { type: 'simple', config: { command: 'cat /workspace/{{ filepath }}' } },
+      { type: 'simple', config: { command: 'Lies die Datei {{ filepath }} und gib den Inhalt aus.' } },
       { type: 'simple', config: { command: 'Extrahiere alle faktischen Behauptungen, Zahlen und Statistiken. Nummeriere jede Behauptung.' } },
       { type: 'simple', config: { command: 'Pruefe jede Behauptung. Markiere als KORREKT, UNKLAR oder FALSCH mit Begruendung.' } },
       { type: 'conditional', config: {
@@ -131,6 +142,7 @@ export const workflowTemplates: WorkflowTemplate[] = [
         else_command: 'echo "Alle Fakten geprueft - keine Fehler gefunden."',
       }},
     ],
+    instructions: 'Pruefe alle Fakten sorgfaeltig und erstelle bei Fehlern einen detaillierten Korrekturbericht.',
   },
   {
     id: 'translation-pipeline',
@@ -138,11 +150,12 @@ export const workflowTemplates: WorkflowTemplate[] = [
     nameKey: 'translationPipeline',
     descriptionKey: 'translationPipelineDescription',
     blocks: [
-      { type: 'simple', config: { command: 'cat /workspace/{{ filepath }}' } },
+      { type: 'simple', config: { command: 'Lies die Datei {{ filepath }} und gib den Inhalt aus.' } },
       { type: 'simple', config: { command: 'Uebersetze den Text ins {{ target_language }}. Behalte Formatierung, Fachbegriffe und Struktur bei.' } },
       { type: 'simple', config: { command: 'Pruefe die Uebersetzung auf: 1) Sprachliche Natuerlichkeit 2) Fachbegriff-Konsistenz 3) Vollstaendigkeit. Liste alle Probleme auf.' } },
       { type: 'simple', config: { command: 'Korrigiere alle gefundenen Probleme und gib die finale Uebersetzung aus.' } },
     ],
+    instructions: 'Uebersetze den Text hochwertig mit Qualitaetskontrolle und konsistenten Fachbegriffen.',
   },
   {
     id: 'code-refactor',
@@ -150,11 +163,12 @@ export const workflowTemplates: WorkflowTemplate[] = [
     nameKey: 'codeRefactor',
     descriptionKey: 'codeRefactorDescription',
     blocks: [
-      { type: 'simple', config: { command: 'find /workspace -type f \\( -name "*.ts" -o -name "*.js" -o -name "*.py" -o -name "*.java" \\) -not -path "*/node_modules/*" | head -20' } },
+      { type: 'simple', config: { command: 'find . -type f \\( -name "*.ts" -o -name "*.js" -o -name "*.py" -o -name "*.java" \\) -not -path "*/node_modules/*" | head -20' } },
       { type: 'simple', config: { command: 'Schau dir die Code-Dateien im Projekt an. Lies die Datei {{ filepath }} und analysiere: 1) Bugs und logische Fehler 2) Sicherheitsprobleme 3) Performance 4) Code-Qualitaet. Strukturiere nach Schweregrad.' } },
       { type: 'simple', config: { command: 'Erstelle fuer jedes Problem einen konkreten Verbesserungsvorschlag mit Code-Beispiel.' } },
       { type: 'simple', config: { command: 'Wende alle Verbesserungen an und gib die refactored Version aus. Kommentiere die wesentlichen Aenderungen.' } },
     ],
+    instructions: 'Analysiere den Code auf Bugs, Sicherheit und Qualitaet. Erstelle konkrete Verbesserungen.',
   },
   {
     id: 'topic-deep-dive',
@@ -162,10 +176,135 @@ export const workflowTemplates: WorkflowTemplate[] = [
     nameKey: 'topicDeepDive',
     descriptionKey: 'topicDeepDiveDescription',
     blocks: [
-      { type: 'simple', config: { command: 'ls -la /workspace/' } },
+      { type: 'simple', config: { command: 'ls -la .' } },
       { type: 'simple', config: { command: 'Schau dir das Projekt an und recherchiere das Thema "{{ topic }}" im Kontext dieses Projekts. Identifiziere die wichtigsten Aspekte und aktuelle Entwicklungen.' } },
       { type: 'simple', config: { command: 'Erstelle eine detaillierte Gliederung fuer einen Report zu diesem Thema.' } },
       { type: 'simple', config: { command: 'Schreibe den vollstaendigen Report. Jeder Abschnitt soll fundiert und gut strukturiert sein. Fuege am Ende ein Quellenverzeichnis hinzu.' } },
     ],
+    instructions: 'Recherchiere das Thema im Projektkontext und erstelle einen fundierten, strukturierten Report.',
+  },
+  // --- Advanced scenarios: Claude CLI in Docker with file outputs ---
+  {
+    id: 'doc-to-website',
+    icon: '🌐',
+    nameKey: 'docToWebsite',
+    descriptionKey: 'docToWebsiteDescription',
+    blocks: [
+      { type: 'simple', config: { command: 'Lies die Datei {{ filepath }}. Analysiere die Struktur: Wie viele Kapitel/Abschnitte gibt es? Was sind die Hauptthemen? Gib eine strukturierte Uebersicht aus.' } },
+      { type: 'agentic', config: { goal: "Erstelle eine vollstaendige statische Webseite in output/{{ title }}/. Die Webseite soll enthalten: (1) Eine Startseite mit Gesamtzusammenfassung, (2) Eine Seite pro Kapitel/Abschnitt mit Zusammenfassung und Key Takeaways, (3) Eine Zitate-Seite mit den wichtigsten Passagen, (4) Navigation zwischen allen Seiten, (5) Responsive Design im Stil '{{ style }}' mit TailwindCSS via CDN, (6) Eine einfache Suchfunktion mit JavaScript. Sprache: {{ language }}.", success_criteria: 'Alle HTML-Dateien existieren in output/{{ title }}/ und sind vollstaendig.', max_iterations: 8 } },
+      { type: 'simple', config: { command: 'Pruefe alle erstellten HTML-Dateien in output/{{ title }}/. Liste alle Dateien auf, pruefe ob Links zwischen Seiten funktionieren, und gib eine Zusammenfassung aus: Anzahl Seiten, Gesamtgroesse, Qualitaetsbewertung.' } },
+    ],
+    instructions: 'Erstelle eine vollstaendige, responsive Webseite aus dem Dokument. Verwende relative Pfade.',
+  },
+  {
+    id: 'idea-to-prototype',
+    icon: '🚀',
+    nameKey: 'ideaToPrototype',
+    descriptionKey: 'ideaToPrototypeDescription',
+    blocks: [
+      { type: 'simple', config: { command: 'Analysiere diese App-Idee: {{ idea }}. Erstelle eine detaillierte Feature-Liste und einen technischen Plan. Tech-Stack: {{ tech_stack }}. Definiere: Datenmodell, Komponenten-Struktur, benoetigte Abhaengigkeiten.' } },
+      { type: 'agentic', config: { goal: "Baue einen funktionierenden Prototyp fuer: {{ idea }}. Tech-Stack: {{ tech_stack }}. Erstelle das Projekt in prototype/. Schritte: (1) Projektstruktur anlegen, (2) package.json/Abhaengigkeiten erstellen, (3) npm install ausfuehren, (4) Alle Komponenten und Seiten implementieren, (5) npm run build ausfuehren und Fehler beheben. Kommentare auf {{ language }}.", success_criteria: 'npm run build laeuft erfolgreich ohne Fehler.', max_iterations: 12 } },
+      { type: 'simple', config: { command: 'Erstelle eine README.md in prototype/ mit: Projektbeschreibung, Screenshots-Platzhalter, Installation, Starten, Technologie-Stack.' } },
+    ],
+    instructions: 'Baue einen funktionierenden Prototyp mit allen Abhaengigkeiten und Build-Konfiguration.',
+  },
+  {
+    id: 'cv-to-portfolio',
+    icon: '💼',
+    nameKey: 'cvToPortfolio',
+    descriptionKey: 'cvToPortfolioDescription',
+    blocks: [
+      { type: 'simple', config: { command: 'Lies {{ filepath }} und extrahiere alle relevanten Informationen: Name, Beruf, Kontaktdaten, Berufserfahrung (Firma, Rolle, Zeitraum, Beschreibung), Ausbildung, Skills (mit Kategorien), Projekte, Sprachen. Strukturiere alles als JSON-Ueberblick.' } },
+      { type: 'agentic', config: { goal: "Erstelle eine professionelle Single-Page Portfolio-Webseite in portfolio/. Verwende die extrahierten Lebenslauf-Daten. Die Seite soll enthalten: (1) Hero-Bereich mit Name und Berufstitel, (2) Ueber-mich Abschnitt, (3) Berufserfahrung als vertikale Timeline, (4) Skills als animierte Progress-Bars nach Kategorien, (5) Projekte als Card-Grid, (6) Ausbildung, (7) Kontakt-Bereich. Design: Modernes Single-Page Layout mit Farbschema '{{ color_scheme }}', Smooth-Scroll Navigation, TailwindCSS via CDN, dezente CSS-Animationen. Sprache: {{ language }}.", success_criteria: 'index.html existiert in portfolio/ und enthaelt alle Sektionen.', max_iterations: 6 } },
+      { type: 'simple', config: { command: 'Pruefe portfolio/index.html. Stelle sicher dass alle Sektionen vorhanden sind und das HTML valide ist. Gib eine Zusammenfassung aus.' } },
+    ],
+    instructions: 'Erstelle eine professionelle Portfolio-Webseite aus dem Lebenslauf.',
+  },
+  {
+    id: 'csv-to-dashboard',
+    icon: '📊',
+    nameKey: 'csvToDashboard',
+    descriptionKey: 'csvToDashboardDescription',
+    blocks: [
+      { type: 'simple', config: { command: 'Lies {{ filepath }}. Analysiere die CSV-Struktur: Spaltennamen, Datentypen, Anzahl Zeilen, fehlende Werte. Identifiziere automatisch: (1) Numerische Spalten fuer KPIs (Summe, Durchschnitt, Min/Max), (2) Zeitliche Spalten fuer Trend-Charts, (3) Kategorische Spalten fuer Pie/Bar-Charts, (4) Korrelationen zwischen Spalten. Gib einen strukturierten Analyse-Plan aus.' } },
+      { type: 'agentic', config: { goal: "Erstelle ein interaktives HTML-Dashboard in dashboard/. Titel: '{{ title }}'. Basierend auf der CSV-Analyse: (1) KPI-Karten oben (grosse Zahlen mit Vergleichsindikatoren), (2) Trend-Line-Charts fuer zeitliche Daten, (3) Bar/Pie-Charts fuer kategorische Verteilungen, (4) Datentabelle mit Sortierung. Verwende Chart.js via CDN fuer Diagramme, TailwindCSS fuer Layout. Die CSV-Daten sollen als JavaScript-Variable eingebettet werden. Sprache: {{ language }}. Das Dashboard soll als einzelne index.html Datei funktionieren.", success_criteria: 'index.html in dashboard/ enthaelt mindestens 3 verschiedene Chart-Typen und eine KPI-Uebersicht.', max_iterations: 8 } },
+      { type: 'simple', config: { command: 'Pruefe dashboard/index.html. Zaehle die Diagramme, pruefe ob Chart.js korrekt eingebunden ist, und gib eine Uebersicht des Dashboards aus.' } },
+    ],
+    instructions: 'Erstelle ein interaktives Dashboard mit Chart.js aus den CSV-Daten.',
+  },
+  {
+    id: 'codebase-to-onboarding',
+    icon: '📚',
+    nameKey: 'codebaseToOnboarding',
+    descriptionKey: 'codebaseToOnboardingDescription',
+    blocks: [
+      { type: 'simple', config: { command: 'Scanne das Projekt rekursiv. Liste auf: Verzeichnisstruktur (max 3 Ebenen), erkannte Programmiersprachen, Config-Dateien, Einstiegspunkte (main, index, app), Test-Dateien, CI/CD-Konfiguration. Gib eine strukturierte Projektanalyse aus.' } },
+      { type: 'agentic', config: { goal: "Erstelle ein vollstaendiges Developer-Onboarding-Paket fuer '{{ project_name }}' in docs/onboarding/. Erstelle diese Dateien: (1) README.md — Projektuebersicht, Zweck, Technologie-Stack, (2) SETUP.md — Schritt-fuer-Schritt Setup-Anleitung (Prerequisites, Installation, Konfiguration, Erster Start), (3) ARCHITECTURE.md — Architektur-Diagramm (ASCII), Verzeichnis-Erklaerung, Datenfluss, zentrale Konzepte, (4) CODE_WALKTHROUGH.md — Die 10 wichtigsten Dateien erklaert mit Code-Beispielen, (5) GLOSSARY.md — Projektspezifische Begriffe und Abkuerzungen, (6) FAQ.md — Haeufige Probleme und Loesungen. Sprache: {{ language }}. Zielgruppe: {{ audience }}.", success_criteria: 'Alle 6 Markdown-Dateien existieren in docs/onboarding/ und sind inhaltlich vollstaendig.', max_iterations: 10 } },
+      { type: 'simple', config: { command: 'Lies alle Dateien in docs/onboarding/ und erstelle eine Qualitaetsbewertung: Vollstaendigkeit, Verstaendlichkeit, fehlende Themen.' } },
+    ],
+    instructions: 'Erstelle ein umfassendes Onboarding-Paket fuer neue Entwickler.',
+  },
+  {
+    id: 'git-to-changelog',
+    icon: '📋',
+    nameKey: 'gitToChangelog',
+    descriptionKey: 'gitToChangelogDescription',
+    blocks: [
+      { type: 'simple', config: { command: "git log {{ since_tag }}..HEAD --format='%h | %s | %an | %ad' --date=short" } },
+      { type: 'simple', config: { command: 'Analysiere die Git-Commits. Kategorisiere jeden Commit: feat (neue Features), fix (Bugfixes), refactor, docs, test, chore, breaking (Breaking Changes). Gruppiere zusammengehoerige Commits. Identifiziere die 3 wichtigsten Aenderungen.' } },
+      { type: 'simple', config: { command: 'Erstelle CHANGELOG.md im Keep-a-Changelog Format fuer Version {{ new_version }}. Kategorien: Added, Changed, Fixed, Removed, Breaking Changes. Jeder Eintrag mit Commit-Hash.' } },
+      { type: 'conditional', config: { condition: "grep -qi 'breaking' CHANGELOG.md && echo true || echo false", then_command: 'Erstelle MIGRATION.md mit einer Schritt-fuer-Schritt Migrationsanleitung fuer alle Breaking Changes.', else_command: 'echo "Keine Breaking Changes — Migration Guide nicht noetig."' } },
+      { type: 'simple', config: { command: 'Erstelle RELEASE_NOTES.md fuer \'{{ product_name }}\' {{ new_version }}. Schreibe benutzerfreundlich (nicht technisch). Struktur: Was ist neu (mit Beispielen), Was wurde verbessert, Was wurde behoben, Upgrade-Hinweise.' } },
+    ],
+    instructions: 'Generiere Changelog, Release Notes und ggf. Migrationsanleitung aus der Git-History.',
+  },
+  {
+    id: 'notes-to-presentation',
+    icon: '🎬',
+    nameKey: 'notesToPresentation',
+    descriptionKey: 'notesToPresentationDescription',
+    blocks: [
+      { type: 'simple', config: { command: 'Lies {{ filepath }}. Analysiere den Inhalt und erstelle eine Slide-Gliederung. Beruecksichtige die Ziel-Dauer von {{ duration_minutes }} Minuten (ca. 1-2 Minuten pro Slide). Gib aus: Anzahl geplanter Slides, Titel jedes Slides, geschaetzte Redezeit pro Slide.' } },
+      { type: 'agentic', config: { goal: "Erstelle eine reveal.js Praesentation in presentation/. Verwende reveal.js via CDN. Theme: '{{ theme }}'. Sprache: {{ language }}. Fuer jeden Slide: (1) Klarer Titel, (2) Maximal 3-5 Bullet Points oder eine Visualisierung, (3) Speaker Notes im <aside class='notes'> Tag mit ausfuehrlichem Redetext. Fuege hinzu: Titelslide, Agenda-Slide, Zusammenfassung-Slide, Danke-Slide. Nutze reveal.js Features: Fragment-Animationen, Code-Highlighting wo passend, vertikale Slides fuer Vertiefungen.", success_criteria: 'index.html in presentation/ ist eine vollstaendige reveal.js Praesentation mit mindestens 8 Slides.', max_iterations: 6 } },
+      { type: 'simple', config: { command: 'Zaehle die Slides in presentation/index.html und pruefe ob Speaker Notes vorhanden sind. Gib eine Uebersicht aus: Slide-Titel, Anzahl, geschaetzte Gesamtdauer.' } },
+    ],
+    instructions: 'Erstelle eine professionelle Praesentation mit Speaker Notes aus den Notizen.',
+  },
+  {
+    id: 'api-to-sdk',
+    icon: '🔌',
+    nameKey: 'apiToSdk',
+    descriptionKey: 'apiToSdkDescription',
+    blocks: [
+      { type: 'simple', config: { command: 'Lies {{ filepath }}. Extrahiere alle API-Endpunkte: HTTP-Methode, Pfad, Parameter, Request Body, Response Schema, Authentifizierung. Gib eine strukturierte Uebersicht aller Endpunkte aus.' } },
+      { type: 'agentic', config: { goal: "Erstelle ein typisiertes Client-SDK in {{ target_language }} unter {{ package_name }}/. Das SDK soll enthalten: (1) Typen/Interfaces fuer alle Request/Response-Modelle, (2) Eine Client-Klasse mit Methoden fuer jeden Endpunkt, (3) Error Handling (HTTP-Fehler, Netzwerkfehler, Validierung), (4) Konfiguration (Base URL, Auth Token, Timeout), (5) package.json/setup.py/go.mod je nach Sprache, (6) README.md mit Installationsanleitung und Beispielen fuer jeden Endpunkt. Fuehre den Type-Check aus (tsc/mypy/go build) und behebe Fehler.", success_criteria: 'Type-Check laeuft ohne Fehler.', max_iterations: 10 } },
+      { type: 'simple', config: { command: 'Liste alle generierten Dateien in {{ package_name }}/ auf. Gib eine Zusammenfassung: Anzahl Endpunkte, Anzahl Typen, Code-Zeilen, unterstuetzte Features.' } },
+    ],
+    instructions: 'Generiere ein typisiertes Client-SDK mit Error Handling aus der API-Spezifikation.',
+  },
+  {
+    id: 'markdown-to-ebook',
+    icon: '📖',
+    nameKey: 'markdownToEbook',
+    descriptionKey: 'markdownToEbookDescription',
+    blocks: [
+      { type: 'simple', config: { command: 'Finde alle Markdown-Dateien im Projekt (rekursiv, ausser node_modules und .git). Liste sie auf und analysiere: Dateiname, erste Zeile (vermutlicher Titel), Wortanzahl. Schlage eine sinnvolle Kapitel-Reihenfolge vor.' } },
+      { type: 'simple', config: { command: 'Lies alle gefundenen Markdown-Dateien. Erstelle eine Zusammenfassung: (1) Gesamtstruktur (wieviele Kapitel, geschaetzte Seitenzahl), (2) Inhaltsuebersicht pro Kapitel (2-3 Saetze), (3) Thematische Kohaerenz — passen die Texte zusammen? Gibt es Luecken?' } },
+      { type: 'agentic', config: { goal: "Erstelle ein formatiertes E-Book in ebook/. Titel: '{{ title }}', Autor: '{{ author }}', Sprache: {{ language }}. Erstelle: (1) index.html — Hauptdatei mit allen Kapiteln, automatischem Inhaltsverzeichnis mit Ankern, Titelseite mit Autor und Titel, (2) style.css — Buch-typisches CSS: Serifen-Font, angenehme Zeilenbreite (max 70 Zeichen), Kapiteltrenner, Print-CSS mit Seitenumbruechen, (3) Fuege zwischen Kapiteln Trennseiten ein. Alle Markdown-Inhalte sollen korrekt in HTML konvertiert werden (Ueberschriften, Listen, Code-Blocks, Links, Bilder).", success_criteria: 'index.html und style.css existieren in ebook/ und enthalten alle Kapitel.', max_iterations: 8 } },
+      { type: 'simple', config: { command: 'Pruefe ebook/index.html: Anzahl Kapitel, Inhaltsverzeichnis-Links funktionieren, Gesamtwortanzahl. Erstelle eine Zusammenfassung.' } },
+    ],
+    instructions: 'Kombiniere die Markdown-Dateien zu einem formatierten HTML-E-Book mit Inhaltsverzeichnis.',
+  },
+  {
+    id: 'bug-to-fix',
+    icon: '🐛',
+    nameKey: 'bugToFix',
+    descriptionKey: 'bugToFixDescription',
+    blocks: [
+      { type: 'simple', config: { command: 'Lies {{ filepath }} und analysiere den Code. Suche nach dem beschriebenen Bug: {{ bug_description }}. Identifiziere die betroffene Funktion/Stelle und erklaere die Ursache.' } },
+      { type: 'agentic', config: { goal: "Behebe den Bug in {{ filepath }}. Bug: '{{ bug_description }}'. Vorgehen: (1) Verstehe den bestehenden Code und das Bug-Verhalten, (2) Schreibe zuerst einen Test der den Bug reproduziert (der Test muss fehlschlagen), (3) Implementiere den Fix, (4) Fuehre den Test erneut aus — er muss jetzt bestehen, (5) Fuehre alle existierenden Tests aus um sicherzustellen dass nichts kaputt geht.", success_criteria: 'Alle Tests bestehen nach dem Fix.', max_iterations: 8 } },
+      { type: 'simple', config: { command: 'Erstelle einen Bug-Fix-Report: (1) Ursache des Bugs, (2) Was wurde geaendert (mit Diff-Ueberblick), (3) Welche Tests wurden hinzugefuegt, (4) Wie kann man verifizieren dass der Fix korrekt ist.' } },
+    ],
+    instructions: 'Analysiere den Bug, schreibe einen reproduzierenden Test, behebe den Fehler und verifiziere.',
   },
 ];

@@ -8,6 +8,8 @@ import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.workflow.WorkflowExecutor;
+import com.automation.service.workflow.WorkflowOptimizationService;
+import com.automation.service.system.ApiKeyService;
 import com.automation.service.workflow.WorkflowService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,6 +56,12 @@ class WorkflowControllerTest {
     @MockBean
     private WorkflowMapper workflowMapper;
 
+    @MockBean
+    private ApiKeyService apiKeyService;
+
+    @MockBean
+    private WorkflowOptimizationService optimizationService;
+
     private Workflow testWorkflow;
     private WorkflowResponse testResponse;
 
@@ -72,7 +80,7 @@ class WorkflowControllerTest {
         testResponse = new WorkflowResponse(
                 "wf-1", "proj-1", "Test Project", "Test Workflow", "A test workflow",
                 null, List.of(), "1.0.0", Map.of(), List.of(), 0L,
-                Instant.now(), Instant.now()
+                null, null, Instant.now(), Instant.now()
         );
     }
 

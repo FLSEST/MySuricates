@@ -53,6 +53,8 @@ export function Workflows() {
         description: t.templates[template.descriptionKey as keyof typeof t.templates] as string,
         icon: template.icon,
         blocks: template.blocks,
+        instructions: template.instructions,
+        model: template.model,
       });
     } else {
       setForm({ projectId: '', name: '' });

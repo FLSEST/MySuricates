@@ -58,6 +58,8 @@ export interface Workflow {
   activatedSkillNames: string[];
   version: string;
   runCount: number;
+  instructions: string | null;
+  model: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -69,6 +71,8 @@ export interface CreateWorkflowRequest {
   icon?: string;
   blocks?: BlockDefinition[];
   activatedSkillIds?: string[];
+  instructions?: string;
+  model?: string;
 }
 
 export interface UpdateWorkflowRequest {
@@ -76,9 +80,11 @@ export interface UpdateWorkflowRequest {
   description?: string;
   icon?: string;
   blocks?: BlockDefinition[];
+  instructions?: string;
+  model?: string;
 }
 
-export type BlockType = 'simple' | 'retry' | 'foreach' | 'while' | 'conditional' | 'skill-capability' | 'approval' | 'agentic';
+export type BlockType = 'simple' | 'retry' | 'foreach' | 'while' | 'conditional' | 'skill-capability' | 'approval' | 'agentic' | 'sub-workflow';
 
 export interface BlockDefinition {
   type: BlockType;

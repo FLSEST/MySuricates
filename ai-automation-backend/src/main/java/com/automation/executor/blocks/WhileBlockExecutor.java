@@ -60,7 +60,9 @@ public class WhileBlockExecutor implements BlockExecutor {
                             .type("simple")
                             .config(Map.of("command", resolvedCommand))
                             .build(),
-                    context.nextStepIndex()
+                    context.nextStepIndex(),
+                    context.getInstructionPrefix(),
+                    context.getModel()
             );
 
             outputs.append("[iteration ").append(iteration + 1).append("]: ")

@@ -210,8 +210,12 @@ public class AgenticBlockExecutor implements BlockExecutor {
             String actionOutput;
             int exitCode;
             try {
+                String actionCommand = plan.getAction();
+                if (context.getInstructionPrefix() != null && !context.getInstructionPrefix().isBlank()) {
+                    actionCommand = commandExecutor.prependInstructions(actionCommand, context.getInstructionPrefix());
+                }
                 CliSession.EnrichedCommandResult cmdResult = commandExecutor.executeCommandEnriched(
-                        context.getContainerId(), "claude", plan.getAction());
+                        context.getContainerId(), "claude", actionCommand, context.getModel());
                 actionOutput = cmdResult.output() != null ? cmdResult.output() : "";
                 exitCode = cmdResult.exitCode();
 

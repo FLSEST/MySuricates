@@ -38,6 +38,15 @@ public class CommandExecutorService {
         }
     }
 
+    public CliSession.EnrichedCommandResult executeCommandEnriched(String containerId, String cliType, String command, String model) {
+        try {
+            CliSession session = sessionManager.getOrCreateSession(containerId, cliType);
+            return session.sendCommandEnriched(command, model);
+        } catch (IOException e) {
+            throw new WorkflowExecutionException("Failed to execute command in container: " + containerId, e);
+        }
+    }
+
     public void injectSkillContext(String containerId, String cliType, List<Skill> activatedSkills) {
         if (activatedSkills == null || activatedSkills.isEmpty()) {
             return;
@@ -56,7 +65,25 @@ public class CommandExecutorService {
                 .collect(Collectors.joining("\n\n"));
     }
 
+    public StepResult executeStep(String containerId, String cliType, BlockDefinition block, int stepIndex,
+                                   String instructionPrefix, String model) {
+        String command = extractCommand(block);
+        if (instructionPrefix != null && !instructionPrefix.isBlank()) {
+            command = prependInstructions(command, instructionPrefix);
+        }
+        BlockDefinition enrichedBlock = BlockDefinition.builder()
+                .type(block.getType())
+                .config(new java.util.HashMap<>(block.getConfig()))
+                .build();
+        enrichedBlock.getConfig().put("command", command);
+        return executeStepInternal(containerId, cliType, enrichedBlock, stepIndex, model);
+    }
+
     public StepResult executeStep(String containerId, String cliType, BlockDefinition block, int stepIndex) {
+        return executeStepInternal(containerId, cliType, block, stepIndex, null);
+    }
+
+    private StepResult executeStepInternal(String containerId, String cliType, BlockDefinition block, int stepIndex, String model) {
         StepResult step = new StepResult();
         step.setStepIndex(stepIndex);
         step.setStartedAt(Instant.now());
@@ -66,7 +93,9 @@ public class CommandExecutorService {
         step.setStatus(StepStatus.RUNNING);
 
         try {
-            CliSession.EnrichedCommandResult result = executeCommandEnriched(containerId, cliType, command);
+            CliSession.EnrichedCommandResult result = (model != null && !model.isBlank())
+                    ? executeCommandEnriched(containerId, cliType, command, model)
+                    : executeCommandEnriched(containerId, cliType, command);
             step.setOutput(result.output());
             step.setStatus(result.exitCode() == 0 ? StepStatus.COMPLETED : StepStatus.FAILED);
 
@@ -86,6 +115,10 @@ public class CommandExecutorService {
         );
 
         return step;
+    }
+
+    public String prependInstructions(String command, String prefix) {
+        return "INSTRUCTIONS:\n" + prefix + "\n---\nTASK:\n" + command;
     }
 
     private String extractCommand(BlockDefinition block) {

@@ -62,6 +62,11 @@ public class Workflow {
     @Builder.Default
     private List<Skill> activatedSkills = new ArrayList<>();
 
+    @Column(columnDefinition = "text")
+    private String instructions;
+
+    private String model;
+
     @OneToMany(mappedBy = "workflow", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<WorkflowRun> runs = new ArrayList<>();

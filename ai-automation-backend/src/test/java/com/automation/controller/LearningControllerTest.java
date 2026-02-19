@@ -4,6 +4,7 @@ import com.automation.dto.response.DashboardResponse;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.service.learning.LearningService;
+import com.automation.service.system.ApiKeyService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -29,6 +30,9 @@ class LearningControllerTest {
 
     @MockBean
     private LearningService learningService;
+
+    @MockBean
+    private ApiKeyService apiKeyService;
 
     @Test
     void getDashboard_returnsOk() throws Exception {

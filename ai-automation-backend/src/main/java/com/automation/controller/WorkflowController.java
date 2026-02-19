@@ -11,6 +11,7 @@ import com.automation.entity.WorkflowRun;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.workflow.WorkflowExecutor;
+import com.automation.service.workflow.WorkflowOptimizationService;
 import com.automation.service.workflow.WorkflowService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ public class WorkflowController {
     private final WorkflowExecutor workflowExecutor;
     private final WorkflowRunRepository runRepository;
     private final WorkflowMapper workflowMapper;
+    private final WorkflowOptimizationService optimizationService;
 
     @GetMapping
     public List<WorkflowResponse> listWorkflows() {
@@ -82,6 +84,12 @@ public class WorkflowController {
         var run = runRepository.findById(runId)
                 .orElseThrow(() -> new com.automation.exception.ResourceNotFoundException("WorkflowRun", runId));
         return workflowMapper.toRunResponse(run);
+    }
+
+    @PostMapping("/{id}/optimize")
+    public ResponseEntity<Map<String, Object>> optimizeWorkflow(@PathVariable String id) {
+        Map<String, Object> suggestion = optimizationService.optimizeWorkflow(id);
+        return ResponseEntity.ok(suggestion);
     }
 
     @PostMapping("/{id}/skills")

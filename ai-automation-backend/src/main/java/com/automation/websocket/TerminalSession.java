@@ -12,6 +12,8 @@ import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 @Slf4j
 public class TerminalSession {
@@ -23,10 +25,23 @@ public class TerminalSession {
     private final PipedOutputStream stdinWriter;
     private volatile boolean destroyed = false;
 
-    public TerminalSession(WebSocketSession wsSession, DockerClient dockerClient, String containerId) {
+    public TerminalSession(WebSocketSession wsSession, DockerClient dockerClient, String containerId,
+                           boolean skipPermissions, List<String> allowedTools) {
         this.wsSession = wsSession;
         this.dockerClient = dockerClient;
         this.containerId = containerId;
+
+        // Build command with configurable permissions
+        List<String> cmd = new ArrayList<>(List.of("claude"));
+        if (skipPermissions) {
+            cmd.add("--dangerously-skip-permissions");
+        }
+        if (allowedTools != null) {
+            for (String tool : allowedTools) {
+                cmd.add("--allowedTools");
+                cmd.add(tool);
+            }
+        }
 
         // Create exec instance with TTY
         var execCreate = dockerClient.execCreateCmd(containerId)
@@ -34,7 +49,7 @@ public class TerminalSession {
                 .withAttachStdin(true)
                 .withAttachStdout(true)
                 .withAttachStderr(true)
-                .withCmd("claude", "--dangerously-skip-permissions")
+                .withCmd(cmd.toArray(new String[0]))
                 .exec();
         this.execId = execCreate.getId();
 

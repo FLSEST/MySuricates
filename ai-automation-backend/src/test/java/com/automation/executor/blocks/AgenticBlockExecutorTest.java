@@ -117,7 +117,7 @@ class AgenticBlockExecutorTest {
         assertThat(metadata.get("totalIterations")).isEqualTo(1);
 
         // Should not have called container execution
-        verify(commandExecutor, never()).executeCommandEnriched(anyString(), anyString(), anyString());
+        verify(commandExecutor, never()).executeCommandEnriched(anyString(), anyString(), anyString(), any());
     }
 
     @Test
@@ -128,7 +128,7 @@ class AgenticBlockExecutorTest {
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Need to create file\nACTION: Create test.txt\nSUMMARY: Creating file"))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: File created\nACTION:\nSUMMARY: Done"));
 
-        when(commandExecutor.executeCommandEnriched("test-container", "claude", "Create test.txt"))
+        when(commandExecutor.executeCommandEnriched("test-container", "claude", "Create test.txt", null))
                 .thenReturn(new CliSession.EnrichedCommandResult("File created", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -148,7 +148,7 @@ class AgenticBlockExecutorTest {
         when(hostClaude.reasonStructured("prompt")).thenReturn(
                 rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Still working\nACTION: Try again\nSUMMARY: Retrying"));
 
-        when(commandExecutor.executeCommandEnriched("test-container", "claude", "Try again"))
+        when(commandExecutor.executeCommandEnriched("test-container", "claude", "Try again", null))
                 .thenReturn(new CliSession.EnrichedCommandResult("Still failing", 1, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -166,7 +166,7 @@ class AgenticBlockExecutorTest {
     void execute_cancellationStopsLoop() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
 
-        when(commandExecutor.executeCommandEnriched("test-container", "claude", "Do something"))
+        when(commandExecutor.executeCommandEnriched("test-container", "claude", "Do something", null))
                 .thenReturn(new CliSession.EnrichedCommandResult("partial", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -206,9 +206,9 @@ class AgenticBlockExecutorTest {
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Try different approach\nACTION: Fix and run\nSUMMARY: Fixing"))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Fixed\nACTION:\nSUMMARY: All good"));
 
-        when(commandExecutor.executeCommandEnriched("test-container", "claude", "Run tests"))
+        when(commandExecutor.executeCommandEnriched("test-container", "claude", "Run tests", null))
                 .thenReturn(new CliSession.EnrichedCommandResult("Tests failed: 3 errors", 1, null));
-        when(commandExecutor.executeCommandEnriched("test-container", "claude", "Fix and run"))
+        when(commandExecutor.executeCommandEnriched("test-container", "claude", "Fix and run", null))
                 .thenReturn(new CliSession.EnrichedCommandResult("All tests pass", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());

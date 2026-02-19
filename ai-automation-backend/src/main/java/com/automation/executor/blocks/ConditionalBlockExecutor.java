@@ -52,7 +52,9 @@ public class ConditionalBlockExecutor implements BlockExecutor {
                             .type("simple")
                             .config(Map.of("command", resolved))
                             .build(),
-                    context.nextStepIndex()
+                    context.nextStepIndex(),
+                    context.getInstructionPrefix(),
+                    context.getModel()
             );
 
             result.setOutput(stepResult.getOutput());

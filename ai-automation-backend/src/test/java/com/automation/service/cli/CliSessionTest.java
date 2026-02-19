@@ -61,7 +61,7 @@ class CliSessionTest {
     @Test
     void customPromptPattern_accepted() {
         var pattern = java.util.regex.Pattern.compile("^custom-prompt>");
-        CliSession session = new CliSession("container-1", "custom-cli", pattern);
+        CliSession session = new CliSession("container-1", "custom-cli", pattern, true, java.util.List.of());
 
         assertThat(session.getCliType()).isEqualTo("custom-cli");
     }

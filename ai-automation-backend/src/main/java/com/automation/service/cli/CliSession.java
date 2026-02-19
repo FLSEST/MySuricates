@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.io.*;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.regex.Pattern;
@@ -33,6 +34,8 @@ public class CliSession implements Closeable {
     private final String cliType;
     private final boolean oneOffMode;
     private final Pattern promptPattern;
+    private final boolean skipPermissions;
+    private final List<String> allowedTools;
 
     private Process process;
     private BufferedReader reader;
@@ -45,14 +48,21 @@ public class CliSession implements Closeable {
     private volatile boolean alive;
 
     public CliSession(String containerId, String cliType) {
-        this(containerId, cliType, null);
+        this(containerId, cliType, null, true, List.of());
     }
 
-    public CliSession(String containerId, String cliType, Pattern customPromptPattern) {
+    public CliSession(String containerId, String cliType, boolean skipPermissions, List<String> allowedTools) {
+        this(containerId, cliType, null, skipPermissions, allowedTools);
+    }
+
+    public CliSession(String containerId, String cliType, Pattern customPromptPattern,
+                       boolean skipPermissions, List<String> allowedTools) {
         this.containerId = containerId;
         this.cliType = cliType;
         this.oneOffMode = true;
         this.promptPattern = customPromptPattern != null ? customPromptPattern : DEFAULT_PROMPT_PATTERN;
+        this.skipPermissions = skipPermissions;
+        this.allowedTools = allowedTools != null ? allowedTools : List.of();
         this.lastActivity = Instant.now();
     }
 
@@ -107,6 +117,10 @@ public class CliSession implements Closeable {
     }
 
     public EnrichedCommandResult sendCommandEnriched(String command) throws IOException {
+        return sendCommandEnriched(command, null);
+    }
+
+    public EnrichedCommandResult sendCommandEnriched(String command, String model) throws IOException {
         if (!alive) {
             throw new IllegalStateException("CLI session is not alive");
         }
@@ -118,46 +132,36 @@ public class CliSession implements Closeable {
             return new EnrichedCommandResult(basic.output(), basic.exitCode(), null);
         }
 
-        return executeOneOffEnriched(command);
+        return executeOneOffEnriched(command, model);
     }
 
     private CommandResult executeOneOff(String command) throws IOException {
-        List<String> cmd;
         if ("claude".equals(cliType)) {
-            // Use stream-json for Claude and extract text
             EnrichedCommandResult enriched = executeOneOffEnriched(command);
             return enriched.toCommandResult();
-        } else {
-            cmd = List.of("docker", "exec", containerId,
-                    "bash", "-c", command);
         }
-
-        ProcessBuilder pb = new ProcessBuilder(cmd);
-        pb.redirectErrorStream(true);
-
-        Process proc = pb.start();
-        try {
-            String output = new String(proc.getInputStream().readAllBytes()).trim();
-            boolean finished = proc.waitFor(READ_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-            if (!finished) {
-                proc.destroyForcibly();
-                throw new IOException("Command timed out after " + READ_TIMEOUT.toMinutes() + " minutes");
-            }
-            int exitCode = proc.exitValue();
-            lastActivity = Instant.now();
-            return new CommandResult(output, exitCode);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            proc.destroyForcibly();
-            throw new IOException("Command interrupted");
-        }
+        throw new UnsupportedOperationException("Only claude CLI type is supported in one-off mode");
     }
 
     private EnrichedCommandResult executeOneOffEnriched(String command) throws IOException {
-        List<String> cmd = List.of("docker", "exec", containerId,
+        return executeOneOffEnriched(command, null);
+    }
+
+    private EnrichedCommandResult executeOneOffEnriched(String command, String model) throws IOException {
+        List<String> cmd = new ArrayList<>(List.of("docker", "exec", containerId,
                 "claude", "-p", command,
-                "--output-format", "stream-json",
-                "--dangerously-skip-permissions");
+                "--output-format", "stream-json"));
+        if (model != null && !model.isBlank()) {
+            cmd.add("--model");
+            cmd.add(model);
+        }
+        if (skipPermissions) {
+            cmd.add("--dangerously-skip-permissions");
+        }
+        for (String tool : allowedTools) {
+            cmd.add("--allowedTools");
+            cmd.add(tool);
+        }
 
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.redirectErrorStream(true);

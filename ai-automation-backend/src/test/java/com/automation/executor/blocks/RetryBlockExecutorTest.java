@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,7 +51,7 @@ class RetryBlockExecutorTest {
     void execute_successOnFirstAttempt_returnsCompleted() {
         StepResult success = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("passed").build();
-        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt()))
+        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt(), isNull(), isNull()))
                 .thenReturn(success);
 
         BlockDefinition block = BlockDefinition.builder()
@@ -65,7 +66,7 @@ class RetryBlockExecutorTest {
         StepResult result = executor.execute(block, context);
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
-        verify(commandExecutor, times(1)).executeStep(any(), any(), any(), anyInt());
+        verify(commandExecutor, times(1)).executeStep(any(), any(), any(), anyInt(), any(), any());
     }
 
     @Test
@@ -74,7 +75,7 @@ class RetryBlockExecutorTest {
                 .stepIndex(0).status(StepStatus.FAILED).output("failed").build();
         StepResult success = StepResult.builder()
                 .stepIndex(1).status(StepStatus.COMPLETED).output("passed").build();
-        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt()))
+        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt(), isNull(), isNull()))
                 .thenReturn(failed, success);
 
         BlockDefinition block = BlockDefinition.builder()
@@ -89,14 +90,14 @@ class RetryBlockExecutorTest {
         StepResult result = executor.execute(block, context);
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
-        verify(commandExecutor, times(2)).executeStep(any(), any(), any(), anyInt());
+        verify(commandExecutor, times(2)).executeStep(any(), any(), any(), anyInt(), any(), any());
     }
 
     @Test
     void execute_allAttemptsFail_returnsLastFailedResult() {
         StepResult failed = StepResult.builder()
                 .stepIndex(0).status(StepStatus.FAILED).output("error").build();
-        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt()))
+        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt(), isNull(), isNull()))
                 .thenReturn(failed);
 
         BlockDefinition block = BlockDefinition.builder()
@@ -112,14 +113,14 @@ class RetryBlockExecutorTest {
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
         // 1 initial + 2 retries = 3 attempts
-        verify(commandExecutor, times(3)).executeStep(any(), any(), any(), anyInt());
+        verify(commandExecutor, times(3)).executeStep(any(), any(), any(), anyInt(), any(), any());
     }
 
     @Test
     void execute_cancelledDuringRetry_stopsEarly() {
         StepResult failed = StepResult.builder()
                 .stepIndex(0).status(StepStatus.FAILED).output("error").build();
-        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt()))
+        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt(), isNull(), isNull()))
                 .thenAnswer(inv -> {
                     context.cancel(); // Cancel after first attempt
                     return failed;
@@ -137,14 +138,14 @@ class RetryBlockExecutorTest {
         StepResult result = executor.execute(block, context);
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
-        verify(commandExecutor, times(1)).executeStep(any(), any(), any(), anyInt());
+        verify(commandExecutor, times(1)).executeStep(any(), any(), any(), anyInt(), any(), any());
     }
 
     @Test
     void execute_defaultRetries_usesThree() {
         StepResult failed = StepResult.builder()
                 .stepIndex(0).status(StepStatus.FAILED).output("error").build();
-        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt()))
+        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt(), isNull(), isNull()))
                 .thenReturn(failed);
 
         BlockDefinition block = BlockDefinition.builder()
@@ -158,6 +159,6 @@ class RetryBlockExecutorTest {
         executor.execute(block, context);
 
         // 1 initial + 3 default retries = 4 attempts
-        verify(commandExecutor, times(4)).executeStep(any(), any(), any(), anyInt());
+        verify(commandExecutor, times(4)).executeStep(any(), any(), any(), anyInt(), any(), any());
     }
 }

@@ -3,6 +3,7 @@ package com.automation.controller;
 import com.automation.dto.response.RemoteAccessResponse;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.TailscaleException;
+import com.automation.service.system.ApiKeyService;
 import com.automation.service.system.TailscaleService;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.PingCmd;
@@ -36,6 +37,9 @@ class SystemControllerTest {
 
     @MockBean
     private DataSource dataSource;
+
+    @MockBean
+    private ApiKeyService apiKeyService;
 
     @Test
     void health_dockerAvailable_returnsUp() throws Exception {

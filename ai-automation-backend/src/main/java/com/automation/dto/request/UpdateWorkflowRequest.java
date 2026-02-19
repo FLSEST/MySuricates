@@ -8,5 +8,7 @@ public record UpdateWorkflowRequest(
         String name,
         String description,
         String icon,
-        List<BlockDefinition> blocks
+        List<BlockDefinition> blocks,
+        String instructions,
+        String model
 ) {}

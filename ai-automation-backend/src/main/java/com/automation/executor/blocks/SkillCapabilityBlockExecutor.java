@@ -50,10 +50,14 @@ public class SkillCapabilityBlockExecutor implements BlockExecutor {
         result.setInput("skill-capability: " + capability);
 
         try {
+            String fullPrompt = prompt.toString();
+            if (context.getInstructionPrefix() != null && !context.getInstructionPrefix().isBlank()) {
+                fullPrompt = commandExecutor.prependInstructions(fullPrompt, context.getInstructionPrefix());
+            }
             String response = commandExecutor.executeCommand(
                     context.getContainerId(),
                     BlockExecutor.cliTypeFor("skill-capability"),
-                    prompt.toString()
+                    fullPrompt
             ).output();
 
             result.setOutput(response);

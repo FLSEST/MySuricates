@@ -28,6 +28,7 @@ public class SecurityConfig {
                         // Public endpoints
                         .requestMatchers("/api/v1/system/health").permitAll()
                         .requestMatchers("/api/v1/system/info").permitAll()
+                        .requestMatchers("/api/v1/system/auth-status").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
                         // WebSocket endpoint
                         .requestMatchers("/ws/**").permitAll()

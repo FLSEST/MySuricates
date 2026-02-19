@@ -16,6 +16,8 @@ interface WorkflowApiResponse {
   metadata: Record<string, unknown>;
   activatedSkills: Array<{ id: string; name: string }>;
   runCount: number;
+  instructions: string | null;
+  model: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -27,6 +29,8 @@ function mapWorkflow(raw: WorkflowApiResponse): Workflow {
     activatedSkillIds: raw.activatedSkills?.map((s) => s.id) ?? [],
     activatedSkillNames: raw.activatedSkills?.map((s) => s.name) ?? [],
     runCount: raw.runCount ?? 0,
+    instructions: raw.instructions ?? null,
+    model: raw.model ?? null,
   };
 }
 
@@ -152,5 +156,19 @@ export function useSubmitApproval() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['workflows'] });
     },
+  });
+}
+
+export function useOptimizeWorkflow() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
+  return useMutation({
+    mutationFn: (workflowId: string) =>
+      api.post<Record<string, unknown>>(`/workflows/${workflowId}/optimize`),
+    onSuccess: (_, workflowId) => {
+      qc.invalidateQueries({ queryKey: ['workflows', workflowId] });
+    },
+    onError: () => toast.error(t.workflows.optimizeFailed),
   });
 }

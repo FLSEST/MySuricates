@@ -103,7 +103,7 @@ class WorkflowServiceTest {
         List<BlockDefinition> blocks = List.of(
                 BlockDefinition.builder().type("simple").config(Map.of("command", "npm test")).build()
         );
-        var request = new CreateWorkflowRequest("proj-1", "New Workflow", "desc", "icon", blocks, null);
+        var request = new CreateWorkflowRequest("proj-1", "New Workflow", "desc", "icon", blocks, null, null, null);
         when(projectRepository.findById("proj-1")).thenReturn(Optional.of(testProject));
         when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> {
             Workflow w = inv.getArgument(0);
@@ -121,7 +121,7 @@ class WorkflowServiceTest {
     @Test
     void create_withActivatedSkills_activatesSkills() {
         var request = new CreateWorkflowRequest("proj-1", "Skilled", "desc", null,
-                List.of(), List.of("skill-1", "skill-2"));
+                List.of(), List.of("skill-1", "skill-2"), null, null);
         Skill skill1 = Skill.builder().id("skill-1").name("Skill A").category(SkillCategory.CODE).build();
         Skill skill2 = Skill.builder().id("skill-2").name("Skill B").category(SkillCategory.DOCUMENT).build();
 
@@ -137,7 +137,7 @@ class WorkflowServiceTest {
 
     @Test
     void create_nonExistentProject_throwsException() {
-        var request = new CreateWorkflowRequest("unknown", "Name", null, null, List.of(), null);
+        var request = new CreateWorkflowRequest("unknown", "Name", null, null, List.of(), null, null, null);
         when(projectRepository.findById("unknown")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> workflowService.create(request))
@@ -150,7 +150,7 @@ class WorkflowServiceTest {
         when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
         when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new UpdateWorkflowRequest("Updated Name", null, null, null);
+        var request = new UpdateWorkflowRequest("Updated Name", null, null, null, null, null);
         Workflow result = workflowService.update("wf-1", request);
 
         assertThat(result.getName()).isEqualTo("Updated Name");
