@@ -45,6 +45,10 @@ docker:
     pids-limit: 100
     idle-timeout-minutes: 60
 
+app:
+  version: @project.version@
+  build-timestamp: @maven.build.timestamp@
+
 automation:
   cli:
     host-home: ${AUTOMATION_HOST_HOME:}    # Default: System.getProperty("user.home")
@@ -68,6 +72,13 @@ automation:
     timeout-seconds: ${AUTOMATION_HOST_CLAUDE_TIMEOUT:300}
   execution:
     max-concurrent: ${AUTOMATION_MAX_CONCURRENT_RUNS:10}
+  summarization:
+    base-dir: ${AUTOMATION_SUMMARIZATION_DIR:${user.home}/.autotrigger/summarization}
+    timeout-seconds: ${AUTOMATION_SUMMARIZATION_TIMEOUT:120}
+  tray:
+    enabled: ${AUTOMATION_TRAY_ENABLED:true}
+    poll-interval-ms: ${AUTOMATION_TRAY_POLL_MS:15000}
+    web-ui-url: ${AUTOMATION_WEB_UI_URL:http://localhost:3000}
 
 logging:
   level:
