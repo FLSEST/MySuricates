@@ -84,7 +84,7 @@ export interface UpdateWorkflowRequest {
   model?: string;
 }
 
-export type BlockType = 'simple' | 'retry' | 'foreach' | 'while' | 'conditional' | 'skill-capability' | 'approval' | 'agentic' | 'sub-workflow';
+export type BlockType = 'simple' | 'shell' | 'retry' | 'foreach' | 'while' | 'conditional' | 'skill-capability' | 'approval' | 'agentic' | 'sub-workflow';
 
 export interface BlockDefinition {
   type: BlockType;
@@ -158,6 +158,8 @@ export interface ScheduledWorkflow {
   workflowId: string;
   workflowName: string;
   cronExpression: string;
+  scheduleType: 'CRON' | 'ONCE';
+  scheduledAt: string | null;
   description: string;
   inputContext: Record<string, unknown>;
   enabled: boolean;
@@ -169,9 +171,36 @@ export interface ScheduledWorkflow {
 
 export interface CreateScheduleRequest {
   workflowId: string;
-  cronExpression: string;
+  cronExpression?: string;
   description?: string;
   inputContext?: Record<string, unknown>;
+  scheduleType?: 'CRON' | 'ONCE';
+  scheduledAt?: string;
+}
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  date: string;
+  type: 'scheduled' | 'past_run';
+  status?: string;
+  workflowId: string;
+}
+
+export interface CalendarDataResponse {
+  upcoming: ScheduledWorkflow[];
+  pastRuns: WorkflowRun[];
+}
+
+// ── Upcoming Schedule ────────────────────────────────────
+
+export interface UpcomingScheduleData {
+  count: number;
+  schedules: Array<{
+    scheduleId: string;
+    workflowName: string;
+    scheduledAt: string;
+  }>;
 }
 
 // ── Webhook ──────────────────────────────────────────────
@@ -207,6 +236,8 @@ export interface SystemHealth {
 export interface SystemInfo {
   name: string;
   version: string;
+  buildType: string;
+  buildTimestamp: string;
   java: string;
   tailscale: string;
 }
@@ -341,6 +372,50 @@ export interface WorkflowSuggestion {
   originalGoal: string;
   agenticStepsAnalyzed: number;
   available: boolean;
+}
+
+// ── Activity Log ─────────────────────────────────────────
+
+export type ActivityLogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
+export type ActivityLogCategory = 'SYSTEM' | 'EXECUTION' | 'SCHEDULE' | 'WEBHOOK' | 'SECURITY' | 'CONTAINER';
+
+export interface ActivityLogEntry {
+  id: string;
+  timestamp: string;
+  level: ActivityLogLevel;
+  category: ActivityLogCategory;
+  message: string;
+  source: string | null;
+  referenceId: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface ActivityLogPage {
+  content: ActivityLogEntry[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+// ── Workflow Memory ──────────────────────────────────────
+
+export interface WorkflowMemory {
+  id: string;
+  workflowId: string;
+  title: string;
+  content: string;
+  tags: string[];
+  sourceRunIds: string[];
+  provider: string;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface ExtractMemoryRequest {
+  runIds?: string[];
+  provider: string;
 }
 
 // ── API Error ────────────────────────────────────────────

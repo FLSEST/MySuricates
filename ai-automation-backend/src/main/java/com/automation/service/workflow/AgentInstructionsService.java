@@ -12,6 +12,8 @@ import java.nio.charset.StandardCharsets;
 @Slf4j
 public class AgentInstructionsService {
 
+    private static final int MAX_INSTRUCTION_LENGTH = 10_000;
+
     private String baseInstructions = "";
 
     @PostConstruct
@@ -32,14 +34,31 @@ public class AgentInstructionsService {
             sb.append(baseInstructions);
         }
 
-        if (workflowInstructions != null && !workflowInstructions.isBlank()) {
+        String validated = validateInstructions(workflowInstructions);
+        if (validated != null && !validated.isBlank()) {
             if (!sb.isEmpty()) {
                 sb.append("\n\n");
             }
             sb.append("## Workflow-Specific Instructions\n");
-            sb.append(workflowInstructions);
+            sb.append(validated);
         }
 
         return sb.toString();
+    }
+
+    private String validateInstructions(String instructions) {
+        if (instructions == null) {
+            return null;
+        }
+        String trimmed = instructions.strip();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        if (trimmed.length() > MAX_INSTRUCTION_LENGTH) {
+            log.warn("Workflow instructions truncated from {} to {} chars",
+                    trimmed.length(), MAX_INSTRUCTION_LENGTH);
+            return trimmed.substring(0, MAX_INSTRUCTION_LENGTH) + "\n[... truncated]";
+        }
+        return trimmed;
     }
 }

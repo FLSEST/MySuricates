@@ -18,4 +18,7 @@ public interface ScheduledWorkflowRepository extends JpaRepository<ScheduledWork
     List<ScheduledWorkflow> findDueSchedules(@Param("before") Instant before);
 
     List<ScheduledWorkflow> findByWorkflowId(String workflowId);
+
+    @Query("SELECT s FROM ScheduledWorkflow s WHERE s.enabled = true AND s.nextRunAt BETWEEN :from AND :to")
+    List<ScheduledWorkflow> findSchedulesInRange(@Param("from") Instant from, @Param("to") Instant to);
 }

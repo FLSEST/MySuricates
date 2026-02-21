@@ -22,12 +22,17 @@ public class ForEachBlockExecutor implements BlockExecutor {
 
     private final CommandExecutorService commandExecutor;
 
+    private static final int DEFAULT_SHELL_TIMEOUT = 300;
+
     @Override
     @SuppressWarnings("unchecked")
     public StepResult execute(BlockDefinition block, ExecutionContext context) {
         Map<String, Object> config = block.getConfig();
         String variableName = (String) config.getOrDefault("variable_name", "item");
         String command = (String) config.get("command");
+        String executionMode = (String) config.getOrDefault("execution_mode", "claude");
+        boolean isShell = "shell".equals(executionMode);
+        int shellTimeout = ((Number) config.getOrDefault("timeout_seconds", DEFAULT_SHELL_TIMEOUT)).intValue();
 
         // Get items from list or command output
         List<String> items;
@@ -35,8 +40,14 @@ public class ForEachBlockExecutor implements BlockExecutor {
 
         if ("command".equals(itemsSource)) {
             String itemsCommand = context.resolveTemplate((String) config.get("items_command"));
-            String output = commandExecutor.executeCommand(
-                    context.getContainerId(), BlockExecutor.cliTypeFor("foreach"), itemsCommand).output();
+            String output;
+            if (isShell) {
+                output = commandExecutor.executeShellCommandOnHost(
+                        context.getProjectPath(), itemsCommand, shellTimeout).output();
+            } else {
+                output = commandExecutor.executeCommandOnHost(
+                        context.getProjectPath(), itemsCommand).output();
+            }
             items = Arrays.asList(output.split("\n"));
         } else {
             Object rawItems = config.get("items");
@@ -63,17 +74,29 @@ public class ForEachBlockExecutor implements BlockExecutor {
             context.setVariable(variableName, item);
             String resolvedCommand = context.resolveTemplate(command);
 
-            StepResult itemResult = commandExecutor.executeStep(
-                    context.getContainerId(),
-                    BlockExecutor.cliTypeFor("simple"),
-                    BlockDefinition.builder()
-                            .type("simple")
-                            .config(Map.of("command", resolvedCommand))
-                            .build(),
-                    context.nextStepIndex(),
-                    context.getInstructionPrefix(),
-                    context.getModel()
-            );
+            StepResult itemResult;
+            if (isShell) {
+                itemResult = commandExecutor.executeStepAsShell(
+                        context.getProjectPath(),
+                        BlockDefinition.builder()
+                                .type("shell")
+                                .config(Map.of("command", resolvedCommand))
+                                .build(),
+                        context.nextStepIndex(),
+                        shellTimeout
+                );
+            } else {
+                itemResult = commandExecutor.executeStepOnHost(
+                        context.getProjectPath(),
+                        BlockDefinition.builder()
+                                .type("simple")
+                                .config(Map.of("command", resolvedCommand))
+                                .build(),
+                        context.nextStepIndex(),
+                        context.getInstructionPrefix(),
+                        context.getModel()
+                );
+            }
 
             outputs.append("[").append(item).append("]: ").append(itemResult.getOutput()).append("\n");
             if (itemResult.getStatus() == StepStatus.FAILED) {

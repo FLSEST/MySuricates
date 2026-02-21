@@ -37,6 +37,12 @@ public class SystemController {
     @Value("${spring.datasource.url}")
     private String datasourceUrl;
 
+    @Value("${app.version:0.1.0-SNAPSHOT}")
+    private String appVersion;
+
+    @Value("${app.build-timestamp:unknown}")
+    private String buildTimestamp;
+
     @Value("${automation.security.enabled:true}")
     private boolean securityEnabled;
 
@@ -64,9 +70,19 @@ public class SystemController {
 
     @GetMapping("/info")
     public Map<String, Object> info() {
+        String version = appVersion;
+        String buildType = "RELEASE";
+        int dashIdx = appVersion.indexOf('-');
+        if (dashIdx > 0) {
+            version = appVersion.substring(0, dashIdx);
+            buildType = appVersion.substring(dashIdx + 1);
+        }
+
         return Map.of(
                 "name", "AI Automation Platform",
-                "version", "0.1.0",
+                "version", version,
+                "buildType", buildType,
+                "buildTimestamp", buildTimestamp,
                 "java", System.getProperty("java.version"),
                 "tailscale", tailscaleService.isConfigEnabled() ? "CONFIGURED" : "DISABLED"
         );

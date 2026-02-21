@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Play, Plus, Trash2, Pencil, Zap, Clock, Wand2, FileText, Bot,
+  ArrowLeft, Play, Plus, Trash2, Pencil, Zap, Clock, Wand2, FileText, Bot, Copy,
 } from 'lucide-react';
 import { Card, CardHeader, Button, Input, Select, Modal, Spinner } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
@@ -9,17 +9,19 @@ import { ErrorState } from '../components/shared/ErrorState';
 import { MonacoEditor } from '../components/shared/MonacoEditor';
 import {
   useWorkflow, useWorkflows as useWorkflowsList, useWorkflowRuns, useUpdateWorkflow,
-  useDeleteWorkflow, useExecuteWorkflow, useOptimizeWorkflow,
+  useDeleteWorkflow, useExecuteWorkflow, useOptimizeWorkflow, useCreateWorkflow,
 } from '../hooks/useWorkflows';
 import { useSkills, useActivateSkills, useDeactivateSkill } from '../hooks/useSkills';
+import { useProjects } from '../hooks/useProjects';
 import { SortableBlockList } from '../components/workflow/SortableBlockList';
 import { ExecuteDialog } from '../components/workflow/ExecuteDialog';
+import { WorkflowMemoryPanel } from '../components/workflow/WorkflowMemoryPanel';
 import { useT } from '../i18n';
 import { formatDuration } from '../utils/formatTime';
 import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
 import type { BlockDefinition, BlockType, WorkflowRun } from '../types';
 
-const BLOCK_TYPES: BlockType[] = ['simple', 'retry', 'foreach', 'while', 'conditional', 'skill-capability', 'approval', 'agentic', 'sub-workflow'];
+const BLOCK_TYPES: BlockType[] = ['simple', 'shell', 'retry', 'foreach', 'while', 'conditional', 'skill-capability', 'approval', 'agentic', 'sub-workflow'];
 
 const MODEL_OPTIONS = [
   { value: '', label: '' }, // will be replaced by t.workflows.modelDefault
@@ -36,10 +38,12 @@ export function WorkflowDetail() {
   const { data: runs } = useWorkflowRuns(id!);
   const { data: allSkills } = useSkills();
   const { data: allWorkflows } = useWorkflowsList();
+  const { data: projects } = useProjects();
   const updateWorkflow = useUpdateWorkflow();
   const deleteWorkflow = useDeleteWorkflow();
   const executeWorkflow = useExecuteWorkflow();
   const optimizeWorkflow = useOptimizeWorkflow();
+  const createWorkflow = useCreateWorkflow();
   const activateSkills = useActivateSkills();
   const deactivateSkill = useDeactivateSkill();
 
@@ -64,6 +68,8 @@ export function WorkflowDetail() {
   });
   const [selectedSkillId, setSelectedSkillId] = useState('');
   const [showExecuteDialog, setShowExecuteDialog] = useState(false);
+  const [showClone, setShowClone] = useState(false);
+  const [cloneForm, setCloneForm] = useState({ projectId: '', name: '' });
 
   if (isLoading) {
     return (
@@ -227,6 +233,16 @@ export function WorkflowDetail() {
             {t.workflows.execute}
           </Button>
           <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} onClick={openEdit} aria-label={t.common.edit} />
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<Copy className="w-4 h-4" />}
+            onClick={() => {
+              setCloneForm({ projectId: workflow.projectId, name: `${workflow.name} (Copy)` });
+              setShowClone(true);
+            }}
+            aria-label={t.workflows.clone}
+          />
           <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4" />} onClick={() => setShowDelete(true)} aria-label={t.common.delete} />
         </div>
       </div>
@@ -296,6 +312,9 @@ export function WorkflowDetail() {
               </p>
             )}
           </Card>
+
+          {/* Workflow Memory */}
+          <WorkflowMemoryPanel workflowId={workflow.id} runs={runs} />
 
           {/* Model Selection */}
           <Card>
@@ -456,13 +475,14 @@ export function WorkflowDetail() {
               const type = e.target.value as BlockType;
               const defaultConfig: Record<BlockType, object> = {
                 simple: { command: '' },
+                shell: { command: '', timeout_seconds: 300 },
                 retry: { command: '', max_retries: 3, delay: 5 },
                 foreach: { items_command: '', variable_name: 'item', command: '' },
                 while: { condition_command: '', command: '', max_iterations: 10 },
                 conditional: { condition: '', then_command: '', else_command: '' },
                 'skill-capability': { capability: '', input: '{{ previous_output }}' },
                 approval: { question: '', options: ['Yes', 'Yes always', 'No'], mode: 'ask', auto_answer: null, on_no: 'continue', variable_name: 'approval_answer', timeout_minutes: 30 },
-                agentic: { goal: '', success_criteria: '', max_iterations: 10, iteration_timeout_seconds: 300, require_approval: false },
+                agentic: { goal: '', success_criteria: '', max_iterations: 10, iteration_timeout_seconds: 300, total_timeout_seconds: 1800, max_total_tokens: 200000, max_repeated_actions: 3, require_approval: false },
                 'sub-workflow': { workflow_id: '' },
               };
               setNewBlock({ type, config: JSON.stringify(defaultConfig[type], null, 2) });
@@ -590,6 +610,62 @@ export function WorkflowDetail() {
         <p className="text-sm text-text-secondary">
           {t.common.deleteConfirm} {t.workflows.deleteConfirm}
         </p>
+      </Modal>
+
+      {/* Clone modal */}
+      <Modal
+        open={showClone}
+        onClose={() => setShowClone(false)}
+        title={t.workflows.cloneWorkflow}
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowClone(false)}>{t.common.cancel}</Button>
+            <Button
+              onClick={() => {
+                createWorkflow.mutate(
+                  {
+                    projectId: cloneForm.projectId,
+                    name: cloneForm.name,
+                    description: workflow.description,
+                    icon: workflow.icon,
+                    blocks: workflow.blocks,
+                    activatedSkillIds: workflow.activatedSkillIds,
+                    instructions: workflow.instructions ?? undefined,
+                    model: workflow.model ?? undefined,
+                  },
+                  {
+                    onSuccess: (newWorkflow) => {
+                      setShowClone(false);
+                      navigate(`/workflows/${newWorkflow.id}`);
+                    },
+                  }
+                );
+              }}
+              loading={createWorkflow.isPending}
+              disabled={!cloneForm.projectId || !cloneForm.name.trim()}
+            >
+              {t.common.create}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Select
+            label={t.workflows.cloneProject}
+            value={cloneForm.projectId}
+            onChange={(e) => setCloneForm({ ...cloneForm, projectId: e.target.value })}
+            options={[
+              { value: '', label: t.common.selectProject },
+              ...(projects?.map((p) => ({ value: p.id, label: p.name })) ?? []),
+            ]}
+          />
+          <Input
+            label={t.workflows.cloneName}
+            value={cloneForm.name}
+            onChange={(e) => setCloneForm({ ...cloneForm, name: e.target.value })}
+          />
+        </div>
       </Modal>
 
       {/* Execute with variables dialog */}

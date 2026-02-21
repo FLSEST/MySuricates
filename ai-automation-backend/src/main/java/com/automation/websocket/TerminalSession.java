@@ -7,13 +7,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
 
 @Slf4j
 public class TerminalSession {
@@ -25,31 +22,18 @@ public class TerminalSession {
     private final PipedOutputStream stdinWriter;
     private volatile boolean destroyed = false;
 
-    public TerminalSession(WebSocketSession wsSession, DockerClient dockerClient, String containerId,
-                           boolean skipPermissions, List<String> allowedTools) {
+    public TerminalSession(WebSocketSession wsSession, DockerClient dockerClient, String containerId) {
         this.wsSession = wsSession;
         this.dockerClient = dockerClient;
         this.containerId = containerId;
 
-        // Build command with configurable permissions
-        List<String> cmd = new ArrayList<>(List.of("claude"));
-        if (skipPermissions) {
-            cmd.add("--dangerously-skip-permissions");
-        }
-        if (allowedTools != null) {
-            for (String tool : allowedTools) {
-                cmd.add("--allowedTools");
-                cmd.add(tool);
-            }
-        }
-
-        // Create exec instance with TTY
+        // Create exec instance with TTY — run bash shell for interactive terminal access
         var execCreate = dockerClient.execCreateCmd(containerId)
                 .withTty(true)
                 .withAttachStdin(true)
                 .withAttachStdout(true)
                 .withAttachStderr(true)
-                .withCmd(cmd.toArray(new String[0]))
+                .withCmd("bash", "-l")
                 .exec();
         this.execId = execCreate.getId();
 

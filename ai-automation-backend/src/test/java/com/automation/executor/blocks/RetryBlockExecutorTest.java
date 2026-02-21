@@ -37,8 +37,9 @@ class RetryBlockExecutorTest {
     void setUp() {
         context = ExecutionContext.builder()
                 .containerId("container-1")
-                                .workflowRunId("run-1")
+                .workflowRunId("run-1")
                 .build();
+        context.setProjectPath("/test/project");
     }
 
     @Test
@@ -51,7 +52,7 @@ class RetryBlockExecutorTest {
     void execute_successOnFirstAttempt_returnsCompleted() {
         StepResult success = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("passed").build();
-        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(), anyInt(), isNull(), isNull()))
                 .thenReturn(success);
 
         BlockDefinition block = BlockDefinition.builder()
@@ -66,7 +67,7 @@ class RetryBlockExecutorTest {
         StepResult result = executor.execute(block, context);
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
-        verify(commandExecutor, times(1)).executeStep(any(), any(), any(), anyInt(), any(), any());
+        verify(commandExecutor, times(1)).executeStepOnHost(any(), any(), anyInt(), any(), any());
     }
 
     @Test
@@ -75,7 +76,7 @@ class RetryBlockExecutorTest {
                 .stepIndex(0).status(StepStatus.FAILED).output("failed").build();
         StepResult success = StepResult.builder()
                 .stepIndex(1).status(StepStatus.COMPLETED).output("passed").build();
-        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(), anyInt(), isNull(), isNull()))
                 .thenReturn(failed, success);
 
         BlockDefinition block = BlockDefinition.builder()
@@ -90,14 +91,14 @@ class RetryBlockExecutorTest {
         StepResult result = executor.execute(block, context);
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
-        verify(commandExecutor, times(2)).executeStep(any(), any(), any(), anyInt(), any(), any());
+        verify(commandExecutor, times(2)).executeStepOnHost(any(), any(), anyInt(), any(), any());
     }
 
     @Test
     void execute_allAttemptsFail_returnsLastFailedResult() {
         StepResult failed = StepResult.builder()
                 .stepIndex(0).status(StepStatus.FAILED).output("error").build();
-        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(), anyInt(), isNull(), isNull()))
                 .thenReturn(failed);
 
         BlockDefinition block = BlockDefinition.builder()
@@ -113,14 +114,14 @@ class RetryBlockExecutorTest {
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
         // 1 initial + 2 retries = 3 attempts
-        verify(commandExecutor, times(3)).executeStep(any(), any(), any(), anyInt(), any(), any());
+        verify(commandExecutor, times(3)).executeStepOnHost(any(), any(), anyInt(), any(), any());
     }
 
     @Test
     void execute_cancelledDuringRetry_stopsEarly() {
         StepResult failed = StepResult.builder()
                 .stepIndex(0).status(StepStatus.FAILED).output("error").build();
-        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(), anyInt(), isNull(), isNull()))
                 .thenAnswer(inv -> {
                     context.cancel(); // Cancel after first attempt
                     return failed;
@@ -138,14 +139,14 @@ class RetryBlockExecutorTest {
         StepResult result = executor.execute(block, context);
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
-        verify(commandExecutor, times(1)).executeStep(any(), any(), any(), anyInt(), any(), any());
+        verify(commandExecutor, times(1)).executeStepOnHost(any(), any(), anyInt(), any(), any());
     }
 
     @Test
     void execute_defaultRetries_usesThree() {
         StepResult failed = StepResult.builder()
                 .stepIndex(0).status(StepStatus.FAILED).output("error").build();
-        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(), anyInt(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(), anyInt(), isNull(), isNull()))
                 .thenReturn(failed);
 
         BlockDefinition block = BlockDefinition.builder()
@@ -159,6 +160,32 @@ class RetryBlockExecutorTest {
         executor.execute(block, context);
 
         // 1 initial + 3 default retries = 4 attempts
-        verify(commandExecutor, times(4)).executeStep(any(), any(), any(), anyInt(), any(), any());
+        verify(commandExecutor, times(4)).executeStepOnHost(any(), any(), anyInt(), any(), any());
+    }
+
+    @Test
+    void execute_shellMode_usesShellExecution() {
+        StepResult failed = StepResult.builder()
+                .stepIndex(0).status(StepStatus.FAILED).output("error").build();
+        StepResult success = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("passed").build();
+        when(commandExecutor.executeStepAsShell(eq("/test/project"), any(), anyInt(), eq(300)))
+                .thenReturn(failed, success);
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("retry")
+                .config(new HashMap<>(Map.of(
+                        "command", "npm test",
+                        "max_retries", 3,
+                        "delay", 0,
+                        "execution_mode", "shell"
+                )))
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        verify(commandExecutor, times(2)).executeStepAsShell(any(), any(), anyInt(), eq(300));
+        verify(commandExecutor, never()).executeStepOnHost(any(), any(), anyInt(), any(), any());
     }
 }

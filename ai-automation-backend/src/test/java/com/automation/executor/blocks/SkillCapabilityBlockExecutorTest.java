@@ -37,8 +37,9 @@ class SkillCapabilityBlockExecutorTest {
     void setUp() {
         context = ExecutionContext.builder()
                 .containerId("container-1")
-                                .workflowRunId("run-1")
+                .workflowRunId("run-1")
                 .build();
+        context.setProjectPath("/test/project");
     }
 
     @Test
@@ -49,8 +50,8 @@ class SkillCapabilityBlockExecutorTest {
 
     @Test
     void execute_validCapability_returnsCompletedResult() {
-        when(commandExecutor.executeCommand(eq("container-1"), eq("claude"), contains("fact_check")))
-                .thenReturn(new CliSession.CommandResult("Facts verified: 95% accuracy", 0));
+        when(commandExecutor.executeCommandOnHost(eq("/test/project"), contains("fact_check"), any(), any()))
+                .thenReturn(new CliSession.EnrichedCommandResult("Facts verified: 95% accuracy", 0, null));
 
         Map<String, Object> config = new HashMap<>();
         config.put("capability", "fact_check");
@@ -72,8 +73,8 @@ class SkillCapabilityBlockExecutorTest {
     @Test
     void execute_resolvesInputTemplate() {
         context.setPreviousOutput("document content here");
-        when(commandExecutor.executeCommand(eq("container-1"), eq("claude"), contains("document content here")))
-                .thenReturn(new CliSession.CommandResult("analyzed", 0));
+        when(commandExecutor.executeCommandOnHost(eq("/test/project"), contains("document content here"), any(), any()))
+                .thenReturn(new CliSession.EnrichedCommandResult("analyzed", 0, null));
 
         Map<String, Object> config = new HashMap<>();
         config.put("capability", "analyze");
@@ -91,7 +92,7 @@ class SkillCapabilityBlockExecutorTest {
 
     @Test
     void execute_commandThrows_returnsFailedResult() {
-        when(commandExecutor.executeCommand(anyString(), anyString(), anyString()))
+        when(commandExecutor.executeCommandOnHost(anyString(), anyString(), any(), any()))
                 .thenThrow(new RuntimeException("AI unavailable"));
 
         Map<String, Object> config = new HashMap<>();
@@ -127,8 +128,8 @@ class SkillCapabilityBlockExecutorTest {
 
     @Test
     void execute_noInput_usesEmptyString() {
-        when(commandExecutor.executeCommand(anyString(), anyString(), anyString()))
-                .thenReturn(new CliSession.CommandResult("processed", 0));
+        when(commandExecutor.executeCommandOnHost(anyString(), anyString(), any(), any()))
+                .thenReturn(new CliSession.EnrichedCommandResult("processed", 0, null));
 
         Map<String, Object> config = new HashMap<>();
         config.put("capability", "summarize");

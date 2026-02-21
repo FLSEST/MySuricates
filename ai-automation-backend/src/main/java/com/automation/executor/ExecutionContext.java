@@ -20,6 +20,9 @@ public class ExecutionContext {
     private final String workflowRunId;
 
     @Setter
+    private String projectPath;
+
+    @Setter
     private String previousOutput;
 
     @Setter

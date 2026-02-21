@@ -1,12 +1,15 @@
 package com.automation.service.workflow;
 
 import com.automation.entity.*;
+import com.automation.exception.ContainerException;
 import com.automation.exception.WorkflowExecutionException;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
 import com.automation.repository.ContainerRepository;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.cli.CommandExecutorService;
+import com.automation.service.memory.WorkflowMemoryService;
 import com.automation.service.project.ContainerService;
 import com.automation.service.workflow.AgentInstructionsService;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,6 +57,12 @@ class WorkflowExecutorTest {
     @Mock
     private AgentInstructionsService agentInstructionsService;
 
+    @Mock
+    private ActivityLogService activityLogService;
+
+    @Mock
+    private WorkflowMemoryService workflowMemoryService;
+
     private WorkflowExecutor workflowExecutor;
 
     private Workflow testWorkflow;
@@ -76,7 +85,9 @@ class WorkflowExecutorTest {
                 messagingTemplate,
                 virtualThreadExecutor,
                 new Semaphore(10),
-                agentInstructionsService
+                agentInstructionsService,
+                activityLogService,
+                workflowMemoryService
         );
 
         testProject = Project.builder()
@@ -229,8 +240,8 @@ class WorkflowExecutorTest {
 
         workflowExecutor.execute(testWorkflow, null);
 
-        verify(commandExecutorService).injectSkillContext(
-                eq("docker-container-1"), eq("claude"), eq(testWorkflow.getActivatedSkills()));
+        verify(commandExecutorService).injectSkillContextOnHost(
+                eq("/workspace/test"), eq(testWorkflow.getActivatedSkills()));
     }
 
     @Test
@@ -287,5 +298,36 @@ class WorkflowExecutorTest {
     void getContainerIdForRun_noActiveExecution_returnsNull() {
         String result = workflowExecutor.getContainerIdForRun("non-existent-run");
         assertThat(result).isNull();
+    }
+
+    @Test
+    void execute_containerNotRunning_autoStartsContainer() {
+        // Container not running initially
+        when(containerService.getDockerContainerId(any()))
+                .thenThrow(new ContainerException("No running container for project: proj-1"));
+
+        Container autoStartedContainer = Container.builder()
+                .dockerContainerId("auto-started-container")
+                .status(ContainerStatus.RUNNING)
+                .build();
+        when(containerService.createAndStartContainer(any())).thenReturn(autoStartedContainer);
+
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(step);
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        // Container was auto-started
+        verify(containerService).createAndStartContainer(testProject);
+
+        // WebSocket broadcasts for container_starting and container_started
+        verify(messagingTemplate, atLeastOnce()).convertAndSend(
+                eq("/topic/executions/run-1/logs"), any(Map.class));
+
+        // Workflow completed successfully
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
     }
 }

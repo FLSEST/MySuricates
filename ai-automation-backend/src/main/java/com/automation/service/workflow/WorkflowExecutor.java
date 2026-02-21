@@ -1,13 +1,16 @@
 package com.automation.service.workflow;
 
 import com.automation.entity.*;
+import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.exception.WorkflowExecutionException;
 import com.automation.executor.ApprovalRequest;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
 import com.automation.repository.ContainerRepository;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.cli.CommandExecutorService;
+import com.automation.service.memory.WorkflowMemoryService;
 import com.automation.service.project.ContainerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -40,6 +44,8 @@ public class WorkflowExecutor {
     private final ExecutorService virtualThreadExecutor;
     private final Semaphore executionSemaphore;
     private final AgentInstructionsService agentInstructionsService;
+    private final ActivityLogService activityLogService;
+    private final WorkflowMemoryService workflowMemoryService;
 
     private final Map<String, ExecutionContext> activeExecutions = new ConcurrentHashMap<>();
 
@@ -67,12 +73,17 @@ public class WorkflowExecutor {
 
         // Execute asynchronously — return the run immediately
         final String runId = run.getId();
-        virtualThreadExecutor.submit(() -> executeBlocks(runId, project, blocks, skills, contextVars, instructions, model));
+        final String workflowId = workflow.getId();
+        final String workflowName = workflow.getName();
+        activityLogService.info(LogCategory.EXECUTION,
+                "Workflow execution started: " + workflowName,
+                "WorkflowExecutor", runId);
+        virtualThreadExecutor.submit(() -> executeBlocks(runId, workflowId, project, blocks, skills, contextVars, instructions, model));
 
         return run;
     }
 
-    private void executeBlocks(String runId, Project project, List<BlockDefinition> blocks,
+    private void executeBlocks(String runId, String workflowId, Project project, List<BlockDefinition> blocks,
                                List<Skill> skills, Map<String, Object> inputContext,
                                String instructions, String model) {
         try {
@@ -92,12 +103,13 @@ public class WorkflowExecutor {
         run.setSteps(new ArrayList<>());
 
         try {
-            String containerId = containerService.getDockerContainerId(project);
+            String containerId = ensureContainerRunning(project, runId);
 
             ExecutionContext context = ExecutionContext.builder()
                     .containerId(containerId)
                     .workflowRunId(runId)
                     .build();
+            context.setProjectPath(project.getPath());
             inputContext.forEach(context::setVariable);
 
             // Set instruction prefix and model from workflow
@@ -111,7 +123,10 @@ public class WorkflowExecutor {
 
             activeExecutions.put(runId, context);
 
-            commandExecutorService.injectSkillContext(containerId, "claude", skills);
+            commandExecutorService.injectSkillContextOnHost(project.getPath(), skills);
+
+            // Write active workflow memory to project for executing agent
+            workflowMemoryService.writeActiveMemoryToProject(workflowId, project.getPath());
 
             for (BlockDefinition block : blocks) {
                 if (context.shouldStop()) {
@@ -134,8 +149,10 @@ public class WorkflowExecutor {
                 run.addStep(step);
                 context.setPreviousOutput(step.getOutput());
 
-                // Update container last activity
-                updateContainerActivity(containerId);
+                // Update container last activity (skip if no container)
+                if (containerId != null) {
+                    updateContainerActivity(containerId);
+                }
 
                 broadcastStepResult(run.getId(), step);
                 runRepository.save(run);
@@ -152,10 +169,23 @@ public class WorkflowExecutor {
                 run.setStatus(RunStatus.COMPLETED);
             }
 
+            if (run.getStatus() == RunStatus.COMPLETED) {
+                activityLogService.info(LogCategory.EXECUTION,
+                        "Workflow execution completed: " + runId,
+                        "WorkflowExecutor", runId);
+            } else if (run.getStatus() == RunStatus.FAILED) {
+                activityLogService.error(LogCategory.EXECUTION,
+                        "Workflow execution failed: " + runId,
+                        "WorkflowExecutor", runId);
+            }
+
         } catch (Exception e) {
             log.error("Workflow execution failed: {}", runId, e);
             run.setStatus(RunStatus.FAILED);
             run.setError(Map.of("message", e.getMessage() != null ? e.getMessage() : e.getClass().getName()));
+            activityLogService.error(LogCategory.EXECUTION,
+                    "Workflow execution error: " + (e.getMessage() != null ? e.getMessage() : e.getClass().getName()),
+                    "WorkflowExecutor", runId);
         } finally {
             run.setCompletedAt(Instant.now());
             run.setDurationMs(
@@ -213,6 +243,16 @@ public class WorkflowExecutor {
         }
     }
 
+    public int getActiveRunCount() {
+        return activeExecutions.size();
+    }
+
+    public int getPendingApprovalCount() {
+        return (int) activeExecutions.values().stream()
+                .filter(ctx -> ctx.getCurrentApprovalRequest().get() != null)
+                .count();
+    }
+
     public ApprovalRequest getPendingApproval(String runId) {
         ExecutionContext context = activeExecutions.get(runId);
         if (context != null) {
@@ -254,6 +294,48 @@ public class WorkflowExecutor {
                         "No executor found for block type: " + blockType));
     }
 
+    private String ensureContainerRunning(Project project, String runId) {
+        // Try to get existing running container
+        try {
+            return containerService.getDockerContainerId(project);
+        } catch (Exception e) {
+            log.warn("No running container for project {} ({}), attempting to start one...",
+                    project.getName(), e.getMessage());
+        }
+
+        // Try to start a new container
+        try {
+            broadcastLogMessage(runId, "container_starting",
+                    Map.of("message", "Container wird gestartet für Projekt: " + project.getName()));
+
+            Container container = containerService.createAndStartContainer(project);
+
+            broadcastLogMessage(runId, "container_started",
+                    Map.of("message", "Container gestartet", "containerId", container.getDockerContainerId()));
+
+            return container.getDockerContainerId();
+        } catch (Exception e) {
+            // Container creation failed — continue without container (host-based execution still works)
+            log.warn("Failed to start container for project {} — continuing with host-based execution: {}",
+                    project.getName(), e.getMessage());
+            broadcastLogMessage(runId, "container_skipped",
+                    Map.of("message", "Container konnte nicht gestartet werden, Ausführung erfolgt auf dem Host"));
+            return null;
+        }
+    }
+
+    private void broadcastLogMessage(String runId, String type, Map<String, Object> data) {
+        try {
+            Map<String, Object> msg = new HashMap<>(data);
+            msg.put("type", type);
+            msg.put("runId", runId);
+            msg.put("timestamp", Instant.now().toString());
+            messagingTemplate.convertAndSend("/topic/executions/" + runId + "/logs", msg);
+        } catch (Exception e) {
+            log.warn("Failed to broadcast log message: {}", e.getMessage());
+        }
+    }
+
     private void broadcastStepResult(String runId, StepResult step) {
         try {
             messagingTemplate.convertAndSend(
@@ -283,6 +365,9 @@ public class WorkflowExecutor {
         }
         if (!orphaned.isEmpty()) {
             log.info("Recovered {} orphaned runs", orphaned.size());
+            activityLogService.warn(LogCategory.EXECUTION,
+                    "Recovered " + orphaned.size() + " orphaned runs after server restart",
+                    "WorkflowExecutor");
         }
     }
 

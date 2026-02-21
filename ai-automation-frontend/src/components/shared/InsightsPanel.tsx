@@ -72,10 +72,20 @@ export function InsightsPanel({ runId }: { runId: string }) {
                 </div>
                 <div className="flex items-center gap-4 text-xs text-text-secondary">
                   {step.toolUseCount != null && step.toolUseCount > 0 && (
-                    <span className="flex items-center gap-1" title={(step.toolNames || []).join(', ')}>
-                      <Wrench className="w-3 h-3" />
-                      {step.toolUseCount}
-                    </span>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <Wrench className="w-3 h-3 shrink-0" />
+                      {(step.toolNames || []).slice(0, 5).map((name, i) => (
+                        <span key={i} className="px-1 py-0.5 rounded text-[10px] bg-surface-hover">{name}</span>
+                      ))}
+                      {(step.toolNames || []).length > 5 && (
+                        <span
+                          className="px-1 py-0.5 rounded text-[10px] bg-surface-hover text-text-tertiary"
+                          title={(step.toolNames || []).slice(5).join(', ')}
+                        >
+                          +{(step.toolNames || []).length - 5}
+                        </span>
+                      )}
+                    </div>
                   )}
                   <span>{formatTokens(step.inputTokens + step.outputTokens)} tok</span>
                   <span className="font-medium text-text">{formatCost(step.costUsd)}</span>

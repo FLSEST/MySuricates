@@ -1,6 +1,5 @@
 package com.automation.websocket;
 
-import com.automation.config.CliPermissionsConfig;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.dockerjava.api.DockerClient;
@@ -28,7 +27,6 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
     private final WorkflowExecutor workflowExecutor;
     private final DockerClient dockerClient;
     private final ObjectMapper objectMapper;
-    private final CliPermissionsConfig cliPermissionsConfig;
 
     private final Map<String, TerminalSession> sessions = new ConcurrentHashMap<>();
     private final Map<String, AtomicInteger> containerSessionCounts = new ConcurrentHashMap<>();
@@ -56,9 +54,7 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
         count.incrementAndGet();
 
         try {
-            TerminalSession terminal = new TerminalSession(session, dockerClient, containerId,
-                    cliPermissionsConfig.isSkipPermissions(),
-                    cliPermissionsConfig.getAllowedTools());
+            TerminalSession terminal = new TerminalSession(session, dockerClient, containerId);
             sessions.put(session.getId(), terminal);
             session.getAttributes().put("containerId", containerId);
             log.info("Terminal WebSocket connected: session={}, run={}, container={}", session.getId(), runId, containerId);

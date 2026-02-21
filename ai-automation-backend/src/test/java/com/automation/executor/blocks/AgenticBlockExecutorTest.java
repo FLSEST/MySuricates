@@ -6,6 +6,7 @@ import com.automation.entity.StepStatus;
 import com.automation.executor.ExecutionContext;
 import com.automation.service.ai.HostClaudeService;
 import com.automation.service.ai.HostClaudeService.ReasoningResult;
+import com.automation.service.cli.ClaudeJsonResponse;
 import com.automation.service.cli.CliSession;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.entity.Workflow;
@@ -26,8 +27,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -61,10 +61,12 @@ class AgenticBlockExecutorTest {
     }
 
     private ExecutionContext buildContext() {
-        return ExecutionContext.builder()
+        ExecutionContext ctx = ExecutionContext.builder()
                 .containerId("test-container")
                 .workflowRunId("run-1")
                 .build();
+        ctx.setProjectPath("/test/project");
+        return ctx;
     }
 
     private BlockDefinition buildBlock(String goal) {
@@ -102,7 +104,7 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_goalAchievedOnFirstIteration() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured("prompt")).thenReturn(
+        when(hostClaude.reasonStructured(eq("prompt"), anyString())).thenReturn(
                 rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Already done\nACTION:\nSUMMARY: Goal was already met"));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -117,18 +119,18 @@ class AgenticBlockExecutorTest {
         assertThat(metadata.get("totalIterations")).isEqualTo(1);
 
         // Should not have called container execution
-        verify(commandExecutor, never()).executeCommandEnriched(anyString(), anyString(), anyString(), any());
+        verify(commandExecutor, never()).executeCommandOnHost(anyString(), anyString(), any(), any());
     }
 
     @Test
     void execute_multiIterationUntilGoalAchieved() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
 
-        when(hostClaude.reasonStructured("prompt"))
+        when(hostClaude.reasonStructured(eq("prompt"), anyString()))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Need to create file\nACTION: Create test.txt\nSUMMARY: Creating file"))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: File created\nACTION:\nSUMMARY: Done"));
 
-        when(commandExecutor.executeCommandEnriched("test-container", "claude", "Create test.txt", null))
+        when(commandExecutor.executeCommandOnHost("/test/project", "Create test.txt", null, null))
                 .thenReturn(new CliSession.EnrichedCommandResult("File created", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -145,15 +147,25 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_maxIterationsReached() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured("prompt")).thenReturn(
+        when(hostClaude.reasonStructured(eq("prompt"), anyString())).thenReturn(
                 rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Still working\nACTION: Try again\nSUMMARY: Retrying"));
 
-        when(commandExecutor.executeCommandEnriched("test-container", "claude", "Try again", null))
+        when(commandExecutor.executeCommandOnHost("/test/project", "Try again", null, null))
                 .thenReturn(new CliSession.EnrichedCommandResult("Still failing", 1, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
-        StepResult result = executor.execute(buildBlock("Impossible goal", 2), buildContext());
+        // Use 3 iterations to avoid repeated action detection (default max_repeated_actions=3 would trigger at 2 iterations with same action)
+        Map<String, Object> config = new HashMap<>();
+        config.put("goal", "Impossible goal");
+        config.put("success_criteria", "Test passes");
+        config.put("max_iterations", 2);
+        config.put("iteration_timeout_seconds", 300);
+        config.put("require_approval", false);
+        config.put("max_repeated_actions", 10); // disable repeated action detection for this test
+        BlockDefinition block = BlockDefinition.builder().type("agentic").config(config).build();
+
+        StepResult result = executor.execute(block, buildContext());
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
 
@@ -166,14 +178,14 @@ class AgenticBlockExecutorTest {
     void execute_cancellationStopsLoop() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
 
-        when(commandExecutor.executeCommandEnriched("test-container", "claude", "Do something", null))
+        when(commandExecutor.executeCommandOnHost("/test/project", "Do something", null, null))
                 .thenReturn(new CliSession.EnrichedCommandResult("partial", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
         ExecutionContext context = buildContext();
         // Cancel after first iteration observe
-        when(hostClaude.reasonStructured("prompt"))
+        when(hostClaude.reasonStructured(eq("prompt"), anyString()))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Do something\nSUMMARY: Step 1"))
                 .thenAnswer(invocation -> {
                     context.cancel();
@@ -188,7 +200,7 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_hostClaudeError_stopsWithFailure() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured("prompt")).thenThrow(new java.io.IOException("Connection refused"));
+        when(hostClaude.reasonStructured(eq("prompt"), anyString())).thenThrow(new java.io.IOException("Connection refused"));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
         StepResult result = executor.execute(buildBlock("Test"), buildContext());
@@ -201,14 +213,14 @@ class AgenticBlockExecutorTest {
     void execute_containerCommandFailure_isObservedAndRetried() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
 
-        when(hostClaude.reasonStructured("prompt"))
+        when(hostClaude.reasonStructured(eq("prompt"), anyString()))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: First try\nACTION: Run tests\nSUMMARY: Running tests"))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Try different approach\nACTION: Fix and run\nSUMMARY: Fixing"))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Fixed\nACTION:\nSUMMARY: All good"));
 
-        when(commandExecutor.executeCommandEnriched("test-container", "claude", "Run tests", null))
+        when(commandExecutor.executeCommandOnHost("/test/project", "Run tests", null, null))
                 .thenReturn(new CliSession.EnrichedCommandResult("Tests failed: 3 errors", 1, null));
-        when(commandExecutor.executeCommandEnriched("test-container", "claude", "Fix and run", null))
+        when(commandExecutor.executeCommandOnHost("/test/project", "Fix and run", null, null))
                 .thenReturn(new CliSession.EnrichedCommandResult("All tests pass", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -223,7 +235,7 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_metadataStoredCorrectly() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured("prompt")).thenReturn(
+        when(hostClaude.reasonStructured(eq("prompt"), anyString())).thenReturn(
                 rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -248,7 +260,7 @@ class AgenticBlockExecutorTest {
         ));
 
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured("prompt")).thenReturn(
+        when(hostClaude.reasonStructured(eq("prompt"), anyString())).thenReturn(
                 rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
 
         executor.execute(buildBlock("Test"), buildContext());
@@ -260,7 +272,7 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_learningServiceCalledWithWorkflowId_notRunId() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured("prompt")).thenReturn(
+        when(hostClaude.reasonStructured(eq("prompt"), anyString())).thenReturn(
                 rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
         when(learningService.getAgenticStrategyHistory("workflow-1")).thenReturn(List.of());
 
@@ -274,7 +286,7 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_broadcastsWebSocketEvents() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured("prompt")).thenReturn(
+        when(hostClaude.reasonStructured(eq("prompt"), anyString())).thenReturn(
                 rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -289,7 +301,7 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_goalImpossible_returnsFailed() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured("prompt")).thenReturn(
+        when(hostClaude.reasonStructured(eq("prompt"), anyString())).thenReturn(
                 rr("GOAL_STATUS: IMPOSSIBLE\nRATIONALE: No access\nACTION:\nSUMMARY: Cannot proceed"));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -312,9 +324,45 @@ class AgenticBlockExecutorTest {
     }
 
     @Test
+    void execute_tokenBudgetExceeded_stopsLoop() throws Exception {
+        // Create a response with high token usage to exceed a small budget
+        ClaudeJsonResponse.Usage highUsage = new ClaudeJsonResponse.Usage(60000, 60000);
+        ClaudeJsonResponse parsedWithUsage = new ClaudeJsonResponse(
+                "result", null, 1.0, 1000L, 800L, 1, highUsage, null, null);
+
+        when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
+        when(hostClaude.reasonStructured(eq("prompt"), anyString()))
+                .thenReturn(new ReasoningResult(
+                        "GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Do work\nSUMMARY: Step", parsedWithUsage));
+
+        when(commandExecutor.executeCommandOnHost("/test/project", "Do work", null, null))
+                .thenReturn(new CliSession.EnrichedCommandResult("Done", 0, parsedWithUsage));
+
+        when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
+
+        // Set a very low token budget (100k) that will be exceeded by first iteration (240k tokens)
+        Map<String, Object> config = new HashMap<>();
+        config.put("goal", "Budget test");
+        config.put("success_criteria", "Test passes");
+        config.put("max_iterations", 10);
+        config.put("iteration_timeout_seconds", 300);
+        config.put("max_total_tokens", 100000);
+        config.put("max_repeated_actions", 10);
+        config.put("require_approval", false);
+        BlockDefinition block = BlockDefinition.builder().type("agentic").config(config).build();
+
+        StepResult result = executor.execute(block, buildContext());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getOutput()).contains("TOKEN BUDGET EXCEEDED");
+        assertThat(result.getMetadata().get("stopReason")).isEqualTo("TOKEN_BUDGET_EXCEEDED");
+        assertThat(((Number) result.getMetadata().get("totalIterations")).intValue()).isEqualTo(1);
+    }
+
+    @Test
     void execute_setsContextVariables() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured("prompt")).thenReturn(
+        when(hostClaude.reasonStructured(eq("prompt"), anyString())).thenReturn(
                 rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 

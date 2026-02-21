@@ -63,6 +63,20 @@ export function useWorkflowRuns(workflowId: string) {
   });
 }
 
+export function useAllRuns(params?: { status?: string; workflowId?: string; projectId?: string }) {
+  return useQuery({
+    queryKey: ['runs', params],
+    queryFn: () => {
+      const searchParams = new URLSearchParams();
+      if (params?.status) searchParams.set('status', params.status);
+      if (params?.workflowId) searchParams.set('workflowId', params.workflowId);
+      if (params?.projectId) searchParams.set('projectId', params.projectId);
+      const qs = searchParams.toString();
+      return api.get<WorkflowRun[]>(`/executions${qs ? `?${qs}` : ''}`);
+    },
+  });
+}
+
 export function useCreateWorkflow() {
   const qc = useQueryClient();
   const toast = useToast();

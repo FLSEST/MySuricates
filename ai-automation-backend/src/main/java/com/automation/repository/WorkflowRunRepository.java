@@ -25,6 +25,16 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
 
     long countByStartedAtAfter(Instant since);
 
+    List<WorkflowRun> findAllByOrderByStartedAtDesc();
+
+    List<WorkflowRun> findByStatusOrderByStartedAtDesc(RunStatus status);
+
+    @Query("SELECT wr FROM WorkflowRun wr LEFT JOIN FETCH wr.workflow w WHERE w.project.id = :projectId ORDER BY wr.startedAt DESC")
+    List<WorkflowRun> findByProjectIdOrderByStartedAtDesc(@org.springframework.data.repository.query.Param("projectId") String projectId);
+
+    @Query("SELECT wr FROM WorkflowRun wr LEFT JOIN FETCH wr.workflow w WHERE wr.status = :status AND w.project.id = :projectId ORDER BY wr.startedAt DESC")
+    List<WorkflowRun> findByStatusAndProjectIdOrderByStartedAtDesc(@org.springframework.data.repository.query.Param("status") RunStatus status, @org.springframework.data.repository.query.Param("projectId") String projectId);
+
     List<WorkflowRun> findTop10ByOrderByStartedAtDesc();
 
     List<WorkflowRun> findByStartedAtAfterOrderByStartedAtDesc(Instant since);
@@ -36,4 +46,8 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
            "ORDER BY COUNT(wr) DESC " +
            "LIMIT 5")
     List<Object[]> findTopWorkflows();
+
+    List<WorkflowRun> findByStartedAtBetween(Instant from, Instant to);
+
+    long countByStatusAndStartedAtAfter(RunStatus status, Instant since);
 }

@@ -9,6 +9,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 public class AiAutomationApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(AiAutomationApplication.class, args);
+        SpringApplication app = new SpringApplication(AiAutomationApplication.class);
+        app.setHeadless(false);
+        app.run(args);
     }
 }

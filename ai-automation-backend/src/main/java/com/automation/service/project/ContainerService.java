@@ -1,11 +1,13 @@
 package com.automation.service.project;
 
+import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.Container;
 import com.automation.entity.ContainerStatus;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectType;
 import com.automation.exception.ContainerException;
 import com.automation.repository.ContainerRepository;
+import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.CreateContainerResponse;
@@ -31,6 +33,7 @@ public class ContainerService {
     private final DockerClient dockerClient;
     private final ContainerRepository containerRepository;
     private final WorkflowExecutor workflowExecutor;
+    private final ActivityLogService activityLogService;
     private static final String CONTAINER_HOME = "/home/agent";
 
     private final long cpuQuota;
@@ -44,6 +47,7 @@ public class ContainerService {
             DockerClient dockerClient,
             ContainerRepository containerRepository,
             @Lazy WorkflowExecutor workflowExecutor,
+            ActivityLogService activityLogService,
             @Value("${docker.container.cpu-quota}") long cpuQuota,
             @Value("${docker.container.memory-limit}") long memoryLimit,
             @Value("${docker.container.pids-limit}") long pidsLimit,
@@ -53,6 +57,7 @@ public class ContainerService {
         this.dockerClient = dockerClient;
         this.containerRepository = containerRepository;
         this.workflowExecutor = workflowExecutor;
+        this.activityLogService = activityLogService;
         this.cpuQuota = cpuQuota;
         this.memoryLimit = memoryLimit;
         this.pidsLimit = pidsLimit;
@@ -101,9 +106,10 @@ public class ContainerService {
                                             // Claude binary (read-only, from host)
                                             Bind.parse(hostHome + "/.local/bin/claude:" + CONTAINER_HOME + "/.local/bin/claude:ro"),
                                             Bind.parse(hostHome + "/.local/share/claude:" + CONTAINER_HOME + "/.local/share/claude:ro"),
-                                            // Claude config (read-only)
-                                            Bind.parse(hostHome + "/.claude:" + CONTAINER_HOME + "/.claude:ro"),
-                                            Bind.parse(hostHome + "/.claude.json:" + CONTAINER_HOME + "/.claude.json:ro")
+                                            // Claude config (read-write, CLI needs to write session state/todos)
+                                            // TODO: Consider copying only auth credentials read-only and letting CLI manage its own state
+                                            Bind.parse(hostHome + "/.claude:" + CONTAINER_HOME + "/.claude"),
+                                            Bind.parse(hostHome + "/.claude.json:" + CONTAINER_HOME + "/.claude.json")
                                     )
                     )
                     .withUser(hostUid)
@@ -127,9 +133,15 @@ public class ContainerService {
             project.setContainer(saved);
 
             log.info("Started container {} for project {}", response.getId(), project.getId());
+            activityLogService.info(LogCategory.CONTAINER,
+                    "Container started for project: " + project.getName(),
+                    "ContainerService", project.getId());
             return saved;
 
         } catch (Exception e) {
+            activityLogService.error(LogCategory.CONTAINER,
+                    "Failed to create container for project: " + project.getName() + " - " + e.getMessage(),
+                    "ContainerService", project.getId());
             throw new ContainerException("Failed to create container for project: " + project.getId(), e);
         }
     }
@@ -142,15 +154,29 @@ public class ContainerService {
             container.setStoppedAt(Instant.now());
             containerRepository.save(container);
             log.info("Stopped container for project {}", project.getId());
+            activityLogService.info(LogCategory.CONTAINER,
+                    "Container stopped for project: " + project.getName(),
+                    "ContainerService", project.getId());
         });
     }
 
     public String getDockerContainerId(Project project) {
-        return containerRepository.findByProjectId(project.getId())
-                .filter(c -> c.getStatus() == ContainerStatus.RUNNING)
-                .map(Container::getDockerContainerId)
-                .orElseThrow(() -> new ContainerException(
-                        "No running container for project: " + project.getId()));
+        var containerOpt = containerRepository.findByProjectId(project.getId());
+        if (containerOpt.isPresent()) {
+            Container container = containerOpt.get();
+            if (container.getStatus() == ContainerStatus.RUNNING) {
+                if (isDockerContainerRunning(container.getDockerContainerId())) {
+                    return container.getDockerContainerId();
+                }
+                // Docker container is gone — correct stale DB status
+                log.warn("Container {} for project {} is marked RUNNING but Docker reports it is not running. Updating status.",
+                        container.getDockerContainerId(), project.getId());
+                container.setStatus(ContainerStatus.STOPPED);
+                container.setStoppedAt(Instant.now());
+                containerRepository.save(container);
+            }
+        }
+        throw new ContainerException("No running container for project: " + project.getId());
     }
 
     @Scheduled(fixedRate = 300_000)
@@ -175,6 +201,9 @@ public class ContainerService {
                 container.setStatus(ContainerStatus.STOPPED);
                 container.setStoppedAt(Instant.now());
                 containerRepository.save(container);
+                activityLogService.info(LogCategory.CONTAINER,
+                        "Idle container cleaned up: " + container.getDockerContainerId(),
+                        "ContainerService");
 
                 if (container.getProject() != null) {
                     container.getProject().setStatus(com.automation.entity.ProjectStatus.STOPPED);

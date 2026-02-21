@@ -22,12 +22,17 @@ public class WhileBlockExecutor implements BlockExecutor {
 
     private final CommandExecutorService commandExecutor;
 
+    private static final int DEFAULT_SHELL_TIMEOUT = 300;
+
     @Override
     public StepResult execute(BlockDefinition block, ExecutionContext context) {
         Map<String, Object> config = block.getConfig();
         String command = (String) config.get("command");
         String conditionCommand = (String) config.get("condition_command");
         int maxIterations = ((Number) config.getOrDefault("max_iterations", MAX_ITERATIONS)).intValue();
+        String executionMode = (String) config.getOrDefault("execution_mode", "claude");
+        boolean isShell = "shell".equals(executionMode);
+        int shellTimeout = ((Number) config.getOrDefault("timeout_seconds", DEFAULT_SHELL_TIMEOUT)).intValue();
 
         StepResult aggregateResult = new StepResult();
         aggregateResult.setStepIndex(context.nextStepIndex());
@@ -40,30 +45,49 @@ public class WhileBlockExecutor implements BlockExecutor {
         while (iteration < maxIterations && !context.shouldStop()) {
             // Check condition
             if (conditionCommand != null) {
-                String conditionResult = commandExecutor.executeCommand(
-                        context.getContainerId(), BlockExecutor.cliTypeFor("while"),
-                        context.resolveTemplate(conditionCommand)
-                ).output();
-
-                if ("false".equalsIgnoreCase(conditionResult.trim()) ||
-                        "0".equals(conditionResult.trim()) ||
-                        conditionResult.trim().isEmpty()) {
-                    break;
+                String resolvedCondition = context.resolveTemplate(conditionCommand);
+                if (isShell) {
+                    // In shell mode, use exit code: 0 = true (continue), non-zero = false (stop)
+                    int exitCode = commandExecutor.executeShellCommandOnHost(
+                            context.getProjectPath(), resolvedCondition, shellTimeout).exitCode();
+                    if (exitCode != 0) {
+                        break;
+                    }
+                } else {
+                    String conditionResult = commandExecutor.executeCommandOnHost(
+                            context.getProjectPath(), resolvedCondition).output();
+                    if ("false".equalsIgnoreCase(conditionResult.trim()) ||
+                            "0".equals(conditionResult.trim()) ||
+                            conditionResult.trim().isEmpty()) {
+                        break;
+                    }
                 }
             }
 
             String resolvedCommand = context.resolveTemplate(command);
-            StepResult stepResult = commandExecutor.executeStep(
-                    context.getContainerId(),
-                    BlockExecutor.cliTypeFor("simple"),
-                    BlockDefinition.builder()
-                            .type("simple")
-                            .config(Map.of("command", resolvedCommand))
-                            .build(),
-                    context.nextStepIndex(),
-                    context.getInstructionPrefix(),
-                    context.getModel()
-            );
+            StepResult stepResult;
+            if (isShell) {
+                stepResult = commandExecutor.executeStepAsShell(
+                        context.getProjectPath(),
+                        BlockDefinition.builder()
+                                .type("shell")
+                                .config(Map.of("command", resolvedCommand))
+                                .build(),
+                        context.nextStepIndex(),
+                        shellTimeout
+                );
+            } else {
+                stepResult = commandExecutor.executeStepOnHost(
+                        context.getProjectPath(),
+                        BlockDefinition.builder()
+                                .type("simple")
+                                .config(Map.of("command", resolvedCommand))
+                                .build(),
+                        context.nextStepIndex(),
+                        context.getInstructionPrefix(),
+                        context.getModel()
+                );
+            }
 
             outputs.append("[iteration ").append(iteration + 1).append("]: ")
                     .append(stepResult.getOutput()).append("\n");

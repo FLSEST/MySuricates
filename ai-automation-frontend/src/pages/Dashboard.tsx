@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FolderKanban, GitBranch, Zap,
-  TrendingUp, Clock, Coins,
+  TrendingUp, Clock, Coins, CalendarClock, CalendarRange, Info,
 } from 'lucide-react';
 import { Card, CardHeader, Button, Spinner } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
@@ -11,15 +11,18 @@ import { RunsChart } from '../components/dashboard/RunsChart';
 import { SuccessRateChart } from '../components/dashboard/SuccessRateChart';
 import { useDashboard } from '../hooks/useLearning';
 import { useProjects } from '../hooks/useProjects';
+import { useRemainingToday, useRemainingThisWeek } from '../hooks/useSchedules';
+import { useSystemInfo } from '../hooks/useSystem';
 import { useT, useI18nStore } from '../i18n';
 import { formatDuration, formatRelativeTime, formatDateTime } from '../utils/formatTime';
-import type { WorkflowRun } from '../types';
+import type { WorkflowRun, SystemInfo } from '../types';
 
-function StatCard({ icon, label, value, accent }: {
+function StatCard({ icon, label, value, accent, badge }: {
   icon: React.ReactNode;
   label: string;
   value: string | number;
   accent?: string;
+  badge?: string;
 }) {
   return (
     <Card className="flex items-center gap-4">
@@ -28,7 +31,62 @@ function StatCard({ icon, label, value, accent }: {
       </div>
       <div>
         <p className="text-sm text-text-secondary">{label}</p>
-        <p className="text-2xl font-bold text-text">{value}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-2xl font-bold text-text">{value}</p>
+          {badge && (
+            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide ${
+              badge === 'RELEASE'
+                ? 'bg-[var(--color-success)]/15 text-[var(--color-success)]'
+                : 'bg-[var(--color-warning)]/15 text-[var(--color-warning)]'
+            }`}>
+              {badge}
+            </span>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function formatBuildTime(iso: string | undefined): string {
+  if (!iso || iso === 'unknown') return '?';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString([], { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return iso;
+  }
+}
+
+function BuildInfoCard({ systemInfo }: { systemInfo: SystemInfo | undefined }) {
+  const t = useT();
+  const feTimestamp = __BUILD_TIMESTAMP__;
+
+  return (
+    <Card className="flex items-center gap-4">
+      <div className="p-3 rounded-xl bg-teal-500/10">
+        <Info className="w-5 h-5 text-teal-500" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-sm text-text-secondary">{t.dashboard.version}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-2xl font-bold text-text">
+            {systemInfo ? `v${systemInfo.version}` : '-'}
+          </p>
+          {systemInfo?.buildType && (
+            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide ${
+              systemInfo.buildType === 'RELEASE'
+                ? 'bg-[var(--color-success)]/15 text-[var(--color-success)]'
+                : 'bg-[var(--color-warning)]/15 text-[var(--color-warning)]'
+            }`}>
+              {systemInfo.buildType}
+            </span>
+          )}
+        </div>
+        <div className="flex gap-3 mt-0.5 text-[10px] text-text-tertiary">
+          <span title="Backend Build">BE {formatBuildTime(systemInfo?.buildTimestamp)}</span>
+          <span title="Frontend Build">FE {formatBuildTime(feTimestamp)}</span>
+        </div>
       </div>
     </Card>
   );
@@ -51,6 +109,9 @@ export function Dashboard() {
   const now = useLiveClock();
   const { data: dashboard, isLoading: dashLoading, error, refetch } = useDashboard();
   const { data: projects } = useProjects();
+  const { data: remainingToday } = useRemainingToday();
+  const { data: remainingThisWeek } = useRemainingThisWeek();
+  const { data: systemInfo } = useSystemInfo();
 
   const activeProjects = projects?.filter((p) => p.status === 'RUNNING').length ?? 0;
 
@@ -87,7 +148,7 @@ export function Dashboard() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 animate-stagger">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 animate-stagger">
         <StatCard
           icon={<FolderKanban className="w-5 h-5 text-accent" />}
           label={t.dashboard.activeProjects}
@@ -120,6 +181,19 @@ export function Dashboard() {
             : '$0.00'}
           accent="bg-warning-subtle"
         />
+        <StatCard
+          icon={<CalendarClock className="w-5 h-5 text-blue-500" />}
+          label={t.dashboard.plannedToday}
+          value={remainingToday?.count ?? 0}
+          accent="bg-blue-500/10"
+        />
+        <StatCard
+          icon={<CalendarRange className="w-5 h-5 text-violet-500" />}
+          label={t.dashboard.plannedThisWeek}
+          value={remainingThisWeek?.count ?? 0}
+          accent="bg-violet-500/10"
+        />
+        <BuildInfoCard systemInfo={systemInfo} />
       </div>
 
       {/* Charts */}

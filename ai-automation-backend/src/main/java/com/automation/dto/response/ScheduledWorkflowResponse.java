@@ -8,6 +8,8 @@ public record ScheduledWorkflowResponse(
         String workflowId,
         String workflowName,
         String cronExpression,
+        String scheduleType,
+        Instant scheduledAt,
         boolean enabled,
         String description,
         Map<String, Object> inputContext,

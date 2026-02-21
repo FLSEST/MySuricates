@@ -32,8 +32,8 @@ public class ConditionalBlockExecutor implements BlockExecutor {
         result.setStartedAt(Instant.now());
 
         // Evaluate condition by asking Claude
-        String conditionResult = commandExecutor.executeCommand(
-                context.getContainerId(), "claude",
+        String conditionResult = commandExecutor.executeCommandOnHost(
+                context.getProjectPath(),
                 "Evaluate this condition and respond with ONLY the word TRUE or FALSE, nothing else: " + condition
         ).output();
 
@@ -45,9 +45,8 @@ public class ConditionalBlockExecutor implements BlockExecutor {
 
         if (commandToExecute != null) {
             String resolved = context.resolveTemplate(commandToExecute);
-            StepResult stepResult = commandExecutor.executeStep(
-                    context.getContainerId(),
-                    BlockExecutor.cliTypeFor("simple"),
+            StepResult stepResult = commandExecutor.executeStepOnHost(
+                    context.getProjectPath(),
                     BlockDefinition.builder()
                             .type("simple")
                             .config(Map.of("command", resolved))

@@ -19,6 +19,13 @@ export function extractWorkflowVariables(blocks: BlockDefinition[]): string[] {
     variables.delete(sysVar);
   }
 
+  // Remove forEach loop variables — these are bound by the block, not user input
+  for (const block of blocks) {
+    if (block.type === 'foreach' && typeof block.config?.variable_name === 'string') {
+      variables.delete(block.config.variable_name);
+    }
+  }
+
   return Array.from(variables);
 }
 

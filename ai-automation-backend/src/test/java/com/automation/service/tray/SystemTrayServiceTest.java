@@ -1,0 +1,135 @@
+package com.automation.service.tray;
+
+import com.automation.config.TrayConfig;
+import com.automation.entity.RunStatus;
+import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.tray.SystemTrayService.IconColor;
+import com.automation.service.tray.SystemTrayService.TrayState;
+import com.automation.service.workflow.WorkflowExecutor;
+import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.api.command.PingCmd;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.Instant;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class SystemTrayServiceTest {
+
+    @Mock
+    private TrayConfig trayConfig;
+
+    @Mock
+    private WorkflowRunRepository runRepository;
+
+    @Mock
+    private WorkflowExecutor workflowExecutor;
+
+    @Mock
+    private DockerClient dockerClient;
+
+    @Mock
+    private PingCmd pingCmd;
+
+    private SystemTrayService service;
+
+    @BeforeEach
+    void setUp() {
+        service = new SystemTrayService(trayConfig, runRepository, workflowExecutor, dockerClient);
+    }
+
+    @Test
+    void collectStatus_aggregatesDataCorrectly() {
+        when(workflowExecutor.getActiveRunCount()).thenReturn(2);
+        when(runRepository.countByStartedAtAfter(any(Instant.class))).thenReturn(10L);
+        when(runRepository.countByStatusAndStartedAtAfter(eq(RunStatus.FAILED), any(Instant.class))).thenReturn(1L);
+        when(workflowExecutor.getPendingApprovalCount()).thenReturn(0);
+        when(dockerClient.pingCmd()).thenReturn(pingCmd);
+        when(trayConfig.getWebUiUrl()).thenReturn("http://localhost:99999");
+
+        TrayState state = service.collectStatus();
+
+        assertThat(state.activeRuns()).isEqualTo(2);
+        assertThat(state.runsToday()).isEqualTo(10);
+        assertThat(state.failedToday()).isEqualTo(1);
+        assertThat(state.pendingApprovals()).isZero();
+        assertThat(state.dockerOk()).isTrue();
+    }
+
+    @Test
+    void collectStatus_dockerOffline() {
+        when(workflowExecutor.getActiveRunCount()).thenReturn(0);
+        when(runRepository.countByStartedAtAfter(any(Instant.class))).thenReturn(0L);
+        when(runRepository.countByStatusAndStartedAtAfter(eq(RunStatus.FAILED), any(Instant.class))).thenReturn(0L);
+        when(workflowExecutor.getPendingApprovalCount()).thenReturn(0);
+        when(dockerClient.pingCmd()).thenThrow(new RuntimeException("Connection refused"));
+        when(trayConfig.getWebUiUrl()).thenReturn("http://localhost:99999");
+
+        TrayState state = service.collectStatus();
+
+        assertThat(state.dockerOk()).isFalse();
+    }
+
+    @Test
+    void checkFrontend_falseWhenUnreachable() {
+        when(trayConfig.getWebUiUrl()).thenReturn("http://localhost:99999");
+        assertThat(service.checkFrontend()).isFalse();
+    }
+
+    @Test
+    void determineIconColor_greenWhenAllOk() {
+        TrayState state = new TrayState(1, 5, 0, 0, true, true);
+        assertThat(service.determineIconColor(state)).isEqualTo(IconColor.GREEN);
+    }
+
+    @Test
+    void determineIconColor_yellowWhenDockerOffline() {
+        TrayState state = new TrayState(0, 5, 0, 0, false, true);
+        assertThat(service.determineIconColor(state)).isEqualTo(IconColor.YELLOW);
+    }
+
+    @Test
+    void determineIconColor_yellowWhenFrontendOffline() {
+        TrayState state = new TrayState(0, 5, 0, 0, true, false);
+        assertThat(service.determineIconColor(state)).isEqualTo(IconColor.YELLOW);
+    }
+
+    @Test
+    void determineIconColor_yellowWhenApprovalsPending() {
+        TrayState state = new TrayState(1, 5, 0, 2, true, true);
+        assertThat(service.determineIconColor(state)).isEqualTo(IconColor.YELLOW);
+    }
+
+    @Test
+    void determineIconColor_redWhenNewFailure() {
+        TrayState state = new TrayState(0, 5, 2, 0, true, true);
+        assertThat(service.determineIconColor(state)).isEqualTo(IconColor.RED);
+    }
+
+    @Test
+    void successPercent_calculatesCorrectly() {
+        TrayState state = new TrayState(0, 20, 2, 0, true, true);
+        assertThat(state.successPercent()).isEqualTo(90);
+    }
+
+    @Test
+    void successPercent_100WhenNoRuns() {
+        TrayState state = new TrayState(0, 0, 0, 0, true, true);
+        assertThat(state.successPercent()).isEqualTo(100);
+    }
+
+    @Test
+    void initialize_skipsWhenTrayNotSupported() {
+        // On headless CI, SystemTray.isSupported() returns false
+        service.initialize();
+        service.cleanup();
+    }
+}

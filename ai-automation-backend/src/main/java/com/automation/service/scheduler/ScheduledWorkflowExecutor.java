@@ -1,7 +1,10 @@
 package com.automation.service.scheduler;
 
+import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.ScheduledWorkflow;
+import com.automation.entity.ScheduledWorkflow.ScheduleType;
 import com.automation.repository.ScheduledWorkflowRepository;
+import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.workflow.WorkflowExecutor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +23,7 @@ public class ScheduledWorkflowExecutor {
 
     private final ScheduledWorkflowRepository scheduledRepository;
     private final WorkflowExecutor workflowExecutor;
+    private final ActivityLogService activityLogService;
 
     @Transactional
     public void executeSingleSchedule(String scheduleId) {
@@ -31,17 +35,28 @@ public class ScheduledWorkflowExecutor {
             return;
         }
 
-        log.info("Executing scheduled workflow: {} (cron: {})",
-                scheduled.getId(), scheduled.getCronExpression());
+        log.info("Executing scheduled workflow: {} (type: {})",
+                scheduled.getId(), scheduled.getScheduleType());
+
+        activityLogService.info(LogCategory.SCHEDULE,
+                "Schedule triggered: " + scheduled.getWorkflow().getName(),
+                "ScheduledWorkflowExecutor", scheduled.getId());
 
         workflowExecutor.execute(scheduled.getWorkflow(), scheduled.getInputContext());
 
         scheduled.setLastRunAt(Instant.now());
-        scheduled.setNextRunAt(calculateNextRun(scheduled.getCronExpression()));
-        scheduledRepository.save(scheduled);
 
-        log.info("Scheduled workflow {} executed successfully, next run at: {}",
-                scheduled.getId(), scheduled.getNextRunAt());
+        if (scheduled.getScheduleType() == ScheduleType.ONCE) {
+            scheduled.setNextRunAt(null);
+            scheduled.setEnabled(false);
+            log.info("ONCE schedule {} executed and disabled", scheduled.getId());
+        } else {
+            scheduled.setNextRunAt(calculateNextRun(scheduled.getCronExpression()));
+            log.info("Scheduled workflow {} executed, next run at: {}",
+                    scheduled.getId(), scheduled.getNextRunAt());
+        }
+
+        scheduledRepository.save(scheduled);
     }
 
     private Instant calculateNextRun(String cronExpression) {

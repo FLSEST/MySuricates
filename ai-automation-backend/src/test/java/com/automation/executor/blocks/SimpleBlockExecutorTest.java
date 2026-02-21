@@ -39,8 +39,9 @@ class SimpleBlockExecutorTest {
     void setUp() {
         context = ExecutionContext.builder()
                 .containerId("container-1")
-                                .workflowRunId("run-1")
+                .workflowRunId("run-1")
                 .build();
+        context.setProjectPath("/test/project");
     }
 
     @Test
@@ -54,7 +55,7 @@ class SimpleBlockExecutorTest {
     void execute_validCommand_delegatesToCommandExecutor() {
         StepResult expected = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("success").build();
-        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(BlockDefinition.class), anyInt(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(BlockDefinition.class), anyInt(), isNull(), isNull()))
                 .thenReturn(expected);
 
         BlockDefinition block = BlockDefinition.builder()
@@ -73,7 +74,7 @@ class SimpleBlockExecutorTest {
         context.setPreviousOutput("previous result");
         StepResult expected = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("done").build();
-        when(commandExecutor.executeStep(eq("container-1"), eq("claude"), any(BlockDefinition.class), anyInt(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(BlockDefinition.class), anyInt(), isNull(), isNull()))
                 .thenReturn(expected);
 
         BlockDefinition block = BlockDefinition.builder()

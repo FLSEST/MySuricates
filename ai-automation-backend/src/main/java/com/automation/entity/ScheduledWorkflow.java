@@ -21,6 +21,10 @@ import java.util.Map;
 @Builder
 public class ScheduledWorkflow {
 
+    public enum ScheduleType {
+        CRON, ONCE
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
@@ -31,6 +35,14 @@ public class ScheduledWorkflow {
 
     @Column(nullable = false)
     private String cronExpression;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "schedule_type", nullable = false)
+    @Builder.Default
+    private ScheduleType scheduleType = ScheduleType.CRON;
+
+    @Column(name = "scheduled_at")
+    private Instant scheduledAt;
 
     @Builder.Default
     private boolean enabled = true;

@@ -10,6 +10,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.automation.entity.RunStatus;
+
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -20,6 +23,39 @@ public class ExecutionController {
     private final WorkflowExecutor workflowExecutor;
     private final WorkflowRunRepository runRepository;
     private final WorkflowMapper workflowMapper;
+
+    @GetMapping
+    public List<WorkflowRunResponse> listExecutions(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String workflowId,
+            @RequestParam(required = false) String projectId) {
+        List<com.automation.entity.WorkflowRun> runs;
+
+        RunStatus runStatus = null;
+        if (status != null && !status.isBlank()) {
+            runStatus = RunStatus.valueOf(status.toUpperCase());
+        }
+
+        if (workflowId != null && !workflowId.isBlank()) {
+            runs = runRepository.findByWorkflowIdOrderByStartedAtDesc(workflowId);
+            if (runStatus != null) {
+                RunStatus finalStatus = runStatus;
+                runs = runs.stream().filter(r -> r.getStatus() == finalStatus).toList();
+            }
+        } else if (projectId != null && !projectId.isBlank()) {
+            if (runStatus != null) {
+                runs = runRepository.findByStatusAndProjectIdOrderByStartedAtDesc(runStatus, projectId);
+            } else {
+                runs = runRepository.findByProjectIdOrderByStartedAtDesc(projectId);
+            }
+        } else if (runStatus != null) {
+            runs = runRepository.findByStatusOrderByStartedAtDesc(runStatus);
+        } else {
+            runs = runRepository.findAllByOrderByStartedAtDesc();
+        }
+
+        return workflowMapper.toRunResponseList(runs);
+    }
 
     @GetMapping("/{id}")
     public WorkflowRunResponse getExecution(@PathVariable String id) {

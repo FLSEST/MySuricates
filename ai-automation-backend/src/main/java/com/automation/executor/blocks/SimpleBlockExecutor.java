@@ -32,9 +32,8 @@ public class SimpleBlockExecutor implements BlockExecutor {
                 .config(new HashMap<>(Map.of("command", command)))
                 .build();
 
-        return commandExecutor.executeStep(
-                context.getContainerId(),
-                BlockExecutor.cliTypeFor("simple"),
+        return commandExecutor.executeStepOnHost(
+                context.getProjectPath(),
                 resolved,
                 context.nextStepIndex(),
                 context.getInstructionPrefix(),

@@ -2,12 +2,36 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
-import type { ScheduledWorkflow, CreateScheduleRequest } from '../types';
+import type { ScheduledWorkflow, CreateScheduleRequest, CalendarDataResponse, UpcomingScheduleData } from '../types';
 
 export function useSchedules() {
   return useQuery({
     queryKey: ['schedules'],
     queryFn: () => api.get<ScheduledWorkflow[]>('/schedules'),
+  });
+}
+
+export function useCalendarData(from: string, to: string) {
+  return useQuery({
+    queryKey: ['schedules', 'calendar', from, to],
+    queryFn: () => api.get<CalendarDataResponse>(`/schedules/calendar?from=${from}&to=${to}`),
+    enabled: !!from && !!to,
+  });
+}
+
+export function useRemainingToday() {
+  return useQuery({
+    queryKey: ['schedules', 'remaining-today'],
+    queryFn: () => api.get<UpcomingScheduleData>('/schedules/remaining-today'),
+    refetchInterval: 60_000,
+  });
+}
+
+export function useRemainingThisWeek() {
+  return useQuery({
+    queryKey: ['schedules', 'remaining-this-week'],
+    queryFn: () => api.get<UpcomingScheduleData>('/schedules/remaining-this-week'),
+    refetchInterval: 60_000,
   });
 }
 

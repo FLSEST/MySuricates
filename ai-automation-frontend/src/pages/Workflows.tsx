@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GitBranch, Plus, Search, Play } from 'lucide-react';
+import { GitBranch, Plus, Search, Play, LayoutGrid, FolderOpen } from 'lucide-react';
 import { Card, Button, Input, Select, Modal, Spinner } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
@@ -13,6 +13,8 @@ import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
 import type { CreateWorkflowRequest, Workflow } from '../types';
 import type { WorkflowTemplate } from '../data/workflowTemplates';
 
+type ViewMode = 'flat' | 'grouped';
+
 type CreateStep = 'closed' | 'template' | 'details';
 
 export function Workflows() {
@@ -24,6 +26,8 @@ export function Workflows() {
   const executeWorkflow = useExecuteWorkflow();
 
   const [search, setSearch] = useState('');
+  const [projectFilter, setProjectFilter] = useState('');
+  const [viewMode, setViewMode] = useState<ViewMode>('flat');
   const [createStep, setCreateStep] = useState<CreateStep>('closed');
   const [selectedTemplate, setSelectedTemplate] = useState<WorkflowTemplate | null>(null);
   const [form, setForm] = useState<CreateWorkflowRequest>({ projectId: '', name: '' });
@@ -33,10 +37,26 @@ export function Workflows() {
     variables: [],
   });
 
-  const filtered = workflows?.filter((w) =>
-    w.name.toLowerCase().includes(search.toLowerCase()) ||
-    w.projectName.toLowerCase().includes(search.toLowerCase())
-  ) ?? [];
+  const filtered = workflows?.filter((w) => {
+    const matchesSearch = !search ||
+      w.name.toLowerCase().includes(search.toLowerCase()) ||
+      w.projectName.toLowerCase().includes(search.toLowerCase());
+    const matchesProject = !projectFilter || w.projectId === projectFilter;
+    return matchesSearch && matchesProject;
+  }) ?? [];
+
+  const groupedByProject = useMemo(() => {
+    if (viewMode !== 'grouped') return [];
+    const groups = new Map<string, { projectName: string; workflows: Workflow[] }>();
+    for (const wf of filtered) {
+      const key = wf.projectId;
+      if (!groups.has(key)) {
+        groups.set(key, { projectName: wf.projectName || t.common.project, workflows: [] });
+      }
+      groups.get(key)!.workflows.push(wf);
+    }
+    return Array.from(groups.values()).sort((a, b) => a.projectName.localeCompare(b.projectName));
+  }, [filtered, viewMode, t.common.project]);
 
   const openCreate = () => {
     setCreateStep('template');
@@ -131,75 +151,81 @@ export function Workflows() {
         </Button>
       </div>
 
-      {/* Search */}
-      <div className="max-w-sm">
-        <Input
-          placeholder={t.common.search}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          icon={<Search className="w-4 h-4 text-text-tertiary" />}
-        />
+      {/* Search & Filters */}
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="w-64">
+          <Input
+            placeholder={t.common.search}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            icon={<Search className="w-4 h-4 text-text-tertiary" />}
+          />
+        </div>
+        <div className="w-48">
+          <Select
+            value={projectFilter}
+            onChange={(e) => setProjectFilter(e.target.value)}
+            options={[
+              { value: '', label: t.workflows.allProjects },
+              ...(projects?.map((p) => ({ value: p.id, label: p.name })) ?? []),
+            ]}
+          />
+        </div>
+        <div className="flex rounded-lg border border-border overflow-hidden">
+          <button
+            onClick={() => setViewMode('flat')}
+            className={`p-2 transition-colors ${viewMode === 'flat' ? 'bg-accent/10 text-accent' : 'text-text-tertiary hover:text-text'}`}
+            title={t.workflows.viewFlat}
+          >
+            <LayoutGrid className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setViewMode('grouped')}
+            className={`p-2 transition-colors ${viewMode === 'grouped' ? 'bg-accent/10 text-accent' : 'text-text-tertiary hover:text-text'}`}
+            title={t.workflows.viewByProject}
+          >
+            <FolderOpen className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Workflow list */}
       {filtered.length === 0 ? (
         <EmptyState
           icon={<GitBranch className="w-8 h-8 text-text-tertiary" />}
-          title={search ? t.common.noResults : t.workflows.title}
-          description={search ? undefined : t.workflows.noWorkflows}
+          title={search || projectFilter ? t.common.noResults : t.workflows.title}
+          description={search || projectFilter ? undefined : t.workflows.noWorkflows}
           action={
-            !search && (
+            !search && !projectFilter && (
               <Button size="sm" onClick={openCreate}>
                 {t.workflows.create}
               </Button>
             )
           }
         />
+      ) : viewMode === 'grouped' ? (
+        <div className="space-y-6 animate-stagger">
+          {groupedByProject.map((group) => (
+            <div key={group.projectName}>
+              <div className="flex items-center gap-2 mb-3">
+                <FolderOpen className="w-4 h-4 text-text-tertiary" />
+                <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wide">
+                  {group.projectName}
+                </h2>
+                <span className="text-xs text-text-tertiary">({group.workflows.length})</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {group.workflows.map((wf) => (
+                  <WorkflowCard key={wf.id} wf={wf} t={t} navigate={navigate} onExecute={handleExecute} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 animate-stagger">
           {filtered.map((wf) => (
-            <Card
-              key={wf.id}
-              className="cursor-pointer hover:border-border-strong transition-colors"
-              onClick={() => navigate(`/workflows/${wf.id}`)}
-            >
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-xl">{wf.icon || '\uD83D\uDCCB'}</span>
-                  <div className="min-w-0">
-                    <h3 className="font-semibold text-text truncate">{wf.name}</h3>
-                    <p className="text-xs text-text-tertiary">{wf.projectName}</p>
-                  </div>
-                </div>
-                <button
-                  onClick={(e) => handleExecute(e, wf)}
-                  className="p-2 rounded-lg text-accent hover:bg-accent/10 transition-colors shrink-0"
-                  title={t.workflows.execute}
-                  aria-label={t.workflows.execute}
-                >
-                  <Play className="w-4 h-4" />
-                </button>
-              </div>
-              {wf.description && (
-                <p className="text-xs text-text-secondary line-clamp-2 mb-3">{wf.description}</p>
-              )}
-              <div className="flex items-center justify-between text-xs text-text-tertiary">
-                <span>{wf.blocks.length} {t.workflows.blocks.toLowerCase()}</span>
-                <span>{wf.runCount} {t.common.runs}</span>
-              </div>
-              {wf.activatedSkillNames.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {wf.activatedSkillNames.map((name) => (
-                    <span
-                      key={name}
-                      className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-accent/10 text-accent"
-                    >
-                      {name}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </Card>
+            <WorkflowCard key={wf.id} wf={wf} t={t} navigate={navigate} onExecute={handleExecute} />
           ))}
         </div>
       )}
@@ -281,5 +307,56 @@ export function Workflows() {
         </div>
       </Modal>
     </div>
+  );
+}
+
+function WorkflowCard({ wf, t, navigate, onExecute }: {
+  wf: Workflow;
+  t: ReturnType<typeof useT>;
+  navigate: ReturnType<typeof useNavigate>;
+  onExecute: (e: React.MouseEvent, wf: Workflow) => void;
+}) {
+  return (
+    <Card
+      className="cursor-pointer hover:border-border-strong transition-colors"
+      onClick={() => navigate(`/workflows/${wf.id}`)}
+    >
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-xl">{wf.icon || '\uD83D\uDCCB'}</span>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-text truncate">{wf.name}</h3>
+            <p className="text-xs text-text-tertiary">{wf.projectName}</p>
+          </div>
+        </div>
+        <button
+          onClick={(e) => onExecute(e, wf)}
+          className="p-2 rounded-lg text-accent hover:bg-accent/10 transition-colors shrink-0"
+          title={t.workflows.execute}
+          aria-label={t.workflows.execute}
+        >
+          <Play className="w-4 h-4" />
+        </button>
+      </div>
+      {wf.description && (
+        <p className="text-xs text-text-secondary line-clamp-2 mb-3">{wf.description}</p>
+      )}
+      <div className="flex items-center justify-between text-xs text-text-tertiary">
+        <span>{wf.blocks.length} {t.workflows.blocks.toLowerCase()}</span>
+        <span>{wf.runCount} {t.common.runs}</span>
+      </div>
+      {wf.activatedSkillNames.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-2">
+          {wf.activatedSkillNames.map((name) => (
+            <span
+              key={name}
+              className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-accent/10 text-accent"
+            >
+              {name}
+            </span>
+          ))}
+        </div>
+      )}
+    </Card>
   );
 }

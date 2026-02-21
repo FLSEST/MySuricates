@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Pencil, Trash2, Link2 } from 'lucide-react';
+import { GripVertical, Pencil, Trash2, Link2, Terminal } from 'lucide-react';
 import { Badge } from '../ui';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useT } from '../../i18n';
@@ -62,6 +62,11 @@ export function SortableBlock({ id, index, block, onEdit, onRemove }: SortableBl
           <pre className="text-xs text-text-secondary font-mono bg-surface rounded-lg p-3 mt-2 overflow-x-auto">
             {JSON.stringify(block.config, null, 2)}
           </pre>
+        ) : block.type === 'shell' ? (
+          <p className="text-sm text-text-secondary truncate flex items-center gap-1.5">
+            <Terminal className="w-3.5 h-3.5 text-accent shrink-0" />
+            <code className="font-mono text-xs">{String(block.config.command || '')}</code>
+          </p>
         ) : block.type === 'sub-workflow' ? (
           <p className="text-sm text-text-secondary truncate flex items-center gap-1.5">
             <Link2 className="w-3.5 h-3.5 text-accent shrink-0" />

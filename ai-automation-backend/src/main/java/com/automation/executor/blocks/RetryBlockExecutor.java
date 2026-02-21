@@ -19,6 +19,8 @@ public class RetryBlockExecutor implements BlockExecutor {
 
     private final CommandExecutorService commandExecutor;
 
+    private static final int DEFAULT_SHELL_TIMEOUT = 300;
+
     @Override
     public StepResult execute(BlockDefinition block, ExecutionContext context) {
         Map<String, Object> config = block.getConfig();
@@ -26,6 +28,9 @@ public class RetryBlockExecutor implements BlockExecutor {
         int maxRetries = ((Number) config.getOrDefault("max_retries", 3)).intValue();
         int delaySeconds = ((Number) config.getOrDefault("delay", 5)).intValue();
         boolean exponentialBackoff = Boolean.TRUE.equals(config.get("exponential_backoff"));
+        String executionMode = (String) config.getOrDefault("execution_mode", "claude");
+        boolean isShell = "shell".equals(executionMode);
+        int shellTimeout = ((Number) config.getOrDefault("timeout_seconds", DEFAULT_SHELL_TIMEOUT)).intValue();
 
         StepResult lastResult = StepResult.builder()
                 .stepIndex(context.nextStepIndex())
@@ -48,17 +53,28 @@ public class RetryBlockExecutor implements BlockExecutor {
                 }
             }
 
-            lastResult = commandExecutor.executeStep(
-                    context.getContainerId(),
-                    BlockExecutor.cliTypeFor("simple"),
-                    BlockDefinition.builder()
-                            .type("simple")
-                            .config(Map.of("command", command))
-                            .build(),
-                    context.nextStepIndex(),
-                    context.getInstructionPrefix(),
-                    context.getModel()
-            );
+            if (isShell) {
+                lastResult = commandExecutor.executeStepAsShell(
+                        context.getProjectPath(),
+                        BlockDefinition.builder()
+                                .type("shell")
+                                .config(Map.of("command", command))
+                                .build(),
+                        context.nextStepIndex(),
+                        shellTimeout
+                );
+            } else {
+                lastResult = commandExecutor.executeStepOnHost(
+                        context.getProjectPath(),
+                        BlockDefinition.builder()
+                                .type("simple")
+                                .config(Map.of("command", command))
+                                .build(),
+                        context.nextStepIndex(),
+                        context.getInstructionPrefix(),
+                        context.getModel()
+                );
+            }
 
             if (lastResult.getStatus() == StepStatus.COMPLETED) {
                 return lastResult;

@@ -121,6 +121,10 @@ public class CliSession implements Closeable {
     }
 
     public EnrichedCommandResult sendCommandEnriched(String command, String model) throws IOException {
+        return sendCommandEnriched(command, model, null);
+    }
+
+    public EnrichedCommandResult sendCommandEnriched(String command, String model, String systemPrompt) throws IOException {
         if (!alive) {
             throw new IllegalStateException("CLI session is not alive");
         }
@@ -132,7 +136,7 @@ public class CliSession implements Closeable {
             return new EnrichedCommandResult(basic.output(), basic.exitCode(), null);
         }
 
-        return executeOneOffEnriched(command, model);
+        return executeOneOffEnriched(command, model, systemPrompt);
     }
 
     private CommandResult executeOneOff(String command) throws IOException {
@@ -148,12 +152,20 @@ public class CliSession implements Closeable {
     }
 
     private EnrichedCommandResult executeOneOffEnriched(String command, String model) throws IOException {
+        return executeOneOffEnriched(command, model, null);
+    }
+
+    EnrichedCommandResult executeOneOffEnriched(String command, String model, String systemPrompt) throws IOException {
         List<String> cmd = new ArrayList<>(List.of("docker", "exec", containerId,
                 "claude", "-p", command,
-                "--output-format", "stream-json"));
+                "--output-format", "stream-json", "--verbose"));
         if (model != null && !model.isBlank()) {
             cmd.add("--model");
             cmd.add(model);
+        }
+        if (systemPrompt != null && !systemPrompt.isBlank()) {
+            cmd.add("--append-system-prompt");
+            cmd.add(systemPrompt);
         }
         if (skipPermissions) {
             cmd.add("--dangerously-skip-permissions");

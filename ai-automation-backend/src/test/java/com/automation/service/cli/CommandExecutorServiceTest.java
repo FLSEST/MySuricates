@@ -6,10 +6,11 @@ import com.automation.entity.SkillCategory;
 import com.automation.entity.StepStatus;
 import com.automation.entity.StepResult;
 import com.automation.exception.WorkflowExecutionException;
+import com.automation.service.ai.HostClaudeService;
+import com.automation.service.ai.HostClaudeService.ActionResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -19,6 +20,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,11 +32,17 @@ class CommandExecutorServiceTest {
     @Mock
     private CliSession cliSession;
 
-    @InjectMocks
+    @Mock
+    private HostClaudeService hostClaudeService;
+
+    @Mock
+    private ShellCommandService shellCommandService;
+
     private CommandExecutorService commandExecutorService;
 
     @BeforeEach
     void setUp() throws IOException {
+        commandExecutorService = new CommandExecutorService(sessionManager, hostClaudeService, shellCommandService);
         lenient().when(sessionManager.getOrCreateSession(anyString(), anyString())).thenReturn(cliSession);
     }
 
@@ -60,7 +68,7 @@ class CommandExecutorServiceTest {
 
     @Test
     void executeStep_successfulCommand_returnsCompletedStep() throws IOException {
-        when(cliSession.sendCommandEnriched("npm test"))
+        when(cliSession.sendCommandEnriched(eq("npm test"), any(), any()))
                 .thenReturn(new CliSession.EnrichedCommandResult("All tests passed", 0, null));
 
         BlockDefinition block = BlockDefinition.builder()
@@ -79,7 +87,7 @@ class CommandExecutorServiceTest {
 
     @Test
     void executeStep_nonZeroExitCode_returnsFailedStep() throws IOException {
-        when(cliSession.sendCommandEnriched("npm test"))
+        when(cliSession.sendCommandEnriched(eq("npm test"), any(), any()))
                 .thenReturn(new CliSession.EnrichedCommandResult("Error: test suite failed", 1, null));
 
         BlockDefinition block = BlockDefinition.builder()
@@ -94,7 +102,7 @@ class CommandExecutorServiceTest {
 
     @Test
     void executeStep_exception_returnsFailedWithErrorMessage() throws IOException {
-        when(cliSession.sendCommandEnriched(anyString())).thenThrow(new IOException("Session dead"));
+        when(cliSession.sendCommandEnriched(anyString(), any(), any())).thenThrow(new IOException("Session dead"));
 
         BlockDefinition block = BlockDefinition.builder()
                 .type("simple")
@@ -175,5 +183,76 @@ class CommandExecutorServiceTest {
         String context = commandExecutorService.buildSkillContext(List.of(skill));
 
         assertThat(context).isEmpty();
+    }
+
+    // === Host-based execution tests ===
+
+    @Test
+    void executeCommandOnHost_success_returnsEnrichedResult() throws IOException {
+        when(hostClaudeService.executeAction(eq("hello"), eq("sonnet"), eq("sys prompt"), eq("/project")))
+                .thenReturn(new ActionResult("Hello world", 0, null));
+
+        CliSession.EnrichedCommandResult result =
+                commandExecutorService.executeCommandOnHost("/project", "hello", "sonnet", "sys prompt");
+
+        assertThat(result.output()).isEqualTo("Hello world");
+        assertThat(result.exitCode()).isEqualTo(0);
+    }
+
+    @Test
+    void executeCommandOnHost_ioException_throwsWorkflowExecutionException() throws IOException {
+        when(hostClaudeService.executeAction(anyString(), any(), any(), anyString()))
+                .thenThrow(new IOException("Claude not found"));
+
+        assertThatThrownBy(() ->
+                commandExecutorService.executeCommandOnHost("/project", "cmd", null, null))
+                .isInstanceOf(WorkflowExecutionException.class)
+                .hasMessageContaining("/project");
+    }
+
+    @Test
+    void executeStepOnHost_success_returnsCompletedStep() throws IOException {
+        when(hostClaudeService.executeAction(eq("npm test"), any(), any(), eq("/project")))
+                .thenReturn(new ActionResult("All tests passed", 0, null));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("simple")
+                .config(Map.of("command", "npm test"))
+                .build();
+
+        StepResult result = commandExecutorService.executeStepOnHost("/project", block, 0, null, null);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getOutput()).isEqualTo("All tests passed");
+        assertThat(result.getStepIndex()).isEqualTo(0);
+        assertThat(result.getInput()).isEqualTo("npm test");
+        assertThat(result.getDurationMs()).isNotNull();
+    }
+
+    @Test
+    void executeStepOnHost_nonZeroExitCode_returnsFailedStep() throws IOException {
+        when(hostClaudeService.executeAction(eq("npm test"), any(), any(), eq("/project")))
+                .thenReturn(new ActionResult("Error: tests failed", 1, null));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("simple")
+                .config(Map.of("command", "npm test"))
+                .build();
+
+        StepResult result = commandExecutorService.executeStepOnHost("/project", block, 0, null, null);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+    }
+
+    @Test
+    void executeCommandOnHost_simpleOverload_returnsCommandResult() throws IOException {
+        when(hostClaudeService.executeAction(eq("ls"), any(), any(), eq("/project")))
+                .thenReturn(new ActionResult("file.txt", 0, null));
+
+        CliSession.CommandResult result =
+                commandExecutorService.executeCommandOnHost("/project", "ls");
+
+        assertThat(result.output()).isEqualTo("file.txt");
+        assertThat(result.exitCode()).isEqualTo(0);
     }
 }

@@ -11,7 +11,6 @@ import com.automation.service.ai.HostClaudeService;
 import com.automation.service.ai.HostClaudeService.ReasoningResult;
 import com.automation.service.ai.HostClaudeService.Turn;
 import com.automation.service.cli.CliSession;
-import com.automation.service.cli.ClaudeJsonResponse;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.learning.LearningService;
 import com.automation.repository.WorkflowRunRepository;
@@ -54,6 +53,12 @@ public class AgenticBlockExecutor implements BlockExecutor {
         int maxIterations = ((Number) config.getOrDefault("max_iterations", 10)).intValue();
         int iterationTimeoutSeconds = ((Number) config.getOrDefault(
                 "iteration_timeout_seconds", 300)).intValue();
+        int totalTimeoutSeconds = ((Number) config.getOrDefault(
+                "total_timeout_seconds", 1800)).intValue();
+        int maxTotalTokens = ((Number) config.getOrDefault(
+                "max_total_tokens", 200_000)).intValue();
+        int maxRepeatedActions = ((Number) config.getOrDefault(
+                "max_repeated_actions", 3)).intValue();
         boolean requireApproval = Boolean.TRUE.equals(config.get("require_approval"));
 
         // Gather learning context — resolve workflow ID from the run
@@ -62,8 +67,9 @@ public class AgenticBlockExecutor implements BlockExecutor {
                 .orElse(null);
         String learningContext = buildLearningContext(workflowId);
 
-        // Build system prompt for host Claude
-        String systemPrompt = buildSystemPrompt(goal, successCriteria, learningContext);
+        // Build system prompt for host Claude (include workflow instructions for consistency)
+        String workflowInstructions = context.getInstructionPrefix();
+        String systemPrompt = buildSystemPrompt(goal, successCriteria, learningContext, workflowInstructions);
 
         // Conversation history for multi-turn reasoning
         List<Turn> history = new ArrayList<>();
@@ -81,8 +87,21 @@ public class AgenticBlockExecutor implements BlockExecutor {
         int iteration = 0;
         boolean goalAchieved = false;
         boolean approvalRequired = requireApproval;
+        Instant blockStart = Instant.now();
+        int runningTotalTokens = 0;
+        List<String> recentActions = new ArrayList<>();
+        String stopReason = null;
 
         while (iteration < maxIterations && !context.shouldStop()) {
+            // Overall timeout check
+            long elapsedSeconds = (Instant.now().toEpochMilli() - blockStart.toEpochMilli()) / 1000;
+            if (elapsedSeconds > totalTimeoutSeconds) {
+                stopReason = "TOTAL_TIMEOUT";
+                fullOutput.append("[TOTAL TIMEOUT after ").append(elapsedSeconds).append("s]\n");
+                broadcastAgenticEvent(context.getWorkflowRunId(), stepIndex,
+                        "agentic_total_timeout", Map.of("elapsedSeconds", elapsedSeconds));
+                break;
+            }
             // Handle pause
             while (context.isPaused() && !context.shouldStop()) {
                 try {
@@ -105,14 +124,16 @@ public class AgenticBlockExecutor implements BlockExecutor {
 
             String reasoning;
             try {
-                String fullPrompt = hostClaude.buildConversationPrompt(systemPrompt, history);
-                ReasoningResult reasonResult = hostClaude.reasonStructured(fullPrompt);
+                String conversationPrompt = hostClaude.buildConversationPrompt(systemPrompt, history);
+                ReasoningResult reasonResult = hostClaude.reasonStructured(conversationPrompt, systemPrompt);
                 reasoning = reasonResult.text();
 
                 // Capture reasoning token/cost metadata
-                if (reasonResult.parsed() != null) {
+                if (reasonResult.parsed() != null && reasonResult.parsed().usage() != null) {
                     Map<String, Object> reasonMeta = reasonResult.parsed().toMetadata();
                     iterData.put("reasonMeta", reasonMeta);
+                } else {
+                    log.warn("Agentic iteration {}: REASON phase returned no token usage data — token budget tracking is blind", iteration);
                 }
             } catch (Exception e) {
                 log.error("Host Claude reasoning failed at iteration {}: {}", iteration, e.getMessage());
@@ -211,23 +232,29 @@ public class AgenticBlockExecutor implements BlockExecutor {
             int exitCode;
             try {
                 String actionCommand = plan.getAction();
-                if (context.getInstructionPrefix() != null && !context.getInstructionPrefix().isBlank()) {
-                    actionCommand = commandExecutor.prependInstructions(actionCommand, context.getInstructionPrefix());
-                }
-                CliSession.EnrichedCommandResult cmdResult = commandExecutor.executeCommandEnriched(
-                        context.getContainerId(), "claude", actionCommand, context.getModel());
+                String containerSystemPrompt = context.getInstructionPrefix();
+                CliSession.EnrichedCommandResult cmdResult = commandExecutor.executeCommandOnHost(
+                        context.getProjectPath(), actionCommand, context.getModel(), containerSystemPrompt);
                 actionOutput = cmdResult.output() != null ? cmdResult.output() : "";
                 exitCode = cmdResult.exitCode();
 
                 // Capture action token/cost metadata
-                if (cmdResult.parsed() != null) {
+                if (cmdResult.parsed() != null && cmdResult.parsed().usage() != null) {
                     Map<String, Object> actMeta = cmdResult.parsed().toMetadata();
                     iterData.put("actMeta", actMeta);
+                } else {
+                    log.warn("Agentic iteration {}: ACT phase returned no token usage data — token budget tracking is blind", iteration);
                 }
             } catch (Exception e) {
                 actionOutput = "Execution error: " + e.getMessage();
                 exitCode = -1;
             }
+
+            // Track tokens for budget check
+            runningTotalTokens += extractTokenCount(iterData, "reasonMeta", "inputTokens");
+            runningTotalTokens += extractTokenCount(iterData, "reasonMeta", "outputTokens");
+            runningTotalTokens += extractTokenCount(iterData, "actMeta", "inputTokens");
+            runningTotalTokens += extractTokenCount(iterData, "actMeta", "outputTokens");
 
             iterData.put("action", plan.getAction());
             iterData.put("actionOutput", truncate(actionOutput, 2000));
@@ -260,12 +287,45 @@ public class AgenticBlockExecutor implements BlockExecutor {
 
             // Timeout check per iteration
             if (iterMs > (long) iterationTimeoutSeconds * 1000) {
+                stopReason = "ITERATION_TIMEOUT";
                 broadcastAgenticEvent(context.getWorkflowRunId(), stepIndex,
                         "agentic_iteration_timeout", Map.of("iteration", iteration));
                 fullOutput.append("[iteration ").append(iteration)
                         .append(" - TIMEOUT]\n");
                 break;
             }
+
+            // Token budget check
+            if (maxTotalTokens > 0 && runningTotalTokens > maxTotalTokens) {
+                stopReason = "TOKEN_BUDGET_EXCEEDED";
+                broadcastAgenticEvent(context.getWorkflowRunId(), stepIndex,
+                        "agentic_token_budget_exceeded",
+                        Map.of("iteration", iteration, "totalTokens", runningTotalTokens,
+                                "budget", maxTotalTokens));
+                fullOutput.append("[TOKEN BUDGET EXCEEDED: ").append(runningTotalTokens)
+                        .append("/").append(maxTotalTokens).append(" tokens]\n");
+                break;
+            }
+
+            // Progress detection — abort if same action repeated N times
+            String actionNormalized = plan.getAction().strip();
+            recentActions.add(actionNormalized);
+            if (recentActions.size() >= maxRepeatedActions) {
+                List<String> lastN = recentActions.subList(
+                        recentActions.size() - maxRepeatedActions, recentActions.size());
+                if (lastN.stream().allMatch(a -> a.equals(lastN.getFirst()))) {
+                    stopReason = "REPEATED_ACTIONS";
+                    broadcastAgenticEvent(context.getWorkflowRunId(), stepIndex,
+                            "agentic_repeated_actions",
+                            Map.of("iteration", iteration, "repeatedCount", maxRepeatedActions));
+                    fullOutput.append("[ABORTED: Same action repeated ")
+                            .append(maxRepeatedActions).append(" times]\n");
+                    break;
+                }
+            }
+
+            // History compression — keep recent turns in full, summarize older ones
+            compressHistory(history);
         }
 
         // Finalize
@@ -310,6 +370,10 @@ public class AgenticBlockExecutor implements BlockExecutor {
             metadata.put("toolNames", allToolNames);
             metadata.put("toolUseCount", allToolNames.size());
         }
+        metadata.put("totalTokensUsed", runningTotalTokens);
+        if (stopReason != null) {
+            metadata.put("stopReason", stopReason);
+        }
         metadata.put("iterations", iterationLog);
         result.setMetadata(metadata);
 
@@ -324,6 +388,41 @@ public class AgenticBlockExecutor implements BlockExecutor {
                         "durationMs", result.getDurationMs()));
 
         return result;
+    }
+
+    /**
+     * Compress conversation history to manage context window size.
+     * Keeps the first turn (initial prompt) and the most recent 4 turns in full.
+     * Middle turns are collapsed into a single summary turn.
+     */
+    private void compressHistory(List<Turn> history) {
+        int keepRecentCount = 4;
+        // Only compress if history is long enough to benefit
+        // Need at least: 1 (initial) + keepRecentCount + 2 (to compress at least 2 turns)
+        if (history.size() <= keepRecentCount + 3) {
+            return;
+        }
+
+        // Keep index 0 (initial user prompt) and the last keepRecentCount turns
+        int compressEnd = history.size() - keepRecentCount;
+
+        // Build summary of middle turns (from index 1 to compressEnd-1)
+        StringBuilder summary = new StringBuilder();
+        summary.append("[Compressed history of ").append(compressEnd - 1).append(" turns]\n");
+        for (int i = 1; i < compressEnd; i++) {
+            Turn turn = history.get(i);
+            String label = "assistant".equals(turn.role()) ? "ASSISTANT" : "USER";
+            summary.append("- ").append(label).append(": ").append(truncate(turn.content(), 150)).append("\n");
+        }
+
+        // Remove the middle turns and replace with summary
+        List<Turn> compressed = new ArrayList<>();
+        compressed.add(history.get(0)); // keep initial prompt
+        compressed.add(new Turn("user", summary.toString())); // compressed middle
+        compressed.addAll(history.subList(compressEnd, history.size())); // keep recent
+
+        history.clear();
+        history.addAll(compressed);
     }
 
     private String buildLearningContext(String workflowId) {
@@ -357,7 +456,15 @@ public class AgenticBlockExecutor implements BlockExecutor {
         }
     }
 
-    private String buildSystemPrompt(String goal, String successCriteria, String learningContext) {
+    private String buildSystemPrompt(String goal, String successCriteria,
+                                      String learningContext, String workflowInstructions) {
+        String instructionsSection = "";
+        if (workflowInstructions != null && !workflowInstructions.isBlank()) {
+            instructionsSection = "\n## Workflow Instructions\n" +
+                    "The following instructions apply to this workflow and should guide your planning:\n" +
+                    workflowInstructions + "\n";
+        }
+
         return """
                 You are an autonomous agent orchestrator. You analyze situations, plan actions, and evaluate results.
                 You operate in a Reason-Act-Observe loop. The actions you plan will be executed by another AI agent \
@@ -368,7 +475,7 @@ public class AgenticBlockExecutor implements BlockExecutor {
 
                 ## Success Criteria
                 %s
-
+                %s\
                 ## Response Format
                 You MUST respond in this exact format:
 
@@ -394,9 +501,10 @@ public class AgenticBlockExecutor implements BlockExecutor {
                 - The container agent can run commands, edit files, and interact with the development environment.
                 - Be specific in your ACTION -- describe exactly what needs to be done.
                 - If a previous action failed, analyze the error and try a different approach.
+                - Do NOT repeat the same action if it failed -- try a different approach.
                 - Prefer small, incremental steps over large changes.
                 - After each observation, assess progress towards the goal.
-                %s""".formatted(goal, successCriteria, learningContext);
+                %s""".formatted(goal, successCriteria, instructionsSection, learningContext);
     }
 
     private void broadcastAgenticEvent(String runId, int stepIndex,
