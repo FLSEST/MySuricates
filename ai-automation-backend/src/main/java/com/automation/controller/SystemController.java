@@ -79,7 +79,7 @@ public class SystemController {
         }
 
         return Map.of(
-                "name", "AI Automation Platform",
+                "name", "MySuricates",
                 "version", version,
                 "buildType", buildType,
                 "buildTimestamp", buildTimestamp,
@@ -131,7 +131,7 @@ public class SystemController {
         }
 
         // Copy to temp file (WAL-safe snapshot)
-        Path tempFile = Files.createTempFile("autopilot-backup-", ".db");
+        Path tempFile = Files.createTempFile("mysuricates-backup-", ".db");
         Files.copy(dbPath, tempFile, StandardCopyOption.REPLACE_EXISTING);
 
         // Also copy WAL and SHM if they exist (for consistency)
@@ -145,7 +145,7 @@ public class SystemController {
         }
 
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm"));
-        String filename = "autopilot-backup-" + timestamp + ".db";
+        String filename = "mysuricates-backup-" + timestamp + ".db";
 
         InputStreamResource resource = new InputStreamResource(new FileInputStream(tempFile.toFile())) {
             @Override

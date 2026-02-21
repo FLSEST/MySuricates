@@ -4,27 +4,27 @@
 
 /* ── Default theme tokens (dark) ───────────────────────── */
 :root {
-  --color-surface: #0f172a;
-  --color-surface-raised: #1e293b;
-  --color-surface-overlay: #1e293b;
-  --color-border: #334155;
-  --color-border-strong: #475569;
-  --color-text: #f1f5f9;
-  --color-text-secondary: #94a3b8;
-  --color-text-tertiary: #64748b;
-  --color-text-inverse: #0f172a;
-  --color-accent: #06b6d4;
-  --color-accent-hover: #22d3ee;
-  --color-accent-subtle: #083344;
-  --color-success: #34d399;
-  --color-success-subtle: #064e3b;
-  --color-warning: #fbbf24;
-  --color-warning-subtle: #451a03;
-  --color-danger: #f87171;
-  --color-danger-subtle: #450a0a;
-  --color-sidebar: #020617;
-  --color-sidebar-hover: #0f172a;
-  --color-sidebar-active: #1e293b;
+  --color-surface: #231e19;
+  --color-surface-raised: #2e2720;
+  --color-surface-overlay: #332c24;
+  --color-border: #4a3f33;
+  --color-border-strong: #5e5143;
+  --color-text: #f7f3ee;
+  --color-text-secondary: #b8aa9a;
+  --color-text-tertiary: #8c7e6e;
+  --color-text-inverse: #231e19;
+  --color-accent: #eba44a;
+  --color-accent-hover: #f2ba62;
+  --color-accent-subtle: #3d2e14;
+  --color-success: #6cc66c;
+  --color-success-subtle: #1e3320;
+  --color-warning: #eba44a;
+  --color-warning-subtle: #3d2e14;
+  --color-danger: #e07272;
+  --color-danger-subtle: #3d1f1f;
+  --color-sidebar: #1a1614;
+  --color-sidebar-hover: #252019;
+  --color-sidebar-active: #332b22;
 }
 
 /* ── Base styles ───────────────────────────────────────── */

@@ -55,7 +55,7 @@ export function ApiKeyGuard({ children }: { children: React.ReactNode }) {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-accent/10 mb-4">
             <Shield className="w-8 h-8 text-accent" />
           </div>
-          <h1 className="text-2xl font-bold text-text">AutoPilot</h1>
+          <h1 className="text-2xl font-bold text-text">MySuricates</h1>
           <p className="text-text-secondary mt-2">{t.security.authRequired}</p>
         </div>
 

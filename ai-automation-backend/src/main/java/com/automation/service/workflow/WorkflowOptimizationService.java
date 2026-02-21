@@ -51,7 +51,7 @@ public class WorkflowOptimizationService {
 
     private String buildOptimizationPrompt(String name, String description, String instructions, String blocksJson) {
         return """
-                Du bist ein Workflow-Optimierer fuer die AutoPilot-Plattform.
+                Du bist ein Workflow-Optimierer fuer die MySuricates-Plattform.
 
                 ## Plattform-Kontext
                 - Workflows bestehen aus Blocks die in Docker-Containern via Claude CLI ausgefuehrt werden

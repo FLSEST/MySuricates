@@ -14,8 +14,8 @@
     <groupId>com.automation</groupId>
     <artifactId>ai-automation-backend</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-    <name>AI Automation Backend</name>
-    <description>AI Automation Platform with Skill System</description>
+    <name>MySuricates Backend</name>
+    <description>MySuricates - AI Workflow Automation</description>
 
     <properties>
         <java.version>21</java.version>

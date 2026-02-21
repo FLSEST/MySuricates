@@ -83,7 +83,7 @@ public class SystemTrayService {
             loadIcons(targetSize);
 
             Image icon = iconCache.get(IconColor.GRAY);
-            trayIcon = new TrayIcon(icon, "AutoPilot | Starting...");
+            trayIcon = new TrayIcon(icon, "MySuricates | Starting...");
             trayIcon.setImageAutoSize(false);
 
             PopupMenu menu = buildMenu(new TrayState(0, 0, 0, 0, false, false));
@@ -198,7 +198,7 @@ public class SystemTrayService {
     }
 
     private String buildTooltip(TrayState state) {
-        return String.format("AutoPilot | UP | Docker: %s | Frontend: %s | %d aktiv | %d%% Erfolg",
+        return String.format("MySuricates | UP | Docker: %s | Frontend: %s | %d aktiv | %d%% Erfolg",
                 state.dockerOk ? "OK" : "Offline",
                 state.frontendOk ? "OK" : "Offline",
                 state.activeRuns,
@@ -208,7 +208,7 @@ public class SystemTrayService {
     private PopupMenu buildMenu(TrayState state) {
         PopupMenu menu = new PopupMenu();
 
-        MenuItem header = new MenuItem("AutoPilot");
+        MenuItem header = new MenuItem("MySuricates");
         header.setEnabled(false);
         menu.add(header);
 
@@ -265,20 +265,20 @@ public class SystemTrayService {
         if (previousState == null) return;
 
         if (previousState.activeRuns > 0 && state.activeRuns == 0) {
-            trayIcon.displayMessage("AutoPilot",
+            trayIcon.displayMessage("MySuricates",
                     "Alle Workflows abgeschlossen",
                     TrayIcon.MessageType.INFO);
         }
 
         if (state.failedToday > previousState.failedToday) {
             long newFailures = state.failedToday - previousState.failedToday;
-            trayIcon.displayMessage("AutoPilot",
+            trayIcon.displayMessage("MySuricates",
                     newFailures + " Workflow(s) fehlgeschlagen",
                     TrayIcon.MessageType.WARNING);
         }
 
         if (state.pendingApprovals > previousState.pendingApprovals) {
-            trayIcon.displayMessage("AutoPilot",
+            trayIcon.displayMessage("MySuricates",
                     state.pendingApprovals + " Approval(s) warten auf Eingabe",
                     TrayIcon.MessageType.WARNING);
         }

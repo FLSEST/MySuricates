@@ -12,11 +12,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icons/*.svg'],
       manifest: {
-        name: 'AI Automation Platform',
-        short_name: 'AutoPilot',
-        description: 'AI-powered workflow automation',
-        theme_color: '#0f172a',
-        background_color: '#0f172a',
+        name: 'MySuricates',
+        short_name: 'MySuricates',
+        description: 'Your meerkats automating workflows',
+        theme_color: '#231e19',
+        background_color: '#231e19',
         display: 'standalone',
         icons: [
           {

@@ -15,11 +15,11 @@ public class ActivityLogLifecycleListener {
 
     @EventListener(ApplicationReadyEvent.class)
     public void onStartup() {
-        activityLogService.info(LogCategory.SYSTEM, "AutoPilot server started", "System");
+        activityLogService.info(LogCategory.SYSTEM, "MySuricates server started", "System");
     }
 
     @EventListener(ContextClosedEvent.class)
     public void onShutdown() {
-        activityLogService.info(LogCategory.SYSTEM, "AutoPilot server shutting down", "System");
+        activityLogService.info(LogCategory.SYSTEM, "MySuricates server shutting down", "System");
     }
 }
