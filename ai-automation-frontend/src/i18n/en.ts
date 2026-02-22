@@ -429,6 +429,8 @@ export const en = {
     bugToFixDescription: 'Analyze a bug, write a failing test, implement the fix, and verify all tests pass',
     huntQualityPipeline: 'Hunt Quality Pipeline',
     huntQualityPipelineDescription: 'Verify treasure hunts, fact-check content, validate rules, and fix issues',
+    folderBackup: 'Folder Backup (tar.gz)',
+    folderBackupDescription: 'Backup multiple folders via shell into compressed archives with checksums',
     useTemplate: 'Use Template',
     startBlank: 'Start Blank',
     searchPlaceholder: 'Search templates...',

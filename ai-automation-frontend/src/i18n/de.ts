@@ -431,6 +431,8 @@ export const de: TranslationKeys = {
     bugToFixDescription: 'Bug analysieren, fehlschlagenden Test schreiben, Fix implementieren und alle Tests verifizieren',
     huntQualityPipeline: 'Hunt-Qualitäts-Pipeline',
     huntQualityPipelineDescription: 'Schnitzeljagden verifizieren, Fakten prüfen, Regeln checken und gezielt reparieren',
+    folderBackup: 'Ordner-Backup (tar.gz)',
+    folderBackupDescription: 'Mehrere Ordner per Shell in komprimierte Archive sichern, inklusive Checksummen',
     useTemplate: 'Vorlage verwenden',
     startBlank: 'Leer starten',
     searchPlaceholder: 'Vorlagen durchsuchen...',

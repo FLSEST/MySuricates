@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoPilot — Workflow Engine</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --purple: #bc8cff;
+      --orange: #d29922;
+      --red: #f85149;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1.5rem 2rem;
+      text-align: center;
+    }
+    header h1 { font-size: 1.8rem; font-weight: 600; }
+    header p { color: var(--text-muted); margin-top: 0.3rem; }
+    nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0.8rem 2rem;
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    nav a {
+      color: var(--accent);
+      text-decoration: none;
+      padding: 0.4rem 1rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      transition: background 0.2s;
+    }
+    nav a:hover { background: rgba(88,166,255,0.1); }
+    main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+    section h2 {
+      font-size: 1.4rem;
+      margin-bottom: 0.5rem;
+      color: var(--accent);
+    }
+    section h2 span { font-size: 0.85rem; color: var(--text-muted); font-weight: 400; margin-left: 0.5rem; }
+    section > p { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.95rem; }
+    .mermaid {
+      display: flex;
+      justify-content: center;
+      margin: 1rem 0;
+    }
+    .mermaid svg { max-width: 100%; height: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+    th, td {
+      padding: 0.6rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    th { color: var(--text-muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; }
+    td code {
+      background: rgba(88,166,255,0.1);
+      color: var(--accent);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+    }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.2rem;
+    }
+    .card h3 { font-size: 1rem; margin-bottom: 0.5rem; }
+    .card p { font-size: 0.85rem; color: var(--text-muted); }
+    .tree {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.85rem;
+      line-height: 1.8;
+      background: var(--bg);
+      padding: 1.5rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      overflow-x: auto;
+    }
+    .tree .dir { color: var(--accent); font-weight: 600; }
+    .tree .file { color: var(--text); }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-blue { background: rgba(88,166,255,0.15); color: var(--accent); }
+    .badge-green { background: rgba(63,185,80,0.15); color: var(--green); }
+    .badge-purple { background: rgba(188,140,255,0.15); color: var(--purple); }
+    .badge-orange { background: rgba(210,153,34,0.15); color: var(--orange); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>AutoPilot — Workflow Engine</h1>
+  <p>Kernlogik, Ausführungsmodi (mit/ohne KI) und Steuerflüsse</p>
+</header>
+
+<nav>
+  <a href="#overview">Uebersicht</a>
+  <a href="#exec-standard">Standard-Flow</a>
+  <a href="#exec-shell">Shell-Flow</a>
+  <a href="#agentic">Agentic Loop</a>
+  <a href="#control">Control Flow</a>
+  <a href="#providers">Provider</a>
+  <a href="#blocks">Block-Matrix</a>
+  <a href="#config">Konfig</a>
+  <a href="#files">Dateien</a>
+</nav>
+
+<main>
+
+<section id="overview">
+  <h2>Systemuebersicht <span>High-Level</span></h2>
+  <p>Alle Workflows laufen ueber den WorkflowExecutor. Er orchestriert BlockExecutors, Container-Start, Skill-Kontext und WebSocket-Logs.</p>
+  <pre class="mermaid">
+flowchart LR
+    subgraph Browser["Browser (React SPA)"]
+        UI["Workflow Pages + Live Logs"]
+    end
+
+    subgraph Backend["Backend (Spring Boot)"]
+        WE["WorkflowExecutor"]
+        BE["BlockExecutors"]
+        CES["CommandExecutorService"]
+        SCS["ShellCommandService"]
+        HCL["HostClaudeService"]
+        WS["/topic/executions/{runId}/logs"]
+    end
+
+    subgraph Runtime["Runtime Target"]
+        CON["Docker Container (Projekt)"]
+        HOST["Host (Fallback)"]
+    end
+
+    UI -->|"POST /workflows/{id}/execute"| WE
+    WE -->|"blocks"| BE
+    BE -->|"claude"| CES
+    BE -->|"shell"| SCS
+    CES -->|"CLI"| CON
+    SCS --> CON
+    CES -.fallback.-> HOST
+    SCS -.fallback.-> HOST
+    WE --> WS
+    WS --> UI
+
+    style Browser fill:#1a1f2e,stroke:#30363d,color:#e6edf3
+    style Backend fill:#1a1f2e,stroke:#30363d,color:#e6edf3
+    style Runtime fill:#1a2e1a,stroke:#3fb950,color:#e6edf3
+  </pre>
+</section>
+
+<section id="exec-standard">
+  <h2>Ausfuehrung (Standard, KI-gestuetzt) <span>Reason/Act</span></h2>
+  <p>Default: Befehle gehen an Claude-CLI (Host/Container). Instruction-Prefix + Model kommen aus dem Workflow.</p>
+  <pre class="mermaid">
+sequenceDiagram
+    participant UI as Frontend
+    participant WE as WorkflowExecutor
+    participant BE as BlockExecutor
+    participant CES as CommandExecutorService
+    participant CLI as Claude CLI
+    participant WS as WebSocket
+
+    UI->>WE: POST /workflows/{id}/execute
+    WE->>WE: create WorkflowRun (RUNNING)
+    WE->>WE: ensureContainerRunning()
+    WE->>BE: for block in blocks
+    BE->>CES: executeStepOnHost/Container(command, model, instructions)
+    CES->>CLI: claude -p "<command>"
+    CLI-->>CES: output + exitCode + usage
+    CES-->>BE: StepResult (status by exitCode)
+    BE-->>WE: add StepResult, set previous_output
+    WE->>WS: broadcast step log
+    alt step failed & on_failure=stop
+        WE->>WE: mark RUN FAILED
+    end
+    WE->>WE: mark RUN COMPLETED/FAILED
+    WE->>WS: final status event
+  </pre>
+</section>
+
+<section id="exec-shell">
+  <h2>Ausfuehrung (ohne KI) <span>Shell-Pfade</span></h2>
+  <p>Shell-Mode nutzt keine Modelle, keine Instruktions-Prefixe, bewertet nur Exit-Code.</p>
+  <pre class="mermaid">
+sequenceDiagram
+    participant BE as BlockExecutor
+    participant SCS as ShellCommandService
+    participant SH as Shell
+    participant WE as WorkflowExecutor
+
+    BE->>SCS: execute(command, workDir, timeout)
+    SCS->>SH: run command
+    SH-->>SCS: output + exitCode
+    SCS-->>BE: StepResult (status by exitCode)
+    BE-->>WE: add StepResult
+  </pre>
+  <div class="grid">
+    <div class="card">
+      <h3>Wann Shell?</h3>
+      <p>&#x2022; Blocktyp <code>shell</code><br/>&#x2022; <code>execution_mode=shell</code> bei foreach/while/retry</p>
+    </div>
+    <div class="card">
+      <h3>Unterschiede</h3>
+      <p>&#x2022; Kein Model / kein Prompt-Limit<br/>&#x2022; Deterministisch durch Exit-Code<br/>&#x2022; Kein Token-Metadata</p>
+    </div>
+  </div>
+</section>
+
+<section id="agentic">
+  <h2>Agentic Loop <span>Reason–Act–Observe</span></h2>
+  <p>Mehrstufige KI-Planung mit Token-/Zeit-Budgets, Wiederholungs-Stopp und optionalem Approval.</p>
+  <pre class="mermaid">
+sequenceDiagram
+    participant AG as AgenticBlockExecutor
+    participant HC as HostClaudeService
+    participant CLI as claude -p (reasonStructured)
+    participant CES as CommandExecutorService (ACT)
+    participant CLI2 as claude -p (action)
+
+    AG->>HC: buildConversationPrompt + reasonStructured()
+    HC->>CLI: stream-json
+    CLI-->>HC: structured reasoning
+    HC-->>AG: RATIONALE + ACTION
+    alt ACTION empty
+        AG->>AG: ask for clearer action
+    else ACTION present
+        AG->>CES: executeCommandOnHost(action, model, sysPrompt)
+        CES->>CLI2: run action
+        CLI2-->>CES: output + exitCode + usage
+        CES-->>AG: result
+    end
+    AG->>AG: record iteration, token budget, repetition check
+    AG->>AG: stop if goal ACHIEVED/IMPOSSIBLE/timeout/repeat/token
+  </pre>
+</section>
+
+<section id="control">
+  <h2>Control Flow <span>Conditional & Approval</span></h2>
+  <p>Branching und User-Gates innerhalb eines Runs.</p>
+  <pre class="mermaid">
+flowchart LR
+    A["conditional block<br/>condition -> Claude TRUE/FALSE"] -->|then| T["run then_command (simple)"]
+    A -->|else| E["run else_command (simple)"]
+    subgraph Approval
+        Q["approval block<br/>question + options"] --> MEM["remember 'Yes always' per run"]
+        Q --> OUTC["answer stored as variable"]
+        Q --> DEC{"on_no"}
+        DEC -->|fail| FAIL["Step FAILED"]
+        DEC -->|skip| SKIP["Step SKIPPED"]
+        DEC -->|continue| CONT["Step COMPLETED"]
+    end
+  </pre>
+</section>
+
+<section id="providers">
+  <h2>Provider & Ausfuehrungsmodi <span>KI vs. Kein KI</span></h2>
+  <table>
+    <thead><tr><th>Merkmal</th><th>KI (Claude)</th><th>Ohne KI (Shell)</th></tr></thead>
+    <tbody>
+      <tr><td>CLI</td><td><code>claude -p</code></td><td>System-Shell</td></tr>
+      <tr><td>Kontext</td><td>Instruction-Prefix, Skill-Context, previous_output</td><td>Nur Shell-Kommandostring</td></tr>
+      <tr><td>Determinismus</td><td>Niedriger (LLM)</td><td>Hoch (Exit-Code)</td></tr>
+      <tr><td>Telemetry</td><td>Token/Cost in StepResult.metadata</td><td>exitCode + duration</td></tr>
+      <tr><td>Fallback</td><td>Host, falls Container nicht startet</td><td>Host gleicher Pfad</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="blocks">
+  <h2>Block-Matrix <span>Typ → Exec-Modus</span></h2>
+  <table>
+    <thead><tr><th>Block</th><th>Default</th><th>Optionen</th><th>Stop on failure</th></tr></thead>
+    <tbody>
+      <tr><td><code>simple</code></td><td>claude</td><td>-</td><td>Ja (default)</td></tr>
+      <tr><td><code>shell</code></td><td>shell</td><td><code>timeout_seconds</code></td><td>Ja</td></tr>
+      <tr><td><code>retry</code></td><td>claude</td><td><code>execution_mode</code>=shell/claude, <code>max_retries</code>, <code>delay</code>, <code>exponential_backoff</code></td><td>Ja (wenn alle Fehlversuche)</td></tr>
+      <tr><td><code>foreach</code></td><td>claude</td><td><code>execution_mode</code>=shell, <code>items_source</code>=list/command</td><td>Aggregiertes Ergebnis</td></tr>
+      <tr><td><code>while</code></td><td>claude</td><td><code>execution_mode</code>=shell, <code>condition_command</code></td><td>Ja bei innerem Fail</td></tr>
+      <tr><td><code>conditional</code></td><td>claude</td><td>-</td><td>Branch-spezifisch</td></tr>
+      <tr><td><code>approval</code></td><td>-</td><td><code>mode</code>=ask/auto, <code>on_no</code>=fail/skip/continue</td><td>on_no=fail</td></tr>
+      <tr><td><code>skill-capability</code></td><td>claude</td><td><code>params</code>, <code>input</code></td><td>Ja</td></tr>
+      <tr><td><code>sub-workflow</code></td><td>depends</td><td>Tiefe<=5, Timeout 30 min</td><td>Ja bei Timeout/Zyklus</td></tr>
+      <tr><td><code>agentic</code></td><td>claude</td><td>Budget, Iterationen, Approval</td><td>Ja bei Stoppgründen</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="config">
+  <h2>Konfiguration <span>application.yml (relevant)</span></h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Execution Limits</h3>
+      <p><code>automation.execution.max-concurrent</code>: parallele Runs</p>
+      <p><code>automation.host-claude.timeout-seconds</code>: CLI Timeout</p>
+      <p><code>docker.container.idle-timeout-minutes</code>: Container Idle Stop</p>
+    </div>
+    <div class="card">
+      <h3>Security</h3>
+      <p><code>automation.security.enabled</code> / <code>api-key</code></p>
+      <p><code>rate-limit</code> defaults disabled</p>
+      <p>CORS: <code>automation.cors.allowed-origins</code></p>
+    </div>
+  </div>
+</section>
+
+<section id="files">
+  <h2>Dateistruktur <span>Kernklassen</span></h2>
+  <div class="tree">
+<span class="dir">ai-automation-backend/src/main/java/com/automation/</span>
+├── <span class="dir">executor/</span>
+│   ├── ExecutionContext.java
+│   ├── BlockExecutor.java
+│   ├── <span class="dir">blocks/</span> (Simple, Shell, Retry, ForEach, While, Conditional, Approval, SkillCapability, SubWorkflow, Agentic)
+├── <span class="dir">service/workflow/</span>
+│   ├── WorkflowExecutor.java
+│   └── AgentInstructionsService.java
+├── <span class="dir">service/cli/</span>
+│   ├── CommandExecutorService.java
+│   ├── ShellCommandService.java
+│   └── CliSessionManager.java
+└── <span class="dir">service/ai/</span>
+    └── HostClaudeService.java
+  </div>
+</section>
+
+</main>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      primaryColor: '#1a2e3e',
+      primaryTextColor: '#e6edf3',
+      primaryBorderColor: '#58a6ff',
+      lineColor: '#8b949e',
+      secondaryColor: '#2e1a2e',
+      tertiaryColor: '#1a2e1a',
+      background: '#0d1117',
+      mainBkg: '#161b22',
+      nodeBorder: '#30363d',
+      clusterBkg: '#161b22',
+      clusterBorder: '#30363d',
+      titleColor: '#e6edf3',
+      edgeLabelBackground: '#161b22'
+    },
+    flowchart: { curve: 'basis', padding: 20 },
+    sequence: { actorMargin: 50, messageMargin: 40 },
+    er: { layoutDirection: 'LR' }
+  });
+</script>
+
+</body>
+</html>
