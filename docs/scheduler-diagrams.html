@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoPilot — Scheduler & Cron</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    :root { --bg:#0d1117; --surface:#161b22; --border:#30363d; --text:#e6edf3; --text-muted:#8b949e; --accent:#58a6ff; --green:#3fb950; --purple:#bc8cff; --orange:#d29922; }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;}
+    header{background:var(--surface);border-bottom:1px solid var(--border);padding:1.5rem 2rem;text-align:center;}
+    header h1{font-size:1.8rem;font-weight:600;} header p{color:var(--text-muted);margin-top:0.3rem;}
+    nav{background:var(--surface);border-bottom:1px solid var(--border);padding:0.8rem 2rem;display:flex;gap:0.5rem;flex-wrap:wrap;justify-content:center;position:sticky;top:0;z-index:100;}
+    nav a{color:var(--accent);text-decoration:none;padding:0.4rem 1rem;border-radius:6px;font-size:0.9rem;transition:background 0.2s;}
+    nav a:hover{background:rgba(88,166,255,0.1);}
+    main{max-width:1200px;margin:0 auto;padding:2rem;}
+    section{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:2rem;margin-bottom:2rem;}
+    section h2{font-size:1.4rem;margin-bottom:0.5rem;color:var(--accent);} section h2 span{font-size:0.85rem;color:var(--text-muted);font-weight:400;margin-left:0.5rem;}
+    section>p{color:var(--text-muted);margin-bottom:1.5rem;font-size:0.95rem;}
+    .mermaid{display:flex;justify-content:center;margin:1rem 0;} .mermaid svg{max-width:100%;height:auto;}
+    table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:0.9rem;}
+    th,td{padding:0.6rem 1rem;text-align:left;border-bottom:1px solid var(--border);} th{color:var(--text-muted);font-weight:600;font-size:0.8rem;text-transform:uppercase;}
+    td code{background:rgba(88,166,255,0.1);color:var(--accent);padding:0.15rem 0.4rem;border-radius:4px;font-size:0.85rem;}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;} @media(max-width:800px){.grid{grid-template-columns:1fr;}}
+    .card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:1.2rem;}
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>AutoPilot — Scheduler & Cron</h1>
+  <p>Schedules, InputContext, Ausloesung und Ausfuehrungspipeline</p>
+</header>
+
+<nav>
+  <a href="#overview">Uebersicht</a>
+  <a href="#create">Anlegen</a>
+  <a href="#execute">Ausfuehren</a>
+  <a href="#data">Datenmodell</a>
+  <a href="#config">Konfig</a>
+</nav>
+
+<main>
+
+<section id="overview">
+  <h2>Systemuebersicht <span>Scheduler Loop</span></h2>
+  <p>Ein Minutentakt prueft faellige Schedules und startet Workflows mit gespeichertem <code>inputContext</code>.</p>
+  <pre class="mermaid">
+flowchart LR
+    subgraph DB["SQLite"]
+        SW["scheduled_workflows"]
+    end
+    subgraph Backend["Backend"]
+        SCH["SchedulerService @Scheduled 60s"]
+        EXE["ScheduledWorkflowExecutor"]
+        WE["WorkflowExecutor"]
+    end
+    SCH -->|findDueSchedules| SW
+    SCH --> EXE
+    EXE --> WE
+    WE --> SW
+
+    style DB fill:#2e1a1a,stroke:#30363d,color:#e6edf3
+  </pre>
+</section>
+
+<section id="create">
+  <h2>Anlegen von Zeitplaenen <span>API Flow</span></h2>
+  <pre class="mermaid">
+sequenceDiagram
+    participant UI as Frontend
+    participant CTR as ScheduleController
+    participant SVC as SchedulerService
+    participant DB as scheduled_workflows
+
+    UI->>CTR: POST /api/v1/schedules {workflowId, cronExpression|scheduledAt, inputContext}
+    CTR->>SVC: create(...)
+    SVC->>DB: INSERT scheduled_workflows (input_context JSON)
+    DB-->>SVC: saved schedule
+    SVC-->>CTR: ScheduledWorkflowResponse
+    CTR-->>UI: 201 Created
+  </pre>
+  <div class="grid">
+    <div class="card">
+      <h3>Typen</h3>
+      <p><code>scheduleType</code>: <code>CRON</code> (default) oder <code>ONCE</code></p>
+      <p>CRON braucht <code>cronExpression</code>; ONCE braucht <code>scheduledAt</code></p>
+    </div>
+    <div class="card">
+      <h3>InputContext</h3>
+      <p>Beliebiges JSON; wird 1:1 an <code>workflowExecutor.execute(..., context)</code> weitergegeben.</p>
+      <p>Damit laufen Zeitplaene deterministisch mit den gespeicherten Variablen.</p>
+    </div>
+  </div>
+</section>
+
+<section id="execute">
+  <h2>Ausfuehrung <span>Due Schedules</span></h2>
+  <pre class="mermaid">
+sequenceDiagram
+    participant CRON as @Scheduled (60s)
+    participant DB as scheduled_workflows
+    participant EX as ScheduledWorkflowExecutor
+    participant WE as WorkflowExecutor
+
+    CRON->>DB: findDueSchedules(now)
+    DB-->>CRON: List<ScheduledWorkflow>
+    loop for each due
+        CRON->>EX: executeSingleSchedule(id)
+        EX->>WE: execute(workflow, inputContext)
+        WE-->>EX: WorkflowRun (async)
+        EX->>DB: update lastRunAt, nextRunAt / disable if ONCE
+    end
+  </pre>
+</section>
+
+<section id="data">
+  <h2>Datenmodell <span>scheduled_workflows</span></h2>
+  <table>
+    <thead><tr><th>Spalte</th><th>Beschreibung</th></tr></thead>
+    <tbody>
+      <tr><td><code>workflow_id</code></td><td>FK → workflow</td></tr>
+      <tr><td><code>cron_expression</code></td><td>CRON-String (leer bei ONCE)</td></tr>
+      <tr><td><code>schedule_type</code></td><td><code>CRON</code> | <code>ONCE</code></td></tr>
+      <tr><td><code>scheduled_at</code></td><td>Execution-Timestamp fuer ONCE</td></tr>
+      <tr><td><code>input_context</code></td><td>JSON Map (Parameter fuer Run)</td></tr>
+      <tr><td><code>enabled</code></td><td>Toggle</td></tr>
+      <tr><td><code>last_run_at</code>, <code>next_run_at</code></td><td>Tracking</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="config">
+  <h2>Konfig & Verhalten <span>wichtige Punkte</span></h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Validierung</h3>
+      <p>CRON wird mit <code>CronExpression.isValidExpression</code> geprüft.</p>
+      <p>ONCE erfordert <code>scheduledAt</code>.</p>
+    </div>
+    <div class="card">
+      <h3>Takt & NextRun</h3>
+      <p>Check: jede Minute (<code>@Scheduled(fixedRate=60_000)</code>).</p>
+      <p>Nach Ausführung: CRON → nextRun neu berechnet, ONCE → disabled.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      primaryColor: '#1a2e3e',
+      primaryTextColor: '#e6edf3',
+      primaryBorderColor: '#58a6ff',
+      lineColor: '#8b949e',
+      secondaryColor: '#2e1a2e',
+      tertiaryColor: '#1a2e1a',
+      background: '#0d1117',
+      mainBkg: '#161b22',
+      nodeBorder: '#30363d',
+      clusterBkg: '#161b22',
+      clusterBorder: '#30363d',
+      titleColor: '#e6edf3',
+      edgeLabelBackground: '#161b22'
+    },
+    flowchart: { curve: 'basis', padding: 20 },
+    sequence: { actorMargin: 50, messageMargin: 40 },
+    er: { layoutDirection: 'LR' }
+  });
+</script>
+
+</body>
+</html>

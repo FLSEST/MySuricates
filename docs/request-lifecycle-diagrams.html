@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoPilot — Request Lifecycle & Security</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --purple: #bc8cff;
+      --orange: #d29922;
+      --red: #f85149;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 1.5rem 2rem; text-align: center; }
+    header h1 { font-size: 1.8rem; font-weight: 600; }
+    header p { color: var(--text-muted); margin-top: 0.3rem; }
+    nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0.8rem 2rem; display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; position: sticky; top: 0; z-index: 100; }
+    nav a { color: var(--accent); text-decoration: none; padding: 0.4rem 1rem; border-radius: 6px; font-size: 0.9rem; transition: background 0.2s; }
+    nav a:hover { background: rgba(88,166,255,0.1); }
+    main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; margin-bottom: 2rem; }
+    section h2 { font-size: 1.4rem; margin-bottom: 0.5rem; color: var(--accent); }
+    section h2 span { font-size: 0.85rem; color: var(--text-muted); font-weight: 400; margin-left: 0.5rem; }
+    section > p { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.95rem; }
+    .mermaid { display: flex; justify-content: center; margin: 1rem 0; }
+    .mermaid svg { max-width: 100%; height: auto; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem; }
+    th, td { padding: 0.6rem 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+    th { color: var(--text-muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; }
+    td code { background: rgba(88,166,255,0.1); color: var(--accent); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.85rem; }
+    .card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.2rem; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>AutoPilot — Request Lifecycle & Security</h1>
+  <p>Vom Browser bis zur Datenbank: Filter, Fehlerformat, Auth, Rate Limits</p>
+</header>
+
+<nav>
+  <a href="#overview">Uebersicht</a>
+  <a href="#filters">Filterkette</a>
+  <a href="#controller">Controller → Service → Repo</a>
+  <a href="#errors">Fehlerformat</a>
+  <a href="#security">Security & Rate Limit</a>
+  <a href="#open-endpoints">Offene Endpunkte</a>
+</nav>
+
+<main>
+
+<section id="overview">
+  <h2>Systemuebersicht <span>Request Path</span></h2>
+  <p>HTTP-Anfragen laufen ueber den Vite-Proxy (Dev) oder direkt zum Spring Boot Backend, passieren Security-Filter und landen in den REST-Controllern.</p>
+  <pre class="mermaid">
+flowchart LR
+    B["Browser"] --> P["Vite Proxy /api -> :9090"]
+    P --> F["ApiKeyAuthFilter"]
+    F --> RLF["RateLimitFilter"]
+    RLF --> C["REST Controller"]
+    C --> S["Service"]
+    S --> REPO["Repository (JPA)"]
+    REPO --> DB["SQLite (WAL)"]
+    C --> WS["STOMP /topic/**"]
+
+    style DB fill:#2e1a1a,stroke:#30363d,color:#e6edf3
+  </pre>
+</section>
+
+<section id="filters">
+  <h2>Filterkette <span>Vor den Controllern</span></h2>
+  <p>Reihenfolge: ApiKeyAuth → RateLimit → Controller. Bei Fehlkonfig oder fehlendem Key wird die Anfrage abgewiesen, bevor Business-Logik startet.</p>
+  <pre class="mermaid">
+sequenceDiagram
+    participant Client
+    participant Proxy as Vite Proxy
+    participant API as Spring Boot
+    participant AK as ApiKeyAuthFilter
+    participant RL as RateLimitFilter
+    participant CTR as Controller
+
+    Client->>Proxy: HTTP /api/v1/...
+    Proxy->>API: forwarded request
+    API->>AK: doFilter
+    alt API-Key fehlt/ungueltig (wenn enabled)
+        AK-->>Client: 401 Unauthorized
+    else ok
+        AK->>RL: proceed
+        alt Limit ueberschritten
+            RL-->>Client: 429 Too Many Requests
+        else ok
+            RL->>CTR: proceed
+            CTR-->>Client: Response / Error
+        end
+    end
+  </pre>
+</section>
+
+<section id="controller">
+  <h2>Controller → Service → Repository <span>Beispiel: /projects</span></h2>
+  <p>Controller sind schlank; Services kapseln Logik, Repositories sprechen SQLite.</p>
+  <pre class="mermaid">
+sequenceDiagram
+    participant Client
+    participant CTR as ProjectController
+    participant SVC as ProjectService
+    participant REP as ProjectRepository
+    participant DB as SQLite
+
+    Client->>CTR: GET /api/v1/projects
+    CTR->>SVC: findAll()
+    SVC->>REP: findAll()
+    REP-->>SVC: List<Project>
+    SVC-->>CTR: DTOs via Mapper
+    CTR-->>Client: 200 JSON
+  </pre>
+</section>
+
+<section id="errors">
+  <h2>Fehlerformat <span>GlobalExceptionHandler</span></h2>
+  <table>
+    <thead><tr><th>Fall</th><th>Status</th><th>Body</th></tr></thead>
+    <tbody>
+      <tr><td>Validation</td><td>400</td><td><code>{"error":"Validation failed","fieldErrors":{...}}</code></td></tr>
+      <tr><td>Not Found</td><td>404</td><td><code>{"error":"Resource not found"}</code></td></tr>
+      <tr><td>Rate Limit</td><td>429</td><td><code>{"error":"Too many requests"}</code></td></tr>
+      <tr><td>Server</td><td>500</td><td><code>{"error":"Internal server error"}</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="security">
+  <h2>Security & Rate Limit <span>Konfiguration</span></h2>
+  <div class="grid">
+    <div class="card">
+      <h3>API-Key</h3>
+      <p><code>automation.security.enabled=true</code></p>
+      <p>Header: <code>X-API-Key</code></p>
+      <p>Constant-Time Vergleich (<code>MessageDigest.isEqual</code>)</p>
+    </div>
+    <div class="card">
+      <h3>Rate Limit</h3>
+      <p><code>automation.security.rate-limit.enabled</code> (default false)</p>
+      <p>Sliding Window, 120 req/min pro Client-IP</p>
+      <p>Header: <code>X-RateLimit-Remaining</code></p>
+    </div>
+  </div>
+</section>
+
+<section id="open-endpoints">
+  <h2>Offene Endpunkte <span>ohne API-Key</span></h2>
+  <ul style="color: var(--text); line-height:1.6; padding-left:1.2rem;">
+    <li><code>GET /api/v1/system/health</code></li>
+    <li><code>GET /api/v1/system/info</code></li>
+    <li><code>POST /api/v1/webhook/trigger/{token}</code></li>
+    <li><code>/ws/**</code> (SockJS/STOMP)</li>
+    <li><code>/actuator/**</code></li>
+  </ul>
+</section>
+
+</main>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      primaryColor: '#1a2e3e',
+      primaryTextColor: '#e6edf3',
+      primaryBorderColor: '#58a6ff',
+      lineColor: '#8b949e',
+      secondaryColor: '#2e1a2e',
+      tertiaryColor: '#1a2e1a',
+      background: '#0d1117',
+      mainBkg: '#161b22',
+      nodeBorder: '#30363d',
+      clusterBkg: '#161b22',
+      clusterBorder: '#30363d',
+      titleColor: '#e6edf3',
+      edgeLabelBackground: '#161b22'
+    },
+    flowchart: { curve: 'basis', padding: 20 },
+    sequence: { actorMargin: 50, messageMargin: 40 },
+    er: { layoutDirection: 'LR' }
+  });
+</script>
+
+</body>
+</html>
