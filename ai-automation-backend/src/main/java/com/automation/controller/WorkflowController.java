@@ -3,12 +3,18 @@ package com.automation.controller;
 import com.automation.dto.request.ActivateSkillsRequest;
 import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.dto.request.ExecuteWorkflowRequest;
+import com.automation.dto.request.ImportWorkflowRequest;
 import com.automation.dto.request.UpdateWorkflowRequest;
+import com.automation.dto.response.ExportWorkflowResponse;
 import com.automation.dto.response.WorkflowResponse;
 import com.automation.dto.response.WorkflowRunResponse;
+import com.automation.entity.Project;
+import com.automation.entity.ProjectStatus;
+import com.automation.entity.ProjectType;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.mapper.WorkflowMapper;
+import com.automation.repository.ProjectRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowOptimizationService;
@@ -19,6 +25,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -27,9 +34,12 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class WorkflowController {
 
+    private static final String COLLECTION_PROJECT_NAME = "Sammlung";
+
     private final WorkflowService workflowService;
     private final WorkflowExecutor workflowExecutor;
     private final WorkflowRunRepository runRepository;
+    private final ProjectRepository projectRepository;
     private final WorkflowMapper workflowMapper;
     private final WorkflowOptimizationService optimizationService;
 
@@ -102,5 +112,54 @@ public class WorkflowController {
     @DeleteMapping("/{id}/skills/{skillId}")
     public WorkflowResponse deactivateSkill(@PathVariable String id, @PathVariable String skillId) {
         return workflowMapper.toResponse(workflowService.deactivateSkill(id, skillId));
+    }
+
+    @GetMapping("/export/{id}")
+    public ExportWorkflowResponse exportWorkflow(@PathVariable String id) {
+        var workflow = workflowService.findById(id);
+        return new ExportWorkflowResponse(
+                workflow.getName(),
+                workflow.getDescription(),
+                workflow.getIcon(),
+                workflow.getBlocks(),
+                workflow.getInstructions(),
+                workflow.getModel(),
+                workflow.getVersion(),
+                Instant.now()
+        );
+    }
+
+    @PostMapping("/import")
+    public ResponseEntity<WorkflowResponse> importWorkflow(@Valid @RequestBody ImportWorkflowRequest request) {
+        String projectId = request.projectId();
+        if (projectId == null || projectId.isBlank()) {
+            projectId = getOrCreateCollectionProject().getId();
+        }
+        var createRequest = new CreateWorkflowRequest(
+                projectId,
+                request.name(),
+                request.description(),
+                request.icon(),
+                request.blocks(),
+                List.of(),
+                request.instructions(),
+                request.model()
+        );
+        var workflow = workflowService.create(createRequest);
+        return ResponseEntity.status(HttpStatus.CREATED).body(workflowMapper.toResponse(workflow));
+    }
+
+    private Project getOrCreateCollectionProject() {
+        return projectRepository.findFirstByName(COLLECTION_PROJECT_NAME)
+                .orElseGet(() -> {
+                    Project project = Project.builder()
+                            .name(COLLECTION_PROJECT_NAME)
+                            .subtitle("Importierte Workflows")
+                            .type(ProjectType.PERSONAL)
+                            .path("/tmp")
+                            .status(ProjectStatus.STOPPED)
+                            .build();
+                    return projectRepository.save(project);
+                });
     }
 }

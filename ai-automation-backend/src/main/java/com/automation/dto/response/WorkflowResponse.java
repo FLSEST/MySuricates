@@ -10,6 +10,8 @@ public record WorkflowResponse(
         String id,
         String projectId,
         String projectName,
+        String projectSubtitle,
+        String projectDescription,
         String name,
         String description,
         String icon,

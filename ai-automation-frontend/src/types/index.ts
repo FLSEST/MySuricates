@@ -6,6 +6,8 @@ export type ProjectStatus = 'STOPPED' | 'STARTING' | 'RUNNING' | 'ERROR';
 export interface Project {
   id: string;
   name: string;
+  subtitle?: string;
+  description?: string;
   type: ProjectType;
   path: string;
   config: Record<string, unknown>;
@@ -18,6 +20,8 @@ export interface Project {
 
 export interface CreateProjectRequest {
   name: string;
+  subtitle?: string;
+  description?: string;
   type: ProjectType;
   path: string;
   config?: Record<string, unknown>;
@@ -25,6 +29,8 @@ export interface CreateProjectRequest {
 
 export interface UpdateProjectRequest {
   name?: string;
+  subtitle?: string;
+  description?: string;
   type?: ProjectType;
   path?: string;
   config?: Record<string, unknown>;
@@ -50,6 +56,8 @@ export interface Workflow {
   id: string;
   projectId: string;
   projectName: string;
+  projectSubtitle?: string;
+  projectDescription?: string;
   name: string;
   description: string;
   icon: string;
@@ -90,6 +98,17 @@ export interface BlockDefinition {
   type: BlockType;
   config: Record<string, unknown>;
   requiredCapabilities?: string[];
+}
+
+export interface WorkflowExportData {
+  name: string;
+  description?: string;
+  icon?: string;
+  blocks: BlockDefinition[];
+  instructions?: string;
+  model?: string;
+  version?: string;
+  exportedAt?: string;
 }
 
 // ── Workflow Run ─────────────────────────────────────────

@@ -232,6 +232,59 @@ Workflow löschen.
 
 **Response:** `204 No Content`
 
+### `GET /api/v1/workflows/export/{id}`
+
+Workflow als portables JSON exportieren (ohne IDs, ohne Projekt-Zuordnung).
+
+**Response:** `ExportWorkflowResponse`
+
+```json
+{
+  "name": "Code Review",
+  "description": "Automatisiertes Code Review",
+  "icon": "🔍",
+  "blocks": [
+    { "type": "simple", "config": { "prompt": "Review code" }, "requiredCapabilities": [] }
+  ],
+  "instructions": null,
+  "model": null,
+  "version": "1.0.0",
+  "exportedAt": "2025-02-22T14:00:00Z"
+}
+```
+
+### `POST /api/v1/workflows/import`
+
+Workflow aus JSON importieren (exportiertes Format + Zielprojekt).
+
+**Request:**
+
+```json
+{
+  "projectId": "uuid",
+  "name": "Code Review",
+  "description": "Automatisiertes Code Review",
+  "icon": "🔍",
+  "blocks": [
+    { "type": "simple", "config": { "prompt": "Review code" }, "requiredCapabilities": [] }
+  ],
+  "instructions": null,
+  "model": null
+}
+```
+
+| Feld | Typ | Pflicht |
+|---|---|---|
+| `projectId` | String | Ja |
+| `name` | String | Ja |
+| `description` | String | Nein |
+| `icon` | String | Nein |
+| `blocks` | BlockDefinition[] | Nein |
+| `instructions` | String | Nein |
+| `model` | String | Nein |
+
+**Response:** `201` mit `WorkflowResponse`
+
 ### `POST /api/v1/workflows/{id}/execute`
 
 Workflow ausführen.

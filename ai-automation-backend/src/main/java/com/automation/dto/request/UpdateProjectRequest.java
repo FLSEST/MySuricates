@@ -6,6 +6,8 @@ import java.util.Map;
 
 public record UpdateProjectRequest(
         String name,
+        String subtitle,
+        String description,
         ProjectType type,
         String path,
         Map<String, Object> config

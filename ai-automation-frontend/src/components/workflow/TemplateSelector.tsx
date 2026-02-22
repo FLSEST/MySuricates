@@ -3,6 +3,7 @@ import { FileText, Search } from 'lucide-react';
 import { Card, Input } from '../ui';
 import { useT } from '../../i18n';
 import { workflowTemplates, type WorkflowTemplate } from '../../data/workflowTemplates';
+import { ExecutionBadges } from '../shared/ExecutionBadges';
 
 interface TemplateSelectorProps {
   onSelect: (template: WorkflowTemplate | null) => void;
@@ -70,9 +71,12 @@ export function TemplateSelector({ onSelect }: TemplateSelectorProps) {
                   <h4 className="font-semibold text-text">
                     {t.templates[tmpl.nameKey as keyof typeof t.templates]}
                   </h4>
-                  <span className="text-xs text-text-tertiary">
-                    {tmpl.blocks.length} {t.workflows.blocks.toLowerCase()}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-text-tertiary">
+                      {tmpl.blocks.length} {t.workflows.blocks.toLowerCase()}
+                    </span>
+                    <ExecutionBadges blocks={tmpl.blocks} />
+                  </div>
                 </div>
               </div>
               <p className="text-xs text-text-secondary">

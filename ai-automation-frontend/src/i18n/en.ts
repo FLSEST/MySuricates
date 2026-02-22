@@ -185,6 +185,8 @@ export const en = {
     importSelectProject: 'Target Project',
     importFileHint: 'Select a .json workflow file',
     invalidFile: 'Invalid workflow file',
+    importNoProject: 'No project (Collection)',
+    importCollectionHint: 'Without project selection, the workflow is added to the "Sammlung" collection.',
     activateSkill: 'Activate Skill',
     executeWithVariables: 'Execute with Variables',
     variablesDescription: 'This workflow requires input values. Please fill in all variables below.',

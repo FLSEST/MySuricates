@@ -30,7 +30,7 @@ export function ProjectDetail() {
 
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
-  const [editForm, setEditForm] = useState({ name: '', type: 'CODE' as ProjectType, path: '' });
+  const [editForm, setEditForm] = useState({ name: '', subtitle: '', description: '', type: 'CODE' as ProjectType, path: '' });
 
   const projectWorkflows = workflows?.filter((w) => w.projectId === id) ?? [];
 
@@ -47,7 +47,7 @@ export function ProjectDetail() {
   }
 
   const openEdit = () => {
-    setEditForm({ name: project.name, type: project.type, path: project.path });
+    setEditForm({ name: project.name, subtitle: project.subtitle ?? '', description: project.description ?? '', type: project.type, path: project.path });
     setShowEdit(true);
   };
 
@@ -222,6 +222,22 @@ export function ProjectDetail() {
             value={editForm.name}
             onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
           />
+          <Input
+            label={t.projects.subtitleField}
+            value={editForm.subtitle}
+            onChange={(e) => setEditForm({ ...editForm, subtitle: e.target.value })}
+            placeholder={t.projects.subtitlePlaceholder}
+          />
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">{t.projects.descriptionField}</label>
+            <textarea
+              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors resize-none"
+              rows={3}
+              value={editForm.description}
+              onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+              placeholder={t.projects.descriptionPlaceholder}
+            />
+          </div>
           <Select
             label={t.projects.type}
             value={editForm.type}

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Play, Plus, Trash2, Pencil, Zap, Clock, Wand2, FileText, Bot, Copy,
+  ArrowLeft, Play, Plus, Trash2, Pencil, Zap, Clock, Wand2, FileText, Bot, Copy, Download,
 } from 'lucide-react';
 import { Card, CardHeader, Button, Input, Select, Modal, Spinner } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
@@ -10,6 +10,7 @@ import { MonacoEditor } from '../components/shared/MonacoEditor';
 import {
   useWorkflow, useWorkflows as useWorkflowsList, useWorkflowRuns, useUpdateWorkflow,
   useDeleteWorkflow, useExecuteWorkflow, useOptimizeWorkflow, useCreateWorkflow,
+  exportWorkflow,
 } from '../hooks/useWorkflows';
 import { useSkills, useActivateSkills, useDeactivateSkill } from '../hooks/useSkills';
 import { useProjects } from '../hooks/useProjects';
@@ -242,6 +243,16 @@ export function WorkflowDetail() {
               setShowClone(true);
             }}
             aria-label={t.workflows.clone}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<Download className="w-4 h-4" />}
+            onClick={() => {
+              const safeName = workflow.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+              exportWorkflow(workflow.id, `${safeName}.json`);
+            }}
+            aria-label={t.workflows.exportWorkflow}
           />
           <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4" />} onClick={() => setShowDelete(true)} aria-label={t.common.delete} />
         </div>

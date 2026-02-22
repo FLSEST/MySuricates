@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
-import type { Workflow, WorkflowRun, CreateWorkflowRequest, UpdateWorkflowRequest } from '../types';
+import type { Workflow, WorkflowRun, CreateWorkflowRequest, UpdateWorkflowRequest, WorkflowExportData } from '../types';
 
 interface WorkflowApiResponse {
   id: string;
@@ -170,6 +170,40 @@ export function useSubmitApproval() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['workflows'] });
     },
+  });
+}
+
+export async function exportWorkflow(id: string, filename: string) {
+  const data = await api.get<WorkflowExportData>(`/workflows/export/${id}`);
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export function useImportWorkflow() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
+  return useMutation({
+    mutationFn: (data: { projectId: string } & WorkflowExportData) =>
+      api.post<Workflow>('/workflows/import', {
+        projectId: data.projectId,
+        name: data.name,
+        description: data.description,
+        icon: data.icon,
+        blocks: data.blocks,
+        instructions: data.instructions,
+        model: data.model,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workflows'] });
+      toast.success(t.toast.workflowImported);
+    },
+    onError: () => toast.error(t.toast.workflowImportFailed),
   });
 }
 

@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   GitBranch,
@@ -11,18 +11,18 @@ import {
   Pencil,
   Clock,
   ChevronsUpDown,
-  Terminal,
-  Brain,
-  ShieldCheck,
   Trash2,
   CheckSquare,
   Square,
   X,
+  Upload,
+  Download,
 } from 'lucide-react';
 import { Button, Input, Modal, Spinner, Select } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
+import { ExecutionBadges } from '../components/shared/ExecutionBadges';
 import { TemplateSelector } from '../components/workflow/TemplateSelector';
 import { ExecuteDialog } from '../components/workflow/ExecuteDialog';
 import { WorkflowIcon } from '../utils/workflowIcon';
@@ -32,13 +32,16 @@ import {
   useExecuteWorkflow,
   useDeleteWorkflow,
   useWorkflowRuns,
+  useImportWorkflow,
+  exportWorkflow,
 } from '../hooks/useWorkflows';
 import { useProjects } from '../hooks/useProjects';
 import { useT } from '../i18n';
 import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
 import { formatDuration, formatDateTime } from '../utils/formatTime';
-import type { BlockDefinition, CreateWorkflowRequest, Workflow } from '../types';
+import type { CreateWorkflowRequest, Workflow, WorkflowExportData } from '../types';
 import type { WorkflowTemplate } from '../data/workflowTemplates';
+import { useToast } from '../hooks/useToast';
 
 function pluralize(count: number, singular: string, plural: string) {
   return count === 1 ? singular : plural;
@@ -76,49 +79,7 @@ function saveSelectedId(id: string | null) {
   } catch { /* ignore */ }
 }
 
-// ── Block type analysis ──────────────────────────────────────
-
-type ExecutionMode = 'shell' | 'ai' | 'approval';
-
-function getExecutionModes(blocks: BlockDefinition[]): ExecutionMode[] {
-  const modes = new Set<ExecutionMode>();
-  for (const b of blocks) {
-    const t = b.type;
-    if (t === 'shell') modes.add('shell');
-    else if (t === 'simple' || t === 'agentic' || t === 'skill-capability') modes.add('ai');
-    else if (t === 'approval') modes.add('approval');
-    else if (t === 'foreach' || t === 'while') {
-      const mode = (b.config as Record<string, unknown>).execution_mode;
-      if (mode === 'shell') modes.add('shell');
-      else modes.add('ai');
-    }
-  }
-  return [...modes];
-}
-
-const modeConfig: Record<ExecutionMode, { icon: typeof Terminal; label: string; color: string }> = {
-  shell: { icon: Terminal, label: 'Shell', color: 'text-emerald-500' },
-  ai: { icon: Brain, label: 'AI', color: 'text-violet-400' },
-  approval: { icon: ShieldCheck, label: 'Approval', color: 'text-amber-400' },
-};
-
-function ExecutionBadges({ blocks }: { blocks: BlockDefinition[] }) {
-  const modes = getExecutionModes(blocks);
-  if (modes.length === 0) return null;
-  return (
-    <span className="flex items-center gap-0.5 shrink-0">
-      {modes.map((mode) => {
-        const cfg = modeConfig[mode];
-        const Icon = cfg.icon;
-        return (
-          <span key={mode} title={cfg.label}>
-            <Icon className={`w-3 h-3 ${cfg.color}`} />
-          </span>
-        );
-      })}
-    </span>
-  );
-}
+// ExecutionBadges imported from ../components/shared/ExecutionBadges
 
 // ── Main Component ──────────────────────────────────────────
 
@@ -132,6 +93,8 @@ export function Workflows() {
   const createWorkflow = useCreateWorkflow();
   const executeWorkflow = useExecuteWorkflow();
   const deleteWorkflow = useDeleteWorkflow();
+  const importWorkflow = useImportWorkflow();
+  const toast = useToast();
 
   const [search, setSearch] = useState('');
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(loadSelectedId);
@@ -148,6 +111,13 @@ export function Workflows() {
     workflow: null,
     variables: [],
   });
+
+  // Import state
+  const [showImport, setShowImport] = useState(false);
+  const [importData, setImportData] = useState<WorkflowExportData | null>(null);
+  const [importProjectId, setImportProjectId] = useState('');
+  const [importName, setImportName] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Multi-select & delete state
   const [selectMode, setSelectMode] = useState(false);
@@ -380,9 +350,46 @@ export function Workflows() {
           <h1 className="text-2xl font-bold text-text">{t.workflows.title}</h1>
           <p className="text-sm text-text-secondary mt-1">{t.workflows.subtitle}</p>
         </div>
-        <Button icon={<Plus className="w-4 h-4" />} onClick={openCreate}>
-          {t.workflows.create}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            icon={<Upload className="w-4 h-4" />}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {t.common.import}
+          </Button>
+          <Button icon={<Plus className="w-4 h-4" />} onClick={openCreate}>
+            {t.workflows.create}
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = (ev) => {
+                try {
+                  const data = JSON.parse(ev.target?.result as string) as WorkflowExportData;
+                  if (!data.name || !Array.isArray(data.blocks)) {
+                    toast.error(t.workflows.invalidFile);
+                    return;
+                  }
+                  setImportData(data);
+                  setImportName(data.name);
+                  setImportProjectId('');
+                  setShowImport(true);
+                } catch {
+                  toast.error(t.workflows.invalidFile);
+                }
+              };
+              reader.readAsText(file);
+              e.target.value = '';
+            }}
+          />
+        </div>
       </div>
 
       {filtered.length === 0 ? (
@@ -597,6 +604,73 @@ export function Workflows() {
           />
         </div>
       </Modal>
+
+      {/* Import workflow modal */}
+      <Modal
+        open={showImport}
+        onClose={() => { setShowImport(false); setImportData(null); }}
+        title={t.workflows.importWorkflow}
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => { setShowImport(false); setImportData(null); }}>
+              {t.common.cancel}
+            </Button>
+            <Button
+              onClick={() => {
+                if (!importData || !importName.trim()) return;
+                importWorkflow.mutate(
+                  { ...importData, name: importName, projectId: importProjectId || '' },
+                  {
+                    onSuccess: () => {
+                      setShowImport(false);
+                      setImportData(null);
+                    },
+                  },
+                );
+              }}
+              loading={importWorkflow.isPending}
+              disabled={!importName.trim()}
+            >
+              {t.common.import}
+            </Button>
+          </>
+        }
+      >
+        {importData && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/5 border border-accent/20">
+              <span className="text-xl">{importData.icon || '📋'}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-text">{importData.name}</p>
+                <p className="text-xs text-text-secondary flex items-center gap-2">
+                  <span>{importData.blocks?.length ?? 0} {t.workflows.blocks.toLowerCase()}</span>
+                  <ExecutionBadges blocks={importData.blocks ?? []} />
+                </p>
+              </div>
+            </div>
+            <div>
+              <Select
+                label={t.workflows.importSelectProject}
+                value={importProjectId}
+                onChange={(e) => setImportProjectId(e.target.value)}
+                options={[
+                  { value: '', label: t.workflows.importNoProject },
+                  ...(projects?.map((p) => ({ value: p.id, label: p.name })) ?? []),
+                ]}
+              />
+              {!importProjectId && (
+                <p className="text-xs text-text-tertiary mt-1">{t.workflows.importCollectionHint}</p>
+              )}
+            </div>
+            <Input
+              label={t.common.name}
+              value={importName}
+              onChange={(e) => setImportName(e.target.value)}
+            />
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
@@ -665,6 +739,9 @@ function ProjectGroup({
           )}
           <FolderOpen className="w-3.5 h-3.5 text-text-tertiary" />
           <span className="text-sm font-medium text-text-secondary truncate">{projectName}</span>
+          {workflows[0]?.projectSubtitle && (
+            <span className="text-xs text-text-tertiary truncate">{workflows[0].projectSubtitle}</span>
+          )}
           <span className="text-xs text-text-tertiary ml-auto shrink-0">({workflows.length})</span>
         </button>
       </div>
@@ -790,7 +867,6 @@ function WorkflowDetailPanel({
 }) {
   const { data: runs, isLoading: runsLoading } = useWorkflowRuns(workflow.id);
   const recentRuns = runs?.slice(0, 5) ?? [];
-  const modes = getExecutionModes(workflow.blocks);
 
   return (
     <div className="bg-surface border border-border rounded-xl p-6 space-y-6">
@@ -801,9 +877,19 @@ function WorkflowDetailPanel({
         </span>
         <div className="min-w-0 flex-1">
           <h2 className="text-xl font-bold text-text truncate">{workflow.name}</h2>
-          <p className="text-sm text-text-tertiary">{workflow.projectName}</p>
+          <p className="text-sm text-text-tertiary">
+            {workflow.projectName}
+            {workflow.projectSubtitle && (
+              <span className="text-text-tertiary/60"> · {workflow.projectSubtitle}</span>
+            )}
+          </p>
         </div>
       </div>
+
+      {/* Project Description */}
+      {workflow.projectDescription && (
+        <p className="text-xs text-text-tertiary italic">{workflow.projectDescription}</p>
+      )}
 
       {/* Description */}
       {workflow.description && (
@@ -824,16 +910,7 @@ function WorkflowDetailPanel({
             {pluralize(workflow.runCount, t.common.run, t.common.runs)}
           </span>
         </div>
-        {modes.map((mode) => {
-          const cfg = modeConfig[mode];
-          const Icon = cfg.icon;
-          return (
-            <div key={mode} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-raised border border-border text-sm">
-              <Icon className={`w-3.5 h-3.5 ${cfg.color}`} />
-              <span className="text-text-tertiary font-medium">{cfg.label}</span>
-            </div>
-          );
-        })}
+        <ExecutionBadges blocks={workflow.blocks} />
         {workflow.model && (
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-raised border border-border text-sm">
             <span className="text-text-tertiary font-medium">{workflow.model}</span>
@@ -901,6 +978,16 @@ function WorkflowDetailPanel({
         <Button variant="secondary" icon={<Pencil className="w-4 h-4" />} onClick={onEdit}>
           {t.common.edit}
         </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={<Download className="w-4 h-4" />}
+          onClick={() => {
+            const safeName = workflow.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+            exportWorkflow(workflow.id, `${safeName}.json`);
+          }}
+          aria-label={t.workflows.exportWorkflow}
+        />
       </div>
     </div>
   );

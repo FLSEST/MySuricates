@@ -30,6 +30,10 @@ public class Project {
     @Column(nullable = false)
     private String name;
 
+    private String subtitle;
+
+    private String description;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ProjectType type;

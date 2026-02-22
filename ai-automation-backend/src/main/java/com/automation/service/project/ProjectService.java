@@ -39,6 +39,8 @@ public class ProjectService {
 
         Project project = Project.builder()
                 .name(request.name())
+                .subtitle(request.subtitle())
+                .description(request.description())
                 .type(request.type())
                 .path(request.path())
                 .config(request.config() != null ? request.config() : new java.util.HashMap<>())
@@ -56,6 +58,12 @@ public class ProjectService {
 
         if (request.name() != null) {
             project.setName(request.name());
+        }
+        if (request.subtitle() != null) {
+            project.setSubtitle(request.subtitle());
+        }
+        if (request.description() != null) {
+            project.setDescription(request.description());
         }
         if (request.type() != null) {
             project.setType(request.type());

@@ -187,6 +187,8 @@ export const de: TranslationKeys = {
     importSelectProject: 'Zielprojekt',
     importFileHint: 'JSON-Workflow-Datei auswählen',
     invalidFile: 'Ungültige Workflow-Datei',
+    importNoProject: 'Kein Projekt (Sammlung)',
+    importCollectionHint: 'Ohne Projektzuordnung wird der Workflow zur „Sammlung" hinzugefügt.',
     activateSkill: 'Skill aktivieren',
     executeWithVariables: 'Mit Variablen ausführen',
     variablesDescription: 'Dieser Workflow benötigt Eingabewerte. Bitte füllen Sie alle Variablen aus.',

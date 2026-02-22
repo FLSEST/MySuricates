@@ -9,6 +9,8 @@ import java.util.Map;
 public record ProjectResponse(
         String id,
         String name,
+        String subtitle,
+        String description,
         ProjectType type,
         String path,
         Map<String, Object> config,
