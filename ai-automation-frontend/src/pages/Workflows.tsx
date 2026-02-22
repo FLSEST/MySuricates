@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   GitBranch,
@@ -10,6 +10,14 @@ import {
   ChevronDown,
   Pencil,
   Clock,
+  ChevronsUpDown,
+  Terminal,
+  Brain,
+  ShieldCheck,
+  Trash2,
+  CheckSquare,
+  Square,
+  X,
 } from 'lucide-react';
 import { Button, Input, Modal, Spinner, Select } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
@@ -22,18 +30,97 @@ import {
   useWorkflows,
   useCreateWorkflow,
   useExecuteWorkflow,
+  useDeleteWorkflow,
   useWorkflowRuns,
 } from '../hooks/useWorkflows';
 import { useProjects } from '../hooks/useProjects';
 import { useT } from '../i18n';
 import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
 import { formatDuration, formatDateTime } from '../utils/formatTime';
-import type { CreateWorkflowRequest, Workflow } from '../types';
+import type { BlockDefinition, CreateWorkflowRequest, Workflow } from '../types';
 import type { WorkflowTemplate } from '../data/workflowTemplates';
 
 function pluralize(count: number, singular: string, plural: string) {
   return count === 1 ? singular : plural;
 }
+
+// ── Persistence helpers ──────────────────────────────────────
+
+const STORAGE_KEY = 'workflows-collapsed-projects';
+const SELECTED_KEY = 'workflows-selected-id';
+
+function loadCollapsed(): Set<string> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return new Set(JSON.parse(raw));
+  } catch { /* ignore */ }
+  return new Set(['__all__']); // default: all collapsed
+}
+
+function saveCollapsed(set: Set<string>) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([...set]));
+  } catch { /* ignore */ }
+}
+
+function loadSelectedId(): string | null {
+  try {
+    return localStorage.getItem(SELECTED_KEY);
+  } catch { return null; }
+}
+
+function saveSelectedId(id: string | null) {
+  try {
+    if (id) localStorage.setItem(SELECTED_KEY, id);
+    else localStorage.removeItem(SELECTED_KEY);
+  } catch { /* ignore */ }
+}
+
+// ── Block type analysis ──────────────────────────────────────
+
+type ExecutionMode = 'shell' | 'ai' | 'approval';
+
+function getExecutionModes(blocks: BlockDefinition[]): ExecutionMode[] {
+  const modes = new Set<ExecutionMode>();
+  for (const b of blocks) {
+    const t = b.type;
+    if (t === 'shell') modes.add('shell');
+    else if (t === 'simple' || t === 'agentic' || t === 'skill-capability') modes.add('ai');
+    else if (t === 'approval') modes.add('approval');
+    else if (t === 'foreach' || t === 'while') {
+      const mode = (b.config as Record<string, unknown>).execution_mode;
+      if (mode === 'shell') modes.add('shell');
+      else modes.add('ai');
+    }
+  }
+  return [...modes];
+}
+
+const modeConfig: Record<ExecutionMode, { icon: typeof Terminal; label: string; color: string }> = {
+  shell: { icon: Terminal, label: 'Shell', color: 'text-emerald-500' },
+  ai: { icon: Brain, label: 'AI', color: 'text-violet-400' },
+  approval: { icon: ShieldCheck, label: 'Approval', color: 'text-amber-400' },
+};
+
+function ExecutionBadges({ blocks }: { blocks: BlockDefinition[] }) {
+  const modes = getExecutionModes(blocks);
+  if (modes.length === 0) return null;
+  return (
+    <span className="flex items-center gap-0.5 shrink-0">
+      {modes.map((mode) => {
+        const cfg = modeConfig[mode];
+        const Icon = cfg.icon;
+        return (
+          <span key={mode} title={cfg.label}>
+            <Icon className={`w-3 h-3 ${cfg.color}`} />
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+// ── Main Component ──────────────────────────────────────────
 
 type CreateStep = 'closed' | 'template' | 'details';
 
@@ -44,10 +131,11 @@ export function Workflows() {
   const { data: projects } = useProjects();
   const createWorkflow = useCreateWorkflow();
   const executeWorkflow = useExecuteWorkflow();
+  const deleteWorkflow = useDeleteWorkflow();
 
   const [search, setSearch] = useState('');
-  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
-  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(loadSelectedId);
+  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(loadCollapsed);
   const [createStep, setCreateStep] = useState<CreateStep>('closed');
   const [selectedTemplate, setSelectedTemplate] = useState<WorkflowTemplate | null>(null);
   const [form, setForm] = useState<CreateWorkflowRequest>({ projectId: '', name: '' });
@@ -61,6 +149,20 @@ export function Workflows() {
     variables: [],
   });
 
+  // Multi-select & delete state
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    open: boolean;
+    ids: string[];
+    names: string[];
+  }>({ open: false, ids: [], names: [] });
+  const [deleting, setDeleting] = useState(false);
+
+  // Persist collapsed state
+  useEffect(() => { saveCollapsed(collapsedProjects); }, [collapsedProjects]);
+  useEffect(() => { saveSelectedId(selectedWorkflowId); }, [selectedWorkflowId]);
+
   const filtered = useMemo(
     () =>
       workflows?.filter(
@@ -73,11 +175,11 @@ export function Workflows() {
   );
 
   const groupedByProject = useMemo(() => {
-    const groups = new Map<string, { projectName: string; workflows: Workflow[] }>();
+    const groups = new Map<string, { projectId: string; projectName: string; workflows: Workflow[] }>();
     for (const wf of filtered) {
       const key = wf.projectId;
       if (!groups.has(key)) {
-        groups.set(key, { projectName: wf.projectName || t.common.project, workflows: [] });
+        groups.set(key, { projectId: key, projectName: wf.projectName || t.common.project, workflows: [] });
       }
       groups.get(key)!.workflows.push(wf);
     }
@@ -86,21 +188,110 @@ export function Workflows() {
     );
   }, [filtered, t.common.project]);
 
-  // Auto-select first workflow if nothing selected
+  // Resolve __all__ sentinel: on first render with data, expand nothing (all collapsed)
+  useEffect(() => {
+    if (!groupedByProject.length) return;
+    if (collapsedProjects.has('__all__')) {
+      const allIds = new Set(groupedByProject.map((g) => g.projectId));
+      setCollapsedProjects(allIds);
+    }
+  }, [groupedByProject.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-select: restore persisted or pick first visible
   const selectedWorkflow = useMemo(() => {
     if (!filtered.length) return null;
     const found = selectedWorkflowId ? filtered.find((w) => w.id === selectedWorkflowId) : null;
     return found ?? filtered[0];
   }, [filtered, selectedWorkflowId]);
 
-  const toggleProject = (projectName: string) => {
+  const isProjectCollapsed = useCallback(
+    (projectId: string) => collapsedProjects.has(projectId),
+    [collapsedProjects],
+  );
+
+  const toggleProject = useCallback((projectId: string) => {
     setCollapsedProjects((prev) => {
       const next = new Set(prev);
-      if (next.has(projectName)) next.delete(projectName);
-      else next.add(projectName);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
       return next;
     });
-  };
+  }, []);
+
+  const allCollapsed = groupedByProject.length > 0 && groupedByProject.every((g) => collapsedProjects.has(g.projectId));
+
+  const toggleAll = useCallback(() => {
+    setCollapsedProjects((prev) => {
+      const allIds = groupedByProject.map((g) => g.projectId);
+      const allAreCollapsed = allIds.every((id) => prev.has(id));
+      return allAreCollapsed ? new Set() : new Set(allIds);
+    });
+  }, [groupedByProject]);
+
+  // ── Select mode helpers ──
+
+  const toggleSelectMode = useCallback(() => {
+    setSelectMode((prev) => {
+      if (prev) setSelectedIds(new Set());
+      return !prev;
+    });
+  }, []);
+
+  const toggleWorkflowSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleProjectSelect = useCallback((projectWorkflows: Workflow[]) => {
+    setSelectedIds((prev) => {
+      const ids = projectWorkflows.map((w) => w.id);
+      const allSelected = ids.every((id) => prev.has(id));
+      const next = new Set(prev);
+      if (allSelected) {
+        ids.forEach((id) => next.delete(id));
+      } else {
+        ids.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  }, []);
+
+  const requestDeleteSingle = useCallback((wf: Workflow) => {
+    setDeleteConfirm({ open: true, ids: [wf.id], names: [wf.name] });
+  }, []);
+
+  const requestDeleteSelected = useCallback(() => {
+    if (selectedIds.size === 0) return;
+    const names = filtered.filter((w) => selectedIds.has(w.id)).map((w) => w.name);
+    setDeleteConfirm({ open: true, ids: [...selectedIds], names });
+  }, [selectedIds, filtered]);
+
+  const confirmDelete = useCallback(async () => {
+    setDeleting(true);
+    try {
+      for (const id of deleteConfirm.ids) {
+        await deleteWorkflow.mutateAsync(id);
+      }
+      // Clear selection for deleted items
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        deleteConfirm.ids.forEach((id) => next.delete(id));
+        return next;
+      });
+      if (deleteConfirm.ids.includes(selectedWorkflowId ?? '')) {
+        setSelectedWorkflowId(null);
+      }
+    } finally {
+      setDeleting(false);
+      setDeleteConfirm({ open: false, ids: [], names: [] });
+    }
+  }, [deleteConfirm, deleteWorkflow, selectedWorkflowId]);
+
+  // ── Create / Execute handlers ──
 
   const openCreate = () => {
     setCreateStep('template');
@@ -211,32 +402,77 @@ export function Workflows() {
         <div className="flex gap-4 flex-1 min-h-0">
           {/* Left: Workflow list */}
           <div className="w-full lg:w-80 lg:min-w-[20rem] flex flex-col min-h-0">
-            <div className="mb-3">
-              <Input
-                placeholder={t.common.search}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                icon={<Search className="w-4 h-4 text-text-tertiary" />}
-              />
+            <div className="flex items-center gap-2 mb-3">
+              <div className="flex-1">
+                <Input
+                  placeholder={t.common.search}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  icon={<Search className="w-4 h-4 text-text-tertiary" />}
+                />
+              </div>
+              <button
+                onClick={toggleSelectMode}
+                className={`p-2 rounded-lg transition-colors shrink-0 ${
+                  selectMode
+                    ? 'bg-accent/10 text-accent'
+                    : 'hover:bg-surface-raised text-text-tertiary hover:text-text'
+                }`}
+                title={selectMode ? t.workflows.exitSelectMode : t.workflows.selectMode}
+              >
+                {selectMode ? <X className="w-4 h-4" /> : <CheckSquare className="w-4 h-4" />}
+              </button>
+              <button
+                onClick={toggleAll}
+                className="p-2 rounded-lg hover:bg-surface-raised text-text-tertiary hover:text-text transition-colors shrink-0"
+                title={allCollapsed ? t.workflows.expandAll : t.workflows.collapseAll}
+              >
+                <ChevronsUpDown className="w-4 h-4" />
+              </button>
             </div>
+
+            {/* Bulk delete bar */}
+            {selectMode && selectedIds.size > 0 && (
+              <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg bg-danger/10 border border-danger/20">
+                <span className="text-xs text-danger font-medium flex-1">
+                  {selectedIds.size} {t.workflows.selected}
+                </span>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  icon={<Trash2 className="w-3.5 h-3.5" />}
+                  onClick={requestDeleteSelected}
+                >
+                  {t.common.delete}
+                </Button>
+              </div>
+            )}
+
             <div className="flex-1 overflow-y-auto space-y-1 pr-1">
               {groupedByProject.map((group) => (
                 <ProjectGroup
-                  key={group.projectName}
+                  key={group.projectId}
+                  projectId={group.projectId}
                   projectName={group.projectName}
                   workflows={group.workflows}
-                  collapsed={collapsedProjects.has(group.projectName)}
-                  onToggle={() => toggleProject(group.projectName)}
+                  collapsed={isProjectCollapsed(group.projectId)}
+                  onToggle={() => toggleProject(group.projectId)}
                   selectedId={selectedWorkflow?.id ?? null}
                   onSelect={(id) => setSelectedWorkflowId(id)}
+                  onExecute={handleExecute}
+                  onDelete={requestDeleteSingle}
                   navigate={navigate}
+                  selectMode={selectMode}
+                  selectedIds={selectedIds}
+                  onToggleSelect={toggleWorkflowSelect}
+                  onToggleProjectSelect={toggleProjectSelect}
                 />
               ))}
             </div>
           </div>
 
           {/* Right: Detail panel (desktop only) */}
-          {selectedWorkflow && (
+          {selectedWorkflow && !selectMode && (
             <div className="hidden lg:block flex-1 min-h-0 overflow-y-auto">
               <WorkflowDetailPanel
                 workflow={selectedWorkflow}
@@ -249,6 +485,46 @@ export function Workflows() {
           )}
         </div>
       )}
+
+      {/* Delete confirmation modal */}
+      <Modal
+        open={deleteConfirm.open}
+        onClose={() => !deleting && setDeleteConfirm({ open: false, ids: [], names: [] })}
+        title={deleteConfirm.ids.length === 1 ? t.workflows.deleteWorkflow : t.workflows.deleteWorkflows}
+        size="sm"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setDeleteConfirm({ open: false, ids: [], names: [] })}
+              disabled={deleting}
+            >
+              {t.common.cancel}
+            </Button>
+            <Button
+              variant="danger"
+              icon={<Trash2 className="w-4 h-4" />}
+              onClick={confirmDelete}
+              loading={deleting}
+            >
+              {t.common.delete} ({deleteConfirm.ids.length})
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-text-secondary">{t.workflows.deleteConfirm}</p>
+          <div className="max-h-48 overflow-y-auto space-y-1">
+            {deleteConfirm.names.map((name, i) => (
+              <div key={i} className="flex items-center gap-2 px-2 py-1 rounded bg-surface-raised text-sm text-text">
+                <Trash2 className="w-3 h-3 text-danger shrink-0" />
+                <span className="truncate">{name}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-danger">{t.common.deleteConfirm}</p>
+        </div>
+      </Modal>
 
       {/* Execute with variables dialog */}
       <ExecuteDialog
@@ -334,31 +610,64 @@ function ProjectGroup({
   onToggle,
   selectedId,
   onSelect,
+  onExecute,
+  onDelete,
   navigate,
+  selectMode,
+  selectedIds,
+  onToggleSelect,
+  onToggleProjectSelect,
 }: {
+  projectId: string;
   projectName: string;
   workflows: Workflow[];
   collapsed: boolean;
   onToggle: () => void;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onExecute: (w: Workflow) => void;
+  onDelete: (w: Workflow) => void;
   navigate: ReturnType<typeof useNavigate>;
+  selectMode: boolean;
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string) => void;
+  onToggleProjectSelect: (workflows: Workflow[]) => void;
 }) {
+  const allSelected = workflows.every((w) => selectedIds.has(w.id));
+  const someSelected = !allSelected && workflows.some((w) => selectedIds.has(w.id));
+
   return (
     <div>
-      <button
-        onClick={onToggle}
-        className="flex items-center gap-1.5 w-full px-2 py-1.5 text-left rounded-md hover:bg-surface-raised transition-colors group"
-      >
-        {collapsed ? (
-          <ChevronRight className="w-3.5 h-3.5 text-text-tertiary" />
-        ) : (
-          <ChevronDown className="w-3.5 h-3.5 text-text-tertiary" />
+      <div className="flex items-center gap-1">
+        {selectMode && !collapsed && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleProjectSelect(workflows); }}
+            className="p-0.5 shrink-0 text-text-tertiary hover:text-accent transition-colors"
+            title={allSelected ? 'Alle abwählen' : 'Alle auswählen'}
+          >
+            {allSelected ? (
+              <CheckSquare className="w-3.5 h-3.5 text-accent" />
+            ) : someSelected ? (
+              <CheckSquare className="w-3.5 h-3.5 text-accent/50" />
+            ) : (
+              <Square className="w-3.5 h-3.5" />
+            )}
+          </button>
         )}
-        <FolderOpen className="w-3.5 h-3.5 text-text-tertiary" />
-        <span className="text-sm font-medium text-text-secondary truncate">{projectName}</span>
-        <span className="text-xs text-text-tertiary ml-auto">({workflows.length})</span>
-      </button>
+        <button
+          onClick={onToggle}
+          className="flex items-center gap-1.5 flex-1 px-2 py-1.5 text-left rounded-md hover:bg-surface-raised transition-colors group"
+        >
+          {collapsed ? (
+            <ChevronRight className="w-3.5 h-3.5 text-text-tertiary" />
+          ) : (
+            <ChevronDown className="w-3.5 h-3.5 text-text-tertiary" />
+          )}
+          <FolderOpen className="w-3.5 h-3.5 text-text-tertiary" />
+          <span className="text-sm font-medium text-text-secondary truncate">{projectName}</span>
+          <span className="text-xs text-text-tertiary ml-auto shrink-0">({workflows.length})</span>
+        </button>
+      </div>
       {!collapsed && (
         <div className="ml-3 mt-0.5 space-y-0.5">
           {workflows.map((wf) => (
@@ -367,7 +676,12 @@ function ProjectGroup({
               workflow={wf}
               selected={wf.id === selectedId}
               onSelect={() => onSelect(wf.id)}
+              onExecute={() => onExecute(wf)}
+              onDelete={() => onDelete(wf)}
               navigate={navigate}
+              selectMode={selectMode}
+              isChecked={selectedIds.has(wf.id)}
+              onToggleCheck={() => onToggleSelect(wf.id)}
             />
           ))}
         </div>
@@ -380,15 +694,28 @@ function WorkflowRow({
   workflow,
   selected,
   onSelect,
+  onExecute,
+  onDelete,
   navigate,
+  selectMode,
+  isChecked,
+  onToggleCheck,
 }: {
   workflow: Workflow;
   selected: boolean;
   onSelect: () => void;
+  onExecute: () => void;
+  onDelete: () => void;
   navigate: ReturnType<typeof useNavigate>;
+  selectMode: boolean;
+  isChecked: boolean;
+  onToggleCheck: () => void;
 }) {
   const handleClick = () => {
-    // On mobile (<lg) navigate directly; on desktop select
+    if (selectMode) {
+      onToggleCheck();
+      return;
+    }
     if (window.innerWidth < 1024) {
       navigate(`/workflows/${workflow.id}`);
     } else {
@@ -397,24 +724,54 @@ function WorkflowRow({
   };
 
   return (
-    <button
-      onClick={handleClick}
-      className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-left transition-colors ${
-        selected
+    <div
+      className={`group flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-left transition-colors cursor-pointer ${
+        selectMode && isChecked
           ? 'bg-accent/10 text-accent border border-accent/20'
-          : 'hover:bg-surface-raised text-text border border-transparent'
+          : selected && !selectMode
+            ? 'bg-accent/10 text-accent border border-accent/20'
+            : 'hover:bg-surface-raised text-text border border-transparent'
       }`}
+      onClick={handleClick}
     >
+      {selectMode && (
+        <span className="shrink-0">
+          {isChecked ? (
+            <CheckSquare className="w-4 h-4 text-accent" />
+          ) : (
+            <Square className="w-4 h-4 text-text-tertiary" />
+          )}
+        </span>
+      )}
       <span className="text-base shrink-0">
         <WorkflowIcon icon={workflow.icon} className="w-4 h-4" />
       </span>
       <span className="text-sm truncate flex-1">{workflow.name}</span>
-      {workflow.runCount > 0 && (
-        <span className="text-[10px] tabular-nums text-text-tertiary bg-surface-raised px-1.5 py-0.5 rounded-full shrink-0">
-          {workflow.runCount}
-        </span>
+      {!selectMode && (
+        <>
+          <ExecutionBadges blocks={workflow.blocks} />
+          {workflow.runCount > 0 && (
+            <span className="text-[10px] tabular-nums text-text-tertiary bg-surface-raised px-1.5 py-0.5 rounded-full shrink-0">
+              {workflow.runCount}
+            </span>
+          )}
+          <button
+            onClick={(e) => { e.stopPropagation(); onExecute(); }}
+            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-accent/20 text-accent transition-all shrink-0"
+            title="Ausführen"
+          >
+            <Play className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-danger/20 text-text-tertiary hover:text-danger transition-all shrink-0"
+            title="Löschen"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </>
       )}
-    </button>
+    </div>
   );
 }
 
@@ -433,6 +790,7 @@ function WorkflowDetailPanel({
 }) {
   const { data: runs, isLoading: runsLoading } = useWorkflowRuns(workflow.id);
   const recentRuns = runs?.slice(0, 5) ?? [];
+  const modes = getExecutionModes(workflow.blocks);
 
   return (
     <div className="bg-surface border border-border rounded-xl p-6 space-y-6">
@@ -453,7 +811,7 @@ function WorkflowDetailPanel({
       )}
 
       {/* Stats */}
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-2">
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-raised border border-border text-sm">
           <span className="text-text-tertiary font-medium">
             {workflow.blocks.length}{' '}
@@ -466,6 +824,16 @@ function WorkflowDetailPanel({
             {pluralize(workflow.runCount, t.common.run, t.common.runs)}
           </span>
         </div>
+        {modes.map((mode) => {
+          const cfg = modeConfig[mode];
+          const Icon = cfg.icon;
+          return (
+            <div key={mode} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-raised border border-border text-sm">
+              <Icon className={`w-3.5 h-3.5 ${cfg.color}`} />
+              <span className="text-text-tertiary font-medium">{cfg.label}</span>
+            </div>
+          );
+        })}
         {workflow.model && (
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-raised border border-border text-sm">
             <span className="text-text-tertiary font-medium">{workflow.model}</span>
