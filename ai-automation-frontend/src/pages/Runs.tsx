@@ -68,7 +68,12 @@ export function Runs() {
       key: 'workflow',
       header: t.common.workflow,
       render: (r: WorkflowRun) => (
-        <span className="font-medium text-text">{r.workflowName}</span>
+        <div className="min-w-0">
+          <span className="font-medium text-text block truncate">{r.workflowName}</span>
+          {r.projectName && (
+            <span className="text-xs text-accent/70 block truncate">{r.projectName}</span>
+          )}
+        </div>
       ),
     },
     {

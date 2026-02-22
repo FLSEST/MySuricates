@@ -233,9 +233,14 @@ export function Dashboard() {
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <StatusBadge status={run.status} />
-                    <span className="text-sm font-medium text-text truncate">
-                      {run.workflowName}
-                    </span>
+                    <div className="min-w-0">
+                      <span className="text-sm font-medium text-text truncate block">
+                        {run.workflowName}
+                      </span>
+                      {run.projectName && (
+                        <span className="text-xs text-accent/70 truncate block">{run.projectName}</span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-4 shrink-0 text-xs text-text-tertiary">
                     <span className="flex items-center gap-1">

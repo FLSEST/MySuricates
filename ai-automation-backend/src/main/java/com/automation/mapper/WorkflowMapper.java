@@ -28,6 +28,7 @@ public abstract class WorkflowMapper {
 
     @Mapping(source = "workflow.id", target = "workflowId")
     @Mapping(source = "workflow.name", target = "workflowName")
+    @Mapping(source = "workflow.project.name", target = "projectName")
     public abstract WorkflowRunResponse toRunResponse(WorkflowRun run);
 
     public abstract List<WorkflowRunResponse> toRunResponseList(List<WorkflowRun> runs);

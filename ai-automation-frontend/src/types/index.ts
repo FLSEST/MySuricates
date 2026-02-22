@@ -101,6 +101,7 @@ export interface WorkflowRun {
   id: string;
   workflowId: string;
   workflowName: string;
+  projectName: string | null;
   status: RunStatus;
   steps: StepResult[];
   startedAt: string;
