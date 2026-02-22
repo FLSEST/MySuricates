@@ -9,6 +9,10 @@ import { StatusBadge } from '../components/shared/StatusBadge';
 import { ErrorState } from '../components/shared/ErrorState';
 import { RunsChart } from '../components/dashboard/RunsChart';
 import { SuccessRateChart } from '../components/dashboard/SuccessRateChart';
+import { TodosDonutChart } from '../components/dashboard/TodosDonutChart';
+import { UpcomingSchedulesCard } from '../components/dashboard/UpcomingSchedulesCard';
+import { FailingWorkflowsCard } from '../components/dashboard/FailingWorkflowsCard';
+import { TodosWidget } from '../components/dashboard/TodosWidget';
 import { useDashboard } from '../hooks/useLearning';
 import { useProjects } from '../hooks/useProjects';
 import { useRemainingToday, useRemainingThisWeek } from '../hooks/useSchedules';
@@ -25,16 +29,16 @@ function StatCard({ icon, label, value, accent, badge }: {
   badge?: string;
 }) {
   return (
-    <Card className="flex items-center gap-4">
-      <div className={`p-3 rounded-xl ${accent ?? 'bg-accent/10'}`}>
+    <Card className="flex items-center gap-3 !py-3 !px-4">
+      <div className={`p-2 rounded-lg ${accent ?? 'bg-accent/10'}`}>
         {icon}
       </div>
-      <div>
-        <p className="text-sm text-text-secondary">{label}</p>
-        <div className="flex items-center gap-2">
-          <p className="text-2xl font-bold text-text">{value}</p>
+      <div className="min-w-0">
+        <p className="text-xs text-text-secondary truncate">{label}</p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-lg font-bold text-text">{value}</p>
           {badge && (
-            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide ${
+            <span className={`text-[9px] font-semibold px-1 py-0.5 rounded-full uppercase tracking-wide ${
               badge === 'RELEASE'
                 ? 'bg-[var(--color-success)]/15 text-[var(--color-success)]'
                 : 'bg-[var(--color-warning)]/15 text-[var(--color-warning)]'
@@ -63,18 +67,18 @@ function BuildInfoCard({ systemInfo }: { systemInfo: SystemInfo | undefined }) {
   const feTimestamp = __BUILD_TIMESTAMP__;
 
   return (
-    <Card className="flex items-center gap-4">
-      <div className="p-3 rounded-xl bg-teal-500/10">
-        <Info className="w-5 h-5 text-teal-500" />
+    <Card className="flex items-center gap-3 !py-3 !px-4">
+      <div className="p-2 rounded-lg bg-teal-500/10">
+        <Info className="w-4 h-4 text-teal-500" />
       </div>
       <div className="min-w-0">
-        <p className="text-sm text-text-secondary">{t.dashboard.version}</p>
-        <div className="flex items-center gap-2">
-          <p className="text-2xl font-bold text-text">
+        <p className="text-xs text-text-secondary">{t.dashboard.version}</p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-lg font-bold text-text">
             {systemInfo ? `v${systemInfo.version}` : '-'}
           </p>
           {systemInfo?.buildType && (
-            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wide ${
+            <span className={`text-[9px] font-semibold px-1 py-0.5 rounded-full uppercase tracking-wide ${
               systemInfo.buildType === 'RELEASE'
                 ? 'bg-[var(--color-success)]/15 text-[var(--color-success)]'
                 : 'bg-[var(--color-warning)]/15 text-[var(--color-warning)]'
@@ -83,7 +87,7 @@ function BuildInfoCard({ systemInfo }: { systemInfo: SystemInfo | undefined }) {
             </span>
           )}
         </div>
-        <div className="flex gap-3 mt-0.5 text-[10px] text-text-tertiary">
+        <div className="flex gap-2 text-[9px] text-text-tertiary">
           <span title="Backend Build">BE {formatBuildTime(systemInfo?.buildTimestamp)}</span>
           <span title="Frontend Build">FE {formatBuildTime(feTimestamp)}</span>
         </div>
@@ -148,33 +152,33 @@ export function Dashboard() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 animate-stagger">
+      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3 animate-stagger">
         <StatCard
-          icon={<FolderKanban className="w-5 h-5 text-accent" />}
+          icon={<FolderKanban className="w-4 h-4 text-accent" />}
           label={t.dashboard.activeProjects}
           value={activeProjects}
           accent="bg-accent/10"
         />
         <StatCard
-          icon={<GitBranch className="w-5 h-5 text-[var(--color-success)]" />}
+          icon={<GitBranch className="w-4 h-4 text-[var(--color-success)]" />}
           label={t.dashboard.totalWorkflows}
           value={stats?.totalWorkflows ?? 0}
           accent="bg-success-subtle"
         />
         <StatCard
-          icon={<Zap className="w-5 h-5 text-[var(--color-warning)]" />}
+          icon={<Zap className="w-4 h-4 text-[var(--color-warning)]" />}
           label={t.dashboard.runsToday}
           value={stats?.runsToday ?? 0}
           accent="bg-warning-subtle"
         />
         <StatCard
-          icon={<TrendingUp className="w-5 h-5 text-accent" />}
+          icon={<TrendingUp className="w-4 h-4 text-accent" />}
           label={t.dashboard.successRate}
           value={stats?.successRate != null ? `${(stats.successRate * 100).toFixed(0)}%` : '-'}
           accent="bg-accent/10"
         />
         <StatCard
-          icon={<Coins className="w-5 h-5 text-[var(--color-warning)]" />}
+          icon={<Coins className="w-4 h-4 text-[var(--color-warning)]" />}
           label={t.dashboard.totalCost}
           value={stats?.totalCostUsd30d != null && stats.totalCostUsd30d > 0
             ? `$${stats.totalCostUsd30d < 0.01 ? stats.totalCostUsd30d.toFixed(4) : stats.totalCostUsd30d.toFixed(2)}`
@@ -182,13 +186,13 @@ export function Dashboard() {
           accent="bg-warning-subtle"
         />
         <StatCard
-          icon={<CalendarClock className="w-5 h-5 text-blue-500" />}
+          icon={<CalendarClock className="w-4 h-4 text-blue-500" />}
           label={t.dashboard.plannedToday}
           value={remainingToday?.count ?? 0}
           accent="bg-blue-500/10"
         />
         <StatCard
-          icon={<CalendarRange className="w-5 h-5 text-violet-500" />}
+          icon={<CalendarRange className="w-4 h-4 text-violet-500" />}
           label={t.dashboard.plannedThisWeek}
           value={remainingThisWeek?.count ?? 0}
           accent="bg-violet-500/10"
@@ -196,11 +200,17 @@ export function Dashboard() {
         <BuildInfoCard systemInfo={systemInfo} />
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Charts row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
         <RunsChart data={stats?.timeSeries} />
         <SuccessRateChart data={stats?.timeSeries} />
+        <TodosDonutChart />
+        <UpcomingSchedulesCard />
+        <FailingWorkflowsCard recentRuns={stats?.recentRuns} />
       </div>
+
+      {/* Todos overview */}
+      <TodosWidget />
 
       {/* Two-column layout: recent runs + quick actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

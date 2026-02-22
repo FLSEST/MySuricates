@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, GitBranch, History, Zap,
-  Calendar, Webhook, ScrollText, Settings, ChevronLeft, ChevronRight,
+  Calendar, Webhook, ScrollText, CheckSquare, Settings, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useSidebarStore } from '../../stores/sidebarStore';
 import { useT } from '../../i18n';
@@ -85,6 +85,7 @@ const navItems = [
   { to: '/skills', icon: Zap, labelKey: 'skills' as const },
   { to: '/schedules', icon: Calendar, labelKey: 'schedules' as const },
   { to: '/webhooks', icon: Webhook, labelKey: 'webhooks' as const },
+  { to: '/todos', icon: CheckSquare, labelKey: 'todos' as const },
   { to: '/activity', icon: ScrollText, labelKey: 'activityLog' as const },
 ];
 

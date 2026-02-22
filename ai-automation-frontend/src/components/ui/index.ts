@@ -10,3 +10,4 @@ export { Table } from './Table';
 export { ToastContainer } from './ToastContainer';
 export { DirectoryPicker } from './DirectoryPicker';
 export { CronPicker } from './CronPicker';
+export { TagInput } from './TagInput';

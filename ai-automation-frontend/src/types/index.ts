@@ -418,6 +418,57 @@ export interface ExtractMemoryRequest {
   provider: string;
 }
 
+// ── Todo ────────────────────────────────────────────────
+
+export type TodoStatus = 'OPEN' | 'IN_PROGRESS' | 'DONE';
+export type TodoPriority = 'LOW' | 'MEDIUM' | 'HIGH';
+export type TodoSource = 'USER' | 'AI' | 'WORKFLOW';
+
+export interface Todo {
+  id: string;
+  title: string;
+  description: string | null;
+  status: TodoStatus;
+  priority: TodoPriority;
+  tags: string[];
+  projectId: string | null;
+  projectName: string | null;
+  source: TodoSource;
+  sourceAgent: string | null;
+  workflowRunId: string | null;
+  referenceType: string | null;
+  referenceId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTodoRequest {
+  title: string;
+  description?: string;
+  status?: TodoStatus;
+  priority?: TodoPriority;
+  tags?: string[];
+  projectId?: string;
+  source?: TodoSource;
+  sourceAgent?: string;
+  workflowRunId?: string;
+}
+
+export interface UpdateTodoRequest {
+  title?: string;
+  description?: string;
+  status?: TodoStatus;
+  priority?: TodoPriority;
+  tags?: string[];
+  projectId?: string;
+}
+
+export interface TodoCountResponse {
+  open: number;
+  inProgress: number;
+  done: number;
+}
+
 // ── API Error ────────────────────────────────────────────
 
 export interface ApiError {

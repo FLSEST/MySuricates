@@ -14,6 +14,7 @@ const Skills = lazy(() => import('./pages/Skills').then(m => ({ default: m.Skill
 const Schedules = lazy(() => import('./pages/Schedules').then(m => ({ default: m.Schedules })));
 const Webhooks = lazy(() => import('./pages/Webhooks').then(m => ({ default: m.Webhooks })));
 const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })));
+const Todos = lazy(() => import('./pages/Todos').then(m => ({ default: m.Todos })));
 const ActivityLog = lazy(() => import('./pages/ActivityLog').then(m => ({ default: m.ActivityLog })));
 
 const router = createBrowserRouter([
@@ -31,6 +32,7 @@ const router = createBrowserRouter([
       { path: 'skills', element: <Skills /> },
       { path: 'schedules', element: <Schedules /> },
       { path: 'webhooks', element: <Webhooks /> },
+      { path: 'todos', element: <Todos /> },
       { path: 'activity', element: <ActivityLog /> },
       { path: 'settings', element: <Settings /> },
     ],

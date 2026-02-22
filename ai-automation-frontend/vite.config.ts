@@ -11,6 +11,10 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/*.svg'],
+      workbox: {
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api/, /^\/ws/],
+      },
       manifest: {
         name: 'MySuricates',
         short_name: 'MySuricates',

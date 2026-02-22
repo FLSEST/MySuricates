@@ -1,0 +1,72 @@
+package com.automation.controller;
+
+import com.automation.dto.request.CreateTodoRequest;
+import com.automation.dto.request.UpdateTodoRequest;
+import com.automation.dto.response.TodoCountResponse;
+import com.automation.dto.response.TodoResponse;
+import com.automation.entity.Todo;
+import com.automation.mapper.TodoMapper;
+import com.automation.service.todo.TodoService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/v1/todos")
+@RequiredArgsConstructor
+public class TodoController {
+
+    private final TodoService todoService;
+    private final TodoMapper todoMapper;
+
+    @GetMapping
+    public List<TodoResponse> listTodos(
+            @RequestParam(required = false) String projectId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String priority,
+            @RequestParam(required = false) String source,
+            @RequestParam(required = false) String tag,
+            @RequestParam(required = false) String q) {
+        return todoService.findAll(projectId, status, priority, source, tag, q);
+    }
+
+    @PostMapping
+    public ResponseEntity<TodoResponse> createTodo(@Valid @RequestBody CreateTodoRequest request) {
+        var todo = todoService.create(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(todoMapper.toResponse(todo));
+    }
+
+    @GetMapping("/{id}")
+    public TodoResponse getTodo(@PathVariable String id) {
+        return todoService.findByIdResponse(id);
+    }
+
+    @PutMapping("/{id}")
+    public TodoResponse updateTodo(@PathVariable String id, @RequestBody UpdateTodoRequest request) {
+        var todo = todoService.update(id, request);
+        return todoService.findByIdResponse(todo.getId());
+    }
+
+    @PatchMapping("/{id}/status")
+    public TodoResponse updateTodoStatus(@PathVariable String id, @RequestBody Map<String, String> body) {
+        var newStatus = Todo.Status.valueOf(body.get("status"));
+        var todo = todoService.updateStatus(id, newStatus);
+        return todoService.findByIdResponse(todo.getId());
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteTodo(@PathVariable String id) {
+        todoService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/count")
+    public TodoCountResponse countTodos() {
+        return todoService.count();
+    }
+}
