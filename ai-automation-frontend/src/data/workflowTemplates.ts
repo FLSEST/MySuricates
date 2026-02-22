@@ -353,14 +353,14 @@ export const workflowTemplates: WorkflowTemplate[] = [
     nameKey: 'testMatrix',
     descriptionKey: 'testMatrixDescription',
     blocks: [
-      { type: 'shell', config: { command: 'find . -maxdepth 2 \\( -name package.json -o -name pom.xml -o -name build.gradle -o -name build.gradle.kts -o -name pyproject.toml \\) -print | xargs -n1 dirname | sort -u' } },
+      { type: 'shell', config: { command: 'find . -maxdepth 2 \\( -name .git -o -name node_modules -o -name .next -o -name dist -o -name build -o -name .turbo -o -name .vercel -o -name coverage -o -name venv -o -name .venv \\) -prune -o \\( -name package.json -o -name pom.xml -o -name build.gradle -o -name build.gradle.kts -o -name pyproject.toml \\) -print | xargs -n1 dirname | sort -u' } },
       { type: 'foreach', config: {
         variable_name: 'repo',
         items_source: 'command',
-        items_command: 'find . -maxdepth 2 \\( -name package.json -o -name pom.xml -o -name build.gradle -o -name build.gradle.kts -o -name pyproject.toml \\) -print | xargs -n1 dirname | sort -u',
+        items_command: 'find . -maxdepth 2 \\( -name .git -o -name node_modules -o -name .next -o -name dist -o -name build -o -name .turbo -o -name .vercel -o -name coverage -o -name venv -o -name .venv \\) -prune -o \\( -name package.json -o -name pom.xml -o -name build.gradle -o -name build.gradle.kts -o -name pyproject.toml \\) -print | xargs -n1 dirname | sort -u',
         execution_mode: 'shell',
         timeout_seconds: 900,
-        command: 'set -euo pipefail; cd "{{ repo }}"; start=$(date +%s); if [ -f package.json ]; then cmd=\"npm test -- --runInBand\"; elif [ -f pom.xml ]; then cmd=\"mvn -q test\"; elif [ -f build.gradle ] || [ -f build.gradle.kts ]; then cmd=\"./gradlew test || gradle test\"; elif [ -f pyproject.toml ]; then cmd=\"pytest\"; else cmd=\"echo unsupported\"; fi; echo \"=== {{ repo }} ===\"; echo \"$cmd\"; ($cmd); status=$?; dur=$(($(date +%s)-start)); if [ $status -ne 0 ]; then echo \"-- FAIL (exit $status, ${dur}s)\"; tail -100 build/test-results/test/*.xml 2>/dev/null || true; else echo \"-- OK (${dur}s)\"; fi; exit 0'
+        command: 'set -euo pipefail; cd "{{ repo }}"; start=$(date +%s); echo "=== {{ repo }} ==="; if [ -f package.json ]; then has_test=$(node -e "const s=require('./package.json').scripts||{}; console.log(s.test?\'has\':\'none\')"); if [ "$has_test" = "none" ]; then echo "-- SKIP (no npm test script)"; exit 0; fi; cmd="npm test -- --runInBand"; stack="npm"; elif [ -f pom.xml ]; then if ! command -v mvn >/dev/null 2>&1; then echo "-- SKIP (mvn not installed)"; exit 0; fi; cmd="mvn -q test"; stack="maven"; elif [ -f build.gradle ] || [ -f build.gradle.kts ]; then if [ -x "./gradlew" ]; then cmd="./gradlew test"; else if command -v gradle >/dev/null 2>&1; then cmd="gradle test"; else echo "-- SKIP (gradle not available)"; exit 0; fi; fi; stack="gradle"; elif [ -f pyproject.toml ]; then if ! command -v pytest >/dev/null 2>&1; then echo "-- SKIP (pytest not installed)"; exit 0; fi; cmd="pytest"; stack="pytest"; else echo "-- SKIP (no supported build file)"; exit 0; fi; echo "$cmd"; set +e; ($cmd); status=$?; set -e; dur=$(($(date +%s)-start)); if [ $status -ne 0 ]; then echo "-- FAIL ($stack, exit $status, ${dur}s)"; tail -100 build/test-results/test/*.xml 2>/dev/null || true; tail -100 target/surefire-reports/*.txt 2>/dev/null || true; else echo "-- OK ($stack, ${dur}s)"; fi; exit 0'
       }},
       { type: 'skill-capability', config: {
         capability: 'analyze',
