@@ -308,6 +308,70 @@ export const workflowTemplates: WorkflowTemplate[] = [
     instructions: 'Analysiere den Bug, schreibe einen reproduzierenden Test, behebe den Fehler und verifiziere.',
   },
   {
+    id: 'dependency-risk-radar',
+    icon: '🧭',
+    nameKey: 'dependencyRiskRadar',
+    descriptionKey: 'dependencyRiskRadarDescription',
+    blocks: [
+      { type: 'shell', config: { command: 'find . -maxdepth 2 \\( -name package.json -o -name pom.xml \\) -print | xargs -n1 dirname | sort -u' } },
+      { type: 'foreach', config: {
+        variable_name: 'repo',
+        items_source: 'command',
+        items_command: 'find . -maxdepth 2 \\( -name package.json -o -name pom.xml \\) -print | xargs -n1 dirname | sort -u',
+        execution_mode: 'shell',
+        timeout_seconds: 600,
+        command: 'set -euo pipefail; cd "{{ repo }}"; if [ -f package.json ]; then echo "=== {{ repo }} (npm) ==="; npm outdated --json || true; elif [ -f pom.xml ]; then echo "=== {{ repo }} (maven) ==="; mvn -q versions:display-dependency-updates || true; else echo "=== {{ repo }} (unknown) ==="; fi'
+      }},
+      { type: 'skill-capability', config: {
+        capability: 'analyze',
+        input: 'Aggregierte Dependency-Outputs aus mehreren Repos:\n\n{{ previous_output }}\n\nAufgabe: Fasse die Top-5 dringendsten Updates zusammen. Priorisiere Major/Critical. Nenne je Eintrag: Repo, Paket/Artefakt, current→latest, Risiko (security/major/compat), kurzen Handlungsvorschlag.',
+        params: { max_entries: 5 }
+      }},
+      { type: 'simple', config: { command: 'Erstelle einen Aktionsplan aus der Analyse: Repo | Paket | current→latest | Impact | Empfehlung. Halte dich kurz.' } },
+    ],
+    instructions: 'Scanne alle Repos unterhalb des Projektpfads nach npm- oder Maven-Abhaengigkeiten, identifiziere kritische Updates und liefere einen priorisierten Aktionsplan.',
+  },
+  {
+    id: 'log-triage',
+    icon: '🪵',
+    nameKey: 'logTriage',
+    descriptionKey: 'logTriageDescription',
+    blocks: [
+      { type: 'shell', config: { command: 'find . -path \"*/logs/*.log\" -mtime -1 -print -exec tail -200 {} \\;' } },
+      { type: 'skill-capability', config: {
+        capability: 'analyze',
+        input: 'Log-Auszug der letzten 24h aus mehreren Projekten:\n\n{{ previous_output }}\n\nGruppiere Fehler/Warnings, nenne vermutlich betroffene Services/Repos, moegliche Ursachen und empfohlene Checks. Markiere kritische Themen zuerst.',
+        params: { max_groups: 5 }
+      }},
+      { type: 'simple', config: { command: 'Fasse kurz zusammen: Anzahl gefundener Fehlergruppen, kritische Punkte, welche Repos/Services betroffen sind, empfohlene Sofortmassnahmen.' } },
+    ],
+    instructions: 'Triagiert Logs der letzten 24h (logs/*.log), gruppiert Fehler und liefert Empfehlungen.',
+  },
+  {
+    id: 'test-matrix',
+    icon: '✅',
+    nameKey: 'testMatrix',
+    descriptionKey: 'testMatrixDescription',
+    blocks: [
+      { type: 'shell', config: { command: 'find . -maxdepth 2 \\( -name package.json -o -name pom.xml -o -name build.gradle -o -name build.gradle.kts -o -name pyproject.toml \\) -print | xargs -n1 dirname | sort -u' } },
+      { type: 'foreach', config: {
+        variable_name: 'repo',
+        items_source: 'command',
+        items_command: 'find . -maxdepth 2 \\( -name package.json -o -name pom.xml -o -name build.gradle -o -name build.gradle.kts -o -name pyproject.toml \\) -print | xargs -n1 dirname | sort -u',
+        execution_mode: 'shell',
+        timeout_seconds: 900,
+        command: 'set -euo pipefail; cd "{{ repo }}"; start=$(date +%s); if [ -f package.json ]; then cmd=\"npm test -- --runInBand\"; elif [ -f pom.xml ]; then cmd=\"mvn -q test\"; elif [ -f build.gradle ] || [ -f build.gradle.kts ]; then cmd=\"./gradlew test || gradle test\"; elif [ -f pyproject.toml ]; then cmd=\"pytest\"; else cmd=\"echo unsupported\"; fi; echo \"=== {{ repo }} ===\"; echo \"$cmd\"; ($cmd); status=$?; dur=$(($(date +%s)-start)); if [ $status -ne 0 ]; then echo \"-- FAIL (exit $status, ${dur}s)\"; tail -100 build/test-results/test/*.xml 2>/dev/null || true; else echo \"-- OK (${dur}s)\"; fi; exit 0'
+      }},
+      { type: 'skill-capability', config: {
+        capability: 'analyze',
+        input: 'Testergebnisse mehrerer Repos:\n\n{{ previous_output }}\n\nFasse fehlgeschlagene Repos/Tests zusammen. Nenne pro Failure: Repo, vermutete Ursache (aus Logauszug), empfohlene Fix-Richtung. Wenn alle gruen: kurzer OK-Report.',
+        params: { summarize_failures: true }
+      }},
+      { type: 'simple', config: { command: 'Erstelle eine Test-Matrix: Repo | Stack | Ergebnis (OK/FAIL) | Dauer | Empfehlung/Nächster Schritt.' } },
+    ],
+    instructions: 'Fuehrt tests build-abhängig (npm/mvn/gradle/pytest) über alle Repos im Projektpfad aus, sammelt Logs bei Fehlschlag und erzeugt eine kurze Entscheidungs-Matrix.',
+  },
+  {
     id: 'hunt-quality-pipeline',
     icon: '🔎',
     nameKey: 'huntQualityPipeline',
