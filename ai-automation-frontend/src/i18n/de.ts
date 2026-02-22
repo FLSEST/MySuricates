@@ -263,7 +263,7 @@ export const de: TranslationKeys = {
     subtitle: 'Automatische Workflow-Planung',
     create: 'Neuer Zeitplan',
     cronExpression: 'Cron-Ausdruck',
-    cronHint: 'Standard-Cron-Syntax (Minute Stunde Tag Monat Wochentag)',
+    cronHint: 'Spring-Cron-Syntax (Sekunde Minute Stunde Tag Monat Wochentag)',
     nextRun: 'Nächste Ausführung',
     lastRun: 'Letzte Ausführung',
     noSchedules: 'Keine geplanten Workflows.',

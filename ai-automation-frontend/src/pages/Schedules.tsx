@@ -59,7 +59,12 @@ export function Schedules() {
       key: 'workflow',
       header: t.common.workflow,
       render: (s: ScheduledWorkflow) => (
-        <span className="font-medium text-text">{s.workflowName}</span>
+        <div className="min-w-0">
+          <span className="font-medium text-text block truncate">{s.workflowName}</span>
+          {s.projectName && (
+            <span className="text-xs text-accent/70 block truncate">{s.projectName}</span>
+          )}
+        </div>
       ),
     },
     {
@@ -228,7 +233,10 @@ export function Schedules() {
             onChange={(e) => setForm({ ...form, workflowId: e.target.value })}
             options={[
               { value: '', label: t.common.selectWorkflow },
-              ...(workflows?.map((w) => ({ value: w.id, label: w.name })) ?? []),
+              ...(workflows?.map((w) => ({
+                value: w.id,
+                label: w.projectName ? `${w.name} (${w.projectName})` : w.name,
+              })) ?? []),
             ]}
           />
 

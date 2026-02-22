@@ -157,6 +157,7 @@ export interface ScheduledWorkflow {
   id: string;
   workflowId: string;
   workflowName: string;
+  projectName: string | null;
   cronExpression: string;
   scheduleType: 'CRON' | 'ONCE';
   scheduledAt: string | null;

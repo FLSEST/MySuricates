@@ -261,7 +261,7 @@ export const en = {
     subtitle: 'Automated workflow scheduling',
     create: 'New Schedule',
     cronExpression: 'Cron Expression',
-    cronHint: 'Standard cron syntax (minute hour day month weekday)',
+    cronHint: 'Spring cron syntax (second minute hour day month weekday)',
     nextRun: 'Next Run',
     lastRun: 'Last Run',
     noSchedules: 'No scheduled workflows.',

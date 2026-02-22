@@ -23,15 +23,18 @@ const WEEKDAY_CRON_VALUES = [1, 2, 3, 4, 5, 6, 0]; // cron: 0=Sun, 1=Mon, ...
 
 function parseCronToState(cron: string): CronState {
   const parts = cron.trim().split(/\s+/);
-  if (parts.length !== 5) {
+  // Spring cron uses 6 fields: second minute hour dayOfMonth month weekday
+  // Also accept 5-field (legacy): minute hour dayOfMonth month weekday
+  if (parts.length !== 6 && parts.length !== 5) {
     return { frequency: 'advanced', hour: '0', minute: '0', weekdays: [], dayOfMonth: '1' };
   }
 
-  const minute = parts[0]!;
-  const hour = parts[1]!;
-  const dayOfMonth = parts[2]!;
-  const month = parts[3]!;
-  const weekday = parts[4]!;
+  const offset = parts.length === 6 ? 1 : 0; // skip seconds field if 6-field
+  const minute = parts[offset]!;
+  const hour = parts[offset + 1]!;
+  const dayOfMonth = parts[offset + 2]!;
+  const month = parts[offset + 3]!;
+  const weekday = parts[offset + 4]!;
 
   // Check if it's a simple daily pattern: MM HH * * *
   if (dayOfMonth === '*' && month === '*' && weekday === '*') {
@@ -53,15 +56,16 @@ function parseCronToState(cron: string): CronState {
 }
 
 function stateToCron(state: CronState): string {
+  // Spring cron: 6 fields — second minute hour dayOfMonth month weekday
   switch (state.frequency) {
     case 'daily':
-      return `${state.minute} ${state.hour} * * *`;
+      return `0 ${state.minute} ${state.hour} * * *`;
     case 'weekly': {
       const days = state.weekdays.length > 0 ? state.weekdays.sort((a, b) => a - b).join(',') : '*';
-      return `${state.minute} ${state.hour} * * ${days}`;
+      return `0 ${state.minute} ${state.hour} * * ${days}`;
     }
     case 'monthly':
-      return `${state.minute} ${state.hour} ${state.dayOfMonth} * *`;
+      return `0 ${state.minute} ${state.hour} ${state.dayOfMonth} * *`;
     default:
       return '';
   }
@@ -133,7 +137,7 @@ export function CronPicker({ value, onChange, label }: CronPickerProps) {
             setRawValue(e.target.value);
             onChange(e.target.value);
           }}
-          placeholder="0 0 * * *"
+          placeholder="0 0 0 * * *"
           hint={t.schedules.cronHint}
         />
       ) : (

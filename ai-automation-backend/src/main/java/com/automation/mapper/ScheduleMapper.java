@@ -12,6 +12,7 @@ public interface ScheduleMapper {
 
     @Mapping(source = "workflow.id", target = "workflowId")
     @Mapping(source = "workflow.name", target = "workflowName")
+    @Mapping(source = "workflow.project.name", target = "projectName")
     ScheduledWorkflowResponse toResponse(ScheduledWorkflow scheduled);
 
     List<ScheduledWorkflowResponse> toResponseList(List<ScheduledWorkflow> scheduled);

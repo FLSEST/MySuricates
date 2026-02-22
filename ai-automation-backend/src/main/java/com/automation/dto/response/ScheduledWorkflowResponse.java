@@ -7,6 +7,7 @@ public record ScheduledWorkflowResponse(
         String id,
         String workflowId,
         String workflowName,
+        String projectName,
         String cronExpression,
         String scheduleType,
         Instant scheduledAt,
