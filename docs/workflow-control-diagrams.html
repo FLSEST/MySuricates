@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoPilot — Workflow Control & States</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    :root { --bg:#0d1117; --surface:#161b22; --border:#30363d; --text:#e6edf3; --text-muted:#8b949e; --accent:#58a6ff; --green:#3fb950; --orange:#d29922; --red:#f85149; --purple:#bc8cff; }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;}
+    header{background:var(--surface);border-bottom:1px solid var(--border);padding:1.5rem 2rem;text-align:center;}
+    header h1{font-size:1.8rem;font-weight:600;} header p{color:var(--text-muted);margin-top:0.3rem;}
+    nav{background:var(--surface);border-bottom:1px solid var(--border);padding:0.8rem 2rem;display:flex;gap:0.5rem;flex-wrap:wrap;justify-content:center;position:sticky;top:0;z-index:100;}
+    nav a{color:var(--accent);text-decoration:none;padding:0.4rem 1rem;border-radius:6px;font-size:0.9rem;transition:background 0.2s;}
+    nav a:hover{background:rgba(88,166,255,0.1);}
+    main{max-width:1200px;margin:0 auto;padding:2rem;}
+    section{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:2rem;margin-bottom:2rem;}
+    section h2{font-size:1.4rem;margin-bottom:0.5rem;color:var(--accent);} section h2 span{font-size:0.85rem;color:var(--text-muted);font-weight:400;margin-left:0.5rem;}
+    section>p{color:var(--text-muted);margin-bottom:1.5rem;font-size:0.95rem;}
+    .mermaid{display:flex;justify-content:center;margin:1rem 0;} .mermaid svg{max-width:100%;height:auto;}
+    table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:0.9rem;}
+    th,td{padding:0.6rem 1rem;text-align:left;border-bottom:1px solid var(--border);} th{color:var(--text-muted);font-weight:600;font-size:0.8rem;text-transform:uppercase;}
+    td code{background:rgba(88,166,255,0.1);color:var(--accent);padding:0.15rem 0.4rem;border-radius:4px;font-size:0.85rem;}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;} @media(max-width:800px){.grid{grid-template-columns:1fr;}}
+    .card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:1.2rem;}
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>AutoPilot — Workflow Control & States</h1>
+  <p>Status-Maschinen, Pause/Resume/Cancel, Approval & Fehlerpfade</p>
+</header>
+
+<nav>
+  <a href="#run-states">Run States</a>
+  <a href="#step-states">Step States</a>
+  <a href="#pause-cancel">Pause/Cancel</a>
+  <a href="#approval">Approval</a>
+  <a href="#errors">Fehlerpfade</a>
+</nav>
+
+<main>
+
+<section id="run-states">
+  <h2>WorkflowRun State Machine <span>RunStatus</span></h2>
+  <pre class="mermaid">
+stateDiagram-v2
+    [*] --> RUNNING : execute()
+    RUNNING --> PAUSED : pauseExecution(runId)
+    PAUSED --> RUNNING : resumeExecution(runId)
+    RUNNING --> FAILED : step failed + on_failure=stop / exception
+    RUNNING --> CANCELLED : cancelExecution(runId)
+    RUNNING --> COMPLETED : alle Schritte ok
+    PAUSED --> CANCELLED : cancelExecution(runId)
+    FAILED --> [*]
+    CANCELLED --> [*]
+    COMPLETED --> [*]
+  </pre>
+</section>
+
+<section id="step-states">
+  <h2>StepResult Status <span>StepStatus</span></h2>
+  <pre class="mermaid">
+flowchart LR
+    PENDING --> RUNNING
+    RUNNING --> COMPLETED
+    RUNNING --> FAILED
+    RUNNING --> SKIPPED
+  </pre>
+  <p>Setzen durch BlockExecutor: Shell/Claude Exit-Code -> COMPLETED/FAILED; Conditional ohne Branch -> SKIPPED.</p>
+</section>
+
+<section id="pause-cancel">
+  <h2>Pause / Cancel <span>ExecutionContext</span></h2>
+  <pre class="mermaid">
+sequenceDiagram
+    participant UI
+    participant CTRL as ExecutionController (n/a)
+    participant WE as WorkflowExecutor
+    participant CTX as ExecutionContext
+
+    UI->>WE: pauseExecution(runId)
+    WE->>CTX: paused=true
+    Note over CTX: Block-Loop pollt paused<br/>und wartet 500ms
+    UI->>WE: resumeExecution(runId)
+    WE->>CTX: paused=false
+    UI->>WE: cancelExecution(runId)
+    WE->>CTX: cancelled=true + cancel pending approvals
+  </pre>
+</section>
+
+<section id="approval">
+  <h2>Approval Flow <span>ApprovalBlock & Agentic</span></h2>
+  <pre class="mermaid">
+sequenceDiagram
+    participant BE as ApprovalBlockExecutor
+    participant CTX as ExecutionContext
+    participant WS as WebSocket /topic/...
+    participant USER as User
+
+    BE->>CTX: requestApproval(question, options)
+    BE->>WS: broadcast approval_required
+    USER-->>WS: answer via UI
+    WE->>CTX: resolveApproval(answer)
+    CTX-->>BE: future completes
+    alt answer == "Yes always"
+        CTX->>CTX: rememberApproval(question, answer)
+    end
+    BE-->>WE: StepResult (COMPLETED/FAILED/SKIPPED je nach on_no)
+  </pre>
+</section>
+
+<section id="errors">
+  <h2>Fehlerpfade & Stop-on-Failure <span>BlockDefinition.on_failure</span></h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Default Verhalten</h3>
+      <p><code>on_failure</code> fehlt → stoppt Run bei FAILED-Step.</p>
+      <p>Setzbar auf <code>"continue"</code> falls Folge-Schritte trotzdem laufen sollen.</p>
+    </div>
+    <div class="card">
+      <h3>Agentic Speziell</h3>
+      <p>Stop-Gründe: ITERATION_TIMEOUT, TOTAL_TIMEOUT, TOKEN_BUDGET_EXCEEDED, REPEATED_ACTIONS, GOAL_STATUS=IMPOSSIBLE.</p>
+      <p>Status: FAILED wenn Ziel nicht erreicht.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      primaryColor: '#1a2e3e',
+      primaryTextColor: '#e6edf3',
+      primaryBorderColor: '#58a6ff',
+      lineColor: '#8b949e',
+      secondaryColor: '#2e1a2e',
+      tertiaryColor: '#1a2e1a',
+      background: '#0d1117',
+      mainBkg: '#161b22',
+      nodeBorder: '#30363d',
+      clusterBkg: '#161b22',
+      clusterBorder: '#30363d',
+      titleColor: '#e6edf3',
+      edgeLabelBackground: '#161b22'
+    },
+    flowchart: { curve: 'basis', padding: 20 },
+    sequence: { actorMargin: 50, messageMargin: 40 },
+    er: { layoutDirection: 'LR' }
+  });
+</script>
+
+</body>
+</html>
