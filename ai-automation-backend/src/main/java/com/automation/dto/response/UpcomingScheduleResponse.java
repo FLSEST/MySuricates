@@ -10,6 +10,7 @@ public record UpcomingScheduleResponse(
     public record UpcomingRun(
             String scheduleId,
             String workflowName,
+            String projectName,
             Instant scheduledAt
     ) {}
 }

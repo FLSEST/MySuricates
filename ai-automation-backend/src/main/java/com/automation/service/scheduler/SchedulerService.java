@@ -149,6 +149,8 @@ public class SchedulerService {
 
         for (ScheduledWorkflow sw : enabled) {
             String workflowName = sw.getWorkflow() != null ? sw.getWorkflow().getName() : "Unknown";
+            String projectName = sw.getWorkflow() != null && sw.getWorkflow().getProject() != null
+                    ? sw.getWorkflow().getProject().getName() : null;
 
             if (sw.getScheduleType() == ScheduledWorkflow.ScheduleType.CRON) {
                 CronExpression cron = CronExpression.parse(sw.getCronExpression());
@@ -157,7 +159,7 @@ public class SchedulerService {
                     Instant nextInstant = next.atZone(ZoneId.systemDefault()).toInstant();
                     if (nextInstant.isAfter(until)) break;
                     upcoming.add(new UpcomingScheduleResponse.UpcomingRun(
-                            sw.getId(), workflowName, nextInstant));
+                            sw.getId(), workflowName, projectName, nextInstant));
                     next = cron.next(next);
                 }
             } else if (sw.getScheduleType() == ScheduledWorkflow.ScheduleType.ONCE) {
@@ -165,7 +167,7 @@ public class SchedulerService {
                         && sw.getScheduledAt().isAfter(now)
                         && sw.getScheduledAt().isBefore(until)) {
                     upcoming.add(new UpcomingScheduleResponse.UpcomingRun(
-                            sw.getId(), workflowName, sw.getScheduledAt()));
+                            sw.getId(), workflowName, projectName, sw.getScheduledAt()));
                 }
             }
         }

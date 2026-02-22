@@ -199,6 +199,7 @@ export interface UpcomingScheduleData {
   schedules: Array<{
     scheduleId: string;
     workflowName: string;
+    projectName: string | null;
     scheduledAt: string;
   }>;
 }

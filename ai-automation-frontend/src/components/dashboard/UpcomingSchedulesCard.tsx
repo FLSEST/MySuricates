@@ -53,7 +53,12 @@ export function UpcomingSchedulesCard() {
                 <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                   schedule.isToday ? 'bg-accent' : 'bg-text-tertiary/40'
                 }`} />
-                <span className="text-xs text-text truncate">{schedule.workflowName}</span>
+                <div className="min-w-0">
+                  <span className="text-xs text-text truncate block">{schedule.workflowName}</span>
+                  {schedule.projectName && (
+                    <span className="text-[10px] text-accent/70 truncate block">{schedule.projectName}</span>
+                  )}
+                </div>
               </div>
               <span className="text-[10px] text-text-tertiary shrink-0 tabular-nums">
                 {schedule.isToday
