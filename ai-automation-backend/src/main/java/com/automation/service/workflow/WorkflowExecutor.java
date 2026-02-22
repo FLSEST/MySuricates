@@ -144,9 +144,30 @@ public class WorkflowExecutor {
                 }
 
                 BlockExecutor executor = findExecutor(block.getType());
-                StepResult step = executor.execute(block, context);
 
+                // Pre-create RUNNING placeholder so UI shows the step immediately
+                int stepIndex = context.preAllocateStepIndex();
+                StepResult step = new StepResult();
+                step.setStepIndex(stepIndex);
+                step.setStartedAt(Instant.now());
+                step.setStatus(StepStatus.RUNNING);
+                step.setMetadata(Map.of("blockType", block.getType()));
                 run.addStep(step);
+                runRepository.save(run);
+                broadcastStepResult(run.getId(), step);
+
+                // Execute the block — nextStepIndex() returns the pre-allocated index
+                StepResult result = executor.execute(block, context);
+
+                // Update the persisted step with the actual results
+                step.setInput(result.getInput());
+                step.setOutput(result.getOutput());
+                step.setStatus(result.getStatus());
+                step.setCompletedAt(result.getCompletedAt());
+                step.setDurationMs(result.getDurationMs());
+                if (result.getMetadata() != null) {
+                    step.setMetadata(result.getMetadata());
+                }
                 context.setPreviousOutput(step.getOutput());
 
                 // Update container last activity (skip if no container)

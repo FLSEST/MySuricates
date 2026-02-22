@@ -38,6 +38,9 @@ public class ExecutionContext {
     private final AtomicInteger stepCounter = new AtomicInteger(0);
 
     @Builder.Default
+    private final AtomicInteger preAllocatedIndex = new AtomicInteger(-1);
+
+    @Builder.Default
     private final AtomicBoolean paused = new AtomicBoolean(false);
 
     @Builder.Default
@@ -52,8 +55,19 @@ public class ExecutionContext {
     @Builder.Default
     private final Map<String, String> approvalMemory = new ConcurrentHashMap<>();
 
+    /**
+     * Reserve the next step index for a RUNNING placeholder.
+     * The subsequent call to nextStepIndex() will return this same value.
+     */
+    public int preAllocateStepIndex() {
+        int idx = stepCounter.getAndIncrement();
+        preAllocatedIndex.set(idx);
+        return idx;
+    }
+
     public int nextStepIndex() {
-        return stepCounter.getAndIncrement();
+        int pre = preAllocatedIndex.getAndSet(-1);
+        return pre >= 0 ? pre : stepCounter.getAndIncrement();
     }
 
     public void setVariable(String name, Object value) {

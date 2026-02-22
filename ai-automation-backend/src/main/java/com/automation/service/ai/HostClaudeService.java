@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -66,7 +68,8 @@ public class HostClaudeService {
 
         log.debug("Host Claude reasoning (prompt length: {} chars, workDir: {})", prompt.length(), workingDirectory);
         Process proc = pb.start();
-        proc.getOutputStream().close(); // Signal EOF to prevent stdin deadlock
+        // Write prompt via stdin to avoid OS command-line length limits (E2BIG)
+        writePromptToStdin(proc, prompt);
 
         try {
             CompletableFuture<byte[]> outputFuture = CompletableFuture.supplyAsync(() -> {
@@ -121,7 +124,8 @@ public class HostClaudeService {
 
         log.debug("Host Claude action (prompt length: {} chars, workDir: {})", prompt.length(), workingDirectory);
         Process proc = pb.start();
-        proc.getOutputStream().close(); // Signal EOF to prevent stdin deadlock
+        // Write prompt via stdin to avoid OS command-line length limits (E2BIG)
+        writePromptToStdin(proc, prompt);
 
         try {
             CompletableFuture<byte[]> outputFuture = CompletableFuture.supplyAsync(() -> {
@@ -165,7 +169,7 @@ public class HostClaudeService {
 
     List<String> buildReasonCommand(String prompt, String systemPrompt, Integer maxTurns) {
         List<String> cmd = new ArrayList<>(List.of(
-                "claude", "-p", prompt,
+                "claude", "-p",
                 "--output-format", "stream-json", "--verbose"
         ));
 
@@ -196,7 +200,7 @@ public class HostClaudeService {
      */
     List<String> buildActionCommand(String prompt, String model, String systemPrompt) {
         List<String> cmd = new ArrayList<>(List.of(
-                "claude", "-p", prompt,
+                "claude", "-p",
                 "--output-format", "stream-json", "--verbose"
         ));
 
@@ -244,6 +248,17 @@ public class HostClaudeService {
         sb.append("Respond following the format specified in the system instructions.");
 
         return sb.toString();
+    }
+
+    /**
+     * Writes the prompt to the process's stdin and closes it.
+     * This avoids OS command-line argument length limits (E2BIG / errno 7).
+     */
+    private void writePromptToStdin(Process proc, String prompt) throws IOException {
+        try (OutputStream stdin = proc.getOutputStream()) {
+            stdin.write(prompt.getBytes(StandardCharsets.UTF_8));
+            stdin.flush();
+        }
     }
 
     private String truncate(String s, int maxLen) {

@@ -329,11 +329,12 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string)
               });
             }
 
-            // Invalidate run queries only on terminal status changes
-            if (isStatusMessage(data) && ['COMPLETED', 'FAILED', 'CANCELLED'].includes(data.status)) {
-              if (workflowIdRef.current) {
-                queryClientRef.current.invalidateQueries({ queryKey: ['workflows', workflowIdRef.current, 'runs'] });
-              }
+            // Invalidate run queries on step updates and terminal status changes
+            const shouldRefetch =
+              (isStatusMessage(data) && ['COMPLETED', 'FAILED', 'CANCELLED'].includes(data.status)) ||
+              (!isStatusMessage(data) && !isAgenticMessage(data) && !isApprovalRequired(data) && !isApprovalResolved(data) && 'stepIndex' in data);
+            if (shouldRefetch && workflowIdRef.current) {
+              queryClientRef.current.invalidateQueries({ queryKey: ['workflows', workflowIdRef.current, 'runs'] });
             }
           } catch {
             appendLog({ timestamp: new Date().toISOString(), level: 'INFO', message: message.body });

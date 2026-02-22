@@ -63,7 +63,8 @@ class HostClaudeServiceTest {
         HostClaudeService service = createService(null, false, List.of());
         List<String> cmd = service.buildReasonCommand("hello", null);
 
-        assertThat(cmd).startsWith("claude", "-p", "hello", "--output-format", "stream-json", "--verbose");
+        assertThat(cmd).startsWith("claude", "-p", "--output-format", "stream-json", "--verbose");
+        assertThat(cmd).doesNotContain("hello"); // prompt is sent via stdin, not args
         assertThat(cmd).contains("--max-turns", "3"); // default
     }
 
@@ -149,7 +150,8 @@ class HostClaudeServiceTest {
         HostClaudeService service = createService(4096, true, List.of("Bash"));
         List<String> cmd = service.buildActionCommand("prompt", "claude-sonnet-4-6", "sys");
 
-        assertThat(cmd).startsWith("claude", "-p", "prompt", "--output-format", "stream-json", "--verbose");
+        assertThat(cmd).startsWith("claude", "-p", "--output-format", "stream-json", "--verbose");
+        assertThat(cmd).doesNotContain("prompt"); // prompt is sent via stdin, not args
         assertThat(cmd).contains("--model", "claude-sonnet-4-6");
         assertThat(cmd).contains("--append-system-prompt", "sys");
         assertThat(cmd).contains("--dangerously-skip-permissions");

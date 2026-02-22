@@ -13,10 +13,10 @@ interface LogViewerProps {
 }
 
 const levelColors: Record<string, string> = {
-  INFO: 'text-accent',
-  ERROR: 'text-danger',
-  WARN: 'text-warning',
-  DEBUG: 'text-text-tertiary',
+  INFO: 'text-sky-400',
+  ERROR: 'text-red-400',
+  WARN: 'text-amber-400',
+  DEBUG: 'text-gray-500',
 };
 
 export function LogViewer({ logs, autoScroll = true, maxHeight = '400px' }: LogViewerProps) {
@@ -36,21 +36,21 @@ export function LogViewer({ logs, autoScroll = true, maxHeight = '400px' }: LogV
     >
       <div className="p-4 space-y-0.5">
         {logs.length === 0 && (
-          <div className="text-text-tertiary animate-pulse-subtle">Waiting for logs...</div>
+          <div className="text-gray-500 animate-pulse-subtle">Waiting for logs...</div>
         )}
         {logs.map((log, i) => (
           <div key={i} className="flex gap-3 hover:bg-white/5 rounded px-1 -mx-1">
             {log.timestamp && (
-              <span className="text-text-tertiary shrink-0 select-none">
+              <span className="text-gray-500 shrink-0 select-none">
                 {new Date(log.timestamp).toLocaleTimeString()}
               </span>
             )}
             {log.level && (
-              <span className={`shrink-0 w-12 ${levelColors[log.level] ?? 'text-text-secondary'}`}>
+              <span className={`shrink-0 w-12 ${levelColors[log.level] ?? 'text-gray-400'}`}>
                 {log.level}
               </span>
             )}
-            <span className="text-text whitespace-pre-wrap break-all">{log.message}</span>
+            <span className="text-gray-200 whitespace-pre-wrap break-all">{log.message}</span>
           </div>
         ))}
       </div>
