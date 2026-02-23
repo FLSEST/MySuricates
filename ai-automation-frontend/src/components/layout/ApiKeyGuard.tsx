@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Shield, ArrowRight, AlertTriangle } from 'lucide-react';
+import { ArrowRight, AlertTriangle } from 'lucide-react';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useT } from '../../i18n';
+import { MeerkatIcon } from './Sidebar';
 
 export function ApiKeyGuard({ children }: { children: React.ReactNode }) {
   const t = useT();
@@ -52,8 +53,8 @@ export function ApiKeyGuard({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-surface flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-accent/10 mb-4">
-            <Shield className="w-8 h-8 text-accent" />
+          <div className="inline-flex items-center justify-center w-64 h-48 rounded-2xl bg-accent/10 mb-4">
+            <MeerkatIcon className="text-accent" size={220} />
           </div>
           <h1 className="text-2xl font-bold text-text">MySuricates</h1>
           <p className="text-text-secondary mt-2">{t.security.authRequired}</p>

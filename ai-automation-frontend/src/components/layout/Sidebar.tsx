@@ -7,7 +7,7 @@ import { useSidebarStore } from '../../stores/sidebarStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useT } from '../../i18n';
 
-function MeerkatIcon({ className, size = 24 }: { className?: string; size?: number }) {
+export function MeerkatIcon({ className, size = 24 }: { className?: string; size?: number }) {
   const bg = 'var(--color-sidebar, #1a1614)';
   return (
     <svg viewBox="0 0 48 32" fill="none" className={className} style={{ width: size, height: size * 32 / 48 }} xmlns="http://www.w3.org/2000/svg">
