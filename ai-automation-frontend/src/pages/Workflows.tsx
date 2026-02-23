@@ -834,14 +834,14 @@ function WorkflowRow({
           )}
           <button
             onClick={(e) => { e.stopPropagation(); onExecute(); }}
-            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-accent/20 text-accent transition-all shrink-0"
+            className="sm:opacity-0 sm:group-hover:opacity-100 p-0.5 rounded hover:bg-accent/20 text-accent transition-all shrink-0"
             title="Ausführen"
           >
             <Play className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-danger/20 text-text-tertiary hover:text-danger transition-all shrink-0"
+            className="sm:opacity-0 sm:group-hover:opacity-100 p-0.5 rounded hover:bg-danger/20 text-text-tertiary hover:text-danger transition-all shrink-0"
             title="Löschen"
           >
             <Trash2 className="w-3.5 h-3.5" />

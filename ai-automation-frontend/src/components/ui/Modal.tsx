@@ -45,7 +45,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
       <div
         role="dialog"
         aria-modal="true"
-        className={`relative w-full ${sizeStyles[size]} mx-4 bg-surface-overlay border border-border
+        className={`relative w-full ${sizeStyles[size]} mx-2 sm:mx-4 bg-surface-overlay border border-border
                      rounded-xl shadow-2xl animate-slide-up`}
       >
         {/* Header */}
@@ -53,7 +53,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
           <h2 className="text-lg font-semibold text-text">{title}</h2>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-text-tertiary hover:text-text hover:bg-surface-raised transition-colors"
+            className="p-2 rounded-lg text-text-tertiary hover:text-text hover:bg-surface-raised transition-colors"
             aria-label="Close"
           >
             <X className="w-4 h-4" />
@@ -61,7 +61,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
         </div>
 
         {/* Body */}
-        <div className="px-5 py-4 max-h-[60vh] overflow-y-auto">{children}</div>
+        <div className="px-5 py-4 max-h-[70vh] sm:max-h-[60vh] overflow-y-auto">{children}</div>
 
         {/* Footer */}
         {footer && (

@@ -128,7 +128,7 @@ export function Projects() {
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     onClick={(e) => { e.stopPropagation(); openEdit(project); }}
-                    className="opacity-0 group-hover/card:opacity-100 p-1 rounded-md hover:bg-surface-raised text-text-tertiary hover:text-text transition-all"
+                    className="sm:opacity-0 sm:group-hover/card:opacity-100 p-1 rounded-md hover:bg-surface-raised text-text-tertiary hover:text-text transition-all"
                     title={t.common.edit}
                   >
                     <Pencil className="w-3.5 h-3.5" />

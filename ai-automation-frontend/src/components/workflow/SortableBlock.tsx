@@ -86,14 +86,14 @@ export function SortableBlock({ id, index, block, onEdit, onRemove }: SortableBl
       </div>
       <button
         onClick={(e) => { e.stopPropagation(); onEdit(index); }}
-        className="p-1.5 rounded-lg text-text-tertiary hover:text-accent opacity-0 group-hover:opacity-100 transition-all"
+        className="p-1.5 rounded-lg text-text-tertiary hover:text-accent sm:opacity-0 sm:group-hover:opacity-100 transition-all"
         aria-label={t.common.edit}
       >
         <Pencil className="w-4 h-4" />
       </button>
       <button
         onClick={(e) => { e.stopPropagation(); onRemove(index); }}
-        className="p-1.5 rounded-lg text-text-tertiary hover:text-danger opacity-0 group-hover:opacity-100 transition-all"
+        className="p-1.5 rounded-lg text-text-tertiary hover:text-danger sm:opacity-0 sm:group-hover:opacity-100 transition-all"
         aria-label={t.common.delete}
       >
         <Trash2 className="w-4 h-4" />

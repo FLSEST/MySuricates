@@ -44,6 +44,7 @@ export const en = {
     live: 'Live',
     collapse: 'Collapse',
     expand: 'Expand',
+    menu: 'Menu',
   },
   nav: {
     dashboard: 'Dashboard',

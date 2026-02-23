@@ -4,6 +4,7 @@ import {
   Calendar, Webhook, ScrollText, CheckSquare, Settings, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useSidebarStore } from '../../stores/sidebarStore';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import { useT } from '../../i18n';
 
 function MeerkatIcon({ className, size = 24 }: { className?: string; size?: number }) {
@@ -90,19 +91,24 @@ const navItems = [
 ];
 
 export function Sidebar() {
-  const { collapsed, toggle } = useSidebarStore();
+  const { collapsed, toggle, mobileOpen, setMobileOpen } = useSidebarStore();
+  const isMobile = useIsMobile();
   const t = useT();
+
+  const isOpen = isMobile ? mobileOpen : true;
+  const showLabels = isMobile ? true : !collapsed;
 
   return (
     <aside
       className={`fixed left-0 top-0 h-screen flex flex-col z-40 transition-all duration-200
-                  ${collapsed ? 'w-16' : 'w-56'}`}
+                  ${isMobile ? 'w-56' : collapsed ? 'w-16' : 'w-56'}
+                  ${isMobile ? (isOpen ? 'translate-x-0' : '-translate-x-full') : ''}`}
       style={{ backgroundColor: 'var(--color-sidebar)' }}
     >
       {/* Logo */}
-      <div className={`flex flex-col items-center border-b border-white/10 ${collapsed ? 'px-2 py-3' : 'px-3 pt-4 pb-3'}`}>
-        <MeerkatIcon className="text-accent" size={collapsed ? 48 : 140} />
-        {!collapsed && (
+      <div className={`flex flex-col items-center border-b border-white/10 ${collapsed && !isMobile ? 'px-2 py-3' : 'px-3 pt-4 pb-3'}`}>
+        <MeerkatIcon className="text-accent" size={collapsed && !isMobile ? 48 : 140} />
+        {showLabels && (
           <span className="text-lg font-bold text-white tracking-tight mt-1.5">
             MySuricates
           </span>
@@ -126,9 +132,10 @@ export function Sidebar() {
             style={({ isActive }) => ({
               backgroundColor: isActive ? 'var(--color-sidebar-active)' : undefined,
             })}
+            onClick={() => { if (isMobile) setMobileOpen(false); }}
           >
             <item.icon className="w-4.5 h-4.5 shrink-0" style={{ width: 18, height: 18 }} />
-            {!collapsed && <span className="truncate">{t.nav[item.labelKey]}</span>}
+            {showLabels && <span className="truncate">{t.nav[item.labelKey]}</span>}
           </NavLink>
         ))}
       </nav>
@@ -144,26 +151,29 @@ export function Sidebar() {
           style={({ isActive }) => ({
             backgroundColor: isActive ? 'var(--color-sidebar-active)' : undefined,
           })}
+          onClick={() => { if (isMobile) setMobileOpen(false); }}
         >
           <Settings className="w-[18px] h-[18px] shrink-0" />
-          {!collapsed && <span>{t.nav.settings}</span>}
+          {showLabels && <span>{t.nav.settings}</span>}
         </NavLink>
 
-        <button
-          onClick={toggle}
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-[#7a6e60]
-                     hover:text-[#a89a8a] transition-colors w-full"
-          aria-label={collapsed ? t.common.expand : t.common.collapse}
-        >
-          {collapsed ? (
-            <ChevronRight className="w-[18px] h-[18px]" />
-          ) : (
-            <>
-              <ChevronLeft className="w-[18px] h-[18px]" />
-              <span>{t.common.collapse}</span>
-            </>
-          )}
-        </button>
+        {!isMobile && (
+          <button
+            onClick={toggle}
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-[#7a6e60]
+                       hover:text-[#a89a8a] transition-colors w-full"
+            aria-label={collapsed ? t.common.expand : t.common.collapse}
+          >
+            {collapsed ? (
+              <ChevronRight className="w-[18px] h-[18px]" />
+            ) : (
+              <>
+                <ChevronLeft className="w-[18px] h-[18px]" />
+                <span>{t.common.collapse}</span>
+              </>
+            )}
+          </button>
+        )}
       </div>
     </aside>
   );

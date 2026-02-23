@@ -373,7 +373,7 @@ export function WorkflowDetail() {
                     </div>
                     <button
                       onClick={() => deactivateSkill.mutate({ workflowId: workflow.id, skillId })}
-                      className="p-1 rounded text-text-tertiary hover:text-danger opacity-0 group-hover:opacity-100 transition-all"
+                      className="p-1 rounded text-text-tertiary hover:text-danger sm:opacity-0 sm:group-hover:opacity-100 transition-all"
                       aria-label={t.skills.deactivate}
                     >
                       <Trash2 className="w-3.5 h-3.5" />

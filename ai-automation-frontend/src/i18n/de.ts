@@ -46,6 +46,7 @@ export const de: TranslationKeys = {
     live: 'Live',
     collapse: 'Einklappen',
     expand: 'Ausklappen',
+    menu: 'Menü',
   },
   nav: {
     dashboard: 'Dashboard',
