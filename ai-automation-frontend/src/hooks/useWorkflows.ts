@@ -8,6 +8,8 @@ interface WorkflowApiResponse {
   id: string;
   projectId: string;
   projectName: string;
+  projectSubtitle: string | null;
+  projectDescription: string | null;
   name: string;
   description: string;
   icon: string;
@@ -18,6 +20,7 @@ interface WorkflowApiResponse {
   runCount: number;
   instructions: string | null;
   model: string | null;
+  templateId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -135,7 +138,10 @@ export function usePauseExecution() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (runId: string) => api.post(`/executions/${runId}/pause`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['workflows'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workflows'] });
+      qc.invalidateQueries({ queryKey: ['learning'] });
+    },
   });
 }
 
@@ -143,7 +149,10 @@ export function useResumeExecution() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (runId: string) => api.post(`/executions/${runId}/resume`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['workflows'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workflows'] });
+      qc.invalidateQueries({ queryKey: ['learning'] });
+    },
   });
 }
 
@@ -151,7 +160,10 @@ export function useCancelExecution() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (runId: string) => api.post(`/executions/${runId}/cancel`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['workflows'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workflows'] });
+      qc.invalidateQueries({ queryKey: ['learning'] });
+    },
   });
 }
 
