@@ -68,6 +68,7 @@ export interface Workflow {
   runCount: number;
   instructions: string | null;
   model: string | null;
+  metadata?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 }
@@ -81,6 +82,34 @@ export interface CreateWorkflowRequest {
   activatedSkillIds?: string[];
   instructions?: string;
   model?: string;
+  templateId?: string;
+}
+
+// ── Workflow Template ────────────────────────────────────
+export interface WorkflowTemplate {
+  id: string;
+  name: Record<string, string>;
+  description: Record<string, string>;
+  icon: string;
+  category: string | null;
+  blocks: BlockDefinition[];
+  instructions: string | null;
+  model: string | null;
+  builtIn: boolean;
+  sortOrder: number;
+  version: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateWorkflowTemplateRequest {
+  name: Record<string, string>;
+  description?: Record<string, string>;
+  icon?: string;
+  category?: string;
+  blocks: BlockDefinition[];
+  instructions?: string;
+  model?: string;
 }
 
 export interface UpdateWorkflowRequest {
@@ -90,6 +119,7 @@ export interface UpdateWorkflowRequest {
   blocks?: BlockDefinition[];
   instructions?: string;
   model?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export type BlockType = 'simple' | 'shell' | 'retry' | 'foreach' | 'while' | 'conditional' | 'skill-capability' | 'approval' | 'agentic' | 'sub-workflow';
@@ -270,10 +300,36 @@ export interface RemoteAccessStatus {
   hostname: string | null;
 }
 
+export interface BackupInfo {
+  filename: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
 export interface BrowseDirectoryResponse {
   current: string;
   parent: string | null;
   directories: Array<{ name: string; path: string }>;
+}
+
+// ── Staging ──────────────────────────────────────────────
+
+export interface StagingStatus {
+  containerRunning: boolean;
+  healthy: boolean;
+  promotePhase: string;
+  promoteStep: number;
+  promoteTotalSteps: number;
+  lastSnapshot: string | null;
+  error: string | null;
+}
+
+export interface SyncResult {
+  projectsSynced: number;
+  workflowsSynced: number;
+  skillsSynced: number;
+  skipped: number;
+  errors: string[];
 }
 
 // ── Learning / Analytics ─────────────────────────────────

@@ -7,8 +7,8 @@ AI-powered workflow automation platform with a skill system, Docker-based execut
 ```
 ai-automation-backend/     Spring Boot 3.2 (Java 21) REST API
   src/main/java/com/automation/
-    controller/            REST controllers (Workflow, Skill, Execution, Learning, Schedule, Webhook, System, Project, Conversion)
-    entity/                JPA entities (Workflow, Skill, Project, Container, ScheduledWorkflow, WebhookTrigger, WorkflowRun, ...)
+    controller/            REST controllers (Workflow, WorkflowTemplate, Skill, Execution, Learning, Schedule, Webhook, System, Project, Conversion)
+    entity/                JPA entities (Workflow, WorkflowTemplate, Skill, Project, Container, ScheduledWorkflow, WebhookTrigger, WorkflowRun, ...)
     dto/                   Request/response DTOs
     mapper/                MapStruct mappers (Entity <-> DTO)
     repository/            Spring Data JPA repositories
@@ -19,10 +19,10 @@ ai-automation-backend/     Spring Boot 3.2 (Java 21) REST API
     service/cli/           Claude output parsing (ClaudeOutputParser, ClaudeJsonResponse)
     service/conversion/    Agentic-to-workflow conversion (WorkflowConversionService)
     security/              API key auth, rate limiting, Tailscale
-    config/                Spring configuration
+    config/                Spring configuration, built-in template/skill seeders
     websocket/             WebSocket for real-time updates
   src/main/resources/
-    db/migration/          Flyway migrations (V1-V10, SQLite)
+    db/migration/          Flyway migrations (V1-V19, SQLite)
     application.yml        App config
   docker/                  Dockerfiles for agent containers (Python, Node, Go)
 
@@ -31,9 +31,9 @@ ai-automation-frontend/    React 18 SPA (TypeScript)
     api/client.ts          Shared API client (fetch-based, /api/v1 prefix)
     pages/                 Route pages (Dashboard, Projects, Workflows, Skills, Schedules, Webhooks, Settings, ...)
     components/            UI components (ui/, layout/, dashboard/, workflow/, shared/, skill/)
-    hooks/                 TanStack Query hooks (useWorkflows, useSkills, useProjects, useSchedules, useWebhooks, useConversion, useInsights, ...)
-    data/                  Skill catalog data, workflow templates
-    utils/                 Utility functions (formatTime, extractWorkflowVariables)
+    hooks/                 TanStack Query hooks (useWorkflows, useSkills, useProjects, useSchedules, useWebhooks, useConversion, useInsights, useTemplates, ...)
+    data/                  Skill constants, static data
+    utils/                 Utility functions (formatTime, extractWorkflowVariables, templateUtils)
     stores/                Zustand stores (settings, sidebar, theme, toast)
     i18n/                  Translations (de.ts, en.ts)
     types/index.ts         Shared TypeScript types
@@ -113,6 +113,14 @@ Injection paths:
 - Applied via `--max-tokens` flag in both `reasonStructured()` and `executeAction()`
 - Distinct from the agentic block's `max_total_tokens` budget (which tracks cumulative input+output across all iterations)
 
+## Per-Block Claude CLI Timeout
+
+- All block types support an optional `timeout_seconds` field in block config
+- Overrides the global `automation.host-claude.timeout-seconds` (default: 300s) for that block's Claude CLI calls
+- Without `timeout_seconds` in config → global default applies
+- For dual-mode blocks (shell/claude), `timeout_seconds` controls both the shell timeout and the Claude CLI timeout
+- Applies to both `reasonStructured()` and `executeAction()` calls in agentic blocks
+
 ## Agentic Block Safety
 
 | Config Key | Default | Description |
@@ -129,6 +137,30 @@ Additional safety:
 - Token tracking warnings: `AgenticBlockExecutor` logs `WARN` when REASON or ACT phase returns no usage data, indicating the token budget is not being enforced
 - All 6 safety fields are pre-populated in the frontend "Add Block" dialog defaults
 
+## Workflow Templates
+
+- Templates are stored in the `workflow_templates` DB table (V19 migration), not hardcoded
+- 28 built-in templates are seeded on startup by `WorkflowTemplateSeeder` (idempotent, only inserts missing)
+- Template definitions live in `BuiltInTemplates.java` (`config/` package)
+- Name and description are i18n JSON maps: `{"de":"...","en":"..."}` — stored via `JsonStringMapConverter`
+- Built-in templates (`builtIn=true`) cannot be deleted; only `sortOrder` and `category` can be updated
+- Users can create custom templates via API or by saving an existing workflow as a template
+- Workflows have an optional `templateId` back-reference to their source template
+- Frontend resolves locale-aware template names via `resolveTemplateName()` in `utils/templateUtils.ts`
+- CRUD API at `/api/v1/workflow-templates` (see `WorkflowTemplateController`)
+
+## Built-in Skills
+
+- Skills are stored in the `skills` DB table, not hardcoded in frontend or in-memory beans
+- 16 built-in skills are seeded on startup by `SkillSeeder` (idempotent, seeds missing skills)
+- Skill definitions live in `BuiltInSkills.java` (`config/` package)
+- Built-in skills have stable IDs (e.g. `builtin-code-review`, `builtin-test-generator`)
+- `SkillSeeder` also registers all skills in the in-memory `SkillRegistry` for capability lookups
+- `SkillRegistry` no longer depends on `SkillProvider` beans — seeder handles registration
+- Capability handler classes (e.g. `LintHandler`, `OCRHandler`) remain as independent `@Component` beans in `skills/handlers/`
+- Users can create custom skills via the import API (`POST /api/v1/skills/import`)
+- `Skill.java` entity uses `@PrePersist ensureId()` (not `@GeneratedValue`) to allow explicit IDs for built-ins
+
 ## Sub-Workflow Block
 
 - `SubWorkflowBlockExecutor` — runs another workflow as a nested block
@@ -136,3 +168,52 @@ Additional safety:
 - Max nesting depth: 5 levels
 - Polling-based completion with 30min timeout
 - `@Lazy` injection on `WorkflowExecutor` to break Spring DI cycle
+
+## Staging (Stable + Dev parallel)
+
+Two environments run side-by-side:
+- **Dev**: `localhost:3000` → proxy → `localhost:9090` (from source, as usual)
+- **Stable**: `localhost:9091` (Docker container, backend serves static frontend)
+
+### Auto-Start
+
+Dev automatically starts the Stable container on boot (`ApplicationReadyEvent`) if:
+1. A snapshot exists (`stable-frontend/` directory present, i.e. promote was run at least once)
+2. The container is not already running
+
+Controlled by `automation.staging.auto-start` (default: `true`, disabled in `application-stable.yml` to prevent self-start).
+
+### Definition Sync (Dev → Stable)
+
+`POST /api/v1/staging/sync-definitions` selectively syncs **definitions only** from Dev to Stable via Stable's REST API:
+
+| Synced | Matching | Behavior |
+|---|---|---|
+| Projects | name + path | Skip if exists, create if new |
+| Workflows | name + projectName | Update if exists, import if new |
+| Custom Skills | name | Skip if exists, import if new |
+
+**Not synced** (preserved on Stable): workflow_runs, step_results, scheduled_workflows, webhook_triggers, activity_log, todos, built-in skills/templates.
+
+Requires Stable to be running and healthy. In the UI: Settings → Stable → "Definitionen synchronisieren" (only enabled when Stable is healthy).
+
+### CLI Management
+
+```bash
+./scripts/staging.sh snapshot    # Build JAR + frontend + Docker image, tag git commit
+./scripts/staging.sh start       # Start stable container on :9091
+./scripts/staging.sh stop        # Stop stable container
+./scripts/staging.sh status      # Container status + health check
+./scripts/staging.sh log         # Tail container logs
+./scripts/staging.sh db-seed     # Raw DB copy (emergency only, overwrites everything)
+./scripts/staging.sh clean       # Remove container + volume + image
+./scripts/staging.sh promote     # stop → snapshot → start (one-liner)
+```
+
+Key files:
+- `ai-automation-backend/docker/Dockerfile.stable` — Ubuntu-based (glibc for Claude CLI)
+- `ai-automation-backend/docker-compose.stable.yml` — Volume mounts for Claude CLI + projects
+- `application-stable.yml` — Spring profile: port 9091, tray disabled, auto-start disabled, frontend serving enabled
+- `StaticFrontendConfig.java` — Conditional `WebMvcConfigurer` for SPA static file serving
+- `StagingService.java` — Auto-start, promote, sync-definitions, container lifecycle
+- Dev tray icon shows status of both environments via health checks

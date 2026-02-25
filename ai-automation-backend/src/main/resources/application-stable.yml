@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    url: jdbc:sqlite:/app/data/automation.db?journal_mode=WAL&busy_timeout=10000
+
+server:
+  port: 9091
+
+automation:
+  cors:
+    allowed-origins: http://localhost:9091
+  tray:
+    enabled: false
+  staging:
+    auto-start: false
+  serve-frontend: true
+  frontend-path: /app/frontend
+
+logging:
+  level:
+    com.automation: INFO
+    org.hibernate.SQL: WARN
