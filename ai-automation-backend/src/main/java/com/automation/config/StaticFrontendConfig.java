@@ -28,14 +28,18 @@ public class StaticFrontendConfig implements WebMvcConfigurer {
                 .addResolver(new PathResourceResolver() {
                     @Override
                     protected Resource getResource(String resourcePath, Resource location) throws IOException {
+                        // Root path or empty → serve index.html
+                        if (resourcePath == null || resourcePath.isEmpty() || resourcePath.equals(".")) {
+                            return new FileSystemResource(frontendPath + "/index.html");
+                        }
+                        // Don't handle API or WebSocket paths
+                        if (resourcePath.startsWith("api/") || resourcePath.startsWith("ws/") || resourcePath.startsWith("actuator/")) {
+                            return null;
+                        }
                         Resource requested = location.createRelative(resourcePath);
                         // Serve the requested file if it exists, otherwise fall back to index.html for SPA routing
                         if (requested.exists() && requested.isReadable()) {
                             return requested;
-                        }
-                        // Don't fall back for API or WebSocket paths
-                        if (resourcePath.startsWith("api/") || resourcePath.startsWith("ws/") || resourcePath.startsWith("actuator/")) {
-                            return null;
                         }
                         return new FileSystemResource(frontendPath + "/index.html");
                     }
