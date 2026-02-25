@@ -1,4 +1,4 @@
-# AI Automation Platform (AutoPilot)
+# MySuricates - AI Workflow Automation
 
 AI-powered workflow automation platform with a skill system, Docker-based execution, and a React frontend.
 
@@ -7,16 +7,16 @@ AI-powered workflow automation platform with a skill system, Docker-based execut
 ```
 ai-automation-backend/     Spring Boot 3.2 (Java 21) REST API
   src/main/java/com/automation/
-    controller/            REST controllers (Workflow, WorkflowTemplate, Skill, Execution, Learning, Schedule, Webhook, System, Project, Conversion)
-    entity/                JPA entities (Workflow, WorkflowTemplate, Skill, Project, Container, ScheduledWorkflow, WebhookTrigger, WorkflowRun, ...)
+    controller/            REST controllers (Workflow, WorkflowTemplate, Skill, Execution, Learning, Schedule, Webhook, System, Project, Conversion, Todo, ActivityLog, WorkflowMemory, Staging)
+    entity/                JPA entities (Workflow, WorkflowTemplate, Skill, Project, Container, ScheduledWorkflow, WebhookTrigger, WorkflowRun, Todo, ActivityLog, WorkflowMemory, StepResult, BlockDefinition, ...)
     dto/                   Request/response DTOs
     mapper/                MapStruct mappers (Entity <-> DTO)
     repository/            Spring Data JPA repositories
     service/               Business logic
     executor/              Docker-based skill execution
-    executor/blocks/       Block executors (Simple, Retry, Conditional, ForEach, While, Agentic, Approval, SubWorkflow, SkillCapability)
-    service/ai/            Host Claude CLI integration (HostClaudeService)
-    service/cli/           Claude output parsing (ClaudeOutputParser, ClaudeJsonResponse)
+    executor/blocks/       Block executors (Simple, Shell, Retry, Conditional, ForEach, While, Agentic, Approval, SubWorkflow, SkillCapability)
+    service/ai/            Host CLI integration (HostClaudeService, HostCodexService)
+    service/cli/           CLI execution and parsing (CommandExecutorService, CliSessionManager, ClaudeOutputParser, ClaudeJsonResponse, ShellCommandService)
     service/conversion/    Agentic-to-workflow conversion (WorkflowConversionService)
     security/              API key auth, rate limiting, Tailscale
     config/                Spring configuration, built-in template/skill seeders
@@ -24,16 +24,16 @@ ai-automation-backend/     Spring Boot 3.2 (Java 21) REST API
   src/main/resources/
     db/migration/          Flyway migrations (V1-V19, SQLite)
     application.yml        App config
-  docker/                  Dockerfiles for agent containers (Python, Node, Go)
+  docker/                  Dockerfiles (agent containers: Python/Node/Go, backend, stable)
 
 ai-automation-frontend/    React 18 SPA (TypeScript)
   src/
     api/client.ts          Shared API client (fetch-based, /api/v1 prefix)
     pages/                 Route pages (Dashboard, Projects, Workflows, Skills, Schedules, Webhooks, Settings, ...)
-    components/            UI components (ui/, layout/, dashboard/, workflow/, shared/, skill/)
+    components/            UI components (ui/, layout/, dashboard/, workflow/, shared/, skill/, schedule/)
     hooks/                 TanStack Query hooks (useWorkflows, useSkills, useProjects, useSchedules, useWebhooks, useConversion, useInsights, useTemplates, ...)
     data/                  Skill constants, static data
-    utils/                 Utility functions (formatTime, extractWorkflowVariables, templateUtils)
+    utils/                 Utility functions (formatTime, extractWorkflowVariables, templateUtils, workflowIcon)
     stores/                Zustand stores (settings, sidebar, theme, toast)
     i18n/                  Translations (de.ts, en.ts)
     types/index.ts         Shared TypeScript types
@@ -71,7 +71,7 @@ npm run cy:open                          # Open Cypress UI
 - **API client**: Singleton `api` instance in `src/api/client.ts` — all hooks use this
 - **i18n**: German (`de.ts`) and English (`en.ts`), both must be updated together
 - **Styling**: TailwindCSS utility classes, dark mode support via theme store
-- **PWA**: Vite PWA plugin configured, app name "AutoPilot"
+- **PWA**: Vite PWA plugin configured, app name "MySuricates"
 - **WebSocket**: Backend sends real-time updates via `/ws`, frontend connects via `useWebSocket` hook
 
 ## Architecture Notes
@@ -84,8 +84,8 @@ npm run cy:open                          # Open Cypress UI
   - `CLAUDE_CODE` and `CLAUDECODE` env vars are removed from the process environment to prevent nested-session errors
   - `CommandExecutorService` provides `executeCommandOnHost()` / `executeStepOnHost()` / `injectSkillContextOnHost()` methods
 - Docker containers have resource limits: 4GB memory, CPU quota, 100 PIDs, 60min idle timeout
-- Security is optional (disabled by default): API key auth via `X-API-Key` header, rate limiting
-- Block types: simple, retry, conditional, forEach, while, agentic, approval, sub-workflow, skill-capability
+- Security is enabled by default: API key auth via `X-API-Key` header (auto-generated if not configured), rate limiting
+- Block types: simple, shell, retry, conditional, forEach, while, agentic, approval, sub-workflow, skill-capability
 - Agentic blocks use a Goal→Reason→Act→Observe loop powered by Host Claude CLI
 - Workflow Conversion: Successful agentic runs can be converted to deterministic workflows (rule-based + AI)
 - Terminal WebSocket at `/ws/terminal` for real-time container access
@@ -168,6 +168,17 @@ Additional safety:
 - Max nesting depth: 5 levels
 - Polling-based completion with 30min timeout
 - `@Lazy` injection on `WorkflowExecutor` to break Spring DI cycle
+
+## Workflow Memory
+
+- Workflows can accumulate knowledge across runs via the memory system
+- `WorkflowMemoryController` — CRUD API at `/api/v1/workflows/{workflowId}/memory`
+- `WorkflowMemoryService` — extracts knowledge from completed runs, manages activation/deactivation
+- `HostCodexService` — runs OpenAI Codex CLI on the host for summarization tasks (analogous to `HostClaudeService`)
+- `CodexSummarizer` — uses Codex to summarize workflow run outputs into reusable knowledge
+- `SummarizationConfig` — configuration for the summarization backend
+- `WorkflowMemory` entity (V16 migration) — stores extracted knowledge entries per workflow
+- Frontend hook: `useWorkflowMemory.ts`
 
 ## Staging (Stable + Dev parallel)
 
