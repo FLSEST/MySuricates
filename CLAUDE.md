@@ -7,8 +7,8 @@ AI-powered workflow automation platform with a skill system, Docker-based execut
 ```
 ai-automation-backend/     Spring Boot 3.2 (Java 21) REST API
   src/main/java/com/automation/
-    controller/            REST controllers (Workflow, WorkflowTemplate, Skill, Execution, Learning, Schedule, Webhook, System, Project, Conversion, Todo, ActivityLog, WorkflowMemory, Staging)
-    entity/                JPA entities (Workflow, WorkflowTemplate, Skill, Project, Container, ScheduledWorkflow, WebhookTrigger, WorkflowRun, Todo, ActivityLog, WorkflowMemory, StepResult, BlockDefinition, ...)
+    controller/            REST controllers (Workflow, WorkflowTemplate, Skill, Execution, Learning, Schedule, Webhook, System, Project, Conversion, Todo, ActivityLog, WorkflowMemory, Staging, Chain)
+    entity/                JPA entities (Workflow, WorkflowTemplate, Skill, Project, Container, ScheduledWorkflow, WebhookTrigger, WorkflowRun, Todo, ActivityLog, WorkflowMemory, StepResult, BlockDefinition, WorkflowChain, ChainRun, ChainEntry, ChainRunEntry, ...)
     dto/                   Request/response DTOs
     mapper/                MapStruct mappers (Entity <-> DTO)
     repository/            Spring Data JPA repositories
@@ -18,6 +18,7 @@ ai-automation-backend/     Spring Boot 3.2 (Java 21) REST API
     service/ai/            Host CLI integration (HostClaudeService, HostCodexService)
     service/cli/           CLI execution and parsing (CommandExecutorService, CliSessionManager, ClaudeOutputParser, ClaudeJsonResponse, ShellCommandService)
     service/conversion/    Agentic-to-workflow conversion (WorkflowConversionService)
+    service/chain/         Workflow chain CRUD and sequential execution (ChainService, ChainExecutor)
     security/              API key auth, rate limiting, Tailscale
     config/                Spring configuration, built-in template/skill seeders
     websocket/             WebSocket for real-time updates
@@ -168,6 +169,22 @@ Additional safety:
 - Max nesting depth: 5 levels
 - Polling-based completion with 30min timeout
 - `@Lazy` injection on `WorkflowExecutor` to break Spring DI cycle
+
+## Workflow Chains
+
+- Chains group multiple workflows for sequential execution as a single unit
+- Cross-project: a chain belongs to no project and can reference workflows from any project
+- `WorkflowChain` entity with `entries` (JSON list of `ChainEntry` value objects) sorted by `sortOrder`
+- `ChainRun` entity tracks execution state with `entryRuns` (JSON list of `ChainRunEntry`)
+- `ChainService` — CRUD with workflow ID validation
+- `ChainExecutor` — async sequential execution using virtual threads, polling-based workflow completion (2s interval, 30min timeout)
+- Each entry builds context: chain-level + entry-level + `previous_chain_output` from last completed workflow
+- `stopOnFailure` flag at both chain and entry level — chain stops only if both are true
+- Cancellation via `ConcurrentHashMap<String, AtomicBoolean>`
+- WebSocket status broadcasts at `/topic/chains/{chainRunId}/status`
+- CRUD + execution API at `/api/v1/chains`
+- Frontend: Chains page with split-panel layout, pipeline visualization, create/edit modal with workflow search
+- Frontend: ChainExecution page with live polling and navigation to individual workflow runs
 
 ## Workflow Memory
 
