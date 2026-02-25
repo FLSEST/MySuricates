@@ -45,7 +45,8 @@ public class StagingService {
     }
 
     private record PromoteState(PromotePhase phase, int step, String error) {
-        static PromoteState idle() { return new PromoteState(PromotePhase.IDLE, 0, null); }
+        private static final PromoteState IDLE = new PromoteState(PromotePhase.IDLE, 0, null);
+        static PromoteState idle() { return IDLE; }
         static PromoteState of(PromotePhase phase, int step) { return new PromoteState(phase, step, null); }
         static PromoteState error(String msg) { return new PromoteState(PromotePhase.ERROR, 0, msg); }
     }
