@@ -48,7 +48,10 @@ export function Settings() {
   const handleBackup = async () => {
     setBackupLoading(true);
     try {
-      const res = await fetch('/api/v1/system/backup');
+      const headers: HeadersInit = {};
+      const storedKey = useSettingsStore.getState().apiKey;
+      if (storedKey) headers['X-API-Key'] = storedKey;
+      const res = await fetch('/api/v1/system/backup', { headers });
       if (!res.ok) throw new Error('Backup failed');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -67,13 +70,25 @@ export function Settings() {
     }
   };
 
-  const handleDownloadExisting = (filename: string) => {
-    const a = document.createElement('a');
-    a.href = `/api/v1/system/backups/${encodeURIComponent(filename)}`;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+  const handleDownloadExisting = async (filename: string) => {
+    const headers: HeadersInit = {};
+    const storedKey = useSettingsStore.getState().apiKey;
+    if (storedKey) headers['X-API-Key'] = storedKey;
+    try {
+      const res = await fetch(`/api/v1/system/backups/${encodeURIComponent(filename)}`, { headers });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      // silently fail
+    }
   };
 
   const formatBytes = (bytes: number) => {
