@@ -71,7 +71,8 @@ class SystemControllerTest {
                 .andExpect(jsonPath("$.name").value("MySuricates"))
                 .andExpect(jsonPath("$.version").value("0.1.0"))
                 .andExpect(jsonPath("$.java").exists())
-                .andExpect(jsonPath("$.tailscale").value("DISABLED"));
+                .andExpect(jsonPath("$.tailscale").value("DISABLED"))
+                .andExpect(jsonPath("$.environment").value("Dev"));
     }
 
     @Test

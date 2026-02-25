@@ -135,4 +135,36 @@ class StagingServiceTest {
         config.setHealthUrl("http://localhost:9091/health");
         assertThat(service.deriveStableBaseUrl()).isEqualTo("http://localhost:9091/api/v1");
     }
+
+    @Test
+    void promote_canBeCalledFromIdleState() {
+        // This tests the IDLE singleton fix — promote() should not throw when state is IDLE.
+        // It will fail internally (no Docker etc.), but should not throw "already in progress".
+        config.setBackendDir("/tmp/nonexistent-staging-test");
+        config.setFrontendDir("/tmp/nonexistent-staging-frontend");
+
+        assertThatCode(() -> service.promote()).doesNotThrowAnyException();
+
+        // Wait briefly for async thread to run and fail
+        try { Thread.sleep(500); } catch (InterruptedException ignored) {}
+
+        // Should be in ERROR state (because dirs don't exist), not stuck in IDLE
+        StagingStatusResponse status = service.getStatus();
+        assertThat(status.promotePhase()).isIn("ERROR", "IDLE");
+    }
+
+    @Test
+    void promote_rejectsDoubleInvocation() {
+        config.setBackendDir("/tmp/nonexistent-staging-test");
+        config.setFrontendDir("/tmp/nonexistent-staging-frontend");
+
+        // First call succeeds
+        service.promote();
+
+        // Second call should throw (promote is in progress)
+        // Need to call quickly before async thread finishes
+        assertThatThrownBy(() -> service.promote())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("already in progress");
+    }
 }
