@@ -211,6 +211,23 @@ export function WorkflowExecution() {
         )}
       </div>
 
+      {/* Input Variables */}
+      {run.inputContext && Object.keys(run.inputContext).length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-text-secondary">{t.workflows.execution.inputVariables}:</span>
+          {Object.entries(run.inputContext).map(([key, value]) => (
+            <span
+              key={key}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised text-xs font-mono"
+            >
+              <span className="text-text-secondary">{key}</span>
+              <span className="text-text-tertiary">=</span>
+              <span className="text-text">{String(value)}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Steps */}
         <Card padding={false}>

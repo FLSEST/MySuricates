@@ -159,6 +159,7 @@ export interface WorkflowRun {
   userRating: number | null;
   error: Record<string, unknown> | null;
   metadata: Record<string, unknown>;
+  inputContext?: Record<string, unknown>;
 }
 
 export interface StepResult {

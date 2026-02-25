@@ -216,6 +216,7 @@ export const de: TranslationKeys = {
       command: 'Befehl',
       commandPlaceholder: 'Befehl im Container ausführen...',
       sendCommand: 'Senden',
+      inputVariables: 'Eingabevariablen',
       commandSent: 'Befehl gesendet',
       commandFailed: 'Befehl fehlgeschlagen',
       terminal: {

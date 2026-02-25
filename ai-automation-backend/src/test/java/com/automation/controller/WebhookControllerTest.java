@@ -205,7 +205,7 @@ class WebhookControllerTest {
                 .build();
         WorkflowRunResponse runResponse = new WorkflowRunResponse(
                 "run-1", "wf-1", "Test Workflow", null, RunStatus.RUNNING, List.of(),
-                null, null, null, null, Map.of(), Map.of()
+                null, null, null, null, Map.of(), Map.of(), Map.of()
         );
 
         when(webhookService.trigger(eq("abc123token"), any())).thenReturn(run);
@@ -250,7 +250,7 @@ class WebhookControllerTest {
         WorkflowRun run = WorkflowRun.builder().id("run-1").status(RunStatus.RUNNING).build();
         WorkflowRunResponse runResponse = new WorkflowRunResponse(
                 "run-1", "wf-1", "Test Workflow", null, RunStatus.RUNNING, List.of(),
-                null, null, null, null, Map.of(), Map.of()
+                null, null, null, null, Map.of(), Map.of(), Map.of()
         );
 
         when(webhookService.trigger(eq("abc123token"), isNull())).thenReturn(run);

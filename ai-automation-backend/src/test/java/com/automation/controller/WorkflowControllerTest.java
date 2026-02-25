@@ -207,7 +207,7 @@ class WorkflowControllerTest {
 
         WorkflowRunResponse runResponse = new WorkflowRunResponse(
                 "run-1", "wf-1", "Test Workflow", "Test Project", RunStatus.RUNNING, List.of(),
-                Instant.now(), null, null, null, null, Map.of()
+                Instant.now(), null, null, null, null, Map.of(), Map.of()
         );
 
         when(workflowService.findById("wf-1")).thenReturn(testWorkflow);
@@ -234,7 +234,7 @@ class WorkflowControllerTest {
                 .id("run-1").workflow(testWorkflow).status(RunStatus.RUNNING).build();
         WorkflowRunResponse runResponse = new WorkflowRunResponse(
                 "run-1", "wf-1", "Test Workflow", "Test Project", RunStatus.RUNNING, List.of(),
-                null, null, null, null, null, null
+                null, null, null, null, null, null, null
         );
 
         when(workflowService.findById("wf-1")).thenReturn(testWorkflow);
@@ -262,7 +262,7 @@ class WorkflowControllerTest {
                 .id("run-1").workflow(testWorkflow).status(RunStatus.COMPLETED).build();
         WorkflowRunResponse runResponse = new WorkflowRunResponse(
                 "run-1", "wf-1", "Test Workflow", "Test Project", RunStatus.COMPLETED, List.of(),
-                null, null, null, null, null, null
+                null, null, null, null, null, null, null
         );
 
         when(runRepository.findById("run-1")).thenReturn(Optional.of(run));

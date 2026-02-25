@@ -75,6 +75,12 @@ public class WorkflowExecutor {
 
         Map<String, Object> contextVars = inputContext != null ? Map.copyOf(inputContext) : Map.of();
 
+        // Persist input context so it's visible in execution details
+        if (!contextVars.isEmpty()) {
+            run.setInputContext(new HashMap<>(contextVars));
+            run = runRepository.save(run);
+        }
+
         // Execute asynchronously — return the run immediately
         final String runId = run.getId();
         final String workflowId = workflow.getId();

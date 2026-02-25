@@ -55,6 +55,11 @@ public class WorkflowRun {
     @Builder.Default
     private Map<String, Object> metadata = new HashMap<>();
 
+    @Convert(converter = JsonMapConverter.class)
+    @Column(columnDefinition = "text")
+    @Builder.Default
+    private Map<String, Object> inputContext = new HashMap<>();
+
     public void addStep(StepResult step) {
         step.setWorkflowRun(this);
         if (step.getStepIndex() <= 0) {

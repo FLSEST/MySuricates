@@ -214,6 +214,7 @@ export const en = {
       command: 'Command',
       commandPlaceholder: 'Enter command to run in container...',
       sendCommand: 'Send',
+      inputVariables: 'Input Variables',
       commandSent: 'Command sent',
       commandFailed: 'Command failed',
       terminal: {

@@ -18,5 +18,6 @@ public record WorkflowRunResponse(
         Long durationMs,
         Integer userRating,
         Map<String, Object> error,
-        Map<String, Object> metadata
+        Map<String, Object> metadata,
+        Map<String, Object> inputContext
 ) {}
