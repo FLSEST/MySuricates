@@ -14,6 +14,8 @@ const Skills = lazy(() => import('./pages/Skills').then(m => ({ default: m.Skill
 const Schedules = lazy(() => import('./pages/Schedules').then(m => ({ default: m.Schedules })));
 const Webhooks = lazy(() => import('./pages/Webhooks').then(m => ({ default: m.Webhooks })));
 const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })));
+const Chains = lazy(() => import('./pages/Chains').then(m => ({ default: m.Chains })));
+const ChainExecution = lazy(() => import('./pages/ChainExecution').then(m => ({ default: m.ChainExecution })));
 const Todos = lazy(() => import('./pages/Todos').then(m => ({ default: m.Todos })));
 const ActivityLog = lazy(() => import('./pages/ActivityLog').then(m => ({ default: m.ActivityLog })));
 
@@ -28,6 +30,8 @@ const router = createBrowserRouter([
       { path: 'workflows', element: <Workflows /> },
       { path: 'workflows/:id', element: <WorkflowDetail /> },
       { path: 'workflows/:id/run/:runId', element: <WorkflowExecution /> },
+      { path: 'chains', element: <Chains /> },
+      { path: 'chains/:id/run/:runId', element: <ChainExecution /> },
       { path: 'runs', element: <Runs /> },
       { path: 'skills', element: <Skills /> },
       { path: 'schedules', element: <Schedules /> },

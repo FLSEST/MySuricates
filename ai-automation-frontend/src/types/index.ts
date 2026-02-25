@@ -551,6 +551,80 @@ export interface TodoCountResponse {
   done: number;
 }
 
+// ── Workflow Chain ──────────────────────────────────────
+
+export interface WorkflowChain {
+  id: string;
+  name: string;
+  description: string | null;
+  icon: string | null;
+  entries: ChainEntry[];
+  stopOnFailure: boolean;
+  runCount: number;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChainEntry {
+  workflowId: string;
+  workflowName: string | null;
+  projectName: string | null;
+  label: string | null;
+  sortOrder: number;
+  stopOnFailure: boolean;
+  inputContext: Record<string, unknown>;
+}
+
+export interface CreateChainRequest {
+  name: string;
+  description?: string;
+  icon?: string;
+  entries: ChainEntryRequest[];
+  stopOnFailure?: boolean;
+}
+
+export interface UpdateChainRequest {
+  name?: string;
+  description?: string;
+  icon?: string;
+  entries?: ChainEntryRequest[];
+  stopOnFailure?: boolean;
+}
+
+export interface ChainEntryRequest {
+  workflowId: string;
+  label?: string;
+  sortOrder: number;
+  stopOnFailure?: boolean;
+  inputContext?: Record<string, unknown>;
+}
+
+export interface ChainRun {
+  id: string;
+  chainId: string;
+  chainName: string | null;
+  status: RunStatus;
+  entryRuns: ChainRunEntry[];
+  inputContext: Record<string, unknown>;
+  startedAt: string | null;
+  completedAt: string | null;
+  durationMs: number | null;
+  error: string | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface ChainRunEntry {
+  entryIndex: number;
+  workflowId: string;
+  workflowName: string | null;
+  workflowRunId: string | null;
+  status: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  durationMs: number | null;
+}
+
 // ── API Error ────────────────────────────────────────────
 
 export interface ApiError {
