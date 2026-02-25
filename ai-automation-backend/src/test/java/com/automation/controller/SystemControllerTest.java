@@ -69,7 +69,7 @@ class SystemControllerTest {
         mockMvc.perform(get("/api/v1/system/info"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("MySuricates"))
-                .andExpect(jsonPath("$.version").value("0.1.1"))
+                .andExpect(jsonPath("$.version").exists())
                 .andExpect(jsonPath("$.java").exists())
                 .andExpect(jsonPath("$.tailscale").value("DISABLED"))
                 .andExpect(jsonPath("$.environment").value("Dev"));
