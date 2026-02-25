@@ -55,6 +55,9 @@ public class ExecutionContext {
     @Builder.Default
     private final Map<String, String> approvalMemory = new ConcurrentHashMap<>();
 
+    @Builder.Default
+    private final Map<String, Object> runMetadata = new ConcurrentHashMap<>();
+
     /**
      * Reserve the next step index for a RUNNING placeholder.
      * The subsequent call to nextStepIndex() will return this same value.
@@ -68,6 +71,10 @@ public class ExecutionContext {
     public int nextStepIndex() {
         int pre = preAllocatedIndex.getAndSet(-1);
         return pre >= 0 ? pre : stepCounter.getAndIncrement();
+    }
+
+    public void setRunMetadata(String key, Object value) {
+        runMetadata.put(key, value);
     }
 
     public void setVariable(String name, Object value) {

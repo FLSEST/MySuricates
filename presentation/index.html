@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clean Code &mdash; Prinzipien, Praxis, Projektanalyse</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/solarized.css" id="theme">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/monokai.css">
+  <style>
+    :root {
+      --r-heading-font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      --r-main-font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      --r-code-font: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+      --accent: #268bd2;
+      --warn: #cb4b16;
+      --good: #859900;
+    }
+    .reveal { font-size: 32px; }
+    .reveal h1, .reveal h2, .reveal h3 { text-transform: none; letter-spacing: -0.02em; }
+    .reveal h1 { font-size: 2.2em; font-weight: 700; }
+    .reveal h2 { font-size: 1.6em; font-weight: 600; color: var(--accent); }
+    .reveal h3 { font-size: 1.1em; font-weight: 600; color: #586e75; }
+    .reveal code { font-family: var(--r-code-font); }
+    .reveal pre { box-shadow: none; font-size: 0.55em; }
+    .reveal pre code { padding: 1em; border-radius: 8px; max-height: 500px; }
+    .reveal ul { list-style: none; padding-left: 0; }
+    .reveal ul li { margin-bottom: 0.4em; }
+    .reveal ul li::before { content: "\25B8"; color: var(--accent); margin-right: 0.5em; }
+    .reveal .accent { color: var(--accent); font-weight: 600; }
+    .reveal .warn { color: var(--warn); font-weight: 600; }
+    .reveal .good { color: var(--good); font-weight: 600; }
+    .reveal blockquote { background: rgba(0,0,0,0.04); border-left: 4px solid var(--accent); padding: 0.8em 1.2em; font-style: italic; font-size: 0.9em; border-radius: 4px; }
+    .reveal table { font-size: 0.65em; margin: 0 auto; border-collapse: collapse; }
+    .reveal table th { background: rgba(38,139,210,0.1); color: var(--accent); padding: 0.5em 0.8em; }
+    .reveal table td { padding: 0.4em 0.8em; border-bottom: 1px solid rgba(0,0,0,0.08); }
+    .reveal .badge { display: inline-block; padding: 0.15em 0.6em; border-radius: 4px; font-size: 0.7em; font-weight: 600; margin: 0 0.2em; }
+    .reveal .badge-good { background: rgba(133,153,0,0.15); color: var(--good); }
+    .reveal .badge-warn { background: rgba(203,75,22,0.15); color: var(--warn); }
+    .reveal .badge-crit { background: rgba(220,50,47,0.15); color: #dc322f; }
+    .reveal .title-slide h1 { margin-bottom: 0.1em; }
+    .reveal .title-slide p { color: #93a1a1; font-size: 0.7em; margin-top: 0.5em; }
+    .reveal .two-col { display: flex; gap: 2em; align-items: flex-start; }
+    .reveal .two-col > div { flex: 1; }
+    .reveal .fragment.fade-in-then-semi-out.visible:not(.current-fragment) { opacity: 0.4; }
+    .slide-number { font-size: 0.5em !important; }
+  </style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ============================================================ -->
+<!-- TITLE SLIDE -->
+<!-- ============================================================ -->
+<section class="title-slide" data-background-gradient="linear-gradient(135deg, #002b36 0%, #073642 50%, #002b36 100%)">
+  <h1>Clean Code</h1>
+  <h3 style="color: var(--accent); font-weight: 400;">Prinzipien, Praxis &amp; Projektanalyse</h3>
+  <p style="margin-top: 1.5em;">
+    Basierend auf Robert C. Martin, Martin Fowler &amp; einer realen Code-Analyse
+  </p>
+  <p>Februar 2026</p>
+  <aside class="notes">
+    Willkommen zur Praesentation ueber Clean Code.
+    Wir schauen uns heute nicht nur die Theorie an, sondern wenden die Prinzipien direkt auf ein reales Node.js-Projekt an.
+    Das Ziel: Verstaendnis dafuer entwickeln, warum Clean Code ueber den Quellcode hinausgeht.
+  </aside>
+</section>
+
+<!-- ============================================================ -->
+<!-- AGENDA -->
+<!-- ============================================================ -->
+<section>
+  <h2>Agenda</h2>
+  <ol style="list-style: decimal; padding-left: 1.5em; font-size: 0.85em;">
+    <li class="fragment">Warum Clean Code?</li>
+    <li class="fragment">Sprechende Namen</li>
+    <li class="fragment">Kleine Funktionen &amp; SRP</li>
+    <li class="fragment">DRY &mdash; Don&rsquo;t Repeat Yourself</li>
+    <li class="fragment">Kommentare &amp; Selbstdokumentation</li>
+    <li class="fragment">Fehlerbehandlung</li>
+    <li class="fragment">Testqualitaet &amp; Testehrlichkeit</li>
+    <li class="fragment">Projektkonsistenz</li>
+    <li class="fragment">Live-Analyse: Node.js Utility-Bibliothek</li>
+    <li class="fragment">Empfehlungen &amp; Fazit</li>
+  </ol>
+  <aside class="notes">
+    Die Praesentation ist in zehn Abschnitte gegliedert.
+    Wir starten mit den Grundlagen und arbeiten uns bis zur Analyse eines realen Projekts vor.
+    Am Ende gibt es konkrete, priorisierte Handlungsempfehlungen.
+  </aside>
+</section>
+
+<!-- ============================================================ -->
+<!-- 1. WARUM CLEAN CODE? -->
+<!-- ============================================================ -->
+<section>
+  <section>
+    <h2>1. Warum Clean Code?</h2>
+    <blockquote>
+      &ldquo;Any fool can write code that a computer can understand.<br>
+      Good programmers write code that <em>humans</em> can understand.&rdquo;
+      <br><span style="font-style: normal; color: #90a4ae;">&mdash; Martin Fowler</span>
+    </blockquote>
+    <aside class="notes">
+      Dieses Zitat bringt den Kern von Clean Code auf den Punkt.
+      Code wird einmal geschrieben, aber hundertmal gelesen.
+      Die Wartungskosten uebersteigen die Entwicklungskosten um ein Vielfaches.
+    </aside>
+  </section>
+  <section>
+    <h3>Der Business-Case</h3>
+    <ul>
+      <li class="fragment">Code wird <span class="accent">10x haeufiger gelesen</span> als geschrieben</li>
+      <li class="fragment">Wartung macht <span class="accent">60&ndash;80%</span> der Gesamtkosten aus</li>
+      <li class="fragment">Technische Schulden wachsen <span class="warn">exponentiell</span></li>
+      <li class="fragment">Clean Code ist kein Luxus &mdash; es ist <span class="good">Risikomanagement</span></li>
+    </ul>
+    <aside class="notes">
+      Der Business-Case ist klar: Lesbarkeit spart Geld.
+      Robert C. Martin beschreibt, wie technische Schulden Teams ausbremsen.
+      Jede Minute, die in sauberen Code investiert wird, spart spaeter ein Vielfaches.
+    </aside>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- 2. SPRECHENDE NAMEN -->
+<!-- ============================================================ -->
+<section>
+  <section>
+    <h2>2. Sprechende Namen</h2>
+    <ul>
+      <li class="fragment"><span class="accent">Absicht offenlegen</span> &mdash; der Name verraet das &bdquo;Warum&ldquo;</li>
+      <li class="fragment"><span class="warn">Abkuerzungen vermeiden</span> &mdash; <code>usr</code> &rarr; <code>user</code></li>
+      <li class="fragment">Klassen = <span class="accent">Substantive</span>, Methoden = <span class="accent">Verben</span></li>
+      <li class="fragment">Suchbare, aussprechbare Namen waehlen</li>
+    </ul>
+    <aside class="notes">
+      Clean-Code-Kapitel 2: Meaningful Names.
+      Ein guter Name ersetzt einen Kommentar.
+      Die Faustregel: Wenn jemand den Funktionsnamen liest, sollte er wissen, was die Funktion tut, ohne den Body lesen zu muessen.
+    </aside>
+  </section>
+  <section>
+    <h3>Praxis-Beispiel</h3>
+    <div class="two-col">
+      <div>
+        <p class="warn" style="font-size: 0.8em;">Unklar</p>
+        <pre><code class="language-javascript">function processData(items) {
+  // ???
+}</code></pre>
+      </div>
+      <div>
+        <p class="good" style="font-size: 0.8em;">Aussagekraeftig</p>
+        <pre><code class="language-javascript">function computeDoubleAndSquare(items) {
+  // Verdoppeln und Quadrieren
+}</code></pre>
+      </div>
+    </div>
+    <p class="fragment" style="font-size: 0.75em; color: #90a4ae; margin-top: 1em;">
+      &rarr; Der Name <code>processData</code> verraet weder <em>was</em> verarbeitet wird,
+      noch <em>wie</em> das Ergebnis aussieht.
+    </p>
+    <aside class="notes">
+      Dieses Beispiel stammt direkt aus unserem analysierten Projekt.
+      processData ist ein typischer generischer Name, der nichts verraet.
+      computeDoubleAndSquare macht Kommentare ueberfluessig.
+      In der Praxis wurde dieser Rename tatsaechlich als Verbesserungsmassnahme empfohlen und umgesetzt.
+    </aside>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- 3. KLEINE FUNKTIONEN & SRP -->
+<!-- ============================================================ -->
+<section>
+  <section>
+    <h2>3. Funktionen &amp; SRP</h2>
+    <ul>
+      <li class="fragment">Eine Funktion = <span class="accent">eine Aufgabe</span></li>
+      <li class="fragment">Ideallaenge: <span class="accent">&lt; 20 Zeilen</span></li>
+      <li class="fragment">Wenige Parameter: <span class="good">0&ndash;2</span> bevorzugt, <span class="warn">&ge; 3</span> hinterfragen</li>
+      <li class="fragment">Abstraktionsebene konsistent halten</li>
+    </ul>
+    <aside class="notes">
+      Clean-Code-Kapitel 3: Functions.
+      Das Single Responsibility Principle besagt: Eine Funktion sollte genau einen Grund haben, sich zu aendern.
+      Kurze Funktionen sind einfacher zu testen, zu benennen und zu verstehen.
+    </aside>
+  </section>
+  <section>
+    <h3>Vorbildlich: index.js</h3>
+    <pre><code class="language-javascript">function add(a, b) {
+  assertFiniteNumbers(a, b);
+  return a + b;
+}
+
+function divide(a, b) {
+  assertFiniteNumbers(a, b);
+  if (b === 0) throw new Error("Division by zero");
+  return a / b;
+}</code></pre>
+    <p class="fragment" style="font-size: 0.75em; color: var(--good);">
+      &#10004; Kurz &bull; Klar benannt &bull; Eine Aufgabe &bull; Wenige Parameter
+    </p>
+    <aside class="notes">
+      Diese Funktionen aus dem analysierten Projekt sind gute Beispiele fuer SRP.
+      Jede tut genau eine Sache. Die Validierung ist in eine Hilfsfunktion ausgelagert.
+      Die Funktionen sind so kurz, dass sie auf einen Blick erfassbar sind.
+    </aside>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- 4. DRY -->
+<!-- ============================================================ -->
+<section>
+  <section>
+    <h2>4. DRY &mdash; Don&rsquo;t Repeat Yourself</h2>
+    <blockquote>
+      &ldquo;Every piece of knowledge must have a single, unambiguous,
+      authoritative representation within a system.&rdquo;
+      <br><span style="font-style: normal; color: #90a4ae;">&mdash; Hunt &amp; Thomas, The Pragmatic Programmer</span>
+    </blockquote>
+    <aside class="notes">
+      Das DRY-Prinzip stammt aus dem Pragmatic Programmer von Hunt und Thomas, 1999.
+      Es geht nicht nur um Code-Duplikation, sondern um Wissens-Duplikation.
+      Wenn sich eine Validierungsregel aendert, darf die Aenderung nur an einer Stelle noetig sein.
+    </aside>
+  </section>
+  <section>
+    <h3>Vorher: Dreifache Duplizierung</h3>
+    <pre><code class="language-javascript">function add(a, b) {
+  if (typeof a !== 'number' || typeof b !== 'number')
+    throw new TypeError('Expected numbers');  // Zeile 3
+  return a + b;
+}
+function multiply(a, b) {
+  if (typeof a !== 'number' || typeof b !== 'number')
+    throw new TypeError('Expected numbers');  // Zeile 8
+  return a * b;
+}
+function divide(a, b) {
+  if (typeof a !== 'number' || typeof b !== 'number')
+    throw new TypeError('Expected numbers');  // Zeile 13
+  return a / b;
+}</code></pre>
+    <p class="fragment warn" style="font-size: 0.75em;">3 &times; dieselbe Guard-Clause &mdash; Aenderung erfordert 3 Stellen</p>
+    <aside class="notes">
+      Im Original-Code stand die identische Typenpruefung dreimal woertlich drin.
+      Das ist eine klare DRY-Verletzung: Wenn sich die Validierungslogik aendert, muessen drei Stellen angefasst werden.
+      Schlimmer noch: typeof NaN === 'number' ist true, d.h. NaN passiert die Pruefung unerkannt.
+    </aside>
+  </section>
+  <section>
+    <h3>Nachher: Zentralisiert</h3>
+    <pre><code class="language-javascript">function assertFiniteNumbers(a, b) {
+  if (!Number.isFinite(a) || !Number.isFinite(b))
+    throw new TypeError('Expected finite numbers');
+}
+
+function add(a, b) {
+  assertFiniteNumbers(a, b);
+  return a + b;
+}</code></pre>
+    <p class="fragment good" style="font-size: 0.75em;">
+      &#10004; Eine Stelle &bull; NaN-sicher &bull; 6 Zeilen weniger
+    </p>
+    <aside class="notes">
+      Die Loesung: Eine einzige Hilfsfunktion assertFiniteNumbers.
+      Bonus: Sie verwendet Number.isFinite statt typeof, und faengt damit auch NaN und Infinity ab.
+      Das ist ein schoenes Beispiel, wie DRY und Bugfix Hand in Hand gehen koennen.
+    </aside>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- 5. KOMMENTARE -->
+<!-- ============================================================ -->
+<section>
+  <section>
+    <h2>5. Kommentare</h2>
+    <ul>
+      <li class="fragment"><span class="accent">Guter Code ist selbstdokumentierend</span></li>
+      <li class="fragment">Kommentare erklaeren das <span class="accent">&bdquo;Warum&ldquo;</span>, nicht das &bdquo;Was&ldquo;</li>
+      <li class="fragment"><span class="warn">Keine Kommentare als Entschuldigung</span> fuer schlechten Code</li>
+    </ul>
+    <aside class="notes">
+      Clean-Code-Kapitel 4: Comments.
+      Robert C. Martin sagt: Der einzig gute Kommentar ist der, den du nicht schreiben musstest.
+      Wenn dein Code einen Kommentar braucht, um verstaendlich zu sein, ist wahrscheinlich der Code das Problem.
+    </aside>
+  </section>
+  <section>
+    <h3>Akzeptable Kommentare</h3>
+    <ul>
+      <li><span class="good">Legal:</span> Lizenzhinweise</li>
+      <li><span class="good">Informativ:</span> Regulaere Ausdruecke, komplexe Algorithmen</li>
+      <li><span class="good">TODO:</span> Geplante Verbesserungen (mit Ticket-Nummer)</li>
+      <li><span class="good">Warnung:</span> <code>// This test takes 30 minutes</code></li>
+    </ul>
+    <p class="fragment" style="font-size: 0.75em; color: #90a4ae; margin-top: 1em;">
+      Faustregel: Wenn du den Kommentar loeschen kannst und der Code trotzdem klar ist &mdash; loesche ihn.
+    </p>
+    <aside class="notes">
+      Nicht alle Kommentare sind schlecht.
+      Rechtliche Hinweise, Warnungen vor Seiteneffekten, und TODOs mit Kontext sind voellig in Ordnung.
+      Aber: auskommentierter Code, redundante Kommentare wie "// addiert zwei Zahlen" bei einer add-Funktion, und Journal-Kommentare gehoeren nicht in modernen Code.
+    </aside>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- 6. FEHLERBEHANDLUNG -->
+<!-- ============================================================ -->
+<section>
+  <section>
+    <h2>6. Fehlerbehandlung</h2>
+    <ul>
+      <li class="fragment">Exceptions statt Error Codes <span class="good">&#10004;</span></li>
+      <li class="fragment"><span class="accent">Kontext mitgeben</span> &mdash; was ging schief und warum?</li>
+      <li class="fragment"><span class="warn">Niemals <code>null</code> zurueckgeben</span> statt eine Exception zu werfen</li>
+      <li class="fragment">Fail fast &mdash; Fehler so frueh wie moeglich melden</li>
+    </ul>
+    <aside class="notes">
+      Clean-Code-Kapitel 7: Error Handling.
+      Exceptions trennen die Fehlerbehandlung von der normalen Logik.
+      Error Codes erzwingen verschachtelte if-else-Bloecke und verschleiern den Happy Path.
+    </aside>
+  </section>
+  <section>
+    <h3>Realer Bug: Division durch Null</h3>
+    <div class="two-col">
+      <div>
+        <p class="warn" style="font-size: 0.8em;">Buggy (Original)</p>
+        <pre><code class="language-javascript">function divide(a, b) {
+  if (typeof a !== 'number' ...)
+    throw new TypeError(...);
+  // b === 0 nicht geprueft!
+  return a / b;  // → Infinity
+}</code></pre>
+      </div>
+      <div>
+        <p class="good" style="font-size: 0.8em;">Korrigiert</p>
+        <pre><code class="language-javascript">function divide(a, b) {
+  assertFiniteNumbers(a, b);
+  if (b === 0)
+    throw new Error(
+      "Division by zero"
+    );
+  return a / b;
+}</code></pre>
+      </div>
+    </div>
+    <p class="fragment" style="font-size: 0.75em; color: #90a4ae;">
+      <code>divide(5, 0)</code> gab <code>Infinity</code> zurueck statt einen Fehler zu werfen.
+    </p>
+    <aside class="notes">
+      Im Original-Code fehlte die Pruefung auf Division durch Null.
+      JavaScript gibt in diesem Fall Infinity zurueck, statt einen Fehler zu werfen.
+      Das ist ein stilles Fehlverhalten, das sich durch die gesamte Aufrufkette propagieren kann.
+      Die korrigierte Version wirft eine explizite Exception — fail fast.
+    </aside>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- 7. TESTQUALITAET -->
+<!-- ============================================================ -->
+<section>
+  <section>
+    <h2>7. Tests &amp; Testehrlichkeit</h2>
+    <ul>
+      <li class="fragment">Tests sind <span class="accent">ausfuehrbarer Vertrag</span></li>
+      <li class="fragment">Struktur: <span class="accent">Arrange &rarr; Act &rarr; Assert</span></li>
+      <li class="fragment">Happy Path + Edge Cases + <span class="warn">Fehlerszenarien</span></li>
+    </ul>
+    <aside class="notes">
+      Tests sind nicht optional. Sie sind der ausfuehrbare Beweis, dass der Code tut, was er soll.
+      Ein guter Test hat drei Phasen: Setup, Ausfuehrung, Verifizierung.
+      Und er testet nicht nur den Normalfall, sondern auch Grenzfaelle und Fehlersituationen.
+    </aside>
+  </section>
+  <section>
+    <h3>Testabdeckung im Projekt</h3>
+    <table>
+      <thead>
+        <tr><th>Funktion</th><th>Happy Path</th><th>Edge Cases</th><th>Fehler</th><th>Gesamt</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>add</code></td><td>1</td><td>2</td><td>1</td><td>4</td></tr>
+        <tr><td><code>multiply</code></td><td>1</td><td>2</td><td>1</td><td>4</td></tr>
+        <tr><td><code>divide</code></td><td>1</td><td>1</td><td>3</td><td>5</td></tr>
+        <tr><td><code>processData</code></td><td>1</td><td>2</td><td>4</td><td>7</td></tr>
+        <tr style="font-weight: 600; color: var(--accent);"><td>Gesamt</td><td>4</td><td>7</td><td>9</td><td>20</td></tr>
+      </tbody>
+    </table>
+    <p class="fragment good" style="font-size: 0.75em;">&#10004; Vorbildliche Struktur mit <code>describe</code>/<code>it</code>-Bloecken</p>
+    <aside class="notes">
+      Die Testdatei im Projekt ist strukturell vorbildlich.
+      20 Tests, sauber nach Funktion gruppiert, mit klaren Beschreibungen.
+      Sowohl Happy Paths als auch Edge Cases und Fehlerszenarien werden abgedeckt.
+      Aber es gibt ein grosses Problem...
+    </aside>
+  </section>
+  <section data-background-color="#073642">
+    <h3>Das Testehrlichkeits-Problem</h3>
+    <pre><code class="language-json">{
+  "scripts": {
+    "test":  "echo 'Tests passed'",
+    "lint":  "echo 'Lint passed'",
+    "build": "echo 'Build successful'"
+  }
+}</code></pre>
+    <p class="fragment warn" style="font-size: 0.85em;">
+      <code>npm test</code> meldet <em>immer</em> Erfolg &mdash;<br>
+      unabhaengig davon, ob Tests bestehen.
+    </p>
+    <p class="fragment" style="font-size: 0.75em; color: #ef5350;">
+      &#9888; Tests, die nie laufen, sind schlimmer als keine Tests:<br>
+      Sie erzeugen <strong>falsches Vertrauen</strong>.
+    </p>
+    <aside class="notes">
+      Hier kommt der kritischste Befund der Analyse.
+      Alle drei QA-Scripts in package.json sind Fake-Implementierungen.
+      npm test gibt immer "Tests passed" aus und Exit-Code 0, ohne die Tests auszufuehren.
+      Jede CI/CD-Pipeline, die sich darauf verlaesst, wuerde niemals einen Fehler melden.
+      Robert C. Martin wuerde das unter dem Prinzip der Ehrlichkeit im Code einordnen:
+      Code soll tun, was er vorgibt zu tun.
+    </aside>
+  </section>
+  <section>
+    <h3>Die Korrektur</h3>
+    <pre><code class="language-json">{
+  "scripts": {
+    "test": "node --test index.test.js"
+  }
+}</code></pre>
+    <p class="fragment good" style="font-size: 0.85em;">
+      &#10004; Aktiviert alle 20 vorhandenen Tests sofort<br>
+      &#10004; Wirkungsvollste Einzelmassnahme &mdash; weniger als 1 Minute
+    </p>
+    <aside class="notes">
+      Die Loesung ist trivial: Eine Zeile aendern.
+      node --test ist das eingebaute Test-Framework von Node.js.
+      Damit werden die 20 bereits geschriebenen Tests sofort aktiv.
+      Das zeigt: Manchmal liegt der groesste Hebel nicht im Code, sondern in der Konfiguration.
+    </aside>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- 8. PROJEKTKONSISTENZ -->
+<!-- ============================================================ -->
+<section>
+  <section>
+    <h2>8. Projektkonsistenz</h2>
+    <p style="font-size: 0.85em;">Clean Code erstreckt sich ueber den Quellcode hinaus.</p>
+    <ul>
+      <li class="fragment">README &hArr; tatsaechliche Funktionalitaet</li>
+      <li class="fragment">API-Spec &hArr; implementierter Code</li>
+      <li class="fragment">Build-Scripts &hArr; echte Qualitaetssicherung</li>
+      <li class="fragment">Praesentationsnotizen &hArr; angewandte Prinzipien</li>
+    </ul>
+    <aside class="notes">
+      Ein oft uebersehener Aspekt von Clean Code: Projektkonsistenz.
+      Wenn Dokumentation und Code sich widersprechen, entsteht Vertrauensschuld.
+      Das ist schwerer zu beheben als technische Schulden, weil es die Faehigkeit untergräbt, den tatsaechlichen Zustand des Projekts einzuschaetzen.
+    </aside>
+  </section>
+  <section>
+    <h3>Widerspruechliche Artefakte</h3>
+    <table>
+      <thead>
+        <tr><th>Artefakt</th><th>Behauptet</th><th>Realitaet</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>api-spec.yaml</code></td>
+          <td>Todo-REST-API</td>
+          <td class="warn">Math-Utilities</td>
+        </tr>
+        <tr>
+          <td><code>npm test</code></td>
+          <td>&bdquo;Tests passed&ldquo;</td>
+          <td class="warn">Kein Test laeuft</td>
+        </tr>
+        <tr>
+          <td><code>README</code></td>
+          <td><code>npm install</code> noetig</td>
+          <td class="warn">0 Dependencies</td>
+        </tr>
+        <tr>
+          <td><code>npm start</code></td>
+          <td>Sichtbarer Output</td>
+          <td class="warn">Kein Output</td>
+        </tr>
+      </tbody>
+    </table>
+    <aside class="notes">
+      Im analysierten Projekt gibt es vier zentrale Widersprueche.
+      Die API-Spec beschreibt eine Todo-API, aber der Code macht Mathematik.
+      npm test luegt, die README fuehrt in die Irre, npm start produziert keinen Output.
+      Das Muster ist klar: Kein einzelner Artefakt ist an sich schlecht, aber sie passen nicht zusammen.
+    </aside>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- 9. LIVE-ANALYSE SCORECARD -->
+<!-- ============================================================ -->
+<section>
+  <section>
+    <h2>9. Analyse-Ergebnis</h2>
+    <h3>Clean-Code-Scorecard</h3>
+    <table style="font-size: 0.6em;">
+      <thead>
+        <tr><th>Dimension</th><th>Bewertung</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Funktionsdesign &amp; SRP</td><td><span class="badge badge-good">gut</span></td></tr>
+        <tr><td>Namensgebung</td><td><span class="badge badge-warn">befriedigend</span></td></tr>
+        <tr><td>DRY-Prinzip</td><td><span class="badge badge-crit">mangelhaft</span></td></tr>
+        <tr><td>Eingabevalidierung</td><td><span class="badge badge-crit">mangelhaft</span></td></tr>
+        <tr><td>Testqualitaet</td><td><span class="badge badge-good">gut</span></td></tr>
+        <tr><td>Testausfuehrbarkeit</td><td><span class="badge badge-crit">kritisch</span></td></tr>
+        <tr><td>Projektkonfiguration</td><td><span class="badge badge-crit">kritisch</span></td></tr>
+        <tr><td>Artefakt-Konsistenz</td><td><span class="badge badge-crit">kritisch</span></td></tr>
+      </tbody>
+    </table>
+    <aside class="notes">
+      Die Scorecard zeigt das zweigeteilte Bild:
+      Der Code selbst ist gut — kurze Funktionen, klare Verantwortlichkeiten, gute Tests.
+      Die Infrastruktur drumherum ist kritisch: Fake-Scripts, widersprüchliche Artefakte.
+      Das Kernproblem ist nicht mangelnde Codequalitaet, sondern die Diskrepanz zwischen dem, was das Projekt vorgibt zu sein, und dem, was es tatsaechlich tut.
+    </aside>
+  </section>
+  <section>
+    <h3>Faktencheck ueber alle Dateien</h3>
+    <table style="font-size: 0.6em;">
+      <thead>
+        <tr><th>Datei</th><th style="color: var(--good);">Korrekt</th><th style="color: #ffa726;">Unklar</th><th style="color: var(--warn);">Falsch</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>notes.md</code></td><td>8</td><td>0</td><td>0</td></tr>
+        <tr><td><code>resume.md</code></td><td>4</td><td>0</td><td>0</td></tr>
+        <tr><td><code>README.md</code></td><td>3</td><td>1</td><td>1</td></tr>
+        <tr><td><code>index.js</code></td><td>5</td><td>1</td><td>0</td></tr>
+        <tr><td><code>package.json</code></td><td>1</td><td>0</td><td>3</td></tr>
+        <tr><td><code>api-spec.yaml</code></td><td>1</td><td>0</td><td>1</td></tr>
+        <tr style="font-weight: 600;"><td>Gesamt</td><td class="good">22</td><td style="color:#ffa726;">2</td><td class="warn">5</td></tr>
+      </tbody>
+    </table>
+    <aside class="notes">
+      Der Faktencheck ueber alle Projektdateien zeigt 22 korrekte, 2 unklare und 5 falsche Aussagen.
+      Die falschen Aussagen konzentrieren sich auf package.json (Fake-Scripts) und api-spec.yaml (falsches System beschrieben).
+      Besonders auffaellig: Der eigentliche Code und die Praesentationsnotizen sind fehlerfrei.
+    </aside>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- 10. EMPFEHLUNGEN -->
+<!-- ============================================================ -->
+<section>
+  <section>
+    <h2>10. Empfehlungen</h2>
+    <h3 style="color: #ef5350;">Sofort (kritisch)</h3>
+    <ol style="list-style: decimal; padding-left: 1.5em; font-size: 0.85em;">
+      <li class="fragment"><strong>Test-Script aktivieren</strong><br>
+        <code style="font-size:0.8em;">"test": "node --test index.test.js"</code>
+      </li>
+      <li class="fragment"><strong>NaN-Defekt beheben</strong><br>
+        <code style="font-size:0.8em;">Number.isFinite()</code> statt <code style="font-size:0.8em;">typeof</code>
+      </li>
+      <li class="fragment"><strong>Eingabevalidierung</strong> in <code>processData</code></li>
+    </ol>
+    <aside class="notes">
+      Die drei kritischsten Massnahmen.
+      Test-Script aktivieren ist die wirkungsvollste Einzelmassnahme: eine Zeile, 20 Tests sofort aktiv.
+      NaN-Defekt und Eingabevalidierung koennen gleichzeitig mit der DRY-Loesung behoben werden.
+      Alle drei zusammen sind in unter 10 Minuten umgesetzt.
+    </aside>
+  </section>
+  <section>
+    <h3 style="color: #ffa726;">Kurzfristig (empfohlen)</h3>
+    <ol start="4" style="list-style: decimal; padding-left: 1.5em; font-size: 0.85em;">
+      <li class="fragment"><strong>README aktualisieren</strong> &mdash; Realitaet dokumentieren</li>
+      <li class="fragment"><strong>API-Spec klaeren</strong> &mdash; entfernen oder vervollstaendigen</li>
+      <li class="fragment"><strong>Funktionsname praezsieren</strong> &mdash; <code>processData</code> &rarr; <code>computeDoubleAndSquare</code></li>
+    </ol>
+    <h3 style="color: var(--accent); margin-top: 0.8em;">Langfristig (optional)</h3>
+    <ol start="7" style="list-style: decimal; padding-left: 1.5em; font-size: 0.85em;">
+      <li class="fragment">ESLint-Integration</li>
+      <li class="fragment">CI/CD-Pipeline mit echten Checks</li>
+      <li class="fragment">JSDoc oder TypeScript fuer Typsicherheit</li>
+    </ol>
+    <aside class="notes">
+      Die kurzfristigen Massnahmen stellen die Konsistenz zwischen Artefakten her.
+      Langfristig geht es um professionelle Tooling-Integration.
+      Wichtig: Die Reihenfolge ist nicht zufaellig — die kritischen Massnahmen zuerst,
+      weil sie das meiste Risiko eliminieren.
+    </aside>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- FAZIT -->
+<!-- ============================================================ -->
+<section>
+  <section>
+    <h2>Fazit</h2>
+    <ul>
+      <li class="fragment">Schreibe Code fuer <span class="accent">Menschen</span>, nicht fuer Maschinen</li>
+      <li class="fragment">Clean Code = <span class="accent">Code</span> + <span class="accent">Tests</span> + <span class="accent">Konfiguration</span> + <span class="accent">Dokumentation</span></li>
+      <li class="fragment"><span class="good">Refactore kontinuierlich</span> &mdash; die Boy-Scout-Regel</li>
+      <li class="fragment"><span class="warn">Vertrauensschuld</span> wiegt schwerer als technische Schulden</li>
+    </ul>
+    <aside class="notes">
+      Die zentrale Erkenntnis dieser Praesentation: Clean Code endet nicht beim Quellcode.
+      Wenn npm test luegt, ist das eine Form von Unehrlichkeit im System.
+      Die Boy-Scout-Regel besagt: Hinterlasse den Code sauberer, als du ihn vorgefunden hast.
+      Das gilt fuer Dokumentation, Konfiguration und Tests genauso wie fuer den Code selbst.
+    </aside>
+  </section>
+  <section data-background-gradient="linear-gradient(135deg, #002b36 0%, #073642 50%, #002b36 100%)">
+    <h2>Die Kernbotschaft</h2>
+    <blockquote style="font-size: 1.1em;">
+      Ein Projekt, in dem <code>npm test</code> luegt,
+      die README taeuscht und die API-Spec keinen Bezug zur Implementierung hat,
+      verletzt das Grundprinzip der Ehrlichkeit &mdash;
+      <span class="accent">unabhaengig davon, wie sauber die einzelnen Funktionen geschrieben sind.</span>
+    </blockquote>
+    <aside class="notes">
+      Das ist der Satz, den die Zuhoerer mitnehmen sollen.
+      Code-Qualitaet allein reicht nicht. Das gesamte Projekt muss ehrlich sein.
+      Die gute Nachricht: Die Codebasis ist tragfaehig, und die kritischsten Korrekturen sind trivial umzusetzen.
+    </aside>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- QUELLEN -->
+<!-- ============================================================ -->
+<section>
+  <h2>Quellen</h2>
+  <ul style="font-size: 0.65em;">
+    <li>Martin, Robert C. (2008): <em>Clean Code: A Handbook of Agile Software Craftsmanship</em>. Prentice Hall.</li>
+    <li>Fowler, Martin (1999): <em>Refactoring: Improving the Design of Existing Code</em>. Addison-Wesley.</li>
+    <li>Hunt, Andrew; Thomas, David (1999): <em>The Pragmatic Programmer</em>. Addison-Wesley.</li>
+    <li>OpenAPI Initiative (2017): <em>OpenAPI Specification 3.0.0</em></li>
+    <li>Node.js Documentation: <em>Test Runner</em> (<code>node:test</code>)</li>
+  </ul>
+  <aside class="notes">
+    Die vollstaendigen Quellenangaben sind hier aufgelistet.
+    Die Analyse basiert primaer auf Robert C. Martins Clean Code, ergaenzt durch Fowler und Hunt/Thomas.
+    Fuer die API-Spec-Bewertung wurde die OpenAPI-Spezifikation 3.0.0 herangezogen.
+  </aside>
+</section>
+
+<!-- ============================================================ -->
+<!-- DANKE -->
+<!-- ============================================================ -->
+<section data-background-gradient="linear-gradient(135deg, #002b36 0%, #073642 50%, #002b36 100%)">
+  <h1 style="font-size: 2.5em;">Fragen?</h1>
+  <p style="color: #90a4ae; font-size: 0.7em; margin-top: 2em;">
+    Clean Code &mdash; Prinzipien, Praxis &amp; Projektanalyse<br>
+    Februar 2026
+  </p>
+  <aside class="notes">
+    Vielen Dank fuer die Aufmerksamkeit.
+    Ich freue mich auf Fragen und Diskussion.
+    Besonders interessant sind Erfahrungen mit Fake-Scripts und Vertrauensschuld in eigenen Projekten.
+  </aside>
+</section>
+
+</div><!-- /slides -->
+</div><!-- /reveal -->
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/zoom/zoom.js"></script>
+<script>
+  Reveal.initialize({
+    hash: true,
+    slideNumber: 'c/t',
+    showSlideNumber: 'all',
+    transition: 'slide',
+    transitionSpeed: 'default',
+    backgroundTransition: 'fade',
+    center: true,
+    width: 1280,
+    height: 720,
+    margin: 0.08,
+    plugins: [RevealNotes, RevealHighlight, RevealZoom]
+  });
+</script>
+</body>
+</html>

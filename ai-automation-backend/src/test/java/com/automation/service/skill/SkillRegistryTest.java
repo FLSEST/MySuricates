@@ -28,7 +28,7 @@ class SkillRegistryTest {
 
     @BeforeEach
     void setUp() {
-        skillRegistry = new SkillRegistry(List.of(), capabilityRegistry);
+        skillRegistry = new SkillRegistry(capabilityRegistry);
 
         testCapability = Capability.builder()
                 .id("cap-1")

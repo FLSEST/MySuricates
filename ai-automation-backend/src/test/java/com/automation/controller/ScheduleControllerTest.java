@@ -81,7 +81,7 @@ class ScheduleControllerTest {
                 .build();
 
         testResponse = new ScheduledWorkflowResponse(
-                "sched-1", "wf-1", "Test Workflow", "0 0 * * * *", "CRON", null,
+                "sched-1", "wf-1", "Test Workflow", null, "0 0 * * * *", "CRON", null,
                 true, "Hourly run", Map.of(), null,
                 Instant.parse("2026-02-16T00:00:00Z"), testScheduled.getCreatedAt()
         );
@@ -173,7 +173,7 @@ class ScheduleControllerTest {
                 .enabled(true)
                 .build();
         ScheduledWorkflowResponse onceResponse = new ScheduledWorkflowResponse(
-                "sched-once", "wf-1", "Test Workflow", "", "ONCE",
+                "sched-once", "wf-1", "Test Workflow", null, "", "ONCE",
                 Instant.parse("2026-03-01T10:00:00Z"),
                 true, null, Map.of(), null,
                 Instant.parse("2026-03-01T10:00:00Z"), null
@@ -214,7 +214,7 @@ class ScheduleControllerTest {
         testScheduled.setEnabled(false);
         when(schedulerService.disable("sched-1")).thenReturn(testScheduled);
         ScheduledWorkflowResponse disabledResponse = new ScheduledWorkflowResponse(
-                "sched-1", "wf-1", "Test Workflow", "0 0 * * * *", "CRON", null,
+                "sched-1", "wf-1", "Test Workflow", null, "0 0 * * * *", "CRON", null,
                 false, "Hourly run", Map.of(), null, null, testScheduled.getCreatedAt()
         );
         when(scheduleMapper.toResponse(testScheduled)).thenReturn(disabledResponse);

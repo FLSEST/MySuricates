@@ -31,6 +31,9 @@ public class RetryBlockExecutor implements BlockExecutor {
         String executionMode = (String) config.getOrDefault("execution_mode", "claude");
         boolean isShell = "shell".equals(executionMode);
         int shellTimeout = ((Number) config.getOrDefault("timeout_seconds", DEFAULT_SHELL_TIMEOUT)).intValue();
+        Integer claudeTimeout = config.containsKey("timeout_seconds")
+                ? ((Number) config.get("timeout_seconds")).intValue()
+                : null;
 
         StepResult lastResult = StepResult.builder()
                 .stepIndex(context.nextStepIndex())
@@ -72,7 +75,8 @@ public class RetryBlockExecutor implements BlockExecutor {
                                 .build(),
                         context.nextStepIndex(),
                         context.getInstructionPrefix(),
-                        context.getModel()
+                        context.getModel(),
+                        claudeTimeout
                 );
             }
 

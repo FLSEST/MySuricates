@@ -58,7 +58,7 @@ public class SystemTrayService {
         this.dockerClient = dockerClient;
     }
 
-    record TrayState(int activeRuns, long runsToday, long failedToday, int pendingApprovals, boolean dockerOk, boolean frontendOk) {
+    record TrayState(int activeRuns, long runsToday, long failedToday, int pendingApprovals, boolean dockerOk, boolean frontendOk, boolean stableOk) {
         int successPercent() {
             if (runsToday == 0) return 100;
             return (int) ((runsToday - failedToday) * 100 / runsToday);
@@ -86,7 +86,7 @@ public class SystemTrayService {
             trayIcon = new TrayIcon(icon, "MySuricates | Starting...");
             trayIcon.setImageAutoSize(false);
 
-            PopupMenu menu = buildMenu(new TrayState(0, 0, 0, 0, false, false));
+            PopupMenu menu = buildMenu(new TrayState(0, 0, 0, 0, false, false, false));
             trayIcon.setPopupMenu(menu);
 
             systemTray.add(trayIcon);
@@ -183,24 +183,24 @@ public class SystemTrayService {
         int pendingApprovals = workflowExecutor.getPendingApprovalCount();
         boolean dockerOk = checkDocker();
         boolean frontendOk = checkFrontend();
+        boolean stableOk = checkStable();
 
-        return new TrayState(activeRuns, runsToday, failedToday, pendingApprovals, dockerOk, frontendOk);
+        return new TrayState(activeRuns, runsToday, failedToday, pendingApprovals, dockerOk, frontendOk, stableOk);
     }
 
     IconColor determineIconColor(TrayState state) {
         if (state.failedToday > 0 && (previousState == null || state.failedToday > previousState.failedToday)) {
             return IconColor.RED;
         }
-        if (!state.dockerOk || !state.frontendOk || state.pendingApprovals > 0) {
+        if (!state.dockerOk || !state.frontendOk || !state.stableOk || state.pendingApprovals > 0) {
             return IconColor.YELLOW;
         }
         return IconColor.GREEN;
     }
 
     private String buildTooltip(TrayState state) {
-        return String.format("MySuricates | UP | Docker: %s | Frontend: %s | %d aktiv | %d%% Erfolg",
-                state.dockerOk ? "OK" : "Offline",
-                state.frontendOk ? "OK" : "Offline",
+        return String.format("MySuricates | Dev: UP | Stable: %s | %d aktiv | %d%% Erfolg",
+                state.stableOk ? "UP" : "Offline",
                 state.activeRuns,
                 state.successPercent());
     }
@@ -212,20 +212,26 @@ public class SystemTrayService {
         header.setEnabled(false);
         menu.add(header);
 
-        MenuItem statusItem = new MenuItem(String.format("Server: UP | Docker: %s | Frontend: %s",
+        menu.addSeparator();
+
+        String devStatus = String.format("Dev  [localhost:3000]  %s", "UP");
+        MenuItem devItem = new MenuItem(devStatus);
+        devItem.setEnabled(false);
+        menu.add(devItem);
+
+        String stableStatus = String.format("Stable [localhost:9091]  %s", state.stableOk ? "UP" : "Offline");
+        MenuItem stableItem = new MenuItem(stableStatus);
+        stableItem.setEnabled(false);
+        menu.add(stableItem);
+
+        menu.addSeparator();
+
+        MenuItem dockerItem = new MenuItem(String.format("Docker: %s | %d aktiv | %d%% Erfolg",
                 state.dockerOk ? "OK" : "Offline",
-                state.frontendOk ? "OK" : "Offline"));
-        statusItem.setEnabled(false);
-        menu.add(statusItem);
-
-        MenuItem activeItem = new MenuItem("Aktive Runs: " + state.activeRuns);
-        activeItem.setEnabled(false);
-        menu.add(activeItem);
-
-        MenuItem todayItem = new MenuItem(String.format("Heute: %d Runs (%d%%)",
-                state.runsToday, state.successPercent()));
-        todayItem.setEnabled(false);
-        menu.add(todayItem);
+                state.activeRuns,
+                state.successPercent()));
+        dockerItem.setEnabled(false);
+        menu.add(dockerItem);
 
         menu.addSeparator();
 
@@ -236,13 +242,21 @@ public class SystemTrayService {
             menu.addSeparator();
         }
 
-        MenuItem webUiItem = new MenuItem("Web-UI oeffnen");
-        webUiItem.addActionListener(e -> openUrl(trayConfig.getWebUiUrl()));
-        menu.add(webUiItem);
+        MenuItem devUiItem = new MenuItem("Dev Web-UI oeffnen");
+        devUiItem.addActionListener(e -> openUrl(trayConfig.getWebUiUrl()));
+        menu.add(devUiItem);
 
-        MenuItem dashboardItem = new MenuItem("Dashboard");
-        dashboardItem.addActionListener(e -> openUrl(trayConfig.getWebUiUrl() + "/"));
-        menu.add(dashboardItem);
+        MenuItem stableUiItem = new MenuItem("Stable Web-UI oeffnen");
+        stableUiItem.addActionListener(e -> openUrl(trayConfig.getStableUrl()));
+        menu.add(stableUiItem);
+
+        MenuItem dashboardDevItem = new MenuItem("Dashboard (Dev)");
+        dashboardDevItem.addActionListener(e -> openUrl(trayConfig.getWebUiUrl() + "/"));
+        menu.add(dashboardDevItem);
+
+        MenuItem dashboardStableItem = new MenuItem("Dashboard (Stable)");
+        dashboardStableItem.addActionListener(e -> openUrl(trayConfig.getStableUrl() + "/"));
+        menu.add(dashboardStableItem);
 
         MenuItem activityItem = new MenuItem("Activity Log");
         activityItem.addActionListener(e -> openUrl(trayConfig.getWebUiUrl() + "/activity"));
@@ -297,6 +311,20 @@ public class SystemTrayService {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(trayConfig.getWebUiUrl()))
+                    .timeout(Duration.ofSeconds(3))
+                    .method("HEAD", HttpRequest.BodyPublishers.noBody())
+                    .build();
+            HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
+            return response.statusCode() < 500;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    boolean checkStable() {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(trayConfig.getStableUrl() + "/api/v1/system/health"))
                     .timeout(Duration.ofSeconds(3))
                     .method("HEAD", HttpRequest.BodyPublishers.noBody())
                     .build();

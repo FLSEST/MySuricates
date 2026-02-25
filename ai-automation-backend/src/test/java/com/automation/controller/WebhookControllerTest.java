@@ -204,7 +204,7 @@ class WebhookControllerTest {
                 .status(RunStatus.RUNNING)
                 .build();
         WorkflowRunResponse runResponse = new WorkflowRunResponse(
-                "run-1", "wf-1", "Test Workflow", RunStatus.RUNNING, List.of(),
+                "run-1", "wf-1", "Test Workflow", null, RunStatus.RUNNING, List.of(),
                 null, null, null, null, Map.of(), Map.of()
         );
 
@@ -249,7 +249,7 @@ class WebhookControllerTest {
     void triggerWebhook_noBody_returnsOk() throws Exception {
         WorkflowRun run = WorkflowRun.builder().id("run-1").status(RunStatus.RUNNING).build();
         WorkflowRunResponse runResponse = new WorkflowRunResponse(
-                "run-1", "wf-1", "Test Workflow", RunStatus.RUNNING, List.of(),
+                "run-1", "wf-1", "Test Workflow", null, RunStatus.RUNNING, List.of(),
                 null, null, null, null, Map.of(), Map.of()
         );
 

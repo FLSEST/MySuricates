@@ -2,8 +2,6 @@ package com.automation.service.skill;
 
 import com.automation.entity.Capability;
 import com.automation.entity.Skill;
-import com.automation.skills.SkillProvider;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,19 +15,9 @@ import java.util.stream.Collectors;
 @Slf4j
 public class SkillRegistry {
 
-    private final List<SkillProvider> skillProviders;
     private final CapabilityRegistry capabilityRegistry;
 
     private final Map<String, Skill> registeredSkills = new ConcurrentHashMap<>();
-
-    @PostConstruct
-    public void init() {
-        for (SkillProvider provider : skillProviders) {
-            Skill skill = provider.provide();
-            register(skill);
-            log.info("Registered built-in skill: {} ({})", skill.getName(), skill.getId());
-        }
-    }
 
     public void register(Skill skill) {
         registeredSkills.put(skill.getId(), skill);

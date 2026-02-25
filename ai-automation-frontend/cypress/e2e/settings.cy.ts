@@ -16,14 +16,14 @@ describe('Settings', () => {
     // Start in English
     cy.get('h1').should('contain.text', 'Settings');
 
-    // The language select is in the General section, near the "Language" text
-    cy.contains('Language').parents('.flex').first().find('select').select('de');
+    // The language select is in the row container (justify-between), not the inner icon group
+    cy.contains('Language').closest('.justify-between').find('select').select('de');
 
     // Page title should change to German
     cy.get('h1').should('contain.text', 'Einstellungen');
 
     // Switch back to English
-    cy.contains('Sprache').parents('.flex').first().find('select').select('en');
+    cy.contains('Sprache').closest('.justify-between').find('select').select('en');
     cy.get('h1').should('contain.text', 'Settings');
   });
 

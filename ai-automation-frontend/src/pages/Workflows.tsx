@@ -17,6 +17,7 @@ import {
   X,
   Upload,
   Download,
+  Save,
 } from 'lucide-react';
 import { Button, Input, Modal, Spinner, Select } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
@@ -29,6 +30,7 @@ import { WorkflowIcon } from '../utils/workflowIcon';
 import {
   useWorkflows,
   useCreateWorkflow,
+  useUpdateWorkflow,
   useExecuteWorkflow,
   useDeleteWorkflow,
   useWorkflowRuns,
@@ -39,8 +41,10 @@ import { useProjects } from '../hooks/useProjects';
 import { useT } from '../i18n';
 import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
 import { formatDuration, formatDateTime } from '../utils/formatTime';
-import type { CreateWorkflowRequest, Workflow, WorkflowExportData } from '../types';
-import type { WorkflowTemplate } from '../data/workflowTemplates';
+import type { CreateWorkflowRequest, Workflow, WorkflowExportData, WorkflowTemplate } from '../types';
+import { useI18nStore } from '../i18n';
+import { resolveTemplateName } from '../utils/templateUtils';
+import { useSaveWorkflowAsTemplate } from '../hooks/useTemplates';
 import { useToast } from '../hooks/useToast';
 
 function pluralize(count: number, singular: string, plural: string) {
@@ -95,6 +99,8 @@ export function Workflows() {
   const deleteWorkflow = useDeleteWorkflow();
   const importWorkflow = useImportWorkflow();
   const toast = useToast();
+  const locale = useI18nStore((s) => s.locale);
+  const saveAsTemplate = useSaveWorkflowAsTemplate();
 
   const [search, setSearch] = useState('');
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(loadSelectedId);
@@ -274,12 +280,13 @@ export function Workflows() {
     if (template) {
       setForm({
         projectId: '',
-        name: t.templates[template.nameKey as keyof typeof t.templates] as string,
-        description: t.templates[template.descriptionKey as keyof typeof t.templates] as string,
+        name: resolveTemplateName(template.name, locale),
+        description: resolveTemplateName(template.description, locale),
         icon: template.icon,
         blocks: template.blocks,
-        instructions: template.instructions,
-        model: template.model,
+        instructions: template.instructions ?? undefined,
+        model: template.model ?? undefined,
+        templateId: template.id,
       });
     } else {
       setForm({ projectId: '', name: '' });
@@ -486,6 +493,8 @@ export function Workflows() {
                 t={t}
                 onExecute={() => handleExecute(selectedWorkflow)}
                 onEdit={() => navigate(`/workflows/${selectedWorkflow.id}`)}
+                onSaveAsTemplate={() => saveAsTemplate.mutate(selectedWorkflow.id)}
+                saveAsTemplateLoading={saveAsTemplate.isPending}
                 navigate={navigate}
               />
             </div>
@@ -573,7 +582,7 @@ export function Workflows() {
               <span className="text-xl">{selectedTemplate.icon}</span>
               <div>
                 <p className="text-sm font-medium text-text">
-                  {t.templates[selectedTemplate.nameKey as keyof typeof t.templates]}
+                  {resolveTemplateName(selectedTemplate.name, locale)}
                 </p>
                 <p className="text-xs text-text-secondary">
                   {selectedTemplate.blocks.length} {t.workflows.blocks.toLowerCase()}
@@ -857,16 +866,22 @@ function WorkflowDetailPanel({
   t,
   onExecute,
   onEdit,
+  onSaveAsTemplate,
+  saveAsTemplateLoading,
   navigate,
 }: {
   workflow: Workflow;
   t: ReturnType<typeof useT>;
   onExecute: () => void;
   onEdit: () => void;
+  onSaveAsTemplate: () => void;
+  saveAsTemplateLoading: boolean;
   navigate: ReturnType<typeof useNavigate>;
 }) {
   const { data: runs, isLoading: runsLoading } = useWorkflowRuns(workflow.id);
   const recentRuns = runs?.slice(0, 5) ?? [];
+  const updateWorkflow = useUpdateWorkflow();
+  const autoTodoEnabled = !!(workflow.metadata?.autoTodo as Record<string, unknown> | undefined)?.enabled;
 
   return (
     <div className="bg-surface border border-border rounded-xl p-6 space-y-6">
@@ -916,6 +931,34 @@ function WorkflowDetailPanel({
             <span className="text-text-tertiary font-medium">{workflow.model}</span>
           </div>
         )}
+      </div>
+
+      {/* Auto-Todo Toggle */}
+      <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-surface-raised border border-border">
+        <div>
+          <span className="text-sm font-medium text-text">{t.workflows.autoTodo}</span>
+          <p className="text-xs text-text-tertiary">{t.workflows.autoTodoDescription}</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={autoTodoEnabled}
+          onClick={() =>
+            updateWorkflow.mutate({
+              id: workflow.id,
+              data: { metadata: { autoTodo: { enabled: !autoTodoEnabled } } },
+            })
+          }
+          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+            autoTodoEnabled ? 'bg-accent' : 'bg-border'
+          }`}
+        >
+          <span
+            className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${
+              autoTodoEnabled ? 'translate-x-4' : 'translate-x-0'
+            }`}
+          />
+        </button>
       </div>
 
       {/* Recent Runs */}
@@ -987,6 +1030,14 @@ function WorkflowDetailPanel({
             exportWorkflow(workflow.id, `${safeName}.json`);
           }}
           aria-label={t.workflows.exportWorkflow}
+        />
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={<Save className="w-4 h-4" />}
+          onClick={onSaveAsTemplate}
+          loading={saveAsTemplateLoading}
+          aria-label={t.templates.saveAsTemplate}
         />
       </div>
     </div>

@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kapitel 13: Nebenlaeufigkeit — Clean Code</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: { 50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',300:'#93c5fd',400:'#60a5fa',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8',800:'#1e40af',900:'#1e3a8a' },
+            surface: { 50:'#f8fafc',100:'#f1f5f9',200:'#e2e8f0',300:'#cbd5e1',700:'#334155',800:'#1e293b',900:'#0f172a',950:'#020617' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    code, pre { font-family: 'JetBrains Mono', monospace; }
+    .fade-in { animation: fadeIn 0.4s ease-out; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+  </style>
+</head>
+<body class="bg-surface-950 text-surface-200 min-h-screen flex flex-col">
+
+<nav class="sticky top-0 z-50 bg-surface-900/95 backdrop-blur border-b border-surface-700">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between h-16">
+      <a href="index.html" class="text-xl font-bold text-primary-400 hover:text-primary-300 transition">📖 Clean Code</a>
+      <div class="hidden md:flex items-center space-x-1">
+        <a href="index.html" class="px-3 py-2 rounded-lg text-sm font-medium text-surface-300 hover:text-white hover:bg-surface-700 transition">Startseite</a>
+        <div class="relative group">
+          <button class="px-3 py-2 rounded-lg text-sm font-medium text-surface-300 hover:text-white hover:bg-surface-700 transition">Kapitel ▾</button>
+          <div class="absolute left-0 mt-1 w-72 bg-surface-800 border border-surface-700 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 max-h-[70vh] overflow-y-auto z-50">
+            <a href="kapitel-01.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">01 — Sauberer Code</a>
+            <a href="kapitel-02.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">02 — Bedeutungsvolle Namen</a>
+            <a href="kapitel-03.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">03 — Funktionen</a>
+            <a href="kapitel-04.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">04 — Kommentare</a>
+            <a href="kapitel-05.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">05 — Formatierung</a>
+            <a href="kapitel-06.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">06 — Objekte und Datenstrukturen</a>
+            <a href="kapitel-07.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">07 — Fehlerbehandlung</a>
+            <a href="kapitel-08.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">08 — Grenzen</a>
+            <a href="kapitel-09.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">09 — Unit-Tests</a>
+            <a href="kapitel-10.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">10 — Klassen</a>
+            <a href="kapitel-11.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">11 — Systeme</a>
+            <a href="kapitel-12.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">12 — Emergenz</a>
+            <a href="kapitel-13.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">13 — Nebenlaeufigkeit</a>
+            <a href="kapitel-14.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">14 — Schrittweise Verfeinerung</a>
+            <a href="kapitel-15.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">15 — JUnit-Interna</a>
+            <a href="kapitel-16.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">16 — SerialDate refaktorisieren</a>
+            <a href="kapitel-17.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">17 — Gerueche und Heuristiken</a>
+          </div>
+        </div>
+        <a href="zitate.html" class="px-3 py-2 rounded-lg text-sm font-medium text-surface-300 hover:text-white hover:bg-surface-700 transition">Zitate</a>
+      </div>
+      <button onclick="document.getElementById('mobile-menu').classList.toggle('hidden')" class="md:hidden p-2 rounded-lg text-surface-300 hover:bg-surface-700">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+    </div>
+    <div id="mobile-menu" class="hidden md:hidden pb-4 space-y-1">
+      <a href="index.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">Startseite</a>
+      <a href="kapitel-01.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">01 — Sauberer Code</a>
+      <a href="kapitel-02.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">02 — Bedeutungsvolle Namen</a>
+      <a href="kapitel-03.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">03 — Funktionen</a>
+      <a href="kapitel-04.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">04 — Kommentare</a>
+      <a href="kapitel-05.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">05 — Formatierung</a>
+      <a href="kapitel-06.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">06 — Objekte und Datenstrukturen</a>
+      <a href="kapitel-07.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">07 — Fehlerbehandlung</a>
+      <a href="kapitel-08.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">08 — Grenzen</a>
+      <a href="kapitel-09.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">09 — Unit-Tests</a>
+      <a href="kapitel-10.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">10 — Klassen</a>
+      <a href="kapitel-11.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">11 — Systeme</a>
+      <a href="kapitel-12.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">12 — Emergenz</a>
+      <a href="kapitel-13.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">13 — Nebenlaeufigkeit</a>
+      <a href="kapitel-14.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">14 — Schrittweise Verfeinerung</a>
+      <a href="kapitel-15.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">15 — JUnit-Interna</a>
+      <a href="kapitel-16.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">16 — SerialDate refaktorisieren</a>
+      <a href="kapitel-17.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">17 — Gerueche und Heuristiken</a>
+      <a href="zitate.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">Zitate</a>
+    </div>
+  </div>
+</nav>
+
+<main class="flex-1">
+  <!-- Breadcrumb -->
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 fade-in">
+    <nav class="flex items-center space-x-2 text-sm text-surface-400">
+      <a href="index.html" class="hover:text-primary-400 transition">Startseite</a>
+      <span>/</span>
+      <span class="text-surface-500">Kapitel 13</span>
+      <span>/</span>
+      <span class="text-surface-300">Nebenlaeufigkeit</span>
+    </nav>
+  </div>
+
+  <!-- Hero Section -->
+  <section class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-12 fade-in">
+    <div class="flex items-start gap-6">
+      <div class="flex-shrink-0 w-20 h-20 bg-primary-600/20 border border-primary-500/30 rounded-2xl flex items-center justify-center">
+        <span class="text-3xl font-extrabold text-primary-400">13</span>
+      </div>
+      <div>
+        <h1 class="text-4xl sm:text-5xl font-extrabold text-white leading-tight">Nebenlaeufigkeit</h1>
+        <p class="mt-3 text-lg text-surface-400 max-w-2xl">Warum nebenlaeufige Programmierung so schwer ist und welche Prinzipien dabei helfen, sauberen und korrekten Code zu schreiben.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Zusammenfassung -->
+  <section class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 fade-in">
+    <div class="bg-surface-800/50 border border-surface-700 rounded-2xl p-8">
+      <h2 class="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+        <span class="w-8 h-8 bg-primary-600/20 rounded-lg flex items-center justify-center text-primary-400 text-sm font-bold">#</span>
+        Zusammenfassung
+      </h2>
+      <div class="prose prose-invert max-w-none space-y-4 text-surface-300 leading-relaxed">
+        <p>
+          Nebenlaeufigkeit ist eines der schwierigsten Themen in der Softwareentwicklung. Robert C. Martin beginnt dieses Kapitel mit einer klaren Warnung: Nebenlaeufigen Code korrekt zu schreiben ist ausserordentlich schwer, selbst fuer erfahrene Entwickler. Ein Programm, das in einer einzelnen Thread-Umgebung einwandfrei funktioniert, kann in einer nebenlaeufigen Umgebung auf unzaehlige Weisen versagen. Die Fehler sind oft nicht reproduzierbar, schwer zu diagnostizieren und koennen jahrelang unentdeckt bleiben.
+        </p>
+        <p>
+          Warum benoetigen wir ueberhaupt Nebenlaeufigkeit? Der Hauptgrund ist die <strong>Entkopplung von Was und Wann</strong>. In einem sequentiellen Programm ist die Reihenfolge der Ausfuehrung klar definiert. Nebenlaeufigkeit ermoeglicht es uns, die zeitliche Kopplung aufzubrechen. Dies verbessert sowohl den Durchsatz als auch die Strukturen unserer Anwendungen. Ein Webserver, der gleichzeitig tausende Anfragen bearbeiten kann, ist ein klassisches Beispiel. Ohne Nebenlaeufigkeit muesste jede Anfrage warten, bis die vorherige abgeschlossen ist.
+        </p>
+        <p>
+          Martin raumt mit verbreiteten <strong>Mythen und Missverstaendnissen</strong> auf. Nebenlaeufigkeit macht Code nicht automatisch schneller — manchmal sogar langsamer durch den Overhead der Thread-Verwaltung. Das Design aendert sich grundlegend, wenn Nebenlaeufigkeit eingefuehrt wird. Die Probleme von Nebenlaeufigkeit zu verstehen ist nicht trivial, selbst wenn man Container wie Web-Container oder Applikationsserver verwendet. Nebenlaeufigkeit bringt immer zusaetzliche Komplexitaet mit sich, unabhaengig davon, wie elegant die Loesung erscheint.
+        </p>
+        <p>
+          Die groessten <strong>Herausforderungen</strong> liegen im Umgang mit gemeinsamen Daten. Wenn mehrere Threads gleichzeitig auf dieselben Daten zugreifen und mindestens einer davon schreibt, entsteht eine sogenannte Race Condition. Das Ergebnis haengt von der zufaelligen Reihenfolge der Thread-Ausfuehrung ab. Deadlocks, bei denen sich Threads gegenseitig blockieren, und Livelocks, bei denen Threads zwar aktiv sind, aber keinen Fortschritt machen, sind weitere typische Probleme.
+        </p>
+        <p>
+          Martin stellt mehrere <strong>Prinzipien</strong> vor, um Nebenlaeufigkeit beherrschbar zu machen. Das Single-Responsibility-Prinzip gilt auch fuer Threads: Nebenlaeufiger Code sollte von anderem Code getrennt werden. Datenbereiche, auf die mehrere Threads zugreifen, sollten so weit wie moeglich eingeschraenkt werden. Anstatt Daten zwischen Threads zu teilen, sollten Kopien verwendet werden, die jeder Thread unabhaengig bearbeiten kann. Threads sollten so unabhaengig wie moeglich gestaltet werden — idealerweise teilen sie ueberhaupt keine Daten.
+        </p>
+        <p>
+          Ein zentrales Thema sind die <strong>Ausfuehrungsmodelle</strong> der Nebenlaeufigkeit. Martin erklaert das Producer-Consumer-Muster, bei dem Erzeuger Daten in eine Warteschlange stellen und Verbraucher sie entnehmen. Das Readers-Writers-Problem behandelt den Fall, dass viele Leser gleichzeitig zugreifen koennen, Schreiber aber exklusiven Zugriff benoetigen. Das Dining-Philosophers-Problem illustriert die Gefahr von Deadlocks bei konkurrierendem Ressourcenzugriff.
+        </p>
+        <p>
+          <strong>Synchronized-Bereiche</strong> sollten so klein wie moeglich gehalten werden. Jeder synchronisierte Block ist ein potenzieller Engpass und kann die Leistung drastisch reduzieren. Grossflaechiges Locking fuehrt zu Problemen: entweder Performance-Verlust oder erhoehte Deadlock-Gefahr. Martin betont auch, dass korrektes Herunterfahren nebenlaeufiger Systeme ueberraschend schwierig ist und von Anfang an geplant werden muss.
+        </p>
+        <p>
+          Schliesslich widmet sich Martin dem <strong>Testen von nebenlaeufigem Code</strong>. Er empfiehlt, sporadische Fehler nicht zu ignorieren — sie sind oft Anzeichen fuer Nebenlaeufigkeitsprobleme. Code sollte zuerst ohne Nebenlaeufigkeit zum Laufen gebracht werden. Verschiedene Konfigurationen von Threads und Prozessoren sollten getestet werden. Instrumentierung des Codes (durch Einfuegen von sleep, yield und priority-Aenderungen) kann helfen, versteckte Fehler aufzudecken.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Key Takeaways -->
+  <section class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 fade-in">
+    <h2 class="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+      <span class="w-8 h-8 bg-green-600/20 rounded-lg flex items-center justify-center text-green-400 text-sm font-bold">!</span>
+      Wichtige Erkenntnisse
+    </h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="bg-surface-800/50 border border-surface-700 rounded-xl p-5 hover:border-primary-500/30 transition">
+        <div class="w-10 h-10 bg-red-600/20 rounded-lg flex items-center justify-center mb-3">
+          <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <h3 class="font-semibold text-white mb-2">Nebenlaeufigkeit ist komplex</h3>
+        <p class="text-sm text-surface-400">Selbst einfache Programme koennen unvorhersehbare Fehler zeigen, wenn sie nebenlaeufig ausgefuehrt werden. Fehler sind oft nicht reproduzierbar und treten nur unter Last auf.</p>
+      </div>
+      <div class="bg-surface-800/50 border border-surface-700 rounded-xl p-5 hover:border-primary-500/30 transition">
+        <div class="w-10 h-10 bg-blue-600/20 rounded-lg flex items-center justify-center mb-3">
+          <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+        </div>
+        <h3 class="font-semibold text-white mb-2">SRP auch fuer Threads</h3>
+        <p class="text-sm text-surface-400">Nebenlaeufiger Code sollte strikt von Geschaeftslogik getrennt werden. Das Single-Responsibility-Prinzip gilt auf Thread-Ebene genauso wie auf Klassenebene.</p>
+      </div>
+      <div class="bg-surface-800/50 border border-surface-700 rounded-xl p-5 hover:border-primary-500/30 transition">
+        <div class="w-10 h-10 bg-yellow-600/20 rounded-lg flex items-center justify-center mb-3">
+          <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        </div>
+        <h3 class="font-semibold text-white mb-2">Gemeinsame Daten minimieren</h3>
+        <p class="text-sm text-surface-400">Je weniger Daten zwischen Threads geteilt werden, desto weniger Fehlerquellen gibt es. Verwende Kopien statt gemeinsamer veraenderbarer Objekte.</p>
+      </div>
+      <div class="bg-surface-800/50 border border-surface-700 rounded-xl p-5 hover:border-primary-500/30 transition">
+        <div class="w-10 h-10 bg-purple-600/20 rounded-lg flex items-center justify-center mb-3">
+          <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        </div>
+        <h3 class="font-semibold text-white mb-2">Ausfuehrungsmodelle kennen</h3>
+        <p class="text-sm text-surface-400">Producer-Consumer, Readers-Writers und Dining Philosophers sind grundlegende Muster, die jeder Entwickler verstehen sollte, um Nebenlaeufigkeitsprobleme zu erkennen.</p>
+      </div>
+      <div class="bg-surface-800/50 border border-surface-700 rounded-xl p-5 hover:border-primary-500/30 transition">
+        <div class="w-10 h-10 bg-green-600/20 rounded-lg flex items-center justify-center mb-3">
+          <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <h3 class="font-semibold text-white mb-2">Gruendlich testen</h3>
+        <p class="text-sm text-surface-400">Sporadische Fehler niemals ignorieren. Nebenlaeufigen Code mit verschiedenen Thread-Zahlen und Konfigurationen testen. Instrumentierung hilft, versteckte Bugs aufzudecken.</p>
+      </div>
+      <div class="bg-surface-800/50 border border-surface-700 rounded-xl p-5 hover:border-primary-500/30 transition">
+        <div class="w-10 h-10 bg-orange-600/20 rounded-lg flex items-center justify-center mb-3">
+          <svg class="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        </div>
+        <h3 class="font-semibold text-white mb-2">Synchronized klein halten</h3>
+        <p class="text-sm text-surface-400">Synchronisierte Bereiche so kurz wie moeglich gestalten. Grossflaechiges Locking fuehrt zu Performance-Problemen oder erhoehter Deadlock-Gefahr.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Code Example -->
+  <section class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 fade-in">
+    <h2 class="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+      <span class="w-8 h-8 bg-primary-600/20 rounded-lg flex items-center justify-center text-primary-400 text-sm font-bold">&lt;&gt;</span>
+      Codebeispiel
+    </h2>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Bad Example -->
+      <div class="bg-surface-800 border border-red-500/30 rounded-xl overflow-hidden">
+        <div class="px-4 py-3 bg-red-500/10 border-b border-red-500/30 flex items-center gap-2">
+          <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          <span class="text-sm font-medium text-red-400">Schlecht: Gemeinsamer veraenderbarer Zustand</span>
+        </div>
+        <pre class="p-4 text-sm text-surface-300 overflow-x-auto"><code>public class UserCounter {
+    private int count = 0;
+
+    // GEFAEHRLICH: Mehrere Threads
+    // aendern denselben Zustand!
+    public void increment() {
+        count++;  // Nicht atomar!
+    }
+
+    public int getCount() {
+        return count;
+    }
+}
+
+// Verwendung: Race Condition!
+UserCounter counter = new UserCounter();
+for (int i = 0; i &lt; 10; i++) {
+    new Thread(() -&gt; {
+        for (int j = 0; j &lt; 1000; j++) {
+            counter.increment();
+        }
+    }).start();
+}
+// Ergebnis: Fast nie 10000!
+// count++ besteht aus LESEN, ERHOEHEN,
+// SCHREIBEN — drei separate Operationen.</code></pre>
+      </div>
+      <!-- Good Example -->
+      <div class="bg-surface-800 border border-green-500/30 rounded-xl overflow-hidden">
+        <div class="px-4 py-3 bg-green-500/10 border-b border-green-500/30 flex items-center gap-2">
+          <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          <span class="text-sm font-medium text-green-400">Sauber: Thread-sichere Implementierung</span>
+        </div>
+        <pre class="p-4 text-sm text-surface-300 overflow-x-auto"><code>public class UserCounter {
+    private final AtomicInteger count =
+        new AtomicInteger(0);
+
+    // SICHER: AtomicInteger garantiert
+    // atomare Operationen
+    public void increment() {
+        count.incrementAndGet();
+    }
+
+    public int getCount() {
+        return count.get();
+    }
+}
+
+// Alternative: Unveraenderliche Daten
+public class ImmutableCounter {
+    private final int count;
+
+    public ImmutableCounter(int count) {
+        this.count = count;
+    }
+
+    // Neue Instanz statt Mutation
+    public ImmutableCounter increment() {
+        return new ImmutableCounter(
+            this.count + 1
+        );
+    }
+
+    public int getCount() {
+        return count;
+    }
+}</code></pre>
+      </div>
+    </div>
+    <div class="mt-4 bg-surface-800/50 border border-surface-700 rounded-xl p-5">
+      <h3 class="font-semibold text-white mb-2">Erklaerung</h3>
+      <p class="text-sm text-surface-400">
+        Der Operator <code class="text-primary-400 bg-surface-700 px-1 rounded">count++</code> ist nicht atomar — er besteht aus Lesen, Erhoehen und Schreiben. Wenn zwei Threads gleichzeitig lesen, geht ein Inkrement verloren. Die saubere Loesung verwendet entweder <code class="text-primary-400 bg-surface-700 px-1 rounded">AtomicInteger</code> fuer atomare Operationen oder unveraenderliche Objekte, die bei jeder Aenderung eine neue Instanz erzeugen. Unveraenderliche Objekte sind von Natur aus thread-sicher, da sie nach der Erstellung nicht mehr veraendert werden koennen.
+      </p>
+    </div>
+  </section>
+
+  <!-- Quote -->
+  <section class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 fade-in">
+    <blockquote class="relative bg-gradient-to-br from-primary-900/30 to-surface-800/50 border border-primary-500/20 rounded-2xl p-8">
+      <svg class="absolute top-4 left-4 w-10 h-10 text-primary-500/20" fill="currentColor" viewBox="0 0 24 24"><path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10H14.017zM0 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151C7.546 6.068 5.983 8.789 5.983 11H10v10H0z"/></svg>
+      <p class="relative z-10 text-xl italic text-surface-200 pl-8 leading-relaxed">
+        &bdquo;Nebenlaeufigkeit ist eine Entkopplungsstrategie. Sie hilft uns, das Was von dem Wann zu entkoppeln. In Single-Thread-Anwendungen sind Was und Wann so eng miteinander verknuepft, dass der Zustand der gesamten Anwendung oft allein durch Betrachten des Stack Backtrace bestimmt werden kann.&ldquo;
+      </p>
+      <footer class="relative z-10 mt-4 pl-8 text-surface-400 text-sm">
+        — Robert C. Martin, <cite>Clean Code</cite>, Kapitel 13
+      </footer>
+    </blockquote>
+  </section>
+
+  <!-- Vertiefung: Ausfuehrungsmodelle -->
+  <section class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 fade-in">
+    <h2 class="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+      <span class="w-8 h-8 bg-purple-600/20 rounded-lg flex items-center justify-center text-purple-400 text-sm font-bold">~</span>
+      Ausfuehrungsmodelle im Detail
+    </h2>
+    <div class="space-y-4">
+      <div class="bg-surface-800/50 border border-surface-700 rounded-xl p-6">
+        <h3 class="font-semibold text-primary-400 mb-2">Producer-Consumer (Erzeuger-Verbraucher)</h3>
+        <p class="text-sm text-surface-400">Ein oder mehrere Erzeuger-Threads stellen Arbeit in eine begrenzte Warteschlange. Ein oder mehrere Verbraucher-Threads entnehmen Arbeit und verarbeiten sie. Die Warteschlange dient als Puffer und entkoppelt Erzeugungs- und Verarbeitungsgeschwindigkeit. Signalisierung ueber volle/leere Queue ist entscheidend.</p>
+      </div>
+      <div class="bg-surface-800/50 border border-surface-700 rounded-xl p-6">
+        <h3 class="font-semibold text-primary-400 mb-2">Readers-Writers (Leser-Schreiber)</h3>
+        <p class="text-sm text-surface-400">Viele Leser koennen gleichzeitig auf eine gemeinsame Ressource zugreifen, aber Schreiber benoetigen exklusiven Zugriff. Die Herausforderung liegt in der Balance: Werden Leser bevorzugt, kann ein Schreiber verhungern. Werden Schreiber bevorzugt, sinkt der Durchsatz fuer Leser. ReadWriteLock bietet hier eine elegante Loesung.</p>
+      </div>
+      <div class="bg-surface-800/50 border border-surface-700 rounded-xl p-6">
+        <h3 class="font-semibold text-primary-400 mb-2">Dining Philosophers (Speisende Philosophen)</h3>
+        <p class="text-sm text-surface-400">Fuenf Philosophen sitzen an einem runden Tisch mit fuenf Gabeln. Jeder braucht zwei Gabeln zum Essen. Wenn alle gleichzeitig die linke Gabel nehmen, hat keiner zwei Gabeln — ein Deadlock. Dieses klassische Problem illustriert, wie konkurrierende Prozesse sich gegenseitig blockieren koennen.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Prev/Next Navigation -->
+  <section class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 fade-in">
+    <div class="flex flex-col sm:flex-row justify-between gap-4">
+      <a href="kapitel-12.html" class="group flex items-center gap-3 bg-surface-800/50 border border-surface-700 hover:border-primary-500/30 rounded-xl px-6 py-4 transition flex-1">
+        <svg class="w-5 h-5 text-surface-400 group-hover:text-primary-400 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        <div>
+          <p class="text-xs text-surface-500">Vorheriges Kapitel</p>
+          <p class="font-medium text-surface-300 group-hover:text-white transition">12 — Emergenz</p>
+        </div>
+      </a>
+      <a href="kapitel-14.html" class="group flex items-center justify-end gap-3 bg-surface-800/50 border border-surface-700 hover:border-primary-500/30 rounded-xl px-6 py-4 transition flex-1">
+        <div class="text-right">
+          <p class="text-xs text-surface-500">Naechstes Kapitel</p>
+          <p class="font-medium text-surface-300 group-hover:text-white transition">14 — Schrittweise Verfeinerung</p>
+        </div>
+        <svg class="w-5 h-5 text-surface-400 group-hover:text-primary-400 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+      </a>
+    </div>
+  </section>
+</main>
+
+<footer class="bg-surface-900 border-t border-surface-700 mt-auto">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+      <p class="text-surface-400 text-sm">Clean Code — Robert C. Martin | Zusammenfassung auf Deutsch</p>
+      <div class="flex space-x-4">
+        <a href="index.html" class="text-surface-400 hover:text-primary-400 text-sm transition">Startseite</a>
+        <a href="zitate.html" class="text-surface-400 hover:text-primary-400 text-sm transition">Zitate</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

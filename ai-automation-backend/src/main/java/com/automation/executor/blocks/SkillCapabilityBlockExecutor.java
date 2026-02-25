@@ -47,6 +47,10 @@ public class SkillCapabilityBlockExecutor implements BlockExecutor {
 
         prompt.append("\nInput:\n").append(input);
 
+        Integer claudeTimeout = config.containsKey("timeout_seconds")
+                ? ((Number) config.get("timeout_seconds")).intValue()
+                : null;
+
         result.setInput("skill-capability: " + capability);
 
         try {
@@ -56,7 +60,8 @@ public class SkillCapabilityBlockExecutor implements BlockExecutor {
                     context.getProjectPath(),
                     fullPrompt,
                     context.getModel(),
-                    systemPrompt
+                    systemPrompt,
+                    claudeTimeout
             ).output();
 
             result.setOutput(response);

@@ -48,11 +48,11 @@ class ConditionalBlockExecutorTest {
 
     @Test
     void execute_conditionTrue_executesThenBranch() {
-        when(commandExecutor.executeCommandOnHost(eq("/test/project"), contains("Evaluate")))
-                .thenReturn(new CliSession.CommandResult("true", 0));
+        when(commandExecutor.executeCommandOnHost(eq("/test/project"), contains("Evaluate"), isNull(), isNull(), isNull()))
+                .thenReturn(new CliSession.EnrichedCommandResult("true", 0, null));
         StepResult thenResult = StepResult.builder()
                 .stepIndex(1).status(StepStatus.COMPLETED).output("deployed").build();
-        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(), anyInt(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(), anyInt(), isNull(), isNull(), isNull()))
                 .thenReturn(thenResult);
 
         Map<String, Object> config = new HashMap<>();
@@ -74,11 +74,11 @@ class ConditionalBlockExecutorTest {
 
     @Test
     void execute_conditionFalse_executesElseBranch() {
-        when(commandExecutor.executeCommandOnHost(eq("/test/project"), contains("Evaluate")))
-                .thenReturn(new CliSession.CommandResult("false", 0));
+        when(commandExecutor.executeCommandOnHost(eq("/test/project"), contains("Evaluate"), isNull(), isNull(), isNull()))
+                .thenReturn(new CliSession.EnrichedCommandResult("false", 0, null));
         StepResult elseResult = StepResult.builder()
                 .stepIndex(1).status(StepStatus.COMPLETED).output("skipped").build();
-        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(), anyInt(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(), anyInt(), isNull(), isNull(), isNull()))
                 .thenReturn(elseResult);
 
         Map<String, Object> config = new HashMap<>();
@@ -98,8 +98,8 @@ class ConditionalBlockExecutorTest {
 
     @Test
     void execute_conditionTrue_noElseBranch_skips() {
-        when(commandExecutor.executeCommandOnHost(eq("/test/project"), contains("Evaluate")))
-                .thenReturn(new CliSession.CommandResult("false", 0));
+        when(commandExecutor.executeCommandOnHost(eq("/test/project"), contains("Evaluate"), isNull(), isNull(), isNull()))
+                .thenReturn(new CliSession.EnrichedCommandResult("false", 0, null));
 
         Map<String, Object> config = new HashMap<>();
         config.put("condition", "branch == 'main'");
@@ -120,8 +120,8 @@ class ConditionalBlockExecutorTest {
     @Test
     void execute_ambiguousResponse_notTreatedAsTrue() {
         // Edge case: response contains "true" but means false ("The condition is false, not true")
-        when(commandExecutor.executeCommandOnHost(eq("/test/project"), contains("Evaluate")))
-                .thenReturn(new CliSession.CommandResult("The condition is false, not true", 0));
+        when(commandExecutor.executeCommandOnHost(eq("/test/project"), contains("Evaluate"), isNull(), isNull(), isNull()))
+                .thenReturn(new CliSession.EnrichedCommandResult("The condition is false, not true", 0, null));
 
         Map<String, Object> config = new HashMap<>();
         config.put("condition", "branch == 'main'");
@@ -135,7 +135,7 @@ class ConditionalBlockExecutorTest {
 
         StepResult elseResult = StepResult.builder()
                 .stepIndex(1).status(StepStatus.COMPLETED).output("skipped").build();
-        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(), anyInt(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(), anyInt(), isNull(), isNull(), isNull()))
                 .thenReturn(elseResult);
 
         StepResult result = executor.execute(block, context);
@@ -147,8 +147,8 @@ class ConditionalBlockExecutorTest {
 
     @Test
     void execute_conditionFalse_noThenDefined_butThenWouldExecute() {
-        when(commandExecutor.executeCommandOnHost(eq("/test/project"), contains("Evaluate")))
-                .thenReturn(new CliSession.CommandResult("true", 0));
+        when(commandExecutor.executeCommandOnHost(eq("/test/project"), contains("Evaluate"), isNull(), isNull(), isNull()))
+                .thenReturn(new CliSession.EnrichedCommandResult("true", 0, null));
 
         Map<String, Object> config = new HashMap<>();
         config.put("condition", "always true");

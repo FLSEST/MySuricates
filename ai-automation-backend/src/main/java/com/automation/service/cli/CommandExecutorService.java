@@ -123,8 +123,15 @@ public class CommandExecutorService {
 
     public CliSession.EnrichedCommandResult executeCommandOnHost(
             String projectPath, String command, String model, String systemPrompt) {
+        return executeCommandOnHost(projectPath, command, model, systemPrompt, null);
+    }
+
+    public CliSession.EnrichedCommandResult executeCommandOnHost(
+            String projectPath, String command, String model, String systemPrompt,
+            Integer timeoutSeconds) {
         try {
-            ActionResult result = hostClaudeService.executeAction(command, model, systemPrompt, projectPath);
+            ActionResult result = hostClaudeService.executeAction(
+                    command, model, systemPrompt, projectPath, timeoutSeconds);
             return new CliSession.EnrichedCommandResult(result.text(), result.exitCode(), result.parsed());
         } catch (IOException e) {
             throw new WorkflowExecutionException("Failed to execute command on host (project: " + projectPath + ")", e);
@@ -137,6 +144,12 @@ public class CommandExecutorService {
 
     public StepResult executeStepOnHost(String projectPath, BlockDefinition block,
                                          int stepIndex, String instructionPrefix, String model) {
+        return executeStepOnHost(projectPath, block, stepIndex, instructionPrefix, model, null);
+    }
+
+    public StepResult executeStepOnHost(String projectPath, BlockDefinition block,
+                                         int stepIndex, String instructionPrefix, String model,
+                                         Integer timeoutSeconds) {
         StepResult step = new StepResult();
         step.setStepIndex(stepIndex);
         step.setStartedAt(Instant.now());
@@ -147,7 +160,7 @@ public class CommandExecutorService {
 
         try {
             CliSession.EnrichedCommandResult result =
-                    executeCommandOnHost(projectPath, command, model, instructionPrefix);
+                    executeCommandOnHost(projectPath, command, model, instructionPrefix, timeoutSeconds);
             step.setOutput(result.output());
             step.setStatus(result.exitCode() == 0 ? StepStatus.COMPLETED : StepStatus.FAILED);
 

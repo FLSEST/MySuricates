@@ -26,6 +26,10 @@ public class SimpleBlockExecutor implements BlockExecutor {
         }
 
         String command = context.resolveTemplate(rawCommand.toString());
+        Map<String, Object> config = block.getConfig();
+        Integer claudeTimeout = config.containsKey("timeout_seconds")
+                ? ((Number) config.get("timeout_seconds")).intValue()
+                : null;
 
         BlockDefinition resolved = BlockDefinition.builder()
                 .type("simple")
@@ -37,7 +41,8 @@ public class SimpleBlockExecutor implements BlockExecutor {
                 resolved,
                 context.nextStepIndex(),
                 context.getInstructionPrefix(),
-                context.getModel()
+                context.getModel(),
+                claudeTimeout
         );
     }
 

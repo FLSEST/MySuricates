@@ -72,8 +72,8 @@ class ConversionControllerTest {
     @Test
     void createWorkflow_validRequest_returnsOk() throws Exception {
         WorkflowResponse response = new WorkflowResponse(
-                "wf-new", "proj-1", "Project", "My Workflow",
-                "desc", null, List.of(), null, Map.of(), List.of(), 0, null, null, null, null);
+                "wf-new", "proj-1", "Project", null, null, "My Workflow",
+                "desc", null, List.of(), null, Map.of(), List.of(), 0, null, null, null, null, null);
 
         when(conversionService.createWorkflowFromSuggestion("run-1", "proj-1", "My Workflow"))
                 .thenReturn(response);

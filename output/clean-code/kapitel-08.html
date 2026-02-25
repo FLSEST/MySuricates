@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kapitel 8: Grenzen — Clean Code</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: { 50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',300:'#93c5fd',400:'#60a5fa',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8',800:'#1e40af',900:'#1e3a8a' },
+            surface: { 50:'#f8fafc',100:'#f1f5f9',200:'#e2e8f0',300:'#cbd5e1',700:'#334155',800:'#1e293b',900:'#0f172a',950:'#020617' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    code, pre { font-family: 'JetBrains Mono', monospace; }
+    .fade-in { animation: fadeIn 0.4s ease-out; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+  </style>
+</head>
+<body class="bg-surface-950 text-surface-200 min-h-screen flex flex-col">
+
+<nav class="sticky top-0 z-50 bg-surface-900/95 backdrop-blur border-b border-surface-700">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between h-16">
+      <a href="index.html" class="text-xl font-bold text-primary-400 hover:text-primary-300 transition">📖 Clean Code</a>
+      <div class="hidden md:flex items-center space-x-1">
+        <a href="index.html" class="px-3 py-2 rounded-lg text-sm font-medium text-surface-300 hover:text-white hover:bg-surface-700 transition">Startseite</a>
+        <div class="relative group">
+          <button class="px-3 py-2 rounded-lg text-sm font-medium text-surface-300 hover:text-white hover:bg-surface-700 transition">Kapitel ▾</button>
+          <div class="absolute left-0 mt-1 w-72 bg-surface-800 border border-surface-700 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 max-h-[70vh] overflow-y-auto z-50">
+            <a href="kapitel-01.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">01 — Sauberer Code</a>
+            <a href="kapitel-02.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">02 — Bedeutungsvolle Namen</a>
+            <a href="kapitel-03.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">03 — Funktionen</a>
+            <a href="kapitel-04.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">04 — Kommentare</a>
+            <a href="kapitel-05.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">05 — Formatierung</a>
+            <a href="kapitel-06.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">06 — Objekte und Datenstrukturen</a>
+            <a href="kapitel-07.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">07 — Fehlerbehandlung</a>
+            <a href="kapitel-08.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">08 — Grenzen</a>
+            <a href="kapitel-09.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">09 — Unit-Tests</a>
+            <a href="kapitel-10.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">10 — Klassen</a>
+            <a href="kapitel-11.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">11 — Systeme</a>
+            <a href="kapitel-12.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">12 — Emergenz</a>
+            <a href="kapitel-13.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">13 — Nebenlaeufigkeit</a>
+            <a href="kapitel-14.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">14 — Schrittweise Verfeinerung</a>
+            <a href="kapitel-15.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">15 — JUnit-Interna</a>
+            <a href="kapitel-16.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">16 — SerialDate refaktorisieren</a>
+            <a href="kapitel-17.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">17 — Gerueche und Heuristiken</a>
+          </div>
+        </div>
+        <a href="zitate.html" class="px-3 py-2 rounded-lg text-sm font-medium text-surface-300 hover:text-white hover:bg-surface-700 transition">Zitate</a>
+      </div>
+      <button onclick="document.getElementById('mobile-menu').classList.toggle('hidden')" class="md:hidden p-2 rounded-lg text-surface-300 hover:bg-surface-700">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+    </div>
+    <div id="mobile-menu" class="hidden md:hidden pb-4 space-y-1">
+      <a href="index.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">Startseite</a>
+      <a href="kapitel-01.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">01 — Sauberer Code</a>
+      <a href="kapitel-02.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">02 — Bedeutungsvolle Namen</a>
+      <a href="kapitel-03.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">03 — Funktionen</a>
+      <a href="kapitel-04.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">04 — Kommentare</a>
+      <a href="kapitel-05.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">05 — Formatierung</a>
+      <a href="kapitel-06.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">06 — Objekte und Datenstrukturen</a>
+      <a href="kapitel-07.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">07 — Fehlerbehandlung</a>
+      <a href="kapitel-08.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">08 — Grenzen</a>
+      <a href="kapitel-09.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">09 — Unit-Tests</a>
+      <a href="kapitel-10.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">10 — Klassen</a>
+      <a href="kapitel-11.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">11 — Systeme</a>
+      <a href="kapitel-12.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">12 — Emergenz</a>
+      <a href="kapitel-13.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">13 — Nebenlaeufigkeit</a>
+      <a href="kapitel-14.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">14 — Schrittweise Verfeinerung</a>
+      <a href="kapitel-15.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">15 — JUnit-Interna</a>
+      <a href="kapitel-16.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">16 — SerialDate refaktorisieren</a>
+      <a href="kapitel-17.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">17 — Gerueche und Heuristiken</a>
+      <a href="zitate.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">Zitate</a>
+    </div>
+  </div>
+</nav>
+
+<main class="flex-1">
+  <!-- Breadcrumb -->
+  <div class="bg-surface-900 border-b border-surface-800">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+      <nav class="flex items-center space-x-2 text-sm text-surface-400">
+        <a href="index.html" class="hover:text-primary-400 transition">Startseite</a>
+        <span>/</span>
+        <span>Kapitel 08</span>
+        <span>/</span>
+        <span class="text-surface-200">Grenzen</span>
+      </nav>
+    </div>
+  </div>
+
+  <!-- Hero Section -->
+  <section class="bg-gradient-to-b from-surface-900 to-surface-950 py-16 fade-in">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <span class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-primary-600/20 text-primary-400 text-3xl font-extrabold mb-6 border border-primary-500/30">08</span>
+      <h1 class="text-4xl sm:text-5xl font-extrabold text-white mb-4">Grenzen</h1>
+      <p class="text-lg text-surface-300 max-w-2xl mx-auto">Drittanbieter-Code sauber integrieren durch Kapselung, Learning Tests und klar definierte Schnittstellen an den Grenzen unseres Systems.</p>
+    </div>
+  </section>
+
+  <!-- Zusammenfassung -->
+  <section class="py-16">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h2 class="text-3xl font-bold text-white mb-8 flex items-center gap-3">
+        <span class="w-10 h-10 rounded-lg bg-primary-600/20 flex items-center justify-center text-primary-400 text-lg">Z</span>
+        Zusammenfassung
+      </h2>
+      <div class="prose prose-invert max-w-none space-y-4 text-surface-300 leading-relaxed">
+        <p>
+          Software existiert selten in vollstaendiger Isolation. In fast jedem Projekt muessen wir fremden Code integrieren — sei es eine Drittanbieter-Bibliothek, ein Open-Source-Framework oder eine API, die von einem anderen Team bereitgestellt wird. Robert C. Martin widmet sich in diesem Kapitel der Frage, wie wir diese <strong>Grenzen</strong> zwischen unserem Code und fremdem Code sauber gestalten koennen.
+        </p>
+        <p>
+          Das grundlegende Problem: Drittanbieter-Code ist nicht unter unserer Kontrolle. Der Anbieter kann Schnittstellen aendern, veraltete Methoden entfernen oder das Verhalten in neuen Versionen anpassen. Wenn unser Code direkt und ueberall an diese fremden APIs gekoppelt ist, breiten sich Aenderungen unkontrolliert durch unser gesamtes System aus. Die Loesung besteht darin, <strong>Grenzen klar zu definieren und fremden Code zu kapseln</strong>.
+        </p>
+        <p>
+          Martin schlaegt das <strong>Wrapper-Pattern</strong> vor: Anstatt eine Drittanbieter-Klasse direkt zu verwenden, erstellen wir eine eigene Klasse, die die fremde API kapselt und nur die fuer uns relevanten Methoden exponiert. Ein Beispiel: Wenn wir <code>java.util.Map</code> verwenden, bietet diese Klasse eine Vielzahl von Methoden — <code>clear()</code>, <code>containsKey()</code>, <code>put()</code>, <code>remove()</code> und viele mehr. Wenn unser Anwendungsfall nur das Lesen von Werten erfordert, sollten wir die Map hinter einem Interface oder einer Wrapper-Klasse verstecken, die nur die noetige Funktionalitaet bereitstellt. So verhindern wir, dass andere Teile des Codes versehentlich die Map manipulieren.
+        </p>
+        <p>
+          Ein besonders wertvolles Werkzeug an den Grenzen sind <strong>Learning Tests</strong>. Bevor wir fremden Code in unser Projekt integrieren, schreiben wir Tests, die das Verhalten der fremden API ueberpruefen. Diese Tests dienen nicht dazu, den fremden Code zu testen — sie dienen dazu, <em>unser Verstaendnis</em> des fremden Codes zu ueberpruefen. Wenn eine neue Version der Bibliothek erscheint, koennen wir die Learning Tests erneut ausfuehren und sofort sehen, ob sich das Verhalten geaendert hat. Learning Tests sind quasi kostenlos und bieten einen enormen Schutz gegen ueberraschende Aenderungen.
+        </p>
+        <p>
+          Martin fuehrt auch das Konzept des <strong>Adapter Patterns</strong> ein, um fremde APIs an unsere eigenen Beduerfnisse anzupassen. Der Adapter uebersetzt zwischen der Schnittstelle, die wir erwarten, und der Schnittstelle, die der Drittanbieter bereitstellt. Wenn sich die fremde API aendert, muessen wir nur den Adapter anpassen — der restliche Code bleibt unberuehrt.
+        </p>
+        <p>
+          Besonders interessant ist Martins Rat fuer den Fall, dass <strong>Code, den wir integrieren muessen, noch gar nicht existiert</strong>. Wenn ein anderes Team noch an einer Schnittstelle arbeitet, sollten wir nicht warten, sondern ein eigenes Interface definieren, das beschreibt, was wir von dieser Schnittstelle erwarten. Wir programmieren gegen unser eigenes Interface und erstellen spaeter einen Adapter, der unser Interface auf die tatsaechliche Implementierung abbildet. So koennen wir parallel weiterarbeiten und sind nicht blockiert.
+        </p>
+        <p>
+          Schliesslich betont Martin die Bedeutung von <strong>Boundary Tests</strong> — Tests, die spezifisch an den Grenzen unseres Systems angesiedelt sind. Diese Tests stellen sicher, dass die Integration korrekt funktioniert und geben uns Vertrauen bei Updates oder Migrationen. Sie bilden ein Sicherheitsnetz, das uns warnt, sobald eine Grenze bricht.
+        </p>
+        <p>
+          Die zentrale Lektion: <strong>Grenzen im Code verdienen besondere Aufmerksamkeit.</strong> Sie sind die Stellen, an denen unser sauberer, kontrollierter Code auf die unvorhersehbare Aussenwelt trifft. Durch Kapselung, klare Interfaces, Learning Tests und Adapter koennen wir diese Grenzen so gestalten, dass Aenderungen beherrschbar bleiben.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Key Takeaways -->
+  <section class="py-16 bg-surface-900/50">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h2 class="text-3xl font-bold text-white mb-8 flex items-center gap-3">
+        <span class="w-10 h-10 rounded-lg bg-primary-600/20 flex items-center justify-center text-primary-400 text-lg">K</span>
+        Kernaussagen
+      </h2>
+      <div class="grid gap-4">
+        <div class="bg-surface-800 border border-surface-700 rounded-xl p-5 hover:border-primary-500/50 transition">
+          <div class="flex items-start gap-4">
+            <span class="flex-shrink-0 w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center text-red-400 font-bold text-sm">1</span>
+            <div>
+              <h3 class="text-white font-semibold mb-1">Fremden Code kapseln</h3>
+              <p class="text-surface-400 text-sm">Drittanbieter-APIs niemals direkt im gesamten Code verwenden. Wrapper-Klassen erstellen, die nur die benoetigte Funktionalitaet exponieren und den Austausch erleichtern.</p>
+            </div>
+          </div>
+        </div>
+        <div class="bg-surface-800 border border-surface-700 rounded-xl p-5 hover:border-primary-500/50 transition">
+          <div class="flex items-start gap-4">
+            <span class="flex-shrink-0 w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center text-orange-400 font-bold text-sm">2</span>
+            <div>
+              <h3 class="text-white font-semibold mb-1">Learning Tests schreiben</h3>
+              <p class="text-surface-400 text-sm">Vor der Integration fremder Bibliotheken Tests schreiben, die unser Verstaendnis der API ueberpruefen. Bei Updates zeigen sie sofort, ob sich das Verhalten geaendert hat.</p>
+            </div>
+          </div>
+        </div>
+        <div class="bg-surface-800 border border-surface-700 rounded-xl p-5 hover:border-primary-500/50 transition">
+          <div class="flex items-start gap-4">
+            <span class="flex-shrink-0 w-8 h-8 rounded-lg bg-yellow-500/20 flex items-center justify-center text-yellow-400 font-bold text-sm">3</span>
+            <div>
+              <h3 class="text-white font-semibold mb-1">Adapter Pattern nutzen</h3>
+              <p class="text-surface-400 text-sm">Einen Adapter zwischen unserer erwarteten Schnittstelle und der fremden API platzieren. Bei Aenderungen muss nur der Adapter angepasst werden — der restliche Code bleibt stabil.</p>
+            </div>
+          </div>
+        </div>
+        <div class="bg-surface-800 border border-surface-700 rounded-xl p-5 hover:border-primary-500/50 transition">
+          <div class="flex items-start gap-4">
+            <span class="flex-shrink-0 w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center text-green-400 font-bold text-sm">4</span>
+            <div>
+              <h3 class="text-white font-semibold mb-1">Interfaces fuer unbekannten Code definieren</h3>
+              <p class="text-surface-400 text-sm">Wenn eine Schnittstelle noch nicht existiert: ein eigenes Interface entwerfen und dagegen programmieren. Spaeter einen Adapter schreiben, der das Interface auf die reale Implementierung abbildet.</p>
+            </div>
+          </div>
+        </div>
+        <div class="bg-surface-800 border border-surface-700 rounded-xl p-5 hover:border-primary-500/50 transition">
+          <div class="flex items-start gap-4">
+            <span class="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 font-bold text-sm">5</span>
+            <div>
+              <h3 class="text-white font-semibold mb-1">Boundary Tests implementieren</h3>
+              <p class="text-surface-400 text-sm">Tests gezielt an den Integrationspunkten platzieren. Sie bilden ein Sicherheitsnetz fuer Updates und Migrationen und geben Vertrauen, dass die Grenzen korrekt funktionieren.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Code Example -->
+  <section class="py-16">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h2 class="text-3xl font-bold text-white mb-8 flex items-center gap-3">
+        <span class="w-10 h-10 rounded-lg bg-primary-600/20 flex items-center justify-center text-primary-400 text-lg">&lt;/&gt;</span>
+        Codebeispiel
+      </h2>
+      <p class="text-surface-300 mb-6">Vergleich: Direkte Verwendung einer Drittanbieter-API versus gekapselter Zugriff mit Wrapper-Klasse und Adapter.</p>
+
+      <!-- Bad Example -->
+      <div class="mb-8">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="px-3 py-1 rounded-full bg-red-500/20 text-red-400 text-xs font-semibold uppercase tracking-wide">Schlecht</span>
+          <span class="text-surface-400 text-sm">Map direkt im gesamten Code verwenden</span>
+        </div>
+        <pre class="bg-surface-800 border border-surface-700 rounded-xl p-6 overflow-x-auto text-sm leading-relaxed"><code class="text-surface-200">// Map wird ueberall direkt verwendet — keine Kontrolle
+Map&lt;String, Sensor&gt; sensors = new HashMap&lt;&gt;();
+
+// Jeder kann die Map manipulieren
+sensors.clear();  // Gefaehrlich!
+sensors.remove("temperature");  // Unkontrolliert!
+
+// Aenderung des Typs (z.B. generics) erfordert
+// Aenderungen an JEDER Stelle im Code
+Sensor s = sensors.get("temperature");
+if (s != null) {  // Null-Pruefung noetig
+    s.record(value);
+}
+
+// 30+ Stellen im Code verwenden sensors direkt
+// Eine Aenderung der Map-API betrifft alle Stellen</code></pre>
+      </div>
+
+      <!-- Good Example -->
+      <div>
+        <div class="flex items-center gap-2 mb-3">
+          <span class="px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-xs font-semibold uppercase tracking-wide">Sauber</span>
+          <span class="text-surface-400 text-sm">Gekapselte Grenze mit Wrapper-Klasse</span>
+        </div>
+        <pre class="bg-surface-800 border border-surface-700 rounded-xl p-6 overflow-x-auto text-sm leading-relaxed"><code class="text-surface-200">// Wrapper kapselt die Map — nur benoetigte Operationen
+public class Sensors {
+    private Map&lt;String, Sensor&gt; sensors = new HashMap&lt;&gt;();
+
+    public Sensor getById(String id) {
+        return sensors.get(id);
+    }
+
+    // Keine clear(), remove() etc. exponiert!
+    // Aenderung der internen Datenstruktur betrifft
+    // NUR diese Klasse
+}
+
+// Interface fuer Code, der noch nicht existiert
+public interface Transmitter {
+    void transmit(Frequency frequency, Stream data);
+}
+
+// Adapter verbindet unser Interface mit der realen API
+public class TransmitterAdapter implements Transmitter {
+    private final VendorTransmitterApi api;
+
+    public TransmitterAdapter(VendorTransmitterApi api) {
+        this.api = api;
+    }
+
+    @Override
+    public void transmit(Frequency frequency, Stream data) {
+        // Uebersetzung auf die Vendor-API
+        api.send(frequency.toHertz(), data.toBytes());
+    }
+}
+
+// Learning Test: Unser Verstaendnis der API ueberpruefen
+@Test
+public void testLog4jLogging() {
+    Logger logger = Logger.getLogger("MyLogger");
+    logger.addAppender(new ConsoleAppender(
+        new PatternLayout("%p %t %m%n"),
+        ConsoleAppender.SYSTEM_OUT
+    ));
+    logger.info("Hello Log4j");
+    // Wenn dieses Verhalten sich in einer neuen Version
+    // aendert, schlaegt dieser Test sofort fehl
+}</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- Quote -->
+  <section class="py-16 bg-surface-900/50">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <blockquote class="relative bg-surface-800 border-l-4 border-primary-500 rounded-r-xl p-8 shadow-lg">
+        <svg class="absolute top-4 right-6 w-12 h-12 text-primary-500/10" fill="currentColor" viewBox="0 0 24 24"><path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/></svg>
+        <p class="text-lg text-surface-200 italic leading-relaxed mb-4">
+          "Interessanter Code entsteht an den Grenzen. Aenderungen sind eine der groessten Gefahren an diesen Stellen. Gutes Software-Design passt sich an Aenderungen an, ohne grosse Investitionen und Nacharbeit."
+        </p>
+        <cite class="text-surface-400 text-sm">— Robert C. Martin, Clean Code, Kapitel 8</cite>
+      </blockquote>
+    </div>
+  </section>
+
+  <!-- Prev/Next Navigation -->
+  <section class="py-12">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center gap-4">
+        <a href="kapitel-07.html" class="flex-1 group flex items-center gap-3 bg-surface-800 border border-surface-700 rounded-xl p-5 hover:border-primary-500/50 transition">
+          <svg class="w-5 h-5 text-surface-400 group-hover:text-primary-400 transition flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+          <div>
+            <span class="text-xs text-surface-500 uppercase tracking-wide">Vorheriges Kapitel</span>
+            <p class="text-white font-medium group-hover:text-primary-400 transition">07 — Fehlerbehandlung</p>
+          </div>
+        </a>
+        <a href="kapitel-09.html" class="flex-1 group flex items-center justify-end gap-3 bg-surface-800 border border-surface-700 rounded-xl p-5 hover:border-primary-500/50 transition text-right">
+          <div>
+            <span class="text-xs text-surface-500 uppercase tracking-wide">Naechstes Kapitel</span>
+            <p class="text-white font-medium group-hover:text-primary-400 transition">09 — Unit-Tests</p>
+          </div>
+          <svg class="w-5 h-5 text-surface-400 group-hover:text-primary-400 transition flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="bg-surface-900 border-t border-surface-700 mt-auto">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+      <p class="text-surface-400 text-sm">Clean Code — Robert C. Martin | Zusammenfassung auf Deutsch</p>
+      <div class="flex space-x-4">
+        <a href="index.html" class="text-surface-400 hover:text-primary-400 text-sm transition">Startseite</a>
+        <a href="zitate.html" class="text-surface-400 hover:text-primary-400 text-sm transition">Zitate</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

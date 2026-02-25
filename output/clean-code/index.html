@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Startseite — Clean Code Zusammenfassung</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: { 50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',300:'#93c5fd',400:'#60a5fa',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8',800:'#1e40af',900:'#1e3a8a' },
+            surface: { 50:'#f8fafc',100:'#f1f5f9',200:'#e2e8f0',300:'#cbd5e1',700:'#334155',800:'#1e293b',900:'#0f172a',950:'#020617' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    code, pre { font-family: 'JetBrains Mono', monospace; }
+    .card-hover { transition: transform 0.2s, box-shadow 0.2s; }
+    .card-hover:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.15); }
+    .fade-in { animation: fadeIn 0.4s ease-out; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+    details summary { cursor: pointer; }
+    details summary::-webkit-details-marker { display: none; }
+  </style>
+</head>
+<body class="bg-surface-950 text-surface-200 min-h-screen flex flex-col">
+
+  <!-- Navigation -->
+  <nav class="sticky top-0 z-50 bg-surface-900/95 backdrop-blur border-b border-surface-700">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <a href="index.html" class="text-xl font-bold text-primary-400 hover:text-primary-300 transition">📖 Clean Code</a>
+        <div class="hidden md:flex items-center space-x-1">
+          <a href="index.html" class="px-3 py-2 rounded-lg text-sm font-medium text-white bg-surface-700 transition">Startseite</a>
+          <div class="relative group">
+            <button class="px-3 py-2 rounded-lg text-sm font-medium text-surface-300 hover:text-white hover:bg-surface-700 transition">Kapitel ▾</button>
+            <div class="absolute left-0 mt-1 w-72 bg-surface-800 border border-surface-700 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 max-h-[70vh] overflow-y-auto z-50">
+              <a href="kapitel-01.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">01 — Sauberer Code</a>
+              <a href="kapitel-02.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">02 — Bedeutungsvolle Namen</a>
+              <a href="kapitel-03.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">03 — Funktionen</a>
+              <a href="kapitel-04.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">04 — Kommentare</a>
+              <a href="kapitel-05.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">05 — Formatierung</a>
+              <a href="kapitel-06.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">06 — Objekte und Datenstrukturen</a>
+              <a href="kapitel-07.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">07 — Fehlerbehandlung</a>
+              <a href="kapitel-08.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">08 — Grenzen</a>
+              <a href="kapitel-09.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">09 — Unit-Tests</a>
+              <a href="kapitel-10.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">10 — Klassen</a>
+              <a href="kapitel-11.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">11 — Systeme</a>
+              <a href="kapitel-12.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">12 — Emergenz</a>
+              <a href="kapitel-13.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">13 — Nebenlaeufigkeit</a>
+              <a href="kapitel-14.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">14 — Schrittweise Verfeinerung</a>
+              <a href="kapitel-15.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">15 — JUnit-Interna</a>
+              <a href="kapitel-16.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">16 — SerialDate refaktorisieren</a>
+              <a href="kapitel-17.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">17 — Gerueche und Heuristiken</a>
+            </div>
+          </div>
+          <a href="zitate.html" class="px-3 py-2 rounded-lg text-sm font-medium text-surface-300 hover:text-white hover:bg-surface-700 transition">Zitate</a>
+        </div>
+        <button onclick="document.getElementById('mobile-menu').classList.toggle('hidden')" class="md:hidden p-2 rounded-lg text-surface-300 hover:bg-surface-700">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+      </div>
+      <div id="mobile-menu" class="hidden md:hidden pb-4 space-y-1">
+        <a href="index.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">Startseite</a>
+        <a href="kapitel-01.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">01 — Sauberer Code</a>
+        <a href="kapitel-02.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">02 — Bedeutungsvolle Namen</a>
+        <a href="kapitel-03.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">03 — Funktionen</a>
+        <a href="kapitel-04.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">04 — Kommentare</a>
+        <a href="kapitel-05.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">05 — Formatierung</a>
+        <a href="kapitel-06.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">06 — Objekte und Datenstrukturen</a>
+        <a href="kapitel-07.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">07 — Fehlerbehandlung</a>
+        <a href="kapitel-08.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">08 — Grenzen</a>
+        <a href="kapitel-09.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">09 — Unit-Tests</a>
+        <a href="kapitel-10.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">10 — Klassen</a>
+        <a href="kapitel-11.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">11 — Systeme</a>
+        <a href="kapitel-12.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">12 — Emergenz</a>
+        <a href="kapitel-13.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">13 — Nebenlaeufigkeit</a>
+        <a href="kapitel-14.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">14 — Schrittweise Verfeinerung</a>
+        <a href="kapitel-15.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">15 — JUnit-Interna</a>
+        <a href="kapitel-16.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">16 — SerialDate refaktorisieren</a>
+        <a href="kapitel-17.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">17 — Gerueche und Heuristiken</a>
+        <a href="zitate.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">Zitate</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="flex-1">
+
+    <!-- Hero Section -->
+    <section class="relative overflow-hidden bg-gradient-to-br from-surface-900 via-surface-950 to-primary-900/20">
+      <div class="absolute inset-0 opacity-10">
+        <div class="absolute top-20 left-10 w-72 h-72 bg-primary-500 rounded-full blur-3xl"></div>
+        <div class="absolute bottom-20 right-10 w-96 h-96 bg-primary-700 rounded-full blur-3xl"></div>
+      </div>
+      <div class="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28 text-center fade-in">
+        <div class="inline-block mb-6 px-4 py-1.5 bg-primary-600/20 border border-primary-500/30 rounded-full">
+          <span class="text-primary-300 text-sm font-medium">Robert C. Martin</span>
+        </div>
+        <h1 class="text-5xl sm:text-6xl lg:text-7xl font-extrabold text-white mb-4 tracking-tight">
+          Clean Code
+        </h1>
+        <p class="text-xl sm:text-2xl text-surface-300 mb-8 max-w-2xl mx-auto leading-relaxed">
+          Ein Handbuch der agilen Software-Entwicklung
+        </p>
+        <div class="max-w-3xl mx-auto text-left bg-surface-800/60 backdrop-blur border border-surface-700 rounded-2xl p-6 sm:p-8">
+          <h2 class="text-lg font-semibold text-white mb-4">Was ist Clean Code?</h2>
+          <p class="text-surface-300 leading-relaxed mb-4">
+            Robert C. Martins "Clean Code" ist eines der einflussreichsten Buecher in der Geschichte der Software-Entwicklung. Seit seiner Erstveroeffentlichung im Jahr 2008 hat es die Art und Weise, wie Entwickler weltweit ueber ihren Code nachdenken, grundlegend veraendert. Das Buch entstand aus Jahrzehnten praktischer Erfahrung und der tiefen Ueberzeugung, dass Software-Handwerkskunst mehr erfordert als nur funktionierenden Code zu schreiben.
+          </p>
+          <p class="text-surface-300 leading-relaxed mb-4">
+            Die Kernbotschaft ist so einfach wie tiefgreifend: Code wird weit oefter gelesen als geschrieben. Deshalb muessen wir unseren Code so gestalten, dass er fuer andere Entwickler — und fuer unser zukuenftiges Ich — leicht verstaendlich ist. Martin fuehrt den Leser durch fundamentale Prinzipien wie die Wahl aussagekraeftiger Namen, das Schreiben kurzer und fokussierter Funktionen, den richtigen Umgang mit Kommentaren und Fehlerbehandlung sowie die Kunst, Klassen und Systeme sauber zu strukturieren.
+          </p>
+          <p class="text-surface-300 leading-relaxed">
+            Ueber reine Theorie hinaus bietet das Buch konkrete Fallstudien, in denen bestehender Code Schritt fuer Schritt verbessert wird. Es schließt mit einem umfassenden Katalog von "Code Smells" und Heuristiken, der als Nachschlagewerk fuer die taegliche Arbeit dient. Clean Code hat nicht nur individuelle Programmierer beeinflusst, sondern ganze Teamkulturen gepraegt und die Grundlage fuer Bewegungen wie Software Craftsmanship gelegt. Diese Zusammenfassung gibt einen kompakten Ueberblick ueber alle 17 Kapitel des Buches.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Search and Chapter Grid -->
+    <section class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+
+      <!-- Search -->
+      <div class="mb-10 max-w-xl mx-auto">
+        <div class="relative">
+          <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+          <input
+            type="text"
+            id="search-input"
+            placeholder="Kapitel durchsuchen..."
+            class="w-full pl-12 pr-4 py-3.5 bg-surface-800 border border-surface-700 rounded-xl text-white placeholder-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+          >
+        </div>
+      </div>
+
+      <!-- Chapter Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" id="chapter-grid">
+
+        <!-- Chapter 01 -->
+        <a href="kapitel-01.html" class="chapter-card card-hover block bg-surface-800 border border-surface-700 rounded-xl p-6 fade-in">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-primary-600 text-white text-sm font-bold">01</span>
+            <h3 class="text-lg font-semibold text-white">Sauberer Code</h3>
+          </div>
+          <p class="text-surface-300 text-sm leading-relaxed mb-4">Was macht Code zu sauberem Code? Dieses Kapitel definiert den Begriff und erklaert, warum Codequalitaet entscheidend fuer den Projekterfolg ist. Verschiedene Experten teilen ihre Definitionen von Clean Code.</p>
+          <span class="text-primary-400 text-sm font-medium hover:text-primary-300 transition">Weiterlesen &rarr;</span>
+        </a>
+
+        <!-- Chapter 02 -->
+        <a href="kapitel-02.html" class="chapter-card card-hover block bg-surface-800 border border-surface-700 rounded-xl p-6 fade-in">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-primary-600 text-white text-sm font-bold">02</span>
+            <h3 class="text-lg font-semibold text-white">Bedeutungsvolle Namen</h3>
+          </div>
+          <p class="text-surface-300 text-sm leading-relaxed mb-4">Namen sind ueberall im Code. Gute Namen offenbaren Absichten, vermeiden Desinformation und sind aussprechbar. Dieses Kapitel liefert praktische Regeln fuer klare, aussagekraeftige Bezeichner.</p>
+          <span class="text-primary-400 text-sm font-medium hover:text-primary-300 transition">Weiterlesen &rarr;</span>
+        </a>
+
+        <!-- Chapter 03 -->
+        <a href="kapitel-03.html" class="chapter-card card-hover block bg-surface-800 border border-surface-700 rounded-xl p-6 fade-in">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-primary-600 text-white text-sm font-bold">03</span>
+            <h3 class="text-lg font-semibold text-white">Funktionen</h3>
+          </div>
+          <p class="text-surface-300 text-sm leading-relaxed mb-4">Funktionen sind die grundlegenden Bausteine jedes Programms. Sie sollten kurz sein, nur eine Aufgabe erledigen und auf einer einzigen Abstraktionsebene arbeiten. Weniger Parameter sind besser.</p>
+          <span class="text-primary-400 text-sm font-medium hover:text-primary-300 transition">Weiterlesen &rarr;</span>
+        </a>
+
+        <!-- Chapter 04 -->
+        <a href="kapitel-04.html" class="chapter-card card-hover block bg-surface-800 border border-surface-700 rounded-xl p-6 fade-in">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-primary-600 text-white text-sm font-bold">04</span>
+            <h3 class="text-lg font-semibold text-white">Kommentare</h3>
+          </div>
+          <p class="text-surface-300 text-sm leading-relaxed mb-4">Kommentare sind oft ein Zeichen dafuer, dass der Code nicht fuer sich selbst spricht. Lerne, wann Kommentare wirklich helfen und wann sie mehr schaden als nuetzen. Guter Code braucht wenige Kommentare.</p>
+          <span class="text-primary-400 text-sm font-medium hover:text-primary-300 transition">Weiterlesen &rarr;</span>
+        </a>
+
+        <!-- Chapter 05 -->
+        <a href="kapitel-05.html" class="chapter-card card-hover block bg-surface-800 border border-surface-700 rounded-xl p-6 fade-in">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-primary-600 text-white text-sm font-bold">05</span>
+            <h3 class="text-lg font-semibold text-white">Formatierung</h3>
+          </div>
+          <p class="text-surface-300 text-sm leading-relaxed mb-4">Code-Formatierung kommuniziert Professionalitaet. Vertikale Formatierung regelt Dateilaenge und Abstaende, horizontale Formatierung die Zeilenbreite. Konsistente Teamregeln sind entscheidend.</p>
+          <span class="text-primary-400 text-sm font-medium hover:text-primary-300 transition">Weiterlesen &rarr;</span>
+        </a>
+
+        <!-- Chapter 06 -->
+        <a href="kapitel-06.html" class="chapter-card card-hover block bg-surface-800 border border-surface-700 rounded-xl p-6 fade-in">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-primary-600 text-white text-sm font-bold">06</span>
+            <h3 class="text-lg font-semibold text-white">Objekte und Datenstrukturen</h3>
+          </div>
+          <p class="text-surface-300 text-sm leading-relaxed mb-4">Es gibt einen fundamentalen Unterschied zwischen Objekten und Datenstrukturen. Objekte verbergen Daten hinter Abstraktionen, Datenstrukturen legen sie offen. Das Gesetz von Demeter hilft bei der Entscheidung.</p>
+          <span class="text-primary-400 text-sm font-medium hover:text-primary-300 transition">Weiterlesen &rarr;</span>
+        </a>
+
+        <!-- Chapter 07 -->
+        <a href="kapitel-07.html" class="chapter-card card-hover block bg-surface-800 border border-surface-700 rounded-xl p-6 fade-in">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-primary-600 text-white text-sm font-bold">07</span>
+            <h3 class="text-lg font-semibold text-white">Fehlerbehandlung</h3>
+          </div>
+          <p class="text-surface-300 text-sm leading-relaxed mb-4">Fehlerbehandlung ist wichtig, darf aber die Logik nicht verschleiern. Verwende Exceptions statt Fehlercodes, gib niemals null zurueck und schreibe Tests, die Fehlerfaelle abdecken.</p>
+          <span class="text-primary-400 text-sm font-medium hover:text-primary-300 transition">Weiterlesen &rarr;</span>
+        </a>
+
+        <!-- Chapter 08 -->
+        <a href="kapitel-08.html" class="chapter-card card-hover block bg-surface-800 border border-surface-700 rounded-xl p-6 fade-in">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-primary-600 text-white text-sm font-bold">08</span>
+            <h3 class="text-lg font-semibold text-white">Grenzen</h3>
+          </div>
+          <p class="text-surface-300 text-sm leading-relaxed mb-4">Wenn wir externen Code oder Drittanbieter-Bibliotheken nutzen, entstehen Grenzen in unserem System. Lerne Techniken wie Boundary-Tests und Adapter-Pattern, um diese Grenzen sauber zu verwalten.</p>
+          <span class="text-primary-400 text-sm font-medium hover:text-primary-300 transition">Weiterlesen &rarr;</span>
+        </a>
+
+        <!-- Chapter 09 -->
+        <a href="kapitel-09.html" class="chapter-card card-hover block bg-surface-800 border border-surface-700 rounded-xl p-6 fade-in">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-primary-600 text-white text-sm font-bold">09</span>
+            <h3 class="text-lg font-semibold text-white">Unit-Tests</h3>
+          </div>
+          <p class="text-surface-300 text-sm leading-relaxed mb-4">TDD und die drei Gesetze sauberer Tests. Testcode verdient dieselbe Sorgfalt wie Produktionscode. Saubere Tests sind lesbar, schnell, unabhaengig, wiederholbar und selbstvalidierend (F.I.R.S.T.).</p>
+          <span class="text-primary-400 text-sm font-medium hover:text-primary-300 transition">Weiterlesen &rarr;</span>
+        </a>
+
+        <!-- Chapter 10 -->
+        <a href="kapitel-10.html" class="chapter-card card-hover block bg-surface-800 border border-surface-700 rounded-xl p-6 fade-in">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-primary-600 text-white text-sm font-bold">10</span>
+            <h3 class="text-lg font-semibold text-white">Klassen</h3>
+          </div>
+          <p class="text-surface-300 text-sm leading-relaxed mb-4">Klassen sollten klein sein — gemessen an Verantwortlichkeiten, nicht Codezeilen. Das Single Responsibility Principle und hohe Kohaesion fuehren zu wartbarem, flexiblem Code.</p>
+          <span class="text-primary-400 text-sm font-medium hover:text-primary-300 transition">Weiterlesen &rarr;</span>
+        </a>
+
+        <!-- Chapter 11 -->
+        <a href="kapitel-11.html" class="chapter-card card-hover block bg-surface-800 border border-surface-700 rounded-xl p-6 fade-in">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-primary-600 text-white text-sm font-bold">11</span>
+            <h3 class="text-lg font-semibold text-white">Systeme</h3>
+          </div>
+          <p class="text-surface-300 text-sm leading-relaxed mb-4">Saubere Systeme trennen die Konstruktion von der Nutzung. Dependency Injection, Factories und aspektorientierte Programmierung helfen dabei, Systemarchitekturen sauber und erweiterbar zu halten.</p>
+          <span class="text-primary-400 text-sm font-medium hover:text-primary-300 transition">Weiterlesen &rarr;</span>
+        </a>
+
+        <!-- Chapter 12 -->
+        <a href="kapitel-12.html" class="chapter-card card-hover block bg-surface-800 border border-surface-700 rounded-xl p-6 fade-in">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-primary-600 text-white text-sm font-bold">12</span>
+            <h3 class="text-lg font-semibold text-white">Emergenz</h3>
+          </div>
+          <p class="text-surface-300 text-sm leading-relaxed mb-4">Kent Becks vier Regeln fuer emergentes Design: Alle Tests bestehen, keine Duplikation, Absicht des Programmierers ausdruecken und die Anzahl der Klassen und Methoden minimieren.</p>
+          <span class="text-primary-400 text-sm font-medium hover:text-primary-300 transition">Weiterlesen &rarr;</span>
+        </a>
+
+        <!-- Chapter 13 -->
+        <a href="kapitel-13.html" class="chapter-card card-hover block bg-surface-800 border border-surface-700 rounded-xl p-6 fade-in">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-primary-600 text-white text-sm font-bold">13</span>
+            <h3 class="text-lg font-semibold text-white">Nebenlaeufigkeit</h3>
+          </div>
+          <p class="text-surface-300 text-sm leading-relaxed mb-4">Nebenlaeufigkeit ist schwer und fuehrt zu subtilen Fehlern. Dieses Kapitel erklaert Herausforderungen paralleler Programmierung und Strategien wie Thread-sichere Collections und das Producer-Consumer-Pattern.</p>
+          <span class="text-primary-400 text-sm font-medium hover:text-primary-300 transition">Weiterlesen &rarr;</span>
+        </a>
+
+        <!-- Chapter 14 -->
+        <a href="kapitel-14.html" class="chapter-card card-hover block bg-surface-800 border border-surface-700 rounded-xl p-6 fade-in">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-primary-600 text-white text-sm font-bold">14</span>
+            <h3 class="text-lg font-semibold text-white">Schrittweise Verfeinerung</h3>
+          </div>
+          <p class="text-surface-300 text-sm leading-relaxed mb-4">Eine ausfuehrliche Fallstudie zur schrittweisen Verbesserung eines Argument-Parsers. Martin zeigt, wie iteratives Refactoring aus unuebersichtlichem Code eine saubere Loesung formt.</p>
+          <span class="text-primary-400 text-sm font-medium hover:text-primary-300 transition">Weiterlesen &rarr;</span>
+        </a>
+
+        <!-- Chapter 15 -->
+        <a href="kapitel-15.html" class="chapter-card card-hover block bg-surface-800 border border-surface-700 rounded-xl p-6 fade-in">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-primary-600 text-white text-sm font-bold">15</span>
+            <h3 class="text-lg font-semibold text-white">JUnit-Interna</h3>
+          </div>
+          <p class="text-surface-300 text-sm leading-relaxed mb-4">Eine Refactoring-Fallstudie des ComparisonCompactor aus dem JUnit-Framework. Schritt fuer Schritt wird gezeigt, wie selbst bewehrter Open-Source-Code noch verbessert werden kann.</p>
+          <span class="text-primary-400 text-sm font-medium hover:text-primary-300 transition">Weiterlesen &rarr;</span>
+        </a>
+
+        <!-- Chapter 16 -->
+        <a href="kapitel-16.html" class="chapter-card card-hover block bg-surface-800 border border-surface-700 rounded-xl p-6 fade-in">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-primary-600 text-white text-sm font-bold">16</span>
+            <h3 class="text-lg font-semibold text-white">SerialDate refaktorisieren</h3>
+          </div>
+          <p class="text-surface-300 text-sm leading-relaxed mb-4">Ein Praxisbeispiel anhand der SerialDate-Klasse aus JCommon. Martin demonstriert sein Vorgehen beim Refactoring einer realen Klasse, einschliesslich Testabdeckung und schrittweiser Verbesserung.</p>
+          <span class="text-primary-400 text-sm font-medium hover:text-primary-300 transition">Weiterlesen &rarr;</span>
+        </a>
+
+        <!-- Chapter 17 -->
+        <a href="kapitel-17.html" class="chapter-card card-hover block bg-surface-800 border border-surface-700 rounded-xl p-6 fade-in">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-primary-600 text-white text-sm font-bold">17</span>
+            <h3 class="text-lg font-semibold text-white">Gerueche und Heuristiken</h3>
+          </div>
+          <p class="text-surface-300 text-sm leading-relaxed mb-4">Der umfassende Katalog von Code-Smells und Heuristiken. Von Kommentar-Geruechen ueber Funktions-Gerueche bis hin zu allgemeinen Smells — ein Nachschlagewerk fuer die taegliche Programmierpraxis.</p>
+          <span class="text-primary-400 text-sm font-medium hover:text-primary-300 transition">Weiterlesen &rarr;</span>
+        </a>
+
+      </div>
+
+      <!-- No results message -->
+      <div id="no-results" class="hidden text-center py-12">
+        <p class="text-surface-400 text-lg">Keine Kapitel gefunden. Versuche einen anderen Suchbegriff.</p>
+      </div>
+
+    </section>
+
+    <!-- Quick Stats -->
+    <section class="bg-surface-900/50 border-t border-b border-surface-700">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-8 text-center">
+          <div>
+            <div class="text-3xl font-bold text-primary-400">17</div>
+            <div class="text-sm text-surface-400 mt-1">Kapitel</div>
+          </div>
+          <div>
+            <div class="text-3xl font-bold text-primary-400">464</div>
+            <div class="text-sm text-surface-400 mt-1">Seiten</div>
+          </div>
+          <div>
+            <div class="text-3xl font-bold text-primary-400">2008</div>
+            <div class="text-sm text-surface-400 mt-1">Erstausgabe</div>
+          </div>
+          <div>
+            <div class="text-3xl font-bold text-primary-400">15+</div>
+            <div class="text-sm text-surface-400 mt-1">Zitate</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-surface-900 border-t border-surface-700 mt-auto">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+        <p class="text-surface-400 text-sm">Clean Code — Robert C. Martin | Zusammenfassung auf Deutsch</p>
+        <div class="flex space-x-4">
+          <a href="index.html" class="text-surface-400 hover:text-primary-400 text-sm transition">Startseite</a>
+          <a href="zitate.html" class="text-surface-400 hover:text-primary-400 text-sm transition">Zitate</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Search Script -->
+  <script>
+    const searchInput = document.getElementById('search-input');
+    const cards = document.querySelectorAll('.chapter-card');
+    const noResults = document.getElementById('no-results');
+
+    searchInput.addEventListener('input', function() {
+      const query = this.value.toLowerCase();
+      let visibleCount = 0;
+      cards.forEach(card => {
+        const text = card.textContent.toLowerCase();
+        const isVisible = text.includes(query);
+        card.style.display = isVisible ? '' : 'none';
+        if (isVisible) visibleCount++;
+      });
+      noResults.classList.toggle('hidden', visibleCount > 0);
+    });
+  </script>
+
+</body>
+</html>

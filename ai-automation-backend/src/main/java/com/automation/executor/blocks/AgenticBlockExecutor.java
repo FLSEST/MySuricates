@@ -60,6 +60,9 @@ public class AgenticBlockExecutor implements BlockExecutor {
         int maxRepeatedActions = ((Number) config.getOrDefault(
                 "max_repeated_actions", 3)).intValue();
         boolean requireApproval = Boolean.TRUE.equals(config.get("require_approval"));
+        Integer claudeTimeout = config.containsKey("timeout_seconds")
+                ? ((Number) config.get("timeout_seconds")).intValue()
+                : null;
 
         // Gather learning context — resolve workflow ID from the run
         String workflowId = runRepository.findById(context.getWorkflowRunId())
@@ -125,7 +128,8 @@ public class AgenticBlockExecutor implements BlockExecutor {
             String reasoning;
             try {
                 String conversationPrompt = hostClaude.buildConversationPrompt(systemPrompt, history);
-                ReasoningResult reasonResult = hostClaude.reasonStructured(conversationPrompt, systemPrompt);
+                ReasoningResult reasonResult = hostClaude.reasonStructured(
+                        conversationPrompt, systemPrompt, null, null, claudeTimeout);
                 reasoning = reasonResult.text();
 
                 // Capture reasoning token/cost metadata
@@ -234,7 +238,8 @@ public class AgenticBlockExecutor implements BlockExecutor {
                 String actionCommand = plan.getAction();
                 String containerSystemPrompt = context.getInstructionPrefix();
                 CliSession.EnrichedCommandResult cmdResult = commandExecutor.executeCommandOnHost(
-                        context.getProjectPath(), actionCommand, context.getModel(), containerSystemPrompt);
+                        context.getProjectPath(), actionCommand, context.getModel(), containerSystemPrompt,
+                        claudeTimeout);
                 actionOutput = cmdResult.output() != null ? cmdResult.output() : "";
                 exitCode = cmdResult.exitCode();
 

@@ -67,6 +67,8 @@ public class Workflow {
 
     private String model;
 
+    private String templateId;
+
     @OneToMany(mappedBy = "workflow", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<WorkflowRun> runs = new ArrayList<>();

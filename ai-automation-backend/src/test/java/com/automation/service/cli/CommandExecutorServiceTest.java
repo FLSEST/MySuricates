@@ -189,7 +189,7 @@ class CommandExecutorServiceTest {
 
     @Test
     void executeCommandOnHost_success_returnsEnrichedResult() throws IOException {
-        when(hostClaudeService.executeAction(eq("hello"), eq("sonnet"), eq("sys prompt"), eq("/project")))
+        when(hostClaudeService.executeAction(eq("hello"), eq("sonnet"), eq("sys prompt"), eq("/project"), isNull()))
                 .thenReturn(new ActionResult("Hello world", 0, null));
 
         CliSession.EnrichedCommandResult result =
@@ -201,7 +201,7 @@ class CommandExecutorServiceTest {
 
     @Test
     void executeCommandOnHost_ioException_throwsWorkflowExecutionException() throws IOException {
-        when(hostClaudeService.executeAction(anyString(), any(), any(), anyString()))
+        when(hostClaudeService.executeAction(anyString(), any(), any(), anyString(), isNull()))
                 .thenThrow(new IOException("Claude not found"));
 
         assertThatThrownBy(() ->
@@ -212,7 +212,7 @@ class CommandExecutorServiceTest {
 
     @Test
     void executeStepOnHost_success_returnsCompletedStep() throws IOException {
-        when(hostClaudeService.executeAction(eq("npm test"), any(), any(), eq("/project")))
+        when(hostClaudeService.executeAction(eq("npm test"), any(), any(), eq("/project"), isNull()))
                 .thenReturn(new ActionResult("All tests passed", 0, null));
 
         BlockDefinition block = BlockDefinition.builder()
@@ -231,7 +231,7 @@ class CommandExecutorServiceTest {
 
     @Test
     void executeStepOnHost_nonZeroExitCode_returnsFailedStep() throws IOException {
-        when(hostClaudeService.executeAction(eq("npm test"), any(), any(), eq("/project")))
+        when(hostClaudeService.executeAction(eq("npm test"), any(), any(), eq("/project"), isNull()))
                 .thenReturn(new ActionResult("Error: tests failed", 1, null));
 
         BlockDefinition block = BlockDefinition.builder()
@@ -246,7 +246,7 @@ class CommandExecutorServiceTest {
 
     @Test
     void executeCommandOnHost_simpleOverload_returnsCommandResult() throws IOException {
-        when(hostClaudeService.executeAction(eq("ls"), any(), any(), eq("/project")))
+        when(hostClaudeService.executeAction(eq("ls"), any(), any(), eq("/project"), isNull()))
                 .thenReturn(new ActionResult("file.txt", 0, null));
 
         CliSession.CommandResult result =

@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kapitel 7: Fehlerbehandlung — Clean Code</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: { 50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',300:'#93c5fd',400:'#60a5fa',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8',800:'#1e40af',900:'#1e3a8a' },
+            surface: { 50:'#f8fafc',100:'#f1f5f9',200:'#e2e8f0',300:'#cbd5e1',700:'#334155',800:'#1e293b',900:'#0f172a',950:'#020617' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    code, pre { font-family: 'JetBrains Mono', monospace; }
+    .fade-in { animation: fadeIn 0.4s ease-out; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+  </style>
+</head>
+<body class="bg-surface-950 text-surface-200 min-h-screen flex flex-col">
+
+<nav class="sticky top-0 z-50 bg-surface-900/95 backdrop-blur border-b border-surface-700">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between h-16">
+      <a href="index.html" class="text-xl font-bold text-primary-400 hover:text-primary-300 transition">📖 Clean Code</a>
+      <div class="hidden md:flex items-center space-x-1">
+        <a href="index.html" class="px-3 py-2 rounded-lg text-sm font-medium text-surface-300 hover:text-white hover:bg-surface-700 transition">Startseite</a>
+        <div class="relative group">
+          <button class="px-3 py-2 rounded-lg text-sm font-medium text-surface-300 hover:text-white hover:bg-surface-700 transition">Kapitel ▾</button>
+          <div class="absolute left-0 mt-1 w-72 bg-surface-800 border border-surface-700 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 max-h-[70vh] overflow-y-auto z-50">
+            <a href="kapitel-01.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">01 — Sauberer Code</a>
+            <a href="kapitel-02.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">02 — Bedeutungsvolle Namen</a>
+            <a href="kapitel-03.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">03 — Funktionen</a>
+            <a href="kapitel-04.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">04 — Kommentare</a>
+            <a href="kapitel-05.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">05 — Formatierung</a>
+            <a href="kapitel-06.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">06 — Objekte und Datenstrukturen</a>
+            <a href="kapitel-07.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">07 — Fehlerbehandlung</a>
+            <a href="kapitel-08.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">08 — Grenzen</a>
+            <a href="kapitel-09.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">09 — Unit-Tests</a>
+            <a href="kapitel-10.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">10 — Klassen</a>
+            <a href="kapitel-11.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">11 — Systeme</a>
+            <a href="kapitel-12.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">12 — Emergenz</a>
+            <a href="kapitel-13.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">13 — Nebenlaeufigkeit</a>
+            <a href="kapitel-14.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">14 — Schrittweise Verfeinerung</a>
+            <a href="kapitel-15.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">15 — JUnit-Interna</a>
+            <a href="kapitel-16.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">16 — SerialDate refaktorisieren</a>
+            <a href="kapitel-17.html" class="block px-4 py-2 text-sm text-surface-300 hover:bg-surface-700 hover:text-white">17 — Gerueche und Heuristiken</a>
+          </div>
+        </div>
+        <a href="zitate.html" class="px-3 py-2 rounded-lg text-sm font-medium text-surface-300 hover:text-white hover:bg-surface-700 transition">Zitate</a>
+      </div>
+      <button onclick="document.getElementById('mobile-menu').classList.toggle('hidden')" class="md:hidden p-2 rounded-lg text-surface-300 hover:bg-surface-700">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+    </div>
+    <div id="mobile-menu" class="hidden md:hidden pb-4 space-y-1">
+      <a href="index.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">Startseite</a>
+      <a href="kapitel-01.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">01 — Sauberer Code</a>
+      <a href="kapitel-02.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">02 — Bedeutungsvolle Namen</a>
+      <a href="kapitel-03.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">03 — Funktionen</a>
+      <a href="kapitel-04.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">04 — Kommentare</a>
+      <a href="kapitel-05.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">05 — Formatierung</a>
+      <a href="kapitel-06.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">06 — Objekte und Datenstrukturen</a>
+      <a href="kapitel-07.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">07 — Fehlerbehandlung</a>
+      <a href="kapitel-08.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">08 — Grenzen</a>
+      <a href="kapitel-09.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">09 — Unit-Tests</a>
+      <a href="kapitel-10.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">10 — Klassen</a>
+      <a href="kapitel-11.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">11 — Systeme</a>
+      <a href="kapitel-12.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">12 — Emergenz</a>
+      <a href="kapitel-13.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">13 — Nebenlaeufigkeit</a>
+      <a href="kapitel-14.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">14 — Schrittweise Verfeinerung</a>
+      <a href="kapitel-15.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">15 — JUnit-Interna</a>
+      <a href="kapitel-16.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">16 — SerialDate refaktorisieren</a>
+      <a href="kapitel-17.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">17 — Gerueche und Heuristiken</a>
+      <a href="zitate.html" class="block px-3 py-2 rounded-lg text-sm text-surface-300 hover:bg-surface-700">Zitate</a>
+    </div>
+  </div>
+</nav>
+
+<main class="flex-1">
+  <!-- Breadcrumb -->
+  <div class="bg-surface-900 border-b border-surface-800">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+      <nav class="flex items-center space-x-2 text-sm text-surface-400">
+        <a href="index.html" class="hover:text-primary-400 transition">Startseite</a>
+        <span>/</span>
+        <span>Kapitel 07</span>
+        <span>/</span>
+        <span class="text-surface-200">Fehlerbehandlung</span>
+      </nav>
+    </div>
+  </div>
+
+  <!-- Hero Section -->
+  <section class="bg-gradient-to-b from-surface-900 to-surface-950 py-16 fade-in">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <span class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-primary-600/20 text-primary-400 text-3xl font-extrabold mb-6 border border-primary-500/30">07</span>
+      <h1 class="text-4xl sm:text-5xl font-extrabold text-white mb-4">Fehlerbehandlung</h1>
+      <p class="text-lg text-surface-300 max-w-2xl mx-auto">Fehler elegant behandeln, ohne die Kernlogik zu verschleiern — mit Exceptions, dem Special Case Pattern und einer klaren Null-Vermeidungsstrategie.</p>
+    </div>
+  </section>
+
+  <!-- Zusammenfassung -->
+  <section class="py-16">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h2 class="text-3xl font-bold text-white mb-8 flex items-center gap-3">
+        <span class="w-10 h-10 rounded-lg bg-primary-600/20 flex items-center justify-center text-primary-400 text-lg">Z</span>
+        Zusammenfassung
+      </h2>
+      <div class="prose prose-invert max-w-none space-y-4 text-surface-300 leading-relaxed">
+        <p>
+          Fehlerbehandlung ist ein unverzichtbarer Bestandteil professioneller Softwareentwicklung. Doch Robert C. Martin warnt eindringlich davor, dass sie die eigentliche Geschaeftslogik nicht ueberlagern darf. Wenn Fehlerbehandlungscode den Algorithmus verdunkelt, haben wir etwas grundlegend falsch gemacht. Das Ziel ist Code, der sowohl robust als auch lesbar ist — und diese beiden Eigenschaften muessen kein Widerspruch sein.
+        </p>
+        <p>
+          Der erste und wichtigste Grundsatz lautet: <strong>Verwende Exceptions statt Fehlercodes.</strong> In aelteren Programmierparadigmen war es ueblich, dass Funktionen einen Fehlercode zurueckgeben, den der Aufrufer pruefen musste. Dieses Muster fuehrt zu tief verschachteltem Code, weil jeder Aufruf sofort von einer Fehlerpruefung gefolgt werden muss. Exceptions hingegen trennen den fehlerfreien Pfad sauber vom Fehlerbehandlungspfad. Der Algorithmus bleibt im Try-Block klar erkennbar, waehrend die Fehlerbehandlung im Catch-Block zusammengefasst wird.
+        </p>
+        <p>
+          Martin empfiehlt ausdruecklich die Verwendung von <strong>Unchecked Exceptions</strong>. Checked Exceptions in Java, die in der Methodensignatur deklariert werden muessen, verletzen das Open/Closed-Prinzip: Eine Aenderung in einer tiefen Methode erzwingt Anpassungen in allen aufrufenden Methoden bis hinauf zur obersten Ebene. Unchecked Exceptions vermeiden diese Kaskade und halten die Schnittstellen sauber.
+        </p>
+        <p>
+          Ein weiterer zentraler Punkt ist die <strong>Bereitstellung von Kontext</strong>. Jede Exception sollte genug Information enthalten, um den Fehler lokalisieren und verstehen zu koennen. Dazu gehoeren die fehlgeschlagene Operation, der Typ des Fehlers und relevante Kontextdaten. Eine generische Meldung wie "Fehler aufgetreten" ist wertlos — eine praezise Nachricht wie "Verbindung zur Datenbank 'orders' auf Host 'db.prod.internal:5432' fehlgeschlagen nach 3 Versuchen" erlaubt dagegen eine schnelle Diagnose.
+        </p>
+        <p>
+          Martin betont besonders zwei Regeln zum Umgang mit Null: <strong>Gib niemals null zurueck</strong> und <strong>uebergib niemals null als Argument</strong>. Methoden, die null zurueckgeben, zwingen jeden Aufrufer zu einer Null-Pruefung — und eine einzige vergessene Pruefung fuehrt zu einer NullPointerException. Stattdessen sollte man leere Collections zurueckgeben, das Special Case Pattern anwenden oder eine Exception werfen. Ebenso sollte null niemals als Parameter uebergeben werden, weil es die aufgerufene Methode zwingt, mit einem undefinierten Zustand umzugehen.
+        </p>
+        <p>
+          Das <strong>Special Case Pattern</strong> (auch Null Object Pattern genannt) ist eine elegante Alternative zu Null-Pruefungen. Anstatt null zurueckzugeben, liefert man ein Objekt, das ein standardmaessiges oder neutrales Verhalten implementiert. Der Client-Code kann dieses Objekt wie ein normales Ergebnis verwenden, ohne Sonderfaelle abfangen zu muessen. Dies reduziert die Komplexitaet und eliminiert ganze Klassen von Fehlern.
+        </p>
+        <p>
+          Schliesslich raet Martin dazu, die <strong>Try-Catch-Finally-Struktur zuerst zu schreiben</strong>. Wenn man mit Code beginnt, der Exceptions werfen kann, definiert man zuerst den Try-Block und legt fest, was im Fehlerfall passieren soll. Dies ist eine Form von TDD fuer Fehlerbehandlung: Man schreibt zuerst den Test fuer den Fehlerfall, dann den Code, der die Exception wirft, und schliesslich den Handler. So stellt man sicher, dass die Fehlerbehandlung von Anfang an Teil des Designs ist und nicht nachtraeglich angefuegt wird.
+        </p>
+        <p>
+          Die uebergreifende Botschaft dieses Kapitels: Fehlerbehandlung ist eine <strong>eigene Aufgabe</strong>, die getrennt von der Geschaeftslogik betrachtet und implementiert werden sollte. Code, der diese Trennung respektiert, ist sowohl zuverlaessiger als auch leichter zu warten.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Key Takeaways -->
+  <section class="py-16 bg-surface-900/50">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h2 class="text-3xl font-bold text-white mb-8 flex items-center gap-3">
+        <span class="w-10 h-10 rounded-lg bg-primary-600/20 flex items-center justify-center text-primary-400 text-lg">K</span>
+        Kernaussagen
+      </h2>
+      <div class="grid gap-4">
+        <div class="bg-surface-800 border border-surface-700 rounded-xl p-5 hover:border-primary-500/50 transition">
+          <div class="flex items-start gap-4">
+            <span class="flex-shrink-0 w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center text-red-400 font-bold text-sm">1</span>
+            <div>
+              <h3 class="text-white font-semibold mb-1">Exceptions statt Return-Codes</h3>
+              <p class="text-surface-400 text-sm">Fehlercodes fuehren zu verschachteltem Code und erzwingen sofortige Pruefungen. Exceptions trennen den Normalpfad sauber von der Fehlerbehandlung und machen den Algorithmus lesbar.</p>
+            </div>
+          </div>
+        </div>
+        <div class="bg-surface-800 border border-surface-700 rounded-xl p-5 hover:border-primary-500/50 transition">
+          <div class="flex items-start gap-4">
+            <span class="flex-shrink-0 w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center text-orange-400 font-bold text-sm">2</span>
+            <div>
+              <h3 class="text-white font-semibold mb-1">Null vermeiden — weder zurueckgeben noch uebergeben</h3>
+              <p class="text-surface-400 text-sm">Jede Null-Rueckgabe ist eine potenzielle NullPointerException. Stattdessen leere Collections, das Special Case Pattern oder Exceptions verwenden. Null als Parameter ist ebenso zu vermeiden.</p>
+            </div>
+          </div>
+        </div>
+        <div class="bg-surface-800 border border-surface-700 rounded-xl p-5 hover:border-primary-500/50 transition">
+          <div class="flex items-start gap-4">
+            <span class="flex-shrink-0 w-8 h-8 rounded-lg bg-yellow-500/20 flex items-center justify-center text-yellow-400 font-bold text-sm">3</span>
+            <div>
+              <h3 class="text-white font-semibold mb-1">Try-Catch-Finally zuerst schreiben</h3>
+              <p class="text-surface-400 text-sm">Beginne mit der Fehlerbehandlungsstruktur, bevor du die Geschaeftslogik implementierst. Das stellt sicher, dass Fehlerfaelle von Anfang an im Design beruecksichtigt werden.</p>
+            </div>
+          </div>
+        </div>
+        <div class="bg-surface-800 border border-surface-700 rounded-xl p-5 hover:border-primary-500/50 transition">
+          <div class="flex items-start gap-4">
+            <span class="flex-shrink-0 w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center text-green-400 font-bold text-sm">4</span>
+            <div>
+              <h3 class="text-white font-semibold mb-1">Special Case Pattern anwenden</h3>
+              <p class="text-surface-400 text-sm">Anstatt null zurueckzugeben, ein Objekt mit neutralem Standardverhalten liefern. Der Client-Code wird einfacher und Null-Pruefungen entfallen vollstaendig.</p>
+            </div>
+          </div>
+        </div>
+        <div class="bg-surface-800 border border-surface-700 rounded-xl p-5 hover:border-primary-500/50 transition">
+          <div class="flex items-start gap-4">
+            <span class="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 font-bold text-sm">5</span>
+            <div>
+              <h3 class="text-white font-semibold mb-1">Kontext in Exceptions bereitstellen</h3>
+              <p class="text-surface-400 text-sm">Fehlermeldungen muessen genug Informationen enthalten, um den Fehler zu lokalisieren: Operation, Fehlertyp und relevante Daten. Generische Meldungen sind wertlos.</p>
+            </div>
+          </div>
+        </div>
+        <div class="bg-surface-800 border border-surface-700 rounded-xl p-5 hover:border-primary-500/50 transition">
+          <div class="flex items-start gap-4">
+            <span class="flex-shrink-0 w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400 font-bold text-sm">6</span>
+            <div>
+              <h3 class="text-white font-semibold mb-1">Unchecked Exceptions bevorzugen</h3>
+              <p class="text-surface-400 text-sm">Checked Exceptions verletzen das Open/Closed-Prinzip und erzwingen Aenderungskaskaden durch alle Aufrufebenen. Unchecked Exceptions halten Schnittstellen sauber und flexibel.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Code Example -->
+  <section class="py-16">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h2 class="text-3xl font-bold text-white mb-8 flex items-center gap-3">
+        <span class="w-10 h-10 rounded-lg bg-primary-600/20 flex items-center justify-center text-primary-400 text-lg">&lt;/&gt;</span>
+        Codebeispiel
+      </h2>
+      <p class="text-surface-300 mb-6">Vergleich: Fehlerbehandlung mit Return-Codes versus Exceptions und dem Special Case Pattern.</p>
+
+      <!-- Bad Example -->
+      <div class="mb-8">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="px-3 py-1 rounded-full bg-red-500/20 text-red-400 text-xs font-semibold uppercase tracking-wide">Schlecht</span>
+          <span class="text-surface-400 text-sm">Fehlercodes und Null-Pruefungen ueberall</span>
+        </div>
+        <pre class="bg-surface-800 border border-surface-700 rounded-xl p-6 overflow-x-auto text-sm leading-relaxed"><code class="text-surface-200">public class DeviceController {
+
+    public void sendShutDown() {
+        DeviceHandle handle = getHandle(DEV1);
+        // Null-Pruefung nach Null-Pruefung...
+        if (handle != DeviceHandle.INVALID) {
+            DeviceRecord record = retrieveDeviceRecord(handle);
+            if (record.getStatus() != DEVICE_SUSPENDED) {
+                pauseDevice(handle);
+                clearDeviceWorkQueue(handle);
+                closeDevice(handle);
+            } else {
+                logger.log("Device suspended. Unable to shut down.");
+            }
+        } else {
+            logger.log("Invalid handle for: " + DEV1.toString());
+        }
+    }
+
+    // Jede Methode gibt null oder Fehlercodes zurueck
+    private DeviceHandle getHandle(DeviceID id) {
+        // ... kann DeviceHandle.INVALID zurueckgeben
+    }
+}</code></pre>
+      </div>
+
+      <!-- Good Example -->
+      <div>
+        <div class="flex items-center gap-2 mb-3">
+          <span class="px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-xs font-semibold uppercase tracking-wide">Sauber</span>
+          <span class="text-surface-400 text-sm">Exceptions und Special Case Pattern</span>
+        </div>
+        <pre class="bg-surface-800 border border-surface-700 rounded-xl p-6 overflow-x-auto text-sm leading-relaxed"><code class="text-surface-200">public class DeviceController {
+
+    // Der Algorithmus ist klar erkennbar
+    public void sendShutDown() {
+        try {
+            tryToShutDown();
+        } catch (DeviceShutDownError e) {
+            logger.log(e);
+        }
+    }
+
+    private void tryToShutDown() throws DeviceShutDownError {
+        DeviceHandle handle = getHandle(DEV1);
+        DeviceRecord record = retrieveDeviceRecord(handle);
+
+        pauseDevice(handle);
+        clearDeviceWorkQueue(handle);
+        closeDevice(handle);
+    }
+
+    // Wirft Exception statt null/Fehlercode zurueck
+    private DeviceHandle getHandle(DeviceID id) {
+        // ...
+        throw new DeviceShutDownError(
+            "Invalid handle for: " + id.toString()
+        );
+    }
+}
+
+// Special Case Pattern: Statt null eine leere Expense-Liste
+public class MealExpenses {
+    // Statt null pruefungen...
+    public List&lt;Expense&gt; getExpenses() {
+        // Gibt IMMER eine Liste zurueck — niemals null
+        if (noExpensesFound) {
+            return Collections.emptyList();
+        }
+        return expenses;
+    }
+}
+
+// Oder ein Special Case Objekt:
+public class PerDiemMealExpenses implements MealExpenses {
+    // Standardverhalten fuer den Fall "keine Ausgaben"
+    public int getTotal() {
+        return getPerDiemDefault();
+    }
+}</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- Quote -->
+  <section class="py-16 bg-surface-900/50">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <blockquote class="relative bg-surface-800 border-l-4 border-primary-500 rounded-r-xl p-8 shadow-lg">
+        <svg class="absolute top-4 right-6 w-12 h-12 text-primary-500/10" fill="currentColor" viewBox="0 0 24 24"><path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/></svg>
+        <p class="text-lg text-surface-200 italic leading-relaxed mb-4">
+          "Fehlerbehandlung ist wichtig, aber wenn sie die Logik verdunkelt, ist sie falsch."
+        </p>
+        <cite class="text-surface-400 text-sm">— Robert C. Martin, Clean Code, Kapitel 7</cite>
+      </blockquote>
+    </div>
+  </section>
+
+  <!-- Prev/Next Navigation -->
+  <section class="py-12">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center gap-4">
+        <a href="kapitel-06.html" class="flex-1 group flex items-center gap-3 bg-surface-800 border border-surface-700 rounded-xl p-5 hover:border-primary-500/50 transition">
+          <svg class="w-5 h-5 text-surface-400 group-hover:text-primary-400 transition flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+          <div>
+            <span class="text-xs text-surface-500 uppercase tracking-wide">Vorheriges Kapitel</span>
+            <p class="text-white font-medium group-hover:text-primary-400 transition">06 — Objekte und Datenstrukturen</p>
+          </div>
+        </a>
+        <a href="kapitel-08.html" class="flex-1 group flex items-center justify-end gap-3 bg-surface-800 border border-surface-700 rounded-xl p-5 hover:border-primary-500/50 transition text-right">
+          <div>
+            <span class="text-xs text-surface-500 uppercase tracking-wide">Naechstes Kapitel</span>
+            <p class="text-white font-medium group-hover:text-primary-400 transition">08 — Grenzen</p>
+          </div>
+          <svg class="w-5 h-5 text-surface-400 group-hover:text-primary-400 transition flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="bg-surface-900 border-t border-surface-700 mt-auto">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+      <p class="text-surface-400 text-sm">Clean Code — Robert C. Martin | Zusammenfassung auf Deutsch</p>
+      <div class="flex space-x-4">
+        <a href="index.html" class="text-surface-400 hover:text-primary-400 text-sm transition">Startseite</a>
+        <a href="zitate.html" class="text-surface-400 hover:text-primary-400 text-sm transition">Zitate</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

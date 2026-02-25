@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kapitel 1: Sauberer Code – Clean Code Zusammenfassung</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd', 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#1e3a8a' }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 antialiased">
+
+    <!-- Navigation -->
+    <nav class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <a href="../index.html" class="text-xl font-bold text-brand-700 hover:text-brand-500 transition-colors">Clean Code</a>
+                <!-- Desktop Nav -->
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="../index.html" class="text-gray-600 hover:text-brand-600 font-medium transition-colors">Startseite</a>
+                    <a href="01-sauberer-code.html" class="text-brand-600 font-semibold border-b-2 border-brand-600 pb-0.5">Kapitel</a>
+                    <a href="../zitate.html" class="text-gray-600 hover:text-brand-600 font-medium transition-colors">Zitate</a>
+                </div>
+                <!-- Mobile Menu Button -->
+                <button id="mobile-menu-btn" class="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors" aria-label="Menü öffnen">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </button>
+            </div>
+        </div>
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="hidden md:hidden border-t border-gray-200 bg-white">
+            <div class="px-4 py-3 space-y-2">
+                <a href="../index.html" class="block px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium">Startseite</a>
+                <a href="01-sauberer-code.html" class="block px-3 py-2 rounded-lg text-brand-600 bg-brand-50 font-semibold">Kapitel</a>
+                <a href="../zitate.html" class="block px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium">Zitate</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Chapter Header -->
+    <header class="bg-gradient-to-br from-brand-600 to-brand-800 text-white py-16 sm:py-20">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <p class="text-brand-200 font-semibold text-sm uppercase tracking-widest mb-3">Kapitel 1</p>
+            <h1 class="text-4xl sm:text-5xl font-extrabold leading-tight">Sauberer Code</h1>
+            <p class="mt-4 text-brand-100 text-lg max-w-2xl">Was bedeutet &bdquo;sauberer Code&ldquo; und warum ist er so wichtig für professionelle Softwareentwicklung?</p>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+
+        <!-- Zusammenfassung -->
+        <section class="mb-14">
+            <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-brand-100 text-brand-700">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                </span>
+                Zusammenfassung
+            </h2>
+            <div class="prose prose-lg max-w-none space-y-4 text-gray-700 leading-relaxed">
+                <p>Was bedeutet sauberer Code? Robert C. Martin sammelt Definitionen verschiedener Experten und zeigt, dass es bei sauberem Code nicht nur um Funktionalität geht, sondern um Qualität auf mehreren Ebenen. Bjarne Stroustrup, der Erfinder von C++, betont Eleganz und Effizienz – sauberer Code tut eine Sache gut und verführt nicht dazu, ihn zu verschlechtern.</p>
+                <p>Grady Booch spricht von Lesbarkeit: Sauberer Code liest sich wie gut geschriebene Prosa. Dave Thomas fordert, dass Code von anderen Entwicklern verstanden und erweitert werden kann – er enthält aussagekräftige Tests und minimale Abhängigkeiten.</p>
+                <p>Michael Feathers bringt es auf den Punkt: Sauberer Code sieht aus, als wäre er mit Sorgfalt geschrieben worden. Es gibt nichts Offensichtliches, was man noch verbessern könnte. Der Autor des Codes hat sich sichtbar Mühe gegeben.</p>
+            </div>
+        </section>
+
+        <!-- Key Takeaways -->
+        <section class="mb-14">
+            <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-brand-100 text-brand-700">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                </span>
+                Key Takeaways
+            </h2>
+            <div class="grid gap-4">
+                <div class="flex items-start gap-4 bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                    <span class="mt-1 flex-shrink-0 w-8 h-8 rounded-lg bg-brand-100 text-brand-700 flex items-center justify-center font-bold text-sm">1</span>
+                    <p class="text-gray-700"><strong class="text-gray-900">Code wird öfter gelesen als geschrieben</strong> – daher sollte Lesbarkeit immer Priorität haben.</p>
+                </div>
+                <div class="flex items-start gap-4 bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                    <span class="mt-1 flex-shrink-0 w-8 h-8 rounded-lg bg-brand-100 text-brand-700 flex items-center justify-center font-bold text-sm">2</span>
+                    <p class="text-gray-700"><strong class="text-gray-900">Die Pfadfinder-Regel:</strong> Hinterlasse den Code immer besser, als du ihn vorgefunden hast.</p>
+                </div>
+                <div class="flex items-start gap-4 bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                    <span class="mt-1 flex-shrink-0 w-8 h-8 rounded-lg bg-brand-100 text-brand-700 flex items-center justify-center font-bold text-sm">3</span>
+                    <p class="text-gray-700"><strong class="text-gray-900">Sauberer Code ist fokussiert</strong> – jede Funktion, Klasse und jedes Modul hat eine klare, einzelne Aufgabe.</p>
+                </div>
+                <div class="flex items-start gap-4 bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                    <span class="mt-1 flex-shrink-0 w-8 h-8 rounded-lg bg-brand-100 text-brand-700 flex items-center justify-center font-bold text-sm">4</span>
+                    <p class="text-gray-700"><strong class="text-gray-900">Softwareentwicklung ist ein Handwerk,</strong> das kontinuierliche Übung und Disziplin erfordert.</p>
+                </div>
+                <div class="flex items-start gap-4 bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                    <span class="mt-1 flex-shrink-0 w-8 h-8 rounded-lg bg-brand-100 text-brand-700 flex items-center justify-center font-bold text-sm">5</span>
+                    <p class="text-gray-700"><strong class="text-gray-900">Schlechter Code verlangsamt Teams exponentiell</strong> – die anfängliche Geschwindigkeit geht schnell verloren, wenn die Codebasis verrottet.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Chapter Navigation -->
+        <nav class="flex items-center justify-between border-t border-gray-200 pt-8">
+            <div></div>
+            <a href="02-bezeichner.html" class="inline-flex items-center gap-2 px-6 py-3 bg-brand-600 text-white font-semibold rounded-xl hover:bg-brand-700 transition-colors shadow-sm">
+                Nächstes Kapitel
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </a>
+        </nav>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-gray-400 mt-16">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 text-center">
+            <p class="font-semibold text-white text-lg mb-1">Clean Code – Zusammenfassung</p>
+            <p class="text-sm">Basierend auf &bdquo;Clean Code&ldquo; von Robert C. Martin</p>
+            <p class="text-xs mt-4 text-gray-500">&copy; 2026 Buchzusammenfassung. Alle Rechte vorbehalten.</p>
+        </div>
+    </footer>
+
+    <script>
+        const btn = document.getElementById('mobile-menu-btn');
+        const menu = document.getElementById('mobile-menu');
+        btn.addEventListener('click', () => menu.classList.toggle('hidden'));
+    </script>
+</body>
+</html>

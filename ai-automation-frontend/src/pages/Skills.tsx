@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { Zap, Search, Store } from 'lucide-react';
+import { Zap, Search } from 'lucide-react';
 import { Card, Button, Input, Badge, Spinner } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
-import { SkillCatalog } from '../components/skill/SkillCatalog';
 import { useSkills, useSkillCapabilities } from '../hooks/useSkills';
 import { useT } from '../i18n';
 import { CATEGORY_ICONS, CATEGORY_COLORS, SKILL_CATEGORIES } from '../data/skillConstants';
@@ -113,7 +112,6 @@ export function Skills() {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<SkillCategory | 'ALL'>('ALL');
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
-  const [catalogOpen, setCatalogOpen] = useState(false);
 
   const filtered = skills?.filter((s) => {
     const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -137,17 +135,9 @@ export function Skills() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-text">{t.skills.title}</h1>
-          <p className="text-sm text-text-secondary mt-1">{t.skills.subtitle}</p>
-        </div>
-        <Button
-          icon={<Store className="w-4 h-4" />}
-          onClick={() => setCatalogOpen(true)}
-        >
-          {t.skills.catalog}
-        </Button>
+      <div>
+        <h1 className="text-2xl font-bold text-text">{t.skills.title}</h1>
+        <p className="text-sm text-text-secondary mt-1">{t.skills.subtitle}</p>
       </div>
 
       {/* Filters */}
@@ -205,14 +195,6 @@ export function Skills() {
       {/* Skill detail slide-over */}
       {selectedSkill && (
         <SkillDetail skill={selectedSkill} onClose={() => setSelectedSkill(null)} />
-      )}
-
-      {/* Skill catalog overlay */}
-      {catalogOpen && (
-        <SkillCatalog
-          installedSkills={skills ?? []}
-          onClose={() => setCatalogOpen(false)}
-        />
       )}
     </div>
   );

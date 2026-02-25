@@ -54,6 +54,7 @@ class SystemTrayServiceTest {
         when(workflowExecutor.getPendingApprovalCount()).thenReturn(0);
         when(dockerClient.pingCmd()).thenReturn(pingCmd);
         when(trayConfig.getWebUiUrl()).thenReturn("http://localhost:99999");
+        when(trayConfig.getStableUrl()).thenReturn("http://localhost:99998");
 
         TrayState state = service.collectStatus();
 
@@ -72,6 +73,7 @@ class SystemTrayServiceTest {
         when(workflowExecutor.getPendingApprovalCount()).thenReturn(0);
         when(dockerClient.pingCmd()).thenThrow(new RuntimeException("Connection refused"));
         when(trayConfig.getWebUiUrl()).thenReturn("http://localhost:99999");
+        when(trayConfig.getStableUrl()).thenReturn("http://localhost:99998");
 
         TrayState state = service.collectStatus();
 
@@ -86,44 +88,56 @@ class SystemTrayServiceTest {
 
     @Test
     void determineIconColor_greenWhenAllOk() {
-        TrayState state = new TrayState(1, 5, 0, 0, true, true);
+        TrayState state = new TrayState(1, 5, 0, 0, true, true, true);
         assertThat(service.determineIconColor(state)).isEqualTo(IconColor.GREEN);
     }
 
     @Test
     void determineIconColor_yellowWhenDockerOffline() {
-        TrayState state = new TrayState(0, 5, 0, 0, false, true);
+        TrayState state = new TrayState(0, 5, 0, 0, false, true, true);
         assertThat(service.determineIconColor(state)).isEqualTo(IconColor.YELLOW);
     }
 
     @Test
     void determineIconColor_yellowWhenFrontendOffline() {
-        TrayState state = new TrayState(0, 5, 0, 0, true, false);
+        TrayState state = new TrayState(0, 5, 0, 0, true, false, true);
         assertThat(service.determineIconColor(state)).isEqualTo(IconColor.YELLOW);
     }
 
     @Test
     void determineIconColor_yellowWhenApprovalsPending() {
-        TrayState state = new TrayState(1, 5, 0, 2, true, true);
+        TrayState state = new TrayState(1, 5, 0, 2, true, true, true);
         assertThat(service.determineIconColor(state)).isEqualTo(IconColor.YELLOW);
     }
 
     @Test
     void determineIconColor_redWhenNewFailure() {
-        TrayState state = new TrayState(0, 5, 2, 0, true, true);
+        TrayState state = new TrayState(0, 5, 2, 0, true, true, true);
         assertThat(service.determineIconColor(state)).isEqualTo(IconColor.RED);
     }
 
     @Test
     void successPercent_calculatesCorrectly() {
-        TrayState state = new TrayState(0, 20, 2, 0, true, true);
+        TrayState state = new TrayState(0, 20, 2, 0, true, true, true);
         assertThat(state.successPercent()).isEqualTo(90);
     }
 
     @Test
     void successPercent_100WhenNoRuns() {
-        TrayState state = new TrayState(0, 0, 0, 0, true, true);
+        TrayState state = new TrayState(0, 0, 0, 0, true, true, true);
         assertThat(state.successPercent()).isEqualTo(100);
+    }
+
+    @Test
+    void checkStable_falseWhenUnreachable() {
+        when(trayConfig.getStableUrl()).thenReturn("http://localhost:99998");
+        assertThat(service.checkStable()).isFalse();
+    }
+
+    @Test
+    void determineIconColor_yellowWhenStableOffline() {
+        TrayState state = new TrayState(0, 5, 0, 0, true, true, false);
+        assertThat(service.determineIconColor(state)).isEqualTo(IconColor.YELLOW);
     }
 
     @Test

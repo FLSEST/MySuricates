@@ -7,6 +7,7 @@ import com.automation.entity.StepResult;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.repository.WorkflowRunRepository;
+import jakarta.persistence.EntityNotFoundException;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,12 +29,39 @@ public abstract class WorkflowMapper {
 
     public abstract List<WorkflowResponse> toResponseList(List<Workflow> workflows);
 
-    @Mapping(source = "workflow.id", target = "workflowId")
-    @Mapping(source = "workflow.name", target = "workflowName")
-    @Mapping(source = "workflow.project.name", target = "projectName")
+    @Mapping(target = "workflowId", expression = "java(safeWorkflowId(run))")
+    @Mapping(target = "workflowName", expression = "java(safeWorkflowName(run))")
+    @Mapping(target = "projectName", expression = "java(safeProjectName(run))")
     public abstract WorkflowRunResponse toRunResponse(WorkflowRun run);
 
     public abstract List<WorkflowRunResponse> toRunResponseList(List<WorkflowRun> runs);
 
     public abstract StepResultResponse toStepResponse(StepResult step);
+
+    protected String safeWorkflowId(WorkflowRun run) {
+        try {
+            return run.getWorkflow() != null ? run.getWorkflow().getId() : null;
+        } catch (EntityNotFoundException e) {
+            return null;
+        }
+    }
+
+    protected String safeWorkflowName(WorkflowRun run) {
+        try {
+            return run.getWorkflow() != null ? run.getWorkflow().getName() : "(deleted)";
+        } catch (EntityNotFoundException e) {
+            return "(deleted)";
+        }
+    }
+
+    protected String safeProjectName(WorkflowRun run) {
+        try {
+            if (run.getWorkflow() != null && run.getWorkflow().getProject() != null) {
+                return run.getWorkflow().getProject().getName();
+            }
+            return null;
+        } catch (EntityNotFoundException e) {
+            return null;
+        }
+    }
 }

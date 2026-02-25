@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="author" content="Test Author">
+  <meta name="description" content="Test E-Book — Ein umfassendes E-Book mit mehreren Kapiteln">
+  <title>Test E-Book</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ====================================================================
+       TITELSEITE
+       ==================================================================== -->
+  <header class="title-page">
+    <h1>Test E-Book</h1>
+    <p class="subtitle">Ein umfassendes Handbuch</p>
+    <p class="author">Test Author</p>
+    <p class="meta">Sprache: Deutsch | Ausgabe 2026</p>
+  </header>
+
+  <!-- ====================================================================
+       INHALTSVERZEICHNIS
+       ==================================================================== -->
+  <nav class="toc">
+    <h2>Inhaltsverzeichnis</h2>
+    <ol>
+      <li><a href="#kapitel-1">Einleitung</a></li>
+      <li><a href="#kapitel-2">Grundlagen der Webentwicklung</a></li>
+      <li><a href="#kapitel-3">HTML im Detail</a></li>
+      <li><a href="#kapitel-4">CSS und Gestaltung</a></li>
+      <li><a href="#kapitel-5">JavaScript-Grundlagen</a></li>
+      <li><a href="#kapitel-6">Werkzeuge und Workflow</a></li>
+      <li><a href="#kapitel-7">Best Practices und Muster</a></li>
+      <li><a href="#kapitel-8">Ausblick und Weiterlernen</a></li>
+    </ol>
+  </nav>
+
+  <!-- ====================================================================
+       KAPITEL 1 — Einleitung
+       ==================================================================== -->
+  <section class="chapter" id="kapitel-1">
+    <h2>Kapitel 1: Einleitung</h2>
+
+    <p>Willkommen zu diesem E-Book! Dieses Buch richtet sich an alle, die einen
+    umfassenden Einstieg in die moderne Webentwicklung suchen. Wir behandeln die
+    drei Grundpfeiler des Webs: <strong>HTML</strong>, <strong>CSS</strong> und
+    <strong>JavaScript</strong>.</p>
+
+    <h3>Warum dieses Buch?</h3>
+
+    <p>Die Webentwicklung hat sich in den letzten Jahren rasant weiterentwickelt.
+    Neue Standards, Frameworks und Werkzeuge erscheinen in immer kuerzeren
+    Abstaenden. Dieses Buch bietet eine solide Grundlage, auf der Sie aufbauen
+    koennen.</p>
+
+    <blockquote>
+      <p>&bdquo;Das Web ist die universellste Plattform, die je geschaffen wurde.
+      Wer es versteht, kann die Welt veraendern.&ldquo;</p>
+      <p>&mdash; Tim Berners-Lee</p>
+    </blockquote>
+
+    <h3>Voraussetzungen</h3>
+
+    <p>Um diesem Buch folgen zu koennen, benoetigen Sie:</p>
+
+    <ul>
+      <li>Einen modernen Webbrowser (z.&nbsp;B. Firefox, Chrome oder Edge)</li>
+      <li>Einen Texteditor (z.&nbsp;B. <a href="https://code.visualstudio.com/">Visual Studio Code</a>)</li>
+      <li>Grundlegende Computerkenntnisse</li>
+      <li>Neugier und Ausdauer</li>
+    </ul>
+
+    <h3>Aufbau des Buches</h3>
+
+    <p>Jedes Kapitel baut auf dem vorherigen auf. Wir empfehlen, die Kapitel in
+    der vorgegebenen Reihenfolge durchzuarbeiten:</p>
+
+    <ol>
+      <li><strong>Grundlagen</strong> &mdash; Die Basis verstehen</li>
+      <li><strong>HTML</strong> &mdash; Struktur und Semantik</li>
+      <li><strong>CSS</strong> &mdash; Gestaltung und Layout</li>
+      <li><strong>JavaScript</strong> &mdash; Interaktivitaet hinzufuegen</li>
+      <li><strong>Werkzeuge</strong> &mdash; Professioneller Workflow</li>
+      <li><strong>Best Practices</strong> &mdash; Qualitaet sichern</li>
+    </ol>
+  </section>
+
+  <!-- Trennseite -->
+  <div class="chapter-separator">
+    <div class="ornament">&bull; &bull; &bull;</div>
+    <div class="next-chapter">Naechstes Kapitel: Grundlagen der Webentwicklung</div>
+  </div>
+
+  <!-- ====================================================================
+       KAPITEL 2 — Grundlagen der Webentwicklung
+       ==================================================================== -->
+  <section class="chapter" id="kapitel-2">
+    <h2>Kapitel 2: Grundlagen der Webentwicklung</h2>
+
+    <p>Bevor wir in die Details eintauchen, muessen wir verstehen, wie das Web
+    funktioniert. Im Kern besteht jede Webseite aus einer Anfrage und einer
+    Antwort zwischen <em>Client</em> und <em>Server</em>.</p>
+
+    <h3>Wie das Web funktioniert</h3>
+
+    <p>Der grundlegende Ablauf einer Webseitenanfrage sieht so aus:</p>
+
+    <ol>
+      <li>Der Benutzer gibt eine URL in den Browser ein</li>
+      <li>Der Browser loest den Domainnamen ueber DNS auf</li>
+      <li>Der Browser sendet eine HTTP-Anfrage an den Server</li>
+      <li>Der Server verarbeitet die Anfrage und sendet eine Antwort</li>
+      <li>Der Browser rendert die empfangenen Daten</li>
+    </ol>
+
+    <h3>Die drei Sauelen des Webs</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Technologie</th>
+          <th>Aufgabe</th>
+          <th>Beispiel</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>HTML</td>
+          <td>Struktur &amp; Inhalt</td>
+          <td><code>&lt;h1&gt;Titel&lt;/h1&gt;</code></td>
+        </tr>
+        <tr>
+          <td>CSS</td>
+          <td>Gestaltung &amp; Layout</td>
+          <td><code>color: blue;</code></td>
+        </tr>
+        <tr>
+          <td>JavaScript</td>
+          <td>Verhalten &amp; Interaktion</td>
+          <td><code>alert('Hallo!');</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>HTTP-Statuscodes</h3>
+
+    <p>Die wichtigsten HTTP-Statuscodes sollte jeder Webentwickler kennen:</p>
+
+    <ul>
+      <li><strong>200 OK</strong> &mdash; Anfrage erfolgreich</li>
+      <li><strong>301 Moved Permanently</strong> &mdash; Ressource wurde dauerhaft verschoben</li>
+      <li><strong>404 Not Found</strong> &mdash; Ressource nicht gefunden</li>
+      <li><strong>500 Internal Server Error</strong> &mdash; Serverfehler</li>
+    </ul>
+
+    <h4>Ein einfacher HTTP-Request</h4>
+
+    <pre><code>GET /index.html HTTP/1.1
+Host: www.beispiel.de
+Accept: text/html
+Accept-Language: de-DE</code></pre>
+  </section>
+
+  <!-- Trennseite -->
+  <div class="chapter-separator">
+    <div class="ornament">&bull; &bull; &bull;</div>
+    <div class="next-chapter">Naechstes Kapitel: HTML im Detail</div>
+  </div>
+
+  <!-- ====================================================================
+       KAPITEL 3 — HTML im Detail
+       ==================================================================== -->
+  <section class="chapter" id="kapitel-3">
+    <h2>Kapitel 3: HTML im Detail</h2>
+
+    <p>HTML (<em>Hypertext Markup Language</em>) bildet das Geruest jeder Webseite.
+    Es definiert die Struktur und den semantischen Inhalt eines Dokuments.</p>
+
+    <h3>Grundstruktur eines HTML-Dokuments</h3>
+
+    <pre><code>&lt;!DOCTYPE html&gt;
+&lt;html lang="de"&gt;
+&lt;head&gt;
+  &lt;meta charset="UTF-8"&gt;
+  &lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;
+  &lt;title&gt;Meine Webseite&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;header&gt;
+    &lt;h1&gt;Willkommen&lt;/h1&gt;
+    &lt;nav&gt;
+      &lt;a href="#ueber"&gt;Ueber uns&lt;/a&gt;
+      &lt;a href="#kontakt"&gt;Kontakt&lt;/a&gt;
+    &lt;/nav&gt;
+  &lt;/header&gt;
+  &lt;main&gt;
+    &lt;p&gt;Inhalt der Seite&lt;/p&gt;
+  &lt;/main&gt;
+  &lt;footer&gt;
+    &lt;p&gt;&amp;copy; 2026 Mein Unternehmen&lt;/p&gt;
+  &lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+
+    <h3>Semantische Elemente</h3>
+
+    <p>HTML5 fuehrte zahlreiche semantische Elemente ein, die den Inhalt besser
+    beschreiben:</p>
+
+    <ul>
+      <li><code>&lt;header&gt;</code> &mdash; Kopfbereich der Seite oder eines Abschnitts</li>
+      <li><code>&lt;nav&gt;</code> &mdash; Navigationsbereich</li>
+      <li><code>&lt;main&gt;</code> &mdash; Hauptinhalt der Seite</li>
+      <li><code>&lt;article&gt;</code> &mdash; Eigenstaendiger Inhalt (z.&nbsp;B. Blogartikel)</li>
+      <li><code>&lt;section&gt;</code> &mdash; Thematischer Abschnitt</li>
+      <li><code>&lt;aside&gt;</code> &mdash; Ergaenzender Inhalt (Seitenleiste)</li>
+      <li><code>&lt;footer&gt;</code> &mdash; Fussbereich</li>
+    </ul>
+
+    <h3>Formulare</h3>
+
+    <p>Formulare sind das wichtigste Mittel fuer Benutzerinteraktion in HTML:</p>
+
+    <pre><code>&lt;form action="/anmeldung" method="POST"&gt;
+  &lt;label for="name"&gt;Name:&lt;/label&gt;
+  &lt;input type="text" id="name" name="name" required&gt;
+
+  &lt;label for="email"&gt;E-Mail:&lt;/label&gt;
+  &lt;input type="email" id="email" name="email" required&gt;
+
+  &lt;label for="nachricht"&gt;Nachricht:&lt;/label&gt;
+  &lt;textarea id="nachricht" name="nachricht"&gt;&lt;/textarea&gt;
+
+  &lt;button type="submit"&gt;Absenden&lt;/button&gt;
+&lt;/form&gt;</code></pre>
+
+    <h3>Bilder und Medien</h3>
+
+    <p>Bilder werden mit dem <code>&lt;img&gt;</code>-Element eingebunden. Fuer
+    Barrierefreiheit ist das <code>alt</code>-Attribut unverzichtbar:</p>
+
+    <pre><code>&lt;img src="foto.jpg" alt="Beschreibung des Bildes" width="800" height="600"&gt;
+
+&lt;figure&gt;
+  &lt;img src="diagramm.png" alt="Architektur-Diagramm"&gt;
+  &lt;figcaption&gt;Abb. 1: Architektur der Webanwendung&lt;/figcaption&gt;
+&lt;/figure&gt;</code></pre>
+  </section>
+
+  <!-- Trennseite -->
+  <div class="chapter-separator">
+    <div class="ornament">&bull; &bull; &bull;</div>
+    <div class="next-chapter">Naechstes Kapitel: CSS und Gestaltung</div>
+  </div>
+
+  <!-- ====================================================================
+       KAPITEL 4 — CSS und Gestaltung
+       ==================================================================== -->
+  <section class="chapter" id="kapitel-4">
+    <h2>Kapitel 4: CSS und Gestaltung</h2>
+
+    <p>CSS (<em>Cascading Style Sheets</em>) ist die Sprache, mit der wir das
+    Aussehen unserer Webseiten gestalten. Von Farben ueber Schriften bis hin zu
+    komplexen Layouts &mdash; CSS macht es moeglich.</p>
+
+    <h3>Selektoren</h3>
+
+    <p>CSS-Selektoren bestimmen, welche Elemente gestylt werden. Die wichtigsten
+    Selektoren sind:</p>
+
+    <pre><code>/* Element-Selektor */
+p {
+  color: #333;
+}
+
+/* Klassen-Selektor */
+.hervorgehoben {
+  background: yellow;
+}
+
+/* ID-Selektor */
+#hauptnavigation {
+  position: fixed;
+  top: 0;
+}
+
+/* Kombinations-Selektor */
+article > p:first-child {
+  font-size: 1.2em;
+  font-weight: bold;
+}</code></pre>
+
+    <h3>Das Box-Modell</h3>
+
+    <p>Jedes Element in CSS wird als Box behandelt. Das Box-Modell besteht aus
+    vier Schichten:</p>
+
+    <ol>
+      <li><strong>Content</strong> &mdash; Der eigentliche Inhalt</li>
+      <li><strong>Padding</strong> &mdash; Innenabstand</li>
+      <li><strong>Border</strong> &mdash; Rahmen</li>
+      <li><strong>Margin</strong> &mdash; Aussenabstand</li>
+    </ol>
+
+    <blockquote>
+      <p><strong>Tipp:</strong> Setzen Sie <code>box-sizing: border-box;</code> auf
+      alle Elemente, damit Padding und Border in die Gesamtbreite einberechnet
+      werden.</p>
+    </blockquote>
+
+    <h3>Flexbox-Layout</h3>
+
+    <p>Flexbox ist eines der maechtigsten Layout-Werkzeuge in CSS:</p>
+
+    <pre><code>.container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.item {
+  flex: 1;
+  min-width: 200px;
+}</code></pre>
+
+    <h3>CSS Grid</h3>
+
+    <p>Fuer zweidimensionale Layouts eignet sich CSS Grid hervorragend:</p>
+
+    <pre><code>.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-gap: 2rem;
+}
+
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}</code></pre>
+
+    <h3>Responsive Design</h3>
+
+    <p>Mit Media Queries passen wir das Layout an verschiedene Bildschirmgroessen an.
+    Der wichtigste Grundsatz lautet: <strong>Mobile First</strong>.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Breakpoint</th>
+          <th>Geraet</th>
+          <th>Typische Breite</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>max-width: 480px</code></td>
+          <td>Smartphone</td>
+          <td>320&ndash;480px</td>
+        </tr>
+        <tr>
+          <td><code>max-width: 768px</code></td>
+          <td>Tablet</td>
+          <td>481&ndash;768px</td>
+        </tr>
+        <tr>
+          <td><code>max-width: 1024px</code></td>
+          <td>Laptop</td>
+          <td>769&ndash;1024px</td>
+        </tr>
+        <tr>
+          <td><code>min-width: 1025px</code></td>
+          <td>Desktop</td>
+          <td>1025px+</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Trennseite -->
+  <div class="chapter-separator">
+    <div class="ornament">&bull; &bull; &bull;</div>
+    <div class="next-chapter">Naechstes Kapitel: JavaScript-Grundlagen</div>
+  </div>
+
+  <!-- ====================================================================
+       KAPITEL 5 — JavaScript-Grundlagen
+       ==================================================================== -->
+  <section class="chapter" id="kapitel-5">
+    <h2>Kapitel 5: JavaScript-Grundlagen</h2>
+
+    <p>JavaScript ist die Programmiersprache des Webs. Sie ermoeglicht
+    Interaktivitaet, dynamische Inhalte und komplexe Anwendungen direkt im
+    Browser.</p>
+
+    <h3>Variablen und Datentypen</h3>
+
+    <p>In modernem JavaScript verwenden wir <code>const</code> und <code>let</code>
+    statt <code>var</code>:</p>
+
+    <pre><code>// Konstante (unveraenderlich)
+const PI = 3.14159;
+const name = "Max Mustermann";
+
+// Variable (veraenderlich)
+let zaehler = 0;
+let istAktiv = true;
+
+// Datentypen
+const text = "Hallo Welt";        // String
+const zahl = 42;                   // Number
+const wahr = true;                 // Boolean
+const nichts = null;               // Null
+const undefiniert = undefined;     // Undefined
+const liste = [1, 2, 3];          // Array
+const objekt = { name: "Max" };   // Object</code></pre>
+
+    <h3>Funktionen</h3>
+
+    <p>JavaScript kennt verschiedene Arten, Funktionen zu definieren:</p>
+
+    <pre><code>// Funktionsdeklaration
+function addiere(a, b) {
+  return a + b;
+}
+
+// Pfeilfunktion (Arrow Function)
+const multipliziere = (a, b) =&gt; a * b;
+
+// Funktion mit Standardparametern
+function begruesse(name = "Welt") {
+  return `Hallo, ${name}!`;
+}
+
+console.log(begruesse());          // "Hallo, Welt!"
+console.log(begruesse("Max"));     // "Hallo, Max!"</code></pre>
+
+    <h3>DOM-Manipulation</h3>
+
+    <p>JavaScript kann das HTML-Dokument dynamisch veraendern:</p>
+
+    <pre><code>// Element finden
+const titel = document.querySelector('h1');
+const buttons = document.querySelectorAll('.btn');
+
+// Inhalt aendern
+titel.textContent = 'Neuer Titel';
+titel.innerHTML = '&lt;em&gt;Kursiver&lt;/em&gt; Titel';
+
+// Event-Listener hinzufuegen
+const button = document.querySelector('#meinButton');
+button.addEventListener('click', (event) =&gt; {
+  event.preventDefault();
+  console.log('Button wurde geklickt!');
+});</code></pre>
+
+    <h3>Fetch API</h3>
+
+    <p>Mit der Fetch API koennen wir Daten von einem Server laden:</p>
+
+    <pre><code>// Daten abrufen
+async function ladeDaten() {
+  try {
+    const antwort = await fetch('https://api.beispiel.de/daten');
+    if (!antwort.ok) {
+      throw new Error(`HTTP-Fehler: ${antwort.status}`);
+    }
+    const daten = await antwort.json();
+    console.log(daten);
+  } catch (fehler) {
+    console.error('Fehler beim Laden:', fehler);
+  }
+}
+
+ladeDaten();</code></pre>
+  </section>
+
+  <!-- Trennseite -->
+  <div class="chapter-separator">
+    <div class="ornament">&bull; &bull; &bull;</div>
+    <div class="next-chapter">Naechstes Kapitel: Werkzeuge und Workflow</div>
+  </div>
+
+  <!-- ====================================================================
+       KAPITEL 6 — Werkzeuge und Workflow
+       ==================================================================== -->
+  <section class="chapter" id="kapitel-6">
+    <h2>Kapitel 6: Werkzeuge und Workflow</h2>
+
+    <p>Ein professioneller Entwicklungsworkflow erfordert die richtigen Werkzeuge.
+    In diesem Kapitel stellen wir die wichtigsten vor.</p>
+
+    <h3>Versionskontrolle mit Git</h3>
+
+    <p>Git ist das Standardwerkzeug fuer Versionskontrolle in der
+    Softwareentwicklung:</p>
+
+    <pre><code># Repository initialisieren
+git init
+
+# Dateien zum Staging hinzufuegen
+git add index.html style.css
+
+# Commit erstellen
+git commit -m "Erste Version der Webseite"
+
+# Branch erstellen und wechseln
+git checkout -b feature/neues-design
+
+# Aenderungen zusammenfuehren
+git checkout main
+git merge feature/neues-design</code></pre>
+
+    <h3>Paketmanager: npm</h3>
+
+    <p>npm (<em>Node Package Manager</em>) verwaltet Abhaengigkeiten in
+    JavaScript-Projekten:</p>
+
+    <pre><code># Projekt initialisieren
+npm init -y
+
+# Paket installieren
+npm install lodash
+
+# Entwicklungsabhaengigkeit installieren
+npm install --save-dev eslint
+
+# Skript ausfuehren
+npm run build</code></pre>
+
+    <h3>Build-Werkzeuge</h3>
+
+    <p>Moderne Webprojekte nutzen Build-Werkzeuge fuer Optimierung und
+    Transformation:</p>
+
+    <ul>
+      <li><strong>Vite</strong> &mdash; Schneller Entwicklungsserver und Bundler</li>
+      <li><strong>Webpack</strong> &mdash; Konfigurierbarer Module-Bundler</li>
+      <li><strong>ESLint</strong> &mdash; Code-Qualitaet und Stilrichtlinien</li>
+      <li><strong>Prettier</strong> &mdash; Automatische Code-Formatierung</li>
+    </ul>
+
+    <h3>Browser DevTools</h3>
+
+    <p>Die Entwicklerwerkzeuge im Browser sind unverzichtbar fuer das Debugging:</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Tab</th>
+          <th>Funktion</th>
+          <th>Tastenkuerzel</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Elements</td>
+          <td>HTML/CSS inspizieren</td>
+          <td><code>Strg+Umschalt+C</code></td>
+        </tr>
+        <tr>
+          <td>Console</td>
+          <td>JavaScript-Konsole</td>
+          <td><code>Strg+Umschalt+J</code></td>
+        </tr>
+        <tr>
+          <td>Network</td>
+          <td>Netzwerk-Anfragen</td>
+          <td><code>Strg+Umschalt+E</code></td>
+        </tr>
+        <tr>
+          <td>Sources</td>
+          <td>Quellcode debuggen</td>
+          <td><code>Strg+Umschalt+S</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Trennseite -->
+  <div class="chapter-separator">
+    <div class="ornament">&bull; &bull; &bull;</div>
+    <div class="next-chapter">Naechstes Kapitel: Best Practices und Muster</div>
+  </div>
+
+  <!-- ====================================================================
+       KAPITEL 7 — Best Practices und Muster
+       ==================================================================== -->
+  <section class="chapter" id="kapitel-7">
+    <h2>Kapitel 7: Best Practices und Muster</h2>
+
+    <p>Guter Code zeichnet sich nicht nur durch Funktionalitaet aus, sondern auch
+    durch Lesbarkeit, Wartbarkeit und Skalierbarkeit. In diesem Kapitel sammeln
+    wir die wichtigsten Best Practices.</p>
+
+    <h3>Code-Organisation</h3>
+
+    <p>Eine saubere Projektstruktur ist die Grundlage fuer jedes Projekt:</p>
+
+    <pre><code>projekt/
+  ├── index.html
+  ├── css/
+  │   ├── reset.css
+  │   ├── variables.css
+  │   └── main.css
+  ├── js/
+  │   ├── app.js
+  │   ├── utils.js
+  │   └── components/
+  │       ├── navigation.js
+  │       └── modal.js
+  ├── assets/
+  │   ├── images/
+  │   └── fonts/
+  └── README.md</code></pre>
+
+    <h3>Barrierefreiheit (Accessibility)</h3>
+
+    <p>Barrierefreiheit ist kein optionales Feature, sondern eine Grundanforderung.
+    Die wichtigsten Regeln:</p>
+
+    <ol>
+      <li>Verwenden Sie <strong>semantisches HTML</strong> (nicht alles ist ein <code>&lt;div&gt;</code>)</li>
+      <li>Stellen Sie ausreichenden <strong>Farbkontrast</strong> sicher (mind. 4.5:1)</li>
+      <li>Alle Bilder brauchen <strong>Alt-Texte</strong></li>
+      <li>Die Seite muss per <strong>Tastatur</strong> bedienbar sein</li>
+      <li>Verwenden Sie <strong>ARIA-Attribute</strong> wo noetig</li>
+    </ol>
+
+    <pre><code>&lt;!-- Schlecht --&gt;
+&lt;div class="btn" onclick="absenden()"&gt;Absenden&lt;/div&gt;
+
+&lt;!-- Gut --&gt;
+&lt;button type="submit" aria-label="Formular absenden"&gt;
+  Absenden
+&lt;/button&gt;</code></pre>
+
+    <h3>Performance-Optimierung</h3>
+
+    <p>Schnelle Ladezeiten sind entscheidend fuer die Benutzererfahrung:</p>
+
+    <ul>
+      <li><strong>Bilder optimieren</strong> &mdash; WebP-Format, responsive Bilder mit <code>srcset</code></li>
+      <li><strong>CSS/JS minimieren</strong> &mdash; Unnoetige Zeichen entfernen</li>
+      <li><strong>Lazy Loading</strong> &mdash; Bilder erst laden, wenn sie sichtbar werden</li>
+      <li><strong>Caching</strong> &mdash; Browser-Cache effektiv nutzen</li>
+      <li><strong>Code-Splitting</strong> &mdash; Nur laden, was benoetigt wird</li>
+    </ul>
+
+    <blockquote>
+      <p><strong>Faustregel:</strong> Eine Webseite sollte in weniger als 3 Sekunden
+      vollstaendig geladen sein. Jede weitere Sekunde kostet im Durchschnitt 7%
+      der Konversionsrate.</p>
+    </blockquote>
+
+    <h3>Sicherheit</h3>
+
+    <p>Grundlegende Sicherheitsmassnahmen fuer Webanwendungen:</p>
+
+    <ul>
+      <li><strong>XSS verhindern</strong> &mdash; Benutzereingaben immer escapen</li>
+      <li><strong>CSRF-Token</strong> &mdash; Formulare gegen Faelschung schuetzen</li>
+      <li><strong>HTTPS</strong> &mdash; Verschluesselte Verbindungen erzwingen</li>
+      <li><strong>Content Security Policy</strong> &mdash; Erlaubte Ressourcen einschraenken</li>
+    </ul>
+  </section>
+
+  <!-- Trennseite -->
+  <div class="chapter-separator">
+    <div class="ornament">&bull; &bull; &bull;</div>
+    <div class="next-chapter">Naechstes Kapitel: Ausblick und Weiterlernen</div>
+  </div>
+
+  <!-- ====================================================================
+       KAPITEL 8 — Ausblick und Weiterlernen
+       ==================================================================== -->
+  <section class="chapter" id="kapitel-8">
+    <h2>Kapitel 8: Ausblick und Weiterlernen</h2>
+
+    <p>Sie haben nun eine solide Grundlage in der Webentwicklung gelegt.
+    Doch die Reise endet hier nicht &mdash; sie beginnt erst. In diesem letzten
+    Kapitel geben wir einen Ausblick auf weiterfuehrende Themen.</p>
+
+    <h3>Frameworks und Bibliotheken</h3>
+
+    <p>Nachdem Sie die Grundlagen beherrschen, koennen Sie sich mit Frameworks
+    beschaeftigen:</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Framework</th>
+          <th>Typ</th>
+          <th>Staerke</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><a href="https://react.dev/">React</a></td>
+          <td>UI-Bibliothek</td>
+          <td>Komponentenbasiert, grosses Oekosystem</td>
+        </tr>
+        <tr>
+          <td><a href="https://vuejs.org/">Vue.js</a></td>
+          <td>Framework</td>
+          <td>Einsteigerfreundlich, progressiv</td>
+        </tr>
+        <tr>
+          <td><a href="https://svelte.dev/">Svelte</a></td>
+          <td>Compiler</td>
+          <td>Kein Runtime-Overhead, schnell</td>
+        </tr>
+        <tr>
+          <td><a href="https://angular.io/">Angular</a></td>
+          <td>Full Framework</td>
+          <td>Enterprise, TypeScript-First</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Backend-Entwicklung</h3>
+
+    <p>Fuer Full-Stack-Entwicklung benoetigen Sie auch Backend-Kenntnisse:</p>
+
+    <ul>
+      <li><strong>Node.js</strong> &mdash; JavaScript auf dem Server</li>
+      <li><strong>Python (Django/Flask)</strong> &mdash; Schnelle Prototypen</li>
+      <li><strong>Java (Spring Boot)</strong> &mdash; Enterprise-Anwendungen</li>
+      <li><strong>Go</strong> &mdash; Hochperformante Microservices</li>
+    </ul>
+
+    <h3>Weiterlernen</h3>
+
+    <p>Empfohlene Ressourcen zum Weiterlernen:</p>
+
+    <ol>
+      <li><a href="https://developer.mozilla.org/de/">MDN Web Docs</a> &mdash; Die beste Referenz fuer Webtechnologien</li>
+      <li><a href="https://web.dev/">web.dev</a> &mdash; Googles Lernplattform fuer moderne Webentwicklung</li>
+      <li><a href="https://css-tricks.com/">CSS-Tricks</a> &mdash; CSS-Tipps und Tutorials</li>
+      <li><a href="https://javascript.info/">JavaScript.info</a> &mdash; Umfassendes JavaScript-Tutorial</li>
+    </ol>
+
+    <blockquote>
+      <p>&bdquo;Die beste Zeit, mit dem Programmieren anzufangen, war vor zehn Jahren.
+      Die zweitbeste Zeit ist jetzt.&ldquo;</p>
+    </blockquote>
+
+    <h3>Schlusswort</h3>
+
+    <p>Vielen Dank, dass Sie dieses E-Book gelesen haben. Wir hoffen, dass es
+    Ihnen einen hilfreichen Einstieg in die Welt der Webentwicklung gegeben hat.
+    Denken Sie daran: Der beste Weg zu lernen ist, selbst Code zu schreiben.
+    Starten Sie ein eigenes Projekt, experimentieren Sie und haben Sie Spass
+    dabei!</p>
+
+    <p><em>Viel Erfolg auf Ihrem Weg als Webentwickler!</em></p>
+  </section>
+
+  <!-- ====================================================================
+       KOLOPHON
+       ==================================================================== -->
+  <footer class="colophon">
+    <p><strong>Test E-Book</strong></p>
+    <p>Verfasst von Test Author</p>
+    <p>Ausgabe 2026 &bull; Sprache: Deutsch</p>
+    <p>&copy; 2026 Test Author. Alle Rechte vorbehalten.</p>
+  </footer>
+
+</body>
+</html>

@@ -33,6 +33,9 @@ public class ForEachBlockExecutor implements BlockExecutor {
         String executionMode = (String) config.getOrDefault("execution_mode", "claude");
         boolean isShell = "shell".equals(executionMode);
         int shellTimeout = ((Number) config.getOrDefault("timeout_seconds", DEFAULT_SHELL_TIMEOUT)).intValue();
+        Integer claudeTimeout = config.containsKey("timeout_seconds")
+                ? ((Number) config.get("timeout_seconds")).intValue()
+                : null;
 
         // Get items from list or command output
         List<String> items;
@@ -40,14 +43,9 @@ public class ForEachBlockExecutor implements BlockExecutor {
 
         if ("command".equals(itemsSource)) {
             String itemsCommand = context.resolveTemplate((String) config.get("items_command"));
-            String output;
-            if (isShell) {
-                output = commandExecutor.executeShellCommandOnHost(
-                        context.getProjectPath(), itemsCommand, shellTimeout).output();
-            } else {
-                output = commandExecutor.executeCommandOnHost(
-                        context.getProjectPath(), itemsCommand).output();
-            }
+            // items_command always runs as shell — it collects iteration targets, not AI work
+            String output = commandExecutor.executeShellCommandOnHost(
+                    context.getProjectPath(), itemsCommand, shellTimeout).output();
             items = Arrays.asList(output.split("\n"));
         } else {
             Object rawItems = config.get("items");
@@ -94,7 +92,8 @@ public class ForEachBlockExecutor implements BlockExecutor {
                                 .build(),
                         context.nextStepIndex(),
                         context.getInstructionPrefix(),
-                        context.getModel()
+                        context.getModel(),
+                        claudeTimeout
                 );
             }
 

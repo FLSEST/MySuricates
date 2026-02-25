@@ -6,6 +6,8 @@ export function useDashboard() {
   return useQuery({
     queryKey: ['learning', 'dashboard'],
     queryFn: () => api.get<DashboardData>('/learning/dashboard'),
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
   });
 }
 

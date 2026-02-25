@@ -143,7 +143,8 @@ public class WorkflowController {
                 request.blocks(),
                 List.of(),
                 request.instructions(),
-                request.model()
+                request.model(),
+                null
         );
         var workflow = workflowService.create(createRequest);
         return ResponseEntity.status(HttpStatus.CREATED).body(workflowMapper.toResponse(workflow));

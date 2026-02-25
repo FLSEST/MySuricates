@@ -10,7 +10,10 @@ declare global {
       /** Create a workflow via API, yields the workflow object */
       apiCreateWorkflow(projectId: string, name?: string): Chainable;
 
-      /** Delete all test data (webhooks, schedules, workflows, projects) */
+      /** Create a todo via API, yields the todo object */
+      apiCreateTodo(title?: string, priority?: 'LOW' | 'MEDIUM' | 'HIGH', tags?: string[]): Chainable;
+
+      /** Delete all test data (todos, webhooks, schedules, workflows, projects) */
       apiCleanup(): Chainable<void>;
 
       /** Assert a toast notification appears with the given text */
@@ -36,6 +39,10 @@ Cypress.Commands.add('apiCreateProject', (name?: string) => {
 
 Cypress.Commands.add('apiCreateWorkflow', (projectId: string, name?: string) => {
   return api.createWorkflow(projectId, name);
+});
+
+Cypress.Commands.add('apiCreateTodo', (title?: string, priority?: 'LOW' | 'MEDIUM' | 'HIGH', tags?: string[]) => {
+  return api.createTodo(title, priority, tags);
 });
 
 Cypress.Commands.add('apiCleanup', () => {

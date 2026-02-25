@@ -55,6 +55,12 @@ public class HostClaudeService {
 
     public ReasoningResult reasonStructured(String prompt, String systemPrompt,
                                              String workingDirectory, Integer maxTurns) throws IOException {
+        return reasonStructured(prompt, systemPrompt, workingDirectory, maxTurns, null);
+    }
+
+    public ReasoningResult reasonStructured(String prompt, String systemPrompt,
+                                             String workingDirectory, Integer maxTurns,
+                                             Integer timeoutSeconds) throws IOException {
         List<String> cmd = buildReasonCommand(prompt, systemPrompt, maxTurns);
 
         ProcessBuilder pb = new ProcessBuilder(cmd);
@@ -77,10 +83,11 @@ public class HostClaudeService {
                 catch (IOException e) { return new byte[0]; }
             });
 
-            boolean finished = proc.waitFor(config.getTimeoutSeconds(), TimeUnit.SECONDS);
+            int effectiveTimeout = timeoutSeconds != null ? timeoutSeconds : config.getTimeoutSeconds();
+            boolean finished = proc.waitFor(effectiveTimeout, TimeUnit.SECONDS);
             if (!finished) {
                 proc.destroyForcibly();
-                throw new IOException("Host Claude timed out after " + config.getTimeoutSeconds() + " seconds");
+                throw new IOException("Host Claude timed out after " + effectiveTimeout + " seconds");
             }
 
             String rawOutput = new String(outputFuture.get(5, TimeUnit.SECONDS)).trim();
@@ -111,6 +118,12 @@ public class HostClaudeService {
      */
     public ActionResult executeAction(String prompt, String model,
                                        String systemPrompt, String workingDirectory) throws IOException {
+        return executeAction(prompt, model, systemPrompt, workingDirectory, null);
+    }
+
+    public ActionResult executeAction(String prompt, String model,
+                                       String systemPrompt, String workingDirectory,
+                                       Integer timeoutSeconds) throws IOException {
         List<String> cmd = buildActionCommand(prompt, model, systemPrompt);
 
         ProcessBuilder pb = new ProcessBuilder(cmd);
@@ -133,10 +146,11 @@ public class HostClaudeService {
                 catch (IOException e) { return new byte[0]; }
             });
 
-            boolean finished = proc.waitFor(config.getTimeoutSeconds(), TimeUnit.SECONDS);
+            int effectiveTimeout = timeoutSeconds != null ? timeoutSeconds : config.getTimeoutSeconds();
+            boolean finished = proc.waitFor(effectiveTimeout, TimeUnit.SECONDS);
             if (!finished) {
                 proc.destroyForcibly();
-                throw new IOException("Host Claude action timed out after " + config.getTimeoutSeconds() + " seconds");
+                throw new IOException("Host Claude action timed out after " + effectiveTimeout + " seconds");
             }
 
             String rawOutput = new String(outputFuture.get(5, TimeUnit.SECONDS)).trim();

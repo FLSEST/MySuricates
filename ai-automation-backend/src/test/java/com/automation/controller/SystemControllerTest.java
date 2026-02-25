@@ -4,11 +4,10 @@ import com.automation.dto.response.RemoteAccessResponse;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.TailscaleException;
 import com.automation.service.system.ApiKeyService;
+import com.automation.service.system.DatabaseBackupService;
 import com.automation.service.system.TailscaleService;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.PingCmd;
-
-import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -36,7 +35,7 @@ class SystemControllerTest {
     private TailscaleService tailscaleService;
 
     @MockBean
-    private DataSource dataSource;
+    private DatabaseBackupService databaseBackupService;
 
     @MockBean
     private ApiKeyService apiKeyService;

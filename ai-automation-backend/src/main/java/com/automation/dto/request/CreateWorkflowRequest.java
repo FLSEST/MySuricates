@@ -13,7 +13,8 @@ public record CreateWorkflowRequest(
         List<BlockDefinition> blocks,
         List<String> activatedSkillIds,
         String instructions,
-        String model
+        String model,
+        String templateId
 ) {
     public CreateWorkflowRequest {
         if (blocks == null) blocks = List.of();

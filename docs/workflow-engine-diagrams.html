@@ -313,16 +313,16 @@ flowchart LR
   <table>
     <thead><tr><th>Block</th><th>Default</th><th>Optionen</th><th>Stop on failure</th></tr></thead>
     <tbody>
-      <tr><td><code>simple</code></td><td>claude</td><td>-</td><td>Ja (default)</td></tr>
+      <tr><td><code>simple</code></td><td>claude</td><td><code>timeout_seconds</code></td><td>Ja (default)</td></tr>
       <tr><td><code>shell</code></td><td>shell</td><td><code>timeout_seconds</code></td><td>Ja</td></tr>
-      <tr><td><code>retry</code></td><td>claude</td><td><code>execution_mode</code>=shell/claude, <code>max_retries</code>, <code>delay</code>, <code>exponential_backoff</code></td><td>Ja (wenn alle Fehlversuche)</td></tr>
-      <tr><td><code>foreach</code></td><td>claude</td><td><code>execution_mode</code>=shell, <code>items_source</code>=list/command</td><td>Aggregiertes Ergebnis</td></tr>
-      <tr><td><code>while</code></td><td>claude</td><td><code>execution_mode</code>=shell, <code>condition_command</code></td><td>Ja bei innerem Fail</td></tr>
-      <tr><td><code>conditional</code></td><td>claude</td><td>-</td><td>Branch-spezifisch</td></tr>
+      <tr><td><code>retry</code></td><td>claude</td><td><code>execution_mode</code>=shell/claude, <code>max_retries</code>, <code>delay</code>, <code>exponential_backoff</code>, <code>timeout_seconds</code></td><td>Ja (wenn alle Fehlversuche)</td></tr>
+      <tr><td><code>foreach</code></td><td>claude</td><td><code>execution_mode</code>=shell, <code>items_source</code>=list/command, <code>timeout_seconds</code></td><td>Aggregiertes Ergebnis</td></tr>
+      <tr><td><code>while</code></td><td>claude</td><td><code>execution_mode</code>=shell, <code>condition_command</code>, <code>timeout_seconds</code></td><td>Ja bei innerem Fail</td></tr>
+      <tr><td><code>conditional</code></td><td>claude</td><td><code>timeout_seconds</code></td><td>Branch-spezifisch</td></tr>
       <tr><td><code>approval</code></td><td>-</td><td><code>mode</code>=ask/auto, <code>on_no</code>=fail/skip/continue</td><td>on_no=fail</td></tr>
-      <tr><td><code>skill-capability</code></td><td>claude</td><td><code>params</code>, <code>input</code></td><td>Ja</td></tr>
+      <tr><td><code>skill-capability</code></td><td>claude</td><td><code>params</code>, <code>input</code>, <code>timeout_seconds</code></td><td>Ja</td></tr>
       <tr><td><code>sub-workflow</code></td><td>depends</td><td>Tiefe<=5, Timeout 30 min</td><td>Ja bei Timeout/Zyklus</td></tr>
-      <tr><td><code>agentic</code></td><td>claude</td><td>Budget, Iterationen, Approval</td><td>Ja bei Stoppgründen</td></tr>
+      <tr><td><code>agentic</code></td><td>claude</td><td>Budget, Iterationen, Approval, <code>timeout_seconds</code></td><td>Ja bei Stoppgründen</td></tr>
     </tbody>
   </table>
 </section>

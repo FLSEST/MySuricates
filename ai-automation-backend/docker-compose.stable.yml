@@ -1,0 +1,24 @@
+services:
+  stable:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.stable
+    container_name: mysuricates-stable
+    ports:
+      - "9091:9091"
+    environment:
+      - SPRING_PROFILES_ACTIVE=stable
+      - HOME=${HOME}
+      - PATH=/opt/java/openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${HOME}/.local/bin
+    volumes:
+      - stable-data:/app/data
+      - ./stable-frontend:/app/frontend:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${HOME}/.local/share/claude:${HOME}/.local/share/claude:ro
+      - ${HOME}/.local/bin:${HOME}/.local/bin:ro
+      - ${HOME}/.claude:${HOME}/.claude
+      - ${HOME}/Entwicklung:${HOME}/Entwicklung
+    restart: unless-stopped
+
+volumes:
+  stable-data:

@@ -2,6 +2,7 @@ package com.automation.service.workflow;
 
 import com.automation.entity.*;
 import com.automation.entity.ActivityLog.LogCategory;
+import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.exception.WorkflowExecutionException;
 import com.automation.executor.ApprovalRequest;
 import com.automation.executor.BlockExecutor;
@@ -15,6 +16,7 @@ import com.automation.service.project.ContainerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -46,6 +48,7 @@ public class WorkflowExecutor {
     private final AgentInstructionsService agentInstructionsService;
     private final ActivityLogService activityLogService;
     private final WorkflowMemoryService workflowMemoryService;
+    private final ApplicationEventPublisher eventPublisher;
 
     private final Map<String, ExecutionContext> activeExecutions = new ConcurrentHashMap<>();
 
@@ -68,6 +71,7 @@ public class WorkflowExecutor {
         List<Skill> skills = List.copyOf(workflow.getActivatedSkills());
         String instructions = workflow.getInstructions();
         String model = workflow.getModel();
+        Map<String, Object> workflowMeta = Map.copyOf(workflow.getMetadata());
 
         Map<String, Object> contextVars = inputContext != null ? Map.copyOf(inputContext) : Map.of();
 
@@ -78,14 +82,14 @@ public class WorkflowExecutor {
         activityLogService.info(LogCategory.EXECUTION,
                 "Workflow execution started: " + workflowName,
                 "WorkflowExecutor", runId);
-        virtualThreadExecutor.submit(() -> executeBlocks(runId, workflowId, project, blocks, skills, contextVars, instructions, model));
+        virtualThreadExecutor.submit(() -> executeBlocks(runId, workflowId, workflowName, project, blocks, skills, contextVars, instructions, model, workflowMeta));
 
         return run;
     }
 
-    private void executeBlocks(String runId, String workflowId, Project project, List<BlockDefinition> blocks,
+    private void executeBlocks(String runId, String workflowId, String workflowName, Project project, List<BlockDefinition> blocks,
                                List<Skill> skills, Map<String, Object> inputContext,
-                               String instructions, String model) {
+                               String instructions, String model, Map<String, Object> workflowMeta) {
         try {
             executionSemaphore.acquire();
         } catch (InterruptedException e) {
@@ -102,10 +106,11 @@ public class WorkflowExecutor {
         // Replace lazy proxy with fresh list — run was just created with 0 steps
         run.setSteps(new ArrayList<>());
 
+        ExecutionContext context = null;
         try {
             String containerId = ensureContainerRunning(project, runId);
 
-            ExecutionContext context = ExecutionContext.builder()
+            context = ExecutionContext.builder()
                     .containerId(containerId)
                     .workflowRunId(runId)
                     .build();
@@ -180,8 +185,10 @@ public class WorkflowExecutor {
 
                 if (step.getStatus() == StepStatus.FAILED && block.shouldStopOnFailure()) {
                     run.setStatus(RunStatus.FAILED);
-                    run.setError(Map.of("step", step.getStepIndex(), "message",
-                            step.getOutput() != null ? step.getOutput() : "Step failed"));
+                    String output = step.getOutput() != null ? step.getOutput() : "";
+                    String message = "Step " + step.getStepIndex() + " (" + block.getType() + ") failed: "
+                            + (output.length() > 500 ? output.substring(0, 500) + "..." : output);
+                    run.setError(Map.of("step", step.getStepIndex(), "blockType", block.getType(), "message", message));
                     break;
                 }
             }
@@ -212,12 +219,30 @@ public class WorkflowExecutor {
             run.setDurationMs(
                     run.getCompletedAt().toEpochMilli() - run.getStartedAt().toEpochMilli()
             );
+
+            // Merge context runMetadata into WorkflowRun.metadata
+            if (context != null && !context.getRunMetadata().isEmpty()) {
+                Map<String, Object> merged = new HashMap<>(run.getMetadata());
+                merged.putAll(context.getRunMetadata());
+                run.setMetadata(merged);
+            }
+
             runRepository.save(run);
             activeExecutions.remove(run.getId());
             executionSemaphore.release();
 
             // Broadcast final status
             broadcastStepResult(run.getId(), run.getStatus());
+
+            // Publish domain event for listeners (e.g. AutoTodoService)
+            try {
+                eventPublisher.publishEvent(new WorkflowRunCompletedEvent(
+                        this, run.getId(), workflowId, workflowName,
+                        project.getId(), project.getPath(), run.getStatus(),
+                        run.getMetadata(), workflowMeta, run.getError()));
+            } catch (Exception e) {
+                log.warn("Failed to publish WorkflowRunCompletedEvent: {}", e.getMessage());
+            }
         }
     }
 

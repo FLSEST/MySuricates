@@ -200,6 +200,7 @@ Neuen Workflow erstellen.
 | `icon` | String | Nein |
 | `blocks` | BlockDefinition[] | Ja |
 | `activatedSkillIds` | String[] | Nein |
+| `templateId` | String | Nein | ID des Quell-Templates (wenn aus Template erstellt) |
 
 **Response:** `201` mit `WorkflowResponse`
 
@@ -283,6 +284,34 @@ Workflow aus JSON importieren (exportiertes Format + Zielprojekt).
 | `instructions` | String | Nein |
 | `model` | String | Nein |
 
+#### Block-Config: `timeout_seconds`
+
+Alle Block-Typen unterstützen ein optionales `timeout_seconds`-Feld in der Block-Config.
+Damit wird das Claude-CLI-Timeout pro Block übersteuert (Default: globaler Wert aus `automation.host-claude.timeout-seconds`, Standard 300s).
+
+```json
+{
+  "type": "simple",
+  "config": {
+    "command": "Analysiere den Code in src/",
+    "timeout_seconds": 600
+  }
+}
+```
+
+| Block-Typ | Wirkung von `timeout_seconds` |
+|---|---|
+| `simple` | Claude-CLI-Timeout für den Step |
+| `retry` | Claude-CLI-Timeout pro Retry-Versuch (Shell: Shell-Timeout) |
+| `conditional` | Claude-CLI-Timeout für Condition-Auswertung und Branch-Ausführung |
+| `foreach` | Claude-CLI-Timeout pro Iteration (Shell: Shell-Timeout) |
+| `while` | Claude-CLI-Timeout für Condition und Body (Shell: Shell-Timeout) |
+| `skill-capability` | Claude-CLI-Timeout für Capability-Ausführung |
+| `agentic` | Claude-CLI-Timeout für REASON- und ACT-Phase pro Iteration |
+| `shell` | Shell-Prozess-Timeout (wie bisher) |
+
+Ohne `timeout_seconds` greift der globale Default (`automation.host-claude.timeout-seconds`).
+
 **Response:** `201` mit `WorkflowResponse`
 
 ### `POST /api/v1/workflows/{id}/execute`
@@ -348,6 +377,105 @@ Skills für einen Workflow aktivieren.
 Skill von einem Workflow deaktivieren.
 
 **Response:** `WorkflowResponse`
+
+---
+
+## Workflow Templates
+
+### `GET /api/v1/workflow-templates`
+
+Alle Workflow-Templates auflisten (sortiert nach `sortOrder`).
+
+**Response:** `WorkflowTemplateResponse[]`
+
+```json
+[
+  {
+    "id": "uuid",
+    "name": {"de": "Code-Qualität", "en": "Code Quality"},
+    "description": {"de": "Prüft Code-Qualität", "en": "Checks code quality"},
+    "icon": "🔍",
+    "category": "CODE",
+    "blocks": [
+      { "type": "simple", "config": { "command": "npm run lint" } }
+    ],
+    "instructions": null,
+    "model": null,
+    "builtIn": true,
+    "sortOrder": 0,
+    "createdAt": "2025-01-15T10:00:00Z",
+    "updatedAt": "2025-01-15T10:00:00Z"
+  }
+]
+```
+
+### `GET /api/v1/workflow-templates/{id}`
+
+Einzelnes Template abrufen.
+
+**Response:** `WorkflowTemplateResponse`
+
+### `POST /api/v1/workflow-templates`
+
+Neues User-Template erstellen (`builtIn` wird automatisch auf `false` gesetzt).
+
+**Request:**
+
+```json
+{
+  "name": {"de": "Mein Template", "en": "My Template"},
+  "description": {"de": "Beschreibung", "en": "Description"},
+  "icon": "⚡",
+  "category": "CODE",
+  "blocks": [
+    { "type": "simple", "config": { "command": "echo hello" } }
+  ],
+  "instructions": null,
+  "model": null
+}
+```
+
+| Feld | Typ | Pflicht |
+|---|---|---|
+| `name` | Map<String, String> | Ja |
+| `description` | Map<String, String> | Nein |
+| `icon` | String | Nein |
+| `category` | String | Nein |
+| `blocks` | BlockDefinition[] | Ja |
+| `instructions` | String | Nein |
+| `model` | String | Nein |
+
+**Response:** `201` mit `WorkflowTemplateResponse`
+
+### `PUT /api/v1/workflow-templates/{id}`
+
+Template aktualisieren. Bei Built-in Templates können nur `sortOrder` und `category` geändert werden.
+
+**Request:**
+
+```json
+{
+  "name": {"de": "Neuer Name", "en": "New Name"},
+  "description": {"de": "Neue Beschreibung", "en": "New Description"},
+  "sortOrder": 5
+}
+```
+
+Alle Felder sind optional; nur übergebene Felder werden aktualisiert.
+
+**Response:** `WorkflowTemplateResponse`
+
+### `DELETE /api/v1/workflow-templates/{id}`
+
+User-Template löschen. Built-in Templates können nicht gelöscht werden (→ `400`).
+
+**Response:** `204 No Content`
+
+### `POST /api/v1/workflow-templates/from-workflow/{workflowId}`
+
+Einen bestehenden Workflow als neues Template speichern (Name, Beschreibung, Blöcke, Instructions, Model werden übernommen).
+
+**Response:** `201` mit `WorkflowTemplateResponse`
 
 ---
 

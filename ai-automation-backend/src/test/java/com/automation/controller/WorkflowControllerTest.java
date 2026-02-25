@@ -6,6 +6,7 @@ import com.automation.entity.*;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.WorkflowMapper;
+import com.automation.repository.ProjectRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowOptimizationService;
@@ -62,6 +63,9 @@ class WorkflowControllerTest {
     @MockBean
     private WorkflowOptimizationService optimizationService;
 
+    @MockBean
+    private ProjectRepository projectRepository;
+
     private Workflow testWorkflow;
     private WorkflowResponse testResponse;
 
@@ -78,9 +82,10 @@ class WorkflowControllerTest {
                 .build();
 
         testResponse = new WorkflowResponse(
-                "wf-1", "proj-1", "Test Project", "Test Workflow", "A test workflow",
+                "wf-1", "proj-1", "Test Project", null, null,
+                "Test Workflow", "A test workflow",
                 null, List.of(), "1.0.0", Map.of(), List.of(), 0L,
-                null, null, Instant.now(), Instant.now()
+                null, null, null, Instant.now(), Instant.now()
         );
     }
 
@@ -201,7 +206,7 @@ class WorkflowControllerTest {
                 .build();
 
         WorkflowRunResponse runResponse = new WorkflowRunResponse(
-                "run-1", "wf-1", "Test Workflow", RunStatus.RUNNING, List.of(),
+                "run-1", "wf-1", "Test Workflow", "Test Project", RunStatus.RUNNING, List.of(),
                 Instant.now(), null, null, null, null, Map.of()
         );
 
@@ -228,7 +233,7 @@ class WorkflowControllerTest {
         WorkflowRun run = WorkflowRun.builder()
                 .id("run-1").workflow(testWorkflow).status(RunStatus.RUNNING).build();
         WorkflowRunResponse runResponse = new WorkflowRunResponse(
-                "run-1", "wf-1", "Test Workflow", RunStatus.RUNNING, List.of(),
+                "run-1", "wf-1", "Test Workflow", "Test Project", RunStatus.RUNNING, List.of(),
                 null, null, null, null, null, null
         );
 
@@ -256,7 +261,7 @@ class WorkflowControllerTest {
         WorkflowRun run = WorkflowRun.builder()
                 .id("run-1").workflow(testWorkflow).status(RunStatus.COMPLETED).build();
         WorkflowRunResponse runResponse = new WorkflowRunResponse(
-                "run-1", "wf-1", "Test Workflow", RunStatus.COMPLETED, List.of(),
+                "run-1", "wf-1", "Test Workflow", "Test Project", RunStatus.COMPLETED, List.of(),
                 null, null, null, null, null, null
         );
 

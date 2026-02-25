@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zitate — Clean Code</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8',800:'#1e40af',900:'#1e3a5f' }
+          },
+          fontFamily: { sans: ['Inter','system-ui','sans-serif'], mono: ['Fira Code','monospace'] }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col font-sans">
+  <nav class="bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-16">
+        <a href="index.html" class="flex items-center gap-2 text-brand-700 font-bold text-xl">
+          <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+          Clean Code
+        </a>
+        <div class="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
+          <a href="index.html" class="hover:text-brand-600 transition">Startseite</a>
+          <a href="chapters/01-sauberer-code.html" class="hover:text-brand-600 transition">Kapitel</a>
+          <a href="zitate.html" class="text-brand-700 border-b-2 border-brand-700 pb-0.5">Zitate</a>
+        </div>
+        <button id="mobile-menu-btn" class="md:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100"><svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      </div>
+    </div>
+    <div id="mobile-menu" class="hidden md:hidden border-t border-gray-100 bg-white">
+      <div class="px-4 py-3 space-y-1">
+        <a href="index.html" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50">Startseite</a>
+        <a href="chapters/01-sauberer-code.html" class="block px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50">Kapitel</a>
+        <a href="zitate.html" class="block px-3 py-2 rounded-lg text-sm font-medium text-brand-700 bg-brand-50">Zitate</a>
+      </div>
+    </div>
+  </nav>
+
+  <header class="bg-gradient-to-br from-purple-800 via-purple-700 to-indigo-900 text-white py-12 sm:py-16">
+    <div class="max-w-4xl mx-auto px-4 text-center">
+      <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight mb-3">Die wichtigsten Zitate</h1>
+      <p class="text-purple-200 text-base">Weisheiten und Einsichten aus Clean Code von Robert C. Martin</p>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-4 py-12 space-y-6">
+    <blockquote class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+      <p class="text-gray-700 text-lg italic leading-relaxed">&laquo;Clean code always looks like it was written by someone who cares.&raquo;</p>
+      <footer class="mt-3 text-sm text-gray-500">— Michael Feathers, zitiert in Kapitel 1</footer>
+    </blockquote>
+    <blockquote class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+      <p class="text-gray-700 text-lg italic leading-relaxed">&laquo;Any fool can write code that a computer can understand. Good programmers write code that humans can understand.&raquo;</p>
+      <footer class="mt-3 text-sm text-gray-500">— Martin Fowler, zitiert in Kapitel 1</footer>
+    </blockquote>
+    <blockquote class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+      <p class="text-gray-700 text-lg italic leading-relaxed">&laquo;The ratio of time spent reading versus writing is well over 10 to 1. We are constantly reading old code as part of the effort to write new code.&raquo;</p>
+      <footer class="mt-3 text-sm text-gray-500">— Robert C. Martin, Kapitel 1</footer>
+    </blockquote>
+    <blockquote class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+      <p class="text-gray-700 text-lg italic leading-relaxed">&laquo;The name of a variable, function, or class should answer all the big questions. It should tell you why it exists, what it does, and how it is used.&raquo;</p>
+      <footer class="mt-3 text-sm text-gray-500">— Robert C. Martin, Kapitel 2</footer>
+    </blockquote>
+    <blockquote class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+      <p class="text-gray-700 text-lg italic leading-relaxed">&laquo;Functions should do one thing. They should do it well. They should do it only.&raquo;</p>
+      <footer class="mt-3 text-sm text-gray-500">— Robert C. Martin, Kapitel 3</footer>
+    </blockquote>
+    <blockquote class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+      <p class="text-gray-700 text-lg italic leading-relaxed">&laquo;The ideal number of arguments for a function is zero. Next comes one, followed closely by two. Three arguments should be avoided where possible.&raquo;</p>
+      <footer class="mt-3 text-sm text-gray-500">— Robert C. Martin, Kapitel 3</footer>
+    </blockquote>
+    <blockquote class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+      <p class="text-gray-700 text-lg italic leading-relaxed">&laquo;Don't use a comment when you can use a function or a variable.&raquo;</p>
+      <footer class="mt-3 text-sm text-gray-500">— Robert C. Martin, Kapitel 4</footer>
+    </blockquote>
+    <blockquote class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+      <p class="text-gray-700 text-lg italic leading-relaxed">&laquo;The proper use of comments is to compensate for our failure to express ourselves in code.&raquo;</p>
+      <footer class="mt-3 text-sm text-gray-500">— Robert C. Martin, Kapitel 4</footer>
+    </blockquote>
+    <blockquote class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+      <p class="text-gray-700 text-lg italic leading-relaxed">&laquo;Code formatting is about communication, and communication is the professional developer's first order of business.&raquo;</p>
+      <footer class="mt-3 text-sm text-gray-500">— Robert C. Martin, Kapitel 5</footer>
+    </blockquote>
+    <blockquote class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+      <p class="text-gray-700 text-lg italic leading-relaxed">&laquo;Objects hide their data behind abstractions and expose functions that operate on that data. Data structures expose their data and have no meaningful functions.&raquo;</p>
+      <footer class="mt-3 text-sm text-gray-500">— Robert C. Martin, Kapitel 6</footer>
+    </blockquote>
+    <blockquote class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+      <p class="text-gray-700 text-lg italic leading-relaxed">&laquo;Error handling is important, but if it obscures logic, it's wrong.&raquo;</p>
+      <footer class="mt-3 text-sm text-gray-500">— Robert C. Martin, Kapitel 7</footer>
+    </blockquote>
+    <blockquote class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+      <p class="text-gray-700 text-lg italic leading-relaxed">&laquo;If you want clean code, you must first write dirty code, then clean it.&raquo;</p>
+      <footer class="mt-3 text-sm text-gray-500">— Robert C. Martin, Kapitel 1</footer>
+    </blockquote>
+    <blockquote class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+      <p class="text-gray-700 text-lg italic leading-relaxed">&laquo;Test code is just as important as production code.&raquo;</p>
+      <footer class="mt-3 text-sm text-gray-500">— Robert C. Martin, Kapitel 9</footer>
+    </blockquote>
+    <blockquote class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+      <p class="text-gray-700 text-lg italic leading-relaxed">&laquo;The first rule of classes is that they should be small. The second rule of classes is that they should be smaller than that.&raquo;</p>
+      <footer class="mt-3 text-sm text-gray-500">— Robert C. Martin, Kapitel 10</footer>
+    </blockquote>
+    <blockquote class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+      <p class="text-gray-700 text-lg italic leading-relaxed">&laquo;Duplication is the primary enemy of a well-designed system.&raquo;</p>
+      <footer class="mt-3 text-sm text-gray-500">— Robert C. Martin, Kapitel 12</footer>
+    </blockquote>
+  </main>
+
+  <footer class="mt-auto bg-white border-t border-gray-200 py-8">
+    <div class="max-w-6xl mx-auto px-4 text-center text-sm text-gray-400">
+      <p>Clean Code Zusammenfassung &middot; Basierend auf dem Buch von Robert C. Martin</p>
+      <p class="mt-1"><a href="index.html" class="text-brand-600 hover:underline">Zurueck zur Startseite</a></p>
+    </div>
+  </footer>
+  <script>
+    const btn=document.getElementById('mobile-menu-btn'),menu=document.getElementById('mobile-menu');
+    btn.addEventListener('click',()=>menu.classList.toggle('hidden'));
+    document.addEventListener('click',(e)=>{if(!btn.contains(e.target)&&!menu.contains(e.target))menu.classList.add('hidden');});
+  </script>
+</body>
+</html>

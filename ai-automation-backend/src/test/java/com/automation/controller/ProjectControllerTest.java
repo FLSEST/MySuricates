@@ -73,7 +73,7 @@ class ProjectControllerTest {
                 .build();
 
         testResponse = new ProjectResponse(
-                "proj-1", "Test Project", ProjectType.CODE, "/workspace/test",
+                "proj-1", "Test Project", null, null, ProjectType.CODE, "/workspace/test",
                 Map.of(), ProjectStatus.STOPPED, null,
                 Instant.now(), Instant.now()
         );
@@ -201,7 +201,7 @@ class ProjectControllerTest {
     void startProject_returnsOk() throws Exception {
         testProject.setStatus(ProjectStatus.RUNNING);
         ProjectResponse runningResponse = new ProjectResponse(
-                "proj-1", "Test Project", ProjectType.CODE, "/workspace/test",
+                "proj-1", "Test Project", null, null, ProjectType.CODE, "/workspace/test",
                 Map.of(), ProjectStatus.RUNNING, null,
                 Instant.now(), Instant.now()
         );

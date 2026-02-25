@@ -33,6 +33,9 @@ public class WhileBlockExecutor implements BlockExecutor {
         String executionMode = (String) config.getOrDefault("execution_mode", "claude");
         boolean isShell = "shell".equals(executionMode);
         int shellTimeout = ((Number) config.getOrDefault("timeout_seconds", DEFAULT_SHELL_TIMEOUT)).intValue();
+        Integer claudeTimeout = config.containsKey("timeout_seconds")
+                ? ((Number) config.get("timeout_seconds")).intValue()
+                : null;
 
         StepResult aggregateResult = new StepResult();
         aggregateResult.setStepIndex(context.nextStepIndex());
@@ -55,7 +58,7 @@ public class WhileBlockExecutor implements BlockExecutor {
                     }
                 } else {
                     String conditionResult = commandExecutor.executeCommandOnHost(
-                            context.getProjectPath(), resolvedCondition).output();
+                            context.getProjectPath(), resolvedCondition, null, null, claudeTimeout).output();
                     if ("false".equalsIgnoreCase(conditionResult.trim()) ||
                             "0".equals(conditionResult.trim()) ||
                             conditionResult.trim().isEmpty()) {
@@ -85,7 +88,8 @@ public class WhileBlockExecutor implements BlockExecutor {
                                 .build(),
                         context.nextStepIndex(),
                         context.getInstructionPrefix(),
-                        context.getModel()
+                        context.getModel(),
+                        claudeTimeout
                 );
             }
 

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kapitel 4: Kommentare – Clean Code Zusammenfassung</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd', 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#1e3a8a' }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 antialiased">
+
+    <!-- Navigation -->
+    <nav class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <a href="../index.html" class="text-xl font-bold text-yellow-700 hover:text-yellow-500 transition-colors">Clean Code</a>
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="../index.html" class="text-gray-600 hover:text-yellow-600 font-medium transition-colors">Startseite</a>
+                    <a href="01-sauberer-code.html" class="text-yellow-600 font-semibold border-b-2 border-yellow-600 pb-0.5">Kapitel</a>
+                    <a href="../zitate.html" class="text-gray-600 hover:text-yellow-600 font-medium transition-colors">Zitate</a>
+                </div>
+                <button id="mobile-menu-btn" class="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors" aria-label="Menü öffnen">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </button>
+            </div>
+        </div>
+        <div id="mobile-menu" class="hidden md:hidden border-t border-gray-200 bg-white">
+            <div class="px-4 py-3 space-y-2">
+                <a href="../index.html" class="block px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium">Startseite</a>
+                <a href="01-sauberer-code.html" class="block px-3 py-2 rounded-lg text-yellow-600 bg-yellow-50 font-semibold">Kapitel</a>
+                <a href="../zitate.html" class="block px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium">Zitate</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Chapter Header -->
+    <header class="bg-gradient-to-br from-yellow-500 to-yellow-700 text-white py-16 sm:py-20">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <p class="text-yellow-200 font-semibold text-sm uppercase tracking-widest mb-3">Kapitel 4</p>
+            <h1 class="text-4xl sm:text-5xl font-extrabold leading-tight">Kommentare</h1>
+            <p class="mt-4 text-yellow-100 text-lg max-w-2xl">Wann Kommentare helfen, wann sie schaden und warum guter Code sich selbst erklärt.</p>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+
+        <!-- Zusammenfassung -->
+        <section class="mb-14">
+            <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-yellow-100 text-yellow-700">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                </span>
+                Zusammenfassung
+            </h2>
+            <div class="prose prose-lg max-w-none space-y-4 text-gray-700 leading-relaxed">
+                <p>Kommentare sind bestenfalls ein notwendiges Übel. Sie kompensieren unser Versagen, uns im Code auszudrücken. Jeder Kommentar stellt ein Versagen dar, den Code selbstsprechend zu gestalten. Bevor Sie einen Kommentar schreiben, fragen Sie sich: Kann ich den Code so umstrukturieren, dass der Kommentar überflüssig wird?</p>
+                <p>Es gibt durchaus gute Kommentare: rechtliche Hinweise, informative Kommentare die reguläre Ausdrücke erklären, TODO-Kommentare die auf zukünftige Aufgaben hinweisen und Warnungen vor Konsequenzen. Diese dienen einem echten Zweck und helfen dem Leser.</p>
+                <p>Schlechte Kommentare hingegen sind Legion: redundante Kommentare die nur wiederholen was der Code schon sagt, irreführende Kommentare die nicht mehr zur Realität passen, auskommentierter Code der wie ein Geschwür im Quelltext sitzt. Die Versionskontrolle merkt sich alles – löschen Sie auskommentierten Code sofort.</p>
+            </div>
+        </section>
+
+        <!-- Key Takeaways -->
+        <section class="mb-14">
+            <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-yellow-100 text-yellow-700">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                </span>
+                Key Takeaways
+            </h2>
+            <div class="grid gap-4">
+                <div class="flex items-start gap-4 bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                    <span class="mt-1 flex-shrink-0 w-8 h-8 rounded-lg bg-yellow-100 text-yellow-700 flex items-center justify-center font-bold text-sm">1</span>
+                    <p class="text-gray-700"><strong class="text-gray-900">Code sollte sich selbst erklären</strong> – Kommentare sind oft ein Zeichen von Schwäche im Code-Design.</p>
+                </div>
+                <div class="flex items-start gap-4 bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                    <span class="mt-1 flex-shrink-0 w-8 h-8 rounded-lg bg-yellow-100 text-yellow-700 flex items-center justify-center font-bold text-sm">2</span>
+                    <p class="text-gray-700"><strong class="text-gray-900">Gute Kommentare:</strong> rechtliche Hinweise, informative Kommentare, TODOs und Warnungen vor Konsequenzen.</p>
+                </div>
+                <div class="flex items-start gap-4 bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                    <span class="mt-1 flex-shrink-0 w-8 h-8 rounded-lg bg-yellow-100 text-yellow-700 flex items-center justify-center font-bold text-sm">3</span>
+                    <p class="text-gray-700"><strong class="text-gray-900">Schlechte Kommentare:</strong> redundante Kommentare, irreführende Beschreibungen und auskommentierter Code.</p>
+                </div>
+                <div class="flex items-start gap-4 bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                    <span class="mt-1 flex-shrink-0 w-8 h-8 rounded-lg bg-yellow-100 text-yellow-700 flex items-center justify-center font-bold text-sm">4</span>
+                    <p class="text-gray-700"><strong class="text-gray-900">Javadoc in öffentlichen APIs ist sinnvoll</strong> – in internem Code ist es oft unnötiger Ballast.</p>
+                </div>
+                <div class="flex items-start gap-4 bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                    <span class="mt-1 flex-shrink-0 w-8 h-8 rounded-lg bg-yellow-100 text-yellow-700 flex items-center justify-center font-bold text-sm">5</span>
+                    <p class="text-gray-700"><strong class="text-gray-900">Auskommentierten Code sofort löschen</strong> – die Versionskontrolle merkt sich alles, es gibt keinen Grund ihn zu behalten.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Chapter Navigation -->
+        <nav class="flex items-center justify-between border-t border-gray-200 pt-8">
+            <a href="03-funktionen.html" class="inline-flex items-center gap-2 px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                Vorheriges Kapitel
+            </a>
+            <a href="05-formatierung.html" class="inline-flex items-center gap-2 px-6 py-3 bg-yellow-600 text-white font-semibold rounded-xl hover:bg-yellow-700 transition-colors shadow-sm">
+                Nächstes Kapitel
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </a>
+        </nav>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-gray-400 mt-16">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 text-center">
+            <p class="font-semibold text-white text-lg mb-1">Clean Code – Zusammenfassung</p>
+            <p class="text-sm">Basierend auf &bdquo;Clean Code&ldquo; von Robert C. Martin</p>
+            <p class="text-xs mt-4 text-gray-500">&copy; 2026 Buchzusammenfassung. Alle Rechte vorbehalten.</p>
+        </div>
+    </footer>
+
+    <script>
+        const btn = document.getElementById('mobile-menu-btn');
+        const menu = document.getElementById('mobile-menu');
+        btn.addEventListener('click', () => menu.classList.toggle('hidden'));
+    </script>
+</body>
+</html>

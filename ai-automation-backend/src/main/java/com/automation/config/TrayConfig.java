@@ -16,4 +16,6 @@ public class TrayConfig {
     private long pollIntervalMs = 15000;
 
     private String webUiUrl = "http://localhost:3000";
+
+    private String stableUrl = "http://localhost:9091";
 }

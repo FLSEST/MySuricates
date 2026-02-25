@@ -15,7 +15,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -55,6 +57,7 @@ public class WorkflowService {
                 .blocks(request.blocks() != null ? request.blocks() : new ArrayList<>())
                 .instructions(request.instructions())
                 .model(request.model())
+                .templateId(request.templateId())
                 .build();
 
         // Activate skills if provided
@@ -89,6 +92,11 @@ public class WorkflowService {
         }
         if (request.model() != null) {
             workflow.setModel(request.model());
+        }
+        if (request.metadata() != null) {
+            Map<String, Object> merged = new HashMap<>(workflow.getMetadata());
+            merged.putAll(request.metadata());
+            workflow.setMetadata(merged);
         }
 
         Workflow saved = workflowRepository.save(workflow);

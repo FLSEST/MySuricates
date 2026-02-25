@@ -5,10 +5,19 @@
 
 const API = 'http://localhost:9090/api/v1';
 
+function apiHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const apiKey = Cypress.env('API_KEY');
+  if (apiKey) {
+    headers['X-API-Key'] = apiKey;
+  }
+  return headers;
+}
+
 // ── Projects ────────────────────────────────────────────
 
 export function getProjects() {
-  return cy.request('GET', `${API}/projects`).its('body');
+  return cy.request({ method: 'GET', url: `${API}/projects`, headers: apiHeaders() }).its('body');
 }
 
 export function createProject(
@@ -16,17 +25,17 @@ export function createProject(
   type = 'CODE',
   path = '/tmp/cypress-test',
 ) {
-  return cy.request('POST', `${API}/projects`, { name, type, path }).its('body');
+  return cy.request({ method: 'POST', url: `${API}/projects`, headers: apiHeaders(), body: { name, type, path } }).its('body');
 }
 
 export function deleteProject(id: string) {
-  return cy.request({ method: 'DELETE', url: `${API}/projects/${id}`, failOnStatusCode: false });
+  return cy.request({ method: 'DELETE', url: `${API}/projects/${id}`, headers: apiHeaders(), failOnStatusCode: false });
 }
 
 // ── Workflows ───────────────────────────────────────────
 
 export function getWorkflows() {
-  return cy.request('GET', `${API}/workflows`).its('body');
+  return cy.request({ method: 'GET', url: `${API}/workflows`, headers: apiHeaders() }).its('body');
 }
 
 export function createWorkflow(
@@ -34,17 +43,17 @@ export function createWorkflow(
   name = `Cypress Workflow ${Date.now()}`,
   description = 'Cypress test data',
 ) {
-  return cy.request('POST', `${API}/workflows`, { projectId, name, description }).its('body');
+  return cy.request({ method: 'POST', url: `${API}/workflows`, headers: apiHeaders(), body: { projectId, name, description } }).its('body');
 }
 
 export function deleteWorkflow(id: string) {
-  return cy.request({ method: 'DELETE', url: `${API}/workflows/${id}`, failOnStatusCode: false });
+  return cy.request({ method: 'DELETE', url: `${API}/workflows/${id}`, headers: apiHeaders(), failOnStatusCode: false });
 }
 
 // ── Schedules ───────────────────────────────────────────
 
 export function getSchedules() {
-  return cy.request('GET', `${API}/schedules`).its('body');
+  return cy.request({ method: 'GET', url: `${API}/schedules`, headers: apiHeaders() }).its('body');
 }
 
 export function createSchedule(
@@ -52,37 +61,67 @@ export function createSchedule(
   cronExpression = '0 0 * * *',
   description = 'Cypress test schedule',
 ) {
-  return cy.request('POST', `${API}/schedules`, { workflowId, cronExpression, description }).its('body');
+  return cy.request({ method: 'POST', url: `${API}/schedules`, headers: apiHeaders(), body: { workflowId, cronExpression, description } }).its('body');
 }
 
 export function deleteSchedule(id: string) {
-  return cy.request({ method: 'DELETE', url: `${API}/schedules/${id}`, failOnStatusCode: false });
+  return cy.request({ method: 'DELETE', url: `${API}/schedules/${id}`, headers: apiHeaders(), failOnStatusCode: false });
 }
 
 // ── Webhooks ────────────────────────────────────────────
 
 export function getWebhooks() {
-  return cy.request('GET', `${API}/webhooks`).its('body');
+  return cy.request({ method: 'GET', url: `${API}/webhooks`, headers: apiHeaders() }).its('body');
 }
 
 export function createWebhook(workflowId: string, description = 'Cypress test webhook') {
-  return cy.request('POST', `${API}/webhooks`, { workflowId, description }).its('body');
+  return cy.request({ method: 'POST', url: `${API}/webhooks`, headers: apiHeaders(), body: { workflowId, description } }).its('body');
 }
 
 export function deleteWebhook(id: string) {
-  return cy.request({ method: 'DELETE', url: `${API}/webhooks/${id}`, failOnStatusCode: false });
+  return cy.request({ method: 'DELETE', url: `${API}/webhooks/${id}`, headers: apiHeaders(), failOnStatusCode: false });
+}
+
+// ── Todos ──────────────────────────────────────────────
+
+export function getTodos() {
+  return cy.request({ method: 'GET', url: `${API}/todos`, headers: apiHeaders() }).its('body');
+}
+
+export function createTodo(
+  title = `Cypress Todo ${Date.now()}`,
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' = 'MEDIUM',
+  tags: string[] = [],
+  projectId?: string,
+) {
+  return cy.request({
+    method: 'POST',
+    url: `${API}/todos`,
+    headers: apiHeaders(),
+    body: { title, priority, tags, projectId, source: 'USER' },
+  }).its('body');
+}
+
+export function deleteTodo(id: string) {
+  return cy.request({ method: 'DELETE', url: `${API}/todos/${id}`, headers: apiHeaders(), failOnStatusCode: false });
+}
+
+// ── Executions ─────────────────────────────────────────
+
+export function getExecutions() {
+  return cy.request({ method: 'GET', url: `${API}/executions`, headers: apiHeaders() }).its('body');
 }
 
 // ── Skills ──────────────────────────────────────────────
 
 export function getSkills() {
-  return cy.request('GET', `${API}/skills`).its('body');
+  return cy.request({ method: 'GET', url: `${API}/skills`, headers: apiHeaders() }).its('body');
 }
 
 // ── System ──────────────────────────────────────────────
 
 export function getHealth() {
-  return cy.request('GET', `${API}/system/health`).its('body');
+  return cy.request({ method: 'GET', url: `${API}/system/health`, headers: apiHeaders() }).its('body');
 }
 
 // ── Cleanup ─────────────────────────────────────────────
@@ -90,8 +129,8 @@ export function getHealth() {
 /** Prefix used for all test-created data. Only data with this prefix gets cleaned up. */
 export const TEST_PREFIX = 'Cypress';
 
-function isTestData(name: string): boolean {
-  return name.startsWith(TEST_PREFIX);
+function isTestData(name: string | null | undefined): boolean {
+  return !!name && name.startsWith(TEST_PREFIX);
 }
 
 /**
@@ -101,7 +140,14 @@ function isTestData(name: string): boolean {
  * User-created data is never touched.
  */
 export function cleanupAll() {
-  // Webhooks first (depend on workflows)
+  // Todos first (no dependencies)
+  getTodos().then((todos: { id: string; title: string }[]) => {
+    todos
+      .filter((t) => isTestData(t.title))
+      .forEach((t) => deleteTodo(t.id));
+  });
+
+  // Webhooks (depend on workflows)
   getWebhooks().then((webhooks: { id: string; description: string; workflowName: string }[]) => {
     webhooks
       .filter((w) => isTestData(w.description) || isTestData(w.workflowName))

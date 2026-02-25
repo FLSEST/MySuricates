@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
-import type { SystemHealth, SystemInfo, RemoteAccessStatus, BrowseDirectoryResponse } from '../types';
+import type { SystemHealth, SystemInfo, RemoteAccessStatus, BrowseDirectoryResponse, BackupInfo } from '../types';
 
 export function useSystemHealth() {
   return useQuery({
@@ -37,6 +37,13 @@ export function useDisableRemoteAccess() {
   return useMutation({
     mutationFn: () => api.post('/system/remote-access/disable'),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['system', 'remote-access'] }),
+  });
+}
+
+export function useBackupList() {
+  return useQuery({
+    queryKey: ['system', 'backups'],
+    queryFn: () => api.get<BackupInfo[]>('/system/backups'),
   });
 }
 

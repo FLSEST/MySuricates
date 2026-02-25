@@ -55,7 +55,7 @@ class SimpleBlockExecutorTest {
     void execute_validCommand_delegatesToCommandExecutor() {
         StepResult expected = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("success").build();
-        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(BlockDefinition.class), anyInt(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(BlockDefinition.class), anyInt(), isNull(), isNull(), isNull()))
                 .thenReturn(expected);
 
         BlockDefinition block = BlockDefinition.builder()
@@ -74,7 +74,7 @@ class SimpleBlockExecutorTest {
         context.setPreviousOutput("previous result");
         StepResult expected = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("done").build();
-        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(BlockDefinition.class), anyInt(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(BlockDefinition.class), anyInt(), isNull(), isNull(), isNull()))
                 .thenReturn(expected);
 
         BlockDefinition block = BlockDefinition.builder()

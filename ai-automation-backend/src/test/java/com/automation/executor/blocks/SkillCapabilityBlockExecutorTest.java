@@ -50,7 +50,7 @@ class SkillCapabilityBlockExecutorTest {
 
     @Test
     void execute_validCapability_returnsCompletedResult() {
-        when(commandExecutor.executeCommandOnHost(eq("/test/project"), contains("fact_check"), any(), any()))
+        when(commandExecutor.executeCommandOnHost(eq("/test/project"), contains("fact_check"), any(), any(), isNull()))
                 .thenReturn(new CliSession.EnrichedCommandResult("Facts verified: 95% accuracy", 0, null));
 
         Map<String, Object> config = new HashMap<>();
@@ -73,7 +73,7 @@ class SkillCapabilityBlockExecutorTest {
     @Test
     void execute_resolvesInputTemplate() {
         context.setPreviousOutput("document content here");
-        when(commandExecutor.executeCommandOnHost(eq("/test/project"), contains("document content here"), any(), any()))
+        when(commandExecutor.executeCommandOnHost(eq("/test/project"), contains("document content here"), any(), any(), isNull()))
                 .thenReturn(new CliSession.EnrichedCommandResult("analyzed", 0, null));
 
         Map<String, Object> config = new HashMap<>();
@@ -92,7 +92,7 @@ class SkillCapabilityBlockExecutorTest {
 
     @Test
     void execute_commandThrows_returnsFailedResult() {
-        when(commandExecutor.executeCommandOnHost(anyString(), anyString(), any(), any()))
+        when(commandExecutor.executeCommandOnHost(anyString(), anyString(), any(), any(), isNull()))
                 .thenThrow(new RuntimeException("AI unavailable"));
 
         Map<String, Object> config = new HashMap<>();
@@ -128,7 +128,7 @@ class SkillCapabilityBlockExecutorTest {
 
     @Test
     void execute_noInput_usesEmptyString() {
-        when(commandExecutor.executeCommandOnHost(anyString(), anyString(), any(), any()))
+        when(commandExecutor.executeCommandOnHost(anyString(), anyString(), any(), any(), isNull()))
                 .thenReturn(new CliSession.EnrichedCommandResult("processed", 0, null));
 
         Map<String, Object> config = new HashMap<>();

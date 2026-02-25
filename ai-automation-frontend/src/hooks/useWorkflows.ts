@@ -29,11 +29,14 @@ function mapWorkflow(raw: WorkflowApiResponse): Workflow {
   return {
     ...raw,
     projectName: raw.projectName ?? '',
+    projectSubtitle: raw.projectSubtitle ?? undefined,
+    projectDescription: raw.projectDescription ?? undefined,
     activatedSkillIds: raw.activatedSkills?.map((s) => s.id) ?? [],
     activatedSkillNames: raw.activatedSkills?.map((s) => s.name) ?? [],
     runCount: raw.runCount ?? 0,
     instructions: raw.instructions ?? null,
     model: raw.model ?? null,
+    metadata: raw.metadata ?? {},
   };
 }
 

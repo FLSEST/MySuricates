@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kapitel 2: Aussagekräftige Bezeichner – Clean Code Zusammenfassung</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd', 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#1e3a8a' }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-50 font-sans text-gray-800 antialiased">
+
+    <!-- Navigation -->
+    <nav class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <a href="../index.html" class="text-xl font-bold text-blue-700 hover:text-blue-500 transition-colors">Clean Code</a>
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="../index.html" class="text-gray-600 hover:text-blue-600 font-medium transition-colors">Startseite</a>
+                    <a href="01-sauberer-code.html" class="text-blue-600 font-semibold border-b-2 border-blue-600 pb-0.5">Kapitel</a>
+                    <a href="../zitate.html" class="text-gray-600 hover:text-blue-600 font-medium transition-colors">Zitate</a>
+                </div>
+                <button id="mobile-menu-btn" class="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors" aria-label="Menü öffnen">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </button>
+            </div>
+        </div>
+        <div id="mobile-menu" class="hidden md:hidden border-t border-gray-200 bg-white">
+            <div class="px-4 py-3 space-y-2">
+                <a href="../index.html" class="block px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium">Startseite</a>
+                <a href="01-sauberer-code.html" class="block px-3 py-2 rounded-lg text-blue-600 bg-blue-50 font-semibold">Kapitel</a>
+                <a href="../zitate.html" class="block px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium">Zitate</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Chapter Header -->
+    <header class="bg-gradient-to-br from-blue-500 to-blue-700 text-white py-16 sm:py-20">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <p class="text-blue-200 font-semibold text-sm uppercase tracking-widest mb-3">Kapitel 2</p>
+            <h1 class="text-4xl sm:text-5xl font-extrabold leading-tight">Aussagekräftige Bezeichner</h1>
+            <p class="mt-4 text-blue-100 text-lg max-w-2xl">Warum gute Namen die Grundlage für verständlichen Code sind und wie man sie wählt.</p>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+
+        <!-- Zusammenfassung -->
+        <section class="mb-14">
+            <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-700">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                </span>
+                Zusammenfassung
+            </h2>
+            <div class="prose prose-lg max-w-none space-y-4 text-gray-700 leading-relaxed">
+                <p>Namen sind überall im Code: Variablen, Funktionen, Klassen, Pakete. Wir benennen ständig, und weil wir es so oft tun, sollten wir es gut tun. Gute Namen offenbaren die Absicht. Der Name einer Variable, Funktion oder Klasse sollte verraten, warum sie existiert, was sie tut und wie sie verwendet wird.</p>
+                <p>Vermeiden Sie Desinformation und bedeutungslose Unterscheidungen. Ein Name wie <code class="bg-blue-50 text-blue-800 px-1.5 py-0.5 rounded">accountList</code> ist irreführend, wenn die Variable gar keine Liste ist. Namen wie <code class="bg-blue-50 text-blue-800 px-1.5 py-0.5 rounded">a1</code> und <code class="bg-blue-50 text-blue-800 px-1.5 py-0.5 rounded">a2</code> sagen nichts aus – sie sind rauschartige Bezeichner, die weder informieren noch unterscheiden.</p>
+                <p>Verwenden Sie aussprechbare und suchbare Namen. Einbuchstabige Variablen und numerische Konstanten sind im Code schwer zu finden. Die Länge eines Namens sollte dem Umfang seines Gültigkeitsbereichs entsprechen.</p>
+            </div>
+        </section>
+
+        <!-- Key Takeaways -->
+        <section class="mb-14">
+            <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-700">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                </span>
+                Key Takeaways
+            </h2>
+            <div class="grid gap-4">
+                <div class="flex items-start gap-4 bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                    <span class="mt-1 flex-shrink-0 w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm">1</span>
+                    <p class="text-gray-700"><strong class="text-gray-900">Namen sollen die Absicht offenbaren</strong> (Intention-Revealing Names) – der Name verrät, warum etwas existiert.</p>
+                </div>
+                <div class="flex items-start gap-4 bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                    <span class="mt-1 flex-shrink-0 w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm">2</span>
+                    <p class="text-gray-700"><strong class="text-gray-900">Desinformation vermeiden</strong> – keine irreführenden Hinweise geben, die den Leser in die falsche Richtung lenken.</p>
+                </div>
+                <div class="flex items-start gap-4 bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                    <span class="mt-1 flex-shrink-0 w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm">3</span>
+                    <p class="text-gray-700"><strong class="text-gray-900">Aussprechbare und suchbare Namen verwenden</strong> – damit Code in Diskussionen und bei der Suche funktioniert.</p>
+                </div>
+                <div class="flex items-start gap-4 bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                    <span class="mt-1 flex-shrink-0 w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm">4</span>
+                    <p class="text-gray-700"><strong class="text-gray-900">Klassennamen sind Substantive, Methodennamen sind Verben</strong> – diese Konvention macht Code natürlich lesbar.</p>
+                </div>
+                <div class="flex items-start gap-4 bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                    <span class="mt-1 flex-shrink-0 w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm">5</span>
+                    <p class="text-gray-700"><strong class="text-gray-900">Pro Konzept ein Wort</strong> – nicht <code class="bg-blue-50 text-blue-800 px-1.5 py-0.5 rounded">fetch</code>, <code class="bg-blue-50 text-blue-800 px-1.5 py-0.5 rounded">retrieve</code> und <code class="bg-blue-50 text-blue-800 px-1.5 py-0.5 rounded">get</code> mischen.</p>
+                </div>
+                <div class="flex items-start gap-4 bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                    <span class="mt-1 flex-shrink-0 w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm">6</span>
+                    <p class="text-gray-700"><strong class="text-gray-900">Encodings vermeiden</strong> – keine ungarische Notation oder andere Präfix-Systeme, die nur Rauschen erzeugen.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Chapter Navigation -->
+        <nav class="flex items-center justify-between border-t border-gray-200 pt-8">
+            <a href="01-sauberer-code.html" class="inline-flex items-center gap-2 px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                Vorheriges Kapitel
+            </a>
+            <a href="03-funktionen.html" class="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm">
+                Nächstes Kapitel
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </a>
+        </nav>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-gray-400 mt-16">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 text-center">
+            <p class="font-semibold text-white text-lg mb-1">Clean Code – Zusammenfassung</p>
+            <p class="text-sm">Basierend auf &bdquo;Clean Code&ldquo; von Robert C. Martin</p>
+            <p class="text-xs mt-4 text-gray-500">&copy; 2026 Buchzusammenfassung. Alle Rechte vorbehalten.</p>
+        </div>
+    </footer>
+
+    <script>
+        const btn = document.getElementById('mobile-menu-btn');
+        const menu = document.getElementById('mobile-menu');
+        btn.addEventListener('click', () => menu.classList.toggle('hidden'));
+    </script>
+</body>
+</html>

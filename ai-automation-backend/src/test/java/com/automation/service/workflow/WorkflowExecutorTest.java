@@ -1,6 +1,7 @@
 package com.automation.service.workflow;
 
 import com.automation.entity.*;
+import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.exception.ContainerException;
 import com.automation.exception.WorkflowExecutionException;
 import com.automation.executor.BlockExecutor;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.util.*;
@@ -63,6 +65,9 @@ class WorkflowExecutorTest {
     @Mock
     private WorkflowMemoryService workflowMemoryService;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private WorkflowExecutor workflowExecutor;
 
     private Workflow testWorkflow;
@@ -87,7 +92,8 @@ class WorkflowExecutorTest {
                 new Semaphore(10),
                 agentInstructionsService,
                 activityLogService,
-                workflowMemoryService
+                workflowMemoryService,
+                eventPublisher
         );
 
         testProject = Project.builder()
@@ -329,5 +335,23 @@ class WorkflowExecutorTest {
         // Workflow completed successfully
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
+    }
+
+    @Test
+    void execute_publishesWorkflowRunCompletedEvent() {
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(step);
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        ArgumentCaptor<WorkflowRunCompletedEvent> eventCaptor = ArgumentCaptor.forClass(WorkflowRunCompletedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        WorkflowRunCompletedEvent event = eventCaptor.getValue();
+        assertThat(event.getWorkflowId()).isEqualTo("wf-1");
+        assertThat(event.getWorkflowName()).isEqualTo("Test Workflow");
+        assertThat(event.getProjectId()).isEqualTo("proj-1");
+        assertThat(event.getStatus()).isEqualTo(RunStatus.COMPLETED);
     }
 }

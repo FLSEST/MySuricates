@@ -211,6 +211,7 @@ public class WorkflowConversionService {
                 suggestion.blocks(),
                 List.of(),
                 null,
+                null,
                 null
         );
 

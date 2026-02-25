@@ -22,6 +22,7 @@ public record WorkflowResponse(
         long runCount,
         String instructions,
         String model,
+        String templateId,
         Instant createdAt,
         Instant updatedAt
 ) {}

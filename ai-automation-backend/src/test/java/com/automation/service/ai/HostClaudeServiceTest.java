@@ -205,6 +205,97 @@ class HostClaudeServiceTest {
                 .hasMessageContaining("timed out");
     }
 
+    // --- per-block timeout override ---
+
+    @Test
+    void reasonStructured_usesPerCallTimeout_whenProvided() {
+        HostClaudeConfig config = new HostClaudeConfig();
+        config.setTimeoutSeconds(300); // global default
+        config.setMaxTokens(null);
+        CliPermissionsConfig perms = new CliPermissionsConfig();
+        perms.setSkipPermissions(false);
+        perms.setAllowedTools(List.of());
+
+        HostClaudeService service = new HostClaudeService(config, perms) {
+            @Override
+            List<String> buildReasonCommand(String prompt, String systemPrompt, Integer maxTurns) {
+                // "sleep 60" hangs for 60s, well beyond 2s override
+                return List.of("sleep", "60");
+            }
+        };
+
+        // Per-call timeout of 2s should override the 300s global default
+        assertThatThrownBy(() -> service.reasonStructured("test", null, null, null, 2))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("timed out after 2 seconds");
+    }
+
+    @Test
+    void reasonStructured_usesGlobalTimeout_whenOverrideIsNull() {
+        HostClaudeConfig config = new HostClaudeConfig();
+        config.setTimeoutSeconds(1); // global 1s
+        config.setMaxTokens(null);
+        CliPermissionsConfig perms = new CliPermissionsConfig();
+        perms.setSkipPermissions(false);
+        perms.setAllowedTools(List.of());
+
+        HostClaudeService service = new HostClaudeService(config, perms) {
+            @Override
+            List<String> buildReasonCommand(String prompt, String systemPrompt, Integer maxTurns) {
+                return List.of("sleep", "60");
+            }
+        };
+
+        // null timeout → falls back to global 1s
+        assertThatThrownBy(() -> service.reasonStructured("test", null, null, null, null))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("timed out after 1 seconds");
+    }
+
+    @Test
+    void executeAction_usesPerCallTimeout_whenProvided() {
+        HostClaudeConfig config = new HostClaudeConfig();
+        config.setTimeoutSeconds(300);
+        config.setMaxTokens(null);
+        CliPermissionsConfig perms = new CliPermissionsConfig();
+        perms.setSkipPermissions(false);
+        perms.setAllowedTools(List.of());
+
+        HostClaudeService service = new HostClaudeService(config, perms) {
+            @Override
+            List<String> buildActionCommand(String prompt, String model, String systemPrompt) {
+                return List.of("sleep", "60");
+            }
+        };
+
+        // Per-call timeout of 2s should override the 300s global default
+        assertThatThrownBy(() -> service.executeAction("test", null, null, null, 2))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("timed out after 2 seconds");
+    }
+
+    @Test
+    void executeAction_usesGlobalTimeout_whenOverrideIsNull() {
+        HostClaudeConfig config = new HostClaudeConfig();
+        config.setTimeoutSeconds(1);
+        config.setMaxTokens(null);
+        CliPermissionsConfig perms = new CliPermissionsConfig();
+        perms.setSkipPermissions(false);
+        perms.setAllowedTools(List.of());
+
+        HostClaudeService service = new HostClaudeService(config, perms) {
+            @Override
+            List<String> buildActionCommand(String prompt, String model, String systemPrompt) {
+                return List.of("sleep", "60");
+            }
+        };
+
+        // null timeout → falls back to global 1s
+        assertThatThrownBy(() -> service.executeAction("test", null, null, null, null))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("timed out after 1 seconds");
+    }
+
     // --- buildConversationPrompt ---
 
     @Test

@@ -76,10 +76,23 @@ automation:
   summarization:
     base-dir: ${AUTOMATION_SUMMARIZATION_DIR:${user.home}/.autotrigger/summarization}
     timeout-seconds: ${AUTOMATION_SUMMARIZATION_TIMEOUT:120}
+  backup:
+    enabled: ${AUTOMATION_BACKUP_ENABLED:true}
+    cron: ${AUTOMATION_BACKUP_CRON:0 0 2 * * *}
+    retain-count: ${AUTOMATION_BACKUP_RETAIN_COUNT:5}
+    directory: ${AUTOMATION_BACKUP_DIR:${user.home}/.autotrigger/backups}
+  staging:
+    compose-file: ${AUTOMATION_STAGING_COMPOSE:docker-compose.stable.yml}
+    backend-dir: ${AUTOMATION_STAGING_BACKEND_DIR:}
+    frontend-dir: ${AUTOMATION_STAGING_FRONTEND_DIR:}
+    container-name: ${AUTOMATION_STAGING_CONTAINER:mysuricates-stable}
+    stable-frontend-dir: ${AUTOMATION_STAGING_FRONTEND:stable-frontend}
+    health-url: ${AUTOMATION_STAGING_HEALTH_URL:http://localhost:9091/api/v1/system/health}
   tray:
     enabled: ${AUTOMATION_TRAY_ENABLED:true}
     poll-interval-ms: ${AUTOMATION_TRAY_POLL_MS:15000}
     web-ui-url: ${AUTOMATION_WEB_UI_URL:http://localhost:3000}
+    stable-url: ${AUTOMATION_STABLE_URL:http://localhost:9091}
 
 logging:
   level:

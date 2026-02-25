@@ -1,0 +1,30 @@
+FROM eclipse-temurin:21-jre-jammy
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl git && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -g 1000 appuser && \
+    useradd -u 1000 -g appuser -m appuser
+
+WORKDIR /app
+
+COPY target/ai-automation-backend-*.jar app.jar
+
+RUN mkdir -p /app/data /app/frontend && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
+EXPOSE 9091
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD curl -f http://localhost:9091/api/v1/system/health || exit 1
+
+ENTRYPOINT ["java", \
+    "-XX:+UseZGC", \
+    "-XX:+ZGenerational", \
+    "-Xms256m", \
+    "-Xmx1g", \
+    "-Djava.awt.headless=true", \
+    "-jar", "app.jar"]

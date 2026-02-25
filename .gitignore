@@ -9,3 +9,6 @@ ai-automation-frontend/node_modules/
 ai-automation-frontend/dist/
 ai-automation-frontend/tsconfig.tsbuildinfo
 ai-automation-frontend/cypress/screenshots/
+
+# Stable environment build artifacts
+ai-automation-backend/stable-frontend/

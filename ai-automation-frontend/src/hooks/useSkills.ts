@@ -42,35 +42,6 @@ export function useActivateSkills() {
   });
 }
 
-export function useImportSkill() {
-  const qc = useQueryClient();
-  const toast = useToast();
-  const t = useT();
-  return useMutation({
-    mutationFn: (skill: {
-      name: string;
-      description: string;
-      icon: string;
-      category: string;
-      aiContext: string;
-      configSchema: Record<string, unknown>;
-      version: string;
-      capabilities: Array<{
-        name: string;
-        description: string;
-        inputSchema: Record<string, unknown>;
-        outputSchema: Record<string, unknown>;
-        async: boolean;
-      }>;
-    }) => api.post<Skill>('/skills/import', skill),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['skills'] });
-      toast.success(t.toast.skillInstalled);
-    },
-    onError: () => toast.error(t.toast.skillInstallFailed),
-  });
-}
-
 export function useDeactivateSkill() {
   const qc = useQueryClient();
   const toast = useToast();
