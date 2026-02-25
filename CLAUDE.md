@@ -228,3 +228,23 @@ Key files:
 - `StaticFrontendConfig.java` — Conditional `WebMvcConfigurer` for SPA static file serving
 - `StagingService.java` — Auto-start, promote, sync-definitions, container lifecycle
 - Dev tray icon shows status of both environments via health checks
+- Staging status includes `stableVersion` and `stableBuildTimestamp` (fetched from Stable's `/system/info`)
+
+## Releasing
+
+```bash
+./scripts/release.sh           # Patch: 0.1.0 → 0.1.1
+./scripts/release.sh minor     # Minor: 0.1.1 → 0.2.0
+./scripts/release.sh major     # Major: 0.2.0 → 1.0.0
+```
+
+The script:
+1. Reads current version from `pom.xml` (strips `-SNAPSHOT`)
+2. Bumps the requested segment (patch/minor/major)
+3. Updates `pom.xml` (`X.Y.Z-SNAPSHOT`) and `package.json` (`X.Y.Z`)
+4. Commits: `Release vX.Y.Z`
+5. Tags: `vX.Y.Z`
+
+Two kinds of Git tags:
+- **`v*`** — Semver release tags (created by `release.sh`)
+- **`stable-*`** — Deployment timestamps (created by `staging.sh promote`)

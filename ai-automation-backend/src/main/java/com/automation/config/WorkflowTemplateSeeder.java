@@ -36,8 +36,16 @@ public class WorkflowTemplateSeeder implements ApplicationRunner {
             }
             log.info("Seeded {} built-in workflow templates", allBuiltIn.size());
         } else {
-            log.info("Found {} existing built-in templates (expected {}), skipping seeder to avoid duplicates",
-                    existing.size(), allBuiltIn.size());
+            // Partial state — seed missing ones
+            List<String> existingIds = existing.stream().map(WorkflowTemplate::getId).toList();
+            int seeded = 0;
+            for (WorkflowTemplate template : allBuiltIn) {
+                if (!existingIds.contains(template.getId())) {
+                    templateRepository.save(template);
+                    seeded++;
+                }
+            }
+            log.info("Seeded {} new built-in workflow templates ({} already existed)", seeded, existing.size());
         }
     }
 }

@@ -483,6 +483,145 @@ public final class BuiltInTemplates {
                 "Sichere alle Unterordner des aktuellen Projektverzeichnisses (ausser backup) in komprimierte Tar-Archive mit Zeitstempel nach backup/. Keine KI-Beteiligung, reine Shell-Ausfuehrung.",
                 null));
 
+        // --- Shell-only templates (no AI, deterministic, fast) ---
+
+        templates.add(template("github-project-bootstrap", "\uD83C\uDFD7\uFE0F",
+                Map.of("de", "GitHub Projekt-Bootstrap", "en", "GitHub Project Bootstrap"),
+                Map.of("de", "Neues GitHub-Repository erstellen mit Labels, Branch-Protection und initialen Issues",
+                        "en", "Create a new GitHub repository with labels, branch protection, and initial issues"),
+                "CODE", order++,
+                List.of(
+                        block("shell", Map.of("command", "set -euo pipefail\nVIS=\"{{ visibility }}\"\nORG=\"{{ org }}\"\nREPO=\"{{ repo_name }}\"\nif [ -n \"$ORG\" ] && [ \"$ORG\" != \"none\" ]; then\n  gh repo create \"$ORG/$REPO\" --\"$VIS\" --clone\nelse\n  gh repo create \"$REPO\" --\"$VIS\" --clone\nfi\ncd \"$REPO\"\ngit commit --allow-empty -m \"Initial commit\"\ngit push -u origin main\necho \"Repository created: $(gh repo view --json url -q .url)\"")),
+                        block("foreach", Map.of(
+                                "variable_name", "label",
+                                "items_source", "inline",
+                                "items_inline", "bug:d73a4a,feature:0e8a16,documentation:0075ca,refactor:e4e669,urgent:b60205,good-first-issue:7057ff",
+                                "execution_mode", "shell",
+                                "command", "set -euo pipefail\ncd \"{{ repo_name }}\"\nNAME=\"$(echo '{{ label }}' | cut -d: -f1)\"\nCOLOR=\"$(echo '{{ label }}' | cut -d: -f2)\"\ngh label create \"$NAME\" --color \"$COLOR\" --force\necho \"Label created: $NAME\""
+                        )),
+                        block("shell", Map.of("command", "set -euo pipefail\ncd \"{{ repo_name }}\"\ngh api repos/{owner}/{repo}/branches/main/protection \\\n  --method PUT \\\n  --input - <<'JSON'\n{\n  \"required_pull_request_reviews\": { \"required_approving_review_count\": 1 },\n  \"enforce_admins\": false,\n  \"required_status_checks\": null,\n  \"restrictions\": null\n}\nJSON\necho \"Branch protection enabled on main\"")),
+                        block("shell", Map.of("command", "set -euo pipefail\ncd \"{{ repo_name }}\"\ngh issue create --title \"Project setup\" --body \"- [ ] Add README\\n- [ ] Configure CI/CD\\n- [ ] Add .gitignore\\n- [ ] Set up linting\" --label \"good-first-issue\"\ngh issue create --title \"Add contributing guidelines\" --body \"Add CONTRIBUTING.md with development workflow and coding standards.\" --label \"documentation\"\necho \"Initial issues created\""))
+                ),
+                "Erstelle ein neues GitHub-Repository mit Standardkonfiguration. Variablen: repo_name, visibility (public/private), org (Organisation oder 'none').",
+                null));
+
+        templates.add(template("dependency-update-check", "\uD83D\uDCE6",
+                Map.of("de", "Dependency Update Check", "en", "Dependency Update Check"),
+                Map.of("de", "Veraltete Pakete und Sicherheitsl\u00fccken pr\u00fcfen",
+                        "en", "Check for outdated packages and security vulnerabilities"),
+                "CODE", order++,
+                List.of(
+                        block("shell", Map.of("command", "set -euo pipefail\ncd \"{{ project_path }}\"\nPM=\"{{ package_manager }}\"\necho \"=== Outdated Dependencies ===\"\nif [ \"$PM\" = \"npm\" ]; then\n  npm outdated 2>&1 || true\nelif [ \"$PM\" = \"mvn\" ]; then\n  mvn -q versions:display-dependency-updates 2>&1 || true\nelif [ \"$PM\" = \"gradle\" ]; then\n  ./gradlew dependencyUpdates 2>&1 || true\nelse\n  echo \"Unsupported package manager: $PM\" && exit 1\nfi")),
+                        block("shell", Map.of("command", "set -euo pipefail\ncd \"{{ project_path }}\"\nPM=\"{{ package_manager }}\"\necho \"=== Security Audit ===\"\nif [ \"$PM\" = \"npm\" ]; then\n  npm audit 2>&1 || true\nelif [ \"$PM\" = \"mvn\" ]; then\n  mvn -q dependency:tree 2>&1 | head -100 || true\n  echo \"(Run OWASP dependency-check for full security audit)\"\nelif [ \"$PM\" = \"gradle\" ]; then\n  ./gradlew dependencies 2>&1 | head -100 || true\nfi")),
+                        block("conditional", Map.of(
+                                "condition", "cd \"{{ project_path }}\" && PM=\"{{ package_manager }}\"; if [ \"$PM\" = \"npm\" ]; then npm audit --json 2>/dev/null | python3 -c \"import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('metadata',{}).get('vulnerabilities',{}).get('critical',0)>0 else 1)\" 2>/dev/null; else exit 1; fi",
+                                "then_command", "echo \"CRITICAL vulnerabilities found! Immediate action required.\"",
+                                "else_command", "echo \"No critical vulnerabilities detected.\"",
+                                "execution_mode", "shell"
+                        )),
+                        block("shell", Map.of("command", "set -euo pipefail\ncd \"{{ project_path }}\"\nPM=\"{{ package_manager }}\"\necho \"# Dependency Update Report\"\necho \"Generated: $(date -Iseconds)\"\necho \"Project: {{ project_path }}\"\necho \"Package Manager: $PM\"\necho \"\"\necho \"## Outdated Dependencies\"\nif [ \"$PM\" = \"npm\" ]; then\n  npm outdated 2>&1 || true\nfi\necho \"\"\necho \"## Security Summary\"\nif [ \"$PM\" = \"npm\" ]; then\n  npm audit --omit=dev 2>&1 || true\nfi"))
+                ),
+                "Pruefe Abhaengigkeiten auf Updates und Sicherheitsluecken. Variablen: project_path, package_manager (npm/mvn/gradle).",
+                null));
+
+        templates.add(template("secret-scanner", "\uD83D\uDD10",
+                Map.of("de", "Secret Scanner", "en", "Secret Scanner"),
+                Map.of("de", "Repository nach eingecheckten Secrets scannen",
+                        "en", "Scan repository for checked-in secrets"),
+                "CODE", order++,
+                List.of(
+                        block("shell", Map.of("command", "set -euo pipefail\ncd \"{{ project_path }}\"\nTOOL=\"{{ tool }}\"\necho \"=== Secret Scan ===\"\nif [ \"$TOOL\" = \"gitleaks\" ]; then\n  gitleaks detect --source . --report-format json --report-path /tmp/gitleaks-report.json 2>&1 && echo \"No secrets found.\" || echo \"Potential secrets detected!\"\nelif [ \"$TOOL\" = \"trufflehog\" ]; then\n  trufflehog filesystem --json . > /tmp/trufflehog-report.json 2>&1 || true\n  FINDINGS=$(wc -l < /tmp/trufflehog-report.json)\n  echo \"Findings: $FINDINGS\"\nelse\n  echo \"Unsupported tool: $TOOL (use gitleaks or trufflehog)\" && exit 1\nfi")),
+                        block("conditional", Map.of(
+                                "condition", "TOOL=\"{{ tool }}\"; if [ \"$TOOL\" = \"gitleaks\" ]; then [ -f /tmp/gitleaks-report.json ] && python3 -c \"import json; f=json.load(open('/tmp/gitleaks-report.json')); exit(0 if len(f)>0 else 1)\"; elif [ \"$TOOL\" = \"trufflehog\" ]; then [ -f /tmp/trufflehog-report.json ] && [ -s /tmp/trufflehog-report.json ]; else exit 1; fi",
+                                "then_command", "echo \"WARNING: Secrets found! Review the report below.\"",
+                                "else_command", "echo \"All clear - no secrets detected.\"",
+                                "execution_mode", "shell"
+                        )),
+                        block("shell", Map.of("command", "set -euo pipefail\nTOOL=\"{{ tool }}\"\necho \"# Secret Scan Report\"\necho \"Generated: $(date -Iseconds)\"\necho \"Project: {{ project_path }}\"\necho \"Tool: $TOOL\"\necho \"\"\nif [ \"$TOOL\" = \"gitleaks\" ] && [ -f /tmp/gitleaks-report.json ]; then\n  COUNT=$(python3 -c \"import json; print(len(json.load(open('/tmp/gitleaks-report.json'))))\" 2>/dev/null || echo 0)\n  echo \"Findings: $COUNT\"\n  if [ \"$COUNT\" != \"0\" ]; then\n    python3 -c \"\nimport json\nfor f in json.load(open('/tmp/gitleaks-report.json')):\n    print(f'- {f.get(\\\"RuleID\\\",\\\"unknown\\\")}: {f.get(\\\"File\\\",\\\"?\\\")}:{f.get(\\\"StartLine\\\",\\\"?\\\")}')\" 2>/dev/null || true\n  fi\nelif [ \"$TOOL\" = \"trufflehog\" ] && [ -f /tmp/trufflehog-report.json ]; then\n  LINES=$(wc -l < /tmp/trufflehog-report.json)\n  echo \"Findings: $LINES\"\nfi\nrm -f /tmp/gitleaks-report.json /tmp/trufflehog-report.json"))
+                ),
+                "Scanne ein Repository nach eingecheckten Secrets. Variablen: project_path, tool (gitleaks/trufflehog).",
+                null));
+
+        templates.add(template("container-vuln-scan", "\uD83D\uDC33",
+                Map.of("de", "Container Vulnerability Scan", "en", "Container Vulnerability Scan"),
+                Map.of("de", "Docker Images auf CVEs pr\u00fcfen",
+                        "en", "Scan Docker images for CVEs"),
+                "CODE", order++,
+                List.of(
+                        block("shell", Map.of("command", "set -euo pipefail\nIMAGE=\"{{ image_name }}\"\nTHRESHOLD=\"{{ severity_threshold }}\"\necho \"=== Scanning $IMAGE for $THRESHOLD+ vulnerabilities ===\"\ntrivy image --severity \"$THRESHOLD\" --format table \"$IMAGE\" 2>&1 || true")),
+                        block("shell", Map.of("command", "set -euo pipefail\nIMAGE=\"{{ image_name }}\"\nTHRESHOLD=\"{{ severity_threshold }}\"\ntrivy image --severity \"$THRESHOLD\" --format json \"$IMAGE\" 2>/dev/null > /tmp/trivy-report.json || true\npython3 -c \"\nimport json, sys\ntry:\n    data = json.load(open('/tmp/trivy-report.json'))\n    results = data.get('Results', [])\n    total = sum(len(r.get('Vulnerabilities', [])) for r in results)\n    by_sev = {}\n    for r in results:\n        for v in r.get('Vulnerabilities', []):\n            s = v.get('Severity', 'UNKNOWN')\n            by_sev[s] = by_sev.get(s, 0) + 1\n    print(f'Total vulnerabilities: {total}')\n    for s, c in sorted(by_sev.items()):\n        print(f'  {s}: {c}')\nexcept Exception as e:\n    print(f'Error parsing report: {e}', file=sys.stderr)\n\" 2>&1")),
+                        block("conditional", Map.of(
+                                "condition", "python3 -c \"import json; data=json.load(open('/tmp/trivy-report.json')); results=data.get('Results',[]); criticals=sum(1 for r in results for v in r.get('Vulnerabilities',[]) if v.get('Severity')=='CRITICAL'); exit(0 if criticals>0 else 1)\" 2>/dev/null",
+                                "then_command", "echo \"CRITICAL CVEs found! Do not deploy this image without remediation.\"",
+                                "else_command", "echo \"No CRITICAL CVEs found.\"",
+                                "execution_mode", "shell"
+                        )),
+                        block("shell", Map.of("command", "set -euo pipefail\necho \"# Container Vulnerability Report\"\necho \"Generated: $(date -Iseconds)\"\necho \"Image: {{ image_name }}\"\necho \"Threshold: {{ severity_threshold }}\"\necho \"\"\ntrivy image --severity \"{{ severity_threshold }}\" --format table \"{{ image_name }}\" 2>&1 | head -80 || true\nrm -f /tmp/trivy-report.json"))
+                ),
+                "Scanne ein Docker Image auf CVEs mit Trivy. Variablen: image_name, severity_threshold (CRITICAL/HIGH/MEDIUM).",
+                null));
+
+        templates.add(template("database-backup-verify", "\uD83D\uDDC4\uFE0F",
+                Map.of("de", "Datenbank-Backup & Verify", "en", "Database Backup & Verify"),
+                Map.of("de", "Automatisiertes Backup mit Kompression, Checksumme und Retention",
+                        "en", "Automated backup with compression, checksum, and retention"),
+                "DATA", order++,
+                List.of(
+                        block("shell", Map.of("command", "set -euo pipefail\nDB_TYPE=\"{{ db_type }}\"\nDB_CONN=\"{{ db_connection }}\"\nBACKUP_DIR=\"{{ backup_dir }}\"\nmkdir -p \"$BACKUP_DIR\"\nTS=$(date +%Y%m%d-%H%M%S)\nBACKUP_FILE=\"$BACKUP_DIR/${DB_TYPE}-backup-${TS}.sql\"\necho \"=== Creating $DB_TYPE backup ===\"\nif [ \"$DB_TYPE\" = \"postgres\" ]; then\n  pg_dump \"$DB_CONN\" > \"$BACKUP_FILE\"\nelif [ \"$DB_TYPE\" = \"mysql\" ]; then\n  mysqldump $DB_CONN > \"$BACKUP_FILE\"\nelif [ \"$DB_TYPE\" = \"sqlite\" ]; then\n  sqlite3 \"$DB_CONN\" \".backup '$BACKUP_FILE'\"\nelse\n  echo \"Unsupported db_type: $DB_TYPE\" && exit 1\nfi\necho \"Backup created: $BACKUP_FILE ($(du -h \"$BACKUP_FILE\" | cut -f1))\"")),
+                        block("shell", Map.of("command", "set -euo pipefail\nBACKUP_DIR=\"{{ backup_dir }}\"\nLATEST=$(ls -t \"$BACKUP_DIR\"/*.sql 2>/dev/null | head -1)\nif [ -z \"$LATEST\" ]; then echo \"No backup found!\" && exit 1; fi\necho \"=== Compressing $LATEST ===\"\ngzip -f \"$LATEST\"\nCOMPRESSED=\"${LATEST}.gz\"\nsha256sum \"$COMPRESSED\" > \"${COMPRESSED}.sha256\"\necho \"Compressed: $COMPRESSED ($(du -h \"$COMPRESSED\" | cut -f1))\"\necho \"Checksum: $(cat \"${COMPRESSED}.sha256\")\"")),
+                        block("shell", Map.of("command", "set -euo pipefail\nBACKUP_DIR=\"{{ backup_dir }}\"\nLATEST_GZ=$(ls -t \"$BACKUP_DIR\"/*.sql.gz 2>/dev/null | head -1)\nif [ -z \"$LATEST_GZ\" ]; then echo \"No compressed backup found!\" && exit 1; fi\necho \"=== Verifying checksum ===\"\ncd \"$BACKUP_DIR\"\nsha256sum -c \"$(basename \"$LATEST_GZ\").sha256\"\necho \"Checksum verification passed.\"")),
+                        block("shell", Map.of("command", "set -euo pipefail\nBACKUP_DIR=\"{{ backup_dir }}\"\nRETENTION={{ retention_count }}\necho \"=== Retention cleanup (keeping $RETENTION backups) ===\"\nCOUNT=$(ls -1 \"$BACKUP_DIR\"/*.sql.gz 2>/dev/null | wc -l)\nif [ \"$COUNT\" -gt \"$RETENTION\" ]; then\n  REMOVE=$((COUNT - RETENTION))\n  ls -t \"$BACKUP_DIR\"/*.sql.gz | tail -$REMOVE | while read f; do\n    echo \"Removing: $f\"\n    rm -f \"$f\" \"${f}.sha256\"\n  done\n  echo \"Removed $REMOVE old backups.\"\nelse\n  echo \"$COUNT backups present, retention limit $RETENTION not exceeded.\"\nfi")),
+                        block("shell", Map.of("command", "set -euo pipefail\nBACKUP_DIR=\"{{ backup_dir }}\"\necho \"# Backup Report\"\necho \"Generated: $(date -Iseconds)\"\necho \"DB Type: {{ db_type }}\"\necho \"Backup Dir: $BACKUP_DIR\"\necho \"\"\necho \"## Current Backups\"\nls -lh \"$BACKUP_DIR\"/*.sql.gz 2>/dev/null || echo \"No backups found.\"\necho \"\"\necho \"## Disk Usage\"\ndu -sh \"$BACKUP_DIR\" 2>/dev/null || true"))
+                ),
+                "Erstelle ein Datenbank-Backup mit Kompression und Checksumme. Variablen: db_type (postgres/mysql/sqlite), db_connection, backup_dir, retention_count.",
+                null));
+
+        templates.add(template("git-statistics-report", "\uD83D\uDCC8",
+                Map.of("de", "Git-Statistik-Report", "en", "Git Statistics Report"),
+                Map.of("de", "Commits, Contributors, Churn und Aktivit\u00e4ts-Trends analysieren",
+                        "en", "Analyze commits, contributors, churn, and activity trends"),
+                "CODE", order++,
+                List.of(
+                        block("shell", Map.of("command", "set -euo pipefail\ncd \"{{ project_path }}\"\nSINCE=\"{{ since }}\"\necho \"=== Commit Summary (since $SINCE) ===\"\nTOTAL=$(git rev-list --count --since=\"$SINCE\" HEAD)\nAUTHORS=$(git log --since=\"$SINCE\" --format='%aN' | sort -u | wc -l)\nFIRST=$(git log --since=\"$SINCE\" --reverse --format='%ad' --date=short | head -1)\nLAST=$(git log --since=\"$SINCE\" --format='%ad' --date=short | head -1)\necho \"Total commits: $TOTAL\"\necho \"Unique authors: $AUTHORS\"\necho \"Period: $FIRST .. $LAST\"\necho \"\"\necho \"=== Top Authors ===\"\ngit shortlog --since=\"$SINCE\" -sn HEAD | head -10")),
+                        block("shell", Map.of("command", "set -euo pipefail\ncd \"{{ project_path }}\"\nSINCE=\"{{ since }}\"\necho \"=== Most Changed Files (Top 20) ===\"\ngit log --since=\"$SINCE\" --format='' --name-only | sort | uniq -c | sort -rn | head -20")),
+                        block("shell", Map.of("command", "set -euo pipefail\ncd \"{{ project_path }}\"\nSINCE=\"{{ since }}\"\necho \"=== Activity by Weekday ===\"\ngit log --since=\"$SINCE\" --format='%ad' --date=format:'%A' | sort | uniq -c | sort -rn\necho \"\"\necho \"=== Activity by Hour ===\"\ngit log --since=\"$SINCE\" --format='%ad' --date=format:'%H' | sort | uniq -c | sort -rn | head -10")),
+                        block("shell", Map.of("command", "set -euo pipefail\ncd \"{{ project_path }}\"\nSINCE=\"{{ since }}\"\necho \"=== Lines Changed per Author ===\"\ngit log --since=\"$SINCE\" --format='%aN' --numstat | python3 -c \"\nimport sys\nauthors = {}\ncurrent = None\nfor line in sys.stdin:\n    line = line.strip()\n    if not line:\n        continue\n    parts = line.split('\\t')\n    if len(parts) == 1:\n        current = line\n        if current not in authors:\n            authors[current] = {'added': 0, 'deleted': 0}\n    elif len(parts) == 3 and current:\n        try:\n            authors[current]['added'] += int(parts[0])\n            authors[current]['deleted'] += int(parts[1])\n        except ValueError:\n            pass\nfor name, stats in sorted(authors.items(), key=lambda x: x[1]['added'], reverse=True):\n    print(f'{name}: +{stats[\\\"added\\\"]} -{stats[\\\"deleted\\\"]}')\" 2>&1"))
+                ),
+                "Erstelle einen Git-Statistik-Report. Variablen: project_path, since (z.B. '3 months ago').",
+                null));
+
+        templates.add(template("directory-sync", "\uD83D\uDD01",
+                Map.of("de", "Verzeichnis-Synchronisation", "en", "Directory Sync"),
+                Map.of("de", "Rsync-basierte Synchronisation mit Dry-Run und Report",
+                        "en", "Rsync-based synchronization with dry run and report"),
+                "DATA", order++,
+                List.of(
+                        block("shell", Map.of("command", "set -euo pipefail\nSOURCE=\"{{ source }}\"\nTARGET=\"{{ target }}\"\nEXCLUDE=\"{{ exclude_patterns }}\"\nDELETE=\"{{ delete_removed }}\"\necho \"=== Dry Run ===\"\nCMD=\"rsync -avhn\"\nif [ \"$DELETE\" = \"true\" ]; then CMD=\"$CMD --delete\"; fi\nfor pat in $(echo \"$EXCLUDE\" | tr ',' ' '); do\n  CMD=\"$CMD --exclude=$pat\"\ndone\n$CMD \"$SOURCE\" \"$TARGET\" 2>&1")),
+                        block("shell", Map.of("command", "set -euo pipefail\nSOURCE=\"{{ source }}\"\nTARGET=\"{{ target }}\"\nEXCLUDE=\"{{ exclude_patterns }}\"\nDELETE=\"{{ delete_removed }}\"\necho \"=== Executing Sync ===\"\nCMD=\"rsync -avh --stats\"\nif [ \"$DELETE\" = \"true\" ]; then CMD=\"$CMD --delete\"; fi\nfor pat in $(echo \"$EXCLUDE\" | tr ',' ' '); do\n  CMD=\"$CMD --exclude=$pat\"\ndone\n$CMD \"$SOURCE\" \"$TARGET\" 2>&1")),
+                        block("shell", Map.of("command", "set -euo pipefail\necho \"# Sync Report\"\necho \"Generated: $(date -Iseconds)\"\necho \"Source: {{ source }}\"\necho \"Target: {{ target }}\"\necho \"Delete removed: {{ delete_removed }}\"\necho \"Exclude: {{ exclude_patterns }}\"\necho \"\"\necho \"## Source\"\ndu -sh \"{{ source }}\" 2>/dev/null || true\necho \"\"\necho \"## Target\"\ndu -sh \"{{ target }}\" 2>/dev/null || true"))
+                ),
+                "Synchronisiere Verzeichnisse mit rsync. Variablen: source, target, exclude_patterns (kommasepariert), delete_removed (true/false).",
+                null));
+
+        templates.add(template("docker-image-build-push", "\uD83D\uDC0B",
+                Map.of("de", "Docker Image Build & Push", "en", "Docker Image Build & Push"),
+                Map.of("de", "Docker Build, Tag und Push in Registry",
+                        "en", "Docker build, tag, and push to registry"),
+                "CODE", order++,
+                List.of(
+                        block("shell", Map.of("command", "set -euo pipefail\nDOCKERFILE=\"{{ dockerfile }}\"\nIMAGE=\"{{ image_name }}\"\nTAG=\"{{ tag }}\"\nREGISTRY=\"{{ registry }}\"\nFULL_IMAGE=\"$REGISTRY/$IMAGE:$TAG\"\necho \"=== Building $FULL_IMAGE ===\"\ndocker build -f \"$DOCKERFILE\" -t \"$FULL_IMAGE\" .\necho \"Build complete: $FULL_IMAGE\"")),
+                        block("conditional", Map.of(
+                                "condition", "docker image inspect \"{{ registry }}/{{ image_name }}:{{ tag }}\" >/dev/null 2>&1",
+                                "then_command", "echo \"Build verified: image exists locally.\"",
+                                "else_command", "echo \"ERROR: Build failed - image not found!\" && exit 1",
+                                "execution_mode", "shell"
+                        )),
+                        block("shell", Map.of("command", "set -euo pipefail\nIMAGE=\"{{ image_name }}\"\nTAG=\"{{ tag }}\"\nREGISTRY=\"{{ registry }}\"\nFULL_IMAGE=\"$REGISTRY/$IMAGE:$TAG\"\nLATEST=\"$REGISTRY/$IMAGE:latest\"\necho \"=== Tagging + Pushing ===\"\ndocker tag \"$FULL_IMAGE\" \"$LATEST\"\ndocker push \"$FULL_IMAGE\"\ndocker push \"$LATEST\"\necho \"Pushed: $FULL_IMAGE and $LATEST\"")),
+                        block("shell", Map.of("command", "set -euo pipefail\nFULL_IMAGE=\"{{ registry }}/{{ image_name }}:{{ tag }}\"\necho \"# Docker Build & Push Report\"\necho \"Generated: $(date -Iseconds)\"\necho \"Image: $FULL_IMAGE\"\necho \"Latest: {{ registry }}/{{ image_name }}:latest\"\necho \"\"\necho \"## Image Details\"\ndocker image inspect \"$FULL_IMAGE\" --format 'Size: {{.Size}} bytes' 2>/dev/null || true\ndocker image inspect \"$FULL_IMAGE\" --format 'Created: {{.Created}}' 2>/dev/null || true\necho \"\"\necho \"## Layers\"\ndocker history \"$FULL_IMAGE\" --no-trunc --format 'table {{.CreatedBy}}\\t{{.Size}}' 2>/dev/null | head -15 || true"))
+                ),
+                "Baue und pushe ein Docker Image. Variablen: dockerfile, image_name, tag, registry.",
+                null));
+
         return templates;
     }
 

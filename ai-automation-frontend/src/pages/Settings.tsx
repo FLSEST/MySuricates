@@ -331,6 +331,7 @@ export function Settings() {
         <StagingCard
           t={t}
           staging={staging}
+          devVersion={sysInfo?.version}
           onStart={() => stagingStart.mutate()}
           onStop={() => stagingStop.mutate()}
           onPromote={() => stagingPromote.mutate()}
@@ -386,9 +387,10 @@ const PROMOTE_PHASES = ['STOPPING', 'BUILDING_BACKEND', 'BUILDING_FRONTEND', 'BU
 
 type PhaseKey = `stagingPhase${typeof PROMOTE_PHASES[number]}`;
 
-function StagingCard({ t, staging, onStart, onStop, onPromote, onCancel, onSync, syncResult, startLoading, stopLoading, promoteLoading, syncLoading }: {
+function StagingCard({ t, staging, devVersion, onStart, onStop, onPromote, onCancel, onSync, syncResult, startLoading, stopLoading, promoteLoading, syncLoading }: {
   t: ReturnType<typeof useT>;
   staging: import('../types').StagingStatus | undefined;
+  devVersion: string | undefined;
   onStart: () => void;
   onStop: () => void;
   onPromote: () => void;
@@ -444,6 +446,26 @@ function StagingCard({ t, staging, onStart, onStop, onPromote, onCancel, onSync,
             />
           </div>
         </div>
+
+        {/* Version comparison */}
+        {(devVersion || staging?.stableVersion) && (
+          <div className="pl-8 flex items-center gap-3 text-xs">
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-accent/10 text-accent font-medium">
+              {t.settings.stagingDevVersion} v{devVersion ?? t.settings.stagingVersionUnknown}
+            </span>
+            <span className="text-text-tertiary">vs</span>
+            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md font-medium ${
+              staging?.stableVersion && devVersion && staging.stableVersion !== devVersion
+                ? 'bg-warning/10 text-warning'
+                : 'bg-surface-raised text-text-secondary'
+            }`}>
+              {t.settings.stagingStableVersion} v{staging?.stableVersion ?? t.settings.stagingVersionUnknown}
+            </span>
+            {staging?.stableVersion && devVersion && staging.stableVersion !== devVersion && (
+              <span className="text-warning text-[10px]">{t.settings.stagingPromoteAvailable}</span>
+            )}
+          </div>
+        )}
 
         {/* Last snapshot */}
         <div className="pl-8 text-xs text-text-tertiary">

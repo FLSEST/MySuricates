@@ -177,6 +177,48 @@ cypress/
 - Selektoren nutzen `aria-label`, Button-Text, `h1`-Text, `placeholder`, `role="switch"` (keine `data-testid`)
 - `before()` / `after()` Hooks sorgen für saubere Testdaten via `cy.apiCleanup()`
 
+## Versionierung & Releases
+
+### Wo die Version definiert ist
+
+| Datei | Format | Beispiel |
+|---|---|---|
+| `ai-automation-backend/pom.xml` | `X.Y.Z-SNAPSHOT` | `0.1.1-SNAPSHOT` |
+| `ai-automation-frontend/package.json` | `X.Y.Z` | `0.1.1` |
+| `application.yml` | via `@project.version@` (Maven-Filtering) | automatisch |
+
+Das Dashboard zeigt die Version über den `/api/v1/system/info`-Endpunkt an.
+
+### Release-Script
+
+```bash
+./scripts/release.sh           # Patch: 0.1.0 → 0.1.1 (Standard)
+./scripts/release.sh minor     # Minor: 0.1.1 → 0.2.0
+./scripts/release.sh major     # Major: 0.2.0 → 1.0.0
+```
+
+Das Script:
+1. Liest die aktuelle Version aus `pom.xml` (ohne `-SNAPSHOT`)
+2. Berechnet die neue Version (Segment hochzählen)
+3. Aktualisiert `pom.xml` (`X.Y.Z-SNAPSHOT`) und `package.json` (`X.Y.Z`)
+4. Erstellt Git-Commit: `Release vX.Y.Z`
+5. Setzt Git-Tag: `vX.Y.Z`
+
+**Voraussetzung:** Sauberer Working Tree (keine uncommitteten Änderungen).
+
+### Zusammenspiel mit Staging
+
+Nach einem Release kann `./scripts/staging.sh promote` ausgeführt werden, um die neue Version in die Stable-Umgebung zu deployen. Die Settings-Seite zeigt dann einen Versionsvergleich (Dev vs. Stable) und empfiehlt ein Promote, wenn die Versionen abweichen.
+
+### Git-Tags
+
+Es gibt zwei Arten von Git-Tags:
+
+| Tag-Format | Erstellt durch | Zweck |
+|---|---|---|
+| `v0.1.1` | `release.sh` | Semver-Release-Markierung |
+| `stable-20250225-143022` | `staging.sh promote` | Deployment-Zeitstempel |
+
 ## Projektkonventionen
 
 ### Backend

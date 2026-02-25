@@ -7,6 +7,8 @@ public record StagingStatusResponse(
         int promoteStep,
         int promoteTotalSteps,
         String lastSnapshot,
-        String error
+        String error,
+        String stableVersion,
+        String stableBuildTimestamp
 ) {
 }

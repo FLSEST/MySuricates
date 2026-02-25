@@ -377,6 +377,10 @@ export const de: TranslationKeys = {
     stagingPhaseBUILDING_IMAGE: 'Docker-Image bauen...',
     stagingPhaseSTARTING: 'Starten...',
     stagingPromoteFailed: 'Promote fehlgeschlagen',
+    stagingDevVersion: 'Dev',
+    stagingStableVersion: 'Stable',
+    stagingVersionUnknown: 'unbekannt',
+    stagingPromoteAvailable: 'Neuere Version verfügbar — Promote empfohlen',
   },
   toast: {
     projectCreated: 'Projekt erfolgreich erstellt',

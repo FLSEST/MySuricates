@@ -324,6 +324,8 @@ export interface StagingStatus {
   promoteTotalSteps: number;
   lastSnapshot: string | null;
   error: string | null;
+  stableVersion: string | null;
+  stableBuildTimestamp: string | null;
 }
 
 export interface SyncResult {

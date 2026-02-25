@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+POM_FILE="$PROJECT_ROOT/ai-automation-backend/pom.xml"
+PACKAGE_JSON="$PROJECT_ROOT/ai-automation-frontend/package.json"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+log()  { echo -e "${GREEN}[release]${NC} $*"; }
+warn() { echo -e "${YELLOW}[release]${NC} $*"; }
+err()  { echo -e "${RED}[release]${NC} $*" >&2; }
+
+usage() {
+    echo "Usage: $(basename "$0") [patch|minor|major]"
+    echo ""
+    echo "Bumps the version in pom.xml and package.json, commits, and tags."
+    echo ""
+    echo "  patch  (default)  0.1.0 → 0.1.1"
+    echo "  minor             0.1.1 → 0.2.0"
+    echo "  major             0.2.0 → 1.0.0"
+}
+
+# ── Read current version from pom.xml ─────────────────────
+
+read_version() {
+    # Match the project-level <version> (first <version> after </parent>), strip -SNAPSHOT
+    local raw
+    raw=$(sed -n '/<\/parent>/,$ { s/.*<version>\(.*\)<\/version>.*/\1/p; }' "$POM_FILE" | head -1)
+    echo "${raw%-SNAPSHOT}"
+}
+
+# ── Compute next version ──────────────────────────────────
+
+bump_version() {
+    local version="$1"
+    local bump="${2:-patch}"
+
+    IFS='.' read -r major minor patch <<< "$version"
+
+    case "$bump" in
+        major) major=$((major + 1)); minor=0; patch=0 ;;
+        minor) minor=$((minor + 1)); patch=0 ;;
+        patch) patch=$((patch + 1)) ;;
+        *) err "Unknown bump type: $bump"; usage; exit 1 ;;
+    esac
+
+    echo "${major}.${minor}.${patch}"
+}
+
+# ── Update files ──────────────────────────────────────────
+
+update_pom() {
+    local new_version="$1"
+    # Replace the project-level <version> (first <version> after </parent>)
+    local line_num
+    line_num=$(sed -n '/<\/parent>/,$ { /[0-9]*\.[0-9]*\.[0-9]*/ { =; q; } }' "$POM_FILE")
+    if [ -n "$line_num" ]; then
+        sed -i "${line_num}s|<version>.*</version>|<version>${new_version}-SNAPSHOT</version>|" "$POM_FILE"
+    fi
+}
+
+update_package_json() {
+    local new_version="$1"
+    sed -i "s|\"version\": \"[0-9]*\.[0-9]*\.[0-9]*\"|\"version\": \"${new_version}\"|" "$PACKAGE_JSON"
+}
+
+# ── Main ──────────────────────────────────────────────────
+
+BUMP="${1:-patch}"
+
+if [[ "$BUMP" == "-h" || "$BUMP" == "--help" ]]; then
+    usage
+    exit 0
+fi
+
+# Ensure clean working tree
+cd "$PROJECT_ROOT"
+if ! git diff --quiet || ! git diff --cached --quiet; then
+    err "Working tree is not clean. Commit or stash changes first."
+    exit 1
+fi
+
+CURRENT=$(read_version)
+NEXT=$(bump_version "$CURRENT" "$BUMP")
+
+log "Current version: $CURRENT"
+log "Bump type:       $BUMP"
+log "New version:     $NEXT"
+echo ""
+
+# Update files
+log "Updating pom.xml → ${NEXT}-SNAPSHOT"
+update_pom "$NEXT"
+
+log "Updating package.json → ${NEXT}"
+update_package_json "$NEXT"
+
+# Commit and tag
+log "Committing..."
+git add "$POM_FILE" "$PACKAGE_JSON"
+git commit -m "Release v${NEXT}"
+
+log "Tagging v${NEXT}..."
+git tag "v${NEXT}"
+
+echo ""
+log "Done! Version bumped to ${NEXT}"
+log "  pom.xml:      ${NEXT}-SNAPSHOT"
+log "  package.json: ${NEXT}"
+log "  Git tag:      v${NEXT}"
+echo ""
+log "To push: git push && git push --tags"

@@ -36,7 +36,7 @@ class StagingControllerTest {
     @Test
     void status_returnsCurrentState() throws Exception {
         when(stagingService.getStatus()).thenReturn(
-                new StagingStatusResponse(true, true, "IDLE", 0, 5, "stable-20260225-091500", null));
+                new StagingStatusResponse(true, true, "IDLE", 0, 5, "stable-20260225-091500", null, "0.1.0", "2026-02-25T09:15:00Z"));
 
         mockMvc.perform(get("/api/v1/staging/status"))
                 .andExpect(status().isOk())
@@ -50,7 +50,7 @@ class StagingControllerTest {
     @Test
     void status_stopped_returnsOffline() throws Exception {
         when(stagingService.getStatus()).thenReturn(
-                new StagingStatusResponse(false, false, "IDLE", 0, 5, null, null));
+                new StagingStatusResponse(false, false, "IDLE", 0, 5, null, null, null, null));
 
         mockMvc.perform(get("/api/v1/staging/status"))
                 .andExpect(status().isOk())

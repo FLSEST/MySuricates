@@ -191,3 +191,27 @@ networks:
   automation:
     driver: bridge
 ```
+
+## Staging (Stable-Umgebung)
+
+Neben der Entwicklungsumgebung (Port 3000/9090) läuft eine Stable-Umgebung als Docker-Container auf Port 9091. Siehe `scripts/staging.sh` für die CLI-Verwaltung.
+
+### Versionsanzeige
+
+In Settings → Stable wird ein Versionsvergleich angezeigt:
+- **Dev**: Version aus dem lokalen `/api/v1/system/info`
+- **Stable**: Version aus dem Stable-Container's `/api/v1/system/info`
+
+Wenn die Versionen abweichen (z.B. nach einem Release), wird ein Promote empfohlen.
+
+### Release + Promote Workflow
+
+```bash
+# 1. Version bumpen
+./scripts/release.sh           # z.B. 0.1.0 → 0.1.1
+
+# 2. Neue Version in Stable deployen
+./scripts/staging.sh promote   # Baut und startet Stable mit der neuen Version
+```
+
+Nach dem Promote zeigt die Settings-Seite beide Versionen als identisch an.

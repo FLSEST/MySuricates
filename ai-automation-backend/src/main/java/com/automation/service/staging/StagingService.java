@@ -86,6 +86,21 @@ public class StagingService {
         String lastSnapshot = findLastSnapshot();
         PromoteState state = promoteState.get();
 
+        String stableVersion = null;
+        String stableBuildTimestamp = null;
+        if (healthy) {
+            try {
+                String stableBaseUrl = deriveStableBaseUrl();
+                JsonNode info = httpGet(stableBaseUrl + "/system/info");
+                if (info != null) {
+                    stableVersion = info.path("version").asText(null);
+                    stableBuildTimestamp = info.path("buildTimestamp").asText(null);
+                }
+            } catch (Exception e) {
+                log.debug("Failed to fetch stable system info: {}", e.getMessage());
+            }
+        }
+
         return new StagingStatusResponse(
                 running,
                 healthy,
@@ -93,7 +108,9 @@ public class StagingService {
                 state.step(),
                 5,
                 lastSnapshot,
-                state.error()
+                state.error(),
+                stableVersion,
+                stableBuildTimestamp
         );
     }
 
