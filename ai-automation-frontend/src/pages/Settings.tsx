@@ -339,6 +339,7 @@ export function Settings() {
           syncResult={stagingSync.data}
           startLoading={stagingStart.isPending}
           stopLoading={stagingStop.isPending}
+          promoteLoading={stagingPromote.isPending}
           syncLoading={stagingSync.isPending}
         />
       )}
@@ -385,7 +386,7 @@ const PROMOTE_PHASES = ['STOPPING', 'BUILDING_BACKEND', 'BUILDING_FRONTEND', 'BU
 
 type PhaseKey = `stagingPhase${typeof PROMOTE_PHASES[number]}`;
 
-function StagingCard({ t, staging, onStart, onStop, onPromote, onCancel, onSync, syncResult, startLoading, stopLoading, syncLoading }: {
+function StagingCard({ t, staging, onStart, onStop, onPromote, onCancel, onSync, syncResult, startLoading, stopLoading, promoteLoading, syncLoading }: {
   t: ReturnType<typeof useT>;
   staging: import('../types').StagingStatus | undefined;
   onStart: () => void;
@@ -396,6 +397,7 @@ function StagingCard({ t, staging, onStart, onStop, onPromote, onCancel, onSync,
   syncResult: import('../types').SyncResult | undefined;
   startLoading: boolean;
   stopLoading: boolean;
+  promoteLoading: boolean;
   syncLoading: boolean;
 }) {
   const [syncConfirm, setSyncConfirm] = useState(false);
@@ -533,6 +535,7 @@ function StagingCard({ t, staging, onStart, onStop, onPromote, onCancel, onSync,
                 size="sm"
                 icon={<Upload className="w-3.5 h-3.5" />}
                 onClick={onPromote}
+                loading={promoteLoading}
               >
                 {t.settings.stagingPromote}
               </Button>

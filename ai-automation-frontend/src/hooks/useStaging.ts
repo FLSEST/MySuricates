@@ -8,7 +8,7 @@ export function useStagingStatus() {
     queryFn: () => api.get<StagingStatus>('/staging/status'),
     refetchInterval: (query) => {
       const phase = query.state.data?.promotePhase;
-      if (phase && phase !== 'IDLE' && phase !== 'ERROR') return 3_000;
+      if (phase && phase !== 'IDLE' && phase !== 'ERROR') return 1_000;
       return 15_000;
     },
   });
