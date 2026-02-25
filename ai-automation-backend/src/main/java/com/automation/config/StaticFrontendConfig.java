@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
+import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.resource.PathResourceResolver;
 
@@ -19,6 +20,13 @@ public class StaticFrontendConfig implements WebMvcConfigurer {
     private String frontendPath;
 
     @Override
+    public void addViewControllers(ViewControllerRegistry registry) {
+        // Root URL "/" resolves to resourcePath "." which ResourceHttpRequestHandler
+        // rejects before the custom PathResourceResolver is called. Forward to index.html.
+        registry.addViewController("/").setViewName("forward:/index.html");
+    }
+
+    @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         String location = "file:" + frontendPath + "/";
 
@@ -28,10 +36,6 @@ public class StaticFrontendConfig implements WebMvcConfigurer {
                 .addResolver(new PathResourceResolver() {
                     @Override
                     protected Resource getResource(String resourcePath, Resource location) throws IOException {
-                        // Root path or empty → serve index.html
-                        if (resourcePath == null || resourcePath.isEmpty() || resourcePath.equals(".")) {
-                            return new FileSystemResource(frontendPath + "/index.html");
-                        }
                         // Don't handle API or WebSocket paths
                         if (resourcePath.startsWith("api/") || resourcePath.startsWith("ws/") || resourcePath.startsWith("actuator/")) {
                             return null;
