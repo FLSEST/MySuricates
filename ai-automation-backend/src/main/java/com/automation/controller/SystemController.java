@@ -40,6 +40,9 @@ public class SystemController {
     @Value("${automation.security.enabled:true}")
     private boolean securityEnabled;
 
+    @Value("${automation.environment:Dev}")
+    private String environment;
+
     @GetMapping("/auth-status")
     public Map<String, Object> authStatus() {
         return Map.of("securityEnabled", securityEnabled);
@@ -72,14 +75,15 @@ public class SystemController {
             buildType = appVersion.substring(dashIdx + 1);
         }
 
-        return Map.of(
-                "name", "MySuricates",
-                "version", version,
-                "buildType", buildType,
-                "buildTimestamp", buildTimestamp,
-                "java", System.getProperty("java.version"),
-                "tailscale", tailscaleService.isConfigEnabled() ? "CONFIGURED" : "DISABLED"
-        );
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("name", "MySuricates");
+        result.put("version", version);
+        result.put("buildType", buildType);
+        result.put("buildTimestamp", buildTimestamp);
+        result.put("java", System.getProperty("java.version"));
+        result.put("tailscale", tailscaleService.isConfigEnabled() ? "CONFIGURED" : "DISABLED");
+        result.put("environment", environment);
+        return result;
     }
 
     @PostMapping("/remote-access/enable")

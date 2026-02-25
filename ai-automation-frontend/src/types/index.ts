@@ -292,6 +292,7 @@ export interface SystemInfo {
   buildTimestamp: string;
   java: string;
   tailscale: string;
+  environment: string;
 }
 
 export interface RemoteAccessStatus {

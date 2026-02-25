@@ -14,6 +14,7 @@ automation:
     auto-start: false
   serve-frontend: true
   frontend-path: /app/frontend
+  environment: Produktiv
 
 logging:
   level:

@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useSidebarStore } from '../../stores/sidebarStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { useSystemInfo } from '../../hooks/useSystem';
 import { useT } from '../../i18n';
 
 export function MeerkatIcon({ className, size = 24 }: { className?: string; size?: number }) {
@@ -93,6 +94,7 @@ const navItems = [
 export function Sidebar() {
   const { collapsed, toggle, mobileOpen, setMobileOpen } = useSidebarStore();
   const isMobile = useIsMobile();
+  const { data: systemInfo } = useSystemInfo();
   const t = useT();
 
   const isOpen = isMobile ? mobileOpen : true;
@@ -108,10 +110,25 @@ export function Sidebar() {
       {/* Logo */}
       <div className={`flex flex-col items-center border-b border-white/10 ${collapsed && !isMobile ? 'px-2 py-3' : 'px-3 pt-4 pb-3'}`}>
         <MeerkatIcon className="text-accent" size={collapsed && !isMobile ? 48 : 140} />
-        {showLabels && (
-          <span className="text-lg font-bold text-white tracking-tight mt-1.5">
-            MySuricates
-          </span>
+        {showLabels ? (
+          <>
+            <span className="text-lg font-bold text-white tracking-tight mt-1.5">
+              MySuricates
+            </span>
+            {systemInfo?.environment && (
+              <span className={`text-[10px] font-semibold uppercase tracking-widest mt-0.5 px-2 py-0.5 rounded-full ${
+                systemInfo.environment === 'Produktiv'
+                  ? 'bg-emerald-500/20 text-emerald-400'
+                  : 'bg-amber-500/20 text-amber-400'
+              }`}>
+                {systemInfo.environment}
+              </span>
+            )}
+          </>
+        ) : systemInfo?.environment && (
+          <span className={`w-2 h-2 rounded-full mt-1 ${
+            systemInfo.environment === 'Produktiv' ? 'bg-emerald-400' : 'bg-amber-400'
+          }`} title={systemInfo.environment} />
         )}
       </div>
 
