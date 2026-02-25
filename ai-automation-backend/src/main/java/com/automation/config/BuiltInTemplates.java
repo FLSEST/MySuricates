@@ -567,14 +567,14 @@ public final class BuiltInTemplates {
                         "en", "Automated backup with compression, checksum, and retention"),
                 "DATA", order++,
                 List.of(
-                        block("shell", Map.of("command", "set -euo pipefail\nDB_TYPE=\"{{ db_type }}\"\nDB_CONN=\"{{ db_connection }}\"\nBACKUP_DIR=\"{{ backup_dir }}\"\nmkdir -p \"$BACKUP_DIR\"\nTS=$(date +%Y%m%d-%H%M%S)\nBACKUP_FILE=\"$BACKUP_DIR/${DB_TYPE}-backup-${TS}.sql\"\necho \"=== Creating $DB_TYPE backup ===\"\nif [ \"$DB_TYPE\" = \"postgres\" ]; then\n  pg_dump \"$DB_CONN\" > \"$BACKUP_FILE\"\nelif [ \"$DB_TYPE\" = \"mysql\" ]; then\n  mysqldump $DB_CONN > \"$BACKUP_FILE\"\nelif [ \"$DB_TYPE\" = \"sqlite\" ]; then\n  sqlite3 \"$DB_CONN\" \".backup '$BACKUP_FILE'\"\nelse\n  echo \"Unsupported db_type: $DB_TYPE\" && exit 1\nfi\necho \"Backup created: $BACKUP_FILE ($(du -h \"$BACKUP_FILE\" | cut -f1))\"")),
+                        block("shell", Map.of("command", "set -euo pipefail\nDB_TYPE=\"{{ db_type }}\"\nDB_CONN=\"{{ db_connection }}\"\nBACKUP_DIR=\"{{ backup_dir }}\"\nmkdir -p \"$BACKUP_DIR\"\nTS=$(date +%Y%m%d-%H%M%S)\nBACKUP_FILE=\"$BACKUP_DIR/${DB_TYPE}-backup-${TS}.sql\"\necho \"=== Creating $DB_TYPE backup ===\"\nif [ \"$DB_TYPE\" = \"postgres\" ]; then\n  pg_dump \"$DB_CONN\" > \"$BACKUP_FILE\"\nelif [ \"$DB_TYPE\" = \"mysql\" ]; then\n  mysqldump $DB_CONN > \"$BACKUP_FILE\"\nelif [ \"$DB_TYPE\" = \"sqlite\" ]; then\n  python3 -c \"import shutil; shutil.copy2('$DB_CONN', '$BACKUP_FILE')\"\nelse\n  echo \"Unsupported db_type: $DB_TYPE\" && exit 1\nfi\necho \"Backup created: $BACKUP_FILE ($(du -h \"$BACKUP_FILE\" | cut -f1))\"")),
                         block("shell", Map.of("command", "set -euo pipefail\nBACKUP_DIR=\"{{ backup_dir }}\"\nLATEST=$(ls -t \"$BACKUP_DIR\"/*.sql 2>/dev/null | head -1)\nif [ -z \"$LATEST\" ]; then echo \"No backup found!\" && exit 1; fi\necho \"=== Compressing $LATEST ===\"\ngzip -f \"$LATEST\"\nCOMPRESSED=\"${LATEST}.gz\"\nsha256sum \"$COMPRESSED\" > \"${COMPRESSED}.sha256\"\necho \"Compressed: $COMPRESSED ($(du -h \"$COMPRESSED\" | cut -f1))\"\necho \"Checksum: $(cat \"${COMPRESSED}.sha256\")\"")),
                         block("shell", Map.of("command", "set -euo pipefail\nBACKUP_DIR=\"{{ backup_dir }}\"\nLATEST_GZ=$(ls -t \"$BACKUP_DIR\"/*.sql.gz 2>/dev/null | head -1)\nif [ -z \"$LATEST_GZ\" ]; then echo \"No compressed backup found!\" && exit 1; fi\necho \"=== Verifying checksum ===\"\ncd \"$BACKUP_DIR\"\nsha256sum -c \"$(basename \"$LATEST_GZ\").sha256\"\necho \"Checksum verification passed.\"")),
                         block("shell", Map.of("command", "set -euo pipefail\nBACKUP_DIR=\"{{ backup_dir }}\"\nRETENTION={{ retention_count }}\necho \"=== Retention cleanup (keeping $RETENTION backups) ===\"\nCOUNT=$(ls -1 \"$BACKUP_DIR\"/*.sql.gz 2>/dev/null | wc -l)\nif [ \"$COUNT\" -gt \"$RETENTION\" ]; then\n  REMOVE=$((COUNT - RETENTION))\n  ls -t \"$BACKUP_DIR\"/*.sql.gz | tail -$REMOVE | while read f; do\n    echo \"Removing: $f\"\n    rm -f \"$f\" \"${f}.sha256\"\n  done\n  echo \"Removed $REMOVE old backups.\"\nelse\n  echo \"$COUNT backups present, retention limit $RETENTION not exceeded.\"\nfi")),
                         block("shell", Map.of("command", "set -euo pipefail\nBACKUP_DIR=\"{{ backup_dir }}\"\necho \"# Backup Report\"\necho \"Generated: $(date -Iseconds)\"\necho \"DB Type: {{ db_type }}\"\necho \"Backup Dir: $BACKUP_DIR\"\necho \"\"\necho \"## Current Backups\"\nls -lh \"$BACKUP_DIR\"/*.sql.gz 2>/dev/null || echo \"No backups found.\"\necho \"\"\necho \"## Disk Usage\"\ndu -sh \"$BACKUP_DIR\" 2>/dev/null || true"))
                 ),
                 "Erstelle ein Datenbank-Backup mit Kompression und Checksumme. Variablen: db_type (postgres/mysql/sqlite), db_connection, backup_dir, retention_count.",
-                null));
+                null, "1.0.1"));
 
         templates.add(template("git-statistics-report", "\uD83D\uDCC8",
                 Map.of("de", "Git-Statistik-Report", "en", "Git Statistics Report"),
@@ -583,12 +583,12 @@ public final class BuiltInTemplates {
                 "CODE", order++,
                 List.of(
                         block("shell", Map.of("command", "set -euo pipefail\ncd \"{{ project_path }}\"\nSINCE=\"{{ since }}\"\necho \"=== Commit Summary (since $SINCE) ===\"\nTOTAL=$(git rev-list --count --since=\"$SINCE\" HEAD)\nAUTHORS=$(git log --since=\"$SINCE\" --format='%aN' | sort -u | wc -l)\nFIRST=$(git log --since=\"$SINCE\" --reverse --format='%ad' --date=short | head -1)\nLAST=$(git log --since=\"$SINCE\" --format='%ad' --date=short | head -1)\necho \"Total commits: $TOTAL\"\necho \"Unique authors: $AUTHORS\"\necho \"Period: $FIRST .. $LAST\"\necho \"\"\necho \"=== Top Authors ===\"\ngit shortlog --since=\"$SINCE\" -sn HEAD | head -10")),
-                        block("shell", Map.of("command", "set -euo pipefail\ncd \"{{ project_path }}\"\nSINCE=\"{{ since }}\"\necho \"=== Most Changed Files (Top 20) ===\"\ngit log --since=\"$SINCE\" --format='' --name-only | sort | uniq -c | sort -rn | head -20")),
-                        block("shell", Map.of("command", "set -euo pipefail\ncd \"{{ project_path }}\"\nSINCE=\"{{ since }}\"\necho \"=== Activity by Weekday ===\"\ngit log --since=\"$SINCE\" --format='%ad' --date=format:'%A' | sort | uniq -c | sort -rn\necho \"\"\necho \"=== Activity by Hour ===\"\ngit log --since=\"$SINCE\" --format='%ad' --date=format:'%H' | sort | uniq -c | sort -rn | head -10")),
+                        block("shell", Map.of("command", "set -euo pipefail\ncd \"{{ project_path }}\"\nSINCE=\"{{ since }}\"\necho \"=== Most Changed Files (Top 20) ===\"\ngit log --since=\"$SINCE\" --format='' --name-only | grep -v '^$' | sort | uniq -c | sort -rn | head -20")),
+                        block("shell", Map.of("command", "set -euo pipefail\ncd \"{{ project_path }}\"\nSINCE=\"{{ since }}\"\necho \"=== Activity by Weekday ===\"\ngit log --since=\"$SINCE\" --format=\"%ad\" --date=format:\"%A\" | sort | uniq -c | sort -rn\necho \"\"\necho \"=== Activity by Hour ===\"\ngit log --since=\"$SINCE\" --format=\"%ad\" --date=format:\"%H\" | sort | uniq -c | sort -rn | head -10")),
                         block("shell", Map.of("command", "set -euo pipefail\ncd \"{{ project_path }}\"\nSINCE=\"{{ since }}\"\necho \"=== Lines Changed per Author ===\"\ngit log --since=\"$SINCE\" --format='%aN' --numstat | python3 -c \"\nimport sys\nauthors = {}\ncurrent = None\nfor line in sys.stdin:\n    line = line.strip()\n    if not line:\n        continue\n    parts = line.split('\\t')\n    if len(parts) == 1:\n        current = line\n        if current not in authors:\n            authors[current] = {'added': 0, 'deleted': 0}\n    elif len(parts) == 3 and current:\n        try:\n            authors[current]['added'] += int(parts[0])\n            authors[current]['deleted'] += int(parts[1])\n        except ValueError:\n            pass\nfor name, stats in sorted(authors.items(), key=lambda x: x[1]['added'], reverse=True):\n    print(f'{name}: +{stats[\\\"added\\\"]} -{stats[\\\"deleted\\\"]}')\" 2>&1"))
                 ),
                 "Erstelle einen Git-Statistik-Report. Variablen: project_path, since (z.B. '3 months ago').",
-                null));
+                null, "1.0.1"));
 
         templates.add(template("directory-sync", "\uD83D\uDD01",
                 Map.of("de", "Verzeichnis-Synchronisation", "en", "Directory Sync"),
@@ -630,6 +630,14 @@ public final class BuiltInTemplates {
                                               String category, int sortOrder,
                                               List<BlockDefinition> blocks,
                                               String instructions, String model) {
+        return template(id, icon, name, description, category, sortOrder, blocks, instructions, model, "1.0.0");
+    }
+
+    private static WorkflowTemplate template(String id, String icon,
+                                              Map<String, String> name, Map<String, String> description,
+                                              String category, int sortOrder,
+                                              List<BlockDefinition> blocks,
+                                              String instructions, String model, String version) {
         return WorkflowTemplate.builder()
                 .id(id)
                 .icon(icon)
@@ -641,7 +649,7 @@ public final class BuiltInTemplates {
                 .instructions(instructions)
                 .model(model)
                 .builtIn(true)
-                .version("1.0.0")
+                .version(version)
                 .build();
     }
 

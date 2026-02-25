@@ -10,5 +10,10 @@ ai-automation-frontend/dist/
 ai-automation-frontend/tsconfig.tsbuildinfo
 ai-automation-frontend/cypress/screenshots/
 
+# Database
+*.db
+*.db-shm
+*.db-wal
+
 # Stable environment build artifacts
 ai-automation-backend/stable-frontend/

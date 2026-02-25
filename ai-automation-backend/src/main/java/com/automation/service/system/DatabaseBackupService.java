@@ -43,6 +43,17 @@ public class DatabaseBackupService {
             Files.createDirectories(dir);
             log.info("Created backup directory: {}", dir);
         }
+
+        if (backupConfig.isEnabled()) {
+            try {
+                Path backup = createBackup();
+                rotateBackups();
+                log.info("Startup backup created: {}", backup.getFileName());
+                activityLogService.info(LogCategory.SYSTEM, "Startup backup created: " + backup.getFileName(), "DatabaseBackupService");
+            } catch (Exception e) {
+                log.warn("Startup backup failed: {}", e.getMessage());
+            }
+        }
     }
 
     /**

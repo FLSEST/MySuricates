@@ -10,6 +10,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -24,28 +28,62 @@ public class WorkflowTemplateSeeder implements ApplicationRunner {
         List<WorkflowTemplate> existing = templateRepository.findByBuiltInTrue();
         List<WorkflowTemplate> allBuiltIn = BuiltInTemplates.getAll();
 
-        if (existing.size() >= allBuiltIn.size()) {
-            log.debug("All {} built-in workflow templates already exist", existing.size());
-            return;
+        Map<String, WorkflowTemplate> existingById = existing.stream()
+                .collect(Collectors.toMap(WorkflowTemplate::getId, Function.identity()));
+        Set<String> existingNames = existing.stream()
+                .map(t -> t.getName().getOrDefault("en", ""))
+                .collect(Collectors.toSet());
+
+        int seeded = 0;
+        int updated = 0;
+
+        for (WorkflowTemplate template : allBuiltIn) {
+            String enName = template.getName().getOrDefault("en", "");
+            WorkflowTemplate dbTemplate = existingById.get(template.getId());
+
+            if (dbTemplate == null && !existingNames.contains(enName)) {
+                // New template — insert
+                templateRepository.save(template);
+                seeded++;
+            } else if (dbTemplate != null && isNewerVersion(template.getVersion(), dbTemplate.getVersion())) {
+                // Existing template with older version — update
+                dbTemplate.setBlocks(template.getBlocks());
+                dbTemplate.setInstructions(template.getInstructions());
+                dbTemplate.setModel(template.getModel());
+                dbTemplate.setIcon(template.getIcon());
+                dbTemplate.setName(template.getName());
+                dbTemplate.setDescription(template.getDescription());
+                dbTemplate.setCategory(template.getCategory());
+                dbTemplate.setSortOrder(template.getSortOrder());
+                dbTemplate.setVersion(template.getVersion());
+                templateRepository.save(dbTemplate);
+                updated++;
+            }
         }
 
-        if (existing.isEmpty()) {
-            // Fresh install — seed all
-            for (WorkflowTemplate template : allBuiltIn) {
-                templateRepository.save(template);
-            }
-            log.info("Seeded {} built-in workflow templates", allBuiltIn.size());
+        if (seeded > 0 || updated > 0) {
+            log.info("Built-in templates: seeded {}, updated {} ({} total)", seeded, updated, existing.size() + seeded);
         } else {
-            // Partial state — seed missing ones
-            List<String> existingIds = existing.stream().map(WorkflowTemplate::getId).toList();
-            int seeded = 0;
-            for (WorkflowTemplate template : allBuiltIn) {
-                if (!existingIds.contains(template.getId())) {
-                    templateRepository.save(template);
-                    seeded++;
-                }
-            }
-            log.info("Seeded {} new built-in workflow templates ({} already existed)", seeded, existing.size());
+            log.debug("All {} built-in workflow templates up to date", existing.size());
         }
+    }
+
+    /**
+     * Compare semver version strings. Returns true if newVersion > oldVersion.
+     */
+    static boolean isNewerVersion(String newVersion, String oldVersion) {
+        if (oldVersion == null || oldVersion.isBlank()) return true;
+        if (newVersion == null || newVersion.isBlank()) return false;
+
+        String[] newParts = newVersion.split("\\.");
+        String[] oldParts = oldVersion.split("\\.");
+
+        for (int i = 0; i < Math.max(newParts.length, oldParts.length); i++) {
+            int n = i < newParts.length ? Integer.parseInt(newParts[i]) : 0;
+            int o = i < oldParts.length ? Integer.parseInt(oldParts[i]) : 0;
+            if (n > o) return true;
+            if (n < o) return false;
+        }
+        return false;
     }
 }
