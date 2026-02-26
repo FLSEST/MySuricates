@@ -17,3 +17,12 @@ ai-automation-frontend/cypress/screenshots/
 
 # Stable environment build artifacts
 ai-automation-backend/stable-frontend/
+
+# Generated session artifacts
+portfolio/
+dashboard/
+presentation/
+ebook/
+prototype/
+output/
+todo-sdk/
