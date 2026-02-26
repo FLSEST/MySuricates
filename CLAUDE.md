@@ -67,6 +67,7 @@ npm run cy:open                          # Open Cypress UI
 
 - **Backend ORM**: Lombok for boilerplate, MapStruct for entity-DTO mapping
 - **Database**: SQLite with Flyway migrations. Naming: `V{N}__description.sql`
+- **NEVER write to the SQLite database directly** (via `sqlite3` CLI or raw SQL). Always use the REST API or the Spring service/repository layer. Direct DB writes bypass Hibernate's entity cache and cause inconsistent state, "Internal server error" responses, and hard-to-debug issues. This applies to testing, debugging, and seeding alike — use the API.
 - **API prefix**: All endpoints under `/api/v1`
 - **Frontend state**: Zustand for client state (settings, theme, sidebar), TanStack Query for server state
 - **API client**: Singleton `api` instance in `src/api/client.ts` — all hooks use this

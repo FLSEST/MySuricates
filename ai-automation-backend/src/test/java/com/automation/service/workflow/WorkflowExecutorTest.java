@@ -68,6 +68,9 @@ class WorkflowExecutorTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private TemplateVerificationService templateVerificationService;
+
     private WorkflowExecutor workflowExecutor;
 
     private Workflow testWorkflow;
@@ -93,7 +96,8 @@ class WorkflowExecutorTest {
                 agentInstructionsService,
                 activityLogService,
                 workflowMemoryService,
-                eventPublisher
+                eventPublisher,
+                templateVerificationService
         );
 
         testProject = Project.builder()

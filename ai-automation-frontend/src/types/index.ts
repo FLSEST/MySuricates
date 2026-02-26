@@ -86,6 +86,13 @@ export interface CreateWorkflowRequest {
 }
 
 // ── Workflow Template ────────────────────────────────────
+export interface TemplateVerification {
+  projectId: string;
+  projectName: string;
+  lastRunId: string;
+  verifiedAt: string;
+}
+
 export interface WorkflowTemplate {
   id: string;
   name: Record<string, string>;
@@ -97,6 +104,8 @@ export interface WorkflowTemplate {
   model: string | null;
   builtIn: boolean;
   sortOrder: number;
+  qualityStatus: 'UNTESTED' | 'TESTED';
+  verifications: TemplateVerification[];
   version: string;
   createdAt: string;
   updatedAt: string;

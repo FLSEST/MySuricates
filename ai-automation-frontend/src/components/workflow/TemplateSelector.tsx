@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileText, Search } from 'lucide-react';
+import { CheckCircle, FileText, Search } from 'lucide-react';
 import { Card, Input, Spinner } from '../ui';
 import { useT } from '../../i18n';
 import { useI18nStore } from '../../i18n';
@@ -77,10 +77,21 @@ export function TemplateSelector({ onSelect }: TemplateSelectorProps) {
               >
                 <div className="flex items-center gap-3 mb-2">
                   <span className="text-2xl">{tmpl.icon}</span>
-                  <div>
-                    <h4 className="font-semibold text-text">
-                      {resolveTemplateName(tmpl.name, locale)}
-                    </h4>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-semibold text-text truncate">
+                        {resolveTemplateName(tmpl.name, locale)}
+                      </h4>
+                      {tmpl.qualityStatus === 'TESTED' && (
+                        <span
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-500/15 text-green-600 dark:text-green-400 shrink-0"
+                          title={`${t.templates.testedIn} ${tmpl.verifications.map((v) => v.projectName).join(', ')}`}
+                        >
+                          <CheckCircle className="w-3 h-3" />
+                          {t.templates.tested}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-text-tertiary">
                         {tmpl.blocks.length} {t.workflows.blocks.toLowerCase()}

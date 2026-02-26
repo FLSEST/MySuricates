@@ -66,6 +66,9 @@ public class WorkflowTemplate {
     private int sortOrder = 0;
 
     @Builder.Default
+    private String qualityStatus = "UNTESTED";
+
+    @Builder.Default
     private String version = "1.0.0";
 
     @CreatedDate

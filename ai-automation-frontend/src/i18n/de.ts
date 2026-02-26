@@ -451,6 +451,9 @@ export const de: TranslationKeys = {
     deleteTemplate: 'Vorlage löschen',
     builtIn: 'Integriert',
     custom: 'Benutzerdefiniert',
+    tested: 'Getestet',
+    untested: 'Ungetestet',
+    testedIn: 'Getestet in:',
   },
   insights: {
     title: 'Ausführungs-Insights',

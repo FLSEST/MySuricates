@@ -17,7 +17,16 @@ public record WorkflowTemplateResponse(
         String model,
         boolean builtIn,
         int sortOrder,
+        String qualityStatus,
+        List<TemplateVerificationInfo> verifications,
         String version,
         Instant createdAt,
         Instant updatedAt
-) {}
+) {
+    public record TemplateVerificationInfo(
+            String projectId,
+            String projectName,
+            String lastRunId,
+            Instant verifiedAt
+    ) {}
+}

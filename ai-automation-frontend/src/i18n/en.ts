@@ -449,6 +449,9 @@ export const en = {
     deleteTemplate: 'Delete Template',
     builtIn: 'Built-in',
     custom: 'Custom',
+    tested: 'Tested',
+    untested: 'Untested',
+    testedIn: 'Tested in:',
   },
   insights: {
     title: 'Execution Insights',

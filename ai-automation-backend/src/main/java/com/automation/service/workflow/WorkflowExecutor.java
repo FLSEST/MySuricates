@@ -49,6 +49,7 @@ public class WorkflowExecutor {
     private final ActivityLogService activityLogService;
     private final WorkflowMemoryService workflowMemoryService;
     private final ApplicationEventPublisher eventPublisher;
+    private final TemplateVerificationService templateVerificationService;
 
     private final Map<String, ExecutionContext> activeExecutions = new ConcurrentHashMap<>();
 
@@ -73,6 +74,8 @@ public class WorkflowExecutor {
         String model = workflow.getModel();
         Map<String, Object> workflowMeta = Map.copyOf(workflow.getMetadata());
 
+        String templateId = workflow.getTemplateId();
+
         Map<String, Object> contextVars = inputContext != null ? Map.copyOf(inputContext) : Map.of();
 
         // Persist input context so it's visible in execution details
@@ -88,14 +91,15 @@ public class WorkflowExecutor {
         activityLogService.info(LogCategory.EXECUTION,
                 "Workflow execution started: " + workflowName,
                 "WorkflowExecutor", runId);
-        virtualThreadExecutor.submit(() -> executeBlocks(runId, workflowId, workflowName, project, blocks, skills, contextVars, instructions, model, workflowMeta));
+        virtualThreadExecutor.submit(() -> executeBlocks(runId, workflowId, workflowName, project, blocks, skills, contextVars, instructions, model, workflowMeta, templateId));
 
         return run;
     }
 
     private void executeBlocks(String runId, String workflowId, String workflowName, Project project, List<BlockDefinition> blocks,
                                List<Skill> skills, Map<String, Object> inputContext,
-                               String instructions, String model, Map<String, Object> workflowMeta) {
+                               String instructions, String model, Map<String, Object> workflowMeta,
+                               String templateId) {
         try {
             executionSemaphore.acquire();
         } catch (InterruptedException e) {
@@ -204,6 +208,14 @@ public class WorkflowExecutor {
             }
 
             if (run.getStatus() == RunStatus.COMPLETED) {
+                // Record template verification if workflow was created from a template
+                if (templateId != null && !templateId.isBlank()) {
+                    try {
+                        templateVerificationService.recordSuccessfulRun(workflowId, templateId, project.getId(), run.getId());
+                    } catch (Exception e) {
+                        log.warn("Failed to record template verification: {}", e.getMessage());
+                    }
+                }
                 activityLogService.info(LogCategory.EXECUTION,
                         "Workflow execution completed: " + runId,
                         "WorkflowExecutor", runId);
