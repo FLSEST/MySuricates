@@ -17,7 +17,8 @@ cat > "$BASE/package.json" <<'EOF'
   "main": "src/index.ts",
   "scripts": {
     "test": "jest --config jest.config.js",
-    "build": "tsc",
+    "build": "echo 'Build: compiled successfully'",
+    "lint": "echo 'Lint: no issues found'",
     "start": "node dist/index.js"
   },
   "dependencies": {
@@ -456,6 +457,13 @@ cat > "$BASE/logs/app.log" <<'EOF'
 2024-06-15T10:00:00.000Z INFO  [main] Health check: OK — uptime=2h, memory=456MB/1024MB
 EOF
 
+# ── sync directories (for directory-sync template) ──
+mkdir -p "$BASE/sync-source" "$BASE/sync-target"
+echo "file1 content" > "$BASE/sync-source/file1.txt"
+echo "file2 content" > "$BASE/sync-source/file2.txt"
+mkdir -p "$BASE/sync-source/subdir"
+echo "nested content" > "$BASE/sync-source/subdir/nested.txt"
+
 # ── .git with 3 commits + tag ──
 cd "$BASE"
 git init -q
@@ -467,7 +475,7 @@ git tag v1.0.0
 git add src/index.ts src/index.test.ts
 git -c user.name="Test" -c user.email="test@test.com" commit -q -m "feat: add task CRUD operations and tests"
 
-git add document.md cv.md api-spec.yaml data.csv NOTES.md chapter1.md chapter2.md logs/app.log
+git add document.md cv.md api-spec.yaml data.csv NOTES.md chapter1.md chapter2.md logs/app.log sync-source/
 git -c user.name="Test" -c user.email="test@test.com" commit -q -m "docs: add project documents, data, and logs"
 
 echo ""

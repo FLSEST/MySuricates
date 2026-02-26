@@ -9,6 +9,9 @@ ai-automation-frontend/node_modules/
 ai-automation-frontend/dist/
 ai-automation-frontend/tsconfig.tsbuildinfo
 ai-automation-frontend/cypress/screenshots/
+ai-automation-frontend/playwright/results/
+ai-automation-frontend/playwright/report/
+ai-automation-frontend/playwright/.auth/
 
 # Database
 *.db
