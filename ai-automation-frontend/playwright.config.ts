@@ -33,25 +33,25 @@ export default defineConfig({
     baseURL: 'http://localhost:3000',
     trace: 'off',
     screenshot: 'off', // We take manual screenshots
-    storageState: 'playwright/.auth/state.json',
   },
   projects: [
     {
       name: 'setup',
       testMatch: /auth\.setup\.ts/,
-      use: { storageState: undefined },
     },
     {
       name: 'shell-templates',
       testMatch: /shell-templates\.spec\.ts/,
       dependencies: ['setup'],
       timeout: 5 * 60 * 1000, // 5 min per test
+      use: { storageState: 'playwright/.auth/state.json' },
     },
     {
       name: 'simple-ai-templates',
       testMatch: /simple-ai-templates\.spec\.ts/,
       dependencies: ['setup'],
       timeout: 10 * 60 * 1000, // 10 min per test
+      use: { storageState: 'playwright/.auth/state.json' },
     },
   ],
   // Export API key for fixtures

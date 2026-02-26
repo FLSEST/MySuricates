@@ -23,7 +23,7 @@ const WORKSPACE = '/tmp/autopilot-testbed';
 let projectId: string;
 let templates: TemplateResponse[];
 
-test.describe.configure({ mode: 'serial' });
+// No serial mode — tests are independent and should run even if one fails
 
 test.beforeAll(async () => {
   // 1. Create test workspace
@@ -41,80 +41,34 @@ test.beforeAll(async () => {
 
 for (const templateConfig of simpleAiTemplates) {
   test(`template: ${templateConfig.templateId}`, async ({ page }) => {
-    // Find template definition
-    const template = templates.find((t) => t.id === templateConfig.templateId);
-    expect(template, `Template '${templateConfig.templateId}' not found`).toBeTruthy();
+    // Find template by English name (DB IDs may be UUIDs from legacy seeding)
+    const template = templates.find((t) => t.name['en'] === templateConfig.nameEn);
+    expect(template, `Template '${templateConfig.nameEn}' not found in API response`).toBeTruthy();
 
     // Reset workspace between templates
     resetWorkspace(WORKSPACE);
 
-    // Create workflow from template
-    const templateName = template!.name['en'] ?? template!.name['de'] ?? templateConfig.templateId;
+    // Create workflow from template (use DB id for templateId reference)
     const workflow = await createWorkflow({
       projectId,
-      name: `${TEST_PREFIX} ${templateName}`,
+      name: `${TEST_PREFIX} ${templateConfig.nameEn}`,
       description: `Playwright test of template: ${templateConfig.templateId}`,
       blocks: template!.blocks,
       instructions: template!.instructions ?? undefined,
       model: template!.model ?? undefined,
-      templateId: templateConfig.templateId,
+      templateId: template!.id,
     });
 
-    // Navigate to workflow page
-    await page.goto(`/workflows/${workflow.id}`);
+    // Execute via API
+    const run = await executeWorkflow(workflow.id, templateConfig.variables);
+
+    // Navigate to run page
+    await page.goto(`/workflows/${workflow.id}/run/${run.id}`);
     await page.waitForLoadState('networkidle');
 
-    // Click Execute button
-    const executeButton = page.getByRole('button', { name: /execute/i });
-    await expect(executeButton).toBeVisible({ timeout: 10000 });
-
-    const hasVariables = Object.keys(templateConfig.variables).length > 0;
-
-    if (hasVariables) {
-      // Click execute to open dialog
-      await executeButton.click();
-
-      // Fill in variables in the dialog
-      for (const [varName, varValue] of Object.entries(templateConfig.variables)) {
-        const labelInput = page.getByLabel(varName);
-        if (await labelInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await labelInput.fill(varValue);
-        } else {
-          const inputField = page.locator(`label:has-text("${varName}") + input, label:has-text("${varName}") input`).first();
-          await inputField.fill(varValue);
-        }
-      }
-
-      // Click the execute button inside the dialog
-      const dialogExecuteBtn = page.locator('[role="dialog"] button').filter({ hasText: /execute/i });
-      await dialogExecuteBtn.click();
-    } else {
-      // No variables — execute via API
-      const run = await executeWorkflow(workflow.id, {});
-      await page.goto(`/workflows/${workflow.id}/run/${run.id}`);
-    }
-
-    // Wait for navigation to run page
-    await page.waitForURL(/\/run\//, { timeout: 15000 }).catch(() => {
-      // Already on run page from API execution
-    });
-
-    // Extract run ID from URL
-    const currentUrl = page.url();
-    const runIdMatch = currentUrl.match(/\/run\/([^/]+)/);
-
-    let runId: string;
-    if (runIdMatch) {
-      runId = runIdMatch[1];
-    } else {
-      const run = await executeWorkflow(workflow.id, templateConfig.variables);
-      runId = run.id;
-      await page.goto(`/workflows/${workflow.id}/run/${runId}`);
-    }
-
-    // Poll until done (10 min timeout for AI templates)
+    // Poll until done
     const timeoutMs = templateConfig.timeoutMs ?? 10 * 60 * 1000;
-    const completedRun = await pollRunCompletion(workflow.id, runId, { timeoutMs });
+    const completedRun = await pollRunCompletion(workflow.id, run.id, { timeoutMs });
 
     // Reload to show final state
     await page.reload();
