@@ -18,6 +18,8 @@ import {
   Upload,
   Download,
   Save,
+  Bell,
+  BellOff,
 } from 'lucide-react';
 import { Button, Input, Modal, Spinner, Select } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
@@ -37,6 +39,7 @@ import {
   useImportWorkflow,
   exportWorkflow,
 } from '../hooks/useWorkflows';
+import { useSettingsStore } from '../stores/settingsStore';
 import { useProjects } from '../hooks/useProjects';
 import { useT } from '../i18n';
 import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
@@ -95,6 +98,7 @@ export function Workflows() {
   const { data: workflows, isLoading, error, refetch } = useWorkflows();
   const { data: projects } = useProjects();
   const createWorkflow = useCreateWorkflow();
+  const updateWorkflow = useUpdateWorkflow();
   const executeWorkflow = useExecuteWorkflow();
   const deleteWorkflow = useDeleteWorkflow();
   const importWorkflow = useImportWorkflow();
@@ -295,7 +299,11 @@ export function Workflows() {
   };
 
   const handleCreate = () => {
-    createWorkflow.mutate(form, {
+    const autoTodoDefault = useSettingsStore.getState().autoTodoDefault;
+    const payload = autoTodoDefault
+      ? { ...form, metadata: { ...form.metadata, autoTodo: { enabled: true } } }
+      : form;
+    createWorkflow.mutate(payload, {
       onSuccess: (wf) => {
         setCreateStep('closed');
         setForm({ projectId: '', name: '' });
@@ -445,12 +453,36 @@ export function Workflows() {
               </button>
             </div>
 
-            {/* Bulk delete bar */}
+            {/* Bulk action bar */}
             {selectMode && selectedIds.size > 0 && (
-              <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg bg-danger/10 border border-danger/20">
-                <span className="text-xs text-danger font-medium flex-1">
+              <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg bg-accent/5 border border-accent/20">
+                <span className="text-xs text-accent font-medium flex-1">
                   {selectedIds.size} {t.workflows.selected}
                 </span>
+                {(() => {
+                  const selectedWorkflows = filtered.filter((w) => selectedIds.has(w.id));
+                  const allEnabled = selectedWorkflows.every(
+                    (w) => !!(w.metadata?.autoTodo as Record<string, unknown> | undefined)?.enabled,
+                  );
+                  return (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={allEnabled ? <BellOff className="w-3.5 h-3.5" /> : <Bell className="w-3.5 h-3.5" />}
+                      onClick={() => {
+                        const newEnabled = !allEnabled;
+                        for (const id of selectedIds) {
+                          updateWorkflow.mutate({
+                            id,
+                            data: { metadata: { autoTodo: { enabled: newEnabled } } },
+                          });
+                        }
+                      }}
+                    >
+                      {allEnabled ? t.workflows.disableAutoTodo : t.workflows.enableAutoTodo}
+                    </Button>
+                  );
+                })()}
                 <Button
                   variant="danger"
                   size="sm"
@@ -833,6 +865,9 @@ function WorkflowRow({
         <WorkflowIcon icon={workflow.icon} className="w-4 h-4" />
       </span>
       <span className="text-sm truncate flex-1">{workflow.name}</span>
+      {!selectMode && !!(workflow.metadata?.autoTodo as Record<string, unknown> | undefined)?.enabled && (
+        <Bell className="w-3 h-3 text-accent/50 shrink-0" />
+      )}
       {!selectMode && (
         <>
           <ExecutionBadges blocks={workflow.blocks} />

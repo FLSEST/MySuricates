@@ -266,3 +266,42 @@ The script:
 Two kinds of Git tags:
 - **`v*`** — Semver release tags (created by `release.sh`)
 - **`stable-*`** — Deployment timestamps (created by `staging.sh promote`)
+
+## Todo-Verwaltung via API
+
+Wenn Claude ein TODO anlegen soll, immer über die REST API — niemals direkt in die DB schreiben.
+
+### API-Key auslesen
+
+```bash
+python3 -c "import sqlite3; conn = sqlite3.connect('ai-automation-backend/data/automation.db'); c = conn.cursor(); c.execute(\"SELECT value FROM app_settings WHERE key = 'api-key'\"); print(c.fetchone()[0]); conn.close()"
+```
+
+### TODO erstellen
+
+```bash
+curl -X POST http://localhost:9090/api/v1/todos \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: <key>" \
+  -d '{
+    "title": "Kurzer Titel im Imperativ oder als Beschreibung",
+    "description": "Markdown-Beschreibung mit Kontext, Hintergrund, Umsetzungsschritten",
+    "priority": "HIGH | MEDIUM | LOW",
+    "tags": ["bereich", "typ"],
+    "projectId": "ebf4f50c-20c2-4c35-a84a-a0b350124523",
+    "source": "AI",
+    "sourceAgent": "claude-code"
+  }'
+```
+
+### Konventionen
+
+- **Projekt**: `AutoPilot` (ID: `ebf4f50c-20c2-4c35-a84a-a0b350124523`) für MySuricates-eigene TODOs
+- **Source**: `AI` mit `sourceAgent: "claude-code"` wenn Claude das TODO erstellt
+- **Sprache**: Deutsch für Titel, Beschreibung kann deutsch oder englisch sein
+- **Priority**: `HIGH` = blockierend/kritisch, `MEDIUM` = sollte bald gemacht werden, `LOW` = nice-to-have
+- **Tags**: Aus bestehenden Tags wählen, neue nur wenn nötig
+  - Bereiche: `backend`, `frontend`, `architektur`, `security`, `performance`, `ux`, `ui`
+  - Typen: `feature`, `bug`, `testing`, `documentation`
+  - Spezifisch: `workflow-execution`, `container-execution`, `staging`
+- **Description**: Markdown mit Sektionen (## Problem, ## Umsetzung, ## Betroffene Dateien, etc.)

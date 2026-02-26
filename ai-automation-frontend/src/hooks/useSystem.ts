@@ -47,6 +47,13 @@ export function useBackupList() {
   });
 }
 
+export function useUpdateSystemSetting() {
+  return useMutation({
+    mutationFn: ({ key, value }: { key: string; value: string }) =>
+      api.put(`/system/settings/${key}`, { value }),
+  });
+}
+
 export function useBrowseDirectory(path: string | null) {
   return useQuery({
     queryKey: ['system', 'browse', path],

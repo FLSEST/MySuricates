@@ -3,6 +3,7 @@ package com.automation.controller;
 import com.automation.dto.response.RemoteAccessResponse;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.TailscaleException;
+import com.automation.repository.AppSettingsRepository;
 import com.automation.service.system.ApiKeyService;
 import com.automation.service.system.DatabaseBackupService;
 import com.automation.service.system.TailscaleService;
@@ -39,6 +40,9 @@ class SystemControllerTest {
 
     @MockBean
     private ApiKeyService apiKeyService;
+
+    @MockBean
+    private AppSettingsRepository appSettingsRepository;
 
     @Test
     void health_dockerAvailable_returnsUp() throws Exception {

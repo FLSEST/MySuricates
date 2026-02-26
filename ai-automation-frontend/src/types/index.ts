@@ -83,6 +83,7 @@ export interface CreateWorkflowRequest {
   instructions?: string;
   model?: string;
   templateId?: string;
+  metadata?: Record<string, unknown>;
 }
 
 // ── Workflow Template ────────────────────────────────────

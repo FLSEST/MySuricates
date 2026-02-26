@@ -5,6 +5,7 @@ import com.automation.entity.Project;
 import com.automation.entity.Todo;
 import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.mapper.TodoMapper;
+import com.automation.repository.AppSettingsRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.service.todo.GateStatusResolver.GateResult;
 import lombok.RequiredArgsConstructor;
@@ -27,16 +28,18 @@ public class AutoTodoService {
     static final String TAG_AUTO_WORKFLOW = "auto:workflow";
     static final String REFERENCE_TYPE = "workflow_run";
     static final String SOURCE_AGENT = "auto-todo";
+    static final String SETTING_AUTO_TODO_DEFAULT = "auto-todo-default";
 
     private final TodoRepository todoRepository;
     private final GateStatusResolver gateStatusResolver;
     private final ProjectPathResolver projectPathResolver;
+    private final AppSettingsRepository appSettingsRepository;
 
     @Async
     @EventListener
     @Transactional
     public void onWorkflowRunCompleted(WorkflowRunCompletedEvent event) {
-        if (!event.isAutoTodoEnabled()) {
+        if (!isAutoTodoEnabled(event)) {
             log.debug("Auto-todo disabled for workflow {}", event.getWorkflowId());
             return;
         }
@@ -59,6 +62,25 @@ public class AutoTodoService {
                 case RED -> upsertTodo(projectId, event, gate, Todo.Priority.HIGH);
             }
         }
+    }
+
+    /**
+     * Determines if auto-todo is enabled for this workflow run.
+     * Priority: explicit workflow metadata > global default > false
+     */
+    @SuppressWarnings("unchecked")
+    boolean isAutoTodoEnabled(WorkflowRunCompletedEvent event) {
+        Object autoTodo = event.getWorkflowMetadata().get("autoTodo");
+        if (autoTodo instanceof Map<?, ?> map) {
+            Object enabled = map.get("enabled");
+            if (enabled instanceof Boolean b) {
+                return b;
+            }
+        }
+        // No explicit setting — fall back to global default
+        return appSettingsRepository.get(SETTING_AUTO_TODO_DEFAULT)
+                .map("true"::equals)
+                .orElse(false);
     }
 
     private List<String> resolveTargetProjectIds(WorkflowRunCompletedEvent event) {

@@ -224,11 +224,22 @@ export function captureArtifacts(
     // ignore
   }
 
-  // Copy known output directories per template
+  // Copy known output files/directories per template
   const outputPaths: Record<string, string[]> = {
     'folder-backup': ['backup'],
     'directory-sync': ['sync-target'],
     'git-to-changelog': ['CHANGELOG.md', 'RELEASE_NOTES.md', 'MIGRATION.md'],
+    'code-refactor': ['src/utils.ts', 'src/index.ts', 'src/index.test.ts', 'review'],
+    'file-improve': ['src/index.ts', 'src/utils.ts'],
+    'iterative-refine': ['README.md', 'document.md', 'summary.md'],
+    'document-review': ['review_result.md'],
+    'research-enhance': ['document.md', 'README.md', 'NOTES.md', 'chapter1.md', 'chapter2.md', 'cv.md'],
+    'translation-pipeline': ['translations'],
+    'project-overview': ['analysis'],
+    'topic-deep-dive': ['reports'],
+    'log-triage': ['output'],
+    'data-analysis': ['output'],
+    'fact-check-pipeline': ['document.md'],
   };
 
   const paths = outputPaths[templateId] ?? [];
@@ -237,11 +248,40 @@ export function captureArtifacts(
     if (existsSync(src)) {
       const dest = resolve(artifactsDir, p);
       try {
+        mkdirSync(resolve(artifactsDir, dirname(p)), { recursive: true });
         cpSync(src, dest, { recursive: true });
       } catch {
         // ignore copy errors
       }
     }
+  }
+
+  // Also copy any untracked files/dirs listed in git status
+  try {
+    const status = execSync('git status --porcelain', {
+      cwd: workspacePath,
+      encoding: 'utf-8',
+      timeout: 10000,
+    });
+    for (const line of status.split('\n')) {
+      if (line.startsWith('?? ')) {
+        const untrackedPath = line.slice(3).replace(/\/$/, '');
+        // Skip node_modules etc.
+        if (untrackedPath.startsWith('node_modules')) continue;
+        const src = resolve(workspacePath, untrackedPath);
+        const dest = resolve(artifactsDir, untrackedPath);
+        if (existsSync(src)) {
+          try {
+            mkdirSync(resolve(artifactsDir, dirname(untrackedPath)), { recursive: true });
+            cpSync(src, dest, { recursive: true });
+          } catch {
+            // ignore
+          }
+        }
+      }
+    }
+  } catch {
+    // ignore
   }
 }
 
@@ -251,7 +291,8 @@ export function captureArtifacts(
 export function resetWorkspace(workspacePath: string): void {
   try {
     execSync('git checkout -- .', { cwd: workspacePath, timeout: 10000 });
-    execSync('git clean -fd --exclude=backup --exclude=output --exclude=sync-target', {
+    // Clean everything including output dirs — no excludes so each template starts fresh
+    execSync('git clean -fd', {
       cwd: workspacePath,
       timeout: 10000,
     });

@@ -6,6 +6,7 @@ import com.automation.entity.StepStatus;
 import com.automation.exception.WorkflowExecutionException;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
+import com.automation.service.cli.ContainerShellService;
 import com.automation.service.cli.ShellCommandService;
 import com.automation.service.cli.ShellCommandService.ShellResult;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ public class ShellBlockExecutor implements BlockExecutor {
     private static final int DEFAULT_TIMEOUT_SECONDS = 300;
 
     private final ShellCommandService shellService;
+    private final ContainerShellService containerShellService;
 
     @Override
     public StepResult execute(BlockDefinition block, ExecutionContext context) {
@@ -39,7 +41,20 @@ public class ShellBlockExecutor implements BlockExecutor {
         step.setInput(command);
         step.setStatus(StepStatus.RUNNING);
 
-        ShellResult result = shellService.execute(command, context.getProjectPath(), timeout);
+        String containerImage = config.get("container_image") instanceof String s ? s : null;
+        boolean mountDockerSocket = Boolean.TRUE.equals(config.get("mount_docker_socket"));
+
+        ShellResult result;
+        String executionMode;
+
+        if (containerImage != null && !containerImage.isBlank()) {
+            result = containerShellService.execute(command, context.getProjectPath(), timeout,
+                    containerImage, mountDockerSocket);
+            executionMode = "container:" + containerImage;
+        } else {
+            result = shellService.execute(command, context.getProjectPath(), timeout);
+            executionMode = "shell";
+        }
 
         step.setOutput(result.output());
         step.setStatus(result.exitCode() == 0 ? StepStatus.COMPLETED : StepStatus.FAILED);
@@ -47,7 +62,7 @@ public class ShellBlockExecutor implements BlockExecutor {
         step.setDurationMs(result.durationMs());
         step.setMetadata(Map.of(
                 "exitCode", result.exitCode(),
-                "executionMode", "shell"
+                "executionMode", executionMode
         ));
 
         return step;

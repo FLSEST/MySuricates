@@ -4,6 +4,7 @@ import com.automation.entity.BlockDefinition;
 import jakarta.validation.constraints.NotBlank;
 
 import java.util.List;
+import java.util.Map;
 
 public record CreateWorkflowRequest(
         @NotBlank String projectId,
@@ -14,7 +15,8 @@ public record CreateWorkflowRequest(
         List<String> activatedSkillIds,
         String instructions,
         String model,
-        String templateId
+        String templateId,
+        Map<String, Object> metadata
 ) {
     public CreateWorkflowRequest {
         if (blocks == null) blocks = List.of();

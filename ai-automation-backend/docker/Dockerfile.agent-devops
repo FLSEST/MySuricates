@@ -1,0 +1,53 @@
+FROM ubuntu:24.04
+
+# Create generic agent user - UID is overridden at runtime via --user
+# Ubuntu 24.04 ships with UID 1000 (ubuntu user), so remove it first
+RUN userdel -r ubuntu 2>/dev/null; useradd -m -u 1000 agent
+
+# Install base tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git curl jq bash python3 ca-certificates gnupg && \
+    rm -rf /var/lib/apt/lists/*
+
+# GitHub CLI (gh) — official APT repo
+RUN mkdir -p /etc/apt/keyrings && \
+    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+      -o /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
+    chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+      > /etc/apt/sources.list.d/github-cli.list && \
+    apt-get update && apt-get install -y gh && \
+    rm -rf /var/lib/apt/lists/*
+
+# gitleaks — binary from GitHub releases
+RUN ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "amd64" ]; then ARCH="x64"; fi && \
+    VERSION=$(curl -fsSL "https://api.github.com/repos/gitleaks/gitleaks/releases/latest" | jq -r .tag_name | sed 's/^v//') && \
+    curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_${ARCH}.tar.gz" \
+      -o /tmp/gitleaks.tar.gz && \
+    tar -xzf /tmp/gitleaks.tar.gz -C /usr/local/bin gitleaks && \
+    chmod +x /usr/local/bin/gitleaks && \
+    rm /tmp/gitleaks.tar.gz
+
+# trivy — official installer
+RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+
+# Docker CE CLI only (no daemon)
+RUN install -m 0755 -d /etc/apt/keyrings && \
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc && \
+    chmod a+r /etc/apt/keyrings/docker.asc && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu noble stable" \
+      > /etc/apt/sources.list.d/docker.list && \
+    apt-get update && apt-get install -y --no-install-recommends docker-ce-cli && \
+    rm -rf /var/lib/apt/lists/*
+
+# Prepare home directories
+RUN mkdir -p /home/agent/.cache /home/agent/.config && \
+    chown -R agent:agent /home/agent
+
+ENV HOME="/home/agent"
+
+USER agent
+WORKDIR /workspace
+
+CMD ["tail", "-f", "/dev/null"]

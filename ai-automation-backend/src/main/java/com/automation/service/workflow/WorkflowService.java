@@ -60,6 +60,10 @@ public class WorkflowService {
                 .templateId(request.templateId())
                 .build();
 
+        if (request.metadata() != null) {
+            workflow.getMetadata().putAll(request.metadata());
+        }
+
         // Activate skills if provided
         if (request.activatedSkillIds() != null) {
             List<Skill> skills = skillRepository.findAllById(request.activatedSkillIds());

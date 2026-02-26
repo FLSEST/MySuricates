@@ -6,7 +6,7 @@ import { useThemeStore } from '../stores/themeStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useI18nStore, type Locale } from '../i18n';
 import { useT } from '../i18n';
-import { useSystemHealth, useSystemInfo, useRemoteAccessStatus, useEnableRemoteAccess, useDisableRemoteAccess, useBackupList } from '../hooks/useSystem';
+import { useSystemHealth, useSystemInfo, useRemoteAccessStatus, useEnableRemoteAccess, useDisableRemoteAccess, useBackupList, useUpdateSystemSetting } from '../hooks/useSystem';
 import { useStagingStatus, useStagingStart, useStagingStop, useStagingPromote, useStagingCancel, useStagingSync } from '../hooks/useStaging';
 import { Sun, Moon, Globe, Shield, Paintbrush, Wifi, Server, RotateCcw, Database, Download, HardDrive, Container, Play, Square, Upload, ExternalLink, X, RefreshCw } from 'lucide-react';
 import { lightTheme, darkTheme, type ThemeTokens } from '../theme/tokens';
@@ -27,7 +27,8 @@ const COLOR_KEYS: Array<{ key: keyof ThemeTokens; label: string }> = [
 export function Settings() {
   const t = useT();
   const { mode, setMode, overrides, setOverride, resetOverrides } = useThemeStore();
-  const { apiKey, setApiKey, advancedMode, setAdvancedMode } = useSettingsStore();
+  const { apiKey, setApiKey, advancedMode, setAdvancedMode, autoTodoDefault, setAutoTodoDefault } = useSettingsStore();
+  const updateSetting = useUpdateSystemSetting();
   const { locale, setLocale } = useI18nStore();
   const [backupLoading, setBackupLoading] = useState(false);
 
@@ -134,6 +135,21 @@ export function Settings() {
               <p className="text-xs text-text-tertiary">{t.settings.advancedHint}</p>
             </div>
             <Toggle enabled={advancedMode} onChange={setAdvancedMode} />
+          </div>
+
+          {/* Auto-Todo Default */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-text">{t.settings.autoTodoDefault}</p>
+              <p className="text-xs text-text-tertiary">{t.settings.autoTodoDefaultHint}</p>
+            </div>
+            <Toggle
+              enabled={autoTodoDefault}
+              onChange={(enabled) => {
+                setAutoTodoDefault(enabled);
+                updateSetting.mutate({ key: 'auto-todo-default', value: String(enabled) });
+              }}
+            />
           </div>
         </div>
       </Card>

@@ -491,7 +491,7 @@ public final class BuiltInTemplates {
                         "en", "Create a new GitHub repository with labels, branch protection, and initial issues"),
                 "CODE", order++,
                 List.of(
-                        block("shell", Map.of("command", "set -euo pipefail\nVIS=\"{{ visibility }}\"\nORG=\"{{ org }}\"\nREPO=\"{{ repo_name }}\"\nif [ -n \"$ORG\" ] && [ \"$ORG\" != \"none\" ]; then\n  gh repo create \"$ORG/$REPO\" --\"$VIS\" --clone\nelse\n  gh repo create \"$REPO\" --\"$VIS\" --clone\nfi\ncd \"$REPO\"\ngit commit --allow-empty -m \"Initial commit\"\ngit push -u origin main\necho \"Repository created: $(gh repo view --json url -q .url)\"")),
+                        block("shell", Map.of("command", "set -euo pipefail\nVIS=\"{{ visibility }}\"\nORG=\"{{ org }}\"\nREPO=\"{{ repo_name }}\"\nif [ -n \"$ORG\" ] && [ \"$ORG\" != \"none\" ]; then\n  gh repo create \"$ORG/$REPO\" --\"$VIS\" --clone\nelse\n  gh repo create \"$REPO\" --\"$VIS\" --clone\nfi\ncd \"$REPO\"\ngit commit --allow-empty -m \"Initial commit\"\ngit push -u origin main\necho \"Repository created: $(gh repo view --json url -q .url)\"", "container_image", "automation-agent-devops:latest")),
                         block("foreach", Map.of(
                                 "variable_name", "label",
                                 "items_source", "inline",
@@ -499,11 +499,11 @@ public final class BuiltInTemplates {
                                 "execution_mode", "shell",
                                 "command", "set -euo pipefail\ncd \"{{ repo_name }}\"\nNAME=\"$(echo '{{ label }}' | cut -d: -f1)\"\nCOLOR=\"$(echo '{{ label }}' | cut -d: -f2)\"\ngh label create \"$NAME\" --color \"$COLOR\" --force\necho \"Label created: $NAME\""
                         )),
-                        block("shell", Map.of("command", "set -euo pipefail\ncd \"{{ repo_name }}\"\ngh api repos/{owner}/{repo}/branches/main/protection \\\n  --method PUT \\\n  --input - <<'JSON'\n{\n  \"required_pull_request_reviews\": { \"required_approving_review_count\": 1 },\n  \"enforce_admins\": false,\n  \"required_status_checks\": null,\n  \"restrictions\": null\n}\nJSON\necho \"Branch protection enabled on main\"")),
-                        block("shell", Map.of("command", "set -euo pipefail\ncd \"{{ repo_name }}\"\ngh issue create --title \"Project setup\" --body \"- [ ] Add README\\n- [ ] Configure CI/CD\\n- [ ] Add .gitignore\\n- [ ] Set up linting\" --label \"good-first-issue\"\ngh issue create --title \"Add contributing guidelines\" --body \"Add CONTRIBUTING.md with development workflow and coding standards.\" --label \"documentation\"\necho \"Initial issues created\""))
+                        block("shell", Map.of("command", "set -euo pipefail\ncd \"{{ repo_name }}\"\ngh api repos/{owner}/{repo}/branches/main/protection \\\n  --method PUT \\\n  --input - <<'JSON'\n{\n  \"required_pull_request_reviews\": { \"required_approving_review_count\": 1 },\n  \"enforce_admins\": false,\n  \"required_status_checks\": null,\n  \"restrictions\": null\n}\nJSON\necho \"Branch protection enabled on main\"", "container_image", "automation-agent-devops:latest")),
+                        block("shell", Map.of("command", "set -euo pipefail\ncd \"{{ repo_name }}\"\ngh issue create --title \"Project setup\" --body \"- [ ] Add README\\n- [ ] Configure CI/CD\\n- [ ] Add .gitignore\\n- [ ] Set up linting\" --label \"good-first-issue\"\ngh issue create --title \"Add contributing guidelines\" --body \"Add CONTRIBUTING.md with development workflow and coding standards.\" --label \"documentation\"\necho \"Initial issues created\"", "container_image", "automation-agent-devops:latest"))
                 ),
                 "Erstelle ein neues GitHub-Repository mit Standardkonfiguration. Variablen: repo_name, visibility (public/private), org (Organisation oder 'none').",
-                null));
+                null, "1.1.0"));
 
         templates.add(template("dependency-update-check", "\uD83D\uDCE6",
                 Map.of("de", "Dependency Update Check", "en", "Dependency Update Check"),
@@ -530,17 +530,17 @@ public final class BuiltInTemplates {
                         "en", "Scan repository for checked-in secrets"),
                 "CODE", order++,
                 List.of(
-                        block("shell", Map.of("command", "set -euo pipefail\ncd \"{{ project_path }}\"\nTOOL=\"{{ tool }}\"\necho \"=== Secret Scan ===\"\nif [ \"$TOOL\" = \"gitleaks\" ]; then\n  gitleaks detect --source . --report-format json --report-path /tmp/gitleaks-report.json 2>&1 && echo \"No secrets found.\" || echo \"Potential secrets detected!\"\nelif [ \"$TOOL\" = \"trufflehog\" ]; then\n  trufflehog filesystem --json . > /tmp/trufflehog-report.json 2>&1 || true\n  FINDINGS=$(wc -l < /tmp/trufflehog-report.json)\n  echo \"Findings: $FINDINGS\"\nelse\n  echo \"Unsupported tool: $TOOL (use gitleaks or trufflehog)\" && exit 1\nfi")),
+                        block("shell", Map.of("command", "set -euo pipefail\nTOOL=\"{{ tool }}\"\necho \"=== Secret Scan ($(pwd)) ===\"\nif [ \"$TOOL\" = \"gitleaks\" ]; then\n  gitleaks detect --source . --report-format json --report-path .gitleaks-report.json 2>&1 && echo \"No secrets found.\" || echo \"Potential secrets detected!\"\nelif [ \"$TOOL\" = \"trufflehog\" ]; then\n  trufflehog filesystem --json . > .trufflehog-report.json 2>&1 || true\n  FINDINGS=$(wc -l < .trufflehog-report.json)\n  echo \"Findings: $FINDINGS\"\nelse\n  echo \"Unsupported tool: $TOOL (use gitleaks or trufflehog)\" && exit 1\nfi", "container_image", "automation-agent-devops:latest")),
                         block("conditional", Map.of(
-                                "condition", "TOOL=\"{{ tool }}\"; if [ \"$TOOL\" = \"gitleaks\" ]; then [ -f /tmp/gitleaks-report.json ] && python3 -c \"import json; f=json.load(open('/tmp/gitleaks-report.json')); exit(0 if len(f)>0 else 1)\"; elif [ \"$TOOL\" = \"trufflehog\" ]; then [ -f /tmp/trufflehog-report.json ] && [ -s /tmp/trufflehog-report.json ]; else exit 1; fi",
+                                "condition", "TOOL=\"{{ tool }}\"; if [ \"$TOOL\" = \"gitleaks\" ]; then [ -f .gitleaks-report.json ] && python3 -c \"import json; f=json.load(open('.gitleaks-report.json')); exit(0 if len(f)>0 else 1)\"; elif [ \"$TOOL\" = \"trufflehog\" ]; then [ -f .trufflehog-report.json ] && [ -s .trufflehog-report.json ]; else exit 1; fi",
                                 "then_command", "echo \"WARNING: Secrets found! Review the report below.\"",
                                 "else_command", "echo \"All clear - no secrets detected.\"",
                                 "execution_mode", "shell"
                         )),
-                        block("shell", Map.of("command", "set -euo pipefail\nTOOL=\"{{ tool }}\"\necho \"# Secret Scan Report\"\necho \"Generated: $(date -Iseconds)\"\necho \"Project: {{ project_path }}\"\necho \"Tool: $TOOL\"\necho \"\"\nif [ \"$TOOL\" = \"gitleaks\" ] && [ -f /tmp/gitleaks-report.json ]; then\n  COUNT=$(python3 -c \"import json; print(len(json.load(open('/tmp/gitleaks-report.json'))))\" 2>/dev/null || echo 0)\n  echo \"Findings: $COUNT\"\n  if [ \"$COUNT\" != \"0\" ]; then\n    python3 -c \"\nimport json\nfor f in json.load(open('/tmp/gitleaks-report.json')):\n    print(f'- {f.get(\\\"RuleID\\\",\\\"unknown\\\")}: {f.get(\\\"File\\\",\\\"?\\\")}:{f.get(\\\"StartLine\\\",\\\"?\\\")}')\" 2>/dev/null || true\n  fi\nelif [ \"$TOOL\" = \"trufflehog\" ] && [ -f /tmp/trufflehog-report.json ]; then\n  LINES=$(wc -l < /tmp/trufflehog-report.json)\n  echo \"Findings: $LINES\"\nfi\nrm -f /tmp/gitleaks-report.json /tmp/trufflehog-report.json"))
+                        block("shell", Map.of("command", "set -euo pipefail\nTOOL=\"{{ tool }}\"\necho \"# Secret Scan Report\"\necho \"Generated: $(date -Iseconds)\"\necho \"Project: $(pwd)\"\necho \"Tool: $TOOL\"\necho \"\"\nif [ \"$TOOL\" = \"gitleaks\" ] && [ -f .gitleaks-report.json ]; then\n  COUNT=$(python3 -c \"import json; print(len(json.load(open('.gitleaks-report.json'))))\" 2>/dev/null || echo 0)\n  echo \"Findings: $COUNT\"\n  if [ \"$COUNT\" != \"0\" ]; then\n    python3 -c \"\nimport json\nfor f in json.load(open('.gitleaks-report.json')):\n    print(f'- {f.get(\\\"RuleID\\\",\\\"unknown\\\")}: {f.get(\\\"File\\\",\\\"?\\\")}:{f.get(\\\"StartLine\\\",\\\"?\\\")}')\" 2>/dev/null || true\n  fi\nelif [ \"$TOOL\" = \"trufflehog\" ] && [ -f .trufflehog-report.json ]; then\n  LINES=$(wc -l < .trufflehog-report.json)\n  echo \"Findings: $LINES\"\nfi\nrm -f .gitleaks-report.json .trufflehog-report.json", "container_image", "automation-agent-devops:latest"))
                 ),
-                "Scanne ein Repository nach eingecheckten Secrets. Variablen: project_path, tool (gitleaks/trufflehog).",
-                null));
+                "Scanne das Projekt-Repository nach eingecheckten Secrets. Variablen: tool (gitleaks/trufflehog).",
+                null, "1.3.0"));
 
         templates.add(template("container-vuln-scan", "\uD83D\uDC33",
                 Map.of("de", "Container Vulnerability Scan", "en", "Container Vulnerability Scan"),
@@ -548,18 +548,18 @@ public final class BuiltInTemplates {
                         "en", "Scan Docker images for CVEs"),
                 "CODE", order++,
                 List.of(
-                        block("shell", Map.of("command", "set -euo pipefail\nIMAGE=\"{{ image_name }}\"\nTHRESHOLD=\"{{ severity_threshold }}\"\necho \"=== Scanning $IMAGE for $THRESHOLD+ vulnerabilities ===\"\ntrivy image --severity \"$THRESHOLD\" --format table \"$IMAGE\" 2>&1 || true")),
-                        block("shell", Map.of("command", "set -euo pipefail\nIMAGE=\"{{ image_name }}\"\nTHRESHOLD=\"{{ severity_threshold }}\"\ntrivy image --severity \"$THRESHOLD\" --format json \"$IMAGE\" 2>/dev/null > /tmp/trivy-report.json || true\npython3 -c \"\nimport json, sys\ntry:\n    data = json.load(open('/tmp/trivy-report.json'))\n    results = data.get('Results', [])\n    total = sum(len(r.get('Vulnerabilities', [])) for r in results)\n    by_sev = {}\n    for r in results:\n        for v in r.get('Vulnerabilities', []):\n            s = v.get('Severity', 'UNKNOWN')\n            by_sev[s] = by_sev.get(s, 0) + 1\n    print(f'Total vulnerabilities: {total}')\n    for s, c in sorted(by_sev.items()):\n        print(f'  {s}: {c}')\nexcept Exception as e:\n    print(f'Error parsing report: {e}', file=sys.stderr)\n\" 2>&1")),
+                        block("shell", Map.of("command", "set -euo pipefail\nIMAGE=\"{{ image_name }}\"\nTHRESHOLD=\"{{ severity_threshold }}\"\necho \"=== Scanning $IMAGE for $THRESHOLD+ vulnerabilities ===\"\ntrivy image --severity \"$THRESHOLD\" --format table \"$IMAGE\" 2>&1 || true", "container_image", "automation-agent-devops:latest", "mount_docker_socket", true)),
+                        block("shell", Map.of("command", "set -euo pipefail\nIMAGE=\"{{ image_name }}\"\nTHRESHOLD=\"{{ severity_threshold }}\"\ntrivy image --severity \"$THRESHOLD\" --format json \"$IMAGE\" 2>/dev/null > .trivy-report.json || true\npython3 -c \"\nimport json, sys\ntry:\n    data = json.load(open('.trivy-report.json'))\n    results = data.get('Results', [])\n    total = sum(len(r.get('Vulnerabilities', [])) for r in results)\n    by_sev = {}\n    for r in results:\n        for v in r.get('Vulnerabilities', []):\n            s = v.get('Severity', 'UNKNOWN')\n            by_sev[s] = by_sev.get(s, 0) + 1\n    print(f'Total vulnerabilities: {total}')\n    for s, c in sorted(by_sev.items()):\n        print(f'  {s}: {c}')\nexcept Exception as e:\n    print(f'Error parsing report: {e}', file=sys.stderr)\n\" 2>&1", "container_image", "automation-agent-devops:latest", "mount_docker_socket", true)),
                         block("conditional", Map.of(
-                                "condition", "python3 -c \"import json; data=json.load(open('/tmp/trivy-report.json')); results=data.get('Results',[]); criticals=sum(1 for r in results for v in r.get('Vulnerabilities',[]) if v.get('Severity')=='CRITICAL'); exit(0 if criticals>0 else 1)\" 2>/dev/null",
+                                "condition", "python3 -c \"import json; data=json.load(open('.trivy-report.json')); results=data.get('Results',[]); criticals=sum(1 for r in results for v in r.get('Vulnerabilities',[]) if v.get('Severity')=='CRITICAL'); exit(0 if criticals>0 else 1)\" 2>/dev/null",
                                 "then_command", "echo \"CRITICAL CVEs found! Do not deploy this image without remediation.\"",
                                 "else_command", "echo \"No CRITICAL CVEs found.\"",
                                 "execution_mode", "shell"
                         )),
-                        block("shell", Map.of("command", "set -euo pipefail\necho \"# Container Vulnerability Report\"\necho \"Generated: $(date -Iseconds)\"\necho \"Image: {{ image_name }}\"\necho \"Threshold: {{ severity_threshold }}\"\necho \"\"\ntrivy image --severity \"{{ severity_threshold }}\" --format table \"{{ image_name }}\" 2>&1 | head -80 || true\nrm -f /tmp/trivy-report.json"))
+                        block("shell", Map.of("command", "set -euo pipefail\necho \"# Container Vulnerability Report\"\necho \"Generated: $(date -Iseconds)\"\necho \"Image: {{ image_name }}\"\necho \"Threshold: {{ severity_threshold }}\"\necho \"\"\ntrivy image --severity \"{{ severity_threshold }}\" --format table \"{{ image_name }}\" 2>&1 | head -80 || true\nrm -f .trivy-report.json", "container_image", "automation-agent-devops:latest", "mount_docker_socket", true))
                 ),
                 "Scanne ein Docker Image auf CVEs mit Trivy. Variablen: image_name, severity_threshold (CRITICAL/HIGH/MEDIUM).",
-                null));
+                null, "1.2.0"));
 
         templates.add(template("database-backup-verify", "\uD83D\uDDC4\uFE0F",
                 Map.of("de", "Datenbank-Backup & Verify", "en", "Database Backup & Verify"),
@@ -609,18 +609,18 @@ public final class BuiltInTemplates {
                         "en", "Docker build, tag, and push to registry"),
                 "CODE", order++,
                 List.of(
-                        block("shell", Map.of("command", "set -euo pipefail\nDOCKERFILE=\"{{ dockerfile }}\"\nIMAGE=\"{{ image_name }}\"\nTAG=\"{{ tag }}\"\nREGISTRY=\"{{ registry }}\"\nFULL_IMAGE=\"$REGISTRY/$IMAGE:$TAG\"\necho \"=== Building $FULL_IMAGE ===\"\ndocker build -f \"$DOCKERFILE\" -t \"$FULL_IMAGE\" .\necho \"Build complete: $FULL_IMAGE\"")),
+                        block("shell", Map.of("command", "set -euo pipefail\nDOCKERFILE=\"{{ dockerfile }}\"\nIMAGE=\"{{ image_name }}\"\nTAG=\"{{ tag }}\"\nREGISTRY=\"{{ registry }}\"\nFULL_IMAGE=\"$REGISTRY/$IMAGE:$TAG\"\necho \"=== Building $FULL_IMAGE ===\"\ndocker build -f \"$DOCKERFILE\" -t \"$FULL_IMAGE\" .\necho \"Build complete: $FULL_IMAGE\"", "container_image", "automation-agent-devops:latest", "mount_docker_socket", true)),
                         block("conditional", Map.of(
                                 "condition", "docker image inspect \"{{ registry }}/{{ image_name }}:{{ tag }}\" >/dev/null 2>&1",
                                 "then_command", "echo \"Build verified: image exists locally.\"",
                                 "else_command", "echo \"ERROR: Build failed - image not found!\" && exit 1",
                                 "execution_mode", "shell"
                         )),
-                        block("shell", Map.of("command", "set -euo pipefail\nIMAGE=\"{{ image_name }}\"\nTAG=\"{{ tag }}\"\nREGISTRY=\"{{ registry }}\"\nFULL_IMAGE=\"$REGISTRY/$IMAGE:$TAG\"\nLATEST=\"$REGISTRY/$IMAGE:latest\"\necho \"=== Tagging + Pushing ===\"\ndocker tag \"$FULL_IMAGE\" \"$LATEST\"\ndocker push \"$FULL_IMAGE\"\ndocker push \"$LATEST\"\necho \"Pushed: $FULL_IMAGE and $LATEST\"")),
-                        block("shell", Map.of("command", "set -euo pipefail\nFULL_IMAGE=\"{{ registry }}/{{ image_name }}:{{ tag }}\"\necho \"# Docker Build & Push Report\"\necho \"Generated: $(date -Iseconds)\"\necho \"Image: $FULL_IMAGE\"\necho \"Latest: {{ registry }}/{{ image_name }}:latest\"\necho \"\"\necho \"## Image Details\"\ndocker image inspect \"$FULL_IMAGE\" --format 'Size: {{.Size}} bytes' 2>/dev/null || true\ndocker image inspect \"$FULL_IMAGE\" --format 'Created: {{.Created}}' 2>/dev/null || true\necho \"\"\necho \"## Layers\"\ndocker history \"$FULL_IMAGE\" --no-trunc --format 'table {{.CreatedBy}}\\t{{.Size}}' 2>/dev/null | head -15 || true"))
+                        block("shell", Map.of("command", "set -euo pipefail\nIMAGE=\"{{ image_name }}\"\nTAG=\"{{ tag }}\"\nREGISTRY=\"{{ registry }}\"\nFULL_IMAGE=\"$REGISTRY/$IMAGE:$TAG\"\nLATEST=\"$REGISTRY/$IMAGE:latest\"\necho \"=== Tagging + Pushing ===\"\ndocker tag \"$FULL_IMAGE\" \"$LATEST\"\ndocker push \"$FULL_IMAGE\"\ndocker push \"$LATEST\"\necho \"Pushed: $FULL_IMAGE and $LATEST\"", "container_image", "automation-agent-devops:latest", "mount_docker_socket", true)),
+                        block("shell", Map.of("command", "set -euo pipefail\nFULL_IMAGE=\"{{ registry }}/{{ image_name }}:{{ tag }}\"\necho \"# Docker Build & Push Report\"\necho \"Generated: $(date -Iseconds)\"\necho \"Image: $FULL_IMAGE\"\necho \"Latest: {{ registry }}/{{ image_name }}:latest\"\necho \"\"\necho \"## Image Details\"\ndocker image inspect \"$FULL_IMAGE\" --format 'Size: {{.Size}} bytes' 2>/dev/null || true\ndocker image inspect \"$FULL_IMAGE\" --format 'Created: {{.Created}}' 2>/dev/null || true\necho \"\"\necho \"## Layers\"\ndocker history \"$FULL_IMAGE\" --no-trunc --format 'table {{.CreatedBy}}\\t{{.Size}}' 2>/dev/null | head -15 || true", "container_image", "automation-agent-devops:latest", "mount_docker_socket", true))
                 ),
                 "Baue und pushe ein Docker Image. Variablen: dockerfile, image_name, tag, registry.",
-                null));
+                null, "1.1.0"));
 
         return templates;
     }

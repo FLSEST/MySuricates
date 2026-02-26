@@ -1,6 +1,7 @@
 package com.automation.controller;
 
 import com.automation.dto.response.RemoteAccessResponse;
+import com.automation.repository.AppSettingsRepository;
 import com.automation.service.system.DatabaseBackupService;
 import com.automation.service.system.TailscaleService;
 import com.github.dockerjava.api.DockerClient;
@@ -30,6 +31,7 @@ public class SystemController {
     private final DockerClient dockerClient;
     private final TailscaleService tailscaleService;
     private final DatabaseBackupService databaseBackupService;
+    private final AppSettingsRepository appSettingsRepository;
 
     @Value("${app.version:0.1.0-SNAPSHOT}")
     private String appVersion;
@@ -137,6 +139,30 @@ public class SystemController {
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .contentLength(Files.size(file))
                 .body(resource);
+    }
+
+    private static final Set<String> ALLOWED_SETTINGS = Set.of("auto-todo-default");
+
+    @GetMapping("/settings/{key}")
+    public ResponseEntity<Map<String, String>> getSetting(@PathVariable String key) {
+        if (!ALLOWED_SETTINGS.contains(key)) {
+            return ResponseEntity.badRequest().build();
+        }
+        String value = appSettingsRepository.get(key).orElse(null);
+        return ResponseEntity.ok(Map.of("key", key, "value", value != null ? value : ""));
+    }
+
+    @PutMapping("/settings/{key}")
+    public ResponseEntity<Void> setSetting(@PathVariable String key, @RequestBody Map<String, String> body) {
+        if (!ALLOWED_SETTINGS.contains(key)) {
+            return ResponseEntity.badRequest().build();
+        }
+        String value = body.get("value");
+        if (value == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        appSettingsRepository.set(key, value);
+        return ResponseEntity.ok().build();
     }
 
     private static final Set<String> BLOCKED_PREFIXES = Set.of(

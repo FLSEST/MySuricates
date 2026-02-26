@@ -4,6 +4,7 @@ import com.automation.entity.GateStatus;
 import com.automation.entity.RunStatus;
 import com.automation.entity.Todo;
 import com.automation.event.WorkflowRunCompletedEvent;
+import com.automation.repository.AppSettingsRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.service.todo.GateStatusResolver.GateResult;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +15,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -33,6 +35,9 @@ class AutoTodoServiceTest {
 
     @Mock
     private ProjectPathResolver projectPathResolver;
+
+    @Mock
+    private AppSettingsRepository appSettingsRepository;
 
     @InjectMocks
     private AutoTodoService autoTodoService;
@@ -181,6 +186,44 @@ class AutoTodoServiceTest {
         assertThat(updated.getId()).isEqualTo("todo-existing");
         assertThat(updated.getWorkflowRunId()).isEqualTo("run-1");
         assertThat(updated.getDescription()).contains("5 errors now");
+    }
+
+    @Test
+    void globalDefault_enablesAutoTodoWhenNoExplicitSetting() {
+        // Workflow has no autoTodo in metadata — fallback to global default
+        WorkflowRunCompletedEvent event = createEvent(RunStatus.FAILED, Map.of(), Map.of());
+        when(appSettingsRepository.get("auto-todo-default")).thenReturn(Optional.of("true"));
+        when(gateStatusResolver.resolve(event))
+                .thenReturn(new GateResult(GateStatus.RED, "execution-failure", "Process exited with code 1"));
+        when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(Optional.empty());
+        when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        autoTodoService.onWorkflowRunCompleted(event);
+
+        verify(todoRepository).save(any(Todo.class));
+    }
+
+    @Test
+    void globalDefault_disabledDoesNotCreateTodo() {
+        WorkflowRunCompletedEvent event = createEvent(RunStatus.FAILED, Map.of(), Map.of());
+        when(appSettingsRepository.get("auto-todo-default")).thenReturn(Optional.of("false"));
+
+        autoTodoService.onWorkflowRunCompleted(event);
+
+        verifyNoInteractions(todoRepository);
+    }
+
+    @Test
+    void explicitDisable_overridesGlobalDefault() {
+        // Workflow explicitly sets autoTodo.enabled = false, even with global default true
+        Map<String, Object> meta = Map.of("autoTodo", Map.of("enabled", false));
+        WorkflowRunCompletedEvent event = createEvent(RunStatus.FAILED, Map.of(), meta);
+
+        autoTodoService.onWorkflowRunCompleted(event);
+
+        verifyNoInteractions(todoRepository);
+        verifyNoInteractions(appSettingsRepository);
     }
 
     private WorkflowRunCompletedEvent createEvent(RunStatus status,
