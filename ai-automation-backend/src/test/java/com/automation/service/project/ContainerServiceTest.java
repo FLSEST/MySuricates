@@ -1,0 +1,270 @@
+package com.automation.service.project;
+
+import com.automation.entity.Container;
+import com.automation.entity.ContainerStatus;
+import com.automation.entity.Project;
+import com.automation.entity.ProjectType;
+import com.automation.exception.ContainerException;
+import com.automation.repository.ContainerRepository;
+import com.automation.service.activitylog.ActivityLogService;
+import com.automation.service.workflow.WorkflowExecutor;
+import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.api.command.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class ContainerServiceTest {
+
+    @Mock
+    private DockerClient dockerClient;
+
+    @Mock
+    private ContainerRepository containerRepository;
+
+    @Mock
+    private WorkflowExecutor workflowExecutor;
+
+    @Mock
+    private ActivityLogService activityLogService;
+
+    private ContainerService service;
+
+    private Project testProject;
+
+    @BeforeEach
+    void setUp() {
+        service = new ContainerService(
+                dockerClient,
+                containerRepository,
+                workflowExecutor,
+                activityLogService,
+                100_000L,   // cpuQuota
+                4_294_967_296L, // memoryLimit (4GB)
+                100L,       // pidsLimit
+                60,         // idleTimeoutMinutes
+                "/home/test", // hostHome
+                "1000"      // hostUid
+        );
+
+        testProject = Project.builder()
+                .id("project-1")
+                .name("Test Project")
+                .path("/test/project")
+                .type(ProjectType.CODE)
+                .build();
+    }
+
+    private void stubDockerRemoveCommands() {
+        StopContainerCmd stopCmd = mock(StopContainerCmd.class);
+        when(stopCmd.withTimeout(anyInt())).thenReturn(stopCmd);
+        lenient().when(dockerClient.stopContainerCmd(anyString())).thenReturn(stopCmd);
+
+        RemoveContainerCmd removeCmd = mock(RemoveContainerCmd.class);
+        when(removeCmd.withForce(true)).thenReturn(removeCmd);
+        lenient().when(dockerClient.removeContainerCmd(anyString())).thenReturn(removeCmd);
+    }
+
+    private void stubDockerInspectRunning(String containerId) {
+        InspectContainerResponse inspectResponse = mock(InspectContainerResponse.class);
+        InspectContainerResponse.ContainerState state = mock(InspectContainerResponse.ContainerState.class);
+        when(state.getRunning()).thenReturn(true);
+        when(inspectResponse.getState()).thenReturn(state);
+        InspectContainerCmd inspectCmd = mock(InspectContainerCmd.class);
+        when(inspectCmd.exec()).thenReturn(inspectResponse);
+        when(dockerClient.inspectContainerCmd(containerId)).thenReturn(inspectCmd);
+    }
+
+    private void stubDockerInspectNotRunning(String containerId) {
+        InspectContainerCmd inspectCmd = mock(InspectContainerCmd.class);
+        when(inspectCmd.exec()).thenThrow(new RuntimeException("not found"));
+        when(dockerClient.inspectContainerCmd(containerId)).thenReturn(inspectCmd);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void stubDockerCreateAndStart(String responseId) {
+        CreateContainerResponse createResponse = mock(CreateContainerResponse.class);
+        when(createResponse.getId()).thenReturn(responseId);
+
+        CreateContainerCmd createCmd = mock(CreateContainerCmd.class, RETURNS_DEEP_STUBS);
+        when(createCmd.withName(anyString())).thenReturn(createCmd);
+        when(createCmd.withHostConfig(any())).thenReturn(createCmd);
+        when(createCmd.withUser(anyString())).thenReturn(createCmd);
+        when(createCmd.withWorkingDir(anyString())).thenReturn(createCmd);
+        when(createCmd.withCmd(any(String[].class))).thenReturn(createCmd);
+        when(createCmd.exec()).thenReturn(createResponse);
+        when(dockerClient.createContainerCmd(anyString())).thenReturn(createCmd);
+
+        StartContainerCmd startCmd = mock(StartContainerCmd.class);
+        when(dockerClient.startContainerCmd(responseId)).thenReturn(startCmd);
+    }
+
+    @Test
+    void createAndStart_noExisting_createsNewContainer() {
+        when(containerRepository.findByProjectId("project-1")).thenReturn(Optional.empty());
+        stubDockerRemoveCommands();
+        stubDockerCreateAndStart("docker-123");
+        when(containerRepository.save(any(Container.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Container result = service.createAndStartContainer(testProject);
+
+        assertThat(result.getDockerContainerId()).isEqualTo("docker-123");
+        assertThat(result.getStatus()).isEqualTo(ContainerStatus.RUNNING);
+        verify(containerRepository).save(any(Container.class));
+    }
+
+    @Test
+    void createAndStart_existingRunning_reusesContainer() {
+        Container existing = Container.builder()
+                .id("c1")
+                .project(testProject)
+                .dockerContainerId("docker-existing")
+                .status(ContainerStatus.RUNNING)
+                .build();
+        when(containerRepository.findByProjectId("project-1")).thenReturn(Optional.of(existing));
+        stubDockerInspectRunning("docker-existing");
+
+        Container result = service.createAndStartContainer(testProject);
+
+        assertThat(result.getDockerContainerId()).isEqualTo("docker-existing");
+        verify(dockerClient, never()).createContainerCmd(anyString());
+    }
+
+    @Test
+    void createAndStart_existingStale_removesAndCreatesNew() {
+        Container stale = Container.builder()
+                .id("c1")
+                .project(testProject)
+                .dockerContainerId("docker-stale")
+                .status(ContainerStatus.RUNNING)
+                .build();
+        when(containerRepository.findByProjectId("project-1")).thenReturn(Optional.of(stale));
+        stubDockerInspectNotRunning("docker-stale");
+        stubDockerRemoveCommands();
+        stubDockerCreateAndStart("docker-new");
+        when(containerRepository.save(any(Container.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Container result = service.createAndStartContainer(testProject);
+
+        assertThat(result.getDockerContainerId()).isEqualTo("docker-new");
+        verify(containerRepository).delete(stale);
+    }
+
+    @Test
+    void createAndStart_dockerFails_throwsContainerException() {
+        when(containerRepository.findByProjectId("project-1")).thenReturn(Optional.empty());
+        stubDockerRemoveCommands();
+        when(dockerClient.createContainerCmd(anyString())).thenThrow(new RuntimeException("Docker error"));
+
+        assertThatThrownBy(() -> service.createAndStartContainer(testProject))
+                .isInstanceOf(ContainerException.class)
+                .hasMessageContaining("Failed to create container");
+    }
+
+    @Test
+    void stopContainer_existingContainer_stopsAndUpdates() {
+        Container container = Container.builder()
+                .id("c1")
+                .project(testProject)
+                .dockerContainerId("docker-stop")
+                .status(ContainerStatus.RUNNING)
+                .build();
+        when(containerRepository.findByProjectId("project-1")).thenReturn(Optional.of(container));
+        stubDockerRemoveCommands();
+        when(containerRepository.save(any(Container.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.stopContainer(testProject);
+
+        assertThat(container.getStatus()).isEqualTo(ContainerStatus.STOPPED);
+        assertThat(container.getStoppedAt()).isNotNull();
+        verify(containerRepository).save(container);
+    }
+
+    @Test
+    void stopContainer_noContainer_doesNothing() {
+        when(containerRepository.findByProjectId("project-1")).thenReturn(Optional.empty());
+
+        service.stopContainer(testProject);
+
+        verify(containerRepository, never()).save(any());
+    }
+
+    @Test
+    void getDockerContainerId_runningContainer_returnsId() {
+        Container container = Container.builder()
+                .id("c1")
+                .project(testProject)
+                .dockerContainerId("docker-running")
+                .status(ContainerStatus.RUNNING)
+                .build();
+        when(containerRepository.findByProjectId("project-1")).thenReturn(Optional.of(container));
+        stubDockerInspectRunning("docker-running");
+
+        String id = service.getDockerContainerId(testProject);
+
+        assertThat(id).isEqualTo("docker-running");
+    }
+
+    @Test
+    void getDockerContainerId_staleContainer_correctsStatus() {
+        Container container = Container.builder()
+                .id("c1")
+                .project(testProject)
+                .dockerContainerId("docker-gone")
+                .status(ContainerStatus.RUNNING)
+                .build();
+        when(containerRepository.findByProjectId("project-1")).thenReturn(Optional.of(container));
+        stubDockerInspectNotRunning("docker-gone");
+        when(containerRepository.save(any(Container.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThatThrownBy(() -> service.getDockerContainerId(testProject))
+                .isInstanceOf(ContainerException.class);
+
+        assertThat(container.getStatus()).isEqualTo(ContainerStatus.STOPPED);
+    }
+
+    @Test
+    void getDockerContainerId_noContainer_throwsException() {
+        when(containerRepository.findByProjectId("project-1")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getDockerContainerId(testProject))
+                .isInstanceOf(ContainerException.class)
+                .hasMessageContaining("No running container");
+    }
+
+    @Test
+    void cleanupIdle_idleContainer_stopsIt() {
+        Container idle = Container.builder()
+                .id("c1")
+                .project(testProject)
+                .dockerContainerId("docker-idle")
+                .status(ContainerStatus.RUNNING)
+                .lastActivityAt(Instant.now().minus(120, ChronoUnit.MINUTES))
+                .startedAt(Instant.now().minus(120, ChronoUnit.MINUTES))
+                .build();
+        when(containerRepository.findByStatus(ContainerStatus.RUNNING)).thenReturn(List.of(idle));
+        when(workflowExecutor.getActiveContainerIds()).thenReturn(Set.of());
+        stubDockerRemoveCommands();
+        when(containerRepository.save(any(Container.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.cleanupIdleContainers();
+
+        assertThat(idle.getStatus()).isEqualTo(ContainerStatus.STOPPED);
+        verify(containerRepository).save(idle);
+    }
+}
