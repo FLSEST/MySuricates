@@ -199,6 +199,9 @@ export const de: TranslationKeys = {
     executeWithVariables: 'Mit Variablen ausführen',
     variablesDescription: 'Dieser Workflow benötigt Eingabewerte. Bitte füllen Sie alle Variablen aus.',
     enterValue: 'Wert eingeben für',
+    defaultValues: 'Standardwerte',
+    defaultValuesHint: 'Vorausgefüllte Werte für Variablen bei der Ausführung.',
+    defaultValueSet: 'Standardwert gesetzt',
     execution: {
       title: 'Workflow-Ausführung',
       running: 'Läuft...',

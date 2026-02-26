@@ -76,7 +76,11 @@ public class WorkflowExecutor {
 
         String templateId = workflow.getTemplateId();
 
-        Map<String, Object> contextVars = inputContext != null ? Map.copyOf(inputContext) : Map.of();
+        Map<String, Object> mergedContext = new HashMap<>(workflow.getDefaultContext());
+        if (inputContext != null) {
+            mergedContext.putAll(inputContext);
+        }
+        Map<String, Object> contextVars = Map.copyOf(mergedContext);
 
         // Persist input context so it's visible in execution details
         if (!contextVars.isEmpty()) {

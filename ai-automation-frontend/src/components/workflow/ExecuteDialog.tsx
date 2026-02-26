@@ -7,13 +7,14 @@ interface ExecuteDialogProps {
   onClose: () => void;
   onExecute: (context: Record<string, string>) => void;
   variables: string[];
+  defaultValues?: Record<string, string>;
   loading?: boolean;
 }
 
-export function ExecuteDialog({ open, onClose, onExecute, variables, loading }: ExecuteDialogProps) {
+export function ExecuteDialog({ open, onClose, onExecute, variables, defaultValues, loading }: ExecuteDialogProps) {
   const t = useT();
   const [values, setValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(variables.map((v) => [v, '']))
+    Object.fromEntries(variables.map((v) => [v, defaultValues?.[v] ?? '']))
   );
 
   const allFilled = variables.every((v) => values[v]?.trim());
@@ -27,7 +28,7 @@ export function ExecuteDialog({ open, onClose, onExecute, variables, loading }: 
   const [prevKey, setPrevKey] = useState(variableKey);
   if (variableKey !== prevKey) {
     setPrevKey(variableKey);
-    setValues(Object.fromEntries(variables.map((v) => [v, ''])));
+    setValues(Object.fromEntries(variables.map((v) => [v, defaultValues?.[v] ?? ''])));
   }
 
   return (
@@ -54,7 +55,9 @@ export function ExecuteDialog({ open, onClose, onExecute, variables, loading }: 
             label={variable}
             value={values[variable] ?? ''}
             onChange={(e) => setValues({ ...values, [variable]: e.target.value })}
-            placeholder={`${t.workflows.enterValue} ${variable}`}
+            placeholder={defaultValues?.[variable]
+              ? `${t.workflows.defaultValueSet}: ${defaultValues[variable]}`
+              : `${t.workflows.enterValue} ${variable}`}
           />
         ))}
       </div>

@@ -580,6 +580,7 @@ export function Workflows() {
         onClose={() => setExecuteDialog({ open: false, workflow: null, variables: [] })}
         onExecute={handleExecuteWithContext}
         variables={executeDialog.variables}
+        defaultValues={executeDialog.workflow?.defaultContext}
         loading={executeWorkflow.isPending}
       />
 

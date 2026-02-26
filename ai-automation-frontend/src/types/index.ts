@@ -69,6 +69,7 @@ export interface Workflow {
   instructions: string | null;
   model: string | null;
   metadata?: Record<string, unknown>;
+  defaultContext?: Record<string, string>;
   createdAt: string;
   updatedAt: string;
 }
@@ -130,6 +131,7 @@ export interface UpdateWorkflowRequest {
   instructions?: string;
   model?: string;
   metadata?: Record<string, unknown>;
+  defaultContext?: Record<string, string>;
 }
 
 export type BlockType = 'simple' | 'shell' | 'retry' | 'foreach' | 'while' | 'conditional' | 'skill-capability' | 'approval' | 'agentic' | 'sub-workflow';

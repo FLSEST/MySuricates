@@ -342,6 +342,42 @@ class WorkflowExecutorTest {
     }
 
     @Test
+    void execute_mergesDefaultContextWithInputContext() {
+        testWorkflow.setDefaultContext(new HashMap<>(Map.of("branch", "main", "env", "prod")));
+
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        ArgumentCaptor<ExecutionContext> ctxCaptor = ArgumentCaptor.forClass(ExecutionContext.class);
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), ctxCaptor.capture()))
+                .thenReturn(step);
+
+        Map<String, Object> inputContext = Map.of("branch", "develop");
+        workflowExecutor.execute(testWorkflow, inputContext);
+
+        // Verify merged context: branch=develop (overridden) + env=prod (default)
+        ExecutionContext captured = ctxCaptor.getValue();
+        assertThat(captured.getVariable("branch")).isEqualTo("develop");
+        assertThat(captured.getVariable("env")).isEqualTo("prod");
+    }
+
+    @Test
+    void execute_usesDefaultContextWhenNoInputProvided() {
+        testWorkflow.setDefaultContext(new HashMap<>(Map.of("branch", "main")));
+
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        ArgumentCaptor<ExecutionContext> ctxCaptor = ArgumentCaptor.forClass(ExecutionContext.class);
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), ctxCaptor.capture()))
+                .thenReturn(step);
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        // Verify default context was applied
+        ExecutionContext captured = ctxCaptor.getValue();
+        assertThat(captured.getVariable("branch")).isEqualTo("main");
+    }
+
+    @Test
     void execute_publishesWorkflowRunCompletedEvent() {
         StepResult step = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();

@@ -23,6 +23,7 @@ public record WorkflowResponse(
         String instructions,
         String model,
         String templateId,
+        Map<String, Object> defaultContext,
         Instant createdAt,
         Instant updatedAt
 ) {}

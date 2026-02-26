@@ -197,6 +197,9 @@ export const en = {
     executeWithVariables: 'Execute with Variables',
     variablesDescription: 'This workflow requires input values. Please fill in all variables below.',
     enterValue: 'Enter value for',
+    defaultValues: 'Default Values',
+    defaultValuesHint: 'Pre-filled values for variables when executing.',
+    defaultValueSet: 'Default value set',
     execution: {
       title: 'Workflow Execution',
       running: 'Running...',

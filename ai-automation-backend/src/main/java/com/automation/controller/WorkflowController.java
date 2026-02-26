@@ -145,6 +145,7 @@ public class WorkflowController {
                 request.instructions(),
                 request.model(),
                 null,
+                null,
                 null
         );
         var workflow = workflowService.create(createRequest);

@@ -339,11 +339,13 @@ export function WorkflowExecution() {
       )}
 
       {/* Error */}
-      {run.error && (
+      {run.error && Object.keys(run.error).length > 0 && (
         <Card className="border-danger/30 bg-danger-subtle">
           <CardHeader title={t.workflows.execution.error} />
           <pre className="text-sm text-danger font-mono whitespace-pre-wrap">
-            {JSON.stringify(run.error, null, 2)}
+            {typeof run.error.message === 'string'
+              ? run.error.message
+              : JSON.stringify(run.error, null, 2)}
           </pre>
         </Card>
       )}

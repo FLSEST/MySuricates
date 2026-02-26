@@ -12,5 +12,6 @@ public record UpdateWorkflowRequest(
         List<BlockDefinition> blocks,
         String instructions,
         String model,
-        Map<String, Object> metadata
+        Map<String, Object> metadata,
+        Map<String, Object> defaultContext
 ) {}

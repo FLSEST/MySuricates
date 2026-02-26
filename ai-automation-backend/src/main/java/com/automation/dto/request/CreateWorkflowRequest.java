@@ -16,7 +16,8 @@ public record CreateWorkflowRequest(
         String instructions,
         String model,
         String templateId,
-        Map<String, Object> metadata
+        Map<String, Object> metadata,
+        Map<String, Object> defaultContext
 ) {
     public CreateWorkflowRequest {
         if (blocks == null) blocks = List.of();

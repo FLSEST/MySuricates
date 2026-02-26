@@ -64,6 +64,10 @@ public class WorkflowService {
             workflow.getMetadata().putAll(request.metadata());
         }
 
+        if (request.defaultContext() != null) {
+            workflow.getDefaultContext().putAll(request.defaultContext());
+        }
+
         // Activate skills if provided
         if (request.activatedSkillIds() != null) {
             List<Skill> skills = skillRepository.findAllById(request.activatedSkillIds());
@@ -101,6 +105,9 @@ public class WorkflowService {
             Map<String, Object> merged = new HashMap<>(workflow.getMetadata());
             merged.putAll(request.metadata());
             workflow.setMetadata(merged);
+        }
+        if (request.defaultContext() != null) {
+            workflow.setDefaultContext(new HashMap<>(request.defaultContext()));
         }
 
         Workflow saved = workflowRepository.save(workflow);

@@ -53,6 +53,11 @@ public class Workflow {
     @Builder.Default
     private Map<String, Object> metadata = new HashMap<>();
 
+    @Convert(converter = JsonMapConverter.class)
+    @Column(name = "default_context", columnDefinition = "text")
+    @Builder.Default
+    private Map<String, Object> defaultContext = new HashMap<>();
+
     @ManyToMany
     @JoinTable(
             name = "workflow_skills",
