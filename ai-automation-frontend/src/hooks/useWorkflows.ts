@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
+import { downloadJSON } from '../utils/downloadFile';
 import type { Workflow, WorkflowRun, CreateWorkflowRequest, UpdateWorkflowRequest, WorkflowExportData, PageResponse } from '../types';
 
 interface WorkflowApiResponse {
@@ -191,13 +192,7 @@ export function useSubmitApproval() {
 
 export async function exportWorkflow(id: string, filename: string) {
   const data = await api.get<WorkflowExportData>(`/workflows/export/${id}`);
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadJSON(data, filename);
 }
 
 export function useImportWorkflow() {

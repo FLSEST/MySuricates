@@ -23,6 +23,8 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+import static com.automation.config.ExecutionDefaults.*;
+
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -121,11 +123,11 @@ public class AgenticBlockExecutor implements BlockExecutor {
             }
 
             history.add(new Turn("assistant", reasoning));
-            iterData.put("reasoning", truncate(reasoning, 2000));
+            iterData.put("reasoning", truncate(reasoning, TRUNCATE_LONG));
 
             broadcastAgenticEvent(context.getWorkflowRunId(), stepIndex,
                     "agentic_reasoned", Map.of("iteration", iteration,
-                            "reasoning", truncate(reasoning, 2000)));
+                            "reasoning", truncate(reasoning, TRUNCATE_LONG)));
 
             // Parse structured response
             AgenticPlan plan = AgenticPlan.parse(reasoning);
@@ -168,7 +170,7 @@ public class AgenticBlockExecutor implements BlockExecutor {
 
             broadcastAgenticEvent(context.getWorkflowRunId(), stepIndex,
                     "agentic_acting", Map.of("iteration", iteration,
-                            "action", truncate(plan.getAction(), 500)));
+                            "action", truncate(plan.getAction(), TRUNCATE_MEDIUM)));
 
             String actionOutput;
             int exitCode;
@@ -201,29 +203,29 @@ public class AgenticBlockExecutor implements BlockExecutor {
             }
 
             iterData.put("action", plan.getAction());
-            iterData.put("actionOutput", truncate(actionOutput, 2000));
+            iterData.put("actionOutput", truncate(actionOutput, TRUNCATE_LONG));
             iterData.put("exitCode", exitCode);
 
             broadcastAgenticEvent(context.getWorkflowRunId(), stepIndex,
                     "agentic_acted", Map.of("iteration", iteration,
-                            "action", truncate(plan.getAction(), 500),
-                            "output", truncate(actionOutput, 2000),
+                            "action", truncate(plan.getAction(), TRUNCATE_MEDIUM),
+                            "output", truncate(actionOutput, TRUNCATE_LONG),
                             "exitCode", exitCode));
 
             // === OBSERVE phase ===
             String observation = "Action result (exit code " + exitCode + "):\n" + actionOutput;
             history.add(new Turn("user",
-                    "Observation from executing your action:\n" + truncate(observation, 4000)
+                    "Observation from executing your action:\n" + truncate(observation, TRUNCATE_OBSERVATION)
                             + "\n\nAnalyze this result. Has the goal been achieved? "
                             + "If not, what should we do next?"));
 
             context.setPreviousOutput(actionOutput);
 
             fullOutput.append("[iteration ").append(iteration).append("]\n")
-                    .append("  Reasoning: ").append(truncate(plan.getRationale(), 200)).append("\n")
-                    .append("  Action: ").append(truncate(plan.getAction(), 200)).append("\n")
+                    .append("  Reasoning: ").append(truncate(plan.getRationale(), TRUNCATE_SHORT)).append("\n")
+                    .append("  Action: ").append(truncate(plan.getAction(), TRUNCATE_SHORT)).append("\n")
                     .append("  Exit code: ").append(exitCode).append("\n")
-                    .append("  Result: ").append(truncate(actionOutput, 500)).append("\n\n");
+                    .append("  Result: ").append(truncate(actionOutput, TRUNCATE_MEDIUM)).append("\n\n");
 
             long iterMs = Instant.now().toEpochMilli() - iterStart.toEpochMilli();
             iterData.put("durationMs", iterMs);
@@ -306,12 +308,12 @@ public class AgenticBlockExecutor implements BlockExecutor {
                 "agentic_approval_required",
                 Map.of("iteration", iteration,
                         "action", plan.getAction(),
-                        "rationale", truncate(plan.getRationale(), 500)));
+                        "rationale", truncate(plan.getRationale(), TRUNCATE_MEDIUM)));
 
         CompletableFuture<String> future = context.requestApproval(
                 ApprovalRequest.builder()
                         .blockId("agentic-" + stepIndex + "-iter-" + iteration)
-                        .question("Approve action: " + truncate(plan.getAction(), 200))
+                        .question("Approve action: " + truncate(plan.getAction(), TRUNCATE_SHORT))
                         .options(List.of("Yes", "Yes always", "No"))
                         .stepIndex(stepIndex)
                         .build());
@@ -362,7 +364,7 @@ public class AgenticBlockExecutor implements BlockExecutor {
         for (int i = 1; i < compressEnd; i++) {
             Turn turn = history.get(i);
             String label = "assistant".equals(turn.role()) ? "ASSISTANT" : "USER";
-            summary.append("- ").append(label).append(": ").append(truncate(turn.content(), 150)).append("\n");
+            summary.append("- ").append(label).append(": ").append(truncate(turn.content(), TRUNCATE_HISTORY)).append("\n");
         }
 
         List<Turn> compressed = new ArrayList<>();

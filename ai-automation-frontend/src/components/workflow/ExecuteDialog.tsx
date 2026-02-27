@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Modal, Button, Input } from '../ui';
+import { Modal, Input, ModalFooter } from '../ui';
 import { useT } from '../../i18n';
 
 interface ExecuteDialogProps {
@@ -37,14 +37,14 @@ export function ExecuteDialog({ open, onClose, onExecute, variables, defaultValu
       onClose={onClose}
       title={t.workflows.executeWithVariables}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            {t.common.cancel}
-          </Button>
-          <Button onClick={handleExecute} loading={loading} disabled={!allFilled}>
-            {t.workflows.execute}
-          </Button>
-        </>
+        <ModalFooter
+          onCancel={onClose}
+          onAction={handleExecute}
+          cancelLabel={t.common.cancel}
+          actionLabel={t.workflows.execute}
+          actionLoading={loading}
+          actionDisabled={!allFilled}
+        />
       }
     >
       <div className="space-y-4">

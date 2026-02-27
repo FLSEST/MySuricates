@@ -11,3 +11,4 @@ export { ToastContainer } from './ToastContainer';
 export { DirectoryPicker } from './DirectoryPicker';
 export { CronPicker } from './CronPicker';
 export { TagInput } from './TagInput';
+export { ModalFooter } from './ModalFooter';

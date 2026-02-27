@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, Button, Input, Toggle, Select } from '../components/ui';
+import { downloadFromResponse } from '../utils/downloadFile';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { useThemeStore } from '../stores/themeStore';
 import { useSettingsStore } from '../stores/settingsStore';
@@ -62,15 +63,7 @@ export function Settings() {
       if (storedKey) headers['X-API-Key'] = storedKey;
       const res = await fetch('/api/v1/system/backup', { headers });
       if (!res.ok) throw new Error('Backup failed');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = res.headers.get('content-disposition')?.match(/filename="(.+)"/)?.[1] ?? 'autopilot-backup.db';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      await downloadFromResponse(res, 'autopilot-backup.db');
       queryClient.invalidateQueries({ queryKey: ['system', 'backups'] });
     } catch {
       // silently fail — user sees no download
@@ -86,15 +79,7 @@ export function Settings() {
     try {
       const res = await fetch(`/api/v1/system/backups/${encodeURIComponent(filename)}`, { headers });
       if (!res.ok) return;
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      await downloadFromResponse(res, filename);
     } catch {
       // silently fail
     }

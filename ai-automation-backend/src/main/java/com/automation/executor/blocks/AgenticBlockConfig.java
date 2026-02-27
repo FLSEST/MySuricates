@@ -5,6 +5,8 @@ import com.automation.executor.ExecutionContext;
 
 import java.util.Map;
 
+import static com.automation.config.ExecutionDefaults.*;
+
 /**
  * Parsed and validated configuration for an agentic block.
  */
@@ -27,15 +29,15 @@ public record AgenticBlockConfig(
         String goal = context.resolveTemplate(requireString(config, "goal"));
         String successCriteria = context.resolveTemplate(
                 (String) config.getOrDefault("success_criteria", ""));
-        int maxIterations = ((Number) config.getOrDefault("max_iterations", 10)).intValue();
+        int maxIterations = ((Number) config.getOrDefault("max_iterations", AGENTIC_MAX_ITERATIONS)).intValue();
         int iterationTimeoutSeconds = ((Number) config.getOrDefault(
-                "iteration_timeout_seconds", 300)).intValue();
+                "iteration_timeout_seconds", AGENTIC_ITERATION_TIMEOUT_SECONDS)).intValue();
         int totalTimeoutSeconds = ((Number) config.getOrDefault(
-                "total_timeout_seconds", 1800)).intValue();
+                "total_timeout_seconds", AGENTIC_TOTAL_TIMEOUT_SECONDS)).intValue();
         int maxTotalTokens = ((Number) config.getOrDefault(
-                "max_total_tokens", 200_000)).intValue();
+                "max_total_tokens", AGENTIC_MAX_TOTAL_TOKENS)).intValue();
         int maxRepeatedActions = ((Number) config.getOrDefault(
-                "max_repeated_actions", 3)).intValue();
+                "max_repeated_actions", AGENTIC_MAX_REPEATED_ACTIONS)).intValue();
         boolean requireApproval = Boolean.TRUE.equals(config.get("require_approval"));
         Integer claudeTimeout = config.containsKey("timeout_seconds")
                 ? ((Number) config.get("timeout_seconds")).intValue()

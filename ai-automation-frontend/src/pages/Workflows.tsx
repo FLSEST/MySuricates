@@ -482,7 +482,7 @@ export function Workflows() {
                 {(() => {
                   const selectedWorkflows = filtered.filter((w) => selectedIds.has(w.id));
                   const allEnabled = selectedWorkflows.every(
-                    (w) => !!(w.metadata?.autoTodo as Record<string, unknown> | undefined)?.enabled,
+                    (w) => !!w.metadata?.autoTodo?.enabled,
                   );
                   return (
                     <Button
@@ -807,6 +807,11 @@ function ProjectGroup({
           <span className="text-xs text-text-tertiary ml-auto shrink-0">({workflows.length})</span>
         </button>
       </div>
+      {!collapsed && workflows[0]?.projectDescription && (
+        <p className="ml-8 mt-0.5 mb-1 text-xs text-text-tertiary italic line-clamp-2">
+          {workflows[0].projectDescription}
+        </p>
+      )}
       {!collapsed && (
         <div className="ml-3 mt-0.5 space-y-0.5">
           {workflows.map((wf) => (
@@ -886,7 +891,7 @@ function WorkflowRow({
         <WorkflowIcon icon={workflow.icon} className="w-4 h-4" />
       </span>
       <span className="text-sm truncate flex-1">{workflow.name}</span>
-      {!selectMode && !!(workflow.metadata?.autoTodo as Record<string, unknown> | undefined)?.enabled && (
+      {!selectMode && !!workflow.metadata?.autoTodo?.enabled && (
         <Bell className="w-3 h-3 text-accent/50 shrink-0" />
       )}
       {!selectMode && workflow.testStatus === 'PASSED' && (
@@ -947,7 +952,7 @@ function WorkflowDetailPanel({
   const { data: runsPage, isLoading: runsLoading } = useWorkflowRuns(workflow.id, 0, 5);
   const recentRuns = runsPage?.content ?? [];
   const updateWorkflow = useUpdateWorkflow();
-  const autoTodoEnabled = !!(workflow.metadata?.autoTodo as Record<string, unknown> | undefined)?.enabled;
+  const autoTodoEnabled = !!workflow.metadata?.autoTodo?.enabled;
 
   return (
     <div className="bg-surface border border-border rounded-xl p-6 space-y-6">

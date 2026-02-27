@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Play, Plus, Trash2, Pencil, Zap, Clock, Wand2, FileText, Bot, Copy, Download,
 } from 'lucide-react';
-import { Card, CardHeader, Button, Input, Select, Modal, Spinner } from '../components/ui';
+import { Card, CardHeader, Button, Input, Select, Modal, Spinner, ModalFooter } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ErrorState } from '../components/shared/ErrorState';
 import { MonacoEditor } from '../components/shared/MonacoEditor';
@@ -60,7 +60,7 @@ export function WorkflowDetail() {
   const [showDelete, setShowDelete] = useState(false);
   const [showEditInstructions, setShowEditInstructions] = useState(false);
   const [showOptimizeResult, setShowOptimizeResult] = useState(false);
-  const [optimizeResult, setOptimizeResult] = useState<Record<string, unknown> | null>(null);
+  const [optimizeResult, setOptimizeResult] = useState<import('../types').OptimizeResult | null>(null);
   const [editInstructions, setEditInstructions] = useState('');
   const [editForm, setEditForm] = useState({ name: '', description: '', icon: '' });
   const [newBlock, setNewBlock] = useState<{ type: BlockType; config: string }>({
@@ -446,10 +446,13 @@ export function WorkflowDetail() {
         onClose={() => setShowEdit(false)}
         title={t.workflows.editWorkflow}
         footer={
-          <>
-            <Button variant="secondary" onClick={() => setShowEdit(false)}>{t.common.cancel}</Button>
-            <Button onClick={handleUpdate} loading={updateWorkflow.isPending}>{t.common.save}</Button>
-          </>
+          <ModalFooter
+            onCancel={() => setShowEdit(false)}
+            onAction={handleUpdate}
+            cancelLabel={t.common.cancel}
+            actionLabel={t.common.save}
+            actionLoading={updateWorkflow.isPending}
+          />
         }
       >
         <div className="space-y-4">
@@ -479,12 +482,13 @@ export function WorkflowDetail() {
         title={t.workflows.addBlock}
         size="lg"
         footer={
-          <>
-            <Button variant="secondary" onClick={() => setShowAddBlock(false)}>{t.common.cancel}</Button>
-            <Button onClick={handleAddBlock} loading={updateWorkflow.isPending}>
-              {t.workflows.addBlock}
-            </Button>
-          </>
+          <ModalFooter
+            onCancel={() => setShowAddBlock(false)}
+            onAction={handleAddBlock}
+            cancelLabel={t.common.cancel}
+            actionLabel={t.workflows.addBlock}
+            actionLoading={updateWorkflow.isPending}
+          />
         }
       >
         <div className="space-y-4">
@@ -543,12 +547,13 @@ export function WorkflowDetail() {
         title={`${t.workflows.editBlock} #${editBlockIndex + 1}`}
         size="lg"
         footer={
-          <>
-            <Button variant="secondary" onClick={() => setShowEditBlock(false)}>{t.common.cancel}</Button>
-            <Button onClick={handleSaveBlock} loading={updateWorkflow.isPending}>
-              {t.common.save}
-            </Button>
-          </>
+          <ModalFooter
+            onCancel={() => setShowEditBlock(false)}
+            onAction={handleSaveBlock}
+            cancelLabel={t.common.cancel}
+            actionLabel={t.common.save}
+            actionLoading={updateWorkflow.isPending}
+          />
         }
       >
         <div className="space-y-4">
@@ -594,12 +599,14 @@ export function WorkflowDetail() {
         title={t.workflows.activateSkill}
         size="sm"
         footer={
-          <>
-            <Button variant="secondary" onClick={() => setShowAddSkill(false)}>{t.common.cancel}</Button>
-            <Button onClick={handleActivateSkill} disabled={!selectedSkillId} loading={activateSkills.isPending}>
-              {t.skills.activate}
-            </Button>
-          </>
+          <ModalFooter
+            onCancel={() => setShowAddSkill(false)}
+            onAction={handleActivateSkill}
+            cancelLabel={t.common.cancel}
+            actionLabel={t.skills.activate}
+            actionDisabled={!selectedSkillId}
+            actionLoading={activateSkills.isPending}
+          />
         }
       >
         <Select
@@ -620,12 +627,14 @@ export function WorkflowDetail() {
         title={`${t.common.delete} "${workflow.name}"?`}
         size="sm"
         footer={
-          <>
-            <Button variant="secondary" onClick={() => setShowDelete(false)}>{t.common.cancel}</Button>
-            <Button variant="danger" onClick={handleDelete} loading={deleteWorkflow.isPending}>
-              {t.common.delete}
-            </Button>
-          </>
+          <ModalFooter
+            onCancel={() => setShowDelete(false)}
+            onAction={handleDelete}
+            cancelLabel={t.common.cancel}
+            actionLabel={t.common.delete}
+            actionVariant="danger"
+            actionLoading={deleteWorkflow.isPending}
+          />
         }
       >
         <p className="text-sm text-text-secondary">
@@ -706,20 +715,18 @@ export function WorkflowDetail() {
         title={t.workflows.editInstructions}
         size="lg"
         footer={
-          <>
-            <Button variant="secondary" onClick={() => setShowEditInstructions(false)}>{t.common.cancel}</Button>
-            <Button
-              onClick={() => {
-                updateWorkflow.mutate(
-                  { id: workflow.id, data: { instructions: editInstructions } },
-                  { onSuccess: () => setShowEditInstructions(false) }
-                );
-              }}
-              loading={updateWorkflow.isPending}
-            >
-              {t.common.save}
-            </Button>
-          </>
+          <ModalFooter
+            onCancel={() => setShowEditInstructions(false)}
+            onAction={() => {
+              updateWorkflow.mutate(
+                { id: workflow.id, data: { instructions: editInstructions } },
+                { onSuccess: () => setShowEditInstructions(false) }
+              );
+            }}
+            cancelLabel={t.common.cancel}
+            actionLabel={t.common.save}
+            actionLoading={updateWorkflow.isPending}
+          />
         }
       >
         <div className="space-y-3">
@@ -740,28 +747,26 @@ export function WorkflowDetail() {
         title={t.workflows.optimizeResult}
         size="lg"
         footer={
-          <>
-            <Button variant="secondary" onClick={() => setShowOptimizeResult(false)}>{t.common.cancel}</Button>
-            <Button
-              onClick={() => {
-                if (!optimizeResult) return;
-                const data: Record<string, unknown> = {};
-                if (optimizeResult.suggestedName) data.name = optimizeResult.suggestedName;
-                if (optimizeResult.suggestedDescription) data.description = optimizeResult.suggestedDescription;
-                if (optimizeResult.suggestedInstructions) data.instructions = optimizeResult.suggestedInstructions;
-                if (Array.isArray(optimizeResult.blocks) && optimizeResult.blocks.length > 0) {
-                  data.blocks = optimizeResult.blocks;
-                }
-                updateWorkflow.mutate(
-                  { id: workflow.id, data: data as import('../types').UpdateWorkflowRequest },
-                  { onSuccess: () => setShowOptimizeResult(false) }
-                );
-              }}
-              loading={updateWorkflow.isPending}
-            >
-              {t.workflows.optimizeApply}
-            </Button>
-          </>
+          <ModalFooter
+            onCancel={() => setShowOptimizeResult(false)}
+            onAction={() => {
+              if (!optimizeResult) return;
+              const data: import('../types').UpdateWorkflowRequest = {};
+              if (optimizeResult.suggestedName) data.name = optimizeResult.suggestedName;
+              if (optimizeResult.suggestedDescription) data.description = optimizeResult.suggestedDescription;
+              if (optimizeResult.suggestedInstructions) data.instructions = optimizeResult.suggestedInstructions;
+              if (optimizeResult.blocks && optimizeResult.blocks.length > 0) {
+                data.blocks = optimizeResult.blocks;
+              }
+              updateWorkflow.mutate(
+                { id: workflow.id, data },
+                { onSuccess: () => setShowOptimizeResult(false) }
+              );
+            }}
+            cancelLabel={t.common.cancel}
+            actionLabel={t.workflows.optimizeApply}
+            actionLoading={updateWorkflow.isPending}
+          />
         }
       >
         {optimizeResult && (
@@ -774,7 +779,7 @@ export function WorkflowDetail() {
                   <h4 className="text-sm font-medium text-text mb-2">{t.workflows.optimizeChanges}</h4>
                   {Array.isArray(optimizeResult.changes) && optimizeResult.changes.length > 0 ? (
                     <ul className="space-y-2">
-                      {(optimizeResult.changes as Array<{ type: string; description: string }>).map((change, i) => (
+                      {optimizeResult.changes!.map((change, i) => (
                         <li key={i} className="flex items-start gap-2 text-sm">
                           <span className="shrink-0 px-1.5 py-0.5 rounded-sm text-[10px] font-medium bg-accent/10 text-accent">
                             {change.type}
@@ -797,7 +802,7 @@ export function WorkflowDetail() {
                 )}
                 {Array.isArray(optimizeResult.blocks) && optimizeResult.blocks.length > 0 && (
                   <div>
-                    <h4 className="text-sm font-medium text-text mb-1">{t.workflows.blocks} ({(optimizeResult.blocks as unknown[]).length})</h4>
+                    <h4 className="text-sm font-medium text-text mb-1">{t.workflows.blocks} ({optimizeResult.blocks!.length})</h4>
                     <pre className="text-xs text-text-secondary font-mono bg-surface rounded-lg p-3 max-h-60 overflow-y-auto">
                       {JSON.stringify(optimizeResult.blocks, null, 2)}
                     </pre>

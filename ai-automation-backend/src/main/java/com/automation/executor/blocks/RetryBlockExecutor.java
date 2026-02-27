@@ -12,14 +12,14 @@ import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
+import static com.automation.config.ExecutionDefaults.SHELL_TIMEOUT_SECONDS;
+
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class RetryBlockExecutor implements BlockExecutor {
 
     private final CommandExecutorService commandExecutor;
-
-    private static final int DEFAULT_SHELL_TIMEOUT = 300;
 
     @Override
     public StepResult execute(BlockDefinition block, ExecutionContext context) {
@@ -30,7 +30,7 @@ public class RetryBlockExecutor implements BlockExecutor {
         boolean exponentialBackoff = Boolean.TRUE.equals(config.get("exponential_backoff"));
         String executionMode = (String) config.getOrDefault("execution_mode", "claude");
         boolean isShell = "shell".equals(executionMode);
-        int shellTimeout = ((Number) config.getOrDefault("timeout_seconds", DEFAULT_SHELL_TIMEOUT)).intValue();
+        int shellTimeout = ((Number) config.getOrDefault("timeout_seconds", SHELL_TIMEOUT_SECONDS)).intValue();
         Integer claudeTimeout = config.containsKey("timeout_seconds")
                 ? ((Number) config.get("timeout_seconds")).intValue()
                 : null;

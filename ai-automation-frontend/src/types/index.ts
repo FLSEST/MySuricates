@@ -52,6 +52,17 @@ export interface Container {
 
 // ── Workflow ─────────────────────────────────────────────
 
+export interface AutoTodoConfig {
+  enabled: boolean;
+  priority?: TodoPriority;
+  tags?: string[];
+}
+
+export interface WorkflowMetadata {
+  autoTodo?: AutoTodoConfig;
+  [key: string]: unknown;
+}
+
 export interface Workflow {
   id: string;
   projectId: string;
@@ -68,7 +79,7 @@ export interface Workflow {
   runCount: number;
   instructions: string | null;
   model: string | null;
-  metadata?: Record<string, unknown>;
+  metadata?: WorkflowMetadata;
   defaultContext?: Record<string, string>;
   testStatus?: 'UNTESTED' | 'PASSED' | 'FAILED';
   lastTestedAt?: string | null;
@@ -86,7 +97,7 @@ export interface CreateWorkflowRequest {
   instructions?: string;
   model?: string;
   templateId?: string;
-  metadata?: Record<string, unknown>;
+  metadata?: WorkflowMetadata;
 }
 
 // ── Workflow Template ────────────────────────────────────
@@ -178,18 +189,26 @@ export interface PoolWorkflowEntry {
 export type RunStatus = 'PENDING' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
 export type StepStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'SKIPPED' | 'WAITING_APPROVAL';
 
+export interface WorkflowRunError {
+  message?: string;
+  type?: string;
+  stepIndex?: number;
+  [key: string]: unknown;
+}
+
 export interface WorkflowRun {
   id: string;
   workflowId: string;
   workflowName: string;
   projectName: string | null;
+  projectPath: string | null;
   status: RunStatus;
   steps: StepResult[];
   startedAt: string;
   completedAt: string | null;
   durationMs: number | null;
   userRating: number | null;
-  error: Record<string, unknown> | null;
+  error: WorkflowRunError | null;
   metadata: Record<string, unknown>;
   inputContext?: Record<string, unknown>;
 }
@@ -486,6 +505,18 @@ export interface RunInsights {
   totalTokens: number;
   durationMs: number | null;
   steps: StepInsight[];
+}
+
+// ── Optimize Result ─────────────────────────────────────
+
+export interface OptimizeResult {
+  suggestedName?: string;
+  suggestedDescription?: string;
+  suggestedInstructions?: string;
+  blocks?: BlockDefinition[];
+  changes?: Array<{ type: string; description: string }>;
+  error?: boolean;
+  message?: string;
 }
 
 // ── Agentic → Workflow Conversion ───────────────────────

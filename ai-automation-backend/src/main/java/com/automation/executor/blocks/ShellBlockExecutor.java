@@ -15,11 +15,11 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.util.Map;
 
+import static com.automation.config.ExecutionDefaults.SHELL_TIMEOUT_SECONDS;
+
 @Component
 @RequiredArgsConstructor
 public class ShellBlockExecutor implements BlockExecutor {
-
-    private static final int DEFAULT_TIMEOUT_SECONDS = 300;
 
     private final ShellCommandService shellService;
     private final ContainerShellService containerShellService;
@@ -33,7 +33,7 @@ public class ShellBlockExecutor implements BlockExecutor {
         }
 
         String command = context.resolveTemplate(rawCommand.toString());
-        int timeout = ((Number) config.getOrDefault("timeout_seconds", DEFAULT_TIMEOUT_SECONDS)).intValue();
+        int timeout = ((Number) config.getOrDefault("timeout_seconds", SHELL_TIMEOUT_SECONDS)).intValue();
 
         StepResult step = new StepResult();
         step.setStepIndex(context.nextStepIndex());
@@ -52,9 +52,13 @@ public class ShellBlockExecutor implements BlockExecutor {
                     containerImage, mountDockerSocket);
             executionMode = "container:" + containerImage;
         } else {
-            result = shellService.execute(command, context.getProjectPath(), timeout);
+            result = shellService.execute(command, context.getProjectPath(), timeout, proc -> {
+                context.registerProcess(proc);
+            });
             executionMode = "shell";
         }
+
+        context.clearProcess();
 
         step.setOutput(result.output());
         step.setStatus(result.exitCode() == 0 ? StepStatus.COMPLETED : StepStatus.FAILED);

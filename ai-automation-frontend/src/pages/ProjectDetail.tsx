@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Play, Square, Trash2, Pencil, GitBranch, Container as ContainerIcon,
 } from 'lucide-react';
+import { ModalFooter } from '../components/ui';
 import { Card, CardHeader, Button, Input, Select, Modal, Spinner, DirectoryPicker } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ErrorState } from '../components/shared/ErrorState';
@@ -206,14 +207,13 @@ export function ProjectDetail() {
         onClose={() => setShowEdit(false)}
         title={`${t.common.edit} ${project.name}`}
         footer={
-          <>
-            <Button variant="secondary" onClick={() => setShowEdit(false)}>
-              {t.common.cancel}
-            </Button>
-            <Button onClick={handleUpdate} loading={updateProject.isPending}>
-              {t.common.save}
-            </Button>
-          </>
+          <ModalFooter
+            onCancel={() => setShowEdit(false)}
+            onAction={handleUpdate}
+            cancelLabel={t.common.cancel}
+            actionLabel={t.common.save}
+            actionLoading={updateProject.isPending}
+          />
         }
       >
         <div className="space-y-4">
@@ -262,14 +262,14 @@ export function ProjectDetail() {
         title={`${t.common.delete} "${project.name}"?`}
         size="sm"
         footer={
-          <>
-            <Button variant="secondary" onClick={() => setShowDelete(false)}>
-              {t.common.cancel}
-            </Button>
-            <Button variant="danger" onClick={handleDelete} loading={deleteProject.isPending}>
-              {t.common.delete}
-            </Button>
-          </>
+          <ModalFooter
+            onCancel={() => setShowDelete(false)}
+            onAction={handleDelete}
+            cancelLabel={t.common.cancel}
+            actionLabel={t.common.delete}
+            actionVariant="danger"
+            actionLoading={deleteProject.isPending}
+          />
         }
       >
         <p className="text-sm text-text-secondary">

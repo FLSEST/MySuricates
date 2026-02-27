@@ -1,11 +1,12 @@
 package com.automation.service.chain;
 
+import com.automation.config.ChainConfig;
 import com.automation.entity.*;
 import com.automation.repository.ChainRunRepository;
+import com.automation.repository.StepResultRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -18,13 +19,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static com.automation.config.ExecutionDefaults.POLLING_INTERVAL_MS;
+
 @Service
 @Slf4j
 public class ChainExecutor {
 
-    private static final Duration MAX_WAIT = Duration.ofMinutes(30);
-
+    private final ChainConfig chainConfig;
     private final ChainRunRepository chainRunRepository;
+    private final StepResultRepository stepResultRepository;
     private final WorkflowRunRepository workflowRunRepository;
     private final WorkflowService workflowService;
     private final WorkflowExecutor workflowExecutor;
@@ -34,14 +37,18 @@ public class ChainExecutor {
     private final Map<String, AtomicBoolean> activeCancellations = new ConcurrentHashMap<>();
 
     public ChainExecutor(
+            ChainConfig chainConfig,
             ChainRunRepository chainRunRepository,
+            StepResultRepository stepResultRepository,
             WorkflowRunRepository workflowRunRepository,
             WorkflowService workflowService,
             @Lazy WorkflowExecutor workflowExecutor,
             SimpMessagingTemplate messagingTemplate,
             ExecutorService virtualThreadExecutor
     ) {
+        this.chainConfig = chainConfig;
         this.chainRunRepository = chainRunRepository;
+        this.stepResultRepository = stepResultRepository;
         this.workflowRunRepository = workflowRunRepository;
         this.workflowService = workflowService;
         this.workflowExecutor = workflowExecutor;
@@ -215,7 +222,8 @@ public class ChainExecutor {
     }
 
     private WorkflowRun waitForCompletion(String runId, AtomicBoolean cancelled) {
-        Instant deadline = Instant.now().plus(MAX_WAIT);
+        Duration maxWait = Duration.ofMinutes(chainConfig.getWorkflowTimeoutMinutes());
+        Instant deadline = Instant.now().plus(maxWait);
         while (Instant.now().isBefore(deadline)) {
             if (cancelled != null && cancelled.get()) {
                 throw new RuntimeException("Chain execution cancelled");
@@ -225,20 +233,23 @@ public class ChainExecutor {
                 return run;
             }
             try {
-                Thread.sleep(2000);
+                Thread.sleep(POLLING_INTERVAL_MS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new RuntimeException("Interrupted while waiting for workflow completion");
             }
         }
-        throw new RuntimeException("Workflow timed out after " + MAX_WAIT.toMinutes() + " minutes");
+        throw new RuntimeException("Workflow timed out after " + maxWait.toMinutes() + " minutes");
     }
 
     private String extractOutput(WorkflowRun run) {
-        if (run.getSteps() == null || run.getSteps().isEmpty()) {
+        // Use repository query instead of lazy-loaded collection to avoid
+        // LazyInitializationException outside of a Hibernate session
+        List<StepResult> steps = stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc(run.getId());
+        if (steps == null || steps.isEmpty()) {
             return null;
         }
-        StepResult lastStep = run.getSteps().get(run.getSteps().size() - 1);
+        StepResult lastStep = steps.get(steps.size() - 1);
         return lastStep.getOutput();
     }
 
