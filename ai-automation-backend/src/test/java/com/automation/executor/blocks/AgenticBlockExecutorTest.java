@@ -360,6 +360,75 @@ class AgenticBlockExecutorTest {
     }
 
     @Test
+    void execute_tokenTrackingFailed_afterConsecutiveBlindIterations() throws Exception {
+        // All iterations return null parsed (no usage data) — triggers fallback estimation + abort after 3
+        when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Step A\nSUMMARY: Doing A"))
+                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Continuing\nACTION: Step B\nSUMMARY: Doing B"))
+                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: More work\nACTION: Step C\nSUMMARY: Doing C"))
+                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Keep going\nACTION: Step D\nSUMMARY: Doing D"));
+
+        // EnrichedCommandResult with null parsed → no usage data
+        when(commandExecutor.executeCommandOnHost(eq("/test/project"), anyString(), isNull(), isNull(), isNull()))
+                .thenReturn(new CliSession.EnrichedCommandResult("output", 0, null));
+
+        when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("goal", "Blind budget test");
+        config.put("success_criteria", "Test passes");
+        config.put("max_iterations", 10);
+        config.put("iteration_timeout_seconds", 300);
+        config.put("max_total_tokens", 200000);
+        config.put("max_repeated_actions", 10);
+        config.put("require_approval", false);
+        BlockDefinition block = BlockDefinition.builder().type("agentic").config(config).build();
+
+        StepResult result = executor.execute(block, buildContext());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getOutput()).contains("TOKEN TRACKING FAILED");
+        assertThat(result.getMetadata().get("stopReason")).isEqualTo("TOKEN_TRACKING_FAILED");
+        assertThat(result.getMetadata().get("tokenEstimationFallback")).isEqualTo(true);
+        // Should stop after 3 consecutive blind iterations
+        assertThat(((Number) result.getMetadata().get("totalIterations")).intValue()).isEqualTo(3);
+        // Fallback estimation should have produced non-zero token count
+        assertThat(((Number) result.getMetadata().get("totalTokensUsed")).intValue()).isGreaterThan(0);
+    }
+
+    @Test
+    void execute_fallbackEstimation_resetsOnRealUsage() throws Exception {
+        // First iteration: no usage (blind), second: real usage, third: no usage again — should NOT abort
+        ClaudeJsonResponse.Usage realUsage = new ClaudeJsonResponse.Usage(1000, 500);
+        ClaudeJsonResponse parsedWithUsage = new ClaudeJsonResponse(
+                "result", null, 0.01, 500L, 400L, 1, realUsage, null, null);
+
+        when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: First\nACTION: Step 1\nSUMMARY: S1"))
+                .thenReturn(new ReasoningResult(
+                        "GOAL_STATUS: IN_PROGRESS\nRATIONALE: Second\nACTION: Step 2\nSUMMARY: S2", parsedWithUsage))
+                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Third\nACTION: Step 3\nSUMMARY: S3"))
+                .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
+
+        when(commandExecutor.executeCommandOnHost(eq("/test/project"), eq("Step 1"), isNull(), isNull(), isNull()))
+                .thenReturn(new CliSession.EnrichedCommandResult("out1", 0, null));
+        when(commandExecutor.executeCommandOnHost(eq("/test/project"), eq("Step 2"), isNull(), isNull(), isNull()))
+                .thenReturn(new CliSession.EnrichedCommandResult("out2", 0, parsedWithUsage));
+        when(commandExecutor.executeCommandOnHost(eq("/test/project"), eq("Step 3"), isNull(), isNull(), isNull()))
+                .thenReturn(new CliSession.EnrichedCommandResult("out3", 0, null));
+
+        when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
+
+        StepResult result = executor.execute(buildBlock("Reset test", 10), buildContext());
+
+        // Goal achieved because consecutive blind count reset at iteration 2
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata().get("goalAchieved")).isEqualTo(true);
+    }
+
+    @Test
     void execute_setsContextVariables() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
         when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull())).thenReturn(

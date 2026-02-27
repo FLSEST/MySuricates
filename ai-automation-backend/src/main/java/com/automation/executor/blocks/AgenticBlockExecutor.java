@@ -92,6 +92,8 @@ public class AgenticBlockExecutor implements BlockExecutor {
         boolean approvalRequired = requireApproval;
         Instant blockStart = Instant.now();
         int runningTotalTokens = 0;
+        int consecutiveBlindIterations = 0;
+        boolean usingFallbackEstimation = false;
         List<String> recentActions = new ArrayList<>();
         String stopReason = null;
 
@@ -137,7 +139,16 @@ public class AgenticBlockExecutor implements BlockExecutor {
                     Map<String, Object> reasonMeta = reasonResult.parsed().toMetadata();
                     iterData.put("reasonMeta", reasonMeta);
                 } else {
-                    log.warn("Agentic iteration {}: REASON phase returned no token usage data — token budget tracking is blind", iteration);
+                    // Fallback: estimate tokens from string length (~4 chars/token)
+                    int estimatedInput = conversationPrompt.length() / 4;
+                    int estimatedOutput = reasoning.length() / 4;
+                    Map<String, Object> fallbackMeta = Map.of(
+                            "inputTokens", estimatedInput,
+                            "outputTokens", estimatedOutput,
+                            "estimated", true);
+                    iterData.put("reasonMeta", fallbackMeta);
+                    log.warn("Agentic iteration {}: REASON phase returned no usage data — using fallback estimation ({} in, {} out)",
+                            iteration, estimatedInput, estimatedOutput);
                 }
             } catch (Exception e) {
                 log.error("Host Claude reasoning failed at iteration {}: {}", iteration, e.getMessage());
@@ -248,18 +259,49 @@ public class AgenticBlockExecutor implements BlockExecutor {
                     Map<String, Object> actMeta = cmdResult.parsed().toMetadata();
                     iterData.put("actMeta", actMeta);
                 } else {
-                    log.warn("Agentic iteration {}: ACT phase returned no token usage data — token budget tracking is blind", iteration);
+                    // Fallback: estimate tokens from string length (~4 chars/token)
+                    int estimatedInput = actionCommand.length() / 4;
+                    int estimatedOutput = actionOutput.length() / 4;
+                    Map<String, Object> fallbackMeta = Map.of(
+                            "inputTokens", estimatedInput,
+                            "outputTokens", estimatedOutput,
+                            "estimated", true);
+                    iterData.put("actMeta", fallbackMeta);
+                    log.warn("Agentic iteration {}: ACT phase returned no usage data — using fallback estimation ({} in, {} out)",
+                            iteration, estimatedInput, estimatedOutput);
                 }
             } catch (Exception e) {
                 actionOutput = "Execution error: " + e.getMessage();
                 exitCode = -1;
             }
 
-            // Track tokens for budget check
+            // Track tokens for budget check (includes fallback estimates)
             runningTotalTokens += extractTokenCount(iterData, "reasonMeta", "inputTokens");
             runningTotalTokens += extractTokenCount(iterData, "reasonMeta", "outputTokens");
             runningTotalTokens += extractTokenCount(iterData, "actMeta", "inputTokens");
             runningTotalTokens += extractTokenCount(iterData, "actMeta", "outputTokens");
+
+            // Track consecutive iterations without real usage data
+            boolean reasonEstimated = isEstimated(iterData, "reasonMeta");
+            boolean actEstimated = isEstimated(iterData, "actMeta");
+            if (reasonEstimated && actEstimated) {
+                consecutiveBlindIterations++;
+                usingFallbackEstimation = true;
+            } else {
+                consecutiveBlindIterations = 0;
+            }
+
+            // Abort if too many consecutive iterations had no real usage data
+            if (consecutiveBlindIterations >= 3) {
+                stopReason = "TOKEN_TRACKING_FAILED";
+                broadcastAgenticEvent(context.getWorkflowRunId(), stepIndex,
+                        "agentic_token_tracking_failed",
+                        Map.of("iteration", iteration, "consecutiveBlind", consecutiveBlindIterations));
+                fullOutput.append("[TOKEN TRACKING FAILED: ").append(consecutiveBlindIterations)
+                        .append(" consecutive iterations without real usage data — using fallback estimates, budget enforcement is approximate]\n");
+                log.error("Agentic block aborting after {} consecutive iterations without real token usage data", consecutiveBlindIterations);
+                break;
+            }
 
             iterData.put("action", plan.getAction());
             iterData.put("actionOutput", truncate(actionOutput, 2000));
@@ -376,6 +418,9 @@ public class AgenticBlockExecutor implements BlockExecutor {
             metadata.put("toolUseCount", allToolNames.size());
         }
         metadata.put("totalTokensUsed", runningTotalTokens);
+        if (usingFallbackEstimation) {
+            metadata.put("tokenEstimationFallback", true);
+        }
         if (stopReason != null) {
             metadata.put("stopReason", stopReason);
         }
@@ -532,6 +577,15 @@ public class AgenticBlockExecutor implements BlockExecutor {
             throw new WorkflowExecutionException("Agentic block requires '" + key + "' in config");
         }
         return value.toString();
+    }
+
+    @SuppressWarnings("unchecked")
+    private boolean isEstimated(Map<String, Object> iterData, String metaKey) {
+        Object meta = iterData.get(metaKey);
+        if (meta instanceof Map<?, ?> map) {
+            return Boolean.TRUE.equals(((Map<String, Object>) map).get("estimated"));
+        }
+        return true; // no metadata at all counts as estimated
     }
 
     @SuppressWarnings("unchecked")
