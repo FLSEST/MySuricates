@@ -7,6 +7,7 @@ import com.automation.dto.response.SyncResult;
 import com.automation.entity.Project;
 import com.automation.entity.Skill;
 import com.automation.entity.Workflow;
+import com.automation.repository.AppSettingsRepository;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.SkillRepository;
 import com.automation.repository.WorkflowRepository;
@@ -27,6 +28,7 @@ import java.util.*;
 @Slf4j
 public class InstanceSyncHelper {
 
+    private final AppSettingsRepository appSettingsRepository;
     private final ProjectRepository projectRepository;
     private final WorkflowRepository workflowRepository;
     private final SkillRepository skillRepository;
@@ -286,6 +288,18 @@ public class InstanceSyncHelper {
                 log.warn("Failed to sync skill '{}': {}", skill.getName(), e.getMessage());
             }
         }
+
+        // 4. Sync auto-todo-default setting
+        appSettingsRepository.get("auto-todo-default").ifPresent(value -> {
+            try {
+                httpPut(targetBaseUrl + "/system/settings/auto-todo-default",
+                        Map.of("value", value));
+                log.info("Synced auto-todo-default setting: {}", value);
+            } catch (Exception e) {
+                errors.add("Setting 'auto-todo-default': " + e.getMessage());
+                log.warn("Failed to sync auto-todo-default: {}", e.getMessage());
+            }
+        });
 
         log.info("Definition sync complete: {} projects, {} workflows, {} skills synced, {} skipped, {} errors",
                 projectsSynced, workflowsSynced, skillsSynced, skipped, errors.size());

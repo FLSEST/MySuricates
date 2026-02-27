@@ -88,7 +88,7 @@ class WorkflowControllerTest {
                 "wf-1", "proj-1", "Test Project", null, null,
                 "Test Workflow", "A test workflow",
                 null, List.of(), "1.0.0", Map.of(), List.of(), 0L,
-                null, null, null, Map.of(), Instant.now(), Instant.now()
+                null, null, null, Map.of(), null, null, Instant.now(), Instant.now()
         );
     }
 

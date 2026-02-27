@@ -71,6 +71,8 @@ automation:
     enabled: ${AUTOMATION_TAILSCALE_ENABLED:false}
   host-claude:
     timeout-seconds: ${AUTOMATION_HOST_CLAUDE_TIMEOUT:300}
+    inter-call-delay-ms: ${AUTOMATION_HOST_CLAUDE_INTER_CALL_DELAY_MS:0}
+    max-concurrent-calls: ${AUTOMATION_HOST_CLAUDE_MAX_CONCURRENT_CALLS:3}
   execution:
     max-concurrent: ${AUTOMATION_MAX_CONCURRENT_RUNS:10}
   summarization:

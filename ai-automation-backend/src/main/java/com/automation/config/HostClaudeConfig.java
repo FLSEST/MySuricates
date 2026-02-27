@@ -20,4 +20,14 @@ public class HostClaudeConfig {
      * Optional max-tokens flag passed to claude CLI.
      */
     private Integer maxTokens;
+
+    /**
+     * Minimum delay in milliseconds between consecutive Claude CLI calls (0 = disabled).
+     */
+    private long interCallDelayMs = 0;
+
+    /**
+     * Maximum number of concurrent Claude CLI processes.
+     */
+    private int maxConcurrentCalls = 3;
 }

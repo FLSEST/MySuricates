@@ -188,6 +188,8 @@ public class WorkflowExecutor {
                     step.setMetadata(result.getMetadata());
                 }
                 context.setPreviousOutput(step.getOutput());
+                context.setVariable("step_" + step.getStepIndex() + "_output",
+                        step.getOutput() != null ? step.getOutput() : "");
 
                 // Update container last activity (skip if no container)
                 if (containerId != null) {

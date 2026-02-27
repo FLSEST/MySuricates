@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import jakarta.annotation.PostConstruct;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -17,8 +19,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +37,16 @@ public class HostClaudeService {
 
     private final HostClaudeConfig config;
     private final CliPermissionsConfig permissionsConfig;
+
+    private Semaphore callSemaphore;
+    private final AtomicLong lastCallTimestamp = new AtomicLong(0);
+
+    @PostConstruct
+    void initThrottle() {
+        callSemaphore = new Semaphore(config.getMaxConcurrentCalls());
+        log.info("Claude CLI throttle: maxConcurrent={}, interCallDelay={}ms",
+                config.getMaxConcurrentCalls(), config.getInterCallDelayMs());
+    }
 
     /**
      * Sends a single reasoning prompt to the local Claude CLI on the host.
@@ -62,33 +76,38 @@ public class HostClaudeService {
     public ReasoningResult reasonStructured(String prompt, String systemPrompt,
                                              String workingDirectory, Integer maxTurns,
                                              Integer timeoutSeconds) throws IOException {
-        List<String> cmd = buildReasonCommand(prompt, systemPrompt, maxTurns);
+        acquireThrottle();
+        try {
+            List<String> cmd = buildReasonCommand(prompt, systemPrompt, maxTurns);
 
-        ProcessBuilder pb = new ProcessBuilder(cmd);
-        pb.redirectErrorStream(true);
-        // Prevent nested-session detection (same as executeAction)
-        pb.environment().remove("CLAUDECODE");
-        pb.environment().remove("CLAUDE_CODE");
-        if (workingDirectory != null && !workingDirectory.isBlank()) {
-            pb.directory(new File(workingDirectory));
+            ProcessBuilder pb = new ProcessBuilder(cmd);
+            pb.redirectErrorStream(true);
+            // Prevent nested-session detection (same as executeAction)
+            pb.environment().remove("CLAUDECODE");
+            pb.environment().remove("CLAUDE_CODE");
+            if (workingDirectory != null && !workingDirectory.isBlank()) {
+                pb.directory(new File(workingDirectory));
+            }
+
+            log.debug("Host Claude reasoning (prompt length: {} chars, workDir: {})", prompt.length(), workingDirectory);
+            Process proc = pb.start();
+            // Write prompt via stdin to avoid OS command-line length limits (E2BIG)
+            writePromptToStdin(proc, prompt);
+
+            int effectiveTimeout = timeoutSeconds != null ? timeoutSeconds : config.getTimeoutSeconds();
+            String rawOutput = drainProcess(proc, effectiveTimeout, "Host Claude reasoning");
+
+            int exitCode = proc.exitValue();
+            if (exitCode != 0) {
+                log.warn("Host Claude returned exit code {}: {}", exitCode, truncate(rawOutput, 500));
+            }
+
+            ClaudeJsonResponse parsed = ClaudeOutputParser.parseStreamJson(rawOutput);
+            String text = parsed.result() != null ? parsed.result() : rawOutput;
+            return new ReasoningResult(text, parsed);
+        } finally {
+            callSemaphore.release();
         }
-
-        log.debug("Host Claude reasoning (prompt length: {} chars, workDir: {})", prompt.length(), workingDirectory);
-        Process proc = pb.start();
-        // Write prompt via stdin to avoid OS command-line length limits (E2BIG)
-        writePromptToStdin(proc, prompt);
-
-        int effectiveTimeout = timeoutSeconds != null ? timeoutSeconds : config.getTimeoutSeconds();
-        String rawOutput = drainProcess(proc, effectiveTimeout, "Host Claude reasoning");
-
-        int exitCode = proc.exitValue();
-        if (exitCode != 0) {
-            log.warn("Host Claude returned exit code {}: {}", exitCode, truncate(rawOutput, 500));
-        }
-
-        ClaudeJsonResponse parsed = ClaudeOutputParser.parseStreamJson(rawOutput);
-        String text = parsed.result() != null ? parsed.result() : rawOutput;
-        return new ReasoningResult(text, parsed);
     }
 
     /**
@@ -105,33 +124,38 @@ public class HostClaudeService {
     public ActionResult executeAction(String prompt, String model,
                                        String systemPrompt, String workingDirectory,
                                        Integer timeoutSeconds) throws IOException {
-        List<String> cmd = buildActionCommand(prompt, model, systemPrompt);
+        acquireThrottle();
+        try {
+            List<String> cmd = buildActionCommand(prompt, model, systemPrompt);
 
-        ProcessBuilder pb = new ProcessBuilder(cmd);
-        pb.redirectErrorStream(true);
-        if (workingDirectory != null && !workingDirectory.isBlank()) {
-            pb.directory(new File(workingDirectory));
+            ProcessBuilder pb = new ProcessBuilder(cmd);
+            pb.redirectErrorStream(true);
+            if (workingDirectory != null && !workingDirectory.isBlank()) {
+                pb.directory(new File(workingDirectory));
+            }
+            // Remove nested-session detection env vars
+            pb.environment().remove("CLAUDE_CODE");
+            pb.environment().remove("CLAUDECODE");
+
+            log.debug("Host Claude action (prompt length: {} chars, workDir: {})", prompt.length(), workingDirectory);
+            Process proc = pb.start();
+            // Write prompt via stdin to avoid OS command-line length limits (E2BIG)
+            writePromptToStdin(proc, prompt);
+
+            int effectiveTimeout = timeoutSeconds != null ? timeoutSeconds : config.getTimeoutSeconds();
+            String rawOutput = drainProcess(proc, effectiveTimeout, "Host Claude action");
+
+            int exitCode = proc.exitValue();
+            if (exitCode != 0) {
+                log.warn("Host Claude action returned exit code {}: {}", exitCode, truncate(rawOutput, 500));
+            }
+
+            ClaudeJsonResponse parsed = ClaudeOutputParser.parseStreamJson(rawOutput);
+            String text = parsed.result() != null ? parsed.result() : rawOutput;
+            return new ActionResult(text, exitCode, parsed);
+        } finally {
+            callSemaphore.release();
         }
-        // Remove nested-session detection env vars
-        pb.environment().remove("CLAUDE_CODE");
-        pb.environment().remove("CLAUDECODE");
-
-        log.debug("Host Claude action (prompt length: {} chars, workDir: {})", prompt.length(), workingDirectory);
-        Process proc = pb.start();
-        // Write prompt via stdin to avoid OS command-line length limits (E2BIG)
-        writePromptToStdin(proc, prompt);
-
-        int effectiveTimeout = timeoutSeconds != null ? timeoutSeconds : config.getTimeoutSeconds();
-        String rawOutput = drainProcess(proc, effectiveTimeout, "Host Claude action");
-
-        int exitCode = proc.exitValue();
-        if (exitCode != 0) {
-            log.warn("Host Claude action returned exit code {}: {}", exitCode, truncate(rawOutput, 500));
-        }
-
-        ClaudeJsonResponse parsed = ClaudeOutputParser.parseStreamJson(rawOutput);
-        String text = parsed.result() != null ? parsed.result() : rawOutput;
-        return new ActionResult(text, exitCode, parsed);
     }
 
     /**
@@ -223,6 +247,34 @@ public class HostClaudeService {
         sb.append("Respond following the format specified in the system instructions.");
 
         return sb.toString();
+    }
+
+    /**
+     * Acquires a throttle permit: limits concurrency via semaphore and enforces
+     * a minimum inter-call delay to prevent API rate limiting.
+     */
+    private void acquireThrottle() throws IOException {
+        try {
+            callSemaphore.acquire();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while waiting for Claude CLI throttle permit", e);
+        }
+        long delayMs = config.getInterCallDelayMs();
+        if (delayMs > 0) {
+            long remaining = delayMs - (System.currentTimeMillis() - lastCallTimestamp.get());
+            if (remaining > 0) {
+                log.debug("Claude CLI throttle: waiting {}ms before next call", remaining);
+                try {
+                    Thread.sleep(remaining);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    callSemaphore.release();
+                    throw new IOException("Interrupted during Claude CLI throttle delay", e);
+                }
+            }
+        }
+        lastCallTimestamp.set(System.currentTimeMillis());
     }
 
     /**

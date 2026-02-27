@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.stable
+    image: ai-automation-backend-test
     container_name: mysuricates-test
     ports:
       - "8090:8090"
@@ -13,11 +14,17 @@ services:
     volumes:
       - test-data:/app/data
       - ./stable-frontend:/app/frontend:ro
+      - ./src/main/resources/application-test.yml:/app/config/application-test.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - ${HOME}/.local/share/claude:${HOME}/.local/share/claude:ro
       - ${HOME}/.local/bin:${HOME}/.local/bin:ro
       - ${HOME}/.claude:${HOME}/.claude
       - ${HOME}/Entwicklung:${HOME}/Entwicklung
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/api/v1/system/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     restart: unless-stopped
 
 volumes:

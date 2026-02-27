@@ -1,7 +1,7 @@
 FROM eclipse-temurin:21-jre-jammy
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl git && \
+    apt-get install -y --no-install-recommends curl git gosu && \
     rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g 1000 appuser && \
@@ -10,21 +10,17 @@ RUN groupadd -g 1000 appuser && \
 WORKDIR /app
 
 COPY target/ai-automation-backend-*.jar app.jar
+COPY docker/entrypoint.sh /app/entrypoint.sh
 
 RUN mkdir -p /app/data /app/frontend && \
-    chown -R appuser:appuser /app
-
-USER appuser
+    chown -R appuser:appuser /app && \
+    chmod +x /app/entrypoint.sh
 
 EXPOSE 9091
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD curl -f http://localhost:9091/api/v1/system/health || exit 1
 
-ENTRYPOINT ["java", \
-    "-XX:+UseZGC", \
-    "-XX:+ZGenerational", \
-    "-Xms256m", \
-    "-Xmx1g", \
-    "-Djava.awt.headless=true", \
-    "-jar", "app.jar"]
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["java", "-XX:+UseZGC", "-XX:+ZGenerational", "-Xms256m", "-Xmx1g", \
+     "-Djava.awt.headless=true", "-jar", "app.jar"]

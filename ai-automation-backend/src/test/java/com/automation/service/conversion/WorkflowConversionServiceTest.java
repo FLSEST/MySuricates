@@ -207,7 +207,7 @@ class WorkflowConversionServiceTest {
 
         WorkflowResponse expectedResponse = new WorkflowResponse(
                 "new-wf", "proj-1", "Project", null, null, "My Workflow",
-                null, null, List.of(), null, Map.of(), List.of(), 0, null, null, null, Map.of(), null, null);
+                null, null, List.of(), null, Map.of(), List.of(), 0, null, null, null, Map.of(), null, null, null, null);
         when(workflowMapper.toResponse(createdWorkflow)).thenReturn(expectedResponse);
 
         WorkflowResponse result = conversionService.createWorkflowFromSuggestion("run-1", "proj-1", "My Workflow");

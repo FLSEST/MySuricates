@@ -509,7 +509,7 @@ function StagingCard({ t, staging, devVersion, onStart, onStop, onPromote, onCan
             <div>
               <div className="flex items-center gap-2">
                 <p className="text-sm font-medium text-text">Stable</p>
-                <span className="text-xs text-text-tertiary font-mono">localhost:9091</span>
+                <a href="http://localhost:9091" target="_blank" rel="noopener noreferrer" className="text-xs text-accent hover:text-accent-hover font-mono hover:underline">localhost:9091</a>
               </div>
               <p className="text-xs text-text-tertiary">{t.settings.stagingHint}</p>
             </div>
@@ -770,7 +770,7 @@ function TestingCard({ t, testing, devVersion, onStart, onStop, onReset, onSyncA
             <div>
               <div className="flex items-center gap-2">
                 <p className="text-sm font-medium text-text">Test</p>
-                <span className="text-xs text-text-tertiary font-mono">localhost:8090</span>
+                <a href="http://localhost:8090" target="_blank" rel="noopener noreferrer" className="text-xs text-accent hover:text-accent-hover font-mono hover:underline">localhost:8090</a>
               </div>
               <p className="text-xs text-text-tertiary">{t.settings.testingHint}</p>
             </div>
