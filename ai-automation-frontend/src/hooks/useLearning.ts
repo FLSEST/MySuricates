@@ -15,7 +15,7 @@ export function useRateRun() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ runId, rating }: { runId: string; rating: number }) =>
-      api.post(`/learning/runs/${runId}/rate`, { rating }),
+      api.post(`/learning/runs/${runId}/rate?rating=${rating}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['learning'] }),
   });
 }
