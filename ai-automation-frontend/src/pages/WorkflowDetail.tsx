@@ -22,7 +22,7 @@ import { formatDuration } from '../utils/formatTime';
 import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
 import type { BlockDefinition, BlockType, WorkflowRun } from '../types';
 
-const BLOCK_TYPES: BlockType[] = ['simple', 'shell', 'retry', 'foreach', 'while', 'conditional', 'skill-capability', 'approval', 'agentic', 'sub-workflow'];
+const BLOCK_TYPES: BlockType[] = ['simple', 'shell', 'retry', 'foreach', 'while', 'conditional', 'skill-capability', 'approval', 'human-input', 'agentic', 'sub-workflow'];
 
 const MODEL_OPTIONS = [
   { value: '', label: '' }, // will be replaced by t.workflows.modelDefault
@@ -502,6 +502,7 @@ export function WorkflowDetail() {
                 conditional: { condition: '', then_command: '', else_command: '' },
                 'skill-capability': { capability: '', input: '{{ previous_output }}' },
                 approval: { question: '', options: ['Yes', 'Yes always', 'No'], mode: 'ask', auto_answer: null, on_no: 'continue', variable_name: 'approval_answer', timeout_minutes: 30 },
+                'human-input': { prompt: '', input_type: 'text', variable_name: 'user_input', options: [], default_value: '', required: true, timeout_minutes: 30, use_default_on_timeout: true },
                 agentic: { goal: '', success_criteria: '', max_iterations: 10, iteration_timeout_seconds: 300, total_timeout_seconds: 1800, max_total_tokens: 200000, max_repeated_actions: 3, require_approval: false },
                 'sub-workflow': { workflow_id: '' },
               };

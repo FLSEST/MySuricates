@@ -13,6 +13,7 @@ const blockTypeVariant: Record<BlockType, BadgeVariant> = {
   'skill-capability': 'success',
   shell: 'accent',
   approval: 'warning',
+  'human-input': 'warning',
   'sub-workflow': 'accent',
   retry: 'default',
   foreach: 'default',
@@ -94,7 +95,11 @@ export function SortableBlock({ id, index, block, onEdit, onRemove }: SortableBl
                 ? String(block.config.capability)
                 : 'goal' in block.config
                   ? String(block.config.goal)
-                  : JSON.stringify(block.config)}
+                  : 'prompt' in block.config
+                    ? String(block.config.prompt)
+                    : 'question' in block.config
+                      ? String(block.config.question)
+                      : JSON.stringify(block.config)}
           </p>
         )}
       </div>

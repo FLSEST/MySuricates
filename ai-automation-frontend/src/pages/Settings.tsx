@@ -878,16 +878,27 @@ function TestingCard({ t, testing, devVersion, onStart, onStop, onReset, onSyncA
             </div>
           ) : (
             <div>
-              <Button
-                size="sm"
-                variant="ghost"
-                icon={<RefreshCw className="w-3.5 h-3.5" />}
-                onClick={handleSync}
-                loading={syncLoading}
-                disabled={!testing?.healthy}
-              >
-                {t.settings.testingSync}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={<RefreshCw className="w-3.5 h-3.5" />}
+                  onClick={handleSync}
+                  loading={syncLoading}
+                  disabled={!testing?.healthy}
+                >
+                  {t.settings.syncAll}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={<ListChecks className="w-3.5 h-3.5" />}
+                  onClick={() => setSyncModalOpen(true)}
+                  disabled={!testing?.healthy || syncLoading}
+                >
+                  {t.settings.syncSelective}
+                </Button>
+              </div>
               <p className="text-xs text-text-tertiary mt-1">{t.settings.testingSyncHint}</p>
             </div>
           )}

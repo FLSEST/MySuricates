@@ -108,13 +108,22 @@ public class ExecutionController {
         if (request == null) {
             return ResponseEntity.ok(Map.of("pending", false));
         }
-        return ResponseEntity.ok(Map.of(
-                "pending", true,
-                "blockId", request.getBlockId(),
-                "question", request.getQuestion(),
-                "options", request.getOptions(),
-                "stepIndex", request.getStepIndex()
-        ));
+        Map<String, Object> response = new java.util.HashMap<>();
+        response.put("pending", true);
+        response.put("blockId", request.getBlockId());
+        response.put("question", request.getQuestion());
+        response.put("options", request.getOptions());
+        response.put("stepIndex", request.getStepIndex());
+        response.put("type", request.getType());
+
+        if ("human-input".equals(request.getType())) {
+            response.put("inputType", request.getInputType());
+            response.put("defaultValue", request.getDefaultValue());
+            response.put("variableName", request.getVariableName());
+            response.put("required", request.isRequired());
+            response.put("validationPattern", request.getValidationPattern());
+        }
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/{id}/command")

@@ -8,6 +8,7 @@ import { StatusBadge } from '../components/shared/StatusBadge';
 import { ErrorState } from '../components/shared/ErrorState';
 import { LogViewer } from '../components/shared/LogViewer';
 import { ApprovalDialog } from '../components/shared/ApprovalDialog';
+import { HumanInputDialog } from '../components/shared/HumanInputDialog';
 import { AgenticStepCard } from '../components/shared/AgenticStepCard';
 import { InsightsPanel } from '../components/shared/InsightsPanel';
 import { ConversionSuggestion } from '../components/shared/ConversionSuggestion';
@@ -20,7 +21,7 @@ import { useRateRun } from '../hooks/useLearning';
 import { useT } from '../i18n';
 import { formatDuration } from '../utils/formatTime';
 import { api } from '../api/client';
-import type { WorkflowRun, StepResult } from '../types';
+import type { WorkflowRun, StepResult, PendingHumanInput } from '../types';
 
 const TerminalPanel = lazy(() => import('../components/shared/TerminalPanel').then(m => ({ default: m.TerminalPanel })));
 
@@ -74,7 +75,7 @@ export function WorkflowExecution() {
 
   const { data: workflow } = useWorkflow(id!);
   const { data: runs, error: runsError, refetch: refetchRuns } = useWorkflowRuns(id!);
-  const { logs, connected, pendingApproval, agenticStates } = useExecutionWebSocket(runId!, id);
+  const { logs, connected, pendingApproval, pendingHumanInput, agenticStates } = useExecutionWebSocket(runId!, id);
   const rateRun = useRateRun();
   const pauseExecution = usePauseExecution();
   const resumeExecution = useResumeExecution();
@@ -87,25 +88,45 @@ export function WorkflowExecution() {
   const [recoveredApproval, setRecoveredApproval] = useState<{
     blockId: string; question: string; options: string[]; stepIndex: number;
   } | null>(null);
+  const [recoveredHumanInput, setRecoveredHumanInput] = useState<PendingHumanInput | null>(null);
 
-  // Recovery: check for pending approval on page load/reload
+  // Recovery: check for pending approval/human-input on page load/reload
   useEffect(() => {
     if (!runId) return;
-    api.get<{ pending: boolean; blockId?: string; question?: string; options?: string[]; stepIndex?: number }>(
+    api.get<{
+      pending: boolean; blockId?: string; question?: string; options?: string[]; stepIndex?: number;
+      type?: string; inputType?: string; defaultValue?: string; variableName?: string;
+      required?: boolean; validationPattern?: string | null;
+    }>(
       `/executions/${runId}/approval`
     ).then((data) => {
       if (data.pending && data.blockId) {
-        setRecoveredApproval({
-          blockId: data.blockId,
-          question: data.question!,
-          options: data.options!,
-          stepIndex: data.stepIndex!,
-        });
+        if (data.type === 'human-input') {
+          setRecoveredHumanInput({
+            blockId: data.blockId,
+            prompt: data.question!,
+            inputType: (data.inputType as PendingHumanInput['inputType']) || 'text',
+            options: data.options || [],
+            defaultValue: data.defaultValue || '',
+            required: data.required ?? true,
+            validationPattern: data.validationPattern ?? null,
+            variableName: data.variableName || 'user_input',
+            stepIndex: data.stepIndex!,
+          });
+        } else {
+          setRecoveredApproval({
+            blockId: data.blockId,
+            question: data.question!,
+            options: data.options!,
+            stepIndex: data.stepIndex!,
+          });
+        }
       }
     }).catch(() => { /* ignore */ });
   }, [runId]);
 
   const activeApproval = pendingApproval ?? recoveredApproval;
+  const activeHumanInput = pendingHumanInput ?? recoveredHumanInput;
 
   const run: WorkflowRun | undefined = runs?.content?.find((r) => r.id === runId);
   const isRunning = run?.status === 'RUNNING' || run?.status === 'PAUSED';
@@ -359,6 +380,21 @@ export function WorkflowExecution() {
             submitApproval.mutate({ runId: runId!, answer }, {
               onSuccess: () => {
                 setRecoveredApproval(null);
+              },
+            });
+          }}
+        />
+      )}
+
+      {/* Human Input Dialog */}
+      {activeHumanInput && (
+        <HumanInputDialog
+          humanInput={activeHumanInput}
+          loading={submitApproval.isPending}
+          onSubmit={(value) => {
+            submitApproval.mutate({ runId: runId!, answer: value }, {
+              onSuccess: () => {
+                setRecoveredHumanInput(null);
               },
             });
           }}

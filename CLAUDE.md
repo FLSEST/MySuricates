@@ -5,39 +5,48 @@ AI-powered workflow automation platform with a skill system, Docker-based execut
 ## Project Structure
 
 ```
-ai-automation-backend/     Spring Boot 3.2 (Java 21) REST API
+ai-automation-backend/     Spring Boot 3.4 (Java 21) REST API
   src/main/java/com/automation/
-    controller/            REST controllers (Workflow, WorkflowTemplate, Skill, Execution, Learning, Schedule, Webhook, System, Project, Conversion, Todo, ActivityLog, WorkflowMemory, Staging, Chain)
-    entity/                JPA entities (Workflow, WorkflowTemplate, Skill, Project, Container, ScheduledWorkflow, WebhookTrigger, WorkflowRun, Todo, ActivityLog, WorkflowMemory, StepResult, BlockDefinition, WorkflowChain, ChainRun, ChainEntry, ChainRunEntry, ...)
+    controller/            REST controllers (Workflow, WorkflowTemplate, Skill, Execution, Learning, Schedule, Webhook, System, Project, Conversion, Todo, ActivityLog, WorkflowMemory, Staging, Chain, Testing)
+    entity/                JPA entities (Workflow, WorkflowTemplate, Skill, Project, Container, ScheduledWorkflow, WebhookTrigger, WorkflowRun, Todo, ActivityLog, WorkflowMemory, StepResult, BlockDefinition, WorkflowChain, ChainRun, ChainEntry, ChainRunEntry, TemplateVerification, Capability, GateStatus, ...)
     dto/                   Request/response DTOs
     mapper/                MapStruct mappers (Entity <-> DTO)
     repository/            Spring Data JPA repositories
     service/               Business logic
     executor/              Docker-based skill execution
-    executor/blocks/       Block executors (Simple, Shell, Retry, Conditional, ForEach, While, Agentic, Approval, SubWorkflow, SkillCapability)
+    executor/blocks/       Block executors (Simple, Shell, Retry, Conditional, ForEach, While, Agentic, Approval, SubWorkflow, SkillCapability, HumanInput)
     service/ai/            Host CLI integration (HostClaudeService, HostCodexService)
     service/cli/           CLI execution and parsing (CommandExecutorService, CliSessionManager, ClaudeOutputParser, ClaudeJsonResponse, ShellCommandService)
     service/conversion/    Agentic-to-workflow conversion (WorkflowConversionService)
     service/chain/         Workflow chain CRUD and sequential execution (ChainService, ChainExecutor)
+    service/memory/        Knowledge extraction and summarization (WorkflowMemoryService, ClaudeSummarizer, CodexSummarizer, KnowledgeSummarizer)
+    service/staging/       Staging lifecycle, sync, and test instance (StagingService, TestingService, InstanceSyncHelper)
+    service/todo/          Todo management and gate resolution (TodoService, AutoTodoService, GateStatusResolver)
+    service/workflow/      Workflow execution, templates, optimization (WorkflowExecutor, WorkflowService, TemplateVerificationService)
     security/              API key auth, rate limiting, Tailscale
     config/                Spring configuration, built-in template/skill seeders
     websocket/             WebSocket for real-time updates
+    event/                 Spring application events (WorkflowRunCompletedEvent)
+    exception/             Custom exception hierarchy + GlobalExceptionHandler
+    util/                  JPA converters for JSON/custom types
   src/main/resources/
-    db/migration/          Flyway migrations (V1-V19, SQLite)
+    db/migration/          Flyway migrations (V1-V24, SQLite)
     application.yml        App config
   docker/                  Dockerfiles (agent containers: Python/Node/Go, backend, stable)
 
 ai-automation-frontend/    React 18 SPA (TypeScript)
   src/
     api/client.ts          Shared API client (fetch-based, /api/v1 prefix)
-    pages/                 Route pages (Dashboard, Projects, Workflows, Skills, Schedules, Webhooks, Settings, ...)
+    pages/                 Route pages (Dashboard, Projects, ProjectDetail, Workflows, WorkflowDetail, WorkflowExecution, Runs, Skills, Schedules, Webhooks, Settings, Todos, Chains, ChainExecution, ActivityLog)
     components/            UI components (ui/, layout/, dashboard/, workflow/, shared/, skill/, schedule/)
-    hooks/                 TanStack Query hooks (useWorkflows, useSkills, useProjects, useSchedules, useWebhooks, useConversion, useInsights, useTemplates, ...)
+    hooks/                 TanStack Query hooks (useWorkflows, useSkills, useProjects, useSchedules, useWebhooks, useConversion, useInsights, useTemplates, useChains, useActivityLog, useLearning, useStaging, useTesting, useTodos, useWorkflowMemory, useSystem, useIsMobile, useToast, useWebSocket)
     data/                  Skill constants, static data
     utils/                 Utility functions (formatTime, extractWorkflowVariables, templateUtils, workflowIcon)
     stores/                Zustand stores (settings, sidebar, theme, toast)
     i18n/                  Translations (de.ts, en.ts)
     types/index.ts         Shared TypeScript types
+    theme/                 Design tokens (colors, spacing)
+    test/                  Test utilities (MSW handlers, setup)
   cypress/                 E2E tests (Cypress 13)
 ```
 
@@ -87,7 +96,7 @@ npm run cy:open                          # Open Cypress UI
   - `CommandExecutorService` provides `executeCommandOnHost()` / `executeStepOnHost()` / `injectSkillContextOnHost()` methods
 - Docker containers have resource limits: 4GB memory, CPU quota, 100 PIDs, 60min idle timeout
 - Security is enabled by default: API key auth via `X-API-Key` header (auto-generated if not configured), rate limiting
-- Block types: simple, shell, retry, conditional, forEach, while, agentic, approval, sub-workflow, skill-capability
+- Block types: simple, shell, retry, conditional, forEach, while, agentic, approval, sub-workflow, skill-capability, human-input
 - Agentic blocks use a Goal→Reason→Act→Observe loop powered by Host Claude CLI
 - Workflow Conversion: Successful agentic runs can be converted to deterministic workflows (rule-based + AI)
 - Terminal WebSocket at `/ws/terminal` for real-time container access
@@ -163,6 +172,14 @@ Additional safety:
 - Users can create custom skills via the import API (`POST /api/v1/skills/import`)
 - `Skill.java` entity uses `@PrePersist ensureId()` (not `@GeneratedValue`) to allow explicit IDs for built-ins
 
+## Human-Input Block
+
+- `HumanInputBlockExecutor` — pauses workflow execution to collect input from the user via WebSocket
+- Broadcasts `human_input_required` event to `/topic/executions/{runId}/logs`, waits for response
+- Config fields: `prompt`, `input_type` (text/select), `variable_name`, `options`, `default_value`, `required`, `validation_pattern`, `timeout_minutes` (default: 30), `use_default_on_timeout`
+- User's answer is stored as a context variable (`variable_name`) for subsequent steps
+- Reuses the `ApprovalRequest` mechanism from the approval block
+
 ## Sub-Workflow Block
 
 - `SubWorkflowBlockExecutor` — runs another workflow as a nested block
@@ -192,17 +209,27 @@ Additional safety:
 - Workflows can accumulate knowledge across runs via the memory system
 - `WorkflowMemoryController` — CRUD API at `/api/v1/workflows/{workflowId}/memory`
 - `WorkflowMemoryService` — extracts knowledge from completed runs, manages activation/deactivation
+- `KnowledgeSummarizer` — interface for summarization backends, implemented by:
+  - `ClaudeSummarizer` — uses Host Claude CLI for summarization (primary)
+  - `CodexSummarizer` — uses OpenAI Codex CLI as alternative backend
 - `HostCodexService` — runs OpenAI Codex CLI on the host for summarization tasks (analogous to `HostClaudeService`)
-- `CodexSummarizer` — uses Codex to summarize workflow run outputs into reusable knowledge
-- `SummarizationConfig` — configuration for the summarization backend
+- `SummarizationConfig` — configuration for the summarization backend selection
 - `WorkflowMemory` entity (V16 migration) — stores extracted knowledge entries per workflow
 - Frontend hook: `useWorkflowMemory.ts`
 
-## Staging (Stable + Dev parallel)
+## Template Verification
 
-Two environments run side-by-side:
+- `TemplateVerification` entity (V22 migration) — tracks quality status of workflow templates
+- `TemplateVerificationService` — manages verification state per template+project pair
+- Workflows created from templates can be test-run to verify the template works correctly
+- Verification results visible in template CRUD API responses
+
+## Staging (Stable + Dev + Test parallel)
+
+Three environments can run side-by-side:
 - **Dev**: `localhost:3000` → proxy → `localhost:9090` (from source, as usual)
 - **Stable**: `localhost:9091` (Docker container, backend serves static frontend)
+- **Test**: `localhost:8090` (Docker container, dedicated test instance for workflow testing)
 
 ### Auto-Start
 

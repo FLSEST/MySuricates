@@ -150,6 +150,7 @@ export const en = {
       approval: 'Approval / Decision',
       agentic: 'Agentic (AI Loop)',
       'sub-workflow': 'Sub-Workflow',
+      'human-input': 'Human Input',
     },
     instructions: 'Agent Instructions',
     allProjects: 'All Projects',
@@ -234,6 +235,14 @@ export const en = {
       approval: {
         title: 'Approval Required',
         description: 'This workflow step requires your decision to continue.',
+      },
+      humanInput: {
+        title: 'Input Required',
+        description: 'This workflow step requires your input to continue.',
+        submit: 'Submit',
+        placeholder: 'Enter value...',
+        validationError: 'Input does not match the required format.',
+        requiredError: 'This field is required.',
       },
       agentic: {
         title: 'Agentic Loop',

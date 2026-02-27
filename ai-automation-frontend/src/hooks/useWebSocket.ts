@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
-import type { AgenticState, AgenticIteration, AgenticPhase } from '../types';
+import type { AgenticState, AgenticIteration, AgenticPhase, PendingHumanInput } from '../types';
 
 interface StepMessage {
   stepIndex: number;
@@ -29,6 +29,25 @@ interface ApprovalRequiredMessage {
 
 interface ApprovalResolvedMessage {
   type: 'approval_resolved';
+  stepIndex: number;
+  answer: string;
+}
+
+interface HumanInputRequiredMessage {
+  type: 'human_input_required';
+  blockId: string;
+  prompt: string;
+  inputType: 'text' | 'number' | 'textarea' | 'select';
+  options: string[];
+  defaultValue: string;
+  required: boolean;
+  validationPattern: string | null;
+  variableName: string;
+  stepIndex: number;
+}
+
+interface HumanInputResolvedMessage {
+  type: 'human_input_resolved';
   stepIndex: number;
   answer: string;
 }
@@ -112,7 +131,7 @@ type AgenticMessage =
   | AgenticErrorMessage
   | AgenticApprovalMessage;
 
-type WsMessage = StepMessage | StatusMessage | ApprovalRequiredMessage | ApprovalResolvedMessage | AgenticMessage;
+type WsMessage = StepMessage | StatusMessage | ApprovalRequiredMessage | ApprovalResolvedMessage | HumanInputRequiredMessage | HumanInputResolvedMessage | AgenticMessage;
 
 export interface PendingApproval {
   blockId: string;
@@ -131,6 +150,14 @@ function isApprovalRequired(data: WsMessage): data is ApprovalRequiredMessage {
 
 function isApprovalResolved(data: WsMessage): data is ApprovalResolvedMessage {
   return 'type' in data && data.type === 'approval_resolved';
+}
+
+function isHumanInputRequired(data: WsMessage): data is HumanInputRequiredMessage {
+  return 'type' in data && data.type === 'human_input_required';
+}
+
+function isHumanInputResolved(data: WsMessage): data is HumanInputResolvedMessage {
+  return 'type' in data && data.type === 'human_input_resolved';
 }
 
 function isAgenticMessage(data: WsMessage): data is AgenticMessage {
@@ -251,6 +278,7 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string)
   const [logs, setLogs] = useState<Array<{ timestamp: string; level: string; message: string }>>([]);
   const [connected, setConnected] = useState(false);
   const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null);
+  const [pendingHumanInput, setPendingHumanInput] = useState<PendingHumanInput | null>(null);
   const [agenticStates, setAgenticStates] = useState<Map<number, AgenticState>>(new Map());
   const clientRef = useRef<Client | null>(null);
   const queryClient = useQueryClient();
@@ -315,6 +343,30 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string)
                 level: 'INFO',
                 message: `[Step ${data.stepIndex}] Approval resolved: ${data.answer}`,
               });
+            } else if (isHumanInputRequired(data)) {
+              setPendingHumanInput({
+                blockId: data.blockId,
+                prompt: data.prompt,
+                inputType: data.inputType,
+                options: data.options,
+                defaultValue: data.defaultValue,
+                required: data.required,
+                validationPattern: data.validationPattern,
+                variableName: data.variableName,
+                stepIndex: data.stepIndex,
+              });
+              appendLog({
+                timestamp: new Date().toISOString(),
+                level: 'WARN',
+                message: `[Step ${data.stepIndex}] Human input required: ${data.prompt}`,
+              });
+            } else if (isHumanInputResolved(data)) {
+              setPendingHumanInput(null);
+              appendLog({
+                timestamp: new Date().toISOString(),
+                level: 'INFO',
+                message: `[Step ${data.stepIndex}] Human input received: ${data.answer}`,
+              });
             } else if (isStatusMessage(data)) {
               appendLog({
                 timestamp: new Date().toISOString(),
@@ -332,7 +384,7 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string)
             // Invalidate run queries on step updates and terminal status changes
             const shouldRefetch =
               (isStatusMessage(data) && ['COMPLETED', 'FAILED', 'CANCELLED'].includes(data.status)) ||
-              (!isStatusMessage(data) && !isAgenticMessage(data) && !isApprovalRequired(data) && !isApprovalResolved(data) && 'stepIndex' in data);
+              (!isStatusMessage(data) && !isAgenticMessage(data) && !isApprovalRequired(data) && !isApprovalResolved(data) && !isHumanInputRequired(data) && !isHumanInputResolved(data) && 'stepIndex' in data);
             if (shouldRefetch && workflowIdRef.current) {
               queryClientRef.current.invalidateQueries({ queryKey: ['workflows', workflowIdRef.current, 'runs'] });
             }
@@ -356,5 +408,5 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string)
 
   const clearLogs = useCallback(() => setLogs([]), []);
 
-  return { logs, connected, clearLogs, pendingApproval, agenticStates };
+  return { logs, connected, clearLogs, pendingApproval, pendingHumanInput, agenticStates };
 }

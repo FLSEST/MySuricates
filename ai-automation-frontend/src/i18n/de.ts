@@ -152,6 +152,7 @@ export const de: TranslationKeys = {
       approval: 'Genehmigung / Entscheidung',
       agentic: 'Agentisch (KI-Loop)',
       'sub-workflow': 'Sub-Workflow',
+      'human-input': 'Benutzereingabe',
     },
     instructions: 'Agent-Anweisungen',
     allProjects: 'Alle Projekte',
@@ -236,6 +237,14 @@ export const de: TranslationKeys = {
       approval: {
         title: 'Genehmigung erforderlich',
         description: 'Dieser Workflow-Schritt erfordert Ihre Entscheidung zum Fortfahren.',
+      },
+      humanInput: {
+        title: 'Eingabe erforderlich',
+        description: 'Dieser Workflow-Schritt erfordert Ihre Eingabe zum Fortfahren.',
+        submit: 'Absenden',
+        placeholder: 'Wert eingeben...',
+        validationError: 'Eingabe entspricht nicht dem erforderlichen Format.',
+        requiredError: 'Dieses Feld ist erforderlich.',
       },
       agentic: {
         title: 'Agentischer Loop',

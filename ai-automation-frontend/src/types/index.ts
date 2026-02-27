@@ -136,7 +136,7 @@ export interface UpdateWorkflowRequest {
   defaultContext?: Record<string, string>;
 }
 
-export type BlockType = 'simple' | 'shell' | 'retry' | 'foreach' | 'while' | 'conditional' | 'skill-capability' | 'approval' | 'agentic' | 'sub-workflow';
+export type BlockType = 'simple' | 'shell' | 'retry' | 'foreach' | 'while' | 'conditional' | 'skill-capability' | 'approval' | 'agentic' | 'sub-workflow' | 'human-input';
 
 export interface BlockDefinition {
   type: BlockType;
@@ -636,6 +636,20 @@ export interface ChainRunEntry {
   startedAt: string | null;
   completedAt: string | null;
   durationMs: number | null;
+}
+
+// ── Human Input ─────────────────────────────────────────
+
+export interface PendingHumanInput {
+  blockId: string;
+  prompt: string;
+  inputType: 'text' | 'number' | 'textarea' | 'select';
+  options: string[];
+  defaultValue: string;
+  required: boolean;
+  validationPattern: string | null;
+  variableName: string;
+  stepIndex: number;
 }
 
 // ── API Error ────────────────────────────────────────────
