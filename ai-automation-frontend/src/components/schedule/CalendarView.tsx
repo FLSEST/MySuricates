@@ -44,10 +44,10 @@ export function CalendarView() {
       if (date) {
         result.push({
           id: s.id,
-          title: s.workflowName,
+          title: s.workflowName ?? s.chainName ?? '',
           date,
           type: 'scheduled',
-          workflowId: s.workflowId,
+          workflowId: s.workflowId ?? s.chainId ?? '',
           status: s.scheduleType === 'ONCE' ? 'ONCE' : 'CRON',
         });
       }

@@ -54,10 +54,14 @@ export function UpcomingSchedulesCard() {
                   schedule.isToday ? 'bg-accent' : 'bg-text-tertiary/40'
                 }`} />
                 <div className="min-w-0">
-                  <span className="text-xs text-text truncate block">{schedule.workflowName}</span>
-                  {schedule.projectName && (
+                  <span className="text-xs text-text truncate block">
+                    {schedule.workflowName ?? schedule.chainName}
+                  </span>
+                  {schedule.projectName ? (
                     <span className="text-[10px] text-accent/70 truncate block">{schedule.projectName}</span>
-                  )}
+                  ) : schedule.targetType === 'CHAIN' ? (
+                    <span className="text-[10px] text-accent/70 truncate block">Chain</span>
+                  ) : null}
                 </div>
               </div>
               <span className="text-[10px] text-text-tertiary shrink-0 tabular-nums">

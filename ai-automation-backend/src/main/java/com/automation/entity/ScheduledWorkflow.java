@@ -25,13 +25,26 @@ public class ScheduledWorkflow {
         CRON, ONCE
     }
 
+    public enum TargetType {
+        WORKFLOW, CHAIN
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "target_type", nullable = false)
+    @Builder.Default
+    private TargetType targetType = TargetType.WORKFLOW;
+
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "workflow_id", nullable = false)
+    @JoinColumn(name = "workflow_id")
     private Workflow workflow;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "chain_id")
+    private WorkflowChain chain;
 
     @Column(nullable = false)
     private String cronExpression;
@@ -64,4 +77,11 @@ public class ScheduledWorkflow {
 
     @LastModifiedDate
     private Instant updatedAt;
+
+    public String getTargetName() {
+        if (targetType == TargetType.CHAIN && chain != null) {
+            return chain.getName();
+        }
+        return workflow != null ? workflow.getName() : "Unknown";
+    }
 }

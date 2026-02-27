@@ -11,6 +11,9 @@ public record UpcomingScheduleResponse(
             String scheduleId,
             String workflowName,
             String projectName,
+            String chainId,
+            String chainName,
+            String targetType,
             Instant scheduledAt
     ) {}
 }

@@ -1,44 +1,65 @@
 import { useState } from 'react';
-import { Calendar, Plus, Trash2, List } from 'lucide-react';
+import { Calendar, Plus, Trash2, List, Link2 } from 'lucide-react';
 import { Card, Button, Input, Select, Modal, Spinner, Table, Toggle, CronPicker } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
 import { CalendarView } from '../components/schedule/CalendarView';
 import { useSchedules, useCreateSchedule, useToggleSchedule, useDeleteSchedule } from '../hooks/useSchedules';
 import { useWorkflows } from '../hooks/useWorkflows';
+import { useChains } from '../hooks/useChains';
 import { useT } from '../i18n';
 import type { ScheduledWorkflow, CreateScheduleRequest } from '../types';
+
+type TargetType = 'WORKFLOW' | 'CHAIN';
+
+interface FormState extends CreateScheduleRequest {
+  targetType: TargetType;
+}
 
 export function Schedules() {
   const t = useT();
   const { data: schedules, isLoading, error, refetch } = useSchedules();
   const { data: workflows } = useWorkflows();
+  const { data: chains } = useChains();
   const createSchedule = useCreateSchedule();
   const toggleSchedule = useToggleSchedule();
   const deleteSchedule = useDeleteSchedule();
 
   const [view, setView] = useState<'list' | 'calendar'>('list');
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState<CreateScheduleRequest>({
+  const [form, setForm] = useState<FormState>({
+    targetType: 'WORKFLOW',
     workflowId: '',
+    chainId: '',
     cronExpression: '',
     scheduleType: 'CRON',
   });
 
   const handleCreate = () => {
     const payload: CreateScheduleRequest = {
-      ...form,
+      targetType: form.targetType,
       cronExpression: form.scheduleType === 'ONCE' ? undefined : form.cronExpression,
+      description: form.description,
+      inputContext: form.inputContext,
+      scheduleType: form.scheduleType,
+      scheduledAt: form.scheduledAt,
     };
+    if (form.targetType === 'CHAIN') {
+      payload.chainId = form.chainId;
+    } else {
+      payload.workflowId = form.workflowId;
+    }
     createSchedule.mutate(payload, {
       onSuccess: () => {
         setShowCreate(false);
-        setForm({ workflowId: '', cronExpression: '', scheduleType: 'CRON' });
+        setForm({ targetType: 'WORKFLOW', workflowId: '', chainId: '', cronExpression: '', scheduleType: 'CRON' });
       },
     });
   };
 
-  const isFormValid = form.workflowId && (
+  const isFormValid = (
+    form.targetType === 'CHAIN' ? !!form.chainId : !!form.workflowId
+  ) && (
     form.scheduleType === 'ONCE' ? !!form.scheduledAt : !!form.cronExpression
   );
 
@@ -57,13 +78,22 @@ export function Schedules() {
   const columns = [
     {
       key: 'workflow',
-      header: t.common.workflow,
+      header: t.schedules.targetType,
       render: (s: ScheduledWorkflow) => (
-        <div className="min-w-0">
-          <span className="font-medium text-text block truncate">{s.workflowName}</span>
-          {s.projectName && (
-            <span className="text-xs text-accent/70 block truncate">{s.projectName}</span>
+        <div className="min-w-0 flex items-center gap-2">
+          {s.targetType === 'CHAIN' && (
+            <Link2 className="w-3.5 h-3.5 text-accent/70 shrink-0" />
           )}
+          <div className="min-w-0">
+            <span className="font-medium text-text block truncate">
+              {s.targetType === 'CHAIN' ? s.chainName : s.workflowName}
+            </span>
+            {s.targetType === 'CHAIN' ? (
+              <span className="text-xs text-accent/70 block truncate">{t.schedules.targetChain}</span>
+            ) : s.projectName ? (
+              <span className="text-xs text-accent/70 block truncate">{s.projectName}</span>
+            ) : null}
+          </div>
         </div>
       ),
     },
@@ -227,18 +257,63 @@ export function Schedules() {
         }
       >
         <div className="space-y-4">
-          <Select
-            label={t.common.workflow}
-            value={form.workflowId}
-            onChange={(e) => setForm({ ...form, workflowId: e.target.value })}
-            options={[
-              { value: '', label: t.common.selectWorkflow },
-              ...(workflows?.map((w) => ({
-                value: w.id,
-                label: w.projectName ? `${w.name} (${w.projectName})` : w.name,
-              })) ?? []),
-            ]}
-          />
+          {/* Target Type Toggle */}
+          <div>
+            <label className="block text-sm font-medium text-text mb-1.5">{t.schedules.targetType}</label>
+            <div className="flex items-center bg-surface-secondary rounded-lg p-0.5 border border-border">
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, targetType: 'WORKFLOW', chainId: '' })}
+                className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  form.targetType === 'WORKFLOW'
+                    ? 'bg-surface text-text shadow-xs'
+                    : 'text-text-secondary hover:text-text'
+                }`}
+              >
+                {t.schedules.targetWorkflow}
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, targetType: 'CHAIN', workflowId: '' })}
+                className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  form.targetType === 'CHAIN'
+                    ? 'bg-surface text-text shadow-xs'
+                    : 'text-text-secondary hover:text-text'
+                }`}
+              >
+                {t.schedules.targetChain}
+              </button>
+            </div>
+          </div>
+
+          {/* Workflow or Chain selector */}
+          {form.targetType === 'CHAIN' ? (
+            <Select
+              label={t.schedules.targetChain}
+              value={form.chainId ?? ''}
+              onChange={(e) => setForm({ ...form, chainId: e.target.value })}
+              options={[
+                { value: '', label: t.schedules.selectChain },
+                ...(chains?.map((c) => ({
+                  value: c.id,
+                  label: c.name,
+                })) ?? []),
+              ]}
+            />
+          ) : (
+            <Select
+              label={t.common.workflow}
+              value={form.workflowId ?? ''}
+              onChange={(e) => setForm({ ...form, workflowId: e.target.value })}
+              options={[
+                { value: '', label: t.common.selectWorkflow },
+                ...(workflows?.map((w) => ({
+                  value: w.id,
+                  label: w.projectName ? `${w.name} (${w.projectName})` : w.name,
+                })) ?? []),
+              ]}
+            />
+          )}
 
           {/* Schedule Type Toggle */}
           <div>

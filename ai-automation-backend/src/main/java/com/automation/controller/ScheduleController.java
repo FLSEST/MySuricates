@@ -52,6 +52,11 @@ public class ScheduleController {
         return scheduleMapper.toResponseList(schedulerService.findByWorkflowId(workflowId));
     }
 
+    @GetMapping("/chain/{chainId}")
+    public List<ScheduledWorkflowResponse> getByChain(@PathVariable String chainId) {
+        return scheduleMapper.toResponseList(schedulerService.findByChainId(chainId));
+    }
+
     @GetMapping("/calendar")
     public CalendarDataResponse getCalendarData(
             @RequestParam Instant from,
@@ -65,7 +70,8 @@ public class ScheduleController {
     public ResponseEntity<ScheduledWorkflowResponse> createSchedule(
             @Valid @RequestBody CreateScheduleRequest request) {
         var scheduled = schedulerService.create(
-                request.workflowId(), request.cronExpression(),
+                request.workflowId(), request.chainId(),
+                request.targetType(), request.cronExpression(),
                 request.description(), request.inputContext(),
                 request.scheduleType(), request.scheduledAt());
         return ResponseEntity.status(HttpStatus.CREATED).body(scheduleMapper.toResponse(scheduled));

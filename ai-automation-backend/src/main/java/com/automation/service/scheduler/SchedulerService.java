@@ -3,9 +3,12 @@ package com.automation.service.scheduler;
 import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.ScheduledWorkflow.ScheduleType;
+import com.automation.entity.ScheduledWorkflow.TargetType;
 import com.automation.entity.Workflow;
+import com.automation.entity.WorkflowChain;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ScheduledWorkflowRepository;
+import com.automation.repository.WorkflowChainRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.service.activitylog.ActivityLogService;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +37,7 @@ public class SchedulerService {
 
     private final ScheduledWorkflowRepository scheduledRepository;
     private final WorkflowRepository workflowRepository;
+    private final WorkflowChainRepository workflowChainRepository;
     private final ScheduledWorkflowExecutor scheduledExecutor;
     private final ActivityLogService activityLogService;
 
@@ -54,25 +58,54 @@ public class SchedulerService {
     }
 
     @Transactional(readOnly = true)
+    public List<ScheduledWorkflow> findByChainId(String chainId) {
+        return scheduledRepository.findByChainId(chainId);
+    }
+
+    @Transactional(readOnly = true)
     public List<ScheduledWorkflow> findSchedulesInRange(Instant from, Instant to) {
         return scheduledRepository.findSchedulesInRange(from, to);
     }
 
     @Transactional
-    public ScheduledWorkflow create(String workflowId, String cronExpression,
+    public ScheduledWorkflow create(String workflowId, String chainId,
+                                     String targetTypeStr, String cronExpression,
                                      String description, Map<String, Object> inputContext,
                                      String scheduleType, Instant scheduledAt) {
-        Workflow workflow = workflowRepository.findById(workflowId)
-                .orElseThrow(() -> new ResourceNotFoundException("Workflow", workflowId));
+        TargetType targetType = parseTargetType(targetTypeStr);
+
+        // Validate mutual exclusivity
+        boolean hasWorkflow = workflowId != null && !workflowId.isBlank();
+        boolean hasChain = chainId != null && !chainId.isBlank();
+
+        if (targetType == TargetType.CHAIN) {
+            if (!hasChain) {
+                throw new IllegalArgumentException("chainId is required for CHAIN schedules");
+            }
+        } else {
+            if (!hasWorkflow) {
+                throw new IllegalArgumentException("workflowId is required for WORKFLOW schedules");
+            }
+        }
 
         ScheduleType type = parseScheduleType(scheduleType);
 
         ScheduledWorkflow.ScheduledWorkflowBuilder builder = ScheduledWorkflow.builder()
-                .workflow(workflow)
+                .targetType(targetType)
                 .description(description)
                 .inputContext(inputContext != null ? inputContext : Map.of())
                 .enabled(true)
                 .scheduleType(type);
+
+        if (targetType == TargetType.CHAIN) {
+            WorkflowChain chain = workflowChainRepository.findById(chainId)
+                    .orElseThrow(() -> new ResourceNotFoundException("WorkflowChain", chainId));
+            builder.chain(chain);
+        } else {
+            Workflow workflow = workflowRepository.findById(workflowId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Workflow", workflowId));
+            builder.workflow(workflow);
+        }
 
         if (type == ScheduleType.ONCE) {
             if (scheduledAt == null) {
@@ -93,8 +126,9 @@ public class SchedulerService {
         }
 
         ScheduledWorkflow saved = scheduledRepository.save(builder.build());
-        log.info("Created {} schedule: {} for workflow {}",
-                type, saved.getId(), workflowId);
+        log.info("Created {} schedule: {} for {} {}",
+                type, saved.getId(), targetType,
+                targetType == TargetType.CHAIN ? chainId : workflowId);
         return saved;
     }
 
@@ -136,7 +170,6 @@ public class SchedulerService {
 
     @Transactional(readOnly = true)
     public UpcomingScheduleResponse getRemainingThisWeek() {
-        // End of week = next Monday 00:00 (week starts on Monday)
         LocalDate nextMonday = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY));
         Instant endOfWeek = nextMonday.atStartOfDay(ZoneId.systemDefault()).toInstant();
         return getUpcomingRuns(endOfWeek);
@@ -148,26 +181,40 @@ public class SchedulerService {
         List<UpcomingScheduleResponse.UpcomingRun> upcoming = new ArrayList<>();
 
         for (ScheduledWorkflow sw : enabled) {
-            String workflowName = sw.getWorkflow() != null ? sw.getWorkflow().getName() : "Unknown";
-            String projectName = sw.getWorkflow() != null && sw.getWorkflow().getProject() != null
-                    ? sw.getWorkflow().getProject().getName() : null;
+            String workflowName = null;
+            String projectName = null;
+            String chainId = null;
+            String chainName = null;
+            String targetType = sw.getTargetType().name();
 
-            if (sw.getScheduleType() == ScheduledWorkflow.ScheduleType.CRON) {
+            if (sw.getTargetType() == TargetType.CHAIN && sw.getChain() != null) {
+                chainId = sw.getChain().getId();
+                chainName = sw.getChain().getName();
+            } else if (sw.getWorkflow() != null) {
+                workflowName = sw.getWorkflow().getName();
+                if (sw.getWorkflow().getProject() != null) {
+                    projectName = sw.getWorkflow().getProject().getName();
+                }
+            }
+
+            if (sw.getScheduleType() == ScheduleType.CRON) {
                 CronExpression cron = CronExpression.parse(sw.getCronExpression());
                 LocalDateTime next = cron.next(LocalDateTime.now());
                 while (next != null) {
                     Instant nextInstant = next.atZone(ZoneId.systemDefault()).toInstant();
                     if (nextInstant.isAfter(until)) break;
                     upcoming.add(new UpcomingScheduleResponse.UpcomingRun(
-                            sw.getId(), workflowName, projectName, nextInstant));
+                            sw.getId(), workflowName, projectName,
+                            chainId, chainName, targetType, nextInstant));
                     next = cron.next(next);
                 }
-            } else if (sw.getScheduleType() == ScheduledWorkflow.ScheduleType.ONCE) {
+            } else if (sw.getScheduleType() == ScheduleType.ONCE) {
                 if (sw.getScheduledAt() != null
                         && sw.getScheduledAt().isAfter(now)
                         && sw.getScheduledAt().isBefore(until)) {
                     upcoming.add(new UpcomingScheduleResponse.UpcomingRun(
-                            sw.getId(), workflowName, projectName, sw.getScheduledAt()));
+                            sw.getId(), workflowName, projectName,
+                            chainId, chainName, targetType, sw.getScheduledAt()));
                 }
             }
         }
@@ -175,11 +222,6 @@ public class SchedulerService {
         return new UpcomingScheduleResponse(upcoming.size(), upcoming);
     }
 
-    /**
-     * Runs every minute to check for due scheduled workflows.
-     * Delegates to ScheduledWorkflowExecutor (separate bean) so that
-     * @Transactional on executeSingleSchedule is properly proxied.
-     */
     @Scheduled(fixedRate = 60_000)
     public void checkAndExecuteScheduled() {
         List<ScheduledWorkflow> dueSchedules = scheduledRepository.findDueSchedules(Instant.now());
@@ -193,6 +235,17 @@ public class SchedulerService {
                         "Schedule execution failed: " + e.getMessage(),
                         "SchedulerService", scheduled.getId());
             }
+        }
+    }
+
+    private TargetType parseTargetType(String targetType) {
+        if (targetType == null || targetType.isBlank()) {
+            return TargetType.WORKFLOW;
+        }
+        try {
+            return TargetType.valueOf(targetType.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid target type: " + targetType);
         }
     }
 

@@ -220,9 +220,12 @@ export interface Capability {
 
 export interface ScheduledWorkflow {
   id: string;
-  workflowId: string;
-  workflowName: string;
+  workflowId: string | null;
+  workflowName: string | null;
   projectName: string | null;
+  chainId: string | null;
+  chainName: string | null;
+  targetType: 'WORKFLOW' | 'CHAIN';
   cronExpression: string;
   scheduleType: 'CRON' | 'ONCE';
   scheduledAt: string | null;
@@ -236,7 +239,9 @@ export interface ScheduledWorkflow {
 }
 
 export interface CreateScheduleRequest {
-  workflowId: string;
+  workflowId?: string;
+  chainId?: string;
+  targetType?: 'WORKFLOW' | 'CHAIN';
   cronExpression?: string;
   description?: string;
   inputContext?: Record<string, unknown>;
@@ -264,8 +269,11 @@ export interface UpcomingScheduleData {
   count: number;
   schedules: Array<{
     scheduleId: string;
-    workflowName: string;
+    workflowName: string | null;
     projectName: string | null;
+    chainId: string | null;
+    chainName: string | null;
+    targetType: string;
     scheduledAt: string;
   }>;
 }
