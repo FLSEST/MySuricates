@@ -7,6 +7,7 @@ import { useSidebarStore } from '../../stores/sidebarStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useSystemInfo } from '../../hooks/useSystem';
 import { useT } from '../../i18n';
+import { HealthIndicator } from './HealthIndicator';
 
 export function MeerkatIcon({ className, size = 24 }: { className?: string; size?: number }) {
   const bg = 'var(--color-sidebar, #1a1614)';
@@ -174,6 +175,8 @@ export function Sidebar() {
           <Settings className="w-[18px] h-[18px] shrink-0" />
           {showLabels && <span>{t.nav.settings}</span>}
         </NavLink>
+
+        <HealthIndicator collapsed={collapsed && !isMobile} />
 
         {!isMobile && (
           <button

@@ -1,6 +1,7 @@
 import { lazy } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { Layout } from './components/layout/Layout';
+import { RouteErrorFallback } from './components/shared/RouteErrorFallback';
 import { ToastContainer } from './components/ui/ToastContainer';
 
 const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
@@ -23,6 +24,7 @@ const router = createBrowserRouter([
   {
     path: '/',
     element: <Layout />,
+    errorElement: <RouteErrorFallback />,
     children: [
       { index: true, element: <Dashboard /> },
       { path: 'projects', element: <Projects /> },

@@ -15,7 +15,12 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.Statement;
 
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -44,26 +49,62 @@ class SystemControllerTest {
     @MockBean
     private AppSettingsRepository appSettingsRepository;
 
+    @MockBean
+    private DataSource dataSource;
+
+    private void mockDbHealthy() throws Exception {
+        Connection conn = mock(Connection.class);
+        Statement stmt = mock(Statement.class);
+        when(dataSource.getConnection()).thenReturn(conn);
+        when(conn.createStatement()).thenReturn(stmt);
+    }
+
     @Test
-    void health_dockerAvailable_returnsUp() throws Exception {
+    void health_allUp_returnsUp() throws Exception {
         PingCmd pingCmd = mock(PingCmd.class);
         when(dockerClient.pingCmd()).thenReturn(pingCmd);
+        mockDbHealthy();
 
         mockMvc.perform(get("/api/v1/system/health"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("UP"))
                 .andExpect(jsonPath("$.docker").value("CONNECTED"))
-                .andExpect(jsonPath("$.timestamp").exists());
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.components.database.status").value("UP"))
+                .andExpect(jsonPath("$.components.docker.status").value("UP"));
     }
 
     @Test
-    void health_dockerUnavailable_returnsUnavailable() throws Exception {
+    void health_dockerUnavailable_returnsDegraded() throws Exception {
         when(dockerClient.pingCmd()).thenThrow(new RuntimeException("Docker not available"));
+        mockDbHealthy();
 
         mockMvc.perform(get("/api/v1/system/health"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("UP"))
-                .andExpect(jsonPath("$.docker").value("UNAVAILABLE"));
+                .andExpect(jsonPath("$.status").value("DEGRADED"))
+                .andExpect(jsonPath("$.docker").value("UNAVAILABLE"))
+                .andExpect(jsonPath("$.components.database.status").value("UP"))
+                .andExpect(jsonPath("$.components.docker.status").value("DOWN"));
+    }
+
+    @Test
+    void health_dbDown_returnsDown() throws Exception {
+        PingCmd pingCmd = mock(PingCmd.class);
+        when(dockerClient.pingCmd()).thenReturn(pingCmd);
+        when(dataSource.getConnection()).thenThrow(new RuntimeException("DB connection failed"));
+
+        mockMvc.perform(get("/api/v1/system/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DOWN"))
+                .andExpect(jsonPath("$.components.database.status").value("DOWN"));
+    }
+
+    @Test
+    void clientErrors_logsAndReturnsAccepted() throws Exception {
+        mockMvc.perform(post("/api/v1/system/client-errors")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"test error\",\"stack\":\"Error: test\\n  at foo\",\"source\":\"react\",\"url\":\"http://localhost:3000/\",\"timestamp\":\"2026-01-01T00:00:00Z\"}"))
+                .andExpect(status().isAccepted());
     }
 
     @Test

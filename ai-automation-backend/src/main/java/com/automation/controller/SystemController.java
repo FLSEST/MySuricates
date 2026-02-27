@@ -15,9 +15,12 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import javax.sql.DataSource;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.Statement;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Stream;
@@ -32,6 +35,7 @@ public class SystemController {
     private final TailscaleService tailscaleService;
     private final DatabaseBackupService databaseBackupService;
     private final AppSettingsRepository appSettingsRepository;
+    private final DataSource dataSource;
 
     @Value("${app.version:0.1.0-SNAPSHOT}")
     private String appVersion;
@@ -60,11 +64,53 @@ public class SystemController {
             dockerAvailable = false;
         }
 
-        return Map.of(
-                "status", "UP",
-                "timestamp", Instant.now().toString(),
-                "docker", dockerAvailable ? "CONNECTED" : "UNAVAILABLE"
-        );
+        boolean dbAvailable;
+        long dbResponseTimeMs;
+        long start = System.nanoTime();
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.execute("SELECT 1");
+            dbAvailable = true;
+        } catch (Exception e) {
+            dbAvailable = false;
+        }
+        dbResponseTimeMs = (System.nanoTime() - start) / 1_000_000;
+
+        String status;
+        if (!dbAvailable) {
+            status = "DOWN";
+        } else if (!dockerAvailable) {
+            status = "DEGRADED";
+        } else {
+            status = "UP";
+        }
+
+        Map<String, Object> dbComponent = new LinkedHashMap<>();
+        dbComponent.put("status", dbAvailable ? "UP" : "DOWN");
+        dbComponent.put("responseTimeMs", dbResponseTimeMs);
+
+        Map<String, Object> dockerComponent = new LinkedHashMap<>();
+        dockerComponent.put("status", dockerAvailable ? "UP" : "DOWN");
+
+        Map<String, Object> components = new LinkedHashMap<>();
+        components.put("database", dbComponent);
+        components.put("docker", dockerComponent);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("status", status);
+        result.put("timestamp", Instant.now().toString());
+        result.put("docker", dockerAvailable ? "CONNECTED" : "UNAVAILABLE");
+        result.put("components", components);
+        return result;
+    }
+
+    record ClientErrorReport(String message, String stack, String source, String url, String timestamp) {}
+
+    @PostMapping("/client-errors")
+    public ResponseEntity<Void> reportClientError(@RequestBody ClientErrorReport report) {
+        log.warn("[CLIENT] {} | source={} url={} | {}", report.message(), report.source(), report.url(),
+                report.stack() != null ? report.stack().lines().findFirst().orElse("") : "no stack");
+        return ResponseEntity.accepted().build();
     }
 
     @GetMapping("/info")

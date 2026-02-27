@@ -35,4 +35,14 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
     List<Todo> findByProjectIdAndSourceAndReferenceTypeAndReferenceIdAndStatusNot(
             String projectId, Todo.Source source, String referenceType,
             String referenceId, Todo.Status status);
+
+    /**
+     * Find an open todo by referenceType and referenceId (source-agnostic).
+     * Used for health check deduplication.
+     */
+    @Query("SELECT t FROM Todo t WHERE t.referenceType = :refType "
+         + "AND t.referenceId = :refId AND t.status <> 'DONE'")
+    Optional<Todo> findOpenByReferenceTypeAndId(
+            @Param("refType") String referenceType,
+            @Param("refId") String referenceId);
 }

@@ -253,7 +253,7 @@ public class TestingService {
         }
     }
 
-    boolean isHealthy() {
+    public boolean isHealthy() {
         try {
             HttpURLConnection conn = (HttpURLConnection) URI.create(config.getTestHealthUrl()).toURL().openConnection();
             conn.setConnectTimeout(3000);

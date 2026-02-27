@@ -302,10 +302,19 @@ export interface CreateWebhookRequest {
 
 // ── System ───────────────────────────────────────────────
 
+export interface HealthComponent {
+  status: 'UP' | 'DOWN';
+  responseTimeMs?: number;
+}
+
 export interface SystemHealth {
-  status: string;
+  status: 'UP' | 'DEGRADED' | 'DOWN';
   timestamp: string;
   docker: string;
+  components?: {
+    database: HealthComponent;
+    docker: HealthComponent;
+  };
 }
 
 export interface SystemInfo {

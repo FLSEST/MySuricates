@@ -375,7 +375,7 @@ export function Settings() {
           onStop={() => stagingStop.mutate()}
           onPromote={() => stagingPromote.mutate()}
           onCancel={() => stagingCancel.mutate()}
-          onSyncAll={() => stagingSync.mutateAsync()}
+          onSyncAll={() => stagingSync.mutateAsync(undefined)}
           onSyncSelective={(req) => stagingSync.mutateAsync(req)}
           syncResult={stagingSync.data}
           startLoading={stagingStart.isPending}
@@ -394,7 +394,7 @@ export function Settings() {
           onStart={() => testingStart.mutate()}
           onStop={() => testingStop.mutate()}
           onReset={() => testingReset.mutateAsync()}
-          onSyncAll={() => testingSync.mutateAsync()}
+          onSyncAll={() => testingSync.mutateAsync(undefined)}
           onSyncSelective={(req) => testingSync.mutateAsync(req)}
           onPullChanges={() => testingPullChanges.mutateAsync()}
           syncResult={testingSync.data}

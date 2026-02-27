@@ -664,6 +664,19 @@ export const en = {
     runs: 'Runs',
     rate: 'Rate',
   },
+  health: {
+    allSystemsOk: 'Systems OK',
+    degraded: 'Degraded',
+    down: 'Down',
+    dockerOffline: 'Docker offline',
+    databaseDown: 'DB error',
+  },
+  errorPage: {
+    somethingWentWrong: 'Something went wrong',
+    unexpectedError: 'An unexpected error occurred.',
+    goHome: 'Go to Home',
+    tryAgain: 'Try Again',
+  },
 } as const;
 
 type DeepStringify<T> = {

@@ -666,4 +666,17 @@ export const de: TranslationKeys = {
     runs: 'Ausführungen',
     rate: 'Rate',
   },
+  health: {
+    allSystemsOk: 'Systeme OK',
+    degraded: 'Eingeschränkt',
+    down: 'Nicht erreichbar',
+    dockerOffline: 'Docker offline',
+    databaseDown: 'DB Fehler',
+  },
+  errorPage: {
+    somethingWentWrong: 'Etwas ist schiefgelaufen',
+    unexpectedError: 'Ein unerwarteter Fehler ist aufgetreten.',
+    goHome: 'Zur Startseite',
+    tryAgain: 'Erneut versuchen',
+  },
 } as const;

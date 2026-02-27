@@ -255,7 +255,7 @@ public class StagingService {
         }
     }
 
-    boolean isHealthy() {
+    public boolean isHealthy() {
         try {
             HttpURLConnection conn = (HttpURLConnection) URI.create(config.getHealthUrl()).toURL().openConnection();
             conn.setConnectTimeout(3000);

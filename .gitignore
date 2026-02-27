@@ -12,6 +12,7 @@ ai-automation-frontend/cypress/screenshots/
 ai-automation-frontend/playwright/results/
 ai-automation-frontend/playwright/report/
 ai-automation-frontend/playwright/.auth/
+ai-automation-frontend/test-results/
 
 # Database
 *.db

@@ -2,8 +2,13 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App } from './App';
+import { ErrorBoundary } from './components/shared/ErrorBoundary';
 import { useThemeStore } from './stores/themeStore';
+import { installGlobalErrorHandlers } from './utils/errorReporter';
 import './index.css';
+
+// Install global error handlers before anything else
+installGlobalErrorHandlers();
 
 // Initialize TanStack Query client
 const queryClient = new QueryClient({
@@ -21,8 +26,10 @@ useThemeStore.getState().apply();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </ErrorBoundary>
   </React.StrictMode>
 );
