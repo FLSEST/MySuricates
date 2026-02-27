@@ -24,7 +24,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="p-1 rounded text-text-tertiary hover:text-accent transition-colors"
+      className="p-1 rounded-sm text-text-tertiary hover:text-accent transition-colors"
       title="Copy"
       aria-label="Copy"
     >

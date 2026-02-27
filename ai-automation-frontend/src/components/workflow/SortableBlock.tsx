@@ -53,7 +53,7 @@ export function SortableBlock({ id, index, block, onEdit, onRemove }: SortableBl
       </button>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-xs font-mono px-2 py-0.5 rounded bg-surface text-text-secondary">
+          <span className="text-xs font-mono px-2 py-0.5 rounded-sm bg-surface text-text-secondary">
             #{index + 1}
           </span>
           <Badge variant="accent">{t.workflows.blockTypes[block.type]}</Badge>

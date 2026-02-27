@@ -6,17 +6,17 @@ import { useToastStore, type Toast, type ToastType } from '../../stores/toastSto
 const AUTO_DISMISS_MS = 4000;
 
 const icons: Record<ToastType, React.ReactNode> = {
-  success: <CheckCircle2 className="w-5 h-5 text-[var(--color-success)]" />,
-  error: <XCircle className="w-5 h-5 text-[var(--color-danger)]" />,
+  success: <CheckCircle2 className="w-5 h-5 text-success" />,
+  error: <XCircle className="w-5 h-5 text-danger" />,
   info: <Info className="w-5 h-5 text-accent" />,
-  warning: <AlertTriangle className="w-5 h-5 text-[var(--color-warning)]" />,
+  warning: <AlertTriangle className="w-5 h-5 text-warning" />,
 };
 
 const progressColors: Record<ToastType, string> = {
-  success: 'bg-[var(--color-success)]',
-  error: 'bg-[var(--color-danger)]',
+  success: 'bg-success',
+  error: 'bg-danger',
   info: 'bg-accent',
-  warning: 'bg-[var(--color-warning)]',
+  warning: 'bg-warning',
 };
 
 function ToastItem({ toast }: { toast: Toast }) {

@@ -231,7 +231,7 @@ export function ProjectDetail() {
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-1.5">{t.projects.descriptionField}</label>
             <textarea
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors resize-none"
+              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-tertiary focus:outline-hidden focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors resize-none"
               rows={3}
               value={editForm.description}
               onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}

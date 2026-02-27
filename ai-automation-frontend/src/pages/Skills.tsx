@@ -46,7 +46,7 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
 
   return (
     <div className="fixed inset-0 z-50 flex">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-xs" onClick={onClose} />
       <div className="relative ml-auto w-full max-w-lg bg-surface-overlay border-l border-border h-full overflow-y-auto animate-slide-in">
         <div className="p-6 space-y-6">
           {/* Header */}

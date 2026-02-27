@@ -65,7 +65,7 @@ export function InsightsPanel({ runId }: { runId: string }) {
           </h4>
           {insights.steps.map((step) => (
             (step.costUsd > 0 || step.inputTokens > 0) && (
-              <div key={step.stepIndex} className="flex items-center justify-between py-1.5 px-2 rounded bg-surface text-sm">
+              <div key={step.stepIndex} className="flex items-center justify-between py-1.5 px-2 rounded-sm bg-surface text-sm">
                 <div className="flex items-center gap-2">
                   <span className="text-text-tertiary font-mono text-xs">#{step.stepIndex + 1}</span>
                   {step.model && <Badge variant="default">{step.model}</Badge>}
@@ -75,11 +75,11 @@ export function InsightsPanel({ runId }: { runId: string }) {
                     <div className="flex items-center gap-1 flex-wrap">
                       <Wrench className="w-3 h-3 shrink-0" />
                       {(step.toolNames || []).slice(0, 5).map((name, i) => (
-                        <span key={i} className="px-1 py-0.5 rounded text-[10px] bg-surface-hover">{name}</span>
+                        <span key={i} className="px-1 py-0.5 rounded-sm text-[10px] bg-surface-hover">{name}</span>
                       ))}
                       {(step.toolNames || []).length > 5 && (
                         <span
-                          className="px-1 py-0.5 rounded text-[10px] bg-surface-hover text-text-tertiary"
+                          className="px-1 py-0.5 rounded-sm text-[10px] bg-surface-hover text-text-tertiary"
                           title={(step.toolNames || []).slice(5).join(', ')}
                         >
                           +{(step.toolNames || []).length - 5}

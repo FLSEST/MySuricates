@@ -76,7 +76,7 @@ export function ApiKeyGuard({ children }: { children: React.ReactNode }) {
                 value={inputKey}
                 onChange={(e) => setInputKey(e.target.value)}
                 placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                className="w-full px-3 py-2.5 rounded-lg bg-surface border border-border text-text placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent font-mono text-sm"
+                className="w-full px-3 py-2.5 rounded-lg bg-surface border border-border text-text placeholder:text-text-tertiary focus:outline-hidden focus:ring-2 focus:ring-accent/50 focus:border-accent font-mono text-sm"
                 autoFocus
               />
             </div>

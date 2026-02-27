@@ -97,7 +97,7 @@ export function WorkflowMemoryPanel({ workflowId, runs }: Props) {
                       {mem.title || `v${memories.length - idx}`}
                     </span>
                     {mem.active && (
-                      <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent/10 text-accent">
+                      <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[10px] font-medium bg-accent/10 text-accent">
                         <Check className="w-3 h-3" />
                         {t.memory.active}
                       </span>
@@ -112,7 +112,7 @@ export function WorkflowMemoryPanel({ workflowId, runs }: Props) {
                       {mem.tags.map((tag) => (
                         <span
                           key={tag}
-                          className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface-raised text-text-secondary"
+                          className="px-1.5 py-0.5 rounded-sm text-[10px] font-medium bg-surface-raised text-text-secondary"
                         >
                           {tag}
                         </span>
@@ -122,7 +122,7 @@ export function WorkflowMemoryPanel({ workflowId, runs }: Props) {
                 </div>
                 <button
                   onClick={() => setExpandedId(expandedId === mem.id ? null : mem.id)}
-                  className="p-1 rounded text-text-tertiary hover:text-text transition-colors"
+                  className="p-1 rounded-sm text-text-tertiary hover:text-text transition-colors"
                 >
                   {expandedId === mem.id ? (
                     <ChevronUp className="w-4 h-4" />
@@ -192,7 +192,7 @@ export function WorkflowMemoryPanel({ workflowId, runs }: Props) {
             <p className="text-xs text-text-tertiary mb-2">{t.memory.selectRunsHint}</p>
             <div className="max-h-40 overflow-y-auto space-y-1 border border-border rounded-lg p-2">
               {runs?.slice(0, 20).map((run) => (
-                <label key={run.id} className="flex items-center gap-2 text-sm text-text py-1 px-1 rounded hover:bg-surface-raised cursor-pointer">
+                <label key={run.id} className="flex items-center gap-2 text-sm text-text py-1 px-1 rounded-sm hover:bg-surface-raised cursor-pointer">
                   <input
                     type="checkbox"
                     checked={selectedRunIds.includes(run.id)}
@@ -203,7 +203,7 @@ export function WorkflowMemoryPanel({ workflowId, runs }: Props) {
                         setSelectedRunIds(selectedRunIds.filter((id) => id !== run.id));
                       }
                     }}
-                    className="rounded border-border"
+                    className="rounded-sm border-border"
                   />
                   <span className={`w-2 h-2 rounded-full ${
                     run.status === 'COMPLETED' ? 'bg-success' :
@@ -247,7 +247,7 @@ export function WorkflowMemoryPanel({ workflowId, runs }: Props) {
               type="text"
               value={editData.title}
               onChange={(e) => setEditData({ ...editData, title: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
+              className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm focus:outline-hidden focus:ring-2 focus:ring-accent/50"
             />
           </div>
           <MonacoEditor

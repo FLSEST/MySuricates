@@ -29,9 +29,9 @@ function StepCard({ step }: { step: StepResult }) {
     <div className="flex gap-3 py-3">
       <div className="pt-0.5">
         {step.status === 'COMPLETED' ? (
-          <CheckCircle2 className="w-5 h-5 text-[var(--color-success)]" />
+          <CheckCircle2 className="w-5 h-5 text-success" />
         ) : step.status === 'FAILED' ? (
-          <AlertCircle className="w-5 h-5 text-[var(--color-danger)]" />
+          <AlertCircle className="w-5 h-5 text-danger" />
         ) : step.status === 'RUNNING' ? (
           <div className="w-5 h-5 rounded-full border-2 border-accent border-t-transparent animate-spin" />
         ) : (

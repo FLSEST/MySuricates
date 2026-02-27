@@ -371,15 +371,6 @@ export interface DashboardData {
   timeSeries?: TimeSeriesPoint[];
 }
 
-export interface WorkflowStats {
-  workflowId: string;
-  totalRuns: number;
-  successfulRuns: number;
-  failedRuns: number;
-  averageDurationMs: number;
-  successRate: number;
-}
-
 // ── Agentic Loop ─────────────────────────────────────────
 
 export type AgenticPhase = 'reasoning' | 'acting' | 'acted' | 'approval' | 'completed' | 'error';
@@ -428,33 +419,6 @@ export interface RunInsights {
   totalTokens: number;
   durationMs: number | null;
   steps: StepInsight[];
-}
-
-export interface ExecutionInsights {
-  totalRuns: number;
-  runsWithInsights: number;
-  totalCostUsd: number;
-  avgCostPerRunUsd: number;
-  totalInputTokens: number;
-  totalOutputTokens: number;
-  totalTokens: number;
-  modelsUsed: string[];
-}
-
-// ── Tool Patterns ───────────────────────────────────────
-
-export interface ToolPattern {
-  pattern: string[];
-  frequency: number;
-  avgCostUsd: number;
-  occurrences: number;
-}
-
-export interface ToolPatternsResponse {
-  workflowId: string;
-  totalAgenticRuns: number;
-  patterns: ToolPattern[];
-  topTools: Array<{ name: string; count: number }>;
 }
 
 // ── Agentic → Workflow Conversion ───────────────────────

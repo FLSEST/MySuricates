@@ -29,7 +29,7 @@ function StatCard({ icon, label, value, accent, badge }: {
   badge?: string;
 }) {
   return (
-    <Card className="flex items-center gap-3 !py-3 !px-4">
+    <Card className="flex items-center gap-3 py-3! px-4!">
       <div className={`p-2 rounded-lg ${accent ?? 'bg-accent/10'}`}>
         {icon}
       </div>
@@ -40,8 +40,8 @@ function StatCard({ icon, label, value, accent, badge }: {
           {badge && (
             <span className={`text-[9px] font-semibold px-1 py-0.5 rounded-full uppercase tracking-wide ${
               badge === 'RELEASE'
-                ? 'bg-[var(--color-success)]/15 text-[var(--color-success)]'
-                : 'bg-[var(--color-warning)]/15 text-[var(--color-warning)]'
+                ? 'bg-success/15 text-success'
+                : 'bg-warning/15 text-warning'
             }`}>
               {badge}
             </span>
@@ -67,7 +67,7 @@ function BuildInfoCard({ systemInfo }: { systemInfo: SystemInfo | undefined }) {
   const feTimestamp = __BUILD_TIMESTAMP__;
 
   return (
-    <Card className="flex items-center gap-3 !py-3 !px-4">
+    <Card className="flex items-center gap-3 py-3! px-4!">
       <div className="p-2 rounded-lg bg-teal-500/10">
         <Info className="w-4 h-4 text-teal-500" />
       </div>
@@ -80,8 +80,8 @@ function BuildInfoCard({ systemInfo }: { systemInfo: SystemInfo | undefined }) {
           {systemInfo?.buildType && (
             <span className={`text-[9px] font-semibold px-1 py-0.5 rounded-full uppercase tracking-wide ${
               systemInfo.buildType === 'RELEASE'
-                ? 'bg-[var(--color-success)]/15 text-[var(--color-success)]'
-                : 'bg-[var(--color-warning)]/15 text-[var(--color-warning)]'
+                ? 'bg-success/15 text-success'
+                : 'bg-warning/15 text-warning'
             }`}>
               {systemInfo.buildType}
             </span>
@@ -160,13 +160,13 @@ export function Dashboard() {
           accent="bg-accent/10"
         />
         <StatCard
-          icon={<GitBranch className="w-4 h-4 text-[var(--color-success)]" />}
+          icon={<GitBranch className="w-4 h-4 text-success" />}
           label={t.dashboard.totalWorkflows}
           value={stats?.totalWorkflows ?? 0}
           accent="bg-success-subtle"
         />
         <StatCard
-          icon={<Zap className="w-4 h-4 text-[var(--color-warning)]" />}
+          icon={<Zap className="w-4 h-4 text-warning" />}
           label={t.dashboard.runsToday}
           value={stats?.runsToday ?? 0}
           accent="bg-warning-subtle"
@@ -178,7 +178,7 @@ export function Dashboard() {
           accent="bg-accent/10"
         />
         <StatCard
-          icon={<Coins className="w-4 h-4 text-[var(--color-warning)]" />}
+          icon={<Coins className="w-4 h-4 text-warning" />}
           label={t.dashboard.totalCost}
           value={stats?.totalCostUsd30d != null && stats.totalCostUsd30d > 0
             ? `$${stats.totalCostUsd30d < 0.01 ? stats.totalCostUsd30d.toFixed(4) : stats.totalCostUsd30d.toFixed(2)}`

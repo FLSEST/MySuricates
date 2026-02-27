@@ -17,11 +17,11 @@ function IterationCard({ iter }: { iter: AgenticIteration }) {
     reasoning: <Brain className="w-4 h-4 text-purple-500 animate-pulse" />,
     acting: <Terminal className="w-4 h-4 text-blue-500 animate-pulse" />,
     acted: iter.exitCode === 0
-      ? <CheckCircle2 className="w-4 h-4 text-[var(--color-success)]" />
-      : <AlertCircle className="w-4 h-4 text-[var(--color-danger)]" />,
+      ? <CheckCircle2 className="w-4 h-4 text-success" />
+      : <AlertCircle className="w-4 h-4 text-danger" />,
     approval: <ShieldQuestion className="w-4 h-4 text-warning" />,
-    completed: <CheckCircle2 className="w-4 h-4 text-[var(--color-success)]" />,
-    error: <XCircle className="w-4 h-4 text-[var(--color-danger)]" />,
+    completed: <CheckCircle2 className="w-4 h-4 text-success" />,
+    error: <XCircle className="w-4 h-4 text-danger" />,
   };
 
   const phaseBadge = {
@@ -62,7 +62,7 @@ function IterationCard({ iter }: { iter: AgenticIteration }) {
                 <Brain className="w-3 h-3" />
                 {t.workflows.execution.agentic.reasoning}
               </p>
-              <pre className="text-xs font-mono text-text bg-background rounded p-2 overflow-x-auto max-h-32 whitespace-pre-wrap">
+              <pre className="text-xs font-mono text-text bg-background rounded-sm p-2 overflow-x-auto max-h-32 whitespace-pre-wrap">
                 {iter.reasoning}
               </pre>
             </div>
@@ -74,7 +74,7 @@ function IterationCard({ iter }: { iter: AgenticIteration }) {
                 <Terminal className="w-3 h-3" />
                 {t.workflows.execution.agentic.action}
               </p>
-              <pre className="text-xs font-mono text-text bg-background rounded p-2 overflow-x-auto max-h-20 whitespace-pre-wrap">
+              <pre className="text-xs font-mono text-text bg-background rounded-sm p-2 overflow-x-auto max-h-20 whitespace-pre-wrap">
                 {iter.action}
               </pre>
             </div>
@@ -85,7 +85,7 @@ function IterationCard({ iter }: { iter: AgenticIteration }) {
               <p className="text-xs font-medium text-text-secondary mb-1">
                 {t.workflows.execution.agentic.result}
               </p>
-              <pre className="text-xs font-mono text-text bg-background rounded p-2 overflow-x-auto max-h-40 whitespace-pre-wrap">
+              <pre className="text-xs font-mono text-text bg-background rounded-sm p-2 overflow-x-auto max-h-40 whitespace-pre-wrap">
                 {iter.output}
               </pre>
             </div>
@@ -115,15 +115,15 @@ export function AgenticStepCard({ step, agenticState }: AgenticStepCardProps) {
     <div className="flex gap-3 py-3">
       <div className="pt-0.5">
         {goalAchieved === true ? (
-          <CheckCircle2 className="w-5 h-5 text-[var(--color-success)]" />
+          <CheckCircle2 className="w-5 h-5 text-success" />
         ) : goalAchieved === false ? (
-          <AlertCircle className="w-5 h-5 text-[var(--color-danger)]" />
+          <AlertCircle className="w-5 h-5 text-danger" />
         ) : isRunning ? (
           <Loader2 className="w-5 h-5 text-accent animate-spin" />
         ) : step.status === 'COMPLETED' ? (
-          <CheckCircle2 className="w-5 h-5 text-[var(--color-success)]" />
+          <CheckCircle2 className="w-5 h-5 text-success" />
         ) : step.status === 'FAILED' ? (
-          <AlertCircle className="w-5 h-5 text-[var(--color-danger)]" />
+          <AlertCircle className="w-5 h-5 text-danger" />
         ) : (
           <div className="w-5 h-5 rounded-full border-2 border-border" />
         )}
@@ -161,12 +161,12 @@ export function AgenticStepCard({ step, agenticState }: AgenticStepCardProps) {
                 {t.workflows.execution.agentic.iteration} {currentIteration} / {maxIterations}
               </span>
               {goalAchieved === true && (
-                <span className="text-[var(--color-success)] font-medium">
+                <span className="text-success font-medium">
                   {t.workflows.execution.agentic.goalAchieved}
                 </span>
               )}
               {goalAchieved === false && (
-                <span className="text-[var(--color-danger)] font-medium">
+                <span className="text-danger font-medium">
                   {t.workflows.execution.agentic.goalNotAchieved}
                 </span>
               )}
@@ -179,8 +179,8 @@ export function AgenticStepCard({ step, agenticState }: AgenticStepCardProps) {
             <div className="w-full bg-surface rounded-full h-1.5">
               <div
                 className={`h-1.5 rounded-full transition-all duration-500 ${
-                  goalAchieved === true ? 'bg-[var(--color-success)]'
-                  : goalAchieved === false ? 'bg-[var(--color-danger)]'
+                  goalAchieved === true ? 'bg-success'
+                  : goalAchieved === false ? 'bg-danger'
                   : 'bg-accent'
                 }`}
                 style={{ width: `${maxIterations > 0 ? (currentIteration / maxIterations) * 100 : 0}%` }}

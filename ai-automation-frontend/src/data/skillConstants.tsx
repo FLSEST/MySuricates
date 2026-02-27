@@ -12,8 +12,8 @@ export const CATEGORY_ICONS: Record<SkillCategory, React.ReactNode> = {
 
 export const CATEGORY_COLORS: Record<SkillCategory, string> = {
   CODE: 'text-accent',
-  DOCUMENT: 'text-[var(--color-warning)]',
-  DATA: 'text-[var(--color-success)]',
+  DOCUMENT: 'text-warning',
+  DATA: 'text-success',
   CONTENT: 'text-purple-400',
   RESEARCH: 'text-blue-400',
   BUSINESS: 'text-orange-400',

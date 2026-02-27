@@ -1,6 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
 
 /* ── Default theme tokens (dark) ───────────────────────── */
 :root {
@@ -25,6 +25,126 @@
   --color-sidebar: #1a1614;
   --color-sidebar-hover: #252019;
   --color-sidebar-active: #332b22;
+}
+
+@theme inline {
+  --color-surface: var(--color-surface);
+  --color-surface-raised: var(--color-surface-raised);
+  --color-surface-overlay: var(--color-surface-overlay);
+
+  --color-border: var(--color-border);
+  --color-border-strong: var(--color-border-strong);
+
+  --color-text: var(--color-text);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-text-tertiary: var(--color-text-tertiary);
+  --color-text-inverse: var(--color-text-inverse);
+
+  --color-accent: var(--color-accent);
+  --color-accent-hover: var(--color-accent-hover);
+  --color-accent-subtle: var(--color-accent-subtle);
+
+  --color-success: var(--color-success);
+  --color-success-subtle: var(--color-success-subtle);
+
+  --color-warning: var(--color-warning);
+  --color-warning-subtle: var(--color-warning-subtle);
+
+  --color-danger: var(--color-danger);
+  --color-danger-subtle: var(--color-danger-subtle);
+
+  --font-sans: Plus Jakarta Sans, system-ui, sans-serif;
+  --font-mono: JetBrains Mono, Fira Code, monospace;
+
+  --text-2xs: 0.625rem;
+  --text-2xs--line-height: 0.875rem;
+
+  --animate-fade-in: fadeIn 0.2s ease-out;
+  --animate-slide-in: slideIn 0.2s ease-out;
+  --animate-slide-up: slideUp 0.3s ease-out;
+  --animate-pulse-subtle: pulseSubtle 2s ease-in-out infinite;
+  --animate-slide-in-right: slideInRight 0.2s ease-out;
+
+  @keyframes fadeIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+  @keyframes slideIn {
+    0% { opacity: 0; transform: translateX(-8px); }
+    100% { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes slideUp {
+    0% { opacity: 0; transform: translateY(8px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pulseSubtle {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+  @keyframes slideInRight {
+    0% { opacity: 0; transform: translateX(16px); }
+    100% { opacity: 1; transform: translateX(0); }
+  }
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+/* ── Component layer ───────────────────────────────────── */
+@utility glass {
+  @apply backdrop-blur-xs border border-border;
+  background-color: color-mix(
+    in srgb,
+    var(--color-surface-raised) 80%,
+    transparent
+  );
+}
+@utility focus-ring {
+  @apply focus:outline-hidden focus:ring-2 focus:ring-offset-0;
+  --tw-ring-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+}
+@utility input-base {
+  @apply w-full px-3 py-2 rounded-lg bg-surface border border-border
+           text-text placeholder:text-text-tertiary
+           focus-ring transition-colors duration-150;
+}
+@utility btn-base {
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2
+           rounded-lg font-medium text-sm transition-all duration-150
+           focus-ring disabled:opacity-50 disabled:pointer-events-none
+           active:scale-[0.98];
+}
+
+/* ── Utility layer ─────────────────────────────────────── */
+@utility text-balance {
+  text-wrap: balance;
+}
+@utility animate-stagger {
+  & > * {
+    animation: slideUp 0.3s ease-out both;
+  }
+
+  & > *:nth-child(1) { animation-delay: 0ms; }
+  & > *:nth-child(2) { animation-delay: 50ms; }
+  & > *:nth-child(3) { animation-delay: 100ms; }
+  & > *:nth-child(4) { animation-delay: 150ms; }
+  & > *:nth-child(5) { animation-delay: 200ms; }
+  & > *:nth-child(6) { animation-delay: 250ms; }
 }
 
 /* ── Base styles ───────────────────────────────────────── */
@@ -58,48 +178,4 @@
   ::selection {
     background-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
   }
-}
-
-/* ── Component layer ───────────────────────────────────── */
-@layer components {
-  .glass {
-    @apply backdrop-blur-sm border border-border;
-    background-color: color-mix(in srgb, var(--color-surface-raised) 80%, transparent);
-  }
-
-  .focus-ring {
-    @apply focus:outline-none focus:ring-2 focus:ring-offset-0;
-    --tw-ring-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
-  }
-
-  .input-base {
-    @apply w-full px-3 py-2 rounded-lg bg-surface border border-border
-           text-text placeholder:text-text-tertiary
-           focus-ring transition-colors duration-150;
-  }
-
-  .btn-base {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2
-           rounded-lg font-medium text-sm transition-all duration-150
-           focus-ring disabled:opacity-50 disabled:pointer-events-none
-           active:scale-[0.98];
-  }
-}
-
-/* ── Utility layer ─────────────────────────────────────── */
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-
-  .animate-stagger > * {
-    animation: slideUp 0.3s ease-out both;
-  }
-
-  .animate-stagger > *:nth-child(1) { animation-delay: 0ms; }
-  .animate-stagger > *:nth-child(2) { animation-delay: 50ms; }
-  .animate-stagger > *:nth-child(3) { animation-delay: 100ms; }
-  .animate-stagger > *:nth-child(4) { animation-delay: 150ms; }
-  .animate-stagger > *:nth-child(5) { animation-delay: 200ms; }
-  .animate-stagger > *:nth-child(6) { animation-delay: 250ms; }
 }

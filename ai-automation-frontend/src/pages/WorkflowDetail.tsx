@@ -382,7 +382,7 @@ export function WorkflowDetail() {
                     </div>
                     <button
                       onClick={() => deactivateSkill.mutate({ workflowId: workflow.id, skillId })}
-                      className="p-1 rounded text-text-tertiary hover:text-danger sm:opacity-0 sm:group-hover:opacity-100 transition-all"
+                      className="p-1 rounded-sm text-text-tertiary hover:text-danger sm:opacity-0 sm:group-hover:opacity-100 transition-all"
                       aria-label={t.skills.deactivate}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -775,7 +775,7 @@ export function WorkflowDetail() {
                     <ul className="space-y-2">
                       {(optimizeResult.changes as Array<{ type: string; description: string }>).map((change, i) => (
                         <li key={i} className="flex items-start gap-2 text-sm">
-                          <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent/10 text-accent">
+                          <span className="shrink-0 px-1.5 py-0.5 rounded-sm text-[10px] font-medium bg-accent/10 text-accent">
                             {change.type}
                           </span>
                           <span className="text-text-secondary">{change.description}</span>

@@ -378,7 +378,7 @@ function ChainFormModal({ title, chain, workflows, onSave, onClose, saving }: Ch
   return (
     <Modal open onClose={onClose} title={title}>
       <div className="space-y-4">
-        <div className="grid grid-cols-[1fr,auto] gap-3">
+        <div className="grid grid-cols-[1fr_auto] gap-3">
           <Input
             label={t.common.name}
             value={name}

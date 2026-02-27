@@ -39,7 +39,7 @@ export function LogViewer({ logs, autoScroll = true, maxHeight = '400px' }: LogV
           <div className="text-gray-500 animate-pulse-subtle">Waiting for logs...</div>
         )}
         {logs.map((log, i) => (
-          <div key={i} className="flex gap-3 hover:bg-white/5 rounded px-1 -mx-1">
+          <div key={i} className="flex gap-3 hover:bg-white/5 rounded-sm px-1 -mx-1">
             {log.timestamp && (
               <span className="text-gray-500 shrink-0 select-none">
                 {new Date(log.timestamp).toLocaleTimeString()}

@@ -100,7 +100,7 @@ export function TagInput({ tags, onChange, suggestions = [], label, hint, placeh
           <input
             ref={inputRef}
             type="text"
-            className={`w-full bg-transparent outline-none text-text placeholder:text-text-tertiary ${compact ? 'text-xs' : 'text-sm'}`}
+            className={`w-full bg-transparent outline-hidden text-text placeholder:text-text-tertiary ${compact ? 'text-xs' : 'text-sm'}`}
             value={input}
             onChange={(e) => { setInput(e.target.value); setShowSuggestions(true); }}
             onFocus={() => setShowSuggestions(true)}

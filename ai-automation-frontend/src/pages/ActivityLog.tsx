@@ -82,7 +82,7 @@ export function ActivityLog() {
                       {formatTime(entry.timestamp)}
                     </td>
                     <td className="px-4 py-2.5">
-                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${levelColors[entry.level]}`}>
+                      <span className={`inline-block px-2 py-0.5 rounded-sm text-xs font-medium ${levelColors[entry.level]}`}>
                         {entry.level}
                       </span>
                     </td>

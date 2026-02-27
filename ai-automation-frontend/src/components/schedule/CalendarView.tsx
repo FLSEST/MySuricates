@@ -215,7 +215,7 @@ export function CalendarView() {
             <div className="space-y-2">
               {selectedEvents.map((ev) => (
                 <div key={ev.id} className="flex items-center gap-3 p-2 rounded-lg bg-surface-secondary">
-                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${
                     ev.type === 'scheduled' ? 'bg-blue-500' :
                     ev.status === 'COMPLETED' ? 'bg-green-500' :
                     ev.status === 'FAILED' ? 'bg-red-500' : 'bg-gray-400'

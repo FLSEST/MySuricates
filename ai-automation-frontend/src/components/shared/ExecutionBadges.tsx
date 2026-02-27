@@ -36,7 +36,7 @@ export function ExecutionBadges({ blocks, className = '' }: { blocks: BlockDefin
         return (
           <span
             key={mode}
-            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface-hover"
+            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-sm text-[10px] font-medium bg-surface-hover"
             title={cfg.label}
           >
             <Icon className={`w-3 h-3 ${cfg.color}`} />

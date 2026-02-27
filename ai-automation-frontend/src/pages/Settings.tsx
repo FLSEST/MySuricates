@@ -337,7 +337,7 @@ export function Settings() {
             <div className="pl-8">
               <div className="space-y-1.5">
                 {backups.map((b) => (
-                  <div key={b.filename} className="flex items-center justify-between text-xs py-1 px-2 rounded hover:bg-surface-raised transition-colors">
+                  <div key={b.filename} className="flex items-center justify-between text-xs py-1 px-2 rounded-sm hover:bg-surface-raised transition-colors">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-text font-mono truncate">{b.filename}</span>
                       <span className="text-text-tertiary shrink-0">{formatBytes(b.sizeBytes)}</span>

@@ -26,20 +26,6 @@ export function useCreateTemplate() {
   });
 }
 
-export function useDeleteTemplate() {
-  const qc = useQueryClient();
-  const toast = useToast();
-  const t = useT();
-  return useMutation({
-    mutationFn: (id: string) => api.delete(`/workflow-templates/${id}`),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['workflow-templates'] });
-      toast.success(t.toast.workflowDeleted);
-    },
-    onError: () => toast.error(t.toast.workflowDeleteFailed),
-  });
-}
-
 export function useSaveWorkflowAsTemplate() {
   const qc = useQueryClient();
   const toast = useToast();

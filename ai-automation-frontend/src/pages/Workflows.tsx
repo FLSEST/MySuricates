@@ -564,7 +564,7 @@ export function Workflows() {
           <p className="text-sm text-text-secondary">{t.workflows.deleteConfirm}</p>
           <div className="max-h-48 overflow-y-auto space-y-1">
             {deleteConfirm.names.map((name, i) => (
-              <div key={i} className="flex items-center gap-2 px-2 py-1 rounded bg-surface-raised text-sm text-text">
+              <div key={i} className="flex items-center gap-2 px-2 py-1 rounded-sm bg-surface-raised text-sm text-text">
                 <Trash2 className="w-3 h-3 text-danger shrink-0" />
                 <span className="truncate">{name}</span>
               </div>
@@ -879,14 +879,14 @@ function WorkflowRow({
           )}
           <button
             onClick={(e) => { e.stopPropagation(); onExecute(); }}
-            className="sm:opacity-0 sm:group-hover:opacity-100 p-0.5 rounded hover:bg-accent/20 text-accent transition-all shrink-0"
+            className="sm:opacity-0 sm:group-hover:opacity-100 p-0.5 rounded-sm hover:bg-accent/20 text-accent transition-all shrink-0"
             title="Ausführen"
           >
             <Play className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="sm:opacity-0 sm:group-hover:opacity-100 p-0.5 rounded hover:bg-danger/20 text-text-tertiary hover:text-danger transition-all shrink-0"
+            className="sm:opacity-0 sm:group-hover:opacity-100 p-0.5 rounded-sm hover:bg-danger/20 text-text-tertiary hover:text-danger transition-all shrink-0"
             title="Löschen"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -1040,7 +1040,7 @@ function WorkflowDetailPanel({
             {workflow.activatedSkillNames.map((name) => (
               <span
                 key={name}
-                className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-accent/10 text-accent"
+                className="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium bg-accent/10 text-accent"
               >
                 {name}
               </span>

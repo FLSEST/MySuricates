@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.2</version>
+        <version>3.4.13</version>
         <relativePath/>
     </parent>
 
@@ -21,8 +21,8 @@
         <java.version>21</java.version>
         <maven.build.timestamp.format>yyyy-MM-dd'T'HH:mm:ss'Z'</maven.build.timestamp.format>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
-        <docker-java.version>3.3.4</docker-java.version>
-        <sqlite-jdbc.version>3.44.1.0</sqlite-jdbc.version>
+        <docker-java.version>3.4.1</docker-java.version>
+        <sqlite-jdbc.version>3.49.1.0</sqlite-jdbc.version>
         <sqlite-dialect.version>0.1.4</sqlite-dialect.version>
     </properties>
 

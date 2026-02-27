@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
-import type { DashboardData, WorkflowStats } from '../types';
+import type { DashboardData } from '../types';
 
 export function useDashboard() {
   return useQuery({
@@ -8,14 +8,6 @@ export function useDashboard() {
     queryFn: () => api.get<DashboardData>('/learning/dashboard'),
     refetchInterval: 30_000,
     refetchOnWindowFocus: true,
-  });
-}
-
-export function useWorkflowStats(workflowId: string) {
-  return useQuery({
-    queryKey: ['learning', 'stats', workflowId],
-    queryFn: () => api.get<WorkflowStats>(`/learning/workflows/${workflowId}/stats`),
-    enabled: !!workflowId,
   });
 }
 

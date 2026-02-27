@@ -157,7 +157,7 @@ export function Schedules() {
               onClick={() => setView('list')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 view === 'list'
-                  ? 'bg-surface text-text shadow-sm'
+                  ? 'bg-surface text-text shadow-xs'
                   : 'text-text-secondary hover:text-text'
               }`}
             >
@@ -168,7 +168,7 @@ export function Schedules() {
               onClick={() => setView('calendar')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 view === 'calendar'
-                  ? 'bg-surface text-text shadow-sm'
+                  ? 'bg-surface text-text shadow-xs'
                   : 'text-text-secondary hover:text-text'
               }`}
             >
@@ -249,7 +249,7 @@ export function Schedules() {
                 onClick={() => setForm({ ...form, scheduleType: 'CRON', scheduledAt: undefined })}
                 className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   form.scheduleType !== 'ONCE'
-                    ? 'bg-surface text-text shadow-sm'
+                    ? 'bg-surface text-text shadow-xs'
                     : 'text-text-secondary hover:text-text'
                 }`}
               >
@@ -260,7 +260,7 @@ export function Schedules() {
                 onClick={() => setForm({ ...form, scheduleType: 'ONCE', cronExpression: '' })}
                 className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   form.scheduleType === 'ONCE'
-                    ? 'bg-surface text-text shadow-sm'
+                    ? 'bg-surface text-text shadow-xs'
                     : 'text-text-secondary hover:text-text'
                 }`}
               >
@@ -280,7 +280,7 @@ export function Schedules() {
                   const val = e.target.value;
                   setForm({ ...form, scheduledAt: val ? new Date(val).toISOString() : undefined });
                 }}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
+                className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm focus:outline-hidden focus:ring-2 focus:ring-accent/50"
               />
             </div>
           ) : (

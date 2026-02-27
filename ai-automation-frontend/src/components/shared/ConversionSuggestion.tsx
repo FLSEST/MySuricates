@@ -76,7 +76,7 @@ export function ConversionSuggestion({ runId }: { runId: string }) {
             </p>
             <div className="space-y-1">
               {suggestion.blocks.map((block, i) => (
-                <div key={i} className="flex items-center gap-2 p-2 rounded bg-surface text-sm">
+                <div key={i} className="flex items-center gap-2 p-2 rounded-sm bg-surface text-sm">
                   <span className="text-text-tertiary font-mono text-xs">#{i + 1}</span>
                   <Badge variant="default">{block.type}</Badge>
                   <span className="text-text-secondary truncate font-mono text-xs">
