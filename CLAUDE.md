@@ -239,6 +239,15 @@ Dev automatically starts the Stable container on boot (`ApplicationReadyEvent`) 
 
 Controlled by `automation.staging.auto-start` (default: `true`, disabled in `application-stable.yml` to prevent self-start).
 
+### Test Instance
+
+- `TestingService` — manages a dedicated test Docker container on port 8090
+- Auto-starts on boot if `automation.staging.test-auto-start` is true and a snapshot exists
+- Auto-syncs definitions from Dev to Test on startup
+- `TestingController` — REST API at `/api/v1/testing` (status, start, stop, sync)
+- Uses `InstanceSyncHelper` (shared with `StagingService`) for definition sync logic
+- Frontend hook: `useTesting.ts`
+
 ### Definition Sync (Dev → Stable)
 
 `POST /api/v1/staging/sync-definitions` selectively syncs **definitions only** from Dev to Stable via Stable's REST API:
