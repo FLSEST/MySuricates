@@ -47,6 +47,7 @@
     "@vitejs/plugin-react": "^5.1.4",
     "cypress": "^13.17.0",
     "jsdom": "^28.1.0",
+    "msw": "^2.12.10",
     "postcss": "^8.4.33",
     "tailwindcss": "^4.2.1",
     "typescript": "^5.3.3",

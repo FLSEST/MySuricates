@@ -4,10 +4,6 @@ import com.automation.config.StagingConfig;
 import com.automation.dto.response.StagingStatusResponse;
 import com.automation.dto.response.SyncResult;
 import com.automation.entity.*;
-import com.automation.repository.ProjectRepository;
-import com.automation.repository.SkillRepository;
-import com.automation.repository.WorkflowRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -19,10 +15,7 @@ import static org.mockito.Mockito.*;
 class StagingServiceTest {
 
     private StagingConfig config;
-    private ProjectRepository projectRepository;
-    private WorkflowRepository workflowRepository;
-    private SkillRepository skillRepository;
-    private ObjectMapper objectMapper;
+    private InstanceSyncHelper syncHelper;
     private StagingService service;
 
     @BeforeEach
@@ -32,11 +25,8 @@ class StagingServiceTest {
         config.setHealthUrl("http://localhost:9091/api/v1/system/health");
         config.setComposeFile("docker-compose.stable.yml");
         config.setStableFrontendDir("stable-frontend");
-        projectRepository = mock(ProjectRepository.class);
-        workflowRepository = mock(WorkflowRepository.class);
-        skillRepository = mock(SkillRepository.class);
-        objectMapper = new ObjectMapper();
-        service = new StagingService(config, projectRepository, workflowRepository, skillRepository, objectMapper);
+        syncHelper = mock(InstanceSyncHelper.class);
+        service = new StagingService(config, syncHelper);
     }
 
     @Test
