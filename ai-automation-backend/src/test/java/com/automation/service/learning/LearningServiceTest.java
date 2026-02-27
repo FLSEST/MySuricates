@@ -169,18 +169,20 @@ class LearningServiceTest {
 
     @Test
     void getSimilarWorkflows_findsSimilarByBlockTypes() {
-        Workflow other = Workflow.builder()
-                .id("wf-2")
-                .name("Similar Workflow")
+        Workflow wf = Workflow.builder()
+                .id("wf-1")
+                .name("Test Workflow")
+                .blockTypes("retry,simple")
                 .blocks(List.of(
                         BlockDefinition.builder().type("simple").build(),
-                        BlockDefinition.builder().type("retry").build(),
-                        BlockDefinition.builder().type("simple").build()
+                        BlockDefinition.builder().type("retry").build()
                 ))
                 .build();
 
-        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
-        when(workflowRepository.findAll()).thenReturn(List.of(testWorkflow, other));
+        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(wf));
+        // Lightweight query returns Object[] rows: {id, name, block_types}
+        when(workflowRepository.findAllIdNameBlockTypes("wf-1"))
+                .thenReturn(objectArrayList(new Object[]{"wf-2", "Similar Workflow", "retry,simple"}));
 
         List<Map<String, Object>> similar = learningService.getSimilarWorkflows("wf-1");
 
@@ -191,17 +193,19 @@ class LearningServiceTest {
 
     @Test
     void getSimilarWorkflows_excludesDissimilar() {
-        Workflow dissimilar = Workflow.builder()
-                .id("wf-3")
-                .name("Dissimilar")
+        Workflow wf = Workflow.builder()
+                .id("wf-1")
+                .name("Test Workflow")
+                .blockTypes("retry,simple")
                 .blocks(List.of(
-                        BlockDefinition.builder().type("foreach").build(),
-                        BlockDefinition.builder().type("while").build()
+                        BlockDefinition.builder().type("simple").build(),
+                        BlockDefinition.builder().type("retry").build()
                 ))
                 .build();
 
-        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
-        when(workflowRepository.findAll()).thenReturn(List.of(testWorkflow, dissimilar));
+        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(wf));
+        when(workflowRepository.findAllIdNameBlockTypes("wf-1"))
+                .thenReturn(objectArrayList(new Object[]{"wf-3", "Dissimilar", "foreach,while"}));
 
         List<Map<String, Object>> similar = learningService.getSimilarWorkflows("wf-1");
 
@@ -214,6 +218,54 @@ class LearningServiceTest {
 
         assertThatThrownBy(() -> learningService.getSimilarWorkflows("unknown"))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void getSimilarWorkflows_cachesResults() {
+        Workflow wf = Workflow.builder()
+                .id("wf-1")
+                .name("Test Workflow")
+                .blockTypes("retry,simple")
+                .blocks(List.of(
+                        BlockDefinition.builder().type("simple").build(),
+                        BlockDefinition.builder().type("retry").build()
+                ))
+                .build();
+
+        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(wf));
+        when(workflowRepository.findAllIdNameBlockTypes("wf-1"))
+                .thenReturn(objectArrayList(new Object[]{"wf-2", "Similar", "retry,simple"}));
+
+        // First call
+        learningService.getSimilarWorkflows("wf-1");
+        // Second call should use cache
+        learningService.getSimilarWorkflows("wf-1");
+
+        // findById called twice (once per getSimilarWorkflows), but lightweight query only once
+        // Actually, cache means second call skips both
+        verify(workflowRepository, times(1)).findAllIdNameBlockTypes("wf-1");
+    }
+
+    @Test
+    void getSimilarWorkflows_fallsBackToBlocks_whenBlockTypesEmpty() {
+        Workflow wf = Workflow.builder()
+                .id("wf-cache-test")
+                .name("No Block Types")
+                .blockTypes("")
+                .blocks(List.of(
+                        BlockDefinition.builder().type("simple").build(),
+                        BlockDefinition.builder().type("retry").build()
+                ))
+                .build();
+
+        when(workflowRepository.findById("wf-cache-test")).thenReturn(Optional.of(wf));
+        when(workflowRepository.findAllIdNameBlockTypes("wf-cache-test"))
+                .thenReturn(objectArrayList(new Object[]{"wf-5", "Other", "retry,simple"}));
+
+        List<Map<String, Object>> similar = learningService.getSimilarWorkflows("wf-cache-test");
+
+        assertThat(similar).hasSize(1);
+        assertThat(similar.get(0).get("workflowId")).isEqualTo("wf-5");
     }
 
     // --- rateRun ---
@@ -391,5 +443,10 @@ class LearningServiceTest {
                 .status(status)
                 .durationMs(durationMs)
                 .build();
+    }
+
+    /** Helper to create List<Object[]> with correct generic type inference. */
+    private static List<Object[]> objectArrayList(Object[]... rows) {
+        return List.of(rows);
     }
 }

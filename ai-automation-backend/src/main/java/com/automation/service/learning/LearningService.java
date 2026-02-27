@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -166,39 +167,73 @@ public class LearningService {
         return suggestions;
     }
 
+    // Simple TTL cache for similar-workflows query results
+    private final Map<String, CachedResult> similarWorkflowsCache = new ConcurrentHashMap<>();
+    private static final long CACHE_TTL_MS = 60_000; // 1 minute
+
+    private record CachedResult(List<Map<String, Object>> data, long timestamp) {
+        boolean isExpired() {
+            return System.currentTimeMillis() - timestamp > CACHE_TTL_MS;
+        }
+    }
+
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getSimilarWorkflows(String workflowId) {
+        // Check cache
+        CachedResult cached = similarWorkflowsCache.get(workflowId);
+        if (cached != null && !cached.isExpired()) {
+            return cached.data();
+        }
+
         Workflow workflow = workflowRepository.findById(workflowId)
                 .orElseThrow(() -> new ResourceNotFoundException("Workflow", workflowId));
 
-        List<String> blockTypes = workflow.getBlocks().stream()
-                .map(BlockDefinition::getType)
-                .toList();
+        // Use blockTypes from entity (denormalized column) or compute from blocks
+        String blockTypesStr = workflow.getBlockTypes();
+        Set<String> blockTypes;
+        if (blockTypesStr != null && !blockTypesStr.isEmpty()) {
+            blockTypes = new HashSet<>(Arrays.asList(blockTypesStr.split(",")));
+        } else {
+            blockTypes = workflow.getBlocks().stream()
+                    .map(BlockDefinition::getType)
+                    .collect(Collectors.toSet());
+        }
 
         if (blockTypes.isEmpty()) return List.of();
 
+        // Use lightweight native query — no full entity loading, no JSON parsing
+        List<Object[]> rows = workflowRepository.findAllIdNameBlockTypes(workflowId);
+
         List<Map<String, Object>> similar = new ArrayList<>();
+        for (Object[] row : rows) {
+            String otherId = (String) row[0];
+            String otherName = (String) row[1];
+            String otherBlockTypesStr = (String) row[2];
 
-        for (Workflow other : workflowRepository.findAll()) {
-            if (other.getId().equals(workflowId)) continue;
+            if (otherBlockTypesStr == null || otherBlockTypesStr.isEmpty()) continue;
 
-            List<String> otherTypes = other.getBlocks().stream()
-                    .map(BlockDefinition::getType)
-                    .toList();
+            Set<String> otherTypes = new HashSet<>(Arrays.asList(otherBlockTypesStr.split(",")));
+            double similarity = calculateSetSimilarity(blockTypes, otherTypes);
 
-            double similarity = calculateSimilarity(blockTypes, otherTypes);
             if (similarity > 0.5) {
                 similar.add(Map.of(
-                        "workflowId", other.getId(),
-                        "workflowName", other.getName(),
+                        "workflowId", otherId,
+                        "workflowName", otherName,
                         "similarity", Math.round(similarity * 100),
-                        "blockTypes", otherTypes
+                        "blockTypes", List.copyOf(otherTypes)
                 ));
             }
         }
 
         similar.sort((a, b) -> Long.compare((Long) b.get("similarity"), (Long) a.get("similarity")));
-        return similar;
+
+        // Limit to top 20
+        List<Map<String, Object>> result = similar.size() > 20 ? similar.subList(0, 20) : similar;
+
+        // Cache result
+        similarWorkflowsCache.put(workflowId, new CachedResult(result, System.currentTimeMillis()));
+
+        return result;
     }
 
     @Transactional
@@ -620,12 +655,9 @@ public class LearningService {
         return stepStats;
     }
 
-    private double calculateSimilarity(List<String> a, List<String> b) {
-        if (a.isEmpty() && b.isEmpty()) return 1.0;
-        if (a.isEmpty() || b.isEmpty()) return 0.0;
-
-        Set<String> setA = new HashSet<>(a);
-        Set<String> setB = new HashSet<>(b);
+    private double calculateSetSimilarity(Set<String> setA, Set<String> setB) {
+        if (setA.isEmpty() && setB.isEmpty()) return 1.0;
+        if (setA.isEmpty() || setB.isEmpty()) return 0.0;
 
         Set<String> intersection = new HashSet<>(setA);
         intersection.retainAll(setB);

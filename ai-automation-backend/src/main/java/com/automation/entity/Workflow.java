@@ -74,6 +74,10 @@ public class Workflow {
 
     private String templateId;
 
+    @Column(name = "block_types")
+    @Builder.Default
+    private String blockTypes = "";
+
     @Builder.Default
     private String testStatus = "UNTESTED";
 
@@ -89,4 +93,20 @@ public class Workflow {
 
     @LastModifiedDate
     private Instant updatedAt;
+
+    @PrePersist
+    @PreUpdate
+    void computeBlockTypes() {
+        if (blocks != null && !blocks.isEmpty()) {
+            blockTypes = blocks.stream()
+                    .map(BlockDefinition::getType)
+                    .filter(t -> t != null && !t.isEmpty())
+                    .distinct()
+                    .sorted()
+                    .reduce((a, b) -> a + "," + b)
+                    .orElse("");
+        } else {
+            blockTypes = "";
+        }
+    }
 }
