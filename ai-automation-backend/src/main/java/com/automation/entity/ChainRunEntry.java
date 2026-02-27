@@ -14,6 +14,7 @@ public class ChainRunEntry {
     private int entryIndex;
     private String workflowId;
     private String workflowName;
+    private String projectName;
     private String workflowRunId;
 
     @Builder.Default

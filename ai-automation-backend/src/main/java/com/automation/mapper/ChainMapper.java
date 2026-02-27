@@ -74,6 +74,7 @@ public class ChainMapper {
                         e.getEntryIndex(),
                         e.getWorkflowId(),
                         e.getWorkflowName(),
+                        e.getProjectName(),
                         e.getWorkflowRunId(),
                         e.getStatus(),
                         e.getStartedAt(),

@@ -103,8 +103,11 @@ public class ChainExecutor {
 
                 Workflow workflow;
                 try {
-                    workflow = workflowService.findById(entry.getWorkflowId());
+                    workflow = workflowService.findByIdEager(entry.getWorkflowId());
                     runEntry.setWorkflowName(workflow.getName());
+                    if (workflow.getProject() != null) {
+                        runEntry.setProjectName(workflow.getProject().getName());
+                    }
                 } catch (Exception e) {
                     log.error("Chain {}: Workflow {} not found", chain.getName(), entry.getWorkflowId(), e);
                     runEntry.setStatus("FAILED");

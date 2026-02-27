@@ -289,7 +289,22 @@ function ChainDetail({ chain, onExecute, onEdit, onDelete }: {
                   <div className="flex items-center gap-3">
                     <StatusBadge status={run.status} />
                     <span className="text-sm text-text-secondary">
-                      {run.entryRuns.filter(e => e.status === 'COMPLETED').length}/{run.entryRuns.length} {t.chains.entries}
+                      {(() => {
+                        const completed = run.entryRuns.filter(e => e.status === 'COMPLETED').length;
+                        const failed = run.entryRuns.filter(e => e.status === 'FAILED').length;
+                        const cancelled = run.entryRuns.filter(e => e.status === 'CANCELLED').length;
+                        return (
+                          <>
+                            {completed > 0 && <span className="text-success">{completed} ✓</span>}
+                            {completed > 0 && (failed > 0 || cancelled > 0) && ' '}
+                            {failed > 0 && <span className="text-danger">{failed} ✗</span>}
+                            {failed > 0 && cancelled > 0 && ' '}
+                            {cancelled > 0 && <span className="text-warning">{cancelled} ⊘</span>}
+                            {completed === 0 && failed === 0 && cancelled === 0 && '0'}
+                            {' / '}{run.entryRuns.length} {t.chains.entries}
+                          </>
+                        );
+                      })()}
                     </span>
                   </div>
                   <div className="flex items-center gap-3">

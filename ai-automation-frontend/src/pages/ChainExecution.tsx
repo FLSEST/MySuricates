@@ -129,6 +129,9 @@ function EntryCard({ entry }: { entry: ChainRunEntry }) {
               <p className="font-medium text-text-primary">
                 {entry.workflowName || entry.workflowId}
               </p>
+              {entry.projectName && (
+                <p className="text-xs text-text-tertiary">{entry.projectName}</p>
+              )}
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-xs text-text-tertiary">#{entry.entryIndex + 1}</span>
                 {entry.durationMs != null && (

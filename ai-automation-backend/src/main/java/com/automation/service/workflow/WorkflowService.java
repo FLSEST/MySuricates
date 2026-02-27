@@ -44,6 +44,16 @@ public class WorkflowService {
                 .orElseThrow(() -> new ResourceNotFoundException("Workflow", id));
     }
 
+    @Transactional(readOnly = true)
+    public Workflow findByIdEager(String id) {
+        Workflow workflow = workflowRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Workflow", id));
+        // Force-initialize lazy collections while still in transaction
+        workflow.getBlocks().size();
+        workflow.getActivatedSkills().size();
+        return workflow;
+    }
+
     @Transactional
     public Workflow create(CreateWorkflowRequest request) {
         Project project = projectRepository.findById(request.projectId())

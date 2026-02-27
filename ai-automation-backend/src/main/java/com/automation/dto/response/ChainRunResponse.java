@@ -23,6 +23,7 @@ public record ChainRunResponse(
             int entryIndex,
             String workflowId,
             String workflowName,
+            String projectName,
             String workflowRunId,
             String status,
             Instant startedAt,

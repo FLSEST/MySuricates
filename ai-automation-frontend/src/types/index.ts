@@ -598,6 +598,7 @@ export interface ChainRunEntry {
   entryIndex: number;
   workflowId: string;
   workflowName: string | null;
+  projectName: string | null;
   workflowRunId: string | null;
   status: string;
   startedAt: string | null;
