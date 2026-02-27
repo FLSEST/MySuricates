@@ -21,11 +21,11 @@ ai-automation-frontend/playwright/.auth/
 # Stable environment build artifacts
 ai-automation-backend/stable-frontend/
 
-# Generated session artifacts
-portfolio/
-dashboard/
-presentation/
-ebook/
-prototype/
-output/
-todo-sdk/
+# Generated session artifacts (anchored to repo root)
+/portfolio/
+/dashboard/
+/presentation/
+/ebook/
+/prototype/
+/output/
+/todo-sdk/
