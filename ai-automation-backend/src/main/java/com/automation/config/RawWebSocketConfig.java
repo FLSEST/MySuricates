@@ -1,5 +1,6 @@
 package com.automation.config;
 
+import com.automation.security.WebSocketAuthInterceptor;
 import com.automation.websocket.TerminalWebSocketHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
@@ -13,10 +14,12 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 public class RawWebSocketConfig implements WebSocketConfigurer {
 
     private final TerminalWebSocketHandler terminalWebSocketHandler;
+    private final WebSocketAuthInterceptor webSocketAuthInterceptor;
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(terminalWebSocketHandler, "/ws/terminal/**")
+                .addInterceptors(webSocketAuthInterceptor)
                 .setAllowedOriginPatterns("*");
     }
 }

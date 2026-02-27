@@ -4,6 +4,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
 import { useThemeStore } from '../../stores/themeStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { useT } from '../../i18n';
 import { RefreshCw } from 'lucide-react';
 import { Button, Badge } from '../ui';
@@ -75,7 +76,8 @@ export function TerminalPanel({ runId }: TerminalPanelProps) {
     if (!termRef.current) return;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/terminal/${runId}`;
+    const apiKey = useSettingsStore.getState().apiKey;
+    const wsUrl = `${protocol}//${window.location.host}/ws/terminal/${runId}${apiKey ? `?apiKey=${encodeURIComponent(apiKey)}` : ''}`;
 
     setStatus('connecting');
     const ws = new WebSocket(wsUrl);
