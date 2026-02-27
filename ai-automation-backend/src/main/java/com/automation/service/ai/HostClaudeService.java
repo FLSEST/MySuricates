@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -77,37 +78,17 @@ public class HostClaudeService {
         // Write prompt via stdin to avoid OS command-line length limits (E2BIG)
         writePromptToStdin(proc, prompt);
 
-        try {
-            CompletableFuture<byte[]> outputFuture = CompletableFuture.supplyAsync(() -> {
-                try { return proc.getInputStream().readAllBytes(); }
-                catch (IOException e) { return new byte[0]; }
-            });
+        int effectiveTimeout = timeoutSeconds != null ? timeoutSeconds : config.getTimeoutSeconds();
+        String rawOutput = drainProcess(proc, effectiveTimeout, "Host Claude reasoning");
 
-            int effectiveTimeout = timeoutSeconds != null ? timeoutSeconds : config.getTimeoutSeconds();
-            boolean finished = proc.waitFor(effectiveTimeout, TimeUnit.SECONDS);
-            if (!finished) {
-                proc.destroyForcibly();
-                throw new IOException("Host Claude timed out after " + effectiveTimeout + " seconds");
-            }
-
-            String rawOutput = new String(outputFuture.get(5, TimeUnit.SECONDS)).trim();
-
-            int exitCode = proc.exitValue();
-            if (exitCode != 0) {
-                log.warn("Host Claude returned exit code {}: {}", exitCode, truncate(rawOutput, 500));
-            }
-
-            ClaudeJsonResponse parsed = ClaudeOutputParser.parseStreamJson(rawOutput);
-            String text = parsed.result() != null ? parsed.result() : rawOutput;
-            return new ReasoningResult(text, parsed);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            proc.destroyForcibly();
-            throw new IOException("Host Claude interrupted");
-        } catch (ExecutionException | TimeoutException e) {
-            proc.destroyForcibly();
-            throw new IOException("Failed to read Host Claude output", e);
+        int exitCode = proc.exitValue();
+        if (exitCode != 0) {
+            log.warn("Host Claude returned exit code {}: {}", exitCode, truncate(rawOutput, 500));
         }
+
+        ClaudeJsonResponse parsed = ClaudeOutputParser.parseStreamJson(rawOutput);
+        String text = parsed.result() != null ? parsed.result() : rawOutput;
+        return new ReasoningResult(text, parsed);
     }
 
     /**
@@ -140,37 +121,17 @@ public class HostClaudeService {
         // Write prompt via stdin to avoid OS command-line length limits (E2BIG)
         writePromptToStdin(proc, prompt);
 
-        try {
-            CompletableFuture<byte[]> outputFuture = CompletableFuture.supplyAsync(() -> {
-                try { return proc.getInputStream().readAllBytes(); }
-                catch (IOException e) { return new byte[0]; }
-            });
+        int effectiveTimeout = timeoutSeconds != null ? timeoutSeconds : config.getTimeoutSeconds();
+        String rawOutput = drainProcess(proc, effectiveTimeout, "Host Claude action");
 
-            int effectiveTimeout = timeoutSeconds != null ? timeoutSeconds : config.getTimeoutSeconds();
-            boolean finished = proc.waitFor(effectiveTimeout, TimeUnit.SECONDS);
-            if (!finished) {
-                proc.destroyForcibly();
-                throw new IOException("Host Claude action timed out after " + effectiveTimeout + " seconds");
-            }
-
-            String rawOutput = new String(outputFuture.get(5, TimeUnit.SECONDS)).trim();
-
-            int exitCode = proc.exitValue();
-            if (exitCode != 0) {
-                log.warn("Host Claude action returned exit code {}: {}", exitCode, truncate(rawOutput, 500));
-            }
-
-            ClaudeJsonResponse parsed = ClaudeOutputParser.parseStreamJson(rawOutput);
-            String text = parsed.result() != null ? parsed.result() : rawOutput;
-            return new ActionResult(text, exitCode, parsed);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            proc.destroyForcibly();
-            throw new IOException("Host Claude action interrupted");
-        } catch (ExecutionException | TimeoutException e) {
-            proc.destroyForcibly();
-            throw new IOException("Failed to read Host Claude action output", e);
+        int exitCode = proc.exitValue();
+        if (exitCode != 0) {
+            log.warn("Host Claude action returned exit code {}: {}", exitCode, truncate(rawOutput, 500));
         }
+
+        ClaudeJsonResponse parsed = ClaudeOutputParser.parseStreamJson(rawOutput);
+        String text = parsed.result() != null ? parsed.result() : rawOutput;
+        return new ActionResult(text, exitCode, parsed);
     }
 
     /**
@@ -262,6 +223,46 @@ public class HostClaudeService {
         sb.append("Respond following the format specified in the system instructions.");
 
         return sb.toString();
+    }
+
+    /**
+     * Drains process stdout, waits for completion with timeout, and ensures all streams
+     * are closed — even on timeout or interruption.
+     */
+    private String drainProcess(Process proc, int timeoutSeconds, String label) throws IOException {
+        InputStream stdout = proc.getInputStream();
+        CompletableFuture<byte[]> outputFuture = CompletableFuture.supplyAsync(() -> {
+            try { return stdout.readAllBytes(); }
+            catch (IOException e) { return new byte[0]; }
+        });
+
+        try {
+            boolean finished = proc.waitFor(timeoutSeconds, TimeUnit.SECONDS);
+            if (!finished) {
+                proc.destroyForcibly();
+                proc.waitFor(5, TimeUnit.SECONDS);
+                outputFuture.cancel(true);
+                closeQuietly(stdout);
+                throw new IOException(label + " timed out after " + timeoutSeconds + " seconds");
+            }
+
+            return new String(outputFuture.get(5, TimeUnit.SECONDS)).trim();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            proc.destroyForcibly();
+            outputFuture.cancel(true);
+            closeQuietly(stdout);
+            throw new IOException(label + " interrupted");
+        } catch (ExecutionException | TimeoutException e) {
+            proc.destroyForcibly();
+            outputFuture.cancel(true);
+            closeQuietly(stdout);
+            throw new IOException("Failed to read " + label + " output", e);
+        }
+    }
+
+    private void closeQuietly(InputStream stream) {
+        try { stream.close(); } catch (IOException ignored) { /* already destroyed */ }
     }
 
     /**

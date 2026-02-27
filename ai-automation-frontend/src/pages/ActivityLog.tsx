@@ -31,7 +31,7 @@ export function ActivityLog() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">{t.activityLog.title}</h1>
-        <p className="text-muted mt-1">{t.activityLog.subtitle}</p>
+        <p className="text-text-secondary mt-1">{t.activityLog.subtitle}</p>
       </div>
 
       {/* Filters */}
@@ -39,7 +39,7 @@ export function ActivityLog() {
         <select
           value={level}
           onChange={e => { setLevel(e.target.value); setPage(0); }}
-          className="px-3 py-2 rounded-lg border border-border bg-card text-sm"
+          className="px-3 py-2 rounded-lg border border-border bg-surface-raised text-sm"
         >
           <option value="">{t.activityLog.allLevels}</option>
           {LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
@@ -47,7 +47,7 @@ export function ActivityLog() {
         <select
           value={category}
           onChange={e => { setCategory(e.target.value); setPage(0); }}
-          className="px-3 py-2 rounded-lg border border-border bg-card text-sm"
+          className="px-3 py-2 rounded-lg border border-border bg-surface-raised text-sm"
         >
           <option value="">{t.activityLog.allCategories}</option>
           {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -55,11 +55,11 @@ export function ActivityLog() {
       </div>
 
       {/* Table */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
+      <div className="bg-surface-raised border border-border rounded-xl overflow-hidden">
         {isLoading ? (
-          <div className="p-8 text-center text-muted">{t.common.loading}</div>
+          <div className="p-8 text-center text-text-secondary">{t.common.loading}</div>
         ) : !data || data.content.length === 0 ? (
-          <div className="p-8 text-center text-muted flex flex-col items-center gap-2">
+          <div className="p-8 text-center text-text-secondary flex flex-col items-center gap-2">
             <ScrollText className="w-8 h-8 opacity-40" />
             {t.activityLog.noLogs}
           </div>
@@ -67,7 +67,7 @@ export function ActivityLog() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border text-left text-muted">
+                <tr className="border-b border-border text-left text-text-secondary">
                   <th className="px-4 py-3 font-medium">{t.activityLog.timestamp}</th>
                   <th className="px-4 py-3 font-medium">{t.activityLog.level}</th>
                   <th className="px-4 py-3 font-medium">{t.activityLog.category}</th>
@@ -77,8 +77,8 @@ export function ActivityLog() {
               </thead>
               <tbody>
                 {data.content.map(entry => (
-                  <tr key={entry.id} className="border-b border-border/50 hover:bg-muted/5">
-                    <td className="px-4 py-2.5 whitespace-nowrap text-muted text-xs">
+                  <tr key={entry.id} className="border-b border-border/50 hover:bg-surface">
+                    <td className="px-4 py-2.5 whitespace-nowrap text-text-secondary text-xs">
                       {formatTime(entry.timestamp)}
                     </td>
                     <td className="px-4 py-2.5">
@@ -86,9 +86,9 @@ export function ActivityLog() {
                         {entry.level}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-xs text-muted">{entry.category}</td>
+                    <td className="px-4 py-2.5 text-xs text-text-secondary">{entry.category}</td>
                     <td className="px-4 py-2.5 max-w-md truncate">{entry.message}</td>
-                    <td className="px-4 py-2.5 text-xs text-muted">{entry.source || '—'}</td>
+                    <td className="px-4 py-2.5 text-xs text-text-secondary">{entry.source || '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -100,14 +100,14 @@ export function ActivityLog() {
       {/* Pagination */}
       {data && data.totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted">
+          <span className="text-sm text-text-secondary">
             {data.totalElements} entries
           </span>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPage(p => Math.max(0, p - 1))}
               disabled={page === 0}
-              className="p-2 rounded-lg border border-border hover:bg-muted/10 disabled:opacity-30"
+              className="p-2 rounded-lg border border-border hover:bg-surface disabled:opacity-30"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -117,7 +117,7 @@ export function ActivityLog() {
             <button
               onClick={() => setPage(p => Math.min(data.totalPages - 1, p + 1))}
               disabled={page >= data.totalPages - 1}
-              className="p-2 rounded-lg border border-border hover:bg-muted/10 disabled:opacity-30"
+              className="p-2 rounded-lg border border-border hover:bg-surface disabled:opacity-30"
             >
               <ChevronRight className="w-4 h-4" />
             </button>

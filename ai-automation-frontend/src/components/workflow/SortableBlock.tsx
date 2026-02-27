@@ -4,7 +4,21 @@ import { GripVertical, Pencil, Trash2, Link2, Terminal } from 'lucide-react';
 import { Badge } from '../ui';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useT } from '../../i18n';
-import type { BlockDefinition } from '../../types';
+import type { BlockDefinition, BlockType } from '../../types';
+import type { BadgeVariant } from '../ui/Badge';
+
+const blockTypeVariant: Record<BlockType, BadgeVariant> = {
+  simple: 'success',
+  agentic: 'success',
+  'skill-capability': 'success',
+  shell: 'accent',
+  approval: 'warning',
+  'sub-workflow': 'accent',
+  retry: 'default',
+  foreach: 'default',
+  while: 'default',
+  conditional: 'default',
+};
 
 interface SortableBlockProps {
   id: string;
@@ -56,7 +70,7 @@ export function SortableBlock({ id, index, block, onEdit, onRemove }: SortableBl
           <span className="text-xs font-mono px-2 py-0.5 rounded-sm bg-surface text-text-secondary">
             #{index + 1}
           </span>
-          <Badge variant="accent">{t.workflows.blockTypes[block.type]}</Badge>
+          <Badge variant={blockTypeVariant[block.type] || 'accent'}>{t.workflows.blockTypes[block.type]}</Badge>
         </div>
         {advancedMode ? (
           <pre className="text-xs text-text-secondary font-mono bg-surface rounded-lg p-3 mt-2 overflow-x-auto">
