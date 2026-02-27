@@ -1,0 +1,198 @@
+package com.automation.executor.blocks;
+
+import com.automation.service.ai.HostClaudeService.ReasoningResult;
+import com.automation.service.cli.CliSession;
+import lombok.extern.slf4j.Slf4j;
+
+import java.util.*;
+
+/**
+ * Tracks token usage, cost, and tool names across agentic block iterations.
+ * Handles fallback estimation when real usage data is unavailable.
+ */
+@Slf4j
+public class AgenticTokenTracker {
+
+    private int runningTotalTokens;
+    private int consecutiveBlindIterations;
+    private boolean usingFallbackEstimation;
+    private final List<Map<String, Object>> iterationLog = new ArrayList<>();
+
+    /**
+     * Captures token/cost metadata from the REASON phase into the iteration data map.
+     */
+    public void captureReasonMeta(Map<String, Object> iterData, ReasoningResult reasonResult,
+                                   String promptText, String responseText, int iteration) {
+        if (reasonResult.parsed() != null && reasonResult.parsed().usage() != null) {
+            iterData.put("reasonMeta", reasonResult.parsed().toMetadata());
+        } else {
+            int estimatedInput = promptText.length() / 4;
+            int estimatedOutput = responseText.length() / 4;
+            iterData.put("reasonMeta", Map.of(
+                    "inputTokens", estimatedInput,
+                    "outputTokens", estimatedOutput,
+                    "estimated", true));
+            log.warn("Agentic iteration {}: REASON phase returned no usage data — using fallback estimation ({} in, {} out)",
+                    iteration, estimatedInput, estimatedOutput);
+        }
+    }
+
+    /**
+     * Captures token/cost metadata from the ACT phase into the iteration data map.
+     */
+    public void captureActMeta(Map<String, Object> iterData, CliSession.EnrichedCommandResult cmdResult,
+                                String actionText, String outputText, int iteration) {
+        if (cmdResult.parsed() != null && cmdResult.parsed().usage() != null) {
+            iterData.put("actMeta", cmdResult.parsed().toMetadata());
+        } else {
+            int estimatedInput = actionText.length() / 4;
+            int estimatedOutput = outputText.length() / 4;
+            iterData.put("actMeta", Map.of(
+                    "inputTokens", estimatedInput,
+                    "outputTokens", estimatedOutput,
+                    "estimated", true));
+            log.warn("Agentic iteration {}: ACT phase returned no usage data — using fallback estimation ({} in, {} out)",
+                    iteration, estimatedInput, estimatedOutput);
+        }
+    }
+
+    /**
+     * Updates running token totals and blind-iteration tracking from an iteration's data.
+     */
+    public void trackIteration(Map<String, Object> iterData) {
+        runningTotalTokens += extractTokenCount(iterData, "reasonMeta", "inputTokens");
+        runningTotalTokens += extractTokenCount(iterData, "reasonMeta", "outputTokens");
+        runningTotalTokens += extractTokenCount(iterData, "actMeta", "inputTokens");
+        runningTotalTokens += extractTokenCount(iterData, "actMeta", "outputTokens");
+
+        boolean reasonEstimated = isEstimated(iterData, "reasonMeta");
+        boolean actEstimated = isEstimated(iterData, "actMeta");
+        if (reasonEstimated && actEstimated) {
+            consecutiveBlindIterations++;
+            usingFallbackEstimation = true;
+        } else {
+            consecutiveBlindIterations = 0;
+        }
+
+        iterationLog.add(iterData);
+    }
+
+    /**
+     * Checks if the token budget has been exceeded.
+     * @return stop reason string if budget exceeded, null otherwise
+     */
+    public String checkBudget(int maxTotalTokens) {
+        if (maxTotalTokens > 0 && runningTotalTokens > maxTotalTokens) {
+            return "TOKEN_BUDGET_EXCEEDED";
+        }
+        return null;
+    }
+
+    /**
+     * Checks if too many consecutive iterations lacked real usage data.
+     * @return stop reason string if tracking failed, null otherwise
+     */
+    public String checkBlindIterations() {
+        if (consecutiveBlindIterations >= 3) {
+            return "TOKEN_TRACKING_FAILED";
+        }
+        return null;
+    }
+
+    /**
+     * Builds the final aggregated metadata map for the step result.
+     */
+    public Map<String, Object> buildFinalMetadata(String goal, String successCriteria,
+                                                    int totalIterations, boolean goalAchieved,
+                                                    String stopReason) {
+        int totalInputTokens = 0;
+        int totalOutputTokens = 0;
+        double totalCostUsd = 0.0;
+        List<String> allToolNames = new ArrayList<>();
+
+        for (Map<String, Object> iter : iterationLog) {
+            totalInputTokens += extractTokenCount(iter, "reasonMeta", "inputTokens");
+            totalInputTokens += extractTokenCount(iter, "actMeta", "inputTokens");
+            totalOutputTokens += extractTokenCount(iter, "reasonMeta", "outputTokens");
+            totalOutputTokens += extractTokenCount(iter, "actMeta", "outputTokens");
+            totalCostUsd += extractCost(iter, "reasonMeta");
+            totalCostUsd += extractCost(iter, "actMeta");
+            allToolNames.addAll(extractToolNames(iter, "actMeta"));
+        }
+
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("blockType", "agentic");
+        metadata.put("goal", goal);
+        metadata.put("successCriteria", successCriteria);
+        metadata.put("totalIterations", totalIterations);
+        metadata.put("goalAchieved", goalAchieved);
+        metadata.put("inputTokens", totalInputTokens);
+        metadata.put("outputTokens", totalOutputTokens);
+        metadata.put("costUsd", totalCostUsd);
+        if (!allToolNames.isEmpty()) {
+            metadata.put("toolNames", allToolNames);
+            metadata.put("toolUseCount", allToolNames.size());
+        }
+        metadata.put("totalTokensUsed", runningTotalTokens);
+        if (usingFallbackEstimation) {
+            metadata.put("tokenEstimationFallback", true);
+        }
+        if (stopReason != null) {
+            metadata.put("stopReason", stopReason);
+        }
+        metadata.put("iterations", iterationLog);
+
+        return metadata;
+    }
+
+    public int getRunningTotalTokens() {
+        return runningTotalTokens;
+    }
+
+    public int getConsecutiveBlindIterations() {
+        return consecutiveBlindIterations;
+    }
+
+    // --- Private helpers ---
+
+    @SuppressWarnings("unchecked")
+    private boolean isEstimated(Map<String, Object> iterData, String metaKey) {
+        Object meta = iterData.get(metaKey);
+        if (meta instanceof Map<?, ?> map) {
+            return Boolean.TRUE.equals(((Map<String, Object>) map).get("estimated"));
+        }
+        return true;
+    }
+
+    @SuppressWarnings("unchecked")
+    static int extractTokenCount(Map<String, Object> iterData, String metaKey, String field) {
+        Object meta = iterData.get(metaKey);
+        if (meta instanceof Map<?, ?> map) {
+            Object val = ((Map<String, Object>) map).get(field);
+            if (val instanceof Number n) return n.intValue();
+        }
+        return 0;
+    }
+
+    @SuppressWarnings("unchecked")
+    private double extractCost(Map<String, Object> iterData, String metaKey) {
+        Object meta = iterData.get(metaKey);
+        if (meta instanceof Map<?, ?> map) {
+            Object val = ((Map<String, Object>) map).get("costUsd");
+            if (val instanceof Number n) return n.doubleValue();
+        }
+        return 0.0;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> extractToolNames(Map<String, Object> iterData, String metaKey) {
+        Object meta = iterData.get(metaKey);
+        if (meta instanceof Map<?, ?> map) {
+            Object val = ((Map<String, Object>) map).get("toolNames");
+            if (val instanceof List<?> list) {
+                return list.stream().map(Object::toString).toList();
+            }
+        }
+        return List.of();
+    }
+}

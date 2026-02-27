@@ -3,7 +3,6 @@ package com.automation.executor.blocks;
 import com.automation.entity.BlockDefinition;
 import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
-import com.automation.exception.WorkflowExecutionException;
 import com.automation.executor.ApprovalRequest;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
@@ -44,78 +43,52 @@ public class AgenticBlockExecutor implements BlockExecutor {
     public StepResult execute(BlockDefinition block, ExecutionContext context) {
         int stepIndex = context.nextStepIndex();
         Instant start = Instant.now();
-        Map<String, Object> config = block.getConfig();
 
-        // Extract config
-        String goal = context.resolveTemplate(requireString(config, "goal"));
-        String successCriteria = context.resolveTemplate(
-                (String) config.getOrDefault("success_criteria", ""));
-        int maxIterations = ((Number) config.getOrDefault("max_iterations", 10)).intValue();
-        int iterationTimeoutSeconds = ((Number) config.getOrDefault(
-                "iteration_timeout_seconds", 300)).intValue();
-        int totalTimeoutSeconds = ((Number) config.getOrDefault(
-                "total_timeout_seconds", 1800)).intValue();
-        int maxTotalTokens = ((Number) config.getOrDefault(
-                "max_total_tokens", 200_000)).intValue();
-        int maxRepeatedActions = ((Number) config.getOrDefault(
-                "max_repeated_actions", 3)).intValue();
-        boolean requireApproval = Boolean.TRUE.equals(config.get("require_approval"));
-        Integer claudeTimeout = config.containsKey("timeout_seconds")
-                ? ((Number) config.get("timeout_seconds")).intValue()
-                : null;
+        // Parse and validate config
+        AgenticBlockConfig cfg = AgenticBlockConfig.from(block.getConfig(), context);
 
-        // Gather learning context — resolve workflow ID from the run
+        // Gather learning context
         String workflowId = runRepository.findById(context.getWorkflowRunId())
                 .map(run -> run.getWorkflow().getId())
                 .orElse(null);
         String learningContext = buildLearningContext(workflowId);
 
-        // Build system prompt for host Claude (include workflow instructions for consistency)
-        String workflowInstructions = context.getInstructionPrefix();
-        String systemPrompt = buildSystemPrompt(goal, successCriteria, learningContext, workflowInstructions);
+        // Build system prompt
+        String systemPrompt = buildSystemPrompt(cfg.goal(), cfg.successCriteria(),
+                learningContext, context.getInstructionPrefix());
 
-        // Conversation history for multi-turn reasoning
+        // Initialize state
         List<Turn> history = new ArrayList<>();
-        List<Map<String, Object>> iterationLog = new ArrayList<>();
-
-        // Initial user turn
         history.add(new Turn("user",
                 "Begin working on the goal. Analyze what needs to be done and propose your first action."));
 
-        // Broadcast start
+        AgenticTokenTracker tokenTracker = new AgenticTokenTracker();
+        AgenticSafetyGuard safetyGuard = new AgenticSafetyGuard(
+                cfg.totalTimeoutSeconds(), cfg.iterationTimeoutSeconds(), cfg.maxRepeatedActions());
+
         broadcastAgenticEvent(context.getWorkflowRunId(), stepIndex,
-                "agentic_started", Map.of("goal", goal, "maxIterations", maxIterations));
+                "agentic_started", Map.of("goal", cfg.goal(), "maxIterations", cfg.maxIterations()));
 
         StringBuilder fullOutput = new StringBuilder();
         int iteration = 0;
         boolean goalAchieved = false;
-        boolean approvalRequired = requireApproval;
-        Instant blockStart = Instant.now();
-        int runningTotalTokens = 0;
-        int consecutiveBlindIterations = 0;
-        boolean usingFallbackEstimation = false;
-        List<String> recentActions = new ArrayList<>();
+        boolean approvalRequired = cfg.requireApproval();
         String stopReason = null;
 
-        while (iteration < maxIterations && !context.shouldStop()) {
-            // Overall timeout check
-            long elapsedSeconds = (Instant.now().toEpochMilli() - blockStart.toEpochMilli()) / 1000;
-            if (elapsedSeconds > totalTimeoutSeconds) {
-                stopReason = "TOTAL_TIMEOUT";
-                fullOutput.append("[TOTAL TIMEOUT after ").append(elapsedSeconds).append("s]\n");
+        while (iteration < cfg.maxIterations() && !context.shouldStop()) {
+            // Total timeout check
+            String timeoutReason = safetyGuard.checkTotalTimeout();
+            if (timeoutReason != null) {
+                stopReason = timeoutReason;
+                long elapsed = safetyGuard.elapsedSeconds();
+                fullOutput.append("[TOTAL TIMEOUT after ").append(elapsed).append("s]\n");
                 broadcastAgenticEvent(context.getWorkflowRunId(), stepIndex,
-                        "agentic_total_timeout", Map.of("elapsedSeconds", elapsedSeconds));
+                        "agentic_total_timeout", Map.of("elapsedSeconds", elapsed));
                 break;
             }
-            // Handle pause
-            while (context.isPaused() && !context.shouldStop()) {
-                try {
-                    Thread.sleep(500);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-            }
+
+            // Handle pause/cancel
+            if (!safetyGuard.waitIfPaused(context)) break;
             if (context.shouldStop()) break;
 
             iteration++;
@@ -131,30 +104,14 @@ public class AgenticBlockExecutor implements BlockExecutor {
             try {
                 String conversationPrompt = hostClaude.buildConversationPrompt(systemPrompt, history);
                 ReasoningResult reasonResult = hostClaude.reasonStructured(
-                        conversationPrompt, systemPrompt, null, null, claudeTimeout);
+                        conversationPrompt, systemPrompt, null, null, cfg.claudeTimeout());
                 reasoning = reasonResult.text();
-
-                // Capture reasoning token/cost metadata
-                if (reasonResult.parsed() != null && reasonResult.parsed().usage() != null) {
-                    Map<String, Object> reasonMeta = reasonResult.parsed().toMetadata();
-                    iterData.put("reasonMeta", reasonMeta);
-                } else {
-                    // Fallback: estimate tokens from string length (~4 chars/token)
-                    int estimatedInput = conversationPrompt.length() / 4;
-                    int estimatedOutput = reasoning.length() / 4;
-                    Map<String, Object> fallbackMeta = Map.of(
-                            "inputTokens", estimatedInput,
-                            "outputTokens", estimatedOutput,
-                            "estimated", true);
-                    iterData.put("reasonMeta", fallbackMeta);
-                    log.warn("Agentic iteration {}: REASON phase returned no usage data — using fallback estimation ({} in, {} out)",
-                            iteration, estimatedInput, estimatedOutput);
-                }
+                tokenTracker.captureReasonMeta(iterData, reasonResult, conversationPrompt, reasoning, iteration);
             } catch (Exception e) {
                 log.error("Host Claude reasoning failed at iteration {}: {}", iteration, e.getMessage());
                 iterData.put("phase", "reason");
                 iterData.put("error", e.getMessage());
-                iterationLog.add(iterData);
+                tokenTracker.trackIteration(iterData);
                 broadcastAgenticEvent(context.getWorkflowRunId(), stepIndex,
                         "agentic_error", Map.of("iteration", iteration,
                                 "phase", "reason", "error", e.getMessage()));
@@ -163,7 +120,6 @@ public class AgenticBlockExecutor implements BlockExecutor {
                 break;
             }
 
-            // Add assistant response to history
             history.add(new Turn("assistant", reasoning));
             iterData.put("reasoning", truncate(reasoning, 2000));
 
@@ -181,7 +137,7 @@ public class AgenticBlockExecutor implements BlockExecutor {
                         .append(plan.getSummary()).append("\n");
                 iterData.put("result", plan.getGoalStatus().toLowerCase());
                 iterData.put("summary", plan.getSummary());
-                iterationLog.add(iterData);
+                tokenTracker.trackIteration(iterData);
                 broadcastAgenticEvent(context.getWorkflowRunId(), stepIndex,
                         goalAchieved ? "agentic_goal_achieved" : "agentic_goal_impossible",
                         Map.of("iteration", iteration, "summary", plan.getSummary()));
@@ -190,44 +146,15 @@ public class AgenticBlockExecutor implements BlockExecutor {
 
             // === Optional APPROVAL gate ===
             if (approvalRequired && !plan.getAction().isEmpty()) {
-                broadcastAgenticEvent(context.getWorkflowRunId(), stepIndex,
-                        "agentic_approval_required",
-                        Map.of("iteration", iteration,
-                                "action", plan.getAction(),
-                                "rationale", truncate(plan.getRationale(), 500)));
-
-                CompletableFuture<String> future = context.requestApproval(
-                        ApprovalRequest.builder()
-                                .blockId("agentic-" + stepIndex + "-iter-" + iteration)
-                                .question("Approve action: " + truncate(plan.getAction(), 200))
-                                .options(List.of("Yes", "Yes always", "No"))
-                                .stepIndex(stepIndex)
-                                .build());
-
-                String answer;
-                try {
-                    answer = future.get(30, TimeUnit.MINUTES);
-                } catch (Exception e) {
-                    iterData.put("result", "approval_timeout");
-                    iterationLog.add(iterData);
-                    fullOutput.append("[iteration ").append(iteration)
-                            .append(" - APPROVAL TIMEOUT]\n");
-                    break;
-                }
-
-                if ("No".equalsIgnoreCase(answer)) {
-                    history.add(new Turn("user",
-                            "The user rejected this action. Propose an alternative approach."));
-                    iterData.put("approval", "rejected");
-                    iterationLog.add(iterData);
-                    fullOutput.append("[iteration ").append(iteration)
-                            .append(" - REJECTED]: ").append(plan.getAction()).append("\n");
+                String approvalResult = handleApproval(context, stepIndex, iteration, plan, iterData, fullOutput);
+                if ("break".equals(approvalResult)) break;
+                if ("continue".equals(approvalResult)) {
+                    tokenTracker.trackIteration(iterData);
                     continue;
                 }
-                if ("Yes always".equalsIgnoreCase(answer)) {
+                if ("disable_approval".equals(approvalResult)) {
                     approvalRequired = false;
                 }
-                iterData.put("approval", "approved");
             }
 
             // === ACT phase ===
@@ -235,7 +162,7 @@ public class AgenticBlockExecutor implements BlockExecutor {
                 history.add(new Turn("user",
                         "Your response did not contain a clear action. Please specify an ACTION to execute."));
                 iterData.put("result", "no_action");
-                iterationLog.add(iterData);
+                tokenTracker.trackIteration(iterData);
                 continue;
             }
 
@@ -246,60 +173,30 @@ public class AgenticBlockExecutor implements BlockExecutor {
             String actionOutput;
             int exitCode;
             try {
-                String actionCommand = plan.getAction();
-                String containerSystemPrompt = context.getInstructionPrefix();
                 CliSession.EnrichedCommandResult cmdResult = commandExecutor.executeCommandOnHost(
-                        context.getProjectPath(), actionCommand, context.getModel(), containerSystemPrompt,
-                        claudeTimeout);
+                        context.getProjectPath(), plan.getAction(), context.getModel(),
+                        context.getInstructionPrefix(), cfg.claudeTimeout());
                 actionOutput = cmdResult.output() != null ? cmdResult.output() : "";
                 exitCode = cmdResult.exitCode();
-
-                // Capture action token/cost metadata
-                if (cmdResult.parsed() != null && cmdResult.parsed().usage() != null) {
-                    Map<String, Object> actMeta = cmdResult.parsed().toMetadata();
-                    iterData.put("actMeta", actMeta);
-                } else {
-                    // Fallback: estimate tokens from string length (~4 chars/token)
-                    int estimatedInput = actionCommand.length() / 4;
-                    int estimatedOutput = actionOutput.length() / 4;
-                    Map<String, Object> fallbackMeta = Map.of(
-                            "inputTokens", estimatedInput,
-                            "outputTokens", estimatedOutput,
-                            "estimated", true);
-                    iterData.put("actMeta", fallbackMeta);
-                    log.warn("Agentic iteration {}: ACT phase returned no usage data — using fallback estimation ({} in, {} out)",
-                            iteration, estimatedInput, estimatedOutput);
-                }
+                tokenTracker.captureActMeta(iterData, cmdResult, plan.getAction(), actionOutput, iteration);
             } catch (Exception e) {
                 actionOutput = "Execution error: " + e.getMessage();
                 exitCode = -1;
             }
 
-            // Track tokens for budget check (includes fallback estimates)
-            runningTotalTokens += extractTokenCount(iterData, "reasonMeta", "inputTokens");
-            runningTotalTokens += extractTokenCount(iterData, "reasonMeta", "outputTokens");
-            runningTotalTokens += extractTokenCount(iterData, "actMeta", "inputTokens");
-            runningTotalTokens += extractTokenCount(iterData, "actMeta", "outputTokens");
+            // Track tokens and check for blind iterations
+            tokenTracker.trackIteration(iterData);
 
-            // Track consecutive iterations without real usage data
-            boolean reasonEstimated = isEstimated(iterData, "reasonMeta");
-            boolean actEstimated = isEstimated(iterData, "actMeta");
-            if (reasonEstimated && actEstimated) {
-                consecutiveBlindIterations++;
-                usingFallbackEstimation = true;
-            } else {
-                consecutiveBlindIterations = 0;
-            }
-
-            // Abort if too many consecutive iterations had no real usage data
-            if (consecutiveBlindIterations >= 3) {
-                stopReason = "TOKEN_TRACKING_FAILED";
+            String blindReason = tokenTracker.checkBlindIterations();
+            if (blindReason != null) {
+                stopReason = blindReason;
+                int blind = tokenTracker.getConsecutiveBlindIterations();
                 broadcastAgenticEvent(context.getWorkflowRunId(), stepIndex,
                         "agentic_token_tracking_failed",
-                        Map.of("iteration", iteration, "consecutiveBlind", consecutiveBlindIterations));
-                fullOutput.append("[TOKEN TRACKING FAILED: ").append(consecutiveBlindIterations)
+                        Map.of("iteration", iteration, "consecutiveBlind", blind));
+                fullOutput.append("[TOKEN TRACKING FAILED: ").append(blind)
                         .append(" consecutive iterations without real usage data — using fallback estimates, budget enforcement is approximate]\n");
-                log.error("Agentic block aborting after {} consecutive iterations without real token usage data", consecutiveBlindIterations);
+                log.error("Agentic block aborting after {} consecutive iterations without real token usage data", blind);
                 break;
             }
 
@@ -330,56 +227,51 @@ public class AgenticBlockExecutor implements BlockExecutor {
 
             long iterMs = Instant.now().toEpochMilli() - iterStart.toEpochMilli();
             iterData.put("durationMs", iterMs);
-            iterationLog.add(iterData);
 
-            // Timeout check per iteration
-            if (iterMs > (long) iterationTimeoutSeconds * 1000) {
-                stopReason = "ITERATION_TIMEOUT";
+            // Iteration timeout check
+            String iterTimeoutReason = safetyGuard.checkIterationTimeout(iterStart);
+            if (iterTimeoutReason != null) {
+                stopReason = iterTimeoutReason;
                 broadcastAgenticEvent(context.getWorkflowRunId(), stepIndex,
                         "agentic_iteration_timeout", Map.of("iteration", iteration));
-                fullOutput.append("[iteration ").append(iteration)
-                        .append(" - TIMEOUT]\n");
+                fullOutput.append("[iteration ").append(iteration).append(" - TIMEOUT]\n");
                 break;
             }
 
             // Token budget check
-            if (maxTotalTokens > 0 && runningTotalTokens > maxTotalTokens) {
-                stopReason = "TOKEN_BUDGET_EXCEEDED";
+            String budgetReason = tokenTracker.checkBudget(cfg.maxTotalTokens());
+            if (budgetReason != null) {
+                stopReason = budgetReason;
+                int totalTokens = tokenTracker.getRunningTotalTokens();
                 broadcastAgenticEvent(context.getWorkflowRunId(), stepIndex,
                         "agentic_token_budget_exceeded",
-                        Map.of("iteration", iteration, "totalTokens", runningTotalTokens,
-                                "budget", maxTotalTokens));
-                fullOutput.append("[TOKEN BUDGET EXCEEDED: ").append(runningTotalTokens)
-                        .append("/").append(maxTotalTokens).append(" tokens]\n");
+                        Map.of("iteration", iteration, "totalTokens", totalTokens,
+                                "budget", cfg.maxTotalTokens()));
+                fullOutput.append("[TOKEN BUDGET EXCEEDED: ").append(totalTokens)
+                        .append("/").append(cfg.maxTotalTokens()).append(" tokens]\n");
                 break;
             }
 
-            // Progress detection — abort if same action repeated N times
-            String actionNormalized = plan.getAction().strip();
-            recentActions.add(actionNormalized);
-            if (recentActions.size() >= maxRepeatedActions) {
-                List<String> lastN = recentActions.subList(
-                        recentActions.size() - maxRepeatedActions, recentActions.size());
-                if (lastN.stream().allMatch(a -> a.equals(lastN.getFirst()))) {
-                    stopReason = "REPEATED_ACTIONS";
-                    broadcastAgenticEvent(context.getWorkflowRunId(), stepIndex,
-                            "agentic_repeated_actions",
-                            Map.of("iteration", iteration, "repeatedCount", maxRepeatedActions));
-                    fullOutput.append("[ABORTED: Same action repeated ")
-                            .append(maxRepeatedActions).append(" times]\n");
-                    break;
-                }
+            // Repeated action check
+            String repeatReason = safetyGuard.trackAndCheckRepeatedAction(plan.getAction());
+            if (repeatReason != null) {
+                stopReason = repeatReason;
+                broadcastAgenticEvent(context.getWorkflowRunId(), stepIndex,
+                        "agentic_repeated_actions",
+                        Map.of("iteration", iteration, "repeatedCount", cfg.maxRepeatedActions()));
+                fullOutput.append("[ABORTED: Same action repeated ")
+                        .append(cfg.maxRepeatedActions()).append(" times]\n");
+                break;
             }
 
-            // History compression — keep recent turns in full, summarize older ones
             compressHistory(history);
         }
 
-        // Finalize
+        // Finalize result
         Instant end = Instant.now();
         StepResult result = StepResult.builder()
                 .stepIndex(stepIndex)
-                .input("[Agentic] " + goal)
+                .input("[Agentic] " + cfg.goal())
                 .output(fullOutput.toString().trim())
                 .startedAt(start)
                 .completedAt(end)
@@ -387,47 +279,9 @@ public class AgenticBlockExecutor implements BlockExecutor {
                 .status(goalAchieved ? StepStatus.COMPLETED : StepStatus.FAILED)
                 .build();
 
-        // Aggregate token/cost data across all iterations
-        int totalInputTokens = 0;
-        int totalOutputTokens = 0;
-        double totalCostUsd = 0.0;
-        List<String> allToolNames = new ArrayList<>();
+        result.setMetadata(tokenTracker.buildFinalMetadata(
+                cfg.goal(), cfg.successCriteria(), iteration, goalAchieved, stopReason));
 
-        for (Map<String, Object> iter : iterationLog) {
-            totalInputTokens += extractTokenCount(iter, "reasonMeta", "inputTokens");
-            totalInputTokens += extractTokenCount(iter, "actMeta", "inputTokens");
-            totalOutputTokens += extractTokenCount(iter, "reasonMeta", "outputTokens");
-            totalOutputTokens += extractTokenCount(iter, "actMeta", "outputTokens");
-            totalCostUsd += extractCost(iter, "reasonMeta");
-            totalCostUsd += extractCost(iter, "actMeta");
-            allToolNames.addAll(extractToolNames(iter, "actMeta"));
-        }
-
-        // Store iteration details in metadata for learning
-        Map<String, Object> metadata = new LinkedHashMap<>();
-        metadata.put("blockType", "agentic");
-        metadata.put("goal", goal);
-        metadata.put("successCriteria", successCriteria);
-        metadata.put("totalIterations", iteration);
-        metadata.put("goalAchieved", goalAchieved);
-        metadata.put("inputTokens", totalInputTokens);
-        metadata.put("outputTokens", totalOutputTokens);
-        metadata.put("costUsd", totalCostUsd);
-        if (!allToolNames.isEmpty()) {
-            metadata.put("toolNames", allToolNames);
-            metadata.put("toolUseCount", allToolNames.size());
-        }
-        metadata.put("totalTokensUsed", runningTotalTokens);
-        if (usingFallbackEstimation) {
-            metadata.put("tokenEstimationFallback", true);
-        }
-        if (stopReason != null) {
-            metadata.put("stopReason", stopReason);
-        }
-        metadata.put("iterations", iterationLog);
-        result.setMetadata(metadata);
-
-        // Set context variables for downstream blocks
         context.setVariable("agentic_goal_achieved", goalAchieved);
         context.setVariable("agentic_iterations", iteration);
 
@@ -441,22 +295,68 @@ public class AgenticBlockExecutor implements BlockExecutor {
     }
 
     /**
+     * Handles the optional approval gate.
+     * @return "break" to break the loop, "continue" to skip to next iteration,
+     *         "disable_approval" if "Yes always" was chosen, or null to proceed normally
+     */
+    private String handleApproval(ExecutionContext context, int stepIndex, int iteration,
+                                   AgenticPlan plan, Map<String, Object> iterData,
+                                   StringBuilder fullOutput) {
+        broadcastAgenticEvent(context.getWorkflowRunId(), stepIndex,
+                "agentic_approval_required",
+                Map.of("iteration", iteration,
+                        "action", plan.getAction(),
+                        "rationale", truncate(plan.getRationale(), 500)));
+
+        CompletableFuture<String> future = context.requestApproval(
+                ApprovalRequest.builder()
+                        .blockId("agentic-" + stepIndex + "-iter-" + iteration)
+                        .question("Approve action: " + truncate(plan.getAction(), 200))
+                        .options(List.of("Yes", "Yes always", "No"))
+                        .stepIndex(stepIndex)
+                        .build());
+
+        String answer;
+        try {
+            answer = future.get(30, TimeUnit.MINUTES);
+        } catch (Exception e) {
+            iterData.put("result", "approval_timeout");
+            fullOutput.append("[iteration ").append(iteration)
+                    .append(" - APPROVAL TIMEOUT]\n");
+            return "break";
+        }
+
+        if ("No".equalsIgnoreCase(answer)) {
+            context.getWorkflowRunId(); // keep reference valid
+            var history = new ArrayList<Turn>();
+            history.add(new Turn("user",
+                    "The user rejected this action. Propose an alternative approach."));
+            iterData.put("approval", "rejected");
+            fullOutput.append("[iteration ").append(iteration)
+                    .append(" - REJECTED]: ").append(plan.getAction()).append("\n");
+            return "continue";
+        }
+        if ("Yes always".equalsIgnoreCase(answer)) {
+            iterData.put("approval", "approved");
+            return "disable_approval";
+        }
+        iterData.put("approval", "approved");
+        return null;
+    }
+
+    /**
      * Compress conversation history to manage context window size.
      * Keeps the first turn (initial prompt) and the most recent 4 turns in full.
      * Middle turns are collapsed into a single summary turn.
      */
     private void compressHistory(List<Turn> history) {
         int keepRecentCount = 4;
-        // Only compress if history is long enough to benefit
-        // Need at least: 1 (initial) + keepRecentCount + 2 (to compress at least 2 turns)
         if (history.size() <= keepRecentCount + 3) {
             return;
         }
 
-        // Keep index 0 (initial user prompt) and the last keepRecentCount turns
         int compressEnd = history.size() - keepRecentCount;
 
-        // Build summary of middle turns (from index 1 to compressEnd-1)
         StringBuilder summary = new StringBuilder();
         summary.append("[Compressed history of ").append(compressEnd - 1).append(" turns]\n");
         for (int i = 1; i < compressEnd; i++) {
@@ -465,11 +365,10 @@ public class AgenticBlockExecutor implements BlockExecutor {
             summary.append("- ").append(label).append(": ").append(truncate(turn.content(), 150)).append("\n");
         }
 
-        // Remove the middle turns and replace with summary
         List<Turn> compressed = new ArrayList<>();
-        compressed.add(history.get(0)); // keep initial prompt
-        compressed.add(new Turn("user", summary.toString())); // compressed middle
-        compressed.addAll(history.subList(compressEnd, history.size())); // keep recent
+        compressed.add(history.get(0));
+        compressed.add(new Turn("user", summary.toString()));
+        compressed.addAll(history.subList(compressEnd, history.size()));
 
         history.clear();
         history.addAll(compressed);
@@ -569,55 +468,6 @@ public class AgenticBlockExecutor implements BlockExecutor {
         } catch (Exception e) {
             log.warn("Failed to broadcast agentic event: {}", e.getMessage());
         }
-    }
-
-    private String requireString(Map<String, Object> config, String key) {
-        Object value = config.get(key);
-        if (value == null) {
-            throw new WorkflowExecutionException("Agentic block requires '" + key + "' in config");
-        }
-        return value.toString();
-    }
-
-    @SuppressWarnings("unchecked")
-    private boolean isEstimated(Map<String, Object> iterData, String metaKey) {
-        Object meta = iterData.get(metaKey);
-        if (meta instanceof Map<?, ?> map) {
-            return Boolean.TRUE.equals(((Map<String, Object>) map).get("estimated"));
-        }
-        return true; // no metadata at all counts as estimated
-    }
-
-    @SuppressWarnings("unchecked")
-    private int extractTokenCount(Map<String, Object> iterData, String metaKey, String field) {
-        Object meta = iterData.get(metaKey);
-        if (meta instanceof Map<?, ?> map) {
-            Object val = ((Map<String, Object>) map).get(field);
-            if (val instanceof Number n) return n.intValue();
-        }
-        return 0;
-    }
-
-    @SuppressWarnings("unchecked")
-    private double extractCost(Map<String, Object> iterData, String metaKey) {
-        Object meta = iterData.get(metaKey);
-        if (meta instanceof Map<?, ?> map) {
-            Object val = ((Map<String, Object>) map).get("costUsd");
-            if (val instanceof Number n) return n.doubleValue();
-        }
-        return 0.0;
-    }
-
-    @SuppressWarnings("unchecked")
-    private List<String> extractToolNames(Map<String, Object> iterData, String metaKey) {
-        Object meta = iterData.get(metaKey);
-        if (meta instanceof Map<?, ?> map) {
-            Object val = ((Map<String, Object>) map).get("toolNames");
-            if (val instanceof List<?> list) {
-                return list.stream().map(Object::toString).toList();
-            }
-        }
-        return List.of();
     }
 
     private String truncate(String s, int maxLen) {
