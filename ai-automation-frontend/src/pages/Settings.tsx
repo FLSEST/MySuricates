@@ -7,8 +7,10 @@ import { useSettingsStore } from '../stores/settingsStore';
 import { useI18nStore, type Locale } from '../i18n';
 import { useT } from '../i18n';
 import { useSystemHealth, useSystemInfo, useRemoteAccessStatus, useEnableRemoteAccess, useDisableRemoteAccess, useBackupList, useUpdateSystemSetting } from '../hooks/useSystem';
-import { useStagingStatus, useStagingStart, useStagingStop, useStagingPromote, useStagingCancel, useStagingSync } from '../hooks/useStaging';
-import { Sun, Moon, Globe, Shield, Paintbrush, Wifi, Server, RotateCcw, Database, Download, HardDrive, Container, Play, Square, Upload, ExternalLink, X, RefreshCw } from 'lucide-react';
+import { useStagingStatus, useStagingStart, useStagingStop, useStagingPromote, useStagingCancel, useStagingSync, useStagingSyncPreview } from '../hooks/useStaging';
+import { useTestingStatus, useTestingStart, useTestingStop, useTestingReset, useTestingSync, useTestingPullChanges, useTestingSyncPreview } from '../hooks/useTesting';
+import { SyncSelectModal } from '../components/shared/SyncSelectModal';
+import { Sun, Moon, Globe, Shield, Paintbrush, Wifi, Server, RotateCcw, Database, Download, HardDrive, Container, Play, Square, Upload, ExternalLink, X, RefreshCw, FlaskConical, Trash2, ArrowDownToLine, ListChecks } from 'lucide-react';
 import { lightTheme, darkTheme, type ThemeTokens } from '../theme/tokens';
 
 const COLOR_KEYS: Array<{ key: keyof ThemeTokens; label: string }> = [
@@ -44,6 +46,12 @@ export function Settings() {
   const stagingPromote = useStagingPromote();
   const stagingCancel = useStagingCancel();
   const stagingSync = useStagingSync();
+  const { data: testing } = useTestingStatus();
+  const testingStart = useTestingStart();
+  const testingStop = useTestingStop();
+  const testingReset = useTestingReset();
+  const testingSync = useTestingSync();
+  const testingPullChanges = useTestingPullChanges();
   const queryClient = useQueryClient();
 
   const handleBackup = async () => {
@@ -367,12 +375,35 @@ export function Settings() {
           onStop={() => stagingStop.mutate()}
           onPromote={() => stagingPromote.mutate()}
           onCancel={() => stagingCancel.mutate()}
-          onSync={() => stagingSync.mutateAsync()}
+          onSyncAll={() => stagingSync.mutateAsync()}
+          onSyncSelective={(req) => stagingSync.mutateAsync(req)}
           syncResult={stagingSync.data}
           startLoading={stagingStart.isPending}
           stopLoading={stagingStop.isPending}
           promoteLoading={stagingPromote.isPending}
           syncLoading={stagingSync.isPending}
+        />
+      )}
+
+      {/* Testing (Advanced Mode only) */}
+      {advancedMode && (
+        <TestingCard
+          t={t}
+          testing={testing}
+          devVersion={sysInfo?.version}
+          onStart={() => testingStart.mutate()}
+          onStop={() => testingStop.mutate()}
+          onReset={() => testingReset.mutateAsync()}
+          onSyncAll={() => testingSync.mutateAsync()}
+          onSyncSelective={(req) => testingSync.mutateAsync(req)}
+          onPullChanges={() => testingPullChanges.mutateAsync()}
+          syncResult={testingSync.data}
+          pullResult={testingPullChanges.data}
+          startLoading={testingStart.isPending}
+          stopLoading={testingStop.isPending}
+          resetLoading={testingReset.isPending}
+          syncLoading={testingSync.isPending}
+          pullLoading={testingPullChanges.isPending}
         />
       )}
 
@@ -418,7 +449,7 @@ const PROMOTE_PHASES = ['STOPPING', 'BUILDING_BACKEND', 'BUILDING_FRONTEND', 'BU
 
 type PhaseKey = `stagingPhase${typeof PROMOTE_PHASES[number]}`;
 
-function StagingCard({ t, staging, devVersion, onStart, onStop, onPromote, onCancel, onSync, syncResult, startLoading, stopLoading, promoteLoading, syncLoading }: {
+function StagingCard({ t, staging, devVersion, onStart, onStop, onPromote, onCancel, onSyncAll, onSyncSelective, syncResult, startLoading, stopLoading, promoteLoading, syncLoading }: {
   t: ReturnType<typeof useT>;
   staging: import('../types').StagingStatus | undefined;
   devVersion: string | undefined;
@@ -426,7 +457,8 @@ function StagingCard({ t, staging, devVersion, onStart, onStop, onPromote, onCan
   onStop: () => void;
   onPromote: () => void;
   onCancel: () => void;
-  onSync: () => Promise<import('../types').SyncResult>;
+  onSyncAll: () => Promise<import('../types').SyncResult>;
+  onSyncSelective: (request: import('../types').SyncDefinitionsRequest) => Promise<import('../types').SyncResult>;
   syncResult: import('../types').SyncResult | undefined;
   startLoading: boolean;
   stopLoading: boolean;
@@ -434,6 +466,8 @@ function StagingCard({ t, staging, devVersion, onStart, onStop, onPromote, onCan
   syncLoading: boolean;
 }) {
   const [syncConfirm, setSyncConfirm] = useState(false);
+  const [syncModalOpen, setSyncModalOpen] = useState(false);
+  const { data: syncPreview, isLoading: previewLoading } = useStagingSyncPreview(syncModalOpen);
 
   const isPromoting = staging?.promotePhase != null && staging.promotePhase !== 'IDLE' && staging.promotePhase !== 'ERROR';
   const promoteStep = staging?.promoteStep ?? 0;
@@ -451,12 +485,22 @@ function StagingCard({ t, staging, devVersion, onStart, onStop, onPromote, onCan
       return;
     }
     setSyncConfirm(false);
-    onSync();
+    onSyncAll();
   };
 
   return (
     <Card>
       <CardHeader title={t.settings.staging} />
+      <SyncSelectModal
+        open={syncModalOpen}
+        onClose={() => setSyncModalOpen(false)}
+        preview={syncPreview}
+        previewLoading={previewLoading}
+        onSync={onSyncSelective}
+        syncLoading={syncLoading}
+        title={t.settings.syncSelectTitle}
+        t={t}
+      />
       <div className="space-y-4">
         {/* Status row */}
         <div className="flex items-center justify-between">
@@ -609,16 +653,27 @@ function StagingCard({ t, staging, devVersion, onStart, onStop, onPromote, onCan
                 </div>
               ) : (
                 <div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    icon={<RefreshCw className="w-3.5 h-3.5" />}
-                    onClick={handleSync}
-                    loading={syncLoading}
-                    disabled={!staging?.healthy}
-                  >
-                    {t.settings.stagingSync}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      icon={<RefreshCw className="w-3.5 h-3.5" />}
+                      onClick={handleSync}
+                      loading={syncLoading}
+                      disabled={!staging?.healthy}
+                    >
+                      {t.settings.syncAll}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      icon={<ListChecks className="w-3.5 h-3.5" />}
+                      onClick={() => setSyncModalOpen(true)}
+                      disabled={!staging?.healthy || syncLoading}
+                    >
+                      {t.settings.syncSelective}
+                    </Button>
+                  </div>
                   <p className="text-xs text-text-tertiary mt-1">{t.settings.stagingSyncHint}</p>
                 </div>
               )}
@@ -646,6 +701,249 @@ function StagingCard({ t, staging, devVersion, onStart, onStop, onPromote, onCan
             </div>
           </div>
         )}
+      </div>
+    </Card>
+  );
+}
+
+// ── Testing Card ──────────────────────────────────────────
+
+function TestingCard({ t, testing, devVersion, onStart, onStop, onReset, onSyncAll, onSyncSelective, onPullChanges, syncResult, pullResult, startLoading, stopLoading, resetLoading, syncLoading, pullLoading }: {
+  t: ReturnType<typeof useT>;
+  testing: import('../types').TestingStatus | undefined;
+  devVersion: string | undefined;
+  onStart: () => void;
+  onStop: () => void;
+  onReset: () => Promise<unknown>;
+  onSyncAll: () => Promise<import('../types').SyncResult>;
+  onSyncSelective: (request: import('../types').SyncDefinitionsRequest) => Promise<import('../types').SyncResult>;
+  onPullChanges: () => Promise<import('../types').SyncResult>;
+  syncResult: import('../types').SyncResult | undefined;
+  pullResult: import('../types').SyncResult | undefined;
+  startLoading: boolean;
+  stopLoading: boolean;
+  resetLoading: boolean;
+  syncLoading: boolean;
+  pullLoading: boolean;
+}) {
+  const [syncConfirm, setSyncConfirm] = useState(false);
+  const [resetConfirm, setResetConfirm] = useState(false);
+  const [syncModalOpen, setSyncModalOpen] = useState(false);
+  const { data: syncPreview, isLoading: previewLoading } = useTestingSyncPreview(syncModalOpen);
+
+  const handleSync = () => {
+    if (!syncConfirm) {
+      setSyncConfirm(true);
+      return;
+    }
+    setSyncConfirm(false);
+    onSyncAll();
+  };
+
+  const handleReset = () => {
+    if (!resetConfirm) {
+      setResetConfirm(true);
+      return;
+    }
+    setResetConfirm(false);
+    onReset();
+  };
+
+  return (
+    <Card>
+      <CardHeader title={t.settings.testing} />
+      <SyncSelectModal
+        open={syncModalOpen}
+        onClose={() => setSyncModalOpen(false)}
+        preview={syncPreview}
+        previewLoading={previewLoading}
+        onSync={onSyncSelective}
+        syncLoading={syncLoading}
+        title={t.settings.syncSelectTitle}
+        t={t}
+      />
+      <div className="space-y-4">
+        {/* Status row */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <FlaskConical className="w-5 h-5 text-text-secondary" />
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium text-text">Test</p>
+                <span className="text-xs text-text-tertiary font-mono">localhost:8090</span>
+              </div>
+              <p className="text-xs text-text-tertiary">{t.settings.testingHint}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <StatusBadge
+              status={testing?.containerRunning ? (testing.healthy ? 'RUNNING' : 'STARTING') : 'STOPPED'}
+              label={testing?.containerRunning ? t.settings.testingRunning : t.settings.testingStopped}
+            />
+          </div>
+        </div>
+
+        {/* Version comparison */}
+        {(devVersion || testing?.testVersion) && (
+          <div className="pl-8 flex items-center gap-3 text-xs">
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-accent/10 text-accent font-medium">
+              {t.settings.stagingDevVersion} v{devVersion ?? t.settings.stagingVersionUnknown}
+            </span>
+            <span className="text-text-tertiary">vs</span>
+            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md font-medium ${
+              testing?.testVersion && devVersion && testing.testVersion !== devVersion
+                ? 'bg-warning/10 text-warning'
+                : 'bg-surface-raised text-text-secondary'
+            }`}>
+              {t.settings.testingVersion} v{testing?.testVersion ?? t.settings.stagingVersionUnknown}
+            </span>
+          </div>
+        )}
+
+        {/* Action buttons row */}
+        <div className="flex items-center gap-2 pl-8">
+          {testing?.containerRunning && (
+            <Button
+              size="sm"
+              variant="ghost"
+              icon={<ExternalLink className="w-3.5 h-3.5" />}
+              onClick={() => window.open('http://localhost:8090', '_blank')}
+            >
+              {t.settings.testingOpenUi}
+            </Button>
+          )}
+          {testing?.containerRunning ? (
+            <Button
+              size="sm"
+              variant="danger"
+              icon={<Square className="w-3.5 h-3.5" />}
+              onClick={onStop}
+              loading={stopLoading}
+            >
+              {t.settings.testingStop}
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              icon={<Play className="w-3.5 h-3.5" />}
+              onClick={onStart}
+              loading={startLoading}
+            >
+              {t.settings.testingStart}
+            </Button>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div className="border-t border-border" />
+
+        {/* Reset section */}
+        <div className="space-y-3 pl-8">
+          {resetConfirm ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-warning">{t.settings.testingResetConfirm}</span>
+              <Button size="sm" variant="danger" onClick={handleReset} loading={resetLoading}>
+                {t.common.confirm}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setResetConfirm(false)}>
+                {t.common.cancel}
+              </Button>
+            </div>
+          ) : (
+            <div>
+              <Button
+                size="sm"
+                variant="danger"
+                icon={<Trash2 className="w-3.5 h-3.5" />}
+                onClick={handleReset}
+                loading={resetLoading}
+                disabled={!testing?.containerRunning}
+              >
+                {t.settings.testingReset}
+              </Button>
+              <p className="text-xs text-text-tertiary mt-1">{t.settings.testingResetHint}</p>
+            </div>
+          )}
+
+          {/* Sync definitions */}
+          {syncConfirm ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-warning">{t.settings.testingSyncConfirm}</span>
+              <Button size="sm" variant="danger" onClick={handleSync} loading={syncLoading}>
+                {t.common.confirm}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setSyncConfirm(false)}>
+                {t.common.cancel}
+              </Button>
+            </div>
+          ) : (
+            <div>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={<RefreshCw className="w-3.5 h-3.5" />}
+                onClick={handleSync}
+                loading={syncLoading}
+                disabled={!testing?.healthy}
+              >
+                {t.settings.testingSync}
+              </Button>
+              <p className="text-xs text-text-tertiary mt-1">{t.settings.testingSyncHint}</p>
+            </div>
+          )}
+
+          {/* Sync result display */}
+          {syncResult && (
+            <div className="space-y-1">
+              <p className="text-xs text-success">
+                {t.settings.testingSyncResult
+                  .replace('{workflows}', String(syncResult.workflowsSynced))
+                  .replace('{projects}', String(syncResult.projectsSynced))
+                  .replace('{skills}', String(syncResult.skillsSynced))
+                  .replace('{skipped}', String(syncResult.skipped))}
+              </p>
+              {syncResult.errors.length > 0 && (
+                <div className="text-xs text-danger">
+                  <p>{t.settings.testingSyncErrors.replace('{count}', String(syncResult.errors.length))}</p>
+                  {syncResult.errors.map((err, i) => (
+                    <p key={i} className="pl-2 text-text-tertiary">{err}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Pull changes from Test */}
+          <div>
+            <Button
+              size="sm"
+              variant="ghost"
+              icon={<ArrowDownToLine className="w-3.5 h-3.5" />}
+              onClick={() => onPullChanges()}
+              loading={pullLoading}
+              disabled={!testing?.healthy}
+            >
+              {t.settings.testingPullChanges}
+            </Button>
+            <p className="text-xs text-text-tertiary mt-1">{t.settings.testingPullChangesHint}</p>
+          </div>
+
+          {/* Pull result display */}
+          {pullResult && (
+            <div className="space-y-1">
+              <p className="text-xs text-success">
+                {t.settings.testingPullResult.replace('{workflows}', String(pullResult.workflowsSynced))}
+              </p>
+              {pullResult.errors.length > 0 && (
+                <div className="text-xs text-danger">
+                  {pullResult.errors.map((err, i) => (
+                    <p key={i} className="pl-2 text-text-tertiary">{err}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </Card>
   );

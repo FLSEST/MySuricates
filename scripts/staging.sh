@@ -184,28 +184,128 @@ cmd_promote() {
     log "Promotion complete!"
 }
 
+# ── Test instance commands ─────────────────────────────
+
+TEST_COMPOSE_FILE="$BACKEND_DIR/docker-compose.test.yml"
+TEST_CONTAINER_NAME="mysuricates-test"
+TEST_HEALTH_URL="http://localhost:8090/api/v1/system/health"
+
+test_wait_healthy() {
+    local max_wait=60
+    local waited=0
+    log "Waiting for health check at $TEST_HEALTH_URL ..."
+    while [ $waited -lt $max_wait ]; do
+        if curl -sf "$TEST_HEALTH_URL" > /dev/null 2>&1; then
+            log "Test environment is healthy!"
+            return 0
+        fi
+        sleep 2
+        waited=$((waited + 2))
+    done
+    err "Health check failed after ${max_wait}s"
+    return 1
+}
+
+cmd_test_start() {
+    if [ ! -d "$STABLE_FRONTEND_DIR" ]; then
+        err "No stable-frontend/ found. Run 'staging.sh snapshot' first."
+        exit 1
+    fi
+
+    log "Starting test environment..."
+    cd "$BACKEND_DIR"
+    docker compose -f "$TEST_COMPOSE_FILE" up -d
+
+    test_wait_healthy
+    log "Test environment running at http://localhost:8090"
+}
+
+cmd_test_stop() {
+    log "Stopping test environment..."
+    cd "$BACKEND_DIR"
+    docker compose -f "$TEST_COMPOSE_FILE" down
+    log "Test environment stopped."
+}
+
+cmd_test_status() {
+    echo ""
+    log "=== Test Environment Status ==="
+    echo ""
+
+    if docker ps --filter "name=$TEST_CONTAINER_NAME" --format '{{.Status}}' | grep -q .; then
+        local status
+        status=$(docker ps --filter "name=$TEST_CONTAINER_NAME" --format '{{.Status}}')
+        echo -e "  Container: ${GREEN}Running${NC} ($status)"
+    else
+        echo -e "  Container: ${RED}Stopped${NC}"
+    fi
+
+    if curl -sf "$TEST_HEALTH_URL" > /dev/null 2>&1; then
+        echo -e "  Health:    ${GREEN}OK${NC}"
+    else
+        echo -e "  Health:    ${RED}Unreachable${NC}"
+    fi
+
+    echo ""
+}
+
+cmd_test_reset() {
+    log "Resetting test database..."
+    cd "$BACKEND_DIR"
+    docker compose -f "$TEST_COMPOSE_FILE" down -v 2>/dev/null || true
+    log "Volume removed. Starting fresh..."
+    cmd_test_start
+    log "Test database reset complete."
+}
+
+cmd_test_log() {
+    cd "$BACKEND_DIR"
+    docker compose -f "$TEST_COMPOSE_FILE" logs -f
+}
+
+cmd_test_clean() {
+    log "Cleaning up test environment completely..."
+    cd "$BACKEND_DIR"
+    docker compose -f "$TEST_COMPOSE_FILE" down -v --rmi local 2>/dev/null || true
+    log "Cleaned: test container, volume, and image removed."
+}
+
 usage() {
     echo "Usage: $(basename "$0") <command>"
     echo ""
-    echo "Commands:"
-    echo "  snapshot   Build JAR + Frontend, tag Git commit, build Docker image"
-    echo "  start      Start the stable environment container"
-    echo "  stop       Stop the stable environment container"
-    echo "  status     Show container status, health, and version info"
-    echo "  log        Tail container logs"
-    echo "  db-seed    Copy current dev DB into the stable Docker volume"
-    echo "  clean      Remove container, volume, image, and stable-frontend"
-    echo "  promote    Stop → snapshot → start (one-liner upgrade)"
+    echo "Stable commands:"
+    echo "  snapshot     Build JAR + Frontend, tag Git commit, build Docker image"
+    echo "  start        Start the stable environment container"
+    echo "  stop         Stop the stable environment container"
+    echo "  status       Show container status, health, and version info"
+    echo "  log          Tail container logs"
+    echo "  db-seed      Copy current dev DB into the stable Docker volume"
+    echo "  clean        Remove container, volume, image, and stable-frontend"
+    echo "  promote      Stop → snapshot → start (one-liner upgrade)"
+    echo ""
+    echo "Test commands:"
+    echo "  test-start   Start the test environment container"
+    echo "  test-stop    Stop the test environment container"
+    echo "  test-status  Show test container status and health"
+    echo "  test-reset   Reset test DB (delete volume + restart)"
+    echo "  test-log     Tail test container logs"
+    echo "  test-clean   Remove test container, volume, and image"
 }
 
 case "${1:-}" in
-    snapshot) cmd_snapshot ;;
-    start)    cmd_start ;;
-    stop)     cmd_stop ;;
-    status)   cmd_status ;;
-    log)      cmd_log ;;
-    db-seed)  cmd_db_seed ;;
-    clean)    cmd_clean ;;
-    promote)  cmd_promote ;;
-    *)        usage; exit 1 ;;
+    snapshot)     cmd_snapshot ;;
+    start)        cmd_start ;;
+    stop)         cmd_stop ;;
+    status)       cmd_status ;;
+    log)          cmd_log ;;
+    db-seed)      cmd_db_seed ;;
+    clean)        cmd_clean ;;
+    promote)      cmd_promote ;;
+    test-start)   cmd_test_start ;;
+    test-stop)    cmd_test_stop ;;
+    test-status)  cmd_test_status ;;
+    test-reset)   cmd_test_reset ;;
+    test-log)     cmd_test_log ;;
+    test-clean)   cmd_test_clean ;;
+    *)            usage; exit 1 ;;
 esac

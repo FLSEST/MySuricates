@@ -20,6 +20,7 @@ import {
   Save,
   Bell,
   BellOff,
+  FlaskConical,
 } from 'lucide-react';
 import { Button, Input, Modal, Spinner, Select } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
@@ -869,6 +870,16 @@ function WorkflowRow({
       {!selectMode && !!(workflow.metadata?.autoTodo as Record<string, unknown> | undefined)?.enabled && (
         <Bell className="w-3 h-3 text-accent/50 shrink-0" />
       )}
+      {!selectMode && workflow.testStatus === 'PASSED' && (
+        <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-sm bg-success/10 text-success text-[9px] font-medium shrink-0" title={workflow.lastTestedAt ? new Date(workflow.lastTestedAt).toLocaleString() : undefined}>
+          <FlaskConical className="w-2.5 h-2.5" />
+        </span>
+      )}
+      {!selectMode && workflow.testStatus === 'FAILED' && (
+        <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-sm bg-danger/10 text-danger text-[9px] font-medium shrink-0" title={workflow.lastTestedAt ? new Date(workflow.lastTestedAt).toLocaleString() : undefined}>
+          <FlaskConical className="w-2.5 h-2.5" />
+        </span>
+      )}
       {!selectMode && (
         <>
           <ExecutionBadges blocks={workflow.blocks} />
@@ -927,7 +938,21 @@ function WorkflowDetailPanel({
           <WorkflowIcon icon={workflow.icon} className="w-7 h-7" />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="text-xl font-bold text-text truncate">{workflow.name}</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold text-text truncate">{workflow.name}</h2>
+            {workflow.testStatus === 'PASSED' && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-success/10 text-success text-[10px] font-medium" title={workflow.lastTestedAt ? new Date(workflow.lastTestedAt).toLocaleString() : undefined}>
+                <FlaskConical className="w-3 h-3" />
+                {t.testBadge.passed}
+              </span>
+            )}
+            {workflow.testStatus === 'FAILED' && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-danger/10 text-danger text-[10px] font-medium" title={workflow.lastTestedAt ? new Date(workflow.lastTestedAt).toLocaleString() : undefined}>
+                <FlaskConical className="w-3 h-3" />
+                {t.testBadge.failed}
+              </span>
+            )}
+          </div>
           <p className="text-sm text-text-tertiary">
             {workflow.projectName}
             {workflow.projectSubtitle && (

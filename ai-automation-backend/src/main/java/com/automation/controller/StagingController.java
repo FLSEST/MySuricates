@@ -1,6 +1,8 @@
 package com.automation.controller;
 
+import com.automation.dto.request.SyncDefinitionsRequest;
 import com.automation.dto.response.StagingStatusResponse;
+import com.automation.dto.response.SyncPreview;
 import com.automation.dto.response.SyncResult;
 import com.automation.service.staging.StagingService;
 import lombok.RequiredArgsConstructor;
@@ -45,8 +47,13 @@ public class StagingController {
         return ResponseEntity.ok().build();
     }
 
+    @GetMapping("/sync-preview")
+    public SyncPreview syncPreview() {
+        return stagingService.syncPreview();
+    }
+
     @PostMapping("/sync-definitions")
-    public SyncResult syncDefinitions() {
-        return stagingService.syncDefinitions();
+    public SyncResult syncDefinitions(@RequestBody(required = false) SyncDefinitionsRequest request) {
+        return stagingService.syncDefinitions(request);
     }
 }

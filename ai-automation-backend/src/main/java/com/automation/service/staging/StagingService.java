@@ -1,16 +1,11 @@
 package com.automation.service.staging;
 
 import com.automation.config.StagingConfig;
+import com.automation.dto.request.SyncDefinitionsRequest;
 import com.automation.dto.response.StagingStatusResponse;
+import com.automation.dto.response.SyncPreview;
 import com.automation.dto.response.SyncResult;
-import com.automation.entity.Project;
-import com.automation.entity.Skill;
-import com.automation.entity.Workflow;
-import com.automation.repository.ProjectRepository;
-import com.automation.repository.SkillRepository;
-import com.automation.repository.WorkflowRepository;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -19,13 +14,11 @@ import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.Comparator;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -35,10 +28,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public class StagingService {
 
     private final StagingConfig config;
-    private final ProjectRepository projectRepository;
-    private final WorkflowRepository workflowRepository;
-    private final SkillRepository skillRepository;
-    private final ObjectMapper objectMapper;
+    private final InstanceSyncHelper syncHelper;
 
     public enum PromotePhase {
         IDLE, STOPPING, BUILDING_BACKEND, BUILDING_FRONTEND, BUILDING_IMAGE, STARTING, ERROR
@@ -91,7 +81,7 @@ public class StagingService {
         if (healthy) {
             try {
                 String stableBaseUrl = deriveStableBaseUrl();
-                JsonNode info = httpGet(stableBaseUrl + "/system/info");
+                JsonNode info = syncHelper.httpGet(stableBaseUrl + "/system/info");
                 if (info != null) {
                     stableVersion = info.path("version").asText(null);
                     stableBuildTimestamp = info.path("buildTimestamp").asText(null);
@@ -220,232 +210,33 @@ public class StagingService {
         }
     }
 
-    public SyncResult syncDefinitions() {
+    public SyncPreview syncPreview() {
         if (!isHealthy()) {
             throw new IllegalStateException("Stable instance is not running or not healthy. Start it first.");
         }
-
-        String stableBaseUrl = deriveStableBaseUrl();
-        int projectsSynced = 0;
-        int workflowsSynced = 0;
-        int skillsSynced = 0;
-        int skipped = 0;
-        List<String> errors = new ArrayList<>();
-
-        // Map dev project ID → stable project ID for workflow assignment
-        Map<String, String> projectIdMapping = new HashMap<>();
-
-        // 1. Sync projects
-        List<Project> devProjects = projectRepository.findAll();
-        JsonNode stableProjects = httpGet(stableBaseUrl + "/projects");
-        Map<String, JsonNode> stableProjectsByNamePath = new HashMap<>();
-        if (stableProjects != null && stableProjects.isArray()) {
-            for (JsonNode sp : stableProjects) {
-                String key = sp.path("name").asText() + "|" + sp.path("path").asText();
-                stableProjectsByNamePath.put(key, sp);
-            }
-        }
-
-        for (Project project : devProjects) {
-            try {
-                String key = project.getName() + "|" + project.getPath();
-                JsonNode existing = stableProjectsByNamePath.get(key);
-                if (existing != null) {
-                    projectIdMapping.put(project.getId(), existing.path("id").asText());
-                    skipped++;
-                    log.debug("Project already exists on Stable: {}", project.getName());
-                } else {
-                    Map<String, Object> body = new LinkedHashMap<>();
-                    body.put("name", project.getName());
-                    body.put("type", project.getType().name());
-                    body.put("path", project.getPath());
-                    if (project.getSubtitle() != null) body.put("subtitle", project.getSubtitle());
-                    if (project.getDescription() != null) body.put("description", project.getDescription());
-                    if (project.getConfig() != null && !project.getConfig().isEmpty()) {
-                        body.put("config", project.getConfig());
-                    }
-                    JsonNode created = httpPost(stableBaseUrl + "/projects", body);
-                    if (created != null) {
-                        projectIdMapping.put(project.getId(), created.path("id").asText());
-                        projectsSynced++;
-                        log.info("Synced project: {}", project.getName());
-                    }
-                }
-            } catch (Exception e) {
-                errors.add("Project '" + project.getName() + "': " + e.getMessage());
-                log.warn("Failed to sync project '{}': {}", project.getName(), e.getMessage());
-            }
-        }
-
-        // 2. Sync workflows
-        List<Workflow> devWorkflows = workflowRepository.findAll();
-        JsonNode stableWorkflows = httpGet(stableBaseUrl + "/workflows");
-        Map<String, JsonNode> stableWorkflowsByNameProject = new HashMap<>();
-        if (stableWorkflows != null && stableWorkflows.isArray()) {
-            for (JsonNode sw : stableWorkflows) {
-                String wKey = sw.path("name").asText() + "|" + sw.path("projectName").asText();
-                stableWorkflowsByNameProject.put(wKey, sw);
-            }
-        }
-
-        for (Workflow workflow : devWorkflows) {
-            try {
-                String projectName = workflow.getProject() != null ? workflow.getProject().getName() : "";
-                String wKey = workflow.getName() + "|" + projectName;
-                String stableProjectId = projectIdMapping.get(
-                        workflow.getProject() != null ? workflow.getProject().getId() : null);
-
-                JsonNode existingWorkflow = stableWorkflowsByNameProject.get(wKey);
-                if (existingWorkflow != null) {
-                    // Update existing workflow
-                    String stableWorkflowId = existingWorkflow.path("id").asText();
-                    Map<String, Object> updateBody = new LinkedHashMap<>();
-                    updateBody.put("name", workflow.getName());
-                    updateBody.put("description", workflow.getDescription());
-                    updateBody.put("icon", workflow.getIcon());
-                    updateBody.put("blocks", workflow.getBlocks());
-                    if (workflow.getInstructions() != null) updateBody.put("instructions", workflow.getInstructions());
-                    if (workflow.getModel() != null) updateBody.put("model", workflow.getModel());
-                    if (workflow.getMetadata() != null && !workflow.getMetadata().isEmpty()) {
-                        updateBody.put("metadata", workflow.getMetadata());
-                    }
-                    httpPut(stableBaseUrl + "/workflows/" + stableWorkflowId, updateBody);
-                    workflowsSynced++;
-                    log.info("Updated workflow on Stable: {}", workflow.getName());
-                } else {
-                    // Import as new workflow
-                    Map<String, Object> importBody = new LinkedHashMap<>();
-                    if (stableProjectId != null) importBody.put("projectId", stableProjectId);
-                    importBody.put("name", workflow.getName());
-                    importBody.put("description", workflow.getDescription());
-                    importBody.put("icon", workflow.getIcon());
-                    importBody.put("blocks", workflow.getBlocks());
-                    if (workflow.getInstructions() != null) importBody.put("instructions", workflow.getInstructions());
-                    if (workflow.getModel() != null) importBody.put("model", workflow.getModel());
-                    httpPost(stableBaseUrl + "/workflows/import", importBody);
-                    workflowsSynced++;
-                    log.info("Created workflow on Stable: {}", workflow.getName());
-                }
-            } catch (Exception e) {
-                errors.add("Workflow '" + workflow.getName() + "': " + e.getMessage());
-                log.warn("Failed to sync workflow '{}': {}", workflow.getName(), e.getMessage());
-            }
-        }
-
-        // 3. Sync custom skills (non-builtin only)
-        List<Skill> customSkills = skillRepository.findByBuiltin(false);
-        JsonNode stableSkills = httpGet(stableBaseUrl + "/skills");
-        Set<String> stableSkillNames = new HashSet<>();
-        if (stableSkills != null && stableSkills.isArray()) {
-            for (JsonNode ss : stableSkills) {
-                stableSkillNames.add(ss.path("name").asText());
-            }
-        }
-
-        for (Skill skill : customSkills) {
-            try {
-                if (stableSkillNames.contains(skill.getName())) {
-                    skipped++;
-                    log.debug("Skill already exists on Stable: {}", skill.getName());
-                } else {
-                    Map<String, Object> skillBody = new LinkedHashMap<>();
-                    skillBody.put("name", skill.getName());
-                    skillBody.put("description", skill.getDescription());
-                    skillBody.put("icon", skill.getIcon());
-                    skillBody.put("category", skill.getCategory().name());
-                    skillBody.put("aiContext", skill.getAiContext());
-                    if (skill.getConfigSchema() != null && !skill.getConfigSchema().isEmpty()) {
-                        skillBody.put("configSchema", skill.getConfigSchema());
-                    }
-                    httpPost(stableBaseUrl + "/skills/import", skillBody);
-                    skillsSynced++;
-                    log.info("Synced skill: {}", skill.getName());
-                }
-            } catch (Exception e) {
-                errors.add("Skill '" + skill.getName() + "': " + e.getMessage());
-                log.warn("Failed to sync skill '{}': {}", skill.getName(), e.getMessage());
-            }
-        }
-
-        log.info("Definition sync complete: {} projects, {} workflows, {} skills synced, {} skipped, {} errors",
-                projectsSynced, workflowsSynced, skillsSynced, skipped, errors.size());
-
-        return new SyncResult(projectsSynced, workflowsSynced, skillsSynced, skipped, errors);
+        return syncHelper.syncPreview(deriveStableBaseUrl());
     }
 
-    // ── Stable API HTTP helpers ────────────────────────────
+    public SyncResult syncDefinitions() {
+        return syncDefinitions(null);
+    }
+
+    public SyncResult syncDefinitions(SyncDefinitionsRequest request) {
+        if (!isHealthy()) {
+            throw new IllegalStateException("Stable instance is not running or not healthy. Start it first.");
+        }
+        return syncHelper.syncDefinitionsTo(deriveStableBaseUrl(), request);
+    }
+
+    // ── Stable API URL helper ─────────────────────────────
 
     String deriveStableBaseUrl() {
-        // healthUrl = "http://localhost:9091/api/v1/system/health" → "http://localhost:9091/api/v1"
         String healthUrl = config.getHealthUrl();
         int apiIdx = healthUrl.indexOf("/api/v1");
         if (apiIdx > 0) {
             return healthUrl.substring(0, apiIdx) + "/api/v1";
         }
         return "http://localhost:9091/api/v1";
-    }
-
-    private JsonNode httpGet(String url) {
-        try {
-            HttpURLConnection conn = (HttpURLConnection) URI.create(url).toURL().openConnection();
-            conn.setConnectTimeout(10_000);
-            conn.setReadTimeout(30_000);
-            conn.setRequestProperty("Accept", "application/json");
-            int code = conn.getResponseCode();
-            if (code == 200) {
-                String body = new String(conn.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-                conn.disconnect();
-                return objectMapper.readTree(body);
-            }
-            conn.disconnect();
-            return null;
-        } catch (Exception e) {
-            log.warn("GET {} failed: {}", url, e.getMessage());
-            return null;
-        }
-    }
-
-    private JsonNode httpPost(String url, Object body) {
-        return httpSend("POST", url, body);
-    }
-
-    private JsonNode httpPut(String url, Object body) {
-        return httpSend("PUT", url, body);
-    }
-
-    private JsonNode httpSend(String method, String url, Object body) {
-        try {
-            HttpURLConnection conn = (HttpURLConnection) URI.create(url).toURL().openConnection();
-            conn.setConnectTimeout(10_000);
-            conn.setReadTimeout(30_000);
-            conn.setRequestMethod(method);
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("Accept", "application/json");
-            conn.setDoOutput(true);
-
-            byte[] jsonBytes = objectMapper.writeValueAsBytes(body);
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(jsonBytes);
-            }
-
-            int code = conn.getResponseCode();
-            if (code >= 200 && code < 300) {
-                String responseBody = new String(conn.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-                conn.disconnect();
-                return responseBody.isEmpty() ? null : objectMapper.readTree(responseBody);
-            } else {
-                String errorBody = "";
-                try {
-                    errorBody = new String(conn.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
-                } catch (Exception ignored) {}
-                conn.disconnect();
-                throw new RuntimeException("HTTP " + code + ": " + errorBody);
-            }
-        } catch (RuntimeException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new RuntimeException(method + " " + url + " failed: " + e.getMessage(), e);
-        }
     }
 
     // ── Internal helpers ──────────────────────────────────

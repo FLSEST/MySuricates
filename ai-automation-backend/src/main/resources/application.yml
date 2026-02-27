@@ -88,6 +88,10 @@ automation:
     container-name: ${AUTOMATION_STAGING_CONTAINER:mysuricates-stable}
     stable-frontend-dir: ${AUTOMATION_STAGING_FRONTEND:stable-frontend}
     health-url: ${AUTOMATION_STAGING_HEALTH_URL:http://localhost:9091/api/v1/system/health}
+    test-compose-file: ${AUTOMATION_TEST_COMPOSE:docker-compose.test.yml}
+    test-container-name: ${AUTOMATION_TEST_CONTAINER:mysuricates-test}
+    test-health-url: ${AUTOMATION_TEST_HEALTH_URL:http://localhost:8090/api/v1/system/health}
+    test-auto-start: ${AUTOMATION_TEST_AUTO_START:true}
   tray:
     enabled: ${AUTOMATION_TRAY_ENABLED:true}
     poll-interval-ms: ${AUTOMATION_TRAY_POLL_MS:15000}

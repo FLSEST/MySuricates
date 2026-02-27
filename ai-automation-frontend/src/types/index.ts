@@ -70,6 +70,8 @@ export interface Workflow {
   model: string | null;
   metadata?: Record<string, unknown>;
   defaultContext?: Record<string, string>;
+  testStatus?: 'UNTESTED' | 'PASSED' | 'FAILED';
+  lastTestedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -346,6 +348,36 @@ export interface SyncResult {
   skillsSynced: number;
   skipped: number;
   errors: string[];
+}
+
+// ── Sync Preview / Selective Sync ─────────────────────────
+
+export interface SyncPreview {
+  projects: SyncPreviewItem[];
+  workflows: SyncPreviewItem[];
+  skills: SyncPreviewItem[];
+}
+
+export interface SyncPreviewItem {
+  id: string;
+  name: string;
+  projectName?: string;
+  action: 'NEW' | 'UPDATE' | 'SKIP';
+}
+
+export interface SyncDefinitionsRequest {
+  projectIds?: string[];
+  workflowIds?: string[];
+  skillIds?: string[];
+}
+
+// ── Testing ───────────────────────────────────────────────
+
+export interface TestingStatus {
+  containerRunning: boolean;
+  healthy: boolean;
+  testVersion: string | null;
+  testBuildTimestamp: string | null;
 }
 
 // ── Learning / Analytics ─────────────────────────────────

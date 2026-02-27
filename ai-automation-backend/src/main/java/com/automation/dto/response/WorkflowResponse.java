@@ -24,6 +24,8 @@ public record WorkflowResponse(
         String model,
         String templateId,
         Map<String, Object> defaultContext,
+        String testStatus,
+        Instant lastTestedAt,
         Instant createdAt,
         Instant updatedAt
 ) {}

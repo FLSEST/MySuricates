@@ -74,6 +74,11 @@ public class Workflow {
 
     private String templateId;
 
+    @Builder.Default
+    private String testStatus = "UNTESTED";
+
+    private Instant lastTestedAt;
+
     @OneToMany(mappedBy = "workflow", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<WorkflowRun> runs = new ArrayList<>();

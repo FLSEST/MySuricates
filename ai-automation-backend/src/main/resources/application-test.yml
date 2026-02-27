@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    url: jdbc:sqlite:/app/data/automation.db?journal_mode=WAL&busy_timeout=10000
+
+server:
+  port: 8090
+
+automation:
+  cors:
+    allowed-origins: http://localhost:8090
+  tray:
+    enabled: false
+  staging:
+    auto-start: false
+  serve-frontend: true
+  frontend-path: /app/frontend
+  environment: Test

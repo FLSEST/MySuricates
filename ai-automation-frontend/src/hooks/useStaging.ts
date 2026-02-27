@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
-import type { StagingStatus, SyncResult } from '../types';
+import type { StagingStatus, SyncResult, SyncPreview, SyncDefinitionsRequest } from '../types';
 
 export function useStagingStatus() {
   return useQuery({
@@ -46,10 +46,19 @@ export function useStagingCancel() {
   });
 }
 
+export function useStagingSyncPreview(enabled: boolean) {
+  return useQuery({
+    queryKey: ['staging', 'sync-preview'],
+    queryFn: () => api.get<SyncPreview>('/staging/sync-preview'),
+    enabled,
+  });
+}
+
 export function useStagingSync() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => api.post<SyncResult>('/staging/sync-definitions'),
+    mutationFn: (request?: SyncDefinitionsRequest) =>
+      api.post<SyncResult>('/staging/sync-definitions', request ?? undefined),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['staging'] }),
   });
 }

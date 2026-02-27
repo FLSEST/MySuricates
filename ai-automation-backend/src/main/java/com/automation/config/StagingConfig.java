@@ -18,4 +18,10 @@ public class StagingConfig {
     private String stableFrontendDir = "stable-frontend";
     private String healthUrl = "http://localhost:9091/api/v1/system/health";
     private boolean autoStart = true;
+
+    // Test instance properties
+    private String testComposeFile = "docker-compose.test.yml";
+    private String testContainerName = "mysuricates-test";
+    private String testHealthUrl = "http://localhost:8090/api/v1/system/health";
+    private boolean testAutoStart = true;
 }
