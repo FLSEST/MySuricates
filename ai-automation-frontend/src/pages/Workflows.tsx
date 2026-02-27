@@ -914,8 +914,8 @@ function WorkflowDetailPanel({
   saveAsTemplateLoading: boolean;
   navigate: ReturnType<typeof useNavigate>;
 }) {
-  const { data: runs, isLoading: runsLoading } = useWorkflowRuns(workflow.id);
-  const recentRuns = runs?.slice(0, 5) ?? [];
+  const { data: runsPage, isLoading: runsLoading } = useWorkflowRuns(workflow.id, 0, 5);
+  const recentRuns = runsPage?.content ?? [];
   const updateWorkflow = useUpdateWorkflow();
   const autoTodoEnabled = !!(workflow.metadata?.autoTodo as Record<string, unknown> | undefined)?.enabled;
 

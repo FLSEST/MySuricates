@@ -325,7 +325,7 @@ export function WorkflowDetail() {
           </Card>
 
           {/* Workflow Memory */}
-          <WorkflowMemoryPanel workflowId={workflow.id} runs={runs} />
+          <WorkflowMemoryPanel workflowId={workflow.id} runs={runs?.content} />
 
           {/* Model Selection */}
           <Card>
@@ -396,13 +396,13 @@ export function WorkflowDetail() {
           {/* Recent Runs */}
           <Card padding={false}>
             <div className="p-5 pb-0">
-              <CardHeader title={`${t.dashboard.recentRuns} (${runs?.length ?? 0})`} />
+              <CardHeader title={`${t.dashboard.recentRuns} (${runs?.content?.length ?? 0})`} />
             </div>
-            {!runs?.length ? (
+            {!runs?.content?.length ? (
               <div className="px-5 py-8 text-center text-sm text-text-tertiary">{t.workflows.noRuns}</div>
             ) : (
               <div className="divide-y divide-border">
-                {runs.slice(0, 5).map((run: WorkflowRun) => (
+                {runs.content.slice(0, 5).map((run: WorkflowRun) => (
                   <div
                     key={run.id}
                     className="flex items-center justify-between px-5 py-3 hover:bg-surface transition-colors cursor-pointer"

@@ -1,6 +1,7 @@
 package com.automation.controller;
 
-import com.automation.dto.response.ActivityLogPageResponse;
+import com.automation.dto.response.ActivityLogResponse;
+import com.automation.dto.response.PageResponse;
 import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.ActivityLog.LogLevel;
 import com.automation.mapper.ActivityLogMapper;
@@ -17,7 +18,7 @@ public class ActivityLogController {
     private final ActivityLogMapper activityLogMapper;
 
     @GetMapping
-    public ActivityLogPageResponse getLogs(
+    public PageResponse<ActivityLogResponse> getLogs(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
             @RequestParam(required = false) String level,
@@ -28,7 +29,7 @@ public class ActivityLogController {
 
         var result = activityLogService.findAll(page, size, logLevel, logCategory);
 
-        return new ActivityLogPageResponse(
+        return new PageResponse<>(
                 activityLogMapper.toResponseList(result.getContent()),
                 result.getNumber(),
                 result.getSize(),

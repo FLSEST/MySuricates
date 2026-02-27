@@ -1,6 +1,7 @@
 package com.automation.controller;
 
 import com.automation.dto.request.ExtractMemoryRequest;
+import com.automation.dto.request.UpdateMemoryRequest;
 import com.automation.dto.response.WorkflowMemoryResponse;
 import com.automation.mapper.WorkflowMemoryMapper;
 import com.automation.service.memory.WorkflowMemoryService;
@@ -53,9 +54,9 @@ public class WorkflowMemoryController {
     public WorkflowMemoryResponse update(
             @PathVariable String workflowId,
             @PathVariable String memoryId,
-            @RequestBody Map<String, String> body) {
+            @RequestBody UpdateMemoryRequest request) {
         var memory = memoryService.update(workflowId, memoryId,
-                body.get("title"), body.get("content"));
+                request.title(), request.content());
         return memoryMapper.toResponse(memory);
     }
 

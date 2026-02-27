@@ -47,7 +47,8 @@ function formatRelative(iso: string): string {
 
 export function Todos() {
   const t = useT();
-  const { data: todos, isLoading, error, refetch } = useTodos();
+  const { data: todosPage, isLoading, error, refetch } = useTodos();
+  const todos = todosPage?.content;
   const { data: projects } = useProjects();
   const createTodo = useCreateTodo();
   const updateTodo = useUpdateTodo();

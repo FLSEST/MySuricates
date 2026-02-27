@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
-import type { Workflow, WorkflowRun, CreateWorkflowRequest, UpdateWorkflowRequest, WorkflowExportData } from '../types';
+import type { Workflow, WorkflowRun, CreateWorkflowRequest, UpdateWorkflowRequest, WorkflowExportData, PageResponse } from '../types';
 
 interface WorkflowApiResponse {
   id: string;
@@ -61,24 +61,25 @@ export function useWorkflow(id: string) {
   });
 }
 
-export function useWorkflowRuns(workflowId: string) {
+export function useWorkflowRuns(workflowId: string, page = 0, size = 50) {
   return useQuery({
-    queryKey: ['workflows', workflowId, 'runs'],
-    queryFn: () => api.get<WorkflowRun[]>(`/workflows/${workflowId}/runs`),
+    queryKey: ['workflows', workflowId, 'runs', page, size],
+    queryFn: () => api.get<PageResponse<WorkflowRun>>(`/workflows/${workflowId}/runs?page=${page}&size=${size}`),
     enabled: !!workflowId,
   });
 }
 
-export function useAllRuns(params?: { status?: string; workflowId?: string; projectId?: string }) {
+export function useAllRuns(params?: { status?: string; workflowId?: string; projectId?: string; page?: number; size?: number }) {
   return useQuery({
     queryKey: ['runs', params],
     queryFn: () => {
       const searchParams = new URLSearchParams();
+      searchParams.set('page', String(params?.page ?? 0));
+      searchParams.set('size', String(params?.size ?? 50));
       if (params?.status) searchParams.set('status', params.status);
       if (params?.workflowId) searchParams.set('workflowId', params.workflowId);
       if (params?.projectId) searchParams.set('projectId', params.projectId);
-      const qs = searchParams.toString();
-      return api.get<WorkflowRun[]>(`/executions${qs ? `?${qs}` : ''}`);
+      return api.get<PageResponse<WorkflowRun>>(`/executions?${searchParams.toString()}`);
     },
   });
 }

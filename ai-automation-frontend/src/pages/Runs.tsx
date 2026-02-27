@@ -20,13 +20,20 @@ export function Runs() {
   const [projectFilter, setProjectFilter] = useState('');
   const [search, setSearch] = useState('');
 
-  const { data: runs, isLoading, error, refetch } = useAllRuns({
+  const [page, setPage] = useState(0);
+  const pageSize = 50;
+
+  const { data: runsPage, isLoading, error, refetch } = useAllRuns({
     status: statusFilter || undefined,
     workflowId: workflowFilter || undefined,
     projectId: projectFilter || undefined,
+    page,
+    size: pageSize,
   });
   const { data: workflows } = useWorkflows();
   const { data: projects } = useProjects();
+
+  const runs = runsPage?.content;
 
   const filteredRuns = useMemo(() => {
     if (!runs) return [];
@@ -177,6 +184,34 @@ export function Runs() {
             onRowClick={(r) => navigate(`/workflows/${r.workflowId}/run/${r.id}`)}
           />
         </Card>
+      )}
+
+      {/* Pagination */}
+      {runsPage && runsPage.totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4">
+          <span className="text-sm text-text-secondary">
+            {runsPage.totalElements} {t.runs.title}
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="px-3 py-1.5 text-sm rounded-lg border border-border bg-surface text-text disabled:opacity-40"
+            >
+              &larr;
+            </button>
+            <span className="px-3 py-1.5 text-sm text-text-secondary">
+              {page + 1} / {runsPage.totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(runsPage.totalPages - 1, p + 1))}
+              disabled={page >= runsPage.totalPages - 1}
+              className="px-3 py-1.5 text-sm rounded-lg border border-border bg-surface text-text disabled:opacity-40"
+            >
+              &rarr;
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

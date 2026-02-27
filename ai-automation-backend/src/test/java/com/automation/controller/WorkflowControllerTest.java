@@ -21,6 +21,9 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
@@ -248,12 +251,15 @@ class WorkflowControllerTest {
 
     @Test
     void getWorkflowRuns_returnsOk() throws Exception {
-        when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of());
+        Page<WorkflowRun> emptyPage = new PageImpl<>(List.of());
+        when(runRepository.findByWorkflowIdOrderByStartedAtDesc(eq("wf-1"), any(Pageable.class))).thenReturn(emptyPage);
         when(workflowMapper.toRunResponseList(any())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/v1/workflows/wf-1/runs"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray());
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.totalElements").value(0));
     }
 
     @Test

@@ -2,13 +2,20 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
-import type { Todo, CreateTodoRequest, UpdateTodoRequest, TodoCountResponse, TodoStatus } from '../types';
+import type { Todo, CreateTodoRequest, UpdateTodoRequest, TodoCountResponse, TodoStatus, PageResponse } from '../types';
 
-export function useTodos(params?: Record<string, string>) {
-  const searchParams = params ? '?' + new URLSearchParams(params).toString() : '';
+export function useTodos(params?: Record<string, string>, page = 0, size = 50) {
   return useQuery({
-    queryKey: ['todos', params],
-    queryFn: () => api.get<Todo[]>(`/todos${searchParams}`),
+    queryKey: ['todos', params, page, size],
+    queryFn: () => {
+      const searchParams = new URLSearchParams();
+      searchParams.set('page', String(page));
+      searchParams.set('size', String(size));
+      if (params) {
+        Object.entries(params).forEach(([k, v]) => { if (v) searchParams.set(k, v); });
+      }
+      return api.get<PageResponse<Todo>>(`/todos?${searchParams.toString()}`);
+    },
   });
 }
 

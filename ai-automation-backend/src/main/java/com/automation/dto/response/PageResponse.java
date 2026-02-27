@@ -2,8 +2,8 @@ package com.automation.dto.response;
 
 import java.util.List;
 
-public record ActivityLogPageResponse(
-        List<ActivityLogResponse> content,
+public record PageResponse<T>(
+        List<T> content,
         int page,
         int size,
         long totalElements,

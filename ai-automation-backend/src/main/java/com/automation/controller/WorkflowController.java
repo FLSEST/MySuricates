@@ -6,6 +6,7 @@ import com.automation.dto.request.ExecuteWorkflowRequest;
 import com.automation.dto.request.ImportWorkflowRequest;
 import com.automation.dto.request.UpdateWorkflowRequest;
 import com.automation.dto.response.ExportWorkflowResponse;
+import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.WorkflowResponse;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.entity.Project;
@@ -21,6 +22,7 @@ import com.automation.service.workflow.WorkflowOptimizationService;
 import com.automation.service.workflow.WorkflowService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -55,13 +57,13 @@ public class WorkflowController {
     }
 
     @GetMapping("/{id}")
-    public WorkflowResponse getWorkflow(@PathVariable String id) {
-        return workflowMapper.toResponse(workflowService.findById(id));
+    public ResponseEntity<WorkflowResponse> getWorkflow(@PathVariable String id) {
+        return ResponseEntity.ok(workflowMapper.toResponse(workflowService.findById(id)));
     }
 
     @PutMapping("/{id}")
-    public WorkflowResponse updateWorkflow(@PathVariable String id, @RequestBody UpdateWorkflowRequest request) {
-        return workflowMapper.toResponse(workflowService.update(id, request));
+    public ResponseEntity<WorkflowResponse> updateWorkflow(@PathVariable String id, @RequestBody UpdateWorkflowRequest request) {
+        return ResponseEntity.ok(workflowMapper.toResponse(workflowService.update(id, request)));
     }
 
     @DeleteMapping("/{id}")
@@ -84,9 +86,18 @@ public class WorkflowController {
     }
 
     @GetMapping("/{id}/runs")
-    public List<WorkflowRunResponse> getWorkflowRuns(@PathVariable String id) {
-        var runs = runRepository.findByWorkflowIdOrderByStartedAtDesc(id);
-        return workflowMapper.toRunResponseList(runs);
+    public PageResponse<WorkflowRunResponse> getWorkflowRuns(
+            @PathVariable String id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        var result = runRepository.findByWorkflowIdOrderByStartedAtDesc(id, PageRequest.of(page, size));
+        return new PageResponse<>(
+                workflowMapper.toRunResponseList(result.getContent()),
+                result.getNumber(),
+                result.getSize(),
+                result.getTotalElements(),
+                result.getTotalPages()
+        );
     }
 
     @GetMapping("/{id}/runs/{runId}")
@@ -103,15 +114,15 @@ public class WorkflowController {
     }
 
     @PostMapping("/{id}/skills")
-    public WorkflowResponse activateSkills(
+    public ResponseEntity<WorkflowResponse> activateSkills(
             @PathVariable String id,
             @Valid @RequestBody ActivateSkillsRequest request) {
-        return workflowMapper.toResponse(workflowService.activateSkills(id, request.skillIds()));
+        return ResponseEntity.ok(workflowMapper.toResponse(workflowService.activateSkills(id, request.skillIds())));
     }
 
     @DeleteMapping("/{id}/skills/{skillId}")
-    public WorkflowResponse deactivateSkill(@PathVariable String id, @PathVariable String skillId) {
-        return workflowMapper.toResponse(workflowService.deactivateSkill(id, skillId));
+    public ResponseEntity<WorkflowResponse> deactivateSkill(@PathVariable String id, @PathVariable String skillId) {
+        return ResponseEntity.ok(workflowMapper.toResponse(workflowService.deactivateSkill(id, skillId)));
     }
 
     @GetMapping("/export/{id}")

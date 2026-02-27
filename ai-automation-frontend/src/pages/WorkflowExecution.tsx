@@ -107,7 +107,7 @@ export function WorkflowExecution() {
 
   const activeApproval = pendingApproval ?? recoveredApproval;
 
-  const run: WorkflowRun | undefined = runs?.find((r) => r.id === runId);
+  const run: WorkflowRun | undefined = runs?.content?.find((r) => r.id === runId);
   const isRunning = run?.status === 'RUNNING' || run?.status === 'PAUSED';
 
   const handleRate = (rating: number) => {

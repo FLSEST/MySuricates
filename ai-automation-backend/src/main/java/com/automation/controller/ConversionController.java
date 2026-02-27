@@ -1,13 +1,13 @@
 package com.automation.controller;
 
+import com.automation.dto.request.ConvertRunToWorkflowRequest;
 import com.automation.dto.response.WorkflowResponse;
 import com.automation.service.conversion.WorkflowConversionService;
 import com.automation.service.conversion.WorkflowSuggestion;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/conversions")
@@ -24,15 +24,9 @@ public class ConversionController {
     @PostMapping("/runs/{runId}/create-workflow")
     public ResponseEntity<WorkflowResponse> createWorkflow(
             @PathVariable String runId,
-            @RequestBody Map<String, String> body) {
-        String projectId = body.get("projectId");
-        String name = body.get("name");
-
-        if (projectId == null || projectId.isBlank()) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        WorkflowResponse created = conversionService.createWorkflowFromSuggestion(runId, projectId, name);
+            @Valid @RequestBody ConvertRunToWorkflowRequest request) {
+        WorkflowResponse created = conversionService.createWorkflowFromSuggestion(
+                runId, request.projectId(), request.name());
         return ResponseEntity.ok(created);
     }
 }

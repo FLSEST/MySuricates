@@ -72,13 +72,13 @@ public class ScheduleController {
     }
 
     @PostMapping("/{id}/enable")
-    public ScheduledWorkflowResponse enableSchedule(@PathVariable String id) {
-        return scheduleMapper.toResponse(schedulerService.enable(id));
+    public ResponseEntity<ScheduledWorkflowResponse> enableSchedule(@PathVariable String id) {
+        return ResponseEntity.ok(scheduleMapper.toResponse(schedulerService.enable(id)));
     }
 
     @PostMapping("/{id}/disable")
-    public ScheduledWorkflowResponse disableSchedule(@PathVariable String id) {
-        return scheduleMapper.toResponse(schedulerService.disable(id));
+    public ResponseEntity<ScheduledWorkflowResponse> disableSchedule(@PathVariable String id) {
+        return ResponseEntity.ok(scheduleMapper.toResponse(schedulerService.disable(id)));
     }
 
     @DeleteMapping("/{id}")

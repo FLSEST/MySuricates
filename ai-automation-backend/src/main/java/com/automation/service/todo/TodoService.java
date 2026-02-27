@@ -2,6 +2,7 @@ package com.automation.service.todo;
 
 import com.automation.dto.request.CreateTodoRequest;
 import com.automation.dto.request.UpdateTodoRequest;
+import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.TodoCountResponse;
 import com.automation.dto.response.TodoResponse;
 import com.automation.entity.Todo;
@@ -12,6 +13,9 @@ import com.automation.repository.TodoRepository;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,11 +41,12 @@ public class TodoService {
             }).thenComparing(Todo::getCreatedAt, Comparator.reverseOrder());
 
     @Transactional(readOnly = true)
-    public List<TodoResponse> findAll(String projectId, String status, String priority, String source, String tag, String q) {
+    public PageResponse<TodoResponse> findAll(int page, int size, String projectId, String status, String priority, String source, String tag, String q) {
         Specification<Todo> spec = buildSpec(projectId, status, priority, source, tag, q);
-        List<Todo> todos = todoRepository.findAll(spec);
-        todos.sort(PRIORITY_COMPARATOR);
-        return todos.stream().map(this::toResponseWithProject).toList();
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Order.asc("priority"), Sort.Order.desc("createdAt")));
+        Page<Todo> result = todoRepository.findAll(spec, pageRequest);
+        List<TodoResponse> content = result.getContent().stream().map(this::toResponseWithProject).toList();
+        return new PageResponse<>(content, result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
     }
 
     @Transactional(readOnly = true)

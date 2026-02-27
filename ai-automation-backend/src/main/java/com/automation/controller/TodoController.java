@@ -2,9 +2,10 @@ package com.automation.controller;
 
 import com.automation.dto.request.CreateTodoRequest;
 import com.automation.dto.request.UpdateTodoRequest;
+import com.automation.dto.request.UpdateTodoStatusRequest;
+import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.TodoCountResponse;
 import com.automation.dto.response.TodoResponse;
-import com.automation.entity.Todo;
 import com.automation.mapper.TodoMapper;
 import com.automation.service.todo.TodoService;
 import jakarta.validation.Valid;
@@ -12,9 +13,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/todos")
@@ -25,14 +23,16 @@ public class TodoController {
     private final TodoMapper todoMapper;
 
     @GetMapping
-    public List<TodoResponse> listTodos(
+    public PageResponse<TodoResponse> listTodos(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
             @RequestParam(required = false) String projectId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String priority,
             @RequestParam(required = false) String source,
             @RequestParam(required = false) String tag,
             @RequestParam(required = false) String q) {
-        return todoService.findAll(projectId, status, priority, source, tag, q);
+        return todoService.findAll(page, size, projectId, status, priority, source, tag, q);
     }
 
     @PostMapping
@@ -53,9 +53,9 @@ public class TodoController {
     }
 
     @PatchMapping("/{id}/status")
-    public TodoResponse updateTodoStatus(@PathVariable String id, @RequestBody Map<String, String> body) {
-        var newStatus = Todo.Status.valueOf(body.get("status"));
-        var todo = todoService.updateStatus(id, newStatus);
+    public TodoResponse updateTodoStatus(@PathVariable String id,
+                                         @Valid @RequestBody UpdateTodoStatusRequest request) {
+        var todo = todoService.updateStatus(id, request.status());
         return todoService.findByIdResponse(todo.getId());
     }
 

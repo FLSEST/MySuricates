@@ -1,18 +1,24 @@
 package com.automation.controller;
 
+import com.automation.dto.request.ApproveExecutionRequest;
+import com.automation.dto.request.ExecuteCommandRequest;
+import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.executor.ApprovalRequest;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.workflow.WorkflowExecutor;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.automation.entity.RunStatus;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -25,11 +31,15 @@ public class ExecutionController {
     private final WorkflowMapper workflowMapper;
 
     @GetMapping
-    public List<WorkflowRunResponse> listExecutions(
+    public PageResponse<WorkflowRunResponse> listExecutions(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String workflowId,
             @RequestParam(required = false) String projectId) {
-        List<com.automation.entity.WorkflowRun> runs;
+
+        Pageable pageable = PageRequest.of(page, size);
+        Page<com.automation.entity.WorkflowRun> result;
 
         RunStatus runStatus = null;
         if (status != null && !status.isBlank()) {
@@ -37,31 +47,33 @@ public class ExecutionController {
         }
 
         if (workflowId != null && !workflowId.isBlank()) {
-            runs = runRepository.findByWorkflowIdOrderByStartedAtDesc(workflowId);
-            if (runStatus != null) {
-                RunStatus finalStatus = runStatus;
-                runs = runs.stream().filter(r -> r.getStatus() == finalStatus).toList();
-            }
+            result = runRepository.findByWorkflowIdOrderByStartedAtDesc(workflowId, pageable);
         } else if (projectId != null && !projectId.isBlank()) {
             if (runStatus != null) {
-                runs = runRepository.findByStatusAndProjectIdOrderByStartedAtDesc(runStatus, projectId);
+                result = runRepository.findByStatusAndProjectIdOrderByStartedAtDesc(runStatus, projectId, pageable);
             } else {
-                runs = runRepository.findByProjectIdOrderByStartedAtDesc(projectId);
+                result = runRepository.findByProjectIdOrderByStartedAtDesc(projectId, pageable);
             }
         } else if (runStatus != null) {
-            runs = runRepository.findByStatusOrderByStartedAtDesc(runStatus);
+            result = runRepository.findByStatusOrderByStartedAtDesc(runStatus, pageable);
         } else {
-            runs = runRepository.findAllByOrderByStartedAtDesc();
+            result = runRepository.findByOrderByStartedAtDesc(pageable);
         }
 
-        return workflowMapper.toRunResponseList(runs);
+        return new PageResponse<>(
+                workflowMapper.toRunResponseList(result.getContent()),
+                result.getNumber(),
+                result.getSize(),
+                result.getTotalElements(),
+                result.getTotalPages()
+        );
     }
 
     @GetMapping("/{id}")
-    public WorkflowRunResponse getExecution(@PathVariable String id) {
+    public ResponseEntity<WorkflowRunResponse> getExecution(@PathVariable String id) {
         var run = runRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Execution", id));
-        return workflowMapper.toRunResponse(run);
+        return ResponseEntity.ok(workflowMapper.toRunResponse(run));
     }
 
     @PostMapping("/{id}/pause")
@@ -85,12 +97,8 @@ public class ExecutionController {
     @PostMapping("/{id}/approve")
     public ResponseEntity<Void> approveExecution(
             @PathVariable String id,
-            @RequestBody Map<String, String> body) {
-        String answer = body.get("answer");
-        if (answer == null || answer.isBlank()) {
-            return ResponseEntity.badRequest().build();
-        }
-        workflowExecutor.resolveApproval(id, answer);
+            @Valid @RequestBody ApproveExecutionRequest request) {
+        workflowExecutor.resolveApproval(id, request.answer());
         return ResponseEntity.ok().build();
     }
 
@@ -112,12 +120,8 @@ public class ExecutionController {
     @PostMapping("/{id}/command")
     public ResponseEntity<Map<String, String>> executeCommand(
             @PathVariable String id,
-            @RequestBody Map<String, String> body) {
-        String command = body.get("command");
-        if (command == null || command.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Command is required"));
-        }
-        String output = workflowExecutor.executeAdHocCommand(id, command);
+            @Valid @RequestBody ExecuteCommandRequest request) {
+        String output = workflowExecutor.executeAdHocCommand(id, request.command());
         return ResponseEntity.ok(Map.of("output", output));
     }
 }

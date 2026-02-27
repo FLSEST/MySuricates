@@ -62,7 +62,7 @@ export function TodosWidget() {
   const t = useT();
   const navigate = useNavigate();
   const { data: counts } = useTodoCount();
-  const { data: recentTodos } = useTodos({ status: 'OPEN' });
+  const { data: recentTodosPage } = useTodos({ status: 'OPEN' }, 0, 5);
 
   const open = counts?.open ?? 0;
   const inProgress = counts?.inProgress ?? 0;
@@ -70,7 +70,7 @@ export function TodosWidget() {
   const total = open + inProgress + done;
 
   // Show up to 5 most recent open todos
-  const displayTodos = recentTodos?.slice(0, 5) ?? [];
+  const displayTodos = recentTodosPage?.content ?? [];
 
   return (
     <Card padding={false}>

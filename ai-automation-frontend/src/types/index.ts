@@ -468,6 +468,16 @@ export interface WorkflowSuggestion {
   available: boolean;
 }
 
+// ── Pagination ───────────────────────────────────────────
+
+export interface PageResponse<T> {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
 // ── Activity Log ─────────────────────────────────────────
 
 export type ActivityLogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
@@ -485,13 +495,7 @@ export interface ActivityLogEntry {
   createdAt: string;
 }
 
-export interface ActivityLogPage {
-  content: ActivityLogEntry[];
-  page: number;
-  size: number;
-  totalElements: number;
-  totalPages: number;
-}
+export type ActivityLogPage = PageResponse<ActivityLogEntry>;
 
 // ── Workflow Memory ──────────────────────────────────────
 
