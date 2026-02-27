@@ -15,8 +15,3 @@ automation:
   serve-frontend: true
   frontend-path: /app/frontend
   environment: Produktiv
-
-logging:
-  level:
-    com.automation: INFO
-    org.hibernate.SQL: WARN

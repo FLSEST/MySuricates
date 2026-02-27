@@ -1,0 +1,43 @@
+{
+  "name": {
+    "de": "Code-Review Pipeline",
+    "en": "Code Review Pipeline"
+  },
+  "description": {
+    "de": "Automatisierte Code-Prüfung: Lint, statische Analyse und KI-gestütztes Review",
+    "en": "Automated code review: lint, static analysis, and AI-powered review"
+  },
+  "icon": "🔍",
+  "category": "CODE",
+  "tags": ["code-review", "quality", "lint"],
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "command": "cd {{ project_path }} && find . -name '*.ts' -o -name '*.js' -o -name '*.java' -o -name '*.py' | head -50 | xargs wc -l | tail -1",
+        "label": "Count lines of code"
+      }
+    },
+    {
+      "type": "simple",
+      "config": {
+        "command": "Review the recent code changes in {{ project_path }}. Focus on:\n1. Security vulnerabilities (injection, XSS, auth issues)\n2. Logic errors and edge cases\n3. Code style and naming conventions\n4. Performance concerns\n\nProvide a structured report with severity levels (CRITICAL, WARNING, INFO) for each finding.",
+        "label": "AI Code Review"
+      }
+    },
+    {
+      "type": "simple",
+      "config": {
+        "command": "Based on the previous review results, create a concise summary report:\n- Total findings by severity\n- Top 3 most critical issues\n- Recommended next steps\n\nFormat as markdown.",
+        "label": "Generate Summary Report"
+      }
+    }
+  ],
+  "instructions": "You are a senior code reviewer. Be thorough but constructive. Prioritize security and correctness over style.",
+  "model": "claude-sonnet-4-6",
+  "version": "1.0.0",
+  "author": "MySuricates",
+  "defaultContext": {
+    "project_path": "/path/to/project"
+  }
+}

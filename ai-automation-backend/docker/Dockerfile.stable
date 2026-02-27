@@ -12,7 +12,7 @@ WORKDIR /app
 COPY target/ai-automation-backend-*.jar app.jar
 COPY docker/entrypoint.sh /app/entrypoint.sh
 
-RUN mkdir -p /app/data /app/frontend && \
+RUN mkdir -p /app/data /app/data/logs /app/frontend && \
     chown -R appuser:appuser /app && \
     chmod +x /app/entrypoint.sh
 
@@ -23,4 +23,8 @@ HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
 
 ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["java", "-XX:+UseZGC", "-XX:+ZGenerational", "-Xms256m", "-Xmx1g", \
-     "-Djava.awt.headless=true", "-jar", "app.jar"]
+     "-Djava.awt.headless=true", \
+     "-XX:+HeapDumpOnOutOfMemoryError", "-XX:HeapDumpPath=/app/data/logs/", \
+     "-XX:ErrorFile=/app/data/logs/hs_err_pid%p.log", \
+     "-XX:+ExitOnOutOfMemoryError", \
+     "-jar", "app.jar"]

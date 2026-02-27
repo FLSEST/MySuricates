@@ -1,0 +1,44 @@
+{
+  "name": {
+    "de": "Projekt-Gesundheitscheck",
+    "en": "Project Health Check"
+  },
+  "description": {
+    "de": "Prüft Abhängigkeiten, Sicherheitslücken und allgemeinen Projektzustand",
+    "en": "Checks dependencies, security vulnerabilities, and overall project health"
+  },
+  "icon": "🏥",
+  "category": "CODE",
+  "tags": ["health", "dependencies", "security", "maintenance"],
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "command": "cd {{ project_path }} && ([ -f package.json ] && echo 'NODE_PROJECT' || true) && ([ -f pom.xml ] && echo 'MAVEN_PROJECT' || true) && ([ -f requirements.txt ] && echo 'PYTHON_PROJECT' || true) && ([ -f go.mod ] && echo 'GO_PROJECT' || true)",
+        "label": "Detect project type"
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "command": "cd {{ project_path }} && ([ -f package.json ] && npm audit --json 2>/dev/null | head -100 || echo 'No npm project') && ([ -f pom.xml ] && mvn dependency:tree -DoutputType=text 2>/dev/null | tail -20 || true)",
+        "label": "Check dependencies",
+        "on_failure": "continue"
+      }
+    },
+    {
+      "type": "simple",
+      "config": {
+        "command": "Analyze the project at {{ project_path }} and provide a health report:\n\n1. **Dependency Health**: Are dependencies up to date? Any known vulnerabilities?\n2. **Code Quality**: Check for common anti-patterns, TODO/FIXME comments, dead code\n3. **Documentation**: Is README present and up to date? Are key functions documented?\n4. **Testing**: Are tests present? Estimate coverage quality\n5. **Configuration**: Check for hardcoded secrets, proper .gitignore, env handling\n\nRate each category: HEALTHY / WARNING / CRITICAL\nProvide an overall health score (0-100).",
+        "label": "AI Health Analysis"
+      }
+    }
+  ],
+  "instructions": "Be objective and data-driven. Provide actionable recommendations for each finding.",
+  "model": "claude-sonnet-4-6",
+  "version": "1.0.0",
+  "author": "MySuricates",
+  "defaultContext": {
+    "project_path": "/path/to/project"
+  }
+}

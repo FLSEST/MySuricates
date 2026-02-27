@@ -155,6 +155,24 @@ export interface WorkflowExportData {
   exportedAt?: string;
 }
 
+// ── Workflow Pool ────────────────────────────────────────
+
+export interface PoolWorkflowEntry {
+  id: string;
+  name: Record<string, string>;
+  description: Record<string, string>;
+  icon: string;
+  category: string | null;
+  tags: string[];
+  blocks: BlockDefinition[];
+  instructions: string | null;
+  model: string | null;
+  version: string;
+  author: string | null;
+  defaultContext: Record<string, unknown> | null;
+  filename: string;
+}
+
 // ── Workflow Run ─────────────────────────────────────────
 
 export type RunStatus = 'PENDING' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'FAILED' | 'CANCELLED';

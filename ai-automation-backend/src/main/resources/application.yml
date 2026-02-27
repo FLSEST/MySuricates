@@ -94,13 +94,11 @@ automation:
     test-container-name: ${AUTOMATION_TEST_CONTAINER:mysuricates-test}
     test-health-url: ${AUTOMATION_TEST_HEALTH_URL:http://localhost:8090/api/v1/system/health}
     test-auto-start: ${AUTOMATION_TEST_AUTO_START:true}
+  pool:
+    directory: ${AUTOMATION_POOL_DIR:workflow-pool}
+    enabled: ${AUTOMATION_POOL_ENABLED:true}
   tray:
     enabled: ${AUTOMATION_TRAY_ENABLED:true}
     poll-interval-ms: ${AUTOMATION_TRAY_POLL_MS:15000}
     web-ui-url: ${AUTOMATION_WEB_UI_URL:http://localhost:3000}
     stable-url: ${AUTOMATION_STABLE_URL:http://localhost:9091}
-
-logging:
-  level:
-    com.automation: DEBUG
-    org.hibernate.SQL: WARN

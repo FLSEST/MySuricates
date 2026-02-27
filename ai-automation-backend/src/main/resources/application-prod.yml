@@ -4,8 +4,3 @@ spring:
 
   jpa:
     show-sql: false
-
-logging:
-  level:
-    com.automation: INFO
-    org.hibernate.SQL: WARN

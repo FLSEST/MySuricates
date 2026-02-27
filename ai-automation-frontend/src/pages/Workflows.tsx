@@ -45,7 +45,7 @@ import { useProjects } from '../hooks/useProjects';
 import { useT } from '../i18n';
 import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
 import { formatDuration, formatDateTime } from '../utils/formatTime';
-import type { CreateWorkflowRequest, Workflow, WorkflowExportData, WorkflowTemplate } from '../types';
+import type { CreateWorkflowRequest, Workflow, WorkflowExportData, WorkflowTemplate, PoolWorkflowEntry } from '../types';
 import { useI18nStore } from '../i18n';
 import { resolveTemplateName } from '../utils/templateUtils';
 import { useSaveWorkflowAsTemplate } from '../hooks/useTemplates';
@@ -296,6 +296,25 @@ export function Workflows() {
     } else {
       setForm({ projectId: '', name: '' });
     }
+    setCreateStep('details');
+  };
+
+  const handlePoolSelect = (entry: PoolWorkflowEntry) => {
+    setSelectedTemplate(null);
+    const defaultCtx = entry.defaultContext
+      ? Object.fromEntries(Object.entries(entry.defaultContext).map(([k, v]) => [k, String(v)]))
+      : undefined;
+    setForm({
+      projectId: '',
+      name: resolveTemplateName(entry.name, locale),
+      description: resolveTemplateName(entry.description, locale),
+      icon: entry.icon,
+      blocks: entry.blocks,
+      instructions: entry.instructions ?? undefined,
+      model: entry.model ?? undefined,
+      metadata: defaultCtx ? { poolSource: entry.id } : { poolSource: entry.id },
+      ...(defaultCtx ? { defaultContext: defaultCtx } : {}),
+    } as CreateWorkflowRequest);
     setCreateStep('details');
   };
 
@@ -587,7 +606,7 @@ export function Workflows() {
 
       {/* Step 1: Template selection modal */}
       <Modal open={createStep === 'template'} onClose={handleClose} title={t.workflows.create} size="lg">
-        <TemplateSelector onSelect={handleTemplateSelect} />
+        <TemplateSelector onSelect={handleTemplateSelect} onPoolSelect={handlePoolSelect} />
       </Modal>
 
       {/* Step 2: Details modal */}

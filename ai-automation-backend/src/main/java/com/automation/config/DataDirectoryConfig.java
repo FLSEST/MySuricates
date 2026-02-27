@@ -17,16 +17,28 @@ public class DataDirectoryConfig {
 
     @PostConstruct
     public void ensureDataDirectory() {
-        // Extract path from jdbc:sqlite:./data/automation.db
+        // Extract path from jdbc:sqlite:./data/automation.db?journal_mode=WAL&...
         String dbPath = datasourceUrl.replace("jdbc:sqlite:", "");
+        int queryIdx = dbPath.indexOf('?');
+        if (queryIdx >= 0) {
+            dbPath = dbPath.substring(0, queryIdx);
+        }
         Path parentDir = Path.of(dbPath).getParent();
 
-        if (parentDir != null && !Files.exists(parentDir)) {
+        if (parentDir != null) {
+            createDirIfMissing(parentDir);
+            // Create logs subdirectory
+            createDirIfMissing(parentDir.resolve("logs"));
+        }
+    }
+
+    private void createDirIfMissing(Path dir) {
+        if (!Files.exists(dir)) {
             try {
-                Files.createDirectories(parentDir);
-                log.info("Created data directory: {}", parentDir);
+                Files.createDirectories(dir);
+                log.info("Created directory: {}", dir);
             } catch (Exception e) {
-                log.error("Failed to create data directory: {}", parentDir, e);
+                log.error("Failed to create directory: {}", dir, e);
             }
         }
     }

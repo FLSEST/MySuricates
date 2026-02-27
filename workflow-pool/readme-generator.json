@@ -1,0 +1,35 @@
+{
+  "name": {
+    "de": "README-Generator",
+    "en": "README Generator"
+  },
+  "description": {
+    "de": "Generiert oder aktualisiert eine README.md basierend auf der Projektstruktur",
+    "en": "Generates or updates a README.md based on the project structure"
+  },
+  "icon": "📝",
+  "category": "CONTENT",
+  "tags": ["documentation", "readme", "markdown"],
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "command": "cd {{ project_path }} && find . -maxdepth 3 -type f \\( -name '*.ts' -o -name '*.js' -o -name '*.java' -o -name '*.py' -o -name '*.go' -o -name 'package.json' -o -name 'pom.xml' -o -name 'Makefile' -o -name 'Dockerfile' -o -name '*.yml' -o -name '*.yaml' \\) ! -path '*/node_modules/*' ! -path '*/.git/*' ! -path '*/target/*' | sort",
+        "label": "Scan project structure"
+      }
+    },
+    {
+      "type": "simple",
+      "config": {
+        "command": "Based on the project structure at {{ project_path }}, generate a comprehensive README.md with these sections:\n\n1. **Title & Description** - Infer from package.json/pom.xml or directory name\n2. **Features** - Key features based on code analysis\n3. **Prerequisites** - Required tools and versions\n4. **Installation** - Step-by-step setup instructions\n5. **Usage** - How to run the project (dev, build, test)\n6. **Project Structure** - Key directories and their purpose\n7. **Configuration** - Environment variables and config files\n8. **License** - If detectable\n\nOutput ONLY the markdown content, ready to save as README.md.",
+        "label": "Generate README content"
+      }
+    }
+  ],
+  "model": "claude-sonnet-4-6",
+  "version": "1.0.0",
+  "author": "MySuricates",
+  "defaultContext": {
+    "project_path": "/path/to/project"
+  }
+}

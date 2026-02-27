@@ -483,6 +483,8 @@ export const de: TranslationKeys = {
     chainDeleteFailed: 'Kette konnte nicht gelöscht werden',
     chainExecuted: 'Ketten-Ausführung gestartet',
     chainExecuteFailed: 'Kette konnte nicht ausgeführt werden',
+    poolWorkflowInstalled: 'Pool-Workflow erfolgreich installiert',
+    poolInstallFailed: 'Pool-Workflow konnte nicht installiert werden',
     todoCreated: 'Todo erstellt',
     todoUpdated: 'Todo aktualisiert',
     todoDeleted: 'Todo gelöscht',
@@ -493,6 +495,7 @@ export const de: TranslationKeys = {
   templates: {
     title: 'Vorlage auswählen',
     subtitle: 'Starte mit einem vorgefertigten Workflow oder erstelle einen neuen',
+    tab: 'Vorlagen',
     blank: 'Leerer Workflow',
     blankDescription: 'Starte von Grund auf mit einem leeren Workflow',
     searchPlaceholder: 'Vorlagen durchsuchen...',
@@ -506,6 +509,15 @@ export const de: TranslationKeys = {
     tested: 'Getestet',
     untested: 'Ungetestet',
     testedIn: 'Getestet in:',
+  },
+  pool: {
+    title: 'Workflow-Pool',
+    subtitle: 'Fertige Workflows aus dem lokalen Pool',
+    tab: 'Pool',
+    empty: 'Keine Pool-Workflows vorhanden. Füge JSON-Dateien zum workflow-pool/-Verzeichnis hinzu.',
+    install: 'Installieren',
+    searchPlaceholder: 'Pool-Workflows durchsuchen...',
+    tags: 'Tags',
   },
   testBadge: {
     passed: 'Getestet',

@@ -14,7 +14,7 @@ WORKDIR /app
 
 COPY target/ai-automation-backend-*.jar app.jar
 
-RUN mkdir -p /app/data && chown appuser:appuser /app/data
+RUN mkdir -p /app/data /app/data/logs && chown -R appuser:appuser /app/data
 
 USER appuser
 
@@ -28,4 +28,8 @@ ENTRYPOINT ["java", \
     "-XX:+ZGenerational", \
     "-Xms256m", \
     "-Xmx1g", \
+    "-XX:+HeapDumpOnOutOfMemoryError", \
+    "-XX:HeapDumpPath=/app/data/logs/", \
+    "-XX:ErrorFile=/app/data/logs/hs_err_pid%p.log", \
+    "-XX:+ExitOnOutOfMemoryError", \
     "-jar", "app.jar"]

@@ -9,6 +9,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=stable
       - HOME=${HOME}
+      - LOG_DIR=/app/data/logs
       - PATH=/opt/java/openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${HOME}/.local/bin
     volumes:
       - stable-data:/app/data

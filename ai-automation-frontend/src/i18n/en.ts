@@ -481,6 +481,8 @@ export const en = {
     chainDeleteFailed: 'Failed to delete chain',
     chainExecuted: 'Chain execution started',
     chainExecuteFailed: 'Failed to execute chain',
+    poolWorkflowInstalled: 'Pool workflow installed successfully',
+    poolInstallFailed: 'Failed to install pool workflow',
     todoCreated: 'Todo created',
     todoUpdated: 'Todo updated',
     todoDeleted: 'Todo deleted',
@@ -491,6 +493,7 @@ export const en = {
   templates: {
     title: 'Choose a Template',
     subtitle: 'Start with a pre-built workflow or create from scratch',
+    tab: 'Templates',
     blank: 'Blank Workflow',
     blankDescription: 'Start from scratch with an empty workflow',
     searchPlaceholder: 'Search templates...',
@@ -504,6 +507,15 @@ export const en = {
     tested: 'Tested',
     untested: 'Untested',
     testedIn: 'Tested in:',
+  },
+  pool: {
+    title: 'Workflow Pool',
+    subtitle: 'Ready-to-use workflows from the local pool',
+    tab: 'Pool',
+    empty: 'No pool workflows available. Add JSON files to the workflow-pool/ directory.',
+    install: 'Install',
+    searchPlaceholder: 'Search pool workflows...',
+    tags: 'Tags',
   },
   testBadge: {
     passed: 'Tested',

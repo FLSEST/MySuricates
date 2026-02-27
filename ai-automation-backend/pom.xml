@@ -121,6 +121,11 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
+                    <jvmArguments>
+                        -XX:+HeapDumpOnOutOfMemoryError
+                        -XX:HeapDumpPath=./data/logs/
+                        -XX:ErrorFile=./data/logs/hs_err_pid%p.log
+                    </jvmArguments>
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>
