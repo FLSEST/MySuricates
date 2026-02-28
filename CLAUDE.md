@@ -330,6 +330,21 @@ curl -X POST http://localhost:9090/api/v1/todos \
   }'
 ```
 
+### Status-Workflow
+
+Wenn Claude an einem Todo arbeitet, **immer den Status auf IN_PROGRESS setzen**:
+
+```bash
+curl -X PATCH http://localhost:9090/api/v1/todos/<id>/status \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: <key>" \
+  -d '{"status": "IN_PROGRESS"}'
+```
+
+- **Vor Arbeitsbeginn**: Status auf `IN_PROGRESS` setzen
+- **Nach Abschluss**: Status auf `DONE` setzen
+- **Bei Blockierung**: Status auf `IN_PROGRESS` belassen, Kommentar im Todo hinterlassen
+
 ### Konventionen
 
 - **Projekt**: `AutoPilot` (ID: `ebf4f50c-20c2-4c35-a84a-a0b350124523`) für MySuricates-eigene TODOs
