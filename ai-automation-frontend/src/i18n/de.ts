@@ -562,7 +562,7 @@ export const de: TranslationKeys = {
   },
   runs: {
     title: 'Ausführungs-Verlauf',
-    subtitle: 'Alle Workflow-Ausführungen',
+    subtitle: 'Workflow- und Ketten-Ausführungen',
     noRuns: 'Keine Workflow-Ausführungen gefunden.',
     filterStatus: 'Status',
     filterWorkflow: 'Workflow',
@@ -572,6 +572,10 @@ export const de: TranslationKeys = {
     allProjects: 'Alle Projekte',
     duration: 'Dauer',
     date: 'Datum',
+    tabWorkflows: 'Workflows',
+    tabChains: 'Ketten',
+    progress: 'Fortschritt',
+    noChainRuns: 'Keine Ketten-Ausführungen gefunden.',
   },
   activityLog: {
     title: 'Aktivitätslog',

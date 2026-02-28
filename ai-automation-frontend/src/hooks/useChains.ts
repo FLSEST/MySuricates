@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
-import type { WorkflowChain, ChainRun, CreateChainRequest, UpdateChainRequest } from '../types';
+import type { WorkflowChain, ChainRun, CreateChainRequest, UpdateChainRequest, PageResponse } from '../types';
 
 export function useChains() {
   return useQuery({
@@ -16,6 +16,19 @@ export function useChain(id: string) {
     queryKey: ['chains', id],
     queryFn: () => api.get<WorkflowChain>(`/chains/${id}`),
     enabled: !!id,
+  });
+}
+
+export function useAllChainRuns(params: { page: number; size: number; status?: string }) {
+  const query = new URLSearchParams({
+    page: String(params.page),
+    size: String(params.size),
+  });
+  if (params.status) query.set('status', params.status);
+
+  return useQuery({
+    queryKey: ['chainRuns', params],
+    queryFn: () => api.get<PageResponse<ChainRun>>(`/chains/runs?${query}`),
   });
 }
 

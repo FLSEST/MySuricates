@@ -4,7 +4,9 @@ import com.automation.dto.request.CreateChainRequest;
 import com.automation.dto.request.UpdateChainRequest;
 import com.automation.dto.response.ChainResponse;
 import com.automation.dto.response.ChainRunResponse;
+import com.automation.dto.response.PageResponse;
 import com.automation.entity.ChainRun;
+import com.automation.entity.RunStatus;
 import com.automation.entity.WorkflowChain;
 import com.automation.mapper.ChainMapper;
 import com.automation.repository.ChainRunRepository;
@@ -12,6 +14,9 @@ import com.automation.service.chain.ChainExecutor;
 import com.automation.service.chain.ChainService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -64,6 +69,31 @@ public class ChainController {
         WorkflowChain chain = chainService.findById(id);
         ChainRun run = chainExecutor.execute(chain, inputContext);
         return ResponseEntity.status(HttpStatus.CREATED).body(chainMapper.toRunResponse(run));
+    }
+
+    @GetMapping("/runs")
+    public PageResponse<ChainRunResponse> listAllRuns(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
+            @RequestParam(required = false) String status) {
+
+        Pageable pageable = PageRequest.of(page, size);
+        Page<ChainRun> result;
+
+        if (status != null && !status.isBlank()) {
+            RunStatus runStatus = RunStatus.valueOf(status.toUpperCase());
+            result = chainRunRepository.findByStatusOrderByStartedAtDesc(runStatus, pageable);
+        } else {
+            result = chainRunRepository.findByOrderByStartedAtDesc(pageable);
+        }
+
+        return new PageResponse<>(
+                chainMapper.toRunResponseList(result.getContent()),
+                result.getNumber(),
+                result.getSize(),
+                result.getTotalElements(),
+                result.getTotalPages()
+        );
     }
 
     @GetMapping("/{id}/runs")

@@ -560,7 +560,7 @@ export const en = {
   },
   runs: {
     title: 'Run History',
-    subtitle: 'All workflow executions',
+    subtitle: 'Workflow and chain executions',
     noRuns: 'No workflow runs found.',
     filterStatus: 'Status',
     filterWorkflow: 'Workflow',
@@ -570,6 +570,10 @@ export const en = {
     allProjects: 'All Projects',
     duration: 'Duration',
     date: 'Date',
+    tabWorkflows: 'Workflows',
+    tabChains: 'Chains',
+    progress: 'Progress',
+    noChainRuns: 'No chain runs found.',
   },
   activityLog: {
     title: 'Activity Log',
