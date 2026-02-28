@@ -20,6 +20,15 @@ public class ShellCommandService {
      * No Claude CLI involved — zero token cost, fast execution.
      */
     public ShellResult execute(String command, String workingDirectory, int timeoutSeconds) {
+        return execute(command, workingDirectory, timeoutSeconds, null);
+    }
+
+    /**
+     * Executes a shell command on the host. If a processCallback is provided,
+     * it is called with the started Process so callers can track/cancel it.
+     */
+    public ShellResult execute(String command, String workingDirectory, int timeoutSeconds,
+                               java.util.function.Consumer<Process> processCallback) {
         long start = System.currentTimeMillis();
 
         ProcessBuilder pb = new ProcessBuilder("/bin/bash", "-c", command);
@@ -34,13 +43,17 @@ public class ShellCommandService {
         try {
             Process proc = pb.start();
 
+            if (processCallback != null) {
+                processCallback.accept(proc);
+            }
+
             // Read output in background thread to prevent pipe deadlock
             ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
             Thread reader = Thread.ofVirtual().start(() -> {
                 try (InputStream is = proc.getInputStream()) {
                     is.transferTo(outputBuffer);
                 } catch (IOException ignored) {
-                    // Process destroyed — expected on timeout
+                    // Process destroyed — expected on timeout or cancel
                 }
             });
 

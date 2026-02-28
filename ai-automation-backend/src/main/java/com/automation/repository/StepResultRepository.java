@@ -12,5 +12,7 @@ public interface StepResultRepository extends JpaRepository<StepResult, String> 
 
     List<StepResult> findByWorkflowRunId(String workflowRunId);
 
+    List<StepResult> findByWorkflowRunIdOrderByStepIndexAsc(String workflowRunId);
+
     List<StepResult> findByStatus(StepStatus status);
 }

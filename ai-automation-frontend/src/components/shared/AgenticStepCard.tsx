@@ -4,6 +4,7 @@ import {
   Target, Loader2, XCircle, ShieldQuestion,
 } from 'lucide-react';
 import { Badge } from '../ui';
+import { PathLinkedOutput } from './PathLinkedOutput';
 import { useT } from '../../i18n';
 import { formatDuration } from '../../utils/formatTime';
 /* Badge used in IterationCard, custom span for agentic badge in main card */
@@ -86,7 +87,7 @@ function IterationCard({ iter }: { iter: AgenticIteration }) {
                 {t.workflows.execution.agentic.result}
               </p>
               <pre className="text-xs font-mono text-text bg-background rounded-sm p-2 overflow-x-auto max-h-40 whitespace-pre-wrap">
-                {iter.output}
+                <PathLinkedOutput text={iter.output} />
               </pre>
             </div>
           )}
@@ -224,7 +225,7 @@ export function AgenticStepCard({ step, agenticState }: AgenticStepCardProps) {
         {/* Fallback: show step output if no agentic state */}
         {!agenticState && step.output && (
           <pre className="text-xs text-text font-mono bg-surface rounded-lg p-3 overflow-x-auto max-h-40 whitespace-pre-wrap">
-            {step.output}
+            <PathLinkedOutput text={step.output} />
           </pre>
         )}
       </div>

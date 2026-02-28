@@ -215,6 +215,37 @@ public class SystemController {
             "/etc", "/proc", "/sys", "/dev", "/var/run"
     );
 
+    record OpenPathRequest(String path) {}
+
+    @PostMapping("/open-path")
+    public ResponseEntity<Map<String, String>> openPath(@RequestBody OpenPathRequest request) {
+        if (request.path() == null || request.path().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Path must not be empty"));
+        }
+
+        Path targetPath = Path.of(request.path()).normalize().toAbsolutePath();
+        String normalized = targetPath.toString();
+
+        for (String prefix : BLOCKED_PREFIXES) {
+            if (normalized.startsWith(prefix)) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "Access to system directory is restricted: " + prefix));
+            }
+        }
+
+        if (!Files.exists(targetPath)) {
+            return ResponseEntity.status(404).body(Map.of("error", "Path does not exist: " + normalized));
+        }
+
+        try {
+            Runtime.getRuntime().exec(new String[]{"xdg-open", normalized});
+            return ResponseEntity.ok(Map.of("status", "ok"));
+        } catch (IOException e) {
+            log.error("Failed to open path: {}", normalized, e);
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to open path: " + e.getMessage()));
+        }
+    }
+
     @GetMapping("/browse")
     public ResponseEntity<Map<String, Object>> browseDirectory(
             @RequestParam(required = false) String path) {

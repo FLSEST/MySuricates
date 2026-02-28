@@ -69,3 +69,7 @@ class ApiClient {
 }
 
 export const api = new ApiClient();
+
+export function openPath(path: string): Promise<{ status: string }> {
+  return api.post('/system/open-path', { path });
+}

@@ -19,6 +19,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
@@ -51,7 +52,7 @@ class ShellBlockExecutorTest {
 
     @Test
     void execute_simpleCommand_success() {
-        when(shellService.execute(eq("echo hello"), eq("/test/project"), eq(300)))
+        when(shellService.execute(eq("echo hello"), eq("/test/project"), eq(300), any()))
                 .thenReturn(new ShellResult("hello", 0, 50));
 
         BlockDefinition block = BlockDefinition.builder()
@@ -68,7 +69,7 @@ class ShellBlockExecutorTest {
 
     @Test
     void execute_failingCommand_returnsFailed() {
-        when(shellService.execute(eq("exit 1"), eq("/test/project"), eq(300)))
+        when(shellService.execute(eq("exit 1"), eq("/test/project"), eq(300), any()))
                 .thenReturn(new ShellResult("error", 1, 10));
 
         BlockDefinition block = BlockDefinition.builder()
@@ -84,7 +85,7 @@ class ShellBlockExecutorTest {
     @Test
     void execute_templateResolution_success() {
         context.setVariable("name", "world");
-        when(shellService.execute(eq("echo world"), eq("/test/project"), eq(300)))
+        when(shellService.execute(eq("echo world"), eq("/test/project"), eq(300), any()))
                 .thenReturn(new ShellResult("world", 0, 10));
 
         BlockDefinition block = BlockDefinition.builder()
@@ -112,7 +113,7 @@ class ShellBlockExecutorTest {
 
     @Test
     void execute_customTimeout_respected() {
-        when(shellService.execute(eq("sleep 1"), eq("/test/project"), eq(60)))
+        when(shellService.execute(eq("sleep 1"), eq("/test/project"), eq(60), any()))
                 .thenReturn(new ShellResult("", 0, 1000));
 
         BlockDefinition block = BlockDefinition.builder()
@@ -127,7 +128,7 @@ class ShellBlockExecutorTest {
 
     @Test
     void execute_setsExecutionModeMetadata() {
-        when(shellService.execute(eq("echo test"), eq("/test/project"), eq(300)))
+        when(shellService.execute(eq("echo test"), eq("/test/project"), eq(300), any()))
                 .thenReturn(new ShellResult("test", 0, 5));
 
         BlockDefinition block = BlockDefinition.builder()

@@ -1,0 +1,53 @@
+{
+  "name": {
+    "de": "Suno Batch Song-Generierung",
+    "en": "Suno Batch Song Generation"
+  },
+  "description": {
+    "de": "Erstellt Songs auf Suno aus vorhandenen Lyrics-Dateien via Chromium CDP-Session",
+    "en": "Creates songs on Suno from existing lyrics files via Chromium CDP session"
+  },
+  "icon": "🎵",
+  "category": "CONTENT",
+  "tags": ["suno", "music", "batch", "automation"],
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "command": "echo '=== Suno Batch Pre-Check ===' && echo '' && echo '--- CDP Connection ---' && if curl -s --max-time 5 http://localhost:9222/json/version > /dev/null 2>&1; then echo 'CDP on port 9222: OK'; else echo 'CDP on port 9222: NOT REACHABLE'; echo 'Start Chromium with: chromium --remote-debugging-port=9222'; exit 1; fi && echo '' && echo '--- Lyrics Files ---' && LYRICS_DIR='{{ base_dir }}/{{ lang_pair }}/{{ collection }}' && LYRICS_COUNT=$(find \"$LYRICS_DIR\" -name '*.txt' 2>/dev/null | wc -l) && echo \"Directory: $LYRICS_DIR\" && echo \"Lyrics files found: $LYRICS_COUNT\" && if [ \"$LYRICS_COUNT\" -eq 0 ]; then echo 'ERROR: No lyrics files found'; exit 1; fi && echo '' && echo '--- Existing Downloads ---' && AUDIO_COUNT=$(find \"$LYRICS_DIR\" -name '*.mp3' -o -name '*.wav' 2>/dev/null | wc -l) && echo \"Audio files already present: $AUDIO_COUNT\" && echo \"Remaining to generate: $((LYRICS_COUNT - AUDIO_COUNT))\"",
+        "label": "Pre-Check: CDP & Lyrics",
+        "timeout_seconds": 30
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "command": "cd {{ base_dir }} && bash scripts/suno_batch_pipx.sh --session-mode cdp --continue-on-error --skip-existing --delay {{ delay }} --delay-jitter {{ delay_jitter }} --song-timeout {{ song_timeout }} --max-downloads {{ max_downloads }} '{{ lang_pair }}/{{ collection }}/*.txt'",
+        "label": "Suno Batch Generation",
+        "timeout_seconds": 10800,
+        "on_failure": "continue"
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "command": "echo '=== Suno Batch Results ===' && echo '' && LYRICS_DIR='{{ base_dir }}/{{ lang_pair }}/{{ collection }}' && LYRICS_COUNT=$(find \"$LYRICS_DIR\" -name '*.txt' 2>/dev/null | wc -l) && AUDIO_COUNT=$(find \"$LYRICS_DIR\" -name '*.mp3' -o -name '*.wav' 2>/dev/null | wc -l) && echo \"Total lyrics files: $LYRICS_COUNT\" && echo \"Total audio files:  $AUDIO_COUNT\" && echo \"Success rate: $AUDIO_COUNT / $LYRICS_COUNT\" && echo '' && echo '--- Missing Songs ---' && for txt in \"$LYRICS_DIR\"/*.txt; do base=$(basename \"$txt\" .txt); if [ ! -f \"$LYRICS_DIR/$base.mp3\" ] && [ ! -f \"$LYRICS_DIR/$base.wav\" ]; then echo \"  MISSING: $base\"; fi; done && echo '' && echo 'Done.'",
+        "label": "Result Summary",
+        "timeout_seconds": 60
+      }
+    }
+  ],
+  "instructions": null,
+  "model": null,
+  "version": "1.0.0",
+  "author": "MySuricates",
+  "defaultContext": {
+    "base_dir": "/home/flo/Entwicklung/Musik",
+    "lang_pair": "de-es",
+    "collection": "alltag",
+    "delay": "5",
+    "delay_jitter": "3",
+    "song_timeout": "900",
+    "max_downloads": "2"
+  }
+}

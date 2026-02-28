@@ -11,6 +11,7 @@ public record WorkflowRunResponse(
         String workflowId,
         String workflowName,
         String projectName,
+        String projectPath,
         RunStatus status,
         List<StepResultResponse> steps,
         Instant startedAt,

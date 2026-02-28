@@ -2,6 +2,7 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Pause, Play, XCircle, Clock, CheckCircle2, AlertCircle, Send, TerminalSquare,
+  FolderOpen,
 } from 'lucide-react';
 import { Card, CardHeader, Button, Spinner, Badge, Input } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
@@ -10,6 +11,7 @@ import { LogViewer } from '../components/shared/LogViewer';
 import { ApprovalDialog } from '../components/shared/ApprovalDialog';
 import { HumanInputDialog } from '../components/shared/HumanInputDialog';
 import { AgenticStepCard } from '../components/shared/AgenticStepCard';
+import { PathLinkedOutput } from '../components/shared/PathLinkedOutput';
 import { InsightsPanel } from '../components/shared/InsightsPanel';
 import { ConversionSuggestion } from '../components/shared/ConversionSuggestion';
 import {
@@ -20,7 +22,7 @@ import { useExecutionWebSocket } from '../hooks/useWebSocket';
 import { useRateRun } from '../hooks/useLearning';
 import { useT } from '../i18n';
 import { formatDuration } from '../utils/formatTime';
-import { api } from '../api/client';
+import { api, openPath } from '../api/client';
 import type { WorkflowRun, StepResult, PendingHumanInput } from '../types';
 
 const TerminalPanel = lazy(() => import('../components/shared/TerminalPanel').then(m => ({ default: m.TerminalPanel })));
@@ -57,7 +59,7 @@ function StepCard({ step }: { step: StepResult }) {
         )}
         {step.output && (
           <pre className="text-xs text-text font-mono bg-surface rounded-lg p-3 overflow-x-auto max-h-40 whitespace-pre-wrap">
-            {step.output}
+            <PathLinkedOutput text={step.output} />
           </pre>
         )}
         {step.error && (
@@ -169,8 +171,18 @@ export function WorkflowExecution() {
               </span>
             )}
           </div>
-          <p className="text-sm text-text-secondary mt-0.5">
-            {workflow?.name} &middot; {new Date(run.startedAt).toLocaleString()}
+          <p className="text-sm text-text-secondary mt-0.5 flex items-center gap-2">
+            <span>{workflow?.name} &middot; {new Date(run.startedAt).toLocaleString()}</span>
+            {run.projectPath && (
+              <button
+                onClick={() => openPath(run.projectPath!).catch(() => {})}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-surface-raised hover:bg-surface-raised/80 text-text-secondary hover:text-text transition-colors"
+                title={run.projectPath}
+              >
+                <FolderOpen className="w-3.5 h-3.5" />
+                {t.workflows.execution.openFolder}
+              </button>
+            )}
           </p>
         </div>
         {isRunning && (

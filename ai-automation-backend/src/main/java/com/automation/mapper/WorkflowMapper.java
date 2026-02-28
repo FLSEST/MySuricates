@@ -32,6 +32,7 @@ public abstract class WorkflowMapper {
     @Mapping(target = "workflowId", expression = "java(safeWorkflowId(run))")
     @Mapping(target = "workflowName", expression = "java(safeWorkflowName(run))")
     @Mapping(target = "projectName", expression = "java(safeProjectName(run))")
+    @Mapping(target = "projectPath", expression = "java(safeProjectPath(run))")
     public abstract WorkflowRunResponse toRunResponse(WorkflowRun run);
 
     public abstract List<WorkflowRunResponse> toRunResponseList(List<WorkflowRun> runs);
@@ -58,6 +59,17 @@ public abstract class WorkflowMapper {
         try {
             if (run.getWorkflow() != null && run.getWorkflow().getProject() != null) {
                 return run.getWorkflow().getProject().getName();
+            }
+            return null;
+        } catch (EntityNotFoundException e) {
+            return null;
+        }
+    }
+
+    protected String safeProjectPath(WorkflowRun run) {
+        try {
+            if (run.getWorkflow() != null && run.getWorkflow().getProject() != null) {
+                return run.getWorkflow().getProject().getPath();
             }
             return null;
         } catch (EntityNotFoundException e) {

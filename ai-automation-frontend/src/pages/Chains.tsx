@@ -4,10 +4,12 @@ import { Link2, Plus, Play, Trash2, Pencil, ArrowDown, ChevronRight, X } from 'l
 import { Card, Button, Input, Modal, Spinner, Badge, Toggle } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
+import { ExecuteDialog } from '../components/workflow/ExecuteDialog';
 import { useChains, useCreateChain, useUpdateChain, useDeleteChain, useExecuteChain, useChainRuns } from '../hooks/useChains';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { useT } from '../i18n';
 import { formatDuration, formatRelativeTime } from '../utils/formatTime';
+import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
 import type { WorkflowChain, CreateChainRequest, UpdateChainRequest, ChainEntryRequest } from '../types';
 
 function StatusBadge({ status }: { status: string }) {
@@ -34,6 +36,7 @@ export function Chains() {
   const [showCreate, setShowCreate] = useState(false);
   const [editingChain, setEditingChain] = useState<WorkflowChain | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; chain: WorkflowChain | null }>({ open: false, chain: null });
+  const [executeTarget, setExecuteTarget] = useState<WorkflowChain | null>(null);
 
   const filtered = useMemo(() => {
     if (!chains) return [];
@@ -47,13 +50,48 @@ export function Chains() {
     return filtered[0];
   }, [filtered, selectedId]);
 
+  // Collect all template variables and defaults across chain workflows
+  const getChainVariables = useCallback((chain: WorkflowChain) => {
+    if (!workflows) return { variables: [] as string[], defaults: {} as Record<string, string> };
+    const allVars = new Set<string>();
+    const defaults: Record<string, string> = {};
+    for (const entry of chain.entries) {
+      const wf = workflows.find(w => w.id === entry.workflowId);
+      if (!wf) continue;
+      for (const v of extractWorkflowVariables(wf.blocks)) {
+        allVars.add(v);
+      }
+      if (wf.defaultContext) {
+        for (const [k, v] of Object.entries(wf.defaultContext)) {
+          if (!(k in defaults)) defaults[k] = v;
+        }
+      }
+    }
+    return { variables: Array.from(allVars), defaults };
+  }, [workflows]);
+
   const handleExecute = useCallback((chain: WorkflowChain) => {
-    executeChain.mutate({ id: chain.id }, {
+    const { variables } = getChainVariables(chain);
+    if (variables.length > 0) {
+      setExecuteTarget(chain);
+    } else {
+      executeChain.mutate({ id: chain.id }, {
+        onSuccess: (run) => {
+          navigate(`/chains/${chain.id}/run/${run.id}`);
+        },
+      });
+    }
+  }, [executeChain, navigate, getChainVariables]);
+
+  const handleExecuteWithContext = useCallback((context: Record<string, string>) => {
+    if (!executeTarget) return;
+    executeChain.mutate({ id: executeTarget.id, inputContext: context }, {
       onSuccess: (run) => {
-        navigate(`/chains/${chain.id}/run/${run.id}`);
+        setExecuteTarget(null);
+        navigate(`/chains/${executeTarget.id}/run/${run.id}`);
       },
     });
-  }, [executeChain, navigate]);
+  }, [executeChain, executeTarget, navigate]);
 
   const handleDelete = useCallback(() => {
     if (!deleteConfirm.chain) return;
@@ -185,6 +223,21 @@ export function Chains() {
           <Button variant="danger" onClick={handleDelete} disabled={deleteChain.isPending}>{t.common.delete}</Button>
         </div>
       </Modal>
+
+      {/* Execute with variables dialog */}
+      {executeTarget && (() => {
+        const { variables, defaults } = getChainVariables(executeTarget);
+        return (
+          <ExecuteDialog
+            open={true}
+            onClose={() => setExecuteTarget(null)}
+            onExecute={handleExecuteWithContext}
+            variables={variables}
+            defaultValues={defaults}
+            loading={executeChain.isPending}
+          />
+        );
+      })()}
     </div>
   );
 }

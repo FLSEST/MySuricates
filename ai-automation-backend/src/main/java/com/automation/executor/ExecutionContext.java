@@ -58,6 +58,9 @@ public class ExecutionContext {
     @Builder.Default
     private final Map<String, Object> runMetadata = new ConcurrentHashMap<>();
 
+    @Builder.Default
+    private final AtomicReference<Process> activeProcess = new AtomicReference<>();
+
     /**
      * Reserve the next step index for a RUNNING placeholder.
      * The subsequent call to nextStepIndex() will return this same value.
@@ -118,12 +121,25 @@ public class ExecutionContext {
 
     public void cancel() {
         cancelled.set(true);
+        // Kill any running process (shell block, Claude CLI, etc.)
+        Process proc = activeProcess.getAndSet(null);
+        if (proc != null && proc.isAlive()) {
+            proc.destroyForcibly();
+        }
         // Cancel any pending approval
         CompletableFuture<String> future = pendingApproval.getAndSet(null);
         if (future != null) {
             future.completeExceptionally(new java.util.concurrent.CancellationException("Execution cancelled"));
         }
         currentApprovalRequest.set(null);
+    }
+
+    public void registerProcess(Process process) {
+        activeProcess.set(process);
+    }
+
+    public void clearProcess() {
+        activeProcess.set(null);
     }
 
     public CompletableFuture<String> requestApproval(ApprovalRequest request) {

@@ -226,6 +226,9 @@ export const de: TranslationKeys = {
       inputVariables: 'Eingabevariablen',
       commandSent: 'Befehl gesendet',
       commandFailed: 'Befehl fehlgeschlagen',
+      openFolder: 'Ordner öffnen',
+      openPath: 'Pfad öffnen',
+      openPathFailed: 'Pfad konnte nicht geöffnet werden',
       terminal: {
         title: 'Terminal',
         connected: 'Verbunden',

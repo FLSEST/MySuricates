@@ -1,7 +1,9 @@
 package com.automation.service.chain;
 
+import com.automation.config.ChainConfig;
 import com.automation.entity.*;
 import com.automation.repository.ChainRunRepository;
+import com.automation.repository.StepResultRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
@@ -30,6 +32,9 @@ class ChainExecutorTest {
     private ChainRunRepository chainRunRepository;
 
     @Mock
+    private StepResultRepository stepResultRepository;
+
+    @Mock
     private WorkflowRunRepository workflowRunRepository;
 
     @Mock
@@ -50,8 +55,13 @@ class ChainExecutorTest {
 
     @BeforeEach
     void setUp() {
+        ChainConfig chainConfig = new ChainConfig();
+        chainConfig.setWorkflowTimeoutMinutes(180);
+
         chainExecutor = new ChainExecutor(
+                chainConfig,
                 chainRunRepository,
+                stepResultRepository,
                 workflowRunRepository,
                 workflowService,
                 workflowExecutor,

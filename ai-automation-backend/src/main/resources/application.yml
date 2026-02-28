@@ -73,6 +73,8 @@ automation:
     timeout-seconds: ${AUTOMATION_HOST_CLAUDE_TIMEOUT:300}
     inter-call-delay-ms: ${AUTOMATION_HOST_CLAUDE_INTER_CALL_DELAY_MS:0}
     max-concurrent-calls: ${AUTOMATION_HOST_CLAUDE_MAX_CONCURRENT_CALLS:3}
+  chain:
+    workflow-timeout-minutes: ${AUTOMATION_CHAIN_WORKFLOW_TIMEOUT:180}
   execution:
     max-concurrent: ${AUTOMATION_MAX_CONCURRENT_RUNS:10}
   summarization:

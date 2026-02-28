@@ -224,6 +224,9 @@ export const en = {
       inputVariables: 'Input Variables',
       commandSent: 'Command sent',
       commandFailed: 'Command failed',
+      openFolder: 'Open folder',
+      openPath: 'Open path',
+      openPathFailed: 'Failed to open path',
       terminal: {
         title: 'Terminal',
         connected: 'Connected',
