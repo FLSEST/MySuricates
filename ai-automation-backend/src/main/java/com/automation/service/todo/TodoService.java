@@ -120,7 +120,8 @@ public class TodoService {
         long open = todoRepository.countByStatus(Todo.Status.OPEN);
         long inProgress = todoRepository.countByStatus(Todo.Status.IN_PROGRESS);
         long done = todoRepository.countByStatus(Todo.Status.DONE);
-        return new TodoCountResponse(open, inProgress, done);
+        long backlog = todoRepository.countByStatus(Todo.Status.BACKLOG);
+        return new TodoCountResponse(open, inProgress, done, backlog);
     }
 
     private TodoResponse toResponseWithProject(Todo todo) {

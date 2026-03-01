@@ -13,7 +13,7 @@ import { useProjects } from '../hooks/useProjects';
 import { useT } from '../i18n';
 import type { Todo, TodoStatus, TodoPriority, TodoSource, CreateTodoRequest, UpdateTodoRequest } from '../types';
 
-const STATUSES: TodoStatus[] = ['OPEN', 'IN_PROGRESS', 'DONE'];
+const STATUSES: TodoStatus[] = ['OPEN', 'IN_PROGRESS', 'DONE', 'BACKLOG'];
 const PRIORITIES: TodoPriority[] = ['LOW', 'MEDIUM', 'HIGH'];
 const SOURCES: TodoSource[] = ['USER', 'AI', 'WORKFLOW'];
 
@@ -93,35 +93,49 @@ function StatusDots({ current, onChange }: { current: TodoStatus; onChange: (s: 
           </svg>
         )}
       </button>
+      {/* BACKLOG */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onChange('BACKLOG'); }}
+        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+          current === 'BACKLOG'
+            ? 'border-text-tertiary/60 bg-text-tertiary/20'
+            : 'border-border hover:border-text-tertiary/60'
+        }`}
+        title="Backlog"
+      >
+        {current === 'BACKLOG' && (
+          <div className="w-2 h-2 rounded-full bg-text-tertiary/60" />
+        )}
+      </button>
     </div>
   );
 }
 
 /* ─── Progress Bar ──────────────────────────────────────── */
-function ProgressBar({ open, inProgress, done }: { open: number; inProgress: number; done: number }) {
+function ProgressBar({ open, inProgress, done, backlog }: { open: number; inProgress: number; done: number; backlog: number }) {
   const t = useT();
-  const total = open + inProgress + done;
-  if (total === 0) return null;
+  const activeTotal = open + inProgress + done;
+  if (activeTotal + backlog === 0) return null;
 
   return (
     <div className="flex items-center gap-4">
       <div className="flex-1 h-2 rounded-full bg-surface overflow-hidden flex">
-        {done > 0 && (
+        {done > 0 && activeTotal > 0 && (
           <div
             className="h-full bg-success transition-all duration-500"
-            style={{ width: `${(done / total) * 100}%` }}
+            style={{ width: `${(done / activeTotal) * 100}%` }}
           />
         )}
-        {inProgress > 0 && (
+        {inProgress > 0 && activeTotal > 0 && (
           <div
             className="h-full bg-warning transition-all duration-500"
-            style={{ width: `${(inProgress / total) * 100}%` }}
+            style={{ width: `${(inProgress / activeTotal) * 100}%` }}
           />
         )}
-        {open > 0 && (
+        {open > 0 && activeTotal > 0 && (
           <div
             className="h-full bg-text-tertiary/40 transition-all duration-500"
-            style={{ width: `${(open / total) * 100}%` }}
+            style={{ width: `${(open / activeTotal) * 100}%` }}
           />
         )}
       </div>
@@ -138,6 +152,12 @@ function ProgressBar({ open, inProgress, done }: { open: number; inProgress: num
           <Circle className="w-2 h-2 fill-success text-success" />
           {done} {t.todos.statuses.DONE.toLowerCase()}
         </span>
+        {backlog > 0 && (
+          <span className="flex items-center gap-1 text-text-tertiary/60">
+            <Circle className="w-2 h-2 fill-text-tertiary/30 text-text-tertiary/30" />
+            {backlog} {t.todos.statuses.BACKLOG.toLowerCase()}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -210,6 +230,14 @@ function KanbanCard({ todo, onEdit, onStatusChange }: {
               Done
             </button>
           )}
+          {todo.status !== 'BACKLOG' && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onStatusChange(todo, 'BACKLOG'); }}
+              className="px-1.5 py-0.5 rounded text-[10px] text-text-tertiary/60 hover:bg-text-tertiary/10 transition-colors"
+            >
+              Backlog
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -228,16 +256,17 @@ function KanbanBoard({ todos, onEdit, onStatusChange }: {
     { status: 'OPEN', label: t.todos.statuses.OPEN, color: 'text-text-tertiary', borderColor: 'border-text-tertiary/30' },
     { status: 'IN_PROGRESS', label: t.todos.statuses.IN_PROGRESS, color: 'text-warning', borderColor: 'border-warning/30' },
     { status: 'DONE', label: t.todos.statuses.DONE, color: 'text-success', borderColor: 'border-success/30' },
+    { status: 'BACKLOG', label: t.todos.statuses.BACKLOG, color: 'text-text-tertiary/60', borderColor: 'border-text-tertiary/20' },
   ];
 
   const grouped = useMemo(() => {
-    const map: Record<TodoStatus, Todo[]> = { OPEN: [], IN_PROGRESS: [], DONE: [] };
+    const map: Record<TodoStatus, Todo[]> = { OPEN: [], IN_PROGRESS: [], DONE: [], BACKLOG: [] };
     todos.forEach((todo) => map[todo.status].push(todo));
     return map;
   }, [todos]);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
       {columns.map(({ status, label, color, borderColor }) => (
         <div key={status} className={`rounded-xl border-2 ${borderColor} bg-surface-raised/30 p-3`}>
           {/* Column header */}
@@ -280,7 +309,7 @@ function TodoListItem({ todo, onEdit, onStatusChange, onDelete }: {
   return (
     <div
       className={`flex items-start gap-3 px-4 py-3 hover:bg-surface-raised/50 transition-colors cursor-pointer group ${
-        todo.status === 'DONE' ? 'opacity-50' : ''
+        todo.status === 'DONE' || todo.status === 'BACKLOG' ? 'opacity-50' : ''
       }`}
       onClick={() => onEdit(todo)}
     >
@@ -301,6 +330,9 @@ function TodoListItem({ todo, onEdit, onStatusChange, onDelete }: {
           </span>
           {todo.status === 'IN_PROGRESS' && (
             <Badge variant="warning">{t.todos.statuses.IN_PROGRESS}</Badge>
+          )}
+          {todo.status === 'BACKLOG' && (
+            <Badge variant="default">{t.todos.statuses.BACKLOG}</Badge>
           )}
         </div>
 
@@ -468,6 +500,7 @@ export function Todos() {
   const openCount = todos?.filter((t) => t.status === 'OPEN').length ?? 0;
   const inProgressCount = todos?.filter((t) => t.status === 'IN_PROGRESS').length ?? 0;
   const doneCount = todos?.filter((t) => t.status === 'DONE').length ?? 0;
+  const backlogCount = todos?.filter((t) => t.status === 'BACKLOG').length ?? 0;
 
   const handleQuickAdd = () => {
     if (!quickTitle.trim()) return;
@@ -545,7 +578,7 @@ export function Todos() {
 
       {/* Progress Bar */}
       {(todos && todos.length > 0) && (
-        <ProgressBar open={openCount} inProgress={inProgressCount} done={doneCount} />
+        <ProgressBar open={openCount} inProgress={inProgressCount} done={doneCount} backlog={backlogCount} />
       )}
 
       {/* Quick-Add Bar */}

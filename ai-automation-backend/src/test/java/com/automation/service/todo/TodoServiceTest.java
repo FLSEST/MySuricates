@@ -177,11 +177,13 @@ class TodoServiceTest {
         when(todoRepository.countByStatus(Todo.Status.OPEN)).thenReturn(5L);
         when(todoRepository.countByStatus(Todo.Status.IN_PROGRESS)).thenReturn(3L);
         when(todoRepository.countByStatus(Todo.Status.DONE)).thenReturn(12L);
+        when(todoRepository.countByStatus(Todo.Status.BACKLOG)).thenReturn(2L);
 
         TodoCountResponse counts = todoService.count();
 
         assertThat(counts.open()).isEqualTo(5L);
         assertThat(counts.inProgress()).isEqualTo(3L);
         assertThat(counts.done()).isEqualTo(12L);
+        assertThat(counts.backlog()).isEqualTo(2L);
     }
 }

@@ -101,7 +101,7 @@ class TodoControllerTest {
 
     @Test
     void countTodos_returnsCounts() throws Exception {
-        when(todoService.count()).thenReturn(new TodoCountResponse(5, 2, 10));
+        when(todoService.count()).thenReturn(new TodoCountResponse(5, 2, 10, 3));
 
         mockMvc.perform(get("/api/v1/todos/count"))
                 .andExpect(status().isOk())

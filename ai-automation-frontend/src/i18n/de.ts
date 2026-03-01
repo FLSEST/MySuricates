@@ -641,6 +641,7 @@ export const de: TranslationKeys = {
       OPEN: 'Offen',
       IN_PROGRESS: 'In Bearbeitung',
       DONE: 'Erledigt',
+      BACKLOG: 'Backlog',
     },
     priorities: {
       LOW: 'Niedrig',
@@ -727,6 +728,7 @@ export const de: TranslationKeys = {
       title: 'Ketten-Ausführung',
       running: 'Läuft...',
       completed: 'Abgeschlossen',
+      completedWithErrors: 'Teilweise',
       failed: 'Fehlgeschlagen',
       cancelled: 'Abgebrochen',
       pending: 'Wartend',

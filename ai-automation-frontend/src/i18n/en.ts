@@ -639,6 +639,7 @@ export const en = {
       OPEN: 'Open',
       IN_PROGRESS: 'In Progress',
       DONE: 'Done',
+      BACKLOG: 'Backlog',
     },
     priorities: {
       LOW: 'Low',
@@ -725,6 +726,7 @@ export const en = {
       title: 'Chain Execution',
       running: 'Running...',
       completed: 'Completed',
+      completedWithErrors: 'Partial',
       failed: 'Failed',
       cancelled: 'Cancelled',
       pending: 'Pending',

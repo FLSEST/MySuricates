@@ -186,7 +186,7 @@ export interface PoolWorkflowEntry {
 
 // ── Workflow Run ─────────────────────────────────────────
 
-export type RunStatus = 'PENDING' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+export type RunStatus = 'PENDING' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'COMPLETED_WITH_ERRORS' | 'FAILED' | 'CANCELLED';
 export type StepStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'SKIPPED' | 'WAITING_APPROVAL';
 
 export interface WorkflowRunError {
@@ -580,7 +580,7 @@ export interface ExtractMemoryRequest {
 
 // ── Todo ────────────────────────────────────────────────
 
-export type TodoStatus = 'OPEN' | 'IN_PROGRESS' | 'DONE';
+export type TodoStatus = 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'BACKLOG';
 export type TodoPriority = 'LOW' | 'MEDIUM' | 'HIGH';
 export type TodoSource = 'USER' | 'AI' | 'WORKFLOW';
 
@@ -627,6 +627,7 @@ export interface TodoCountResponse {
   open: number;
   inProgress: number;
   done: number;
+  backlog: number;
 }
 
 // ── Workflow Chain ──────────────────────────────────────
@@ -698,7 +699,7 @@ export interface ChainRunEntry {
   workflowName: string | null;
   projectName: string | null;
   workflowRunId: string | null;
-  status: string;
+  status: RunStatus;
   startedAt: string | null;
   completedAt: string | null;
   durationMs: number | null;
