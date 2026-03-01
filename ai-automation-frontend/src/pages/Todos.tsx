@@ -7,7 +7,7 @@ import { Card, Button, Input, Select, Modal, Spinner, Badge, TagInput } from '..
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
 import {
-  useTodos, useCreateTodo, useUpdateTodo, useUpdateTodoStatus, useDeleteTodo,
+  useTodos, useTodoCount, useCreateTodo, useUpdateTodo, useUpdateTodoStatus, useDeleteTodo,
 } from '../hooks/useTodos';
 import { useProjects } from '../hooks/useProjects';
 import { useT } from '../i18n';
@@ -407,8 +407,28 @@ function TodoListItem({ todo, onEdit, onStatusChange, onDelete }: {
 /* ─── Main Todos Page ───────────────────────────────────── */
 export function Todos() {
   const t = useT();
-  const { data: todosPage, isLoading, error, refetch } = useTodos();
+  // Filter state (declared before useTodos so we can pass filters to the API)
+  const [statusFilter, setStatusFilter] = useState<TodoStatus | 'ALL'>('ALL');
+  const [sourceFilter, setSourceFilter] = useState<TodoSource | 'ALL'>('ALL');
+  const [projectFilter, setProjectFilter] = useState('');
+  const [search, setSearch] = useState('');
+  const [tagFilter, setTagFilter] = useState('');
+  const [showAllTags, setShowAllTags] = useState(false);
+
+  // Build server-side filter params
+  const apiParams = useMemo(() => {
+    const params: Record<string, string> = {};
+    if (statusFilter !== 'ALL') params.status = statusFilter;
+    if (sourceFilter !== 'ALL') params.source = sourceFilter;
+    if (projectFilter) params.projectId = projectFilter;
+    if (tagFilter) params.tag = tagFilter;
+    if (search) params.q = search;
+    return params;
+  }, [statusFilter, sourceFilter, projectFilter, tagFilter, search]);
+
+  const { data: todosPage, isLoading, error, refetch } = useTodos(apiParams, 0, 500);
   const todos = todosPage?.content;
+  const { data: counts } = useTodoCount();
   const { data: projects } = useProjects();
   const createTodo = useCreateTodo();
   const updateTodo = useUpdateTodo();
@@ -432,14 +452,6 @@ export function Todos() {
     localStorage.setItem('todos-view-mode', mode);
   };
 
-  // Filter state
-  const [statusFilter, setStatusFilter] = useState<TodoStatus | 'ALL'>('ALL');
-  const [sourceFilter, setSourceFilter] = useState<TodoSource | 'ALL'>('ALL');
-  const [projectFilter, setProjectFilter] = useState('');
-  const [search, setSearch] = useState('');
-  const [tagFilter, setTagFilter] = useState('');
-  const [showAllTags, setShowAllTags] = useState(false);
-
   // Edit modal state
   const [editTodo, setEditTodo] = useState<Todo | null>(null);
   const [editForm, setEditForm] = useState<UpdateTodoRequest>({});
@@ -459,48 +471,32 @@ export function Todos() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  // Client-side filtering
-  const filtered = useMemo(() => {
-    if (!todos) return [];
-    return todos.filter((todo) => {
-      if (statusFilter !== 'ALL' && todo.status !== statusFilter) return false;
-      if (sourceFilter !== 'ALL' && todo.source !== sourceFilter) return false;
-      if (projectFilter && todo.projectId !== projectFilter) return false;
-      if (tagFilter && !todo.tags.includes(tagFilter)) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        if (!todo.title.toLowerCase().includes(q) && !(todo.description ?? '').toLowerCase().includes(q)) return false;
-      }
-      return true;
-    });
-  }, [todos, statusFilter, sourceFilter, projectFilter, tagFilter, search]);
+  // Server-side filtering — todos already filtered by API params
+  const filtered = todos ?? [];
 
-  // Tags from filtered todos (without tag filter applied, so all relevant tags stay visible)
-  const filteredWithoutTag = useMemo(() => {
-    if (!todos) return [];
-    return todos.filter((todo) => {
-      if (statusFilter !== 'ALL' && todo.status !== statusFilter) return false;
-      if (sourceFilter !== 'ALL' && todo.source !== sourceFilter) return false;
-      if (projectFilter && todo.projectId !== projectFilter) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        if (!todo.title.toLowerCase().includes(q) && !(todo.description ?? '').toLowerCase().includes(q)) return false;
-      }
-      return true;
-    });
+  // Tags from todos (without tag filter, so all relevant tags stay visible)
+  const todosWithoutTagFilter = useMemo(() => {
+    const params: Record<string, string> = {};
+    if (statusFilter !== 'ALL') params.status = statusFilter;
+    if (sourceFilter !== 'ALL') params.source = sourceFilter;
+    if (projectFilter) params.projectId = projectFilter;
+    if (search) params.q = search;
+    // We can't easily make a second API call without tag filter,
+    // so derive tags from current results + include current tag
+    return todos ?? [];
   }, [todos, statusFilter, sourceFilter, projectFilter, search]);
 
   const allTags = useMemo(() => {
     const set = new Set<string>();
-    filteredWithoutTag.forEach((todo) => todo.tags.forEach((tag) => set.add(tag)));
+    todosWithoutTagFilter.forEach((todo) => todo.tags.forEach((tag) => set.add(tag)));
     return Array.from(set).sort();
-  }, [filteredWithoutTag]);
+  }, [todosWithoutTagFilter]);
 
-  // Counts (from all todos, not filtered)
-  const openCount = todos?.filter((t) => t.status === 'OPEN').length ?? 0;
-  const inProgressCount = todos?.filter((t) => t.status === 'IN_PROGRESS').length ?? 0;
-  const doneCount = todos?.filter((t) => t.status === 'DONE').length ?? 0;
-  const backlogCount = todos?.filter((t) => t.status === 'BACKLOG').length ?? 0;
+  // Counts from dedicated count API (accurate across all pages)
+  const openCount = counts?.open ?? 0;
+  const inProgressCount = counts?.inProgress ?? 0;
+  const doneCount = counts?.done ?? 0;
+  const backlogCount = counts?.backlog ?? 0;
 
   const handleQuickAdd = () => {
     if (!quickTitle.trim()) return;

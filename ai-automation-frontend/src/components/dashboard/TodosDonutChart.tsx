@@ -8,6 +8,7 @@ const COLORS = {
   open: 'var(--color-text-tertiary)',
   inProgress: 'var(--color-accent)',
   done: 'var(--color-success)',
+  backlog: 'var(--color-text-tertiary)',
 };
 
 export function TodosDonutChart() {
@@ -20,10 +21,11 @@ export function TodosDonutChart() {
       { name: t.dashboard.todoOpen, value: counts.open, color: COLORS.open },
       { name: t.dashboard.todoInProgress, value: counts.inProgress, color: COLORS.inProgress },
       { name: t.dashboard.todoDone, value: counts.done, color: COLORS.done },
+      { name: 'Backlog', value: counts.backlog, color: COLORS.backlog },
     ].filter((d) => d.value > 0);
   }, [counts, t]);
 
-  const total = (counts?.open ?? 0) + (counts?.inProgress ?? 0) + (counts?.done ?? 0);
+  const total = (counts?.open ?? 0) + (counts?.inProgress ?? 0) + (counts?.done ?? 0) + (counts?.backlog ?? 0);
 
   return (
     <ChartCard title={t.dashboard.todosOverview} isEmpty={total === 0}>

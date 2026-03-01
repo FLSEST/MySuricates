@@ -67,7 +67,8 @@ export function TodosWidget() {
   const open = counts?.open ?? 0;
   const inProgress = counts?.inProgress ?? 0;
   const done = counts?.done ?? 0;
-  const total = open + inProgress + done;
+  const backlog = counts?.backlog ?? 0;
+  const total = open + inProgress + done + backlog;
 
   // Show up to 5 most recent open todos
   const displayTodos = recentTodosPage?.content ?? [];
@@ -112,6 +113,12 @@ export function TodosWidget() {
                     style={{ width: `${(open / total) * 100}%` }}
                   />
                 )}
+                {backlog > 0 && (
+                  <div
+                    className="h-full bg-text-tertiary/20 transition-all duration-500"
+                    style={{ width: `${(backlog / total) * 100}%` }}
+                  />
+                )}
               </>
             )}
           </div>
@@ -130,6 +137,12 @@ export function TodosWidget() {
               <Circle className="w-2 h-2 fill-success text-success" />
               {done} {t.dashboard.todoDone}
             </span>
+            {backlog > 0 && (
+              <span className="flex items-center gap-1 text-text-tertiary/60">
+                <Circle className="w-2 h-2 fill-text-tertiary/30 text-text-tertiary/30" />
+                {backlog} Backlog
+              </span>
+            )}
           </div>
         </div>
       </div>
