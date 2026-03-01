@@ -1,0 +1,484 @@
+import { Button, Input, Select, Modal, ModalFooter } from '../ui';
+import { MonacoEditor } from '../shared/MonacoEditor';
+import { ExecuteDialog } from './ExecuteDialog';
+import { useT } from '../../i18n';
+import type {
+  BlockType, Workflow, OptimizeResult, Project,
+} from '../../types';
+
+const BLOCK_TYPES: BlockType[] = ['simple', 'shell', 'retry', 'foreach', 'while', 'conditional', 'skill-capability', 'approval', 'human-input', 'agentic', 'sub-workflow'];
+
+interface AvailableSkill {
+  id: string;
+  name: string;
+}
+
+interface WorkflowListItem {
+  id: string;
+  name: string;
+  icon: string;
+}
+
+interface WorkflowDetailModalsProps {
+  workflow: Workflow;
+  workflowId: string;
+
+  showEdit: boolean;
+  setShowEdit: (v: boolean) => void;
+  editForm: { name: string; description: string; icon: string };
+  setEditForm: (v: { name: string; description: string; icon: string }) => void;
+  onUpdate: () => void;
+  updateLoading: boolean;
+
+  showAddBlock: boolean;
+  setShowAddBlock: (v: boolean) => void;
+  newBlock: { type: BlockType; config: string };
+  setNewBlock: (v: { type: BlockType; config: string }) => void;
+  onAddBlock: () => void;
+  allWorkflows: WorkflowListItem[] | undefined;
+
+  showEditBlock: boolean;
+  setShowEditBlock: (v: boolean) => void;
+  editBlockIndex: number;
+  editBlock: { type: BlockType; config: string };
+  setEditBlock: (v: { type: BlockType; config: string }) => void;
+  onSaveBlock: () => void;
+
+  showAddSkill: boolean;
+  setShowAddSkill: (v: boolean) => void;
+  selectedSkillId: string;
+  setSelectedSkillId: (v: string) => void;
+  availableSkills: AvailableSkill[];
+  onActivateSkill: () => void;
+  activateLoading: boolean;
+
+  showDelete: boolean;
+  setShowDelete: (v: boolean) => void;
+  onDelete: () => void;
+  deleteLoading: boolean;
+
+  showClone: boolean;
+  setShowClone: (v: boolean) => void;
+  cloneForm: { projectId: string; name: string };
+  setCloneForm: (v: { projectId: string; name: string }) => void;
+  projects: Project[] | undefined;
+  onClone: () => void;
+  cloneLoading: boolean;
+
+  showExecuteDialog: boolean;
+  setShowExecuteDialog: (v: boolean) => void;
+  workflowVariables: string[];
+  defaultValues: Record<string, string> | undefined;
+  onExecuteWithContext: (context: Record<string, string>) => void;
+  executeLoading: boolean;
+
+  showEditInstructions: boolean;
+  setShowEditInstructions: (v: boolean) => void;
+  editInstructions: string;
+  setEditInstructions: (v: string) => void;
+  onSaveInstructions: () => void;
+
+  showOptimizeResult: boolean;
+  setShowOptimizeResult: (v: boolean) => void;
+  optimizeResult: OptimizeResult | null;
+  onApplyOptimize: () => void;
+}
+
+export function WorkflowDetailModals({
+  workflow,
+  workflowId,
+
+  showEdit,
+  setShowEdit,
+  editForm,
+  setEditForm,
+  onUpdate,
+  updateLoading,
+
+  showAddBlock,
+  setShowAddBlock,
+  newBlock,
+  setNewBlock,
+  onAddBlock,
+  allWorkflows,
+
+  showEditBlock,
+  setShowEditBlock,
+  editBlockIndex,
+  editBlock,
+  setEditBlock,
+  onSaveBlock,
+
+  showAddSkill,
+  setShowAddSkill,
+  selectedSkillId,
+  setSelectedSkillId,
+  availableSkills,
+  onActivateSkill,
+  activateLoading,
+
+  showDelete,
+  setShowDelete,
+  onDelete,
+  deleteLoading,
+
+  showClone,
+  setShowClone,
+  cloneForm,
+  setCloneForm,
+  projects,
+  onClone,
+  cloneLoading,
+
+  showExecuteDialog,
+  setShowExecuteDialog,
+  workflowVariables,
+  defaultValues,
+  onExecuteWithContext,
+  executeLoading,
+
+  showEditInstructions,
+  setShowEditInstructions,
+  editInstructions,
+  setEditInstructions,
+  onSaveInstructions,
+
+  showOptimizeResult,
+  setShowOptimizeResult,
+  optimizeResult,
+  onApplyOptimize,
+}: WorkflowDetailModalsProps) {
+  const t = useT();
+
+  return (
+    <>
+      <Modal
+        open={showEdit}
+        onClose={() => setShowEdit(false)}
+        title={t.workflows.editWorkflow}
+        footer={
+          <ModalFooter
+            onCancel={() => setShowEdit(false)}
+            onAction={onUpdate}
+            cancelLabel={t.common.cancel}
+            actionLabel={t.common.save}
+            actionLoading={updateLoading}
+          />
+        }
+      >
+        <div className="space-y-4">
+          <Input
+            label={t.common.name}
+            value={editForm.name}
+            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+          />
+          <Input
+            label={t.common.description}
+            value={editForm.description}
+            onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+          />
+          <Input
+            label={t.workflows.iconLabel}
+            value={editForm.icon}
+            onChange={(e) => setEditForm({ ...editForm, icon: e.target.value })}
+            placeholder="🚀"
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        open={showAddBlock}
+        onClose={() => setShowAddBlock(false)}
+        title={t.workflows.addBlock}
+        size="lg"
+        footer={
+          <ModalFooter
+            onCancel={() => setShowAddBlock(false)}
+            onAction={onAddBlock}
+            cancelLabel={t.common.cancel}
+            actionLabel={t.workflows.addBlock}
+            actionLoading={updateLoading}
+          />
+        }
+      >
+        <div className="space-y-4">
+          <Select
+            label={t.workflows.blockType}
+            value={newBlock.type}
+            onChange={(e) => {
+              const type = e.target.value as BlockType;
+              const defaultConfig: Record<BlockType, object> = {
+                simple: { command: '' },
+                shell: { command: '', timeout_seconds: 300 },
+                retry: { command: '', max_retries: 3, delay: 5 },
+                foreach: { items_command: '', variable_name: 'item', command: '' },
+                while: { condition_command: '', command: '', max_iterations: 10 },
+                conditional: { condition: '', then_command: '', else_command: '' },
+                'skill-capability': { capability: '', input: '{{ previous_output }}' },
+                approval: { question: '', options: ['Yes', 'Yes always', 'No'], mode: 'ask', auto_answer: null, on_no: 'continue', variable_name: 'approval_answer', timeout_minutes: 30 },
+                'human-input': { prompt: '', input_type: 'text', variable_name: 'user_input', options: [], default_value: '', required: true, timeout_minutes: 30, use_default_on_timeout: true },
+                agentic: { goal: '', success_criteria: '', max_iterations: 10, iteration_timeout_seconds: 300, total_timeout_seconds: 1800, max_total_tokens: 200000, max_repeated_actions: 3, require_approval: false },
+                'sub-workflow': { workflow_id: '' },
+              };
+              setNewBlock({ type, config: JSON.stringify(defaultConfig[type], null, 2) });
+            }}
+            options={BLOCK_TYPES.map((type) => ({
+              value: type,
+              label: t.workflows.blockTypes[type],
+            }))}
+          />
+          {newBlock.type === 'sub-workflow' && (
+            <Select
+              label={t.workflows.selectSubWorkflow}
+              value={(() => { try { return JSON.parse(newBlock.config).workflow_id || ''; } catch { return ''; } })()}
+              onChange={(e) => setNewBlock({ ...newBlock, config: JSON.stringify({ workflow_id: e.target.value }, null, 2) })}
+              options={[
+                { value: '', label: t.common.selectWorkflow },
+                ...(allWorkflows?.filter((w) => w.id !== workflowId).map((w) => ({ value: w.id, label: `${w.icon || ''} ${w.name}`.trim() })) ?? []),
+              ]}
+            />
+          )}
+          <div>
+            <label className="block text-sm font-medium text-text mb-1.5">{t.workflows.blockConfig}</label>
+            <MonacoEditor
+              value={newBlock.config}
+              onChange={(val) => setNewBlock({ ...newBlock, config: val })}
+              language="json"
+              height="200px"
+            />
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={showEditBlock}
+        onClose={() => setShowEditBlock(false)}
+        title={`${t.workflows.editBlock} #${editBlockIndex + 1}`}
+        size="lg"
+        footer={
+          <ModalFooter
+            onCancel={() => setShowEditBlock(false)}
+            onAction={onSaveBlock}
+            cancelLabel={t.common.cancel}
+            actionLabel={t.common.save}
+            actionLoading={updateLoading}
+          />
+        }
+      >
+        <div className="space-y-4">
+          <Select
+            label={t.workflows.blockType}
+            value={editBlock.type}
+            onChange={(e) => {
+              const type = e.target.value as BlockType;
+              setEditBlock({ ...editBlock, type });
+            }}
+            options={BLOCK_TYPES.map((type) => ({
+              value: type,
+              label: t.workflows.blockTypes[type],
+            }))}
+          />
+          {editBlock.type === 'sub-workflow' && (
+            <Select
+              label={t.workflows.selectSubWorkflow}
+              value={(() => { try { return JSON.parse(editBlock.config).workflow_id || ''; } catch { return ''; } })()}
+              onChange={(e) => setEditBlock({ ...editBlock, config: JSON.stringify({ workflow_id: e.target.value }, null, 2) })}
+              options={[
+                { value: '', label: t.common.selectWorkflow },
+                ...(allWorkflows?.filter((w) => w.id !== workflowId).map((w) => ({ value: w.id, label: `${w.icon || ''} ${w.name}`.trim() })) ?? []),
+              ]}
+            />
+          )}
+          <div>
+            <label className="block text-sm font-medium text-text mb-1.5">{t.workflows.blockConfig}</label>
+            <MonacoEditor
+              value={editBlock.config}
+              onChange={(val) => setEditBlock({ ...editBlock, config: val })}
+              language="json"
+              height="250px"
+            />
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={showAddSkill}
+        onClose={() => setShowAddSkill(false)}
+        title={t.workflows.activateSkill}
+        size="sm"
+        footer={
+          <ModalFooter
+            onCancel={() => setShowAddSkill(false)}
+            onAction={onActivateSkill}
+            cancelLabel={t.common.cancel}
+            actionLabel={t.skills.activate}
+            actionDisabled={!selectedSkillId}
+            actionLoading={activateLoading}
+          />
+        }
+      >
+        <Select
+          label={t.skills.title}
+          value={selectedSkillId}
+          onChange={(e) => setSelectedSkillId(e.target.value)}
+          options={[
+            { value: '', label: t.common.selectSkill },
+            ...availableSkills.map((s) => ({ value: s.id, label: s.name })),
+          ]}
+        />
+      </Modal>
+
+      <Modal
+        open={showDelete}
+        onClose={() => setShowDelete(false)}
+        title={`${t.common.delete} "${workflow.name}"?`}
+        size="sm"
+        footer={
+          <ModalFooter
+            onCancel={() => setShowDelete(false)}
+            onAction={onDelete}
+            cancelLabel={t.common.cancel}
+            actionLabel={t.common.delete}
+            actionVariant="danger"
+            actionLoading={deleteLoading}
+          />
+        }
+      >
+        <p className="text-sm text-text-secondary">
+          {t.common.deleteConfirm} {t.workflows.deleteConfirm}
+        </p>
+      </Modal>
+
+      <Modal
+        open={showClone}
+        onClose={() => setShowClone(false)}
+        title={t.workflows.cloneWorkflow}
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowClone(false)}>{t.common.cancel}</Button>
+            <Button
+              onClick={onClone}
+              loading={cloneLoading}
+              disabled={!cloneForm.projectId || !cloneForm.name.trim()}
+            >
+              {t.common.create}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Select
+            label={t.workflows.cloneProject}
+            value={cloneForm.projectId}
+            onChange={(e) => setCloneForm({ ...cloneForm, projectId: e.target.value })}
+            options={[
+              { value: '', label: t.common.selectProject },
+              ...(projects?.map((p) => ({ value: p.id, label: p.name })) ?? []),
+            ]}
+          />
+          <Input
+            label={t.workflows.cloneName}
+            value={cloneForm.name}
+            onChange={(e) => setCloneForm({ ...cloneForm, name: e.target.value })}
+          />
+        </div>
+      </Modal>
+
+      <ExecuteDialog
+        open={showExecuteDialog}
+        onClose={() => setShowExecuteDialog(false)}
+        onExecute={onExecuteWithContext}
+        variables={workflowVariables}
+        defaultValues={defaultValues}
+        loading={executeLoading}
+      />
+
+      <Modal
+        open={showEditInstructions}
+        onClose={() => setShowEditInstructions(false)}
+        title={t.workflows.editInstructions}
+        size="lg"
+        footer={
+          <ModalFooter
+            onCancel={() => setShowEditInstructions(false)}
+            onAction={onSaveInstructions}
+            cancelLabel={t.common.cancel}
+            actionLabel={t.common.save}
+            actionLoading={updateLoading}
+          />
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-text-secondary">{t.workflows.instructionsHint}</p>
+          <MonacoEditor
+            value={editInstructions}
+            onChange={setEditInstructions}
+            language="markdown"
+            height="300px"
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        open={showOptimizeResult}
+        onClose={() => setShowOptimizeResult(false)}
+        title={t.workflows.optimizeResult}
+        size="lg"
+        footer={
+          <ModalFooter
+            onCancel={() => setShowOptimizeResult(false)}
+            onAction={onApplyOptimize}
+            cancelLabel={t.common.cancel}
+            actionLabel={t.workflows.optimizeApply}
+            actionLoading={updateLoading}
+          />
+        }
+      >
+        {optimizeResult && (
+          <div className="space-y-4">
+            {optimizeResult.error ? (
+              <p className="text-sm text-danger">{String(optimizeResult.message)}</p>
+            ) : (
+              <>
+                <div>
+                  <h4 className="text-sm font-medium text-text mb-2">{t.workflows.optimizeChanges}</h4>
+                  {Array.isArray(optimizeResult.changes) && optimizeResult.changes.length > 0 ? (
+                    <ul className="space-y-2">
+                      {optimizeResult.changes!.map((change, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm">
+                          <span className="shrink-0 px-1.5 py-0.5 rounded-sm text-[10px] font-medium bg-accent/10 text-accent">
+                            {change.type}
+                          </span>
+                          <span className="text-text-secondary">{change.description}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-text-tertiary">{t.workflows.optimizeNoChanges}</p>
+                  )}
+                </div>
+                {optimizeResult.suggestedInstructions && (
+                  <div>
+                    <h4 className="text-sm font-medium text-text mb-1">{t.workflows.instructions}</h4>
+                    <pre className="text-xs text-text-secondary whitespace-pre-wrap font-mono bg-surface rounded-lg p-3 max-h-40 overflow-y-auto">
+                      {String(optimizeResult.suggestedInstructions)}
+                    </pre>
+                  </div>
+                )}
+                {Array.isArray(optimizeResult.blocks) && optimizeResult.blocks.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-text mb-1">{t.workflows.blocks} ({optimizeResult.blocks!.length})</h4>
+                    <pre className="text-xs text-text-secondary font-mono bg-surface rounded-lg p-3 max-h-60 overflow-y-auto">
+                      {JSON.stringify(optimizeResult.blocks, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </Modal>
+    </>
+  );
+}
