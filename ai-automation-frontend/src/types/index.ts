@@ -718,6 +718,77 @@ export interface PendingHumanInput {
   stepIndex: number;
 }
 
+// ── Wishes ───────────────────────────────────────────────
+
+export type WishStatus = 'RECEIVED' | 'DECOMPOSING' | 'EXECUTING' | 'EVALUATING' | 'REFINING' | 'AWAITING_CLARIFICATION' | 'AWAITING_APPROVAL' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+
+export type WishResponseAction = 'ACCEPT' | 'REFINE' | 'CANCEL' | 'CLARIFY';
+
+export interface WishRespondRequest {
+  action: WishResponseAction;
+  feedback?: string;
+}
+
+export interface Wish {
+  id: string;
+  originalText: string;
+  status: WishStatus;
+  projectId: string | null;
+  projectName: string | null;
+  decomposition: Record<string, unknown> | null;
+  generatedWorkflowIds: string[];
+  generatedWorkflowNames: string[];
+  referenceWorkflowIds: string[];
+  referenceWorkflowNames: string[];
+  generatedChainId: string | null;
+  iterationCount: number;
+  maxIterations: number;
+  currentRunId: string | null;
+  resultSummary: string | null;
+  error: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateWishRequest {
+  text: string;
+  projectId?: string;
+  maxIterations?: number;
+  referenceWorkflowIds?: string[];
+}
+
+// ── Workflow Factory ─────────────────────────────────────
+
+export interface WorkflowFactoryRequest {
+  topic: string;
+  description?: string;
+  category?: string;
+  projectId: string;
+  testInputs?: Record<string, unknown>;
+  autoPromote?: boolean;
+  autoFix?: boolean;
+  maxRetries?: number;
+}
+
+export interface WorkflowFactoryResult {
+  workflowId: string | null;
+  workflowName: string | null;
+  status: 'VERIFIED' | 'FAILED' | 'CREATED' | 'PROMOTED';
+  testRunId: string | null;
+  testStatus: 'PASSED' | 'FAILED' | null;
+  testError: string | null;
+  promotedAsTemplate: boolean;
+  durationMs: number;
+  retryErrors: string[];
+}
+
+export interface FactoryTopicCategory {
+  id: string;
+  name: string;
+  description: string;
+}
+
 // ── API Error ────────────────────────────────────────────
 
 export interface ApiError {

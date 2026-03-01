@@ -17,8 +17,10 @@ const Webhooks = lazy(() => import('./pages/Webhooks').then(m => ({ default: m.W
 const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })));
 const Chains = lazy(() => import('./pages/Chains').then(m => ({ default: m.Chains })));
 const ChainExecution = lazy(() => import('./pages/ChainExecution').then(m => ({ default: m.ChainExecution })));
+const Wishes = lazy(() => import('./pages/Wishes').then(m => ({ default: m.Wishes })));
 const Todos = lazy(() => import('./pages/Todos').then(m => ({ default: m.Todos })));
 const ActivityLog = lazy(() => import('./pages/ActivityLog').then(m => ({ default: m.ActivityLog })));
+const WorkflowFactory = lazy(() => import('./pages/WorkflowFactory').then(m => ({ default: m.WorkflowFactory })));
 
 const router = createBrowserRouter([
   {
@@ -29,9 +31,11 @@ const router = createBrowserRouter([
       { index: true, element: <Dashboard /> },
       { path: 'projects', element: <Projects /> },
       { path: 'projects/:id', element: <ProjectDetail /> },
+      { path: 'wishes', element: <Wishes /> },
       { path: 'workflows', element: <Workflows /> },
       { path: 'workflows/:id', element: <WorkflowDetail /> },
       { path: 'workflows/:id/run/:runId', element: <WorkflowExecution /> },
+      { path: 'factory', element: <WorkflowFactory /> },
       { path: 'chains', element: <Chains /> },
       { path: 'chains/:id/run/:runId', element: <ChainExecution /> },
       { path: 'runs', element: <Runs /> },

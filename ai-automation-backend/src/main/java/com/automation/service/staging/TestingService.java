@@ -21,6 +21,7 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
@@ -222,6 +223,87 @@ public class TestingService {
         }
 
         return new SyncResult(0, workflowsUpdated, 0, 0, errors);
+    }
+
+    // ── Remote execution on Test ─────────────────────────
+
+    /**
+     * Finds a workflow on the Test instance by name and project name,
+     * then starts it with the given context. Returns the run ID.
+     */
+    public String executeWorkflowOnTest(String workflowName, String projectName,
+                                         Map<String, Object> context) {
+        if (!isHealthy()) {
+            throw new IllegalStateException("Test instance is not running or not healthy.");
+        }
+        String baseUrl = deriveTestBaseUrl();
+
+        // Find workflow on test by name + project
+        JsonNode workflows = syncHelper.httpGet(baseUrl + "/workflows");
+        if (workflows == null || !workflows.isArray()) {
+            throw new IllegalStateException("Could not fetch workflows from Test instance.");
+        }
+
+        String testWorkflowId = null;
+        for (JsonNode w : workflows) {
+            String name = w.path("name").asText();
+            String pName = w.path("projectName").asText("");
+            if (name.equals(workflowName) && pName.equals(projectName != null ? projectName : "")) {
+                testWorkflowId = w.path("id").asText();
+                break;
+            }
+        }
+        if (testWorkflowId == null) {
+            throw new IllegalStateException("Workflow '" + workflowName +
+                    "' not found on Test instance (project: " + projectName + ").");
+        }
+
+        // Start execution
+        Map<String, Object> body = context != null && !context.isEmpty()
+                ? Map.of("context", context)
+                : Map.of();
+        JsonNode result = syncHelper.httpPost(baseUrl + "/workflows/" + testWorkflowId + "/execute", body);
+        if (result == null || !result.has("id")) {
+            throw new IllegalStateException("Failed to start workflow on Test instance.");
+        }
+
+        String runId = result.path("id").asText();
+        log.info("Started workflow '{}' on Test instance: runId={}", workflowName, runId);
+        return runId;
+    }
+
+    /**
+     * Polls the Test instance for a run's completion.
+     * Returns the full run JSON node when done (COMPLETED/FAILED/CANCELLED).
+     * Throws on timeout (default 10 min, 2s interval).
+     */
+    public JsonNode pollTestRun(String runId) {
+        return pollTestRun(runId, 600, 2000);
+    }
+
+    public JsonNode pollTestRun(String runId, int maxWaitSeconds, int intervalMs) {
+        String baseUrl = deriveTestBaseUrl();
+        String url = baseUrl + "/executions/" + runId;
+        int waited = 0;
+
+        while (waited < maxWaitSeconds) {
+            JsonNode run = syncHelper.httpGet(url);
+            if (run != null) {
+                String status = run.path("status").asText("");
+                if ("COMPLETED".equals(status) || "FAILED".equals(status) || "CANCELLED".equals(status)) {
+                    log.info("Test run {} finished with status: {} ({}s)", runId, status, waited);
+                    return run;
+                }
+            }
+            try {
+                Thread.sleep(intervalMs);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Polling interrupted", e);
+            }
+            waited += intervalMs / 1000;
+        }
+        throw new IllegalStateException("Test run " + runId + " did not complete within " + maxWaitSeconds + "s");
     }
 
     // ── Internal helpers ──────────────────────────────────

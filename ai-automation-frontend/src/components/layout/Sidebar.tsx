@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import {
-  LayoutDashboard, FolderKanban, GitBranch, History, Zap,
+  LayoutDashboard, FolderKanban, GitBranch, History, Zap, Sparkles, Factory,
   Calendar, Webhook, ScrollText, CheckSquare, Settings, ChevronLeft, ChevronRight, Link2,
 } from 'lucide-react';
 import { useSidebarStore } from '../../stores/sidebarStore';
@@ -83,7 +83,9 @@ export function MeerkatIcon({ className, size = 24 }: { className?: string; size
 const navItems = [
   { to: '/', icon: LayoutDashboard, labelKey: 'dashboard' as const },
   { to: '/projects', icon: FolderKanban, labelKey: 'projects' as const },
+  { to: '/wishes', icon: Sparkles, labelKey: 'wishes' as const },
   { to: '/workflows', icon: GitBranch, labelKey: 'workflows' as const },
+  { to: '/factory', icon: Factory, labelKey: 'factory' as const },
   { to: '/chains', icon: Link2, labelKey: 'chains' as const },
   { to: '/runs', icon: History, labelKey: 'runs' as const },
   { to: '/skills', icon: Zap, labelKey: 'skills' as const },
