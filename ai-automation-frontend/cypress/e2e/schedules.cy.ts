@@ -47,7 +47,7 @@ describe('Schedules', () => {
   it('displays correct table headers', () => {
     // Ensure we have a schedule first
     cy.get('table').within(() => {
-      cy.contains('th', 'Workflow').should('be.visible');
+      cy.contains('th', 'Target').should('be.visible');
       cy.contains('th', 'Cron Expression').should('be.visible');
       cy.contains('th', 'Next Run').should('be.visible');
       cy.contains('th', 'Last Run').should('be.visible');

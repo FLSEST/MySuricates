@@ -13,7 +13,7 @@ describe('Runs', () => {
 
   it('shows the runs page with title and subtitle', () => {
     cy.get('h1').should('contain.text', 'Run History');
-    cy.contains('All workflow executions').should('be.visible');
+    cy.contains('Workflow and chain executions').should('be.visible');
   });
 
   it('shows status filter dropdown', () => {
