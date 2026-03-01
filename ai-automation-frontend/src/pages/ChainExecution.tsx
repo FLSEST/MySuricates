@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowDown, ExternalLink, XCircle, CheckCircle2, AlertCircle, Clock, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowDown, ExternalLink, XCircle, CheckCircle2, AlertCircle, AlertTriangle, Clock, Loader2 } from 'lucide-react';
 import { Card, Button, Badge, Spinner } from '../components/ui';
 import { useChainRun, useCancelChainRun } from '../hooks/useChains';
 import { useT } from '../i18n';
@@ -10,6 +10,8 @@ function EntryStatusIcon({ status }: { status: string }) {
   switch (status) {
     case 'COMPLETED':
       return <CheckCircle2 className="w-5 h-5 text-success" />;
+    case 'COMPLETED_WITH_ERRORS':
+      return <AlertTriangle className="w-5 h-5 text-warning" />;
     case 'FAILED':
       return <AlertCircle className="w-5 h-5 text-danger" />;
     case 'RUNNING':
@@ -23,11 +25,13 @@ function EntryStatusIcon({ status }: { status: string }) {
 
 function StatusBadge({ status }: { status: string }) {
   const variant = status === 'COMPLETED' ? 'success'
+    : status === 'COMPLETED_WITH_ERRORS' ? 'warning'
     : status === 'FAILED' ? 'danger'
     : status === 'RUNNING' ? 'accent'
     : status === 'CANCELLED' ? 'warning'
     : 'default';
-  return <Badge variant={variant} dot>{status}</Badge>;
+  const label = status === 'COMPLETED_WITH_ERRORS' ? 'Partial' : status;
+  return <Badge variant={variant} dot>{label}</Badge>;
 }
 
 export function ChainExecution() {

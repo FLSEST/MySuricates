@@ -14,11 +14,13 @@ import type { WorkflowChain, CreateChainRequest, UpdateChainRequest, ChainEntryR
 
 function StatusBadge({ status }: { status: string }) {
   const variant = status === 'COMPLETED' ? 'success'
+    : status === 'COMPLETED_WITH_ERRORS' ? 'warning'
     : status === 'FAILED' ? 'danger'
     : status === 'RUNNING' ? 'accent'
     : status === 'CANCELLED' ? 'warning'
     : 'default';
-  return <Badge variant={variant} dot>{status}</Badge>;
+  const label = status === 'COMPLETED_WITH_ERRORS' ? 'Partial' : status;
+  return <Badge variant={variant} dot>{label}</Badge>;
 }
 
 export function Chains() {

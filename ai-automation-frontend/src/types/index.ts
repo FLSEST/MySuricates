@@ -721,7 +721,7 @@ export interface PendingHumanInput {
 
 // ── Wishes ───────────────────────────────────────────────
 
-export type WishStatus = 'RECEIVED' | 'DECOMPOSING' | 'EXECUTING' | 'EVALUATING' | 'REFINING' | 'AWAITING_CLARIFICATION' | 'AWAITING_APPROVAL' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+export type WishStatus = 'RECEIVED' | 'DECOMPOSING' | 'AWAITING_DECOMPOSE_APPROVAL' | 'EXECUTING' | 'EVALUATING' | 'REFINING' | 'AWAITING_CLARIFICATION' | 'AWAITING_APPROVAL' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
 
 export type WishResponseAction = 'ACCEPT' | 'REFINE' | 'CANCEL' | 'CLARIFY';
 

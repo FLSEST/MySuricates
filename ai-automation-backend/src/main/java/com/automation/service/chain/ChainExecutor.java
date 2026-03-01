@@ -91,6 +91,7 @@ public class ChainExecutor {
 
         String previousOutput = null;
         boolean chainFailed = false;
+        boolean hasFailures = false;
 
         try {
             for (int i = 0; i < sortedEntries.size(); i++) {
@@ -104,7 +105,7 @@ public class ChainExecutor {
                 ChainRunEntry runEntry = ChainRunEntry.builder()
                         .entryIndex(i)
                         .workflowId(entry.getWorkflowId())
-                        .status("RUNNING")
+                        .status(RunStatus.RUNNING)
                         .startedAt(Instant.now())
                         .build();
 
@@ -117,10 +118,11 @@ public class ChainExecutor {
                     }
                 } catch (Exception e) {
                     log.error("Chain {}: Workflow {} not found", chain.getName(), entry.getWorkflowId(), e);
-                    runEntry.setStatus("FAILED");
+                    runEntry.setStatus(RunStatus.FAILED);
                     runEntry.setCompletedAt(Instant.now());
                     runEntry.setDurationMs(Duration.between(runEntry.getStartedAt(), Instant.now()).toMillis());
                     run.getEntryRuns().add(runEntry);
+                    hasFailures = true;
                     chainRunRepository.save(run);
                     broadcastStatus(runId, run);
 
@@ -156,19 +158,22 @@ public class ChainExecutor {
                     broadcastStatus(runId, run);
 
                     WorkflowRun completed = waitForCompletion(workflowRun.getId(), cancelled);
+                    // Fresh read to avoid stale Hibernate cache
+                    completed = workflowRunRepository.findById(completed.getId()).orElseThrow();
 
                     runEntry.setCompletedAt(Instant.now());
                     runEntry.setDurationMs(Duration.between(runEntry.getStartedAt(), runEntry.getCompletedAt()).toMillis());
 
                     if (completed.getStatus() == RunStatus.COMPLETED) {
-                        runEntry.setStatus("COMPLETED");
+                        runEntry.setStatus(RunStatus.COMPLETED);
                         previousOutput = extractOutput(completed);
                     } else if (completed.getStatus() == RunStatus.CANCELLED) {
-                        runEntry.setStatus("CANCELLED");
+                        runEntry.setStatus(RunStatus.CANCELLED);
                         run.setStatus(RunStatus.CANCELLED);
                         chainFailed = true;
                     } else {
-                        runEntry.setStatus("FAILED");
+                        runEntry.setStatus(RunStatus.FAILED);
+                        hasFailures = true;
                         if (shouldStop(chain, entry)) {
                             run.setStatus(RunStatus.FAILED);
                             run.setError("Workflow '" + workflow.getName() + "' failed");
@@ -183,9 +188,10 @@ public class ChainExecutor {
 
                 } catch (Exception e) {
                     log.error("Chain {}: Error executing workflow {}", chain.getName(), workflow.getName(), e);
-                    runEntry.setStatus("FAILED");
+                    runEntry.setStatus(RunStatus.FAILED);
                     runEntry.setCompletedAt(Instant.now());
                     runEntry.setDurationMs(Duration.between(runEntry.getStartedAt(), Instant.now()).toMillis());
+                    hasFailures = true;
                     chainRunRepository.save(run);
                     broadcastStatus(runId, run);
 
@@ -199,7 +205,7 @@ public class ChainExecutor {
             }
 
             if (!chainFailed) {
-                run.setStatus(RunStatus.COMPLETED);
+                run.setStatus(hasFailures ? RunStatus.COMPLETED_WITH_ERRORS : RunStatus.COMPLETED);
             }
 
         } catch (Exception e) {
@@ -229,7 +235,9 @@ public class ChainExecutor {
                 throw new RuntimeException("Chain execution cancelled");
             }
             WorkflowRun run = workflowRunRepository.findById(runId).orElseThrow();
-            if (run.getStatus() != RunStatus.RUNNING && run.getStatus() != RunStatus.PENDING) {
+            if (run.getStatus() != RunStatus.RUNNING
+                    && run.getStatus() != RunStatus.PENDING
+                    && run.getStatus() != RunStatus.PAUSED) {
                 return run;
             }
             try {

@@ -18,7 +18,7 @@ public class ChainRunEntry {
     private String workflowRunId;
 
     @Builder.Default
-    private String status = "PENDING";
+    private RunStatus status = RunStatus.PENDING;
 
     private Instant startedAt;
     private Instant completedAt;

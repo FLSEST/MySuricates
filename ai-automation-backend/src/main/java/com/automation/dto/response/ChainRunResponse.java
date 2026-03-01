@@ -25,7 +25,7 @@ public record ChainRunResponse(
             String workflowName,
             String projectName,
             String workflowRunId,
-            String status,
+            RunStatus status,
             Instant startedAt,
             Instant completedAt,
             Long durationMs

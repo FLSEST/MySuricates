@@ -14,11 +14,13 @@ const statusConfig: Record<string, { variant: 'success' | 'warning' | 'danger' |
   PENDING: { variant: 'default' },
   PAUSED: { variant: 'warning' },
   COMPLETED: { variant: 'success' },
+  COMPLETED_WITH_ERRORS: { variant: 'warning', label: 'Partial' },
   FAILED: { variant: 'danger' },
   CANCELLED: { variant: 'default' },
   // Step
   SKIPPED: { variant: 'default' },
   WAITING_APPROVAL: { variant: 'warning', label: 'Approval' },
+  AWAITING_DECOMPOSE_APPROVAL: { variant: 'accent', label: 'Review' },
 };
 
 interface StatusBadgeProps {

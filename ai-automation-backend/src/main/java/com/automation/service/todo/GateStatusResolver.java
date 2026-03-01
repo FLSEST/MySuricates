@@ -41,6 +41,7 @@ public class GateStatusResolver {
             case FAILED -> new GateResult(GateStatus.RED, "execution-failure",
                     extractErrorMessage(event.getError()));
             case COMPLETED -> new GateResult(GateStatus.GREEN, "success", null);
+            case COMPLETED_WITH_ERRORS -> new GateResult(GateStatus.YELLOW, "partial-success", null);
             case CANCELLED, PAUSED, PENDING, RUNNING -> null;
         };
     }
