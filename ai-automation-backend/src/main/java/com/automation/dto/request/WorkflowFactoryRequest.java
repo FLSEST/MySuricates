@@ -12,7 +12,8 @@ public record WorkflowFactoryRequest(
         Map<String, Object> testInputs,
         boolean autoPromote,
         boolean autoFix,
-        int maxRetries
+        int maxRetries,
+        String provider
 ) {
     public WorkflowFactoryRequest {
         if (maxRetries <= 0) maxRetries = 2;

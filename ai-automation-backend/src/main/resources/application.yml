@@ -96,6 +96,9 @@ automation:
     test-container-name: ${AUTOMATION_TEST_CONTAINER:mysuricates-test}
     test-health-url: ${AUTOMATION_TEST_HEALTH_URL:http://localhost:8090/api/v1/system/health}
     test-auto-start: ${AUTOMATION_TEST_AUTO_START:true}
+  factory:
+    provider: ${AUTOMATION_FACTORY_PROVIDER:CLAUDE}
+    base-dir: ${AUTOMATION_FACTORY_DIR:${user.home}/.autotrigger/factory}
   pool:
     directory: ${AUTOMATION_POOL_DIR:workflow-pool}
     enabled: ${AUTOMATION_POOL_ENABLED:true}

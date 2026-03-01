@@ -3,12 +3,12 @@ package com.automation.service.factory;
 import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.dto.request.WorkflowFactoryRequest;
 import com.automation.dto.response.WorkflowFactoryResult;
+import com.automation.config.FactoryConfig;
 import com.automation.entity.BlockDefinition;
 import com.automation.entity.Project;
 import com.automation.entity.Workflow;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ProjectRepository;
-import com.automation.service.ai.HostClaudeService;
 import com.automation.service.staging.TestingService;
 import com.automation.service.workflow.WorkflowService;
 import com.automation.service.workflow.WorkflowTemplateService;
@@ -27,7 +27,9 @@ import java.util.*;
 @Slf4j
 public class WorkflowFactoryService {
 
-    private final HostClaudeService hostClaudeService;
+    private final ClaudeWorkflowGenerator claudeGenerator;
+    private final CodexWorkflowGenerator codexGenerator;
+    private final FactoryConfig factoryConfig;
     private final WorkflowService workflowService;
     private final WorkflowTemplateService templateService;
     private final TestingService testingService;
@@ -45,12 +47,12 @@ public class WorkflowFactoryService {
         String prompt = buildGeneratorPrompt(request);
         String systemPrompt = buildSystemPrompt();
 
-        log.info("Factory: generating workflow for topic '{}' (category: {})", request.topic(), request.category());
+        String provider = resolveProvider(request.provider());
+        log.info("Factory: generating workflow for topic '{}' (category: {}, provider: {})",
+                request.topic(), request.category(), provider);
 
-        HostClaudeService.ReasoningResult result = hostClaudeService.reasonStructured(
-                prompt, systemPrompt, null, 1, 120);
-
-        String responseText = result.text();
+        WorkflowTextGenerator generator = getGenerator(provider);
+        String responseText = generator.generate(prompt, systemPrompt, 120);
         JsonNode workflowJson = extractJsonFromResponse(responseText);
 
         // Build CreateWorkflowRequest from Claude's output
@@ -111,7 +113,7 @@ public class WorkflowFactoryService {
                     log.info("Factory: auto-fix attempt {}/{} for workflow '{}'",
                             retries, request.maxRetries(), workflow.getName());
                     try {
-                        autoFixWorkflow(workflow, testResult.error);
+                        autoFixWorkflow(workflow, testResult.error, request.provider());
                         // Re-fetch after update
                         workflow = workflowService.findById(workflow.getId());
                         testResult = deployAndVerify(workflow);
@@ -280,6 +282,11 @@ public class WorkflowFactoryService {
     public record FactoryTestResult(String runId, String status, String error) {}
 
     private void autoFixWorkflow(Workflow workflow, String errorMessage) throws IOException {
+        autoFixWorkflow(workflow, errorMessage, null);
+    }
+
+    private void autoFixWorkflow(Workflow workflow, String errorMessage, String provider) throws IOException {
+        String resolvedProvider = resolveProvider(provider);
         String blocksJson = objectMapper.writeValueAsString(workflow.getBlocks());
 
         String prompt = """
@@ -298,10 +305,9 @@ public class WorkflowFactoryService {
                 Do not wrap in markdown code fences.
                 """.formatted(workflow.getName(), workflow.getDescription(), blocksJson, errorMessage);
 
-        HostClaudeService.ReasoningResult result = hostClaudeService.reasonStructured(
-                prompt, "You are a workflow debugging assistant. Output only valid JSON.", null, 1, 120);
-
-        String responseText = result.text();
+        WorkflowTextGenerator generator = getGenerator(resolvedProvider);
+        String responseText = generator.generate(prompt,
+                "You are a workflow debugging assistant. Output only valid JSON.", 120);
         List<BlockDefinition> fixedBlocks = parseBlocksFromArray(responseText);
 
         if (!fixedBlocks.isEmpty()) {
@@ -474,5 +480,20 @@ public class WorkflowFactoryService {
             }
         }
         return null;
+    }
+
+    private WorkflowTextGenerator getGenerator(String provider) {
+        return switch (provider.toUpperCase()) {
+            case "CLAUDE" -> claudeGenerator;
+            case "CODEX" -> codexGenerator;
+            default -> throw new IllegalArgumentException(
+                    "Unknown factory provider: " + provider + ". Available: [CLAUDE, CODEX]");
+        };
+    }
+
+    private String resolveProvider(String requestProvider) {
+        return (requestProvider != null && !requestProvider.isBlank())
+                ? requestProvider.toUpperCase()
+                : factoryConfig.getProvider().toUpperCase();
     }
 }
