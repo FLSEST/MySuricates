@@ -12,5 +12,6 @@ public record CreateProjectRequest(
         String description,
         @NotNull ProjectType type,
         @NotBlank String path,
-        Map<String, Object> config
+        Map<String, Object> config,
+        String aiContext
 ) {}

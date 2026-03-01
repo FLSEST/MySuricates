@@ -44,6 +44,7 @@ public class ProjectService {
                 .type(request.type())
                 .path(request.path())
                 .config(request.config() != null ? request.config() : new java.util.HashMap<>())
+                .aiContext(request.aiContext())
                 .status(ProjectStatus.STOPPED)
                 .build();
 
@@ -74,6 +75,9 @@ public class ProjectService {
         }
         if (request.config() != null) {
             project.setConfig(request.config());
+        }
+        if (request.aiContext() != null) {
+            project.setAiContext(request.aiContext().isBlank() ? null : request.aiContext());
         }
 
         Project saved = projectRepository.save(project);

@@ -2,14 +2,16 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Play, Square, Trash2, Pencil, GitBranch, Container as ContainerIcon,
+  Brain, Sparkles,
 } from 'lucide-react';
 import { ModalFooter } from '../components/ui';
 import { Card, CardHeader, Button, Input, Select, Modal, Spinner, DirectoryPicker } from '../components/ui';
+import { MonacoEditor } from '../components/shared/MonacoEditor';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ErrorState } from '../components/shared/ErrorState';
 import {
   useProject, useUpdateProject, useDeleteProject,
-  useStartContainer, useStopContainer,
+  useStartContainer, useStopContainer, useGenerateProjectContext,
 } from '../hooks/useProjects';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { useT } from '../i18n';
@@ -28,10 +30,13 @@ export function ProjectDetail() {
   const deleteProject = useDeleteProject();
   const startContainer = useStartContainer();
   const stopContainer = useStopContainer();
+  const generateContext = useGenerateProjectContext();
 
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+  const [showAiContext, setShowAiContext] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', subtitle: '', description: '', type: 'CODE' as ProjectType, path: '' });
+  const [editAiContext, setEditAiContext] = useState('');
 
   const projectWorkflows = workflows?.filter((w) => w.projectId === id) ?? [];
 
@@ -52,11 +57,31 @@ export function ProjectDetail() {
     setShowEdit(true);
   };
 
+  const openAiContext = () => {
+    setEditAiContext(project.aiContext ?? '');
+    setShowAiContext(true);
+  };
+
   const handleUpdate = () => {
     updateProject.mutate(
       { id: project.id, data: editForm },
       { onSuccess: () => setShowEdit(false) }
     );
+  };
+
+  const handleSaveAiContext = () => {
+    updateProject.mutate(
+      { id: project.id, data: { aiContext: editAiContext } },
+      { onSuccess: () => setShowAiContext(false) }
+    );
+  };
+
+  const handleGenerate = () => {
+    generateContext.mutate(project.id, {
+      onSuccess: (data) => {
+        setEditAiContext(data.context);
+      },
+    });
   };
 
   const handleDelete = () => {
@@ -158,6 +183,30 @@ export function ProjectDetail() {
         </Card>
       </div>
 
+      {/* AI Context */}
+      <Card>
+        <CardHeader
+          title={t.projects.aiContext}
+          action={
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={<Brain className="w-4 h-4" />}
+              onClick={openAiContext}
+            >
+              {t.projects.editAiContext}
+            </Button>
+          }
+        />
+        {project.aiContext ? (
+          <pre className="text-sm text-text-secondary whitespace-pre-wrap font-mono bg-surface rounded-lg p-3 max-h-48 overflow-y-auto">
+            {project.aiContext}
+          </pre>
+        ) : (
+          <p className="text-sm text-text-tertiary">{t.projects.noAiContext}</p>
+        )}
+      </Card>
+
       {/* Workflows in project */}
       <Card padding={false}>
         <div className="p-5 pb-0">
@@ -251,6 +300,44 @@ export function ProjectDetail() {
             label={t.projects.path}
             value={editForm.path}
             onChange={(path) => setEditForm({ ...editForm, path })}
+          />
+        </div>
+      </Modal>
+
+      {/* AI Context Modal */}
+      <Modal
+        open={showAiContext}
+        onClose={() => setShowAiContext(false)}
+        title={t.projects.editAiContext}
+        size="lg"
+        footer={
+          <ModalFooter
+            onCancel={() => setShowAiContext(false)}
+            onAction={handleSaveAiContext}
+            cancelLabel={t.common.cancel}
+            actionLabel={t.common.save}
+            actionLoading={updateProject.isPending}
+          />
+        }
+      >
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-text-secondary">{t.projects.aiContextHint}</p>
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={<Sparkles className="w-3.5 h-3.5" />}
+              onClick={handleGenerate}
+              loading={generateContext.isPending}
+            >
+              {generateContext.isPending ? t.projects.generating : t.projects.generateAiContext}
+            </Button>
+          </div>
+          <MonacoEditor
+            value={editAiContext}
+            onChange={setEditAiContext}
+            language="markdown"
+            height="400px"
           />
         </div>
       </Modal>

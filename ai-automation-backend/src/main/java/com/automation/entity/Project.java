@@ -51,6 +51,9 @@ public class Project {
     @Builder.Default
     private ProjectStatus status = ProjectStatus.STOPPED;
 
+    @Column(name = "ai_context", columnDefinition = "text")
+    private String aiContext;
+
     @OneToOne(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
     private Container container;
 

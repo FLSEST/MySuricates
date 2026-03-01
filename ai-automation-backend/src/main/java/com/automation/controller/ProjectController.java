@@ -6,6 +6,7 @@ import com.automation.dto.response.ProjectResponse;
 import com.automation.dto.response.WorkflowResponse;
 import com.automation.mapper.ProjectMapper;
 import com.automation.mapper.WorkflowMapper;
+import com.automation.service.project.ProjectContextService;
 import com.automation.service.project.ProjectService;
 import com.automation.service.workflow.WorkflowService;
 import jakarta.validation.Valid;
@@ -15,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/projects")
@@ -23,6 +25,7 @@ public class ProjectController {
 
     private final ProjectService projectService;
     private final WorkflowService workflowService;
+    private final ProjectContextService projectContextService;
     private final ProjectMapper projectMapper;
     private final WorkflowMapper workflowMapper;
 
@@ -66,5 +69,12 @@ public class ProjectController {
     @GetMapping("/{id}/workflows")
     public List<WorkflowResponse> getProjectWorkflows(@PathVariable String id) {
         return workflowMapper.toResponseList(workflowService.findByProjectId(id));
+    }
+
+    @PostMapping("/{id}/generate-context")
+    public ResponseEntity<Map<String, String>> generateContext(@PathVariable String id) {
+        var project = projectService.findById(id);
+        String generated = projectContextService.generateContext(project.getPath());
+        return ResponseEntity.ok(Map.of("context", generated));
     }
 }

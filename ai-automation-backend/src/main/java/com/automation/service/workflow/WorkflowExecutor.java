@@ -13,6 +13,8 @@ import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.memory.WorkflowMemoryService;
 import com.automation.service.project.ContainerService;
+import com.automation.service.project.ProjectContextService;
+import com.automation.service.system.SystemIdentityService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -48,8 +50,10 @@ public class WorkflowExecutor {
     private final AgentInstructionsService agentInstructionsService;
     private final ActivityLogService activityLogService;
     private final WorkflowMemoryService workflowMemoryService;
+    private final ProjectContextService projectContextService;
     private final ApplicationEventPublisher eventPublisher;
     private final TemplateVerificationService templateVerificationService;
+    private final SystemIdentityService systemIdentity;
 
     private final Map<String, ExecutionContext> activeExecutions = new ConcurrentHashMap<>();
 
@@ -131,6 +135,10 @@ public class WorkflowExecutor {
             context.setProjectPath(project.getPath());
             inputContext.forEach(context::setVariable);
 
+            // Stamp run metadata with system identity
+            context.setRunMetadata("system", systemIdentity.getName());
+            context.setRunMetadata("systemVersion", systemIdentity.getVersion());
+
             // Set instruction prefix and model from workflow
             String instructionPrefix = agentInstructionsService.buildInstructionPrefix(instructions);
             if (!instructionPrefix.isBlank()) {
@@ -146,6 +154,9 @@ public class WorkflowExecutor {
 
             // Write active workflow memory to project for executing agent
             workflowMemoryService.writeActiveMemoryToProject(workflowId, project.getPath());
+
+            // Write project AI context to .claude/rules/ for executing agent
+            projectContextService.writeProjectContextToProject(project.getAiContext(), project.getPath());
 
             for (BlockDefinition block : blocks) {
                 if (context.shouldStop()) {

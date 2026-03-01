@@ -10,5 +10,6 @@ public record UpdateProjectRequest(
         String description,
         ProjectType type,
         String path,
-        Map<String, Object> config
+        Map<String, Object> config,
+        String aiContext
 ) {}

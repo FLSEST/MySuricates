@@ -109,6 +109,12 @@ export const en = {
     descriptionField: 'Description',
     descriptionPlaceholder: 'Brief description of the project...',
     deleteConfirm: 'The project and its container will be permanently deleted.',
+    aiContext: 'AI Context',
+    editAiContext: 'Edit AI Context',
+    aiContextHint: 'Project-wide context for AI agents. Automatically written to .claude/rules/ and used by all workflows in this project.',
+    noAiContext: 'No AI context set',
+    generateAiContext: 'Auto-generate',
+    generating: 'Generating...',
     types: {
       CODE: 'Code',
       RESEARCH: 'Research',

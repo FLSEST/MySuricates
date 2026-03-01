@@ -89,3 +89,9 @@ export function useStopContainer() {
     onError: () => toast.error(t.toast.containerStopFailed),
   });
 }
+
+export function useGenerateProjectContext() {
+  return useMutation({
+    mutationFn: (id: string) => api.post<{ context: string }>(`/projects/${id}/generate-context`),
+  });
+}

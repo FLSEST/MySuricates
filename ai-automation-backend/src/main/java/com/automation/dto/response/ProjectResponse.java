@@ -14,6 +14,7 @@ public record ProjectResponse(
         ProjectType type,
         String path,
         Map<String, Object> config,
+        String aiContext,
         ProjectStatus status,
         ContainerResponse container,
         Instant createdAt,

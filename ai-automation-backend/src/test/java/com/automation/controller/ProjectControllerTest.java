@@ -8,6 +8,7 @@ import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.ProjectMapper;
 import com.automation.mapper.WorkflowMapper;
+import com.automation.service.project.ProjectContextService;
 import com.automation.service.project.ProjectService;
 import com.automation.service.system.ApiKeyService;
 import com.automation.service.workflow.WorkflowService;
@@ -51,6 +52,9 @@ class ProjectControllerTest {
     private WorkflowService workflowService;
 
     @MockBean
+    private ProjectContextService projectContextService;
+
+    @MockBean
     private ProjectMapper projectMapper;
 
     @MockBean
@@ -74,7 +78,7 @@ class ProjectControllerTest {
 
         testResponse = new ProjectResponse(
                 "proj-1", "Test Project", null, null, ProjectType.CODE, "/workspace/test",
-                Map.of(), ProjectStatus.STOPPED, null,
+                Map.of(), null, ProjectStatus.STOPPED, null,
                 Instant.now(), Instant.now()
         );
     }
@@ -202,7 +206,7 @@ class ProjectControllerTest {
         testProject.setStatus(ProjectStatus.RUNNING);
         ProjectResponse runningResponse = new ProjectResponse(
                 "proj-1", "Test Project", null, null, ProjectType.CODE, "/workspace/test",
-                Map.of(), ProjectStatus.RUNNING, null,
+                Map.of(), null, ProjectStatus.RUNNING, null,
                 Instant.now(), Instant.now()
         );
         when(projectService.startContainer("proj-1")).thenReturn(testProject);

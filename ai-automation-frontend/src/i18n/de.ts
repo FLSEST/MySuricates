@@ -111,6 +111,12 @@ export const de: TranslationKeys = {
     descriptionField: 'Beschreibung',
     descriptionPlaceholder: 'Kurze Beschreibung des Projekts...',
     deleteConfirm: 'Das Projekt und sein Container werden dauerhaft gelöscht.',
+    aiContext: 'AI-Kontext',
+    editAiContext: 'AI-Kontext bearbeiten',
+    aiContextHint: 'Projekt-weiter Kontext für KI-Agenten. Wird automatisch in .claude/rules/ geschrieben und von allen Workflows in diesem Projekt genutzt.',
+    noAiContext: 'Kein AI-Kontext gesetzt',
+    generateAiContext: 'Automatisch generieren',
+    generating: 'Generiere...',
     types: {
       CODE: 'Code',
       RESEARCH: 'Forschung',

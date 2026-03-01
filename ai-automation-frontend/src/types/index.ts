@@ -11,6 +11,7 @@ export interface Project {
   type: ProjectType;
   path: string;
   config: Record<string, unknown>;
+  aiContext?: string;
   status: ProjectStatus;
   container: Container | null;
   workflowCount: number;
@@ -25,6 +26,7 @@ export interface CreateProjectRequest {
   type: ProjectType;
   path: string;
   config?: Record<string, unknown>;
+  aiContext?: string;
 }
 
 export interface UpdateProjectRequest {
@@ -34,6 +36,7 @@ export interface UpdateProjectRequest {
   type?: ProjectType;
   path?: string;
   config?: Record<string, unknown>;
+  aiContext?: string;
 }
 
 // ── Container ────────────────────────────────────────────

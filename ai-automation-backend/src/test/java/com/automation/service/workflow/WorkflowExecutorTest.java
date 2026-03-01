@@ -12,6 +12,8 @@ import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.memory.WorkflowMemoryService;
 import com.automation.service.project.ContainerService;
+import com.automation.service.project.ProjectContextService;
+import com.automation.service.system.SystemIdentityService;
 import com.automation.service.workflow.AgentInstructionsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -66,10 +68,16 @@ class WorkflowExecutorTest {
     private WorkflowMemoryService workflowMemoryService;
 
     @Mock
+    private ProjectContextService projectContextService;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     @Mock
     private TemplateVerificationService templateVerificationService;
+
+    @Mock
+    private SystemIdentityService systemIdentity;
 
     private WorkflowExecutor workflowExecutor;
 
@@ -84,6 +92,9 @@ class WorkflowExecutorTest {
             return null;
         }).when(virtualThreadExecutor).submit(any(Runnable.class));
 
+        lenient().when(systemIdentity.getName()).thenReturn("MySuricates");
+        lenient().when(systemIdentity.getVersion()).thenReturn("0.2.3");
+
         workflowExecutor = new WorkflowExecutor(
                 List.of(simpleBlockExecutor),
                 containerService,
@@ -96,8 +107,10 @@ class WorkflowExecutorTest {
                 agentInstructionsService,
                 activityLogService,
                 workflowMemoryService,
+                projectContextService,
                 eventPublisher,
-                templateVerificationService
+                templateVerificationService,
+                systemIdentity
         );
 
         testProject = Project.builder()

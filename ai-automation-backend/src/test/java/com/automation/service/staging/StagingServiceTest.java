@@ -4,6 +4,7 @@ import com.automation.config.StagingConfig;
 import com.automation.dto.response.StagingStatusResponse;
 import com.automation.dto.response.SyncResult;
 import com.automation.entity.*;
+import com.automation.service.system.ApiKeyService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -16,6 +17,7 @@ class StagingServiceTest {
 
     private StagingConfig config;
     private InstanceSyncHelper syncHelper;
+    private ApiKeyService apiKeyService;
     private StagingService service;
 
     @BeforeEach
@@ -26,7 +28,8 @@ class StagingServiceTest {
         config.setComposeFile("docker-compose.stable.yml");
         config.setStableFrontendDir("stable-frontend");
         syncHelper = mock(InstanceSyncHelper.class);
-        service = new StagingService(config, syncHelper);
+        apiKeyService = mock(ApiKeyService.class);
+        service = new StagingService(config, syncHelper, apiKeyService);
     }
 
     @Test

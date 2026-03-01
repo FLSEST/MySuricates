@@ -81,7 +81,7 @@ class ProjectServiceTest {
 
     @Test
     void create_validRequest_createsProject() {
-        var request = new CreateProjectRequest("New Project", null, null, ProjectType.CODE, "/workspace/new", null);
+        var request = new CreateProjectRequest("New Project", null, null, ProjectType.CODE, "/workspace/new", null, null);
         when(projectRepository.save(any(Project.class))).thenAnswer(inv -> {
             Project p = inv.getArgument(0);
             p.setId("proj-new");
@@ -101,7 +101,7 @@ class ProjectServiceTest {
     @Test
     void create_withConfig_preservesConfig() {
         Map<String, Object> config = Map.of("key", "value");
-        var request = new CreateProjectRequest("Configured", null, null, ProjectType.RESEARCH, "/workspace/cfg", config);
+        var request = new CreateProjectRequest("Configured", null, null, ProjectType.RESEARCH, "/workspace/cfg", config, null);
         when(projectRepository.save(any(Project.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Project result = projectService.create(request);
@@ -114,7 +114,7 @@ class ProjectServiceTest {
         when(projectRepository.findById("proj-1")).thenReturn(Optional.of(testProject));
         when(projectRepository.save(any(Project.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new UpdateProjectRequest("Updated Name", null, null, ProjectType.CONTENT, null, null);
+        var request = new UpdateProjectRequest("Updated Name", null, null, ProjectType.CONTENT, null, null, null);
         Project result = projectService.update("proj-1", request);
 
         assertThat(result.getName()).isEqualTo("Updated Name");
@@ -127,7 +127,7 @@ class ProjectServiceTest {
         when(projectRepository.findById("proj-1")).thenReturn(Optional.of(testProject));
         when(projectRepository.save(any(Project.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new UpdateProjectRequest(null, null, null, null, null, null);
+        var request = new UpdateProjectRequest(null, null, null, null, null, null, null);
         Project result = projectService.update("proj-1", request);
 
         assertThat(result.getName()).isEqualTo("Test Project");
