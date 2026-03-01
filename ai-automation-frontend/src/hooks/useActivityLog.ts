@@ -7,15 +7,17 @@ export function useActivityLog(
   size: number,
   level?: string,
   category?: string,
+  workflowId?: string,
 ) {
   const params = new URLSearchParams();
   params.set('page', String(page));
   params.set('size', String(size));
   if (level) params.set('level', level);
   if (category) params.set('category', category);
+  if (workflowId) params.set('workflowId', workflowId);
 
   return useQuery({
-    queryKey: ['activity-log', page, size, level, category],
+    queryKey: ['activity-log', page, size, level, category, workflowId],
     queryFn: () => api.get<ActivityLogPage>(`/activity-log?${params.toString()}`),
     refetchInterval: 10_000,
   });

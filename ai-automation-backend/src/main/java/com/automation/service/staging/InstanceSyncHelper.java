@@ -305,6 +305,18 @@ public class InstanceSyncHelper {
             }
         });
 
+        // 5. Sync auto-repair-default setting
+        appSettingsRepository.get("auto-repair-default").ifPresent(value -> {
+            try {
+                httpPut(targetBaseUrl + "/system/settings/auto-repair-default",
+                        Map.of("value", value));
+                log.info("Synced auto-repair-default setting: {}", value);
+            } catch (Exception e) {
+                errors.add("Setting 'auto-repair-default': " + e.getMessage());
+                log.warn("Failed to sync auto-repair-default: {}", e.getMessage());
+            }
+        });
+
         log.info("Definition sync complete: {} projects, {} workflows, {} skills synced, {} skipped, {} errors",
                 projectsSynced, workflowsSynced, skillsSynced, skipped, errors.size());
 

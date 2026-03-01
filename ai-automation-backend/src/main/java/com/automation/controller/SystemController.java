@@ -175,7 +175,7 @@ public class SystemController {
                 .body(resource);
     }
 
-    private static final Set<String> ALLOWED_SETTINGS = Set.of("auto-todo-default");
+    private static final Set<String> ALLOWED_SETTINGS = Set.of("auto-todo-default", "auto-repair-default");
 
     @GetMapping("/settings/{key}")
     public ResponseEntity<Map<String, String>> getSetting(@PathVariable String key) {

@@ -51,6 +51,9 @@ public class ActivityLog {
     @Column(name = "reference_id")
     private String referenceId;
 
+    @Column(name = "workflow_id")
+    private String workflowId;
+
     @Convert(converter = JsonMapConverter.class)
     @Column(columnDefinition = "text")
     @Builder.Default

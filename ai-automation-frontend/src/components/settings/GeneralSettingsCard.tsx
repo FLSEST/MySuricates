@@ -7,7 +7,7 @@ import { Globe } from 'lucide-react';
 
 export function GeneralSettingsCard() {
   const t = useT();
-  const { advancedMode, setAdvancedMode, autoTodoDefault, setAutoTodoDefault } = useSettingsStore();
+  const { advancedMode, setAdvancedMode, autoTodoDefault, setAutoTodoDefault, autoRepairDefault, setAutoRepairDefault } = useSettingsStore();
   const updateSetting = useUpdateSystemSetting();
   const { locale, setLocale } = useI18nStore();
 
@@ -50,6 +50,20 @@ export function GeneralSettingsCard() {
             onChange={(enabled) => {
               setAutoTodoDefault(enabled);
               updateSetting.mutate({ key: 'auto-todo-default', value: String(enabled) });
+            }}
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-text">{t.settings.autoRepairDefault}</p>
+            <p className="text-xs text-text-tertiary">{t.settings.autoRepairDefaultHint}</p>
+          </div>
+          <Toggle
+            enabled={autoRepairDefault}
+            onChange={(enabled) => {
+              setAutoRepairDefault(enabled);
+              updateSetting.mutate({ key: 'auto-repair-default', value: String(enabled) });
             }}
           />
         </div>

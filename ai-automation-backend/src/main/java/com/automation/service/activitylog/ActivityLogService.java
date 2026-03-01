@@ -28,6 +28,12 @@ public class ActivityLogService {
 
     public ActivityLog log(LogLevel level, LogCategory category, String message,
                            String source, String referenceId, Map<String, Object> metadata) {
+        return log(level, category, message, source, referenceId, metadata, null);
+    }
+
+    public ActivityLog log(LogLevel level, LogCategory category, String message,
+                           String source, String referenceId, Map<String, Object> metadata,
+                           String workflowId) {
         ActivityLog entry = ActivityLog.builder()
                 .timestamp(Instant.now())
                 .level(level)
@@ -35,6 +41,7 @@ public class ActivityLogService {
                 .message(message)
                 .source(source)
                 .referenceId(referenceId)
+                .workflowId(workflowId)
                 .metadata(metadata != null ? metadata : Map.of())
                 .build();
 
@@ -83,8 +90,35 @@ public class ActivityLogService {
         return log(LogLevel.ERROR, category, message, source, referenceId, null);
     }
 
+    public ActivityLog info(LogCategory category, String message, String source, String referenceId, String workflowId) {
+        return log(LogLevel.INFO, category, message, source, referenceId, null, workflowId);
+    }
+
+    public ActivityLog warn(LogCategory category, String message, String source, String referenceId, String workflowId) {
+        return log(LogLevel.WARN, category, message, source, referenceId, null, workflowId);
+    }
+
+    public ActivityLog error(LogCategory category, String message, String source, String referenceId, String workflowId) {
+        return log(LogLevel.ERROR, category, message, source, referenceId, null, workflowId);
+    }
+
     public Page<ActivityLog> findAll(int page, int size, LogLevel level, LogCategory category) {
+        return findAll(page, size, level, category, null);
+    }
+
+    public Page<ActivityLog> findAll(int page, int size, LogLevel level, LogCategory category, String workflowId) {
         PageRequest pageRequest = PageRequest.of(page, size);
+
+        if (workflowId != null) {
+            if (level != null && category != null) {
+                return repository.findByWorkflowIdAndLevelAndCategoryOrderByTimestampDesc(workflowId, level, category, pageRequest);
+            } else if (level != null) {
+                return repository.findByWorkflowIdAndLevelOrderByTimestampDesc(workflowId, level, pageRequest);
+            } else if (category != null) {
+                return repository.findByWorkflowIdAndCategoryOrderByTimestampDesc(workflowId, category, pageRequest);
+            }
+            return repository.findByWorkflowIdOrderByTimestampDesc(workflowId, pageRequest);
+        }
 
         if (level != null && category != null) {
             return repository.findByLevelAndCategoryOrderByTimestampDesc(level, category, pageRequest);

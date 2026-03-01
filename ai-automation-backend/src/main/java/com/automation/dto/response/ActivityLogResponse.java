@@ -11,6 +11,7 @@ public record ActivityLogResponse(
         String message,
         String source,
         String referenceId,
+        String workflowId,
         Map<String, Object> metadata,
         Instant createdAt
 ) {}

@@ -22,12 +22,14 @@ public class ActivityLogController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
             @RequestParam(required = false) String level,
-            @RequestParam(required = false) String category) {
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String workflowId) {
 
         LogLevel logLevel = level != null && !level.isBlank() ? LogLevel.valueOf(level) : null;
         LogCategory logCategory = category != null && !category.isBlank() ? LogCategory.valueOf(category) : null;
+        String wfId = workflowId != null && !workflowId.isBlank() ? workflowId : null;
 
-        var result = activityLogService.findAll(page, size, logLevel, logCategory);
+        var result = activityLogService.findAll(page, size, logLevel, logCategory, wfId);
 
         return new PageResponse<>(
                 activityLogMapper.toResponseList(result.getContent()),

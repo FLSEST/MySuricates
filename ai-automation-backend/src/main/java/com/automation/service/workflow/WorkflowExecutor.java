@@ -98,7 +98,7 @@ public class WorkflowExecutor {
         final String workflowName = workflow.getName();
         activityLogService.info(LogCategory.EXECUTION,
                 "Workflow execution started: " + workflowName,
-                "WorkflowExecutor", runId);
+                "WorkflowExecutor", runId, workflowId);
         virtualThreadExecutor.submit(() -> executeBlocks(runId, workflowId, workflowName, project, blocks, skills, contextVars, instructions, model, workflowMeta, templateId));
 
         return run;
@@ -235,11 +235,11 @@ public class WorkflowExecutor {
                 }
                 activityLogService.info(LogCategory.EXECUTION,
                         "Workflow execution completed: " + runId,
-                        "WorkflowExecutor", runId);
+                        "WorkflowExecutor", runId, workflowId);
             } else if (run.getStatus() == RunStatus.FAILED) {
                 activityLogService.error(LogCategory.EXECUTION,
                         "Workflow execution failed: " + runId,
-                        "WorkflowExecutor", runId);
+                        "WorkflowExecutor", runId, workflowId);
             }
 
         } catch (Exception e) {
@@ -248,7 +248,7 @@ public class WorkflowExecutor {
             run.setError(Map.of("message", e.getMessage() != null ? e.getMessage() : e.getClass().getName()));
             activityLogService.error(LogCategory.EXECUTION,
                     "Workflow execution error: " + (e.getMessage() != null ? e.getMessage() : e.getClass().getName()),
-                    "WorkflowExecutor", runId);
+                    "WorkflowExecutor", runId, workflowId);
         } finally {
             run.setCompletedAt(Instant.now());
             run.setDurationMs(

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ScrollText, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useActivityLog } from '../hooks/useActivityLog';
+import { useWorkflows } from '../hooks/useWorkflows';
 import { useT } from '../i18n';
 import type { ActivityLogLevel, ActivityLogCategory } from '../types';
 
@@ -19,8 +20,10 @@ export function ActivityLog() {
   const [page, setPage] = useState(0);
   const [level, setLevel] = useState('');
   const [category, setCategory] = useState('');
+  const [workflowId, setWorkflowId] = useState('');
 
-  const { data, isLoading } = useActivityLog(page, 50, level || undefined, category || undefined);
+  const { data, isLoading } = useActivityLog(page, 50, level || undefined, category || undefined, workflowId || undefined);
+  const { data: workflows } = useWorkflows();
 
   const formatTime = (ts: string) => {
     const d = new Date(ts);
@@ -51,6 +54,14 @@ export function ActivityLog() {
         >
           <option value="">{t.activityLog.allCategories}</option>
           {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select
+          value={workflowId}
+          onChange={e => { setWorkflowId(e.target.value); setPage(0); }}
+          className="px-3 py-2 rounded-lg border border-border bg-surface-raised text-sm"
+        >
+          <option value="">{t.activityLog.allWorkflows}</option>
+          {workflows?.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
       </div>
 

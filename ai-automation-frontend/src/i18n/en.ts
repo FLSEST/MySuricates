@@ -416,6 +416,8 @@ export const en = {
     advancedHint: 'Show JSON configs, debug info, raw data',
     autoTodoDefault: 'Auto-Todo Default',
     autoTodoDefaultHint: 'Enable auto-todo for new workflows by default',
+    autoRepairDefault: 'Auto-Repair Default',
+    autoRepairDefaultHint: 'Automatically attempt to repair failed workflows via the test instance',
     backup: 'Database Backup',
     backupDescription: 'Download a backup of the SQLite database',
     backupButton: 'Download Backup',
@@ -602,6 +604,7 @@ export const en = {
     timestamp: 'Timestamp',
     allLevels: 'All Levels',
     allCategories: 'All Categories',
+    allWorkflows: 'All Workflows',
   },
   memory: {
     title: 'Workflow Memory',

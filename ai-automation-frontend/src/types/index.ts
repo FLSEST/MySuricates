@@ -556,6 +556,7 @@ export interface ActivityLogEntry {
   message: string;
   source: string | null;
   referenceId: string | null;
+  workflowId: string | null;
   metadata: Record<string, unknown>;
   createdAt: string;
 }

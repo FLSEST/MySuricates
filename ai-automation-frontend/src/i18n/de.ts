@@ -374,6 +374,8 @@ export const de: TranslationKeys = {
     advancedHint: 'JSON-Konfigurationen, Debug-Infos, Rohdaten anzeigen',
     autoTodoDefault: 'Auto-Todo Standard',
     autoTodoDefaultHint: 'Auto-Todo für neue Workflows standardmäßig aktivieren',
+    autoRepairDefault: 'Auto-Repair Standard',
+    autoRepairDefaultHint: 'Fehlgeschlagene Workflows automatisch über die Test-Instanz reparieren',
     backup: 'Datenbank-Backup',
     backupDescription: 'Backup der SQLite-Datenbank herunterladen',
     backupButton: 'Backup herunterladen',
@@ -604,6 +606,7 @@ export const de: TranslationKeys = {
     timestamp: 'Zeitstempel',
     allLevels: 'Alle Levels',
     allCategories: 'Alle Kategorien',
+    allWorkflows: 'Alle Workflows',
   },
   memory: {
     title: 'Workflow-Gedächtnis',
