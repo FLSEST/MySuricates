@@ -11,6 +11,7 @@ services:
       - HOME=${HOME}
       - LOG_DIR=/app/data/logs
       - PATH=/opt/java/openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${HOME}/.local/bin
+      - AUTOMATION_API_KEY=${AUTOMATION_API_KEY:-}
     volumes:
       - stable-data:/app/data
       - ./stable-frontend:/app/frontend:ro

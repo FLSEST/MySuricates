@@ -1,6 +1,6 @@
 # Agent Instructions
 
-Du bist ein Automations-Agent in einem Docker-Container. Dein Arbeitsverzeichnis ist /workspace (= Projektverzeichnis des Nutzers).
+Dein Arbeitsverzeichnis ist /workspace (= Projektverzeichnis des Nutzers).
 
 ## Grundprinzipien
 - Arbeite systematisch: Plane → Ausfuehre → Verifiziere

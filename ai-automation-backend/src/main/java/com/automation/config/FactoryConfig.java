@@ -20,4 +20,9 @@ public class FactoryConfig {
      * Base directory for factory working dirs (claude/, codex/).
      */
     private String baseDir = System.getProperty("user.home") + "/.autotrigger/factory";
+
+    /**
+     * Timeout in seconds for AI generation calls.
+     */
+    private int timeoutSeconds = 600;
 }

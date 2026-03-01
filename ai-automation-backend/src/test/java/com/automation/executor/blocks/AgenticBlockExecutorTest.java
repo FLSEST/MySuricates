@@ -13,6 +13,7 @@ import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.learning.LearningService;
+import com.automation.service.system.SystemIdentityService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,11 +49,15 @@ class AgenticBlockExecutorTest {
     @Mock
     private WorkflowRunRepository runRepository;
 
+    @Mock
+    private SystemIdentityService systemIdentity;
+
     private AgenticBlockExecutor executor;
 
     @BeforeEach
     void setUp() {
-        executor = new AgenticBlockExecutor(hostClaude, commandExecutor, learningService, messagingTemplate, runRepository);
+        lenient().when(systemIdentity.getVersionedName()).thenReturn("MySuricates v0.2.3");
+        executor = new AgenticBlockExecutor(hostClaude, commandExecutor, learningService, messagingTemplate, runRepository, systemIdentity);
 
         // Default: resolve run-1 -> workflow-1
         Workflow workflow = Workflow.builder().id("workflow-1").build();

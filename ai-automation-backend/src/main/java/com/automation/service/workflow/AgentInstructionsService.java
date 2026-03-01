@@ -1,5 +1,7 @@
 package com.automation.service.workflow;
 
+import com.automation.service.system.SystemIdentityService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
@@ -9,10 +11,13 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 @Service
+@RequiredArgsConstructor
 @Slf4j
 public class AgentInstructionsService {
 
     private static final int MAX_INSTRUCTION_LENGTH = 10_000;
+
+    private final SystemIdentityService systemIdentity;
 
     private String baseInstructions = "";
 
@@ -29,6 +34,9 @@ public class AgentInstructionsService {
 
     public String buildInstructionPrefix(String workflowInstructions) {
         StringBuilder sb = new StringBuilder();
+
+        // Prepend system identity block (name + version + git trailer instruction)
+        sb.append(systemIdentity.getAgentIdentityBlock());
 
         if (!baseInstructions.isEmpty()) {
             sb.append(baseInstructions);

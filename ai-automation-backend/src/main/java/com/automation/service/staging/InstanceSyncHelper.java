@@ -11,6 +11,7 @@ import com.automation.repository.AppSettingsRepository;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.SkillRepository;
 import com.automation.repository.WorkflowRepository;
+import com.automation.service.system.ApiKeyService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -28,10 +29,13 @@ import java.util.*;
 @Slf4j
 public class InstanceSyncHelper {
 
+    private static final String API_KEY_HEADER = "X-API-Key";
+
     private final AppSettingsRepository appSettingsRepository;
     private final ProjectRepository projectRepository;
     private final WorkflowRepository workflowRepository;
     private final SkillRepository skillRepository;
+    private final ApiKeyService apiKeyService;
     private final ObjectMapper objectMapper;
 
     // ── Target maps record ──────────────────────────────────
@@ -315,6 +319,7 @@ public class InstanceSyncHelper {
             conn.setConnectTimeout(10_000);
             conn.setReadTimeout(30_000);
             conn.setRequestProperty("Accept", "application/json");
+            addApiKeyHeader(conn);
             int code = conn.getResponseCode();
             if (code == 200) {
                 String body = new String(conn.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
@@ -345,6 +350,7 @@ public class InstanceSyncHelper {
             conn.setRequestMethod(method);
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("Accept", "application/json");
+            addApiKeyHeader(conn);
             conn.setDoOutput(true);
 
             byte[] jsonBytes = objectMapper.writeValueAsBytes(body);
@@ -369,6 +375,13 @@ public class InstanceSyncHelper {
             throw e;
         } catch (Exception e) {
             throw new RuntimeException(method + " " + url + " failed: " + e.getMessage(), e);
+        }
+    }
+
+    private void addApiKeyHeader(HttpURLConnection conn) {
+        String apiKey = apiKeyService.getEffectiveApiKey();
+        if (apiKey != null && !apiKey.isBlank()) {
+            conn.setRequestProperty(API_KEY_HEADER, apiKey);
         }
     }
 }

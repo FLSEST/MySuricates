@@ -52,7 +52,7 @@ public class WorkflowFactoryService {
                 request.topic(), request.category(), provider);
 
         WorkflowTextGenerator generator = getGenerator(provider);
-        String responseText = generator.generate(prompt, systemPrompt, 120);
+        String responseText = generator.generate(prompt, systemPrompt, factoryConfig.getTimeoutSeconds());
         JsonNode workflowJson = extractJsonFromResponse(responseText);
 
         // Build CreateWorkflowRequest from Claude's output

@@ -7,6 +7,7 @@ import com.automation.dto.response.SyncResult;
 import com.automation.dto.response.TestingStatusResponse;
 import com.automation.entity.Workflow;
 import com.automation.repository.WorkflowRepository;
+import com.automation.service.system.ApiKeyService;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,7 @@ public class TestingService {
     private final StagingConfig config;
     private final InstanceSyncHelper syncHelper;
     private final WorkflowRepository workflowRepository;
+    private final ApiKeyService apiKeyService;
 
     @EventListener(ApplicationReadyEvent.class)
     void autoStartTest() {
@@ -89,7 +91,8 @@ public class TestingService {
             throw new IllegalStateException("No stable-frontend/ found. Run promote first.");
         }
         log.info("Starting test environment...");
-        runCommand(composeFile.getParent(), "docker", "compose", "-f", composeFile.toString(), "up", "-d");
+        Map<String, String> env = Map.of("AUTOMATION_API_KEY", apiKeyService.getEffectiveApiKey());
+        runCommand(composeFile.getParent(), env, "docker", "compose", "-f", composeFile.toString(), "up", "-d");
         waitForHealth(60);
         log.info("Test environment started.");
     }
@@ -378,10 +381,17 @@ public class TestingService {
     }
 
     private void runCommand(Path workDir, String... command) {
+        runCommand(workDir, Map.of(), command);
+    }
+
+    private void runCommand(Path workDir, Map<String, String> extraEnv, String... command) {
         try {
             ProcessBuilder pb = new ProcessBuilder(command);
             pb.directory(workDir.toFile());
             pb.redirectErrorStream(true);
+            if (!extraEnv.isEmpty()) {
+                pb.environment().putAll(extraEnv);
+            }
             Process p = pb.start();
 
             try (var reader = new BufferedReader(new InputStreamReader(p.getInputStream()))) {

@@ -6,6 +6,7 @@ import com.automation.exception.TailscaleException;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.system.ApiKeyService;
 import com.automation.service.system.DatabaseBackupService;
+import com.automation.service.system.SystemIdentityService;
 import com.automation.service.system.TailscaleService;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.PingCmd;
@@ -51,6 +52,9 @@ class SystemControllerTest {
 
     @MockBean
     private DataSource dataSource;
+
+    @MockBean
+    private SystemIdentityService systemIdentity;
 
     private void mockDbHealthy() throws Exception {
         Connection conn = mock(Connection.class);
@@ -109,12 +113,17 @@ class SystemControllerTest {
 
     @Test
     void info_returnsPlatformInfo() throws Exception {
+        when(systemIdentity.getName()).thenReturn("MySuricates");
+        when(systemIdentity.getVersion()).thenReturn("0.2.3");
+        when(systemIdentity.getBuildType()).thenReturn("SNAPSHOT");
+        when(systemIdentity.getBuildTimestamp()).thenReturn("unknown");
         when(tailscaleService.isConfigEnabled()).thenReturn(false);
 
         mockMvc.perform(get("/api/v1/system/info"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("MySuricates"))
-                .andExpect(jsonPath("$.version").exists())
+                .andExpect(jsonPath("$.version").value("0.2.3"))
+                .andExpect(jsonPath("$.buildType").value("SNAPSHOT"))
                 .andExpect(jsonPath("$.java").exists())
                 .andExpect(jsonPath("$.tailscale").value("DISABLED"))
                 .andExpect(jsonPath("$.environment").value("Dev"));
@@ -122,6 +131,10 @@ class SystemControllerTest {
 
     @Test
     void info_tailscaleEnabled_showsConfigured() throws Exception {
+        when(systemIdentity.getName()).thenReturn("MySuricates");
+        when(systemIdentity.getVersion()).thenReturn("0.2.3");
+        when(systemIdentity.getBuildType()).thenReturn("RELEASE");
+        when(systemIdentity.getBuildTimestamp()).thenReturn("unknown");
         when(tailscaleService.isConfigEnabled()).thenReturn(true);
 
         mockMvc.perform(get("/api/v1/system/info"))

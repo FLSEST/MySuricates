@@ -12,6 +12,7 @@ import com.automation.service.ai.HostClaudeService.Turn;
 import com.automation.service.cli.CliSession;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.learning.LearningService;
+import com.automation.service.system.SystemIdentityService;
 import com.automation.repository.WorkflowRunRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +36,7 @@ public class AgenticBlockExecutor implements BlockExecutor {
     private final LearningService learningService;
     private final SimpMessagingTemplate messagingTemplate;
     private final WorkflowRunRepository runRepository;
+    private final SystemIdentityService systemIdentity;
 
     @Override
     public boolean supports(String blockType) {
@@ -417,7 +419,8 @@ public class AgenticBlockExecutor implements BlockExecutor {
         }
 
         return """
-                You are an autonomous agent orchestrator. You analyze situations, plan actions, and evaluate results.
+                You are the reasoning engine of %s, an AI workflow automation platform. \
+                You analyze situations, plan actions, and evaluate results.
                 You operate in a Reason-Act-Observe loop. The actions you plan will be executed by another AI agent \
                 inside a Docker container that has access to files, tools, and a development environment.
 
@@ -455,7 +458,7 @@ public class AgenticBlockExecutor implements BlockExecutor {
                 - Do NOT repeat the same action if it failed -- try a different approach.
                 - Prefer small, incremental steps over large changes.
                 - After each observation, assess progress towards the goal.
-                %s""".formatted(goal, successCriteria, instructionsSection, learningContext);
+                %s""".formatted(systemIdentity.getVersionedName(), goal, successCriteria, instructionsSection, learningContext);
     }
 
     private void broadcastAgenticEvent(String runId, int stepIndex,

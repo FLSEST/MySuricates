@@ -5,6 +5,7 @@ import com.automation.dto.request.SyncDefinitionsRequest;
 import com.automation.dto.response.StagingStatusResponse;
 import com.automation.dto.response.SyncPreview;
 import com.automation.dto.response.SyncResult;
+import com.automation.service.system.ApiKeyService;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +19,7 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.Comparator;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
@@ -29,6 +31,7 @@ public class StagingService {
 
     private final StagingConfig config;
     private final InstanceSyncHelper syncHelper;
+    private final ApiKeyService apiKeyService;
 
     public enum PromotePhase {
         IDLE, STOPPING, BUILDING_BACKEND, BUILDING_FRONTEND, BUILDING_IMAGE, STARTING, ERROR
@@ -111,7 +114,7 @@ public class StagingService {
             throw new IllegalStateException("No stable-frontend/ found. Run promote first.");
         }
         log.info("Starting stable environment...");
-        runCommand(composeFile.getParent(), "docker", "compose", "-f", composeFile.toString(), "up", "-d");
+        runCommand(composeFile.getParent(), apiKeyEnv(), "docker", "compose", "-f", composeFile.toString(), "up", "-d");
         waitForHealth(60);
         log.info("Stable environment started.");
     }
@@ -174,7 +177,7 @@ public class StagingService {
                 // Step 5: Start
                 checkCancelled();
                 promoteState.set(PromoteState.of(PromotePhase.STARTING, 5));
-                runCommand(backendDir, "docker", "compose", "-f", composeFile.toString(), "up", "-d");
+                runCommand(backendDir, apiKeyEnv(), "docker", "compose", "-f", composeFile.toString(), "up", "-d");
                 waitForHealth(60);
 
                 // Tag the commit
@@ -286,10 +289,17 @@ public class StagingService {
     }
 
     private void runCommand(Path workDir, String... command) {
+        runCommand(workDir, Map.of(), command);
+    }
+
+    private void runCommand(Path workDir, Map<String, String> extraEnv, String... command) {
         try {
             ProcessBuilder pb = new ProcessBuilder(command);
             pb.directory(workDir.toFile());
             pb.redirectErrorStream(true);
+            if (!extraEnv.isEmpty()) {
+                pb.environment().putAll(extraEnv);
+            }
             Process p = pb.start();
             currentProcess = p;
 
@@ -313,6 +323,10 @@ public class StagingService {
         } catch (Exception e) {
             throw new RuntimeException("Command execution failed: " + e.getMessage(), e);
         }
+    }
+
+    private Map<String, String> apiKeyEnv() {
+        return Map.of("AUTOMATION_API_KEY", apiKeyService.getEffectiveApiKey());
     }
 
     private void waitForHealth(int maxWaitSeconds) {

@@ -1,17 +1,28 @@
 package com.automation.service.workflow;
 
+import com.automation.service.system.SystemIdentityService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
 class AgentInstructionsServiceTest {
+
+    @Mock
+    private SystemIdentityService systemIdentity;
 
     private AgentInstructionsService service;
 
     @BeforeEach
     void setUp() {
-        service = new AgentInstructionsService();
+        when(systemIdentity.getAgentIdentityBlock()).thenReturn(
+                "## System Identity\nDu bist ein Agent von MySuricates v0.2.3.\n\n");
+        service = new AgentInstructionsService(systemIdentity);
         // Call init to load base instructions from classpath
         service.init();
     }

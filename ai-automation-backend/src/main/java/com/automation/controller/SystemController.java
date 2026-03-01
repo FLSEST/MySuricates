@@ -3,6 +3,7 @@ package com.automation.controller;
 import com.automation.dto.response.RemoteAccessResponse;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.system.DatabaseBackupService;
+import com.automation.service.system.SystemIdentityService;
 import com.automation.service.system.TailscaleService;
 import com.github.dockerjava.api.DockerClient;
 import lombok.RequiredArgsConstructor;
@@ -36,12 +37,7 @@ public class SystemController {
     private final DatabaseBackupService databaseBackupService;
     private final AppSettingsRepository appSettingsRepository;
     private final DataSource dataSource;
-
-    @Value("${app.version:0.1.0-SNAPSHOT}")
-    private String appVersion;
-
-    @Value("${app.build-timestamp:unknown}")
-    private String buildTimestamp;
+    private final SystemIdentityService systemIdentity;
 
     @Value("${automation.security.enabled:true}")
     private boolean securityEnabled;
@@ -115,19 +111,11 @@ public class SystemController {
 
     @GetMapping("/info")
     public Map<String, Object> info() {
-        String version = appVersion;
-        String buildType = "RELEASE";
-        int dashIdx = appVersion.indexOf('-');
-        if (dashIdx > 0) {
-            version = appVersion.substring(0, dashIdx);
-            buildType = appVersion.substring(dashIdx + 1);
-        }
-
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("name", "MySuricates");
-        result.put("version", version);
-        result.put("buildType", buildType);
-        result.put("buildTimestamp", buildTimestamp);
+        result.put("name", systemIdentity.getName());
+        result.put("version", systemIdentity.getVersion());
+        result.put("buildType", systemIdentity.getBuildType());
+        result.put("buildTimestamp", systemIdentity.getBuildTimestamp());
         result.put("java", System.getProperty("java.version"));
         result.put("tailscale", tailscaleService.isConfigEnabled() ? "CONFIGURED" : "DISABLED");
         result.put("environment", environment);
