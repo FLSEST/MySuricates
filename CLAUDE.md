@@ -2,6 +2,10 @@
 
 AI-powered workflow automation platform with a skill system, Docker-based execution, and a React frontend.
 
+## Vision
+
+Two pillars: (1) universal problem solver for everyday life and work, (2) self-improving AI platform that gets smarter with every run. See [VISION.md](VISION.md) for the full vision document.
+
 ## Project Structure
 
 ```
