@@ -1,0 +1,15 @@
+package com.automation.entity;
+
+public enum WishStatus {
+    RECEIVED,
+    DECOMPOSING,
+    AWAITING_DECOMPOSE_APPROVAL,
+    EXECUTING,
+    EVALUATING,
+    REFINING,
+    AWAITING_CLARIFICATION,
+    AWAITING_APPROVAL,
+    COMPLETED,
+    FAILED,
+    CANCELLED
+}

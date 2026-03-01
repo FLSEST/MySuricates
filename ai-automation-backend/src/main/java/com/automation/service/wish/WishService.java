@@ -193,8 +193,16 @@ public class WishService {
 
         return switch (request.action()) {
             case ACCEPT -> {
+                if (wish.getStatus() == WishStatus.AWAITING_DECOMPOSE_APPROVAL) {
+                    wish.setStatus(WishStatus.EXECUTING);
+                    wishRepository.save(wish);
+                    broadcastStatus(wishId, wish);
+                    log.info("Wish {}: User approved decomposition, starting execution", wishId);
+                    fulfillAsync(wishId);
+                    yield wish;
+                }
                 if (wish.getStatus() != WishStatus.AWAITING_APPROVAL) {
-                    throw new IllegalStateException("Can only accept wishes in AWAITING_APPROVAL state");
+                    throw new IllegalStateException("Can only accept wishes in AWAITING_APPROVAL or AWAITING_DECOMPOSE_APPROVAL state");
                 }
                 wish.setStatus(WishStatus.COMPLETED);
                 wishRepository.save(wish);
@@ -203,8 +211,19 @@ public class WishService {
                 yield wish;
             }
             case REFINE -> {
+                if (wish.getStatus() == WishStatus.AWAITING_DECOMPOSE_APPROVAL) {
+                    Map<String, Object> meta = new HashMap<>(wish.getMetadata());
+                    meta.put("decomposeFeedback", request.feedback());
+                    wish.setMetadata(meta);
+                    wish.setStatus(WishStatus.REFINING);
+                    wishRepository.save(wish);
+                    broadcastStatus(wishId, wish);
+                    log.info("Wish {}: User requested re-decomposition", wishId);
+                    fulfillAsync(wishId);
+                    yield wish;
+                }
                 if (wish.getStatus() != WishStatus.AWAITING_APPROVAL) {
-                    throw new IllegalStateException("Can only refine wishes in AWAITING_APPROVAL state");
+                    throw new IllegalStateException("Can only refine wishes in AWAITING_APPROVAL or AWAITING_DECOMPOSE_APPROVAL state");
                 }
                 Map<String, Object> meta = new HashMap<>(wish.getMetadata());
                 meta.put("userFeedback", request.feedback());
@@ -437,7 +456,7 @@ public class WishService {
         }
 
         wish.setIterationCount(wish.getIterationCount() + 1);
-        updateStatus(wish, WishStatus.EXECUTING);
+        updateStatus(wish, WishStatus.AWAITING_DECOMPOSE_APPROVAL);
     }
 
     /**
@@ -1200,7 +1219,9 @@ public class WishService {
     }
 
     private boolean isPaused(WishStatus status) {
-        return status == WishStatus.AWAITING_APPROVAL || status == WishStatus.AWAITING_CLARIFICATION;
+        return status == WishStatus.AWAITING_APPROVAL
+                || status == WishStatus.AWAITING_CLARIFICATION
+                || status == WishStatus.AWAITING_DECOMPOSE_APPROVAL;
     }
 
     private void broadcastStatus(String wishId, Wish wish) {

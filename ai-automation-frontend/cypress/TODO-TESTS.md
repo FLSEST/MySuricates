@@ -1,8 +1,8 @@
 # Cypress E2E Test Coverage - TODO
 
-Stand: 2026-02-24 | Aktuell: **122 Tests in 12 Specs, alle gruen**
+Stand: 2026-03-01 | Aktuell: **130 Tests in 13 Specs, alle gruen**
 
-## Abgedeckte Seiten (10 von 13)
+## Abgedeckte Seiten (11 von 14)
 
 | Spec | Tests | Seite |
 |------|-------|-------|
@@ -18,8 +18,9 @@ Stand: 2026-02-24 | Aktuell: **122 Tests in 12 Specs, alle gruen**
 | skills.cy.ts | 9 | Skills |
 | settings.cy.ts | 6 | Settings |
 | activity-log.cy.ts | 8 | Activity Log |
+| wishes.cy.ts | 8 | Wishes |
 
-## Seiten OHNE Tests (1 von 13)
+## Seiten OHNE Tests (1 von 14)
 
 ### WorkflowExecution (`/workflows/:id/run/:runId`) - MITTLERE PRIO
 Erfordert laufende/abgeschlossene Workflow-Execution; nicht trivial in E2E zu simulieren.

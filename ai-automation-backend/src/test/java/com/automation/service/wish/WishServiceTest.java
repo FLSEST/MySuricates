@@ -199,6 +199,16 @@ class WishServiceTest {
             assertThatThrownBy(() -> wishService.delete("w-1"))
                     .isInstanceOf(IllegalStateException.class);
         }
+
+        @Test
+        void delete_awaitingDecomposeApprovalWish_throwsException() {
+            Wish wish = createWish("w-1", WishStatus.AWAITING_DECOMPOSE_APPROVAL);
+            when(wishRepository.findById("w-1")).thenReturn(Optional.of(wish));
+
+            assertThatThrownBy(() -> wishService.delete("w-1"))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("terminal state");
+        }
     }
 
     // --- Respond ---
@@ -318,6 +328,47 @@ class WishServiceTest {
                     new WishRespondRequest(WishRespondRequest.WishResponseAction.CLARIFY, "answer")))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("AWAITING_CLARIFICATION");
+        }
+
+        // --- Decompose Approval ---
+
+        @Test
+        void respond_accept_fromAwaitingDecomposeApproval_startsExecution() {
+            Wish wish = createWish("w-1", WishStatus.AWAITING_DECOMPOSE_APPROVAL);
+            when(wishRepository.findById("w-1")).thenReturn(Optional.of(wish));
+            when(wishRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            Wish result = wishService.respond("w-1",
+                    new WishRespondRequest(WishRespondRequest.WishResponseAction.ACCEPT, null));
+
+            assertThat(result.getStatus()).isEqualTo(WishStatus.EXECUTING);
+            verify(virtualThreadExecutor).submit(any(Runnable.class));
+        }
+
+        @Test
+        void respond_refine_fromAwaitingDecomposeApproval_triggersRedecompose() {
+            Wish wish = createWish("w-1", WishStatus.AWAITING_DECOMPOSE_APPROVAL);
+            when(wishRepository.findById("w-1")).thenReturn(Optional.of(wish));
+            when(wishRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            Wish result = wishService.respond("w-1",
+                    new WishRespondRequest(WishRespondRequest.WishResponseAction.REFINE, "Use fewer blocks"));
+
+            assertThat(result.getStatus()).isEqualTo(WishStatus.REFINING);
+            assertThat(result.getMetadata()).containsEntry("decomposeFeedback", "Use fewer blocks");
+            verify(virtualThreadExecutor).submit(any(Runnable.class));
+        }
+
+        @Test
+        void respond_cancel_fromAwaitingDecomposeApproval_cancels() {
+            Wish wish = createWish("w-1", WishStatus.AWAITING_DECOMPOSE_APPROVAL);
+            when(wishRepository.findById("w-1")).thenReturn(Optional.of(wish));
+            when(wishRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            Wish result = wishService.respond("w-1",
+                    new WishRespondRequest(WishRespondRequest.WishResponseAction.CANCEL, null));
+
+            assertThat(result.getStatus()).isEqualTo(WishStatus.CANCELLED);
         }
     }
 

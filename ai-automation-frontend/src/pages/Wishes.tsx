@@ -1,12 +1,14 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, Send, XCircle, Trash2, ChevronRight, ChevronDown, ExternalLink, Check, RefreshCw, MessageCircle, Save, X } from 'lucide-react';
+import { Sparkles, Send, XCircle, Trash2, ChevronRight, ChevronDown, ExternalLink, Check, RefreshCw, MessageCircle, Save, X, Eye } from 'lucide-react';
 import { Card, Button, Input, Modal, Spinner, Badge } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
+import { LogViewer } from '../components/shared/LogViewer';
 import { useWishes, useCreateWish, useCancelWish, useDeleteWish, useWish, useRespondToWish, useCrystallizeWish } from '../hooks/useWishes';
 import { useProjects } from '../hooks/useProjects';
 import { useWorkflows } from '../hooks/useWorkflows';
+import { useExecutionWebSocket } from '../hooks/useWebSocket';
 import { useT } from '../i18n';
 import { formatRelativeTime } from '../utils/formatTime';
 import type { Wish, WishStatus } from '../types';
@@ -16,10 +18,11 @@ function WishStatusBadge({ status }: { status: WishStatus }) {
     : status === 'FAILED' ? 'danger'
     : status === 'CANCELLED' ? 'warning'
     : (status === 'AWAITING_APPROVAL' || status === 'AWAITING_CLARIFICATION') ? 'warning'
+    : status === 'AWAITING_DECOMPOSE_APPROVAL' ? 'accent'
     : (status === 'DECOMPOSING' || status === 'EXECUTING' || status === 'EVALUATING' || status === 'REFINING') ? 'accent'
     : 'default';
   const isActive = status === 'DECOMPOSING' || status === 'EXECUTING' || status === 'EVALUATING' || status === 'REFINING';
-  const isAwaiting = status === 'AWAITING_APPROVAL' || status === 'AWAITING_CLARIFICATION';
+  const isAwaiting = status === 'AWAITING_APPROVAL' || status === 'AWAITING_CLARIFICATION' || status === 'AWAITING_DECOMPOSE_APPROVAL';
   return <Badge variant={variant} dot={isActive || isAwaiting}>{status}</Badge>;
 }
 
@@ -103,7 +106,7 @@ export function Wishes() {
   };
 
   const isTerminal = (s: WishStatus) => s === 'COMPLETED' || s === 'FAILED' || s === 'CANCELLED';
-  const isPaused = (s: WishStatus) => s === 'AWAITING_APPROVAL' || s === 'AWAITING_CLARIFICATION';
+  const isPaused = (s: WishStatus) => s === 'AWAITING_APPROVAL' || s === 'AWAITING_CLARIFICATION' || s === 'AWAITING_DECOMPOSE_APPROVAL';
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-64"><Spinner text={t.common.loading} /></div>;
@@ -332,6 +335,7 @@ function WishDetail({ wishId, onCancel, onDelete, navigate, isTerminal, isPaused
   // Map AWAITING_* statuses to their timeline position
   const effectiveStatus: WishStatus =
     wish.status === 'AWAITING_CLARIFICATION' ? 'DECOMPOSING' :
+    wish.status === 'AWAITING_DECOMPOSE_APPROVAL' ? 'DECOMPOSING' :
     wish.status === 'AWAITING_APPROVAL' ? 'EVALUATING' :
     wish.status;
   const currentIndex = statusSteps.indexOf(effectiveStatus);
@@ -412,6 +416,11 @@ function WishDetail({ wishId, onCancel, onDelete, navigate, isTerminal, isPaused
         </div>
       </Card>
 
+      {/* Decompose Approval Panel */}
+      {wish.status === 'AWAITING_DECOMPOSE_APPROVAL' && (
+        <DecomposeApprovalPanel wish={wish} />
+      )}
+
       {/* Approval Panel */}
       {wish.status === 'AWAITING_APPROVAL' && (
         <ApprovalPanel wish={wish} />
@@ -420,6 +429,11 @@ function WishDetail({ wishId, onCancel, onDelete, navigate, isTerminal, isPaused
       {/* Clarification Panel */}
       {wish.status === 'AWAITING_CLARIFICATION' && (
         <ClarificationPanel wish={wish} />
+      )}
+
+      {/* Execution Logs */}
+      {wish.status === 'EXECUTING' && wish.currentRunId && (
+        <ExecutionLogsPanel runId={wish.currentRunId} />
       )}
 
       {/* Decomposition */}
@@ -604,6 +618,112 @@ function ClarificationPanel({ wish }: { wish: Wish }) {
             {t.wishes.cancel}
           </Button>
         </div>
+      </div>
+    </Card>
+  );
+}
+
+/* ── Decompose Approval Panel ──────────────────────── */
+
+function DecomposeApprovalPanel({ wish }: { wish: Wish }) {
+  const t = useT();
+  const respond = useRespondToWish();
+  const [feedback, setFeedback] = useState('');
+
+  return (
+    <Card className="border-2 border-accent">
+      <div className="p-4 space-y-3">
+        <h3 className="text-sm font-semibold text-accent uppercase tracking-wide flex items-center gap-2">
+          <Eye className="w-4 h-4" />
+          {t.wishes.status.awaiting_decompose_approval}
+        </h3>
+        <p className="text-sm text-text-secondary">{t.wishes.decomposeApprovalRequired}</p>
+
+        {/* Show decomposition details */}
+        {wish.decomposition && (
+          <div className="space-y-2">
+            {typeof wish.decomposition.analysis === 'string' && (
+              <div className="p-3 rounded-lg bg-surface-raised text-sm text-text-primary">
+                {wish.decomposition.analysis}
+              </div>
+            )}
+            {typeof wish.decomposition.strategy === 'string' && (
+              <div className="p-3 rounded-lg bg-surface-raised text-sm text-text-tertiary">
+                {wish.decomposition.strategy}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Show generated workflow names */}
+        {wish.generatedWorkflowNames.length > 0 && (
+          <div className="space-y-1">
+            {wish.generatedWorkflowNames.map((name, i) => (
+              <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-surface-raised">
+                <span className="text-xs font-mono text-text-tertiary w-5 text-right">{i + 1}.</span>
+                <span className="text-sm text-text-primary">{name}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <textarea
+          value={feedback}
+          onChange={(e) => setFeedback(e.target.value)}
+          placeholder={t.wishes.decomposeRefinePlaceholder}
+          className="w-full h-20 px-3 py-2 rounded-lg bg-surface-raised border border-border text-text-primary placeholder-text-tertiary resize-none focus:outline-none focus:ring-2 focus:ring-accent text-sm"
+        />
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => respond.mutate({ id: wish.id, data: { action: 'ACCEPT' } })}
+            disabled={respond.isPending}
+            icon={<Check className="w-4 h-4" />}
+          >
+            {t.wishes.approveDecomposition}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => respond.mutate({ id: wish.id, data: { action: 'REFINE', feedback } })}
+            disabled={respond.isPending || !feedback.trim()}
+            icon={<RefreshCw className="w-4 h-4" />}
+          >
+            {t.wishes.rejectDecomposition}
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => respond.mutate({ id: wish.id, data: { action: 'CANCEL' } })}
+            disabled={respond.isPending}
+            icon={<XCircle className="w-4 h-4" />}
+          >
+            {t.wishes.cancel}
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+/* ── Execution Logs Panel ──────────────────────────── */
+
+function ExecutionLogsPanel({ runId }: { runId: string }) {
+  const t = useT();
+  const { logs, connected } = useExecutionWebSocket(runId);
+
+  return (
+    <Card>
+      <div className="p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wide">
+            {t.wishes.executionLogs}
+          </h3>
+          {connected && (
+            <span className="flex items-center gap-1.5 text-xs text-success">
+              <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
+              Live
+            </span>
+          )}
+        </div>
+        <LogViewer logs={logs} maxHeight="400px" />
       </div>
     </Card>
   );
