@@ -309,7 +309,19 @@ Two kinds of Git tags:
 
 ## Todo-Verwaltung via API
 
-Wenn Claude ein TODO anlegen soll, immer über die REST API — niemals direkt in die DB schreiben.
+### Pflicht: Jede Aufgabe als TODO tracken
+
+**Bei jeder Aufgabe, die Claude bearbeitet, gilt folgender Workflow:**
+
+1. **TODO prüfen/anlegen**: Vor Arbeitsbeginn prüfen, ob bereits ein passendes offenes TODO existiert (`GET /api/v1/todos?status=OPEN&status=IN_PROGRESS`). Falls nein → neues TODO anlegen.
+2. **IN_PROGRESS setzen**: Sofort nach Arbeitsbeginn den Status auf `IN_PROGRESS` setzen.
+3. **DONE setzen**: Nach erfolgreichem Abschluss den Status auf `DONE` setzen.
+
+Das gilt für **alle** Aufgaben — Features, Bugfixes, Refactorings, Konfigurationsänderungen, etc. Ausnahme: Reine Informationsfragen oder triviale Antworten, die keinen Code ändern.
+
+### API-Zugang
+
+Immer über die REST API — niemals direkt in die DB schreiben.
 
 ### API-Key auslesen
 
