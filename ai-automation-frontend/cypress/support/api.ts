@@ -85,7 +85,11 @@ export function deleteWebhook(id: string) {
 // ── Todos ──────────────────────────────────────────────
 
 export function getTodos() {
-  return cy.request({ method: 'GET', url: `${API}/todos`, headers: apiHeaders() }).its('body');
+  return cy.request({ method: 'GET', url: `${API}/todos`, headers: apiHeaders() }).then((resp) => {
+    const body = resp.body;
+    // Handle both paginated ({content: []}) and plain array responses
+    return Array.isArray(body) ? body : (body.content ?? []);
+  });
 }
 
 export function createTodo(
@@ -109,7 +113,10 @@ export function deleteTodo(id: string) {
 // ── Executions ─────────────────────────────────────────
 
 export function getExecutions() {
-  return cy.request({ method: 'GET', url: `${API}/executions`, headers: apiHeaders() }).its('body');
+  return cy.request({ method: 'GET', url: `${API}/executions`, headers: apiHeaders() }).then((resp) => {
+    const body = resp.body;
+    return Array.isArray(body) ? body : (body.content ?? []);
+  });
 }
 
 // ── Skills ──────────────────────────────────────────────
