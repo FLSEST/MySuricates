@@ -622,6 +622,152 @@ public final class BuiltInTemplates {
                 "Baue und pushe ein Docker Image. Variablen: dockerfile, image_name, tag, registry.",
                 null, "1.1.0"));
 
+        // ── Analysis & Audit Templates ──────────────────────────────────────
+
+        templates.add(template("api-consistency-audit", "\uD83D\uDD0D",
+                Map.of("de", "API-Konsistenz-Audit", "en", "API Consistency Audit"),
+                Map.of("de", "REST-APIs auf Namenskonventionen, fehlende Pagination, Map-Bodies und Fehlerbehandlung pr\u00fcfen",
+                        "en", "Check REST APIs for naming conventions, missing pagination, map bodies, and error handling"),
+                "CODE", order++,
+                List.of(
+                        block("shell", Map.of(
+                                "command", "set -euo pipefail\necho '=== Controller Files ==='\nfind . -type f \\( -name '*Controller.java' -o -name '*Controller.kt' -o -name '*controller.ts' -o -name '*controller.js' \\) -not -path '*/node_modules/*' -not -path '*/build/*' -not -path '*/target/*' 2>/dev/null | head -50\necho ''\necho '=== Endpoint Annotations ==='\ngrep -rn '@\\(Get\\|Post\\|Put\\|Delete\\|Patch\\)Mapping\\|@RequestMapping\\|router\\.\\(get\\|post\\|put\\|delete\\|patch\\)' --include='*.java' --include='*.kt' --include='*.ts' --include='*.js' . 2>/dev/null | grep -v node_modules | grep -v target | grep -v build | head -80\necho ''\necho '=== DTO Classes ==='\nfind . -type f \\( -name '*Dto.java' -o -name '*DTO.java' -o -name '*Request.java' -o -name '*Response.java' -o -name '*Dto.kt' \\) -not -path '*/node_modules/*' -not -path '*/target/*' 2>/dev/null | head -50\necho ''\necho '=== Error Handlers ==='\ngrep -rn '@ExceptionHandler\\|@ControllerAdvice\\|GlobalExceptionHandler\\|ErrorController' --include='*.java' --include='*.kt' . 2>/dev/null | grep -v target | head -20\necho ''\necho '=== Map Return Types ==='\ngrep -rn 'Map<String,\\|Map<string,\\|ResponseEntity<Map\\|: Map<' --include='*.java' --include='*.kt' --include='*.ts' . 2>/dev/null | grep -v node_modules | grep -v target | head -30\necho ''\necho '=== Pagination ==='\ngrep -rn 'Pageable\\|PageRequest\\|Page<\\|PaginatedResponse\\|page.*size\\|offset.*limit' --include='*.java' --include='*.kt' --include='*.ts' . 2>/dev/null | grep -v node_modules | grep -v target | head -20",
+                                "on_failure", "continue"
+                        )),
+                        block("simple", Map.of(
+                                "command", "Analysiere die gesammelten API-Daten:\n\n{{ previous_output }}\n\nPruefe systematisch:\n1. **Namenskonventionen**: Sind Endpunkt-Pfade konsistent (kebab-case vs camelCase vs snake_case)? HTTP-Methoden korrekt (GET=lesen, POST=erstellen, PUT=ersetzen, PATCH=teilupdate, DELETE=loeschen)?\n2. **DTOs vs Maps**: Welche Endpunkte geben Map<String,Object> oder aehnliche untypisierte Strukturen zurueck statt dedizierter DTOs/Response-Klassen?\n3. **Pagination**: Welche Listen-Endpunkte (die Collections zurueckgeben) haben KEINE Pagination? Gibt es ein einheitliches Pagination-Pattern?\n4. **Response-Wrapper**: Gibt es ein einheitliches Response-Format oder mischt der Code nackte Entities mit gewrappten Responses?\n5. **Fehlerbehandlung**: Gibt es einen zentralen ExceptionHandler? Sind Error-Responses konsistent strukturiert (error code, message, details)?\n6. **Fehlende REST-Patterns**: HATEOAS-Links, Versionierung, Content-Type-Handling?\n\nListe jeden Fund mit Datei:Zeile, Schweregrad (CRITICAL/HIGH/MEDIUM/LOW) und konkretem Verbesserungsvorschlag.",
+                                "timeout_seconds", 600
+                        )),
+                        block("simple", Map.of(
+                                "command", "Erstelle aus der Analyse einen strukturierten Report:\n\n{{ previous_output }}\n\n## Format:\n\n### Executive Summary\n- Gesamtbewertung der API-Konsistenz (1-10)\n- Anzahl Findings pro Schweregrad\n\n### Findings-Tabelle\n| # | Schweregrad | Kategorie | Datei:Zeile | Problem | Empfehlung |\n\n### Aktionsplan\nPriorisierte Liste von Verbesserungen, gruppiert nach Aufwand (Quick Wins / Mittelfristig / Langfristig).\n\nHalte den Report kompakt und actionable.",
+                                "timeout_seconds", 600
+                        )),
+                        auditTodoBlock("api-consistency", "API-Konsistenz")
+                ),
+                "Prueft REST-APIs auf Konsistenz: Namenskonventionen, DTOs vs Maps, Pagination, Response-Wrapper, Fehlerbehandlung.",
+                "claude-sonnet-4-6", "1.1.0"));
+
+        templates.add(template("dead-code-detector", "\uD83D\uDC80",
+                Map.of("de", "Dead-Code-Detektor", "en", "Dead Code Detector"),
+                Map.of("de", "Ungenutzten Code finden: verwaiste Exports, tote Dateien, ungenutzte Dependencies",
+                        "en", "Find unused code: orphan exports, dead files, unused dependencies"),
+                "CODE", order++,
+                List.of(
+                        block("shell", Map.of(
+                                "command", "set -euo pipefail\necho '=== Source File Inventory ==='\nfind . -type f \\( -name '*.java' -o -name '*.kt' -o -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \\) -not -path '*/node_modules/*' -not -path '*/build/*' -not -path '*/target/*' -not -path '*/dist/*' -not -path '*/.git/*' | sort > /tmp/all_source_files.txt\nwc -l < /tmp/all_source_files.txt\necho ''\necho '=== Exports (JS/TS) ==='\ngrep -rn 'export \\(default \\|const \\|function \\|class \\|interface \\|type \\|enum \\)' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' . 2>/dev/null | grep -v node_modules | grep -v dist | grep -v build | head -100\necho ''\necho '=== Public Classes/Methods (Java/Kotlin) ==='\ngrep -rn '^public class \\|^public interface \\|^public enum ' --include='*.java' --include='*.kt' . 2>/dev/null | grep -v target | grep -v build | head -80\necho ''\necho '=== Import Statements ==='\ngrep -rn '^import ' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.java' --include='*.kt' . 2>/dev/null | grep -v node_modules | grep -v target | grep -v build | grep -v dist | head -200\necho ''\necho '=== Package Dependencies ==='\nfor f in $(find . -name package.json -not -path '*/node_modules/*' -maxdepth 3 2>/dev/null); do\n  echo \"--- $f ---\"\n  python3 -c \"import json; d=json.load(open('$f')); deps=list(d.get('dependencies',{}).keys())+list(d.get('devDependencies',{}).keys()); print('\\n'.join(deps))\" 2>/dev/null || true\ndone\necho ''\nfor f in $(find . -name pom.xml -maxdepth 3 2>/dev/null); do\n  echo \"--- $f ---\"\n  grep -A2 '<artifactId>' \"$f\" | grep -v '<groupId>\\|--' | sed 's/.*<artifactId>\\(.*\\)<\\/artifactId>.*/\\1/' | head -30\ndone",
+                                "on_failure", "continue"
+                        )),
+                        block("simple", Map.of(
+                                "command", "Analysiere die gesammelten Code-Daten auf ungenutzten Code:\n\n{{ previous_output }}\n\nSuche systematisch nach:\n1. **Verwaiste Exports**: Exportierte Symbole (Funktionen, Klassen, Interfaces, Typen), die nirgends importiert werden\n2. **Tote Dateien**: Source-Dateien, die von keiner anderen Datei referenziert werden (weder importiert noch als Route/Config eingebunden)\n3. **Ungenutzte Dependencies**: Pakete in package.json/pom.xml, die nirgends im Code importiert werden\n4. **Tote Code-Pfade**: Methoden/Funktionen innerhalb von Dateien, die nur definiert aber nie aufgerufen werden\n5. **Auskommentierter Code**: Groessere Bloecke von auskommentiertem Code, der entfernt werden sollte\n\nFuer jeden Fund: Datei, Symbol/Paket, Evidenz warum es ungenutzt ist. Markiere Confidence (HIGH/MEDIUM/LOW) — nur HIGH melden wenn sicher ungenutzt.",
+                                "timeout_seconds", 600
+                        )),
+                        block("simple", Map.of(
+                                "command", "Erstelle einen Impact-Report und Cleanup-Plan:\n\n{{ previous_output }}\n\n## Format:\n\n### Summary\n- Geschaetzte Menge an Dead Code (Dateien, LOC)\n- Betroffene Module/Packages\n\n### Findings nach Kategorie\n| # | Kategorie | Datei/Symbol | Confidence | Impact (LOC) | Aktion |\n\n### Cleanup-Aktionsplan\n1. **Safe Deletes** (HIGH confidence): Sofort entfernbar\n2. **Review Required** (MEDIUM confidence): Manuell pruefen\n3. **Dependency Cleanup**: Pakete zum Entfernen\n\nNur HIGH-confidence Findings in den Safe-Delete-Bereich.",
+                                "timeout_seconds", 600
+                        )),
+                        auditTodoBlock("dead-code", "Dead Code")
+                ),
+                "Findet ungenutzten Code: verwaiste Exports, tote Dateien, ungenutzte Dependencies, tote Code-Pfade.",
+                "claude-sonnet-4-6", "1.1.0"));
+
+        templates.add(template("doc-accuracy-check", "\uD83D\uDCCB",
+                Map.of("de", "Dokumentations-Genauigkeits-Check", "en", "Documentation Accuracy Check"),
+                Map.of("de", "Dokumentation gegen Code verifizieren: Build-Befehle, Struktur, APIs, Versionen",
+                        "en", "Verify documentation against code: build commands, structure, APIs, versions"),
+                "CODE", order++,
+                List.of(
+                        block("shell", Map.of(
+                                "command", "set -euo pipefail\necho '=== Documentation Files ==='\nfind . -type f \\( -name '*.md' -o -name '*.adoc' -o -name '*.rst' \\) -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/target/*' 2>/dev/null | head -30\necho ''\necho '=== README Content ==='\nfor f in $(find . -maxdepth 2 -name 'README.md' -o -name 'CLAUDE.md' 2>/dev/null); do\n  echo \"--- $f ---\"\n  cat \"$f\" 2>/dev/null | head -200\n  echo ''\ndone\necho '=== Config Files ==='\nfor f in $(find . -maxdepth 3 \\( -name 'package.json' -o -name 'pom.xml' -o -name 'build.gradle' -o -name 'application.yml' -o -name 'application.yaml' -o -name 'tsconfig.json' -o -name 'vite.config.*' \\) -not -path '*/node_modules/*' -not -path '*/target/*' 2>/dev/null | head -15); do\n  echo \"--- $f ---\"\n  head -50 \"$f\" 2>/dev/null\n  echo ''\ndone\necho '=== API Endpoints ==='\ngrep -rn '@\\(Get\\|Post\\|Put\\|Delete\\|Patch\\)Mapping\\|@RequestMapping' --include='*.java' . 2>/dev/null | grep -v target | head -60\necho ''\necho '=== Script Files ==='\nfind . -maxdepth 2 -name '*.sh' -not -path '*/.git/*' 2>/dev/null | while read f; do echo \"--- $f ---\"; head -5 \"$f\"; echo ''; done",
+                                "on_failure", "continue"
+                        )),
+                        block("simple", Map.of(
+                                "command", "Vergleiche die Dokumentation systematisch gegen den tatsaechlichen Code:\n\n{{ previous_output }}\n\nPruefe:\n1. **Build-Befehle**: Stimmen dokumentierte Build/Run/Test-Befehle? Existieren die referenzierten Scripts?\n2. **Projektstruktur**: Stimmt die dokumentierte Verzeichnisstruktur mit der Realitaet ueberein? Fehlen Verzeichnisse oder sind zusaetzliche vorhanden?\n3. **API-Endpunkte**: Sind alle dokumentierten Endpunkte im Code vorhanden? Fehlen Endpunkte in der Doku?\n4. **Versionen**: Stimmen dokumentierte Versionen (Java, Node, Spring Boot, React etc.) mit pom.xml/package.json?\n5. **Feature-Listen**: Werden Features beschrieben die nicht (mehr) existieren? Fehlen implementierte Features in der Doku?\n6. **Konfiguration**: Stimmen dokumentierte Config-Keys, Ports, Defaults mit application.yml?\n7. **Produktname/Branding**: Wird der richtige Produktname konsistent verwendet?\n\nJeder Fund: Doku-Stelle, Code-Realitaet, Schweregrad (CRITICAL=falsche Befehle die Nutzer verwirren, HIGH=faktisch falsch, MEDIUM=unvollstaendig, LOW=kosmetisch).",
+                                "timeout_seconds", 600
+                        )),
+                        block("conditional", Map.of(
+                                "condition", "echo '{{ previous_output }}' | grep -qi 'CRITICAL'",
+                                "then_command", "echo 'WARNUNG: Kritische Dokumentationsfehler gefunden! Falsche Build-Befehle oder Anleitungen koennen Nutzer direkt beeintraechtigen.'",
+                                "else_command", "echo 'Keine kritischen Dokumentationsfehler gefunden.'",
+                                "execution_mode", "shell"
+                        )),
+                        block("simple", Map.of(
+                                "command", "Erstelle den finalen Dokumentations-Report:\n\n{{ previous_output }}\n\n## Format:\n\n### Executive Summary\n- Gesamtbewertung Doku-Genauigkeit (1-10)\n- Anzahl Findings pro Schweregrad\n- Kritischster Fund\n\n### Findings\n| # | Schweregrad | Doku-Stelle | Dokumentiert | Tatsaechlich | Korrektur |\n\n### Korrektur-Vorschlaege\nFuer jeden Fund den konkreten Text, der in der Doku stehen sollte (Copy-Paste-fertig).\n\n### Fehlende Dokumentation\nImplementierte Features/Endpunkte die in keiner Doku erwaehnt werden.",
+                                "timeout_seconds", 600
+                        )),
+                        auditTodoBlock("doc-accuracy", "Doku-Genauigkeit")
+                ),
+                "Vergleicht Dokumentation gegen Code: Build-Befehle, Projektstruktur, API-Endpunkte, Versionen, Feature-Listen.",
+                "claude-sonnet-4-6", "1.1.0"));
+
+        templates.add(template("codebase-health-scorecard", "\uD83C\uDFE5",
+                Map.of("de", "Codebase-Gesundheits-Scorecard", "en", "Codebase Health Scorecard"),
+                Map.of("de", "Ganzheitliche Bewertung: Tests, Komplexit\u00e4t, Fehlerbehandlung, Security, Tech Debt, Architektur",
+                        "en", "Holistic assessment: tests, complexity, error handling, security, tech debt, architecture"),
+                "CODE", order++,
+                List.of(
+                        block("shell", Map.of(
+                                "command", "set -euo pipefail\necho '=== File Counts by Type ==='\nfind . -type f \\( -name '*.java' -o -name '*.kt' -o -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \\) -not -path '*/node_modules/*' -not -path '*/build/*' -not -path '*/target/*' -not -path '*/dist/*' -not -path '*/.git/*' | sed 's/.*\\.//' | sort | uniq -c | sort -rn\necho ''\necho '=== Test Files ==='\nfind . -type f \\( -name '*Test.java' -o -name '*Spec.java' -o -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' -o -name '*.test.js' -o -name '*_test.go' \\) -not -path '*/node_modules/*' -not -path '*/target/*' 2>/dev/null | wc -l\necho ''\necho '=== Source vs Test Ratio ==='\nSRC=$(find . -type f \\( -name '*.java' -o -name '*.ts' -o -name '*.tsx' \\) -not -name '*Test*' -not -name '*test*' -not -name '*spec*' -not -path '*/node_modules/*' -not -path '*/target/*' -not -path '*/dist/*' 2>/dev/null | wc -l)\nTEST=$(find . -type f \\( -name '*Test.java' -o -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' \\) -not -path '*/node_modules/*' -not -path '*/target/*' 2>/dev/null | wc -l)\necho \"Source files: $SRC, Test files: $TEST, Ratio: 1:$(python3 -c \"print(round($TEST/$SRC,2) if $SRC>0 else 0)\" 2>/dev/null || echo '?')\"\necho ''\necho '=== Large Files (>300 lines) ==='\nfind . -type f \\( -name '*.java' -o -name '*.ts' -o -name '*.tsx' \\) -not -path '*/node_modules/*' -not -path '*/target/*' -not -path '*/dist/*' 2>/dev/null | while read f; do\n  lines=$(wc -l < \"$f\")\n  if [ \"$lines\" -gt 300 ]; then echo \"$lines $f\"; fi\ndone | sort -rn | head -20\necho ''\necho '=== TODOs/FIXMEs ==='\ngrep -rn 'TODO\\|FIXME\\|HACK\\|XXX\\|WORKAROUND' --include='*.java' --include='*.ts' --include='*.tsx' --include='*.kt' . 2>/dev/null | grep -v node_modules | grep -v target | wc -l\necho ''\necho '=== Empty Catch Blocks ==='\ngrep -rn 'catch.*{' --include='*.java' --include='*.kt' -A1 . 2>/dev/null | grep -B1 '^ *}' | grep 'catch' | grep -v target | wc -l\necho ''\necho '=== Hardcoded Strings (potential secrets) ==='\ngrep -rn 'password.*=.*\"\\|secret.*=.*\"\\|api.key.*=.*\"\\|token.*=.*\"' --include='*.java' --include='*.ts' --include='*.kt' --include='*.yml' --include='*.yaml' -i . 2>/dev/null | grep -v node_modules | grep -v target | grep -v test | grep -v '.md' | head -15\necho ''\necho '=== Deprecated Annotations ==='\ngrep -rn '@Deprecated\\|@deprecated\\|@SuppressWarnings' --include='*.java' --include='*.kt' . 2>/dev/null | grep -v target | wc -l",
+                                "on_failure", "continue"
+                        )),
+                        block("simple", Map.of(
+                                "command", "Bewerte die Codebase-Gesundheit anhand der Metriken:\n\n{{ previous_output }}\n\nBewerte jede Dimension auf einer Skala von 1-10 mit konkreten Belegen:\n\n1. **Testabdeckung** (Gewicht 20%): Test/Source-Ratio, Verteilung der Test-Typen, untestete Bereiche\n2. **Code-Komplexitaet** (Gewicht 15%): Grosse Dateien, God Classes, Verschachtelungstiefe\n3. **Fehlerbehandlung** (Gewicht 15%): Leere Catch-Bloecke, konsistentes Error-Handling, Logging\n4. **Security-Hygiene** (Gewicht 20%): Hardcoded Secrets, Input-Validierung, Dependency-Alter\n5. **Tech Debt** (Gewicht 15%): TODOs/FIXMEs, Deprecated-Nutzung, Workarounds, auskommentierter Code\n6. **Architektur-Klarheit** (Gewicht 15%): Schichtentrennung, Benennungskonsistenz, Package-Struktur\n\nFuer jede Dimension: Score, 2-3 konkrete Belege aus den Daten, groesster Verbesserungshebel.",
+                                "timeout_seconds", 600
+                        )),
+                        block("simple", Map.of(
+                                "command", "Erstelle die finale Scorecard:\n\n{{ previous_output }}\n\n## Format:\n\n### Health Scorecard\n| Dimension | Score | Gewicht | Gewichtet | Trend-Indikator |\n|-----------|-------|---------|-----------|----------------|\n| ... | X/10 | XX% | X.X | (geschaetzt) |\n| **Gesamt** | | | **X.X/10** | |\n\n### Top-3 Staerken\nWas die Codebase gut macht.\n\n### Top-3 Risiken\nWo der groesste Handlungsbedarf besteht.\n\n### Improvement Roadmap\n| Prioritaet | Massnahme | Betroffene Dimension | Erwarteter Impact | Aufwand |\n\nMaximal 8-10 Massnahmen, nach Impact/Aufwand-Verhaeltnis sortiert.",
+                                "timeout_seconds", 600
+                        )),
+                        auditTodoBlock("codebase-health", "Codebase Health")
+                ),
+                "Ganzheitliche Codebase-Bewertung in 6 Dimensionen: Testabdeckung, Komplexitaet, Fehlerbehandlung, Security, Tech Debt, Architektur.",
+                "claude-sonnet-4-6", "1.1.0"));
+
+        templates.add(template("architecture-debt-radar", "\uD83C\uDFD7\uFE0F",
+                Map.of("de", "Architektur-Schulden-Radar", "en", "Architecture Debt Radar"),
+                Map.of("de", "God Classes, zirkul\u00e4re Abh\u00e4ngigkeiten, Schichtverletzungen und \u00fcberm\u00e4\u00dfige Kopplung aufdecken",
+                        "en", "Detect god classes, circular dependencies, layer violations, and excessive coupling"),
+                "CODE", order++,
+                List.of(
+                        block("shell", Map.of(
+                                "command", "set -euo pipefail\necho '=== Directory Structure (depth 3) ==='\nfind . -type d -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/target/*' -not -path '*/build/*' -not -path '*/dist/*' | head -80\necho ''\necho '=== Large Files (>200 lines, candidates for God Classes) ==='\nfind . -type f \\( -name '*.java' -o -name '*.ts' -o -name '*.tsx' -o -name '*.kt' \\) -not -path '*/node_modules/*' -not -path '*/target/*' -not -path '*/dist/*' 2>/dev/null | while read f; do\n  lines=$(wc -l < \"$f\")\n  if [ \"$lines\" -gt 200 ]; then\n    methods=$(grep -c 'public \\|private \\|protected \\|function \\|const .*= .*=>\\|async ' \"$f\" 2>/dev/null || echo 0)\n    injections=$(grep -c '@Autowired\\|@Inject\\|private final.*Service\\|private final.*Repository' \"$f\" 2>/dev/null || echo 0)\n    echo \"$lines lines | $methods methods | $injections injections | $f\"\n  fi\ndone | sort -rn | head -25\necho ''\necho '=== Import Graph (inter-package dependencies) ==='\ngrep -rn '^import ' --include='*.java' . 2>/dev/null | grep -v target | grep 'com.automation' | sed 's/.*import \\(com\\.automation\\.[a-z]*\\).*/\\1/' | sort | uniq -c | sort -rn | head -30\necho ''\necho '=== Frontend Import Graph ==='\ngrep -rn \"^import .* from '\" --include='*.ts' --include='*.tsx' . 2>/dev/null | grep -v node_modules | grep -v dist | sed \"s/.*from '\\([^']*\\)'.*/\\1/\" | grep -v '^[a-z@]' | sort | uniq -c | sort -rn | head -30\necho ''\necho '=== DI Injections per Class ==='\nfor f in $(find . -name '*.java' -not -path '*/target/*' 2>/dev/null); do\n  count=$(grep -c 'private final.*Service\\|private final.*Repository\\|private final.*Executor\\|private final.*Client\\|@Autowired\\|@Inject' \"$f\" 2>/dev/null || echo 0)\n  if [ \"$count\" -gt 5 ]; then echo \"$count injections: $f\"; fi\ndone | sort -rn | head -15\necho ''\necho '=== @Lazy and @SuppressWarnings ==='\ngrep -rn '@Lazy\\|@SuppressWarnings' --include='*.java' --include='*.kt' . 2>/dev/null | grep -v target | head -15\necho ''\necho '=== Cross-Layer Imports (potential violations) ==='\ngrep -rn 'import com.automation.controller' --include='*.java' . 2>/dev/null | grep -v target | grep -v 'controller/' | head -10\ngrep -rn 'import com.automation.repository' --include='*.java' . 2>/dev/null | grep -v target | grep -v 'repository/' | grep -v 'service/' | head -10",
+                                "on_failure", "continue"
+                        )),
+                        block("simple", Map.of(
+                                "command", "Analysiere die gesammelten Architektur-Daten auf strukturelle Probleme:\n\n{{ previous_output }}\n\nUntersuche:\n1. **God Classes**: Dateien mit >300 Zeilen, >10 Methoden oder >5 Injections. Welche Verantwortlichkeiten koennten extrahiert werden?\n2. **Zirkulaere Abhaengigkeiten**: Packages die sich gegenseitig importieren (A→B→A). @Lazy-Annotationen als Symptom.\n3. **Schichtverletzungen**: Controller die Repositories direkt nutzen, Services die Controller importieren, etc.\n4. **Fehlende Abstraktionen**: Wo wird gleiche Logik in mehreren Klassen dupliziert statt in ein gemeinsames Interface/Service extrahiert?\n5. **Uebermassige Kopplung**: Klassen mit >5 DI-Injections — Anzeichen fuer zu breite Verantwortlichkeit.\n6. **Package-Struktur**: Stimmt die Package-Organisation mit der logischen Architektur ueberein?\n\nPro Finding: Konkrete Datei(en), Art des Problems, Schweregrad, spezifischer Refactoring-Vorschlag (z.B. welche Methoden in welche neue Klasse extrahieren).",
+                                "timeout_seconds", 600
+                        )),
+                        block("simple", Map.of(
+                                "command", "Erstelle den Architektur-Schulden-Radar-Report:\n\n{{ previous_output }}\n\n## Format:\n\n### Radar-Uebersicht\n| Dimension | Score (1-10) | Findings | Kritischster Fund |\n|-----------|-------------|----------|-------------------|\n| God Classes | | | |\n| Zirkulaere Deps | | | |\n| Schichtverletzungen | | | |\n| Fehlende Abstraktionen | | | |\n| Kopplung | | | |\n| Package-Struktur | | | |\n\n### God-Class-Aufteilungen\nFuer jede identifizierte God Class:\n- Aktuelle Groesse und Verantwortlichkeiten\n- Vorgeschlagene Aufteilung in N neue Klassen\n- Welche Methoden in welche neue Klasse\n\n### Refactoring-Roadmap\n| Phase | Massnahme | Risiko | Abhaengigkeiten | Geschaetzter Aufwand |\n\nPhasen: 1=Quick Wins (isolierte Aenderungen), 2=Mittelfristig (bedingte Abhaengigkeiten), 3=Langfristig (groessere Umbauarbeiten).",
+                                "timeout_seconds", 600
+                        )),
+                        auditTodoBlock("arch-debt", "Architektur-Schulden")
+                ),
+                "Deckt strukturelle Architektur-Probleme auf: God Classes, zirkulaere Abhaengigkeiten, Schichtverletzungen, fehlende Abstraktionen.",
+                "claude-sonnet-4-6", "1.1.0"));
+
+        templates.add(template("test-coverage-gaps", "\uD83E\uDDEA",
+                Map.of("de", "Test-Abdeckungs-L\u00fccken", "en", "Test Coverage Gaps"),
+                Map.of("de", "Ungetestete Klassen und Services identifizieren, Coverage-Ratio berechnen, Priorit\u00e4ten setzen",
+                        "en", "Identify untested classes and services, calculate coverage ratio, set priorities"),
+                "CODE", order++,
+                List.of(
+                        block("shell", Map.of(
+                                "command", "set -euo pipefail\necho '=== Source Files ==='\nfind . -type f \\( -name '*.java' -o -name '*.kt' -o -name '*.ts' -o -name '*.tsx' \\) -not -path '*/node_modules/*' -not -path '*/build/*' -not -path '*/target/*' -not -path '*/dist/*' -not -path '*/.git/*' -not -name '*Test*' -not -name '*test*' -not -name '*spec*' -not -path '*/test/*' | sort > /tmp/src_files.txt\nSRC_COUNT=$(wc -l < /tmp/src_files.txt)\necho \"Source files: $SRC_COUNT\"\necho ''\necho '=== Test Files ==='\nfind . -type f \\( -name '*Test.java' -o -name '*Spec.java' -o -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' -o -name '*_test.go' \\) -not -path '*/node_modules/*' -not -path '*/target/*' -not -path '*/dist/*' | sort > /tmp/test_files.txt\nTEST_COUNT=$(wc -l < /tmp/test_files.txt)\necho \"Test files: $TEST_COUNT\"\necho ''\necho '=== Coverage Ratio ==='\necho \"Ratio: $(python3 -c \"print(f'{$TEST_COUNT/$SRC_COUNT*100:.1f}%' if $SRC_COUNT>0 else '0%')\" 2>/dev/null)\"\necho ''\necho '=== Untested Source Files (no matching test) ==='\nwhile IFS= read -r src; do\n  base=$(basename \"$src\" | sed 's/\\.[^.]*$//')\n  if ! grep -qi \"$base\" /tmp/test_files.txt 2>/dev/null; then\n    lines=$(wc -l < \"$src\")\n    echo \"$lines $src\"\n  fi\ndone < /tmp/src_files.txt | sort -rn | head -40\necho ''\necho '=== Test File Contents (method count) ==='\nwhile IFS= read -r tf; do\n  methods=$(grep -c '@Test\\|it(\\|test(\\|describe(' \"$tf\" 2>/dev/null || echo 0)\n  echo \"$methods tests: $tf\"\ndone < /tmp/test_files.txt | sort -rn | head -20",
+                                "on_failure", "continue"
+                        )),
+                        block("simple", Map.of(
+                                "command", "Analysiere die Test-Coverage-Daten:\n\n{{ previous_output }}\n\nBewerte systematisch:\n1. **Ungetestete Services/Controller**: Welche Klassen mit Business-Logik haben KEINEN zugehoerigen Test? Priorisiere nach: Groesse (LOC), Komplexitaet (Anzahl public methods), Kritikalitaet (Controller > Service > Utility)\n2. **Duenne Tests**: Test-Dateien mit nur 1-2 Test-Methoden fuer grosse Klassen — wo ist die Test-Tiefe unzureichend?\n3. **Fehlende Test-Typen**: Gibt es nur Unit-Tests aber keine Integration-Tests? Fehlen Edge-Case-Tests?\n4. **Test-Qualitaet**: Tests die nur den Happy Path pruefen, fehlende Assertions, Test-Namen die nichts aussagen\n5. **Kritische Luecken**: Welche untesteten Bereiche stellen das groesste Risiko dar (Security, Datenpersistenz, externe Integrationen)?\n\nFuer jeden Fund: Datei, Schweregrad (CRITICAL/HIGH/MEDIUM/LOW), was genau getestet werden sollte.",
+                                "timeout_seconds", 600
+                        )),
+                        block("simple", Map.of(
+                                "command", "Erstelle den Coverage-Gap-Report:\n\n{{ previous_output }}\n\n## Format:\n\n### Executive Summary\n- Gesamt-Coverage-Ratio (Dateien mit Tests / Gesamt)\n- Anzahl kritisch untesteter Klassen\n- Bewertung der Test-Qualitaet (1-10)\n\n### Coverage-Matrix\n| Modul/Package | Source Files | Test Files | Coverage | Kritischste Luecke |\n\n### Top-10 Prioritaeten\n| # | Datei | LOC | Schweregrad | Was testen | Geschaetzter Aufwand |\n\n### Quick Wins\nKleine Klassen/Utilities die mit wenig Aufwand getestet werden koennen.\n\n### Empfohlene Test-Strategie\nWelche Test-Typen (Unit, Integration, E2E) fuer welche Module priorisiert werden sollten.",
+                                "timeout_seconds", 600
+                        )),
+                        auditTodoBlock("test-coverage", "Test-Abdeckung")
+                ),
+                "Identifiziert ungetestete Klassen, berechnet Coverage-Ratio und priorisiert Test-Luecken nach Kritikalitaet.",
+                "claude-sonnet-4-6"));
+
         return templates;
     }
 
@@ -658,5 +804,50 @@ public final class BuiltInTemplates {
                 .type(type)
                 .config(new java.util.HashMap<>(config))
                 .build();
+    }
+
+    /**
+     * Creates a reusable agentic block that converts audit findings into TODOs via the REST API.
+     * Uses tag-based deduplication to update existing TODOs instead of creating duplicates.
+     *
+     * @param auditTag  tag suffix for dedup (e.g. "api-consistency" → TODO tag "audit:api-consistency")
+     * @param auditLabel human-readable prefix for TODO titles (e.g. "API-Konsistenz")
+     */
+    private static BlockDefinition auditTodoBlock(String auditTag, String auditLabel) {
+        return block("agentic", Map.of(
+                "goal", String.format(
+                        "Erstelle oder aktualisiere TODOs basierend auf den Audit-Findings aus {{ previous_output }}.\n\n"
+                        + "VORGEHEN:\n"
+                        + "1. API-Key aus der SQLite-Datenbank lesen:\n"
+                        + "   python3 -c \"import sqlite3; conn = sqlite3.connect('ai-automation-backend/data/automation.db'); "
+                        + "c = conn.cursor(); c.execute(\\\"SELECT value FROM app_settings WHERE key = 'api-key'\\\"); "
+                        + "print(c.fetchone()[0]); conn.close()\"\n\n"
+                        + "2. Bestehende TODOs mit Tag 'audit:%s' laden:\n"
+                        + "   curl -s -H 'X-API-Key: <KEY>' http://localhost:9090/api/v1/todos?tag=audit:%s\n\n"
+                        + "3. Fuer jeden HIGH oder CRITICAL Finding aus dem Audit-Report:\n"
+                        + "   a) Pruefen ob bereits ein offenes TODO mit gleichem Titel-Prefix existiert\n"
+                        + "   b) Falls ja: TODO-Beschreibung aktualisieren (PATCH /api/v1/todos/<id>)\n"
+                        + "   c) Falls nein: Neues TODO anlegen (POST /api/v1/todos) mit:\n"
+                        + "      - title: \"%s: <kurze Beschreibung des Findings>\"\n"
+                        + "      - description: Markdown mit Details, betroffene Dateien, Empfehlung\n"
+                        + "      - priority: Mapping CRITICAL→HIGH, HIGH→MEDIUM\n"
+                        + "      - tags: [\"audit:%s\", \"backend\" oder \"frontend\"]\n"
+                        + "      - projectId: \"ebf4f50c-20c2-4c35-a84a-a0b350124523\"\n"
+                        + "      - source: \"AI\"\n"
+                        + "      - sourceAgent: \"audit-workflow\"\n\n"
+                        + "4. Bestehende TODOs mit Tag 'audit:%s' die NICHT mehr in den Findings auftauchen:\n"
+                        + "   → Status auf DONE setzen (PATCH /api/v1/todos/<id>/status mit {\"status\": \"DONE\"})\n\n"
+                        + "WICHTIG: Nur HIGH und CRITICAL Findings als TODOs anlegen. MEDIUM und LOW ignorieren.\n"
+                        + "WICHTIG: Jede curl-Aktion muss den API-Key im Header X-API-Key mitgeben.\n"
+                        + "WICHTIG: Absolute Pfade verwenden fuer die SQLite-DB.",
+                        auditTag, auditTag, auditLabel, auditTag, auditTag),
+                "success_criteria", "Alle HIGH/CRITICAL Findings sind als TODOs angelegt oder aktualisiert. Geloeste Issues sind auf DONE gesetzt.",
+                "max_iterations", 10,
+                "max_total_tokens", 150000,
+                "iteration_timeout_seconds", 120,
+                "total_timeout_seconds", 900,
+                "max_repeated_actions", 3,
+                "require_approval", false
+        ));
     }
 }
