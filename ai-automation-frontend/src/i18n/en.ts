@@ -787,6 +787,8 @@ export const en = {
     testing: 'Testing on test instance...',
     topicRequired: 'Topic is required',
     projectRequired: 'Project is required',
+    providerLabel: 'AI Provider',
+    providerDefault: 'Default (Server)',
   },
   errorPage: {
     somethingWentWrong: 'Something went wrong',

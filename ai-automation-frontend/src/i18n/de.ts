@@ -789,6 +789,8 @@ export const de: TranslationKeys = {
     testing: 'Test auf Test-Instanz...',
     topicRequired: 'Thema ist erforderlich',
     projectRequired: 'Projekt ist erforderlich',
+    providerLabel: 'KI-Anbieter',
+    providerDefault: 'Standard (Server)',
   },
   errorPage: {
     somethingWentWrong: 'Etwas ist schiefgelaufen',

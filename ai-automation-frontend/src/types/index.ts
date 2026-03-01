@@ -770,6 +770,7 @@ export interface WorkflowFactoryRequest {
   autoPromote?: boolean;
   autoFix?: boolean;
   maxRetries?: number;
+  provider?: string;
 }
 
 export interface WorkflowFactoryResult {

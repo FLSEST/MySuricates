@@ -47,6 +47,7 @@ export function WorkflowFactory() {
   const [category, setCategory] = useState('');
   const [projectId, setProjectId] = useState('');
   const [testInputs, setTestInputs] = useState('');
+  const [provider, setProvider] = useState('');
   const [autoPromote, setAutoPromote] = useState(false);
   const [autoFix, setAutoFix] = useState(false);
   const [maxRetries, setMaxRetries] = useState(2);
@@ -71,7 +72,7 @@ export function WorkflowFactory() {
 
     generateMutation.mutate({
       topic, description: description || undefined, category: category || undefined,
-      projectId, testInputs: parseTestInputs(),
+      projectId, testInputs: parseTestInputs(), provider: provider || undefined,
     }, {
       onSuccess: (workflow) => {
         toast.success(`Workflow "${workflow.name}" created`);
@@ -93,6 +94,7 @@ export function WorkflowFactory() {
     runMutation.mutate({
       topic, description: description || undefined, category: category || undefined,
       projectId, testInputs: parseTestInputs(), autoPromote, autoFix, maxRetries,
+      provider: provider || undefined,
     }, {
       onSuccess: (result) => {
         setResults(prev => [result, ...prev]);
@@ -187,6 +189,16 @@ export function WorkflowFactory() {
             options={projectOptions}
             value={projectId}
             onChange={e => setProjectId(e.target.value)}
+          />
+          <Select
+            label={t.factory.providerLabel}
+            options={[
+              { value: '', label: t.factory.providerDefault },
+              { value: 'CLAUDE', label: 'Claude' },
+              { value: 'CODEX', label: 'Codex' },
+            ]}
+            value={provider}
+            onChange={e => setProvider(e.target.value)}
           />
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-text-secondary">{t.factory.testInputsLabel}</label>
