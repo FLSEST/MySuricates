@@ -10,6 +10,8 @@ import com.automation.service.ai.HostClaudeService;
 import com.automation.service.chain.ChainExecutor;
 import com.automation.service.chain.ChainService;
 import com.automation.dto.response.PoolWorkflowEntry;
+import com.automation.service.factory.WorkflowFactoryService;
+import com.automation.service.learning.LearningService;
 import com.automation.service.pool.WorkflowPoolService;
 import com.automation.service.workflow.AgentInstructionsService;
 import com.automation.service.workflow.WorkflowExecutor;
@@ -58,6 +60,8 @@ public class WishService {
     private final AgentInstructionsService agentInstructionsService;
     private final WorkflowTemplateService workflowTemplateService;
     private final WorkflowPoolService workflowPoolService;
+    private final WorkflowFactoryService workflowFactoryService;
+    private final LearningService learningService;
     private final SimpMessagingTemplate messagingTemplate;
     private final ExecutorService virtualThreadExecutor;
 
@@ -95,6 +99,8 @@ public class WishService {
             AgentInstructionsService agentInstructionsService,
             @Lazy WorkflowTemplateService workflowTemplateService,
             WorkflowPoolService workflowPoolService,
+            @Lazy WorkflowFactoryService workflowFactoryService,
+            LearningService learningService,
             SimpMessagingTemplate messagingTemplate,
             ExecutorService virtualThreadExecutor
     ) {
@@ -115,6 +121,8 @@ public class WishService {
         this.agentInstructionsService = agentInstructionsService;
         this.workflowTemplateService = workflowTemplateService;
         this.workflowPoolService = workflowPoolService;
+        this.workflowFactoryService = workflowFactoryService;
+        this.learningService = learningService;
         this.messagingTemplate = messagingTemplate;
         this.virtualThreadExecutor = virtualThreadExecutor;
     }
@@ -405,6 +413,9 @@ public class WishService {
 
         wish.setGeneratedWorkflowIds(workflowIds);
 
+        // Pre-flight verification on Test instance (best effort)
+        verifyGeneratedWorkflows(wish, workflowIds);
+
         // Create chain if multiple workflows
         Object chainObj = parsed.get("chain");
         if (workflowIds.size() > 1 && chainObj instanceof Map<?, ?> chainMap) {
@@ -427,6 +438,47 @@ public class WishService {
 
         wish.setIterationCount(wish.getIterationCount() + 1);
         updateStatus(wish, WishStatus.EXECUTING);
+    }
+
+    /**
+     * Best-effort pre-flight verification: deploys each workflow to the Test instance,
+     * runs it, and auto-fixes if it fails. Stores results in wish metadata.
+     * Silently skips if the Test instance is not available.
+     */
+    @SuppressWarnings("unchecked")
+    private void verifyGeneratedWorkflows(Wish wish, List<String> workflowIds) {
+        if (workflowIds.isEmpty()) return;
+
+        try {
+            List<Map<String, String>> results = new ArrayList<>();
+            for (String wfId : workflowIds) {
+                try {
+                    WorkflowFactoryService.FactoryTestResult testResult =
+                            workflowFactoryService.verifyAndFix(wfId, 2);
+                    results.add(Map.of(
+                            "workflowId", wfId,
+                            "status", testResult.status(),
+                            "error", testResult.error() != null ? testResult.error() : ""
+                    ));
+                    log.info("Wish {}: Verified workflow {} → {}",
+                            wish.getId(), wfId, testResult.status());
+                } catch (Exception e) {
+                    results.add(Map.of(
+                            "workflowId", wfId,
+                            "status", "SKIPPED",
+                            "error", e.getMessage() != null ? e.getMessage() : "Unknown"
+                    ));
+                    log.warn("Wish {}: Could not verify workflow {}: {}",
+                            wish.getId(), wfId, e.getMessage());
+                }
+            }
+
+            Map<String, Object> meta = new HashMap<>(wish.getMetadata());
+            meta.put("verificationResults", results);
+            wish.setMetadata(meta);
+        } catch (Exception e) {
+            log.warn("Wish {}: Pre-flight verification skipped: {}", wish.getId(), e.getMessage());
+        }
     }
 
     // ── Phase B: Execute ─────────────────────────────────────────
@@ -727,6 +779,9 @@ public class WishService {
             sb.append("\n");
         }
 
+        // Execution Intelligence from past runs
+        sb.append(buildExecutionIntelligence(wish.getProjectId()));
+
         // Add available skills
         List<Skill> skills = skillRepository.findAll();
         if (!skills.isEmpty()) {
@@ -798,6 +853,116 @@ public class WishService {
             }
         }
         return score;
+    }
+
+    @SuppressWarnings("unchecked")
+    private String buildExecutionIntelligence(String projectId) {
+        StringBuilder sb = new StringBuilder();
+        try {
+            List<Workflow> projectWorkflows = projectId != null
+                    ? workflowRepository.findByProjectId(projectId)
+                    : List.of();
+
+            // Collect per-workflow stats for workflows with enough runs
+            List<String> performanceLines = new ArrayList<>();
+            double totalCost = 0;
+            long totalRuns = 0;
+            Set<String> allModels = new LinkedHashSet<>();
+            List<String> pitfalls = new ArrayList<>();
+
+            for (Workflow wf : projectWorkflows) {
+                Map<String, Object> stats = learningService.getWorkflowStats(wf.getId());
+                int runs = ((Number) stats.getOrDefault("totalRuns", 0)).intValue();
+                if (runs < 2) continue;
+
+                double successRate = ((Number) stats.getOrDefault("successRate", 0.0)).doubleValue();
+                double avgDuration = ((Number) stats.getOrDefault("avgDurationMs", 0.0)).doubleValue();
+                totalRuns += runs;
+
+                Map<String, Object> insights = learningService.getExecutionInsights(wf.getId());
+                double cost = ((Number) insights.getOrDefault("avgCostPerRunUsd", 0.0)).doubleValue();
+                totalCost += ((Number) insights.getOrDefault("totalCostUsd", 0.0)).doubleValue();
+                Object models = insights.get("modelsUsed");
+                if (models instanceof List<?> modelList) {
+                    modelList.forEach(m -> allModels.add(String.valueOf(m)));
+                }
+
+                performanceLines.add(String.format(
+                        "- **%s** (%d runs): %.0f%% success, avg %.0fs, $%.3f/run",
+                        wf.getName(), runs, successRate * 100, avgDuration / 1000.0, cost));
+
+                // Collect pitfalls from high-failure steps
+                List<Map<String, Object>> suggestions = learningService.getOptimizationSuggestions(wf.getId());
+                for (Map<String, Object> sug : suggestions) {
+                    String severity = (String) sug.getOrDefault("severity", "");
+                    if ("HIGH".equals(severity)) {
+                        pitfalls.add("- " + sug.getOrDefault("message", ""));
+                    }
+                }
+            }
+
+            if (performanceLines.isEmpty() && projectWorkflows.size() < 2) {
+                return ""; // Not enough data
+            }
+
+            sb.append("## Execution Intelligence (from past runs)\n\n");
+
+            if (!performanceLines.isEmpty()) {
+                sb.append("### Workflow Performance\n\n");
+                performanceLines.stream().limit(10).forEach(l -> sb.append(l).append("\n"));
+                sb.append("\n");
+            }
+
+            if (!pitfalls.isEmpty()) {
+                sb.append("### Common Issues to Avoid\n\n");
+                pitfalls.stream().distinct().limit(5).forEach(l -> sb.append(l).append("\n"));
+                sb.append("\n");
+            }
+
+            // Agentic block insights (aggregated across project)
+            int agenticRunsTotal = 0;
+            int goalsAchieved = 0;
+            double iterationsSum = 0;
+            int iterationsCount = 0;
+
+            for (Workflow wf : projectWorkflows) {
+                Map<String, Object> agenticAnalytics = learningService.getAgenticAnalytics(wf.getId());
+                int agRuns = ((Number) agenticAnalytics.getOrDefault("totalAgenticRuns", 0)).intValue();
+                if (agRuns == 0) continue;
+                agenticRunsTotal += agRuns;
+                goalsAchieved += ((Number) agenticAnalytics.getOrDefault("achievedGoals", 0)).intValue();
+                double avgIter = ((Number) agenticAnalytics.getOrDefault("avgIterationsToGoal", 0.0)).doubleValue();
+                if (avgIter > 0) {
+                    iterationsSum += avgIter * agRuns;
+                    iterationsCount += agRuns;
+                }
+            }
+
+            if (agenticRunsTotal > 0) {
+                double agenticSuccessRate = (double) goalsAchieved / agenticRunsTotal;
+                double avgIter = iterationsCount > 0 ? iterationsSum / iterationsCount : 0;
+                sb.append("### Agentic Block Insights\n\n");
+                sb.append(String.format("- %d agentic runs total, %.0f%% goal achieved\n",
+                        agenticRunsTotal, agenticSuccessRate * 100));
+                if (avgIter > 0) {
+                    sb.append(String.format("- Avg iterations to success: %.1f\n", avgIter));
+                }
+                sb.append("\n");
+            }
+
+            if (totalRuns > 0) {
+                sb.append("### Cost Profile\n\n");
+                sb.append(String.format("- Total project cost (recent): $%.2f across %d runs\n", totalCost, totalRuns));
+                if (!allModels.isEmpty()) {
+                    sb.append("- Models used: ").append(String.join(", ", allModels)).append("\n");
+                }
+                sb.append("\n");
+            }
+
+        } catch (Exception e) {
+            log.debug("Could not build execution intelligence: {}", e.getMessage());
+        }
+        return sb.toString();
     }
 
     private String buildDecomposeSystemPrompt(Wish wish) {
@@ -902,6 +1067,41 @@ public class WishService {
         } else if (wish.getCurrentRunId() != null) {
             // Single workflow run results
             appendWorkflowRunOutput(sb, wish.getCurrentRunId());
+        }
+
+        // Add execution cost context
+        if (wish.getCurrentRunId() != null) {
+            try {
+                Map<String, Object> runInsights = learningService.getRunInsights(wish.getCurrentRunId());
+                double cost = ((Number) runInsights.getOrDefault("totalCostUsd", 0.0)).doubleValue();
+                long tokens = ((Number) runInsights.getOrDefault("totalTokens", 0L)).longValue();
+                long durationMs = ((Number) runInsights.getOrDefault("durationMs", 0L)).longValue();
+                if (cost > 0 || tokens > 0) {
+                    sb.append("\n## Execution Cost\n\n");
+                    sb.append(String.format("- Cost: $%.4f, Tokens: %d, Duration: %.0fs\n",
+                            cost, tokens, durationMs / 1000.0));
+                    sb.append("- Consider cost efficiency when suggesting improvements\n\n");
+                }
+            } catch (Exception e) {
+                log.debug("Could not add run insights to evaluate prompt: {}", e.getMessage());
+            }
+        }
+
+        // Add verification results if available
+        if (wish.getMetadata() != null && wish.getMetadata().get("verificationResults") instanceof List<?> vResults && !vResults.isEmpty()) {
+            sb.append("## Pre-flight Verification Results\n\n");
+            for (Object vr : vResults) {
+                if (vr instanceof Map<?, ?> vrMap) {
+                    sb.append("- Workflow ").append(vrMap.get("workflowId"))
+                            .append(": ").append(vrMap.get("status"));
+                    Object err = vrMap.get("error");
+                    if (err != null && !String.valueOf(err).isBlank()) {
+                        sb.append(" (").append(truncate(String.valueOf(err), 100)).append(")");
+                    }
+                    sb.append("\n");
+                }
+            }
+            sb.append("\n");
         }
 
         sb.append("\n## Task\n\n");

@@ -6,6 +6,8 @@ import com.automation.repository.*;
 import com.automation.service.ai.HostClaudeService;
 import com.automation.service.chain.ChainExecutor;
 import com.automation.service.chain.ChainService;
+import com.automation.service.factory.WorkflowFactoryService;
+import com.automation.service.learning.LearningService;
 import com.automation.service.pool.WorkflowPoolService;
 import com.automation.service.workflow.AgentInstructionsService;
 import com.automation.service.workflow.WorkflowExecutor;
@@ -46,6 +48,8 @@ class WishServiceTest {
     @Mock private AgentInstructionsService agentInstructionsService;
     @Mock private WorkflowTemplateService workflowTemplateService;
     @Mock private WorkflowPoolService workflowPoolService;
+    @Mock private WorkflowFactoryService workflowFactoryService;
+    @Mock private LearningService learningService;
     @Mock private SimpMessagingTemplate messagingTemplate;
     @Mock private ExecutorService virtualThreadExecutor;
 
@@ -59,7 +63,7 @@ class WishServiceTest {
                 workflowRunRepository, chainRunRepository, stepResultRepository,
                 projectRepository, templateRepository, memoryRepository,
                 agentInstructionsService, workflowTemplateService, workflowPoolService,
-                messagingTemplate, virtualThreadExecutor
+                workflowFactoryService, learningService, messagingTemplate, virtualThreadExecutor
         );
     }
 

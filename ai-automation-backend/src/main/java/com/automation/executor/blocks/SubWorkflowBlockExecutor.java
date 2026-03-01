@@ -46,6 +46,10 @@ public class SubWorkflowBlockExecutor implements BlockExecutor {
 
         String workflowId = (String) block.getConfig().get("workflow_id");
         if (workflowId == null || workflowId.isBlank()) {
+            // Fallback: accept legacy camelCase key
+            workflowId = (String) block.getConfig().get("workflowId");
+        }
+        if (workflowId == null || workflowId.isBlank()) {
             throw new WorkflowExecutionException("Sub-workflow block requires 'workflow_id' in config");
         }
 

@@ -233,6 +233,33 @@ public class WorkflowFactoryService {
     }
 
     /**
+     * Verifies a workflow on the Test instance and auto-fixes if it fails.
+     * Best-effort: callers should catch exceptions (e.g. test instance not running).
+     */
+    public FactoryTestResult verifyAndFix(String workflowId, int maxRetries) {
+        Workflow workflow = workflowService.findById(workflowId);
+        FactoryTestResult result = deployAndVerify(workflow);
+
+        if ("FAILED".equals(result.status()) && maxRetries > 0) {
+            for (int i = 0; i < maxRetries && "FAILED".equals(result.status()); i++) {
+                log.info("Factory: auto-fix attempt {}/{} for workflow '{}'",
+                        i + 1, maxRetries, workflow.getName());
+                try {
+                    autoFixWorkflow(workflow, result.error());
+                    workflow = workflowService.findById(workflowId);
+                    result = deployAndVerify(workflow);
+                } catch (Exception e) {
+                    log.warn("Factory: auto-fix attempt {} failed: {}", i + 1, e.getMessage());
+                }
+            }
+        }
+
+        String projectName = workflow.getProject() != null ? workflow.getProject().getName() : null;
+        testingService.reportTestResult(workflow.getName(), projectName, result.status());
+        return result;
+    }
+
+    /**
      * Returns available topic categories.
      */
     public List<Map<String, String>> getTopicCategories() {
@@ -250,7 +277,7 @@ public class WorkflowFactoryService {
 
     // ── Internal helpers ──────────────────────────────────
 
-    record FactoryTestResult(String runId, String status, String error) {}
+    public record FactoryTestResult(String runId, String status, String error) {}
 
     private void autoFixWorkflow(Workflow workflow, String errorMessage) throws IOException {
         String blocksJson = objectMapper.writeValueAsString(workflow.getBlocks());
