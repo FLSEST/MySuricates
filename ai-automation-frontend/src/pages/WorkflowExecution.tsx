@@ -172,7 +172,15 @@ export function WorkflowExecution() {
             )}
           </div>
           <p className="text-sm text-text-secondary mt-0.5 flex items-center gap-2">
-            <span>{workflow?.name} &middot; {new Date(run.startedAt).toLocaleString()}</span>
+            <span>
+              <button
+                onClick={() => navigate(`/workflows/${id}`)}
+                className="text-accent hover:text-accent-hover hover:underline transition-colors"
+              >
+                {workflow?.name}
+              </button>
+              {' '}&middot; {new Date(run.startedAt).toLocaleString()}
+            </span>
             {run.projectPath && (
               <button
                 onClick={() => openPath(run.projectPath!).catch(() => {})}

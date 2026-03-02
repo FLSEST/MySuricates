@@ -5,7 +5,7 @@ import { SyncSelectModal } from '../shared/SyncSelectModal';
 import { useT } from '../../i18n';
 import { useTestingSyncPreview } from '../../hooks/useTesting';
 import type { TestingStatus, SyncResult, SyncDefinitionsRequest } from '../../types';
-import { FlaskConical, Play, Square, ExternalLink, Trash2, RefreshCw, ListChecks, ArrowDownToLine } from 'lucide-react';
+import { FlaskConical, Play, Square, ExternalLink, Trash2, RefreshCw, ListChecks, ArrowDownToLine, Wrench } from 'lucide-react';
 
 interface TestingCardProps {
   testing: TestingStatus | undefined;
@@ -16,6 +16,7 @@ interface TestingCardProps {
   onSyncAll: () => Promise<SyncResult>;
   onSyncSelective: (request: SyncDefinitionsRequest) => Promise<SyncResult>;
   onPullChanges: () => Promise<SyncResult>;
+  onRepairAll: () => void;
   syncResult: SyncResult | undefined;
   pullResult: SyncResult | undefined;
   startLoading: boolean;
@@ -23,12 +24,14 @@ interface TestingCardProps {
   resetLoading: boolean;
   syncLoading: boolean;
   pullLoading: boolean;
+  repairAllLoading: boolean;
 }
 
-export function TestingCard({ testing, devVersion, onStart, onStop, onReset, onSyncAll, onSyncSelective, onPullChanges, syncResult, pullResult, startLoading, stopLoading, resetLoading, syncLoading, pullLoading }: TestingCardProps) {
+export function TestingCard({ testing, devVersion, onStart, onStop, onReset, onSyncAll, onSyncSelective, onPullChanges, onRepairAll, syncResult, pullResult, startLoading, stopLoading, resetLoading, syncLoading, pullLoading, repairAllLoading }: TestingCardProps) {
   const t = useT();
   const [syncConfirm, setSyncConfirm] = useState(false);
   const [resetConfirm, setResetConfirm] = useState(false);
+  const [repairConfirm, setRepairConfirm] = useState(false);
   const [syncModalOpen, setSyncModalOpen] = useState(false);
   const { data: syncPreview, isLoading: previewLoading } = useTestingSyncPreview(syncModalOpen);
 
@@ -244,6 +247,34 @@ export function TestingCard({ testing, devVersion, onStart, onStop, onReset, onS
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          <div className="border-t border-border" />
+
+          {repairConfirm ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-warning">{t.settings.repairAllConfirm}</span>
+              <Button size="sm" variant="danger" onClick={() => { setRepairConfirm(false); onRepairAll(); }} loading={repairAllLoading}>
+                {t.common.confirm}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setRepairConfirm(false)}>
+                {t.common.cancel}
+              </Button>
+            </div>
+          ) : (
+            <div>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={<Wrench className="w-3.5 h-3.5" />}
+                onClick={() => setRepairConfirm(true)}
+                loading={repairAllLoading}
+                disabled={!testing?.healthy}
+              >
+                {t.settings.repairAll}
+              </Button>
+              <p className="text-xs text-text-tertiary mt-1">{t.settings.repairAllHint}</p>
             </div>
           )}
         </div>

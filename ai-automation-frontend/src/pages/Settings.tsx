@@ -1,6 +1,6 @@
 import { useSettingsStore } from '../stores/settingsStore';
 import { useT } from '../i18n';
-import { useSystemInfo } from '../hooks/useSystem';
+import { useSystemInfo, useRepairAllFailed } from '../hooks/useSystem';
 import { useStagingStatus, useStagingStart, useStagingStop, useStagingPromote, useStagingCancel, useStagingSync } from '../hooks/useStaging';
 import { useTestingStatus, useTestingStart, useTestingStop, useTestingReset, useTestingSync, useTestingPullChanges } from '../hooks/useTesting';
 import { GeneralSettingsCard } from '../components/settings/GeneralSettingsCard';
@@ -30,6 +30,7 @@ export function Settings() {
   const testingReset = useTestingReset();
   const testingSync = useTestingSync();
   const testingPullChanges = useTestingPullChanges();
+  const repairAllFailed = useRepairAllFailed();
 
   return (
     <div className="space-y-6 animate-fade-in max-w-3xl">
@@ -72,6 +73,7 @@ export function Settings() {
           onSyncAll={() => testingSync.mutateAsync(undefined)}
           onSyncSelective={(req) => testingSync.mutateAsync(req)}
           onPullChanges={() => testingPullChanges.mutateAsync()}
+          onRepairAll={() => repairAllFailed.mutate(false)}
           syncResult={testingSync.data}
           pullResult={testingPullChanges.data}
           startLoading={testingStart.isPending}
@@ -79,6 +81,7 @@ export function Settings() {
           resetLoading={testingReset.isPending}
           syncLoading={testingSync.isPending}
           pullLoading={testingPullChanges.isPending}
+          repairAllLoading={repairAllFailed.isPending}
         />
       )}
 

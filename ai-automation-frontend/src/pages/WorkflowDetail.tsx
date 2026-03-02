@@ -5,7 +5,7 @@ import { Card, CardHeader, Button, Spinner } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
 import {
   useWorkflow, useWorkflows as useWorkflowsList, useWorkflowRuns, useUpdateWorkflow,
-  useDeleteWorkflow, useExecuteWorkflow, useOptimizeWorkflow, useCreateWorkflow,
+  useDeleteWorkflow, useExecuteWorkflow, useOptimizeWorkflow, useRepairWorkflow, useCreateWorkflow,
 } from '../hooks/useWorkflows';
 import { useSkills, useActivateSkills, useDeactivateSkill } from '../hooks/useSkills';
 import { useProjects } from '../hooks/useProjects';
@@ -30,6 +30,7 @@ export function WorkflowDetail() {
   const deleteWorkflow = useDeleteWorkflow();
   const executeWorkflow = useExecuteWorkflow();
   const optimizeWorkflow = useOptimizeWorkflow();
+  const repairWorkflow = useRepairWorkflow();
   const createWorkflow = useCreateWorkflow();
   const activateSkills = useActivateSkills();
   const deactivateSkill = useDeactivateSkill();
@@ -87,6 +88,8 @@ export function WorkflowDetail() {
       onSuccess: () => navigate('/workflows'),
     });
   };
+
+  const hasFailedRuns = runs?.content?.some((r) => r.status === 'FAILED') ?? false;
 
   const workflowVariables = extractWorkflowVariables(workflow.blocks);
 
@@ -234,6 +237,9 @@ export function WorkflowDetail() {
             },
           });
         }}
+        onRepair={() => repairWorkflow.mutate(workflow.id)}
+        repairLoading={repairWorkflow.isPending}
+        hasFailedRuns={hasFailedRuns}
         onClone={() => {
           setCloneForm({ projectId: workflow.projectId, name: `${workflow.name} (Copy)` });
           setShowClone(true);

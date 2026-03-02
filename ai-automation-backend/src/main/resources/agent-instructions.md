@@ -35,7 +35,7 @@ curl -X POST http://localhost:9090/api/v1/todos \
     "title": "Kurze Beschreibung des Problems",
     "description": "Detaillierte Erklaerung (optional)",
     "source": "AI",
-    "sourceAgent": "claude-opus-4-6",
+    "sourceAgent": "mySuricates",
     "priority": "MEDIUM",
     "tags": ["bug", "performance"],
     "projectId": "optional-project-uuid"

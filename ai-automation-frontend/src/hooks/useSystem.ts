@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
+import { useToast } from './useToast';
+import { useT } from '../i18n';
 import type { SystemHealth, SystemInfo, RemoteAccessStatus, BrowseDirectoryResponse, BackupInfo } from '../types';
 
 export function useSystemHealth() {
@@ -51,6 +53,21 @@ export function useUpdateSystemSetting() {
   return useMutation({
     mutationFn: ({ key, value }: { key: string; value: string }) =>
       api.put(`/system/settings/${key}`, { value }),
+  });
+}
+
+export function useRepairAllFailed() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
+  return useMutation({
+    mutationFn: (force?: boolean) =>
+      api.post<{ queued: number }>(`/system/repair-failed?force=${force ?? false}`),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['workflows'] });
+      toast.success(t.toast.repairAllStarted.replace('{count}', String(data.queued)));
+    },
+    onError: () => toast.error(t.toast.repairFailed),
   });
 }
 

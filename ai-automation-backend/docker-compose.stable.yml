@@ -3,6 +3,11 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.stable
+      args:
+        HOST_USER: ${USER}
+        HOST_UID: ${UID:-1000}
+        HOST_GID: ${GID:-1000}
+        HOST_HOME: ${HOME}
     container_name: mysuricates-stable
     ports:
       - "9091:9091"
@@ -16,6 +21,7 @@ services:
       - stable-data:/app/data
       - ./stable-frontend:/app/frontend:ro
       - /var/run/docker.sock:/var/run/docker.sock
+      - ${HOME}/.claude.json:${HOME}/.claude.json:ro
       - ${HOME}/.local/share/claude:${HOME}/.local/share/claude:ro
       - ${HOME}/.local/bin:${HOME}/.local/bin:ro
       - ${HOME}/.claude:${HOME}/.claude

@@ -1,5 +1,61 @@
 # MySuricates - AI Workflow Automation
 
+## PFLICHT: TODO-Tracking bei JEDER Code-Änderung
+
+WICHTIG: Dieser Abschnitt hat höchste Priorität. BEVOR du eine Datei änderst, MÜSSEN diese Schritte erfolgen.
+
+### Checkliste (IMMER befolgen)
+
+1. **TODO suchen/anlegen** — `GET /api/v1/todos?status=OPEN&status=IN_PROGRESS` prüfen. Falls kein passendes TODO existiert → neues anlegen (`POST /api/v1/todos`)
+2. **IN_PROGRESS setzen** — `PATCH /api/v1/todos/<id>/status` mit `{"status": "IN_PROGRESS"}` — BEVOR die erste Datei geändert wird
+3. **Arbeiten** — Code ändern, testen, verifizieren
+4. **DONE setzen** — `PATCH /api/v1/todos/<id>/status` mit `{"status": "DONE"}` — NACHDEM die Arbeit abgeschlossen ist
+
+### Wann gilt das?
+
+ALWAYS: Features, Bugfixes, Refactorings, Config-Änderungen, Dokumentations-Updates
+NEVER: Reine Informationsfragen oder triviale Antworten ohne Code-Änderung
+
+### Beispiele
+
+```
+❌ FALSCH: User fragt nach Änderung → sofort Datei editieren → fertig
+✅ RICHTIG: User fragt nach Änderung → TODO anlegen → IN_PROGRESS → Datei editieren → DONE
+```
+
+### API-Key auslesen
+
+```bash
+python3 -c "import sqlite3; conn = sqlite3.connect('ai-automation-backend/data/automation.db'); c = conn.cursor(); c.execute(\"SELECT value FROM app_settings WHERE key = 'api-key'\"); print(c.fetchone()[0]); conn.close()"
+```
+
+### TODO-Felder
+
+```bash
+curl -X POST http://localhost:9090/api/v1/todos \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: <key>" \
+  -d '{
+    "title": "Kurzer Titel im Imperativ",
+    "description": "Markdown mit Kontext und Umsetzungsschritten",
+    "priority": "HIGH | MEDIUM | LOW",
+    "tags": ["bereich", "typ"],
+    "projectId": "ebf4f50c-20c2-4c35-a84a-a0b350124523",
+    "source": "AI",
+    "sourceAgent": "claude-code"
+  }'
+```
+
+### Konventionen
+
+- **Projekt**: `AutoPilot` (ID: `ebf4f50c-20c2-4c35-a84a-a0b350124523`) für MySuricates-eigene TODOs
+- **Source**: `AI` mit `sourceAgent: "claude-code"`
+- **Sprache**: Deutsch für Titel
+- **Priority**: `HIGH` = blockierend, `MEDIUM` = bald, `LOW` = nice-to-have
+- **Tags**: `backend`, `frontend`, `architektur`, `security`, `performance`, `ux`, `ui`, `feature`, `bug`, `testing`, `documentation`, `workflow-execution`, `container-execution`, `staging`
+
+---
+
 AI-powered workflow automation platform with a skill system, Docker-based execution, and a React frontend.
 
 ## Vision
@@ -307,68 +363,3 @@ Two kinds of Git tags:
 - **`v*`** — Semver release tags (created by `release.sh`)
 - **`stable-*`** — Deployment timestamps (created by `staging.sh promote`)
 
-## Todo-Verwaltung via API
-
-### Pflicht: Jede Aufgabe als TODO tracken
-
-**Bei jeder Aufgabe, die Claude bearbeitet, gilt folgender Workflow:**
-
-1. **TODO prüfen/anlegen**: Vor Arbeitsbeginn prüfen, ob bereits ein passendes offenes TODO existiert (`GET /api/v1/todos?status=OPEN&status=IN_PROGRESS`). Falls nein → neues TODO anlegen.
-2. **IN_PROGRESS setzen**: Sofort nach Arbeitsbeginn den Status auf `IN_PROGRESS` setzen.
-3. **DONE setzen**: Nach erfolgreichem Abschluss den Status auf `DONE` setzen.
-
-Das gilt für **alle** Aufgaben — Features, Bugfixes, Refactorings, Konfigurationsänderungen, etc. Ausnahme: Reine Informationsfragen oder triviale Antworten, die keinen Code ändern.
-
-### API-Zugang
-
-Immer über die REST API — niemals direkt in die DB schreiben.
-
-### API-Key auslesen
-
-```bash
-python3 -c "import sqlite3; conn = sqlite3.connect('ai-automation-backend/data/automation.db'); c = conn.cursor(); c.execute(\"SELECT value FROM app_settings WHERE key = 'api-key'\"); print(c.fetchone()[0]); conn.close()"
-```
-
-### TODO erstellen
-
-```bash
-curl -X POST http://localhost:9090/api/v1/todos \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: <key>" \
-  -d '{
-    "title": "Kurzer Titel im Imperativ oder als Beschreibung",
-    "description": "Markdown-Beschreibung mit Kontext, Hintergrund, Umsetzungsschritten",
-    "priority": "HIGH | MEDIUM | LOW",
-    "tags": ["bereich", "typ"],
-    "projectId": "ebf4f50c-20c2-4c35-a84a-a0b350124523",
-    "source": "AI",
-    "sourceAgent": "claude-code"
-  }'
-```
-
-### Status-Workflow
-
-Wenn Claude an einem Todo arbeitet, **immer den Status auf IN_PROGRESS setzen**:
-
-```bash
-curl -X PATCH http://localhost:9090/api/v1/todos/<id>/status \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: <key>" \
-  -d '{"status": "IN_PROGRESS"}'
-```
-
-- **Vor Arbeitsbeginn**: Status auf `IN_PROGRESS` setzen
-- **Nach Abschluss**: Status auf `DONE` setzen
-- **Bei Blockierung**: Status auf `IN_PROGRESS` belassen, Kommentar im Todo hinterlassen
-
-### Konventionen
-
-- **Projekt**: `AutoPilot` (ID: `ebf4f50c-20c2-4c35-a84a-a0b350124523`) für MySuricates-eigene TODOs
-- **Source**: `AI` mit `sourceAgent: "claude-code"` wenn Claude das TODO erstellt
-- **Sprache**: Deutsch für Titel, Beschreibung kann deutsch oder englisch sein
-- **Priority**: `HIGH` = blockierend/kritisch, `MEDIUM` = sollte bald gemacht werden, `LOW` = nice-to-have
-- **Tags**: Aus bestehenden Tags wählen, neue nur wenn nötig
-  - Bereiche: `backend`, `frontend`, `architektur`, `security`, `performance`, `ux`, `ui`
-  - Typen: `feature`, `bug`, `testing`, `documentation`
-  - Spezifisch: `workflow-execution`, `container-execution`, `staging`
-- **Description**: Markdown mit Sektionen (## Problem, ## Umsetzung, ## Betroffene Dateien, etc.)

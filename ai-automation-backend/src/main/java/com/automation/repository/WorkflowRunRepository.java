@@ -65,4 +65,9 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
 
     @Query("SELECT wr FROM WorkflowRun wr LEFT JOIN FETCH wr.workflow w WHERE wr.status = :status AND w.project.id = :projectId ORDER BY wr.startedAt DESC")
     Page<WorkflowRun> findByStatusAndProjectIdOrderByStartedAtDesc(@org.springframework.data.repository.query.Param("status") RunStatus status, @org.springframework.data.repository.query.Param("projectId") String projectId, Pageable pageable);
+
+    @Query("SELECT DISTINCT wr.workflow.id FROM WorkflowRun wr WHERE wr.status = 'FAILED' AND wr.workflow IS NOT NULL")
+    List<String> findDistinctWorkflowIdsWithFailedRuns();
+
+    boolean existsByWorkflowIdAndStatus(String workflowId, RunStatus status);
 }

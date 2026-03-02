@@ -2,6 +2,7 @@ package com.automation.controller;
 
 import com.automation.dto.response.RemoteAccessResponse;
 import com.automation.repository.AppSettingsRepository;
+import com.automation.service.repair.AutoRepairService;
 import com.automation.service.system.DatabaseBackupService;
 import com.automation.service.system.SystemIdentityService;
 import com.automation.service.system.TailscaleService;
@@ -36,6 +37,7 @@ public class SystemController {
     private final TailscaleService tailscaleService;
     private final DatabaseBackupService databaseBackupService;
     private final AppSettingsRepository appSettingsRepository;
+    private final AutoRepairService autoRepairService;
     private final DataSource dataSource;
     private final SystemIdentityService systemIdentity;
 
@@ -120,6 +122,21 @@ public class SystemController {
         result.put("tailscale", tailscaleService.isConfigEnabled() ? "CONFIGURED" : "DISABLED");
         result.put("environment", environment);
         return result;
+    }
+
+    @PostMapping("/repair-failed")
+    public ResponseEntity<Map<String, Object>> repairAllFailed(
+            @RequestParam(defaultValue = "false") boolean force) {
+        if (!autoRepairService.isTestInstanceHealthy()) {
+            return ResponseEntity.status(503).body(Map.of(
+                    "error", "Test instance is not healthy"));
+        }
+
+        int queued = autoRepairService.repairAllFailed(force);
+        return ResponseEntity.accepted().body(Map.of(
+                "status", "repair_started",
+                "workflowsQueued", queued,
+                "force", force));
     }
 
     @PostMapping("/remote-access/enable")

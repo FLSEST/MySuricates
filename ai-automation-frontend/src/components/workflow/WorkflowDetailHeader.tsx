@@ -1,5 +1,5 @@
 import {
-  ArrowLeft, Play, Pencil, Wand2, Copy, Download, Trash2,
+  ArrowLeft, Play, Pencil, Wand2, Wrench, Copy, Download, Trash2,
 } from 'lucide-react';
 import { Button } from '../ui';
 import type { Workflow } from '../../types';
@@ -12,10 +12,13 @@ interface WorkflowDetailHeaderProps {
   onEdit: () => void;
   onExecute: () => void;
   onOptimize: () => void;
+  onRepair: () => void;
   onClone: () => void;
   onDelete: () => void;
   executeLoading: boolean;
   optimizeLoading: boolean;
+  repairLoading: boolean;
+  hasFailedRuns: boolean;
 }
 
 export function WorkflowDetailHeader({
@@ -25,10 +28,13 @@ export function WorkflowDetailHeader({
   onEdit,
   onExecute,
   onOptimize,
+  onRepair,
   onClone,
   onDelete,
   executeLoading,
   optimizeLoading,
+  repairLoading,
+  hasFailedRuns,
 }: WorkflowDetailHeaderProps) {
   return (
     <div className="flex items-center gap-4">
@@ -49,6 +55,17 @@ export function WorkflowDetailHeader({
         )}
       </div>
       <div className="flex items-center gap-2">
+        {hasFailedRuns && (
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Wrench className="w-4 h-4" />}
+            onClick={onRepair}
+            loading={repairLoading}
+          >
+            {repairLoading ? t.workflows.repairing : t.workflows.repair}
+          </Button>
+        )}
         <Button
           variant="secondary"
           size="sm"

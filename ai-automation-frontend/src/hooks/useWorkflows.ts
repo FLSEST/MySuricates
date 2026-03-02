@@ -231,3 +231,19 @@ export function useOptimizeWorkflow() {
     onError: () => toast.error(t.workflows.optimizeFailed),
   });
 }
+
+export function useRepairWorkflow() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
+  return useMutation({
+    mutationFn: (workflowId: string) =>
+      api.post(`/workflows/${workflowId}/repair`),
+    onSuccess: (_, workflowId) => {
+      qc.invalidateQueries({ queryKey: ['workflows', workflowId] });
+      qc.invalidateQueries({ queryKey: ['workflows', workflowId, 'runs'] });
+      toast.success(t.toast.repairStarted);
+    },
+    onError: () => toast.error(t.toast.repairFailed),
+  });
+}

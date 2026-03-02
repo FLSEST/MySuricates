@@ -3,6 +3,11 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.stable
+      args:
+        HOST_USER: ${USER}
+        HOST_UID: ${UID:-1000}
+        HOST_GID: ${GID:-1000}
+        HOST_HOME: ${HOME}
     image: ai-automation-backend-test
     container_name: mysuricates-test
     ports:
@@ -18,6 +23,7 @@ services:
       - ./stable-frontend:/app/frontend:ro
       - ./src/main/resources/application-test.yml:/app/config/application-test.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock
+      - ${HOME}/.claude.json:${HOME}/.claude.json:ro
       - ${HOME}/.local/share/claude:${HOME}/.local/share/claude:ro
       - ${HOME}/.local/bin:${HOME}/.local/bin:ro
       - ${HOME}/.claude:${HOME}/.claude
