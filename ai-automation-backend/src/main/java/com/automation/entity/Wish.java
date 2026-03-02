@@ -1,5 +1,6 @@
 package com.automation.entity;
 
+import com.automation.util.JsonListConverter;
 import com.automation.util.JsonMapConverter;
 import com.automation.util.StringListConverter;
 import jakarta.persistence.*;
@@ -73,6 +74,11 @@ public class Wish {
 
     @Column(columnDefinition = "text")
     private String error;
+
+    @Convert(converter = JsonListConverter.class)
+    @Column(name = "iteration_history", columnDefinition = "text")
+    @Builder.Default
+    private List<Map<String, Object>> iterationHistory = new ArrayList<>();
 
     @Convert(converter = JsonMapConverter.class)
     @Column(columnDefinition = "text")

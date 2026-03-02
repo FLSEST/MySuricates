@@ -1,8 +1,12 @@
 import { openPath } from '../../api/client';
+import { useToast } from '../../hooks/useToast';
+import { useT } from '../../i18n';
 
 const PATH_REGEX = /(\/(?:[\w.-]+\/)+[\w.-]+)/g;
 
 export function PathLinkedOutput({ text }: { text: string }) {
+  const toast = useToast();
+  const t = useT();
   const parts: Array<{ type: 'text' | 'path'; value: string }> = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -33,7 +37,7 @@ export function PathLinkedOutput({ text }: { text: string }) {
         part.type === 'path' ? (
           <button
             key={i}
-            onClick={(e) => { e.stopPropagation(); openPath(part.value).catch(() => {}); }}
+            onClick={(e) => { e.stopPropagation(); openPath(part.value).catch(() => toast.error(t.workflows.execution.openPathFailed)); }}
             className="underline decoration-dotted underline-offset-2 text-accent hover:text-accent/80 transition-colors cursor-pointer inline"
             title={part.value}
           >

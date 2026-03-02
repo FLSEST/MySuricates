@@ -768,6 +768,302 @@ public final class BuiltInTemplates {
                 "Identifiziert ungetestete Klassen, berechnet Coverage-Ratio und priorisiert Test-Luecken nach Kritikalitaet.",
                 "claude-sonnet-4-6"));
 
+        // ── Audit Fix & PR Pipeline ─────────────────────────────────────────
+
+        templates.add(template("audit-fix-pr-pipeline", "\uD83D\uDD27",
+                Map.of("de", "Audit-Fix-PR-Pipeline", "en", "Audit Fix PR Pipeline"),
+                Map.of("de", "Audit-Findings automatisch beheben, verifizieren und als Pull Request einreichen",
+                        "en", "Automatically fix audit findings, verify, and submit as pull request"),
+                "CODE", order++,
+                List.of(
+                        // Block 1: Shell — Git Safety Setup
+                        block("shell", Map.of(
+                                "command", "set -euo pipefail\n"
+                                        + "AUDIT_TYPE=\"{{ audit_type }}\"\n"
+                                        + "BASE_BRANCH=\"{{ base_branch }}\"\n"
+                                        + "if [ -z \"$BASE_BRANCH\" ] || [ \"$BASE_BRANCH\" = \"{{ base_branch }}\" ]; then BASE_BRANCH=\"main\"; fi\n"
+                                        + "if [ -z \"$AUDIT_TYPE\" ] || [ \"$AUDIT_TYPE\" = \"{{ audit_type }}\" ]; then AUDIT_TYPE=\"general\"; fi\n"
+                                        + "\n"
+                                        + "echo '=== Git Safety Check ==='\n"
+                                        + "if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then\n"
+                                        + "  echo 'ERROR: Not a git repository!' && exit 1\n"
+                                        + "fi\n"
+                                        + "\n"
+                                        + "if [ -n \"$(git status --porcelain)\" ]; then\n"
+                                        + "  echo 'ERROR: Working tree is dirty! Commit or stash changes first.'\n"
+                                        + "  git status --short\n"
+                                        + "  exit 1\n"
+                                        + "fi\n"
+                                        + "\n"
+                                        + "BASE_COMMIT=$(git rev-parse HEAD)\n"
+                                        + "FIX_BRANCH=\"fix/${AUDIT_TYPE}-$(date +%Y%m%d-%H%M%S)\"\n"
+                                        + "\n"
+                                        + "echo \"=== Creating branch: $FIX_BRANCH ===\"\n"
+                                        + "git checkout -b \"$FIX_BRANCH\"\n"
+                                        + "\n"
+                                        + "echo \"BASE_COMMIT=$BASE_COMMIT\"\n"
+                                        + "echo \"BASE_BRANCH=$BASE_BRANCH\"\n"
+                                        + "echo \"FIX_BRANCH=$FIX_BRANCH\"\n"
+                                        + "echo \"AUDIT_TYPE=$AUDIT_TYPE\"\n"
+                                        + "echo 'Git setup complete. Ready for fixes.'",
+                                "on_failure", "abort"
+                        )),
+
+                        // Block 2: Simple — Issues parsen und priorisieren
+                        block("simple", Map.of(
+                                "command", "Analysiere den folgenden Audit-Report und erstelle einen strukturierten Fix-Plan.\n\n"
+                                        + "REPORT-QUELLEN (verwende die erste nicht-leere Quelle):\n\n"
+                                        + "1. REPORT-DATEI(EN) VON DISK (hoechste Prioritaet):\n"
+                                        + "   Pfad(e): {{ audit_report_path }}\n"
+                                        + "   Falls ein Pfad angegeben ist (nicht leer und nicht '{{ audit_report_path }}'),\n"
+                                        + "   lies die Datei(en) an diesem Pfad und verwende deren Inhalt als Audit-Report.\n"
+                                        + "   Mehrere Pfade sind komma-separiert moeglich.\n"
+                                        + "   WICHTIG: Lies die Datei(en) ZUERST, bevor du die anderen Quellen pruefst.\n\n"
+                                        + "2. INLINE-REPORT (aus Chain oder Variable):\n"
+                                        + "{{ previous_chain_output }}\n{{ audit_report }}\n{{ previous_output }}\n\n"
+                                        + "AUFGABE:\n"
+                                        + "1. Extrahiere alle Findings aus dem Report\n"
+                                        + "2. Klassifiziere jedes Finding:\n"
+                                        + "   - AUTO_FIXABLE: Kann sicher automatisch behoben werden (z.B. ungenutzte Imports loeschen, fehlende Annotations hinzufuegen, Doku-Fehler korrigieren, Test-Stubs erstellen)\n"
+                                        + "   - MANUAL_REVIEW: Zu komplex oder riskant fuer Auto-Fix (z.B. Architektur-Aenderungen, API-Signatur-Aenderungen)\n"
+                                        + "   - INFORMATIONAL: Nur Hinweis, kein Fix noetig\n"
+                                        + "3. Filtere: NUR CRITICAL und HIGH Findings behalten\n"
+                                        + "4. Sortiere AUTO_FIXABLE nach Abhaengigkeiten (Interface-Aenderungen vor Implementierungen, Imports vor Code)\n"
+                                        + "5. Gib den Fix-Plan als nummerierte Liste aus:\n\n"
+                                        + "FIX_PLAN:\n"
+                                        + "1. [AUTO_FIXABLE] <Datei>: <Was zu tun ist>\n"
+                                        + "2. [AUTO_FIXABLE] <Datei>: <Was zu tun ist>\n"
+                                        + "...\n\n"
+                                        + "SKIPPED (MANUAL_REVIEW):\n"
+                                        + "- <Datei>: <Grund warum manuell>\n\n"
+                                        + "SKIPPED (INFORMATIONAL):\n"
+                                        + "- <Beschreibung>\n\n"
+                                        + "Falls der Audit-Report leer ist oder keine Findings enthaelt, gib aus:\n"
+                                        + "FIX_PLAN: EMPTY - Keine fixbaren Findings gefunden.",
+                                "timeout_seconds", 600
+                        )),
+
+                        // Block 3: Agentic — Fixes anwenden
+                        block("agentic", Map.of(
+                                "goal", "Arbeite den Fix-Plan aus dem vorherigen Schritt ab und committe jeden Fix einzeln.\n\n"
+                                        + "FIX-PLAN:\n{{ previous_output }}\n\n"
+                                        + "REGELN:\n"
+                                        + "1. Arbeite nur die [AUTO_FIXABLE] Eintraege ab, ueberspringe MANUAL_REVIEW und INFORMATIONAL\n"
+                                        + "2. Falls der Fix-Plan EMPTY ist: Gib 'NO_FIXES_NEEDED' aus und beende\n"
+                                        + "3. Ein Commit pro Fix — atomare, reviewbare Git-History\n"
+                                        + "4. Commit-Format: 'fix: <was behoben>' oder 'refactor: <was refactored>' oder 'test: <was getestet>'\n"
+                                        + "5. SICHERHEIT:\n"
+                                        + "   - Keine API-Signaturen aendern (keine Breaking Changes an public Interfaces)\n"
+                                        + "   - Keine Dateien loeschen die noch importiert/referenziert werden koennten — pruefe Imports vorher\n"
+                                        + "   - Bei Unsicherheit: Fix ueberspringen und als SKIPPED dokumentieren\n"
+                                        + "6. WICHTIG FUER JEDE AKTION: Jede ACTION wird von einem SEPARATEN Agenten ausgefuehrt.\n"
+                                        + "   Deshalb MUSS jede ACTION enthalten:\n"
+                                        + "   - ABSOLUTE Dateipfade\n"
+                                        + "   - Den vollstaendigen Kontext was zu aendern ist\n"
+                                        + "   - Nach der Aenderung: git add <datei> && git commit -m '<message>'\n\n"
+                                        + "AUSGABE am Ende:\n"
+                                        + "FIXES_APPLIED:\n"
+                                        + "1. <Datei> — <Commit-Hash> — <Beschreibung>\n"
+                                        + "2. ...\n\n"
+                                        + "FIXES_SKIPPED:\n"
+                                        + "- <Datei> — <Grund>\n\n"
+                                        + "TOTAL: X Fixes applied, Y skipped",
+                                "success_criteria", "Alle AUTO_FIXABLE Issues wurden als einzelne Commits committed oder begruendet uebersprungen.",
+                                "max_iterations", 25,
+                                "iteration_timeout_seconds", 600,
+                                "total_timeout_seconds", 5400,
+                                "max_total_tokens", 400000,
+                                "max_repeated_actions", 3,
+                                "require_approval", false
+                        )),
+
+                        // Block 4: Shell — Verifikation (Build + Test + Lint)
+                        block("shell", Map.of(
+                                "command", "set -euo pipefail\n"
+                                        + "VERIFY_CMD=\"{{ verify_command }}\"\n"
+                                        + "\n"
+                                        + "echo '=== Verification ==='\n"
+                                        + "\n"
+                                        + "# Check if no fixes were applied\n"
+                                        + "if echo '{{ previous_output }}' | grep -q 'NO_FIXES_NEEDED'; then\n"
+                                        + "  echo 'VERIFICATION_PASSED (no fixes to verify)'\n"
+                                        + "  exit 0\n"
+                                        + "fi\n"
+                                        + "\n"
+                                        + "# Use custom verify command if provided\n"
+                                        + "if [ -n \"$VERIFY_CMD\" ] && [ \"$VERIFY_CMD\" != \"{{ verify_command }}\" ]; then\n"
+                                        + "  echo \"Running custom verification: $VERIFY_CMD\"\n"
+                                        + "  if eval \"$VERIFY_CMD\"; then\n"
+                                        + "    echo 'VERIFICATION_PASSED'\n"
+                                        + "  else\n"
+                                        + "    echo 'VERIFICATION_FAILED'\n"
+                                        + "    echo \"Exit code: $?\"\n"
+                                        + "  fi\n"
+                                        + "  exit 0\n"
+                                        + "fi\n"
+                                        + "\n"
+                                        + "# Auto-detect build system\n"
+                                        + "PASSED=true\n"
+                                        + "\n"
+                                        + "if [ -f pom.xml ]; then\n"
+                                        + "  echo '--- Maven: compile + test ---'\n"
+                                        + "  if ! mvn clean test -q 2>&1 | tail -30; then\n"
+                                        + "    PASSED=false\n"
+                                        + "  fi\n"
+                                        + "fi\n"
+                                        + "\n"
+                                        + "if [ -f package.json ]; then\n"
+                                        + "  echo '--- npm: lint + test + build ---'\n"
+                                        + "  if command -v npm >/dev/null 2>&1; then\n"
+                                        + "    HAS_LINT=$(node -e \"const p=require('./package.json'); process.exit(p.scripts&&p.scripts.lint?0:1)\" 2>/dev/null && echo yes || echo no)\n"
+                                        + "    HAS_TEST=$(node -e \"const p=require('./package.json'); process.exit(p.scripts&&p.scripts.test?0:1)\" 2>/dev/null && echo yes || echo no)\n"
+                                        + "    HAS_BUILD=$(node -e \"const p=require('./package.json'); process.exit(p.scripts&&p.scripts.build?0:1)\" 2>/dev/null && echo yes || echo no)\n"
+                                        + "    if [ \"$HAS_LINT\" = \"yes\" ]; then\n"
+                                        + "      echo 'Running lint...'\n"
+                                        + "      if ! npm run lint 2>&1 | tail -20; then PASSED=false; fi\n"
+                                        + "    fi\n"
+                                        + "    if [ \"$HAS_TEST\" = \"yes\" ]; then\n"
+                                        + "      echo 'Running tests...'\n"
+                                        + "      if ! npm test 2>&1 | tail -20; then PASSED=false; fi\n"
+                                        + "    fi\n"
+                                        + "    if [ \"$HAS_BUILD\" = \"yes\" ]; then\n"
+                                        + "      echo 'Running build...'\n"
+                                        + "      if ! npm run build 2>&1 | tail -20; then PASSED=false; fi\n"
+                                        + "    fi\n"
+                                        + "  fi\n"
+                                        + "fi\n"
+                                        + "\n"
+                                        + "if [ \"$PASSED\" = \"true\" ]; then\n"
+                                        + "  echo 'VERIFICATION_PASSED'\n"
+                                        + "else\n"
+                                        + "  echo 'VERIFICATION_FAILED'\n"
+                                        + "fi",
+                                "on_failure", "continue",
+                                "timeout_seconds", 600
+                        )),
+
+                        // Block 5: Conditional — Bei Fehlschlag Rollback
+                        block("conditional", Map.of(
+                                "condition", "echo '{{ previous_output }}' | grep -q 'VERIFICATION_PASSED'",
+                                "then_command", "echo 'All checks passed. Ready for PR.'",
+                                "else_command", "set -euo pipefail\n"
+                                        + "echo '=== Verification failed — attempting rollback ==='\n"
+                                        + "MAX_REVERTS=5\n"
+                                        + "REVERTED=0\n"
+                                        + "while [ $REVERTED -lt $MAX_REVERTS ]; do\n"
+                                        + "  CURRENT=$(git rev-parse HEAD)\n"
+                                        + "  # Stop if we've reverted back to the base\n"
+                                        + "  if [ $(git rev-list --count HEAD) -le 1 ]; then break; fi\n"
+                                        + "  echo \"Reverting commit: $(git log -1 --oneline)\"\n"
+                                        + "  git revert HEAD --no-edit\n"
+                                        + "  REVERTED=$((REVERTED + 1))\n"
+                                        + "  # Re-test after each revert\n"
+                                        + "  RETEST_OK=true\n"
+                                        + "  if [ -f pom.xml ]; then\n"
+                                        + "    mvn clean test -q 2>&1 | tail -5 || RETEST_OK=false\n"
+                                        + "  fi\n"
+                                        + "  if [ -f package.json ]; then\n"
+                                        + "    HAS_BUILD=$(node -e \"const p=require('./package.json'); process.exit(p.scripts&&p.scripts.build?0:1)\" 2>/dev/null && echo yes || echo no)\n"
+                                        + "    if [ \"$HAS_BUILD\" = \"yes\" ]; then\n"
+                                        + "      npm run build 2>&1 | tail -5 || RETEST_OK=false\n"
+                                        + "    fi\n"
+                                        + "  fi\n"
+                                        + "  if [ \"$RETEST_OK\" = \"true\" ]; then\n"
+                                        + "    echo \"Verification passed after reverting $REVERTED commit(s).\"\n"
+                                        + "    echo \"PARTIAL_FIX: Reverted $REVERTED breaking commit(s). Remaining commits are safe.\"\n"
+                                        + "    break\n"
+                                        + "  fi\n"
+                                        + "done\n"
+                                        + "if [ \"$RETEST_OK\" != \"true\" ]; then\n"
+                                        + "  echo \"PARTIAL_FIX: Reverted $REVERTED commits but verification still fails. Manual review needed.\"\n"
+                                        + "fi\n"
+                                        + "echo ''\n"
+                                        + "echo '=== Remaining commits ==='\n"
+                                        + "git log --oneline | head -20",
+                                "execution_mode", "shell"
+                        )),
+
+                        // Block 6: Approval — Menschliche Freigabe
+                        block("approval", Map.of(
+                                "question", "## Audit-Fix-Ergebnis\n\n"
+                                        + "{{ previous_output }}\n\n"
+                                        + "### Optionen:\n"
+                                        + "- **Yes**: Push + Pull Request erstellen\n"
+                                        + "- **No**: Branch lokal behalten fuer manuelle Review\n"
+                                        + "- **Abort**: Branch loeschen und zurueck zu main",
+                                "options", List.of("Yes", "No", "Abort"),
+                                "variable_name", "pr_decision",
+                                "timeout_minutes", 60
+                        )),
+
+                        // Block 7: Shell — PR erstellen
+                        block("shell", Map.of(
+                                "command", "set -euo pipefail\n"
+                                        + "DECISION=\"{{ pr_decision }}\"\n"
+                                        + "AUDIT_TYPE=\"{{ audit_type }}\"\n"
+                                        + "BASE_BRANCH=\"{{ base_branch }}\"\n"
+                                        + "if [ -z \"$BASE_BRANCH\" ] || [ \"$BASE_BRANCH\" = \"{{ base_branch }}\" ]; then BASE_BRANCH=\"main\"; fi\n"
+                                        + "if [ -z \"$AUDIT_TYPE\" ] || [ \"$AUDIT_TYPE\" = \"{{ audit_type }}\" ]; then AUDIT_TYPE=\"general\"; fi\n"
+                                        + "FIX_BRANCH=$(git branch --show-current)\n"
+                                        + "\n"
+                                        + "echo \"Decision: $DECISION\"\n"
+                                        + "echo \"Branch: $FIX_BRANCH\"\n"
+                                        + "\n"
+                                        + "case \"$DECISION\" in\n"
+                                        + "  Yes|yes)\n"
+                                        + "    COMMIT_COUNT=$(git rev-list --count ${BASE_BRANCH}..HEAD 2>/dev/null || echo 0)\n"
+                                        + "    if [ \"$COMMIT_COUNT\" -eq 0 ]; then\n"
+                                        + "      echo 'No commits to push. Nothing to do.'\n"
+                                        + "      exit 0\n"
+                                        + "    fi\n"
+                                        + "    echo \"=== Pushing $COMMIT_COUNT commits ===\"\n"
+                                        + "    git push -u origin \"$FIX_BRANCH\"\n"
+                                        + "    \n"
+                                        + "    # Build PR body from git log\n"
+                                        + "    FIXES=$(git log --oneline ${BASE_BRANCH}..HEAD | sed 's/^/- /')\n"
+                                        + "    \n"
+                                        + "    PR_TITLE=\"fix($AUDIT_TYPE): Auto-fix audit findings\"\n"
+                                        + "    PR_BODY=\"## Summary\\n\\nAutomated fixes from $AUDIT_TYPE audit.\\n\\n## Changes\\n\\n$FIXES\\n\\n## Verification\\n\\nBuild and tests passed after applying fixes.\\n\\n---\\n_Generated by MySuricates Audit-Fix-PR-Pipeline_\"\n"
+                                        + "    \n"
+                                        + "    echo \"=== Creating Pull Request ===\"\n"
+                                        + "    PR_URL=$(gh pr create --base \"$BASE_BRANCH\" --title \"$PR_TITLE\" --body \"$(echo -e \"$PR_BODY\")\" 2>&1)\n"
+                                        + "    echo \"PR created: $PR_URL\"\n"
+                                        + "    ;;\n"
+                                        + "  No|no)\n"
+                                        + "    echo \"Branch '$FIX_BRANCH' kept locally.\"\n"
+                                        + "    echo \"To review: git checkout $FIX_BRANCH\"\n"
+                                        + "    echo \"To push later: git push -u origin $FIX_BRANCH\"\n"
+                                        + "    ;;\n"
+                                        + "  Abort|abort)\n"
+                                        + "    echo '=== Aborting — cleaning up ==='\n"
+                                        + "    git checkout \"$BASE_BRANCH\"\n"
+                                        + "    git branch -D \"$FIX_BRANCH\"\n"
+                                        + "    echo \"Branch $FIX_BRANCH deleted. Back on $BASE_BRANCH.\"\n"
+                                        + "    ;;\n"
+                                        + "  *)\n"
+                                        + "    echo \"Unknown decision: $DECISION. Branch kept locally.\"\n"
+                                        + "    ;;\n"
+                                        + "esac",
+                                "on_failure", "continue"
+                        ))
+                ),
+                "Du bist ein automatischer Code-Fixer. Deine Aufgabe ist es, Findings aus Audit-Reports sicher zu beheben.\n\n"
+                        + "SICHERHEITSREGELN (unbedingt einhalten):\n"
+                        + "- Arbeite IMMER auf einem eigenen Branch, nie direkt auf main\n"
+                        + "- Ein Commit pro Fix (atomar, reviewbar, revertierbar)\n"
+                        + "- Keine Breaking Changes an oeffentlichen APIs\n"
+                        + "- Keine Dateien loeschen die noch referenziert werden\n"
+                        + "- Bei Unsicherheit: Fix ueberspringen statt riskieren\n"
+                        + "- Build und Tests muessen nach allen Fixes bestehen\n"
+                        + "- Mensch entscheidet vor Push/PR\n\n"
+                        + "COMMIT-KONVENTIONEN:\n"
+                        + "- fix: <beschreibung> — fuer Bugfixes und Korrekturen\n"
+                        + "- refactor: <beschreibung> — fuer Umstrukturierungen\n"
+                        + "- test: <beschreibung> — fuer neue/verbesserte Tests\n"
+                        + "- docs: <beschreibung> — fuer Dokumentations-Aenderungen\n"
+                        + "- chore: <beschreibung> — fuer Cleanup (Dead Code, Dependencies)",
+                "claude-sonnet-4-6", "1.1.0"));
+
         return templates;
     }
 

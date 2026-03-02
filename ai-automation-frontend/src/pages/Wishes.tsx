@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, Send, XCircle, Trash2, ChevronRight, ChevronDown, ExternalLink, Check, RefreshCw, MessageCircle, Save, X, Eye } from 'lucide-react';
+import { Sparkles, Send, XCircle, Trash2, ChevronRight, ChevronDown, ExternalLink, Check, RefreshCw, MessageCircle, Save, X, Eye, RotateCcw } from 'lucide-react';
 import { Card, Button, Input, Modal, Spinner, Badge } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
@@ -327,6 +327,8 @@ function WishDetail({ wishId, onCancel, onDelete, navigate, isTerminal, isPaused
 }) {
   const t = useT();
   const { data: wish } = useWish(wishId);
+  const respond = useRespondToWish();
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   if (!wish) return <Card className="p-8 text-center"><Spinner /></Card>;
 
@@ -356,6 +358,17 @@ function WishDetail({ wishId, onCancel, onDelete, navigate, isTerminal, isPaused
               {!isTerminal(wish.status) && !isPaused(wish.status) && (
                 <Button variant="ghost" size="sm" icon={<XCircle className="w-4 h-4" />} onClick={onCancel}>
                   {t.wishes.cancel}
+                </Button>
+              )}
+              {(wish.status === 'FAILED' || wish.status === 'CANCELLED') && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={<RotateCcw className="w-4 h-4" />}
+                  onClick={() => respond.mutate({ id: wish.id, data: { action: 'RETRY' } })}
+                  disabled={respond.isPending}
+                >
+                  {t.wishes.retry}
                 </Button>
               )}
               {isTerminal(wish.status) && (
@@ -485,6 +498,107 @@ function WishDetail({ wishId, onCancel, onDelete, navigate, isTerminal, isPaused
                 <span className="text-sm text-accent flex items-center gap-1">
                   Chain <ChevronRight className="w-3.5 h-3.5" />
                 </span>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+
+      {/* Iteration History */}
+      {wish.iterationHistory && wish.iterationHistory.length > 0 && (
+        <Card>
+          <div className="p-4">
+            <button
+              type="button"
+              className="flex items-center gap-2 w-full text-left"
+              onClick={() => setHistoryOpen(v => !v)}
+            >
+              {historyOpen ? <ChevronDown className="w-4 h-4 text-text-tertiary" /> : <ChevronRight className="w-4 h-4 text-text-tertiary" />}
+              <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wide">
+                {t.wishes.iterationHistory} ({wish.iterationHistory.length})
+              </h3>
+            </button>
+            {historyOpen && (
+              <div className="mt-3 space-y-3">
+                {wish.iterationHistory.map((entry, idx) => {
+                  const iteration = entry.iteration as number ?? idx + 1;
+                  const timestamp = entry.timestamp as string;
+                  const decomposition = entry.decomposition as Record<string, unknown> | undefined;
+                  const evaluation = entry.evaluation as Record<string, unknown> | undefined;
+                  const runId = entry.runId as string | undefined;
+                  const workflowIds = entry.workflowIds as string[] | undefined;
+
+                  return (
+                    <div key={idx} className="rounded-lg border border-border bg-surface-raised p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-text-primary">
+                          {t.wishes.iteration} {iteration}
+                        </span>
+                        {timestamp && (
+                          <span className="text-xs text-text-tertiary">
+                            {formatRelativeTime(timestamp)}
+                          </span>
+                        )}
+                      </div>
+
+                      {decomposition && (
+                        <div className="space-y-1">
+                          {typeof decomposition.analysis === 'string' && (
+                            <p className="text-xs text-text-secondary">{decomposition.analysis}</p>
+                          )}
+                          {typeof decomposition.strategy === 'string' && (
+                            <p className="text-xs text-text-tertiary">{decomposition.strategy}</p>
+                          )}
+                        </div>
+                      )}
+
+                      {workflowIds && workflowIds.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {workflowIds.map(wfId => (
+                            <span
+                              key={wfId}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-surface-base text-accent cursor-pointer hover:underline"
+                              onClick={() => navigate(`/workflows/${wfId}`)}
+                            >
+                              {wfId.slice(0, 8)}...
+                              <ExternalLink className="w-3 h-3" />
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {runId && (
+                        <div
+                          className="text-xs text-accent cursor-pointer hover:underline flex items-center gap-1"
+                          onClick={() => navigate(`/runs`)}
+                        >
+                          Run: {runId.slice(0, 8)}...
+                          <ExternalLink className="w-3 h-3" />
+                        </div>
+                      )}
+
+                      {evaluation && (
+                        <div className="rounded bg-surface-base p-2 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Badge variant={evaluation.satisfied ? 'success' : 'danger'}>
+                              {evaluation.satisfied ? t.wishes.historySatisfied : t.wishes.historyNotSatisfied}
+                            </Badge>
+                          </div>
+                          {typeof evaluation.summary === 'string' && (
+                            <p className="text-xs text-text-secondary">{evaluation.summary}</p>
+                          )}
+                          {Array.isArray(evaluation.issues) && evaluation.issues.length > 0 && (
+                            <ul className="text-xs text-text-tertiary list-disc ml-4">
+                              {(evaluation.issues as string[]).map((issue, i) => (
+                                <li key={i}>{issue}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

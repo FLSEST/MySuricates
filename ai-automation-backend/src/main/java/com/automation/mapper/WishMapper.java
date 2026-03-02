@@ -68,6 +68,7 @@ public class WishMapper {
                 wish.getCurrentRunId(),
                 wish.getResultSummary(),
                 wish.getError(),
+                wish.getIterationHistory(),
                 wish.getMetadata(),
                 wish.getCreatedAt(),
                 wish.getUpdatedAt()

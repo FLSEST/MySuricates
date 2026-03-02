@@ -10,6 +10,7 @@ public record WishRespondRequest(
         ACCEPT,
         REFINE,
         CANCEL,
-        CLARIFY
+        CLARIFY,
+        RETRY
     }
 }

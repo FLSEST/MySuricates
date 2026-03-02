@@ -41,7 +41,7 @@ public class TodoService {
             }).thenComparing(Todo::getCreatedAt, Comparator.reverseOrder());
 
     @Transactional(readOnly = true)
-    public PageResponse<TodoResponse> findAll(int page, int size, String projectId, String status, String priority, String source, String tag, String q) {
+    public PageResponse<TodoResponse> findAll(int page, int size, String projectId, List<String> status, String priority, String source, String tag, String q) {
         Specification<Todo> spec = buildSpec(projectId, status, priority, source, tag, q);
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Order.asc("priority"), Sort.Order.desc("createdAt")));
         Page<Todo> result = todoRepository.findAll(spec, pageRequest);
@@ -142,15 +142,22 @@ public class TodoService {
         );
     }
 
-    private Specification<Todo> buildSpec(String projectId, String status, String priority, String source, String tag, String q) {
+    private Specification<Todo> buildSpec(String projectId, List<String> status, String priority, String source, String tag, String q) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
             if (projectId != null && !projectId.isBlank()) {
                 predicates.add(cb.equal(root.get("projectId"), projectId));
             }
-            if (status != null && !status.isBlank()) {
-                predicates.add(cb.equal(root.get("status"), Todo.Status.valueOf(status)));
+            if (status != null && !status.isEmpty()) {
+                List<Todo.Status> enums = status.stream()
+                        .map(Todo.Status::valueOf)
+                        .toList();
+                if (enums.size() == 1) {
+                    predicates.add(cb.equal(root.get("status"), enums.get(0)));
+                } else {
+                    predicates.add(root.get("status").in(enums));
+                }
             }
             if (priority != null && !priority.isBlank()) {
                 predicates.add(cb.equal(root.get("priority"), Todo.Priority.valueOf(priority)));

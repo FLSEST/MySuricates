@@ -14,6 +14,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/todos")
 @RequiredArgsConstructor
@@ -27,7 +29,7 @@ public class TodoController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
             @RequestParam(required = false) String projectId,
-            @RequestParam(required = false) String status,
+            @RequestParam(required = false) List<String> status,
             @RequestParam(required = false) String priority,
             @RequestParam(required = false) String source,
             @RequestParam(required = false) String tag,

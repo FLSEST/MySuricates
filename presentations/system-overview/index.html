@@ -1,0 +1,1477 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MySuricates — System Overview</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    :root {
+      --purple-deep: #1a0a2e;
+      --purple-mid: #3d1d6b;
+      --purple-light: #7c3aed;
+      --blue-accent: #3b82f6;
+      --cyan-accent: #06b6d4;
+      --cyan-glow: #22d3ee;
+      --magenta: #d946ef;
+      --surface: rgba(255, 255, 255, 0.05);
+      --surface-hover: rgba(255, 255, 255, 0.1);
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --gradient-primary: linear-gradient(135deg, #7c3aed, #3b82f6, #06b6d4);
+      --gradient-warm: linear-gradient(135deg, #d946ef, #7c3aed);
+      --gradient-cool: linear-gradient(135deg, #3b82f6, #06b6d4);
+    }
+
+    .reveal-viewport {
+      background: var(--purple-deep);
+      background-image:
+        radial-gradient(ellipse at 20% 50%, rgba(124, 58, 237, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(6, 182, 212, 0.1) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 80%, rgba(59, 130, 246, 0.08) 0%, transparent 50%);
+    }
+
+    .reveal {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--text-primary);
+    }
+
+    .reveal h1, .reveal h2, .reveal h3, .reveal h4 {
+      font-family: 'Inter', sans-serif;
+      font-weight: 800;
+      text-transform: none;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+    }
+
+    .reveal h1 { font-size: 2.8em; line-height: 1.1; }
+    .reveal h2 { font-size: 1.9em; line-height: 1.2; margin-bottom: 0.6em; }
+    .reveal h3 { font-size: 1.3em; font-weight: 600; }
+
+    .reveal p, .reveal li {
+      font-size: 0.75em;
+      line-height: 1.7;
+      color: var(--text-secondary);
+      font-weight: 400;
+    }
+
+    .reveal ul { list-style: none; padding: 0; margin: 0; }
+    .reveal li { padding: 0.2em 0; }
+    .reveal li::before { content: none; }
+
+    .reveal code {
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(124, 58, 237, 0.2);
+      padding: 0.15em 0.4em;
+      border-radius: 4px;
+      font-size: 0.85em;
+      color: var(--cyan-glow);
+    }
+
+    /* ===== GRADIENT TEXT ===== */
+    .gradient-text {
+      background: var(--gradient-primary);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .gradient-text-warm {
+      background: var(--gradient-warm);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* ===== GLASS CARDS ===== */
+    .glass {
+      background: var(--surface);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 1.2em;
+      transition: all 0.3s ease;
+    }
+
+    .glass:hover {
+      background: var(--surface-hover);
+      border-color: rgba(124, 58, 237, 0.3);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(124, 58, 237, 0.15);
+    }
+
+    .glass-sm {
+      background: var(--surface);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      padding: 0.8em 1em;
+    }
+
+    /* ===== GLOW EFFECTS ===== */
+    .glow-purple { box-shadow: 0 0 30px rgba(124, 58, 237, 0.3), inset 0 0 30px rgba(124, 58, 237, 0.05); }
+    .glow-cyan { box-shadow: 0 0 30px rgba(6, 182, 212, 0.3), inset 0 0 30px rgba(6, 182, 212, 0.05); }
+    .glow-blue { box-shadow: 0 0 30px rgba(59, 130, 246, 0.3), inset 0 0 30px rgba(59, 130, 246, 0.05); }
+
+    /* ===== BADGE / TAG ===== */
+    .badge {
+      display: inline-block;
+      padding: 0.25em 0.75em;
+      border-radius: 999px;
+      font-size: 0.55em;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .badge-purple { background: rgba(124, 58, 237, 0.25); color: #a78bfa; border: 1px solid rgba(124, 58, 237, 0.4); }
+    .badge-cyan { background: rgba(6, 182, 212, 0.2); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.35); }
+    .badge-blue { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.35); }
+    .badge-magenta { background: rgba(217, 70, 239, 0.2); color: #e879f9; border: 1px solid rgba(217, 70, 239, 0.35); }
+    .badge-green { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.35); }
+
+    /* ===== GRID LAYOUTS ===== */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1em; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.8em; }
+    .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.7em; }
+    .flex-center { display: flex; align-items: center; justify-content: center; gap: 0.5em; }
+    .flex-col { display: flex; flex-direction: column; gap: 0.6em; }
+
+    /* ===== TITLE SLIDE ===== */
+    .title-logo {
+      font-size: 5em;
+      margin-bottom: 0.1em;
+      filter: drop-shadow(0 0 40px rgba(124, 58, 237, 0.4));
+      animation: float 4s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-12px); }
+    }
+
+    .title-version {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.5em;
+      color: var(--cyan-glow);
+      opacity: 0.8;
+    }
+
+    .title-tagline {
+      font-size: 1.1em;
+      font-weight: 300;
+      color: var(--text-secondary);
+      margin-top: 0.3em;
+      letter-spacing: 0.08em;
+    }
+
+    /* ===== PARTICLES ===== */
+    .particle-container {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+
+    .particle {
+      position: absolute;
+      width: 3px; height: 3px;
+      border-radius: 50%;
+      background: rgba(124, 58, 237, 0.4);
+      animation: drift linear infinite;
+    }
+
+    @keyframes drift {
+      0% { transform: translateY(100vh) translateX(0); opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { transform: translateY(-10vh) translateX(50px); opacity: 0; }
+    }
+
+    /* ===== ARCHITECTURE DIAGRAM ===== */
+    .arch-diagram {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6em;
+      align-items: center;
+      width: 100%;
+    }
+
+    .arch-layer {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6em;
+      width: 100%;
+    }
+
+    .arch-box {
+      background: var(--surface);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 0.6em 1em;
+      text-align: center;
+      font-size: 0.6em;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+      min-width: 120px;
+    }
+
+    .arch-box::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 3px;
+    }
+
+    .arch-box.frontend::before { background: var(--gradient-cool); }
+    .arch-box.backend::before { background: var(--gradient-primary); }
+    .arch-box.infra::before { background: var(--gradient-warm); }
+    .arch-box.ai::before { background: linear-gradient(90deg, #22d3ee, #4ade80); }
+
+    .arch-box .arch-icon { font-size: 1.4em; display: block; margin-bottom: 0.2em; }
+    .arch-box .arch-label { color: var(--text-primary); font-weight: 600; }
+    .arch-box .arch-sub { color: var(--text-secondary); font-size: 0.85em; margin-top: 0.15em; }
+
+    .arch-connector {
+      font-size: 1.2em;
+      color: rgba(124, 58, 237, 0.5);
+      animation: pulse-connector 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-connector {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 1; color: var(--cyan-glow); }
+    }
+
+    /* ===== AGENTIC LOOP ===== */
+    .loop-container {
+      position: relative;
+      width: 420px;
+      height: 420px;
+      margin: 0 auto;
+    }
+
+    .loop-center {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 100px; height: 100px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(124, 58, 237, 0.4), rgba(124, 58, 237, 0.1));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2em;
+      box-shadow: 0 0 60px rgba(124, 58, 237, 0.3);
+      z-index: 2;
+    }
+
+    .loop-node {
+      position: absolute;
+      width: 110px;
+      text-align: center;
+      z-index: 2;
+    }
+
+    .loop-node-circle {
+      width: 70px; height: 70px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.6em;
+      margin: 0 auto 0.3em;
+      border: 2px solid;
+      transition: all 0.3s ease;
+    }
+
+    .loop-node-label {
+      font-size: 0.6em;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .loop-node.goal { top: -10px; left: 50%; transform: translateX(-50%); }
+    .loop-node.goal .loop-node-circle { background: rgba(217, 70, 239, 0.15); border-color: #d946ef; }
+    .loop-node.goal .loop-node-label { color: #e879f9; }
+
+    .loop-node.reason { top: 50%; right: -15px; transform: translateY(-50%); }
+    .loop-node.reason .loop-node-circle { background: rgba(59, 130, 246, 0.15); border-color: #3b82f6; }
+    .loop-node.reason .loop-node-label { color: #60a5fa; }
+
+    .loop-node.act { bottom: -10px; left: 50%; transform: translateX(-50%); }
+    .loop-node.act .loop-node-circle { background: rgba(34, 197, 94, 0.15); border-color: #22c55e; }
+    .loop-node.act .loop-node-label { color: #4ade80; }
+
+    .loop-node.observe { top: 50%; left: -15px; transform: translateY(-50%); }
+    .loop-node.observe .loop-node-circle { background: rgba(6, 182, 212, 0.15); border-color: #06b6d4; }
+    .loop-node.observe .loop-node-label { color: #22d3ee; }
+
+    .loop-ring {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 300px; height: 300px;
+      transform: translate(-50%, -50%);
+      border: 2px dashed rgba(124, 58, 237, 0.2);
+      border-radius: 50%;
+      animation: spin-slow 20s linear infinite;
+    }
+
+    .loop-orbit {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 300px; height: 300px;
+      transform: translate(-50%, -50%);
+      animation: spin-slow 8s linear infinite;
+      z-index: 1;
+    }
+
+    .loop-orbit-dot {
+      position: absolute;
+      top: -4px; left: 50%;
+      transform: translateX(-50%);
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--cyan-glow);
+      box-shadow: 0 0 15px var(--cyan-glow);
+    }
+
+    @keyframes spin-slow {
+      from { transform: translate(-50%, -50%) rotate(0deg); }
+      to { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    /* ===== BLOCK TYPES ===== */
+    .block-card {
+      background: var(--surface);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      padding: 0.7em;
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+
+    .block-card:hover {
+      transform: translateY(-3px) scale(1.02);
+      border-color: rgba(124, 58, 237, 0.4);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .block-emoji { font-size: 1.8em; margin-bottom: 0.2em; }
+    .block-name { font-size: 0.6em; font-weight: 700; color: var(--text-primary); }
+    .block-desc { font-size: 0.45em; color: var(--text-secondary); margin-top: 0.2em; }
+
+    /* ===== CHAIN PIPELINE ===== */
+    .chain-pipeline {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      flex-wrap: nowrap;
+    }
+
+    .chain-step {
+      background: var(--surface);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 0.6em 0.8em;
+      text-align: center;
+      min-width: 100px;
+      position: relative;
+    }
+
+    .chain-step .step-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.5em;
+      color: var(--purple-light);
+      font-weight: 600;
+    }
+
+    .chain-step .step-icon { font-size: 1.4em; margin: 0.15em 0; }
+    .chain-step .step-label { font-size: 0.5em; font-weight: 600; color: var(--text-primary); }
+
+    .chain-arrow {
+      font-size: 1.2em;
+      color: var(--purple-light);
+      padding: 0 0.2em;
+      animation: arrow-pulse 1.5s ease-in-out infinite;
+    }
+
+    .chain-arrow:nth-child(4) { animation-delay: 0.2s; }
+    .chain-arrow:nth-child(6) { animation-delay: 0.4s; }
+    .chain-arrow:nth-child(8) { animation-delay: 0.6s; }
+    .chain-arrow:nth-child(10) { animation-delay: 0.8s; }
+
+    @keyframes arrow-pulse {
+      0%, 100% { opacity: 0.4; transform: translateX(0); }
+      50% { opacity: 1; transform: translateX(3px); color: var(--cyan-glow); }
+    }
+
+    /* ===== STAT COUNTERS ===== */
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 14px;
+      padding: 1em;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0;
+      width: 100%; height: 3px;
+    }
+
+    .stat-card:nth-child(1)::after { background: var(--gradient-primary); }
+    .stat-card:nth-child(2)::after { background: var(--gradient-warm); }
+    .stat-card:nth-child(3)::after { background: var(--gradient-cool); }
+    .stat-card:nth-child(4)::after { background: linear-gradient(90deg, #22d3ee, #4ade80); }
+
+    .stat-number {
+      font-size: 2.2em;
+      font-weight: 900;
+      background: var(--gradient-primary);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1;
+    }
+
+    .stat-label {
+      font-size: 0.55em;
+      color: var(--text-secondary);
+      margin-top: 0.3em;
+      font-weight: 500;
+    }
+
+    .stat-detail {
+      font-size: 0.45em;
+      color: rgba(148, 163, 184, 0.6);
+      margin-top: 0.2em;
+    }
+
+    /* ===== STAGING DIAGRAM ===== */
+    .staging-env {
+      text-align: center;
+      padding: 1em;
+      border-radius: 14px;
+      border: 1px solid;
+      position: relative;
+    }
+
+    .staging-env.dev {
+      background: rgba(34, 197, 94, 0.08);
+      border-color: rgba(34, 197, 94, 0.3);
+    }
+
+    .staging-env.stable {
+      background: rgba(59, 130, 246, 0.08);
+      border-color: rgba(59, 130, 246, 0.3);
+    }
+
+    .staging-env.test {
+      background: rgba(217, 70, 239, 0.08);
+      border-color: rgba(217, 70, 239, 0.3);
+    }
+
+    .staging-port {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6em;
+      padding: 0.2em 0.6em;
+      border-radius: 6px;
+      display: inline-block;
+      margin-top: 0.3em;
+    }
+
+    .dev .staging-port { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
+    .stable .staging-port { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+    .test .staging-port { background: rgba(217, 70, 239, 0.15); color: #e879f9; }
+
+    /* ===== MEMORY CYCLE ===== */
+    .memory-flow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.3em;
+      flex-wrap: wrap;
+    }
+
+    .memory-step {
+      background: var(--surface);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 0.5em 0.7em;
+      text-align: center;
+      min-width: 90px;
+    }
+
+    .memory-step .mem-icon { font-size: 1.4em; }
+    .memory-step .mem-label { font-size: 0.5em; font-weight: 600; color: var(--text-primary); margin-top: 0.2em; }
+
+    .memory-arrow {
+      font-size: 1em;
+      color: var(--purple-light);
+      animation: arrow-pulse 2s ease-in-out infinite;
+    }
+
+    /* ===== ROADMAP ===== */
+    .roadmap-timeline {
+      display: flex;
+      align-items: flex-start;
+      gap: 0;
+      position: relative;
+      padding-top: 1.5em;
+    }
+
+    .roadmap-timeline::before {
+      content: '';
+      position: absolute;
+      top: 1.5em;
+      left: 10%;
+      right: 10%;
+      height: 3px;
+      background: linear-gradient(90deg, #22c55e, #3b82f6, #7c3aed, #d946ef);
+      border-radius: 2px;
+    }
+
+    .roadmap-phase {
+      flex: 1;
+      text-align: center;
+      position: relative;
+    }
+
+    .roadmap-dot {
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      margin: 0 auto 0.6em;
+      position: relative;
+      z-index: 2;
+    }
+
+    .roadmap-phase:nth-child(1) .roadmap-dot { background: #22c55e; box-shadow: 0 0 15px rgba(34, 197, 94, 0.5); }
+    .roadmap-phase:nth-child(2) .roadmap-dot { background: #3b82f6; box-shadow: 0 0 15px rgba(59, 130, 246, 0.5); }
+    .roadmap-phase:nth-child(3) .roadmap-dot { background: #7c3aed; box-shadow: 0 0 15px rgba(124, 58, 237, 0.5); }
+    .roadmap-phase:nth-child(4) .roadmap-dot { background: #d946ef; box-shadow: 0 0 15px rgba(217, 70, 239, 0.5); }
+
+    .roadmap-title {
+      font-size: 0.6em;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 0.3em;
+    }
+
+    .roadmap-items {
+      font-size: 0.45em;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    /* ===== PILLAR CARDS ===== */
+    .pillar-card {
+      border-radius: 16px;
+      padding: 1.2em;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .pillar-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+    }
+
+    .pillar-card.solver {
+      background: rgba(6, 182, 212, 0.06);
+      border: 1px solid rgba(6, 182, 212, 0.2);
+    }
+    .pillar-card.solver::before { background: linear-gradient(90deg, #06b6d4, #3b82f6); }
+
+    .pillar-card.evolving {
+      background: rgba(124, 58, 237, 0.06);
+      border: 1px solid rgba(124, 58, 237, 0.2);
+    }
+    .pillar-card.evolving::before { background: linear-gradient(90deg, #7c3aed, #d946ef); }
+
+    .pillar-icon { font-size: 2em; margin-bottom: 0.3em; }
+
+    .pillar-card h3 {
+      font-size: 0.85em !important;
+      margin-bottom: 0.4em !important;
+    }
+
+    .pillar-list {
+      font-size: 0.55em;
+      color: var(--text-secondary);
+      line-height: 1.8;
+    }
+
+    .pillar-list span { color: var(--text-primary); font-weight: 500; }
+
+    /* ===== SKILL GRID ===== */
+    .skill-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5em;
+      background: var(--surface);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      padding: 0.5em 0.7em;
+      font-size: 0.55em;
+    }
+
+    .skill-icon { font-size: 1.4em; }
+    .skill-name { font-weight: 600; color: var(--text-primary); }
+    .skill-tag { font-size: 0.8em; color: var(--text-secondary); }
+
+    /* ===== CLOSING SLIDE ===== */
+    .closing-links {
+      display: flex;
+      gap: 1.5em;
+      justify-content: center;
+      margin-top: 1em;
+    }
+
+    .closing-link {
+      font-size: 0.6em;
+      color: var(--text-secondary);
+      text-decoration: none;
+      padding: 0.5em 1em;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      transition: all 0.3s ease;
+    }
+
+    .closing-link:hover {
+      border-color: var(--purple-light);
+      color: var(--text-primary);
+    }
+
+    /* ===== SECTION DIVIDERS ===== */
+    .section-subtitle {
+      font-size: 0.65em;
+      font-weight: 400;
+      color: var(--text-secondary);
+      margin-top: 0.2em;
+    }
+
+    .divider {
+      width: 60px;
+      height: 3px;
+      background: var(--gradient-primary);
+      border-radius: 2px;
+      margin: 0.5em auto;
+    }
+
+    /* ===== SLIDE PROGRESS ===== */
+    .reveal .progress { height: 3px; color: var(--purple-light); }
+    .reveal .controls { color: var(--purple-light); }
+    .reveal .slide-number { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-secondary); }
+
+    /* ===== FRAGMENT ANIMATIONS ===== */
+    .reveal .fragment.grow-in {
+      opacity: 0;
+      transform: scale(0.8);
+      transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .reveal .fragment.grow-in.visible {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .reveal .fragment.slide-up {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    .reveal .fragment.slide-up.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+      .grid-2 { grid-template-columns: 1fr; }
+      .grid-3 { grid-template-columns: 1fr 1fr; }
+      .grid-4 { grid-template-columns: 1fr 1fr; }
+      .chain-pipeline { flex-wrap: wrap; justify-content: center; }
+      .loop-container { width: 300px; height: 300px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Particles -->
+  <div class="particle-container" id="particles"></div>
+
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- ==================== SLIDE 1: TITLE ==================== -->
+      <section>
+        <div class="title-logo">🦫</div>
+        <h1 class="gradient-text" style="margin:0;">MySuricates</h1>
+        <div class="title-version">v0.2.3</div>
+        <div class="divider" style="margin: 0.6em auto;"></div>
+        <p class="title-tagline">AI-Powered Workflow Automation Platform</p>
+        <div style="margin-top: 1.5em; display: flex; gap: 0.8em; justify-content: center;">
+          <span class="badge badge-purple">Spring Boot 3.4</span>
+          <span class="badge badge-cyan">React 18</span>
+          <span class="badge badge-blue">Docker</span>
+          <span class="badge badge-magenta">Claude CLI</span>
+        </div>
+      </section>
+
+      <!-- ==================== SLIDE 2: WHAT IS ==================== -->
+      <section>
+        <h2><span class="gradient-text">Was ist MySuricates?</span></h2>
+        <div class="divider"></div>
+        <p style="font-size: 0.85em; max-width: 800px; margin: 0.8em auto; color: var(--text-secondary); line-height: 1.8;">
+          Eine <span style="color: var(--text-primary); font-weight: 600;">AI-gesteuerte Workflow-Automations-Plattform</span>,
+          die reale Probleme l&ouml;st &mdash; im Beruf und im Alltag.
+        </p>
+        <div class="grid-3" style="margin-top: 1.2em; max-width: 850px; margin-left: auto; margin-right: auto;">
+          <div class="glass fragment grow-in" style="text-align: center;">
+            <div style="font-size: 2em; margin-bottom: 0.2em;">🧩</div>
+            <h3 style="font-size: 0.7em; color: var(--text-primary);">Workflows</h3>
+            <p style="font-size: 0.55em;">Komplexe Aufgaben in automatisierte Schritte zerlegen</p>
+          </div>
+          <div class="glass fragment grow-in" style="text-align: center;">
+            <div style="font-size: 2em; margin-bottom: 0.2em;">🤖</div>
+            <h3 style="font-size: 0.7em; color: var(--text-primary);">AI-native</h3>
+            <p style="font-size: 0.55em;">Claude CLI als Host-Integration f&uuml;r intelligente Ausf&uuml;hrung</p>
+          </div>
+          <div class="glass fragment grow-in" style="text-align: center;">
+            <div style="font-size: 2em; margin-bottom: 0.2em;">📈</div>
+            <h3 style="font-size: 0.7em; color: var(--text-primary);">Selbstlernend</h3>
+            <p style="font-size: 0.55em;">Jeder Run verbessert zuk&uuml;nftige Ergebnisse</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== SLIDE 3: TWO PILLARS ==================== -->
+      <section>
+        <h2><span class="gradient-text">Zwei S&auml;ulen</span></h2>
+        <div class="divider"></div>
+        <div class="grid-2" style="margin-top: 0.8em; max-width: 900px; margin-left: auto; margin-right: auto;">
+          <div class="pillar-card solver fragment slide-up">
+            <div class="pillar-icon">🌍</div>
+            <h3 style="color: #22d3ee;">Universeller Probleml&ouml;ser</h3>
+            <div class="pillar-list">
+              <span>🏢 Beruf:</span> Morgen-Briefings, Meeting-Protokolle, Security Audits<br>
+              <span>🏠 Privat:</span> Bewerbungs-Coach, Reiseplanung, Vokabel-Songs<br>
+              <span>🔗 Chains:</span> Content-Maschine, Website-Audits, B&uuml;ro-Routinen<br>
+              <br>
+              <em style="color: rgba(148,163,184,0.7); font-size: 0.9em;">Nicht nur f&uuml;r Entwickler &mdash; f&uuml;r jeden.</em>
+            </div>
+          </div>
+          <div class="pillar-card evolving fragment slide-up">
+            <div class="pillar-icon">🧬</div>
+            <h3 style="color: #a78bfa;">Selbstverbessernde AI</h3>
+            <div class="pillar-list">
+              <span>💫 Wishes:</span> Nat&uuml;rliche Sprache &rarr; fertige Workflows<br>
+              <span>🏭 Factory:</span> Topic &rarr; Generate &rarr; Test &rarr; Promote<br>
+              <span>📊 Learning:</span> Erfolgsraten, Feedback, Optimierung<br>
+              <span>🧠 Memory:</span> Wissen &uuml;ber Runs hinweg akkumulieren<br>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== SLIDE 4: ARCHITECTURE ==================== -->
+      <section>
+        <h2><span class="gradient-text">Architektur</span></h2>
+        <div class="divider"></div>
+        <div class="arch-diagram" style="margin-top: 0.6em;">
+
+          <!-- Frontend Layer -->
+          <div class="arch-layer">
+            <div class="arch-box frontend" style="min-width: 340px;">
+              <span class="arch-icon">⚛️</span>
+              <div class="arch-label">React 18 Frontend</div>
+              <div class="arch-sub">TypeScript &bull; TailwindCSS &bull; TanStack Query &bull; Zustand</div>
+            </div>
+          </div>
+
+          <div class="arch-connector">▼</div>
+
+          <!-- API Layer -->
+          <div class="arch-layer">
+            <div class="arch-box backend" style="min-width: 340px;">
+              <span class="arch-icon">🍃</span>
+              <div class="arch-label">Spring Boot 3.4 Backend</div>
+              <div class="arch-sub">Java 21 &bull; REST API &bull; WebSocket &bull; Flyway &bull; SQLite</div>
+            </div>
+          </div>
+
+          <div class="arch-connector">▼</div>
+
+          <!-- Infrastructure Layer -->
+          <div class="arch-layer" style="gap: 0.8em;">
+            <div class="arch-box infra">
+              <span class="arch-icon">🐳</span>
+              <div class="arch-label">Docker</div>
+              <div class="arch-sub">Python &bull; Node &bull; Go</div>
+            </div>
+            <div class="arch-box ai">
+              <span class="arch-icon">🧠</span>
+              <div class="arch-label">Claude CLI</div>
+              <div class="arch-sub">Host-Execution</div>
+            </div>
+            <div class="arch-box infra">
+              <span class="arch-icon">💾</span>
+              <div class="arch-label">SQLite</div>
+              <div class="arch-sub">Flyway-Migrationen</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 0.8em; display: flex; gap: 0.6em; justify-content: center; flex-wrap: wrap;">
+          <span class="badge badge-purple">19 REST Controller</span>
+          <span class="badge badge-cyan">43 Services</span>
+          <span class="badge badge-blue">29 Entities</span>
+          <span class="badge badge-green">33 Migrationen</span>
+        </div>
+      </section>
+
+      <!-- ==================== SLIDE 5: BLOCK TYPES ==================== -->
+      <section>
+        <h2><span class="gradient-text">Block-Typen</span></h2>
+        <p class="section-subtitle">Die Bausteine jedes Workflows</p>
+        <div class="divider"></div>
+        <div class="grid-4" style="margin-top: 0.8em; max-width: 880px; margin-left: auto; margin-right: auto;">
+          <div class="block-card fragment grow-in">
+            <div class="block-emoji">⚡</div>
+            <div class="block-name">Simple</div>
+            <div class="block-desc">AI-Textverarbeitung</div>
+          </div>
+          <div class="block-card fragment grow-in">
+            <div class="block-emoji">🐚</div>
+            <div class="block-name">Shell</div>
+            <div class="block-desc">Systembefehle</div>
+          </div>
+          <div class="block-card fragment grow-in">
+            <div class="block-emoji">🤖</div>
+            <div class="block-name">Agentic</div>
+            <div class="block-desc">Goal&rarr;Reason&rarr;Act&rarr;Observe</div>
+          </div>
+          <div class="block-card fragment grow-in">
+            <div class="block-emoji">🔀</div>
+            <div class="block-name">Conditional</div>
+            <div class="block-desc">If/Else Verzweigung</div>
+          </div>
+          <div class="block-card fragment grow-in">
+            <div class="block-emoji">🔄</div>
+            <div class="block-name">ForEach</div>
+            <div class="block-desc">Listen-Iteration</div>
+          </div>
+          <div class="block-card fragment grow-in">
+            <div class="block-emoji">🔁</div>
+            <div class="block-name">While</div>
+            <div class="block-desc">Bedingte Schleife</div>
+          </div>
+          <div class="block-card fragment grow-in">
+            <div class="block-emoji">🔃</div>
+            <div class="block-name">Retry</div>
+            <div class="block-desc">Fehlertoleranz</div>
+          </div>
+          <div class="block-card fragment grow-in">
+            <div class="block-emoji">✅</div>
+            <div class="block-name">Approval</div>
+            <div class="block-desc">Menschliche Freigabe</div>
+          </div>
+          <div class="block-card fragment grow-in">
+            <div class="block-emoji">📥</div>
+            <div class="block-name">Human Input</div>
+            <div class="block-desc">Nutzer-Eingabe</div>
+          </div>
+          <div class="block-card fragment grow-in">
+            <div class="block-emoji">📦</div>
+            <div class="block-name">Sub-Workflow</div>
+            <div class="block-desc">Verschachtelt (5 Ebenen)</div>
+          </div>
+          <div class="block-card fragment grow-in">
+            <div class="block-emoji">🎯</div>
+            <div class="block-name">Skill-Capability</div>
+            <div class="block-desc">Skill-F&auml;higkeiten</div>
+          </div>
+          <div class="block-card fragment grow-in">
+            <div class="block-emoji">🔢</div>
+            <div class="block-name">12 Block-Typen</div>
+            <div class="block-desc">Erweiterbar</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== SLIDE 6: CHAINS ==================== -->
+      <section>
+        <h2><span class="gradient-text">Workflow Chains</span></h2>
+        <p class="section-subtitle">Sequentielle Verkettung von Workflows</p>
+        <div class="divider"></div>
+
+        <div style="margin-top: 1em;">
+          <p style="font-size: 0.65em; margin-bottom: 0.8em; color: var(--text-secondary);">
+            Beispiel: <span style="color: var(--text-primary); font-weight: 600;">Content-Maschine</span>
+          </p>
+          <div class="chain-pipeline">
+            <div class="chain-step">
+              <div class="step-num">01</div>
+              <div class="step-icon">🔍</div>
+              <div class="step-label">Recherche</div>
+            </div>
+            <div class="chain-arrow">→</div>
+            <div class="chain-step">
+              <div class="step-num">02</div>
+              <div class="step-icon">✍️</div>
+              <div class="step-label">Artikel</div>
+            </div>
+            <div class="chain-arrow">→</div>
+            <div class="chain-step">
+              <div class="step-num">03</div>
+              <div class="step-icon">📱</div>
+              <div class="step-label">Social Posts</div>
+            </div>
+            <div class="chain-arrow">→</div>
+            <div class="chain-step">
+              <div class="step-num">04</div>
+              <div class="step-icon">📧</div>
+              <div class="step-label">Newsletter</div>
+            </div>
+            <div class="chain-arrow">→</div>
+            <div class="chain-step">
+              <div class="step-num">05</div>
+              <div class="step-icon">📊</div>
+              <div class="step-label">Report</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-3" style="margin-top: 1.2em; max-width: 750px; margin-left: auto; margin-right: auto;">
+          <div class="glass-sm fragment slide-up" style="text-align: center;">
+            <div style="font-size: 0.65em; font-weight: 600; color: var(--text-primary);">Projekt&uuml;bergreifend</div>
+            <div style="font-size: 0.5em; color: var(--text-secondary);">Workflows aus verschiedenen Projekten kombinieren</div>
+          </div>
+          <div class="glass-sm fragment slide-up" style="text-align: center;">
+            <div style="font-size: 0.65em; font-weight: 600; color: var(--text-primary);">Kontext-Weiterleitung</div>
+            <div style="font-size: 0.5em; color: var(--text-secondary);"><code>previous_chain_output</code> verbindet Schritte</div>
+          </div>
+          <div class="glass-sm fragment slide-up" style="text-align: center;">
+            <div style="font-size: 0.65em; font-weight: 600; color: var(--text-primary);">Fehler-Kontrolle</div>
+            <div style="font-size: 0.5em; color: var(--text-secondary);"><code>stopOnFailure</code> pro Eintrag konfigurierbar</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== SLIDE 7: AGENTIC LOOP ==================== -->
+      <section>
+        <h2><span class="gradient-text">Agentic Blocks</span></h2>
+        <p class="section-subtitle">Autonome AI-Agenten mit Feedback-Schleife</p>
+        <div class="divider"></div>
+
+        <div style="display: flex; align-items: center; gap: 2em; margin-top: 0.5em; justify-content: center;">
+          <div class="loop-container">
+            <div class="loop-ring"></div>
+            <div class="loop-orbit">
+              <div class="loop-orbit-dot"></div>
+            </div>
+            <div class="loop-center">🤖</div>
+
+            <div class="loop-node goal">
+              <div class="loop-node-circle">🎯</div>
+              <div class="loop-node-label">Goal</div>
+            </div>
+            <div class="loop-node reason">
+              <div class="loop-node-circle">💭</div>
+              <div class="loop-node-label">Reason</div>
+            </div>
+            <div class="loop-node act">
+              <div class="loop-node-circle">⚡</div>
+              <div class="loop-node-label">Act</div>
+            </div>
+            <div class="loop-node observe">
+              <div class="loop-node-circle">👁️</div>
+              <div class="loop-node-label">Observe</div>
+            </div>
+          </div>
+
+          <div class="flex-col" style="max-width: 280px;">
+            <div class="glass-sm fragment slide-up">
+              <div style="font-size: 0.6em;"><span style="color: #e879f9; font-weight: 700;">GOAL</span> <span style="color: var(--text-secondary);">&mdash; Ziel definieren</span></div>
+            </div>
+            <div class="glass-sm fragment slide-up">
+              <div style="font-size: 0.6em;"><span style="color: #60a5fa; font-weight: 700;">REASON</span> <span style="color: var(--text-secondary);">&mdash; N&auml;chsten Schritt planen</span></div>
+            </div>
+            <div class="glass-sm fragment slide-up">
+              <div style="font-size: 0.6em;"><span style="color: #4ade80; font-weight: 700;">ACT</span> <span style="color: var(--text-secondary);">&mdash; Claude CLI ausf&uuml;hren</span></div>
+            </div>
+            <div class="glass-sm fragment slide-up">
+              <div style="font-size: 0.6em;"><span style="color: #22d3ee; font-weight: 700;">OBSERVE</span> <span style="color: var(--text-secondary);">&mdash; Ergebnis bewerten</span></div>
+            </div>
+            <div class="glass-sm fragment slide-up" style="border-color: rgba(124, 58, 237, 0.3);">
+              <div style="font-size: 0.5em; color: var(--text-secondary);">
+                Max <code>10</code> Iterationen &bull; <code>200k</code> Token-Budget<br>
+                History-Kompression &bull; Approval Gates
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== SLIDE 8: SKILLS & TEMPLATES ==================== -->
+      <section>
+        <h2><span class="gradient-text">Skills &amp; Templates</span></h2>
+        <p class="section-subtitle">Wiederverwendbare Bausteine &amp; Vorlagen</p>
+        <div class="divider"></div>
+
+        <div class="grid-2" style="margin-top: 0.8em; max-width: 900px; margin-left: auto; margin-right: auto;">
+          <div>
+            <h3 style="font-size: 0.75em; margin-bottom: 0.5em;">
+              <span style="color: #22d3ee;">16</span> Built-in Skills
+            </h3>
+            <div class="flex-col" style="gap: 0.35em;">
+              <div class="skill-item fragment slide-up">
+                <span class="skill-icon">🔍</span>
+                <span class="skill-name">Code Review</span>
+                <span class="skill-tag">&bull; Analyse</span>
+              </div>
+              <div class="skill-item fragment slide-up">
+                <span class="skill-icon">🧪</span>
+                <span class="skill-name">Test Generator</span>
+                <span class="skill-tag">&bull; Testing</span>
+              </div>
+              <div class="skill-item fragment slide-up">
+                <span class="skill-icon">📝</span>
+                <span class="skill-name">Documentation</span>
+                <span class="skill-tag">&bull; Docs</span>
+              </div>
+              <div class="skill-item fragment slide-up">
+                <span class="skill-icon">🛡️</span>
+                <span class="skill-name">Security Audit</span>
+                <span class="skill-tag">&bull; Security</span>
+              </div>
+              <div class="skill-item fragment slide-up">
+                <span class="skill-icon">🎨</span>
+                <span class="skill-name">OCR &amp; Linting</span>
+                <span class="skill-tag">&bull; Utility</span>
+              </div>
+            </div>
+          </div>
+          <div>
+            <h3 style="font-size: 0.75em; margin-bottom: 0.5em;">
+              <span style="color: #a78bfa;">28</span> Workflow-Templates
+            </h3>
+            <div class="flex-col" style="gap: 0.35em;">
+              <div class="skill-item fragment slide-up">
+                <span class="skill-icon">☀️</span>
+                <span class="skill-name">Morgen-Briefing</span>
+                <span class="skill-tag">&bull; Beruf</span>
+              </div>
+              <div class="skill-item fragment slide-up">
+                <span class="skill-icon">🎵</span>
+                <span class="skill-name">Vokabel-Songs</span>
+                <span class="skill-tag">&bull; Bildung</span>
+              </div>
+              <div class="skill-item fragment slide-up">
+                <span class="skill-icon">🌐</span>
+                <span class="skill-name">Website-Audit</span>
+                <span class="skill-tag">&bull; Analyse</span>
+              </div>
+              <div class="skill-item fragment slide-up">
+                <span class="skill-icon">📋</span>
+                <span class="skill-name">Meeting-Protokoll</span>
+                <span class="skill-tag">&bull; Beruf</span>
+              </div>
+              <div class="skill-item fragment slide-up">
+                <span class="skill-icon">✈️</span>
+                <span class="skill-name">Reiseplanung</span>
+                <span class="skill-tag">&bull; Privat</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p style="font-size: 0.55em; margin-top: 0.8em; color: var(--text-secondary);">
+          i18n: Deutsch &amp; Englisch &bull; Eigene Skills &amp; Templates erstellbar &bull; Seeding beim Start
+        </p>
+      </section>
+
+      <!-- ==================== SLIDE 9: STAGING ==================== -->
+      <section>
+        <h2><span class="gradient-text">Staging-System</span></h2>
+        <p class="section-subtitle">Drei Umgebungen parallel</p>
+        <div class="divider"></div>
+
+        <div class="grid-3" style="margin-top: 1em; max-width: 850px; margin-left: auto; margin-right: auto;">
+          <div class="staging-env dev fragment grow-in">
+            <div style="font-size: 2em;">🛠️</div>
+            <h3 style="font-size: 0.8em; color: #4ade80; margin: 0.3em 0;">Dev</h3>
+            <p style="font-size: 0.55em; color: var(--text-secondary);">Aus Sourcen<br>Hot Reload</p>
+            <div class="staging-port">:3000 → :9090</div>
+          </div>
+          <div class="staging-env stable fragment grow-in">
+            <div style="font-size: 2em;">📦</div>
+            <h3 style="font-size: 0.8em; color: #60a5fa; margin: 0.3em 0;">Stable</h3>
+            <p style="font-size: 0.55em; color: var(--text-secondary);">Docker Container<br>Produktion</p>
+            <div class="staging-port">:9091</div>
+          </div>
+          <div class="staging-env test fragment grow-in">
+            <div style="font-size: 2em;">🧪</div>
+            <h3 style="font-size: 0.8em; color: #e879f9; margin: 0.3em 0;">Test</h3>
+            <p style="font-size: 0.55em; color: var(--text-secondary);">Docker Container<br>Workflow-Verifikation</p>
+            <div class="staging-port">:8090</div>
+          </div>
+        </div>
+
+        <div style="margin-top: 1em; display: flex; align-items: center; justify-content: center; gap: 0.5em;">
+          <span class="badge badge-green" style="font-size: 0.5em;">Dev</span>
+          <span style="color: var(--purple-light); font-size: 0.8em;">→ promote →</span>
+          <span class="badge badge-blue" style="font-size: 0.5em;">Stable</span>
+          <span style="color: var(--text-secondary); font-size: 0.6em; margin: 0 0.3em;">|</span>
+          <span class="badge badge-green" style="font-size: 0.5em;">Dev</span>
+          <span style="color: var(--purple-light); font-size: 0.8em;">→ sync →</span>
+          <span class="badge badge-magenta" style="font-size: 0.5em;">Test</span>
+        </div>
+
+        <div class="glass-sm fragment slide-up" style="max-width: 600px; margin: 0.8em auto 0; text-align: center;">
+          <p style="font-size: 0.5em; color: var(--text-secondary); margin: 0;">
+            <code>staging.sh promote</code> &mdash; Build + Docker Image + Git Tag<br>
+            Definition-Sync: Projekte, Workflows, Skills &bull; Runs bleiben isoliert
+          </p>
+        </div>
+      </section>
+
+      <!-- ==================== SLIDE 10: MEMORY & SELF-IMPROVEMENT ==================== -->
+      <section>
+        <h2><span class="gradient-text">Memory &amp; Selbstverbesserung</span></h2>
+        <p class="section-subtitle">Das System lernt aus jedem Run</p>
+        <div class="divider"></div>
+
+        <div class="memory-flow" style="margin-top: 1em;">
+          <div class="memory-step fragment slide-up">
+            <div class="mem-icon">🚀</div>
+            <div class="mem-label">Workflow Run</div>
+          </div>
+          <div class="memory-arrow">→</div>
+          <div class="memory-step fragment slide-up">
+            <div class="mem-icon">📊</div>
+            <div class="mem-label">Ergebnisse</div>
+          </div>
+          <div class="memory-arrow">→</div>
+          <div class="memory-step fragment slide-up">
+            <div class="mem-icon">🧠</div>
+            <div class="mem-label">Extraktion</div>
+          </div>
+          <div class="memory-arrow">→</div>
+          <div class="memory-step fragment slide-up">
+            <div class="mem-icon">💾</div>
+            <div class="mem-label">Knowledge</div>
+          </div>
+          <div class="memory-arrow">→</div>
+          <div class="memory-step fragment slide-up">
+            <div class="mem-icon">⚡</div>
+            <div class="mem-label">Optimierung</div>
+          </div>
+        </div>
+
+        <div class="grid-2" style="margin-top: 1.2em; max-width: 800px; margin-left: auto; margin-right: auto;">
+          <div class="glass fragment slide-up">
+            <h3 style="font-size: 0.7em; color: #22d3ee;">🧠 Workflow Memory</h3>
+            <p style="font-size: 0.5em;">
+              Wissen pro Workflow akkumulieren &bull;
+              Claude &amp; Codex als Summarizer &bull;
+              Aktivierbar/Deaktivierbar pro Eintrag
+            </p>
+          </div>
+          <div class="glass fragment slide-up">
+            <h3 style="font-size: 0.7em; color: #a78bfa;">📈 Learning System</h3>
+            <p style="font-size: 0.5em;">
+              Erfolgsraten pro Template &amp; Block-Typ &bull;
+              Feedback-Loop zur Generation &bull;
+              Modell-Performance-Vergleich
+            </p>
+          </div>
+        </div>
+
+        <div class="glass-sm fragment slide-up" style="max-width: 500px; margin: 0.8em auto 0; text-align: center;">
+          <p style="font-size: 0.5em; color: var(--text-secondary); margin: 0;">
+            <span style="color: var(--text-primary); font-weight: 600;">Wishes</span> &rarr;
+            <span style="color: var(--text-primary); font-weight: 600;">Factory</span> &rarr;
+            <span style="color: var(--text-primary); font-weight: 600;">Learning</span> &rarr;
+            <span style="color: var(--text-primary); font-weight: 600;">Memory</span><br>
+            <em style="color: rgba(148,163,184,0.6);">Der Kreislauf der Selbstverbesserung</em>
+          </p>
+        </div>
+      </section>
+
+      <!-- ==================== SLIDE 11: WISHES & FACTORY ==================== -->
+      <section>
+        <h2><span class="gradient-text">Wishes &amp; Factory</span></h2>
+        <p class="section-subtitle">Von der Idee zum fertigen Workflow</p>
+        <div class="divider"></div>
+
+        <div class="grid-2" style="margin-top: 0.8em; max-width: 900px; margin-left: auto; margin-right: auto;">
+          <div class="glass fragment slide-up glow-cyan">
+            <h3 style="font-size: 0.75em; color: #22d3ee; margin-bottom: 0.5em;">💫 Wishes</h3>
+            <div style="font-size: 0.5em; color: var(--text-secondary); line-height: 1.8;">
+              <div style="margin-bottom: 0.3em; color: var(--text-primary); font-style: italic;">
+                &bdquo;Ich brauche einen w&ouml;chentlichen Security-Report&ldquo;
+              </div>
+              <span style="color: #e879f9;">1.</span> Decompose &rarr; Sub-Tasks identifizieren<br>
+              <span style="color: #60a5fa;">2.</span> Build &rarr; Workflow generieren<br>
+              <span style="color: #4ade80;">3.</span> Verify &rarr; Pre-flight Check<br>
+              <span style="color: #22d3ee;">4.</span> Execute &rarr; Test-Run<br>
+              <span style="color: #a78bfa;">5.</span> Evaluate &rarr; Qualit&auml;t pr&uuml;fen<br>
+              <span style="color: #fbbf24;">6.</span> Iterate &rarr; Verbessern<br>
+            </div>
+          </div>
+          <div class="glass fragment slide-up glow-purple">
+            <h3 style="font-size: 0.75em; color: #a78bfa; margin-bottom: 0.5em;">🏭 Factory</h3>
+            <div style="font-size: 0.5em; color: var(--text-secondary); line-height: 1.8;">
+              <div style="margin-bottom: 0.3em; color: var(--text-primary); font-weight: 600;">
+                Thema rein &rarr; Template raus
+              </div>
+              <span style="color: #e879f9;">Generate:</span> AI erstellt Workflow<br>
+              <span style="color: #60a5fa;">Deploy:</span> Auf Test-Instanz ausrollen<br>
+              <span style="color: #4ade80;">Test:</span> Automatisch ausf&uuml;hren<br>
+              <span style="color: #22d3ee;">Verify:</span> Erfolg, Qualit&auml;t, Kosten<br>
+              <span style="color: #a78bfa;">Promote:</span> Zum wiederverwendbaren Template<br>
+              <br>
+              <em style="color: rgba(148,163,184,0.6); font-size: 0.9em;">Multi-Provider: Claude + Codex</em>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== SLIDE 12: LIVE STATS ==================== -->
+      <section>
+        <h2><span class="gradient-text">Live-Statistiken</span></h2>
+        <p class="section-subtitle">Stand: M&auml;rz 2026</p>
+        <div class="divider"></div>
+
+        <div class="grid-4" style="margin-top: 1em; max-width: 900px; margin-left: auto; margin-right: auto;">
+          <div class="stat-card fragment grow-in">
+            <div class="stat-number" data-count="114">0</div>
+            <div class="stat-label">Git Commits</div>
+            <div class="stat-detail">Branch: main</div>
+          </div>
+          <div class="stat-card fragment grow-in">
+            <div class="stat-number" data-count="19">0</div>
+            <div class="stat-label">REST Controller</div>
+            <div class="stat-detail">Spring Boot 3.4</div>
+          </div>
+          <div class="stat-card fragment grow-in">
+            <div class="stat-number" data-count="43">0</div>
+            <div class="stat-label">Services</div>
+            <div class="stat-detail">Business Logic</div>
+          </div>
+          <div class="stat-card fragment grow-in">
+            <div class="stat-number" data-count="29">0</div>
+            <div class="stat-label">Entities</div>
+            <div class="stat-detail">JPA + SQLite</div>
+          </div>
+        </div>
+
+        <div class="grid-4" style="margin-top: 0.6em; max-width: 900px; margin-left: auto; margin-right: auto;">
+          <div class="stat-card fragment grow-in">
+            <div class="stat-number" data-count="17">0</div>
+            <div class="stat-label">Frontend Pages</div>
+            <div class="stat-detail">React + TypeScript</div>
+          </div>
+          <div class="stat-card fragment grow-in">
+            <div class="stat-number" data-count="26">0</div>
+            <div class="stat-label">React Hooks</div>
+            <div class="stat-detail">TanStack Query</div>
+          </div>
+          <div class="stat-card fragment grow-in">
+            <div class="stat-number" data-count="12">0</div>
+            <div class="stat-label">Block-Typen</div>
+            <div class="stat-detail">Agentic, Shell, ...</div>
+          </div>
+          <div class="stat-card fragment grow-in">
+            <div class="stat-number" data-count="33">0</div>
+            <div class="stat-label">DB-Migrationen</div>
+            <div class="stat-detail">Flyway V1&ndash;V33</div>
+          </div>
+        </div>
+
+        <div style="margin-top: 0.8em; display: flex; gap: 0.8em; justify-content: center; flex-wrap: wrap;">
+          <span class="badge badge-purple">v0.2.3</span>
+          <span class="badge badge-cyan">Java 21</span>
+          <span class="badge badge-green">1 Contributor</span>
+          <span class="badge badge-magenta">3 i18n-Sprachen</span>
+        </div>
+      </section>
+
+      <!-- ==================== SLIDE 13: ROADMAP ==================== -->
+      <section>
+        <h2><span class="gradient-text">Roadmap &amp; Vision</span></h2>
+        <div class="divider"></div>
+
+        <div class="roadmap-timeline" style="margin-top: 1.5em; max-width: 900px; margin-left: auto; margin-right: auto;">
+          <div class="roadmap-phase fragment slide-up">
+            <div class="roadmap-dot"></div>
+            <div class="roadmap-title" style="color: #4ade80;">Phase 1 ✓</div>
+            <div class="roadmap-items">
+              Workflow Engine<br>
+              Block-System<br>
+              Agentic Loop<br>
+              Docker Execution<br>
+              Skills &amp; Templates
+            </div>
+          </div>
+          <div class="roadmap-phase fragment slide-up">
+            <div class="roadmap-dot"></div>
+            <div class="roadmap-title" style="color: #60a5fa;">Phase 2</div>
+            <div class="roadmap-items">
+              Kosten-Sch&auml;tzung<br>
+              Auto-Refine<br>
+              Wishes Pipeline<br>
+              Factory System<br>
+              Multi-Provider
+            </div>
+          </div>
+          <div class="roadmap-phase fragment slide-up">
+            <div class="roadmap-dot"></div>
+            <div class="roadmap-title" style="color: #a78bfa;">Phase 3</div>
+            <div class="roadmap-items">
+              Crystallize Patterns<br>
+              Discovery Engine<br>
+              Cross-Workflow Learning<br>
+              Adaptive Scheduling
+            </div>
+          </div>
+          <div class="roadmap-phase fragment slide-up">
+            <div class="roadmap-dot"></div>
+            <div class="roadmap-title" style="color: #e879f9;">Langfristig</div>
+            <div class="roadmap-items">
+              Marketplace<br>
+              Community Templates<br>
+              Plugin-Ecosystem<br>
+              Enterprise Features
+            </div>
+          </div>
+        </div>
+
+        <div class="glass-sm fragment slide-up" style="max-width: 600px; margin: 1.2em auto 0; text-align: center;">
+          <p style="font-size: 0.55em; color: var(--text-secondary); margin: 0;">
+            <span style="color: var(--text-primary); font-weight: 600;">Ziel:</span>
+            Eine Plattform, die mit jeder Ausf&uuml;hrung schlauer wird &mdash;
+            und dabei f&uuml;r <em>jeden</em> zug&auml;nglich bleibt.
+          </p>
+        </div>
+      </section>
+
+      <!-- ==================== SLIDE 14: CLOSING ==================== -->
+      <section>
+        <div style="font-size: 4em; margin-bottom: 0.3em; filter: drop-shadow(0 0 40px rgba(124, 58, 237, 0.4)); animation: float 4s ease-in-out infinite;">🦫</div>
+        <h1 class="gradient-text" style="font-size: 2.5em; margin: 0;">MySuricates</h1>
+        <div class="divider" style="margin: 0.6em auto;"></div>
+        <p style="font-size: 0.85em; color: var(--text-secondary); max-width: 600px; margin: 0.5em auto; line-height: 1.7;">
+          AI-Powered Workflow Automation<br>
+          <span style="color: var(--text-primary); font-weight: 500;">Probleme l&ouml;sen. Automatisch besser werden.</span>
+        </p>
+
+        <div style="margin-top: 1.5em; display: flex; gap: 1em; justify-content: center; flex-wrap: wrap;">
+          <span class="badge badge-purple" style="font-size: 0.55em;">v0.2.3</span>
+          <span class="badge badge-cyan" style="font-size: 0.55em;">114 Commits</span>
+          <span class="badge badge-blue" style="font-size: 0.55em;">Solo-Projekt</span>
+          <span class="badge badge-magenta" style="font-size: 0.55em;">Open Source</span>
+        </div>
+
+        <p style="font-size: 0.55em; color: rgba(148, 163, 184, 0.5); margin-top: 2em;">
+          Built with ❤️ and AI &bull; Spring Boot &bull; React &bull; Claude
+        </p>
+      </section>
+
+    </div><!-- /.slides -->
+  </div><!-- /.reveal -->
+
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+  <script>
+    // ===== PARTICLES =====
+    (function createParticles() {
+      const container = document.getElementById('particles');
+      const colors = [
+        'rgba(124, 58, 237, 0.3)',
+        'rgba(6, 182, 212, 0.3)',
+        'rgba(59, 130, 246, 0.25)',
+        'rgba(217, 70, 239, 0.2)'
+      ];
+      for (let i = 0; i < 30; i++) {
+        const p = document.createElement('div');
+        p.className = 'particle';
+        p.style.left = Math.random() * 100 + '%';
+        p.style.animationDuration = (8 + Math.random() * 15) + 's';
+        p.style.animationDelay = Math.random() * 10 + 's';
+        p.style.width = p.style.height = (2 + Math.random() * 3) + 'px';
+        p.style.background = colors[Math.floor(Math.random() * colors.length)];
+        container.appendChild(p);
+      }
+    })();
+
+    // ===== REVEAL.JS INIT =====
+    Reveal.initialize({
+      hash: true,
+      slideNumber: 'c/t',
+      showSlideNumber: 'all',
+      transition: 'slide',
+      transitionSpeed: 'default',
+      backgroundTransition: 'fade',
+      center: true,
+      width: 1200,
+      height: 700,
+      margin: 0.06,
+      minScale: 0.2,
+      maxScale: 2.0,
+      progress: true,
+      controls: true,
+      controlsTutorial: true,
+      controlsLayout: 'bottom-right',
+      keyboard: true,
+      overview: true,
+      touch: true,
+    });
+
+    // ===== ANIMATED COUNTERS =====
+    function animateCounters() {
+      document.querySelectorAll('.stat-number[data-count]').forEach(el => {
+        const target = parseInt(el.getAttribute('data-count'));
+        const duration = 1500;
+        const startTime = performance.now();
+
+        function update(currentTime) {
+          const elapsed = currentTime - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          el.textContent = Math.round(target * eased);
+          if (progress < 1) requestAnimationFrame(update);
+        }
+
+        requestAnimationFrame(update);
+      });
+    }
+
+    // Trigger counters when stats slide is visible
+    Reveal.on('slidechanged', event => {
+      if (event.currentSlide.querySelector('.stat-number[data-count]')) {
+        setTimeout(animateCounters, 300);
+      }
+    });
+
+    // Also handle initial load if we're on the stats slide
+    Reveal.on('ready', event => {
+      if (event.currentSlide.querySelector('.stat-number[data-count]')) {
+        animateCounters();
+      }
+    });
+  </script>
+</body>
+</html>

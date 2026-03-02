@@ -23,6 +23,7 @@ public record WishResponse(
         String currentRunId,
         String resultSummary,
         String error,
+        List<Map<String, Object>> iterationHistory,
         Map<String, Object> metadata,
         Instant createdAt,
         Instant updatedAt

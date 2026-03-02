@@ -727,7 +727,7 @@ export interface PendingHumanInput {
 
 export type WishStatus = 'RECEIVED' | 'DECOMPOSING' | 'AWAITING_DECOMPOSE_APPROVAL' | 'EXECUTING' | 'EVALUATING' | 'REFINING' | 'AWAITING_CLARIFICATION' | 'AWAITING_APPROVAL' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
 
-export type WishResponseAction = 'ACCEPT' | 'REFINE' | 'CANCEL' | 'CLARIFY';
+export type WishResponseAction = 'ACCEPT' | 'REFINE' | 'CANCEL' | 'CLARIFY' | 'RETRY';
 
 export interface WishRespondRequest {
   action: WishResponseAction;
@@ -751,6 +751,7 @@ export interface Wish {
   currentRunId: string | null;
   resultSummary: string | null;
   error: string | null;
+  iterationHistory: Array<Record<string, unknown>>;
   metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;

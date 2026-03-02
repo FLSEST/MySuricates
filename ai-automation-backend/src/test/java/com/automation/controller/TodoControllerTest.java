@@ -23,7 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.Instant;
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -47,10 +47,32 @@ class TodoControllerTest {
 
     @Test
     void listTodos_returnsPaged() throws Exception {
-        when(todoService.findAll(0, 50, null, null, null, null, null, null))
+        when(todoService.findAll(eq(0), eq(50), isNull(), isNull(), isNull(), isNull(), isNull(), isNull()))
                 .thenReturn(new PageResponse<>(List.of(sampleResponse()), 0, 50, 1, 1));
 
         mockMvc.perform(get("/api/v1/todos"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value("t-1"));
+    }
+
+    @Test
+    void listTodos_multiStatus() throws Exception {
+        when(todoService.findAll(eq(0), eq(50), isNull(), eq(List.of("OPEN", "IN_PROGRESS")), isNull(), isNull(), isNull(), isNull()))
+                .thenReturn(new PageResponse<>(List.of(sampleResponse()), 0, 50, 1, 1));
+
+        mockMvc.perform(get("/api/v1/todos")
+                        .param("status", "OPEN")
+                        .param("status", "IN_PROGRESS"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value("t-1"));
+    }
+
+    @Test
+    void listTodos_singleStatus() throws Exception {
+        when(todoService.findAll(eq(0), eq(50), isNull(), eq(List.of("OPEN")), isNull(), isNull(), isNull(), isNull()))
+                .thenReturn(new PageResponse<>(List.of(sampleResponse()), 0, 50, 1, 1));
+
+        mockMvc.perform(get("/api/v1/todos").param("status", "OPEN"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value("t-1"));
     }

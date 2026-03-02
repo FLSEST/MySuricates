@@ -20,6 +20,7 @@ import {
 } from '../hooks/useWorkflows';
 import { useExecutionWebSocket } from '../hooks/useWebSocket';
 import { useRateRun } from '../hooks/useLearning';
+import { useToast } from '../hooks/useToast';
 import { useT } from '../i18n';
 import { formatDuration } from '../utils/formatTime';
 import { api, openPath } from '../api/client';
@@ -78,6 +79,7 @@ export function WorkflowExecution() {
   const { data: workflow } = useWorkflow(id!);
   const { data: runs, error: runsError, refetch: refetchRuns } = useWorkflowRuns(id!);
   const { logs, connected, pendingApproval, pendingHumanInput, agenticStates } = useExecutionWebSocket(runId!, id);
+  const toast = useToast();
   const rateRun = useRateRun();
   const pauseExecution = usePauseExecution();
   const resumeExecution = useResumeExecution();
@@ -183,7 +185,7 @@ export function WorkflowExecution() {
             </span>
             {run.projectPath && (
               <button
-                onClick={() => openPath(run.projectPath!).catch(() => {})}
+                onClick={() => openPath(run.projectPath!).catch(() => toast.error(t.workflows.execution.openPathFailed))}
                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-surface-raised hover:bg-surface-raised/80 text-text-secondary hover:text-text transition-colors"
                 title={run.projectPath}
               >

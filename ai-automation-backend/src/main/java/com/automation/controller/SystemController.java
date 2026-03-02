@@ -25,6 +25,7 @@ import java.sql.Connection;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 @RestController
@@ -243,11 +244,29 @@ public class SystemController {
         }
 
         try {
-            Runtime.getRuntime().exec(new String[]{"xdg-open", normalized});
+            ProcessBuilder pb = new ProcessBuilder("xdg-open", normalized);
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+
+            // Drain output to prevent blocking
+            try (InputStream is = process.getInputStream()) {
+                is.readAllBytes();
+            }
+
+            boolean exited = process.waitFor(3, TimeUnit.SECONDS);
+            if (exited && process.exitValue() != 0) {
+                log.warn("xdg-open exited with code {} for path: {}", process.exitValue(), normalized);
+                return ResponseEntity.internalServerError().body(Map.of(
+                        "error", "Failed to open path (exit code " + process.exitValue() + ")"));
+            }
+            // Either exited successfully or still running (file manager is open)
             return ResponseEntity.ok(Map.of("status", "ok"));
         } catch (IOException e) {
             log.error("Failed to open path: {}", normalized, e);
             return ResponseEntity.internalServerError().body(Map.of("error", "Failed to open path: " + e.getMessage()));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return ResponseEntity.internalServerError().body(Map.of("error", "Interrupted while opening path"));
         }
     }
 

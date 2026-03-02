@@ -17,6 +17,7 @@ import com.automation.service.workflow.AgentInstructionsService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
 import com.automation.service.workflow.WorkflowTemplateService;
+import com.automation.util.JsonRepairUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -270,6 +271,19 @@ public class WishService {
                 fulfillAsync(wishId);
                 yield wish;
             }
+            case RETRY -> {
+                if (wish.getStatus() != WishStatus.FAILED && wish.getStatus() != WishStatus.CANCELLED) {
+                    throw new IllegalStateException("Can only retry wishes in FAILED or CANCELLED state");
+                }
+                wish.setStatus(WishStatus.RECEIVED);
+                wish.setError(null);
+                // iterationCount NOT reset — history is preserved
+                wishRepository.save(wish);
+                broadcastStatus(wishId, wish);
+                log.info("Wish {}: User requested retry (iteration {})", wishId, wish.getIterationCount());
+                fulfillAsync(wishId);
+                yield wish;
+            }
         };
     }
 
@@ -381,10 +395,30 @@ public class WishService {
         HostClaudeService.ReasoningResult result = hostClaude.reasonStructured(
                 prompt, systemPrompt, workingDir, 3);
 
-        String json = extractJson(result.text());
-        Map<String, Object> parsed = MAPPER.readValue(json, new TypeReference<>() {});
+        Map<String, Object> parsed;
+        try {
+            parsed = parseJsonSafely(result.text(), "decompose");
+        } catch (IllegalStateException e) {
+            // Retry with shorter-response hint
+            log.warn("Wish {}: Decompose JSON parse failed, retrying with shorter prompt", wish.getId());
+            String retryPrompt = prompt + "\n\nIMPORTANT: Keep your JSON response SHORT. "
+                    + "Max 3 workflows, max 5 blocks per workflow. Respond ONLY with valid JSON, no markdown.";
+            HostClaudeService.ReasoningResult retryResult = hostClaude.reasonStructured(
+                    retryPrompt, systemPrompt, workingDir, 3);
+            parsed = parseJsonSafely(retryResult.text(), "decompose-retry");
+        }
 
         wish.setDecomposition(parsed);
+
+        // Snapshot decomposition into iteration history
+        Map<String, Object> iterationEntry = new HashMap<>();
+        iterationEntry.put("iteration", wish.getIterationCount() + 1); // will be incremented below
+        iterationEntry.put("phase", "decompose");
+        iterationEntry.put("timestamp", Instant.now().toString());
+        iterationEntry.put("decomposition", new HashMap<>(parsed));
+        List<Map<String, Object>> history = new ArrayList<>(wish.getIterationHistory());
+        history.add(iterationEntry);
+        wish.setIterationHistory(history);
 
         // Check if clarification is needed
         Boolean needsClarification = (Boolean) parsed.get("needsClarification");
@@ -431,6 +465,9 @@ public class WishService {
         }
 
         wish.setGeneratedWorkflowIds(workflowIds);
+
+        // Add workflowIds to current iteration entry
+        updateCurrentIterationEntry(wish, "workflowIds", new ArrayList<>(workflowIds));
 
         // Pre-flight verification on Test instance (best effort)
         verifyGeneratedWorkflows(wish, workflowIds);
@@ -509,6 +546,7 @@ public class WishService {
             WorkflowChain chain = chainService.findById(wish.getGeneratedChainId());
             ChainRun chainRun = chainExecutor.execute(chain, Map.of());
             wish.setCurrentRunId(chainRun.getId());
+            updateCurrentIterationEntry(wish, "runId", chainRun.getId());
             wishRepository.save(wish);
             broadcastStatus(wish.getId(), wish);
 
@@ -518,6 +556,7 @@ public class WishService {
             Workflow workflow = workflowService.findByIdEager(wfId);
             WorkflowRun workflowRun = workflowExecutor.execute(workflow, Map.of());
             wish.setCurrentRunId(workflowRun.getId());
+            updateCurrentIterationEntry(wish, "runId", workflowRun.getId());
             wishRepository.save(wish);
             broadcastStatus(wish.getId(), wish);
 
@@ -544,8 +583,15 @@ public class WishService {
         String prompt = buildEvaluatePrompt(wish);
         HostClaudeService.ReasoningResult result = hostClaude.reasonStructured(prompt, null);
 
-        String json = extractJson(result.text());
-        Map<String, Object> evaluation = MAPPER.readValue(json, new TypeReference<>() {});
+        Map<String, Object> evaluation;
+        try {
+            evaluation = parseJsonSafely(result.text(), "evaluate");
+        } catch (IllegalStateException e) {
+            log.warn("Wish {}: Evaluate JSON parse failed, retrying with shorter prompt", wish.getId());
+            String retryPrompt = prompt + "\n\nIMPORTANT: Keep response under 500 tokens. Respond ONLY with valid JSON, no markdown.";
+            HostClaudeService.ReasoningResult retryResult = hostClaude.reasonStructured(retryPrompt, null);
+            evaluation = parseJsonSafely(retryResult.text(), "evaluate-retry");
+        }
 
         Boolean satisfied = (Boolean) evaluation.getOrDefault("satisfied", false);
         String summary = (String) evaluation.getOrDefault("summary", "");
@@ -563,6 +609,9 @@ public class WishService {
         evaluations.add(evaluation);
         meta.put("evaluations", evaluations);
         wish.setMetadata(meta);
+
+        // Add evaluation to current iteration history entry
+        updateCurrentIterationEntry(wish, "evaluation", new HashMap<>(evaluation));
 
         if (Boolean.TRUE.equals(satisfied)) {
             meta.put("pendingEvaluation", evaluation);
@@ -999,7 +1048,13 @@ public class WishService {
                 ## Available Block Types
 
                 - **simple**: Runs a single Claude CLI prompt. Config: `{"command": "prompt text"}`. Use for tasks that need AI reasoning.
-                - **shell**: Runs a shell command. Config: `{"command": "shell command"}`. Use for deterministic tasks (file ops, git, npm, etc.).
+                - **shell**: Runs a shell command. Config: `{"command": "shell command", "container_image": "image:tag"}`. Use for deterministic tasks (file ops, git, API calls, etc.).
+                  **IMPORTANT**: Without `container_image`, the command runs in a MINIMAL environment with ONLY these tools: curl, git, python3, jq, nodejs, npm, wget, unzip. NO pip packages, NO go, NO docker-cli, NO gh, NO specialized tools.
+                  If the command needs ANY tool beyond that list, you MUST set `container_image`. Available container images:
+                  - `automation-agent-python:latest` — Python 3.12 with pandas, numpy, requests, beautifulsoup4, pip
+                  - `automation-agent-devops:latest` — Ubuntu with git, curl, jq, python3, docker-cli, gh, trivy
+                  - `automation-agent-node:latest` — Node.js 21 with npm (full ecosystem)
+                  - `automation-agent-go:latest` — Go 1.22
                 - **agentic**: Multi-turn AI loop with goal. Config: `{"goal": "description", "max_iterations": 10}`. Use for complex tasks requiring exploration and multi-step work.
                 - **conditional**: Branching logic. Config: `{"condition": "expression", "then_blocks": [...], "else_blocks": [...]}`.
                 - **forEach**: Iterates over items. Config: `{"items": "expression", "variable": "item", "blocks": [...]}`.
@@ -1009,17 +1064,18 @@ public class WishService {
                 ## Design Principles
 
                 1. Prefer **shell** blocks for deterministic tasks (faster, reproducible)
-                2. Use **simple** blocks for single AI reasoning steps
-                3. Use **agentic** blocks only when the task requires multi-step exploration
-                4. Agentic block prompts (goal) must be self-contained — include absolute paths, specific names, and exact instructions
-                5. Keep workflows focused — one workflow per coherent task
-                6. Use a chain when tasks are logically separate but sequential
-                7. Set realistic `max_iterations` for agentic blocks (3-10)
-                8. Add shell cleanup steps before agentic blocks if stale data from previous runs could interfere
-                9. Use `{{ previous_output }}` in block prompts to reference the output of the previous step
-                10. Reference existing workflows via sub-workflow blocks instead of duplicating logic — check "Reusable Components" for workflows from ALL projects, not just the current one
-                11. Workflows from other projects can be reused as sub-workflows — use their ID in the `workflow_id` config field
-                12. User-selected "Referenced Workflows" should be prioritized for reuse when they match the task
+                2. Shell blocks WITHOUT `container_image` can ONLY use: curl, git, python3, jq, nodejs, npm, wget, unzip. For anything else, set `container_image`.
+                3. Use **simple** blocks for single AI reasoning steps
+                4. Use **agentic** blocks only when the task requires multi-step exploration
+                5. Agentic block prompts (goal) must be self-contained — include absolute paths, specific names, and exact instructions
+                6. Keep workflows focused — one workflow per coherent task
+                7. Use a chain when tasks are logically separate but sequential
+                8. Set realistic `max_iterations` for agentic blocks (3-10)
+                9. Add shell cleanup steps before agentic blocks if stale data from previous runs could interfere
+                10. Use `{{ previous_output }}` in block prompts to reference the output of the previous step
+                11. Reference existing workflows via sub-workflow blocks instead of duplicating logic — check "Reusable Components" for workflows from ALL projects, not just the current one
+                12. Workflows from other projects can be reused as sub-workflows — use their ID in the `workflow_id` config field
+                13. User-selected "Referenced Workflows" should be prioritized for reuse when they match the task
 
                 ## Output Format
 
@@ -1214,6 +1270,17 @@ public class WishService {
         broadcastStatus(wish.getId(), wish);
     }
 
+    @SuppressWarnings("unchecked")
+    private void updateCurrentIterationEntry(Wish wish, String key, Object value) {
+        List<Map<String, Object>> history = new ArrayList<>(wish.getIterationHistory());
+        if (!history.isEmpty()) {
+            Map<String, Object> current = new HashMap<>(history.get(history.size() - 1));
+            current.put(key, value);
+            history.set(history.size() - 1, current);
+            wish.setIterationHistory(history);
+        }
+    }
+
     private boolean isTerminal(WishStatus status) {
         return status == WishStatus.COMPLETED || status == WishStatus.FAILED || status == WishStatus.CANCELLED;
     }
@@ -1243,6 +1310,27 @@ public class WishService {
             Thread.sleep(POLLING_INTERVAL_MS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+        }
+    }
+
+    private Map<String, Object> parseJsonSafely(String responseText, String context) {
+        String json = extractJson(responseText);
+        try {
+            return MAPPER.readValue(json, new TypeReference<>() {});
+        } catch (Exception e) {
+            log.warn("JSON parse failed in {} ({}), attempting repair", context, e.getClass().getSimpleName());
+            String repaired = JsonRepairUtil.repairTruncatedJson(json);
+            if (repaired != null) {
+                try {
+                    Map<String, Object> result = MAPPER.readValue(repaired, new TypeReference<>() {});
+                    log.warn("JSON repair succeeded in {} (repaired {} chars → {} chars)", context, json.length(), repaired.length());
+                    return result;
+                } catch (Exception e2) {
+                    // repair produced valid JSON tree but not a valid map — fall through
+                }
+            }
+            throw new IllegalStateException("Claude returned unparseable JSON in " + context
+                    + ". First 300 chars: " + truncate(responseText, 300));
         }
     }
 
