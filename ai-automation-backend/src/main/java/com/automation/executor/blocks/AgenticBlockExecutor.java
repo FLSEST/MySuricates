@@ -19,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -30,6 +31,21 @@ import static com.automation.config.ExecutionDefaults.*;
 @RequiredArgsConstructor
 @Slf4j
 public class AgenticBlockExecutor implements BlockExecutor {
+
+    private static final String ACTION_COMPRESS_PROMPT = """
+            You are a task compression assistant. The following is an oversized action description \
+            from a workflow automation system. It contains actionable instructions mixed with tool output, \
+            file contents, and diagnostic data.
+
+            Extract ONLY the actionable instructions — what needs to be done, where (file paths, \
+            commands), and specific details (values, patterns, names). Discard all tool output, \
+            file contents, stack traces, and verbose diagnostic text.
+
+            Output a clean, concise action description under 50000 characters. Preserve all file paths, \
+            command names, variable values, and specific technical details needed to execute the action.
+
+            === OVERSIZED ACTION ===
+            """;
 
     private final HostClaudeService hostClaude;
     private final CommandExecutorService commandExecutor;
@@ -170,19 +186,37 @@ public class AgenticBlockExecutor implements BlockExecutor {
                 continue;
             }
 
+            // Compress oversized actions before sending to ACT phase
+            String action = plan.getAction();
+            if (action.length() > AGENTIC_ACTION_COMPRESS_THRESHOLD) {
+                log.warn("Agentic iteration {}: ACTION too long ({} chars), compressing", iteration, action.length());
+                broadcastAgenticEvent(context.getWorkflowRunId(), stepIndex,
+                        "agentic_action_compressed",
+                        Map.of("iteration", iteration, "originalLength", action.length()));
+                try {
+                    action = compressAction(action);
+                    log.info("Agentic iteration {}: ACTION compressed {} → {} chars",
+                            iteration, plan.getAction().length(), action.length());
+                } catch (Exception e) {
+                    log.error("Agentic iteration {}: compression failed, truncating: {}", iteration, e.getMessage());
+                    action = action.substring(0, AGENTIC_ACTION_COMPRESS_THRESHOLD)
+                            + "\n\n[TRUNCATED: original was " + plan.getAction().length() + " chars]";
+                }
+            }
+
             broadcastAgenticEvent(context.getWorkflowRunId(), stepIndex,
                     "agentic_acting", Map.of("iteration", iteration,
-                            "action", truncate(plan.getAction(), TRUNCATE_MEDIUM)));
+                            "action", truncate(action, TRUNCATE_MEDIUM)));
 
             String actionOutput;
             int exitCode;
             try {
                 CliSession.EnrichedCommandResult cmdResult = commandExecutor.executeCommandOnHost(
-                        context.getProjectPath(), plan.getAction(), context.getModel(),
+                        context.getProjectPath(), action, context.getModel(),
                         context.getInstructionPrefix(), cfg.claudeTimeout());
                 actionOutput = cmdResult.output() != null ? cmdResult.output() : "";
                 exitCode = cmdResult.exitCode();
-                tokenTracker.captureActMeta(iterData, cmdResult, plan.getAction(), actionOutput, iteration);
+                tokenTracker.captureActMeta(iterData, cmdResult, action, actionOutput, iteration);
             } catch (Exception e) {
                 log.error("Host Claude ACT phase failed at iteration {}: {}", iteration, e.getMessage(), e);
                 actionOutput = "Execution error: " + e.getMessage();
@@ -205,13 +239,13 @@ public class AgenticBlockExecutor implements BlockExecutor {
                 break;
             }
 
-            iterData.put("action", plan.getAction());
+            iterData.put("action", action);
             iterData.put("actionOutput", truncate(actionOutput, TRUNCATE_LONG));
             iterData.put("exitCode", exitCode);
 
             broadcastAgenticEvent(context.getWorkflowRunId(), stepIndex,
                     "agentic_acted", Map.of("iteration", iteration,
-                            "action", truncate(plan.getAction(), TRUNCATE_MEDIUM),
+                            "action", truncate(action, TRUNCATE_MEDIUM),
                             "output", truncate(actionOutput, TRUNCATE_LONG),
                             "exitCode", exitCode));
 
@@ -258,7 +292,7 @@ public class AgenticBlockExecutor implements BlockExecutor {
             }
 
             // Repeated action check
-            String repeatReason = safetyGuard.trackAndCheckRepeatedAction(plan.getAction());
+            String repeatReason = safetyGuard.trackAndCheckRepeatedAction(action);
             if (repeatReason != null) {
                 stopReason = repeatReason;
                 broadcastAgenticEvent(context.getWorkflowRunId(), stepIndex,
@@ -389,6 +423,17 @@ public class AgenticBlockExecutor implements BlockExecutor {
 
         history.clear();
         history.addAll(compressed);
+    }
+
+    private String compressAction(String oversizedAction) throws IOException {
+        String prompt = ACTION_COMPRESS_PROMPT + oversizedAction;
+        ReasoningResult result = hostClaude.reasonStructured(
+                prompt, null, null, 1, AGENTIC_ACTION_COMPRESS_TIMEOUT);
+        String compressed = result.text();
+        if (compressed == null || compressed.isBlank()) {
+            throw new IOException("Action compression returned empty result");
+        }
+        return compressed;
     }
 
     private String buildLearningContext(String workflowId) {

@@ -36,6 +36,12 @@ public final class ExecutionDefaults {
     /** Abort after N identical consecutive actions. */
     public static final int AGENTIC_MAX_REPEATED_ACTIONS = 3;
 
+    /** Threshold in chars above which an agentic ACTION is compressed before ACT phase. */
+    public static final int AGENTIC_ACTION_COMPRESS_THRESHOLD = 100_000;
+
+    /** Timeout in seconds for the action compression Claude CLI call. */
+    public static final int AGENTIC_ACTION_COMPRESS_TIMEOUT = 60;
+
     // ── Polling Intervals ──────────────────────────────────────
 
     /** Polling interval for workflow/chain completion checks (ms). */
