@@ -25,8 +25,8 @@ class AgenticBlockConfigTest {
         config.put("goal", "Fix the tests");
         config.put("success_criteria", "All tests pass");
         config.put("max_iterations", 5);
-        config.put("iteration_timeout_seconds", 120);
-        config.put("total_timeout_seconds", 600);
+        config.put("iteration_timeout_seconds", 500);
+        config.put("total_timeout_seconds", 3000);
         config.put("max_total_tokens", 100000);
         config.put("max_repeated_actions", 4);
         config.put("require_approval", true);
@@ -37,12 +37,27 @@ class AgenticBlockConfigTest {
         assertThat(cfg.goal()).isEqualTo("Fix the tests");
         assertThat(cfg.successCriteria()).isEqualTo("All tests pass");
         assertThat(cfg.maxIterations()).isEqualTo(5);
-        assertThat(cfg.iterationTimeoutSeconds()).isEqualTo(120);
-        assertThat(cfg.totalTimeoutSeconds()).isEqualTo(600);
+        // iteration_timeout_seconds stays at 500 because it's already > minIterationTimeout (60*2+60=180)
+        assertThat(cfg.iterationTimeoutSeconds()).isEqualTo(500);
+        assertThat(cfg.totalTimeoutSeconds()).isEqualTo(3000);
         assertThat(cfg.maxTotalTokens()).isEqualTo(100000);
         assertThat(cfg.maxRepeatedActions()).isEqualTo(4);
         assertThat(cfg.requireApproval()).isTrue();
         assertThat(cfg.claudeTimeout()).isEqualTo(60);
+    }
+
+    @Test
+    void from_autoAlignsIterationTimeout_whenClaudeTimeoutLarger() {
+        Map<String, Object> config = new HashMap<>();
+        config.put("goal", "Test auto-alignment");
+        config.put("timeout_seconds", 600);
+        config.put("iteration_timeout_seconds", 300); // too small for timeout_seconds=600
+
+        AgenticBlockConfig cfg = AgenticBlockConfig.from(config, buildContext());
+
+        // minIterationTimeout = 600*2 + 60 = 1260
+        assertThat(cfg.iterationTimeoutSeconds()).isEqualTo(1260);
+        assertThat(cfg.claudeTimeout()).isEqualTo(600);
     }
 
     @Test

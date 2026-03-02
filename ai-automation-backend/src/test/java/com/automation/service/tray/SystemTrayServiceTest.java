@@ -3,6 +3,7 @@ package com.automation.service.tray;
 import com.automation.config.TrayConfig;
 import com.automation.entity.RunStatus;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.system.SystemIdentityService;
 import com.automation.service.tray.SystemTrayService.IconColor;
 import com.automation.service.tray.SystemTrayService.TrayState;
 import com.automation.service.workflow.WorkflowExecutor;
@@ -39,11 +40,14 @@ class SystemTrayServiceTest {
     @Mock
     private PingCmd pingCmd;
 
+    @Mock
+    private SystemIdentityService systemIdentity;
+
     private SystemTrayService service;
 
     @BeforeEach
     void setUp() {
-        service = new SystemTrayService(trayConfig, runRepository, workflowExecutor, dockerClient);
+        service = new SystemTrayService(trayConfig, runRepository, workflowExecutor, dockerClient, systemIdentity);
     }
 
     @Test

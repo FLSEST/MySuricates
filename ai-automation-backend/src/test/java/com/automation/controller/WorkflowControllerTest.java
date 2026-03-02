@@ -67,6 +67,9 @@ class WorkflowControllerTest {
     private WorkflowOptimizationService optimizationService;
 
     @MockBean
+    private com.automation.service.repair.AutoRepairService autoRepairService;
+
+    @MockBean
     private ProjectRepository projectRepository;
 
     private Workflow testWorkflow;

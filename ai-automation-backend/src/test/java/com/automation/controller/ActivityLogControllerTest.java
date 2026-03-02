@@ -41,9 +41,9 @@ class ActivityLogControllerTest {
     @Test
     void getLogs_returnsPagedResults() throws Exception {
         var response = new ActivityLogResponse("log-1", Instant.now(), "INFO", "SYSTEM",
-                "Started", "backend", null, Map.of(), Instant.now());
+                "Started", "backend", null, null, Map.of(), Instant.now());
         var page = new PageImpl<ActivityLog>(List.of(), PageRequest.of(0, 50), 1);
-        when(activityLogService.findAll(0, 50, null, null)).thenReturn(page);
+        when(activityLogService.findAll(0, 50, null, null, null)).thenReturn(page);
         when(activityLogMapper.toResponseList(any())).thenReturn(List.of(response));
 
         mockMvc.perform(get("/api/v1/activity-log"))
@@ -55,7 +55,7 @@ class ActivityLogControllerTest {
     @Test
     void getLogs_withFilters() throws Exception {
         var page = new PageImpl<ActivityLog>(List.of(), PageRequest.of(0, 20), 0);
-        when(activityLogService.findAll(0, 20, LogLevel.ERROR, LogCategory.SECURITY)).thenReturn(page);
+        when(activityLogService.findAll(0, 20, LogLevel.ERROR, LogCategory.SECURITY, null)).thenReturn(page);
         when(activityLogMapper.toResponseList(any())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/v1/activity-log")

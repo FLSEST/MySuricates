@@ -12,9 +12,11 @@ public record ImportWorkflowRequest(
         String icon,
         List<BlockDefinition> blocks,
         String instructions,
-        String model
+        String model,
+        Boolean updateIfExists
 ) {
     public ImportWorkflowRequest {
         if (blocks == null) blocks = List.of();
+        if (updateIfExists == null) updateIfExists = false;
     }
 }

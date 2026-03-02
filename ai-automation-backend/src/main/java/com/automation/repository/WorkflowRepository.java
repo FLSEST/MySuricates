@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface WorkflowRepository extends JpaRepository<Workflow, String> {
@@ -15,11 +16,13 @@ public interface WorkflowRepository extends JpaRepository<Workflow, String> {
 
     List<Workflow> findByNameContainingIgnoreCase(String name);
 
+    Optional<Workflow> findByNameAndProjectId(String name, String projectId);
+
     /**
      * Lightweight projection: returns only id, name, block_types for similarity queries.
      * Avoids full entity loading, JSON deserialization, and EAGER Project join.
      */
-    @Query(value = "SELECT w.id, w.name, w.block_types FROM workflows w WHERE w.id != :excludeId",
+    @Query(value = "SELECT w.id, w.name, w.block_types FROM workflows w WHERE w.id != :excludeId AND w.deleted_at IS NULL",
             nativeQuery = true)
     List<Object[]> findAllIdNameBlockTypes(@Param("excludeId") String excludeId);
 

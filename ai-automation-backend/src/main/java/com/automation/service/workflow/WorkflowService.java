@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -125,11 +126,17 @@ public class WorkflowService {
         return saved;
     }
 
+    @Transactional(readOnly = true)
+    public Optional<Workflow> findByNameAndProjectId(String name, String projectId) {
+        return workflowRepository.findByNameAndProjectId(name, projectId);
+    }
+
     @Transactional
     public void delete(String id) {
         Workflow workflow = findById(id);
-        workflowRepository.delete(workflow);
-        log.info("Deleted workflow: {} ({})", workflow.getName(), workflow.getId());
+        workflow.setDeletedAt(java.time.Instant.now());
+        workflowRepository.save(workflow);
+        log.info("Soft-deleted workflow: {} ({})", workflow.getName(), workflow.getId());
     }
 
     @Transactional

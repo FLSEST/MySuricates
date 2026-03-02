@@ -2,6 +2,7 @@ package com.automation.executor.blocks;
 
 import com.automation.exception.WorkflowExecutionException;
 import com.automation.executor.ExecutionContext;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.Map;
 
@@ -10,6 +11,7 @@ import static com.automation.config.ExecutionDefaults.*;
 /**
  * Parsed and validated configuration for an agentic block.
  */
+@Slf4j
 public record AgenticBlockConfig(
         String goal,
         String successCriteria,
@@ -42,6 +44,23 @@ public record AgenticBlockConfig(
         Integer claudeTimeout = config.containsKey("timeout_seconds")
                 ? ((Number) config.get("timeout_seconds")).intValue()
                 : null;
+
+        // Auto-align: iteration timeout must accommodate the CLI timeout (REASON + ACT + overhead)
+        if (claudeTimeout != null && claudeTimeout > 0) {
+            int minIterationTimeout = claudeTimeout * 2 + 60; // REASON + ACT + 60s overhead
+            if (iterationTimeoutSeconds < minIterationTimeout) {
+                log.warn("Auto-aligning iteration_timeout_seconds: {} → {} (timeout_seconds={}, need room for REASON + ACT + overhead)",
+                        iterationTimeoutSeconds, minIterationTimeout, claudeTimeout);
+                iterationTimeoutSeconds = minIterationTimeout;
+            }
+            // Also ensure total timeout can fit at least one full iteration
+            if (totalTimeoutSeconds < minIterationTimeout) {
+                int newTotalTimeout = minIterationTimeout * maxIterations;
+                log.warn("Auto-aligning total_timeout_seconds: {} → {} (must fit at least one iteration of {}s)",
+                        totalTimeoutSeconds, newTotalTimeout, minIterationTimeout);
+                totalTimeoutSeconds = newTotalTimeout;
+            }
+        }
 
         return new AgenticBlockConfig(
                 goal, successCriteria, maxIterations, iterationTimeoutSeconds,

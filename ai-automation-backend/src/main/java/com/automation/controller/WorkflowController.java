@@ -17,6 +17,8 @@ import com.automation.entity.WorkflowRun;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.entity.RunStatus;
+import com.automation.service.repair.AutoRepairService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowOptimizationService;
 import com.automation.service.workflow.WorkflowService;
@@ -44,6 +46,7 @@ public class WorkflowController {
     private final ProjectRepository projectRepository;
     private final WorkflowMapper workflowMapper;
     private final WorkflowOptimizationService optimizationService;
+    private final AutoRepairService autoRepairService;
 
     @GetMapping
     public List<WorkflowResponse> listWorkflows() {
@@ -113,6 +116,30 @@ public class WorkflowController {
         return ResponseEntity.ok(suggestion);
     }
 
+    @PostMapping("/{id}/repair")
+    public ResponseEntity<Map<String, String>> repairWorkflow(@PathVariable String id) {
+        // Verify workflow exists
+        Workflow workflow = workflowService.findById(id);
+
+        // Check for FAILED runs
+        if (!runRepository.existsByWorkflowIdAndStatus(id, RunStatus.FAILED)) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Workflow '" + workflow.getName() + "' has no failed runs"));
+        }
+
+        // Check test instance health
+        if (!autoRepairService.isTestInstanceHealthy()) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
+                    "error", "Test instance is not healthy"));
+        }
+
+        autoRepairService.repairWorkflow(id);
+        return ResponseEntity.accepted().body(Map.of(
+                "status", "repair_started",
+                "workflowId", id,
+                "workflowName", workflow.getName()));
+    }
+
     @PostMapping("/{id}/skills")
     public ResponseEntity<WorkflowResponse> activateSkills(
             @PathVariable String id,
@@ -146,6 +173,26 @@ public class WorkflowController {
         if (projectId == null || projectId.isBlank()) {
             projectId = getOrCreateCollectionProject().getId();
         }
+
+        // Check for existing workflow if updateIfExists is true
+        if (Boolean.TRUE.equals(request.updateIfExists())) {
+            var existing = workflowService.findByNameAndProjectId(request.name(), projectId);
+            if (existing.isPresent()) {
+                var updateRequest = new UpdateWorkflowRequest(
+                        request.name(),
+                        request.description(),
+                        request.icon(),
+                        request.blocks(),
+                        request.instructions(),
+                        request.model(),
+                        null,
+                        null
+                );
+                var updated = workflowService.update(existing.get().getId(), updateRequest);
+                return ResponseEntity.ok(workflowMapper.toResponse(updated));
+            }
+        }
+
         var createRequest = new CreateWorkflowRequest(
                 projectId,
                 request.name(),

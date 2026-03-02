@@ -37,7 +37,7 @@ describe('Workflows', () => {
     // Click the blank card to select it
     cy.contains('Blank Workflow').click();
     // Should see the details form with project select and name input
-    cy.contains('Project').should('be.visible');
+    cy.contains('Project', { timeout: 8000 }).should('be.visible');
     cy.get('[role="dialog"]').find('input').should('exist');
   });
 

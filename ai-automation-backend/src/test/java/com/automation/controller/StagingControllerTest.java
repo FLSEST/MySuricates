@@ -121,7 +121,7 @@ class StagingControllerTest {
 
     @Test
     void syncDefinitions_returnsSyncResult() throws Exception {
-        when(stagingService.syncDefinitions()).thenReturn(
+        when(stagingService.syncDefinitions(any())).thenReturn(
                 new SyncResult(2, 5, 1, 3, List.of()));
 
         mockMvc.perform(post("/api/v1/staging/sync-definitions"))
@@ -132,12 +132,12 @@ class StagingControllerTest {
                 .andExpect(jsonPath("$.skipped").value(3))
                 .andExpect(jsonPath("$.errors").isArray());
 
-        verify(stagingService).syncDefinitions();
+        verify(stagingService).syncDefinitions(any());
     }
 
     @Test
     void syncDefinitions_stableNotRunning_returns409() throws Exception {
-        when(stagingService.syncDefinitions()).thenThrow(
+        when(stagingService.syncDefinitions(any())).thenThrow(
                 new IllegalStateException("Stable instance is not running or not healthy. Start it first."));
 
         mockMvc.perform(post("/api/v1/staging/sync-definitions"))
@@ -147,7 +147,7 @@ class StagingControllerTest {
 
     @Test
     void syncDefinitions_withErrors_returnsPartialResult() throws Exception {
-        when(stagingService.syncDefinitions()).thenReturn(
+        when(stagingService.syncDefinitions(any())).thenReturn(
                 new SyncResult(1, 3, 0, 0, List.of("Workflow 'test': HTTP 500")));
 
         mockMvc.perform(post("/api/v1/staging/sync-definitions"))

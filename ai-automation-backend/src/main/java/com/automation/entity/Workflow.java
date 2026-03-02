@@ -4,6 +4,7 @@ import com.automation.util.BlockDefinitionListConverter;
 import com.automation.util.JsonMapConverter;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.SQLRestriction;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -16,6 +17,7 @@ import java.util.Map;
 
 @Entity
 @Table(name = "workflows")
+@SQLRestriction("deleted_at IS NULL")
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @Setter
@@ -86,6 +88,9 @@ public class Workflow {
     @OneToMany(mappedBy = "workflow", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<WorkflowRun> runs = new ArrayList<>();
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
 
     @CreatedDate
     @Column(updatable = false)

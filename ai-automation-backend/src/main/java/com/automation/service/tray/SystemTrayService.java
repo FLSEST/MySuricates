@@ -3,6 +3,7 @@ package com.automation.service.tray;
 import com.automation.config.TrayConfig;
 import com.automation.entity.RunStatus;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.system.SystemIdentityService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.github.dockerjava.api.DockerClient;
 import jakarta.annotation.PreDestroy;
@@ -39,10 +40,12 @@ public class SystemTrayService {
     private final WorkflowRunRepository runRepository;
     private final WorkflowExecutor workflowExecutor;
     private final DockerClient dockerClient;
+    private final SystemIdentityService systemIdentity;
 
     private TrayIcon trayIcon;
     private TrayState previousState;
     private boolean initialized = false;
+    private volatile String stableVersion = null;
     private final Map<IconColor, Image> iconCache = new EnumMap<>(IconColor.class);
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(3))
@@ -51,11 +54,13 @@ public class SystemTrayService {
     public SystemTrayService(TrayConfig trayConfig,
                              WorkflowRunRepository runRepository,
                              @Lazy WorkflowExecutor workflowExecutor,
-                             DockerClient dockerClient) {
+                             DockerClient dockerClient,
+                             SystemIdentityService systemIdentity) {
         this.trayConfig = trayConfig;
         this.runRepository = runRepository;
         this.workflowExecutor = workflowExecutor;
         this.dockerClient = dockerClient;
+        this.systemIdentity = systemIdentity;
     }
 
     record TrayState(int activeRuns, long runsToday, long failedToday, int pendingApprovals, boolean dockerOk, boolean frontendOk, boolean stableOk) {
@@ -199,16 +204,18 @@ public class SystemTrayService {
     }
 
     private String buildTooltip(TrayState state) {
-        return String.format("MySuricates | Dev: UP | Stable: %s | %d aktiv | %d%% Erfolg",
-                state.stableOk ? "UP" : "Offline",
-                state.activeRuns,
-                state.successPercent());
+        String devVersion = systemIdentity.getVersion();
+        String stableInfo = state.stableOk
+                ? "UP" + (stableVersion != null ? " v" + stableVersion : "")
+                : "Offline";
+        return String.format("MySuricates v%s | Dev: UP | Stable: %s | %d aktiv | %d%% Erfolg",
+                devVersion, stableInfo, state.activeRuns, state.successPercent());
     }
 
     private PopupMenu buildMenu(TrayState state) {
         PopupMenu menu = new PopupMenu();
 
-        MenuItem header = new MenuItem("MySuricates");
+        MenuItem header = new MenuItem("MySuricates v" + systemIdentity.getVersion());
         header.setEnabled(false);
         menu.add(header);
 
@@ -219,7 +226,10 @@ public class SystemTrayService {
         devItem.setEnabled(false);
         menu.add(devItem);
 
-        String stableStatus = String.format("Stable [localhost:9091]  %s", state.stableOk ? "UP" : "Offline");
+        String stableInfo = state.stableOk
+                ? "UP" + (stableVersion != null ? " (v" + stableVersion + ")" : "")
+                : "Offline";
+        String stableStatus = String.format("Stable [localhost:9091]  %s", stableInfo);
         MenuItem stableItem = new MenuItem(stableStatus);
         stableItem.setEnabled(false);
         menu.add(stableItem);
@@ -324,14 +334,36 @@ public class SystemTrayService {
     boolean checkStable() {
         try {
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(trayConfig.getStableUrl() + "/api/v1/system/health"))
+                    .uri(URI.create(trayConfig.getStableUrl() + "/api/v1/system/info"))
                     .timeout(Duration.ofSeconds(3))
-                    .method("HEAD", HttpRequest.BodyPublishers.noBody())
+                    .GET()
                     .build();
-            HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
-            return response.statusCode() < 500;
-        } catch (Exception e) {
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 500) {
+                extractStableVersion(response.body());
+                return true;
+            }
             return false;
+        } catch (Exception e) {
+            stableVersion = null;
+            return false;
+        }
+    }
+
+    private void extractStableVersion(String body) {
+        try {
+            // Simple JSON parsing for "version":"x.y.z" — avoids Jackson dependency
+            int idx = body.indexOf("\"version\"");
+            if (idx >= 0) {
+                int colon = body.indexOf(':', idx);
+                int firstQuote = body.indexOf('"', colon + 1);
+                int lastQuote = body.indexOf('"', firstQuote + 1);
+                if (firstQuote > 0 && lastQuote > firstQuote) {
+                    stableVersion = body.substring(firstQuote + 1, lastQuote);
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Failed to extract stable version: {}", e.getMessage());
         }
     }
 

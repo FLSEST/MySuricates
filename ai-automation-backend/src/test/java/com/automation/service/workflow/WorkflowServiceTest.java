@@ -158,12 +158,14 @@ class WorkflowServiceTest {
     }
 
     @Test
-    void delete_existingWorkflow_deletes() {
+    void delete_existingWorkflow_softDeletes() {
         when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
+        when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
 
         workflowService.delete("wf-1");
 
-        verify(workflowRepository).delete(testWorkflow);
+        verify(workflowRepository).save(testWorkflow);
+        assertThat(testWorkflow.getDeletedAt()).isNotNull();
     }
 
     @Test

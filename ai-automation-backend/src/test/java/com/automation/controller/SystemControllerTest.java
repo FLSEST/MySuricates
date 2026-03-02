@@ -56,6 +56,9 @@ class SystemControllerTest {
     @MockBean
     private SystemIdentityService systemIdentity;
 
+    @MockBean
+    private com.automation.service.repair.AutoRepairService autoRepairService;
+
     private void mockDbHealthy() throws Exception {
         Connection conn = mock(Connection.class);
         Statement stmt = mock(Statement.class);
