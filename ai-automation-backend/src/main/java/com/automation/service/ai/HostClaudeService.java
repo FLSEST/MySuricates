@@ -4,11 +4,8 @@ import com.automation.config.CliPermissionsConfig;
 import com.automation.config.HostClaudeConfig;
 import com.automation.service.cli.ClaudeJsonResponse;
 import com.automation.service.cli.ClaudeOutputParser;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-
-import jakarta.annotation.PostConstruct;
 
 import java.io.File;
 import java.io.IOException;
@@ -25,7 +22,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class HostClaudeService {
 
@@ -37,13 +33,13 @@ public class HostClaudeService {
 
     private final HostClaudeConfig config;
     private final CliPermissionsConfig permissionsConfig;
-
-    private Semaphore callSemaphore;
+    private final Semaphore callSemaphore;
     private final AtomicLong lastCallTimestamp = new AtomicLong(0);
 
-    @PostConstruct
-    void initThrottle() {
-        callSemaphore = new Semaphore(config.getMaxConcurrentCalls());
+    public HostClaudeService(HostClaudeConfig config, CliPermissionsConfig permissionsConfig) {
+        this.config = config;
+        this.permissionsConfig = permissionsConfig;
+        this.callSemaphore = new Semaphore(config.getMaxConcurrentCalls());
         log.info("Claude CLI throttle: maxConcurrent={}, interCallDelay={}ms",
                 config.getMaxConcurrentCalls(), config.getInterCallDelayMs());
     }
