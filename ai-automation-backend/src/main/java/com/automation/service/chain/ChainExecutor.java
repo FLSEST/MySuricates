@@ -5,6 +5,7 @@ import com.automation.entity.*;
 import com.automation.repository.ChainRunRepository;
 import com.automation.repository.StepResultRepository;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.exception.WorkflowExecutionException;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
 import lombok.extern.slf4j.Slf4j;
@@ -232,7 +233,7 @@ public class ChainExecutor {
         Instant deadline = Instant.now().plus(maxWait);
         while (Instant.now().isBefore(deadline)) {
             if (cancelled != null && cancelled.get()) {
-                throw new RuntimeException("Chain execution cancelled");
+                throw new java.util.concurrent.CancellationException("Chain execution cancelled");
             }
             WorkflowRun run = workflowRunRepository.findById(runId).orElseThrow();
             if (run.getStatus() != RunStatus.RUNNING
@@ -244,10 +245,10 @@ public class ChainExecutor {
                 Thread.sleep(POLLING_INTERVAL_MS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw new RuntimeException("Interrupted while waiting for workflow completion");
+                throw new WorkflowExecutionException("Interrupted while waiting for workflow completion", e);
             }
         }
-        throw new RuntimeException("Workflow timed out after " + maxWait.toMinutes() + " minutes");
+        throw new WorkflowExecutionException("Workflow timed out after " + maxWait.toMinutes() + " minutes");
     }
 
     private String extractOutput(WorkflowRun run) {

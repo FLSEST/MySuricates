@@ -20,11 +20,6 @@ public class GlobalExceptionHandler {
         return respond(ErrorCode.RESOURCE_NOT_FOUND, ex.getMessage());
     }
 
-    @ExceptionHandler(CapabilityNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleCapabilityNotFound(CapabilityNotFoundException ex) {
-        return respond(ErrorCode.RESOURCE_NOT_FOUND, ex.getMessage());
-    }
-
     @ExceptionHandler(NoSuchElementException.class)
     public ResponseEntity<ErrorResponse> handleNoSuchElement(NoSuchElementException ex) {
         return respond(ErrorCode.RESOURCE_NOT_FOUND, ex.getMessage());
@@ -42,6 +37,12 @@ public class GlobalExceptionHandler {
         return respond(ErrorCode.CONTAINER_ERROR, ex.getMessage());
     }
 
+    @ExceptionHandler(StagingException.class)
+    public ResponseEntity<ErrorResponse> handleStagingError(StagingException ex) {
+        log.error("Staging error", ex);
+        return respond(ErrorCode.STAGING_ERROR, ex.getMessage());
+    }
+
     @ExceptionHandler(TailscaleException.class)
     public ResponseEntity<ErrorResponse> handleTailscaleError(TailscaleException ex) {
         log.error("Tailscale error", ex);
@@ -50,11 +51,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
+        log.warn("Invalid argument: {}", ex.getMessage());
         return respond(ErrorCode.INVALID_ARGUMENT, ex.getMessage());
     }
 
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ErrorResponse> handleIllegalState(IllegalStateException ex) {
+        log.warn("State conflict: {}", ex.getMessage());
         return respond(ErrorCode.STATE_CONFLICT, ex.getMessage());
     }
 

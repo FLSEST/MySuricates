@@ -184,6 +184,7 @@ public class AgenticBlockExecutor implements BlockExecutor {
                 exitCode = cmdResult.exitCode();
                 tokenTracker.captureActMeta(iterData, cmdResult, plan.getAction(), actionOutput, iteration);
             } catch (Exception e) {
+                log.error("Host Claude ACT phase failed at iteration {}: {}", iteration, e.getMessage(), e);
                 actionOutput = "Execution error: " + e.getMessage();
                 exitCode = -1;
             }
@@ -323,10 +324,22 @@ public class AgenticBlockExecutor implements BlockExecutor {
         String answer;
         try {
             answer = future.get(30, TimeUnit.MINUTES);
-        } catch (Exception e) {
+        } catch (java.util.concurrent.TimeoutException e) {
             iterData.put("result", "approval_timeout");
             fullOutput.append("[iteration ").append(iteration)
                     .append(" - APPROVAL TIMEOUT]\n");
+            return "break";
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            iterData.put("result", "approval_interrupted");
+            fullOutput.append("[iteration ").append(iteration)
+                    .append(" - INTERRUPTED]\n");
+            return "break";
+        } catch (Exception e) {
+            log.warn("Approval gate failed at iteration {}: {}", iteration, e.getMessage());
+            iterData.put("result", "approval_error");
+            fullOutput.append("[iteration ").append(iteration)
+                    .append(" - APPROVAL ERROR: ").append(e.getMessage()).append("]\n");
             return "break";
         }
 

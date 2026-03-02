@@ -106,6 +106,7 @@ public class CommandExecutorService {
                 step.setMetadata(meta);
             }
         } catch (Exception e) {
+            log.error("Step execution failed for command in container {}: {}", containerId, e.getMessage(), e);
             step.setOutput("Error: " + e.getMessage());
             step.setStatus(StepStatus.FAILED);
             step.setMetadata(Map.of("error", e.getMessage()));
@@ -169,6 +170,7 @@ public class CommandExecutorService {
                 step.setMetadata(meta);
             }
         } catch (Exception e) {
+            log.error("Host step execution failed for project {}: {}", projectPath, e.getMessage(), e);
             step.setOutput("Error: " + e.getMessage());
             step.setStatus(StepStatus.FAILED);
             step.setMetadata(Map.of("error", e.getMessage()));

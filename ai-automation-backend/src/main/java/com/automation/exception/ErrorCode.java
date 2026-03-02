@@ -11,6 +11,7 @@ public enum ErrorCode {
     INVALID_ARGUMENT(HttpStatus.BAD_REQUEST, "Invalid argument"),
     WORKFLOW_EXECUTION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "Workflow execution failed"),
     CONTAINER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Container error"),
+    STAGING_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Staging error"),
     STATE_CONFLICT(HttpStatus.CONFLICT, "State conflict"),
     SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Service unavailable"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error");

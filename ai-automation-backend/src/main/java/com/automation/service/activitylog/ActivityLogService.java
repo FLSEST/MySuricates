@@ -56,7 +56,7 @@ public class ActivityLogService {
                     "message", entry.getMessage()
             ));
         } catch (Exception e) {
-            // Don't fail logging if WebSocket broadcast fails
+            log.debug("WebSocket broadcast for activity log failed: {}", e.getMessage());
         }
 
         return entry;

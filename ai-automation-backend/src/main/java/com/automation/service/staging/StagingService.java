@@ -14,6 +14,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URI;
@@ -68,7 +69,7 @@ public class StagingService {
                 log.info("Auto-starting Stable environment...");
                 start();
             } catch (Exception e) {
-                log.debug("Stable auto-start skipped: {}", e.getMessage());
+                log.warn("Stable auto-start failed: {}", e.getMessage());
             }
         });
     }
@@ -385,9 +386,15 @@ public class StagingService {
         try (var walk = Files.walk(path)) {
             walk.sorted(java.util.Comparator.reverseOrder())
                     .forEach(p -> {
-                        try { Files.delete(p); } catch (Exception ignored) {}
+                        try {
+                            Files.delete(p);
+                        } catch (IOException e) {
+                            log.warn("Failed to delete {}: {}", p, e.getMessage());
+                        }
                     });
-        } catch (Exception ignored) {}
+        } catch (IOException e) {
+            log.warn("Failed to walk directory for deletion {}: {}", path, e.getMessage());
+        }
     }
 
     private void copyDirectory(Path source, Path target) {

@@ -8,6 +8,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -26,7 +29,7 @@ public class WorkflowOptimizationService {
         String blocksJson;
         try {
             blocksJson = objectMapper.writeValueAsString(workflow.getBlocks());
-        } catch (Exception e) {
+        } catch (JsonProcessingException e) {
             blocksJson = workflow.getBlocks().toString();
         }
 
@@ -40,7 +43,7 @@ public class WorkflowOptimizationService {
         try {
             String response = hostClaude.reason(prompt);
             return parseResponse(response);
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.error("Workflow optimization failed for {}: {}", workflowId, e.getMessage());
             return Map.of(
                     "error", true,
@@ -122,7 +125,7 @@ public class WorkflowOptimizationService {
 
         try {
             return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
-        } catch (Exception e) {
+        } catch (JsonProcessingException e) {
             log.warn("Could not parse optimization response as JSON: {}", e.getMessage());
             return Map.of(
                     "suggestedName", "",

@@ -115,6 +115,7 @@ public class SubWorkflowBlockExecutor implements BlockExecutor {
                     .build();
 
         } catch (Exception e) {
+            log.error("Sub-workflow {} execution failed: {}", workflowId, e.getMessage(), e);
             Instant end = Instant.now();
             return StepResult.builder()
                     .stepIndex(stepIndex)
