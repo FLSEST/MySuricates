@@ -31,6 +31,9 @@ public class ExecutionContext {
     @Setter
     private String model;
 
+    @Setter
+    private String provider;
+
     @Builder.Default
     private final Map<String, Object> variables = new HashMap<>();
 

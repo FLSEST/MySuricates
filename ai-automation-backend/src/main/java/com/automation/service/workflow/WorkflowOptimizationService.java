@@ -1,7 +1,8 @@
 package com.automation.service.workflow;
 
 import com.automation.entity.Workflow;
-import com.automation.service.ai.HostClaudeService;
+import com.automation.service.ai.AiProvider;
+import com.automation.service.ai.AiProviderRegistry;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +21,7 @@ import java.util.Map;
 public class WorkflowOptimizationService {
 
     private final WorkflowService workflowService;
-    private final HostClaudeService hostClaude;
+    private final AiProviderRegistry aiProviderRegistry;
     private final ObjectMapper objectMapper;
 
     public Map<String, Object> optimizeWorkflow(String workflowId) {
@@ -41,8 +42,9 @@ public class WorkflowOptimizationService {
         );
 
         try {
-            String response = hostClaude.reason(prompt);
-            return parseResponse(response);
+            AiProvider provider = aiProviderRegistry.resolve(workflow.getProvider());
+            AiProvider.ReasoningResult result = provider.reason(new AiProvider.ReasoningRequest(prompt));
+            return parseResponse(result.text());
         } catch (IOException e) {
             log.error("Workflow optimization failed for {}: {}", workflowId, e.getMessage());
             return Map.of(

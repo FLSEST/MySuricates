@@ -6,8 +6,10 @@ import com.automation.entity.StepStatus;
 import com.automation.executor.ApprovalRequest;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
+import com.automation.service.ai.AiProvider;
+import com.automation.service.ai.AiProviderRegistry;
+import com.automation.service.ai.AiResponseMetadata;
 import com.automation.service.ai.HostClaudeService;
-import com.automation.service.ai.HostClaudeService.ReasoningResult;
 import com.automation.service.ai.HostClaudeService.Turn;
 import com.automation.service.cli.CliSession;
 import com.automation.service.cli.CommandExecutorService;
@@ -53,6 +55,7 @@ public class AgenticBlockExecutor implements BlockExecutor {
     private final SimpMessagingTemplate messagingTemplate;
     private final WorkflowRunRepository runRepository;
     private final SystemIdentityService systemIdentity;
+    private final AiProviderRegistry aiProviderRegistry;
 
     @Override
     public boolean supports(String blockType) {
@@ -77,12 +80,19 @@ public class AgenticBlockExecutor implements BlockExecutor {
         String systemPrompt = buildSystemPrompt(cfg.goal(), cfg.successCriteria(),
                 learningContext, context.getInstructionPrefix());
 
+        // Resolve AI provider
+        AiProvider provider = aiProviderRegistry.resolve(context.getProvider());
+        log.info("Agentic block using AI provider: {}", provider.getId());
+
         // Initialize state
         List<Turn> history = new ArrayList<>();
         history.add(new Turn("user",
                 "Begin working on the goal. Analyze what needs to be done and propose your first action."));
 
         AgenticTokenTracker tokenTracker = new AgenticTokenTracker();
+        if (!provider.getCapabilities().tokenTracking()) {
+            tokenTracker.setExpectEstimatedTokens(true);
+        }
         AgenticSafetyGuard safetyGuard = new AgenticSafetyGuard(
                 cfg.totalTimeoutSeconds(), cfg.iterationTimeoutSeconds(), cfg.maxRepeatedActions());
 
@@ -122,11 +132,11 @@ public class AgenticBlockExecutor implements BlockExecutor {
 
             String reasoning;
             try {
-                String conversationPrompt = hostClaude.buildConversationPrompt(systemPrompt, history);
-                ReasoningResult reasonResult = hostClaude.reasonStructured(
-                        conversationPrompt, systemPrompt, null, null, cfg.claudeTimeout());
+                String conversationPrompt = provider.buildConversationPrompt(systemPrompt, history);
+                AiProvider.ReasoningResult reasonResult = provider.reason(
+                        new AiProvider.ReasoningRequest(conversationPrompt, systemPrompt, null, null, cfg.claudeTimeout()));
                 reasoning = reasonResult.text();
-                tokenTracker.captureReasonMeta(iterData, reasonResult, conversationPrompt, reasoning, iteration);
+                tokenTracker.captureReasonMeta(iterData, reasonResult.metadata(), conversationPrompt, reasoning, iteration);
             } catch (Exception e) {
                 log.error("Host Claude reasoning failed at iteration {}: {}", iteration, e.getMessage());
                 iterData.put("phase", "reason");
@@ -194,7 +204,7 @@ public class AgenticBlockExecutor implements BlockExecutor {
                         "agentic_action_compressed",
                         Map.of("iteration", iteration, "originalLength", action.length()));
                 try {
-                    action = compressAction(action);
+                    action = compressAction(action, provider);
                     log.info("Agentic iteration {}: ACTION compressed {} → {} chars",
                             iteration, plan.getAction().length(), action.length());
                 } catch (Exception e) {
@@ -211,12 +221,12 @@ public class AgenticBlockExecutor implements BlockExecutor {
             String actionOutput;
             int exitCode;
             try {
-                CliSession.EnrichedCommandResult cmdResult = commandExecutor.executeCommandOnHost(
-                        context.getProjectPath(), action, context.getModel(),
-                        context.getInstructionPrefix(), cfg.claudeTimeout());
-                actionOutput = cmdResult.output() != null ? cmdResult.output() : "";
-                exitCode = cmdResult.exitCode();
-                tokenTracker.captureActMeta(iterData, cmdResult, action, actionOutput, iteration);
+                AiProvider.ActionResult actResult = provider.executeAction(
+                        new AiProvider.ActionRequest(action, context.getModel(),
+                                context.getInstructionPrefix(), context.getProjectPath(), cfg.claudeTimeout()));
+                actionOutput = actResult.text() != null ? actResult.text() : "";
+                exitCode = actResult.exitCode();
+                tokenTracker.captureActMeta(iterData, actResult.metadata(), action, actionOutput, iteration);
             } catch (Exception e) {
                 log.error("Host Claude ACT phase failed at iteration {}: {}", iteration, e.getMessage(), e);
                 actionOutput = "Execution error: " + e.getMessage();
@@ -319,7 +329,8 @@ public class AgenticBlockExecutor implements BlockExecutor {
                 .build();
 
         result.setMetadata(tokenTracker.buildFinalMetadata(
-                cfg.goal(), cfg.successCriteria(), iteration, goalAchieved, stopReason));
+                cfg.goal(), cfg.successCriteria(), iteration, goalAchieved, stopReason,
+                context.getModel(), provider.getId()));
 
         context.setVariable("agentic_goal_achieved", goalAchieved);
         context.setVariable("agentic_iterations", iteration);
@@ -425,10 +436,10 @@ public class AgenticBlockExecutor implements BlockExecutor {
         history.addAll(compressed);
     }
 
-    private String compressAction(String oversizedAction) throws IOException {
+    private String compressAction(String oversizedAction, AiProvider provider) throws IOException {
         String prompt = ACTION_COMPRESS_PROMPT + oversizedAction;
-        ReasoningResult result = hostClaude.reasonStructured(
-                prompt, null, null, 1, AGENTIC_ACTION_COMPRESS_TIMEOUT);
+        AiProvider.ReasoningResult result = provider.reason(
+                new AiProvider.ReasoningRequest(prompt, null, null, 1, AGENTIC_ACTION_COMPRESS_TIMEOUT));
         String compressed = result.text();
         if (compressed == null || compressed.isBlank()) {
             throw new IOException("Action compression returned empty result");

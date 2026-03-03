@@ -6,6 +6,7 @@ import com.automation.entity.SkillCategory;
 import com.automation.entity.StepStatus;
 import com.automation.entity.StepResult;
 import com.automation.exception.WorkflowExecutionException;
+import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.ai.HostClaudeService;
 import com.automation.service.ai.HostClaudeService.ActionResult;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,11 +39,14 @@ class CommandExecutorServiceTest {
     @Mock
     private ShellCommandService shellCommandService;
 
+    @Mock
+    private AiProviderRegistry aiProviderRegistry;
+
     private CommandExecutorService commandExecutorService;
 
     @BeforeEach
     void setUp() throws IOException {
-        commandExecutorService = new CommandExecutorService(sessionManager, hostClaudeService, shellCommandService);
+        commandExecutorService = new CommandExecutorService(sessionManager, hostClaudeService, shellCommandService, aiProviderRegistry);
         lenient().when(sessionManager.getOrCreateSession(anyString(), anyString())).thenReturn(cliSession);
     }
 

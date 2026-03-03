@@ -1,8 +1,10 @@
 package com.automation.service.wish;
 
+import com.automation.config.WishConfig;
 import com.automation.dto.request.WishRespondRequest;
 import com.automation.entity.*;
 import com.automation.repository.*;
+import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.ai.HostClaudeService;
 import com.automation.service.chain.ChainExecutor;
 import com.automation.service.chain.ChainService;
@@ -33,6 +35,7 @@ class WishServiceTest {
 
     @Mock private WishRepository wishRepository;
     @Mock private HostClaudeService hostClaude;
+    @Mock private AiProviderRegistry aiProviderRegistry;
     @Mock private WorkflowService workflowService;
     @Mock private ChainService chainService;
     @Mock private ChainExecutor chainExecutor;
@@ -57,8 +60,10 @@ class WishServiceTest {
 
     @BeforeEach
     void setUp() {
+        WishConfig wishConfig = new WishConfig();
         wishService = new WishService(
-                wishRepository, hostClaude, workflowService, chainService,
+                wishConfig,
+                wishRepository, hostClaude, aiProviderRegistry, workflowService, chainService,
                 chainExecutor, workflowExecutor, workflowRepository, skillRepository,
                 workflowRunRepository, chainRunRepository, stepResultRepository,
                 projectRepository, templateRepository, memoryRepository,

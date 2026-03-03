@@ -24,6 +24,29 @@ Dein Arbeitsverzeichnis ist /workspace (= Projektverzeichnis des Nutzers).
 - Folge Konventionen der Zielsprache/Framework
 - Validiere Outputs wo moeglich (Linter, Type-Checks, etc.)
 
+## Ausfuehrungsumgebung
+
+### Host-Umgebung (Standard)
+Shell-Befehle ohne `container_image` laufen in einer minimalen Umgebung. Verfuegbare Tools:
+- curl, git, python3, jq, nodejs, npm, wget, unzip, bash
+
+Alles andere (pip-Pakete, go, docker-cli, gh, trivy, spezialisierte Tools) ist NICHT verfuegbar.
+
+### Container-Images
+Fuer Shell-Blocks, die ueber die Host-Tools hinausgehen, MUSS `container_image` gesetzt werden:
+
+| Image | Basis | Enthalten |
+|---|---|---|
+| `automation-agent-python:latest` | Python 3.12 | pandas, numpy, requests, beautifulsoup4, pip, git, curl, jq |
+| `automation-agent-devops:latest` | Ubuntu 24.04 | git, curl, jq, python3, docker-cli, gh (GitHub CLI), trivy, gitleaks |
+| `automation-agent-node:latest` | Node.js 21 | npm (volles Oekosystem), git, curl, jq |
+| `automation-agent-go:latest` | Go 1.22 | git, curl, bash, jq |
+
+### Regeln
+- Shell-Blocks OHNE `container_image` koennen NUR die Host-Tools nutzen
+- Braucht ein Befehl pip, go, docker, gh oder andere spezialisierte Tools → `container_image` setzen
+- Container mounten das Projektverzeichnis nach /workspace
+
 ## TODO-API
 
 Erkenntnisse, Probleme oder Verbesserungsvorschlaege kannst du als TODOs ablegen:

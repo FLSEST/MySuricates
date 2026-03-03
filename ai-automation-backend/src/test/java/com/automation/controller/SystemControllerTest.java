@@ -23,6 +23,8 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.Statement;
 
+import java.util.Optional;
+
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -58,6 +60,9 @@ class SystemControllerTest {
 
     @MockBean
     private com.automation.service.repair.AutoRepairService autoRepairService;
+
+    @MockBean
+    private com.automation.service.ai.AiProviderRegistry aiProviderRegistry;
 
     private void mockDbHealthy() throws Exception {
         Connection conn = mock(Connection.class);
@@ -207,5 +212,31 @@ class SystemControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.enabled").value(false))
                 .andExpect(jsonPath("$.ip").doesNotExist());
+    }
+
+    @Test
+    void getSetting_defaultAiProvider_returnsValue() throws Exception {
+        when(appSettingsRepository.get("default-ai-provider")).thenReturn(Optional.of("CLAUDE"));
+
+        mockMvc.perform(get("/api/v1/system/settings/default-ai-provider"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.key").value("default-ai-provider"))
+                .andExpect(jsonPath("$.value").value("CLAUDE"));
+    }
+
+    @Test
+    void setSetting_defaultAiProvider_succeeds() throws Exception {
+        mockMvc.perform(put("/api/v1/system/settings/default-ai-provider")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"value\":\"CODEX\"}"))
+                .andExpect(status().isOk());
+
+        verify(appSettingsRepository).set("default-ai-provider", "CODEX");
+    }
+
+    @Test
+    void getSetting_disallowedKey_returns400() throws Exception {
+        mockMvc.perform(get("/api/v1/system/settings/secret-key"))
+                .andExpect(status().isBadRequest());
     }
 }

@@ -6,7 +6,9 @@ import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.dto.response.WorkflowResponse;
 import com.automation.repository.WorkflowRunRepository;
-import com.automation.service.ai.HostClaudeService;
+import com.automation.service.ai.AiProvider;
+import com.automation.service.ai.AiProviderRegistry;
+import com.automation.service.workflow.AgentInstructionsService;
 import com.automation.service.workflow.WorkflowService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,7 +27,8 @@ public class WorkflowConversionService {
     private final WorkflowRunRepository runRepository;
     private final WorkflowService workflowService;
     private final WorkflowMapper workflowMapper;
-    private final HostClaudeService hostClaude;
+    private final AiProviderRegistry aiProviderRegistry;
+    private final AgentInstructionsService agentInstructionsService;
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Transactional(readOnly = true)
@@ -153,16 +156,21 @@ public class WorkflowConversionService {
                 }
 
                 Rules:
-                - Use "simple" blocks for straightforward commands
+                - Use "simple" blocks for AI reasoning tasks
+                - Use "shell" blocks for deterministic commands. Config: {"command": "...", "container_image": "image:tag"}
                 - Use "retry" blocks for commands that might fail transiently
                 - Use "conditional" blocks if the sequence has clear if-then logic
                 - Merge related steps when possible
                 - Remove redundant or exploratory steps
                 - Keep only the essential action chain
+                - Follow the "Ausfuehrungsumgebung" rules for shell block container_image
                 - Output ONLY valid JSON, no explanations
                 """.formatted(actionDesc);
 
-        String response = hostClaude.reason(prompt);
+        String systemPrompt = agentInstructionsService.buildInstructionPrefix(null);
+        AiProvider.ReasoningResult aiResult = aiProviderRegistry.getDefault().reason(
+                new AiProvider.ReasoningRequest(prompt, systemPrompt));
+        String response = aiResult.text();
 
         // Extract JSON from response
         String json = extractJson(response);
@@ -210,6 +218,7 @@ public class WorkflowConversionService {
                 null,
                 suggestion.blocks(),
                 List.of(),
+                null,
                 null,
                 null,
                 null,

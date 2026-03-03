@@ -69,6 +69,7 @@ export function InsightsPanel({ runId }: { runId: string }) {
                 <div className="flex items-center gap-2">
                   <span className="text-text-tertiary font-mono text-xs">#{step.stepIndex + 1}</span>
                   {step.model && <Badge variant="default">{step.model}</Badge>}
+                  {step.provider && <Badge variant="accent">{step.provider}</Badge>}
                 </div>
                 <div className="flex items-center gap-4 text-xs text-text-secondary">
                   {step.toolUseCount != null && step.toolUseCount > 0 && (

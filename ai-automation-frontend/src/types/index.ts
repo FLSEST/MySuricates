@@ -82,6 +82,7 @@ export interface Workflow {
   runCount: number;
   instructions: string | null;
   model: string | null;
+  provider: string | null;
   metadata?: WorkflowMetadata;
   defaultContext?: Record<string, string>;
   testStatus?: 'UNTESTED' | 'PASSED' | 'FAILED';
@@ -99,6 +100,7 @@ export interface CreateWorkflowRequest {
   activatedSkillIds?: string[];
   instructions?: string;
   model?: string;
+  provider?: string;
   templateId?: string;
   metadata?: WorkflowMetadata;
 }
@@ -146,6 +148,7 @@ export interface UpdateWorkflowRequest {
   blocks?: BlockDefinition[];
   instructions?: string;
   model?: string;
+  provider?: string;
   metadata?: Record<string, unknown>;
   defaultContext?: Record<string, string>;
 }
@@ -494,6 +497,7 @@ export interface StepInsight {
   inputTokens: number;
   outputTokens: number;
   model: string | null;
+  provider: string | null;
   numTurns: number | null;
   toolNames: string[] | null;
   toolUseCount: number | null;

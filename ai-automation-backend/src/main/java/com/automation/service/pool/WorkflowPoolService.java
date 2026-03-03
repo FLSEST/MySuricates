@@ -94,6 +94,7 @@ public class WorkflowPoolService {
                 entry.model(),
                 null,
                 null,
+                null,
                 entry.defaultContext()
         );
 

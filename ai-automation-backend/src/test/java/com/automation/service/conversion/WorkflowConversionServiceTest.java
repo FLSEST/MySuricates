@@ -5,7 +5,9 @@ import com.automation.entity.*;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.repository.WorkflowRunRepository;
-import com.automation.service.ai.HostClaudeService;
+import com.automation.service.ai.AiProvider;
+import com.automation.service.ai.AiProviderRegistry;
+import com.automation.service.workflow.AgentInstructionsService;
 import com.automation.service.workflow.WorkflowService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,14 +37,22 @@ class WorkflowConversionServiceTest {
     private WorkflowMapper workflowMapper;
 
     @Mock
-    private HostClaudeService hostClaude;
+    private AiProviderRegistry aiProviderRegistry;
+
+    @Mock
+    private AgentInstructionsService agentInstructionsService;
+
+    @Mock
+    private AiProvider aiProvider;
 
     private WorkflowConversionService conversionService;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         conversionService = new WorkflowConversionService(
-                runRepository, workflowService, workflowMapper, hostClaude);
+                runRepository, workflowService, workflowMapper, aiProviderRegistry, agentInstructionsService);
+        lenient().when(agentInstructionsService.buildInstructionPrefix(null)).thenReturn("");
+        lenient().when(aiProviderRegistry.getDefault()).thenReturn(aiProvider);
     }
 
     private WorkflowRun buildCompletedRunWithAgenticSteps() {
@@ -83,7 +93,7 @@ class WorkflowConversionServiceTest {
         when(runRepository.findById("run-1")).thenReturn(Optional.of(run));
 
         // AI suggestion fails, so rule-based kicks in
-        when(hostClaude.reason(anyString())).thenThrow(new RuntimeException("no AI"));
+        when(aiProvider.reason(any())).thenThrow(new RuntimeException("no AI"));
 
         WorkflowSuggestion suggestion = conversionService.suggestWorkflow("run-1");
 
@@ -180,7 +190,7 @@ class WorkflowConversionServiceTest {
 
         when(runRepository.findById("run-4")).thenReturn(Optional.of(run));
         // AI fails → rule-based fallback
-        when(hostClaude.reason(anyString())).thenThrow(new RuntimeException("no AI"));
+        when(aiProvider.reason(any())).thenThrow(new RuntimeException("no AI"));
 
         WorkflowSuggestion suggestion = conversionService.suggestWorkflow("run-4");
 
@@ -197,7 +207,7 @@ class WorkflowConversionServiceTest {
     void createWorkflowFromSuggestion_createsWorkflowViaService() throws Exception {
         WorkflowRun run = buildCompletedRunWithAgenticSteps();
         when(runRepository.findById("run-1")).thenReturn(Optional.of(run));
-        when(hostClaude.reason(anyString())).thenThrow(new RuntimeException("no AI"));
+        when(aiProvider.reason(any())).thenThrow(new RuntimeException("no AI"));
 
         Workflow createdWorkflow = Workflow.builder()
                 .id("new-wf")
@@ -207,7 +217,7 @@ class WorkflowConversionServiceTest {
 
         WorkflowResponse expectedResponse = new WorkflowResponse(
                 "new-wf", "proj-1", "Project", null, null, "My Workflow",
-                null, null, List.of(), null, Map.of(), List.of(), 0, null, null, null, Map.of(), null, null, null, null);
+                null, null, List.of(), null, Map.of(), List.of(), 0, null, null, null, null, Map.of(), null, null, null, null);
         when(workflowMapper.toResponse(createdWorkflow)).thenReturn(expectedResponse);
 
         WorkflowResponse result = conversionService.createWorkflowFromSuggestion("run-1", "proj-1", "My Workflow");

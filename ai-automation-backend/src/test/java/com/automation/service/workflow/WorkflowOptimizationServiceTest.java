@@ -2,14 +2,14 @@ package com.automation.service.workflow;
 
 import com.automation.entity.BlockDefinition;
 import com.automation.entity.Workflow;
-import com.automation.service.ai.HostClaudeService;
+import com.automation.service.ai.AiProvider;
+import com.automation.service.ai.AiProviderRegistry;
+import com.automation.service.ai.AiResponseMetadata;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
@@ -27,18 +27,23 @@ class WorkflowOptimizationServiceTest {
     private WorkflowService workflowService;
 
     @Mock
-    private HostClaudeService hostClaude;
+    private AiProviderRegistry aiProviderRegistry;
 
-    @Spy
-    private ObjectMapper objectMapper = new ObjectMapper();
+    @Mock
+    private AiProvider aiProvider;
 
-    @InjectMocks
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     private WorkflowOptimizationService optimizationService;
 
     private Workflow testWorkflow;
 
     @BeforeEach
     void setUp() {
+        optimizationService = new WorkflowOptimizationService(workflowService, aiProviderRegistry, objectMapper);
+
+        when(aiProviderRegistry.resolve(any())).thenReturn(aiProvider);
+
         testWorkflow = Workflow.builder()
                 .id("wf-1")
                 .name("Test Workflow")
@@ -51,6 +56,10 @@ class WorkflowOptimizationServiceTest {
                                 .build()
                 ))
                 .build();
+    }
+
+    private AiProvider.ReasoningResult reasonResult(String text) {
+        return new AiProvider.ReasoningResult(text, AiResponseMetadata.estimated(100, 50));
     }
 
     @Test
@@ -66,7 +75,7 @@ class WorkflowOptimizationServiceTest {
                   "changes": [{"type": "modified", "description": "Improved prompt"}]
                 }
                 """;
-        when(hostClaude.reason(anyString())).thenReturn(jsonResponse);
+        when(aiProvider.reason(any())).thenReturn(reasonResult(jsonResponse));
 
         Map<String, Object> result = optimizationService.optimizeWorkflow("wf-1");
 
@@ -92,7 +101,7 @@ class WorkflowOptimizationServiceTest {
                 ```
                 Hope that helps!
                 """;
-        when(hostClaude.reason(anyString())).thenReturn(response);
+        when(aiProvider.reason(any())).thenReturn(reasonResult(response));
 
         Map<String, Object> result = optimizationService.optimizeWorkflow("wf-1");
 
@@ -114,7 +123,7 @@ class WorkflowOptimizationServiceTest {
                 }
                 ```
                 """;
-        when(hostClaude.reason(anyString())).thenReturn(response);
+        when(aiProvider.reason(any())).thenReturn(reasonResult(response));
 
         Map<String, Object> result = optimizationService.optimizeWorkflow("wf-1");
 
@@ -124,7 +133,7 @@ class WorkflowOptimizationServiceTest {
     @Test
     void optimizeWorkflow_invalidJsonResponse_returnsFallback() throws IOException {
         when(workflowService.findById("wf-1")).thenReturn(testWorkflow);
-        when(hostClaude.reason(anyString())).thenReturn("This is not JSON at all");
+        when(aiProvider.reason(any())).thenReturn(reasonResult("This is not JSON at all"));
 
         Map<String, Object> result = optimizationService.optimizeWorkflow("wf-1");
 
@@ -136,7 +145,7 @@ class WorkflowOptimizationServiceTest {
     @Test
     void optimizeWorkflow_claudeThrows_returnsError() throws IOException {
         when(workflowService.findById("wf-1")).thenReturn(testWorkflow);
-        when(hostClaude.reason(anyString())).thenThrow(new IOException("Connection failed"));
+        when(aiProvider.reason(any())).thenThrow(new IOException("Connection failed"));
 
         Map<String, Object> result = optimizationService.optimizeWorkflow("wf-1");
 
@@ -152,7 +161,7 @@ class WorkflowOptimizationServiceTest {
         String jsonResponse = """
                 {"suggestedName":"OK","suggestedDescription":"","suggestedInstructions":"","blocks":[],"changes":[]}
                 """;
-        when(hostClaude.reason(anyString())).thenReturn(jsonResponse);
+        when(aiProvider.reason(any())).thenReturn(reasonResult(jsonResponse));
 
         Map<String, Object> result = optimizationService.optimizeWorkflow("wf-1");
 
@@ -166,10 +175,10 @@ class WorkflowOptimizationServiceTest {
         String jsonResponse = """
                 {"suggestedName":"","suggestedDescription":"","suggestedInstructions":"","blocks":[],"changes":[]}
                 """;
-        when(hostClaude.reason(contains("Test Workflow"))).thenReturn(jsonResponse);
+        when(aiProvider.reason(argThat(req -> req.prompt().contains("Test Workflow")))).thenReturn(reasonResult(jsonResponse));
 
         optimizationService.optimizeWorkflow("wf-1");
 
-        // Verified by the contains() matcher - prompt includes workflow name
+        // Verified by the argThat matcher - prompt includes workflow name
     }
 }

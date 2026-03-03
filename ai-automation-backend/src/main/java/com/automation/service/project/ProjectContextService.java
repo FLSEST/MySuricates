@@ -1,6 +1,7 @@
 package com.automation.service.project;
 
-import com.automation.service.ai.HostClaudeService;
+import com.automation.service.ai.AiProvider;
+import com.automation.service.ai.AiProviderRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,7 +27,7 @@ public class ProjectContextService {
             "CLAUDE.md", ".claude/settings.json"
     );
 
-    private final HostClaudeService hostClaudeService;
+    private final AiProviderRegistry aiProviderRegistry;
 
     /**
      * Writes the project AI context to .claude/rules/project-context.md in the project directory.
@@ -131,7 +132,9 @@ public class ProjectContextService {
                 """ + snapshot;
 
         try {
-            return hostClaudeService.reason(prompt);
+            AiProvider.ReasoningResult result = aiProviderRegistry.getDefault().reason(
+                    new AiProvider.ReasoningRequest(prompt));
+            return result.text();
         } catch (IOException e) {
             log.error("Failed to generate project context: {}", e.getMessage());
             throw new RuntimeException("Failed to generate project context: " + e.getMessage(), e);

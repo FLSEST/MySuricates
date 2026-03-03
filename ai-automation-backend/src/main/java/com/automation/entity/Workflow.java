@@ -74,6 +74,8 @@ public class Workflow {
 
     private String model;
 
+    private String provider;
+
     private String templateId;
 
     @Column(name = "block_types")

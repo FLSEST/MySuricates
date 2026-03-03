@@ -68,6 +68,7 @@ public class WorkflowService {
                 .blocks(request.blocks() != null ? request.blocks() : new ArrayList<>())
                 .instructions(request.instructions())
                 .model(request.model())
+                .provider(request.provider())
                 .templateId(request.templateId())
                 .build();
 
@@ -111,6 +112,9 @@ public class WorkflowService {
         }
         if (request.model() != null) {
             workflow.setModel(request.model());
+        }
+        if (request.provider() != null) {
+            workflow.setProvider(request.provider());
         }
         if (request.metadata() != null) {
             Map<String, Object> merged = new HashMap<>(workflow.getMetadata());

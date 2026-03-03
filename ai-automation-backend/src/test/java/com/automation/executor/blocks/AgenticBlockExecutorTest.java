@@ -4,6 +4,8 @@ import com.automation.entity.BlockDefinition;
 import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.executor.ExecutionContext;
+import com.automation.service.ai.AiProviderRegistry;
+import com.automation.service.ai.ClaudeAiProvider;
 import com.automation.service.ai.HostClaudeService;
 import com.automation.service.ai.HostClaudeService.ReasoningResult;
 import com.automation.service.cli.ClaudeJsonResponse;
@@ -52,12 +54,20 @@ class AgenticBlockExecutorTest {
     @Mock
     private SystemIdentityService systemIdentity;
 
+    @Mock
+    private AiProviderRegistry aiProviderRegistry;
+
     private AgenticBlockExecutor executor;
 
     @BeforeEach
     void setUp() {
         lenient().when(systemIdentity.getVersionedName()).thenReturn("MySuricates v0.2.3");
-        executor = new AgenticBlockExecutor(hostClaude, commandExecutor, learningService, messagingTemplate, runRepository, systemIdentity);
+
+        // Wire up the registry to return a real ClaudeAiProvider backed by the mock hostClaude
+        ClaudeAiProvider claudeProvider = new ClaudeAiProvider(hostClaude);
+        lenient().when(aiProviderRegistry.resolve(any())).thenReturn(claudeProvider);
+
+        executor = new AgenticBlockExecutor(hostClaude, commandExecutor, learningService, messagingTemplate, runRepository, systemIdentity, aiProviderRegistry);
 
         // Default: resolve run-1 -> workflow-1
         Workflow workflow = Workflow.builder().id("workflow-1").build();
@@ -69,8 +79,9 @@ class AgenticBlockExecutorTest {
         ExecutionContext ctx = ExecutionContext.builder()
                 .containerId("test-container")
                 .workflowRunId("run-1")
+                .projectPath("/test/project")
+                .variables(new HashMap<>())
                 .build();
-        ctx.setProjectPath("/test/project");
         return ctx;
     }
 
@@ -123,8 +134,8 @@ class AgenticBlockExecutorTest {
         assertThat(metadata.get("goalAchieved")).isEqualTo(true);
         assertThat(metadata.get("totalIterations")).isEqualTo(1);
 
-        // Should not have called container execution
-        verify(commandExecutor, never()).executeCommandOnHost(anyString(), anyString(), any(), any(), any());
+        // Should not have called action execution
+        verify(hostClaude, never()).executeAction(anyString(), any(), any(), any(), any());
     }
 
     @Test
@@ -135,8 +146,8 @@ class AgenticBlockExecutorTest {
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Need to create file\nACTION: Create test.txt\nSUMMARY: Creating file"))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: File created\nACTION:\nSUMMARY: Done"));
 
-        when(commandExecutor.executeCommandOnHost("/test/project", "Create test.txt", null, null, null))
-                .thenReturn(new CliSession.EnrichedCommandResult("File created", 0, null));
+        when(hostClaude.executeAction(eq("Create test.txt"), isNull(), isNull(), eq("/test/project"), isNull()))
+                .thenReturn(new HostClaudeService.ActionResult("File created", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -155,8 +166,8 @@ class AgenticBlockExecutorTest {
         when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull())).thenReturn(
                 rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Still working\nACTION: Try again\nSUMMARY: Retrying"));
 
-        when(commandExecutor.executeCommandOnHost("/test/project", "Try again", null, null, null))
-                .thenReturn(new CliSession.EnrichedCommandResult("Still failing", 1, null));
+        when(hostClaude.executeAction(eq("Try again"), isNull(), isNull(), eq("/test/project"), isNull()))
+                .thenReturn(new HostClaudeService.ActionResult("Still failing", 1, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -183,8 +194,8 @@ class AgenticBlockExecutorTest {
     void execute_cancellationStopsLoop() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
 
-        when(commandExecutor.executeCommandOnHost("/test/project", "Do something", null, null, null))
-                .thenReturn(new CliSession.EnrichedCommandResult("partial", 0, null));
+        when(hostClaude.executeAction(eq("Do something"), isNull(), isNull(), eq("/test/project"), isNull()))
+                .thenReturn(new HostClaudeService.ActionResult("partial", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -223,10 +234,10 @@ class AgenticBlockExecutorTest {
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Try different approach\nACTION: Fix and run\nSUMMARY: Fixing"))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Fixed\nACTION:\nSUMMARY: All good"));
 
-        when(commandExecutor.executeCommandOnHost("/test/project", "Run tests", null, null, null))
-                .thenReturn(new CliSession.EnrichedCommandResult("Tests failed: 3 errors", 1, null));
-        when(commandExecutor.executeCommandOnHost("/test/project", "Fix and run", null, null, null))
-                .thenReturn(new CliSession.EnrichedCommandResult("All tests pass", 0, null));
+        when(hostClaude.executeAction(eq("Run tests"), isNull(), isNull(), eq("/test/project"), isNull()))
+                .thenReturn(new HostClaudeService.ActionResult("Tests failed: 3 errors", 1, null));
+        when(hostClaude.executeAction(eq("Fix and run"), isNull(), isNull(), eq("/test/project"), isNull()))
+                .thenReturn(new HostClaudeService.ActionResult("All tests pass", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -340,8 +351,8 @@ class AgenticBlockExecutorTest {
                 .thenReturn(new ReasoningResult(
                         "GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Do work\nSUMMARY: Step", parsedWithUsage));
 
-        when(commandExecutor.executeCommandOnHost("/test/project", "Do work", null, null, null))
-                .thenReturn(new CliSession.EnrichedCommandResult("Done", 0, parsedWithUsage));
+        when(hostClaude.executeAction(eq("Do work"), isNull(), isNull(), eq("/test/project"), isNull()))
+                .thenReturn(new HostClaudeService.ActionResult("Done", 0, parsedWithUsage));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -374,9 +385,9 @@ class AgenticBlockExecutorTest {
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: More work\nACTION: Step C\nSUMMARY: Doing C"))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Keep going\nACTION: Step D\nSUMMARY: Doing D"));
 
-        // EnrichedCommandResult with null parsed → no usage data
-        when(commandExecutor.executeCommandOnHost(eq("/test/project"), anyString(), isNull(), isNull(), isNull()))
-                .thenReturn(new CliSession.EnrichedCommandResult("output", 0, null));
+        // ActionResult with null parsed → no usage data
+        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), isNull()))
+                .thenReturn(new HostClaudeService.ActionResult("output", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -417,12 +428,12 @@ class AgenticBlockExecutorTest {
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Third\nACTION: Step 3\nSUMMARY: S3"))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
 
-        when(commandExecutor.executeCommandOnHost(eq("/test/project"), eq("Step 1"), isNull(), isNull(), isNull()))
-                .thenReturn(new CliSession.EnrichedCommandResult("out1", 0, null));
-        when(commandExecutor.executeCommandOnHost(eq("/test/project"), eq("Step 2"), isNull(), isNull(), isNull()))
-                .thenReturn(new CliSession.EnrichedCommandResult("out2", 0, parsedWithUsage));
-        when(commandExecutor.executeCommandOnHost(eq("/test/project"), eq("Step 3"), isNull(), isNull(), isNull()))
-                .thenReturn(new CliSession.EnrichedCommandResult("out3", 0, null));
+        when(hostClaude.executeAction(eq("Step 1"), isNull(), isNull(), eq("/test/project"), isNull()))
+                .thenReturn(new HostClaudeService.ActionResult("out1", 0, null));
+        when(hostClaude.executeAction(eq("Step 2"), isNull(), isNull(), eq("/test/project"), isNull()))
+                .thenReturn(new HostClaudeService.ActionResult("out2", 0, parsedWithUsage));
+        when(hostClaude.executeAction(eq("Step 3"), isNull(), isNull(), eq("/test/project"), isNull()))
+                .thenReturn(new HostClaudeService.ActionResult("out3", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 

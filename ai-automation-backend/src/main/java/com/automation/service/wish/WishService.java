@@ -6,10 +6,13 @@ import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.dto.request.WishRespondRequest;
 import com.automation.entity.*;
 import com.automation.repository.*;
+import com.automation.service.ai.AiProvider;
+import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.ai.HostClaudeService;
 import com.automation.service.chain.ChainExecutor;
 import com.automation.service.chain.ChainService;
 import com.automation.dto.response.PoolWorkflowEntry;
+import com.automation.config.WishConfig;
 import com.automation.service.factory.WorkflowFactoryService;
 import com.automation.service.learning.LearningService;
 import com.automation.service.pool.WorkflowPoolService;
@@ -40,12 +43,12 @@ import static com.automation.config.ExecutionDefaults.POLLING_INTERVAL_MS;
 @Slf4j
 public class WishService {
 
-    private static final int TOTAL_TIMEOUT_MINUTES = 120;
-    private static final int WORKFLOW_WAIT_MINUTES = 30;
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    private final WishConfig wishConfig;
     private final WishRepository wishRepository;
     private final HostClaudeService hostClaude;
+    private final AiProviderRegistry aiProviderRegistry;
     private final WorkflowService workflowService;
     private final ChainService chainService;
     private final ChainExecutor chainExecutor;
@@ -83,8 +86,10 @@ public class WishService {
     private static final Pattern WORD_SPLIT = Pattern.compile("[\\s,;:.!?()\\[\\]{}\"/]+");
 
     public WishService(
+            WishConfig wishConfig,
             WishRepository wishRepository,
             HostClaudeService hostClaude,
+            AiProviderRegistry aiProviderRegistry,
             WorkflowService workflowService,
             ChainService chainService,
             ChainExecutor chainExecutor,
@@ -105,8 +110,10 @@ public class WishService {
             SimpMessagingTemplate messagingTemplate,
             ExecutorService virtualThreadExecutor
     ) {
+        this.wishConfig = wishConfig;
         this.wishRepository = wishRepository;
         this.hostClaude = hostClaude;
+        this.aiProviderRegistry = aiProviderRegistry;
         this.workflowService = workflowService;
         this.chainService = chainService;
         this.chainExecutor = chainExecutor;
@@ -311,7 +318,7 @@ public class WishService {
     // ── Meta-Loop ────────────────────────────────────────────────
 
     private void fulfillWish(String wishId) {
-        Instant deadline = Instant.now().plus(Duration.ofMinutes(TOTAL_TIMEOUT_MINUTES));
+        Instant deadline = Instant.now().plus(Duration.ofMinutes(wishConfig.getTotalTimeoutMinutes()));
 
         try {
             while (true) {
@@ -325,7 +332,7 @@ public class WishService {
                 if (Instant.now().isAfter(deadline)) {
                     Wish w = findById(wishId);
                     w.setStatus(WishStatus.FAILED);
-                    w.setError("Total timeout exceeded (" + TOTAL_TIMEOUT_MINUTES + " minutes)");
+                    w.setError("Total timeout exceeded (" + wishConfig.getTotalTimeoutMinutes() + " minutes)");
                     wishRepository.save(w);
                     broadcastStatus(wishId, w);
                     return;
@@ -392,8 +399,9 @@ public class WishService {
                     .orElse(null);
         }
 
-        HostClaudeService.ReasoningResult result = hostClaude.reasonStructured(
-                prompt, systemPrompt, workingDir, 3);
+        AiProvider defaultProvider = aiProviderRegistry.getDefault();
+        AiProvider.ReasoningResult result = defaultProvider.reason(
+                new AiProvider.ReasoningRequest(prompt, systemPrompt, workingDir, 3, null));
 
         Map<String, Object> parsed;
         try {
@@ -403,8 +411,8 @@ public class WishService {
             log.warn("Wish {}: Decompose JSON parse failed, retrying with shorter prompt", wish.getId());
             String retryPrompt = prompt + "\n\nIMPORTANT: Keep your JSON response SHORT. "
                     + "Max 3 workflows, max 5 blocks per workflow. Respond ONLY with valid JSON, no markdown.";
-            HostClaudeService.ReasoningResult retryResult = hostClaude.reasonStructured(
-                    retryPrompt, systemPrompt, workingDir, 3);
+            AiProvider.ReasoningResult retryResult = defaultProvider.reason(
+                    new AiProvider.ReasoningRequest(retryPrompt, systemPrompt, workingDir, 3, null));
             parsed = parseJsonSafely(retryResult.text(), "decompose-retry");
         }
 
@@ -451,6 +459,7 @@ public class WishService {
                         null,
                         blocks,
                         List.of(),
+                        null,
                         null,
                         null,
                         null,
@@ -581,7 +590,8 @@ public class WishService {
         log.info("Wish {}: Evaluating results", wish.getId());
 
         String prompt = buildEvaluatePrompt(wish);
-        HostClaudeService.ReasoningResult result = hostClaude.reasonStructured(prompt, null);
+        AiProvider defaultProvider = aiProviderRegistry.getDefault();
+        AiProvider.ReasoningResult result = defaultProvider.reason(new AiProvider.ReasoningRequest(prompt));
 
         Map<String, Object> evaluation;
         try {
@@ -589,13 +599,32 @@ public class WishService {
         } catch (IllegalStateException e) {
             log.warn("Wish {}: Evaluate JSON parse failed, retrying with shorter prompt", wish.getId());
             String retryPrompt = prompt + "\n\nIMPORTANT: Keep response under 500 tokens. Respond ONLY with valid JSON, no markdown.";
-            HostClaudeService.ReasoningResult retryResult = hostClaude.reasonStructured(retryPrompt, null);
+            AiProvider.ReasoningResult retryResult = defaultProvider.reason(new AiProvider.ReasoningRequest(retryPrompt));
             evaluation = parseJsonSafely(retryResult.text(), "evaluate-retry");
         }
 
-        Boolean satisfied = (Boolean) evaluation.getOrDefault("satisfied", false);
-        String summary = (String) evaluation.getOrDefault("summary", "");
-        Boolean shouldRetry = (Boolean) evaluation.getOrDefault("shouldRetry", false);
+        Object satisfiedRaw = evaluation.get("satisfied");
+        boolean satisfied = Boolean.TRUE.equals(satisfiedRaw);
+        boolean shouldRetry = Boolean.TRUE.equals(evaluation.get("shouldRetry"));
+        String summary = evaluation.get("summary") instanceof String s ? s : "";
+        List<?> issues = evaluation.get("issues") instanceof List<?> l ? l : List.of();
+
+        // Empty evaluation detection (all fields null/empty = CLI returned no useful response)
+        if (satisfiedRaw == null && summary.isBlank() && issues.isEmpty()) {
+            log.warn("Wish {}: Empty evaluation response — evaluation call likely failed. Treating as retry.", wish.getId());
+            shouldRetry = true;
+            summary = "Evaluation returned empty response (CLI failure). Automatic retry.";
+            evaluation.put("_emptyEvaluation", true);
+            evaluation.put("summary", summary);
+            evaluation.put("shouldRetry", true);
+        }
+        // Ambiguous evaluation: satisfied=null but good summary with no issues → treat as satisfied
+        else if (satisfiedRaw == null && issues.isEmpty() && !summary.isBlank()) {
+            log.warn("Wish {}: satisfied=null with no issues — treating as satisfied", wish.getId());
+            satisfied = true;
+            evaluation.put("satisfied", true);
+            evaluation.put("_inferredSatisfied", true);
+        }
 
         // Store evaluation in metadata
         Map<String, Object> meta = new HashMap<>(wish.getMetadata());
@@ -613,21 +642,20 @@ public class WishService {
         // Add evaluation to current iteration history entry
         updateCurrentIterationEntry(wish, "evaluation", new HashMap<>(evaluation));
 
-        if (Boolean.TRUE.equals(satisfied)) {
+        if (satisfied) {
             meta.put("pendingEvaluation", evaluation);
             wish.setMetadata(meta);
             wish.setResultSummary(summary);
             updateStatus(wish, WishStatus.AWAITING_APPROVAL);
             log.info("Wish {}: Awaiting user approval — {}", wish.getId(), truncate(summary, 100));
             return;
-        } else if (Boolean.TRUE.equals(shouldRetry) && wish.getIterationCount() < wish.getMaxIterations()) {
+        } else if (shouldRetry && wish.getIterationCount() < wish.getMaxIterations()) {
             wish.setStatus(WishStatus.REFINING);
             wish.setResultSummary(summary);
             log.info("Wish {}: Refining (iteration {}/{})", wish.getId(), wish.getIterationCount(), wish.getMaxIterations());
         } else {
             wish.setStatus(WishStatus.FAILED);
             wish.setResultSummary(summary);
-            Object issues = evaluation.getOrDefault("issues", List.of());
             wish.setError("Not satisfied after " + wish.getIterationCount() + " iterations. Issues: " + issues);
             log.info("Wish {}: Failed — {}", wish.getId(), truncate(summary, 100));
         }
@@ -1048,13 +1076,7 @@ public class WishService {
                 ## Available Block Types
 
                 - **simple**: Runs a single Claude CLI prompt. Config: `{"command": "prompt text"}`. Use for tasks that need AI reasoning.
-                - **shell**: Runs a shell command. Config: `{"command": "shell command", "container_image": "image:tag"}`. Use for deterministic tasks (file ops, git, API calls, etc.).
-                  **IMPORTANT**: Without `container_image`, the command runs in a MINIMAL environment with ONLY these tools: curl, git, python3, jq, nodejs, npm, wget, unzip. NO pip packages, NO go, NO docker-cli, NO gh, NO specialized tools.
-                  If the command needs ANY tool beyond that list, you MUST set `container_image`. Available container images:
-                  - `automation-agent-python:latest` — Python 3.12 with pandas, numpy, requests, beautifulsoup4, pip
-                  - `automation-agent-devops:latest` — Ubuntu with git, curl, jq, python3, docker-cli, gh, trivy
-                  - `automation-agent-node:latest` — Node.js 21 with npm (full ecosystem)
-                  - `automation-agent-go:latest` — Go 1.22
+                - **shell**: Runs a shell command. Config: `{"command": "shell command", "container_image": "image:tag"}`. Use for deterministic tasks (file ops, git, API calls, etc.). See "Ausfuehrungsumgebung" section above for available host tools and container images.
                 - **agentic**: Multi-turn AI loop with goal. Config: `{"goal": "description", "max_iterations": 10}`. Use for complex tasks requiring exploration and multi-step work.
                 - **conditional**: Branching logic. Config: `{"condition": "expression", "then_blocks": [...], "else_blocks": [...]}`.
                 - **forEach**: Iterates over items. Config: `{"items": "expression", "variable": "item", "blocks": [...]}`.
@@ -1064,7 +1086,7 @@ public class WishService {
                 ## Design Principles
 
                 1. Prefer **shell** blocks for deterministic tasks (faster, reproducible)
-                2. Shell blocks WITHOUT `container_image` can ONLY use: curl, git, python3, jq, nodejs, npm, wget, unzip. For anything else, set `container_image`.
+                2. Follow the "Ausfuehrungsumgebung" rules for `container_image` — set it when shell blocks need tools beyond the host environment.
                 3. Use **simple** blocks for single AI reasoning steps
                 4. Use **agentic** blocks only when the task requires multi-step exploration
                 5. Agentic block prompts (goal) must be self-contained — include absolute paths, specific names, and exact instructions
@@ -1076,6 +1098,13 @@ public class WishService {
                 11. Reference existing workflows via sub-workflow blocks instead of duplicating logic — check "Reusable Components" for workflows from ALL projects, not just the current one
                 12. Workflows from other projects can be reused as sub-workflows — use their ID in the `workflow_id` config field
                 13. User-selected "Referenced Workflows" should be prioritized for reuse when they match the task
+
+                ## Timeout Guidelines
+
+                Timeouts are applied automatically, but you can override them in block config:
+                - **shell** blocks: `timeout_seconds` (default: 600). Increase to 900+ for long builds or large downloads.
+                - **simple** blocks: `timeout_seconds` (default: 600). Usually sufficient.
+                - **agentic** blocks: `timeout_seconds` (default: 900 per CLI call), `iteration_timeout_seconds` (default: 900 per iteration), `total_timeout_seconds` (default: 3600 overall). For complex tasks with Opus model, use 900/900/3600. IMPORTANT: `iteration_timeout_seconds` must be >= `timeout_seconds`.
 
                 ## Output Format
 
@@ -1117,9 +1146,26 @@ public class WishService {
         sb.append("## Original Wish\n\n");
         sb.append(wish.getOriginalText()).append("\n\n");
 
+        // Include decomposition summary (truncate if very large)
         sb.append("## Generated Workflow Structure\n\n");
         if (wish.getDecomposition() != null) {
-            sb.append(MAPPER.valueToTree(wish.getDecomposition()).toPrettyString()).append("\n\n");
+            String decompositionJson = MAPPER.valueToTree(wish.getDecomposition()).toPrettyString();
+            if (decompositionJson.length() > 3000) {
+                // Only include analysis + strategy + workflow names for large decompositions
+                sb.append("Analysis: ").append(wish.getDecomposition().getOrDefault("analysis", "")).append("\n");
+                sb.append("Strategy: ").append(wish.getDecomposition().getOrDefault("strategy", "")).append("\n");
+                Object wfs = wish.getDecomposition().get("workflows");
+                if (wfs instanceof List<?> wfList) {
+                    for (Object wfObj : wfList) {
+                        if (wfObj instanceof Map<?, ?> wfMap) {
+                            sb.append("- Workflow: ").append(wfMap.get("name")).append("\n");
+                        }
+                    }
+                }
+                sb.append("\n");
+            } else {
+                sb.append(decompositionJson).append("\n\n");
+            }
         }
 
         sb.append("## Execution Results\n\n");
@@ -1179,8 +1225,11 @@ public class WishService {
             sb.append("\n");
         }
 
-        sb.append("\n## Task\n\n");
-        sb.append("""
+        // Cap total prompt size to prevent empty/truncated Claude responses
+        String task = """
+
+                ## Task
+
                 Evaluate whether the wish has been fulfilled.
 
                 CRITICAL: Your ENTIRE response must be a single JSON object. No text before or after. No markdown fences. No explanations. Just the raw JSON object starting with { and ending with }.
@@ -1192,23 +1241,47 @@ public class WishService {
                   "suggestions": ["Improvement 1", "Improvement 2"],
                   "shouldRetry": true/false
                 }
-                """);
+                """;
+
+        int maxContextLength = 15000;
+        if (sb.length() > maxContextLength) {
+            log.info("Wish evaluation prompt truncated from {} to {} chars", sb.length(), maxContextLength);
+            sb.setLength(maxContextLength);
+            sb.append("\n\n[... context truncated for prompt size ...]\n");
+        }
+        sb.append(task);
 
         return sb.toString();
     }
 
     private void appendWorkflowRunOutput(StringBuilder sb, String runId) {
         workflowRunRepository.findById(runId).ifPresent(run -> {
-            sb.append("  Status: ").append(run.getStatus()).append("\n");
+            sb.append("  **Run Status: ").append(run.getStatus()).append("**\n");
+            if (run.getError() != null && !run.getError().isEmpty()) {
+                sb.append("  Error: ").append(truncate(run.getError().toString(), 200)).append("\n");
+            }
             List<StepResult> steps = stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc(runId);
-            for (StepResult step : steps) {
+            int maxDetailedSteps = 8;
+            int startIdx = Math.max(0, steps.size() - maxDetailedSteps);
+
+            // Summarize older steps if there are too many
+            if (startIdx > 0) {
+                long succeeded = steps.subList(0, startIdx).stream()
+                        .filter(s -> "COMPLETED".equals(String.valueOf(s.getStatus())))
+                        .count();
+                sb.append("  [Steps 0-").append(startIdx - 1).append(": ")
+                        .append(succeeded).append("/").append(startIdx).append(" succeeded]\n");
+            }
+
+            for (int i = startIdx; i < steps.size(); i++) {
+                StepResult step = steps.get(i);
                 String blockType = step.getMetadata() != null
                         ? (String) step.getMetadata().getOrDefault("blockType", "unknown")
                         : "unknown";
                 sb.append("  Step ").append(step.getStepIndex()).append(" (").append(blockType).append("): ");
                 sb.append(step.getStatus()).append("\n");
                 if (step.getOutput() != null) {
-                    sb.append("    Output: ").append(truncate(step.getOutput(), 500)).append("\n");
+                    sb.append("    Output: ").append(truncate(step.getOutput(), 300)).append("\n");
                 }
             }
         });
@@ -1228,13 +1301,30 @@ public class WishService {
             Map<String, Object> config = blockMap.get("config") instanceof Map<?, ?> c
                     ? new LinkedHashMap<>((Map<String, Object>) c)
                     : new LinkedHashMap<>();
+
+            // Apply default timeouts from WishConfig if not set by the LLM
+            applyDefaultTimeouts(type, config);
+
             blocks.add(BlockDefinition.builder().type(type).config(config).build());
         }
         return blocks;
     }
 
+    private void applyDefaultTimeouts(String type, Map<String, Object> config) {
+        switch (type) {
+            case "shell" -> config.putIfAbsent("timeout_seconds", wishConfig.getDefaultShellTimeoutSeconds());
+            case "agentic" -> {
+                config.putIfAbsent("timeout_seconds", wishConfig.getDefaultAgenticTimeoutSeconds());
+                config.putIfAbsent("iteration_timeout_seconds", wishConfig.getDefaultAgenticIterationTimeoutSeconds());
+                config.putIfAbsent("total_timeout_seconds", wishConfig.getDefaultAgenticTotalTimeoutSeconds());
+            }
+            case "simple" -> config.putIfAbsent("timeout_seconds", wishConfig.getDefaultShellTimeoutSeconds());
+            default -> { /* no defaults for conditional, forEach, etc. */ }
+        }
+    }
+
     private void waitForWorkflowCompletion(String runId, String wishId) {
-        Instant deadline = Instant.now().plus(Duration.ofMinutes(WORKFLOW_WAIT_MINUTES));
+        Instant deadline = Instant.now().plus(Duration.ofMinutes(wishConfig.getWorkflowWaitMinutes()));
         while (Instant.now().isBefore(deadline)) {
             if (isCancelled(wishId)) return;
             WorkflowRun run = workflowRunRepository.findById(runId).orElseThrow();
@@ -1247,7 +1337,7 @@ public class WishService {
     }
 
     private void waitForChainCompletion(String runId, String wishId) {
-        Instant deadline = Instant.now().plus(Duration.ofMinutes(WORKFLOW_WAIT_MINUTES));
+        Instant deadline = Instant.now().plus(Duration.ofMinutes(wishConfig.getWorkflowWaitMinutes()));
         while (Instant.now().isBefore(deadline)) {
             if (isCancelled(wishId)) return;
             ChainRun run = chainRunRepository.findById(runId).orElseThrow();
@@ -1291,7 +1381,7 @@ public class WishService {
                 || status == WishStatus.AWAITING_DECOMPOSE_APPROVAL;
     }
 
-    private void broadcastStatus(String wishId, Wish wish) {
+    void broadcastStatus(String wishId, Wish wish) {
         try {
             Map<String, Object> payload = Map.of(
                     "wishId", wishId,

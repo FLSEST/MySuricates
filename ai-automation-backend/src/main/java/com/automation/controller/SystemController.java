@@ -2,6 +2,7 @@ package com.automation.controller;
 
 import com.automation.dto.response.RemoteAccessResponse;
 import com.automation.repository.AppSettingsRepository;
+import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.repair.AutoRepairService;
 import com.automation.service.system.DatabaseBackupService;
 import com.automation.service.system.SystemIdentityService;
@@ -41,6 +42,7 @@ public class SystemController {
     private final AutoRepairService autoRepairService;
     private final DataSource dataSource;
     private final SystemIdentityService systemIdentity;
+    private final AiProviderRegistry aiProviderRegistry;
 
     @Value("${automation.security.enabled:true}")
     private boolean securityEnabled;
@@ -125,6 +127,14 @@ public class SystemController {
         return result;
     }
 
+    @GetMapping("/ai-providers")
+    public Map<String, Object> aiProviders() {
+        return Map.of(
+                "providers", aiProviderRegistry.getAvailableProviderIds(),
+                "default", aiProviderRegistry.getDefaultProviderId()
+        );
+    }
+
     @PostMapping("/repair-failed")
     public ResponseEntity<Map<String, Object>> repairAllFailed(
             @RequestParam(defaultValue = "false") boolean force) {
@@ -193,7 +203,7 @@ public class SystemController {
                 .body(resource);
     }
 
-    private static final Set<String> ALLOWED_SETTINGS = Set.of("auto-todo-default", "auto-repair-default");
+    private static final Set<String> ALLOWED_SETTINGS = Set.of("auto-todo-default", "auto-repair-default", "default-ai-provider");
 
     @GetMapping("/settings/{key}")
     public ResponseEntity<Map<String, String>> getSetting(@PathVariable String key) {

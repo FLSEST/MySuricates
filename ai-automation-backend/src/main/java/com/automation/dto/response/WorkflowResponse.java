@@ -22,6 +22,7 @@ public record WorkflowResponse(
         long runCount,
         String instructions,
         String model,
+        String provider,
         String templateId,
         Map<String, Object> defaultContext,
         String testStatus,

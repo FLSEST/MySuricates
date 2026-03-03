@@ -186,6 +186,7 @@ public class WorkflowController {
                         request.instructions(),
                         request.model(),
                         null,
+                        null,
                         null
                 );
                 var updated = workflowService.update(existing.get().getId(), updateRequest);
@@ -202,6 +203,7 @@ public class WorkflowController {
                 List.of(),
                 request.instructions(),
                 request.model(),
+                null,
                 null,
                 null,
                 null

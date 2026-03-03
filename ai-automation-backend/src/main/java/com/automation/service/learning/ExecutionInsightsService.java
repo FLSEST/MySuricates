@@ -95,6 +95,7 @@ public class ExecutionInsightsService {
                 si.put("inputTokens", inTok);
                 si.put("outputTokens", outTok);
                 si.put("model", step.getMetadata().get("model"));
+                si.put("provider", step.getMetadata().get("provider"));
                 si.put("numTurns", step.getMetadata().get("numTurns"));
                 si.put("toolNames", step.getMetadata().get("toolNames"));
                 si.put("toolUseCount", step.getMetadata().get("toolUseCount"));

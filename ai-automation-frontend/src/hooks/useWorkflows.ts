@@ -21,6 +21,7 @@ interface WorkflowApiResponse {
   runCount: number;
   instructions: string | null;
   model: string | null;
+  provider: string | null;
   templateId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -37,6 +38,7 @@ function mapWorkflow(raw: WorkflowApiResponse): Workflow {
     runCount: raw.runCount ?? 0,
     instructions: raw.instructions ?? null,
     model: raw.model ?? null,
+    provider: raw.provider ?? null,
     metadata: raw.metadata ?? {},
   };
 }

@@ -49,6 +49,13 @@ export function useBackupList() {
   });
 }
 
+export function useAiProviders() {
+  return useQuery({
+    queryKey: ['system', 'ai-providers'],
+    queryFn: () => api.get<{ providers: string[]; default: string }>('/system/ai-providers'),
+  });
+}
+
 export function useUpdateSystemSetting() {
   return useMutation({
     mutationFn: ({ key, value }: { key: string; value: string }) =>

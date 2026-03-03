@@ -69,6 +69,8 @@ automation:
       requests-per-minute: ${AUTOMATION_RATE_LIMIT_RPM:120}
   tailscale:
     enabled: ${AUTOMATION_TAILSCALE_ENABLED:false}
+  ai:
+    default-provider: ${AUTOMATION_AI_DEFAULT_PROVIDER:CLAUDE}
   host-claude:
     timeout-seconds: ${AUTOMATION_HOST_CLAUDE_TIMEOUT:300}
     inter-call-delay-ms: ${AUTOMATION_HOST_CLAUDE_INTER_CALL_DELAY_MS:0}
@@ -102,6 +104,16 @@ automation:
   pool:
     directory: ${AUTOMATION_POOL_DIR:workflow-pool}
     enabled: ${AUTOMATION_POOL_ENABLED:true}
+  wish:
+    total-timeout-minutes: ${AUTOMATION_WISH_TOTAL_TIMEOUT:120}
+    workflow-wait-minutes: ${AUTOMATION_WISH_WORKFLOW_WAIT:30}
+    watchdog-enabled: ${AUTOMATION_WISH_WATCHDOG_ENABLED:true}
+    watchdog-interval-ms: ${AUTOMATION_WISH_WATCHDOG_INTERVAL:120000}
+    watchdog-stale-minutes: ${AUTOMATION_WISH_WATCHDOG_STALE:45}
+    default-shell-timeout-seconds: ${AUTOMATION_WISH_SHELL_TIMEOUT:600}
+    default-agentic-timeout-seconds: ${AUTOMATION_WISH_AGENTIC_TIMEOUT:900}
+    default-agentic-iteration-timeout-seconds: ${AUTOMATION_WISH_AGENTIC_ITER_TIMEOUT:900}
+    default-agentic-total-timeout-seconds: ${AUTOMATION_WISH_AGENTIC_TOTAL_TIMEOUT:3600}
   tray:
     enabled: ${AUTOMATION_TRAY_ENABLED:true}
     poll-interval-ms: ${AUTOMATION_TRAY_POLL_MS:15000}

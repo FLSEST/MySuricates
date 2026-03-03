@@ -1,7 +1,7 @@
 package com.automation.executor.blocks;
 
-import com.automation.service.ai.HostClaudeService.ReasoningResult;
-import com.automation.service.cli.CliSession;
+import com.automation.service.ai.AiResponseMetadata;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.*;
@@ -19,12 +19,19 @@ public class AgenticTokenTracker {
     private final List<Map<String, Object>> iterationLog = new ArrayList<>();
 
     /**
-     * Captures token/cost metadata from the REASON phase into the iteration data map.
+     * When true, blind-iteration abort is disabled (e.g. for Codex where tokens are always estimated).
      */
-    public void captureReasonMeta(Map<String, Object> iterData, ReasoningResult reasonResult,
+    @Setter
+    private boolean expectEstimatedTokens;
+
+    /**
+     * Captures token/cost metadata from the REASON phase into the iteration data map.
+     * Accepts normalized {@link AiResponseMetadata} from any provider.
+     */
+    public void captureReasonMeta(Map<String, Object> iterData, AiResponseMetadata metadata,
                                    String promptText, String responseText, int iteration) {
-        if (reasonResult.parsed() != null && reasonResult.parsed().usage() != null) {
-            iterData.put("reasonMeta", reasonResult.parsed().toMetadata());
+        if (metadata != null && !metadata.estimated()) {
+            iterData.put("reasonMeta", metadata.toMap());
         } else {
             int estimatedInput = promptText.length() / 4;
             int estimatedOutput = responseText.length() / 4;
@@ -32,18 +39,21 @@ public class AgenticTokenTracker {
                     "inputTokens", estimatedInput,
                     "outputTokens", estimatedOutput,
                     "estimated", true));
-            log.warn("Agentic iteration {}: REASON phase returned no usage data — using fallback estimation ({} in, {} out)",
-                    iteration, estimatedInput, estimatedOutput);
+            if (!expectEstimatedTokens) {
+                log.warn("Agentic iteration {}: REASON phase returned no usage data — using fallback estimation ({} in, {} out)",
+                        iteration, estimatedInput, estimatedOutput);
+            }
         }
     }
 
     /**
      * Captures token/cost metadata from the ACT phase into the iteration data map.
+     * Accepts normalized {@link AiResponseMetadata} from any provider.
      */
-    public void captureActMeta(Map<String, Object> iterData, CliSession.EnrichedCommandResult cmdResult,
+    public void captureActMeta(Map<String, Object> iterData, AiResponseMetadata metadata,
                                 String actionText, String outputText, int iteration) {
-        if (cmdResult.parsed() != null && cmdResult.parsed().usage() != null) {
-            iterData.put("actMeta", cmdResult.parsed().toMetadata());
+        if (metadata != null && !metadata.estimated()) {
+            iterData.put("actMeta", metadata.toMap());
         } else {
             int estimatedInput = actionText.length() / 4;
             int estimatedOutput = outputText.length() / 4;
@@ -51,8 +61,10 @@ public class AgenticTokenTracker {
                     "inputTokens", estimatedInput,
                     "outputTokens", estimatedOutput,
                     "estimated", true));
-            log.warn("Agentic iteration {}: ACT phase returned no usage data — using fallback estimation ({} in, {} out)",
-                    iteration, estimatedInput, estimatedOutput);
+            if (!expectEstimatedTokens) {
+                log.warn("Agentic iteration {}: ACT phase returned no usage data — using fallback estimation ({} in, {} out)",
+                        iteration, estimatedInput, estimatedOutput);
+            }
         }
     }
 
@@ -90,10 +102,11 @@ public class AgenticTokenTracker {
 
     /**
      * Checks if too many consecutive iterations lacked real usage data.
+     * Disabled when {@code expectEstimatedTokens} is true (e.g. Codex provider).
      * @return stop reason string if tracking failed, null otherwise
      */
     public String checkBlindIterations() {
-        if (consecutiveBlindIterations >= 3) {
+        if (!expectEstimatedTokens && consecutiveBlindIterations >= 3) {
             return "TOKEN_TRACKING_FAILED";
         }
         return null;
@@ -104,7 +117,7 @@ public class AgenticTokenTracker {
      */
     public Map<String, Object> buildFinalMetadata(String goal, String successCriteria,
                                                     int totalIterations, boolean goalAchieved,
-                                                    String stopReason) {
+                                                    String stopReason, String model, String provider) {
         int totalInputTokens = 0;
         int totalOutputTokens = 0;
         double totalCostUsd = 0.0;
@@ -126,6 +139,8 @@ public class AgenticTokenTracker {
         metadata.put("successCriteria", successCriteria);
         metadata.put("totalIterations", totalIterations);
         metadata.put("goalAchieved", goalAchieved);
+        if (model != null) metadata.put("model", model);
+        if (provider != null) metadata.put("provider", provider);
         metadata.put("inputTokens", totalInputTokens);
         metadata.put("outputTokens", totalOutputTokens);
         metadata.put("costUsd", totalCostUsd);

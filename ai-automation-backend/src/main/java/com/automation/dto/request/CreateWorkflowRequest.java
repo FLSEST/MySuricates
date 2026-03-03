@@ -15,6 +15,7 @@ public record CreateWorkflowRequest(
         List<String> activatedSkillIds,
         String instructions,
         String model,
+        String provider,
         String templateId,
         Map<String, Object> metadata,
         Map<String, Object> defaultContext

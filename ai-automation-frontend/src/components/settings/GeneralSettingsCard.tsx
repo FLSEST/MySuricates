@@ -1,15 +1,24 @@
+import { useEffect } from 'react';
 import { Card, CardHeader, Toggle, Select } from '../ui';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useI18nStore, type Locale } from '../../i18n';
 import { useT } from '../../i18n';
 import { useUpdateSystemSetting } from '../../hooks/useSystem';
-import { Globe } from 'lucide-react';
+import { useAiProviders } from '../../hooks/useSystem';
+import { Globe, Bot } from 'lucide-react';
 
 export function GeneralSettingsCard() {
   const t = useT();
-  const { advancedMode, setAdvancedMode, autoTodoDefault, setAutoTodoDefault, autoRepairDefault, setAutoRepairDefault } = useSettingsStore();
+  const { advancedMode, setAdvancedMode, autoTodoDefault, setAutoTodoDefault, autoRepairDefault, setAutoRepairDefault, defaultAiProvider, setDefaultAiProvider } = useSettingsStore();
   const updateSetting = useUpdateSystemSetting();
   const { locale, setLocale } = useI18nStore();
+  const { data: aiProviders } = useAiProviders();
+
+  useEffect(() => {
+    if (aiProviders && !defaultAiProvider) {
+      setDefaultAiProvider(aiProviders.default);
+    }
+  }, [aiProviders, defaultAiProvider, setDefaultAiProvider]);
 
   return (
     <Card>
@@ -29,6 +38,27 @@ export function GeneralSettingsCard() {
               { value: 'en', label: 'English' },
               { value: 'de', label: 'Deutsch' },
             ]}
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Bot className="w-5 h-5 text-text-secondary" />
+            <div>
+              <p className="text-sm font-medium text-text">{t.settings.defaultAiProvider}</p>
+              <p className="text-xs text-text-tertiary">{t.settings.defaultAiProviderHint}</p>
+            </div>
+          </div>
+          <Select
+            value={defaultAiProvider || aiProviders?.default || ''}
+            onChange={(e) => {
+              setDefaultAiProvider(e.target.value);
+              updateSetting.mutate({ key: 'default-ai-provider', value: e.target.value });
+            }}
+            options={(aiProviders?.providers || []).map((p: string) => ({
+              value: p,
+              label: p === 'CLAUDE' ? 'Claude CLI' : p === 'CODEX' ? 'Codex CLI' : p,
+            }))}
           />
         </div>
 

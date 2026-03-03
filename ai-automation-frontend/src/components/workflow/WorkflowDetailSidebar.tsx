@@ -15,6 +15,12 @@ const MODEL_OPTIONS = [
   { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 (fastest)' },
 ];
 
+const PROVIDER_OPTIONS = [
+  { value: '', label: '' },
+  { value: 'CLAUDE', label: 'Claude CLI' },
+  { value: 'CODEX', label: 'Codex CLI' },
+];
+
 interface WorkflowDetailSidebarProps {
   workflow: Workflow;
   runs: PageResponse<WorkflowRun> | undefined;
@@ -82,6 +88,24 @@ export function WorkflowDetailSidebar({
         <p className="text-xs text-text-tertiary mt-2 flex items-center gap-1.5">
           <Bot className="w-3.5 h-3.5" />
           {t.workflows.modelHint}
+        </p>
+      </Card>
+
+      <Card>
+        <CardHeader title={t.workflows.provider} />
+        <Select
+          value={workflow.provider || ''}
+          onChange={(e) => {
+            updateWorkflow.mutate({ id: workflow.id, data: { provider: e.target.value || undefined } });
+          }}
+          options={PROVIDER_OPTIONS.map((opt) => ({
+            value: opt.value,
+            label: opt.value === '' ? t.workflows.providerDefault : opt.label,
+          }))}
+        />
+        <p className="text-xs text-text-tertiary mt-2 flex items-center gap-1.5">
+          <Bot className="w-3.5 h-3.5" />
+          {t.workflows.providerHint}
         </p>
       </Card>
 

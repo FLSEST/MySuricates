@@ -10,6 +10,7 @@ import com.automation.entity.Workflow;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ProjectRepository;
 import com.automation.service.staging.TestingService;
+import com.automation.service.workflow.AgentInstructionsService;
 import com.automation.service.workflow.WorkflowService;
 import com.automation.service.workflow.WorkflowTemplateService;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -34,6 +35,7 @@ public class WorkflowFactoryService {
     private final WorkflowTemplateService templateService;
     private final TestingService testingService;
     private final ProjectRepository projectRepository;
+    private final AgentInstructionsService agentInstructionsService;
     private final ObjectMapper objectMapper;
 
     /**
@@ -83,7 +85,7 @@ public class WorkflowFactoryService {
 
         CreateWorkflowRequest createRequest = new CreateWorkflowRequest(
                 project.getId(), name, description, icon, blocks,
-                List.of(), instructions, null, null, metadata, defaultContext
+                List.of(), instructions, null, null, null, metadata, defaultContext
         );
 
         Workflow workflow = workflowService.create(createRequest);
@@ -314,7 +316,7 @@ public class WorkflowFactoryService {
             workflow.setBlocks(fixedBlocks);
             // Use the repository indirectly through service update
             var updateRequest = new com.automation.dto.request.UpdateWorkflowRequest(
-                    null, null, null, fixedBlocks, null, null, null, null
+                    null, null, null, fixedBlocks, null, null, null, null, null
             );
             workflowService.update(workflow.getId(), updateRequest);
             log.info("Factory: auto-fixed workflow '{}' with {} blocks", workflow.getName(), fixedBlocks.size());
@@ -322,13 +324,21 @@ public class WorkflowFactoryService {
     }
 
     private String buildSystemPrompt() {
-        return """
+        StringBuilder sb = new StringBuilder();
+
+        // Inject base agent instructions (includes execution environment info)
+        String agentBase = agentInstructionsService.buildInstructionPrefix(null);
+        if (!agentBase.isBlank()) {
+            sb.append(agentBase).append("\n\n---\n\n");
+        }
+
+        sb.append("""
                 You are a workflow architect for MySuricates, an AI-powered workflow automation platform.
                 You create workflow definitions as JSON.
 
                 Available block types:
                 - simple: AI-powered tasks (analysis, summarization, generation). Config: { "command": "..." }
-                - shell: Execute shell commands. Config: { "command": "..." }
+                - shell: Execute shell commands. Config: { "command": "...", "container_image": "image:tag" }. See "Ausfuehrungsumgebung" section for available host tools and container images.
                 - retry: Wraps a command with retry logic. Config: { "command": "...", "max_retries": 3, "delay_seconds": 5 }
                 - conditional: Branch based on condition. Config: { "condition": "...", "if_true": "...", "if_false": "..." }
                 - forEach: Loop over items. Config: { "items_expression": "...", "item_variable": "item", "command": "..." }
@@ -342,9 +352,11 @@ public class WorkflowFactoryService {
                 - Retry blocks when failures are likely (API calls, network, tests)
                 - Agentic blocks only for complex, multi-step autonomous tasks
                 - Keep workflows practical and focused (3-7 blocks typical)
+                - Follow the "Ausfuehrungsumgebung" rules for shell block container_image
 
                 Output ONLY valid JSON (no markdown fences).
-                """;
+                """);
+        return sb.toString();
     }
 
     private String buildGeneratorPrompt(WorkflowFactoryRequest request) {

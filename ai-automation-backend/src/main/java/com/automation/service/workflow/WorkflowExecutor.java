@@ -76,6 +76,7 @@ public class WorkflowExecutor {
         List<Skill> skills = List.copyOf(workflow.getActivatedSkills());
         String instructions = workflow.getInstructions();
         String model = workflow.getModel();
+        String provider = workflow.getProvider();
         Map<String, Object> workflowMeta = Map.copyOf(workflow.getMetadata());
 
         String templateId = workflow.getTemplateId();
@@ -99,14 +100,14 @@ public class WorkflowExecutor {
         activityLogService.info(LogCategory.EXECUTION,
                 "Workflow execution started: " + workflowName,
                 "WorkflowExecutor", runId, workflowId);
-        virtualThreadExecutor.submit(() -> executeBlocks(runId, workflowId, workflowName, project, blocks, skills, contextVars, instructions, model, workflowMeta, templateId));
+        virtualThreadExecutor.submit(() -> executeBlocks(runId, workflowId, workflowName, project, blocks, skills, contextVars, instructions, model, provider, workflowMeta, templateId));
 
         return run;
     }
 
     private void executeBlocks(String runId, String workflowId, String workflowName, Project project, List<BlockDefinition> blocks,
                                List<Skill> skills, Map<String, Object> inputContext,
-                               String instructions, String model, Map<String, Object> workflowMeta,
+                               String instructions, String model, String provider, Map<String, Object> workflowMeta,
                                String templateId) {
         try {
             executionSemaphore.acquire();
@@ -146,6 +147,9 @@ public class WorkflowExecutor {
             }
             if (model != null && !model.isBlank()) {
                 context.setModel(model);
+            }
+            if (provider != null && !provider.isBlank()) {
+                context.setProvider(provider);
             }
 
             activeExecutions.put(runId, context);

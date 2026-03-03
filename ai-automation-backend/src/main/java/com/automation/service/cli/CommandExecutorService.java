@@ -2,6 +2,8 @@ package com.automation.service.cli;
 
 import com.automation.entity.*;
 import com.automation.exception.WorkflowExecutionException;
+import com.automation.service.ai.AiProvider;
+import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.ai.HostClaudeService;
 import com.automation.service.ai.HostClaudeService.ActionResult;
 import com.automation.service.cli.ShellCommandService.ShellResult;
@@ -24,6 +26,7 @@ public class CommandExecutorService {
     private final CliSessionManager sessionManager;
     private final HostClaudeService hostClaudeService;
     private final ShellCommandService shellCommandService;
+    private final AiProviderRegistry aiProviderRegistry;
 
     public CliSession.CommandResult executeCommand(String containerId, String cliType, String command) {
         try {
@@ -139,6 +142,26 @@ public class CommandExecutorService {
         }
     }
 
+    /**
+     * Provider-aware host execution. Routes through AiProviderRegistry.
+     */
+    public CliSession.EnrichedCommandResult executeCommandOnHost(
+            String projectPath, String command, String model, String systemPrompt,
+            Integer timeoutSeconds, String providerId) {
+        if (providerId == null || providerId.isBlank() || "CLAUDE".equalsIgnoreCase(providerId)) {
+            return executeCommandOnHost(projectPath, command, model, systemPrompt, timeoutSeconds);
+        }
+
+        try {
+            AiProvider provider = aiProviderRegistry.resolve(providerId);
+            AiProvider.ActionResult result = provider.executeAction(
+                    new AiProvider.ActionRequest(command, model, systemPrompt, projectPath, timeoutSeconds));
+            return new CliSession.EnrichedCommandResult(result.text(), result.exitCode(), null);
+        } catch (IOException e) {
+            throw new WorkflowExecutionException("Failed to execute command on host via provider " + providerId, e);
+        }
+    }
+
     public CliSession.CommandResult executeCommandOnHost(String projectPath, String command) {
         return executeCommandOnHost(projectPath, command, null, null).toCommandResult();
     }
@@ -167,6 +190,13 @@ public class CommandExecutorService {
 
             if (result.parsed() != null) {
                 Map<String, Object> meta = new LinkedHashMap<>(result.parsed().toMetadata());
+                if (model != null && !meta.containsKey("model")) meta.put("model", model);
+                meta.put("provider", "CLAUDE");
+                step.setMetadata(meta);
+            } else {
+                Map<String, Object> meta = new LinkedHashMap<>();
+                if (model != null) meta.put("model", model);
+                meta.put("provider", "CLAUDE");
                 step.setMetadata(meta);
             }
         } catch (Exception e) {

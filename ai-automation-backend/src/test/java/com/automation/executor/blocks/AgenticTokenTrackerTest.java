@@ -1,8 +1,6 @@
 package com.automation.executor.blocks;
 
-import com.automation.service.ai.HostClaudeService.ReasoningResult;
-import com.automation.service.cli.ClaudeJsonResponse;
-import com.automation.service.cli.CliSession;
+import com.automation.service.ai.AiResponseMetadata;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -23,13 +21,10 @@ class AgenticTokenTrackerTest {
 
     @Test
     void captureReasonMeta_withRealUsage_storesActualData() {
-        ClaudeJsonResponse.Usage usage = new ClaudeJsonResponse.Usage(1000, 500);
-        ClaudeJsonResponse parsed = new ClaudeJsonResponse(
-                "result", null, 0.01, 500L, 400L, 1, usage, null, null);
-        ReasoningResult result = new ReasoningResult("response text", parsed);
+        AiResponseMetadata metadata = new AiResponseMetadata(1000, 500, 0.01, "claude-sonnet-4-6", false, null, null, null, List.of());
 
         Map<String, Object> iterData = new LinkedHashMap<>();
-        tracker.captureReasonMeta(iterData, result, "prompt", "response text", 1);
+        tracker.captureReasonMeta(iterData, metadata, "prompt", "response text", 1);
 
         assertThat(iterData).containsKey("reasonMeta");
         @SuppressWarnings("unchecked")
@@ -39,10 +34,8 @@ class AgenticTokenTrackerTest {
 
     @Test
     void captureReasonMeta_withoutUsage_storesFallback() {
-        ReasoningResult result = new ReasoningResult("response text", null);
-
         Map<String, Object> iterData = new LinkedHashMap<>();
-        tracker.captureReasonMeta(iterData, result, "a prompt of some length", "response text", 1);
+        tracker.captureReasonMeta(iterData, null, "a prompt of some length", "response text", 1);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> meta = (Map<String, Object>) iterData.get("reasonMeta");
@@ -53,13 +46,10 @@ class AgenticTokenTrackerTest {
 
     @Test
     void captureActMeta_withRealUsage_storesActualData() {
-        ClaudeJsonResponse.Usage usage = new ClaudeJsonResponse.Usage(2000, 800);
-        ClaudeJsonResponse parsed = new ClaudeJsonResponse(
-                "result", null, 0.02, 600L, 500L, 2, usage, null, null);
-        CliSession.EnrichedCommandResult cmdResult = new CliSession.EnrichedCommandResult("output", 0, parsed);
+        AiResponseMetadata metadata = new AiResponseMetadata(2000, 800, 0.02, "claude-sonnet-4-6", false, null, null, null, List.of());
 
         Map<String, Object> iterData = new LinkedHashMap<>();
-        tracker.captureActMeta(iterData, cmdResult, "action text", "output", 1);
+        tracker.captureActMeta(iterData, metadata, "action text", "output", 1);
 
         assertThat(iterData).containsKey("actMeta");
         @SuppressWarnings("unchecked")
@@ -69,10 +59,8 @@ class AgenticTokenTrackerTest {
 
     @Test
     void captureActMeta_withoutUsage_storesFallback() {
-        CliSession.EnrichedCommandResult cmdResult = new CliSession.EnrichedCommandResult("output", 0, null);
-
         Map<String, Object> iterData = new LinkedHashMap<>();
-        tracker.captureActMeta(iterData, cmdResult, "some action", "output", 1);
+        tracker.captureActMeta(iterData, null, "some action", "output", 1);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> meta = (Map<String, Object>) iterData.get("actMeta");
@@ -168,6 +156,20 @@ class AgenticTokenTrackerTest {
     }
 
     @Test
+    void checkBlindIterations_whenExpectEstimated_alwaysReturnsNull() {
+        tracker.setExpectEstimatedTokens(true);
+
+        for (int i = 0; i < 5; i++) {
+            Map<String, Object> iterData = new LinkedHashMap<>();
+            iterData.put("reasonMeta", Map.of("inputTokens", 100, "outputTokens", 50, "estimated", true));
+            iterData.put("actMeta", Map.of("inputTokens", 200, "outputTokens", 80, "estimated", true));
+            tracker.trackIteration(iterData);
+        }
+
+        assertThat(tracker.checkBlindIterations()).isNull();
+    }
+
+    @Test
     void buildFinalMetadata_aggregatesCorrectly() {
         Map<String, Object> iter1 = new LinkedHashMap<>();
         iter1.put("reasonMeta", Map.of("inputTokens", 100, "outputTokens", 50, "costUsd", 0.01));
@@ -182,7 +184,7 @@ class AgenticTokenTrackerTest {
         tracker.trackIteration(iter2);
 
         Map<String, Object> metadata = tracker.buildFinalMetadata(
-                "Fix tests", "All pass", 2, true, null);
+                "Fix tests", "All pass", 2, true, null, "claude-sonnet-4-6", "CLAUDE");
 
         assertThat(metadata.get("blockType")).isEqualTo("agentic");
         assertThat(metadata.get("goal")).isEqualTo("Fix tests");
@@ -195,6 +197,8 @@ class AgenticTokenTrackerTest {
         List<String> toolNames = (List<String>) metadata.get("toolNames");
         assertThat(toolNames).containsExactly("Read", "Write", "Bash");
         assertThat(metadata.get("toolUseCount")).isEqualTo(3);
+        assertThat(metadata.get("model")).isEqualTo("claude-sonnet-4-6");
+        assertThat(metadata.get("provider")).isEqualTo("CLAUDE");
         assertThat(metadata).doesNotContainKey("stopReason");
         assertThat(metadata).doesNotContainKey("tokenEstimationFallback");
     }
@@ -207,7 +211,7 @@ class AgenticTokenTrackerTest {
         tracker.trackIteration(iterData);
 
         Map<String, Object> metadata = tracker.buildFinalMetadata(
-                "Goal", "Criteria", 1, false, "TOKEN_BUDGET_EXCEEDED");
+                "Goal", "Criteria", 1, false, "TOKEN_BUDGET_EXCEEDED", null, "CODEX");
 
         assertThat(metadata.get("stopReason")).isEqualTo("TOKEN_BUDGET_EXCEEDED");
         assertThat(metadata.get("tokenEstimationFallback")).isEqualTo(true);
