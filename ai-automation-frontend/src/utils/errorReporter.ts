@@ -9,7 +9,7 @@ interface ErrorReport {
   timestamp: string;
 }
 
-let buffer: ErrorReport[] = [];
+const buffer: ErrorReport[] = [];
 
 function getApiKey(): string | null {
   try {

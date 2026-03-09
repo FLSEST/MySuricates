@@ -11,8 +11,8 @@ export function PathLinkedOutput({ text }: { text: string }) {
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
-  // Reset regex state
-  PATH_REGEX.lastIndex = 0;
+  // Reset regex state (global regex requires resetting lastIndex)
+  PATH_REGEX.lastIndex = 0; // eslint-disable-line react-hooks/immutability
 
   while ((match = PATH_REGEX.exec(text)) !== null) {
     const matchStart = match.index;

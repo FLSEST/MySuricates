@@ -126,7 +126,7 @@ cd ai-automation-frontend
 npm install                              # Install dependencies
 npm run dev                              # Start dev server (port 3000, proxies /api to :9090)
 npm run build                            # Production build (tsc + vite)
-npm run lint                             # ESLint
+npm run lint                             # ESLint (flat config, eslint.config.js)
 
 # E2E Tests
 cd ai-automation-frontend
@@ -163,6 +163,25 @@ npm run cy:open                          # Open Cypress UI
 - Workflow Conversion: Successful agentic runs can be converted to deterministic workflows (rule-based + AI)
 - Terminal WebSocket at `/ws/terminal` for real-time container access
 - **Soft-Delete Pattern**: Workflows use `@SQLRestriction("deleted_at IS NULL")` on the entity class. Projects use `archived_at` but filter via repository methods (`findByArchivedAtIsNull()`, `findByArchivedAtIsNotNull()`) instead of `@SQLRestriction` — because `@SQLRestriction` on Project would break eager-loaded `Workflow.project` associations. Archived projects retain all their workflows, runs, and data — nothing is cascade-deleted.
+- **ESLint**: Flat config (`eslint.config.js`, ESLint 9+) with `typescript-eslint`, `react-hooks`, and `react-refresh` plugins. Test files (`**/*.test.{ts,tsx}`) have `no-explicit-any` disabled.
+
+## Gate Status System
+
+Workflow blocks can emit gate status markers in their output to signal quality gates:
+
+```
+gate_status: GREEN|YELLOW|RED
+gate_category: <category>
+gate_description: <description>
+```
+
+- `GateStatusOutputParser` — parses these markers from block output text (tolerant of markdown formatting)
+- `WorkflowExecutor` scans **all** block outputs — highest severity wins (GREEN < YELLOW < RED by enum ordinal)
+- Gate status is stored in `WorkflowRun.metadata` (`gate_status`, `gate_category`, `gate_description`)
+- **YELLOW → `COMPLETED_WITH_ERRORS`**: If the highest gate is YELLOW, the run status is set to `COMPLETED_WITH_ERRORS` instead of `COMPLETED`
+- **RED → `COMPLETED`**: RED gates don't change the run status — `AutoTodoService` handles them via the `WorkflowRunCompletedEvent`
+- `GateStatusResolver` — derives gate status from run status when no explicit marker exists (`FAILED` → RED, `COMPLETED` → GREEN)
+- `AutoTodoService` — creates follow-up TODOs based on gate status (RED → HIGH priority, YELLOW → MEDIUM priority)
 
 ## Agent Instructions System
 

@@ -539,6 +539,43 @@ Block 7 (shell): Push + create PR (or abort)
 
 ---
 
+### Quality Gate Markers
+
+Any block can emit gate status markers in its output to signal quality results. The `WorkflowExecutor` scans **all** block outputs and uses the highest severity.
+
+```
+gate_status: GREEN|YELLOW|RED
+gate_category: lint-errors
+gate_description: Found 3 issues
+```
+
+| Gate | Run Status | Auto-Todo Priority | Meaning |
+|------|-----------|-------------------|---------|
+| GREEN | `COMPLETED` | — | All checks passed |
+| YELLOW | `COMPLETED_WITH_ERRORS` | MEDIUM | Warnings, non-blocking issues |
+| RED | `COMPLETED` | HIGH | Critical issues (handled by AutoTodoService) |
+
+**Shell block example** emitting a gate:
+```bash
+set -euo pipefail
+ERRORS=$(eslint src/ --format json | jq '[.[] | .errorCount] | add // 0')
+if [ "$ERRORS" -gt 0 ]; then
+  echo "gate_status: RED"
+  echo "gate_category: lint-errors"
+  echo "gate_description: $ERRORS lint errors found"
+elif [ "$WARNINGS" -gt 0 ]; then
+  echo "gate_status: YELLOW"
+  echo "gate_category: lint-warnings"
+  echo "gate_description: $WARNINGS warnings found"
+else
+  echo "gate_status: GREEN"
+fi
+```
+
+When multiple blocks emit gates, the highest severity wins (RED > YELLOW > GREEN).
+
+---
+
 ## 5. Timeout Configuration
 
 ### Default Values

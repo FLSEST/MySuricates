@@ -1,9 +1,15 @@
 package com.automation.service.staging;
 
 import com.automation.config.StagingConfig;
+import com.automation.dto.response.SyncResult;
 import com.automation.entity.Project;
 import com.automation.entity.Workflow;
 import com.automation.repository.WorkflowRepository;
+import com.automation.service.system.ApiKeyService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,9 +19,12 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,8 +39,13 @@ class TestingServiceTest {
     @Mock
     private WorkflowRepository workflowRepository;
 
+    @Mock
+    private ApiKeyService apiKeyService;
+
     @InjectMocks
     private TestingService testingService;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     // --- reportTestResult ---
 
@@ -110,5 +124,595 @@ class TestingServiceTest {
         testingService.reportTestResult("Test WF", null, "PASSED");
 
         assertThat(workflow.getTestStatus()).isEqualTo("PASSED");
+    }
+
+    // --- deriveTestBaseUrl ---
+
+    @Test
+    void deriveTestBaseUrl_extractsBaseFromHealthUrl() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+
+        String baseUrl = testingService.deriveTestBaseUrl();
+
+        assertThat(baseUrl).isEqualTo("http://localhost:8090/api/v1");
+    }
+
+    @Test
+    void deriveTestBaseUrl_fallsBackToDefault_whenNoApiV1InUrl() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/health");
+
+        String baseUrl = testingService.deriveTestBaseUrl();
+
+        assertThat(baseUrl).isEqualTo("http://localhost:8090/api/v1");
+    }
+
+    // --- syncDefinitions ---
+
+    @Test
+    void syncDefinitions_delegatesToSyncHelper() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        // Make the test spy return true for isHealthy — use a real TestingService with spied methods
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+
+        SyncResult expected = new SyncResult(2, 3, 1, 0, List.of());
+        when(instanceSyncHelper.syncDefinitionsTo(eq("http://localhost:8090/api/v1"), any()))
+                .thenReturn(expected);
+
+        SyncResult result = spied.syncDefinitions();
+
+        assertThat(result.projectsSynced()).isEqualTo(2);
+        assertThat(result.workflowsSynced()).isEqualTo(3);
+        assertThat(result.skillsSynced()).isEqualTo(1);
+    }
+
+    @Test
+    void syncDefinitions_throwsIfNotHealthy() {
+        TestingService spied = spy(testingService);
+        doReturn(false).when(spied).isHealthy();
+
+        assertThatThrownBy(spied::syncDefinitions)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("not running or not healthy");
+    }
+
+    // --- executeWorkflowOnTest ---
+
+    @Test
+    void executeWorkflowOnTest_findsAndStartsWorkflow() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+
+        // Workflows list on test instance
+        ArrayNode workflows = objectMapper.createArrayNode();
+        ObjectNode wf = objectMapper.createObjectNode();
+        wf.put("id", "test-wf-1");
+        wf.put("name", "My Workflow");
+        wf.put("projectName", "Project A");
+        workflows.add(wf);
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(workflows);
+
+        // Execute response
+        ObjectNode execResult = objectMapper.createObjectNode();
+        execResult.put("id", "run-123");
+        when(instanceSyncHelper.httpPost(eq("http://localhost:8090/api/v1/workflows/test-wf-1/execute"), any()))
+                .thenReturn(execResult);
+
+        String runId = spied.executeWorkflowOnTest("My Workflow", "Project A", Map.of("key", "val"));
+
+        assertThat(runId).isEqualTo("run-123");
+    }
+
+    @Test
+    void executeWorkflowOnTest_workflowNotFound_throws() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+
+        ArrayNode workflows = objectMapper.createArrayNode();
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(workflows);
+
+        assertThatThrownBy(() -> spied.executeWorkflowOnTest("Missing", "Project", Map.of()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("not found on Test instance");
+    }
+
+    @Test
+    void executeWorkflowOnTest_notHealthy_throws() {
+        TestingService spied = spy(testingService);
+        doReturn(false).when(spied).isHealthy();
+
+        assertThatThrownBy(() -> spied.executeWorkflowOnTest("WF", "Proj", Map.of()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("not running or not healthy");
+    }
+
+    // --- pollTestRun ---
+
+    @Test
+    void pollTestRun_completedImmediately_returnsRun() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+
+        ObjectNode completedRun = objectMapper.createObjectNode();
+        completedRun.put("status", "COMPLETED");
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/executions/run-1"))
+                .thenReturn(completedRun);
+
+        JsonNode result = testingService.pollTestRun("run-1", 10, 1000);
+
+        assertThat(result.path("status").asText()).isEqualTo("COMPLETED");
+    }
+
+    @Test
+    void pollTestRun_failedStatus_returnsRun() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+
+        ObjectNode failedRun = objectMapper.createObjectNode();
+        failedRun.put("status", "FAILED");
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/executions/run-1"))
+                .thenReturn(failedRun);
+
+        JsonNode result = testingService.pollTestRun("run-1", 10, 1000);
+
+        assertThat(result.path("status").asText()).isEqualTo("FAILED");
+    }
+
+    @Test
+    void pollTestRun_cancelledStatus_returnsRun() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+
+        ObjectNode cancelledRun = objectMapper.createObjectNode();
+        cancelledRun.put("status", "CANCELLED");
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/executions/run-1"))
+                .thenReturn(cancelledRun);
+
+        JsonNode result = testingService.pollTestRun("run-1", 10, 1000);
+
+        assertThat(result.path("status").asText()).isEqualTo("CANCELLED");
+    }
+
+    @Test
+    void pollTestRun_timeout_throwsException() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+
+        ObjectNode runningRun = objectMapper.createObjectNode();
+        runningRun.put("status", "RUNNING");
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/executions/run-1"))
+                .thenReturn(runningRun);
+
+        // intervalMs/1000 must be >= 1 to avoid infinite loop (integer division)
+        assertThatThrownBy(() -> testingService.pollTestRun("run-1", 1, 1000))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("did not complete within");
+    }
+
+    @Test
+    void pollTestRun_becomesCompletedAfterPolling_returns() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+
+        ObjectNode runningRun = objectMapper.createObjectNode();
+        runningRun.put("status", "RUNNING");
+        ObjectNode completedRun = objectMapper.createObjectNode();
+        completedRun.put("status", "COMPLETED");
+
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/executions/run-1"))
+                .thenReturn(runningRun)
+                .thenReturn(runningRun)
+                .thenReturn(completedRun);
+
+        JsonNode result = testingService.pollTestRun("run-1", 10, 1000);
+
+        assertThat(result.path("status").asText()).isEqualTo("COMPLETED");
+    }
+
+    // --- pullChanges ---
+
+    @Test
+    void pullChanges_updatesInstructionsAndModel() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+
+        // Dev workflow
+        Workflow devWorkflow = Workflow.builder()
+                .id("wf-1").name("Test WF").project(null)
+                .instructions("old instructions").model("claude-sonnet-4-6").build();
+        when(workflowRepository.findAll()).thenReturn(List.of(devWorkflow));
+        when(workflowRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // Test workflow list
+        ArrayNode testWorkflows = objectMapper.createArrayNode();
+        ObjectNode tw = objectMapper.createObjectNode();
+        tw.put("id", "test-wf-1");
+        tw.put("name", "Test WF");
+        tw.put("projectName", "");
+        testWorkflows.add(tw);
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+
+        // Full test workflow details
+        ObjectNode fullTw = objectMapper.createObjectNode();
+        fullTw.put("instructions", "new instructions from test");
+        fullTw.put("model", "claude-opus-4-6");
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/test-wf-1")).thenReturn(fullTw);
+
+        SyncResult result = spied.pullChanges();
+
+        assertThat(result.workflowsSynced()).isEqualTo(1);
+        assertThat(devWorkflow.getInstructions()).isEqualTo("new instructions from test");
+        assertThat(devWorkflow.getModel()).isEqualTo("claude-opus-4-6");
+    }
+
+    @Test
+    void pullChanges_noChanges_doesNotSave() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+
+        Workflow devWorkflow = Workflow.builder()
+                .id("wf-1").name("Test WF").project(null)
+                .instructions("same").model("claude-sonnet-4-6").build();
+        when(workflowRepository.findAll()).thenReturn(List.of(devWorkflow));
+
+        ArrayNode testWorkflows = objectMapper.createArrayNode();
+        ObjectNode tw = objectMapper.createObjectNode();
+        tw.put("id", "test-wf-1");
+        tw.put("name", "Test WF");
+        tw.put("projectName", "");
+        testWorkflows.add(tw);
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+
+        ObjectNode fullTw = objectMapper.createObjectNode();
+        fullTw.put("instructions", "same");
+        fullTw.put("model", "claude-sonnet-4-6");
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/test-wf-1")).thenReturn(fullTw);
+
+        SyncResult result = spied.pullChanges();
+
+        assertThat(result.workflowsSynced()).isEqualTo(0);
+        verify(workflowRepository, never()).save(any());
+    }
+
+    @Test
+    void pullChanges_notHealthy_throws() {
+        TestingService spied = spy(testingService);
+        doReturn(false).when(spied).isHealthy();
+
+        assertThatThrownBy(spied::pullChanges)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("not running or not healthy");
+    }
+
+    // --- getStatus ---
+
+    @Test
+    void getStatus_notRunning_returnsNotRunningNotHealthy() {
+        TestingService spied = spy(testingService);
+        doReturn(false).when(spied).isContainerRunning();
+
+        var status = spied.getStatus();
+
+        assertThat(status.containerRunning()).isFalse();
+        assertThat(status.healthy()).isFalse();
+        assertThat(status.testVersion()).isNull();
+    }
+
+    @Test
+    void getStatus_runningAndHealthy_includesVersionInfo() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isContainerRunning();
+        doReturn(true).when(spied).isHealthy();
+
+        ObjectNode info = objectMapper.createObjectNode();
+        info.put("version", "0.3.0");
+        info.put("buildTimestamp", "2025-01-15T10:00:00Z");
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/system/info")).thenReturn(info);
+
+        var status = spied.getStatus();
+
+        assertThat(status.containerRunning()).isTrue();
+        assertThat(status.healthy()).isTrue();
+        assertThat(status.testVersion()).isEqualTo("0.3.0");
+        assertThat(status.testBuildTimestamp()).isEqualTo("2025-01-15T10:00:00Z");
+    }
+
+    // --- pullChanges: project-based matching (mirrors reportTestResult matching logic) ---
+
+    @Test
+    void pullChanges_matchesByProjectName() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+
+        Project project = Project.builder().id("p-1").name("MyProject").build();
+        Workflow devWorkflow = Workflow.builder()
+                .id("wf-1").name("Deploy").project(project)
+                .instructions("old").model("claude-sonnet-4-6").build();
+        when(workflowRepository.findAll()).thenReturn(List.of(devWorkflow));
+        when(workflowRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ArrayNode testWorkflows = objectMapper.createArrayNode();
+        ObjectNode tw = objectMapper.createObjectNode();
+        tw.put("id", "test-wf-1");
+        tw.put("name", "Deploy");
+        tw.put("projectName", "MyProject");
+        testWorkflows.add(tw);
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+
+        ObjectNode fullTw = objectMapper.createObjectNode();
+        fullTw.put("instructions", "updated");
+        fullTw.put("model", "claude-sonnet-4-6");
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/test-wf-1")).thenReturn(fullTw);
+
+        SyncResult result = spied.pullChanges();
+
+        assertThat(result.workflowsSynced()).isEqualTo(1);
+        assertThat(devWorkflow.getInstructions()).isEqualTo("updated");
+    }
+
+    @Test
+    void pullChanges_wrongProject_doesNotMatch() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+
+        Project project = Project.builder().id("p-1").name("ProjectA").build();
+        Workflow devWorkflow = Workflow.builder()
+                .id("wf-1").name("Deploy").project(project)
+                .instructions("old").model("old-model").build();
+        when(workflowRepository.findAll()).thenReturn(List.of(devWorkflow));
+
+        ArrayNode testWorkflows = objectMapper.createArrayNode();
+        ObjectNode tw = objectMapper.createObjectNode();
+        tw.put("id", "test-wf-1");
+        tw.put("name", "Deploy");
+        tw.put("projectName", "ProjectB");
+        testWorkflows.add(tw);
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+
+        SyncResult result = spied.pullChanges();
+
+        assertThat(result.workflowsSynced()).isEqualTo(0);
+        verify(workflowRepository, never()).save(any());
+    }
+
+    @Test
+    void pullChanges_onlyInstructionsChanged_updatesAndCounts() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+
+        Workflow devWorkflow = Workflow.builder()
+                .id("wf-1").name("WF").project(null)
+                .instructions("old instructions").model("same-model").build();
+        when(workflowRepository.findAll()).thenReturn(List.of(devWorkflow));
+        when(workflowRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ArrayNode testWorkflows = objectMapper.createArrayNode();
+        ObjectNode tw = objectMapper.createObjectNode();
+        tw.put("id", "t-1");
+        tw.put("name", "WF");
+        tw.put("projectName", "");
+        testWorkflows.add(tw);
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+
+        ObjectNode fullTw = objectMapper.createObjectNode();
+        fullTw.put("instructions", "new instructions");
+        fullTw.put("model", "same-model");
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/t-1")).thenReturn(fullTw);
+
+        SyncResult result = spied.pullChanges();
+
+        assertThat(result.workflowsSynced()).isEqualTo(1);
+        assertThat(devWorkflow.getInstructions()).isEqualTo("new instructions");
+        assertThat(devWorkflow.getModel()).isEqualTo("same-model");
+    }
+
+    @Test
+    void pullChanges_onlyModelChanged_updatesAndCounts() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+
+        Workflow devWorkflow = Workflow.builder()
+                .id("wf-1").name("WF").project(null)
+                .instructions("same").model("old-model").build();
+        when(workflowRepository.findAll()).thenReturn(List.of(devWorkflow));
+        when(workflowRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ArrayNode testWorkflows = objectMapper.createArrayNode();
+        ObjectNode tw = objectMapper.createObjectNode();
+        tw.put("id", "t-1");
+        tw.put("name", "WF");
+        tw.put("projectName", "");
+        testWorkflows.add(tw);
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+
+        ObjectNode fullTw = objectMapper.createObjectNode();
+        fullTw.put("instructions", "same");
+        fullTw.put("model", "new-model");
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/t-1")).thenReturn(fullTw);
+
+        SyncResult result = spied.pullChanges();
+
+        assertThat(result.workflowsSynced()).isEqualTo(1);
+        assertThat(devWorkflow.getModel()).isEqualTo("new-model");
+    }
+
+    @Test
+    void pullChanges_fullWorkflowFetchReturnsNull_skipsWithoutError() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+
+        Workflow devWorkflow = Workflow.builder()
+                .id("wf-1").name("WF").project(null).build();
+        when(workflowRepository.findAll()).thenReturn(List.of(devWorkflow));
+
+        ArrayNode testWorkflows = objectMapper.createArrayNode();
+        ObjectNode tw = objectMapper.createObjectNode();
+        tw.put("id", "t-1");
+        tw.put("name", "WF");
+        tw.put("projectName", "");
+        testWorkflows.add(tw);
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/t-1")).thenReturn(null);
+
+        SyncResult result = spied.pullChanges();
+
+        assertThat(result.workflowsSynced()).isEqualTo(0);
+        assertThat(result.errors()).isEmpty();
+        verify(workflowRepository, never()).save(any());
+    }
+
+    @Test
+    void pullChanges_multipleWorkflows_countsOnlyChanged() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+
+        Workflow wf1 = Workflow.builder().id("wf-1").name("WF-A").project(null)
+                .instructions("old-A").model("m1").build();
+        Workflow wf2 = Workflow.builder().id("wf-2").name("WF-B").project(null)
+                .instructions("same-B").model("m2").build();
+        when(workflowRepository.findAll()).thenReturn(List.of(wf1, wf2));
+        when(workflowRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ArrayNode testWorkflows = objectMapper.createArrayNode();
+        ObjectNode tw1 = objectMapper.createObjectNode();
+        tw1.put("id", "t-1"); tw1.put("name", "WF-A"); tw1.put("projectName", "");
+        ObjectNode tw2 = objectMapper.createObjectNode();
+        tw2.put("id", "t-2"); tw2.put("name", "WF-B"); tw2.put("projectName", "");
+        testWorkflows.add(tw1);
+        testWorkflows.add(tw2);
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+
+        ObjectNode full1 = objectMapper.createObjectNode();
+        full1.put("instructions", "new-A"); full1.put("model", "m1");
+        ObjectNode full2 = objectMapper.createObjectNode();
+        full2.put("instructions", "same-B"); full2.put("model", "m2");
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/t-1")).thenReturn(full1);
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/t-2")).thenReturn(full2);
+
+        SyncResult result = spied.pullChanges();
+
+        assertThat(result.workflowsSynced()).isEqualTo(1);
+        assertThat(wf1.getInstructions()).isEqualTo("new-A");
+        assertThat(wf2.getInstructions()).isEqualTo("same-B");
+        verify(workflowRepository, times(1)).save(any());
+    }
+
+    @Test
+    void pullChanges_errorInOneWorkflow_collectsErrorAndContinues() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+
+        Workflow wf1 = Workflow.builder().id("wf-1").name("WF-Good").project(null)
+                .instructions("old").model("m").build();
+        Workflow wf2 = Workflow.builder().id("wf-2").name("WF-Bad").project(null)
+                .instructions("old").model("m").build();
+        when(workflowRepository.findAll()).thenReturn(List.of(wf1, wf2));
+        when(workflowRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ArrayNode testWorkflows = objectMapper.createArrayNode();
+        ObjectNode tw1 = objectMapper.createObjectNode();
+        tw1.put("id", "t-1"); tw1.put("name", "WF-Good"); tw1.put("projectName", "");
+        ObjectNode tw2 = objectMapper.createObjectNode();
+        tw2.put("id", "t-2"); tw2.put("name", "WF-Bad"); tw2.put("projectName", "");
+        testWorkflows.add(tw1);
+        testWorkflows.add(tw2);
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+
+        ObjectNode full1 = objectMapper.createObjectNode();
+        full1.put("instructions", "new"); full1.put("model", "m");
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/t-1")).thenReturn(full1);
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/t-2"))
+                .thenThrow(new RuntimeException("Network error"));
+
+        SyncResult result = spied.pullChanges();
+
+        assertThat(result.workflowsSynced()).isEqualTo(1);
+        assertThat(result.errors()).hasSize(1);
+        assertThat(result.errors().get(0)).contains("WF-Bad");
+    }
+
+    @Test
+    void pullChanges_testWorkflowNotInDev_skippedSilently() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+
+        when(workflowRepository.findAll()).thenReturn(List.of());
+
+        ArrayNode testWorkflows = objectMapper.createArrayNode();
+        ObjectNode tw = objectMapper.createObjectNode();
+        tw.put("id", "t-1"); tw.put("name", "OnlyOnTest"); tw.put("projectName", "");
+        testWorkflows.add(tw);
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+
+        SyncResult result = spied.pullChanges();
+
+        assertThat(result.workflowsSynced()).isEqualTo(0);
+        assertThat(result.errors()).isEmpty();
+        verify(workflowRepository, never()).save(any());
+    }
+
+    @Test
+    void pullChanges_nullWorkflowList_returnsError() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(null);
+
+        SyncResult result = spied.pullChanges();
+
+        assertThat(result.workflowsSynced()).isEqualTo(0);
+        assertThat(result.errors()).hasSize(1);
+        assertThat(result.errors().get(0)).contains("Could not fetch workflows");
+    }
+
+    @Test
+    void pullChanges_nullInstructions_handledCorrectly() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+
+        Workflow devWorkflow = Workflow.builder()
+                .id("wf-1").name("WF").project(null)
+                .instructions("has instructions").model(null).build();
+        when(workflowRepository.findAll()).thenReturn(List.of(devWorkflow));
+        when(workflowRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ArrayNode testWorkflows = objectMapper.createArrayNode();
+        ObjectNode tw = objectMapper.createObjectNode();
+        tw.put("id", "t-1"); tw.put("name", "WF"); tw.put("projectName", "");
+        testWorkflows.add(tw);
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+
+        // Test workflow has no instructions field → asText(null) returns null
+        ObjectNode fullTw = objectMapper.createObjectNode();
+        fullTw.putNull("instructions");
+        fullTw.putNull("model");
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/t-1")).thenReturn(fullTw);
+
+        SyncResult result = spied.pullChanges();
+
+        assertThat(result.workflowsSynced()).isEqualTo(1);
+        assertThat(devWorkflow.getInstructions()).isNull();
+    }
+
+    // --- syncPreview ---
+
+    @Test
+    void syncPreview_notHealthy_throws() {
+        TestingService spied = spy(testingService);
+        doReturn(false).when(spied).isHealthy();
+
+        assertThatThrownBy(spied::syncPreview)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("not running or not healthy");
     }
 }

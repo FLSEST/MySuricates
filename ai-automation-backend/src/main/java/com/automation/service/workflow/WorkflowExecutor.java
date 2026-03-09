@@ -225,29 +225,39 @@ public class WorkflowExecutor {
                 }
             }
 
-            // Parse gate_status markers from last completed block's output
-            if (!run.getSteps().isEmpty()) {
-                StepResult lastStep = run.getSteps().get(run.getSteps().size() - 1);
-                if (lastStep.getOutput() != null) {
-                    var parsedGate = GateStatusOutputParser.parse(lastStep.getOutput());
+            // Parse gate_status markers from ALL blocks — highest severity wins
+            // GateStatus ordinal: GREEN(0) < YELLOW(1) < RED(2)
+            GateStatus highestGate = null;
+            String gateCategory = null;
+            String gateDescription = null;
+            for (StepResult step : run.getSteps()) {
+                if (step.getOutput() != null) {
+                    var parsedGate = GateStatusOutputParser.parse(step.getOutput());
                     if (parsedGate.isPresent()) {
                         var gate = parsedGate.get();
-                        context.setRunMetadata("gate_status", gate.status().name());
-                        if (gate.category() != null) {
-                            context.setRunMetadata("gate_category", gate.category());
-                        }
-                        if (gate.description() != null) {
-                            context.setRunMetadata("gate_description", gate.description());
+                        if (highestGate == null || gate.status().ordinal() > highestGate.ordinal()) {
+                            highestGate = gate.status();
+                            gateCategory = gate.category();
+                            gateDescription = gate.description();
                         }
                     }
                 }
             }
-
-            if (run.getStatus() == RunStatus.RUNNING) {
-                run.setStatus(RunStatus.COMPLETED);
+            if (highestGate != null) {
+                context.setRunMetadata("gate_status", highestGate.name());
+                if (gateCategory != null) context.setRunMetadata("gate_category", gateCategory);
+                if (gateDescription != null) context.setRunMetadata("gate_description", gateDescription);
             }
 
-            if (run.getStatus() == RunStatus.COMPLETED) {
+            if (run.getStatus() == RunStatus.RUNNING) {
+                if (highestGate == GateStatus.YELLOW) {
+                    run.setStatus(RunStatus.COMPLETED_WITH_ERRORS);
+                } else {
+                    run.setStatus(RunStatus.COMPLETED);
+                }
+            }
+
+            if (run.getStatus() == RunStatus.COMPLETED || run.getStatus() == RunStatus.COMPLETED_WITH_ERRORS) {
                 // Record template verification if workflow was created from a template
                 if (templateId != null && !templateId.isBlank()) {
                     try {
@@ -256,9 +266,15 @@ public class WorkflowExecutor {
                         log.warn("Failed to record template verification: {}", e.getMessage());
                     }
                 }
-                activityLogService.info(LogCategory.EXECUTION,
-                        "Workflow execution completed: " + runId,
-                        "WorkflowExecutor", runId, workflowId);
+                if (run.getStatus() == RunStatus.COMPLETED_WITH_ERRORS) {
+                    activityLogService.warn(LogCategory.EXECUTION,
+                            "Workflow completed with warnings: " + runId,
+                            "WorkflowExecutor", runId, workflowId);
+                } else {
+                    activityLogService.info(LogCategory.EXECUTION,
+                            "Workflow execution completed: " + runId,
+                            "WorkflowExecutor", runId, workflowId);
+                }
             } else if (run.getStatus() == RunStatus.FAILED) {
                 activityLogService.error(LogCategory.EXECUTION,
                         "Workflow execution failed: " + runId,

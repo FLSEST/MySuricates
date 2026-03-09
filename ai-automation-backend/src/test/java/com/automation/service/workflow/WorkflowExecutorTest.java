@@ -450,4 +450,300 @@ class WorkflowExecutorTest {
         assertThat(event.getProjectId()).isEqualTo("proj-1");
         assertThat(event.getStatus()).isEqualTo(RunStatus.COMPLETED);
     }
+
+    @Test
+    void recoverOrphanedRuns_marksRunningRunsAsFailed() {
+        WorkflowRun orphan1 = WorkflowRun.builder().id("orphan-1").status(RunStatus.RUNNING).build();
+        WorkflowRun orphan2 = WorkflowRun.builder().id("orphan-2").status(RunStatus.RUNNING).build();
+        when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of(orphan1, orphan2));
+
+        workflowExecutor.recoverOrphanedRuns();
+
+        assertThat(orphan1.getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(orphan1.getCompletedAt()).isNotNull();
+        assertThat(orphan1.getError()).containsKey("error");
+        assertThat(orphan2.getStatus()).isEqualTo(RunStatus.FAILED);
+        verify(runRepository, times(2)).save(any(WorkflowRun.class));
+    }
+
+    @Test
+    void recoverOrphanedRuns_noOrphans_doesNothing() {
+        when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of());
+
+        workflowExecutor.recoverOrphanedRuns();
+
+        verify(runRepository, never()).save(any(WorkflowRun.class));
+    }
+
+    @Test
+    void execute_containerStartFails_continuesWithHostExecution() {
+        // Both getDockerContainerId and createAndStartContainer fail
+        when(containerService.getDockerContainerId(any()))
+                .thenThrow(new ContainerException("No container"));
+        when(containerService.createAndStartContainer(any()))
+                .thenThrow(new RuntimeException("Docker unavailable"));
+
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(step);
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        // Workflow completed despite no container
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
+    }
+
+    @Test
+    void execute_templateVerification_recordedOnCompletion() {
+        testWorkflow.setTemplateId("template-1");
+
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(step);
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        verify(templateVerificationService).recordSuccessfulRun(
+                eq("wf-1"), eq("template-1"), eq("proj-1"), eq("run-1"));
+    }
+
+    @Test
+    void execute_templateVerification_notCalledWithoutTemplateId() {
+        // testWorkflow.templateId is null by default
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(step);
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        verify(templateVerificationService, never()).recordSuccessfulRun(any(), any(), any(), any());
+    }
+
+    @Test
+    void execute_templateVerification_failureDoesNotAbortExecution() {
+        testWorkflow.setTemplateId("template-1");
+
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(step);
+        doThrow(new RuntimeException("DB error"))
+                .when(templateVerificationService).recordSuccessfulRun(any(), any(), any(), any());
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        // Workflow should still complete despite template verification failure
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
+    }
+
+    @Test
+    void getActiveRunCount_returnsZero_whenNoActiveRuns() {
+        assertThat(workflowExecutor.getActiveRunCount()).isEqualTo(0);
+    }
+
+    @Test
+    void getActiveRunCount_returnsCount_duringExecution() {
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenAnswer(inv -> {
+                    assertThat(workflowExecutor.getActiveRunCount()).isEqualTo(1);
+                    return step;
+                });
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        // After execution completes, active count should be 0 again
+        assertThat(workflowExecutor.getActiveRunCount()).isEqualTo(0);
+    }
+
+    @Test
+    void executeAdHocCommand_noActiveRun_throws() {
+        org.junit.jupiter.api.Assertions.assertThrows(
+                WorkflowExecutionException.class,
+                () -> workflowExecutor.executeAdHocCommand("non-existent", "echo hello")
+        );
+    }
+
+    @Test
+    void execute_writesWorkflowMemoryAndProjectContext() {
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(step);
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        verify(workflowMemoryService).writeActiveMemoryToProject("wf-1", "/workspace/test");
+        verify(projectContextService).writeProjectContextToProject(any(), eq("/workspace/test"));
+    }
+
+    @Test
+    void execute_stepOutputVariables_setCorrectly() {
+        StepResult step1 = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("output-from-step-0").build();
+        StepResult step2 = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("output-from-step-1").build();
+
+        ArgumentCaptor<ExecutionContext> ctxCaptor = ArgumentCaptor.forClass(ExecutionContext.class);
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), ctxCaptor.capture()))
+                .thenReturn(step1, step2);
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        // After both blocks, context should have step output variables
+        ExecutionContext ctx = ctxCaptor.getValue();
+        assertThat(ctx.getVariable("step_0_output")).isEqualTo("output-from-step-0");
+        assertThat(ctx.getVariable("step_1_output")).isEqualTo("output-from-step-1");
+    }
+
+    @Test
+    void execute_failedRun_publishesEventWithErrorInfo() {
+        StepResult failed = StepResult.builder()
+                .stepIndex(0).status(StepStatus.FAILED).output("big error").build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(failed);
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        ArgumentCaptor<WorkflowRunCompletedEvent> eventCaptor = ArgumentCaptor.forClass(WorkflowRunCompletedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        WorkflowRunCompletedEvent event = eventCaptor.getValue();
+        assertThat(event.getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(event.getError()).isNotNull();
+    }
+
+    @Test
+    void execute_exceptionDuringExecution_setsFailedWithMessage() {
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenThrow(new RuntimeException("Unexpected failure"));
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(saved.getError().get("message")).isEqualTo("Unexpected failure");
+    }
+
+    @Test
+    void execute_yellowGateStatus_setsCompletedWithErrors() {
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED)
+                .output("Check done.\n\ngate_status: YELLOW\ngate_category: warnings\ngate_description: 2 minor issues")
+                .build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(step);
+
+        testWorkflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder().type("simple").config(new HashMap<>(Map.of("command", "check"))).build()
+        )));
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED_WITH_ERRORS);
+        assertThat(saved.getMetadata()).containsEntry("gate_status", "YELLOW");
+        assertThat(saved.getMetadata()).containsEntry("gate_category", "warnings");
+    }
+
+    @Test
+    void execute_yellowGateStatus_logsWarning() {
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED)
+                .output("gate_status: YELLOW\ngate_category: lint")
+                .build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(step);
+
+        testWorkflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder().type("simple").config(new HashMap<>(Map.of("command", "lint"))).build()
+        )));
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        verify(activityLogService).warn(eq(ActivityLog.LogCategory.EXECUTION),
+                contains("completed with warnings"), eq("WorkflowExecutor"), eq("run-1"), eq("wf-1"));
+    }
+
+    @Test
+    void execute_greenGateStatus_setsCompleted() {
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED)
+                .output("All good.\n\ngate_status: GREEN\ngate_category: quality")
+                .build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(step);
+
+        testWorkflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder().type("simple").config(new HashMap<>(Map.of("command", "check"))).build()
+        )));
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
+    }
+
+    @Test
+    void execute_multipleBlocks_highestGateSeverityWins() {
+        // First block: GREEN, second block: YELLOW — YELLOW should win
+        StepResult greenStep = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED)
+                .output("gate_status: GREEN\ngate_category: tests")
+                .build();
+        StepResult yellowStep = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED)
+                .output("gate_status: YELLOW\ngate_category: lint\ngate_description: 2 warnings")
+                .build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(greenStep, yellowStep);
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED_WITH_ERRORS);
+        assertThat(saved.getMetadata()).containsEntry("gate_status", "YELLOW");
+        assertThat(saved.getMetadata()).containsEntry("gate_category", "lint");
+    }
+
+    @Test
+    void execute_redGateStatus_stillSetsCompleted() {
+        // RED gate doesn't change RunStatus — AutoTodoService handles it via event
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED)
+                .output("gate_status: RED\ngate_category: security\ngate_description: critical vulnerability")
+                .build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(step);
+
+        testWorkflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder().type("simple").config(new HashMap<>(Map.of("command", "scan"))).build()
+        )));
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        WorkflowRun saved = captureLastSavedRun();
+        // RED gate: run still COMPLETED (not FAILED), gate info in metadata
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
+        assertThat(saved.getMetadata()).containsEntry("gate_status", "RED");
+    }
+
+    @Test
+    void execute_setsSystemIdentityInRunMetadata() {
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(step);
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getMetadata()).containsEntry("system", "MySuricates");
+        assertThat(saved.getMetadata()).containsEntry("systemVersion", "0.2.3");
+    }
 }
