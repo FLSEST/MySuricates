@@ -1,0 +1,35 @@
+spring:
+  datasource:
+    url: jdbc:sqlite:file:integrationtest?mode=memory&cache=shared&journal_mode=WAL&busy_timeout=10000
+    driver-class-name: org.sqlite.JDBC
+    hikari:
+      maximum-pool-size: 3
+      minimum-idle: 1
+      connection-test-query: SELECT 1
+      connection-init-sql: PRAGMA foreign_keys = ON
+
+  jpa:
+    database-platform: org.hibernate.community.dialect.SQLiteDialect
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+automation:
+  security:
+    enabled: false
+  tray:
+    enabled: false
+  staging:
+    auto-start: false
+    test-auto-start: false
+  host-claude:
+    timeout-seconds: 10
+    max-concurrent-calls: 1
+
+server:
+  port: 0

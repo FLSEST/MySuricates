@@ -21,7 +21,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -45,7 +44,7 @@ public class WorkflowExecutor {
     private final CommandExecutorService commandExecutorService;
     private final WorkflowRunRepository runRepository;
     private final ContainerRepository containerRepository;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final ExecutionBroadcaster broadcaster;
     private final ExecutorService virtualThreadExecutor;
     private final Semaphore executionSemaphore;
     private final AgentInstructionsService agentInstructionsService;
@@ -189,7 +188,7 @@ public class WorkflowExecutor {
                 step.setMetadata(Map.of("blockType", block.getType()));
                 run.addStep(step);
                 runRepository.save(run);
-                broadcastStepResult(run.getId(), step);
+                broadcaster.broadcastStepResult(run.getId(), step);
 
                 // Execute the block — nextStepIndex() returns the pre-allocated index
                 StepResult result = executor.execute(block, context);
@@ -212,7 +211,7 @@ public class WorkflowExecutor {
                     updateContainerActivity(containerId);
                 }
 
-                broadcastStepResult(run.getId(), step);
+                broadcaster.broadcastStepResult(run.getId(), step);
                 runRepository.save(run);
 
                 if (step.getStatus() == StepStatus.FAILED && block.shouldStopOnFailure()) {
@@ -306,7 +305,7 @@ public class WorkflowExecutor {
             executionSemaphore.release();
 
             // Broadcast final status
-            broadcastStepResult(run.getId(), run.getStatus());
+            broadcaster.broadcastRunStatus(run.getId(), run.getStatus());
 
             // Publish domain event for listeners (e.g. AutoTodoService)
             try {
@@ -390,18 +389,10 @@ public class WorkflowExecutor {
         var result = commandExecutorService.executeCommand(context.getContainerId(), "claude", command);
 
         // Broadcast as a log message
-        try {
-            messagingTemplate.convertAndSend(
-                    "/topic/executions/" + runId + "/logs",
-                    Map.of(
-                            "type", "command",
-                            "input", command,
-                            "output", result.output() != null ? result.output() : ""
-                    )
-            );
-        } catch (Exception e) {
-            log.warn("Failed to broadcast command result: {}", e.getMessage());
-        }
+        broadcaster.broadcastLogMessage(runId, "command", Map.of(
+                "input", command,
+                "output", result.output() != null ? result.output() : ""
+        ));
 
         return result.output() != null ? result.output() : "";
     }
@@ -425,12 +416,12 @@ public class WorkflowExecutor {
 
         // Try to start a new container
         try {
-            broadcastLogMessage(runId, "container_starting",
+            broadcaster.broadcastLogMessage(runId, "container_starting",
                     Map.of("message", "Container wird gestartet für Projekt: " + project.getName()));
 
             Container container = containerService.createAndStartContainer(project);
 
-            broadcastLogMessage(runId, "container_started",
+            broadcaster.broadcastLogMessage(runId, "container_started",
                     Map.of("message", "Container gestartet", "containerId", container.getDockerContainerId()));
 
             return container.getDockerContainerId();
@@ -438,38 +429,9 @@ public class WorkflowExecutor {
             // Container creation failed — continue without container (host-based execution still works)
             log.warn("Failed to start container for project {} — continuing with host-based execution: {}",
                     project.getName(), e.getMessage());
-            broadcastLogMessage(runId, "container_skipped",
+            broadcaster.broadcastLogMessage(runId, "container_skipped",
                     Map.of("message", "Container konnte nicht gestartet werden, Ausführung erfolgt auf dem Host"));
             return null;
-        }
-    }
-
-    private void broadcastLogMessage(String runId, String type, Map<String, Object> data) {
-        try {
-            Map<String, Object> msg = new HashMap<>(data);
-            msg.put("type", type);
-            msg.put("runId", runId);
-            msg.put("timestamp", Instant.now().toString());
-            messagingTemplate.convertAndSend("/topic/executions/" + runId + "/logs", msg);
-        } catch (Exception e) {
-            log.warn("Failed to broadcast log message: {}", e.getMessage());
-        }
-    }
-
-    private void broadcastStepResult(String runId, StepResult step) {
-        try {
-            messagingTemplate.convertAndSend(
-                    "/topic/executions/" + runId + "/logs",
-                    Map.of(
-                            "stepIndex", step.getStepIndex(),
-                            "status", step.getStatus(),
-                            "input", step.getInput() != null ? step.getInput() : "",
-                            "output", step.getOutput() != null ? step.getOutput() : "",
-                            "durationMs", step.getDurationMs() != null ? step.getDurationMs() : 0
-                    )
-            );
-        } catch (Exception e) {
-            log.warn("Failed to broadcast step result: {}", e.getMessage());
         }
     }
 
@@ -502,14 +464,4 @@ public class WorkflowExecutor {
         }
     }
 
-    private void broadcastStepResult(String runId, RunStatus status) {
-        try {
-            messagingTemplate.convertAndSend(
-                    "/topic/executions/" + runId + "/logs",
-                    Map.of("type", "status", "runId", runId, "status", status)
-            );
-        } catch (Exception e) {
-            log.warn("Failed to broadcast final status: {}", e.getMessage());
-        }
-    }
 }

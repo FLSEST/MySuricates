@@ -61,7 +61,7 @@ Access them in block configs with `{{ filepath }}` or `{{ language }}`.
 
 ## 2. Block Type Reference
 
-MySuricates supports 11 block types. Each block has a `type` and `config` map.
+MySuricates supports 12 block types. Each block has a `type` and `config` map.
 
 ### `simple` — AI Text Processing
 
@@ -196,6 +196,46 @@ Evaluates a condition and executes one of two branches.
 **Condition evaluation**: In `shell` mode, exit code 0 = true. In `simple` mode, the AI answers "true" or "false".
 
 **When to use**: Branching logic based on file existence, previous output content, environment checks.
+
+---
+
+### `switch` — Multi-Way Branching
+
+Evaluates an expression and routes execution to the matching case. Like a switch/case statement.
+
+| Config Key | Type | Default | Description |
+|---|---|---|---|
+| `expression` | string | **required** | Expression to evaluate (supports `${var}` and `{{ var }}`) |
+| `cases` | list | **required** | List of case objects with `value` and `blocks` |
+| `default` | list | `null` | Blocks to execute when no case matches |
+
+Each case has:
+- `value`: String to match against (pipe-separated for alternatives: `"error|critical"`)
+- `blocks`: List of block definitions to execute if matched
+
+```json
+{
+  "type": "switch",
+  "config": {
+    "expression": "${gate_status}",
+    "cases": [
+      {
+        "value": "GREEN",
+        "blocks": [{ "type": "shell", "config": { "command": "echo 'All good'" } }]
+      },
+      {
+        "value": "YELLOW|RED",
+        "blocks": [{ "type": "shell", "config": { "command": "echo 'Issues found'" } }]
+      }
+    ],
+    "default": [
+      { "type": "shell", "config": { "command": "echo 'Unknown status'" } }
+    ]
+  }
+}
+```
+
+**When to use**: Multi-way branching when `conditional` (binary if/else) is not expressive enough. Routing based on status codes, environment names, or gate results.
 
 ---
 

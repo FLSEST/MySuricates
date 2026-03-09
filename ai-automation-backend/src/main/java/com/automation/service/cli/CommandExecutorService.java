@@ -123,84 +123,144 @@ public class CommandExecutorService {
         return step;
     }
 
-    // === Host-based execution methods (run Claude CLI on host, not in Docker) ===
+    // === Host-based execution (consolidated API) ===
 
-    public CliSession.EnrichedCommandResult executeCommandOnHost(
-            String projectPath, String command, String model, String systemPrompt) {
-        return executeCommandOnHost(projectPath, command, model, systemPrompt, null);
-    }
-
-    public CliSession.EnrichedCommandResult executeCommandOnHost(
-            String projectPath, String command, String model, String systemPrompt,
-            Integer timeoutSeconds) {
+    /**
+     * Consolidated host command execution via {@link HostExecutionRequest} builder.
+     * Replaces the multiple executeCommandOnHost overloads.
+     */
+    public CliSession.EnrichedCommandResult executeOnHost(HostExecutionRequest request) {
+        String providerId = request.providerId();
+        if (providerId != null && !providerId.isBlank() && !"CLAUDE".equalsIgnoreCase(providerId)) {
+            try {
+                AiProvider provider = aiProviderRegistry.resolve(providerId);
+                AiProvider.ActionResult result = provider.executeAction(
+                        new AiProvider.ActionRequest(request.command(), request.model(),
+                                request.systemPrompt(), request.projectPath(), request.timeoutSeconds()));
+                return new CliSession.EnrichedCommandResult(result.text(), result.exitCode(), null);
+            } catch (IOException e) {
+                throw new WorkflowExecutionException(
+                        "Failed to execute command on host via provider " + providerId, e);
+            }
+        }
         try {
             ActionResult result = hostClaudeService.executeAction(
-                    command, model, systemPrompt, projectPath, timeoutSeconds);
+                    request.command(), request.model(), request.systemPrompt(),
+                    request.projectPath(), request.timeoutSeconds());
             return new CliSession.EnrichedCommandResult(result.text(), result.exitCode(), result.parsed());
         } catch (IOException e) {
-            throw new WorkflowExecutionException("Failed to execute command on host (project: " + projectPath + ")", e);
+            throw new WorkflowExecutionException(
+                    "Failed to execute command on host (project: " + request.projectPath() + ")", e);
         }
     }
 
     /**
-     * Provider-aware host execution. Routes through AiProviderRegistry.
+     * Consolidated host step execution via {@link HostExecutionRequest} builder.
+     * Replaces the multiple executeStepOnHost overloads.
      */
+    public StepResult executeStepOnHost(HostExecutionRequest request) {
+        if (request.block() == null) {
+            throw new WorkflowExecutionException("HostExecutionRequest.block is required for step execution");
+        }
+        if (request.shell()) {
+            return executeStepAsShell(request.projectPath(), request.block(),
+                    request.stepIndex() != null ? request.stepIndex() : 0,
+                    request.timeoutSeconds() != null ? request.timeoutSeconds() : 300);
+        }
+        return executeStepOnHostInternal(request);
+    }
+
+    // === Legacy overloads (deprecated — use HostExecutionRequest builder) ===
+
+    /** @deprecated Use {@link #executeOnHost(HostExecutionRequest)} instead. */
+    @Deprecated(forRemoval = true)
+    public CliSession.EnrichedCommandResult executeCommandOnHost(
+            String projectPath, String command, String model, String systemPrompt) {
+        return executeOnHost(HostExecutionRequest.builder()
+                .projectPath(projectPath).command(command).model(model).systemPrompt(systemPrompt).build());
+    }
+
+    /** @deprecated Use {@link #executeOnHost(HostExecutionRequest)} instead. */
+    @Deprecated(forRemoval = true)
+    public CliSession.EnrichedCommandResult executeCommandOnHost(
+            String projectPath, String command, String model, String systemPrompt,
+            Integer timeoutSeconds) {
+        return executeOnHost(HostExecutionRequest.builder()
+                .projectPath(projectPath).command(command).model(model)
+                .systemPrompt(systemPrompt).timeoutSeconds(timeoutSeconds).build());
+    }
+
+    /** @deprecated Use {@link #executeOnHost(HostExecutionRequest)} instead. */
+    @Deprecated(forRemoval = true)
     public CliSession.EnrichedCommandResult executeCommandOnHost(
             String projectPath, String command, String model, String systemPrompt,
             Integer timeoutSeconds, String providerId) {
-        if (providerId == null || providerId.isBlank() || "CLAUDE".equalsIgnoreCase(providerId)) {
-            return executeCommandOnHost(projectPath, command, model, systemPrompt, timeoutSeconds);
-        }
-
-        try {
-            AiProvider provider = aiProviderRegistry.resolve(providerId);
-            AiProvider.ActionResult result = provider.executeAction(
-                    new AiProvider.ActionRequest(command, model, systemPrompt, projectPath, timeoutSeconds));
-            return new CliSession.EnrichedCommandResult(result.text(), result.exitCode(), null);
-        } catch (IOException e) {
-            throw new WorkflowExecutionException("Failed to execute command on host via provider " + providerId, e);
-        }
+        return executeOnHost(HostExecutionRequest.builder()
+                .projectPath(projectPath).command(command).model(model)
+                .systemPrompt(systemPrompt).timeoutSeconds(timeoutSeconds).providerId(providerId).build());
     }
 
+    /** @deprecated Use {@link #executeOnHost(HostExecutionRequest)} instead. */
+    @Deprecated(forRemoval = true)
     public CliSession.CommandResult executeCommandOnHost(String projectPath, String command) {
-        return executeCommandOnHost(projectPath, command, null, null).toCommandResult();
+        return executeOnHost(HostExecutionRequest.builder()
+                .projectPath(projectPath).command(command).build()).toCommandResult();
     }
 
+    /** @deprecated Use {@link #executeStepOnHost(HostExecutionRequest)} instead. */
+    @Deprecated(forRemoval = true)
     public StepResult executeStepOnHost(String projectPath, BlockDefinition block,
                                          int stepIndex, String instructionPrefix, String model) {
-        return executeStepOnHost(projectPath, block, stepIndex, instructionPrefix, model, null);
+        return executeStepOnHost(HostExecutionRequest.builder()
+                .projectPath(projectPath).block(block).stepIndex(stepIndex)
+                .systemPrompt(instructionPrefix).model(model).build());
     }
 
+    /** @deprecated Use {@link #executeStepOnHost(HostExecutionRequest)} instead. */
+    @Deprecated(forRemoval = true)
     public StepResult executeStepOnHost(String projectPath, BlockDefinition block,
                                          int stepIndex, String instructionPrefix, String model,
                                          Integer timeoutSeconds) {
+        return executeStepOnHost(HostExecutionRequest.builder()
+                .projectPath(projectPath).block(block).stepIndex(stepIndex)
+                .systemPrompt(instructionPrefix).model(model).timeoutSeconds(timeoutSeconds).build());
+    }
+
+    private StepResult executeStepOnHostInternal(HostExecutionRequest request) {
         StepResult step = new StepResult();
+        int stepIndex = request.stepIndex() != null ? request.stepIndex() : 0;
         step.setStepIndex(stepIndex);
         step.setStartedAt(Instant.now());
 
-        String command = extractCommand(block);
+        String command = extractCommand(request.block());
         step.setInput(command);
         step.setStatus(StepStatus.RUNNING);
 
         try {
-            CliSession.EnrichedCommandResult result =
-                    executeCommandOnHost(projectPath, command, model, instructionPrefix, timeoutSeconds);
+            CliSession.EnrichedCommandResult result = executeOnHost(HostExecutionRequest.builder()
+                    .projectPath(request.projectPath())
+                    .command(command)
+                    .model(request.model())
+                    .systemPrompt(request.systemPrompt())
+                    .timeoutSeconds(request.timeoutSeconds())
+                    .providerId(request.providerId())
+                    .build());
             step.setOutput(result.output());
             step.setStatus(result.exitCode() == 0 ? StepStatus.COMPLETED : StepStatus.FAILED);
 
             if (result.parsed() != null) {
                 Map<String, Object> meta = new LinkedHashMap<>(result.parsed().toMetadata());
-                if (model != null && !meta.containsKey("model")) meta.put("model", model);
-                meta.put("provider", "CLAUDE");
+                if (request.model() != null && !meta.containsKey("model")) meta.put("model", request.model());
+                meta.put("provider", request.providerId() != null ? request.providerId() : "CLAUDE");
                 step.setMetadata(meta);
             } else {
                 Map<String, Object> meta = new LinkedHashMap<>();
-                if (model != null) meta.put("model", model);
-                meta.put("provider", "CLAUDE");
+                if (request.model() != null) meta.put("model", request.model());
+                meta.put("provider", request.providerId() != null ? request.providerId() : "CLAUDE");
                 step.setMetadata(meta);
             }
         } catch (Exception e) {
-            log.error("Host step execution failed for project {}: {}", projectPath, e.getMessage(), e);
+            log.error("Host step execution failed for project {}: {}", request.projectPath(), e.getMessage(), e);
             step.setOutput("Error: " + e.getMessage());
             step.setStatus(StepStatus.FAILED);
             step.setMetadata(Map.of("error", e.getMessage()));

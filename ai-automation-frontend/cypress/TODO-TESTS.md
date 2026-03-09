@@ -1,8 +1,8 @@
 # Cypress E2E Test Coverage - TODO
 
-Stand: 2026-03-01 | Aktuell: **130 Tests in 13 Specs, alle gruen**
+Stand: 2026-03-09 | Aktuell: **164 Tests in 14 Specs**
 
-## Abgedeckte Seiten (11 von 14)
+## Abgedeckte Seiten (12 von 14)
 
 | Spec | Tests | Seite |
 |------|-------|-------|
@@ -11,6 +11,7 @@ Stand: 2026-03-01 | Aktuell: **130 Tests in 13 Specs, alle gruen**
 | projects.cy.ts | 8 | Projects List |
 | project-detail.cy.ts | 15 | Project Detail |
 | workflows.cy.ts | 21 | Workflows List + Detail |
+| workflow-execution.cy.ts | 34 | Workflow Execution |
 | runs.cy.ts | 10 | Run History |
 | todos.cy.ts | 16 | Todos |
 | schedules.cy.ts | 6 | Schedules |
@@ -20,16 +21,16 @@ Stand: 2026-03-01 | Aktuell: **130 Tests in 13 Specs, alle gruen**
 | activity-log.cy.ts | 8 | Activity Log |
 | wishes.cy.ts | 8 | Wishes |
 
-## Seiten OHNE Tests (1 von 14)
+## Seiten OHNE Tests (0 von 14)
 
-### WorkflowExecution (`/workflows/:id/run/:runId`) - MITTLERE PRIO
-Erfordert laufende/abgeschlossene Workflow-Execution; nicht trivial in E2E zu simulieren.
-- [ ] Execution-Header mit Status-Badge
-- [ ] Step-Cards (completed, failed, running, pending)
-- [ ] Step-Output-Anzeige (Input, Output, Error)
-- [ ] Pause/Resume-Buttons
-- [ ] Cancel-Button
-- [ ] Run-Command Eingabe
+### WorkflowExecution (`/workflows/:id/run/:runId`) - ABGEDECKT
+Verwendet cy.intercept() fuer API-Mocking statt echte Workflow-Ausfuehrung.
+- [x] Execution-Header mit Status-Badge
+- [x] Step-Cards (completed, failed, running, pending)
+- [x] Step-Output-Anzeige (Input, Output, Error)
+- [x] Pause/Resume-Buttons
+- [x] Cancel-Button
+- [x] Run-Command Eingabe
 - [ ] Approval-Dialog (fuer Approval-Blocks)
 - [ ] WebSocket Live-Updates
 

@@ -84,7 +84,7 @@ ai-automation-backend/     Spring Boot 3.4 (Java 21) REST API
     service/memory/        Knowledge extraction and summarization (WorkflowMemoryService, ClaudeSummarizer, CodexSummarizer, KnowledgeSummarizer)
     service/staging/       Staging lifecycle, sync, and test instance (StagingService, TestingService, InstanceSyncHelper)
     service/todo/          Todo management and gate resolution (TodoService, AutoTodoService, GateStatusResolver)
-    service/workflow/      Workflow execution, templates, optimization (WorkflowExecutor, WorkflowService, TemplateVerificationService)
+    service/workflow/      Workflow execution, templates, optimization (WorkflowExecutor, ExecutionBroadcaster, WorkflowService, TemplateVerificationService)
     security/              API key auth, rate limiting, Tailscale
     config/                Spring configuration, built-in template/skill seeders
     websocket/             WebSocket for real-time updates
@@ -118,7 +118,8 @@ ai-automation-frontend/    React 18 SPA (TypeScript)
 # Backend
 cd ai-automation-backend
 mvn clean package                        # Build JAR
-mvn test                                 # Run tests
+mvn test                                 # Run tests (unit + integration)
+mvn test -Dtest="FlywayMigrationTest,RepositoryIntegrationTest,ControllerIntegrationTest"  # Integration tests only
 mvn spring-boot:run                      # Start dev server (port 9090)
 
 # Frontend
@@ -158,7 +159,7 @@ npm run cy:open                          # Open Cypress UI
   - `CommandExecutorService` provides `executeCommandOnHost()` / `executeStepOnHost()` / `injectSkillContextOnHost()` methods
 - Docker containers have resource limits: 4GB memory, CPU quota, 100 PIDs, 60min idle timeout
 - Security is enabled by default: API key auth via `X-API-Key` header (auto-generated if not configured), rate limiting
-- Block types: simple, shell, retry, conditional, forEach, while, agentic, approval, sub-workflow, skill-capability, human-input
+- Block types: simple, shell, retry, conditional, forEach, while, switch, agentic, approval, sub-workflow, skill-capability, human-input
 - Agentic blocks use a Goal→Reason→Act→Observe loop powered by Host Claude CLI
 - Workflow Conversion: Successful agentic runs can be converted to deterministic workflows (rule-based + AI)
 - Terminal WebSocket at `/ws/terminal` for real-time container access
@@ -269,6 +270,15 @@ Additional safety:
 - Max nesting depth: 5 levels
 - Polling-based completion with 30min timeout
 - `@Lazy` injection on `WorkflowExecutor` to break Spring DI cycle
+
+## Switch Block
+
+- `SwitchBlockExecutor` — multi-way branching based on expression evaluation
+- Expression supports `${varName}` and `{{ varName }}` syntax, resolved from context variables
+- Cases are evaluated in order; first match wins. Pipe-separated alternatives (e.g. `"error|critical"`) supported
+- `default` case executes when no other case matches
+- Each case contains a list of nested blocks (shell or claude) executed sequentially
+- Returns `COMPLETED` with `matchedCase: "none"` when no match and no default
 
 ## Workflow Chains
 

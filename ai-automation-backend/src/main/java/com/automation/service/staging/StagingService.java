@@ -255,6 +255,7 @@ public class StagingService {
             p.waitFor();
             return !output.isEmpty();
         } catch (Exception e) {
+            log.debug("Container status check failed: {}", e.getMessage());
             return false;
         }
     }
@@ -268,6 +269,7 @@ public class StagingService {
             conn.disconnect();
             return code == 200;
         } catch (Exception e) {
+            log.debug("Health check failed for {}: {}", config.getHealthUrl(), e.getMessage());
             return false;
         }
     }
@@ -285,6 +287,7 @@ public class StagingService {
                 return first != null && !first.isBlank() ? first.trim() : null;
             }
         } catch (Exception e) {
+            log.debug("Failed to find last snapshot tag: {}", e.getMessage());
             return null;
         }
     }

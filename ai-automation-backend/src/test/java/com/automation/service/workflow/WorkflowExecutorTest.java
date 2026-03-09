@@ -21,7 +21,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.util.*;
 import java.util.concurrent.ExecutorService;
@@ -50,7 +49,7 @@ class WorkflowExecutorTest {
     private ContainerRepository containerRepository;
 
     @Mock
-    private SimpMessagingTemplate messagingTemplate;
+    private ExecutionBroadcaster broadcaster;
 
     @Mock
     private ExecutorService virtualThreadExecutor;
@@ -101,7 +100,7 @@ class WorkflowExecutorTest {
                 commandExecutorService,
                 runRepository,
                 containerRepository,
-                messagingTemplate,
+                broadcaster,
                 virtualThreadExecutor,
                 new Semaphore(10),
                 agentInstructionsService,
@@ -275,8 +274,7 @@ class WorkflowExecutorTest {
 
         workflowExecutor.execute(testWorkflow, null);
 
-        verify(messagingTemplate, atLeastOnce()).convertAndSend(
-                contains("/topic/executions/"), any(Map.class));
+        verify(broadcaster, atLeastOnce()).broadcastStepResult(anyString(), any(StepResult.class));
     }
 
     @Test
@@ -346,8 +344,7 @@ class WorkflowExecutorTest {
         verify(containerService).createAndStartContainer(testProject);
 
         // WebSocket broadcasts for container_starting and container_started
-        verify(messagingTemplate, atLeastOnce()).convertAndSend(
-                eq("/topic/executions/run-1/logs"), any(Map.class));
+        verify(broadcaster, atLeastOnce()).broadcastLogMessage(eq("run-1"), anyString(), any(Map.class));
 
         // Workflow completed successfully
         WorkflowRun saved = captureLastSavedRun();

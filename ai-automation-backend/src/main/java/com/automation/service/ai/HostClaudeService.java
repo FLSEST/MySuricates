@@ -72,38 +72,9 @@ public class HostClaudeService {
     public ReasoningResult reasonStructured(String prompt, String systemPrompt,
                                              String workingDirectory, Integer maxTurns,
                                              Integer timeoutSeconds) throws IOException {
-        acquireThrottle();
-        try {
-            List<String> cmd = buildReasonCommand(prompt, systemPrompt, maxTurns);
-
-            ProcessBuilder pb = new ProcessBuilder(cmd);
-            pb.redirectErrorStream(true);
-            // Prevent nested-session detection (same as executeAction)
-            pb.environment().remove("CLAUDECODE");
-            pb.environment().remove("CLAUDE_CODE");
-            if (workingDirectory != null && !workingDirectory.isBlank()) {
-                pb.directory(new File(workingDirectory));
-            }
-
-            log.debug("Host Claude reasoning (prompt length: {} chars, workDir: {})", prompt.length(), workingDirectory);
-            Process proc = pb.start();
-            // Write prompt via stdin to avoid OS command-line length limits (E2BIG)
-            writePromptToStdin(proc, prompt);
-
-            int effectiveTimeout = timeoutSeconds != null ? timeoutSeconds : config.getTimeoutSeconds();
-            String rawOutput = drainProcess(proc, effectiveTimeout, "Host Claude reasoning");
-
-            int exitCode = proc.exitValue();
-            if (exitCode != 0) {
-                log.warn("Host Claude returned exit code {}: {}", exitCode, truncate(rawOutput, 500));
-            }
-
-            ClaudeJsonResponse parsed = ClaudeOutputParser.parseStreamJson(rawOutput);
-            String text = parsed.result() != null ? parsed.result() : rawOutput;
-            return new ReasoningResult(text, parsed);
-        } finally {
-            callSemaphore.release();
-        }
+        List<String> cmd = buildReasonCommand(prompt, systemPrompt, maxTurns);
+        var result = executeProcess(cmd, prompt, workingDirectory, timeoutSeconds, "Host Claude reasoning");
+        return new ReasoningResult(result.text, result.parsed);
     }
 
     /**
@@ -120,35 +91,43 @@ public class HostClaudeService {
     public ActionResult executeAction(String prompt, String model,
                                        String systemPrompt, String workingDirectory,
                                        Integer timeoutSeconds) throws IOException {
+        List<String> cmd = buildActionCommand(prompt, model, systemPrompt);
+        var result = executeProcess(cmd, prompt, workingDirectory, timeoutSeconds, "Host Claude action");
+        return new ActionResult(result.text, result.exitCode, result.parsed);
+    }
+
+    /**
+     * Shared process execution logic — eliminates duplication between reasonStructured and executeAction.
+     */
+    private record ProcessResult(String text, int exitCode, ClaudeJsonResponse parsed) {}
+
+    private ProcessResult executeProcess(List<String> cmd, String prompt, String workingDirectory,
+                                          Integer timeoutSeconds, String label) throws IOException {
         acquireThrottle();
         try {
-            List<String> cmd = buildActionCommand(prompt, model, systemPrompt);
-
             ProcessBuilder pb = new ProcessBuilder(cmd);
             pb.redirectErrorStream(true);
+            pb.environment().remove("CLAUDE_CODE");
+            pb.environment().remove("CLAUDECODE");
             if (workingDirectory != null && !workingDirectory.isBlank()) {
                 pb.directory(new File(workingDirectory));
             }
-            // Remove nested-session detection env vars
-            pb.environment().remove("CLAUDE_CODE");
-            pb.environment().remove("CLAUDECODE");
 
-            log.debug("Host Claude action (prompt length: {} chars, workDir: {})", prompt.length(), workingDirectory);
+            log.debug("{} (prompt length: {} chars, workDir: {})", label, prompt.length(), workingDirectory);
             Process proc = pb.start();
-            // Write prompt via stdin to avoid OS command-line length limits (E2BIG)
             writePromptToStdin(proc, prompt);
 
             int effectiveTimeout = timeoutSeconds != null ? timeoutSeconds : config.getTimeoutSeconds();
-            String rawOutput = drainProcess(proc, effectiveTimeout, "Host Claude action");
+            String rawOutput = drainProcess(proc, effectiveTimeout, label);
 
             int exitCode = proc.exitValue();
             if (exitCode != 0) {
-                log.warn("Host Claude action returned exit code {}: {}", exitCode, truncate(rawOutput, 500));
+                log.warn("{} returned exit code {}: {}", label, exitCode, truncate(rawOutput, 500));
             }
 
             ClaudeJsonResponse parsed = ClaudeOutputParser.parseStreamJson(rawOutput);
             String text = parsed.result() != null ? parsed.result() : rawOutput;
-            return new ActionResult(text, exitCode, parsed);
+            return new ProcessResult(text, exitCode, parsed);
         } finally {
             callSemaphore.release();
         }
