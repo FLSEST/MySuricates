@@ -121,6 +121,7 @@ Danach ist die Anwendung unter **http://localhost:3000** erreichbar.
 | [CODE_WALKTHROUGH.md](CODE_WALKTHROUGH.md) | Die 10 wichtigsten Dateien erklaert |
 | [GLOSSARY.md](GLOSSARY.md) | Projektspezifische Begriffe & Abkuerzungen |
 | [FAQ.md](FAQ.md) | Haeufige Probleme und Loesungen |
+| [WORKFLOW-GUIDE.md](../WORKFLOW-GUIDE.md) | Praktischer Guide zum Erstellen von Workflows (Block-Typen, Patterns, Timeouts) |
 
 ---
 

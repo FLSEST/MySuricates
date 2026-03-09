@@ -6,7 +6,7 @@ import java.util.List;
 
 public record CreateWishRequest(
         @NotBlank String text,
-        String projectId,
+        @NotBlank String projectId,
         Integer maxIterations,
         List<String> referenceWorkflowIds
 ) {}

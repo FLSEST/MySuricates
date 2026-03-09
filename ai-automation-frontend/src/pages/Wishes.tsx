@@ -156,7 +156,7 @@ export function Wishes() {
             </div>
             <Button
               onClick={handleSubmit}
-              disabled={!wishText.trim() || createWish.isPending}
+              disabled={!wishText.trim() || !projectId || createWish.isPending}
               icon={<Send className="w-4 h-4" />}
             >
               {t.wishes.create}

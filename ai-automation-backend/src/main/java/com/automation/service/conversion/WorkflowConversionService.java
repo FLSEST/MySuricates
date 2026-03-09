@@ -10,6 +10,7 @@ import com.automation.service.ai.AiProvider;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.workflow.AgentInstructionsService;
 import com.automation.service.workflow.WorkflowService;
+import com.automation.util.JsonRepairUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -174,7 +175,7 @@ public class WorkflowConversionService {
 
         // Extract JSON from response
         String json = extractJson(response);
-        Map<String, Object> parsed = MAPPER.readValue(json, new TypeReference<>() {});
+        Map<String, Object> parsed = JsonRepairUtil.parseWithRepair(json, new TypeReference<>() {});
 
         String sugName = (String) parsed.getOrDefault("suggestedName", "Auto: " + truncate(goal, 60));
         String sugDesc = (String) parsed.getOrDefault("suggestedDescription", "");

@@ -3,6 +3,7 @@ package com.automation.service.workflow;
 import com.automation.entity.Workflow;
 import com.automation.service.ai.AiProvider;
 import com.automation.service.ai.AiProviderRegistry;
+import com.automation.util.JsonRepairUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -126,8 +127,8 @@ public class WorkflowOptimizationService {
         }
 
         try {
-            return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
-        } catch (JsonProcessingException e) {
+            return JsonRepairUtil.parseWithRepair(json, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
             log.warn("Could not parse optimization response as JSON: {}", e.getMessage());
             return Map.of(
                     "suggestedName", "",

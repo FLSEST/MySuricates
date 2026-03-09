@@ -1,5 +1,6 @@
 package com.automation.service.cli;
 
+import com.automation.util.JsonRepairUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -59,6 +60,23 @@ public class ClaudeOutputParser {
                     }
                 }
             } catch (Exception e) {
+                // For the last non-blank line, attempt JSON repair before skipping
+                if (isLastNonBlankLine(lines, line)) {
+                    String repaired = JsonRepairUtil.repairTruncatedJson(line);
+                    if (repaired != null) {
+                        try {
+                            JsonNode node = MAPPER.readTree(repaired);
+                            String type = node.path("type").asText("");
+                            if ("result".equals(type)) {
+                                resultLine = MAPPER.treeToValue(node, ClaudeJsonResponse.class);
+                                log.debug("Repaired truncated result line successfully");
+                                continue;
+                            }
+                        } catch (Exception re) {
+                            log.trace("Repair attempt also failed for line: {}", truncate(line, 200));
+                        }
+                    }
+                }
                 log.trace("Skipping unparseable NDJSON line: {}", truncate(line, 200));
             }
         }
@@ -100,6 +118,15 @@ public class ClaudeOutputParser {
         return new ClaudeJsonResponse(
                 rawText, null, null, null, null, null, null, null, null
         );
+    }
+
+    private static boolean isLastNonBlankLine(String[] lines, String currentLine) {
+        for (int i = lines.length - 1; i >= 0; i--) {
+            if (!lines[i].isBlank()) {
+                return lines[i].equals(currentLine);
+            }
+        }
+        return false;
     }
 
     private static String truncate(String s, int max) {

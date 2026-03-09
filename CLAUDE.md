@@ -58,6 +58,8 @@ curl -X POST http://localhost:9090/api/v1/todos \
 
 AI-powered workflow automation platform with a skill system, Docker-based execution, and a React frontend.
 
+**Workflow Building Guide**: See [docs/WORKFLOW-GUIDE.md](docs/WORKFLOW-GUIDE.md) for a practical guide on building workflows — block types, patterns, timeouts, and pitfalls.
+
 ## Vision
 
 Two pillars: (1) universal problem solver for everyday life and work, (2) self-improving AI platform that gets smarter with every run. See [VISION.md](VISION.md) for the full vision document.
@@ -160,6 +162,7 @@ npm run cy:open                          # Open Cypress UI
 - Agentic blocks use a Goal→Reason→Act→Observe loop powered by Host Claude CLI
 - Workflow Conversion: Successful agentic runs can be converted to deterministic workflows (rule-based + AI)
 - Terminal WebSocket at `/ws/terminal` for real-time container access
+- **Soft-Delete Pattern**: Both `Workflow` and `Project` use `@SQLRestriction` for soft-delete. Workflows use `deleted_at`, Projects use `archived_at`. Standard JPA queries automatically exclude soft-deleted records; native queries with explicit SQL bypass the filter (e.g. `findArchived()`, `findByIdIncludingArchived()`). Archived projects retain all their workflows, runs, and data — nothing is cascade-deleted.
 
 ## Agent Instructions System
 
@@ -318,7 +321,7 @@ Controlled by `automation.staging.auto-start` (default: `true`, disabled in `app
 | Workflows | name + projectName | Update if exists, import if new |
 | Custom Skills | name | Skip if exists, import if new |
 
-**Not synced** (preserved on Stable): workflow_runs, step_results, scheduled_workflows, webhook_triggers, activity_log, todos, built-in skills/templates.
+**Not synced** (preserved on Stable): workflow_runs, step_results, scheduled_workflows, webhook_triggers, activity_log, todos, built-in skills/templates. Archived projects and soft-deleted workflows are automatically excluded via `@SQLRestriction`.
 
 Requires Stable to be running and healthy. In the UI: Settings → Stable → "Definitionen synchronisieren" (only enabled when Stable is healthy).
 

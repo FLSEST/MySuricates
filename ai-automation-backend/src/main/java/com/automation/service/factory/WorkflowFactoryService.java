@@ -13,6 +13,7 @@ import com.automation.service.staging.TestingService;
 import com.automation.service.workflow.AgentInstructionsService;
 import com.automation.service.workflow.WorkflowService;
 import com.automation.service.workflow.WorkflowTemplateService;
+import com.automation.util.JsonRepairUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -408,7 +409,7 @@ public class WorkflowFactoryService {
         int end = trimmed.lastIndexOf('}');
         if (start >= 0 && end > start) {
             String json = trimmed.substring(start, end + 1);
-            return objectMapper.readTree(json);
+            return JsonRepairUtil.readTreeWithRepair(json);
         }
 
         throw new IOException("No valid JSON found in Claude response");
@@ -457,7 +458,7 @@ public class WorkflowFactoryService {
                 // Direct array
                 int arrEnd = trimmed.lastIndexOf(']');
                 String json = trimmed.substring(arrStart, arrEnd + 1);
-                JsonNode arrayNode = objectMapper.readTree(json);
+                JsonNode arrayNode = JsonRepairUtil.readTreeWithRepair(json);
                 List<BlockDefinition> blocks = new ArrayList<>();
                 for (JsonNode blockNode : arrayNode) {
                     BlockDefinition block = new BlockDefinition();

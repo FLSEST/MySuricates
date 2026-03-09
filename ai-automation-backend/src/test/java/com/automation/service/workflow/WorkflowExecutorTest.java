@@ -391,6 +391,49 @@ class WorkflowExecutorTest {
     }
 
     @Test
+    void execute_lastBlockOutputContainsGateStatus_mergesIntoRunMetadata() {
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED)
+                .output("Analysis done.\n\ngate_status: RED\ngate_category: lint-errors\ngate_description: Found 3 issues")
+                .build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(step);
+
+        // Single-block workflow so the last block has the gate_status output
+        testWorkflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder().type("simple").config(new HashMap<>(Map.of("command", "analyze"))).build()
+        )));
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        ArgumentCaptor<WorkflowRunCompletedEvent> eventCaptor = ArgumentCaptor.forClass(WorkflowRunCompletedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        WorkflowRunCompletedEvent event = eventCaptor.getValue();
+        assertThat(event.getRunMetadata()).containsEntry("gate_status", "RED");
+        assertThat(event.getRunMetadata()).containsEntry("gate_category", "lint-errors");
+        assertThat(event.getRunMetadata()).containsEntry("gate_description", "Found 3 issues");
+    }
+
+    @Test
+    void execute_lastBlockOutputWithoutGateStatus_noGateMetadataAdded() {
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED)
+                .output("Everything looks fine, no issues.")
+                .build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(step);
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        ArgumentCaptor<WorkflowRunCompletedEvent> eventCaptor = ArgumentCaptor.forClass(WorkflowRunCompletedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        WorkflowRunCompletedEvent event = eventCaptor.getValue();
+        assertThat(event.getRunMetadata()).doesNotContainKey("gate_status");
+        assertThat(event.getRunMetadata()).doesNotContainKey("gate_category");
+        assertThat(event.getRunMetadata()).doesNotContainKey("gate_description");
+    }
+
+    @Test
     void execute_publishesWorkflowRunCompletedEvent() {
         StepResult step = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();

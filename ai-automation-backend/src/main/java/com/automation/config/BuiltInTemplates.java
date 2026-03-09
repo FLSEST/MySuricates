@@ -1064,6 +1064,73 @@ public final class BuiltInTemplates {
                         + "- chore: <beschreibung> — fuer Cleanup (Dead Code, Dependencies)",
                 "claude-sonnet-4-6", "1.1.0"));
 
+        // ── TODO Creator ─────────────────────────────────────────────────
+
+        templates.add(template("todo-creator", "\u2705",
+                Map.of("de", "TODO-Creator", "en", "TODO Creator"),
+                Map.of("de", "Aufgabenbeschreibung in atomare TODOs zerlegen und via API anlegen",
+                        "en", "Decompose task description into atomic TODOs and create via API"),
+                "TRANSFORM", order++,
+                List.of(
+                        block("simple", Map.of(
+                                "command", "Analysiere die folgende Aufgabe und zerlege sie in atomare, umsetzbare Teilschritte.\n\n"
+                                        + "## Aufgabe\n{{ task_description }}\n\n"
+                                        + "## Projektkontext\n{{ project_context }}\n\n"
+                                        + "Erstelle fuer jeden Teilschritt:\n"
+                                        + "- **title**: Kurzer Titel im Imperativ (z.B. 'API-Endpunkt fuer User-Export implementieren')\n"
+                                        + "- **description**: Markdown mit Kontext, Akzeptanzkriterien, technischen Hinweisen\n"
+                                        + "- **priority**: HIGH (blockierend/kritisch), MEDIUM (bald noetig), LOW (nice-to-have)\n"
+                                        + "- **tags**: Passende Tags aus: backend, frontend, architektur, security, performance, ux, ui, feature, bug, testing, documentation\n\n"
+                                        + "Regeln:\n"
+                                        + "- Jedes TODO muss in sich abgeschlossen und unabhaengig umsetzbar sein\n"
+                                        + "- Abhaengigkeiten zwischen TODOs in der Description erwaehnen\n"
+                                        + "- Realistische Priorisierung — nicht alles ist HIGH\n"
+                                        + "- Maximal 10 TODOs pro Aufgabe\n\n"
+                                        + "Antworte als JSON-Array:\n"
+                                        + "```json\n"
+                                        + "[{\"title\": \"...\", \"description\": \"...\", \"priority\": \"HIGH|MEDIUM|LOW\", \"tags\": [\"...\"]}]\n"
+                                        + "```",
+                                "timeout_seconds", 600
+                        )),
+                        block("agentic", Map.of(
+                                "goal", "Erstelle TODOs via REST API basierend auf der Analyse aus {{ previous_output }}.\n\n"
+                                        + "VORGEHEN:\n"
+                                        + "1. API-Key aus der SQLite-Datenbank lesen:\n"
+                                        + "   python3 -c \"import sqlite3; conn = sqlite3.connect('ai-automation-backend/data/automation.db'); "
+                                        + "c = conn.cursor(); c.execute(\\\"SELECT value FROM app_settings WHERE key = 'api-key'\\\"); "
+                                        + "print(c.fetchone()[0]); conn.close()\"\n\n"
+                                        + "2. Fuer jedes TODO aus der Analyse einen API-Call ausfuehren:\n"
+                                        + "   curl -X POST http://localhost:9090/api/v1/todos \\\n"
+                                        + "     -H 'Content-Type: application/json' \\\n"
+                                        + "     -H 'X-API-Key: <KEY>' \\\n"
+                                        + "     -d '{\"title\": \"...\", \"description\": \"...\", \"priority\": \"...\", "
+                                        + "\"tags\": [...], \"projectId\": \"{{ project_id }}\", \"source\": \"AI\", \"sourceAgent\": \"todo-creator\"}'\n\n"
+                                        + "3. Ergebnis jedes API-Calls pruefen (HTTP 200/201 = Erfolg)\n\n"
+                                        + "WICHTIG: Absolute Pfade fuer die SQLite-DB verwenden. Jeden API-Call einzeln ausfuehren und Ergebnis pruefen.",
+                                "success_criteria", "Alle TODOs aus der Analyse wurden erfolgreich via API angelegt.",
+                                "max_iterations", 10,
+                                "max_total_tokens", 150000,
+                                "iteration_timeout_seconds", 120,
+                                "total_timeout_seconds", 900,
+                                "max_repeated_actions", 3,
+                                "require_approval", false
+                        )),
+                        block("simple", Map.of(
+                                "command", "Erstelle eine Zusammenfassung der angelegten TODOs basierend auf {{ previous_output }}.\n\n"
+                                        + "Format:\n"
+                                        + "## TODO-Creator Ergebnis\n\n"
+                                        + "**Anzahl angelegte TODOs:** X\n\n"
+                                        + "| # | Titel | Prioritaet | Tags |\n"
+                                        + "|---|-------|-----------|------|\n"
+                                        + "| 1 | ... | HIGH/MEDIUM/LOW | ... |\n\n"
+                                        + "Fasse kurz zusammen, welche Bereiche abgedeckt sind und ob Abhaengigkeiten beachtet werden muessen.",
+                                "timeout_seconds", 300
+                        ))
+                ),
+                "Zerlege Aufgabenbeschreibungen in atomare TODOs und lege sie automatisch via API an. "
+                        + "Variablen: task_description (Aufgabe), project_context (Kontext), project_id (Ziel-Projekt-ID).",
+                null));
+
         return templates;
     }
 

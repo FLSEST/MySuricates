@@ -147,10 +147,11 @@ public class WishService {
     }
 
     public Wish create(String text, String projectId, Integer maxIterations, List<String> referenceWorkflowIds) {
-        if (projectId != null) {
-            projectRepository.findById(projectId)
-                    .orElseThrow(() -> new NoSuchElementException("Project not found: " + projectId));
+        if (projectId == null || projectId.isBlank()) {
+            throw new IllegalArgumentException("projectId is required for wish creation");
         }
+        projectRepository.findById(projectId)
+                .orElseThrow(() -> new NoSuchElementException("Project not found: " + projectId));
 
         Wish wish = Wish.builder()
                 .originalText(text)
@@ -452,6 +453,11 @@ public class WishService {
 
                 List<BlockDefinition> blocks = parseBlocks(wf.get("blocks"));
 
+                String model = (String) wf.getOrDefault("model", null);
+                if (model == null) {
+                    model = inferModelFromBlocks(blocks, description);
+                }
+
                 CreateWorkflowRequest req = new CreateWorkflowRequest(
                         wish.getProjectId(),
                         name,
@@ -460,7 +466,7 @@ public class WishService {
                         blocks,
                         List.of(),
                         null,
-                        null,
+                        model,
                         null,
                         null,
                         null,
@@ -1098,6 +1104,7 @@ public class WishService {
                 11. Reference existing workflows via sub-workflow blocks instead of duplicating logic — check "Reusable Components" for workflows from ALL projects, not just the current one
                 12. Workflows from other projects can be reused as sub-workflows — use their ID in the `workflow_id` config field
                 13. User-selected "Referenced Workflows" should be prioritized for reuse when they match the task
+                14. Set `model` for each workflow: Use "claude-opus-4-6" for analysis, audits, architecture reviews, security scans, and complex reasoning tasks. Use null for standard automation workflows
 
                 ## Timeout Guidelines
 
@@ -1117,6 +1124,7 @@ public class WishService {
                     {
                       "name": "Workflow Name",
                       "description": "What this workflow does",
+                      "model": "claude-opus-4-6 | claude-sonnet-4-6 | null",
                       "blocks": [
                         {"type": "shell", "config": {"command": "npm run lint"}},
                         {"type": "agentic", "config": {"goal": "Fix all lint errors", "max_iterations": 5}}
@@ -1321,6 +1329,27 @@ public class WishService {
             case "simple" -> config.putIfAbsent("timeout_seconds", wishConfig.getDefaultShellTimeoutSeconds());
             default -> { /* no defaults for conditional, forEach, etc. */ }
         }
+    }
+
+    private static final Pattern ANALYSIS_PATTERN = Pattern.compile(
+            "(?i)(analy|audit|review|security|vulnerabilit|architect|assess|inspect|evaluat|quality|scorecard|coverage|debt|radar)",
+            Pattern.CASE_INSENSITIVE);
+
+    private String inferModelFromBlocks(List<BlockDefinition> blocks, String description) {
+        // Check description for analysis keywords
+        if (description != null && ANALYSIS_PATTERN.matcher(description).find()) {
+            return "claude-opus-4-6";
+        }
+        // Check agentic block goals for analysis keywords
+        for (BlockDefinition block : blocks) {
+            if ("agentic".equals(block.getType()) && block.getConfig() != null) {
+                String goal = (String) block.getConfig().getOrDefault("goal", "");
+                if (ANALYSIS_PATTERN.matcher(goal).find()) {
+                    return "claude-opus-4-6";
+                }
+            }
+        }
+        return null;
     }
 
     private void waitForWorkflowCompletion(String runId, String wishId) {

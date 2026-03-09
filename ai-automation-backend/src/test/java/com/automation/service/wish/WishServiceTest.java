@@ -108,13 +108,14 @@ class WishServiceTest {
 
         @Test
         void create_withDefaults_setsMaxIterationsTo5() {
+            when(projectRepository.findById("proj-1")).thenReturn(Optional.of(new Project()));
             when(wishRepository.save(any(Wish.class))).thenAnswer(inv -> {
                 Wish w = inv.getArgument(0);
                 w.setId("w-new");
                 return w;
             });
 
-            Wish result = wishService.create("Build a dashboard", null, null, null);
+            Wish result = wishService.create("Build a dashboard", "proj-1", null, null);
 
             assertThat(result.getOriginalText()).isEqualTo("Build a dashboard");
             assertThat(result.getMaxIterations()).isEqualTo(5);
@@ -123,11 +124,26 @@ class WishServiceTest {
 
         @Test
         void create_withCustomMaxIterations_usesProvided() {
+            when(projectRepository.findById("proj-1")).thenReturn(Optional.of(new Project()));
             when(wishRepository.save(any(Wish.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            Wish result = wishService.create("Test", null, 10, null);
+            Wish result = wishService.create("Test", "proj-1", 10, null);
 
             assertThat(result.getMaxIterations()).isEqualTo(10);
+        }
+
+        @Test
+        void create_withNullProjectId_throwsException() {
+            assertThatThrownBy(() -> wishService.create("Test", null, null, null))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("projectId is required");
+        }
+
+        @Test
+        void create_withBlankProjectId_throwsException() {
+            assertThatThrownBy(() -> wishService.create("Test", "  ", null, null))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("projectId is required");
         }
 
         @Test

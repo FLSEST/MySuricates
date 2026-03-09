@@ -1,5 +1,7 @@
 package com.automation.util;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -92,6 +94,42 @@ public final class JsonRepairUtil {
             return repaired;
         }
         return null;
+    }
+
+    /**
+     * Parses JSON into a JsonNode, attempting repair if the initial parse fails.
+     *
+     * @return parsed JsonNode
+     * @throws java.io.IOException if parsing fails even after repair
+     */
+    public static JsonNode readTreeWithRepair(String json) throws java.io.IOException {
+        try {
+            return MAPPER.readTree(json);
+        } catch (Exception e) {
+            String repaired = repairTruncatedJson(json);
+            if (repaired != null) {
+                return MAPPER.readTree(repaired);
+            }
+            throw new java.io.IOException("JSON parsing failed and repair unsuccessful: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Parses JSON into a typed object, attempting repair if the initial parse fails.
+     *
+     * @return parsed object of type T
+     * @throws java.io.IOException if parsing fails even after repair
+     */
+    public static <T> T parseWithRepair(String json, TypeReference<T> typeRef) throws java.io.IOException {
+        try {
+            return MAPPER.readValue(json, typeRef);
+        } catch (Exception e) {
+            String repaired = repairTruncatedJson(json);
+            if (repaired != null) {
+                return MAPPER.readValue(repaired, typeRef);
+            }
+            throw new java.io.IOException("JSON parsing failed and repair unsuccessful: " + e.getMessage(), e);
+        }
     }
 
     /**

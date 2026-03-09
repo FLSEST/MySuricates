@@ -8,6 +8,7 @@ export function ApiKeyGuard({ children }: { children: React.ReactNode }) {
   const t = useT();
   const { apiKey, setApiKey } = useSettingsStore();
   const [securityEnabled, setSecurityEnabled] = useState<boolean | null>(null);
+  const [validatingStored, setValidatingStored] = useState(false);
   const [inputKey, setInputKey] = useState('');
   const [validating, setValidating] = useState(false);
   const [error, setError] = useState('');
@@ -19,10 +20,29 @@ export function ApiKeyGuard({ children }: { children: React.ReactNode }) {
       .catch(() => setSecurityEnabled(false));
   }, []);
 
-  // Still loading auth status
-  if (securityEnabled === null) return null;
+  // Validate stored API key on load
+  useEffect(() => {
+    if (securityEnabled && apiKey) {
+      setValidatingStored(true);
+      fetch('/api/v1/projects', {
+        headers: { 'X-API-Key': apiKey },
+      })
+        .then((res) => {
+          if (res.status === 401 || res.status === 403) {
+            setApiKey('');
+          }
+        })
+        .catch(() => {
+          // Network error — don't clear key
+        })
+        .finally(() => setValidatingStored(false));
+    }
+  }, [securityEnabled, apiKey, setApiKey]);
 
-  // Security disabled or API key already set — pass through
+  // Still loading auth status or validating stored key
+  if (securityEnabled === null || validatingStored) return null;
+
+  // Security disabled or API key already set (and validated) — pass through
   if (!securityEnabled || apiKey) return <>{children}</>;
 
   const handleSubmit = async (e: React.FormEvent) => {

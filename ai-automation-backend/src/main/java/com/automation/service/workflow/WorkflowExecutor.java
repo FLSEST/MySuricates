@@ -12,6 +12,7 @@ import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.memory.WorkflowMemoryService;
+import com.automation.service.todo.GateStatusOutputParser;
 import com.automation.service.project.ContainerService;
 import com.automation.service.project.ProjectContextService;
 import com.automation.service.system.SystemIdentityService;
@@ -221,6 +222,24 @@ public class WorkflowExecutor {
                             + (output.length() > 500 ? output.substring(0, 500) + "..." : output);
                     run.setError(Map.of("step", step.getStepIndex(), "blockType", block.getType(), "message", message));
                     break;
+                }
+            }
+
+            // Parse gate_status markers from last completed block's output
+            if (!run.getSteps().isEmpty()) {
+                StepResult lastStep = run.getSteps().get(run.getSteps().size() - 1);
+                if (lastStep.getOutput() != null) {
+                    var parsedGate = GateStatusOutputParser.parse(lastStep.getOutput());
+                    if (parsedGate.isPresent()) {
+                        var gate = parsedGate.get();
+                        context.setRunMetadata("gate_status", gate.status().name());
+                        if (gate.category() != null) {
+                            context.setRunMetadata("gate_category", gate.category());
+                        }
+                        if (gate.description() != null) {
+                            context.setRunMetadata("gate_description", gate.description());
+                        }
+                    }
                 }
             }
 
