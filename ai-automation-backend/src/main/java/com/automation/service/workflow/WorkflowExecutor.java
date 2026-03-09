@@ -113,20 +113,17 @@ public class WorkflowExecutor {
             executionSemaphore.acquire();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            WorkflowRun run = runRepository.findById(runId).orElseThrow();
-            run.setStatus(RunStatus.FAILED);
-            run.setCompletedAt(Instant.now());
-            run.setError(Map.of("message", "Interrupted while waiting for execution slot"));
-            runRepository.save(run);
+            failRun(runId, "Interrupted while waiting for execution slot");
             return;
         }
 
-        WorkflowRun run = runRepository.findById(runId).orElseThrow();
-        // Replace lazy proxy with fresh list — run was just created with 0 steps
-        run.setSteps(new ArrayList<>());
-
+        WorkflowRun run = null;
         ExecutionContext context = null;
         try {
+            run = runRepository.findById(runId).orElseThrow();
+            // Replace lazy proxy with fresh list — run was just created with 0 steps
+            run.setSteps(new ArrayList<>());
+
             String containerId = ensureContainerRunning(project, runId);
 
             context = ExecutionContext.builder()
@@ -282,39 +279,87 @@ public class WorkflowExecutor {
 
         } catch (Exception e) {
             log.error("Workflow execution failed: {}", runId, e);
-            run.setStatus(RunStatus.FAILED);
-            run.setError(Map.of("message", e.getMessage() != null ? e.getMessage() : e.getClass().getName()));
+            if (run != null) {
+                run.setStatus(RunStatus.FAILED);
+                run.setError(Map.of("message", e.getMessage() != null ? e.getMessage() : e.getClass().getName()));
+            }
             activityLogService.error(LogCategory.EXECUTION,
                     "Workflow execution error: " + (e.getMessage() != null ? e.getMessage() : e.getClass().getName()),
                     "WorkflowExecutor", runId, workflowId);
         } finally {
-            run.setCompletedAt(Instant.now());
-            run.setDurationMs(
-                    run.getCompletedAt().toEpochMilli() - run.getStartedAt().toEpochMilli()
-            );
-
-            // Merge context runMetadata into WorkflowRun.metadata
-            if (context != null && !context.getRunMetadata().isEmpty()) {
-                Map<String, Object> merged = new HashMap<>(run.getMetadata());
-                merged.putAll(context.getRunMetadata());
-                run.setMetadata(merged);
-            }
-
-            runRepository.save(run);
-            activeExecutions.remove(run.getId());
             executionSemaphore.release();
 
-            // Broadcast final status
-            broadcaster.broadcastRunStatus(run.getId(), run.getStatus());
+            if (run != null) {
+                run.setCompletedAt(Instant.now());
+                run.setDurationMs(
+                        run.getCompletedAt().toEpochMilli() - run.getStartedAt().toEpochMilli()
+                );
 
-            // Publish domain event for listeners (e.g. AutoTodoService)
-            try {
-                eventPublisher.publishEvent(new WorkflowRunCompletedEvent(
-                        this, run.getId(), workflowId, workflowName,
-                        project.getId(), project.getPath(), run.getStatus(),
-                        run.getMetadata(), workflowMeta, run.getError()));
-            } catch (Exception e) {
-                log.warn("Failed to publish WorkflowRunCompletedEvent: {}", e.getMessage());
+                // Merge context runMetadata into WorkflowRun.metadata
+                if (context != null && !context.getRunMetadata().isEmpty()) {
+                    Map<String, Object> merged = new HashMap<>(run.getMetadata());
+                    merged.putAll(context.getRunMetadata());
+                    run.setMetadata(merged);
+                }
+
+                runRepository.save(run);
+                activeExecutions.remove(run.getId());
+
+                // Broadcast final status
+                broadcaster.broadcastRunStatus(run.getId(), run.getStatus());
+
+                // Publish domain event for listeners (e.g. AutoTodoService)
+                try {
+                    eventPublisher.publishEvent(new WorkflowRunCompletedEvent(
+                            this, run.getId(), workflowId, workflowName,
+                            project.getId(), project.getPath(), run.getStatus(),
+                            run.getMetadata(), workflowMeta, run.getError()));
+                } catch (Exception e) {
+                    log.warn("Failed to publish WorkflowRunCompletedEvent: {}", e.getMessage());
+                }
+            } else {
+                // run could not be loaded — mark as failed directly
+                failRun(runId, "Failed to load workflow run from database");
+            }
+        }
+    }
+
+    /**
+     * Marks a run as FAILED directly. Used when the run object couldn't be loaded
+     * in the execution thread, or for cleanup of zombie runs.
+     */
+    private void failRun(String runId, String message) {
+        try {
+            WorkflowRun r = runRepository.findById(runId).orElse(null);
+            if (r != null && r.getStatus() == RunStatus.RUNNING) {
+                r.setStatus(RunStatus.FAILED);
+                r.setCompletedAt(Instant.now());
+                r.setDurationMs(r.getCompletedAt().toEpochMilli() - r.getStartedAt().toEpochMilli());
+                r.setError(Map.of("message", message));
+                runRepository.save(r);
+                log.warn("Force-failed zombie run {}: {}", runId, message);
+            }
+        } catch (Exception e) {
+            log.error("Failed to mark run {} as failed: {}", runId, e.getMessage());
+        }
+    }
+
+    /**
+     * Cleans up zombie runs on startup — any runs stuck in RUNNING status
+     * from a previous application lifecycle.
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void cleanupZombieRuns() {
+        List<WorkflowRun> zombies = runRepository.findByStatus(RunStatus.RUNNING);
+        if (!zombies.isEmpty()) {
+            log.warn("Found {} zombie run(s) stuck in RUNNING status — marking as FAILED", zombies.size());
+            for (WorkflowRun zombie : zombies) {
+                zombie.setStatus(RunStatus.FAILED);
+                zombie.setCompletedAt(Instant.now());
+                zombie.setDurationMs(zombie.getCompletedAt().toEpochMilli() - zombie.getStartedAt().toEpochMilli());
+                zombie.setError(Map.of("message", "Cleaned up: run was stuck in RUNNING after application restart"));
+                runRepository.save(zombie);
+                log.info("Cleaned up zombie run: {}", zombie.getId());
             }
         }
     }
