@@ -25,13 +25,17 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public List<Project> findAll() {
-        return projectRepository.findAll();
+        return projectRepository.findByArchivedAtIsNull();
     }
 
     @Transactional(readOnly = true)
     public Project findById(String id) {
-        return projectRepository.findById(id)
+        Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Project", id));
+        if (project.getArchivedAt() != null) {
+            throw new ResourceNotFoundException("Project", id);
+        }
+        return project;
     }
 
     @Transactional
@@ -88,7 +92,8 @@ public class ProjectService {
 
     @Transactional
     public void delete(String id) {
-        Project project = findById(id);
+        Project project = projectRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Project", id));
 
         if (project.getStatus() == ProjectStatus.RUNNING) {
             containerService.stopContainer(project);
@@ -101,12 +106,12 @@ public class ProjectService {
 
     @Transactional(readOnly = true)
     public List<Project> findArchived() {
-        return projectRepository.findArchived();
+        return projectRepository.findByArchivedAtIsNotNull();
     }
 
     @Transactional
     public Project restore(String id) {
-        Project project = projectRepository.findByIdIncludingArchived(id)
+        Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Project", id));
         project.setArchivedAt(null);
         Project saved = projectRepository.save(project);

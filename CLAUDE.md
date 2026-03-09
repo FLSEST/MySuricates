@@ -162,7 +162,7 @@ npm run cy:open                          # Open Cypress UI
 - Agentic blocks use a Goal→Reason→Act→Observe loop powered by Host Claude CLI
 - Workflow Conversion: Successful agentic runs can be converted to deterministic workflows (rule-based + AI)
 - Terminal WebSocket at `/ws/terminal` for real-time container access
-- **Soft-Delete Pattern**: Both `Workflow` and `Project` use `@SQLRestriction` for soft-delete. Workflows use `deleted_at`, Projects use `archived_at`. Standard JPA queries automatically exclude soft-deleted records; native queries with explicit SQL bypass the filter (e.g. `findArchived()`, `findByIdIncludingArchived()`). Archived projects retain all their workflows, runs, and data — nothing is cascade-deleted.
+- **Soft-Delete Pattern**: Workflows use `@SQLRestriction("deleted_at IS NULL")` on the entity class. Projects use `archived_at` but filter via repository methods (`findByArchivedAtIsNull()`, `findByArchivedAtIsNotNull()`) instead of `@SQLRestriction` — because `@SQLRestriction` on Project would break eager-loaded `Workflow.project` associations. Archived projects retain all their workflows, runs, and data — nothing is cascade-deleted.
 
 ## Agent Instructions System
 

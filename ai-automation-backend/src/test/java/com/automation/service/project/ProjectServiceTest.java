@@ -54,7 +54,7 @@ class ProjectServiceTest {
 
     @Test
     void findAll_returnsAllProjects() {
-        when(projectRepository.findAll()).thenReturn(List.of(testProject));
+        when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of(testProject));
 
         List<Project> result = projectService.findAll();
 
@@ -168,7 +168,7 @@ class ProjectServiceTest {
                 .status(ProjectStatus.STOPPED)
                 .archivedAt(Instant.now())
                 .build();
-        when(projectRepository.findArchived()).thenReturn(List.of(archivedProject));
+        when(projectRepository.findByArchivedAtIsNotNull()).thenReturn(List.of(archivedProject));
 
         List<Project> result = projectService.findArchived();
 
@@ -179,7 +179,7 @@ class ProjectServiceTest {
     @Test
     void restore_archivedProject_clearsArchivedAt() {
         testProject.setArchivedAt(Instant.now());
-        when(projectRepository.findByIdIncludingArchived("proj-1")).thenReturn(Optional.of(testProject));
+        when(projectRepository.findById("proj-1")).thenReturn(Optional.of(testProject));
         when(projectRepository.save(any(Project.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Project result = projectService.restore("proj-1");
@@ -190,7 +190,7 @@ class ProjectServiceTest {
 
     @Test
     void restore_nonExistent_throwsResourceNotFoundException() {
-        when(projectRepository.findByIdIncludingArchived("unknown")).thenReturn(Optional.empty());
+        when(projectRepository.findById("unknown")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> projectService.restore("unknown"))
                 .isInstanceOf(ResourceNotFoundException.class)
