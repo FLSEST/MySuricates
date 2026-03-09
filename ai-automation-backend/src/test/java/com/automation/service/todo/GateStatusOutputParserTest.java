@@ -160,6 +160,14 @@ class GateStatusOutputParserTest {
     }
 
     @Test
+    void parse_markdownHeading() {
+        String output = "### Gate-Status: YELLOW";
+        Optional<ParsedGateStatus> result = GateStatusOutputParser.parse(output);
+        assertThat(result).isPresent();
+        assertThat(result.get().status()).isEqualTo(GateStatus.YELLOW);
+    }
+
+    @Test
     void parse_hyphenVariant() {
         String output = "**Gate-Status: YELLOW** — 4 von 6 Kategorien veraltet";
         Optional<ParsedGateStatus> result = GateStatusOutputParser.parse(output);

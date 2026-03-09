@@ -16,18 +16,20 @@ public final class GateStatusOutputParser {
 
     public record ParsedGateStatus(GateStatus status, String category, String description) {}
 
-    // Line-anchored patterns, tolerant of Markdown bold (**), backticks (`),
-    // hyphens (Gate-Status), underscores (gate_status), and trailing text
+    // Line-anchored patterns, tolerant of:
+    // - Markdown headings (###), bold (**), backticks (`)
+    // - Hyphens (Gate-Status) and underscores (gate_status)
+    // - Trailing text after the value
     private static final Pattern STATUS_PATTERN = Pattern.compile(
-            "^[*`]*gate[_-]status[*`]*:\\s*[*`]*(RED|YELLOW|GREEN)[*`]*(?:\\s.*)?$",
+            "^(?:#{1,6}\\s+)?[*`]*gate[_-]status[*`]*:\\s*[*`]*(RED|YELLOW|GREEN)[*`]*(?:\\s.*)?$",
             Pattern.MULTILINE | Pattern.CASE_INSENSITIVE);
 
     private static final Pattern CATEGORY_PATTERN = Pattern.compile(
-            "^[*`]*gate[_-]category[*`]*:\\s*[*`]*(.+?)[*`]*\\s*$",
+            "^(?:#{1,6}\\s+)?[*`]*gate[_-]category[*`]*:\\s*[*`]*(.+?)[*`]*\\s*$",
             Pattern.MULTILINE | Pattern.CASE_INSENSITIVE);
 
     private static final Pattern DESCRIPTION_PATTERN = Pattern.compile(
-            "^[*`]*gate[_-]description[*`]*:\\s*[*`]*(.+?)[*`]*\\s*$",
+            "^(?:#{1,6}\\s+)?[*`]*gate[_-]description[*`]*:\\s*[*`]*(.+?)[*`]*\\s*$",
             Pattern.MULTILINE | Pattern.CASE_INSENSITIVE);
 
     /**
