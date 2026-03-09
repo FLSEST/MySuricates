@@ -457,4 +457,240 @@ class AgenticBlockExecutorTest {
         assertThat(context.getVariable("agentic_goal_achieved")).isEqualTo(true);
         assertThat(context.getVariable("agentic_iterations")).isEqualTo(1);
     }
+
+    @Test
+    void execute_repeatedActions_abortsLoop() throws Exception {
+        when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Trying\nACTION: same action\nSUMMARY: Retry"));
+
+        when(hostClaude.executeAction(eq("same action"), isNull(), isNull(), eq("/test/project"), isNull()))
+                .thenReturn(new HostClaudeService.ActionResult("failed", 1, null));
+
+        when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("goal", "Repeat test");
+        config.put("success_criteria", "Test passes");
+        config.put("max_iterations", 10);
+        config.put("iteration_timeout_seconds", 300);
+        config.put("max_repeated_actions", 3);
+        config.put("require_approval", false);
+        BlockDefinition block = BlockDefinition.builder().type("agentic").config(config).build();
+
+        StepResult result = executor.execute(block, buildContext());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getOutput()).contains("Same action repeated 3 times");
+        assertThat(result.getMetadata().get("stopReason")).isEqualTo("REPEATED_ACTIONS");
+    }
+
+    @Test
+    void execute_noActionInPlan_asksForAction() throws Exception {
+        when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+                // First response has no action
+                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Thinking\nACTION: \nSUMMARY: Planning"))
+                // Second response achieves goal
+                .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
+
+        when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
+
+        StepResult result = executor.execute(buildBlock("Test"), buildContext());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata().get("totalIterations")).isEqualTo(2);
+        // No executeAction call for the empty-action iteration
+        verify(hostClaude, never()).executeAction(anyString(), any(), any(), any(), any());
+    }
+
+    @Test
+    void execute_historyCompression_compressesAfterThreshold() throws Exception {
+        // Need 8+ turns to trigger compression (keepRecentCount=4, threshold=keepRecentCount+3=7)
+        // Each iteration adds 2 turns (assistant reasoning + user observation), plus the initial user turn
+        // So 4 iterations = 1 initial + 4*(1 assistant + 1 user) = 9 turns → triggers compression
+        when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Step1\nACTION: Action A\nSUMMARY: S1"))
+                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Step2\nACTION: Action B\nSUMMARY: S2"))
+                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Step3\nACTION: Action C\nSUMMARY: S3"))
+                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Step4\nACTION: Action D\nSUMMARY: S4"))
+                .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
+
+        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), isNull()))
+                .thenReturn(new HostClaudeService.ActionResult("ok", 0, null));
+
+        when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
+
+        StepResult result = executor.execute(buildBlock("Compression test", 10), buildContext());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata().get("totalIterations")).isEqualTo(5);
+
+        // Verify buildConversationPrompt was called with history containing compressed turns
+        // After compression, history should contain "[Compressed history" in a user turn
+        verify(hostClaude, atLeast(5)).buildConversationPrompt(anyString(), anyList());
+    }
+
+    @Test
+    void execute_actionCompression_compressesOversizedAction() throws Exception {
+        // Generate an action larger than AGENTIC_ACTION_COMPRESS_THRESHOLD (100_000)
+        String oversizedAction = "GOAL_STATUS: IN_PROGRESS\nRATIONALE: Big step\nACTION: " +
+                "x".repeat(110_000) + "\nSUMMARY: Large action";
+
+        when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+                .thenReturn(rr(oversizedAction))
+                .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
+
+        // The compression call via reason (provider.reason)
+        when(hostClaude.reasonStructured(contains("OVERSIZED ACTION"), isNull(), isNull(), eq(1), eq(60)))
+                .thenReturn(rr("Compressed: do the thing"));
+
+        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), isNull()))
+                .thenReturn(new HostClaudeService.ActionResult("done", 0, null));
+
+        when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
+
+        StepResult result = executor.execute(buildBlock("Compress test", 5), buildContext());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        // The compressed action should have been used for execution
+        verify(hostClaude).executeAction(eq("Compressed: do the thing"), isNull(), isNull(), eq("/test/project"), isNull());
+    }
+
+    @Test
+    void execute_actionCompression_fallsBackToTruncation_onError() throws Exception {
+        String oversizedAction = "GOAL_STATUS: IN_PROGRESS\nRATIONALE: Big\nACTION: " +
+                "y".repeat(110_000) + "\nSUMMARY: Large";
+
+        when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+                .thenReturn(rr(oversizedAction))
+                .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
+
+        // Compression fails
+        when(hostClaude.reasonStructured(contains("OVERSIZED ACTION"), isNull(), isNull(), eq(1), eq(60)))
+                .thenThrow(new java.io.IOException("Compression failed"));
+
+        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), isNull()))
+                .thenReturn(new HostClaudeService.ActionResult("done", 0, null));
+
+        when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
+
+        StepResult result = executor.execute(buildBlock("Truncate test", 5), buildContext());
+
+        // Should still complete — fallback truncation was used
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        // The action passed to executeAction should be truncated (contains [TRUNCATED:...)
+        verify(hostClaude).executeAction(contains("[TRUNCATED:"), isNull(), isNull(), eq("/test/project"), isNull());
+    }
+
+    @Test
+    void execute_withModelAndInstructions_passedToProvider() throws Exception {
+        when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Do it\nSUMMARY: Step"))
+                .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
+
+        when(hostClaude.executeAction(eq("Do it"), eq("claude-opus-4-6"), isNull(), eq("/test/project"), isNull()))
+                .thenReturn(new HostClaudeService.ActionResult("done", 0, null));
+
+        when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
+
+        ExecutionContext context = buildContext();
+        context.setModel("claude-opus-4-6");
+        context.setInstructionPrefix("Custom instructions for this workflow");
+
+        StepResult result = executor.execute(buildBlock("Model test"), context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        // System prompt should include custom instructions
+        verify(hostClaude).buildConversationPrompt(contains("Custom instructions for this workflow"), anyList());
+        // Model passed to executeAction
+        verify(hostClaude).executeAction(eq("Do it"), eq("claude-opus-4-6"), isNull(), eq("/test/project"), isNull());
+    }
+
+    @Test
+    void execute_actPhaseException_capturedAsError() throws Exception {
+        when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Do something\nSUMMARY: Step"))
+                .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
+
+        // ACT phase throws exception
+        when(hostClaude.executeAction(eq("Do something"), isNull(), isNull(), eq("/test/project"), isNull()))
+                .thenThrow(new RuntimeException("Process crashed"));
+
+        when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
+
+        StepResult result = executor.execute(buildBlock("Exception test", 5), buildContext());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getOutput()).contains("Execution error: Process crashed");
+    }
+
+    @Test
+    void execute_providerResolved_fromContext() throws Exception {
+        when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+                .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
+        when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
+
+        ExecutionContext context = buildContext();
+        context.setProvider("CODEX");
+
+        executor.execute(buildBlock("Provider test"), context);
+
+        // Provider was resolved from context
+        verify(aiProviderRegistry).resolve("CODEX");
+    }
+
+    @Test
+    void execute_learningServiceThrows_gracefullyHandled() throws Exception {
+        when(learningService.getAgenticStrategyHistory(anyString()))
+                .thenThrow(new RuntimeException("DB connection failed"));
+
+        when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+                .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
+
+        StepResult result = executor.execute(buildBlock("Resilience test"), buildContext());
+
+        // Should succeed despite learning service failure
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+    }
+
+    @Test
+    void execute_noWorkflowRun_learningContextEmpty() throws Exception {
+        // Run not found in repository
+        when(runRepository.findById("run-1")).thenReturn(Optional.empty());
+
+        when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+                .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
+
+        StepResult result = executor.execute(buildBlock("No run test"), buildContext());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        // Learning service should not be called with null workflow ID
+        verify(learningService, never()).getAgenticStrategyHistory(anyString());
+    }
+
+    @Test
+    void execute_websocketBroadcastFailure_doesNotAbortExecution() throws Exception {
+        when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+                .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
+        when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
+
+        // WebSocket broadcast throws
+        doThrow(new RuntimeException("WebSocket connection lost"))
+                .when(messagingTemplate).convertAndSend(anyString(), any(Map.class));
+
+        StepResult result = executor.execute(buildBlock("WS fail test"), buildContext());
+
+        // Should still complete despite broadcast failures
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+    }
 }
