@@ -56,6 +56,16 @@ public class ProjectController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/archived")
+    public List<ProjectResponse> listArchivedProjects() {
+        return projectMapper.toResponseList(projectService.findArchived());
+    }
+
+    @PostMapping("/{id}/restore")
+    public ProjectResponse restoreProject(@PathVariable String id) {
+        return projectMapper.toResponse(projectService.restore(id));
+    }
+
     @PostMapping("/{id}/start")
     public ProjectResponse startProject(@PathVariable String id) {
         return projectMapper.toResponse(projectService.startContainer(id));

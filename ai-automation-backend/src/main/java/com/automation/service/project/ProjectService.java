@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 
 @Service
@@ -93,8 +94,24 @@ public class ProjectService {
             containerService.stopContainer(project);
         }
 
-        projectRepository.delete(project);
-        log.info("Deleted project: {} ({})", project.getName(), project.getId());
+        project.setArchivedAt(Instant.now());
+        projectRepository.save(project);
+        log.info("Archived project: {} ({})", project.getName(), project.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public List<Project> findArchived() {
+        return projectRepository.findArchived();
+    }
+
+    @Transactional
+    public Project restore(String id) {
+        Project project = projectRepository.findByIdIncludingArchived(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Project", id));
+        project.setArchivedAt(null);
+        Project saved = projectRepository.save(project);
+        log.info("Restored project: {} ({})", saved.getName(), saved.getId());
+        return saved;
     }
 
     @Transactional

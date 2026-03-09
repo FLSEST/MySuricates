@@ -17,6 +17,7 @@ public record ProjectResponse(
         String aiContext,
         ProjectStatus status,
         ContainerResponse container,
+        Instant archivedAt,
         Instant createdAt,
         Instant updatedAt
 ) {}

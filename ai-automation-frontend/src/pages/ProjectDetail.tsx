@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Play, Square, Trash2, Pencil, GitBranch, Container as ContainerIcon,
+  Archive, ArchiveRestore, ArrowLeft, Play, Square, Pencil, GitBranch, Container as ContainerIcon,
   Brain, Sparkles,
 } from 'lucide-react';
 import { ModalFooter } from '../components/ui';
@@ -10,7 +10,7 @@ import { MonacoEditor } from '../components/shared/MonacoEditor';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ErrorState } from '../components/shared/ErrorState';
 import {
-  useProject, useUpdateProject, useDeleteProject,
+  useProject, useUpdateProject, useArchiveProject, useRestoreProject,
   useStartContainer, useStopContainer, useGenerateProjectContext,
 } from '../hooks/useProjects';
 import { useWorkflows } from '../hooks/useWorkflows';
@@ -27,13 +27,14 @@ export function ProjectDetail() {
   const { data: project, isLoading, error, refetch } = useProject(id!);
   const { data: workflows } = useWorkflows();
   const updateProject = useUpdateProject();
-  const deleteProject = useDeleteProject();
+  const archiveProject = useArchiveProject();
+  const restoreProject = useRestoreProject();
   const startContainer = useStartContainer();
   const stopContainer = useStopContainer();
   const generateContext = useGenerateProjectContext();
 
   const [showEdit, setShowEdit] = useState(false);
-  const [showDelete, setShowDelete] = useState(false);
+  const [showArchive, setShowArchive] = useState(false);
   const [showAiContext, setShowAiContext] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', subtitle: '', description: '', type: 'CODE' as ProjectType, path: '' });
   const [editAiContext, setEditAiContext] = useState('');
@@ -84,10 +85,14 @@ export function ProjectDetail() {
     });
   };
 
-  const handleDelete = () => {
-    deleteProject.mutate(project.id, {
+  const handleArchive = () => {
+    archiveProject.mutate(project.id, {
       onSuccess: () => navigate('/projects'),
     });
+  };
+
+  const handleRestore = () => {
+    restoreProject.mutate(project.id);
   };
 
   return (
@@ -109,12 +114,26 @@ export function ProjectDetail() {
           <p className="text-sm text-text-tertiary font-mono mt-0.5">{project.path}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} onClick={openEdit}>
-            {t.common.edit}
-          </Button>
-          <Button variant="danger" size="sm" icon={<Trash2 className="w-4 h-4" />} onClick={() => setShowDelete(true)}>
-            {t.common.delete}
-          </Button>
+          {project.archivedAt ? (
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<ArchiveRestore className="w-4 h-4" />}
+              onClick={handleRestore}
+              loading={restoreProject.isPending}
+            >
+              {t.projects.restore}
+            </Button>
+          ) : (
+            <>
+              <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} onClick={openEdit}>
+                {t.common.edit}
+              </Button>
+              <Button variant="danger" size="sm" icon={<Archive className="w-4 h-4" />} onClick={() => setShowArchive(true)}>
+                {t.projects.archive}
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -342,25 +361,25 @@ export function ProjectDetail() {
         </div>
       </Modal>
 
-      {/* Delete Confirmation */}
+      {/* Archive Confirmation */}
       <Modal
-        open={showDelete}
-        onClose={() => setShowDelete(false)}
-        title={`${t.common.delete} "${project.name}"?`}
+        open={showArchive}
+        onClose={() => setShowArchive(false)}
+        title={`${t.projects.archive} "${project.name}"?`}
         size="sm"
         footer={
           <ModalFooter
-            onCancel={() => setShowDelete(false)}
-            onAction={handleDelete}
+            onCancel={() => setShowArchive(false)}
+            onAction={handleArchive}
             cancelLabel={t.common.cancel}
-            actionLabel={t.common.delete}
+            actionLabel={t.projects.archive}
             actionVariant="danger"
-            actionLoading={deleteProject.isPending}
+            actionLoading={archiveProject.isPending}
           />
         }
       >
         <p className="text-sm text-text-secondary">
-          {t.common.deleteConfirm} {t.projects.deleteConfirm}
+          {t.projects.archiveConfirm}
         </p>
       </Modal>
     </div>

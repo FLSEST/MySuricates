@@ -48,7 +48,7 @@ export function useUpdateProject() {
   });
 }
 
-export function useDeleteProject() {
+export function useArchiveProject() {
   const qc = useQueryClient();
   const toast = useToast();
   const t = useT();
@@ -56,9 +56,33 @@ export function useDeleteProject() {
     mutationFn: (id: string) => api.delete(`/projects/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['projects'] });
-      toast.success(t.toast.projectDeleted);
+      qc.invalidateQueries({ queryKey: ['projects', 'archived'] });
+      toast.success(t.toast.projectArchived);
     },
-    onError: () => toast.error(t.toast.projectDeleteFailed),
+    onError: () => toast.error(t.toast.projectArchiveFailed),
+  });
+}
+
+export function useRestoreProject() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
+  return useMutation({
+    mutationFn: (id: string) => api.post<Project>(`/projects/${id}/restore`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projects'] });
+      qc.invalidateQueries({ queryKey: ['projects', 'archived'] });
+      toast.success(t.toast.projectRestored);
+    },
+    onError: () => toast.error(t.toast.projectRestoreFailed),
+  });
+}
+
+export function useArchivedProjects() {
+  return useQuery({
+    queryKey: ['projects', 'archived'],
+    queryFn: () => api.get<Project[]>('/projects/archived'),
+    enabled: false,
   });
 }
 

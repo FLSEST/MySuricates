@@ -19,6 +19,7 @@ public interface ProjectMapper {
     @Mapping(target = "status", constant = "STOPPED")
     @Mapping(target = "container", ignore = true)
     @Mapping(target = "workflows", ignore = true)
+    @Mapping(target = "archivedAt", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     Project toEntity(CreateProjectRequest request);

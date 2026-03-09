@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FolderKanban, Pencil, Plus, Search } from 'lucide-react';
+import { Archive, ArchiveRestore, FolderKanban, Pencil, Plus, Search } from 'lucide-react';
 import { Card, Button, Input, Select, Modal, Spinner, DirectoryPicker } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
-import { useProjects, useCreateProject, useUpdateProject, useStartContainer, useStopContainer } from '../hooks/useProjects';
+import { useProjects, useCreateProject, useUpdateProject, useStartContainer, useStopContainer, useArchivedProjects, useRestoreProject } from '../hooks/useProjects';
 import { useT } from '../i18n';
 import type { Project, ProjectType, CreateProjectRequest, UpdateProjectRequest } from '../types';
 
@@ -19,16 +19,29 @@ export function Projects() {
   const updateProject = useUpdateProject();
   const startContainer = useStartContainer();
   const stopContainer = useStopContainer();
+  const { data: archivedProjects, refetch: fetchArchived } = useArchivedProjects();
+  const restoreProject = useRestoreProject();
 
   const [search, setSearch] = useState('');
+  const [showArchived, setShowArchived] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<CreateProjectRequest>({ name: '', type: 'CODE', path: '' });
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [editForm, setEditForm] = useState<UpdateProjectRequest & { name: string; type: ProjectType; path: string }>({ name: '', type: 'CODE', path: '' });
 
-  const filtered = projects?.filter((p) =>
+  const activeFiltered = projects?.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase())
   ) ?? [];
+  const archivedFiltered = archivedProjects?.filter((p) =>
+    p.name.toLowerCase().includes(search.toLowerCase())
+  ) ?? [];
+  const filtered = showArchived ? archivedFiltered : activeFiltered;
+
+  const toggleArchived = () => {
+    const next = !showArchived;
+    setShowArchived(next);
+    if (next) fetchArchived();
+  };
 
   const openEdit = (project: Project) => {
     setEditForm({
@@ -83,24 +96,34 @@ export function Projects() {
         </Button>
       </div>
 
-      {/* Search */}
-      <div className="max-w-sm">
-        <Input
-          placeholder={t.common.search}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          icon={<Search className="w-4 h-4 text-text-tertiary" />}
-        />
+      {/* Search + Archive toggle */}
+      <div className="flex items-center gap-3">
+        <div className="max-w-sm flex-1">
+          <Input
+            placeholder={t.common.search}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            icon={<Search className="w-4 h-4 text-text-tertiary" />}
+          />
+        </div>
+        <Button
+          variant={showArchived ? 'primary' : 'secondary'}
+          size="sm"
+          icon={showArchived ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
+          onClick={toggleArchived}
+        >
+          {showArchived ? t.projects.showActive : t.projects.showArchived}
+        </Button>
       </div>
 
       {/* Project cards */}
       {filtered.length === 0 ? (
         <EmptyState
-          icon={<FolderKanban className="w-8 h-8 text-text-tertiary" />}
-          title={search ? t.common.noResults : t.projects.title}
-          description={search ? undefined : t.projects.noProjects}
+          icon={showArchived ? <Archive className="w-8 h-8 text-text-tertiary" /> : <FolderKanban className="w-8 h-8 text-text-tertiary" />}
+          title={search ? t.common.noResults : showArchived ? t.projects.archived : t.projects.title}
+          description={search ? undefined : showArchived ? t.projects.noArchivedProjects : t.projects.noProjects}
           action={
-            !search && (
+            !search && !showArchived && (
               <Button size="sm" onClick={() => setShowCreate(true)}>
                 {t.projects.create}
               </Button>
@@ -112,8 +135,8 @@ export function Projects() {
           {filtered.map((project: Project) => (
             <Card
               key={project.id}
-              className="group/card cursor-pointer hover:border-border-strong transition-colors"
-              onClick={() => navigate(`/projects/${project.id}`)}
+              className={`group/card cursor-pointer hover:border-border-strong transition-colors ${showArchived ? 'opacity-75' : ''}`}
+              onClick={() => !showArchived && navigate(`/projects/${project.id}`)}
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="min-w-0">
@@ -122,18 +145,25 @@ export function Projects() {
                     {project.subtitle && (
                       <span className="text-xs text-text-tertiary shrink-0">{project.subtitle}</span>
                     )}
+                    {showArchived && (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-warning/10 text-warning font-medium shrink-0">
+                        {t.projects.archived}
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-text-tertiary mt-0.5 truncate font-mono">{project.path}</p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); openEdit(project); }}
-                    className="sm:opacity-0 sm:group-hover/card:opacity-100 p-1 rounded-md hover:bg-surface-raised text-text-tertiary hover:text-text transition-all"
-                    title={t.common.edit}
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                  <StatusBadge status={project.status} />
+                  {!showArchived && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openEdit(project); }}
+                      className="sm:opacity-0 sm:group-hover/card:opacity-100 p-1 rounded-md hover:bg-surface-raised text-text-tertiary hover:text-text transition-all"
+                      title={t.common.edit}
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {!showArchived && <StatusBadge status={project.status} />}
                 </div>
               </div>
               <div className="flex items-center justify-between text-xs text-text-secondary">
@@ -141,28 +171,43 @@ export function Projects() {
                   {t.projects.types[project.type]}
                 </span>
                 <div className="flex items-center gap-2">
-                  <span>{project.workflowCount} {t.nav.workflows.toLowerCase()}</span>
-                  {project.status === 'STOPPED' ? (
+                  {showArchived ? (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        startContainer.mutate(project.id);
+                        restoreProject.mutate(project.id);
                       }}
-                      className="text-accent hover:text-accent-hover transition-colors font-medium"
+                      className="text-accent hover:text-accent-hover transition-colors font-medium inline-flex items-center gap-1"
                     >
-                      {t.projects.startContainer}
+                      <ArchiveRestore className="w-3.5 h-3.5" />
+                      {t.projects.restore}
                     </button>
-                  ) : project.status === 'RUNNING' ? (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        stopContainer.mutate(project.id);
-                      }}
-                      className="text-danger hover:text-red-400 transition-colors font-medium"
-                    >
-                      {t.projects.stopContainer}
-                    </button>
-                  ) : null}
+                  ) : (
+                    <>
+                      <span>{project.workflowCount} {t.nav.workflows.toLowerCase()}</span>
+                      {project.status === 'STOPPED' ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startContainer.mutate(project.id);
+                          }}
+                          className="text-accent hover:text-accent-hover transition-colors font-medium"
+                        >
+                          {t.projects.startContainer}
+                        </button>
+                      ) : project.status === 'RUNNING' ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            stopContainer.mutate(project.id);
+                          }}
+                          className="text-danger hover:text-red-400 transition-colors font-medium"
+                        >
+                          {t.projects.stopContainer}
+                        </button>
+                      ) : null}
+                    </>
+                  )}
                 </div>
               </div>
             </Card>

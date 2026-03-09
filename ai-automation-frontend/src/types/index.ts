@@ -15,6 +15,7 @@ export interface Project {
   status: ProjectStatus;
   container: Container | null;
   workflowCount: number;
+  archivedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }

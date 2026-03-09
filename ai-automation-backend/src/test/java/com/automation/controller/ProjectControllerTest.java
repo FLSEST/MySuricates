@@ -79,7 +79,7 @@ class ProjectControllerTest {
         testResponse = new ProjectResponse(
                 "proj-1", "Test Project", null, null, ProjectType.CODE, "/workspace/test",
                 Map.of(), null, ProjectStatus.STOPPED, null,
-                Instant.now(), Instant.now()
+                null, Instant.now(), Instant.now()
         );
     }
 
@@ -202,12 +202,47 @@ class ProjectControllerTest {
     }
 
     @Test
+    void listArchivedProjects_returnsOk() throws Exception {
+        ProjectResponse archivedResponse = new ProjectResponse(
+                "proj-2", "Archived Project", null, null, ProjectType.CODE, "/workspace/archived",
+                Map.of(), null, ProjectStatus.STOPPED, null,
+                Instant.now(), Instant.now(), Instant.now()
+        );
+        when(projectService.findArchived()).thenReturn(List.of(testProject));
+        when(projectMapper.toResponseList(any())).thenReturn(List.of(archivedResponse));
+
+        mockMvc.perform(get("/api/v1/projects/archived"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value("proj-2"))
+                .andExpect(jsonPath("$[0].archivedAt").exists());
+    }
+
+    @Test
+    void restoreProject_existingId_returnsOk() throws Exception {
+        when(projectService.restore("proj-1")).thenReturn(testProject);
+        when(projectMapper.toResponse(testProject)).thenReturn(testResponse);
+
+        mockMvc.perform(post("/api/v1/projects/proj-1/restore"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("proj-1"));
+    }
+
+    @Test
+    void restoreProject_nonExistent_returns404() throws Exception {
+        when(projectService.restore("unknown"))
+                .thenThrow(new ResourceNotFoundException("Project", "unknown"));
+
+        mockMvc.perform(post("/api/v1/projects/unknown/restore"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void startProject_returnsOk() throws Exception {
         testProject.setStatus(ProjectStatus.RUNNING);
         ProjectResponse runningResponse = new ProjectResponse(
                 "proj-1", "Test Project", null, null, ProjectType.CODE, "/workspace/test",
                 Map.of(), null, ProjectStatus.RUNNING, null,
-                Instant.now(), Instant.now()
+                null, Instant.now(), Instant.now()
         );
         when(projectService.startContainer("proj-1")).thenReturn(testProject);
         when(projectMapper.toResponse(testProject)).thenReturn(runningResponse);

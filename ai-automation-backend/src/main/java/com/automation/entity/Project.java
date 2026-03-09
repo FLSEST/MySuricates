@@ -3,6 +3,7 @@ package com.automation.entity;
 import com.automation.util.JsonMapConverter;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.SQLRestriction;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -15,6 +16,7 @@ import java.util.Map;
 
 @Entity
 @Table(name = "projects")
+@SQLRestriction("archived_at IS NULL")
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @Setter
@@ -60,6 +62,9 @@ public class Project {
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<Workflow> workflows = new ArrayList<>();
+
+    @Column(name = "archived_at")
+    private Instant archivedAt;
 
     @CreatedDate
     @Column(updatable = false)

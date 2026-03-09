@@ -14,6 +14,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -142,7 +143,8 @@ class ProjectServiceTest {
         projectService.delete("proj-1");
 
         verify(containerService).stopContainer(testProject);
-        verify(projectRepository).delete(testProject);
+        verify(projectRepository).save(testProject);
+        assertThat(testProject.getArchivedAt()).isNotNull();
     }
 
     @Test
@@ -152,7 +154,47 @@ class ProjectServiceTest {
         projectService.delete("proj-1");
 
         verify(containerService, never()).stopContainer(any());
-        verify(projectRepository).delete(testProject);
+        verify(projectRepository).save(testProject);
+        assertThat(testProject.getArchivedAt()).isNotNull();
+    }
+
+    @Test
+    void findArchived_returnsArchivedProjects() {
+        Project archivedProject = Project.builder()
+                .id("proj-archived")
+                .name("Archived Project")
+                .type(ProjectType.CODE)
+                .path("/workspace/archived")
+                .status(ProjectStatus.STOPPED)
+                .archivedAt(Instant.now())
+                .build();
+        when(projectRepository.findArchived()).thenReturn(List.of(archivedProject));
+
+        List<Project> result = projectService.findArchived();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getArchivedAt()).isNotNull();
+    }
+
+    @Test
+    void restore_archivedProject_clearsArchivedAt() {
+        testProject.setArchivedAt(Instant.now());
+        when(projectRepository.findByIdIncludingArchived("proj-1")).thenReturn(Optional.of(testProject));
+        when(projectRepository.save(any(Project.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Project result = projectService.restore("proj-1");
+
+        assertThat(result.getArchivedAt()).isNull();
+        verify(projectRepository).save(testProject);
+    }
+
+    @Test
+    void restore_nonExistent_throwsResourceNotFoundException() {
+        when(projectRepository.findByIdIncludingArchived("unknown")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> projectService.restore("unknown"))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Project");
     }
 
     @Test
