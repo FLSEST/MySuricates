@@ -1,0 +1,38 @@
+{
+  "id" : "notes-to-presentation",
+  "icon" : "\uD83C\uDFAC",
+  "name" : {
+    "en" : "Notes → Slide Deck",
+    "de" : "Notizen → Slide-Deck"
+  },
+  "description" : {
+    "en" : "Turn notes into a complete reveal.js presentation with speaker notes and animations",
+    "de" : "Notizen in eine vollständige reveal.js Präsentation mit Speaker Notes und Animationen verwandeln"
+  },
+  "category" : "TRANSFORM",
+  "sortOrder" : 19,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Erstelle eine professionelle Praesentation mit Speaker Notes aus den Notizen.",
+  "blocks" : [ {
+    "type" : "simple",
+    "config" : {
+      "command" : "Lies {{ filepath }}. Analysiere den Inhalt und erstelle eine Slide-Gliederung. Beruecksichtige die Ziel-Dauer von {{ duration_minutes }} Minuten (ca. 1-2 Minuten pro Slide). Gib aus: Anzahl geplanter Slides, Titel jedes Slides, geschaetzte Redezeit pro Slide."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "agentic",
+    "config" : {
+      "max_iterations" : 6,
+      "success_criteria" : "index.html in presentation/ ist eine vollstaendige reveal.js Praesentation mit mindestens 8 Slides.",
+      "goal" : "Erstelle eine reveal.js Praesentation in presentation/. Verwende reveal.js via CDN. Theme: '{{ theme }}'. Sprache: {{ language }}. Fuer jeden Slide: (1) Klarer Titel, (2) Maximal 3-5 Bullet Points oder eine Visualisierung, (3) Speaker Notes im <aside class='notes'> Tag mit ausfuehrlichem Redetext. Fuege hinzu: Titelslide, Agenda-Slide, Zusammenfassung-Slide, Danke-Slide. Nutze reveal.js Features: Fragment-Animationen, Code-Highlighting wo passend, vertikale Slides fuer Vertiefungen."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Zaehle die Slides in presentation/index.html und pruefe ob Speaker Notes vorhanden sind. Gib eine Uebersicht aus: Slide-Titel, Anzahl, geschaetzte Gesamtdauer."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

@@ -1,0 +1,38 @@
+{
+  "id" : "codebase-to-onboarding",
+  "icon" : "\uD83D\uDCDA",
+  "name" : {
+    "en" : "Codebase → Onboarding Package",
+    "de" : "Codebase → Onboarding-Paket"
+  },
+  "description" : {
+    "en" : "Generate a complete developer onboarding package with architecture guide, setup instructions, and code walkthrough",
+    "de" : "Vollständiges Developer-Onboarding-Paket mit Architektur-Guide, Setup-Anleitung und Code-Walkthrough generieren"
+  },
+  "category" : "CODE",
+  "sortOrder" : 17,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Erstelle ein umfassendes Onboarding-Paket fuer neue Entwickler.",
+  "blocks" : [ {
+    "type" : "simple",
+    "config" : {
+      "command" : "Scanne das Projekt rekursiv. Liste auf: Verzeichnisstruktur (max 3 Ebenen), erkannte Programmiersprachen, Config-Dateien, Einstiegspunkte (main, index, app), Test-Dateien, CI/CD-Konfiguration. Gib eine strukturierte Projektanalyse aus."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "agentic",
+    "config" : {
+      "max_iterations" : 10,
+      "success_criteria" : "Alle 6 Markdown-Dateien existieren in docs/onboarding/ und sind inhaltlich vollstaendig.",
+      "goal" : "Erstelle ein vollstaendiges Developer-Onboarding-Paket fuer '{{ project_name }}' in docs/onboarding/. Erstelle diese Dateien: (1) README.md — Projektuebersicht, Zweck, Technologie-Stack, (2) SETUP.md — Schritt-fuer-Schritt Setup-Anleitung (Prerequisites, Installation, Konfiguration, Erster Start), (3) ARCHITECTURE.md — Architektur-Diagramm (ASCII), Verzeichnis-Erklaerung, Datenfluss, zentrale Konzepte, (4) CODE_WALKTHROUGH.md — Die 10 wichtigsten Dateien erklaert mit Code-Beispielen, (5) GLOSSARY.md — Projektspezifische Begriffe und Abkuerzungen, (6) FAQ.md — Haeufige Probleme und Loesungen. Sprache: {{ language }}. Zielgruppe: {{ audience }}."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Lies alle Dateien in docs/onboarding/ und erstelle eine Qualitaetsbewertung: Vollstaendigkeit, Verstaendlichkeit, fehlende Themen."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

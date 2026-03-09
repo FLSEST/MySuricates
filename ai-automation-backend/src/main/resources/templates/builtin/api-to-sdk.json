@@ -1,0 +1,38 @@
+{
+  "id" : "api-to-sdk",
+  "icon" : "\uD83D\uDD0C",
+  "name" : {
+    "en" : "API Spec → Client SDK",
+    "de" : "API-Spec → Client-SDK"
+  },
+  "description" : {
+    "en" : "Generate a typed client SDK with error handling and examples from an OpenAPI/Swagger spec",
+    "de" : "Typisiertes Client-SDK mit Error Handling und Beispielen aus einer OpenAPI/Swagger-Spec generieren"
+  },
+  "category" : "CODE",
+  "sortOrder" : 20,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Generiere ein typisiertes Client-SDK mit Error Handling aus der API-Spezifikation.",
+  "blocks" : [ {
+    "type" : "simple",
+    "config" : {
+      "command" : "Lies {{ filepath }}. Extrahiere alle API-Endpunkte: HTTP-Methode, Pfad, Parameter, Request Body, Response Schema, Authentifizierung. Gib eine strukturierte Uebersicht aller Endpunkte aus."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "agentic",
+    "config" : {
+      "max_iterations" : 10,
+      "success_criteria" : "Type-Check laeuft ohne Fehler.",
+      "goal" : "Erstelle ein typisiertes Client-SDK in {{ target_language }} unter {{ package_name }}/. Das SDK soll enthalten: (1) Typen/Interfaces fuer alle Request/Response-Modelle, (2) Eine Client-Klasse mit Methoden fuer jeden Endpunkt, (3) Error Handling (HTTP-Fehler, Netzwerkfehler, Validierung), (4) Konfiguration (Base URL, Auth Token, Timeout), (5) package.json/setup.py/go.mod je nach Sprache, (6) README.md mit Installationsanleitung und Beispielen fuer jeden Endpunkt. Fuehre den Type-Check aus (tsc/mypy/go build) und behebe Fehler."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Liste alle generierten Dateien in {{ package_name }}/ auf. Gib eine Zusammenfassung: Anzahl Endpunkte, Anzahl Typen, Code-Zeilen, unterstuetzte Features."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

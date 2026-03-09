@@ -18,6 +18,7 @@ import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.automation.dto.request.UpdateScheduleRequest;
 import com.automation.dto.response.UpcomingScheduleResponse;
 
 import java.time.DayOfWeek;
@@ -130,6 +131,38 @@ public class SchedulerService {
                 type, saved.getId(), targetType,
                 targetType == TargetType.CHAIN ? chainId : workflowId);
         return saved;
+    }
+
+    @Transactional
+    public ScheduledWorkflow update(String id, UpdateScheduleRequest request) {
+        ScheduledWorkflow scheduled = findById(id);
+
+        if (request.description() != null) {
+            scheduled.setDescription(request.description());
+        }
+        if (request.inputContext() != null) {
+            scheduled.setInputContext(request.inputContext());
+        }
+
+        if (scheduled.getScheduleType() == ScheduleType.CRON && request.cronExpression() != null) {
+            if (!CronExpression.isValidExpression(request.cronExpression())) {
+                throw new IllegalArgumentException("Invalid cron expression: " + request.cronExpression());
+            }
+            scheduled.setCronExpression(request.cronExpression());
+            if (scheduled.isEnabled()) {
+                scheduled.setNextRunAt(calculateNextRun(request.cronExpression()));
+            }
+        }
+
+        if (scheduled.getScheduleType() == ScheduleType.ONCE && request.scheduledAt() != null) {
+            scheduled.setScheduledAt(request.scheduledAt());
+            if (scheduled.isEnabled()) {
+                scheduled.setNextRunAt(request.scheduledAt());
+            }
+        }
+
+        log.info("Updated schedule: {}", id);
+        return scheduledRepository.save(scheduled);
     }
 
     @Transactional

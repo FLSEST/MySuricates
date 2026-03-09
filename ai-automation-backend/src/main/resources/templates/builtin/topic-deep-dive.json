@@ -1,0 +1,42 @@
+{
+  "id" : "topic-deep-dive",
+  "icon" : "\uD83D\uDCA1",
+  "name" : {
+    "en" : "Topic Deep Dive",
+    "de" : "Themen-Deep-Dive"
+  },
+  "description" : {
+    "en" : "Research a topic in project context and create a structured report",
+    "de" : "Thema im Projektkontext recherchieren und strukturierten Report erstellen"
+  },
+  "category" : "RESEARCH",
+  "sortOrder" : 12,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Recherchiere das Thema im Projektkontext und erstelle einen fundierten, strukturierten Report.",
+  "blocks" : [ {
+    "type" : "simple",
+    "config" : {
+      "command" : "ls -la ."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Schau dir das Projekt an und recherchiere das Thema \"{{ topic }}\" im Kontext dieses Projekts. Identifiziere die wichtigsten Aspekte und aktuelle Entwicklungen."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Erstelle eine detaillierte Gliederung fuer einen Report zu diesem Thema."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Schreibe den vollstaendigen Report. Jeder Abschnitt soll fundiert und gut strukturiert sein. Fuege am Ende ein Quellenverzeichnis hinzu."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

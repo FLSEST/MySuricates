@@ -293,6 +293,13 @@ export interface CreateScheduleRequest {
   scheduledAt?: string;
 }
 
+export interface UpdateScheduleRequest {
+  cronExpression?: string;
+  description?: string;
+  inputContext?: Record<string, unknown>;
+  scheduledAt?: string;
+}
+
 export interface CalendarEvent {
   id: string;
   title: string;
@@ -604,6 +611,7 @@ export interface Todo {
   projectName: string | null;
   source: TodoSource;
   sourceAgent: string | null;
+  sessionId: string | null;
   workflowRunId: string | null;
   referenceType: string | null;
   referenceId: string | null;
@@ -620,6 +628,7 @@ export interface CreateTodoRequest {
   projectId?: string;
   source?: TodoSource;
   sourceAgent?: string;
+  sessionId?: string;
   workflowRunId?: string;
 }
 

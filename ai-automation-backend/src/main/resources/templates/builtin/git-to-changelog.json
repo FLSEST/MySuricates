@@ -1,0 +1,51 @@
+{
+  "id" : "git-to-changelog",
+  "icon" : "\uD83D\uDCCB",
+  "name" : {
+    "en" : "Git History → Changelog & Release Notes",
+    "de" : "Git-History → Changelog & Release Notes"
+  },
+  "description" : {
+    "en" : "Generate CHANGELOG, release notes, and migration guide from Git commit history",
+    "de" : "CHANGELOG, Release Notes und Migrationsanleitung aus der Git-Commit-History generieren"
+  },
+  "category" : "CODE",
+  "sortOrder" : 18,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Generiere Changelog, Release Notes und ggf. Migrationsanleitung aus der Git-History.",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "command" : "git log {{ since_tag }}..HEAD --format='%h | %s | %an | %ad' --date=short"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Analysiere die Git-Commits. Kategorisiere jeden Commit: feat (neue Features), fix (Bugfixes), refactor, docs, test, chore, breaking (Breaking Changes). Gruppiere zusammengehoerige Commits. Identifiziere die 3 wichtigsten Aenderungen."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Erstelle CHANGELOG.md im Keep-a-Changelog Format fuer Version {{ new_version }}. Kategorien: Added, Changed, Fixed, Removed, Breaking Changes. Jeder Eintrag mit Commit-Hash."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "conditional",
+    "config" : {
+      "else_command" : "echo \"Keine Breaking Changes — Migration Guide nicht noetig.\"",
+      "execution_mode" : "shell",
+      "condition" : "grep -qi 'breaking' CHANGELOG.md",
+      "then_command" : "Erstelle MIGRATION.md mit einer Schritt-fuer-Schritt Migrationsanleitung fuer alle Breaking Changes."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Erstelle RELEASE_NOTES.md fuer '{{ product_name }}' {{ new_version }}. Schreibe benutzerfreundlich (nicht technisch). Struktur: Was ist neu (mit Beispielen), Was wurde verbessert, Was wurde behoben, Upgrade-Hinweise."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

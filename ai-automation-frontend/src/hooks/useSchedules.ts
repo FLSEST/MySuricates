@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
-import type { ScheduledWorkflow, CreateScheduleRequest, CalendarDataResponse, UpcomingScheduleData } from '../types';
+import type { ScheduledWorkflow, CreateScheduleRequest, UpdateScheduleRequest, CalendarDataResponse, UpcomingScheduleData } from '../types';
 
 export function useSchedules() {
   return useQuery({
@@ -47,6 +47,21 @@ export function useCreateSchedule() {
       toast.success(t.toast.scheduleCreated);
     },
     onError: () => toast.error(t.toast.scheduleCreateFailed),
+  });
+}
+
+export function useUpdateSchedule() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateScheduleRequest }) =>
+      api.put<ScheduledWorkflow>(`/schedules/${id}`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['schedules'] });
+      toast.success(t.toast.scheduleUpdated);
+    },
+    onError: () => toast.error(t.toast.scheduleUpdateFailed),
   });
 }
 

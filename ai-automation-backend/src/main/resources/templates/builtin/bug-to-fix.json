@@ -1,0 +1,38 @@
+{
+  "id" : "bug-to-fix",
+  "icon" : "\uD83D\uDC1B",
+  "name" : {
+    "en" : "Bug Report → Fix + Tests",
+    "de" : "Bug-Report → Fix + Tests"
+  },
+  "description" : {
+    "en" : "Analyze a bug, write a failing test, implement the fix, and verify all tests pass",
+    "de" : "Bug analysieren, fehlschlagenden Test schreiben, Fix implementieren und alle Tests verifizieren"
+  },
+  "category" : "CODE",
+  "sortOrder" : 22,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Analysiere den Bug, schreibe einen reproduzierenden Test, behebe den Fehler und verifiziere.",
+  "blocks" : [ {
+    "type" : "simple",
+    "config" : {
+      "command" : "Lies {{ filepath }} und analysiere den Code. Suche nach dem beschriebenen Bug: {{ bug_description }}. Identifiziere die betroffene Funktion/Stelle und erklaere die Ursache."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "agentic",
+    "config" : {
+      "max_iterations" : 8,
+      "success_criteria" : "Alle Tests bestehen nach dem Fix.",
+      "goal" : "Behebe den Bug in {{ filepath }}. Bug: '{{ bug_description }}'. Vorgehen: (1) Verstehe den bestehenden Code und das Bug-Verhalten, (2) Schreibe zuerst einen Test der den Bug reproduziert (der Test muss fehlschlagen), (3) Implementiere den Fix, (4) Fuehre den Test erneut aus — er muss jetzt bestehen, (5) Fuehre alle existierenden Tests aus um sicherzustellen dass nichts kaputt geht."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Erstelle einen Bug-Fix-Report: (1) Ursache des Bugs, (2) Was wurde geaendert (mit Diff-Ueberblick), (3) Welche Tests wurden hinzugefuegt, (4) Wie kann man verifizieren dass der Fix korrekt ist."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

@@ -25,7 +25,7 @@ public class AgenticPlan {
     private static final Pattern RATIONALE_PATTERN = Pattern.compile(
             "RATIONALE:\\s*(.+?)(?=\\nACTION:|\\nGOAL_STATUS:|\\nSUMMARY:|$)", Pattern.DOTALL);
     private static final Pattern ACTION_PATTERN = Pattern.compile(
-            "ACTION:\\s*(.+?)(?=\\nRATIONALE:|\\nGOAL_STATUS:|\\nSUMMARY:|$)", Pattern.DOTALL);
+            "ACTION:[ \\t]*(.*?)(?=\\nRATIONALE:|\\nGOAL_STATUS:|\\nSUMMARY:|$)", Pattern.DOTALL);
     private static final Pattern SUMMARY_PATTERN = Pattern.compile(
             "SUMMARY:\\s*(.+?)(?=\\nRATIONALE:|\\nGOAL_STATUS:|\\nACTION:|$)", Pattern.DOTALL);
 
@@ -55,7 +55,9 @@ public class AgenticPlan {
         String summary = extractField(SUMMARY_PATTERN, response, "");
 
         // If we couldn't parse the structured format, treat the whole response as an action
-        if (action.isEmpty() && !status.equalsIgnoreCase("ACHIEVED") && !status.equalsIgnoreCase("IMPOSSIBLE")) {
+        // Only apply fallback for truly unstructured responses (no ACTION: field present at all)
+        boolean hasActionField = response.contains("ACTION:");
+        if (action.isEmpty() && !hasActionField && !status.equalsIgnoreCase("ACHIEVED") && !status.equalsIgnoreCase("IMPOSSIBLE")) {
             action = response.trim();
             rationale = "Unstructured response, using as direct action";
             summary = "Direct execution";

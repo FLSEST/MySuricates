@@ -1,0 +1,51 @@
+{
+  "id" : "dependency-risk-radar",
+  "icon" : "\uD83E\uDDED",
+  "name" : {
+    "en" : "Dependency Risk Radar",
+    "de" : "Dependency Risk Radar"
+  },
+  "description" : {
+    "en" : "Scan all repos, prioritize critical package updates, create an action plan",
+    "de" : "Alle Repos scannen, kritische Paket-Updates priorisieren, Aktionsplan erstellen"
+  },
+  "category" : "CODE",
+  "sortOrder" : 23,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Scanne alle Repos unterhalb des Projektpfads nach npm- oder Maven-Abhaengigkeiten, identifiziere kritische Updates und liefere einen priorisierten Aktionsplan.",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "command" : "find . -maxdepth 2 \\( -name package.json -o -name pom.xml \\) -print | xargs -n1 dirname | sort -u"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "foreach",
+    "config" : {
+      "items_source" : "command",
+      "execution_mode" : "shell",
+      "items_command" : "find . -maxdepth 2 \\( -name package.json -o -name pom.xml \\) -print | xargs -n1 dirname | sort -u",
+      "variable_name" : "repo",
+      "timeout_seconds" : 600,
+      "command" : "set -euo pipefail; cd \"{{ repo }}\"; if [ -f package.json ]; then echo \"=== {{ repo }} (npm) ===\"; npm outdated --json || true; elif [ -f pom.xml ]; then echo \"=== {{ repo }} (maven) ===\"; mvn -q versions:display-dependency-updates || true; else echo \"=== {{ repo }} (unknown) ===\"; fi"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "skill-capability",
+    "config" : {
+      "params" : {
+        "max_entries" : 5
+      },
+      "input" : "Aggregierte Dependency-Outputs aus mehreren Repos:\n\n{{ previous_output }}\n\nAufgabe: Fasse die Top-5 dringendsten Updates zusammen. Priorisiere Major/Critical. Nenne je Eintrag: Repo, Paket/Artefakt, current→latest, Risiko (security/major/compat), kurzen Handlungsvorschlag.",
+      "capability" : "analyze"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Erstelle einen Aktionsplan aus der Analyse: Repo | Paket | current→latest | Impact | Empfehlung. Halte dich kurz."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

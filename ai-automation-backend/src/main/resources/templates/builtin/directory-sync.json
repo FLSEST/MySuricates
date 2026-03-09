@@ -1,0 +1,36 @@
+{
+  "id" : "directory-sync",
+  "icon" : "\uD83D\uDD01",
+  "name" : {
+    "en" : "Directory Sync",
+    "de" : "Verzeichnis-Synchronisation"
+  },
+  "description" : {
+    "en" : "Rsync-based synchronization with dry run and report",
+    "de" : "Rsync-basierte Synchronisation mit Dry-Run und Report"
+  },
+  "category" : "DATA",
+  "sortOrder" : 34,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Synchronisiere Verzeichnisse mit rsync. Variablen: source, target, exclude_patterns (kommasepariert), delete_removed (true/false).",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "command" : "set -euo pipefail\nSOURCE=\"{{ source }}\"\nTARGET=\"{{ target }}\"\nEXCLUDE=\"{{ exclude_patterns }}\"\nDELETE=\"{{ delete_removed }}\"\necho \"=== Dry Run ===\"\nCMD=\"rsync -avhn\"\nif [ \"$DELETE\" = \"true\" ]; then CMD=\"$CMD --delete\"; fi\nfor pat in $(echo \"$EXCLUDE\" | tr ',' ' '); do\n  CMD=\"$CMD --exclude=$pat\"\ndone\n$CMD \"$SOURCE\" \"$TARGET\" 2>&1"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "command" : "set -euo pipefail\nSOURCE=\"{{ source }}\"\nTARGET=\"{{ target }}\"\nEXCLUDE=\"{{ exclude_patterns }}\"\nDELETE=\"{{ delete_removed }}\"\necho \"=== Executing Sync ===\"\nCMD=\"rsync -avh --stats\"\nif [ \"$DELETE\" = \"true\" ]; then CMD=\"$CMD --delete\"; fi\nfor pat in $(echo \"$EXCLUDE\" | tr ',' ' '); do\n  CMD=\"$CMD --exclude=$pat\"\ndone\n$CMD \"$SOURCE\" \"$TARGET\" 2>&1"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "command" : "set -euo pipefail\necho \"# Sync Report\"\necho \"Generated: $(date -Iseconds)\"\necho \"Source: {{ source }}\"\necho \"Target: {{ target }}\"\necho \"Delete removed: {{ delete_removed }}\"\necho \"Exclude: {{ exclude_patterns }}\"\necho \"\"\necho \"## Source\"\ndu -sh \"{{ source }}\" 2>/dev/null || true\necho \"\"\necho \"## Target\"\ndu -sh \"{{ target }}\" 2>/dev/null || true"
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

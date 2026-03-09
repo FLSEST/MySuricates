@@ -1,6 +1,7 @@
 package com.automation.controller;
 
 import com.automation.dto.request.CreateScheduleRequest;
+import com.automation.dto.request.UpdateScheduleRequest;
 import com.automation.dto.response.CalendarDataResponse;
 import com.automation.dto.response.UpcomingScheduleResponse;
 import com.automation.dto.response.ScheduledWorkflowResponse;
@@ -75,6 +76,13 @@ public class ScheduleController {
                 request.description(), request.inputContext(),
                 request.scheduleType(), request.scheduledAt());
         return ResponseEntity.status(HttpStatus.CREATED).body(scheduleMapper.toResponse(scheduled));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ScheduledWorkflowResponse> updateSchedule(
+            @PathVariable String id,
+            @Valid @RequestBody UpdateScheduleRequest request) {
+        return ResponseEntity.ok(scheduleMapper.toResponse(schedulerService.update(id, request)));
     }
 
     @PostMapping("/{id}/enable")

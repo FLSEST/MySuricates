@@ -1,0 +1,45 @@
+{
+  "id" : "dependency-update-check",
+  "icon" : "\uD83D\uDCE6",
+  "name" : {
+    "en" : "Dependency Update Check",
+    "de" : "Dependency Update Check"
+  },
+  "description" : {
+    "en" : "Check for outdated packages and security vulnerabilities",
+    "de" : "Veraltete Pakete und Sicherheitslücken prüfen"
+  },
+  "category" : "CODE",
+  "sortOrder" : 29,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Pruefe Abhaengigkeiten auf Updates und Sicherheitsluecken. Variablen: project_path, package_manager (npm/mvn/gradle).",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "command" : "set -euo pipefail\ncd \"{{ project_path }}\"\nPM=\"{{ package_manager }}\"\necho \"=== Outdated Dependencies ===\"\nif [ \"$PM\" = \"npm\" ]; then\n  npm outdated 2>&1 || true\nelif [ \"$PM\" = \"mvn\" ]; then\n  mvn -q versions:display-dependency-updates 2>&1 || true\nelif [ \"$PM\" = \"gradle\" ]; then\n  ./gradlew dependencyUpdates 2>&1 || true\nelse\n  echo \"Unsupported package manager: $PM\" && exit 1\nfi"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "command" : "set -euo pipefail\ncd \"{{ project_path }}\"\nPM=\"{{ package_manager }}\"\necho \"=== Security Audit ===\"\nif [ \"$PM\" = \"npm\" ]; then\n  npm audit 2>&1 || true\nelif [ \"$PM\" = \"mvn\" ]; then\n  mvn -q dependency:tree 2>&1 | head -100 || true\n  echo \"(Run OWASP dependency-check for full security audit)\"\nelif [ \"$PM\" = \"gradle\" ]; then\n  ./gradlew dependencies 2>&1 | head -100 || true\nfi"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "conditional",
+    "config" : {
+      "else_command" : "echo \"No critical vulnerabilities detected.\"",
+      "execution_mode" : "shell",
+      "condition" : "cd \"{{ project_path }}\" && PM=\"{{ package_manager }}\"; if [ \"$PM\" = \"npm\" ]; then npm audit --json 2>/dev/null | python3 -c \"import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('metadata',{}).get('vulnerabilities',{}).get('critical',0)>0 else 1)\" 2>/dev/null; else exit 1; fi",
+      "then_command" : "echo \"CRITICAL vulnerabilities found! Immediate action required.\""
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "command" : "set -euo pipefail\ncd \"{{ project_path }}\"\nPM=\"{{ package_manager }}\"\necho \"# Dependency Update Report\"\necho \"Generated: $(date -Iseconds)\"\necho \"Project: {{ project_path }}\"\necho \"Package Manager: $PM\"\necho \"\"\necho \"## Outdated Dependencies\"\nif [ \"$PM\" = \"npm\" ]; then\n  npm outdated 2>&1 || true\nfi\necho \"\"\necho \"## Security Summary\"\nif [ \"$PM\" = \"npm\" ]; then\n  npm audit --omit=dev 2>&1 || true\nfi"
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

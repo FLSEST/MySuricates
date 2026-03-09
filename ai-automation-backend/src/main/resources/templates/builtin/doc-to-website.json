@@ -1,0 +1,38 @@
+{
+  "id" : "doc-to-website",
+  "icon" : "\uD83C\uDF10",
+  "name" : {
+    "en" : "Document → Reading Website",
+    "de" : "Dokument → Lese-Webseite"
+  },
+  "description" : {
+    "en" : "Turn a document into a responsive HTML website with chapter summaries, key takeaways, and search",
+    "de" : "Dokument in eine responsive HTML-Webseite mit Kapitelzusammenfassungen, Key Takeaways und Suche verwandeln"
+  },
+  "category" : "TRANSFORM",
+  "sortOrder" : 13,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Erstelle eine vollstaendige, responsive Webseite aus dem Dokument. Verwende relative Pfade.",
+  "blocks" : [ {
+    "type" : "simple",
+    "config" : {
+      "command" : "Lies die Datei {{ filepath }}. Analysiere die Struktur: Wie viele Kapitel/Abschnitte gibt es? Was sind die Hauptthemen? Gib eine strukturierte Uebersicht aus."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "agentic",
+    "config" : {
+      "max_iterations" : 8,
+      "success_criteria" : "Alle HTML-Dateien existieren in output/{{ title }}/ und sind vollstaendig.",
+      "goal" : "Erstelle eine vollstaendige statische Webseite in output/{{ title }}/. Die Webseite soll enthalten: (1) Eine Startseite mit Gesamtzusammenfassung, (2) Eine Seite pro Kapitel/Abschnitt mit Zusammenfassung und Key Takeaways, (3) Eine Zitate-Seite mit den wichtigsten Passagen, (4) Navigation zwischen allen Seiten, (5) Responsive Design im Stil '{{ style }}' mit TailwindCSS via CDN, (6) Eine einfache Suchfunktion mit JavaScript. Sprache: {{ language }}."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Pruefe alle erstellten HTML-Dateien in output/{{ title }}/. Liste alle Dateien auf, pruefe ob Links zwischen Seiten funktionieren, und gib eine Zusammenfassung aus: Anzahl Seiten, Gesamtgroesse, Qualitaetsbewertung."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

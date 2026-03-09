@@ -1,0 +1,51 @@
+{
+  "id" : "container-vuln-scan",
+  "icon" : "\uD83D\uDC33",
+  "name" : {
+    "en" : "Container Vulnerability Scan",
+    "de" : "Container Vulnerability Scan"
+  },
+  "description" : {
+    "en" : "Scan Docker images for CVEs",
+    "de" : "Docker Images auf CVEs prüfen"
+  },
+  "category" : "CODE",
+  "sortOrder" : 31,
+  "version" : "1.2.0",
+  "model" : null,
+  "instructions" : "Scanne ein Docker Image auf CVEs mit Trivy. Variablen: image_name, severity_threshold (CRITICAL/HIGH/MEDIUM).",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "mount_docker_socket" : true,
+      "command" : "set -euo pipefail\nIMAGE=\"{{ image_name }}\"\nTHRESHOLD=\"{{ severity_threshold }}\"\necho \"=== Scanning $IMAGE for $THRESHOLD+ vulnerabilities ===\"\ntrivy image --severity \"$THRESHOLD\" --format table \"$IMAGE\" 2>&1 || true",
+      "container_image" : "automation-agent-devops:latest"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "mount_docker_socket" : true,
+      "command" : "set -euo pipefail\nIMAGE=\"{{ image_name }}\"\nTHRESHOLD=\"{{ severity_threshold }}\"\ntrivy image --severity \"$THRESHOLD\" --format json \"$IMAGE\" 2>/dev/null > .trivy-report.json || true\npython3 -c \"\nimport json, sys\ntry:\n    data = json.load(open('.trivy-report.json'))\n    results = data.get('Results', [])\n    total = sum(len(r.get('Vulnerabilities', [])) for r in results)\n    by_sev = {}\n    for r in results:\n        for v in r.get('Vulnerabilities', []):\n            s = v.get('Severity', 'UNKNOWN')\n            by_sev[s] = by_sev.get(s, 0) + 1\n    print(f'Total vulnerabilities: {total}')\n    for s, c in sorted(by_sev.items()):\n        print(f'  {s}: {c}')\nexcept Exception as e:\n    print(f'Error parsing report: {e}', file=sys.stderr)\n\" 2>&1",
+      "container_image" : "automation-agent-devops:latest"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "conditional",
+    "config" : {
+      "else_command" : "echo \"No CRITICAL CVEs found.\"",
+      "execution_mode" : "shell",
+      "condition" : "python3 -c \"import json; data=json.load(open('.trivy-report.json')); results=data.get('Results',[]); criticals=sum(1 for r in results for v in r.get('Vulnerabilities',[]) if v.get('Severity')=='CRITICAL'); exit(0 if criticals>0 else 1)\" 2>/dev/null",
+      "then_command" : "echo \"CRITICAL CVEs found! Do not deploy this image without remediation.\""
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "mount_docker_socket" : true,
+      "command" : "set -euo pipefail\necho \"# Container Vulnerability Report\"\necho \"Generated: $(date -Iseconds)\"\necho \"Image: {{ image_name }}\"\necho \"Threshold: {{ severity_threshold }}\"\necho \"\"\ntrivy image --severity \"{{ severity_threshold }}\" --format table \"{{ image_name }}\" 2>&1 | head -80 || true\nrm -f .trivy-report.json",
+      "container_image" : "automation-agent-devops:latest"
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

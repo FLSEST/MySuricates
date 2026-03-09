@@ -1,0 +1,52 @@
+{
+  "id" : "test-coverage-gaps",
+  "icon" : "\uD83E\uDDEA",
+  "name" : {
+    "en" : "Test Coverage Gaps",
+    "de" : "Test-Abdeckungs-Lücken"
+  },
+  "description" : {
+    "en" : "Identify untested classes and services, calculate coverage ratio, set priorities",
+    "de" : "Ungetestete Klassen und Services identifizieren, Coverage-Ratio berechnen, Prioritäten setzen"
+  },
+  "category" : "CODE",
+  "sortOrder" : 41,
+  "version" : "1.0.0",
+  "model" : "claude-sonnet-4-6",
+  "instructions" : "Identifiziert ungetestete Klassen, berechnet Coverage-Ratio und priorisiert Test-Luecken nach Kritikalitaet.",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "on_failure" : "continue",
+      "command" : "set -euo pipefail\necho '=== Source Files ==='\nfind . -type f \\( -name '*.java' -o -name '*.kt' -o -name '*.ts' -o -name '*.tsx' \\) -not -path '*/node_modules/*' -not -path '*/build/*' -not -path '*/target/*' -not -path '*/dist/*' -not -path '*/.git/*' -not -name '*Test*' -not -name '*test*' -not -name '*spec*' -not -path '*/test/*' | sort > /tmp/src_files.txt\nSRC_COUNT=$(wc -l < /tmp/src_files.txt)\necho \"Source files: $SRC_COUNT\"\necho ''\necho '=== Test Files ==='\nfind . -type f \\( -name '*Test.java' -o -name '*Spec.java' -o -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' -o -name '*_test.go' \\) -not -path '*/node_modules/*' -not -path '*/target/*' -not -path '*/dist/*' | sort > /tmp/test_files.txt\nTEST_COUNT=$(wc -l < /tmp/test_files.txt)\necho \"Test files: $TEST_COUNT\"\necho ''\necho '=== Coverage Ratio ==='\necho \"Ratio: $(python3 -c \"print(f'{$TEST_COUNT/$SRC_COUNT*100:.1f}%' if $SRC_COUNT>0 else '0%')\" 2>/dev/null)\"\necho ''\necho '=== Untested Source Files (no matching test) ==='\nwhile IFS= read -r src; do\n  base=$(basename \"$src\" | sed 's/\\.[^.]*$//')\n  if ! grep -qi \"$base\" /tmp/test_files.txt 2>/dev/null; then\n    lines=$(wc -l < \"$src\")\n    echo \"$lines $src\"\n  fi\ndone < /tmp/src_files.txt | sort -rn | head -40\necho ''\necho '=== Test File Contents (method count) ==='\nwhile IFS= read -r tf; do\n  methods=$(grep -c '@Test\\|it(\\|test(\\|describe(' \"$tf\" 2>/dev/null || echo 0)\n  echo \"$methods tests: $tf\"\ndone < /tmp/test_files.txt | sort -rn | head -20"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "timeout_seconds" : 600,
+      "command" : "Analysiere die Test-Coverage-Daten:\n\n{{ previous_output }}\n\nBewerte systematisch:\n1. **Ungetestete Services/Controller**: Welche Klassen mit Business-Logik haben KEINEN zugehoerigen Test? Priorisiere nach: Groesse (LOC), Komplexitaet (Anzahl public methods), Kritikalitaet (Controller > Service > Utility)\n2. **Duenne Tests**: Test-Dateien mit nur 1-2 Test-Methoden fuer grosse Klassen — wo ist die Test-Tiefe unzureichend?\n3. **Fehlende Test-Typen**: Gibt es nur Unit-Tests aber keine Integration-Tests? Fehlen Edge-Case-Tests?\n4. **Test-Qualitaet**: Tests die nur den Happy Path pruefen, fehlende Assertions, Test-Namen die nichts aussagen\n5. **Kritische Luecken**: Welche untesteten Bereiche stellen das groesste Risiko dar (Security, Datenpersistenz, externe Integrationen)?\n\nFuer jeden Fund: Datei, Schweregrad (CRITICAL/HIGH/MEDIUM/LOW), was genau getestet werden sollte."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "timeout_seconds" : 600,
+      "command" : "Erstelle den Coverage-Gap-Report:\n\n{{ previous_output }}\n\n## Format:\n\n### Executive Summary\n- Gesamt-Coverage-Ratio (Dateien mit Tests / Gesamt)\n- Anzahl kritisch untesteter Klassen\n- Bewertung der Test-Qualitaet (1-10)\n\n### Coverage-Matrix\n| Modul/Package | Source Files | Test Files | Coverage | Kritischste Luecke |\n\n### Top-10 Prioritaeten\n| # | Datei | LOC | Schweregrad | Was testen | Geschaetzter Aufwand |\n\n### Quick Wins\nKleine Klassen/Utilities die mit wenig Aufwand getestet werden koennen.\n\n### Empfohlene Test-Strategie\nWelche Test-Typen (Unit, Integration, E2E) fuer welche Module priorisiert werden sollten."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "agentic",
+    "config" : {
+      "max_iterations" : 10,
+      "max_total_tokens" : 150000,
+      "iteration_timeout_seconds" : 120,
+      "goal" : "Erstelle oder aktualisiere TODOs basierend auf den Audit-Findings aus {{ previous_output }}.\n\nVORGEHEN:\n1. API-Key aus der SQLite-Datenbank lesen:\n   python3 -c \"import sqlite3; conn = sqlite3.connect('ai-automation-backend/data/automation.db'); c = conn.cursor(); c.execute(\\\"SELECT value FROM app_settings WHERE key = 'api-key'\\\"); print(c.fetchone()[0]); conn.close()\"\n\n2. Bestehende TODOs mit Tag 'audit:test-coverage' laden:\n   curl -s -H 'X-API-Key: <KEY>' http://localhost:9090/api/v1/todos?tag=audit:test-coverage\n\n3. Fuer jeden HIGH oder CRITICAL Finding aus dem Audit-Report:\n   a) Pruefen ob bereits ein offenes TODO mit gleichem Titel-Prefix existiert\n   b) Falls ja: TODO-Beschreibung aktualisieren (PATCH /api/v1/todos/<id>)\n   c) Falls nein: Neues TODO anlegen (POST /api/v1/todos) mit:\n      - title: \"Test-Abdeckung: <kurze Beschreibung des Findings>\"\n      - description: Markdown mit Details, betroffene Dateien, Empfehlung\n      - priority: Mapping CRITICAL→HIGH, HIGH→MEDIUM\n      - tags: [\"audit:test-coverage\", \"backend\" oder \"frontend\"]\n      - projectId: \"ebf4f50c-20c2-4c35-a84a-a0b350124523\"\n      - source: \"AI\"\n      - sourceAgent: \"audit-workflow\"\n\n4. Bestehende TODOs mit Tag 'audit:test-coverage' die NICHT mehr in den Findings auftauchen:\n   → Status auf DONE setzen (PATCH /api/v1/todos/<id>/status mit {\"status\": \"DONE\"})\n\nWICHTIG: Nur HIGH und CRITICAL Findings als TODOs anlegen. MEDIUM und LOW ignorieren.\nWICHTIG: Jede curl-Aktion muss den API-Key im Header X-API-Key mitgeben.\nWICHTIG: Absolute Pfade verwenden fuer die SQLite-DB.",
+      "max_repeated_actions" : 3,
+      "success_criteria" : "Alle HIGH/CRITICAL Findings sind als TODOs angelegt oder aktualisiert. Geloeste Issues sind auf DONE gesetzt.",
+      "total_timeout_seconds" : 900,
+      "require_approval" : false
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

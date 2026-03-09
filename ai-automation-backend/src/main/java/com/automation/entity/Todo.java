@@ -56,6 +56,9 @@ public class Todo {
     @Column(name = "source_agent")
     private String sourceAgent;
 
+    @Column(name = "session_id")
+    private String sessionId;
+
     @Column(name = "workflow_run_id")
     private String workflowRunId;
 

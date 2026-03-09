@@ -7,9 +7,9 @@ WICHTIG: Dieser Abschnitt hat höchste Priorität. BEVOR du eine Datei änderst,
 ### Checkliste (IMMER befolgen)
 
 1. **TODO suchen/anlegen** — `GET /api/v1/todos?status=OPEN&status=IN_PROGRESS` prüfen. Falls kein passendes TODO existiert → neues anlegen (`POST /api/v1/todos`)
-2. **IN_PROGRESS setzen** — `PATCH /api/v1/todos/<id>/status` mit `{"status": "IN_PROGRESS"}` — BEVOR die erste Datei geändert wird
+2. **IN_PROGRESS setzen** — `PATCH /api/v1/todos/<id>/status` mit `{"status": "IN_PROGRESS", "sessionId": "$SHELL_SESSION_ID"}` — BEVOR die erste Datei geändert wird
 3. **Arbeiten** — Code ändern, testen, verifizieren
-4. **DONE setzen** — `PATCH /api/v1/todos/<id>/status` mit `{"status": "DONE"}` — NACHDEM die Arbeit abgeschlossen ist
+4. **DONE setzen** — `PATCH /api/v1/todos/<id>/status` mit `{"status": "DONE", "sessionId": "$SHELL_SESSION_ID"}` — NACHDEM die Arbeit abgeschlossen ist
 
 ### Wann gilt das?
 
@@ -42,14 +42,15 @@ curl -X POST http://localhost:9090/api/v1/todos \
     "tags": ["bereich", "typ"],
     "projectId": "ebf4f50c-20c2-4c35-a84a-a0b350124523",
     "source": "AI",
-    "sourceAgent": "claude-code"
+    "sourceAgent": "claude-code",
+    "sessionId": "$SHELL_SESSION_ID"
   }'
 ```
 
 ### Konventionen
 
 - **Projekt**: `AutoPilot` (ID: `ebf4f50c-20c2-4c35-a84a-a0b350124523`) für MySuricates-eigene TODOs
-- **Source**: `AI` mit `sourceAgent: "claude-code"`
+- **Source**: `AI` mit `sourceAgent: "claude-code"`, `sessionId: "$SHELL_SESSION_ID"`
 - **Sprache**: Deutsch für Titel
 - **Priority**: `HIGH` = blockierend, `MEDIUM` = bald, `LOW` = nice-to-have
 - **Tags**: `backend`, `frontend`, `architektur`, `security`, `performance`, `ux`, `ui`, `feature`, `bug`, `testing`, `documentation`, `workflow-execution`, `container-execution`, `staging`
@@ -234,8 +235,8 @@ Additional safety:
 ## Workflow Templates
 
 - Templates are stored in the `workflow_templates` DB table (V19 migration), not hardcoded
-- 28 built-in templates are seeded on startup by `WorkflowTemplateSeeder` (idempotent, only inserts missing)
-- Template definitions live in `BuiltInTemplates.java` (`config/` package)
+- 44 built-in templates are seeded on startup by `WorkflowTemplateSeeder` (idempotent, inserts missing, updates on version bump)
+- Template definitions live as individual JSON files in `src/main/resources/templates/builtin/` (one file per template, loaded by `BuiltInTemplateLoader`)
 - Name and description are i18n JSON maps: `{"de":"...","en":"..."}` — stored via `JsonStringMapConverter`
 - Built-in templates (`builtIn=true`) cannot be deleted; only `sortOrder` and `category` can be updated
 - Users can create custom templates via API or by saving an existing workflow as a template

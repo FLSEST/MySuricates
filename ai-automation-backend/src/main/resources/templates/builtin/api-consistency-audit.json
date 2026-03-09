@@ -1,0 +1,52 @@
+{
+  "id" : "api-consistency-audit",
+  "icon" : "\uD83D\uDD0D",
+  "name" : {
+    "en" : "API Consistency Audit",
+    "de" : "API-Konsistenz-Audit"
+  },
+  "description" : {
+    "en" : "Check REST APIs for naming conventions, missing pagination, map bodies, and error handling",
+    "de" : "REST-APIs auf Namenskonventionen, fehlende Pagination, Map-Bodies und Fehlerbehandlung prüfen"
+  },
+  "category" : "CODE",
+  "sortOrder" : 36,
+  "version" : "1.1.0",
+  "model" : "claude-sonnet-4-6",
+  "instructions" : "Prueft REST-APIs auf Konsistenz: Namenskonventionen, DTOs vs Maps, Pagination, Response-Wrapper, Fehlerbehandlung.",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "on_failure" : "continue",
+      "command" : "set -euo pipefail\necho '=== Controller Files ==='\nfind . -type f \\( -name '*Controller.java' -o -name '*Controller.kt' -o -name '*controller.ts' -o -name '*controller.js' \\) -not -path '*/node_modules/*' -not -path '*/build/*' -not -path '*/target/*' 2>/dev/null | head -50\necho ''\necho '=== Endpoint Annotations ==='\ngrep -rn '@\\(Get\\|Post\\|Put\\|Delete\\|Patch\\)Mapping\\|@RequestMapping\\|router\\.\\(get\\|post\\|put\\|delete\\|patch\\)' --include='*.java' --include='*.kt' --include='*.ts' --include='*.js' . 2>/dev/null | grep -v node_modules | grep -v target | grep -v build | head -80\necho ''\necho '=== DTO Classes ==='\nfind . -type f \\( -name '*Dto.java' -o -name '*DTO.java' -o -name '*Request.java' -o -name '*Response.java' -o -name '*Dto.kt' \\) -not -path '*/node_modules/*' -not -path '*/target/*' 2>/dev/null | head -50\necho ''\necho '=== Error Handlers ==='\ngrep -rn '@ExceptionHandler\\|@ControllerAdvice\\|GlobalExceptionHandler\\|ErrorController' --include='*.java' --include='*.kt' . 2>/dev/null | grep -v target | head -20\necho ''\necho '=== Map Return Types ==='\ngrep -rn 'Map<String,\\|Map<string,\\|ResponseEntity<Map\\|: Map<' --include='*.java' --include='*.kt' --include='*.ts' . 2>/dev/null | grep -v node_modules | grep -v target | head -30\necho ''\necho '=== Pagination ==='\ngrep -rn 'Pageable\\|PageRequest\\|Page<\\|PaginatedResponse\\|page.*size\\|offset.*limit' --include='*.java' --include='*.kt' --include='*.ts' . 2>/dev/null | grep -v node_modules | grep -v target | head -20"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "timeout_seconds" : 600,
+      "command" : "Analysiere die gesammelten API-Daten:\n\n{{ previous_output }}\n\nPruefe systematisch:\n1. **Namenskonventionen**: Sind Endpunkt-Pfade konsistent (kebab-case vs camelCase vs snake_case)? HTTP-Methoden korrekt (GET=lesen, POST=erstellen, PUT=ersetzen, PATCH=teilupdate, DELETE=loeschen)?\n2. **DTOs vs Maps**: Welche Endpunkte geben Map<String,Object> oder aehnliche untypisierte Strukturen zurueck statt dedizierter DTOs/Response-Klassen?\n3. **Pagination**: Welche Listen-Endpunkte (die Collections zurueckgeben) haben KEINE Pagination? Gibt es ein einheitliches Pagination-Pattern?\n4. **Response-Wrapper**: Gibt es ein einheitliches Response-Format oder mischt der Code nackte Entities mit gewrappten Responses?\n5. **Fehlerbehandlung**: Gibt es einen zentralen ExceptionHandler? Sind Error-Responses konsistent strukturiert (error code, message, details)?\n6. **Fehlende REST-Patterns**: HATEOAS-Links, Versionierung, Content-Type-Handling?\n\nListe jeden Fund mit Datei:Zeile, Schweregrad (CRITICAL/HIGH/MEDIUM/LOW) und konkretem Verbesserungsvorschlag."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "timeout_seconds" : 600,
+      "command" : "Erstelle aus der Analyse einen strukturierten Report:\n\n{{ previous_output }}\n\n## Format:\n\n### Executive Summary\n- Gesamtbewertung der API-Konsistenz (1-10)\n- Anzahl Findings pro Schweregrad\n\n### Findings-Tabelle\n| # | Schweregrad | Kategorie | Datei:Zeile | Problem | Empfehlung |\n\n### Aktionsplan\nPriorisierte Liste von Verbesserungen, gruppiert nach Aufwand (Quick Wins / Mittelfristig / Langfristig).\n\nHalte den Report kompakt und actionable."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "agentic",
+    "config" : {
+      "max_iterations" : 10,
+      "max_total_tokens" : 150000,
+      "iteration_timeout_seconds" : 120,
+      "goal" : "Erstelle oder aktualisiere TODOs basierend auf den Audit-Findings aus {{ previous_output }}.\n\nVORGEHEN:\n1. API-Key aus der SQLite-Datenbank lesen:\n   python3 -c \"import sqlite3; conn = sqlite3.connect('ai-automation-backend/data/automation.db'); c = conn.cursor(); c.execute(\\\"SELECT value FROM app_settings WHERE key = 'api-key'\\\"); print(c.fetchone()[0]); conn.close()\"\n\n2. Bestehende TODOs mit Tag 'audit:api-consistency' laden:\n   curl -s -H 'X-API-Key: <KEY>' http://localhost:9090/api/v1/todos?tag=audit:api-consistency\n\n3. Fuer jeden HIGH oder CRITICAL Finding aus dem Audit-Report:\n   a) Pruefen ob bereits ein offenes TODO mit gleichem Titel-Prefix existiert\n   b) Falls ja: TODO-Beschreibung aktualisieren (PATCH /api/v1/todos/<id>)\n   c) Falls nein: Neues TODO anlegen (POST /api/v1/todos) mit:\n      - title: \"API-Konsistenz: <kurze Beschreibung des Findings>\"\n      - description: Markdown mit Details, betroffene Dateien, Empfehlung\n      - priority: Mapping CRITICAL→HIGH, HIGH→MEDIUM\n      - tags: [\"audit:api-consistency\", \"backend\" oder \"frontend\"]\n      - projectId: \"ebf4f50c-20c2-4c35-a84a-a0b350124523\"\n      - source: \"AI\"\n      - sourceAgent: \"audit-workflow\"\n\n4. Bestehende TODOs mit Tag 'audit:api-consistency' die NICHT mehr in den Findings auftauchen:\n   → Status auf DONE setzen (PATCH /api/v1/todos/<id>/status mit {\"status\": \"DONE\"})\n\nWICHTIG: Nur HIGH und CRITICAL Findings als TODOs anlegen. MEDIUM und LOW ignorieren.\nWICHTIG: Jede curl-Aktion muss den API-Key im Header X-API-Key mitgeben.\nWICHTIG: Absolute Pfade verwenden fuer die SQLite-DB.",
+      "max_repeated_actions" : 3,
+      "success_criteria" : "Alle HIGH/CRITICAL Findings sind als TODOs angelegt oder aktualisiert. Geloeste Issues sind auf DONE gesetzt.",
+      "total_timeout_seconds" : 900,
+      "require_approval" : false
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

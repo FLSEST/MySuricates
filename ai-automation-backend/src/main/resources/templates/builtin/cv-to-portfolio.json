@@ -1,0 +1,38 @@
+{
+  "id" : "cv-to-portfolio",
+  "icon" : "\uD83D\uDCBC",
+  "name" : {
+    "en" : "Resume → Portfolio Website",
+    "de" : "Lebenslauf → Portfolio-Webseite"
+  },
+  "description" : {
+    "en" : "Turn a resume into a professional single-page portfolio with timeline, skill bars, and animations",
+    "de" : "Lebenslauf in eine professionelle Single-Page Portfolio-Seite mit Timeline, Skill-Bars und Animationen verwandeln"
+  },
+  "category" : "TRANSFORM",
+  "sortOrder" : 15,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Erstelle eine professionelle Portfolio-Webseite aus dem Lebenslauf.",
+  "blocks" : [ {
+    "type" : "simple",
+    "config" : {
+      "command" : "Lies {{ filepath }} und extrahiere alle relevanten Informationen: Name, Beruf, Kontaktdaten, Berufserfahrung (Firma, Rolle, Zeitraum, Beschreibung), Ausbildung, Skills (mit Kategorien), Projekte, Sprachen. Strukturiere alles als JSON-Ueberblick."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "agentic",
+    "config" : {
+      "max_iterations" : 6,
+      "success_criteria" : "index.html existiert in portfolio/ und enthaelt alle Sektionen.",
+      "goal" : "Erstelle eine professionelle Single-Page Portfolio-Webseite in portfolio/. Verwende die extrahierten Lebenslauf-Daten. Die Seite soll enthalten: (1) Hero-Bereich mit Name und Berufstitel, (2) Ueber-mich Abschnitt, (3) Berufserfahrung als vertikale Timeline, (4) Skills als animierte Progress-Bars nach Kategorien, (5) Projekte als Card-Grid, (6) Ausbildung, (7) Kontakt-Bereich. Design: Modernes Single-Page Layout mit Farbschema '{{ color_scheme }}', Smooth-Scroll Navigation, TailwindCSS via CDN, dezente CSS-Animationen. Sprache: {{ language }}."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Pruefe portfolio/index.html. Stelle sicher dass alle Sektionen vorhanden sind und das HTML valide ist. Gib eine Zusammenfassung aus."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

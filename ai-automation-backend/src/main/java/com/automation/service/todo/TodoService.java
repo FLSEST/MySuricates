@@ -2,6 +2,7 @@ package com.automation.service.todo;
 
 import com.automation.dto.request.CreateTodoRequest;
 import com.automation.dto.request.UpdateTodoRequest;
+import com.automation.dto.request.UpdateTodoStatusRequest;
 import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.TodoCountResponse;
 import com.automation.dto.response.TodoResponse;
@@ -71,6 +72,7 @@ public class TodoService {
                 .projectId(request.projectId())
                 .source(request.source() != null ? request.source() : Todo.Source.USER)
                 .sourceAgent(request.sourceAgent())
+                .sessionId(request.sessionId())
                 .workflowRunId(request.workflowRunId())
                 .referenceType(request.referenceType())
                 .referenceId(request.referenceId())
@@ -100,11 +102,14 @@ public class TodoService {
     }
 
     @Transactional
-    public Todo updateStatus(String id, Todo.Status newStatus) {
+    public Todo updateStatus(String id, UpdateTodoStatusRequest request) {
         Todo todo = findById(id);
-        todo.setStatus(newStatus);
+        todo.setStatus(request.status());
+        if (request.sessionId() != null) {
+            todo.setSessionId(request.sessionId());
+        }
         Todo saved = todoRepository.save(todo);
-        log.info("Updated todo status: {} → {} ({})", todo.getTitle(), newStatus, todo.getId());
+        log.info("Updated todo status: {} → {} ({})", todo.getTitle(), request.status(), todo.getId());
         return saved;
     }
 
@@ -136,7 +141,8 @@ public class TodoService {
                 base.id(), base.title(), base.description(),
                 base.status(), base.priority(), base.tags(),
                 base.projectId(), projectName,
-                base.source(), base.sourceAgent(), base.workflowRunId(),
+                base.source(), base.sourceAgent(), base.sessionId(),
+                base.workflowRunId(),
                 base.referenceType(), base.referenceId(),
                 base.createdAt(), base.updatedAt()
         );

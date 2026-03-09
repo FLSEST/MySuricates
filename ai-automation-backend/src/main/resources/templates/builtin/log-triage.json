@@ -1,0 +1,40 @@
+{
+  "id" : "log-triage",
+  "icon" : "\uD83E\uDEB5",
+  "name" : {
+    "en" : "Log Triage (Cross-Repo)",
+    "de" : "Log Triage (Cross-Repo)"
+  },
+  "description" : {
+    "en" : "Collect logs, group errors, suggest causes and checks",
+    "de" : "Logs sammeln, Fehler gruppieren, Ursachen & Checks vorschlagen"
+  },
+  "category" : "CODE",
+  "sortOrder" : 24,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Triagiert Logs der letzten 24h (logs/*.log), gruppiert Fehler und liefert Empfehlungen.",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "command" : "find . \\( -name \"*.log\" -o -name \"*.err\" \\) -not -path \"*/node_modules/*\" -not -path \"*/.git/*\" -mtime -1 -print -exec tail -200 {} \\;"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "skill-capability",
+    "config" : {
+      "params" : {
+        "max_groups" : 5
+      },
+      "input" : "Log-Auszug der letzten 24h aus mehreren Projekten:\n\n{{ previous_output }}\n\nGruppiere Fehler/Warnings, nenne vermutlich betroffene Services/Repos, moegliche Ursachen und empfohlene Checks. Markiere kritische Themen zuerst.",
+      "capability" : "analyze"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Fasse kurz zusammen: Anzahl gefundener Fehlergruppen, kritische Punkte, welche Repos/Services betroffen sind, empfohlene Sofortmassnahmen."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

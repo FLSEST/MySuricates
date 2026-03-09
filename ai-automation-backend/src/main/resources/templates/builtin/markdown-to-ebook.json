@@ -1,0 +1,44 @@
+{
+  "id" : "markdown-to-ebook",
+  "icon" : "\uD83D\uDCD6",
+  "name" : {
+    "en" : "Markdown → E-Book",
+    "de" : "Markdown → E-Book"
+  },
+  "description" : {
+    "en" : "Combine Markdown files into a formatted HTML e-book with table of contents and print CSS",
+    "de" : "Markdown-Dateien zu einem formatierten HTML-E-Book mit Inhaltsverzeichnis und Print-CSS kombinieren"
+  },
+  "category" : "TRANSFORM",
+  "sortOrder" : 21,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Kombiniere die Markdown-Dateien zu einem formatierten HTML-E-Book mit Inhaltsverzeichnis.",
+  "blocks" : [ {
+    "type" : "simple",
+    "config" : {
+      "command" : "Finde alle Markdown-Dateien im Projekt (rekursiv, ausser node_modules und .git). Liste sie auf und analysiere: Dateiname, erste Zeile (vermutlicher Titel), Wortanzahl. Schlage eine sinnvolle Kapitel-Reihenfolge vor."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Lies alle gefundenen Markdown-Dateien. Erstelle eine Zusammenfassung: (1) Gesamtstruktur (wieviele Kapitel, geschaetzte Seitenzahl), (2) Inhaltsuebersicht pro Kapitel (2-3 Saetze), (3) Thematische Kohaerenz — passen die Texte zusammen? Gibt es Luecken?"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "agentic",
+    "config" : {
+      "max_iterations" : 8,
+      "success_criteria" : "index.html und style.css existieren in ebook/ und enthalten alle Kapitel.",
+      "goal" : "Erstelle ein formatiertes E-Book in ebook/. Titel: '{{ title }}', Autor: '{{ author }}', Sprache: {{ language }}. Erstelle: (1) index.html — Hauptdatei mit allen Kapiteln, automatischem Inhaltsverzeichnis mit Ankern, Titelseite mit Autor und Titel, (2) style.css — Buch-typisches CSS: Serifen-Font, angenehme Zeilenbreite (max 70 Zeichen), Kapiteltrenner, Print-CSS mit Seitenumbruechen, (3) Fuege zwischen Kapiteln Trennseiten ein. Alle Markdown-Inhalte sollen korrekt in HTML konvertiert werden (Ueberschriften, Listen, Code-Blocks, Links, Bilder)."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Pruefe ebook/index.html: Anzahl Kapitel, Inhaltsverzeichnis-Links funktionieren, Gesamtwortanzahl. Erstelle eine Zusammenfassung."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

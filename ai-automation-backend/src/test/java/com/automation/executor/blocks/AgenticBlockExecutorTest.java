@@ -460,12 +460,15 @@ class AgenticBlockExecutorTest {
 
     @Test
     void execute_repeatedActions_abortsLoop() throws Exception {
+        ClaudeJsonResponse.Usage usage = new ClaudeJsonResponse.Usage(500, 200);
+        ClaudeJsonResponse parsed = new ClaudeJsonResponse("result", null, 0.01, 200L, 100L, 1, usage, null, null);
+
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
         when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
-                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Trying\nACTION: same action\nSUMMARY: Retry"));
+                .thenReturn(new ReasoningResult("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Trying\nACTION: same action\nSUMMARY: Retry", parsed));
 
         when(hostClaude.executeAction(eq("same action"), isNull(), isNull(), eq("/test/project"), isNull()))
-                .thenReturn(new HostClaudeService.ActionResult("failed", 1, null));
+                .thenReturn(new HostClaudeService.ActionResult("failed", 1, parsed));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -509,16 +512,19 @@ class AgenticBlockExecutorTest {
         // Need 8+ turns to trigger compression (keepRecentCount=4, threshold=keepRecentCount+3=7)
         // Each iteration adds 2 turns (assistant reasoning + user observation), plus the initial user turn
         // So 4 iterations = 1 initial + 4*(1 assistant + 1 user) = 9 turns → triggers compression
+        ClaudeJsonResponse.Usage usage = new ClaudeJsonResponse.Usage(500, 200);
+        ClaudeJsonResponse parsed = new ClaudeJsonResponse("result", null, 0.01, 200L, 100L, 1, usage, null, null);
+
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
         when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
-                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Step1\nACTION: Action A\nSUMMARY: S1"))
-                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Step2\nACTION: Action B\nSUMMARY: S2"))
-                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Step3\nACTION: Action C\nSUMMARY: S3"))
-                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Step4\nACTION: Action D\nSUMMARY: S4"))
-                .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
+                .thenReturn(new ReasoningResult("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Step1\nACTION: Action A\nSUMMARY: S1", parsed))
+                .thenReturn(new ReasoningResult("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Step2\nACTION: Action B\nSUMMARY: S2", parsed))
+                .thenReturn(new ReasoningResult("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Step3\nACTION: Action C\nSUMMARY: S3", parsed))
+                .thenReturn(new ReasoningResult("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Step4\nACTION: Action D\nSUMMARY: S4", parsed))
+                .thenReturn(new ReasoningResult("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete", parsed));
 
         when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), isNull()))
-                .thenReturn(new HostClaudeService.ActionResult("ok", 0, null));
+                .thenReturn(new HostClaudeService.ActionResult("ok", 0, parsed));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -593,7 +599,7 @@ class AgenticBlockExecutorTest {
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Do it\nSUMMARY: Step"))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
 
-        when(hostClaude.executeAction(eq("Do it"), eq("claude-opus-4-6"), isNull(), eq("/test/project"), isNull()))
+        when(hostClaude.executeAction(eq("Do it"), eq("claude-opus-4-6"), eq("Custom instructions for this workflow"), eq("/test/project"), isNull()))
                 .thenReturn(new HostClaudeService.ActionResult("done", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -605,10 +611,10 @@ class AgenticBlockExecutorTest {
         StepResult result = executor.execute(buildBlock("Model test"), context);
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
-        // System prompt should include custom instructions
-        verify(hostClaude).buildConversationPrompt(contains("Custom instructions for this workflow"), anyList());
-        // Model passed to executeAction
-        verify(hostClaude).executeAction(eq("Do it"), eq("claude-opus-4-6"), isNull(), eq("/test/project"), isNull());
+        // System prompt should include custom instructions (called once per iteration)
+        verify(hostClaude, atLeast(1)).buildConversationPrompt(contains("Custom instructions for this workflow"), anyList());
+        // Model and instructions passed to executeAction
+        verify(hostClaude).executeAction(eq("Do it"), eq("claude-opus-4-6"), eq("Custom instructions for this workflow"), eq("/test/project"), isNull());
     }
 
     @Test

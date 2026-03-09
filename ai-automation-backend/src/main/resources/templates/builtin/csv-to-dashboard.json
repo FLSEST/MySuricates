@@ -1,0 +1,38 @@
+{
+  "id" : "csv-to-dashboard",
+  "icon" : "\uD83D\uDCCA",
+  "name" : {
+    "en" : "CSV → Interactive Dashboard",
+    "de" : "CSV → Interaktives Dashboard"
+  },
+  "description" : {
+    "en" : "Turn CSV data into an interactive HTML dashboard with Chart.js visualizations and KPIs",
+    "de" : "CSV-Daten in ein interaktives HTML-Dashboard mit Chart.js-Visualisierungen und KPIs verwandeln"
+  },
+  "category" : "DATA",
+  "sortOrder" : 16,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Erstelle ein interaktives Dashboard mit Chart.js aus den CSV-Daten.",
+  "blocks" : [ {
+    "type" : "simple",
+    "config" : {
+      "command" : "Lies {{ filepath }}. Analysiere die CSV-Struktur: Spaltennamen, Datentypen, Anzahl Zeilen, fehlende Werte. Identifiziere automatisch: (1) Numerische Spalten fuer KPIs (Summe, Durchschnitt, Min/Max), (2) Zeitliche Spalten fuer Trend-Charts, (3) Kategorische Spalten fuer Pie/Bar-Charts, (4) Korrelationen zwischen Spalten. Gib einen strukturierten Analyse-Plan aus."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "agentic",
+    "config" : {
+      "max_iterations" : 8,
+      "success_criteria" : "index.html in dashboard/ enthaelt mindestens 3 verschiedene Chart-Typen und eine KPI-Uebersicht.",
+      "goal" : "Erstelle ein interaktives HTML-Dashboard in dashboard/. Titel: '{{ title }}'. Basierend auf der CSV-Analyse: (1) KPI-Karten oben (grosse Zahlen mit Vergleichsindikatoren), (2) Trend-Line-Charts fuer zeitliche Daten, (3) Bar/Pie-Charts fuer kategorische Verteilungen, (4) Datentabelle mit Sortierung. Verwende Chart.js via CDN fuer Diagramme, TailwindCSS fuer Layout. Die CSV-Daten sollen als JavaScript-Variable eingebettet werden. Sprache: {{ language }}. Das Dashboard soll als einzelne index.html Datei funktionieren."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Pruefe dashboard/index.html. Zaehle die Diagramme, pruefe ob Chart.js korrekt eingebunden ist, und gib eine Uebersicht des Dashboards aus."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

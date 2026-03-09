@@ -1,0 +1,42 @@
+{
+  "id" : "translation-pipeline",
+  "icon" : "\uD83C\uDF10",
+  "name" : {
+    "en" : "Translation Pipeline",
+    "de" : "Übersetzungs-Pipeline"
+  },
+  "description" : {
+    "en" : "Translate with quality check and terminology validation",
+    "de" : "Übersetzen mit Qualitätskontrolle und Fachbegriff-Prüfung"
+  },
+  "category" : "CONTENT",
+  "sortOrder" : 10,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Uebersetze den Text hochwertig mit Qualitaetskontrolle und konsistenten Fachbegriffen.",
+  "blocks" : [ {
+    "type" : "simple",
+    "config" : {
+      "command" : "Lies die Datei {{ filepath }} und gib den Inhalt aus."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Uebersetze den Text ins {{ target_language }}. Behalte Formatierung, Fachbegriffe und Struktur bei."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Pruefe die Uebersetzung auf: 1) Sprachliche Natuerlichkeit 2) Fachbegriff-Konsistenz 3) Vollstaendigkeit. Liste alle Probleme auf."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Korrigiere alle gefundenen Probleme und gib die finale Uebersetzung aus."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

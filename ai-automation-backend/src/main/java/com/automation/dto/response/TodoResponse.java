@@ -16,6 +16,7 @@ public record TodoResponse(
         String projectName,
         Todo.Source source,
         String sourceAgent,
+        String sessionId,
         String workflowRunId,
         String referenceType,
         String referenceId,

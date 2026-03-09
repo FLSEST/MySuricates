@@ -41,7 +41,7 @@ class TodoControllerTest {
 
     private TodoResponse sampleResponse() {
         return new TodoResponse("t-1", "Fix bug", "desc", Todo.Status.OPEN, Todo.Priority.HIGH,
-                List.of("backend"), null, null, Todo.Source.AI, "claude", null, null, null,
+                List.of("backend"), null, null, Todo.Source.AI, "claude", null, null, null, null,
                 Instant.now(), Instant.now());
     }
 
@@ -84,7 +84,7 @@ class TodoControllerTest {
         when(todoMapper.toResponse(todo)).thenReturn(sampleResponse());
 
         var request = new CreateTodoRequest("Fix bug", "desc", null, Todo.Priority.HIGH,
-                List.of("backend"), null, Todo.Source.AI, "claude", null, null, null);
+                List.of("backend"), null, Todo.Source.AI, "claude", null, null, null, null);
 
         mockMvc.perform(post("/api/v1/todos")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -105,12 +105,13 @@ class TodoControllerTest {
     @Test
     void updateTodoStatus_patchesStatus() throws Exception {
         var todo = Todo.builder().id("t-1").title("Fix bug").build();
-        when(todoService.updateStatus("t-1", Todo.Status.DONE)).thenReturn(todo);
+        var statusRequest = new UpdateTodoStatusRequest(Todo.Status.DONE, null);
+        when(todoService.updateStatus(eq("t-1"), any(UpdateTodoStatusRequest.class))).thenReturn(todo);
         when(todoService.findByIdResponse("t-1")).thenReturn(sampleResponse());
 
         mockMvc.perform(patch("/api/v1/todos/t-1/status")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new UpdateTodoStatusRequest(Todo.Status.DONE))))
+                        .content(objectMapper.writeValueAsString(statusRequest)))
                 .andExpect(status().isOk());
     }
 

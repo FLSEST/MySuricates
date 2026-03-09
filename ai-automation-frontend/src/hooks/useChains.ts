@@ -47,7 +47,7 @@ export function useChainRun(chainId: string, runId: string) {
     enabled: !!chainId && !!runId,
     refetchInterval: (query) => {
       const data = query.state.data;
-      if (data && (data.status === 'COMPLETED' || data.status === 'FAILED' || data.status === 'CANCELLED')) {
+      if (data && (data.status === 'COMPLETED' || data.status === 'FAILED' || data.status === 'CANCELLED' || data.status === 'COMPLETED_WITH_ERRORS')) {
         return false;
       }
       return 2000;

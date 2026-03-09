@@ -93,6 +93,7 @@ public class ChainExecutor {
         String previousOutput = null;
         boolean chainFailed = false;
         boolean hasFailures = false;
+        boolean hasWarnings = false;
 
         try {
             for (int i = 0; i < sortedEntries.size(); i++) {
@@ -168,6 +169,10 @@ public class ChainExecutor {
                     if (completed.getStatus() == RunStatus.COMPLETED) {
                         runEntry.setStatus(RunStatus.COMPLETED);
                         previousOutput = extractOutput(completed);
+                    } else if (completed.getStatus() == RunStatus.COMPLETED_WITH_ERRORS) {
+                        runEntry.setStatus(RunStatus.COMPLETED_WITH_ERRORS);
+                        previousOutput = extractOutput(completed);
+                        hasWarnings = true;
                     } else if (completed.getStatus() == RunStatus.CANCELLED) {
                         runEntry.setStatus(RunStatus.CANCELLED);
                         run.setStatus(RunStatus.CANCELLED);
@@ -206,7 +211,18 @@ public class ChainExecutor {
             }
 
             if (!chainFailed) {
-                run.setStatus(hasFailures ? RunStatus.COMPLETED_WITH_ERRORS : RunStatus.COMPLETED);
+                long completedCount = run.getEntryRuns().stream()
+                        .filter(e -> e.getStatus() == RunStatus.COMPLETED
+                                  || e.getStatus() == RunStatus.COMPLETED_WITH_ERRORS)
+                        .count();
+
+                if (hasFailures && completedCount == 0) {
+                    run.setStatus(RunStatus.FAILED);
+                } else if (hasFailures || hasWarnings) {
+                    run.setStatus(RunStatus.COMPLETED_WITH_ERRORS);
+                } else {
+                    run.setStatus(RunStatus.COMPLETED);
+                }
             }
 
         } catch (Exception e) {

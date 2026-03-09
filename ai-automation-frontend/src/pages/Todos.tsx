@@ -894,6 +894,11 @@ export function Todos() {
                 {t.todos.source}: {t.todos.sources[editTodo.source]}
                 {editTodo.sourceAgent && ` (${editTodo.sourceAgent})`}
               </p>
+              {editTodo.sessionId && (
+                <p className="text-xs text-text-tertiary">
+                  {t.todos.sessionId}: {editTodo.sessionId}
+                </p>
+              )}
               <p className="text-xs text-text-tertiary">
                 {t.common.created}: {new Date(editTodo.createdAt).toLocaleString()}
               </p>

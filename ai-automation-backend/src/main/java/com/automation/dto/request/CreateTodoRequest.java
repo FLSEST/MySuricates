@@ -14,6 +14,7 @@ public record CreateTodoRequest(
         String projectId,
         Todo.Source source,
         String sourceAgent,
+        String sessionId,
         String workflowRunId,
         String referenceType,
         String referenceId

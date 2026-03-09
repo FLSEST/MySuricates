@@ -1,0 +1,51 @@
+{
+  "id" : "docker-image-build-push",
+  "icon" : "\uD83D\uDC0B",
+  "name" : {
+    "en" : "Docker Image Build & Push",
+    "de" : "Docker Image Build & Push"
+  },
+  "description" : {
+    "en" : "Docker build, tag, and push to registry",
+    "de" : "Docker Build, Tag und Push in Registry"
+  },
+  "category" : "CODE",
+  "sortOrder" : 35,
+  "version" : "1.1.0",
+  "model" : null,
+  "instructions" : "Baue und pushe ein Docker Image. Variablen: dockerfile, image_name, tag, registry.",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "mount_docker_socket" : true,
+      "command" : "set -euo pipefail\nDOCKERFILE=\"{{ dockerfile }}\"\nIMAGE=\"{{ image_name }}\"\nTAG=\"{{ tag }}\"\nREGISTRY=\"{{ registry }}\"\nFULL_IMAGE=\"$REGISTRY/$IMAGE:$TAG\"\necho \"=== Building $FULL_IMAGE ===\"\ndocker build -f \"$DOCKERFILE\" -t \"$FULL_IMAGE\" .\necho \"Build complete: $FULL_IMAGE\"",
+      "container_image" : "automation-agent-devops:latest"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "conditional",
+    "config" : {
+      "else_command" : "echo \"ERROR: Build failed - image not found!\" && exit 1",
+      "execution_mode" : "shell",
+      "condition" : "docker image inspect \"{{ registry }}/{{ image_name }}:{{ tag }}\" >/dev/null 2>&1",
+      "then_command" : "echo \"Build verified: image exists locally.\""
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "mount_docker_socket" : true,
+      "command" : "set -euo pipefail\nIMAGE=\"{{ image_name }}\"\nTAG=\"{{ tag }}\"\nREGISTRY=\"{{ registry }}\"\nFULL_IMAGE=\"$REGISTRY/$IMAGE:$TAG\"\nLATEST=\"$REGISTRY/$IMAGE:latest\"\necho \"=== Tagging + Pushing ===\"\ndocker tag \"$FULL_IMAGE\" \"$LATEST\"\ndocker push \"$FULL_IMAGE\"\ndocker push \"$LATEST\"\necho \"Pushed: $FULL_IMAGE and $LATEST\"",
+      "container_image" : "automation-agent-devops:latest"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "mount_docker_socket" : true,
+      "command" : "set -euo pipefail\nFULL_IMAGE=\"{{ registry }}/{{ image_name }}:{{ tag }}\"\necho \"# Docker Build & Push Report\"\necho \"Generated: $(date -Iseconds)\"\necho \"Image: $FULL_IMAGE\"\necho \"Latest: {{ registry }}/{{ image_name }}:latest\"\necho \"\"\necho \"## Image Details\"\ndocker image inspect \"$FULL_IMAGE\" --format 'Size: {{.Size}} bytes' 2>/dev/null || true\ndocker image inspect \"$FULL_IMAGE\" --format 'Created: {{.Created}}' 2>/dev/null || true\necho \"\"\necho \"## Layers\"\ndocker history \"$FULL_IMAGE\" --no-trunc --format 'table {{.CreatedBy}}\\t{{.Size}}' 2>/dev/null | head -15 || true",
+      "container_image" : "automation-agent-devops:latest"
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

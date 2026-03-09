@@ -1,0 +1,39 @@
+{
+  "id" : "data-analysis",
+  "icon" : "\uD83D\uDCCA",
+  "name" : {
+    "en" : "Data Analysis",
+    "de" : "Datenanalyse"
+  },
+  "description" : {
+    "en" : "Statistics, anomaly detection, and visualizations",
+    "de" : "Statistiken, Anomalie-Erkennung und Visualisierungen"
+  },
+  "category" : "DATA",
+  "sortOrder" : 4,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Analysiere die Daten systematisch. Identifiziere Muster und Anomalien.",
+  "blocks" : [ {
+    "type" : "skill-capability",
+    "config" : {
+      "input" : "{{ dataset }}",
+      "capability" : "analyze_statistics"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "skill-capability",
+    "config" : {
+      "input" : "{{ previous_output }}",
+      "capability" : "detect_anomalies"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "skill-capability",
+    "config" : {
+      "input" : "{{ previous_output }}",
+      "capability" : "visualizations"
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

@@ -1,0 +1,48 @@
+{
+  "id" : "database-backup-verify",
+  "icon" : "\uD83D\uDDC4️",
+  "name" : {
+    "en" : "Database Backup & Verify",
+    "de" : "Datenbank-Backup & Verify"
+  },
+  "description" : {
+    "en" : "Automated backup with compression, checksum, and retention",
+    "de" : "Automatisiertes Backup mit Kompression, Checksumme und Retention"
+  },
+  "category" : "DATA",
+  "sortOrder" : 32,
+  "version" : "1.0.1",
+  "model" : null,
+  "instructions" : "Erstelle ein Datenbank-Backup mit Kompression und Checksumme. Variablen: db_type (postgres/mysql/sqlite), db_connection, backup_dir, retention_count.",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "command" : "set -euo pipefail\nDB_TYPE=\"{{ db_type }}\"\nDB_CONN=\"{{ db_connection }}\"\nBACKUP_DIR=\"{{ backup_dir }}\"\nmkdir -p \"$BACKUP_DIR\"\nTS=$(date +%Y%m%d-%H%M%S)\nBACKUP_FILE=\"$BACKUP_DIR/${DB_TYPE}-backup-${TS}.sql\"\necho \"=== Creating $DB_TYPE backup ===\"\nif [ \"$DB_TYPE\" = \"postgres\" ]; then\n  pg_dump \"$DB_CONN\" > \"$BACKUP_FILE\"\nelif [ \"$DB_TYPE\" = \"mysql\" ]; then\n  mysqldump $DB_CONN > \"$BACKUP_FILE\"\nelif [ \"$DB_TYPE\" = \"sqlite\" ]; then\n  python3 -c \"import shutil; shutil.copy2('$DB_CONN', '$BACKUP_FILE')\"\nelse\n  echo \"Unsupported db_type: $DB_TYPE\" && exit 1\nfi\necho \"Backup created: $BACKUP_FILE ($(du -h \"$BACKUP_FILE\" | cut -f1))\""
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "command" : "set -euo pipefail\nBACKUP_DIR=\"{{ backup_dir }}\"\nLATEST=$(ls -t \"$BACKUP_DIR\"/*.sql 2>/dev/null | head -1)\nif [ -z \"$LATEST\" ]; then echo \"No backup found!\" && exit 1; fi\necho \"=== Compressing $LATEST ===\"\ngzip -f \"$LATEST\"\nCOMPRESSED=\"${LATEST}.gz\"\nsha256sum \"$COMPRESSED\" > \"${COMPRESSED}.sha256\"\necho \"Compressed: $COMPRESSED ($(du -h \"$COMPRESSED\" | cut -f1))\"\necho \"Checksum: $(cat \"${COMPRESSED}.sha256\")\""
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "command" : "set -euo pipefail\nBACKUP_DIR=\"{{ backup_dir }}\"\nLATEST_GZ=$(ls -t \"$BACKUP_DIR\"/*.sql.gz 2>/dev/null | head -1)\nif [ -z \"$LATEST_GZ\" ]; then echo \"No compressed backup found!\" && exit 1; fi\necho \"=== Verifying checksum ===\"\ncd \"$BACKUP_DIR\"\nsha256sum -c \"$(basename \"$LATEST_GZ\").sha256\"\necho \"Checksum verification passed.\""
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "command" : "set -euo pipefail\nBACKUP_DIR=\"{{ backup_dir }}\"\nRETENTION={{ retention_count }}\necho \"=== Retention cleanup (keeping $RETENTION backups) ===\"\nCOUNT=$(ls -1 \"$BACKUP_DIR\"/*.sql.gz 2>/dev/null | wc -l)\nif [ \"$COUNT\" -gt \"$RETENTION\" ]; then\n  REMOVE=$((COUNT - RETENTION))\n  ls -t \"$BACKUP_DIR\"/*.sql.gz | tail -$REMOVE | while read f; do\n    echo \"Removing: $f\"\n    rm -f \"$f\" \"${f}.sha256\"\n  done\n  echo \"Removed $REMOVE old backups.\"\nelse\n  echo \"$COUNT backups present, retention limit $RETENTION not exceeded.\"\nfi"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "command" : "set -euo pipefail\nBACKUP_DIR=\"{{ backup_dir }}\"\necho \"# Backup Report\"\necho \"Generated: $(date -Iseconds)\"\necho \"DB Type: {{ db_type }}\"\necho \"Backup Dir: $BACKUP_DIR\"\necho \"\"\necho \"## Current Backups\"\nls -lh \"$BACKUP_DIR\"/*.sql.gz 2>/dev/null || echo \"No backups found.\"\necho \"\"\necho \"## Disk Usage\"\ndu -sh \"$BACKUP_DIR\" 2>/dev/null || true"
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

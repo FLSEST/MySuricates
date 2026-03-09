@@ -1,0 +1,42 @@
+{
+  "id" : "file-improve",
+  "icon" : "✨",
+  "name" : {
+    "en" : "File Analysis & Improvement",
+    "de" : "Datei-Analyse & Verbesserung"
+  },
+  "description" : {
+    "en" : "Explore project, analyze a file, and create an improved version",
+    "de" : "Projekt erkunden, Datei analysieren und verbesserte Version erstellen"
+  },
+  "category" : "CONTENT",
+  "sortOrder" : 5,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Analysiere die Datei gruendlich und erstelle konkrete, umsetzbare Verbesserungsvorschlaege.",
+  "blocks" : [ {
+    "type" : "simple",
+    "config" : {
+      "command" : "ls -la ."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Schau dir die Dateien in deinem Projekt an. Lies die Datei {{ filepath }} und analysiere ihren Inhalt. Liste konkret auf: 1) Staerken 2) Schwaechen 3) Fehlende Aspekte"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Erstelle eine priorisierte Liste von Verbesserungsvorschlaegen. Sei konkret - keine vagen Hinweise, sondern umsetzbare Aenderungen."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Wende die Verbesserungen an und gib die vollstaendig ueberarbeitete Version aus. Markiere die geaenderten Stellen."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

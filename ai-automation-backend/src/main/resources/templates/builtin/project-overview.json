@@ -1,0 +1,42 @@
+{
+  "id" : "project-overview",
+  "icon" : "\uD83D\uDDC2️",
+  "name" : {
+    "en" : "Project Overview & Synthesis",
+    "de" : "Projekt-Überblick & Synthese"
+  },
+  "description" : {
+    "en" : "Scan all files, understand structure, and create a project summary",
+    "de" : "Alle Dateien scannen, Struktur verstehen und Projekt-Zusammenfassung erstellen"
+  },
+  "category" : "CODE",
+  "sortOrder" : 8,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Erstelle eine umfassende Projektanalyse mit konkreten Empfehlungen.",
+  "blocks" : [ {
+    "type" : "simple",
+    "config" : {
+      "command" : "find . -type f -not -path \"*/node_modules/*\" -not -path \"*/.git/*\" -not -name \"*.lock\" | head -50"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Verschaffe dir einen Ueberblick ueber das Projekt. Lies die wichtigsten Dateien (README, Konfigurationsdateien, Hauptdateien). Beschreibe: 1) Zweck des Projekts 2) Struktur 3) Verwendete Technologien"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Analysiere die Projektqualitaet: Was ist gut umgesetzt? Wo gibt es Verbesserungspotenzial? Fehlt Dokumentation?"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Erstelle eine strukturierte Zusammenfassung des Projekts mit konkreten Empfehlungen fuer naechste Schritte."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

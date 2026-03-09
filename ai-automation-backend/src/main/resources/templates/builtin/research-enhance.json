@@ -1,0 +1,42 @@
+{
+  "id" : "research-enhance",
+  "icon" : "\uD83D\uDD2C",
+  "name" : {
+    "en" : "Research & Enrichment",
+    "de" : "Recherche & Anreicherung"
+  },
+  "description" : {
+    "en" : "Scan project files, find content gaps, and enrich with research",
+    "de" : "Projektdateien scannen, Lücken finden und mit Recherche anreichern"
+  },
+  "category" : "RESEARCH",
+  "sortOrder" : 6,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Scanne das Projekt rekursiv, finde inhaltliche Luecken und reichere die Texte mit Recherche an.",
+  "blocks" : [ {
+    "type" : "simple",
+    "config" : {
+      "command" : "find . -type f \\( -name \"*.md\" -o -name \"*.txt\" -o -name \"*.rst\" \\) | head -20"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Lies die relevanten Dateien in deinem Projekt. Extrahiere die Kernaussagen und identifiziere inhaltliche Luecken oder Punkte die mehr Tiefe brauchen."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Recherchiere zu den identifizierten Luecken. Finde aktuelle Fakten, Statistiken und Quellen die den Inhalt bereichern wuerden."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Erstelle eine angereicherte Version der Hauptdatei. Integriere die recherchierten Informationen und fuege Quellenangaben hinzu."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

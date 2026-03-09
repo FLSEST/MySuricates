@@ -1,0 +1,38 @@
+{
+  "id" : "idea-to-prototype",
+  "icon" : "\uD83D\uDE80",
+  "name" : {
+    "en" : "Idea → Working Prototype",
+    "de" : "Idee → Funktionierender Prototyp"
+  },
+  "description" : {
+    "en" : "Turn an app idea into a working project with code, dependencies, and build config",
+    "de" : "App-Idee in ein funktionierendes Projekt mit Code, Abhängigkeiten und Build-Konfiguration verwandeln"
+  },
+  "category" : "TRANSFORM",
+  "sortOrder" : 14,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Baue einen funktionierenden Prototyp mit allen Abhaengigkeiten und Build-Konfiguration.",
+  "blocks" : [ {
+    "type" : "simple",
+    "config" : {
+      "command" : "Analysiere diese App-Idee: {{ idea }}. Erstelle eine detaillierte Feature-Liste und einen technischen Plan. Tech-Stack: {{ tech_stack }}. Definiere: Datenmodell, Komponenten-Struktur, benoetigte Abhaengigkeiten."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "agentic",
+    "config" : {
+      "max_iterations" : 12,
+      "success_criteria" : "npm run build laeuft erfolgreich ohne Fehler.",
+      "goal" : "Baue einen funktionierenden Prototyp fuer: {{ idea }}. Tech-Stack: {{ tech_stack }}. Erstelle das Projekt in prototype/. Schritte: (1) Projektstruktur anlegen, (2) package.json/Abhaengigkeiten erstellen, (3) npm install ausfuehren, (4) Alle Komponenten und Seiten implementieren, (5) npm run build ausfuehren und Fehler beheben. Kommentare auf {{ language }}."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Erstelle eine README.md in prototype/ mit: Projektbeschreibung, Screenshots-Platzhalter, Installation, Starten, Technologie-Stack."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

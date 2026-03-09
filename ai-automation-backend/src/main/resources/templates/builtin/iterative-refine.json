@@ -1,0 +1,38 @@
+{
+  "id" : "iterative-refine",
+  "icon" : "\uD83D\uDD04",
+  "name" : {
+    "en" : "Iterative Refinement",
+    "de" : "Iterative Verbesserung"
+  },
+  "description" : {
+    "en" : "Improve text in a loop until quality threshold is met",
+    "de" : "Text in einer Schleife verbessern bis die Qualität stimmt"
+  },
+  "category" : "CONTENT",
+  "sortOrder" : 7,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Verbessere den Text iterativ bis die Qualitaet mindestens 8/10 erreicht.",
+  "blocks" : [ {
+    "type" : "simple",
+    "config" : {
+      "command" : "Lies die Datei {{ filepath }} und gib den Inhalt aus."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "while",
+    "config" : {
+      "max_iterations" : 3,
+      "command" : "Verbessere den Text. Fokussiere auf die groessten Schwaechen. Gib die vollstaendig ueberarbeitete Version aus.",
+      "condition_command" : "Bewerte die Qualitaet des Textes auf einer Skala von 1-10 (Klarheit, Vollstaendigkeit, Struktur). Antworte NUR mit \"true\" wenn unter 8, oder \"false\" wenn 8 oder hoeher."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Erstelle eine Zusammenfassung: Was wurde verbessert? Wie ist die finale Qualitaetsbewertung?"
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

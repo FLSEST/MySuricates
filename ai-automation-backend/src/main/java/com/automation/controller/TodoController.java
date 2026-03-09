@@ -57,7 +57,7 @@ public class TodoController {
     @PatchMapping("/{id}/status")
     public TodoResponse updateTodoStatus(@PathVariable String id,
                                          @Valid @RequestBody UpdateTodoStatusRequest request) {
-        var todo = todoService.updateStatus(id, request.status());
+        var todo = todoService.updateStatus(id, request);
         return todoService.findByIdResponse(todo.getId());
     }
 

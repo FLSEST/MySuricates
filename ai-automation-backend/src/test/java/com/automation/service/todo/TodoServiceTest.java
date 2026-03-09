@@ -2,6 +2,7 @@ package com.automation.service.todo;
 
 import com.automation.dto.request.CreateTodoRequest;
 import com.automation.dto.request.UpdateTodoRequest;
+import com.automation.dto.request.UpdateTodoStatusRequest;
 import com.automation.dto.response.TodoCountResponse;
 import com.automation.dto.response.TodoResponse;
 import com.automation.entity.Todo;
@@ -64,7 +65,7 @@ class TodoServiceTest {
     void create_withDefaults_setsStatusOpenPriorityMediumSourceUser() {
         CreateTodoRequest request = new CreateTodoRequest(
                 "Test Todo", "Description", null, null, null,
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, null);
 
         when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> {
             Todo t = inv.getArgument(0);
@@ -84,7 +85,7 @@ class TodoServiceTest {
         CreateTodoRequest request = new CreateTodoRequest(
                 "Important", "Desc", Todo.Status.IN_PROGRESS, Todo.Priority.HIGH,
                 List.of("backend", "bug"), "proj-1", Todo.Source.AI, "claude-code",
-                null, null, null);
+                null, null, null, null);
 
         when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -144,7 +145,7 @@ class TodoServiceTest {
         when(todoRepository.findById("t-1")).thenReturn(Optional.of(todo));
         when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Todo result = todoService.updateStatus("t-1", Todo.Status.DONE);
+        Todo result = todoService.updateStatus("t-1", new UpdateTodoStatusRequest(Todo.Status.DONE, null));
 
         assertThat(result.getStatus()).isEqualTo(Todo.Status.DONE);
         verify(todoRepository).save(todo);

@@ -1,0 +1,49 @@
+{
+  "id" : "github-project-bootstrap",
+  "icon" : "\uD83C\uDFD7️",
+  "name" : {
+    "en" : "GitHub Project Bootstrap",
+    "de" : "GitHub Projekt-Bootstrap"
+  },
+  "description" : {
+    "en" : "Create a new GitHub repository with labels, branch protection, and initial issues",
+    "de" : "Neues GitHub-Repository erstellen mit Labels, Branch-Protection und initialen Issues"
+  },
+  "category" : "CODE",
+  "sortOrder" : 28,
+  "version" : "1.1.0",
+  "model" : null,
+  "instructions" : "Erstelle ein neues GitHub-Repository mit Standardkonfiguration. Variablen: repo_name, visibility (public/private), org (Organisation oder 'none').",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "command" : "set -euo pipefail\nVIS=\"{{ visibility }}\"\nORG=\"{{ org }}\"\nREPO=\"{{ repo_name }}\"\nif [ -n \"$ORG\" ] && [ \"$ORG\" != \"none\" ]; then\n  gh repo create \"$ORG/$REPO\" --\"$VIS\" --clone\nelse\n  gh repo create \"$REPO\" --\"$VIS\" --clone\nfi\ncd \"$REPO\"\ngit commit --allow-empty -m \"Initial commit\"\ngit push -u origin main\necho \"Repository created: $(gh repo view --json url -q .url)\"",
+      "container_image" : "automation-agent-devops:latest"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "foreach",
+    "config" : {
+      "items_source" : "inline",
+      "execution_mode" : "shell",
+      "variable_name" : "label",
+      "command" : "set -euo pipefail\ncd \"{{ repo_name }}\"\nNAME=\"$(echo '{{ label }}' | cut -d: -f1)\"\nCOLOR=\"$(echo '{{ label }}' | cut -d: -f2)\"\ngh label create \"$NAME\" --color \"$COLOR\" --force\necho \"Label created: $NAME\"",
+      "items_inline" : "bug:d73a4a,feature:0e8a16,documentation:0075ca,refactor:e4e669,urgent:b60205,good-first-issue:7057ff"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "command" : "set -euo pipefail\ncd \"{{ repo_name }}\"\ngh api repos/{owner}/{repo}/branches/main/protection \\\n  --method PUT \\\n  --input - <<'JSON'\n{\n  \"required_pull_request_reviews\": { \"required_approving_review_count\": 1 },\n  \"enforce_admins\": false,\n  \"required_status_checks\": null,\n  \"restrictions\": null\n}\nJSON\necho \"Branch protection enabled on main\"",
+      "container_image" : "automation-agent-devops:latest"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "command" : "set -euo pipefail\ncd \"{{ repo_name }}\"\ngh issue create --title \"Project setup\" --body \"- [ ] Add README\\n- [ ] Configure CI/CD\\n- [ ] Add .gitignore\\n- [ ] Set up linting\" --label \"good-first-issue\"\ngh issue create --title \"Add contributing guidelines\" --body \"Add CONTRIBUTING.md with development workflow and coding standards.\" --label \"documentation\"\necho \"Initial issues created\"",
+      "container_image" : "automation-agent-devops:latest"
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

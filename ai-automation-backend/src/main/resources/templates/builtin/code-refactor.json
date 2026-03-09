@@ -1,0 +1,42 @@
+{
+  "id" : "code-refactor",
+  "icon" : "⚙️",
+  "name" : {
+    "en" : "Code Analysis & Refactoring",
+    "de" : "Code-Analyse & Refactoring"
+  },
+  "description" : {
+    "en" : "Scan project code, find issues, and create improved version",
+    "de" : "Projekt-Code scannen, Probleme finden und verbesserte Version erstellen"
+  },
+  "category" : "CODE",
+  "sortOrder" : 11,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Analysiere den Code auf Bugs, Sicherheit und Qualitaet. Erstelle konkrete Verbesserungen.",
+  "blocks" : [ {
+    "type" : "simple",
+    "config" : {
+      "command" : "find . -type f \\( -name \"*.ts\" -o -name \"*.js\" -o -name \"*.py\" -o -name \"*.java\" \\) -not -path \"*/node_modules/*\" | head -20"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Schau dir die Code-Dateien im Projekt an. Lies die Datei {{ filepath }} und analysiere: 1) Bugs und logische Fehler 2) Sicherheitsprobleme 3) Performance 4) Code-Qualitaet. Strukturiere nach Schweregrad."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Erstelle fuer jedes Problem einen konkreten Verbesserungsvorschlag mit Code-Beispiel."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Wende alle Verbesserungen an und gib die refactored Version aus. Kommentiere die wesentlichen Aenderungen."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

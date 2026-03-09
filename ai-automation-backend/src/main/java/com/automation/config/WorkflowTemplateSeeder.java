@@ -21,12 +21,13 @@ import java.util.stream.Collectors;
 public class WorkflowTemplateSeeder implements ApplicationRunner {
 
     private final WorkflowTemplateRepository templateRepository;
+    private final BuiltInTemplateLoader templateLoader;
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
         List<WorkflowTemplate> existing = templateRepository.findByBuiltInTrue();
-        List<WorkflowTemplate> allBuiltIn = BuiltInTemplates.getAll();
+        List<WorkflowTemplate> allBuiltIn = templateLoader.loadAll();
 
         Map<String, WorkflowTemplate> existingById = existing.stream()
                 .collect(Collectors.toMap(WorkflowTemplate::getId, Function.identity()));

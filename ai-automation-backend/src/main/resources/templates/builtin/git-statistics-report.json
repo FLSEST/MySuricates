@@ -1,0 +1,42 @@
+{
+  "id" : "git-statistics-report",
+  "icon" : "\uD83D\uDCC8",
+  "name" : {
+    "en" : "Git Statistics Report",
+    "de" : "Git-Statistik-Report"
+  },
+  "description" : {
+    "en" : "Analyze commits, contributors, churn, and activity trends",
+    "de" : "Commits, Contributors, Churn und Aktivitäts-Trends analysieren"
+  },
+  "category" : "CODE",
+  "sortOrder" : 33,
+  "version" : "1.0.1",
+  "model" : null,
+  "instructions" : "Erstelle einen Git-Statistik-Report. Variablen: project_path, since (z.B. '3 months ago').",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "command" : "set -euo pipefail\ncd \"{{ project_path }}\"\nSINCE=\"{{ since }}\"\necho \"=== Commit Summary (since $SINCE) ===\"\nTOTAL=$(git rev-list --count --since=\"$SINCE\" HEAD)\nAUTHORS=$(git log --since=\"$SINCE\" --format='%aN' | sort -u | wc -l)\nFIRST=$(git log --since=\"$SINCE\" --reverse --format='%ad' --date=short | head -1)\nLAST=$(git log --since=\"$SINCE\" --format='%ad' --date=short | head -1)\necho \"Total commits: $TOTAL\"\necho \"Unique authors: $AUTHORS\"\necho \"Period: $FIRST .. $LAST\"\necho \"\"\necho \"=== Top Authors ===\"\ngit shortlog --since=\"$SINCE\" -sn HEAD | head -10"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "command" : "set -euo pipefail\ncd \"{{ project_path }}\"\nSINCE=\"{{ since }}\"\necho \"=== Most Changed Files (Top 20) ===\"\ngit log --since=\"$SINCE\" --format='' --name-only | grep -v '^$' | sort | uniq -c | sort -rn | head -20"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "command" : "set -euo pipefail\ncd \"{{ project_path }}\"\nSINCE=\"{{ since }}\"\necho \"=== Activity by Weekday ===\"\ngit log --since=\"$SINCE\" --format=\"%ad\" --date=format:\"%A\" | sort | uniq -c | sort -rn\necho \"\"\necho \"=== Activity by Hour ===\"\ngit log --since=\"$SINCE\" --format=\"%ad\" --date=format:\"%H\" | sort | uniq -c | sort -rn | head -10"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "command" : "set -euo pipefail\ncd \"{{ project_path }}\"\nSINCE=\"{{ since }}\"\necho \"=== Lines Changed per Author ===\"\ngit log --since=\"$SINCE\" --format='%aN' --numstat | python3 -c \"\nimport sys\nauthors = {}\ncurrent = None\nfor line in sys.stdin:\n    line = line.strip()\n    if not line:\n        continue\n    parts = line.split('\\t')\n    if len(parts) == 1:\n        current = line\n        if current not in authors:\n            authors[current] = {'added': 0, 'deleted': 0}\n    elif len(parts) == 3 and current:\n        try:\n            authors[current]['added'] += int(parts[0])\n            authors[current]['deleted'] += int(parts[1])\n        except ValueError:\n            pass\nfor name, stats in sorted(authors.items(), key=lambda x: x[1]['added'], reverse=True):\n    print(f'{name}: +{stats[\\\"added\\\"]} -{stats[\\\"deleted\\\"]}')\" 2>&1"
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

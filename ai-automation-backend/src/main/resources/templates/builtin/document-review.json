@@ -1,0 +1,39 @@
+{
+  "id" : "document-review",
+  "icon" : "\uD83D\uDCC4",
+  "name" : {
+    "en" : "Document Review",
+    "de" : "Dokument-Prüfung"
+  },
+  "description" : {
+    "en" : "Grammar check, fact check, and summarize",
+    "de" : "Grammatikprüfung, Faktencheck und Zusammenfassung"
+  },
+  "category" : "CONTENT",
+  "sortOrder" : 1,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Pruefe das Dokument gruendlich. Achte auf Grammatik, Fakten und erstelle eine praegnante Zusammenfassung.",
+  "blocks" : [ {
+    "type" : "skill-capability",
+    "config" : {
+      "input" : "{{ document }}",
+      "capability" : "grammar_check"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "skill-capability",
+    "config" : {
+      "input" : "{{ previous_output }}",
+      "capability" : "fact_check"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "skill-capability",
+    "config" : {
+      "input" : "{{ previous_output }}",
+      "capability" : "summarize"
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

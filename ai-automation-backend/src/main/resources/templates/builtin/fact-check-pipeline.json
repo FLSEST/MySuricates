@@ -1,0 +1,44 @@
+{
+  "id" : "fact-check-pipeline",
+  "icon" : "✅",
+  "name" : {
+    "en" : "Fact-Check Pipeline",
+    "de" : "Faktencheck-Pipeline"
+  },
+  "description" : {
+    "en" : "Extract claims, verify facts, and generate a correction report",
+    "de" : "Behauptungen extrahieren, Fakten prüfen und Korrekturbericht erstellen"
+  },
+  "category" : "RESEARCH",
+  "sortOrder" : 9,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Pruefe alle Fakten sorgfaeltig und erstelle bei Fehlern einen detaillierten Korrekturbericht.",
+  "blocks" : [ {
+    "type" : "simple",
+    "config" : {
+      "command" : "Lies die Datei {{ filepath }} und gib den Inhalt aus."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Extrahiere alle faktischen Behauptungen, Zahlen und Statistiken. Nummeriere jede Behauptung."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Pruefe jede Behauptung. Markiere als KORREKT, UNKLAR oder FALSCH mit Begruendung."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "conditional",
+    "config" : {
+      "else_command" : "echo \"Alle Fakten geprueft - keine Fehler gefunden.\"",
+      "condition" : "Basierend auf folgendem Pruefergebnis:\n{{ previous_output }}\n\nWurden Behauptungen als FALSCH oder UNKLAR markiert? Antworte nur mit true oder false.",
+      "then_command" : "Erstelle einen Korrekturbericht mit den richtigen Informationen fuer jede fehlerhafte Behauptung."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

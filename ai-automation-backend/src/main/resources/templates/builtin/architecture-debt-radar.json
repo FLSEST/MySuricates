@@ -1,0 +1,52 @@
+{
+  "id" : "architecture-debt-radar",
+  "icon" : "\uD83C\uDFD7️",
+  "name" : {
+    "en" : "Architecture Debt Radar",
+    "de" : "Architektur-Schulden-Radar"
+  },
+  "description" : {
+    "en" : "Detect god classes, circular dependencies, layer violations, and excessive coupling",
+    "de" : "God Classes, zirkuläre Abhängigkeiten, Schichtverletzungen und übermäßige Kopplung aufdecken"
+  },
+  "category" : "CODE",
+  "sortOrder" : 40,
+  "version" : "1.1.0",
+  "model" : "claude-sonnet-4-6",
+  "instructions" : "Deckt strukturelle Architektur-Probleme auf: God Classes, zirkulaere Abhaengigkeiten, Schichtverletzungen, fehlende Abstraktionen.",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "on_failure" : "continue",
+      "command" : "set -euo pipefail\necho '=== Directory Structure (depth 3) ==='\nfind . -type d -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/target/*' -not -path '*/build/*' -not -path '*/dist/*' | head -80\necho ''\necho '=== Large Files (>200 lines, candidates for God Classes) ==='\nfind . -type f \\( -name '*.java' -o -name '*.ts' -o -name '*.tsx' -o -name '*.kt' \\) -not -path '*/node_modules/*' -not -path '*/target/*' -not -path '*/dist/*' 2>/dev/null | while read f; do\n  lines=$(wc -l < \"$f\")\n  if [ \"$lines\" -gt 200 ]; then\n    methods=$(grep -c 'public \\|private \\|protected \\|function \\|const .*= .*=>\\|async ' \"$f\" 2>/dev/null || echo 0)\n    injections=$(grep -c '@Autowired\\|@Inject\\|private final.*Service\\|private final.*Repository' \"$f\" 2>/dev/null || echo 0)\n    echo \"$lines lines | $methods methods | $injections injections | $f\"\n  fi\ndone | sort -rn | head -25\necho ''\necho '=== Import Graph (inter-package dependencies) ==='\ngrep -rn '^import ' --include='*.java' . 2>/dev/null | grep -v target | grep 'com.automation' | sed 's/.*import \\(com\\.automation\\.[a-z]*\\).*/\\1/' | sort | uniq -c | sort -rn | head -30\necho ''\necho '=== Frontend Import Graph ==='\ngrep -rn \"^import .* from '\" --include='*.ts' --include='*.tsx' . 2>/dev/null | grep -v node_modules | grep -v dist | sed \"s/.*from '\\([^']*\\)'.*/\\1/\" | grep -v '^[a-z@]' | sort | uniq -c | sort -rn | head -30\necho ''\necho '=== DI Injections per Class ==='\nfor f in $(find . -name '*.java' -not -path '*/target/*' 2>/dev/null); do\n  count=$(grep -c 'private final.*Service\\|private final.*Repository\\|private final.*Executor\\|private final.*Client\\|@Autowired\\|@Inject' \"$f\" 2>/dev/null || echo 0)\n  if [ \"$count\" -gt 5 ]; then echo \"$count injections: $f\"; fi\ndone | sort -rn | head -15\necho ''\necho '=== @Lazy and @SuppressWarnings ==='\ngrep -rn '@Lazy\\|@SuppressWarnings' --include='*.java' --include='*.kt' . 2>/dev/null | grep -v target | head -15\necho ''\necho '=== Cross-Layer Imports (potential violations) ==='\ngrep -rn 'import com.automation.controller' --include='*.java' . 2>/dev/null | grep -v target | grep -v 'controller/' | head -10\ngrep -rn 'import com.automation.repository' --include='*.java' . 2>/dev/null | grep -v target | grep -v 'repository/' | grep -v 'service/' | head -10"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "timeout_seconds" : 600,
+      "command" : "Analysiere die gesammelten Architektur-Daten auf strukturelle Probleme:\n\n{{ previous_output }}\n\nUntersuche:\n1. **God Classes**: Dateien mit >300 Zeilen, >10 Methoden oder >5 Injections. Welche Verantwortlichkeiten koennten extrahiert werden?\n2. **Zirkulaere Abhaengigkeiten**: Packages die sich gegenseitig importieren (A→B→A). @Lazy-Annotationen als Symptom.\n3. **Schichtverletzungen**: Controller die Repositories direkt nutzen, Services die Controller importieren, etc.\n4. **Fehlende Abstraktionen**: Wo wird gleiche Logik in mehreren Klassen dupliziert statt in ein gemeinsames Interface/Service extrahiert?\n5. **Uebermassige Kopplung**: Klassen mit >5 DI-Injections — Anzeichen fuer zu breite Verantwortlichkeit.\n6. **Package-Struktur**: Stimmt die Package-Organisation mit der logischen Architektur ueberein?\n\nPro Finding: Konkrete Datei(en), Art des Problems, Schweregrad, spezifischer Refactoring-Vorschlag (z.B. welche Methoden in welche neue Klasse extrahieren)."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "timeout_seconds" : 600,
+      "command" : "Erstelle den Architektur-Schulden-Radar-Report:\n\n{{ previous_output }}\n\n## Format:\n\n### Radar-Uebersicht\n| Dimension | Score (1-10) | Findings | Kritischster Fund |\n|-----------|-------------|----------|-------------------|\n| God Classes | | | |\n| Zirkulaere Deps | | | |\n| Schichtverletzungen | | | |\n| Fehlende Abstraktionen | | | |\n| Kopplung | | | |\n| Package-Struktur | | | |\n\n### God-Class-Aufteilungen\nFuer jede identifizierte God Class:\n- Aktuelle Groesse und Verantwortlichkeiten\n- Vorgeschlagene Aufteilung in N neue Klassen\n- Welche Methoden in welche neue Klasse\n\n### Refactoring-Roadmap\n| Phase | Massnahme | Risiko | Abhaengigkeiten | Geschaetzter Aufwand |\n\nPhasen: 1=Quick Wins (isolierte Aenderungen), 2=Mittelfristig (bedingte Abhaengigkeiten), 3=Langfristig (groessere Umbauarbeiten)."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "agentic",
+    "config" : {
+      "max_iterations" : 10,
+      "max_total_tokens" : 150000,
+      "iteration_timeout_seconds" : 120,
+      "goal" : "Erstelle oder aktualisiere TODOs basierend auf den Audit-Findings aus {{ previous_output }}.\n\nVORGEHEN:\n1. API-Key aus der SQLite-Datenbank lesen:\n   python3 -c \"import sqlite3; conn = sqlite3.connect('ai-automation-backend/data/automation.db'); c = conn.cursor(); c.execute(\\\"SELECT value FROM app_settings WHERE key = 'api-key'\\\"); print(c.fetchone()[0]); conn.close()\"\n\n2. Bestehende TODOs mit Tag 'audit:arch-debt' laden:\n   curl -s -H 'X-API-Key: <KEY>' http://localhost:9090/api/v1/todos?tag=audit:arch-debt\n\n3. Fuer jeden HIGH oder CRITICAL Finding aus dem Audit-Report:\n   a) Pruefen ob bereits ein offenes TODO mit gleichem Titel-Prefix existiert\n   b) Falls ja: TODO-Beschreibung aktualisieren (PATCH /api/v1/todos/<id>)\n   c) Falls nein: Neues TODO anlegen (POST /api/v1/todos) mit:\n      - title: \"Architektur-Schulden: <kurze Beschreibung des Findings>\"\n      - description: Markdown mit Details, betroffene Dateien, Empfehlung\n      - priority: Mapping CRITICAL→HIGH, HIGH→MEDIUM\n      - tags: [\"audit:arch-debt\", \"backend\" oder \"frontend\"]\n      - projectId: \"ebf4f50c-20c2-4c35-a84a-a0b350124523\"\n      - source: \"AI\"\n      - sourceAgent: \"audit-workflow\"\n\n4. Bestehende TODOs mit Tag 'audit:arch-debt' die NICHT mehr in den Findings auftauchen:\n   → Status auf DONE setzen (PATCH /api/v1/todos/<id>/status mit {\"status\": \"DONE\"})\n\nWICHTIG: Nur HIGH und CRITICAL Findings als TODOs anlegen. MEDIUM und LOW ignorieren.\nWICHTIG: Jede curl-Aktion muss den API-Key im Header X-API-Key mitgeben.\nWICHTIG: Absolute Pfade verwenden fuer die SQLite-DB.",
+      "max_repeated_actions" : 3,
+      "success_criteria" : "Alle HIGH/CRITICAL Findings sind als TODOs angelegt oder aktualisiert. Geloeste Issues sind auf DONE gesetzt.",
+      "total_timeout_seconds" : 900,
+      "require_approval" : false
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

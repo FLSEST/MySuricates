@@ -1,0 +1,61 @@
+{
+  "id" : "doc-accuracy-check",
+  "icon" : "\uD83D\uDCCB",
+  "name" : {
+    "en" : "Documentation Accuracy Check",
+    "de" : "Dokumentations-Genauigkeits-Check"
+  },
+  "description" : {
+    "en" : "Verify documentation against code: build commands, structure, APIs, versions",
+    "de" : "Dokumentation gegen Code verifizieren: Build-Befehle, Struktur, APIs, Versionen"
+  },
+  "category" : "CODE",
+  "sortOrder" : 38,
+  "version" : "1.1.0",
+  "model" : "claude-sonnet-4-6",
+  "instructions" : "Vergleicht Dokumentation gegen Code: Build-Befehle, Projektstruktur, API-Endpunkte, Versionen, Feature-Listen.",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "on_failure" : "continue",
+      "command" : "set -euo pipefail\necho '=== Documentation Files ==='\nfind . -type f \\( -name '*.md' -o -name '*.adoc' -o -name '*.rst' \\) -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/target/*' 2>/dev/null | head -30\necho ''\necho '=== README Content ==='\nfor f in $(find . -maxdepth 2 -name 'README.md' -o -name 'CLAUDE.md' 2>/dev/null); do\n  echo \"--- $f ---\"\n  cat \"$f\" 2>/dev/null | head -200\n  echo ''\ndone\necho '=== Config Files ==='\nfor f in $(find . -maxdepth 3 \\( -name 'package.json' -o -name 'pom.xml' -o -name 'build.gradle' -o -name 'application.yml' -o -name 'application.yaml' -o -name 'tsconfig.json' -o -name 'vite.config.*' \\) -not -path '*/node_modules/*' -not -path '*/target/*' 2>/dev/null | head -15); do\n  echo \"--- $f ---\"\n  head -50 \"$f\" 2>/dev/null\n  echo ''\ndone\necho '=== API Endpoints ==='\ngrep -rn '@\\(Get\\|Post\\|Put\\|Delete\\|Patch\\)Mapping\\|@RequestMapping' --include='*.java' . 2>/dev/null | grep -v target | head -60\necho ''\necho '=== Script Files ==='\nfind . -maxdepth 2 -name '*.sh' -not -path '*/.git/*' 2>/dev/null | while read f; do echo \"--- $f ---\"; head -5 \"$f\"; echo ''; done"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "timeout_seconds" : 600,
+      "command" : "Vergleiche die Dokumentation systematisch gegen den tatsaechlichen Code:\n\n{{ previous_output }}\n\nPruefe:\n1. **Build-Befehle**: Stimmen dokumentierte Build/Run/Test-Befehle? Existieren die referenzierten Scripts?\n2. **Projektstruktur**: Stimmt die dokumentierte Verzeichnisstruktur mit der Realitaet ueberein? Fehlen Verzeichnisse oder sind zusaetzliche vorhanden?\n3. **API-Endpunkte**: Sind alle dokumentierten Endpunkte im Code vorhanden? Fehlen Endpunkte in der Doku?\n4. **Versionen**: Stimmen dokumentierte Versionen (Java, Node, Spring Boot, React etc.) mit pom.xml/package.json?\n5. **Feature-Listen**: Werden Features beschrieben die nicht (mehr) existieren? Fehlen implementierte Features in der Doku?\n6. **Konfiguration**: Stimmen dokumentierte Config-Keys, Ports, Defaults mit application.yml?\n7. **Produktname/Branding**: Wird der richtige Produktname konsistent verwendet?\n\nJeder Fund: Doku-Stelle, Code-Realitaet, Schweregrad (CRITICAL=falsche Befehle die Nutzer verwirren, HIGH=faktisch falsch, MEDIUM=unvollstaendig, LOW=kosmetisch)."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "conditional",
+    "config" : {
+      "else_command" : "echo 'Keine kritischen Dokumentationsfehler gefunden.'",
+      "execution_mode" : "shell",
+      "condition" : "echo '{{ previous_output }}' | grep -qi 'CRITICAL'",
+      "then_command" : "echo 'WARNUNG: Kritische Dokumentationsfehler gefunden! Falsche Build-Befehle oder Anleitungen koennen Nutzer direkt beeintraechtigen.'"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "timeout_seconds" : 600,
+      "command" : "Erstelle den finalen Dokumentations-Report:\n\n{{ previous_output }}\n\n## Format:\n\n### Executive Summary\n- Gesamtbewertung Doku-Genauigkeit (1-10)\n- Anzahl Findings pro Schweregrad\n- Kritischster Fund\n\n### Findings\n| # | Schweregrad | Doku-Stelle | Dokumentiert | Tatsaechlich | Korrektur |\n\n### Korrektur-Vorschlaege\nFuer jeden Fund den konkreten Text, der in der Doku stehen sollte (Copy-Paste-fertig).\n\n### Fehlende Dokumentation\nImplementierte Features/Endpunkte die in keiner Doku erwaehnt werden."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "agentic",
+    "config" : {
+      "max_iterations" : 10,
+      "max_total_tokens" : 150000,
+      "iteration_timeout_seconds" : 120,
+      "goal" : "Erstelle oder aktualisiere TODOs basierend auf den Audit-Findings aus {{ previous_output }}.\n\nVORGEHEN:\n1. API-Key aus der SQLite-Datenbank lesen:\n   python3 -c \"import sqlite3; conn = sqlite3.connect('ai-automation-backend/data/automation.db'); c = conn.cursor(); c.execute(\\\"SELECT value FROM app_settings WHERE key = 'api-key'\\\"); print(c.fetchone()[0]); conn.close()\"\n\n2. Bestehende TODOs mit Tag 'audit:doc-accuracy' laden:\n   curl -s -H 'X-API-Key: <KEY>' http://localhost:9090/api/v1/todos?tag=audit:doc-accuracy\n\n3. Fuer jeden HIGH oder CRITICAL Finding aus dem Audit-Report:\n   a) Pruefen ob bereits ein offenes TODO mit gleichem Titel-Prefix existiert\n   b) Falls ja: TODO-Beschreibung aktualisieren (PATCH /api/v1/todos/<id>)\n   c) Falls nein: Neues TODO anlegen (POST /api/v1/todos) mit:\n      - title: \"Doku-Genauigkeit: <kurze Beschreibung des Findings>\"\n      - description: Markdown mit Details, betroffene Dateien, Empfehlung\n      - priority: Mapping CRITICAL→HIGH, HIGH→MEDIUM\n      - tags: [\"audit:doc-accuracy\", \"backend\" oder \"frontend\"]\n      - projectId: \"ebf4f50c-20c2-4c35-a84a-a0b350124523\"\n      - source: \"AI\"\n      - sourceAgent: \"audit-workflow\"\n\n4. Bestehende TODOs mit Tag 'audit:doc-accuracy' die NICHT mehr in den Findings auftauchen:\n   → Status auf DONE setzen (PATCH /api/v1/todos/<id>/status mit {\"status\": \"DONE\"})\n\nWICHTIG: Nur HIGH und CRITICAL Findings als TODOs anlegen. MEDIUM und LOW ignorieren.\nWICHTIG: Jede curl-Aktion muss den API-Key im Header X-API-Key mitgeben.\nWICHTIG: Absolute Pfade verwenden fuer die SQLite-DB.",
+      "max_repeated_actions" : 3,
+      "success_criteria" : "Alle HIGH/CRITICAL Findings sind als TODOs angelegt oder aktualisiert. Geloeste Issues sind auf DONE gesetzt.",
+      "total_timeout_seconds" : 900,
+      "require_approval" : false
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

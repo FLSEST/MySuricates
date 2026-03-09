@@ -1,0 +1,39 @@
+{
+  "id" : "deploy-pipeline",
+  "icon" : "\uD83D\uDE80",
+  "name" : {
+    "en" : "Deploy Pipeline",
+    "de" : "Deploy-Pipeline"
+  },
+  "description" : {
+    "en" : "Conditional test, build, and deploy",
+    "de" : "Bedingter Test, Build und Deployment"
+  },
+  "category" : "CODE",
+  "sortOrder" : 2,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Fuehre die Deploy-Pipeline aus. Stoppe bei fehlgeschlagenen Tests.",
+  "blocks" : [ {
+    "type" : "conditional",
+    "config" : {
+      "else_command" : "echo \"No tests\"",
+      "execution_mode" : "shell",
+      "condition" : "test -f package.json",
+      "then_command" : "npm test"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "command" : "npm run build"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "command" : "npm run deploy"
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

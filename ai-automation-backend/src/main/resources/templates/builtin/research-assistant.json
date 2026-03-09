@@ -1,0 +1,39 @@
+{
+  "id" : "research-assistant",
+  "icon" : "\uD83D\uDD0D",
+  "name" : {
+    "en" : "Research Assistant",
+    "de" : "Recherche-Assistent"
+  },
+  "description" : {
+    "en" : "Web search, extract key points, and cite sources",
+    "de" : "Websuche, Kernpunkte extrahieren und Quellen zitieren"
+  },
+  "category" : "RESEARCH",
+  "sortOrder" : 3,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Recherchiere gruendlich und stelle sicher dass alle Quellen korrekt zitiert werden.",
+  "blocks" : [ {
+    "type" : "skill-capability",
+    "config" : {
+      "input" : "{{ query }}",
+      "capability" : "web_search"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "skill-capability",
+    "config" : {
+      "input" : "{{ previous_output }}",
+      "capability" : "extract_key_points"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "skill-capability",
+    "config" : {
+      "input" : "{{ previous_output }}",
+      "capability" : "cite_sources"
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

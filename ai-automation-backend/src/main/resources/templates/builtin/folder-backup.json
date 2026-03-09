@@ -1,0 +1,47 @@
+{
+  "id" : "folder-backup",
+  "icon" : "\uD83D\uDCBE",
+  "name" : {
+    "en" : "Folder Backup (tar.gz)",
+    "de" : "Ordner-Backup (tar.gz)"
+  },
+  "description" : {
+    "en" : "Backup multiple folders via shell into compressed archives with checksums",
+    "de" : "Mehrere Ordner per Shell in komprimierte Archive sichern, inklusive Checksummen"
+  },
+  "category" : "DATA",
+  "sortOrder" : 27,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Sichere alle Unterordner des aktuellen Projektverzeichnisses (ausser backup) in komprimierte Tar-Archive mit Zeitstempel nach backup/. Keine KI-Beteiligung, reine Shell-Ausfuehrung.",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "command" : "mkdir -p backup"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "foreach",
+    "config" : {
+      "items_source" : "command",
+      "execution_mode" : "shell",
+      "items_command" : "find . -mindepth 1 -maxdepth 1 -type d ! -name backup -exec basename {} \\;",
+      "variable_name" : "item",
+      "timeout_seconds" : 900,
+      "command" : "set -euo pipefail; src=\"{{ item }}\"; ts=\"$(date +%Y%m%d-%H%M%S)\"; tar -czf backup/\"${src}-${ts}.tgz\" \"$src\"; sha256sum backup/\"${src}-${ts}.tgz\""
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "command" : "ls -lh backup | sort -k5,5h"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Pruefe das Backup-Verzeichnis backup. Liste die erstellten Archive mit Groesse und Checksumme. Markiere, falls ein Ordner nicht gesichert wurde."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}
