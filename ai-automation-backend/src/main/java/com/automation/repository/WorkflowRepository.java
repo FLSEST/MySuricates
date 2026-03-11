@@ -27,6 +27,12 @@ public interface WorkflowRepository extends JpaRepository<Workflow, String> {
     List<Object[]> findAllIdNameBlockTypes(@Param("excludeId") String excludeId);
 
     /**
+     * Finds all workflows whose project is not archived.
+     */
+    @Query("SELECT w FROM Workflow w WHERE w.project.archivedAt IS NULL")
+    List<Workflow> findAllWithActiveProject();
+
+    /**
      * Finds workflows that need block_types backfill (null or empty).
      */
     @Query("SELECT w FROM Workflow w WHERE w.blockTypes IS NULL OR w.blockTypes = ''")

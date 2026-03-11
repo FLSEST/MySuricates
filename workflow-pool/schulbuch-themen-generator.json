@@ -1,0 +1,59 @@
+{
+  "name": {
+    "de": "Schulbuch-Themen-Generator",
+    "en": "Textbook Topic Generator"
+  },
+  "description": {
+    "de": "Generiert Lernpakete aus Schulbuch-Kapitelbeschreibungen mit Themen-Seiten, Schlüsselbegriffen, externen Links und passenden Übungen.",
+    "en": "Generates learning packages from textbook chapter descriptions with topic pages, key terms, external links and matching exercises."
+  },
+  "icon": "📖",
+  "category": "CONTENT",
+  "tags": ["education", "learning", "textbook", "school"],
+  "blocks": [
+    {
+      "type": "simple",
+      "config": {
+        "label": "Kapitel analysieren + Lernpaket generieren",
+        "timeout_seconds": 900,
+        "command": "Analysiere das folgende Schulbuch-Kapitel und erstelle ein vollständiges JSON-Lernpaket.\n\nSchulbuch: {{ textbook }}\nVerlag: {{ publisher }}\nKapitel: {{ chapter }}\nFach: {{ subject }}\nKlassenstufe: {{ grade }}\nSprache: {{ language }}\n\nErstelle ein JSON-Lernpaket mit BESONDEREM Fokus auf die Topic-Sektion:\n\n```json\n{\n  \"version\": \"1.0\",\n  \"type\": \"learning-package\",\n  \"meta\": {\n    \"id\": \"<generiere-uuid>\",\n    \"title\": \"{{ subject }} — {{ chapter }}\",\n    \"subject\": \"{{ subject }}\",\n    \"grade\": \"{{ grade }}\",\n    \"tags\": [\"<relevante-tags>\", \"schulbuch\"],\n    \"language\": \"{{ language }}\",\n    \"difficulty\": \"mittel\",\n    \"source\": {\n      \"textbook\": \"{{ textbook }}\",\n      \"chapter\": \"{{ chapter }}\",\n      \"publisher\": \"{{ publisher }}\"\n    },\n    \"created\": \"<heutiges-datum>\",\n    \"author\": \"MySuricates Workflow\"\n  },\n  \"topic\": {\n    \"summary\": \"<Ausführliche Markdown-Zusammenfassung, 5-8 Absätze, die das Kapitel vollständig abdeckt>\",\n    \"sections\": [\n      {\"title\": \"<Hauptthema 1>\", \"content\": \"<Detaillierter Markdown-Text mit Erklärungen, Beispielen, ggf. Formeln>\"},\n      {\"title\": \"<Hauptthema 2>\", \"content\": \"...\"},\n      {\"title\": \"<Hauptthema 3>\", \"content\": \"...\"},\n      {\"title\": \"Zusammenhänge und Bedeutung\", \"content\": \"<Einordnung in größeren Kontext>\"}\n    ],\n    \"keyTerms\": [\n      {\"term\": \"<Fachbegriff>\", \"definition\": \"<Klare, schülergerechte Definition>\"},\n      ...\n    ],\n    \"links\": [\n      {\"label\": \"Wikipedia: <Thema>\", \"url\": \"https://de.wikipedia.org/wiki/<Thema>\"},\n      {\"label\": \"Bildungsserver\", \"url\": \"https://www.bildungsserver.de/...\"},\n      ...\n    ]\n  },\n  \"exercises\": {\n    \"flashcards\": [15 Karten mit Fachbegriffen und Definitionen],\n    \"quiz\": [10 Multiple-Choice-Fragen zum Verständnis],\n    \"drill\": [10 Übungen zum aktiven Abruf]\n  }\n}\n```\n\nAnforderungen an die Topic-Sektion:\n- Zusammenfassung: Vollständige Kapitelübersicht, verständlich für Klassenstufe {{ grade }}\n- Mindestens 4 Abschnitte, die die Hauptthemen des Kapitels abdecken\n- Mindestens 10 Schlüsselbegriffe mit schülergerechten Definitionen\n- Mindestens 3 Links (Wikipedia, Bildungsserver, Lernvideos)\n- Markdown-Formatierung in Zusammenfassung und Abschnitten (Fettdruck, Listen, etc.)\n\nAnforderungen an Übungen:\n- 15 Flashcards: Alle Schlüsselbegriffe + wichtige Zusammenhänge\n- 10 Quiz: Verschiedene Schwierigkeitsgrade, plausible Distraktoren\n- 10 Drill: Offene Fragen zum Kapitelinhalt mit Hints\n\nGib NUR das JSON aus, ohne Markdown-Fences oder zusätzlichen Text."
+      }
+    },
+    {
+      "type": "agentic",
+      "config": {
+        "label": "JSON speichern + validieren",
+        "goal": "Speichere das generierte Schulbuch-Lernpaket als JSON-Datei.\n\n1. Erstelle {{ output_dir }} falls nötig (mkdir -p)\n2. Extrahiere das JSON aus {{ previous_output }} (Markdown-Fences entfernen falls vorhanden)\n3. Bereinige den Dateinamen: {{ subject }}_{{ chapter }} → Kleinschreibung, Leerzeichen/Punkte durch Bindestriche ersetzen\n4. Speichere als {{ output_dir }}/<bereinigter-name>.json\n5. Validiere:\n   - Valides JSON\n   - source-Feld mit textbook, chapter, publisher vorhanden\n   - topic.sections hat mindestens 4 Einträge\n   - topic.keyTerms hat mindestens 10 Einträge\n   - topic.links hat mindestens 3 Einträge\n   - exercises.flashcards hat mindestens 15 Einträge\n   - exercises.quiz hat mindestens 10 Einträge\n   - exercises.drill hat mindestens 10 Einträge\n6. Bei Fehlern: korrigieren und erneut speichern",
+        "success_criteria": "JSON-Datei existiert, ist valide und erfüllt alle Mindestanforderungen an Topic-Sektion und Übungsanzahl.",
+        "max_iterations": 5,
+        "timeout_seconds": 300,
+        "iteration_timeout_seconds": 300,
+        "total_timeout_seconds": 600,
+        "max_total_tokens": 100000,
+        "max_repeated_actions": 3,
+        "require_approval": false
+      }
+    },
+    {
+      "type": "simple",
+      "config": {
+        "label": "Zusammenfassung",
+        "timeout_seconds": 300,
+        "command": "Lies die gespeicherte JSON-Datei unter {{ output_dir }}/ (Schulbuch-Lernpaket zu '{{ chapter }}') und prüfe:\n\n## Schulbuch-Lernpaket: {{ textbook }} — {{ chapter }}\n\n### Quellenangabe\n- Schulbuch: {{ textbook }} ({{ publisher }})\n- Kapitel: {{ chapter }}\n- Fach: {{ subject }}, Klasse {{ grade }}\n\n### Topic-Sektion\n- Zusammenfassung: X Zeichen (Minimum: 500)\n- Abschnitte: X (Minimum: 4)\n- Schlüsselbegriffe: X (Minimum: 10)\n- Externe Links: X (Minimum: 3)\n- Markdown-Formatierung vorhanden: ja/nein\n\n### Übungen\n- Flashcards: X (Soll: 15)\n- Quiz: X (Soll: 10)\n- Drill: X (Soll: 10)\n\n### Inhaltliche Qualität\n- Altersgerecht für Klasse {{ grade }}: ja/nein\n- Fachliche Korrektheit: Bewertung\n- Abdeckung des Kapitelthemas: vollständig/teilweise/unzureichend\n\n### Gesamtbewertung\n- Score: X/10\n\ngate_status: GREEN falls Score >= 7, YELLOW falls 5-6, RED falls < 5\ngate_category: content-quality\ngate_description: Qualitätsprüfung Schulbuch-Lernpaket '{{ chapter }}'"
+      }
+    }
+  ],
+  "instructions": "Du generierst Lernpakete basierend auf Schulbuch-Kapiteln für die LernApp.\n\nWICHTIG:\n- Du hast das Schulbuch NICHT vorliegen. Nutze dein Fachwissen über das Thema '{{ chapter }}' im Fach '{{ subject }}' für Klassenstufe {{ grade }}.\n- Die source-Angabe (textbook, publisher, chapter) dient der Zuordnung — der Inhalt muss dem typischen Lehrplan entsprechen.\n- Alle Erklärungen müssen für Klassenstufe {{ grade }} verständlich sein.\n- Fachbegriffe immer mit Erklärung einführen.\n- Formeln und Gleichungen in Markdown-Notation.\n\nJSON-Schema für Lernpakete:\n```json\n{\n  \"version\": \"1.0\",\n  \"type\": \"learning-package\",\n  \"meta\": {\n    \"id\": \"uuid\",\n    \"title\": \"...\",\n    \"subject\": \"...\",\n    \"grade\": \"7\",\n    \"tags\": [\"...\"],\n    \"language\": \"de\",\n    \"difficulty\": \"leicht|mittel|schwer\",\n    \"source\": { \"textbook\": \"...\", \"chapter\": \"...\", \"publisher\": \"...\" },\n    \"created\": \"2026-03-10\",\n    \"author\": \"MySuricates Workflow\"\n  },\n  \"topic\": {\n    \"summary\": \"Markdown...\",\n    \"sections\": [{ \"title\": \"...\", \"content\": \"...\" }],\n    \"keyTerms\": [{ \"term\": \"...\", \"definition\": \"...\" }],\n    \"links\": [{ \"label\": \"...\", \"url\": \"...\" }]\n  },\n  \"exercises\": {\n    \"flashcards\": [{ \"front\": \"...\", \"back\": \"...\", \"tags\": [] }],\n    \"quiz\": [{ \"type\": \"multiple-choice\", \"question\": \"...\", \"options\": [], \"correct\": 0, \"explanation\": \"...\" }],\n    \"drill\": [{ \"prompt\": \"...\", \"answer\": \"...\", \"hint\": \"...\" }]\n  }\n}\n```",
+  "model": "claude-opus-4-6",
+  "version": "1.0.0",
+  "author": "MySuricates",
+  "defaultContext": {
+    "textbook": "Biologie Heute S II",
+    "publisher": "Schroedel",
+    "chapter": "3.2 Fotosynthese",
+    "subject": "Biologie",
+    "grade": "7",
+    "output_dir": "/home/flo/Entwicklung/LernApp/packages",
+    "language": "de"
+  }
+}

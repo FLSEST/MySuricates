@@ -1,0 +1,63 @@
+{
+  "name": {
+    "de": "LernApp Generator",
+    "en": "Learning App Generator"
+  },
+  "description": {
+    "de": "Erstellt eine vollständige Client-Side Lern-SPA (HTML/CSS/JS) oder optimiert eine bestehende. Unterstützt JSON-Lernpaket-Import, Bibliothek, Übungsmodule (Karteikarten, Quiz, Kreuzworträtsel, Wortsuchrätsel, Drill, Grammatik), Fortschritt und Dark Mode.",
+    "en": "Creates a complete client-side learning SPA (HTML/CSS/JS) or optimizes an existing one. Supports JSON learning package import, library, exercise modules (flashcards, quiz, crossword, word search, drill, grammar), progress tracking and dark mode."
+  },
+  "icon": "🎓",
+  "category": "CONTENT",
+  "tags": ["education", "learning", "app-generator", "spa"],
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "label": "Projektstruktur prüfen",
+        "timeout_seconds": 30,
+        "command": "set -euo pipefail\nif [ -f '{{ app_dir }}/index.html' ]; then\n  echo 'EXISTS'\n  echo '--- Existing files ---'\n  find '{{ app_dir }}' -maxdepth 2 -type f \\( -name '*.html' -o -name '*.js' -o -name '*.css' \\) | sort\n  wc -l {{ app_dir }}/*.html {{ app_dir }}/*.js {{ app_dir }}/*.css 2>/dev/null || true\nelse\n  echo 'NEW'\n  echo 'No existing app found — will create from scratch.'\nfi"
+      }
+    },
+    {
+      "type": "agentic",
+      "config": {
+        "label": "App erstellen/optimieren",
+        "goal": "Prüfe ob {{ app_dir }}/index.html existiert.\n\nFalls NICHT (Erstlauf):\nErstelle eine vollständige Single-Page-Application unter {{ app_dir }}/ mit folgenden Dateien:\n- index.html (Hauptseite mit Navigation)\n- app.js (gesamte App-Logik als Module-Pattern)\n- styles.css (Custom Styles ergänzend zu Tailwind)\n- components/ Verzeichnis mit modularen JS-Dateien falls nötig\n\nFalls JA (Optimierung):\nLies alle vorhandenen Dateien, identifiziere maximal 5 konkrete Verbesserungen und wende sie an. Keine Neuerstellung!\n\nDie App MUSS folgende Features haben:\n1. JSON-Lernpaket-Import (Drag & Drop Zone + File Picker Button)\n2. Bibliothek mit allen importierten Paketen (Suche, Filter nach Fach/Klasse/Tags)\n3. Paket-Detailansicht mit Themen-Seite (Zusammenfassung, Abschnitte, Schlüsselbegriffe, Links)\n4. Übungsmodule:\n   a) Karteikarten (Flip-Animation, markieren als gewusst/nicht gewusst)\n   b) Quiz (Multiple-Choice, sofortiges Feedback mit Erklärung)\n   c) Kreuzworträtsel (interaktives Grid, Hinweise, Validierung)\n   d) Wortsuchrätsel (Buchstaben-Grid, Wörter markieren durch Klicken)\n   e) Drill (Eingabefeld, Hint-Button, Antwortprüfung)\n   f) Grammatik (Fill-in, Transform, Error-Correction, Sentence-Building)\n5. Fortschritt pro Paket in localStorage (richtig/falsch/übersprungen pro Übungstyp)\n6. Fortschritts-Dashboard auf der Startseite\n7. Print-CSS für Übungen\n8. Responsive Design (Mobile + Desktop)\n9. Dark Mode Toggle\n10. Sprache: {{ language }}",
+        "success_criteria": "Alle Dateien existieren unter {{ app_dir }}/, die App lädt im Browser ohne Fehler, alle 10 Features sind implementiert, JSON-Import funktioniert mit dem definierten Schema.",
+        "max_iterations": 15,
+        "timeout_seconds": 600,
+        "iteration_timeout_seconds": 600,
+        "total_timeout_seconds": 3600,
+        "max_total_tokens": 400000,
+        "max_repeated_actions": 3,
+        "require_approval": false
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "label": "Dateistruktur verifizieren",
+        "timeout_seconds": 30,
+        "command": "set -euo pipefail\necho '=== Dateistruktur ==='\nls -la '{{ app_dir }}/'\necho ''\necho '=== Zeilenanzahl ==='\nwc -l {{ app_dir }}/*.html {{ app_dir }}/*.js {{ app_dir }}/*.css 2>/dev/null || echo 'Keine Dateien gefunden!'\necho ''\necho '=== Packages-Verzeichnis ==='\nls -la '{{ app_dir }}/packages/' 2>/dev/null || echo 'packages/ Verzeichnis fehlt noch (wird bei erstem Import erstellt)'\necho ''\necho '=== Components-Verzeichnis ==='\nls -la '{{ app_dir }}/components/' 2>/dev/null || echo 'Kein components/ Verzeichnis'"
+      }
+    },
+    {
+      "type": "simple",
+      "config": {
+        "label": "Zusammenfassung",
+        "timeout_seconds": 300,
+        "command": "Lies die erstellten/geänderten Dateien unter {{ app_dir }}/ und erstelle eine Zusammenfassung:\n\n## LernApp Status\n\n### Dateien\n- Liste alle erstellten/geänderten Dateien mit Zeilenanzahl\n\n### Implementierte Features\nPrüfe für jedes Feature ob es im Code vorhanden ist:\n- [ ] JSON-Import (Drag & Drop + File Picker)\n- [ ] Bibliothek mit Suche/Filter\n- [ ] Themen-Seiten\n- [ ] Karteikarten\n- [ ] Quiz\n- [ ] Kreuzworträtsel\n- [ ] Wortsuchrätsel\n- [ ] Drill\n- [ ] Grammatik\n- [ ] Fortschritt (localStorage)\n- [ ] Print-CSS\n- [ ] Responsive\n- [ ] Dark Mode\n\n### Qualitätsbewertung\n- Code-Struktur (modular/monolithisch)\n- Geschätzte Komplexität\n- Fehlende Features oder Verbesserungsvorschläge\n\n### Nächste Schritte\nWas sollte beim nächsten Optimierungs-Lauf verbessert werden?"
+      }
+    }
+  ],
+  "instructions": "Du erstellst eine Client-Side Single-Page-Application als Lernplattform.\n\nTechnologie-Stack:\n- HTML5 + TailwindCSS via CDN (https://cdn.tailwindcss.com)\n- Vanilla JavaScript (ES6+, Module-Pattern)\n- Keine Build-Tools, kein npm, kein Framework\n- localStorage für Persistenz\n\nDesign-Richtlinien:\n- TailwindCSS für Layout und Styling, Custom CSS nur für Animationen und Print\n- Farbschema: {{ color_scheme }} — definiere CSS Custom Properties für Primär/Sekundär/Akzent\n- Dark Mode über class-Toggle auf <html> Element\n- Smooth Transitions zwischen Views (CSS transitions)\n- Cards für Pakete, Modal für Import, Sidebar für Navigation\n\nApp-Architektur:\n- Alles in einer index.html mit eingebundenem app.js und styles.css\n- app.js nutzt Module-Pattern: const App = (function() { ... })();\n- Routing über Hash-Navigation (#library, #package/id, #exercise/type/id)\n- State Management über ein zentrales Store-Objekt in localStorage\n\nlocalStorage Schema:\n```json\n{\n  \"lernapp_packages\": [{ \"id\": \"...\", \"meta\": {...}, \"importedAt\": \"...\" }],\n  \"lernapp_progress\": {\n    \"package_id\": {\n      \"flashcards\": { \"correct\": 5, \"wrong\": 2, \"total\": 10, \"lastPracticed\": \"...\" },\n      \"quiz\": { \"correct\": 8, \"wrong\": 1, \"total\": 10, \"lastPracticed\": \"...\" }\n    }\n  },\n  \"lernapp_settings\": { \"darkMode\": false, \"language\": \"de\" }\n}\n```\n\nJSON-Lernpaket-Schema (die App muss dieses Format importieren können):\n```json\n{\n  \"version\": \"1.0\",\n  \"type\": \"learning-package\",\n  \"meta\": {\n    \"id\": \"uuid\",\n    \"title\": \"Titel des Pakets\",\n    \"subject\": \"Biologie\",\n    \"grade\": \"7\",\n    \"tags\": [\"fotosynthese\", \"pflanzen\"],\n    \"language\": \"de\",\n    \"difficulty\": \"leicht|mittel|schwer\",\n    \"source\": { \"textbook\": \"...\", \"chapter\": \"...\", \"publisher\": \"...\" },\n    \"created\": \"2026-03-10\",\n    \"author\": \"MySuricates Workflow\"\n  },\n  \"topic\": {\n    \"summary\": \"Markdown-Zusammenfassung...\",\n    \"sections\": [{ \"title\": \"Abschnittstitel\", \"content\": \"Markdown-Inhalt\" }],\n    \"keyTerms\": [{ \"term\": \"Chlorophyll\", \"definition\": \"Grüner Farbstoff...\" }],\n    \"links\": [{ \"label\": \"Wikipedia\", \"url\": \"https://...\" }]\n  },\n  \"exercises\": {\n    \"flashcards\": [{ \"front\": \"Was ist Fotosynthese?\", \"back\": \"Der Prozess...\", \"tags\": [\"definition\"] }],\n    \"quiz\": [{ \"type\": \"multiple-choice\", \"question\": \"...\", \"options\": [\"A\",\"B\",\"C\",\"D\"], \"correct\": 1, \"explanation\": \"...\" }],\n    \"crossword\": { \"gridSize\": 15, \"words\": [{ \"word\": \"CHLOROPHYLL\", \"clue\": \"Grüner Farbstoff\", \"row\": 0, \"col\": 2, \"direction\": \"across\" }] },\n    \"wordsearch\": { \"gridSize\": 12, \"words\": [\"CHLOROPHYLL\"], \"grid\": [[\"C\",\"H\",...]] },\n    \"drill\": [{ \"prompt\": \"Nenne die Reaktionsgleichung\", \"answer\": \"6CO2 + 6H2O → C6H12O6 + 6O2\", \"hint\": \"Kohlendioxid + Wasser → ...\" }],\n    \"grammar\": [{ \"type\": \"fill-in\", \"instruction\": \"Setze ein\", \"sentence\": \"Je ___ (parler) français.\", \"answer\": \"parle\", \"hint\": \"1. Person Singular\" }]\n  }\n}\n```\n\nWICHTIG:\n- Jedes Feature muss vollständig funktional sein — keine Platzhalter oder TODOs\n- Die App muss ohne Server funktionieren (file:// Protokoll)\n- Alle Texte auf {{ language }}\n- Kreuzworträtsel-Renderer: Canvas oder HTML-Grid mit Input-Feldern pro Zelle\n- Wortsuchrätsel: Buchstaben-Grid, Wörter markieren durch Klick auf Start- und Endbuchstabe\n- Bei Import: JSON parsen, ID generieren falls fehlend, in localStorage speichern\n- Fehlerbehandlung: Ungültiges JSON abfangen, fehlende Felder graceful handeln",
+  "model": "claude-opus-4-6",
+  "version": "1.0.0",
+  "author": "MySuricates",
+  "defaultContext": {
+    "app_dir": "/home/flo/Entwicklung/LernApp",
+    "language": "Deutsch",
+    "color_scheme": "modern-blue"
+  }
+}

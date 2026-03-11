@@ -1,0 +1,86 @@
+{
+  "id" : "auto-fix-java",
+  "icon" : "\u2615",
+  "name" : {
+    "en" : "Auto-Fix Java",
+    "de" : "Auto-Fix Java"
+  },
+  "description" : {
+    "en" : "Scan Java/Maven projects for compiler warnings, style issues, and bugs, auto-fix safely, verify, and submit as PR",
+    "de" : "Java/Maven-Projekte auf Compiler-Warnungen, Style-Issues und Bugs scannen, sicher auto-fixen, verifizieren und als PR einreichen"
+  },
+  "category" : "CODE",
+  "sortOrder" : 46,
+  "version" : "1.0.0",
+  "model" : "claude-sonnet-4-6",
+  "instructions" : "Du bist ein automatischer Java-Code-Fixer. Deine Aufgabe ist es, Findings aus statischer Analyse sicher zu beheben.\n\nSICHERHEITSREGELN:\n- IMMER auf eigenem Branch arbeiten, nie auf main\n- Ein Commit pro Fix (atomar, reviewbar, revertierbar)\n- Keine Breaking Changes an oeffentlichen APIs\n- Keine Dateien loeschen die noch referenziert werden\n- Bei Unsicherheit: Fix ueberspringen statt riskieren\n- Build und Tests muessen nach allen Fixes bestehen\n\nJAVA-SPEZIFISCH:\n- Lombok-Annotationen beachten (@Data, @Builder, etc. generieren Methoden)\n- MapStruct-Mapper nicht manuell aendern (werden generiert)\n- Spring-Annotationen (@Service, @Repository, etc.) nicht entfernen\n- Bei Generics: Diamond-Operator nutzen wo moeglich (Java 7+)\n- Raw Types nur fixen wenn der Typ eindeutig ableitbar ist\n- @SuppressWarnings nur als letztes Mittel\n- Flyway-Migrationen NIEMALS aendern\n\nCOMMIT-KONVENTIONEN:\n- fix: <beschreibung>\n- refactor: <beschreibung>\n- style: <beschreibung> — fuer Formatting\n- chore: <beschreibung> — fuer Dependency-Updates",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "on_failure" : "abort",
+      "command" : "set -euo pipefail\nREPO_URL=\"{{ repo_url }}\"\nBASE_BRANCH=\"{{ base_branch }}\"\nSOURCE_DIR=\"{{ source_dir }}\"\nif [ -z \"$BASE_BRANCH\" ] || [ \"$BASE_BRANCH\" = \"{{ base_branch }}\" ]; then BASE_BRANCH=\"main\"; fi\nif [ -z \"$SOURCE_DIR\" ] || [ \"$SOURCE_DIR\" = \"{{ source_dir }}\" ]; then SOURCE_DIR=\"src/\"; fi\n\necho '=== Git Safety Check ==='\nif ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then\n  echo 'ERROR: Not a git repository!' && exit 1\nfi\n\nif [ -n \"$(git status --porcelain)\" ]; then\n  echo 'ERROR: Working tree is dirty! Commit or stash changes first.'\n  git status --short\n  exit 1\nfi\n\ngit checkout \"$BASE_BRANCH\" && git pull --ff-only origin \"$BASE_BRANCH\" 2>/dev/null || true\n\nBASE_COMMIT=$(git rev-parse HEAD)\nFIX_BRANCH=\"fix/java-autofix-$(date +%Y%m%d-%H%M%S)\"\n\necho \"=== Creating branch: $FIX_BRANCH ===\"\ngit checkout -b \"$FIX_BRANCH\"\n\necho \"BASE_COMMIT=$BASE_COMMIT\"\necho \"BASE_BRANCH=$BASE_BRANCH\"\necho \"FIX_BRANCH=$FIX_BRANCH\"\necho \"SOURCE_DIR=$SOURCE_DIR\"\necho 'Git setup complete. Ready for scanning.'"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "timeout_seconds" : 600,
+      "on_failure" : "continue",
+      "command" : "set -uo pipefail\nSOURCE_DIR=\"{{ source_dir }}\"\nif [ -z \"$SOURCE_DIR\" ] || [ \"$SOURCE_DIR\" = \"{{ source_dir }}\" ]; then SOURCE_DIR=\"src/\"; fi\n\n# Find pom.xml directory\nPOM_DIR=\".\"\nif [ -f \"$SOURCE_DIR/../pom.xml\" ]; then\n  POM_DIR=$(cd \"$SOURCE_DIR/..\" && pwd)\nelif [ -f \"pom.xml\" ]; then\n  POM_DIR=\".\"\nfi\n\necho '=== Java Code Scan ==='\ncd \"$POM_DIR\"\n\necho ''\necho '--- Maven Compile (Warnings) ---'\nmvn compile -q 2>&1 | grep -E '(WARNING|warning|deprecated|unchecked|rawtypes)' | head -50 || echo 'No compiler warnings found'\n\necho ''\necho '--- Maven Compile (Verbose for deprecation/unchecked) ---'\nmvn compile -Xlint:all 2>&1 | grep -E '(warning:|Note:)' | head -50 || echo 'No additional warnings'\n\necho ''\necho '--- Checkstyle (if plugin configured) ---'\nif grep -q 'maven-checkstyle-plugin' pom.xml 2>/dev/null; then\n  mvn checkstyle:check 2>&1 | tail -30 || true\nelse\n  echo 'Checkstyle plugin not configured in pom.xml'\nfi\n\necho ''\necho '--- PMD (if plugin configured) ---'\nif grep -q 'maven-pmd-plugin' pom.xml 2>/dev/null; then\n  mvn pmd:check 2>&1 | tail -30 || true\nelse\n  echo 'PMD plugin not configured in pom.xml'\nfi\n\necho ''\necho '--- SpotBugs (if plugin configured) ---'\nif grep -q 'spotbugs-maven-plugin' pom.xml 2>/dev/null; then\n  mvn spotbugs:check 2>&1 | tail -30 || true\nelse\n  echo 'SpotBugs plugin not configured in pom.xml'\nfi\n\necho ''\necho '--- Unused Imports / Dead Code (basic grep) ---'\necho 'Scanning for common issues...'\nfind \"$SOURCE_DIR\" -name '*.java' -exec grep -l 'import .*\\*;' {} \\; 2>/dev/null | head -20 && echo '(wildcard imports found)' || echo 'No wildcard imports'\nfind \"$SOURCE_DIR\" -name '*.java' -exec grep -ln '@SuppressWarnings' {} \\; 2>/dev/null | head -10 || echo 'No @SuppressWarnings found'\n\necho ''\necho '--- Dependency Check ---'\nmvn dependency:tree -q 2>&1 | grep -E '(WARNING|CONFLICT)' | head -20 || echo 'No dependency conflicts'\n\necho ''\necho '=== Scan Complete ==='"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "timeout_seconds" : 600,
+      "command" : "Analysiere die Scan-Ergebnisse und erstelle einen strukturierten Fix-Plan.\n\nSCAN-ERGEBNISSE:\n{{ previous_output }}\n\nDOMAIN-KONTEXT:\n{{ domain_context }}\n\nAUFGABE:\n1. Extrahiere alle Findings aus Compiler-Warnings, Checkstyle, PMD, SpotBugs und Dependency-Check\n2. Klassifiziere jedes Finding:\n\n   AUTO_FIXABLE (sicher automatisch behebbar):\n   - Unused imports (entfernen)\n   - Wildcard imports (durch spezifische Imports ersetzen)\n   - Missing @Override Annotation\n   - Raw types → Diamond operator / explizite Generics\n   - Unnecessary casts\n   - Missing serial version UID (wenn Serializable)\n   - Deprecated API Aufrufe (wenn Replacement klar ist)\n   - Checkstyle-Formatting (Einrueckung, Leerzeichen, Klammern)\n   - Unnoetige @SuppressWarnings entfernen\n   - String-Vergleich mit == statt .equals()\n   - Leere catch-Bloecke (mindestens Logger hinzufuegen)\n\n   MANUAL_REVIEW (zu komplex/riskant):\n   - API-Signatur-Aenderungen\n   - Architektur-Refactorings\n   - Dependency-Version-Updates (koennen Inkompatibilitaeten verursachen)\n   - Komplexe Logik-Aenderungen\n   - Lombok/MapStruct-Generierungsprobleme\n   - Flyway-Migrationen\n\n   INFORMATIONAL:\n   - Hinweise ohne konkreten Fix\n\n3. Sortiere AUTO_FIXABLE: Imports → Annotations → Types → Code-Fixes\n4. Gib den Fix-Plan aus:\n\nFIX_PLAN:\n1. [AUTO_FIXABLE] <Datei>:<Zeile> — <Issue> — <Was zu tun ist>\n2. ...\n\nSKIPPED (MANUAL_REVIEW):\n- <Datei>: <Grund>\n\nSKIPPED (INFORMATIONAL):\n- <Beschreibung>\n\nFalls keine Findings: FIX_PLAN: EMPTY - Keine fixbaren Findings gefunden."
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "agentic",
+    "config" : {
+      "max_iterations" : 25,
+      "max_total_tokens" : 400000,
+      "iteration_timeout_seconds" : 600,
+      "goal" : "Arbeite den Fix-Plan aus dem vorherigen Schritt ab und committe jeden Fix einzeln.\n\nFIX-PLAN:\n{{ previous_output }}\n\nREGELN:\n1. Nur [AUTO_FIXABLE] Eintraege abarbeiten\n2. Falls FIX_PLAN EMPTY: 'NO_FIXES_NEEDED' ausgeben und beenden\n3. Ein Commit pro Fix — atomare Git-History\n4. Commit-Format: 'fix: <was behoben>' / 'style: <formatting>' / 'refactor: <was refactored>'\n5. SICHERHEIT:\n   - Keine API-Signaturen aendern (public/protected Methoden)\n   - Keine Dateien loeschen die noch importiert werden — pruefe Imports\n   - Lombok: @Data/@Builder/@AllArgsConstructor generieren Methoden — nicht duplizieren\n   - MapStruct: Mapper-Interfaces nicht manuell aendern\n   - Flyway: Migrations-Dateien (V*.sql) NIEMALS aendern\n   - Spring: @Autowired/@Service/@Repository nicht entfernen\n   - Bei Unsicherheit: Fix ueberspringen als SKIPPED\n6. WICHTIG: Jede ACTION wird von einem SEPARATEN Agenten ausgefuehrt.\n   Jede ACTION MUSS enthalten:\n   - ABSOLUTE Dateipfade\n   - Vollstaendigen Kontext was zu aendern ist\n   - Nach der Aenderung: git add <datei> && git commit -m '<message>'\n\nAUSGABE am Ende:\nFIXES_APPLIED:\n1. <Datei> — <Commit-Hash> — <Beschreibung>\n\nFIXES_SKIPPED:\n- <Datei> — <Grund>\n\nTOTAL: X Fixes applied, Y skipped",
+      "max_repeated_actions" : 3,
+      "success_criteria" : "Alle AUTO_FIXABLE Issues wurden als einzelne Commits committed oder begruendet uebersprungen.",
+      "total_timeout_seconds" : 5400,
+      "require_approval" : false
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "timeout_seconds" : 600,
+      "on_failure" : "continue",
+      "command" : "set -euo pipefail\nSOURCE_DIR=\"{{ source_dir }}\"\nVERIFY_CMD=\"{{ verify_command }}\"\nif [ -z \"$SOURCE_DIR\" ] || [ \"$SOURCE_DIR\" = \"{{ source_dir }}\" ]; then SOURCE_DIR=\"src/\"; fi\n\necho '=== Verification ==='\n\nif echo '{{ previous_output }}' | grep -q 'NO_FIXES_NEEDED'; then\n  echo 'VERIFICATION_PASSED (no fixes to verify)'\n  exit 0\nfi\n\n# Custom verify command\nif [ -n \"$VERIFY_CMD\" ] && [ \"$VERIFY_CMD\" != \"{{ verify_command }}\" ]; then\n  echo \"Running custom verification: $VERIFY_CMD\"\n  if eval \"$VERIFY_CMD\"; then\n    echo 'VERIFICATION_PASSED'\n  else\n    echo 'VERIFICATION_FAILED'\n  fi\n  exit 0\nfi\n\n# Find pom.xml directory\nPOM_DIR=\".\"\nif [ -f \"$SOURCE_DIR/../pom.xml\" ]; then\n  POM_DIR=$(cd \"$SOURCE_DIR/..\" && pwd)\nfi\n\ncd \"$POM_DIR\"\nPASSED=true\n\necho '--- mvn clean test ---'\nif ! mvn clean test -q 2>&1 | tail -30; then\n  PASSED=false\nfi\n\n# Re-check for compiler warnings\necho '--- Compiler warnings check ---'\nWARN_COUNT=$(mvn compile 2>&1 | grep -c 'WARNING\\|warning' || echo 0)\necho \"Remaining compiler warnings: $WARN_COUNT\"\n\n# Checkstyle re-check if available\nif grep -q 'maven-checkstyle-plugin' pom.xml 2>/dev/null; then\n  echo '--- Checkstyle re-check ---'\n  mvn checkstyle:check 2>&1 | tail -10 || true\nfi\n\n# Dependency tree check\necho '--- Dependency tree check ---'\nmvn dependency:tree -q 2>&1 | grep -E '(WARNING|CONFLICT)' | head -5 || echo 'No dependency conflicts'\n\nif [ \"$PASSED\" = \"true\" ]; then\n  echo 'VERIFICATION_PASSED'\nelse\n  echo 'VERIFICATION_FAILED'\nfi"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "conditional",
+    "config" : {
+      "else_command" : "set -euo pipefail\necho '=== Verification failed — attempting rollback ==='\nBASE_BRANCH=\"{{ base_branch }}\"\nif [ -z \"$BASE_BRANCH\" ] || [ \"$BASE_BRANCH\" = \"{{ base_branch }}\" ]; then BASE_BRANCH=\"main\"; fi\n\nSOURCE_DIR=\"{{ source_dir }}\"\nif [ -z \"$SOURCE_DIR\" ] || [ \"$SOURCE_DIR\" = \"{{ source_dir }}\" ]; then SOURCE_DIR=\"src/\"; fi\nPOM_DIR=\".\"\nif [ -f \"$SOURCE_DIR/../pom.xml\" ]; then\n  POM_DIR=$(cd \"$SOURCE_DIR/..\" && pwd)\nfi\n\nMAX_REVERTS=5\nREVERTED=0\nwhile [ $REVERTED -lt $MAX_REVERTS ]; do\n  if [ $(git rev-list --count ${BASE_BRANCH}..HEAD) -le 0 ]; then break; fi\n  echo \"Reverting commit: $(git log -1 --oneline)\"\n  git revert HEAD --no-edit\n  REVERTED=$((REVERTED + 1))\n  RETEST_OK=true\n  cd \"$POM_DIR\"\n  mvn clean test -q 2>&1 | tail -5 || RETEST_OK=false\n  cd - >/dev/null\n  if [ \"$RETEST_OK\" = \"true\" ]; then\n    echo \"Verification passed after reverting $REVERTED commit(s).\"\n    echo \"PARTIAL_FIX: Reverted $REVERTED breaking commit(s). Remaining commits are safe.\"\n    break\n  fi\ndone\nif [ \"$RETEST_OK\" != \"true\" ]; then\n  echo \"PARTIAL_FIX: Reverted $REVERTED commits but verification still fails. Manual review needed.\"\nfi\necho ''\necho '=== Remaining commits ==='\ngit log --oneline | head -20",
+      "execution_mode" : "shell",
+      "condition" : "echo '{{ previous_output }}' | grep -q 'VERIFICATION_PASSED'",
+      "then_command" : "echo 'All checks passed. Ready for PR.'"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "approval",
+    "config" : {
+      "options" : [ "Yes", "No", "Abort" ],
+      "timeout_minutes" : 60,
+      "variable_name" : "pr_decision",
+      "question" : "## Java Auto-Fix Ergebnis\n\n{{ previous_output }}\n\n### Optionen:\n- **Yes**: Push + Pull Request erstellen\n- **No**: Branch lokal behalten fuer manuelle Review\n- **Abort**: Branch loeschen und zurueck zu main"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "on_failure" : "continue",
+      "command" : "set -euo pipefail\nDECISION=\"{{ pr_decision }}\"\nBASE_BRANCH=\"{{ base_branch }}\"\nif [ -z \"$BASE_BRANCH\" ] || [ \"$BASE_BRANCH\" = \"{{ base_branch }}\" ]; then BASE_BRANCH=\"main\"; fi\nFIX_BRANCH=$(git branch --show-current)\n\necho \"Decision: $DECISION\"\necho \"Branch: $FIX_BRANCH\"\n\ncase \"$DECISION\" in\n  Yes|yes)\n    COMMIT_COUNT=$(git rev-list --count ${BASE_BRANCH}..HEAD 2>/dev/null || echo 0)\n    if [ \"$COMMIT_COUNT\" -eq 0 ]; then\n      echo 'No commits to push. Nothing to do.'\n      exit 0\n    fi\n    echo \"=== Pushing $COMMIT_COUNT commits ===\"\n    git push -u origin \"$FIX_BRANCH\"\n    \n    FIXES=$(git log --oneline ${BASE_BRANCH}..HEAD | sed 's/^/- /')\n    \n    PR_TITLE=\"fix(java): Auto-fix compiler warnings and style issues\"\n    PR_BODY=\"## Summary\\n\\nAutomated Java code fixes from static analysis.\\n\\n## Changes\\n\\n$FIXES\\n\\n## Verification\\n\\nmvn clean test passed after applying fixes.\\n\\n---\\n_Generated by MySuricates Auto-Fix Java Pipeline_\"\n    \n    echo \"=== Creating Pull Request ===\"\n    PR_URL=$(gh pr create --base \"$BASE_BRANCH\" --title \"$PR_TITLE\" --body \"$(echo -e \"$PR_BODY\")\" 2>&1)\n    echo \"PR created: $PR_URL\"\n    ;;\n  No|no)\n    echo \"Branch '$FIX_BRANCH' kept locally.\"\n    echo \"To review: git checkout $FIX_BRANCH\"\n    echo \"To push later: git push -u origin $FIX_BRANCH\"\n    ;;\n  Abort|abort)\n    echo '=== Aborting — cleaning up ==='\n    git checkout \"$BASE_BRANCH\"\n    git branch -D \"$FIX_BRANCH\"\n    echo \"Branch $FIX_BRANCH deleted. Back on $BASE_BRANCH.\"\n    ;;\n  *)\n    echo \"Unknown decision: $DECISION. Branch kept locally.\"\n    ;;\nesac"
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

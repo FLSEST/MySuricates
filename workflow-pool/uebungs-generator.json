@@ -1,0 +1,60 @@
+{
+  "name": {
+    "de": "Übungs-Generator",
+    "en": "Exercise Generator"
+  },
+  "description": {
+    "de": "Generiert ein JSON-Lernpaket mit Karteikarten, Quiz und Drill-Übungen zu einem beliebigen Thema. Kompatibel mit der LernApp.",
+    "en": "Generates a JSON learning package with flashcards, quiz and drill exercises for any topic. Compatible with the LernApp."
+  },
+  "icon": "📝",
+  "category": "CONTENT",
+  "tags": ["education", "learning", "exercises", "quiz"],
+  "blocks": [
+    {
+      "type": "simple",
+      "config": {
+        "label": "Lernpaket generieren",
+        "timeout_seconds": 900,
+        "command": "Erstelle ein vollständiges JSON-Lernpaket zum Thema '{{ topic }}'.\n\nParameter:\n- Fach: {{ subject }}\n- Klassenstufe: {{ grade }}\n- Übungstypen: {{ exercise_types }}\n- Schwierigkeit: {{ difficulty }}\n- Anzahl Übungen pro Typ: {{ num_exercises }}\n- Sprache: {{ language }}\n\nDas JSON muss exakt diesem Schema folgen:\n```json\n{\n  \"version\": \"1.0\",\n  \"type\": \"learning-package\",\n  \"meta\": {\n    \"id\": \"<generiere-uuid>\",\n    \"title\": \"<Aussagekräftiger Titel>\",\n    \"subject\": \"{{ subject }}\",\n    \"grade\": \"{{ grade }}\",\n    \"tags\": [\"<relevante-tags>\"],\n    \"language\": \"{{ language }}\",\n    \"difficulty\": \"{{ difficulty }}\",\n    \"created\": \"<heutiges-datum>\",\n    \"author\": \"MySuricates Workflow\"\n  },\n  \"topic\": {\n    \"summary\": \"<Markdown-Zusammenfassung des Themas, 3-5 Absätze>\",\n    \"sections\": [{\"title\": \"...\", \"content\": \"<Markdown>\"}],\n    \"keyTerms\": [{\"term\": \"...\", \"definition\": \"...\"}],\n    \"links\": [{\"label\": \"Wikipedia\", \"url\": \"https://de.wikipedia.org/wiki/...\"}]\n  },\n  \"exercises\": {\n    \"flashcards\": [{\"front\": \"Frage\", \"back\": \"Antwort\", \"tags\": []}],\n    \"quiz\": [{\"type\": \"multiple-choice\", \"question\": \"...\", \"options\": [\"A\",\"B\",\"C\",\"D\"], \"correct\": 0, \"explanation\": \"...\"}],\n    \"drill\": [{\"prompt\": \"...\", \"answer\": \"...\", \"hint\": \"...\"}]\n  }\n}\n```\n\nQualitätsregeln:\n- Nur die in {{ exercise_types }} genannten Übungstypen generieren (kommasepariert: flashcards, quiz, drill)\n- {{ num_exercises }} Übungen pro gewähltem Typ\n- Quiz: 4 plausible Optionen, korrekte Antwort als Index (0-3), Erklärung bei jeder Frage\n- Quiz: Distraktoren müssen plausibel sein — keine offensichtlich falschen Antworten\n- Flashcards: Vorderseite = Frage/Begriff, Rückseite = Erklärung/Definition\n- Drill: Hint muss hilfreich sein ohne die Antwort zu verraten\n- Progressive Schwierigkeit: erste Übungen leichter, letzte schwerer\n- Topic-Sektion: Mindestens 3 Abschnitte, 5 Schlüsselbegriffe, 2 Links\n- Alle Inhalte müssen faktisch korrekt sein\n- Sprache aller Inhalte: {{ language }}\n\nGib NUR das JSON aus, ohne Markdown-Fences oder zusätzlichen Text."
+      }
+    },
+    {
+      "type": "agentic",
+      "config": {
+        "label": "JSON speichern + validieren",
+        "goal": "Speichere das generierte JSON-Lernpaket als Datei.\n\n1. Erstelle das Verzeichnis {{ output_dir }} falls es nicht existiert (mkdir -p)\n2. Der vorherige Block hat JSON generiert. Extrahiere das komplette JSON aus {{ previous_output }}\n3. Falls das JSON in Markdown-Fences eingewickelt ist (```json ... ```), extrahiere nur den JSON-Inhalt\n4. Speichere als {{ output_dir }}/{{ topic }}.json (Leerzeichen im topic durch Bindestriche ersetzen, Kleinschreibung)\n5. Validiere die gespeicherte Datei:\n   - Valides JSON (python3 -c \"import json; json.load(open('...'))\") \n   - Hat alle Pflichtfelder: version, type, meta, topic, exercises\n   - meta hat: id, title, subject, grade, tags, language\n   - Mindestens {{ num_exercises }} Übungen pro gewähltem Typ\n6. Falls Validierung fehlschlägt: Fehler korrigieren und erneut speichern",
+        "success_criteria": "Die JSON-Datei existiert unter {{ output_dir }}/, ist valides JSON und enthält alle Pflichtfelder mit der richtigen Anzahl Übungen.",
+        "max_iterations": 5,
+        "timeout_seconds": 300,
+        "iteration_timeout_seconds": 300,
+        "total_timeout_seconds": 600,
+        "max_total_tokens": 100000,
+        "max_repeated_actions": 3,
+        "require_approval": false
+      }
+    },
+    {
+      "type": "simple",
+      "config": {
+        "label": "Qualitätsprüfung",
+        "timeout_seconds": 300,
+        "command": "Lies die gespeicherte JSON-Datei unter {{ output_dir }}/ (die Datei die zum Thema '{{ topic }}' passt) und führe eine Qualitätsprüfung durch:\n\n## Qualitätsprüfung: {{ topic }}\n\n### Struktur\n- JSON valide: ja/nein\n- Version: ...\n- Pflichtfelder vorhanden: ja/nein (liste fehlende)\n\n### Topic-Sektion\n- Zusammenfassung: X Zeichen\n- Abschnitte: X (Minimum: 3)\n- Schlüsselbegriffe: X (Minimum: 5)\n- Links: X (Minimum: 2)\n\n### Übungen\nFür jeden vorhandenen Übungstyp:\n- Typ: Anzahl X (Soll: {{ num_exercises }})\n- Schwierigkeitsverteilung: leicht/mittel/schwer\n- Qualität: Bewertung 1-5 mit Begründung\n\n### Quiz-Spezifisch (falls vorhanden)\n- Alle Fragen haben 4 Optionen: ja/nein\n- Correct-Index im gültigen Bereich (0-3): ja/nein\n- Distraktoren plausibel: ja/nein (Beispiele für schlechte Distraktoren)\n- Erklärungen vorhanden: ja/nein\n\n### Gesamtbewertung\n- Score: X/10\n- Empfehlungen für Verbesserungen\n\ngate_status: GREEN falls Score >= 7, YELLOW falls 5-6, RED falls < 5\ngate_category: content-quality\ngate_description: Qualitätsprüfung des Lernpakets '{{ topic }}'"
+      }
+    }
+  ],
+  "instructions": "Du generierst ein JSON-Lernpaket für die LernApp-Plattform.\n\nAlle Inhalte müssen faktisch korrekt und altersgerecht für Klassenstufe {{ grade }} sein.\nSchwierigkeit '{{ difficulty }}' beachten:\n- leicht: Grundwissen, einfache Zusammenhänge\n- mittel: Vertieftes Verständnis, Anwendung\n- schwer: Transfer, Analyse, komplexe Zusammenhänge\n\nDie JSON-Datei muss ohne Änderungen in die LernApp importierbar sein.\nUTF-8 Encoding. Keine BOM.\n\nJSON-Schema für Lernpakete:\n```json\n{\n  \"version\": \"1.0\",\n  \"type\": \"learning-package\",\n  \"meta\": {\n    \"id\": \"uuid\",\n    \"title\": \"...\",\n    \"subject\": \"...\",\n    \"grade\": \"7\",\n    \"tags\": [\"...\"],\n    \"language\": \"de\",\n    \"difficulty\": \"leicht|mittel|schwer\",\n    \"source\": { \"textbook\": \"...\", \"chapter\": \"...\", \"publisher\": \"...\" },\n    \"created\": \"2026-03-10\",\n    \"author\": \"MySuricates Workflow\"\n  },\n  \"topic\": {\n    \"summary\": \"Markdown...\",\n    \"sections\": [{ \"title\": \"...\", \"content\": \"...\" }],\n    \"keyTerms\": [{ \"term\": \"...\", \"definition\": \"...\" }],\n    \"links\": [{ \"label\": \"...\", \"url\": \"...\" }]\n  },\n  \"exercises\": {\n    \"flashcards\": [{ \"front\": \"...\", \"back\": \"...\", \"tags\": [] }],\n    \"quiz\": [{ \"type\": \"multiple-choice\", \"question\": \"...\", \"options\": [], \"correct\": 0, \"explanation\": \"...\" }],\n    \"drill\": [{ \"prompt\": \"...\", \"answer\": \"...\", \"hint\": \"...\" }]\n  }\n}\n```",
+  "model": "claude-opus-4-6",
+  "version": "1.0.0",
+  "author": "MySuricates",
+  "defaultContext": {
+    "topic": "Fotosynthese",
+    "subject": "Biologie",
+    "grade": "7",
+    "exercise_types": "flashcards,quiz,drill",
+    "difficulty": "mittel",
+    "num_exercises": "15",
+    "output_dir": "/home/flo/Entwicklung/LernApp/packages",
+    "language": "de"
+  }
+}

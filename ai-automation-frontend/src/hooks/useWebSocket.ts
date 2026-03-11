@@ -368,6 +368,11 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string)
                 message: `[Step ${data.stepIndex}] Human input received: ${data.answer}`,
               });
             } else if (isStatusMessage(data)) {
+              // Clear pending dialogs on terminal status
+              if (['COMPLETED', 'FAILED', 'CANCELLED'].includes(data.status)) {
+                setPendingApproval(null);
+                setPendingHumanInput(null);
+              }
               appendLog({
                 timestamp: new Date().toISOString(),
                 level: 'INFO',

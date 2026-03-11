@@ -129,11 +129,19 @@ export function WorkflowExecution() {
     }).catch(() => { /* ignore */ });
   }, [runId]);
 
-  const activeApproval = pendingApproval ?? recoveredApproval;
-  const activeHumanInput = pendingHumanInput ?? recoveredHumanInput;
-
   const run: WorkflowRun | undefined = runs?.content?.find((r) => r.id === runId);
   const isRunning = run?.status === 'RUNNING' || run?.status === 'PAUSED';
+
+  // Clear recovered dialogs when run is no longer active
+  useEffect(() => {
+    if (run && !isRunning) {
+      setRecoveredApproval(null);
+      setRecoveredHumanInput(null);
+    }
+  }, [run, isRunning]);
+
+  const activeApproval = pendingApproval ?? recoveredApproval;
+  const activeHumanInput = pendingHumanInput ?? recoveredHumanInput;
 
   const handleRate = (rating: number) => {
     rateRun.mutate({ runId: runId!, rating });
@@ -398,6 +406,7 @@ export function WorkflowExecution() {
         <ApprovalDialog
           approval={activeApproval}
           loading={submitApproval.isPending}
+          onDismiss={() => setRecoveredApproval(null)}
           onSubmit={(answer) => {
             submitApproval.mutate({ runId: runId!, answer }, {
               onSuccess: () => {

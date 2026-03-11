@@ -65,7 +65,7 @@ class WorkflowServiceTest {
 
     @Test
     void findAll_returnsAllWorkflows() {
-        when(workflowRepository.findAll()).thenReturn(List.of(testWorkflow));
+        when(workflowRepository.findAllWithActiveProject()).thenReturn(List.of(testWorkflow));
 
         List<Workflow> result = workflowService.findAll();
 

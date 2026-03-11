@@ -1,0 +1,58 @@
+{
+  "name": {
+    "de": "Grammatik-Übungs-Generator",
+    "en": "Grammar Exercise Generator"
+  },
+  "description": {
+    "de": "Generiert Grammatik-Übungen für Fremdsprachenlernen mit Fill-in, Transform, Error-Correction und Sentence-Building Aufgaben.",
+    "en": "Generates grammar exercises for language learning with fill-in, transform, error-correction and sentence-building tasks."
+  },
+  "icon": "🔤",
+  "category": "CONTENT",
+  "tags": ["education", "learning", "grammar", "language-learning"],
+  "blocks": [
+    {
+      "type": "simple",
+      "config": {
+        "label": "Grammatik-Übungen generieren",
+        "timeout_seconds": 900,
+        "command": "Erstelle ein vollständiges JSON-Lernpaket mit Grammatik-Übungen.\n\nParameter:\n- Zielsprache: {{ target_language }}\n- Ausgangssprache: {{ source_language }}\n- Grammatik-Thema: {{ grammar_topic }}\n- Niveau: {{ level }} (CEFR)\n- Anzahl Übungen: {{ exercise_count }}\n\nErstelle ein JSON nach folgendem Schema:\n```json\n{\n  \"version\": \"1.0\",\n  \"type\": \"learning-package\",\n  \"meta\": {\n    \"id\": \"<generiere-uuid>\",\n    \"title\": \"{{ target_language }} Grammatik: {{ grammar_topic }} ({{ level }})\",\n    \"subject\": \"{{ target_language }}\",\n    \"grade\": \"{{ level }}\",\n    \"tags\": [\"grammatik\", \"{{ grammar_topic }}\", \"{{ target_language }}\", \"{{ level }}\"],\n    \"language\": \"de\",\n    \"difficulty\": \"<leicht für A1-A2, mittel für B1, schwer für B2+>\",\n    \"created\": \"<heutiges-datum>\",\n    \"author\": \"MySuricates Workflow\"\n  },\n  \"topic\": {\n    \"summary\": \"<Ausführliche Erklärung der Grammatikregel auf {{ source_language }}, mit Beispielen in {{ target_language }}>\",\n    \"sections\": [\n      {\"title\": \"Bildung\", \"content\": \"<Wie wird die Form gebildet? Regeln + Beispiele>\"},\n      {\"title\": \"Verwendung\", \"content\": \"<Wann benutzt man diese Form? Signalwörter>\"},\n      {\"title\": \"Ausnahmen\", \"content\": \"<Unregelmäßige Formen, Sonderfälle>\"},\n      {\"title\": \"Typische Fehler\", \"content\": \"<Häufige Fehler und wie man sie vermeidet>\"}\n    ],\n    \"keyTerms\": [\n      {\"term\": \"<Fachbegriff in Zielsprache>\", \"definition\": \"<Erklärung auf {{ source_language }}>\"},\n      ...\n    ],\n    \"links\": [\n      {\"label\": \"Konjugationstabelle\", \"url\": \"https://...\"}\n    ]\n  },\n  \"exercises\": {\n    \"flashcards\": [\n      {\"front\": \"<Regel oder Form auf {{ source_language }}>\", \"back\": \"<Erklärung + Beispiel auf {{ target_language }}>\", \"tags\": [\"grammatik\"]}\n    ],\n    \"quiz\": [\n      {\"type\": \"multiple-choice\", \"question\": \"<Grammatikfrage>\", \"options\": [\"A\",\"B\",\"C\",\"D\"], \"correct\": 0, \"explanation\": \"<Warum ist diese Form korrekt?>\"}\n    ],\n    \"grammar\": [\n      {\n        \"type\": \"fill-in\",\n        \"instruction\": \"Setze die richtige Form ein\",\n        \"sentence\": \"Je ___ (parler) français.\",\n        \"answer\": \"parle\",\n        \"hint\": \"1. Person Singular Präsens\"\n      },\n      {\n        \"type\": \"transform\",\n        \"instruction\": \"Setze den Satz ins {{ grammar_topic }}\",\n        \"sentence\": \"<Satz in Ausgangsform>\",\n        \"answer\": \"<Satz in Zielform>\",\n        \"hint\": \"<Hilfestellung>\"\n      },\n      {\n        \"type\": \"error-correction\",\n        \"instruction\": \"Finde und korrigiere den Fehler\",\n        \"sentence\": \"<Satz mit einem Grammatikfehler>\",\n        \"answer\": \"<Korrekter Satz>\",\n        \"hint\": \"<Auf welches Element achten?>\"\n      },\n      {\n        \"type\": \"sentence-building\",\n        \"instruction\": \"Bilde einen korrekten Satz aus den Wörtern\",\n        \"sentence\": \"<Wörter in falscher Reihenfolge>\",\n        \"answer\": \"<Korrekter Satz>\",\n        \"hint\": \"<Hinweis zur Satzstruktur>\"\n      }\n    ]\n  }\n}\n```\n\nVerteilung der {{ exercise_count }} Grammatik-Übungen:\n- 30% fill-in (Lückentext mit Grundform in Klammern)\n- 25% transform (Satz umformen)\n- 25% error-correction (Fehler finden und korrigieren)\n- 20% sentence-building (Satzglieder ordnen)\n\nZusätzlich:\n- 10 Flashcards mit den wichtigsten Regeln und Formen\n- 8 Quiz-Fragen zur Regelanwendung\n\nNiveau {{ level }} beachten:\n- A1: Sehr einfache Sätze, Grundformen\n- A2: Alltagssätze, häufige Formen\n- B1: Komplexere Sätze, Nebensätze\n- B2: Nuancen, Stilebenen, seltene Formen\n\nAlle Grammatik-Übungen MÜSSEN einen hilfreichen Hint haben.\nAlle Beispielsätze müssen natürlich und alltagstauglich klingen.\n\nGib NUR das JSON aus, ohne Markdown-Fences oder zusätzlichen Text."
+      }
+    },
+    {
+      "type": "agentic",
+      "config": {
+        "label": "JSON speichern + validieren",
+        "goal": "Speichere das generierte Grammatik-Lernpaket als JSON-Datei.\n\n1. Erstelle {{ output_dir }} falls nötig (mkdir -p)\n2. Extrahiere das JSON aus {{ previous_output }} (Markdown-Fences entfernen falls vorhanden)\n3. Bereinige den Dateinamen: grammar_{{ grammar_topic }} → Kleinschreibung, Leerzeichen durch Unterstriche\n4. Speichere als {{ output_dir }}/grammar_{{ grammar_topic }}.json\n5. Validiere:\n   - Valides JSON\n   - exercises.grammar hat mindestens {{ exercise_count }} Einträge\n   - Alle grammar-Einträge haben type, instruction, sentence, answer, hint\n   - grammar-types sind verteilt (fill-in, transform, error-correction, sentence-building)\n   - exercises.flashcards hat mindestens 10 Einträge\n   - exercises.quiz hat mindestens 8 Einträge\n   - topic.sections hat mindestens 4 Einträge\n6. Bei Fehlern: korrigieren und erneut speichern",
+        "success_criteria": "JSON-Datei existiert, ist valide und enthält die richtige Anzahl und Verteilung von Grammatik-Übungen.",
+        "max_iterations": 5,
+        "timeout_seconds": 300,
+        "iteration_timeout_seconds": 300,
+        "total_timeout_seconds": 600,
+        "max_total_tokens": 100000,
+        "max_repeated_actions": 3,
+        "require_approval": false
+      }
+    },
+    {
+      "type": "simple",
+      "config": {
+        "label": "Qualitätsprüfung",
+        "timeout_seconds": 300,
+        "command": "Lies die gespeicherte JSON-Datei unter {{ output_dir }}/grammar_{{ grammar_topic }}.json und führe eine Qualitätsprüfung durch:\n\n## Qualitätsprüfung: {{ target_language }} Grammatik — {{ grammar_topic }}\n\n### Struktur\n- JSON valide: ja/nein\n- Pflichtfelder vorhanden: ja/nein\n\n### Topic-Sektion\n- Regelklar erklärt: ja/nein\n- Abschnitte: X (Bildung, Verwendung, Ausnahmen, Typische Fehler)\n- Beispiele in der Erklärung: ja/nein\n\n### Grammatik-Übungen\n- Gesamt: X (Soll: {{ exercise_count }})\n- fill-in: X (Soll: ~30%)\n- transform: X (Soll: ~25%)\n- error-correction: X (Soll: ~25%)\n- sentence-building: X (Soll: ~20%)\n\n### Qualitäts-Checks\n- Alle Übungen haben Hints: ja/nein\n- Antworten grammatisch korrekt: Stichprobe von 5 Übungen prüfen\n- Schwierigkeit passt zu {{ level }}: ja/nein\n- Natürliche Sätze (keine Lehrbuch-Klischees): ja/nein\n- Fehlerkorrektur: Fehler sind subtil genug: ja/nein\n\n### Flashcards + Quiz\n- Flashcards: X (Soll: 10)\n- Quiz: X (Soll: 8)\n- Quiz-Distraktoren plausibel: ja/nein\n\n### Gesamtbewertung\n- Score: X/10\n\ngate_status: GREEN falls Score >= 7, YELLOW falls 5-6, RED falls < 5\ngate_category: content-quality\ngate_description: Qualitätsprüfung Grammatik-Übungen '{{ grammar_topic }}' ({{ target_language }}, {{ level }})"
+      }
+    }
+  ],
+  "instructions": "Du generierst Grammatik-Lernpakete für Fremdsprachenlernen.\n\nZielsprache: {{ target_language }}\nAusgangssprache: {{ source_language }}\nCEFR-Niveau: {{ level }}\n\nAlle Erklärungen und Anweisungen auf {{ source_language }}.\nAlle Übungssätze in {{ target_language }} (mit {{ source_language }}-Übersetzung bei Bedarf).\n\nGrammatik-Übungstypen:\n- fill-in: Lücke im Satz, Grundform in Klammern → korrekte Form einsetzen\n- transform: Satz in anderer Form gegeben → in Zielform umwandeln\n- error-correction: Satz enthält GENAU EINEN Grammatikfehler → korrigieren\n- sentence-building: Wörter/Satzglieder ungeordnet → richtigen Satz bilden\n\nQualitätsregeln:\n- Alle Sätze müssen natürlich klingen und im Alltag verwendbar sein\n- Hints müssen hilfreich sein, ohne die Antwort zu verraten\n- Error-Correction: Der Fehler muss zum Grammatik-Thema passen (nicht Rechtschreibung)\n- Progressive Schwierigkeit innerhalb jedes Typs\n- Keine doppelten Sätze\n\nJSON-Schema für Lernpakete:\n```json\n{\n  \"version\": \"1.0\",\n  \"type\": \"learning-package\",\n  \"meta\": {\n    \"id\": \"uuid\",\n    \"title\": \"...\",\n    \"subject\": \"...\",\n    \"grade\": \"7\",\n    \"tags\": [\"...\"],\n    \"language\": \"de\",\n    \"difficulty\": \"leicht|mittel|schwer\",\n    \"created\": \"2026-03-10\",\n    \"author\": \"MySuricates Workflow\"\n  },\n  \"topic\": {\n    \"summary\": \"Markdown...\",\n    \"sections\": [{ \"title\": \"...\", \"content\": \"...\" }],\n    \"keyTerms\": [{ \"term\": \"...\", \"definition\": \"...\" }],\n    \"links\": [{ \"label\": \"...\", \"url\": \"...\" }]\n  },\n  \"exercises\": {\n    \"flashcards\": [{ \"front\": \"...\", \"back\": \"...\", \"tags\": [] }],\n    \"quiz\": [{ \"type\": \"multiple-choice\", \"question\": \"...\", \"options\": [], \"correct\": 0, \"explanation\": \"...\" }],\n    \"grammar\": [{ \"type\": \"fill-in|transform|error-correction|sentence-building\", \"instruction\": \"...\", \"sentence\": \"...\", \"answer\": \"...\", \"hint\": \"...\" }]\n  }\n}\n```",
+  "model": "claude-opus-4-6",
+  "version": "1.0.0",
+  "author": "MySuricates",
+  "defaultContext": {
+    "target_language": "Franzoesisch",
+    "source_language": "Deutsch",
+    "grammar_topic": "passe_compose",
+    "level": "A2",
+    "exercise_count": "20",
+    "output_dir": "/home/flo/Entwicklung/LernApp/packages"
+  }
+}

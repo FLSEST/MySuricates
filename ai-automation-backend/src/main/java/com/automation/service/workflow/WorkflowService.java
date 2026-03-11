@@ -31,7 +31,7 @@ public class WorkflowService {
 
     @Transactional(readOnly = true)
     public List<Workflow> findAll() {
-        return workflowRepository.findAll();
+        return workflowRepository.findAllWithActiveProject();
     }
 
     @Transactional(readOnly = true)

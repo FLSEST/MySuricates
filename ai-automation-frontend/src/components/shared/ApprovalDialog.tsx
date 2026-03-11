@@ -1,3 +1,4 @@
+import { X } from 'lucide-react';
 import { Button } from '../ui';
 import { useT } from '../../i18n';
 import type { PendingApproval } from '../../hooks/useWebSocket';
@@ -5,15 +6,25 @@ import type { PendingApproval } from '../../hooks/useWebSocket';
 interface ApprovalDialogProps {
   approval: PendingApproval;
   onSubmit: (answer: string) => void;
+  onDismiss?: () => void;
   loading?: boolean;
 }
 
-export function ApprovalDialog({ approval, onSubmit, loading }: ApprovalDialogProps) {
+export function ApprovalDialog({ approval, onSubmit, onDismiss, loading }: ApprovalDialogProps) {
   const t = useT();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
-      <div className="bg-surface-raised border border-border rounded-2xl shadow-xl p-6 max-w-md w-full mx-4">
+      <div className="bg-surface-raised border border-border rounded-2xl shadow-xl p-6 max-w-md w-full mx-4 relative">
+        {onDismiss && (
+          <button
+            onClick={onDismiss}
+            className="absolute top-3 right-3 p-1 rounded-lg text-text-tertiary hover:text-text hover:bg-surface transition-colors"
+            aria-label={t.common.close}
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
         <h3 className="text-lg font-bold text-text mb-1">
           {t.workflows.execution.approval.title}
         </h3>
