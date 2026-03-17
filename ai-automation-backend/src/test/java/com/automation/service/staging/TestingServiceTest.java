@@ -1,6 +1,7 @@
 package com.automation.service.staging;
 
 import com.automation.config.StagingConfig;
+import com.automation.dto.request.SyncDefinitionsRequest;
 import com.automation.dto.response.SyncResult;
 import com.automation.entity.Project;
 import com.automation.entity.Workflow;
@@ -714,5 +715,358 @@ class TestingServiceTest {
         assertThatThrownBy(spied::syncPreview)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("not running or not healthy");
+    }
+
+    // === Additional tests to secure refactoring targets ===
+
+    // --- pollTestRun: default overload delegates with magic number defaults (600s, 2000ms) ---
+
+    @Test
+    void pollTestRun_defaultOverload_completesImmediately() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+
+        ObjectNode completedRun = objectMapper.createObjectNode();
+        completedRun.put("status", "COMPLETED");
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/executions/run-1"))
+                .thenReturn(completedRun);
+
+        // Uses the no-arg overload which internally calls pollTestRun(runId, 600, 2000)
+        JsonNode result = testingService.pollTestRun("run-1");
+
+        assertThat(result.path("status").asText()).isEqualTo("COMPLETED");
+        verify(instanceSyncHelper).httpGet("http://localhost:8090/api/v1/executions/run-1");
+    }
+
+    @Test
+    void pollTestRun_httpGetReturnsNull_continuesPolling() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+
+        ObjectNode completedRun = objectMapper.createObjectNode();
+        completedRun.put("status", "COMPLETED");
+
+        // First call returns null, second returns completed
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/executions/run-1"))
+                .thenReturn(null)
+                .thenReturn(completedRun);
+
+        JsonNode result = testingService.pollTestRun("run-1", 10, 1000);
+
+        assertThat(result.path("status").asText()).isEqualTo("COMPLETED");
+        verify(instanceSyncHelper, times(2)).httpGet("http://localhost:8090/api/v1/executions/run-1");
+    }
+
+    @Test
+    void pollTestRun_unknownStatus_continuesPolling() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+
+        ObjectNode pendingRun = objectMapper.createObjectNode();
+        pendingRun.put("status", "PENDING");
+        ObjectNode completedRun = objectMapper.createObjectNode();
+        completedRun.put("status", "COMPLETED");
+
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/executions/run-1"))
+                .thenReturn(pendingRun)
+                .thenReturn(completedRun);
+
+        JsonNode result = testingService.pollTestRun("run-1", 10, 1000);
+
+        assertThat(result.path("status").asText()).isEqualTo("COMPLETED");
+    }
+
+    // --- getStatus: running but not healthy ---
+
+    @Test
+    void getStatus_runningButNotHealthy_returnsRunningNotHealthyNoVersion() {
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isContainerRunning();
+        doReturn(false).when(spied).isHealthy();
+
+        var status = spied.getStatus();
+
+        assertThat(status.containerRunning()).isTrue();
+        assertThat(status.healthy()).isFalse();
+        assertThat(status.testVersion()).isNull();
+        assertThat(status.testBuildTimestamp()).isNull();
+    }
+
+    @Test
+    void getStatus_healthyButInfoFetchThrows_returnsNullVersions() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isContainerRunning();
+        doReturn(true).when(spied).isHealthy();
+
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/system/info"))
+                .thenThrow(new RuntimeException("Connection refused"));
+
+        var status = spied.getStatus();
+
+        assertThat(status.containerRunning()).isTrue();
+        assertThat(status.healthy()).isTrue();
+        assertThat(status.testVersion()).isNull();
+        assertThat(status.testBuildTimestamp()).isNull();
+    }
+
+    @Test
+    void getStatus_healthyButInfoReturnsNull_returnsNullVersions() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isContainerRunning();
+        doReturn(true).when(spied).isHealthy();
+
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/system/info")).thenReturn(null);
+
+        var status = spied.getStatus();
+
+        assertThat(status.containerRunning()).isTrue();
+        assertThat(status.healthy()).isTrue();
+        assertThat(status.testVersion()).isNull();
+        assertThat(status.testBuildTimestamp()).isNull();
+    }
+
+    // --- Workflow search logic consistency (refactoring 3: duplicated search in reportTestResult + pullChanges + executeWorkflowOnTest) ---
+
+    @Test
+    void reportTestResult_emptyProjectName_matchesNullProjectWorkflow() {
+        // Ensures the matching logic: project==null → "" equals ""
+        Workflow workflow = Workflow.builder()
+                .id("wf-1").name("WF").project(null).build();
+        when(workflowRepository.findAll()).thenReturn(List.of(workflow));
+        when(workflowRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        testingService.reportTestResult("WF", "", "PASSED");
+
+        assertThat(workflow.getTestStatus()).isEqualTo("PASSED");
+        verify(workflowRepository).save(workflow);
+    }
+
+    @Test
+    void reportTestResult_firstMatchWins_whenMultipleSameNameNoProject() {
+        Workflow wf1 = Workflow.builder().id("wf-1").name("WF").project(null).build();
+        Workflow wf2 = Workflow.builder().id("wf-2").name("WF").project(null).build();
+        when(workflowRepository.findAll()).thenReturn(List.of(wf1, wf2));
+        when(workflowRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        testingService.reportTestResult("WF", null, "PASSED");
+
+        assertThat(wf1.getTestStatus()).isEqualTo("PASSED");
+        assertThat(wf2.getTestStatus()).isNotEqualTo("PASSED");
+        verify(workflowRepository, times(1)).save(wf1);
+    }
+
+    @Test
+    void executeWorkflowOnTest_nullProjectName_matchesEmptyProjectOnTest() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+
+        ArrayNode workflows = objectMapper.createArrayNode();
+        ObjectNode wf = objectMapper.createObjectNode();
+        wf.put("id", "t-1");
+        wf.put("name", "Deploy");
+        wf.put("projectName", "");
+        workflows.add(wf);
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(workflows);
+
+        ObjectNode execResult = objectMapper.createObjectNode();
+        execResult.put("id", "run-99");
+        when(instanceSyncHelper.httpPost(eq("http://localhost:8090/api/v1/workflows/t-1/execute"), any()))
+                .thenReturn(execResult);
+
+        String runId = spied.executeWorkflowOnTest("Deploy", null, Map.of());
+
+        assertThat(runId).isEqualTo("run-99");
+    }
+
+    @Test
+    void executeWorkflowOnTest_nullContext_sendsEmptyBody() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+
+        ArrayNode workflows = objectMapper.createArrayNode();
+        ObjectNode wf = objectMapper.createObjectNode();
+        wf.put("id", "t-1");
+        wf.put("name", "WF");
+        wf.put("projectName", "");
+        workflows.add(wf);
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(workflows);
+
+        ObjectNode execResult = objectMapper.createObjectNode();
+        execResult.put("id", "run-42");
+        when(instanceSyncHelper.httpPost(eq("http://localhost:8090/api/v1/workflows/t-1/execute"), eq(Map.of())))
+                .thenReturn(execResult);
+
+        String runId = spied.executeWorkflowOnTest("WF", null, null);
+
+        assertThat(runId).isEqualTo("run-42");
+    }
+
+    @Test
+    void executeWorkflowOnTest_multipleWorkflows_matchesCorrectByNameAndProject() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+
+        ArrayNode workflows = objectMapper.createArrayNode();
+        ObjectNode wf1 = objectMapper.createObjectNode();
+        wf1.put("id", "t-1"); wf1.put("name", "Deploy"); wf1.put("projectName", "ProjectA");
+        ObjectNode wf2 = objectMapper.createObjectNode();
+        wf2.put("id", "t-2"); wf2.put("name", "Deploy"); wf2.put("projectName", "ProjectB");
+        workflows.add(wf1);
+        workflows.add(wf2);
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(workflows);
+
+        ObjectNode execResult = objectMapper.createObjectNode();
+        execResult.put("id", "run-B");
+        when(instanceSyncHelper.httpPost(eq("http://localhost:8090/api/v1/workflows/t-2/execute"), any()))
+                .thenReturn(execResult);
+
+        String runId = spied.executeWorkflowOnTest("Deploy", "ProjectB", Map.of());
+
+        assertThat(runId).isEqualTo("run-B");
+        verify(instanceSyncHelper).httpPost(eq("http://localhost:8090/api/v1/workflows/t-2/execute"), any());
+        verify(instanceSyncHelper, never()).httpPost(eq("http://localhost:8090/api/v1/workflows/t-1/execute"), any());
+    }
+
+    @Test
+    void executeWorkflowOnTest_nullWorkflowList_throws() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(null);
+
+        assertThatThrownBy(() -> spied.executeWorkflowOnTest("WF", null, Map.of()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Could not fetch workflows");
+    }
+
+    @Test
+    void executeWorkflowOnTest_executeReturnsNull_throws() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+
+        ArrayNode workflows = objectMapper.createArrayNode();
+        ObjectNode wf = objectMapper.createObjectNode();
+        wf.put("id", "t-1"); wf.put("name", "WF"); wf.put("projectName", "");
+        workflows.add(wf);
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(workflows);
+        when(instanceSyncHelper.httpPost(anyString(), any())).thenReturn(null);
+
+        assertThatThrownBy(() -> spied.executeWorkflowOnTest("WF", null, Map.of()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Failed to start workflow");
+    }
+
+    // --- pullChanges: null project on dev side matches empty string on test side ---
+
+    @Test
+    void pullChanges_devWorkflowNullProject_matchesEmptyProjectNameOnTest() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+
+        Workflow devWorkflow = Workflow.builder()
+                .id("wf-1").name("WF").project(null)
+                .instructions("old").model("m").build();
+        when(workflowRepository.findAll()).thenReturn(List.of(devWorkflow));
+        when(workflowRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ArrayNode testWorkflows = objectMapper.createArrayNode();
+        ObjectNode tw = objectMapper.createObjectNode();
+        tw.put("id", "t-1"); tw.put("name", "WF"); tw.put("projectName", "");
+        testWorkflows.add(tw);
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+
+        ObjectNode fullTw = objectMapper.createObjectNode();
+        fullTw.put("instructions", "updated"); fullTw.put("model", "m");
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/t-1")).thenReturn(fullTw);
+
+        SyncResult result = spied.pullChanges();
+
+        assertThat(result.workflowsSynced()).isEqualTo(1);
+        assertThat(devWorkflow.getInstructions()).isEqualTo("updated");
+    }
+
+    @Test
+    void pullChanges_sameNameDifferentProjects_updatesCorrectOne() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+
+        Project projA = Project.builder().id("p-1").name("Alpha").build();
+        Project projB = Project.builder().id("p-2").name("Beta").build();
+        Workflow wfA = Workflow.builder().id("wf-1").name("Deploy").project(projA)
+                .instructions("old-A").model("m").build();
+        Workflow wfB = Workflow.builder().id("wf-2").name("Deploy").project(projB)
+                .instructions("old-B").model("m").build();
+        when(workflowRepository.findAll()).thenReturn(List.of(wfA, wfB));
+        when(workflowRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // Only test has the Beta project workflow with changes
+        ArrayNode testWorkflows = objectMapper.createArrayNode();
+        ObjectNode tw = objectMapper.createObjectNode();
+        tw.put("id", "t-1"); tw.put("name", "Deploy"); tw.put("projectName", "Beta");
+        testWorkflows.add(tw);
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+
+        ObjectNode fullTw = objectMapper.createObjectNode();
+        fullTw.put("instructions", "new-Beta"); fullTw.put("model", "m");
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/t-1")).thenReturn(fullTw);
+
+        SyncResult result = spied.pullChanges();
+
+        assertThat(result.workflowsSynced()).isEqualTo(1);
+        assertThat(wfB.getInstructions()).isEqualTo("new-Beta");
+        assertThat(wfA.getInstructions()).isEqualTo("old-A"); // unchanged
+        verify(workflowRepository, times(1)).save(wfB);
+    }
+
+    // --- deriveTestBaseUrl: edge case for magic URL construction ---
+
+    @Test
+    void deriveTestBaseUrl_customPort_extractsCorrectly() {
+        stagingConfig.setTestHealthUrl("http://myhost:9999/api/v1/system/health");
+
+        String baseUrl = testingService.deriveTestBaseUrl();
+
+        assertThat(baseUrl).isEqualTo("http://myhost:9999/api/v1");
+    }
+
+    // --- syncDefinitions with request parameter ---
+
+    @Test
+    void syncDefinitions_withRequest_delegatesRequestToSyncHelper() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+
+        SyncDefinitionsRequest request = new SyncDefinitionsRequest(List.of("p-1"), List.of("wf-1"), List.of());
+        SyncResult expected = new SyncResult(1, 2, 0, 0, List.of());
+        when(instanceSyncHelper.syncDefinitionsTo(eq("http://localhost:8090/api/v1"), eq(request)))
+                .thenReturn(expected);
+
+        SyncResult result = spied.syncDefinitions(request);
+
+        assertThat(result.projectsSynced()).isEqualTo(1);
+        assertThat(result.workflowsSynced()).isEqualTo(2);
+        verify(instanceSyncHelper).syncDefinitionsTo("http://localhost:8090/api/v1", request);
+    }
+
+    @Test
+    void syncDefinitions_noArgOverload_passesNullRequest() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+
+        SyncResult expected = new SyncResult(0, 0, 0, 0, List.of());
+        when(instanceSyncHelper.syncDefinitionsTo(eq("http://localhost:8090/api/v1"), isNull()))
+                .thenReturn(expected);
+
+        SyncResult result = spied.syncDefinitions();
+
+        verify(instanceSyncHelper).syncDefinitionsTo("http://localhost:8090/api/v1", null);
     }
 }
