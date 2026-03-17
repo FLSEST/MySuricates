@@ -6,6 +6,7 @@ import com.automation.exception.WorkflowExecutionException;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
 import com.automation.service.cli.CommandExecutorService;
+import com.automation.service.cli.HostExecutionRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -37,12 +38,15 @@ public class SimpleBlockExecutor implements BlockExecutor {
                 .build();
 
         return commandExecutor.executeStepOnHost(
-                context.getProjectPath(),
-                resolved,
-                context.nextStepIndex(),
-                context.getInstructionPrefix(),
-                context.getModel(),
-                claudeTimeout
+                HostExecutionRequest.builder()
+                        .projectPath(context.getProjectPath())
+                        .block(resolved)
+                        .stepIndex(context.nextStepIndex())
+                        .systemPrompt(context.getInstructionPrefix())
+                        .model(context.getModel())
+                        .timeoutSeconds(claudeTimeout)
+                        .providerId(context.getProvider())
+                        .build()
         );
     }
 

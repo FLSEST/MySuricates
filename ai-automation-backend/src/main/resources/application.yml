@@ -6,10 +6,10 @@ spring:
     url: jdbc:sqlite:${AUTOMATION_DB_PATH:./data/automation.db}?journal_mode=WAL&busy_timeout=10000
     driver-class-name: org.sqlite.JDBC
     hikari:
-      maximum-pool-size: 3
+      maximum-pool-size: 1  # SQLite supports only one writer at a time — pool=1 serializes via Hikari queue instead of SQLite locks (avoids SQLITE_BUSY under concurrent workflow runs)
       minimum-idle: 1
       connection-test-query: SELECT 1
-      connection-init-sql: PRAGMA foreign_keys = ON
+      connection-init-sql: "PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 30000;"
 
   jpa:
     database-platform: org.hibernate.community.dialect.SQLiteDialect
@@ -24,6 +24,10 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
+    # Flyway 10+ uses two connections (migration + lock monitor). With HikariCP pool-size=1
+    # this deadlocks. Giving Flyway its own non-pooled DataSource fixes the issue.
+    url: jdbc:sqlite:${AUTOMATION_DB_PATH:./data/automation.db}?journal_mode=WAL&busy_timeout=10000
+    driver-class-name: org.sqlite.JDBC
 
   threads:
     virtual:
@@ -101,6 +105,8 @@ automation:
   factory:
     provider: ${AUTOMATION_FACTORY_PROVIDER:CLAUDE}
     base-dir: ${AUTOMATION_FACTORY_DIR:${user.home}/.autotrigger/factory}
+  docs:
+    directory: ${AUTOMATION_DOCS_DIR:../docs}
   pool:
     directory: ${AUTOMATION_POOL_DIR:workflow-pool}
     enabled: ${AUTOMATION_POOL_ENABLED:true}

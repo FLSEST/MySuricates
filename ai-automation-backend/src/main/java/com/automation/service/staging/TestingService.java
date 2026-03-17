@@ -31,6 +31,11 @@ import java.util.concurrent.CompletableFuture;
 @Slf4j
 public class TestingService {
 
+    private static final int HEALTH_CHECK_TIMEOUT_MS = 3000;
+    private static final int DEFAULT_POLL_MAX_WAIT_SECONDS = 600;
+    private static final int DEFAULT_POLL_INTERVAL_MS = 2000;
+    private static final int HEALTH_WAIT_INTERVAL_SECONDS = 2;
+
     private final StagingConfig config;
     private final InstanceSyncHelper syncHelper;
     private final WorkflowRepository workflowRepository;
@@ -143,13 +148,7 @@ public class TestingService {
     }
 
     public void reportTestResult(String workflowName, String projectName, String status) {
-        Optional<Workflow> match = workflowRepository.findAll().stream()
-                .filter(w -> w.getName().equals(workflowName))
-                .filter(w -> {
-                    String wProjectName = w.getProject() != null ? w.getProject().getName() : "";
-                    return wProjectName.equals(projectName != null ? projectName : "");
-                })
-                .findFirst();
+        Optional<Workflow> match = findWorkflowByNameAndProject(workflowName, projectName);
 
         if (match.isPresent()) {
             Workflow workflow = match.get();
@@ -182,42 +181,20 @@ public class TestingService {
                 String name = tw.path("name").asText();
                 String projectName = tw.path("projectName").asText("");
 
-                Optional<Workflow> devMatch = workflowRepository.findAll().stream()
-                        .filter(w -> w.getName().equals(name))
-                        .filter(w -> {
-                            String wProjectName = w.getProject() != null ? w.getProject().getName() : "";
-                            return wProjectName.equals(projectName);
-                        })
-                        .findFirst();
+                Optional<Workflow> devMatch = findWorkflowByNameAndProject(name, projectName);
+                if (devMatch.isEmpty()) {
+                    continue;
+                }
 
-                if (devMatch.isPresent()) {
-                    Workflow devWorkflow = devMatch.get();
-                    // Fetch full workflow details from Test
-                    String testWorkflowId = tw.path("id").asText();
-                    JsonNode fullTestWorkflow = syncHelper.httpGet(testBaseUrl + "/workflows/" + testWorkflowId);
-                    if (fullTestWorkflow != null) {
-                        boolean changed = false;
+                String testWorkflowId = tw.path("id").asText();
+                JsonNode fullTestWorkflow = syncHelper.httpGet(testBaseUrl + "/workflows/" + testWorkflowId);
+                if (fullTestWorkflow == null) {
+                    continue;
+                }
 
-                        // Compare and update instructions
-                        String testInstructions = fullTestWorkflow.path("instructions").asText(null);
-                        if (!java.util.Objects.equals(devWorkflow.getInstructions(), testInstructions)) {
-                            devWorkflow.setInstructions(testInstructions);
-                            changed = true;
-                        }
-
-                        // Compare and update model
-                        String testModel = fullTestWorkflow.path("model").asText(null);
-                        if (!java.util.Objects.equals(devWorkflow.getModel(), testModel)) {
-                            devWorkflow.setModel(testModel);
-                            changed = true;
-                        }
-
-                        if (changed) {
-                            workflowRepository.save(devWorkflow);
-                            workflowsUpdated++;
-                            log.info("Pulled changes for workflow '{}' from Test", name);
-                        }
-                    }
+                if (applyWorkflowChanges(devMatch.get(), fullTestWorkflow)) {
+                    workflowsUpdated++;
+                    log.info("Pulled changes for workflow '{}' from Test", name);
                 }
             } catch (Exception e) {
                 errors.add("Workflow '" + tw.path("name").asText() + "': " + e.getMessage());
@@ -281,7 +258,7 @@ public class TestingService {
      * Throws on timeout (default 10 min, 2s interval).
      */
     public JsonNode pollTestRun(String runId) {
-        return pollTestRun(runId, 600, 2000);
+        return pollTestRun(runId, DEFAULT_POLL_MAX_WAIT_SECONDS, DEFAULT_POLL_INTERVAL_MS);
     }
 
     public JsonNode pollTestRun(String runId, int maxWaitSeconds, int intervalMs) {
@@ -311,6 +288,38 @@ public class TestingService {
 
     // ── Internal helpers ──────────────────────────────────
 
+    private Optional<Workflow> findWorkflowByNameAndProject(String workflowName, String projectName) {
+        String effectiveProjectName = projectName != null ? projectName : "";
+        return workflowRepository.findAll().stream()
+                .filter(w -> w.getName().equals(workflowName))
+                .filter(w -> {
+                    String wProjectName = w.getProject() != null ? w.getProject().getName() : "";
+                    return wProjectName.equals(effectiveProjectName);
+                })
+                .findFirst();
+    }
+
+    private boolean applyWorkflowChanges(Workflow devWorkflow, JsonNode fullTestWorkflow) {
+        boolean changed = false;
+
+        String testInstructions = fullTestWorkflow.path("instructions").asText(null);
+        if (!java.util.Objects.equals(devWorkflow.getInstructions(), testInstructions)) {
+            devWorkflow.setInstructions(testInstructions);
+            changed = true;
+        }
+
+        String testModel = fullTestWorkflow.path("model").asText(null);
+        if (!java.util.Objects.equals(devWorkflow.getModel(), testModel)) {
+            devWorkflow.setModel(testModel);
+            changed = true;
+        }
+
+        if (changed) {
+            workflowRepository.save(devWorkflow);
+        }
+        return changed;
+    }
+
     private void autoSyncOnBoot() {
         try {
             if (isHealthy()) {
@@ -326,10 +335,8 @@ public class TestingService {
 
     boolean isContainerRunning() {
         try {
-            ProcessBuilder pb = new ProcessBuilder("docker", "ps", "--filter",
+            Process p = createDockerProcess("docker", "ps", "--filter",
                     "name=" + config.getTestContainerName(), "--format", "{{.Status}}");
-            pb.redirectErrorStream(true);
-            Process p = pb.start();
             String output = new String(p.getInputStream().readAllBytes()).trim();
             p.waitFor();
             return !output.isEmpty();
@@ -341,8 +348,8 @@ public class TestingService {
     public boolean isHealthy() {
         try {
             HttpURLConnection conn = (HttpURLConnection) URI.create(config.getTestHealthUrl()).toURL().openConnection();
-            conn.setConnectTimeout(3000);
-            conn.setReadTimeout(3000);
+            conn.setConnectTimeout(HEALTH_CHECK_TIMEOUT_MS);
+            conn.setReadTimeout(HEALTH_CHECK_TIMEOUT_MS);
             int code = conn.getResponseCode();
             conn.disconnect();
             return code == 200;
@@ -384,6 +391,12 @@ public class TestingService {
         runCommand(workDir, Map.of(), command);
     }
 
+    private Process createDockerProcess(String... command) throws java.io.IOException {
+        ProcessBuilder pb = new ProcessBuilder(command);
+        pb.redirectErrorStream(true);
+        return pb.start();
+    }
+
     private void runCommand(Path workDir, Map<String, String> extraEnv, String... command) {
         try {
             ProcessBuilder pb = new ProcessBuilder(command);
@@ -422,12 +435,12 @@ public class TestingService {
                 return;
             }
             try {
-                Thread.sleep(2000);
+                Thread.sleep(HEALTH_WAIT_INTERVAL_SECONDS * 1000L);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return;
             }
-            waited += 2;
+            waited += HEALTH_WAIT_INTERVAL_SECONDS;
         }
         log.warn("Test health check did not pass within {}s", maxWaitSeconds);
     }
