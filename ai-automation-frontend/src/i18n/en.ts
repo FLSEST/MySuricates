@@ -61,6 +61,7 @@ export const en = {
     chains: 'Chains',
     wishes: 'Wishes',
     factory: 'Factory',
+    docs: 'Documentation',
   },
   dashboard: {
     title: 'Dashboard',
@@ -835,6 +836,12 @@ export const en = {
     projectRequired: 'Project is required',
     providerLabel: 'AI Provider',
     providerDefault: 'Default (Server)',
+  },
+  docs: {
+    title: 'Documentation',
+    subtitle: 'Technical project documentation',
+    noDocs: 'No documentation files found.',
+    selectDoc: 'Select a document from the list on the left.',
   },
   errorPage: {
     somethingWentWrong: 'Something went wrong',

@@ -21,6 +21,7 @@ const Wishes = lazy(() => import('./pages/Wishes').then(m => ({ default: m.Wishe
 const Todos = lazy(() => import('./pages/Todos').then(m => ({ default: m.Todos })));
 const ActivityLog = lazy(() => import('./pages/ActivityLog').then(m => ({ default: m.ActivityLog })));
 const WorkflowFactory = lazy(() => import('./pages/WorkflowFactory').then(m => ({ default: m.WorkflowFactory })));
+const Docs = lazy(() => import('./pages/Docs').then(m => ({ default: m.Docs })));
 
 const router = createBrowserRouter([
   {
@@ -44,6 +45,7 @@ const router = createBrowserRouter([
       { path: 'webhooks', element: <Webhooks /> },
       { path: 'todos', element: <Todos /> },
       { path: 'activity', element: <ActivityLog /> },
+      { path: 'docs', element: <Docs /> },
       { path: 'settings', element: <Settings /> },
     ],
   },

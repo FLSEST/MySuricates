@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, GitBranch, History, Zap, Sparkles, Factory,
-  Calendar, Webhook, ScrollText, CheckSquare, Settings, ChevronLeft, ChevronRight, Link2,
+  Calendar, Webhook, ScrollText, CheckSquare, Settings, ChevronLeft, ChevronRight, Link2, BookOpen,
 } from 'lucide-react';
 import { useSidebarStore } from '../../stores/sidebarStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
@@ -93,6 +93,7 @@ const navItems = [
   { to: '/webhooks', icon: Webhook, labelKey: 'webhooks' as const },
   { to: '/todos', icon: CheckSquare, labelKey: 'todos' as const },
   { to: '/activity', icon: ScrollText, labelKey: 'activityLog' as const },
+  { to: '/docs', icon: BookOpen, labelKey: 'docs' as const },
 ];
 
 export function Sidebar() {

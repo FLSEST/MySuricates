@@ -63,6 +63,7 @@ export const de: TranslationKeys = {
     chains: 'Ketten',
     wishes: 'Wünsche',
     factory: 'Factory',
+    docs: 'Dokumentation',
   },
   dashboard: {
     title: 'Dashboard',
@@ -837,6 +838,12 @@ export const de: TranslationKeys = {
     projectRequired: 'Projekt ist erforderlich',
     providerLabel: 'KI-Anbieter',
     providerDefault: 'Standard (Server)',
+  },
+  docs: {
+    title: 'Dokumentation',
+    subtitle: 'Technische Projektdokumentation',
+    noDocs: 'Keine Dokumentationsdateien gefunden.',
+    selectDoc: 'Wähle links ein Dokument aus der Liste.',
   },
   errorPage: {
     somethingWentWrong: 'Etwas ist schiefgelaufen',
