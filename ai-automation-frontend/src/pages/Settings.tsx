@@ -14,7 +14,7 @@ import { TestingCard } from '../components/settings/TestingCard';
 
 export function Settings() {
   const t = useT();
-  const { advancedMode } = useSettingsStore();
+  const { simpleMode, advancedMode } = useSettingsStore();
   const { data: sysInfo } = useSystemInfo();
 
   const { data: staging } = useStagingStatus();
@@ -42,8 +42,8 @@ export function Settings() {
       <GeneralSettingsCard />
       <AppearanceCard />
       <SecurityCard />
-      <RemoteAccessCard />
-      <BackupCard />
+      {!simpleMode && <RemoteAccessCard />}
+      {!simpleMode && <BackupCard />}
 
       {advancedMode && (
         <StagingCard

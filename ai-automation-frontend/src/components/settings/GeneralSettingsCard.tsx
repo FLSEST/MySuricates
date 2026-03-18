@@ -9,7 +9,7 @@ import { Globe, Bot } from 'lucide-react';
 
 export function GeneralSettingsCard() {
   const t = useT();
-  const { advancedMode, setAdvancedMode, autoTodoDefault, setAutoTodoDefault, autoRepairDefault, setAutoRepairDefault, defaultAiProvider, setDefaultAiProvider } = useSettingsStore();
+  const { simpleMode, setSimpleMode, advancedMode, setAdvancedMode, autoTodoDefault, setAutoTodoDefault, autoRepairDefault, setAutoRepairDefault, defaultAiProvider, setDefaultAiProvider } = useSettingsStore();
   const updateSetting = useUpdateSystemSetting();
   const { locale, setLocale } = useI18nStore();
   const { data: aiProviders } = useAiProviders();
@@ -24,6 +24,14 @@ export function GeneralSettingsCard() {
     <Card>
       <CardHeader title={t.settings.general} />
       <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-text">{t.settings.simpleMode}</p>
+            <p className="text-xs text-text-tertiary">{t.settings.simpleModeHint}</p>
+          </div>
+          <Toggle enabled={simpleMode} onChange={setSimpleMode} />
+        </div>
+
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Globe className="w-5 h-5 text-text-secondary" />
@@ -62,41 +70,47 @@ export function GeneralSettingsCard() {
           />
         </div>
 
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-text">{t.settings.advanced}</p>
-            <p className="text-xs text-text-tertiary">{t.settings.advancedHint}</p>
+        {!simpleMode && (
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-text">{t.settings.advanced}</p>
+              <p className="text-xs text-text-tertiary">{t.settings.advancedHint}</p>
+            </div>
+            <Toggle enabled={advancedMode} onChange={setAdvancedMode} />
           </div>
-          <Toggle enabled={advancedMode} onChange={setAdvancedMode} />
-        </div>
+        )}
 
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-text">{t.settings.autoTodoDefault}</p>
-            <p className="text-xs text-text-tertiary">{t.settings.autoTodoDefaultHint}</p>
+        {!simpleMode && (
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-text">{t.settings.autoTodoDefault}</p>
+              <p className="text-xs text-text-tertiary">{t.settings.autoTodoDefaultHint}</p>
+            </div>
+            <Toggle
+              enabled={autoTodoDefault}
+              onChange={(enabled) => {
+                setAutoTodoDefault(enabled);
+                updateSetting.mutate({ key: 'auto-todo-default', value: String(enabled) });
+              }}
+            />
           </div>
-          <Toggle
-            enabled={autoTodoDefault}
-            onChange={(enabled) => {
-              setAutoTodoDefault(enabled);
-              updateSetting.mutate({ key: 'auto-todo-default', value: String(enabled) });
-            }}
-          />
-        </div>
+        )}
 
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-text">{t.settings.autoRepairDefault}</p>
-            <p className="text-xs text-text-tertiary">{t.settings.autoRepairDefaultHint}</p>
+        {!simpleMode && (
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-text">{t.settings.autoRepairDefault}</p>
+              <p className="text-xs text-text-tertiary">{t.settings.autoRepairDefaultHint}</p>
+            </div>
+            <Toggle
+              enabled={autoRepairDefault}
+              onChange={(enabled) => {
+                setAutoRepairDefault(enabled);
+                updateSetting.mutate({ key: 'auto-repair-default', value: String(enabled) });
+              }}
+            />
           </div>
-          <Toggle
-            enabled={autoRepairDefault}
-            onChange={(enabled) => {
-              setAutoRepairDefault(enabled);
-              updateSetting.mutate({ key: 'auto-repair-default', value: String(enabled) });
-            }}
-          />
-        </div>
+        )}
       </div>
     </Card>
   );

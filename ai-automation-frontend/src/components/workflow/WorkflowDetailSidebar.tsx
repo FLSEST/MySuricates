@@ -4,6 +4,7 @@ import { Card, CardHeader, Button, Input, Select } from '../ui';
 import { StatusBadge } from '../shared/StatusBadge';
 import { WorkflowMemoryPanel } from './WorkflowMemoryPanel';
 import { useUpdateWorkflow } from '../../hooks/useWorkflows';
+import { useAiProviders } from '../../hooks/useSystem';
 import { useT } from '../../i18n';
 import { formatDuration } from '../../utils/formatTime';
 import type { Workflow, WorkflowRun, PageResponse } from '../../types';
@@ -13,12 +14,6 @@ const MODEL_OPTIONS = [
   { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (fast)' },
   { value: 'claude-opus-4-6', label: 'Claude Opus 4.6 (powerful)' },
   { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 (fastest)' },
-];
-
-const PROVIDER_OPTIONS = [
-  { value: '', label: '' },
-  { value: 'CLAUDE', label: 'Claude CLI' },
-  { value: 'CODEX', label: 'Codex CLI' },
 ];
 
 interface WorkflowDetailSidebarProps {
@@ -42,6 +37,7 @@ export function WorkflowDetailSidebar({
 }: WorkflowDetailSidebarProps) {
   const t = useT();
   const updateWorkflow = useUpdateWorkflow();
+  const { data: aiProviders } = useAiProviders();
 
   return (
     <div className="space-y-4">
@@ -98,10 +94,13 @@ export function WorkflowDetailSidebar({
           onChange={(e) => {
             updateWorkflow.mutate({ id: workflow.id, data: { provider: e.target.value || undefined } });
           }}
-          options={PROVIDER_OPTIONS.map((opt) => ({
-            value: opt.value,
-            label: opt.value === '' ? t.workflows.providerDefault : opt.label,
-          }))}
+          options={[
+            { value: '', label: t.workflows.providerDefault },
+            ...(aiProviders?.providers ?? []).map((p) => ({
+              value: p,
+              label: p === 'CLAUDE' ? 'Claude CLI' : p === 'CODEX' ? 'Codex CLI' : p,
+            })),
+          ]}
         />
         <p className="text-xs text-text-tertiary mt-2 flex items-center gap-1.5">
           <Bot className="w-3.5 h-3.5" />

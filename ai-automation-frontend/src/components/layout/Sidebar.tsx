@@ -4,10 +4,13 @@ import {
   Calendar, Webhook, ScrollText, CheckSquare, Settings, ChevronLeft, ChevronRight, Link2, BookOpen,
 } from 'lucide-react';
 import { useSidebarStore } from '../../stores/sidebarStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useSystemInfo } from '../../hooks/useSystem';
 import { useT } from '../../i18n';
 import { HealthIndicator } from './HealthIndicator';
+
+const SIMPLE_MODE_ROUTES = new Set(['/', '/workflows', '/runs']);
 
 export function MeerkatIcon({ className, size = 24 }: { className?: string; size?: number }) {
   const bg = 'var(--color-sidebar, #1a1614)';
@@ -98,9 +101,14 @@ const navItems = [
 
 export function Sidebar() {
   const { collapsed, toggle, mobileOpen, setMobileOpen } = useSidebarStore();
+  const { simpleMode, setSimpleMode } = useSettingsStore();
   const isMobile = useIsMobile();
   const { data: systemInfo } = useSystemInfo();
   const t = useT();
+
+  const visibleNavItems = simpleMode
+    ? navItems.filter((item) => SIMPLE_MODE_ROUTES.has(item.to))
+    : navItems;
 
   const isOpen = isMobile ? mobileOpen : true;
   const showLabels = isMobile ? true : !collapsed;
@@ -129,6 +137,31 @@ export function Sidebar() {
                 {systemInfo.environment}
               </span>
             )}
+            <div className="mt-2 flex rounded-full bg-black/25 p-0.5 text-xs relative">
+              <div
+                className={`absolute inset-y-0.5 w-[calc(50%-2px)] rounded-full bg-accent/25 transition-transform duration-200 ease-in-out ${
+                  simpleMode ? 'translate-x-0.5' : 'translate-x-[calc(100%+2px)]'
+                }`}
+              />
+              <button
+                onClick={() => setSimpleMode(true)}
+                className={`relative z-10 flex items-center gap-1 px-3 py-1 rounded-full font-medium transition-colors ${
+                  simpleMode ? 'text-accent' : 'text-[#5a4e44] hover:text-[#8a7d6e]'
+                }`}
+              >
+                <Zap className="w-3 h-3" />
+                {t.settings.simpleModeShort}
+              </button>
+              <button
+                onClick={() => setSimpleMode(false)}
+                className={`relative z-10 flex items-center gap-1 px-3 py-1 rounded-full font-medium transition-colors ${
+                  !simpleMode ? 'text-accent' : 'text-[#5a4e44] hover:text-[#8a7d6e]'
+                }`}
+              >
+                <Sparkles className="w-3 h-3" />
+                {t.settings.fullModeShort}
+              </button>
+            </div>
           </>
         ) : systemInfo?.environment && (
           <span className={`w-2 h-2 rounded-full mt-1 ${
@@ -139,7 +172,7 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
-        {navItems.map((item) => (
+        {visibleNavItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
