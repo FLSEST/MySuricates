@@ -6,6 +6,7 @@ import com.automation.entity.StepStatus;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
 import com.automation.service.cli.CommandExecutorService;
+import com.automation.service.cli.HostExecutionRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -55,13 +56,15 @@ public class SkillCapabilityBlockExecutor implements BlockExecutor {
 
         try {
             String fullPrompt = prompt.toString();
-            String systemPrompt = context.getInstructionPrefix();
-            String response = commandExecutor.executeCommandOnHost(
-                    context.getProjectPath(),
-                    fullPrompt,
-                    context.getModel(),
-                    systemPrompt,
-                    claudeTimeout
+            String response = commandExecutor.executeOnHost(
+                    HostExecutionRequest.builder()
+                            .projectPath(context.getProjectPath())
+                            .command(fullPrompt)
+                            .model(context.getModel())
+                            .systemPrompt(context.getInstructionPrefix())
+                            .timeoutSeconds(claudeTimeout)
+                            .providerId(context.getProvider())
+                            .build()
             ).output();
 
             result.setOutput(response);

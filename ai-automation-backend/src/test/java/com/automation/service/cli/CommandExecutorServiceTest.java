@@ -192,24 +192,32 @@ class CommandExecutorServiceTest {
     // === Host-based execution tests ===
 
     @Test
-    void executeCommandOnHost_success_returnsEnrichedResult() throws IOException {
+    void executeOnHost_success_returnsEnrichedResult() throws IOException {
         when(hostClaudeService.executeAction(eq("hello"), eq("sonnet"), eq("sys prompt"), eq("/project"), isNull()))
                 .thenReturn(new ActionResult("Hello world", 0, null));
 
-        CliSession.EnrichedCommandResult result =
-                commandExecutorService.executeCommandOnHost("/project", "hello", "sonnet", "sys prompt");
+        CliSession.EnrichedCommandResult result = commandExecutorService.executeOnHost(
+                HostExecutionRequest.builder()
+                        .projectPath("/project")
+                        .command("hello")
+                        .model("sonnet")
+                        .systemPrompt("sys prompt")
+                        .build());
 
         assertThat(result.output()).isEqualTo("Hello world");
         assertThat(result.exitCode()).isEqualTo(0);
     }
 
     @Test
-    void executeCommandOnHost_ioException_throwsWorkflowExecutionException() throws IOException {
+    void executeOnHost_ioException_throwsWorkflowExecutionException() throws IOException {
         when(hostClaudeService.executeAction(anyString(), any(), any(), anyString(), isNull()))
                 .thenThrow(new IOException("Claude not found"));
 
-        assertThatThrownBy(() ->
-                commandExecutorService.executeCommandOnHost("/project", "cmd", null, null))
+        assertThatThrownBy(() -> commandExecutorService.executeOnHost(
+                HostExecutionRequest.builder()
+                        .projectPath("/project")
+                        .command("cmd")
+                        .build()))
                 .isInstanceOf(WorkflowExecutionException.class)
                 .hasMessageContaining("/project");
     }
@@ -224,7 +232,12 @@ class CommandExecutorServiceTest {
                 .config(Map.of("command", "npm test"))
                 .build();
 
-        StepResult result = commandExecutorService.executeStepOnHost("/project", block, 0, null, null);
+        StepResult result = commandExecutorService.executeStepOnHost(
+                HostExecutionRequest.builder()
+                        .projectPath("/project")
+                        .block(block)
+                        .stepIndex(0)
+                        .build());
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         assertThat(result.getOutput()).isEqualTo("All tests passed");
@@ -243,20 +256,13 @@ class CommandExecutorServiceTest {
                 .config(Map.of("command", "npm test"))
                 .build();
 
-        StepResult result = commandExecutorService.executeStepOnHost("/project", block, 0, null, null);
+        StepResult result = commandExecutorService.executeStepOnHost(
+                HostExecutionRequest.builder()
+                        .projectPath("/project")
+                        .block(block)
+                        .stepIndex(0)
+                        .build());
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
-    }
-
-    @Test
-    void executeCommandOnHost_simpleOverload_returnsCommandResult() throws IOException {
-        when(hostClaudeService.executeAction(eq("ls"), any(), any(), eq("/project"), isNull()))
-                .thenReturn(new ActionResult("file.txt", 0, null));
-
-        CliSession.CommandResult result =
-                commandExecutorService.executeCommandOnHost("/project", "ls");
-
-        assertThat(result.output()).isEqualTo("file.txt");
-        assertThat(result.exitCode()).isEqualTo(0);
     }
 }

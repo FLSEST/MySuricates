@@ -7,6 +7,7 @@ import com.automation.exception.WorkflowExecutionException;
 import com.automation.executor.ExecutionContext;
 import com.automation.service.cli.CliSession;
 import com.automation.service.cli.CommandExecutorService;
+import com.automation.service.cli.HostExecutionRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,7 +21,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class SkillCapabilityBlockExecutorTest {
@@ -50,7 +51,7 @@ class SkillCapabilityBlockExecutorTest {
 
     @Test
     void execute_validCapability_returnsCompletedResult() {
-        when(commandExecutor.executeCommandOnHost(eq("/test/project"), contains("fact_check"), any(), any(), isNull()))
+        when(commandExecutor.executeOnHost(argThat(req -> req.command().contains("fact_check"))))
                 .thenReturn(new CliSession.EnrichedCommandResult("Facts verified: 95% accuracy", 0, null));
 
         Map<String, Object> config = new HashMap<>();
@@ -73,7 +74,7 @@ class SkillCapabilityBlockExecutorTest {
     @Test
     void execute_resolvesInputTemplate() {
         context.setPreviousOutput("document content here");
-        when(commandExecutor.executeCommandOnHost(eq("/test/project"), contains("document content here"), any(), any(), isNull()))
+        when(commandExecutor.executeOnHost(argThat(req -> req.command().contains("document content here"))))
                 .thenReturn(new CliSession.EnrichedCommandResult("analyzed", 0, null));
 
         Map<String, Object> config = new HashMap<>();
@@ -92,7 +93,7 @@ class SkillCapabilityBlockExecutorTest {
 
     @Test
     void execute_commandThrows_returnsFailedResult() {
-        when(commandExecutor.executeCommandOnHost(anyString(), anyString(), any(), any(), isNull()))
+        when(commandExecutor.executeOnHost(any(HostExecutionRequest.class)))
                 .thenThrow(new RuntimeException("AI unavailable"));
 
         Map<String, Object> config = new HashMap<>();
@@ -128,7 +129,7 @@ class SkillCapabilityBlockExecutorTest {
 
     @Test
     void execute_noInput_usesEmptyString() {
-        when(commandExecutor.executeCommandOnHost(anyString(), anyString(), any(), any(), isNull()))
+        when(commandExecutor.executeOnHost(any(HostExecutionRequest.class)))
                 .thenReturn(new CliSession.EnrichedCommandResult("processed", 0, null));
 
         Map<String, Object> config = new HashMap<>();
@@ -143,5 +144,44 @@ class SkillCapabilityBlockExecutorTest {
         StepResult result = executor.execute(block, context);
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+    }
+
+    @Test
+    void execute_codexProvider_passesProviderIdToRequest() {
+        context.setProvider("CODEX");
+        when(commandExecutor.executeOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(new CliSession.EnrichedCommandResult("ok", 0, null));
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("capability", "summarize");
+        config.put("input", "text");
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("skill-capability")
+                .config(config)
+                .build();
+
+        executor.execute(block, context);
+
+        verify(commandExecutor).executeOnHost(argThat(req -> "CODEX".equals(req.providerId())));
+    }
+
+    @Test
+    void execute_nullProvider_passesNullProviderIdToRequest() {
+        when(commandExecutor.executeOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(new CliSession.EnrichedCommandResult("ok", 0, null));
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("capability", "summarize");
+        config.put("input", "text");
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("skill-capability")
+                .config(config)
+                .build();
+
+        executor.execute(block, context);
+
+        verify(commandExecutor).executeOnHost(argThat(req -> req.providerId() == null));
     }
 }

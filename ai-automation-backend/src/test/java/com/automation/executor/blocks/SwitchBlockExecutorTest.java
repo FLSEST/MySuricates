@@ -5,6 +5,7 @@ import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.executor.ExecutionContext;
 import com.automation.service.cli.CommandExecutorService;
+import com.automation.service.cli.HostExecutionRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -53,7 +54,7 @@ class SwitchBlockExecutorTest {
 
         StepResult blockResult = StepResult.builder()
                 .stepIndex(1).status(StepStatus.COMPLETED).output("deployed").build();
-        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(), anyInt(), isNull(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
                 .thenReturn(blockResult);
 
         Map<String, Object> config = new HashMap<>();
@@ -86,7 +87,7 @@ class SwitchBlockExecutorTest {
 
         StepResult blockResult = StepResult.builder()
                 .stepIndex(1).status(StepStatus.COMPLETED).output("staging deploy done").build();
-        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(), anyInt(), isNull(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
                 .thenReturn(blockResult);
 
         Map<String, Object> config = new HashMap<>();
@@ -121,7 +122,7 @@ class SwitchBlockExecutorTest {
 
         StepResult blockResult = StepResult.builder()
                 .stepIndex(1).status(StepStatus.COMPLETED).output("alert sent").build();
-        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(), anyInt(), isNull(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
                 .thenReturn(blockResult);
 
         Map<String, Object> config = new HashMap<>();
@@ -153,7 +154,7 @@ class SwitchBlockExecutorTest {
 
         StepResult blockResult = StepResult.builder()
                 .stepIndex(1).status(StepStatus.COMPLETED).output("default handler executed").build();
-        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(), anyInt(), isNull(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
                 .thenReturn(blockResult);
 
         Map<String, Object> config = new HashMap<>();
@@ -203,7 +204,7 @@ class SwitchBlockExecutorTest {
         assertThat(result.getOutput()).contains("No matching case");
         assertThat(result.getOutput()).contains("unknown");
         assertThat(result.getMetadata()).containsEntry("matchedCase", "none");
-        verify(commandExecutor, never()).executeStepOnHost(any(), any(), anyInt(), any(), any(), any());
+        verify(commandExecutor, never()).executeStepOnHost(any(HostExecutionRequest.class));
         verify(commandExecutor, never()).executeStepAsShell(any(), any(), anyInt(), anyInt());
     }
 
@@ -215,7 +216,7 @@ class SwitchBlockExecutorTest {
                 .stepIndex(1).status(StepStatus.COMPLETED).output("compiled").build();
         StepResult secondBlock = StepResult.builder()
                 .stepIndex(2).status(StepStatus.COMPLETED).output("tested").build();
-        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(), anyInt(), isNull(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
                 .thenReturn(firstBlock, secondBlock);
 
         Map<String, Object> config = new HashMap<>();
@@ -237,7 +238,7 @@ class SwitchBlockExecutorTest {
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         assertThat(result.getOutput()).contains("compiled");
         assertThat(result.getOutput()).contains("tested");
-        verify(commandExecutor, times(2)).executeStepOnHost(any(), any(), anyInt(), any(), any(), any());
+        verify(commandExecutor, times(2)).executeStepOnHost(any(HostExecutionRequest.class));
     }
 
     @Test
@@ -267,7 +268,7 @@ class SwitchBlockExecutorTest {
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         assertThat(result.getOutput()).isEqualTo("cleaned up");
         verify(commandExecutor).executeStepAsShell(any(), any(), anyInt(), eq(300));
-        verify(commandExecutor, never()).executeStepOnHost(any(), any(), anyInt(), any(), any(), any());
+        verify(commandExecutor, never()).executeStepOnHost(any(HostExecutionRequest.class));
     }
 
     @Test
@@ -276,7 +277,7 @@ class SwitchBlockExecutorTest {
 
         StepResult failedResult = StepResult.builder()
                 .stepIndex(1).status(StepStatus.FAILED).output("deployment error").build();
-        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(), anyInt(), isNull(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
                 .thenReturn(failedResult);
 
         Map<String, Object> config = new HashMap<>();
@@ -304,7 +305,7 @@ class SwitchBlockExecutorTest {
 
         StepResult blockResult = StepResult.builder()
                 .stepIndex(1).status(StepStatus.COMPLETED).output("warning logged").build();
-        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(), anyInt(), isNull(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
                 .thenReturn(blockResult);
 
         Map<String, Object> config = new HashMap<>();
@@ -338,7 +339,7 @@ class SwitchBlockExecutorTest {
 
         StepResult blockResult = StepResult.builder()
                 .stepIndex(1).status(StepStatus.COMPLETED).output("ran").build();
-        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(), anyInt(), isNull(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
                 .thenReturn(blockResult);
 
         BlockDefinition block = BlockDefinition.builder()
@@ -358,7 +359,7 @@ class SwitchBlockExecutorTest {
 
         StepResult firstResult = StepResult.builder()
                 .stepIndex(1).status(StepStatus.COMPLETED).output("first done").build();
-        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(), anyInt(), isNull(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
                 .thenAnswer(inv -> {
                     context.cancel();
                     return firstResult;
@@ -381,7 +382,7 @@ class SwitchBlockExecutorTest {
 
         executor.execute(block, context);
 
-        verify(commandExecutor, times(1)).executeStepOnHost(any(), any(), anyInt(), any(), any(), any());
+        verify(commandExecutor, times(1)).executeStepOnHost(any(HostExecutionRequest.class));
     }
 
     @Test
@@ -418,5 +419,62 @@ class SwitchBlockExecutorTest {
     @Test
     void resolveExpression_nullExpression_returnsEmpty() {
         assertThat(executor.resolveExpression(null, context)).isEmpty();
+    }
+
+    @Test
+    void execute_codexProvider_passesProviderIdToRequest() {
+        context.setProvider("CODEX");
+        context.setVariable("action", "run");
+
+        StepResult blockResult = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("done").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(blockResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "${action}");
+        config.put("cases", List.of(
+                Map.of("value", "run", "blocks", List.of(
+                        Map.of("type", "simple", "config", Map.of("command", "do work"))
+                ))
+        ));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("switch")
+                .config(config)
+                .build();
+
+        executor.execute(block, context);
+
+        verify(commandExecutor).executeStepOnHost(
+                argThat(req -> "CODEX".equals(req.providerId())));
+    }
+
+    @Test
+    void execute_nullProvider_passesNullProviderIdToRequest() {
+        context.setVariable("action", "run");
+
+        StepResult blockResult = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("done").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(blockResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "${action}");
+        config.put("cases", List.of(
+                Map.of("value", "run", "blocks", List.of(
+                        Map.of("type", "simple", "config", Map.of("command", "do work"))
+                ))
+        ));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("switch")
+                .config(config)
+                .build();
+
+        executor.execute(block, context);
+
+        verify(commandExecutor).executeStepOnHost(
+                argThat(req -> req.providerId() == null));
     }
 }

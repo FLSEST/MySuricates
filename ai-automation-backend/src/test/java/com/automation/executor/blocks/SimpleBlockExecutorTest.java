@@ -16,12 +16,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.automation.service.cli.HostExecutionRequest;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -55,7 +54,7 @@ class SimpleBlockExecutorTest {
     void execute_validCommand_delegatesToCommandExecutor() {
         StepResult expected = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("success").build();
-        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(BlockDefinition.class), anyInt(), isNull(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
                 .thenReturn(expected);
 
         BlockDefinition block = BlockDefinition.builder()
@@ -74,7 +73,7 @@ class SimpleBlockExecutorTest {
         context.setPreviousOutput("previous result");
         StepResult expected = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("done").build();
-        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(BlockDefinition.class), anyInt(), isNull(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
                 .thenReturn(expected);
 
         BlockDefinition block = BlockDefinition.builder()

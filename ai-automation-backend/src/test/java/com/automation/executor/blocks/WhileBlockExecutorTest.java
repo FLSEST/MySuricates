@@ -6,6 +6,7 @@ import com.automation.entity.StepStatus;
 import com.automation.executor.ExecutionContext;
 import com.automation.service.cli.CliSession;
 import com.automation.service.cli.CommandExecutorService;
+import com.automation.service.cli.HostExecutionRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -159,23 +160,22 @@ class WhileBlockExecutorTest {
 
         BlockDefinition block = BlockDefinition.builder().type("while").config(config).build();
 
-        CliSession.EnrichedCommandResult conditionResult = new CliSession.EnrichedCommandResult("true", 0, null);
-        when(commandExecutor.executeCommandOnHost(eq("/tmp/project"), eq("check condition"), isNull(), isNull(), isNull()))
-                .thenReturn(conditionResult)
+        when(commandExecutor.executeOnHost(argThat(req -> "check condition".equals(req.command()))))
+                .thenReturn(new CliSession.EnrichedCommandResult("true", 0, null))
                 .thenReturn(new CliSession.EnrichedCommandResult("false", 0, null));
 
         StepResult step = new StepResult();
         step.setStepIndex(0);
         step.setOutput("analyzed");
         step.setStatus(StepStatus.COMPLETED);
-        when(commandExecutor.executeStepOnHost(eq("/tmp/project"), any(), anyInt(), isNull(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
                 .thenReturn(step);
 
         StepResult result = executor.execute(block, context);
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.PENDING);
         assertThat(result.getOutput()).contains("[iteration 1]");
-        verify(commandExecutor, times(1)).executeStepOnHost(eq("/tmp/project"), any(), anyInt(), isNull(), isNull(), isNull());
+        verify(commandExecutor, times(1)).executeStepOnHost(any(HostExecutionRequest.class));
     }
 
     @Test
@@ -192,5 +192,64 @@ class WhileBlockExecutorTest {
 
         assertThat(result.getInput()).contains("while loop");
         assertThat(result.getInput()).contains("0 iterations");
+    }
+
+    @Test
+    void execute_codexProvider_passesProviderIdToRequests() {
+        context.setProvider("CODEX");
+        Map<String, Object> config = new HashMap<>();
+        config.put("command", "analyze");
+        config.put("condition_command", "check");
+        config.put("max_iterations", 1);
+        config.put("execution_mode", "claude");
+
+        BlockDefinition block = BlockDefinition.builder().type("while").config(config).build();
+
+        when(commandExecutor.executeOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(new CliSession.EnrichedCommandResult("true", 0, null))
+                .thenReturn(new CliSession.EnrichedCommandResult("false", 0, null));
+
+        StepResult step = new StepResult();
+        step.setStepIndex(0);
+        step.setOutput("ok");
+        step.setStatus(StepStatus.COMPLETED);
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(step);
+
+        executor.execute(block, context);
+
+        verify(commandExecutor, atLeastOnce()).executeOnHost(
+                argThat(req -> "CODEX".equals(req.providerId())));
+        verify(commandExecutor).executeStepOnHost(
+                argThat(req -> "CODEX".equals(req.providerId())));
+    }
+
+    @Test
+    void execute_nullProvider_passesNullProviderIdToRequests() {
+        Map<String, Object> config = new HashMap<>();
+        config.put("command", "analyze");
+        config.put("condition_command", "check");
+        config.put("max_iterations", 1);
+        config.put("execution_mode", "claude");
+
+        BlockDefinition block = BlockDefinition.builder().type("while").config(config).build();
+
+        when(commandExecutor.executeOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(new CliSession.EnrichedCommandResult("true", 0, null))
+                .thenReturn(new CliSession.EnrichedCommandResult("false", 0, null));
+
+        StepResult step = new StepResult();
+        step.setStepIndex(0);
+        step.setOutput("ok");
+        step.setStatus(StepStatus.COMPLETED);
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(step);
+
+        executor.execute(block, context);
+
+        verify(commandExecutor, atLeastOnce()).executeOnHost(
+                argThat(req -> req.providerId() == null));
+        verify(commandExecutor).executeStepOnHost(
+                argThat(req -> req.providerId() == null));
     }
 }
