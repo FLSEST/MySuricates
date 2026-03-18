@@ -1,0 +1,68 @@
+{
+  "name": {
+    "de": "Lehrplan-Extraktor NRW",
+    "en": "Curriculum Extractor NRW"
+  },
+  "description": {
+    "de": "Crawlt Lehrplan-Seiten vom Lehrplannavigator NRW und extrahiert die Themenstruktur als JSON. Shell-Crawling + AI-Parsing für echte Lehrplandaten.",
+    "en": "Crawls curriculum pages from the NRW Lehrplannavigator and extracts topic structure as JSON. Shell crawling + AI parsing for real curriculum data."
+  },
+  "icon": "🗺️",
+  "category": "CONTENT",
+  "tags": ["education", "curriculum", "extraction", "lehrplan", "crawling", "nrw"],
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "label": "Vorhandene Extraktion prüfen",
+        "timeout_seconds": 30,
+        "command": "set -euo pipefail\nmkdir -p '{{ base_dir }}/lehrplan'\nFNAME=$(echo '{{ bundesland }}_{{ schulart }}_{{ fach }}' | tr '[:upper:]' '[:lower:]' | tr ' ' '_').json\nFILE=\"{{ base_dir }}/lehrplan/$FNAME\"\nif [ -f \"$FILE\" ]; then\n  echo \"EXISTS\"\n  echo \"Datei: $FILE\"\n  python3 -c \"import json; d=json.load(open('$FILE')); stufen=[s['stufe'] for s in d.get('klassenstufen',[])]; print(f'Vorhandene Stufen: {stufen}'); print(f'Themen gesamt: {sum(len(s.get(\\\"themen\\\",[])) for s in d.get(\\\"klassenstufen\\\",[]))}')\"\nelse\n  echo \"NEW\"\n  echo \"Noch keine Extraktion vorhanden.\"\nfi\necho \"FNAME=$FNAME\""
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "label": "Lehrplan-Seiten holen (NRW)",
+        "timeout_seconds": 120,
+        "command": "set -euo pipefail\nFACH_RAW='{{ fach }}'\nFACH_LOWER=$(echo \"$FACH_RAW\" | tr '[:upper:]' '[:lower:]')\ncase \"$FACH_LOWER\" in\n  \"gesellschaftslehre\"|\"gl\") FACH_SLUG=\"gesellschaftslehre\" ;;\n  \"arbeit-wirtschaft-technik\"|\"awt\") FACH_SLUG=\"arbeit-wirtschaft-technik\" ;;\n  \"wirtschaft-arbeit-technik\"|\"wat\") FACH_SLUG=\"wirtschaft-arbeit-technik\" ;;\n  \"natur-und-gesellschaftswissenschaften\"|\"nug\") FACH_SLUG=\"natur-und-gesellschaftswissenschaften\" ;;\n  *) FACH_SLUG=$(echo \"$FACH_LOWER\" | tr ' ' '-' | tr -d '/') ;;\nesac\nSCHULART_RAW='{{ schulart }}'\nSCHULART_LOWER=$(echo \"$SCHULART_RAW\" | tr '[:upper:]' '[:lower:]')\ncase \"$SCHULART_LOWER\" in\n  \"gymnasium\") SCHULART_SLUG=\"gymnasium\" ;;\n  \"realschule\") SCHULART_SLUG=\"realschule\" ;;\n  \"hauptschule\") SCHULART_SLUG=\"hauptschule\" ;;\n  \"gesamtschule\") SCHULART_SLUG=\"gesamtschule\" ;;\n  \"grundschule\") SCHULART_SLUG=\"grundschule\" ;;\n  *) SCHULART_SLUG=\"$SCHULART_LOWER\" ;;\nesac\nTMPDIR=$(mktemp -d)\nCRAWL_SUCCESS=true\n\necho \"Fach-Slug: $FACH_SLUG\"\necho \"Schulart-Slug: $SCHULART_SLUG\"\necho \"Bundesland: NRW\"\n\n# NRW Lehrplannavigator URL pattern\nfor STUFE in $(seq {{ klasse_von }} {{ klasse_bis }}); do\n  URL=\"https://www.lehrplannavigator.nrw.de/${SCHULART_SLUG}/${FACH_SLUG}-${SCHULART_SLUG}/jahrgangsstufe-${STUFE}\"\n  ALT_URL=\"https://www.lehrplannavigator.nrw.de/sekundarstufe-i/${SCHULART_SLUG}/${FACH_SLUG}-${SCHULART_SLUG}\"\n  echo \"Fetching: $URL\"\n  HTTP_CODE=$(curl -sL -o \"$TMPDIR/stufe_${STUFE}.html\" -w \"%{http_code}\" \\\n    -A 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36' \\\n    --max-time 30 \"$URL\" 2>/dev/null || echo \"000\")\n  SIZE=$(wc -c < \"$TMPDIR/stufe_${STUFE}.html\" 2>/dev/null || echo 0)\n  if [ \"$HTTP_CODE\" != \"200\" ] || [ \"$SIZE\" -lt 2000 ]; then\n    echo \"WARN: Stufe $STUFE -> HTTP $HTTP_CODE, size $SIZE bytes — versuche Alt-URL\"\n    HTTP_CODE2=$(curl -sL -o \"$TMPDIR/stufe_${STUFE}.html\" -w \"%{http_code}\" \\\n      -A 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36' \\\n      --max-time 30 \"$ALT_URL\" 2>/dev/null || echo \"000\")\n    SIZE2=$(wc -c < \"$TMPDIR/stufe_${STUFE}.html\" 2>/dev/null || echo 0)\n    if [ \"$HTTP_CODE2\" != \"200\" ] || [ \"$SIZE2\" -lt 2000 ]; then\n      echo \"WARN: Alt-URL auch fehlgeschlagen -> HTTP $HTTP_CODE2, size $SIZE2 (Fallback wird genutzt)\"\n      CRAWL_SUCCESS=false\n    else\n      echo \"OK (Alt): Stufe $STUFE -> $SIZE2 bytes\"\n    fi\n  else\n    echo \"OK: Stufe $STUFE -> $SIZE bytes\"\n  fi\ndone\n\necho \"TMPDIR=$TMPDIR\"\necho \"CRAWL_SUCCESS=$CRAWL_SUCCESS\"\nls -la \"$TMPDIR/\""
+      }
+    },
+    {
+      "type": "simple",
+      "config": {
+        "label": "HTML → JSON extrahieren",
+        "timeout_seconds": 600,
+        "command": "Die vorherige Ausgabe enthält den TMPDIR-Pfad und Crawl-Ergebnisse:\n\n{{ previous_output }}\n\nAufgabe:\n1. Parse den TMPDIR-Pfad aus der Ausgabe oben (Zeile \"TMPDIR=...\")\n2. Lies alle stufe_*.html Dateien aus diesem TMPDIR\n3. Extrahiere aus dem HTML die Lernbereiche/Themen des NRW-Lehrplans\n\nFalls eine HTML-Datei leer, zu klein (<1000 Bytes) oder kein Lehrplan-HTML enthält:\nNutze dein Wissen über den NRW-Lehrplan für {{ schulart }}/{{ fach }}.\nMarkiere solche Themen mit \"[FALLBACK]\" am Anfang der Beschreibung.\n\nJSON-Schema:\n{\n  \"meta\": {\n    \"bundesland\": \"{{ bundesland }}\",\n    \"schulart\": \"{{ schulart }}\",\n    \"fach\": \"{{ fach }}\",\n    \"klasse_von\": {{ klasse_von }},\n    \"klasse_bis\": {{ klasse_bis }},\n    \"extracted\": \"YYYY-MM-DD\",\n    \"source\": \"lehrplannavigator.nrw.de\"\n  },\n  \"klassenstufen\": [\n    {\n      \"stufe\": 5,\n      \"themen\": [\n        {\n          \"name\": \"Themenname\",\n          \"slug\": \"themenname-als-slug\",\n          \"beschreibung\": \"Kurze Beschreibung (1-2 Sätze)\",\n          \"schwerpunkte\": [\"Unterthema 1\", \"Unterthema 2\"],\n          \"kompetenzen\": [\"Die Schüler können...\"],\n          \"stunden_ca\": 10\n        }\n      ]\n    }\n  ]\n}\n\nRegeln:\n- Für JEDE Klassenstufe von {{ klasse_von }} bis {{ klasse_bis }} einen Eintrag\n- Pro Stufe: ALLE Lernbereiche/Themenfelder des NRW-Lehrplans\n- Slugs: nur [a-z0-9-], Umlaute ersetzen (ä→ae, ö→oe, ü→ue, ß→ss), Leerzeichen→Bindestriche\n- Schwerpunkte: 2-5 pro Thema\n- Kompetenzen: 2-4 pro Thema (\"Die Schüler können...\")\n- Stunden: geschätzte Unterrichtsstunden nach NRW-Stundentafel\n\nWICHTIG: Schreibe KEINE Datei. Gib ausschließlich das valide JSON-Objekt aus — kein Markdown, keine Erklärung, kein Text davor oder danach."
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "label": "JSON speichern + validieren",
+        "timeout_seconds": 60,
+        "command": "set -euo pipefail\nBASE='{{ base_dir }}/lehrplan'\nmkdir -p \"$BASE\"\nFNAME=$(echo '{{ bundesland }}_{{ schulart }}_{{ fach }}' | tr '[:upper:]' '[:lower:]' | tr ' ' '_' | tr '/' '_').json\nOUTFILE=\"$BASE/$FNAME\"\n\nif [ -f \"$OUTFILE\" ]; then\n  echo \"EXISTS: $OUTFILE\"\n  echo \"Ueberspringe, Datei bereits vorhanden.\"\n  exit 0\nfi\n\nexport OUTFILE\nTMPJSON=$(mktemp)\nexport TMPJSON\n\ncat > \"$TMPJSON\" << 'PREV'\n{{ previous_output }}\nPREV\n\npython3 << 'PYEOF'\nimport json, os\n\ntmpjson = os.environ.get('TMPJSON', '')\nwith open(tmpjson) as f:\n    raw = f.read().strip()\n\n# Remove markdown fences if present\nlines = raw.splitlines()\nif lines and lines[0].startswith('`'):\n    lines = lines[1:]\nif lines and lines[-1].strip().startswith('`'):\n    lines = lines[:-1]\nraw = '\\n'.join(lines)\n\n# Find JSON start\nstart = raw.find('{')\nif start > 0:\n    raw = raw[start:]\n\ndata = json.loads(raw)\nassert 'meta' in data\nassert 'klassenstufen' in data\nfor ks in data['klassenstufen']:\n    themen = ks.get('themen', [])\n    assert len(themen) >= 3\n\noutfile = os.environ['OUTFILE']\nwith open(outfile, 'w') as f:\n    json.dump(data, f, indent=2, ensure_ascii=False)\n\nstufen = len(data['klassenstufen'])\nthemen_count = sum(len(s.get('themen', [])) for s in data['klassenstufen'])\nprint('Gespeichert: ' + outfile)\nprint('Stufen: ' + str(stufen))\nprint('Themen: ' + str(themen_count))\nPYEOF\n\nrm -f \"$TMPJSON\""
+      }
+    },
+    {
+      "type": "simple",
+      "config": {
+        "label": "Zusammenfassung",
+        "timeout_seconds": 120,
+        "command": "Lies die gespeicherte Lehrplan-Datei {{ base_dir }}/lehrplan/ (Dateiname: {{ bundesland }}_{{ schulart }}_{{ fach }} in Kleinbuchstaben, Leerzeichen→Unterstriche, .json) und erstelle eine kompakte Übersicht:\n\nValidierungs-Ergebnis:\n{{ previous_output }}\n\n## Lehrplan-Extraktion: {{ fach }} ({{ bundesland }}, {{ schulart }})\n\nFür jede Klassenstufe: Stufe, Anzahl Themen, Themennamen als Liste.\n\nGesamt: X Themen über Y Klassenstufen.\n\ngate_status: GREEN falls alle Stufen mindestens 3 Themen haben, YELLOW falls eine Stufe weniger als 3 hat\ngate_category: extraction-quality\ngate_description: Lehrplan-Extraktion {{ fach }} {{ bundesland }}"
+      }
+    }
+  ],
+  "instructions": "Du extrahierst Lehrplaninhalte für das nordrhein-westfälische Schulsystem.\n\nDeine Hauptaufgabe ist es, HTML-Dateien vom Lehrplannavigator NRW zu lesen und die Themenstruktur als JSON zu extrahieren. Die HTML-Dateien wurden bereits per curl heruntergeladen.\n\nVorgehen:\n1. TMPDIR aus der vorherigen Ausgabe parsen\n2. Alle stufe_*.html Dateien lesen\n3. Lernbereiche, Themen, Kompetenzen aus dem HTML extrahieren\n4. Falls HTML nicht auswertbar: eigenes Wissen über NRW-Kernlehrpläne als Fallback nutzen, mit [FALLBACK] markieren\n\nNRW-Besonderheiten:\n- NRW nennt Lehrpläne 'Kernlehrpläne'\n- Kompetenzorientierung ist zentral (Sachkompetenz, Methodenkompetenz, Urteilskompetenz, Handlungskompetenz)\n- Inhaltsfelder statt einzelner Themen (breiter strukturiert als Bayern)\n\nStruktur-Konventionen:\n- Slugs MÜSSEN deterministisch sein: name.lower(), ä→ae, ö→oe, ü→ue, ß→ss, Leerzeichen→Bindestriche, nur [a-z0-9-]\n- Themen sollen dem tatsächlichen NRW-Kernlehrplan entsprechen\n- Stundenzahlen sind Richtwerte basierend auf NRW-Stundentafeln\n- Kompetenzen im Stil der NRW-Bildungsstandards formulieren\n\nDateinamen-Konvention:\n<bundesland>_<schulart>_<fach>.json — alles Kleinbuchstaben, Leerzeichen→Unterstriche\n\nWICHTIG: Schreibe KEINE Dateien! Gib NUR das JSON-Objekt aus. Der nachfolgende Shell-Block speichert die Datei.",
+  "model": "claude-opus-4-6",
+  "provider": "CLAUDE",
+  "version": "1.0.0",
+  "author": "MySuricates",
+  "defaultContext": {
+    "base_dir": "/home/flo/Entwicklung/LernApp",
+    "bundesland": "NRW",
+    "schulart": "Gymnasium",
+    "fach": "Biologie",
+    "klasse_von": "5",
+    "klasse_bis": "10"
+  }
+}
