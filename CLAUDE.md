@@ -153,6 +153,20 @@ npm run test:e2e                         # Run Cypress headless
 npm run cy:open                          # Open Cypress UI
 ```
 
+## Key API Action Endpoints
+
+These use non-obvious paths — always use these, never guess:
+
+| Action | Method | Path |
+|---|---|---|
+| Run workflow | POST | `/api/v1/workflows/{id}/execute` |
+| Run chain | POST | `/api/v1/chains/{id}/execute` |
+| Cancel execution | POST | `/api/v1/executions/{id}/cancel` |
+| Approve step | POST | `/api/v1/executions/{id}/approve` |
+| Check approval | GET | `/api/v1/executions/{id}/approval` |
+| Pause execution | POST | `/api/v1/executions/{id}/pause` |
+| Resume execution | POST | `/api/v1/executions/{id}/resume` |
+
 ## Key Conventions
 
 - **Backend ORM**: Lombok for boilerplate, MapStruct for entity-DTO mapping
@@ -175,11 +189,11 @@ npm run cy:open                          # Open Cypress UI
 - **All Claude CLI execution happens on the host** (not inside Docker containers) to avoid nested-session detection
   - `HostClaudeService.executeAction()` runs `claude -p` on the host with `ProcessBuilder.directory(projectPath)`
   - `CLAUDE_CODE` and `CLAUDECODE` env vars are removed from the process environment to prevent nested-session errors
-  - `CommandExecutorService` provides `executeCommandOnHost()` / `executeStepOnHost()` / `injectSkillContextOnHost()` methods
+  - `CommandExecutorService` provides `executeOnHost(HostExecutionRequest)` / `executeStepOnHost(HostExecutionRequest)` / `injectSkillContextOnHost()` methods — all overloads use the `HostExecutionRequest` builder API
 - Docker containers have resource limits: 4GB memory, CPU quota, 100 PIDs, 60min idle timeout
 - Security is enabled by default: API key auth via `X-API-Key` header (auto-generated if not configured), rate limiting
 - Block types: simple, shell, retry, conditional, forEach, while, switch, agentic, approval, sub-workflow, skill-capability, human-input
-- **Provider routing**: All block executors (simple, retry, conditional, forEach, while, switch, skill-capability) pass `context.getProvider()` as `providerId` via `HostExecutionRequest.builder()` to `CommandExecutorService`. Setting `"provider": "CODEX"` in a workflow JSON therefore applies to every non-shell block type.
+- **Provider routing**: All block executors (simple, retry, conditional, forEach, while, switch, skill-capability) pass `context.getProvider()` as `providerId` via `HostExecutionRequest.builder()` to `CommandExecutorService`. Setting `"provider": "CODEX"` in a workflow JSON therefore applies to every non-shell block type. `AiProviderRegistry.resolve()` falls back to the configured default provider (not hardcoded CLAUDE) when an unknown provider ID is given.
 - Agentic blocks use a Goal→Reason→Act→Observe loop powered by Host Claude CLI
 - Workflow Conversion: Successful agentic runs can be converted to deterministic workflows (rule-based + AI)
 - Terminal WebSocket at `/ws/terminal` for real-time container access
