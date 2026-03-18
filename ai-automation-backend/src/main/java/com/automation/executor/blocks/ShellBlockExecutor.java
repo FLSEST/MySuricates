@@ -60,7 +60,10 @@ public class ShellBlockExecutor implements BlockExecutor {
 
         context.clearProcess();
 
-        step.setOutput(result.output());
+        String output = result.exitCode() != 0
+                ? result.output() + "\n\n[RECOVERY] " + buildRecoveryHint(result.exitCode(), command)
+                : result.output();
+        step.setOutput(output);
         step.setStatus(result.exitCode() == 0 ? StepStatus.COMPLETED : StepStatus.FAILED);
         step.setCompletedAt(Instant.now());
         step.setDurationMs(result.durationMs());
@@ -75,5 +78,17 @@ public class ShellBlockExecutor implements BlockExecutor {
     @Override
     public boolean supports(String blockType) {
         return "shell".equals(blockType);
+    }
+
+    private String buildRecoveryHint(int exitCode, String command) {
+        String firstToken = command.trim().split("\\s+")[0];
+        return switch (exitCode) {
+            case 124 -> "Timeout. Consider: (1) optimizing the command, (2) increasing `timeout_seconds` in block config, (3) splitting the task into smaller steps.";
+            case 127 -> "Command not found. Verify the tool is installed and available in PATH. Try: `which " + firstToken + "`.";
+            case 126 -> "Permission denied. Check file permissions: `chmod +x <path>`.";
+            case 130 -> "Interrupted. Retry the command.";
+            case 1   -> "General failure (exit 1). See stderr above. Try running the command manually to reproduce.";
+            default  -> "Exit " + exitCode + ": Command failed. See output above for details.";
+        };
     }
 }
