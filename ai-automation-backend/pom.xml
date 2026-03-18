@@ -13,7 +13,7 @@
 
     <groupId>com.automation</groupId>
     <artifactId>ai-automation-backend</artifactId>
-    <version>0.3.2-SNAPSHOT</version>
+    <version>0.4.0-SNAPSHOT</version>
     <name>MySuricates Backend</name>
     <description>MySuricates - AI Workflow Automation</description>
 
