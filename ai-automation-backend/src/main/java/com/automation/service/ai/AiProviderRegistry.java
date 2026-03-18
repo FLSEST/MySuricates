@@ -40,8 +40,8 @@ public class AiProviderRegistry {
         String id = resolveId(workflowProvider);
         AiProvider provider = providers.get(id);
         if (provider == null) {
-            log.warn("Unknown AI provider '{}', falling back to CLAUDE", id);
-            provider = providers.get("CLAUDE");
+            log.warn("Unknown AI provider '{}', falling back to default", id);
+            provider = providers.get(getDefaultProviderId());
         }
         return provider;
     }
