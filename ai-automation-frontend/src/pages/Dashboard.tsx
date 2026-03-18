@@ -136,10 +136,10 @@ export function Dashboard() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Page header */}
-      <div className="flex items-start justify-between">
-        <div>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-text">{t.dashboard.title}</h1>
-          <p className="text-sm text-text-secondary mt-1">{t.dashboard.subtitle}</p>
+          <p className="text-sm text-text-secondary mt-1 truncate">{t.dashboard.subtitle}</p>
         </div>
         <div className="text-right shrink-0">
           <p className="text-2xl font-bold text-text font-mono tabular-nums">
