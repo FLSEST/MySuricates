@@ -914,6 +914,498 @@ Einen Run bewerten (1-5 Sterne).
 
 ---
 
+## Chains
+
+### `GET /api/v1/chains`
+
+Alle Workflow-Chains auflisten.
+
+**Response:** `ChainResponse[]`
+
+### `POST /api/v1/chains`
+
+Neue Chain erstellen.
+
+**Request:**
+
+```json
+{
+  "name": "Deploy Pipeline",
+  "description": "Build, Test, Deploy",
+  "icon": "⛓",
+  "entries": [
+    { "workflowId": "uuid", "sortOrder": 0, "inputContext": {}, "stopOnFailure": true }
+  ],
+  "stopOnFailure": true
+}
+```
+
+**Response:** `201` mit `ChainResponse`
+
+### `GET /api/v1/chains/{id}`
+
+Chain abrufen.
+
+**Response:** `ChainResponse`
+
+### `PUT /api/v1/chains/{id}`
+
+Chain aktualisieren.
+
+**Response:** `ChainResponse`
+
+### `DELETE /api/v1/chains/{id}`
+
+Chain löschen.
+
+**Response:** `204 No Content`
+
+### `POST /api/v1/chains/{id}/execute`
+
+Chain ausführen.
+
+**Request (optional):** `{ "key": "value" }` (Input-Kontext)
+
+**Response:** `201` mit `ChainRunResponse`
+
+### `GET /api/v1/chains/runs`
+
+Alle Chain-Runs (paginiert).
+
+**Query-Parameter:** `page`, `size`, `status`
+
+**Response:** `PageResponse<ChainRunResponse>`
+
+### `GET /api/v1/chains/{id}/runs`
+
+Runs einer bestimmten Chain.
+
+**Response:** `ChainRunResponse[]`
+
+### `GET /api/v1/chains/{id}/runs/{runId}`
+
+Einzelnen Chain-Run abrufen.
+
+**Response:** `ChainRunResponse`
+
+### `POST /api/v1/chains/runs/{runId}/cancel`
+
+Chain-Run abbrechen.
+
+**Response:** `200 OK`
+
+---
+
+## TODOs
+
+### `GET /api/v1/todos`
+
+TODOs auflisten (paginiert, filterbar).
+
+**Query-Parameter:**
+
+| Parameter | Typ | Beschreibung |
+|---|---|---|
+| `page` | int | Seite (Standard: 0) |
+| `size` | int | Einträge pro Seite (Standard: 50) |
+| `projectId` | String | Filter nach Projekt |
+| `status` | String[] | Filter nach Status: `OPEN`, `IN_PROGRESS`, `DONE`, `CANCELLED` |
+| `priority` | String | Filter nach Priorität: `HIGH`, `MEDIUM`, `LOW` |
+| `source` | String | Filter nach Quelle: `USER`, `AI`, `WORKFLOW` |
+| `tag` | String | Filter nach Tag |
+| `q` | String | Volltextsuche |
+
+**Response:** `PageResponse<TodoResponse>`
+
+### `POST /api/v1/todos`
+
+Neues TODO erstellen.
+
+**Request:**
+
+```json
+{
+  "title": "Kurzer Titel im Imperativ",
+  "description": "Markdown mit Kontext",
+  "priority": "HIGH",
+  "tags": ["backend", "bug"],
+  "projectId": "uuid",
+  "source": "AI",
+  "sourceAgent": "claude-code",
+  "sessionId": "shell-session-id"
+}
+```
+
+**Response:** `201` mit `TodoResponse`
+
+### `GET /api/v1/todos/{id}`
+
+Einzelnes TODO abrufen.
+
+**Response:** `TodoResponse`
+
+### `PUT /api/v1/todos/{id}`
+
+TODO vollständig aktualisieren.
+
+**Response:** `TodoResponse`
+
+### `PATCH /api/v1/todos/{id}/status`
+
+Status eines TODOs ändern.
+
+**Request:**
+
+```json
+{
+  "status": "IN_PROGRESS",
+  "sessionId": "optional-session-id"
+}
+```
+
+**Response:** `TodoResponse`
+
+### `DELETE /api/v1/todos/{id}`
+
+TODO löschen.
+
+**Response:** `204 No Content`
+
+### `GET /api/v1/todos/count`
+
+Anzahl TODOs nach Status.
+
+**Response:** `TodoCountResponse`
+
+---
+
+## Workflow Memory
+
+### `GET /api/v1/workflows/{workflowId}/memory`
+
+Alle Memory-Einträge eines Workflows.
+
+**Response:** `WorkflowMemoryResponse[]`
+
+### `POST /api/v1/workflows/{workflowId}/memory/extract`
+
+Wissen aus Runs extrahieren.
+
+**Request:**
+
+```json
+{
+  "runIds": ["run-uuid-1", "run-uuid-2"],
+  "provider": "CLAUDE"
+}
+```
+
+**Response:** `201` mit `WorkflowMemoryResponse`
+
+### `PUT /api/v1/workflows/{workflowId}/memory/{memoryId}`
+
+Memory-Eintrag aktualisieren.
+
+**Request:** `{ "title": "...", "content": "..." }`
+
+**Response:** `WorkflowMemoryResponse`
+
+### `PUT /api/v1/workflows/{workflowId}/memory/{memoryId}/activate`
+
+Memory-Eintrag aktivieren (wird in nachfolgende Runs injiziert).
+
+**Response:** `200 OK`
+
+### `DELETE /api/v1/workflows/{workflowId}/memory/{memoryId}`
+
+Memory-Eintrag löschen.
+
+**Response:** `204 No Content`
+
+---
+
+## Activity Log
+
+### `GET /api/v1/activity-log`
+
+Activity-Log auflisten (paginiert, filterbar).
+
+**Query-Parameter:** `page`, `size`, `level` (`INFO`, `WARN`, `ERROR`, `DEBUG`), `category`, `workflowId`
+
+**Response:** `PageResponse<ActivityLogResponse>`
+
+---
+
+## Staging (Stable-Umgebung)
+
+### `GET /api/v1/staging/status`
+
+Status der Stable-Umgebung.
+
+**Response:** `StagingStatusResponse` (inkl. `stableVersion`, `stableBuildTimestamp`, Health-Status)
+
+### `POST /api/v1/staging/start`
+
+Stable-Container starten.
+
+**Response:** `200 OK`
+
+### `POST /api/v1/staging/stop`
+
+Stable-Container stoppen.
+
+**Response:** `200 OK`
+
+### `POST /api/v1/staging/promote`
+
+Neuen Snapshot bauen und als Stable deployen.
+
+**Response:** `202 Accepted`
+
+### `POST /api/v1/staging/promote/cancel`
+
+Laufenden Promote-Vorgang abbrechen.
+
+**Response:** `200 OK`
+
+### `GET /api/v1/staging/sync-preview`
+
+Vorschau der Sync-Operationen (was würde von Dev nach Stable übertragen?).
+
+**Response:** `SyncPreview`
+
+### `POST /api/v1/staging/sync-definitions`
+
+Definitionen von Dev nach Stable übertragen (Projekte, Workflows, Skills).
+
+**Request (optional):** `SyncDefinitionsRequest` mit optionalen Filtern
+
+**Response:** `SyncResult`
+
+---
+
+## Testing (Test-Instanz)
+
+### `GET /api/v1/testing/status`
+
+Status der Test-Instanz (Port 8090).
+
+**Response:** `TestingStatusResponse`
+
+### `POST /api/v1/testing/start`
+
+Test-Container starten.
+
+**Response:** `200 OK`
+
+### `POST /api/v1/testing/stop`
+
+Test-Container stoppen.
+
+**Response:** `200 OK`
+
+### `POST /api/v1/testing/reset`
+
+Datenbank der Test-Instanz zurücksetzen.
+
+**Response:** `200 OK`
+
+### `GET /api/v1/testing/sync-preview`
+
+Vorschau der Sync-Operationen (Dev → Test).
+
+**Response:** `SyncPreview`
+
+### `POST /api/v1/testing/sync-definitions`
+
+Definitionen von Dev nach Test übertragen.
+
+**Response:** `SyncResult`
+
+### `POST /api/v1/testing/report-result`
+
+Test-Ergebnis von der Test-Instanz zurückmelden.
+
+**Request:** `{ "workflowName": "...", "projectName": "...", "status": "PASSED|FAILED" }`
+
+**Response:** `200 OK`
+
+### `POST /api/v1/testing/pull-changes`
+
+Änderungen von Dev in die Test-Instanz ziehen.
+
+**Response:** `SyncResult`
+
+---
+
+## Conversions
+
+### `GET /api/v1/conversions/runs/{runId}/suggest`
+
+Konvertierungsvorschlag für einen Agentic-Run generieren.
+
+**Response:** `WorkflowSuggestion` (Workflow-Struktur als Vorschlag)
+
+### `POST /api/v1/conversions/runs/{runId}/create-workflow`
+
+Workflow aus einem Agentic-Run erstellen.
+
+**Request:**
+
+```json
+{
+  "projectId": "uuid",
+  "name": "Konvertierter Workflow"
+}
+```
+
+**Response:** `WorkflowResponse`
+
+---
+
+## Workflow Pool
+
+### `GET /api/v1/pool`
+
+Alle verfügbaren Pool-Workflows auflisten.
+
+**Response:** `PoolWorkflowEntry[]`
+
+### `GET /api/v1/pool/{id}`
+
+Einzelnen Pool-Workflow abrufen.
+
+**Response:** `PoolWorkflowEntry`
+
+### `POST /api/v1/pool/{id}/install`
+
+Pool-Workflow in ein Projekt installieren.
+
+**Request:**
+
+```json
+{
+  "projectId": "uuid"
+}
+```
+
+**Response:** `201` mit `{ "workflowId": "uuid", "workflowName": "..." }`
+
+---
+
+## Workflow Factory
+
+### `GET /api/v1/factory/topics`
+
+Verfügbare Topic-Kategorien abrufen.
+
+**Response:** `Array<{ "id": "...", "label": "..." }>`
+
+### `POST /api/v1/factory/generate`
+
+Workflow aus Topic generieren (Vorschau, ohne Test-Ausführung).
+
+**Request:** `WorkflowFactoryRequest`
+
+**Response:** `201` mit `WorkflowResponse`
+
+### `POST /api/v1/factory/run`
+
+Vollständige Factory-Pipeline: Generieren → Test-Instanz → Verifizieren → optional Promoten.
+
+**Request:** `WorkflowFactoryRequest`
+
+**Response:** `WorkflowFactoryResult`
+
+### `POST /api/v1/factory/verify/{id}`
+
+Bestehenden Workflow auf der Test-Instanz verifizieren.
+
+**Response:** `WorkflowFactoryResult`
+
+### `POST /api/v1/factory/promote/{id}`
+
+Verifizierten Workflow als Template promoten.
+
+**Response:** `WorkflowFactoryResult`
+
+---
+
+## Wishes
+
+### `GET /api/v1/wishes`
+
+Alle Wishes auflisten.
+
+**Response:** `WishResponse[]`
+
+### `POST /api/v1/wishes`
+
+Neuen Wunsch erstellen und asynchron erfüllen.
+
+**Request:**
+
+```json
+{
+  "text": "Erstelle einen Workflow, der täglich die neuesten KI-News zusammenfasst",
+  "projectId": "uuid",
+  "maxIterations": 5,
+  "referenceWorkflowIds": ["uuid"]
+}
+```
+
+**Response:** `201` mit `WishResponse`
+
+### `GET /api/v1/wishes/{id}`
+
+Einzelnen Wish abrufen.
+
+**Response:** `WishResponse`
+
+### `POST /api/v1/wishes/{id}/cancel`
+
+Wish abbrechen.
+
+**Response:** `200 OK`
+
+### `POST /api/v1/wishes/{id}/respond`
+
+Feedback zur aktuellen Iteration geben.
+
+**Request:** `WishRespondRequest`
+
+**Response:** `WishResponse`
+
+### `POST /api/v1/wishes/{id}/crystallize`
+
+Erfolgreichen Wish als Template kristallisieren.
+
+**Response:** `{ "templateId": "uuid" }`
+
+### `DELETE /api/v1/wishes/{id}`
+
+Wish löschen.
+
+**Response:** `204 No Content`
+
+---
+
+## Docs
+
+### `GET /api/v1/docs`
+
+Verfügbare Dokumentationsdateien auflisten.
+
+**Response:** `Array<{ "name": "architektur.md", "label": "Architektur" }>`
+
+### `GET /api/v1/docs/{name}`
+
+Inhalt einer Dokumentationsdatei abrufen (nur `.md`-Dateien).
+
+**Response:** `{ "content": "# Architektur\n..." }`
+
+---
+
 ## WebSocket
 
 ### Verbindung
@@ -923,13 +1415,14 @@ Endpunkt: ws://localhost:9090/ws (SockJS)
 Protokoll: STOMP
 ```
 
-### Subscription
+### Topics
 
-```
-Topic: /topic/executions/{runId}/logs
-```
+| Topic | Beschreibung |
+|---|---|
+| `/topic/executions/{runId}/logs` | Workflow-Ausführungs-Logs |
+| `/topic/chains/{chainRunId}/status` | Chain-Ausführungs-Status-Updates |
 
-### Nachrichtenformat
+### Nachrichtenformat (Execution-Logs)
 
 ```json
 {
@@ -940,3 +1433,11 @@ Topic: /topic/executions/{runId}/logs
 ```
 
 Level: `INFO`, `WARN`, `ERROR`, `DEBUG`
+
+### Terminal-WebSocket
+
+```
+Endpunkt: ws://localhost:9090/ws/terminal
+```
+
+Für Echtzeit-Container-Zugriff (interaktive Shell).

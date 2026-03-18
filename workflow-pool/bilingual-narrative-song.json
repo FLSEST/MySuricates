@@ -1,0 +1,48 @@
+{
+  "name": {
+    "de": "Bilingualer Narrative Song (DE/ES)",
+    "en": "Bilingual Narrative Song (DE/ES)"
+  },
+  "description": {
+    "de": "Generiert einen zweisprachigen Soul-Song ueber ein persoenliches Erlebnis — alternierende Deutsch/Spanisch-Zeilen, Suno-kompatibel.",
+    "en": "Generates a bilingual soul song about a personal experience — alternating German/Spanish lines, Suno-compatible."
+  },
+  "icon": "🎵",
+  "category": "CONTENT",
+  "tags": ["song", "bilingual", "suno", "narrative", "language-learning"],
+  "blocks": [
+    {
+      "type": "simple",
+      "config": {
+        "timeout_seconds": 900,
+        "label": "Bilingualen Song generieren",
+        "command": "Schreibe einen bilingualen Soul-Song und speichere ihn als Textdatei.\n\n## Auftrag\n\nThema: {{ topic }}\nOrte und Personen: {{ people }} in {{ place }}\nVibe: {{ vibe }}\nMusikstil: {{ style }}\nQuellsprache: {{ source_language }}\nZielsprache: {{ target_language }}\n\nSpeicherort: {{ base_dir }}/{{ lang_pair }}/{{ collection }}/{{ filename }}.txt\n(Verzeichnis mit mkdir -p anlegen falls noetig)\n\n## Songstruktur (strikt einhalten)\n\nSTRUKTUR:\nStrophe 1 (4-6 Zeilenpaare = 8-12 Zeilen)\n<Leerzeile>\nStrophe 2 (4-6 Zeilenpaare)\n<Leerzeile>\nRefrain (4 Zeilenpaare = 8 Zeilen)\n<Leerzeile>\nStrophe 3 (4-6 Zeilenpaare)\n<Leerzeile>\nStrophe 4 (4-6 Zeilenpaare)\n<Leerzeile>\nRefrain (identischer Text)\n<Leerzeile>\nStrophe 5 (4-6 Zeilenpaare)\n<Leerzeile>\nStrophe 6 (4-6 Zeilenpaare)\n<Leerzeile>\nRefrain (identischer Text)\n<Leerzeile>\nStrophe 7 (3-4 Zeilenpaare, ruhiger Ausklang)\n<Leerzeile>\n[Style: ...]\n\n## Wechselzeilen-Format (PFLICHT)\n\nJede {{ source_language }}-Zeile wird DIREKT von der {{ target_language }}-Uebersetzung gefolgt:\n\nBeispiel:\nHeute bin ich angekommen, voller Freude, voller Licht\nHoy he llegado aqui, lleno de alegria y de luz\nDie Kinder lachen laut — das war genau das was ich brauch\nLos ninos rien fuerte — eso es exactamente lo que necesito\n\n## Inhaltliche Regeln\n\n- Song erzaehlt eine persoenliche Geschichte: {{ topic }}\n- Personen ({{ people }}) und Ort ({{ place }}) natuerlich einweben\n- Botschaft: Auch schwere Zeiten haben ihr Gutes — Zusammensein gibt Kraft\n- Sprache: warm, alltagsnah, emotional ehrlich — kein Kitsch\n- Refrain: eingaengig, wiedererkennbar, Kern-Botschaft des Songs\n- {{ target_language }}-Zeilen sind echte Uebersetzungen (kein Kauderwelsch)\n- Saetze klingen natuerlich in BEIDEN Sprachen\n\n## Technische Regeln\n\n- KEINE [Verse]/[Chorus]/[Bridge]-Tags — nur [Style: ...] ganz am Ende\n- Refrain-Text bei allen 3 Wiederholungen IDENTISCH\n- Maximal 5000 Zeichen (inkl. Leerzeilen und [Style:]-Tag)\n- Moeglichst nah am 5000-Zeichen-Limit (nutze den Platz!)\n- [Style: ...]-Tag: passendes Genre, Instrumente, Stimmung, male and female vocals, BPM\n- UTF-8 Encoding\n\nNach dem Speichern: Zeige die ersten 10 Zeilen des Songs und die Zeichenanzahl (wc -m)."
+      }
+    },
+    {
+      "type": "simple",
+      "config": {
+        "timeout_seconds": 120,
+        "label": "Song verifizieren",
+        "command": "Verifiziere die generierte Song-Datei.\n\nDatei: {{ base_dir }}/{{ lang_pair }}/{{ collection }}/{{ filename }}.txt\n\nPruefe:\n1. Datei existiert (ls -lh)\n2. Zeichenanzahl <= 5000 (wc -m)\n3. Wechselzeilen vorhanden: Jede zweite Zeile ist {{ target_language }} (grep nach typischen Woertern wie 'de', 'la', 'que', 'el', 'en' am Zeilenanfang)\n4. [Style: ...]-Tag am Ende vorhanden (tail -3)\n5. Refrain erscheint genau 3 mal (einfache Stichprobe)\n\nGib eine knappe Zusammenfassung:\n- Dateigroesse und Zeichenanzahl\n- Status: OK / WARNUNG / FEHLER\n- Falls Warnung/Fehler: was muss korrigiert werden"
+      }
+    }
+  ],
+  "instructions": "Du erstellst einen bilingualen Song als persoenliches Erlebnis-Dokument.\nBotschaft: Auch schwere Zeiten haben ihr Gutes — Zusammensein und Freude sind heilsam.\nSprache: warm, direkt, emotional ehrlich. Kein uebertriebener Kitsch.\nDie Uebersetzungen muessen korrekt und natuerlich klingen — pruefe spanische Grammatik sorgfaeltig.\nUTF-8 Encoding fuer alle Dateien.",
+  "model": "claude-opus-4-6",
+  "version": "1.0.0",
+  "author": "MySuricates",
+  "defaultContext": {
+    "base_dir": "/home/flo/Entwicklung/Musik",
+    "lang_pair": "de-es",
+    "collection": "neu-isenburg",
+    "filename": "01-neu-isenburg-besuch",
+    "style": "Soul, Positive Vibes, Acoustic Guitar, Warm Vocals",
+    "vibe": "Warm, positiv, aufbauend — auch schwere Zeiten haben ihr Gutes, Zusammensein gibt Kraft",
+    "topic": "Flos Besuch bei Michi in Neu-Isenburg und dessen Kindern — ein Nachmittag voller Lachen, Naehe und Geborgenheit",
+    "people": "Flo, Michi, Julia, Jonathan und Luise",
+    "place": "Neu-Isenburg",
+    "source_language": "Deutsch",
+    "target_language": "Spanisch"
+  }
+}

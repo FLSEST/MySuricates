@@ -257,19 +257,69 @@ Das Backend nutzt drei Annotation-Prozessoren, die in der Compiler-Konfiguration
 2. **MapStruct** — Generiert Mapper-Implementierungen
 3. **lombok-mapstruct-binding** — Brücke zwischen Lombok und MapStruct
 
+## Architektur-Notizen für Entwickler
+
+### Backend-Struktur
+
+Das Backend umfasst **20 REST-Controller** und **12 Block-Typen**:
+
+**Controller:** Workflow, WorkflowTemplate, Skill, Execution, Learning, Schedule, Webhook, System, Project, Conversion, Todo, ActivityLog, WorkflowMemory, Staging, Testing, Chain, WorkflowPool, WorkflowFactory, Wish, Docs
+
+**Block-Typen:** `simple`, `shell`, `retry`, `conditional`, `forEach`, `while`, `switch`, `agentic`, `approval`, `sub-workflow`, `skill-capability`, `human-input`
+
+### Gate Status System
+
+Workflow-Blöcke können Quality-Gate-Marker ausgeben:
+```
+gate_status: GREEN|YELLOW|RED
+gate_category: <kategorie>
+gate_description: <beschreibung>
+```
+- YELLOW → RunStatus `COMPLETED_WITH_ERRORS`
+- RED → `AutoTodoService` erstellt ein TODO mit HIGH-Priorität
+- `GateStatusOutputParser` parst die Marker aus Block-Ausgaben
+
+### Chains
+
+Chains verketten mehrere Workflows sequenziell:
+- `ChainService` / `ChainExecutor` für CRUD und Ausführung
+- Cross-Project: Chain gehört keinem Projekt
+- `previous_chain_output` als Context-Variable zwischen Entries
+- WebSocket-Status-Broadcasts an `/topic/chains/{chainRunId}/status`
+
+### Workflow Memory
+
+Workflows können Wissen über Runs hinweg akkumulieren:
+- `WorkflowMemoryService.extractKnowledge()` — AI-basierte Extraktion via `KnowledgeSummarizer`
+- Aktive Einträge werden in nachfolgende Runs injiziert
+- Provider: `CLAUDE` (Standard) oder `CODEX`
+
+### Soft-Delete Pattern
+
+- **Workflows:** `@SQLRestriction("deleted_at IS NULL")` auf der Entity-Klasse — automatisch aus allen Queries ausgeblendet
+- **Projekte:** `archived_at IS NOT NULL` = archiviert — Filterung via Repository-Methoden (kein `@SQLRestriction`, da sonst eager-loaded `Workflow.project`-Assoziationen brechen würden)
+
+### Seeder
+
+- **SkillSeeder:** Legt 16 Built-in-Skills beim Start an (idempotent) und registriert sie im `SkillRegistry`
+- **WorkflowTemplateSeeder:** Legt 44 Built-in-Templates beim Start an (idempotent, Update bei Version-Bump)
+- Template-Definitionen als JSON unter `src/main/resources/templates/builtin/`
+
 ## Bekannte Einschränkungen
 
 ### SQLite
 
-- **Concurrent Writes:** SQLite erlaubt nur einen Schreibzugriff gleichzeitig. Der WAL-Modus und HikariCP (max. 3 Connections) mildern dies, aber bei hoher Last können Lock-Konflikte auftreten.
+- **Concurrent Writes:** SQLite erlaubt nur einen Schreibzugriff gleichzeitig. HikariCP ist auf Pool-Size=1 konfiguriert, um alle DB-Operationen zu serialisieren und `SQLITE_BUSY`-Fehler unter parallelen Workflow-Runs zu vermeiden.
 - **Keine nativen Typen:** Booleans als INTEGER, Timestamps als TEXT, JSON als TEXT.
 - **Kein ALTER COLUMN:** Schema-Änderungen sind eingeschränkt (nur ADD COLUMN).
+- **NIEMALS direkt in die DB schreiben** (via `sqlite3` CLI oder SQL). Immer REST-API oder Service/Repository-Layer verwenden — direkte Schreibzugriffe umgehen den Hibernate-Cache.
 
 ### Docker-Abhängigkeit
 
 - Das Backend benötigt Zugriff auf den Docker Socket (`/var/run/docker.sock`).
 - Ohne Docker können keine Projekte gestartet (Container erstellt) und keine Workflows ausgeführt werden.
 - Agent-Images müssen vorher gebaut sein (`docker compose --profile build-only build`).
+- **Claude CLI läuft immer auf dem Host**, nicht in Containern (vermeidet Nested-Session-Erkennung).
 
 ### Sicherheit
 

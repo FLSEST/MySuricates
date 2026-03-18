@@ -8,12 +8,20 @@
 | `/projects` | Projects | Projektliste, Erstellen |
 | `/projects/:id` | ProjectDetail | Projektdetails, Container, Workflows |
 | `/workflows` | Workflows | Workflow-Liste, Erstellen mit Templates |
-| `/workflows/:id` | WorkflowDetail | Block-Editor, Skills, Runs |
+| `/workflows/:id` | WorkflowDetail | Block-Editor, Skills, Runs, Memory |
 | `/workflows/:id/run/:runId` | WorkflowExecution | Live-Ausführung, Logs, Steps |
+| `/runs` | Runs | Alle Workflow-Runs (globale Liste) |
 | `/skills` | Skills | Skill-Katalog mit Capabilities |
 | `/schedules` | Schedules | Cron-basierte Zeitpläne |
 | `/webhooks` | Webhooks | Webhook-Trigger-Verwaltung |
-| `/settings` | Settings | Sprache, Theme, API-Key, Tailscale |
+| `/chains` | Chains | Workflow-Chains, Split-Panel-Layout |
+| `/chains/:id/run/:runId` | ChainExecution | Live Chain-Ausführung, Entry-Status |
+| `/todos` | Todos | TODO-Liste, Filter, Statusverwaltung |
+| `/activity-log` | ActivityLog | System-Activity-Log mit Filtern |
+| `/wishes` | Wishes | Wunsch-System, iterative Erfüllung |
+| `/factory` | WorkflowFactory | Workflow-Generator aus Topics |
+| `/docs` | Docs | Markdown-Dokumentation (Split-Layout) |
+| `/settings` | Settings | Sprache, Theme, API-Key, Tailscale, Staging, Testing |
 
 Alle Routen sind in `src/App.tsx` definiert und von einem `<Layout>`-Wrapper umgeben (Sidebar + Header).
 
@@ -38,8 +46,8 @@ Alle Routen sind in `src/App.tsx` definiert und von einem `<Layout>`-Wrapper umg
 ### Workflows (`/workflows`, `/workflows/:id`)
 
 - 2-Schritt-Erstellung: Template-Auswahl → Formular (Projekt, Name, Beschreibung)
-- 5 vorgefertigte Templates (Code Quality, Document Review, Deploy Pipeline, Research Assistant, Data Analysis)
-- Detail-Seite: 2/3-Spalte Block-Editor (Drag & Drop), 1/3-Sidebar (Skills, Runs, Info)
+- 44 Built-in-Templates (aus DB, via `WorkflowTemplateSeeder`) plus benutzerdefinierte Templates
+- Detail-Seite: 2/3-Spalte Block-Editor (Drag & Drop), 1/3-Sidebar (Skills, Runs, Memory, Info)
 - Block-Editor mit `@dnd-kit` für Drag-and-Drop-Sortierung
 - Modals: Block hinzufügen (Typ + JSON-Config via Monaco Editor), Skill aktivieren
 
@@ -69,12 +77,56 @@ Alle Routen sind in `src/App.tsx` definiert und von einem `<Layout>`-Wrapper umg
 - CopyButton-Komponente mit Erfolgsfeedback
 - Erstellen-Modal: Workflow-Auswahl + Beschreibung
 
+### Chains (`/chains`, `/chains/:id/run/:runId`)
+
+- Split-Panel-Layout: Chain-Liste links, Detail/Ausführung rechts
+- Pipeline-Visualisierung der Chain-Entries
+- Erstellen/Bearbeiten-Modal mit Workflow-Suche und Sortierung
+- ChainExecution: Live-Polling für Entry-Status, Navigation zu einzelnen Workflow-Runs
+
+### Todos (`/todos`)
+
+- Liste aller TODOs mit Filter nach Status, Priorität, Projekt, Quelle, Tag
+- Status-Workflow: OPEN → IN_PROGRESS → DONE / CANCELLED
+- Erkennt automatisch von AI erstellte TODOs (source: AI, sourceAgent: claude-code)
+- Badge-Anzeige in der Sidebar für offene TODOs
+
+### ActivityLog (`/activity-log`)
+
+- Paginierte Log-Tabelle mit Filter nach Level, Kategorie, Workflow
+- Kategorien: WORKFLOW, SKILL, SYSTEM, SECURITY, u.a.
+
+### Wishes (`/wishes`)
+
+- Natürlichsprachige Wünsche eingeben und asynchron erfüllen lassen
+- Iterationsanzeige, Feedback geben, Wunsch abbrechen oder kristallisieren
+
+### WorkflowFactory (`/factory`)
+
+- Workflow aus Topic-Kategorie generieren
+- Vollständige Pipeline: Generieren → Test-Instanz → Verifizieren → Promoten
+- Topic-Kategorien-Auswahl
+
+### Docs (`/docs`)
+
+- Split-Layout: Dokument-Liste links, Markdown-Rendering rechts
+- Dokumente werden via `GET /api/v1/docs` aus `docs/`-Verzeichnis geladen
+- Markdown-Rendering mit `react-markdown` + `remark-gfm` + `@tailwindcss/typography`
+
+### WorkflowDetail (`/workflows/:id`) — Erweiterungen
+
+- **Memory-Tab:** Workflow-Memory-Einträge anzeigen, aktivieren, löschen, neu extrahieren
+- **Instructions-Tab:** Workflow-spezifische Agent-Instructions im Monaco-Editor bearbeiten
+- **Gate-Status:** Anzeige des letzten Gate-Status im Run-Verlauf
+
 ### Settings (`/settings`)
 
 - Allgemein: Sprache (EN/DE), Advanced Mode
 - Darstellung: Theme-Toggle (Light/Dark), Farbauswahl
 - Sicherheit: API-Key-Eingabe (maskiert)
 - Remote-Access: Tailscale-Status + Enable/Disable
+- **Stable:** Versionsvergleich Dev/Stable, Sync-Preview, Sync-Definitions, Start/Stop/Promote
+- **Testing:** Test-Instanz-Status, Start/Stop/Reset, Sync-Preview, Sync-Definitions
 - System: Health-Status, Systeminfos, Docker-Status
 
 ## UI-Komponentenbibliothek
@@ -240,10 +292,100 @@ Alle API-Daten werden über React Query verwaltet:
 | `useEnableRemoteAccess()` | Mutation | Tailscale aktivieren |
 | `useDisableRemoteAccess()` | Mutation | Tailscale deaktivieren |
 
-### `useExecutionWebSocket.ts`
+### `useChains.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useChains()` | Query | Alle Chains |
+| `useChain(id)` | Query | Einzelne Chain |
+| `useChainRuns(chainId)` | Query | Runs einer Chain |
+| `useChainRun(chainId, runId)` | Query | Einzelner Chain-Run |
+| `useAllChainRuns(page, size, status)` | Query | Alle Chain-Runs (paginiert) |
+| `useCreateChain()` | Mutation | Chain erstellen |
+| `useUpdateChain()` | Mutation | Chain aktualisieren |
+| `useDeleteChain()` | Mutation | Chain löschen |
+| `useExecuteChain()` | Mutation | Chain ausführen |
+| `useCancelChainRun()` | Mutation | Chain-Run abbrechen |
+
+### `useTodos.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useTodos(filters)` | Query | TODOs mit Filtern |
+| `useTodo(id)` | Query | Einzelnes TODO |
+| `useTodoCount()` | Query | Anzahl TODOs nach Status |
+| `useCreateTodo()` | Mutation | TODO erstellen |
+| `useUpdateTodo()` | Mutation | TODO aktualisieren |
+| `useUpdateTodoStatus()` | Mutation | Status ändern |
+| `useDeleteTodo()` | Mutation | TODO löschen |
+
+### `useActivityLog.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useActivityLog(page, size, filters)` | Query | Activity-Log-Einträge (paginiert) |
+
+### `useWorkflowMemory.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useWorkflowMemory(workflowId)` | Query | Memory-Einträge eines Workflows |
+| `useExtractMemory()` | Mutation | Wissen aus Runs extrahieren |
+| `useActivateMemory()` | Mutation | Memory-Eintrag aktivieren |
+| `useUpdateMemory()` | Mutation | Memory-Eintrag bearbeiten |
+| `useDeleteMemory()` | Mutation | Memory-Eintrag löschen |
+
+### `useStaging.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useStagingStatus()` | Query | Stable-Status + Version |
+| `useStagingStart()` | Mutation | Stable starten |
+| `useStagingStop()` | Mutation | Stable stoppen |
+| `useStagingPromote()` | Mutation | Promote ausführen |
+| `useSyncPreview()` | Query | Sync-Vorschau |
+| `useSyncDefinitions()` | Mutation | Definitionen synchronisieren |
+
+### `useTesting.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useTestingStatus()` | Query | Test-Instanz-Status |
+| `useTestingStart()` | Mutation | Test-Instanz starten |
+| `useTestingStop()` | Mutation | Test-Instanz stoppen |
+| `useTestingReset()` | Mutation | Test-Datenbank zurücksetzen |
+| `useTestingSyncDefinitions()` | Mutation | Definitionen zu Test synchronisieren |
+
+### `useWishes.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useWishes()` | Query | Alle Wishes |
+| `useWish(id)` | Query | Einzelner Wish |
+| `useCreateWish()` | Mutation | Wish erstellen |
+| `useCancelWish()` | Mutation | Wish abbrechen |
+| `useRespondToWish()` | Mutation | Feedback geben |
+| `useCrystallizeWish()` | Mutation | Wish kristallisieren |
+| `useDeleteWish()` | Mutation | Wish löschen |
+
+### `useDocs.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useDocsList()` | Query | Verfügbare Dokumente |
+| `useDoc(name)` | Query | Inhalt eines Dokuments |
+
+### `usePool.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `usePool()` | Query | Pool-Workflows |
+| `useInstallPoolWorkflow()` | Mutation | Workflow aus Pool installieren |
+
+### `useWebSocket.ts`
 
 ```typescript
-useExecutionWebSocket(runId: string | null) → {
+useWebSocket(runId: string | null) → {
   logs: Array<{ timestamp, level, message }>,
   connected: boolean,
   clearLogs: () => void
@@ -289,7 +431,7 @@ charts (5 Keys) ──── Chart-Labels
 
 Konfiguriert über `vite-plugin-pwa` in `vite.config.ts`:
 
-- **Name:** AI Automation Platform
+- **Name:** MySuricates
 - **Kurzname:** AutoPilot
 - **Display:** Standalone
 - **Theme-Color:** `#0f172a`

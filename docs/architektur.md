@@ -11,7 +11,7 @@
            │ (Vite Proxy)         │ (STOMP/SockJS)
            ▼                      ▼
 ┌─────────────────────────────────────────────────────────┐
-│              Spring Boot Backend (:9090)                 │
+│         Spring Boot Backend Dev (:9090)                 │
 │                                                         │
 │  ┌─────────┐  ┌──────────┐  ┌────────────┐             │
 │  │Controller│→ │ Service  │→ │ Repository │             │
@@ -36,14 +36,26 @@
 │  │          │  │ 3.12)    │  │          │              │
 │  └──────────┘  └──────────┘  └──────────┘              │
 └─────────────────────────────────────────────────────────┘
+
+Stable (:9091) und Test (:8090) laufen als separate Docker-Container.
 ```
+
+## Drei Umgebungen
+
+| Umgebung | Port | Beschreibung |
+|---|---|---|
+| **Dev** | 3000 (Frontend) / 9090 (Backend) | Entwicklungsserver, aus Quellcode |
+| **Stable** | 9091 | Docker-Container, Backend + eingebettetes Frontend |
+| **Test** | 8090 | Docker-Container, dedizierte Test-Instanz |
+
+Dev startet Stable und Test bei Boot automatisch, wenn ein Snapshot vorhanden ist (konfigurierbar via `automation.staging.auto-start` bzw. `automation.staging.test-auto-start`).
 
 ## Backend-Architektur
 
 ### Schichtenmodell
 
 ```
-Controller (REST API)
+Controller (REST API, 20 Controller)
     ↓ DTO (Request/Response Records)
 Service (Geschäftslogik)
     ↓ Entity (JPA)
@@ -56,51 +68,220 @@ SQLite (Datei: data/automation.db)
 
 ```
 com.automation
-├── controller/          8 REST-Controller
+├── controller/          20 REST-Controller
 ├── service/
 │   ├── project/         Projekte + Container-Lifecycle
-│   ├── workflow/        Workflows + Ausführung
+│   ├── workflow/        WorkflowExecutor, WorkflowService, ExecutionBroadcaster, TemplateVerificationService
 │   ├── skill/           Skills + Import/Export
 │   ├── scheduler/       Cron-basierte Ausführung
 │   ├── webhook/         Webhook-Trigger
 │   ├── learning/        Dashboard-Analytics
-│   └── system/          Tailscale Remote-Access
-├── entity/              9 JPA-Entities + 6 Enums
+│   ├── system/          Tailscale Remote-Access
+│   ├── ai/              HostClaudeService, HostCodexService
+│   ├── cli/             CommandExecutorService, CliSessionManager, ClaudeOutputParser
+│   ├── chain/           ChainService, ChainExecutor
+│   ├── memory/          WorkflowMemoryService, ClaudeSummarizer, CodexSummarizer
+│   ├── staging/         StagingService, TestingService, InstanceSyncHelper
+│   ├── todo/            TodoService, AutoTodoService, GateStatusResolver
+│   ├── conversion/      WorkflowConversionService
+│   ├── factory/         WorkflowFactoryService
+│   ├── pool/            WorkflowPoolService
+│   ├── wish/            WishService
+│   └── activitylog/     ActivityLogService
+├── entity/              JPA-Entities + Enums
 ├── dto/
-│   ├── request/         8 Request-Records
-│   └── response/        9 Response-Records
-├── repository/          9 Spring Data Repositories
+│   ├── request/         Request-Records
+│   └── response/        Response-Records
+├── repository/          Spring Data Repositories
 ├── mapper/              MapStruct-Mapper (Entity ↔ DTO)
 ├── executor/            Workflow-Ausführungs-Engine
-│   └── blocks/          6 Block-Typen (Simple, Retry, ForEach, While, Conditional, SkillCapability)
-├── config/              8 Konfigurationsklassen
+│   └── blocks/          12 Block-Executors
+├── config/              Konfigurationsklassen, Seeder (Skill, Template)
 ├── security/            ApiKeyAuthFilter, RateLimitFilter
-├── exception/           GlobalExceptionHandler + 5 Exception-Klassen
-└── util/                JSON-Converter, Hilfklassen
+├── exception/           GlobalExceptionHandler + Exception-Klassen
+├── websocket/           WebSocket-Konfiguration
+├── event/               WorkflowRunCompletedEvent
+└── util/                JPA-Converter (JSON, BlockDefinitions)
 ```
 
 ### Workflow-Ausführung
 
-Die Workflow-Engine führt Blöcke sequenziell in einem Docker-Container aus:
+Die Workflow-Engine führt Blöcke sequenziell aus. Claude CLI läuft **immer auf dem Host** (nicht in Containern), um Nested-Session-Erkennung zu vermeiden.
 
+**Ablauf:**
 1. `WorkflowExecutor` erstellt einen `WorkflowRun` (Status: PENDING → RUNNING)
 2. Für jeden `BlockDefinition` wird der passende `BlockExecutor` ausgewählt
-3. Der Block sendet Befehle via Docker Exec in den Container
-4. Ergebnisse werden als `StepResult` gespeichert
-5. Live-Logs werden über WebSocket (STOMP) an das Frontend gesendet
+3. Claude-CLI-Aufrufe erfolgen auf dem Host via `HostClaudeService` (`ProcessBuilder`)
+4. Shell-Befehle können optional via Docker Exec im Container ausgeführt werden
+5. Ergebnisse werden als `StepResult` gespeichert
+6. Live-Logs gehen über WebSocket (STOMP) an das Frontend
+7. Nach Abschluss wertet `WorkflowExecutor` Gate-Status aus (alle Block-Outputs)
+8. `WorkflowRunCompletedEvent` wird gefeuert → `AutoTodoService` reagiert
 
-**Block-Typen:**
+### Block-Typen (12 gesamt)
 
-| Typ | Beschreibung |
-|---|---|
-| `simple` | Einzelner Befehl |
-| `retry` | Befehl mit Wiederholungsversuchen |
-| `foreach` | Iteration über eine Liste |
-| `while` | Wiederholung mit Bedingung |
-| `conditional` | If/Else-Verzweigung |
-| `skill-capability` | Aufruf einer Skill-Fähigkeit |
+| Typ | Executor | Beschreibung |
+|---|---|---|
+| `simple` | `SimpleBlockExecutor` | Einzelner Claude-CLI-Aufruf mit Prompt |
+| `shell` | `SimpleBlockExecutor` (dual-mode) | Shell-Skript oder Claude-CLI |
+| `retry` | `RetryBlockExecutor` | Prompt mit konfigurierbaren Wiederholungsversuchen |
+| `conditional` | `ConditionalBlockExecutor` | If/Else-Verzweigung basierend auf Bedingung |
+| `forEach` | `ForEachBlockExecutor` | Iteration über eine Liste von Elementen |
+| `while` | `WhileBlockExecutor` | Wiederholung mit Abbruchbedingung und Max-Iterations |
+| `switch` | `SwitchBlockExecutor` | Multi-Way-Branching per Expression mit Cases |
+| `agentic` | `AgenticBlockExecutor` | Goal→Reason→Act→Observe Loop, bis zu 10 Iterationen |
+| `approval` | `ApprovalBlockExecutor` | Hält Ausführung an, wartet auf Nutzer-Bestätigung |
+| `sub-workflow` | `SubWorkflowBlockExecutor` | Führt einen anderen Workflow als Unterprozess aus |
+| `skill-capability` | `SkillCapabilityBlockExecutor` | Ruft eine benannte Skill-Capability auf |
+| `human-input` | `HumanInputBlockExecutor` | Sammelt Nutzereingabe via WebSocket, speichert als Kontext-Variable |
 
-Template-Variablen (`{{ variable }}`, `{{ previous_output }}`) werden zur Laufzeit im `ExecutionContext` aufgelöst.
+**Template-Variablen** (`{{ variable }}`, `${varName}`) werden zur Laufzeit im `ExecutionContext` aufgelöst. `{{ previous_output }}` enthält die Ausgabe des vorherigen Blocks.
+
+### Agentic Block (Goal→Reason→Act→Observe)
+
+Der Agentic-Block implementiert eine autonome Ausführungsschleife:
+
+1. **REASON:** Claude analysiert Ziel und bisherige Beobachtungen → liefert strukturierte JSON-Aktion
+2. **ACT:** Aktion wird ausgeführt (Shell oder Claude-CLI)
+3. **OBSERVE:** Ausgabe wird gesammelt und der History hinzugefügt
+4. Schleife läuft bis `done: true` oder Abbruchbedingungen
+
+**Safety-Mechanismen:**
+
+| Config | Default | Beschreibung |
+|---|---|---|
+| `max_iterations` | 10 | Maximale Iterations-Zahl |
+| `iteration_timeout_seconds` | 300 | Wall-Clock-Timeout pro Iteration |
+| `total_timeout_seconds` | 1800 | Gesamt-Block-Timeout (30 Min.) |
+| `max_total_tokens` | 200000 | Token-Budget (Input+Output, alle Phasen) |
+| `max_repeated_actions` | 3 | Abbruch nach N identischen Aktionen |
+| `require_approval` | false | Approval-Gate vor jeder Aktion |
+
+Zusätzlich: History-Kompression nach 7 Turns, Token-Tracking-Warnungen im Log.
+
+### Switch Block
+
+Der Switch-Block evaluiert einen Ausdruck gegen mehrere Cases:
+- Unterstützt `${varName}` und `{{ varName }}` für Variablen-Interpolation
+- Cases werden in Reihenfolge geprüft — erster Treffer gewinnt
+- Pipe-getrennte Alternativen: `"error|critical"` matched beide
+- `default`-Case, wenn kein anderer Case zutrifft
+- Jeder Case enthält eine Liste von Nested-Blocks (shell oder claude)
+
+### Sub-Workflow Block
+
+- Führt einen anderen Workflow als verschachtelten Block aus
+- Zirkuläre Referenzen werden via `__parent_workflow_ids` erkannt
+- Maximale Verschachtelungstiefe: 5 Ebenen
+- Polling-basierter Abschluss, 30-Minuten-Timeout
+- `@Lazy`-Injection auf `WorkflowExecutor`, um Spring-DI-Zyklen zu brechen
+
+### Human-Input Block
+
+- Pausiert die Workflow-Ausführung und wartet auf Nutzereingabe
+- Sendet `human_input_required`-Event via WebSocket an `/topic/executions/{runId}/logs`
+- Nutzerantwort wird als Kontext-Variable gespeichert (`variable_name`)
+- Unterstützt Text- und Select-Eingaben, Validierungsmuster, Timeout mit optionalem Default
+
+## Gate Status System
+
+Workflow-Blöcke können Quality-Gate-Marker in ihre Ausgabe schreiben:
+
+```
+gate_status: GREEN|YELLOW|RED
+gate_category: <kategorie>
+gate_description: <beschreibung>
+```
+
+**Verarbeitung:**
+- `GateStatusOutputParser` — parst Marker aus Block-Ausgaben (tolerant gegenüber Markdown-Formatierung)
+- `WorkflowExecutor` scannt alle Block-Ausgaben — höchste Schwere gewinnt (GREEN < YELLOW < RED)
+- Gate-Status wird in `WorkflowRun.metadata` gespeichert (`gate_status`, `gate_category`, `gate_description`)
+
+**Gate → Run-Status-Mapping:**
+- **YELLOW → `COMPLETED_WITH_ERRORS`:** Run wird mit diesem Status beendet statt `COMPLETED`
+- **RED → `COMPLETED`:** RED-Gates ändern den Run-Status nicht — `AutoTodoService` erstellt stattdessen ein TODO
+- `GateStatusResolver` — leitet Gate-Status aus Run-Status ab, wenn kein expliziter Marker existiert (`FAILED` → RED, `COMPLETED` → GREEN)
+
+**AutoTodoService:**
+- Reagiert auf `WorkflowRunCompletedEvent`
+- RED-Gate → TODO mit `HIGH`-Priorität
+- YELLOW-Gate → TODO mit `MEDIUM`-Priorität
+- Source: `WORKFLOW`, verknüpft mit dem Run
+
+## Workflow Chains
+
+Chains gruppieren mehrere Workflows für sequenzielle Ausführung:
+
+- **Projektübergreifend:** Eine Chain gehört keinem Projekt und kann Workflows aus verschiedenen Projekten referenzieren
+- **Sequenziell:** `ChainExecutor` führt Entries in `sortOrder`-Reihenfolge aus (virtual threads, polling alle 2s, 30-Min.-Timeout)
+- **Kontext-Weitergabe:** Jeder Entry bekommt Chain-Level-Kontext + Entry-Level-Kontext + `previous_chain_output` vom letzten abgeschlossenen Workflow
+- **Stop-on-Failure:** Flag auf Chain- und Entry-Ebene — Chain stoppt nur wenn beide `true` sind
+- **Cancellation:** Via `ConcurrentHashMap<String, AtomicBoolean>`
+- **WebSocket:** Status-Broadcasts an `/topic/chains/{chainRunId}/status`
+
+## Workflow Memory
+
+Workflows können über Runs hinweg Wissen akkumulieren:
+- `WorkflowMemoryService` — extrahiert Wissen aus abgeschlossenen Runs
+- `ClaudeSummarizer` / `CodexSummarizer` — AI-basierte Zusammenfassung
+- Aktive Memory-Einträge werden in nachfolgende Runs als Kontext injiziert
+
+## Agent Instructions System
+
+Zweistufige Instruction-Injektion via Claude CLI `--append-system-prompt` / `--system-prompt`:
+
+1. **Basis-Instructions** (`src/main/resources/agent-instructions.md`) — geladen beim Start durch `AgentInstructionsService`, gelten für alle Workflows
+2. **Workflow-spezifische Instructions** (`workflow.instructions`) — pro Workflow, im UI editierbar (Monaco-Editor)
+
+Injektionspfade:
+- **Block-Ausführung:** Instructions via `--append-system-prompt` auf Host Claude CLI (`HostClaudeService.executeAction()`)
+- **Agentic REASON:** System-Prompt via `--system-prompt` an `HostClaudeService.reasonStructured()`, inkl. Workflow-Instructions in `## Workflow Instructions`
+
+## Host Claude Service
+
+Alle Claude-CLI-Aufrufe erfolgen auf dem Host (nicht im Container):
+- `HostClaudeService.executeAction()` — ACT-Phase, nutzt `--append-system-prompt`, `--model`-Flag, Projekt-Arbeitsverzeichnis
+- `HostClaudeService.reasonStructured()` — REASON-Phase, nutzt `--system-prompt`, `--max-turns 3`, kein Modell-Flag
+- Prompt wird via **stdin** an den Prozess geschrieben (`writePromptToStdin()`) — vermeidet Linux ARG_MAX-Limit
+- `CLAUDE_CODE` und `CLAUDECODE` Umgebungsvariablen werden aus dem Prozess-Environment entfernt (verhindert Nested-Session-Fehler)
+- `CommandExecutorService` bietet `executeCommandOnHost()` / `executeStepOnHost()` / `injectSkillContextOnHost()`
+
+## Workflow Conversion
+
+Erfolgreiche Agentic-Runs können in deterministische Workflows konvertiert werden:
+- `WorkflowConversionService` — analysiert den Run und schlägt einen strukturierten Workflow vor (regelbasiert + AI)
+- `ConversionController` — API-Endpunkte für Vorschau und Erstellung
+- Frontend: Konversions-Dialog im Execution-View
+
+## Workflow Factory
+
+Automatisches Generieren und Verifizieren von Workflows aus einem Topic:
+- `WorkflowFactoryService` — generiert, deployt auf Test-Instanz, verifiziert, promotet optional
+- `WorkflowFactoryController` — `/api/v1/factory` mit Endpunkten `generate`, `run`, `verify`, `promote`, `topics`
+- Nutzt die Test-Instanz (Port 8090) für sichere Ausführung
+
+## Workflow Pool
+
+Vorgefertigte Workflow-Definitionen aus dem `workflow-pool/`-Verzeichnis:
+- `WorkflowPoolService` — liest JSON-Dateien aus dem konfigurierten Pool-Verzeichnis
+- `WorkflowPoolController` — `/api/v1/pool` mit List, Get, Install-Endpunkten
+- Install: Importiert Workflow aus dem Pool in ein Zielprojekt
+
+## Wishes (Wunsch-System)
+
+Natürlichsprachige Wünsche werden automatisch in Workflows/Chains umgesetzt:
+- `WishService` — erstellt Wish, startet asynchrone Erfüllung
+- Iterativer Prozess: Decomposition → Workflow-/Chain-Generierung → Ausführung → Feedback
+- Unterstützt bis zu `max_iterations` Iterationen für Verbesserungen
+- `crystallize()` — promotet erfolgreichen Wish als Template
+
+## Docs System
+
+Backend liest Markdown-Dokumentationsdateien und stellt sie als API bereit:
+- `DocsController` — `/api/v1/docs`, liest `.md`-Dateien aus konfiguriertem `docs/`-Verzeichnis
+- Pfad-Traversal-Schutz eingebaut
+- Frontend zeigt Docs in Split-Layout mit Markdown-Rendering
 
 ## Frontend-Architektur
 
@@ -112,15 +293,20 @@ App.tsx (Router)
 │   ├── Sidebar (Navigation, Collapse)
 │   └── Header (Sprache, Theme)
 │
-├── Pages (10 Routen)
+├── Pages (18+ Routen)
 │   ├── Dashboard, Projects, ProjectDetail
 │   ├── Workflows, WorkflowDetail, WorkflowExecution
 │   ├── Skills, Schedules, Webhooks, Settings
+│   ├── Runs, ActivityLog, Todos
+│   ├── Chains, ChainExecution
+│   ├── Wishes, WorkflowFactory, Docs
 │
-├── Hooks (React Query + Custom)
+├── Hooks (TanStack Query + Custom)
 │   ├── useProjects, useWorkflows, useSkills, ...
-│   ├── useExecutionWebSocket
-│   └── useToast
+│   ├── useChains, useTodos, useActivityLog
+│   ├── useWorkflowMemory, useWishes, useWorkflowFactory
+│   ├── useStaging, useTesting, usePool, useDocs
+│   └── useWebSocket, useToast
 │
 ├── Stores (Zustand)
 │   ├── sidebarStore, themeStore
@@ -150,15 +336,16 @@ Service → Repository → SQLite
 Response (DTO) → React Query Cache → UI-Update
 ```
 
-## WebSocket (Live-Logs)
+## WebSocket (Live-Logs + Status)
 
 - **Protokoll:** STOMP über SockJS
 - **Endpunkt:** `/ws` (SockJS Handshake)
 - **Broker:** Simple Message Broker auf `/topic`
-- **Topic:** `/topic/executions/{runId}/logs`
+- **Topics:**
+  - `/topic/executions/{runId}/logs` — Workflow-Ausführungs-Logs
+  - `/topic/chains/{chainRunId}/status` — Chain-Ausführungs-Status
 - **Nachrichtenformat:** `{ timestamp, level, message }`
-
-Das Frontend verbindet sich bei geöffneter Workflow-Ausführung automatisch und zeigt Logs in Echtzeit an.
+- **Terminal-WebSocket:** `/ws/terminal` für Echtzeit-Container-Zugriff
 
 ## Sicherheit
 
@@ -167,6 +354,7 @@ Das Frontend verbindet sich bei geöffneter Workflow-Ausführung automatisch und
 - **Header:** `X-API-Key`
 - **Filter:** `ApiKeyAuthFilter` (vor Spring Security)
 - **Vergleich:** Constant-Time (`MessageDigest.isEqual`)
+- **Auto-Generierung:** Key wird beim ersten Start in `app_settings` gespeichert
 - **Deaktivierbar:** `automation.security.enabled=false` (Entwicklung)
 
 ### Öffentliche Endpunkte (kein API-Key nötig)
@@ -188,20 +376,27 @@ Das Frontend verbindet sich bei geöffneter Workflow-Ausführung automatisch und
 ### CORS
 
 - Alle Origins erlaubt (`*`) mit Credentials
-- Alle HTTP-Methoden (GET, POST, PUT, DELETE, OPTIONS)
+- Alle HTTP-Methoden (GET, POST, PUT, DELETE, PATCH, OPTIONS)
 
 ## Verzeichnisstruktur
 
 ```
 autotrigger/
-├── README.md
-├── docs/
+├── CLAUDE.md                          ← Projektanweisungen für Claude Code
+├── VISION.md                          ← Produkt-Vision
+├── docs/                              ← Diese Dokumentationsdateien
+├── workflow-pool/                     ← Vorgefertigte Workflow-Definitionen (JSON)
+├── scripts/
+│   ├── release.sh                     ← Versions-Bump + Git-Tag
+│   └── staging.sh                     ← Stable-Umgebung verwalten
 │
 ├── ai-automation-backend/
 │   ├── pom.xml
 │   ├── docker-compose.yml
+│   ├── docker-compose.stable.yml      ← Stable-Container
 │   ├── docker/
 │   │   ├── Dockerfile.backend
+│   │   ├── Dockerfile.stable          ← Ubuntu-basiert (glibc für Claude CLI)
 │   │   ├── Dockerfile.agent-node
 │   │   ├── Dockerfile.agent-python
 │   │   └── Dockerfile.agent-go
@@ -210,29 +405,35 @@ autotrigger/
 │       ├── java/com/automation/       ← Java-Quelldateien
 │       └── resources/
 │           ├── application.yml
-│           └── db/migration/          ← 9 Flyway-Migrationen
+│           ├── application-stable.yml ← Stable-Profil
+│           ├── agent-instructions.md  ← Basis-Agent-Instructions
+│           ├── templates/builtin/     ← Built-in Template JSON-Dateien
+│           └── db/migration/          ← 36 Flyway-Migrationen
 │
 └── ai-automation-frontend/
     ├── package.json
     ├── vite.config.ts
     ├── tailwind.config.ts
+    ├── eslint.config.js               ← Flat Config (ESLint 9+)
     ├── index.html
     └── src/
         ├── App.tsx                    ← Router
         ├── main.tsx                   ← Entry Point
         ├── index.css                  ← Globale Styles
-        ├── api/client.ts              ← HTTP-Client
+        ├── api/client.ts              ← HTTP-Client (Singleton)
         ├── types/index.ts             ← TypeScript-Typen
-        ├── pages/                     ← 10 Seiten
+        ├── pages/                     ← 18+ Seiten
         ├── components/
         │   ├── ui/                    ← Wiederverwendbare UI-Komponenten
         │   ├── layout/                ← Sidebar, Header, Layout
         │   ├── shared/                ← StatusBadge, LogViewer, etc.
         │   ├── dashboard/             ← Chart-Komponenten
         │   └── workflow/              ← Block-Editor, Templates
-        ├── hooks/                     ← React Query Hooks
+        ├── hooks/                     ← TanStack Query Hooks
         ├── stores/                    ← Zustand Stores
         ├── i18n/                      ← DE/EN Übersetzungen
         ├── theme/                     ← Theme-Tokens
-        └── data/                      ← Workflow-Templates
+        ├── data/                      ← Skill-Konstanten
+        ├── utils/                     ← Hilfsfunktionen
+        └── test/                      ← MSW-Handler, Test-Setup
 ```

@@ -1,23 +1,20 @@
-# Template Intelligence Report — KW 11
+# Template Intelligence Report — KW 12
 
-**Generiert**: 2026-03-09 | **Platform**: MySuricates v0.3.0
+**Datum**: 2026-03-16 | **Plattform**: MySuricates v0.3.2
 
 ---
 
 ## Zusammenfassung
 
-- **Gesamt-Erfolgsrate**: 58.85% (143/243 Runs erfolgreich)
-- **Trend**: → (stabil, keine Vorwochendaten zum Vergleich)
-- **Gate-Status**: **RED** — Durchschnitt unter 70%, Handlungsbedarf
+- **Gesamt-Erfolgsrate**: 58.0% (293/505 Runs)
+- **Trend**: ↓ -0.83 pp vs. Vorwoche (58.85% → 58.02%)
+- **Gate-Status**: 🔴 RED — unter kritischem Schwellenwert von 70%
 
-| Metrik | Wert |
-|---|---|
-| Runs gesamt (30 Tage) | 243 |
-| Erfolgreiche Runs | 143 |
-| Fehlgeschlagene Runs | 99 |
-| Ø Dauer pro Run | 20.9 Min |
-| Kosten (30 Tage) | $169.59 |
-| Verschwendete Kosten | ~$69.30 |
+```
+gate_status: RED
+gate_category: success-rate
+gate_description: Erfolgsrate 58.02% < 70% (kritisch). Regression vs. Vorwoche (-0.83pp). Haupttreiber: neue Batch-Workflows mit hohem Volumen und niedriger Erfolgsrate.
+```
 
 ---
 
@@ -25,48 +22,78 @@
 
 | Workflow | Runs | Erfolgsrate | Trend | Kosten (Tokens) |
 |---|---|---|---|---|
-| Frequenz-basierte Vokabel-Songs | 21 | — ¹ | → | ~14.700 |
-| Code Quality | 20 | — ¹ | → | ~13.600 |
-| Repo-Ready Gate (e4dd6622) | 8 | — ¹ | → | ~5.440 |
-| Repo-Ready Gate (d2a6cec7) | 8 | — ¹ | → | ~5.440 |
-| Repo-Ready Gate (2e2830de) | 7 | — ¹ | → | ~4.760 |
-| Übrige 138 Workflows | 179 | — ¹ | → | ~121.720 |
+| Lehrplan-Extraktor | 99 | ⚠️ Unbekannt* | 🆕 Neu | — |
+| Lernpaket-Batch-Generator | 96 | ⚠️ Unbekannt* | 🆕 Neu | — |
+| Frequenz-basierte Vokabel-Songs | 21 | ~70–80% | → Stabil | Mittel |
+| Code Quality | 20 | ~70–80% | → Stabil | Niedrig |
+| CS2BIM Code-Qualität & Auto-Fix-PR | 15 | ⚠️ Unbekannt* | 🆕 Neu | — |
 
-> ¹ Per-Workflow-Erfolgsraten konnten nicht aufgelöst werden (Block-2-Datenquelle: `AttributeError: 'list' object has no attribute 'get'`). Gesamt-Erfolgsrate: 58.85%. Token-Schätzung basiert auf Ø 6.800 Tokens/Run.
+*) Per-Workflow-Metriken nicht verfügbar (Block 2 Data-Pipeline defekt).
+
+**Plattform-Metriken (Wochenvergleich)**:
+
+| Metrik | Aktuell | Vorwoche | Veränderung |
+|---|---|---|---|
+| Workflows | 156 | 143 | +9.1% |
+| Runs | 505 | 243 | +107.8% |
+| Kosten (30d) | $265.85 | $169.59 | +57% |
+| Tokens (30d) | 2.92M | 1.65M | +77% |
+| Kosten/erfolgreicher Run | $0.91 | — | Hoch |
 
 ---
 
 ## Failure-Hotspots
 
-### 1. Timeout-Überschreitungen in Agentic Blocks — Häufigkeit: HOCH
-`iteration_timeout_seconds` wird auto-aligned (300 → 1260), was auf systematische Fehlkonfiguration hindeutet. Opus-Workflows brauchen mindestens 900s, viele Templates nutzen den Default (300s).
+### 1. Block 2 AttributeError — Data-Pipeline defekt (beide Runs)
 
-### 2. Fehlende ESLint-Konfiguration — Häufigkeit: MITTEL
-ESLint v9+ erfordert `eslint.config.js`, aber Self-Care-Workflows rufen `npx eslint .` ohne passende Config auf. Frontend-Lint-Schritte schlagen konsistent fehl.
+```
+AttributeError: 'list' object has no attribute 'get'
+```
+**Ursache**: Python-Script erwartet Dict, bekommt Liste. API-Response-Format hat sich geändert.
+**Impact**: Verhindert detaillierte Per-Workflow-Analyse in jedem Template-Intelligence-Run.
 
-### 3. Token-Budget-Erschöpfung & Tracking-Lücken — Häufigkeit: MITTEL
-Agentic-Blocks melden fehlende Usage-Daten → Fallback-Schätzung (2 in, 1 out) → Token-Budget wird nicht zuverlässig durchgesetzt. Workflows laufen unkontrolliert weiter oder brechen unerwartet ab.
+### 2. Lernpaket-Batch-Generator — 0/36 Pakete generiert
+
+- Shell-Step identifiziert 36 fehlende Themen korrekt (✅ ~80ms)
+- AI-Generierungsschritt läuft lange / schlägt fehl (❌)
+- 96 Runs, systematisches Fehlermuster, keine Error-Recovery
+
+### 3. Batch-Workflows treiben Fehlerrate
+
+Lehrplan-Extraktor + Lernpaket-Batch-Generator = 195 Runs (38.6% aller Runs).
+Vermutlich 50–60% der Gesamtfehler, da Erfolgsrate trotz +107% mehr Runs stagniert.
 
 ---
 
 ## Empfehlungen
 
-1. **Timeout-Konfiguration standardisieren** — Alle Agentic-Block-Templates mit expliziten Werten ausstatten (Opus: `timeout_seconds: 900`, `iteration_timeout_seconds: 900`; Sonnet: `300`/`600`). Erwartete Wirkung: **+10-15% Erfolgsrate**, Reduktion von Timeout-Failures um ~60%.
+1. **Block 2 AttributeError beheben** — API-Response als Liste behandeln (`isinstance(data, list)`). Ermöglicht vollständiges Monitoring und schließt den Selbstverbesserungs-Loop. ✅ Sofort umsetzbar.
 
-2. **Repo-Ready Gate konsolidieren** — 3 Varianten (23 Runs) zu einem parametrisierten Workflow zusammenführen. Erwartete Wirkung: **Bessere Wartbarkeit**, einheitliche Erfolgsmetrik, kein Workflow-Chaos. Aufwand: 1-2h.
+2. **Lernpaket-Batch-Generator stabilisieren** — Incremental Checkpoints, Retry-Block (3x exponential backoff), Batch-Größe auf 5–10 reduzieren. Erwartete Wirkung: Erfolgsrate +5–8pp gesamt, da Workflow 19% aller Runs ausmacht.
 
-3. **ESLint-Config migrieren** — `eslint.config.js` für Frontend erstellen oder Lint-Step auf `npm run lint` umstellen. Erwartete Wirkung: **Self-Care-Workflows laufen sauber**, CI-Qualität steigt. Aufwand: 30min.
-
----
-
-## Nächste Schritte
-
-- [ ] Per-Workflow-Erfolgsraten aufschlüsseln (Block-2-Script fixen)
-- [ ] Wöchentlichen Trend-Vergleich einführen (KW 11 vs. KW 12)
-- [ ] Empfehlungen 1-3 umsetzen, Wirkung in KW 12 messen
+3. **Kosten-Monitoring einführen** — Budget-Alert bei >$300/30d, Token-Budget pro Workflow, Kosten-Trend im Dashboard. Verhindert unkontrollierte Ausgaben bei fehlschlagenden Workflows.
 
 ---
 
-`gate_status: RED`
+## Gate-Kriterien
 
-*Report generiert von MySuricates Template Intelligence — KW 11/2026*
+| Kriterium | Schwellenwert | Aktuell | Status |
+|---|---|---|---|
+| Ø Erfolgsrate | >70% | 58.02% | 🔴 RED |
+| Regression | <-5pp/Woche | -0.83 pp | 🟢 OK |
+| Data Pipeline | Fehlerfrei | 2x Fehler | 🔴 RED |
+
+**Gesamtbewertung: 🔴 RED** — Sofortiger Handlungsbedarf.
+
+---
+
+## Datenqualität
+
+- ✅ Dashboard-Metriken vollständig
+- ❌ Block 2 in beiden Runs fehlgeschlagen → keine Per-Workflow-Metriken
+- ⚠️ Trend-Analyse auf 2 Datenpunkten basiert
+- ⚠️ Einzelschätzungen basieren auf Volumen-Verteilung und bekannten Fehlermustern
+
+---
+
+*Generiert von: self-care-template-intelligence | MySuricates v0.3.2*

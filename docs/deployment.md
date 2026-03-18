@@ -71,6 +71,8 @@ Die Agent-Images werden nur gebaut (`profiles: build-only`), nicht direkt über 
 | `AUTOMATION_RATE_LIMIT_ENABLED` | `false` | Rate Limiting aktivieren |
 | `AUTOMATION_RATE_LIMIT_RPM` | `120` | Requests pro Minute |
 | `AUTOMATION_TAILSCALE_ENABLED` | `false` | Tailscale Remote-Access |
+| `AUTOMATION_HOST_CLAUDE_MAX_TOKENS` | (leer) | Optionales per-Call Token-Limit für Claude CLI |
+| `AUTOMATION_HOST_CLAUDE_TIMEOUT_SECONDS` | `300` | Globaler Claude-CLI-Timeout in Sekunden |
 | `DOCKER_HOST` | `unix:///var/run/docker.sock` | Docker Socket Pfad |
 
 ### Container-Limits (application.yml)
@@ -122,6 +124,8 @@ volumes:
 ```
 
 **Wichtig:** Der Docker-Socket-Mount gibt dem Backend volle Kontrolle über den Host-Docker. In Produktionsumgebungen sollte API-Key-Auth aktiviert sein.
+
+**Hinweis:** HikariCP Pool-Size ist auf 1 gesetzt. SQLite erlaubt nur einen gleichzeitigen Schreibzugriff. Pool-Size=1 serialisiert alle DB-Operationen — kein Lock-Contention. Pool-Size erhöhen erst sinnvoll beim Wechsel auf PostgreSQL.
 
 ## Tailscale Remote-Access
 
@@ -192,14 +196,71 @@ networks:
     driver: bridge
 ```
 
-## Staging (Stable-Umgebung)
+## Drei-Umgebungs-Setup
 
-Neben der Entwicklungsumgebung (Port 3000/9090) läuft eine Stable-Umgebung als Docker-Container auf Port 9091. Siehe `scripts/staging.sh` für die CLI-Verwaltung.
+Das Projekt unterstützt drei parallele Umgebungen:
+
+| Umgebung | Port | Beschreibung |
+|---|---|---|
+| **Dev** | 3000 (Frontend) / 9090 (Backend) | Aus Quellcode, Vite Dev-Server |
+| **Stable** | 9091 | Docker-Container, Backend + eingebettetes Frontend |
+| **Test** | 8090 | Docker-Container, dedizierte Test-Instanz für Workflow-Tests |
+
+### Auto-Start
+
+Dev startet Stable und Test automatisch beim Boot (`ApplicationReadyEvent`), wenn:
+1. Ein Snapshot vorhanden ist (`stable-frontend/`-Verzeichnis existiert)
+2. Der Container nicht bereits läuft
+
+Kontrolliert via `automation.staging.auto-start` (Standard: `true`, in `application-stable.yml` deaktiviert).
+
+### Stable-Umgebung (Port 9091)
+
+Die Stable-Umgebung ist ein Docker-Container, der Backend + eingebettetes React-Frontend enthält.
+
+**Key-Dateien:**
+- `ai-automation-backend/docker/Dockerfile.stable` — Ubuntu-basiert (glibc für Claude CLI)
+- `ai-automation-backend/docker-compose.stable.yml` — Volume-Mounts für Claude CLI + Projekte
+- `ai-automation-backend/src/main/resources/application-stable.yml` — Port 9091, Auto-Start deaktiviert, Frontend-Serving aktiviert
+
+### Test-Instanz (Port 8090)
+
+Die Test-Instanz ist ein dedizierter Docker-Container für automatisierte Workflow-Tests:
+
+- `TestingService` — verwaltet den Test-Docker-Container
+- Auto-Start beim Boot wenn `automation.staging.test-auto-start=true` und Snapshot vorhanden
+- Auto-Sync von Dev-Definitionen beim Start
+- Datenbank kann via API zurückgesetzt werden (`POST /api/v1/testing/reset`)
+
+### Staging CLI-Verwaltung
+
+```bash
+./scripts/staging.sh snapshot    # JAR + Frontend + Docker-Image bauen, Git-Commit taggen
+./scripts/staging.sh start       # Stable-Container auf :9091 starten
+./scripts/staging.sh stop        # Stable-Container stoppen
+./scripts/staging.sh status      # Container-Status + Health-Check
+./scripts/staging.sh log         # Container-Logs anzeigen (tail)
+./scripts/staging.sh db-seed     # Rohe DB-Kopie (nur Notfall, überschreibt alles)
+./scripts/staging.sh clean       # Container + Volume + Image entfernen
+./scripts/staging.sh promote     # stop → snapshot → start (Einzeiler)
+```
+
+### Definition-Sync (Dev → Stable / Dev → Test)
+
+`POST /api/v1/staging/sync-definitions` und `POST /api/v1/testing/sync-definitions` synchronisieren **nur Definitionen**:
+
+| Synciert | Matching | Verhalten |
+|---|---|---|
+| Projekte | Name + Pfad | Überspringen wenn vorhanden, erstellen wenn neu |
+| Workflows | Name + Projektname | Aktualisieren wenn vorhanden, importieren wenn neu |
+| Custom Skills | Name | Überspringen wenn vorhanden, importieren wenn neu |
+
+**Nicht synciert** (auf Stable/Test erhalten): workflow_runs, step_results, scheduled_workflows, webhook_triggers, activity_log, todos, built-in Skills/Templates. Archivierte Projekte und soft-deleted Workflows werden automatisch ausgeschlossen.
 
 ### Versionsanzeige
 
 In Settings → Stable wird ein Versionsvergleich angezeigt:
-- **Dev**: Version aus dem lokalen `/api/v1/system/info`
+- **Dev**: Version aus `/api/v1/system/info`
 - **Stable**: Version aus dem Stable-Container's `/api/v1/system/info`
 
 Wenn die Versionen abweichen (z.B. nach einem Release), wird ein Promote empfohlen.
@@ -208,10 +269,15 @@ Wenn die Versionen abweichen (z.B. nach einem Release), wird ein Promote empfohl
 
 ```bash
 # 1. Version bumpen
-./scripts/release.sh           # z.B. 0.1.0 → 0.1.1
+./scripts/release.sh           # z.B. 0.3.2 → 0.3.3
 
 # 2. Neue Version in Stable deployen
 ./scripts/staging.sh promote   # Baut und startet Stable mit der neuen Version
 ```
 
-Nach dem Promote zeigt die Settings-Seite beide Versionen als identisch an.
+### Git-Tags
+
+| Tag-Format | Erstellt durch | Zweck |
+|---|---|---|
+| `v0.3.2` | `release.sh` | Semver-Release-Markierung |
+| `stable-20250225-143022` | `staging.sh promote` | Deployment-Zeitstempel |

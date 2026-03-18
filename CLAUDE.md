@@ -55,6 +55,23 @@ curl -X POST http://localhost:9090/api/v1/todos \
 - **Priority**: `HIGH` = blockierend, `MEDIUM` = bald, `LOW` = nice-to-have
 - **Tags**: `backend`, `frontend`, `architektur`, `security`, `performance`, `ux`, `ui`, `feature`, `bug`, `testing`, `documentation`, `workflow-execution`, `container-execution`, `staging`
 
+### Claude-Code-Session-ID in TODO-Description speichern
+
+Das `sessionId`-Feld im TODO enthält die Shell-Session-ID (`$SHELL_SESSION_ID`) — **nicht** die Claude-Code-Konversations-ID. Damit eine Session später via `claude --resume` wiederhergestellt werden kann, muss die Claude-Code-Session-ID in der **Description** gespeichert werden.
+
+**Session-ID auslesen:**
+```bash
+ls -t ~/.claude/projects/-home-flo-Entwicklung-tools-autotrigger/*.jsonl | head -1 | xargs basename -s .jsonl
+```
+
+**Format in der Description:**
+```markdown
+## Claude Code Session
+`claude --resume <uuid>`
+```
+
+Immer beim Anlegen eines TODOs (das eine längere Arbeitssequenz beschreibt) in die Description aufnehmen.
+
 ---
 
 AI-powered workflow automation platform with a skill system, Docker-based execution, and a React frontend.
@@ -141,6 +158,7 @@ npm run cy:open                          # Open Cypress UI
 - **Backend ORM**: Lombok for boilerplate, MapStruct for entity-DTO mapping
 - **Database**: SQLite with Flyway migrations. Naming: `V{N}__description.sql`
 - **NEVER write to the SQLite database directly** (via `sqlite3` CLI or raw SQL). Always use the REST API or the Spring service/repository layer. Direct DB writes bypass Hibernate's entity cache and cause inconsistent state, "Internal server error" responses, and hard-to-debug issues. This applies to testing, debugging, and seeding alike — use the API.
+- **HikariCP pool-size = 1**: SQLite only supports one writer at a time. Using pool-size > 1 causes `SQLITE_BUSY` errors under concurrent workflow runs because multiple connections compete for SQLite's single write lock. With pool-size=1, Hikari serializes all DB operations via its internal queue — no lock contention. Individual DB ops (INSERT/UPDATE) are fast enough (~ms) that even 10 concurrent workflows don't cause Hikari connection timeouts. Do NOT increase the pool size without switching to a proper concurrent database (e.g. PostgreSQL).
 - **API prefix**: All endpoints under `/api/v1`
 - **Frontend state**: Zustand for client state (settings, theme, sidebar), TanStack Query for server state
 - **API client**: Singleton `api` instance in `src/api/client.ts` — all hooks use this
@@ -161,6 +179,7 @@ npm run cy:open                          # Open Cypress UI
 - Docker containers have resource limits: 4GB memory, CPU quota, 100 PIDs, 60min idle timeout
 - Security is enabled by default: API key auth via `X-API-Key` header (auto-generated if not configured), rate limiting
 - Block types: simple, shell, retry, conditional, forEach, while, switch, agentic, approval, sub-workflow, skill-capability, human-input
+- **Provider routing**: All block executors (simple, retry, conditional, forEach, while, switch, skill-capability) pass `context.getProvider()` as `providerId` via `HostExecutionRequest.builder()` to `CommandExecutorService`. Setting `"provider": "CODEX"` in a workflow JSON therefore applies to every non-shell block type.
 - Agentic blocks use a Goal→Reason→Act→Observe loop powered by Host Claude CLI
 - Workflow Conversion: Successful agentic runs can be converted to deterministic workflows (rule-based + AI)
 - Terminal WebSocket at `/ws/terminal` for real-time container access
