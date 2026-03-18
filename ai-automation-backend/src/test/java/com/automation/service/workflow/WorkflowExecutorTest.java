@@ -22,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
@@ -449,25 +450,25 @@ class WorkflowExecutorTest {
     }
 
     @Test
-    void recoverOrphanedRuns_marksRunningRunsAsFailed() {
-        WorkflowRun orphan1 = WorkflowRun.builder().id("orphan-1").status(RunStatus.RUNNING).build();
-        WorkflowRun orphan2 = WorkflowRun.builder().id("orphan-2").status(RunStatus.RUNNING).build();
+    void cleanupZombieRuns_marksRunningRunsAsFailed() {
+        WorkflowRun orphan1 = WorkflowRun.builder().id("orphan-1").status(RunStatus.RUNNING).startedAt(Instant.now()).build();
+        WorkflowRun orphan2 = WorkflowRun.builder().id("orphan-2").status(RunStatus.RUNNING).startedAt(Instant.now()).build();
         when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of(orphan1, orphan2));
 
-        workflowExecutor.recoverOrphanedRuns();
+        workflowExecutor.cleanupZombieRuns();
 
         assertThat(orphan1.getStatus()).isEqualTo(RunStatus.FAILED);
         assertThat(orphan1.getCompletedAt()).isNotNull();
-        assertThat(orphan1.getError()).containsKey("error");
+        assertThat(orphan1.getError()).containsKey("message");
         assertThat(orphan2.getStatus()).isEqualTo(RunStatus.FAILED);
         verify(runRepository, times(2)).save(any(WorkflowRun.class));
     }
 
     @Test
-    void recoverOrphanedRuns_noOrphans_doesNothing() {
+    void cleanupZombieRuns_noZombies_doesNothing() {
         when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of());
 
-        workflowExecutor.recoverOrphanedRuns();
+        workflowExecutor.cleanupZombieRuns();
 
         verify(runRepository, never()).save(any(WorkflowRun.class));
     }

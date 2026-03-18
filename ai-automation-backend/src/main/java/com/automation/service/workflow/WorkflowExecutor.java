@@ -337,6 +337,7 @@ public class WorkflowExecutor {
                 r.setDurationMs(r.getCompletedAt().toEpochMilli() - r.getStartedAt().toEpochMilli());
                 r.setError(Map.of("message", message));
                 runRepository.save(r);
+                broadcaster.broadcastRunStatus(runId, RunStatus.FAILED);
                 log.warn("Force-failed zombie run {}: {}", runId, message);
             }
         } catch (Exception e) {
@@ -351,17 +352,19 @@ public class WorkflowExecutor {
     @EventListener(ApplicationReadyEvent.class)
     public void cleanupZombieRuns() {
         List<WorkflowRun> zombies = runRepository.findByStatus(RunStatus.RUNNING);
-        if (!zombies.isEmpty()) {
-            log.warn("Found {} zombie run(s) stuck in RUNNING status — marking as FAILED", zombies.size());
-            for (WorkflowRun zombie : zombies) {
-                zombie.setStatus(RunStatus.FAILED);
-                zombie.setCompletedAt(Instant.now());
-                zombie.setDurationMs(zombie.getCompletedAt().toEpochMilli() - zombie.getStartedAt().toEpochMilli());
-                zombie.setError(Map.of("message", "Cleaned up: run was stuck in RUNNING after application restart"));
-                runRepository.save(zombie);
-                log.info("Cleaned up zombie run: {}", zombie.getId());
-            }
+        if (zombies.isEmpty()) return;
+        log.warn("Found {} zombie run(s) stuck in RUNNING status — marking as FAILED", zombies.size());
+        for (WorkflowRun zombie : zombies) {
+            zombie.setStatus(RunStatus.FAILED);
+            zombie.setCompletedAt(Instant.now());
+            zombie.setDurationMs(zombie.getCompletedAt().toEpochMilli() - zombie.getStartedAt().toEpochMilli());
+            zombie.setError(Map.of("message", "Cleaned up: run was stuck in RUNNING after application restart"));
+            runRepository.save(zombie);
+            log.info("Cleaned up zombie run: {}", zombie.getId());
         }
+        activityLogService.warn(LogCategory.EXECUTION,
+                "Startup cleanup: marked " + zombies.size() + " zombie run(s) as FAILED",
+                "WorkflowExecutor");
     }
 
     public void pauseExecution(String runId) {
@@ -396,6 +399,25 @@ public class WorkflowExecutor {
         if (context != null) {
             context.cancel();
             log.info("Cancelled execution: {}", runId);
+        } else {
+            // Ghost run: no active thread, but possibly still RUNNING in the DB
+            try {
+                runRepository.findById(runId).ifPresent(run -> {
+                    if (run.getStatus() == RunStatus.RUNNING) {
+                        log.warn("Force-cancelling ghost run {} — not in activeExecutions but status=RUNNING", runId);
+                        run.setStatus(RunStatus.CANCELLED);
+                        run.setCompletedAt(Instant.now());
+                        run.setDurationMs(run.getCompletedAt().toEpochMilli() - run.getStartedAt().toEpochMilli());
+                        run.setError(Map.of("message", "Force-cancelled: no active execution thread found (ghost run)"));
+                        runRepository.save(run);
+                        broadcaster.broadcastRunStatus(runId, RunStatus.CANCELLED);
+                        activityLogService.warn(LogCategory.EXECUTION,
+                                "Ghost run force-cancelled: " + runId, "WorkflowExecutor", runId, null);
+                    }
+                });
+            } catch (Exception e) {
+                log.error("Failed to force-cancel ghost run {}: {}", runId, e.getMessage());
+            }
         }
     }
 
@@ -477,24 +499,6 @@ public class WorkflowExecutor {
             broadcaster.broadcastLogMessage(runId, "container_skipped",
                     Map.of("message", "Container konnte nicht gestartet werden, Ausführung erfolgt auf dem Host"));
             return null;
-        }
-    }
-
-    @EventListener(ApplicationReadyEvent.class)
-    public void recoverOrphanedRuns() {
-        List<WorkflowRun> orphaned = runRepository.findByStatus(RunStatus.RUNNING);
-        for (WorkflowRun run : orphaned) {
-            log.warn("Marking orphaned run {} as FAILED (server restart)", run.getId());
-            run.setStatus(RunStatus.FAILED);
-            run.setCompletedAt(Instant.now());
-            run.setError(Map.of("error", "Server restarted during execution"));
-            runRepository.save(run);
-        }
-        if (!orphaned.isEmpty()) {
-            log.info("Recovered {} orphaned runs", orphaned.size());
-            activityLogService.warn(LogCategory.EXECUTION,
-                    "Recovered " + orphaned.size() + " orphaned runs after server restart",
-                    "WorkflowExecutor");
         }
     }
 
