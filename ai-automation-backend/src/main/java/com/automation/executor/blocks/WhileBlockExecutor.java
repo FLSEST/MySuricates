@@ -6,6 +6,7 @@ import com.automation.entity.StepStatus;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
 import com.automation.service.cli.CommandExecutorService;
+import com.automation.service.cli.HostExecutionRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -57,8 +58,14 @@ public class WhileBlockExecutor implements BlockExecutor {
                         break;
                     }
                 } else {
-                    String conditionResult = commandExecutor.executeCommandOnHost(
-                            context.getProjectPath(), resolvedCondition, null, null, claudeTimeout).output();
+                    String conditionResult = commandExecutor.executeOnHost(
+                            HostExecutionRequest.builder()
+                                    .projectPath(context.getProjectPath())
+                                    .command(resolvedCondition)
+                                    .timeoutSeconds(claudeTimeout)
+                                    .providerId(context.getProvider())
+                                    .build()
+                    ).output();
                     if ("false".equalsIgnoreCase(conditionResult.trim()) ||
                             "0".equals(conditionResult.trim()) ||
                             conditionResult.trim().isEmpty()) {
@@ -81,15 +88,18 @@ public class WhileBlockExecutor implements BlockExecutor {
                 );
             } else {
                 stepResult = commandExecutor.executeStepOnHost(
-                        context.getProjectPath(),
-                        BlockDefinition.builder()
-                                .type("simple")
-                                .config(Map.of("command", resolvedCommand))
-                                .build(),
-                        context.nextStepIndex(),
-                        context.getInstructionPrefix(),
-                        context.getModel(),
-                        claudeTimeout
+                        HostExecutionRequest.builder()
+                                .projectPath(context.getProjectPath())
+                                .block(BlockDefinition.builder()
+                                        .type("simple")
+                                        .config(Map.of("command", resolvedCommand))
+                                        .build())
+                                .stepIndex(context.nextStepIndex())
+                                .systemPrompt(context.getInstructionPrefix())
+                                .model(context.getModel())
+                                .timeoutSeconds(claudeTimeout)
+                                .providerId(context.getProvider())
+                                .build()
                 );
             }
 

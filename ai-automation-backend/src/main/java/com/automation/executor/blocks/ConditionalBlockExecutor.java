@@ -6,6 +6,7 @@ import com.automation.entity.StepStatus;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
 import com.automation.service.cli.CommandExecutorService;
+import com.automation.service.cli.HostExecutionRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -47,10 +48,13 @@ public class ConditionalBlockExecutor implements BlockExecutor {
             conditionMet = exitCode == 0;
         } else {
             // Claude mode: ask AI to evaluate condition as TRUE/FALSE
-            String conditionResult = commandExecutor.executeCommandOnHost(
-                    context.getProjectPath(),
-                    "Evaluate this condition and respond with ONLY the word TRUE or FALSE, nothing else: " + condition,
-                    null, null, claudeTimeout
+            String conditionResult = commandExecutor.executeOnHost(
+                    HostExecutionRequest.builder()
+                            .projectPath(context.getProjectPath())
+                            .command("Evaluate this condition and respond with ONLY the word TRUE or FALSE, nothing else: " + condition)
+                            .timeoutSeconds(claudeTimeout)
+                            .providerId(context.getProvider())
+                            .build()
             ).output();
             String trimmed = conditionResult.trim().toUpperCase();
             conditionMet = trimmed.equals("TRUE") || trimmed.startsWith("TRUE");
@@ -74,15 +78,18 @@ public class ConditionalBlockExecutor implements BlockExecutor {
                 );
             } else {
                 stepResult = commandExecutor.executeStepOnHost(
-                        context.getProjectPath(),
-                        BlockDefinition.builder()
-                                .type("simple")
-                                .config(Map.of("command", resolved))
-                                .build(),
-                        context.nextStepIndex(),
-                        context.getInstructionPrefix(),
-                        context.getModel(),
-                        claudeTimeout
+                        HostExecutionRequest.builder()
+                                .projectPath(context.getProjectPath())
+                                .block(BlockDefinition.builder()
+                                        .type("simple")
+                                        .config(Map.of("command", resolved))
+                                        .build())
+                                .stepIndex(context.nextStepIndex())
+                                .systemPrompt(context.getInstructionPrefix())
+                                .model(context.getModel())
+                                .timeoutSeconds(claudeTimeout)
+                                .providerId(context.getProvider())
+                                .build()
                 );
             }
             result.setOutput(stepResult.getOutput());

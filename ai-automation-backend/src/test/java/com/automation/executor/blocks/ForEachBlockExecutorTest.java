@@ -6,6 +6,7 @@ import com.automation.entity.StepStatus;
 import com.automation.executor.ExecutionContext;
 import com.automation.service.cli.CliSession;
 import com.automation.service.cli.CommandExecutorService;
+import com.automation.service.cli.HostExecutionRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,10 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -54,7 +52,7 @@ class ForEachBlockExecutorTest {
     void execute_withListItems_iteratesEachItem() {
         StepResult stepResult = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("linted").build();
-        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(), anyInt(), isNull(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
                 .thenReturn(stepResult);
 
         Map<String, Object> config = new HashMap<>();
@@ -71,7 +69,7 @@ class ForEachBlockExecutorTest {
         StepResult result = executor.execute(block, context);
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
-        verify(commandExecutor, times(3)).executeStepOnHost(any(), any(), anyInt(), any(), any(), any());
+        verify(commandExecutor, times(3)).executeStepOnHost(any(HostExecutionRequest.class));
     }
 
     @Test
@@ -80,7 +78,7 @@ class ForEachBlockExecutorTest {
                 .thenReturn(new CliSession.CommandResult("file1.js\nfile2.js", 0));
         StepResult stepResult = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
-        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(), anyInt(), isNull(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
                 .thenReturn(stepResult);
 
         Map<String, Object> config = new HashMap<>();
@@ -97,7 +95,7 @@ class ForEachBlockExecutorTest {
         StepResult result = executor.execute(block, context);
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
-        verify(commandExecutor, times(2)).executeStepOnHost(any(), any(), anyInt(), any(), any(), any());
+        verify(commandExecutor, times(2)).executeStepOnHost(any(HostExecutionRequest.class));
     }
 
     @Test
@@ -106,7 +104,7 @@ class ForEachBlockExecutorTest {
                 .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
         StepResult failed = StepResult.builder()
                 .stepIndex(1).status(StepStatus.FAILED).output("error").build();
-        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(), anyInt(), isNull(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
                 .thenReturn(success, failed);
 
         Map<String, Object> config = new HashMap<>();
@@ -139,14 +137,14 @@ class ForEachBlockExecutorTest {
         StepResult result = executor.execute(block, context);
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
-        verify(commandExecutor, never()).executeStepOnHost(any(), any(), anyInt(), any(), any(), any());
+        verify(commandExecutor, never()).executeStepOnHost(any(HostExecutionRequest.class));
     }
 
     @Test
     void execute_cancelledDuringIteration_stopsEarly() {
         StepResult stepResult = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
-        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(), anyInt(), isNull(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
                 .thenAnswer(inv -> {
                     context.cancel();
                     return stepResult;
@@ -164,14 +162,14 @@ class ForEachBlockExecutorTest {
 
         executor.execute(block, context);
 
-        verify(commandExecutor, times(1)).executeStepOnHost(any(), any(), anyInt(), any(), any(), any());
+        verify(commandExecutor, times(1)).executeStepOnHost(any(HostExecutionRequest.class));
     }
 
     @Test
     void execute_stringItems_splitsByNewline() {
         StepResult stepResult = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
-        when(commandExecutor.executeStepOnHost(eq("/test/project"), any(), anyInt(), isNull(), isNull(), isNull()))
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
                 .thenReturn(stepResult);
 
         Map<String, Object> config = new HashMap<>();
@@ -187,7 +185,7 @@ class ForEachBlockExecutorTest {
         StepResult result = executor.execute(block, context);
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
-        verify(commandExecutor, times(3)).executeStepOnHost(any(), any(), anyInt(), any(), any(), any());
+        verify(commandExecutor, times(3)).executeStepOnHost(any(HostExecutionRequest.class));
     }
 
     @Test
@@ -212,7 +210,7 @@ class ForEachBlockExecutorTest {
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         verify(commandExecutor, times(2)).executeStepAsShell(any(), any(), anyInt(), eq(300));
-        verify(commandExecutor, never()).executeStepOnHost(any(), any(), anyInt(), any(), any(), any());
+        verify(commandExecutor, never()).executeStepOnHost(any(HostExecutionRequest.class));
     }
 
     @Test
@@ -240,5 +238,52 @@ class ForEachBlockExecutorTest {
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         verify(commandExecutor).executeShellCommandOnHost("/test/project", "ls *.txt", 300);
         verify(commandExecutor, times(2)).executeStepAsShell(any(), any(), anyInt(), eq(300));
+    }
+
+    @Test
+    void execute_codexProvider_passesProviderIdToRequest() {
+        context.setProvider("CODEX");
+        StepResult stepResult = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(stepResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("items_source", "list");
+        config.put("items", List.of("a"));
+        config.put("command", "process {{ item }}");
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("foreach")
+                .config(config)
+                .build();
+
+        executor.execute(block, context);
+
+        verify(commandExecutor).executeStepOnHost(
+                argThat(req -> "CODEX".equals(req.providerId())));
+    }
+
+    @Test
+    void execute_nullProvider_passesNullProviderIdToRequest() {
+        StepResult stepResult = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(stepResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("items_source", "list");
+        config.put("items", List.of("a"));
+        config.put("command", "process {{ item }}");
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("foreach")
+                .config(config)
+                .build();
+
+        executor.execute(block, context);
+
+        verify(commandExecutor).executeStepOnHost(
+                argThat(req -> req.providerId() == null));
     }
 }

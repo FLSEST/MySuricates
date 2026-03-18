@@ -6,6 +6,7 @@ import com.automation.entity.StepStatus;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
 import com.automation.service.cli.CommandExecutorService;
+import com.automation.service.cli.HostExecutionRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -85,15 +86,18 @@ public class ForEachBlockExecutor implements BlockExecutor {
                 );
             } else {
                 itemResult = commandExecutor.executeStepOnHost(
-                        context.getProjectPath(),
-                        BlockDefinition.builder()
-                                .type("simple")
-                                .config(Map.of("command", resolvedCommand))
-                                .build(),
-                        context.nextStepIndex(),
-                        context.getInstructionPrefix(),
-                        context.getModel(),
-                        claudeTimeout
+                        HostExecutionRequest.builder()
+                                .projectPath(context.getProjectPath())
+                                .block(BlockDefinition.builder()
+                                        .type("simple")
+                                        .config(Map.of("command", resolvedCommand))
+                                        .build())
+                                .stepIndex(context.nextStepIndex())
+                                .systemPrompt(context.getInstructionPrefix())
+                                .model(context.getModel())
+                                .timeoutSeconds(claudeTimeout)
+                                .providerId(context.getProvider())
+                                .build()
                 );
             }
 

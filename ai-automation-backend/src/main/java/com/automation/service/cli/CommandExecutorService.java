@@ -170,62 +170,6 @@ public class CommandExecutorService {
         return executeStepOnHostInternal(request);
     }
 
-    // === Legacy overloads (deprecated — use HostExecutionRequest builder) ===
-
-    /** @deprecated Use {@link #executeOnHost(HostExecutionRequest)} instead. */
-    @Deprecated(forRemoval = true)
-    public CliSession.EnrichedCommandResult executeCommandOnHost(
-            String projectPath, String command, String model, String systemPrompt) {
-        return executeOnHost(HostExecutionRequest.builder()
-                .projectPath(projectPath).command(command).model(model).systemPrompt(systemPrompt).build());
-    }
-
-    /** @deprecated Use {@link #executeOnHost(HostExecutionRequest)} instead. */
-    @Deprecated(forRemoval = true)
-    public CliSession.EnrichedCommandResult executeCommandOnHost(
-            String projectPath, String command, String model, String systemPrompt,
-            Integer timeoutSeconds) {
-        return executeOnHost(HostExecutionRequest.builder()
-                .projectPath(projectPath).command(command).model(model)
-                .systemPrompt(systemPrompt).timeoutSeconds(timeoutSeconds).build());
-    }
-
-    /** @deprecated Use {@link #executeOnHost(HostExecutionRequest)} instead. */
-    @Deprecated(forRemoval = true)
-    public CliSession.EnrichedCommandResult executeCommandOnHost(
-            String projectPath, String command, String model, String systemPrompt,
-            Integer timeoutSeconds, String providerId) {
-        return executeOnHost(HostExecutionRequest.builder()
-                .projectPath(projectPath).command(command).model(model)
-                .systemPrompt(systemPrompt).timeoutSeconds(timeoutSeconds).providerId(providerId).build());
-    }
-
-    /** @deprecated Use {@link #executeOnHost(HostExecutionRequest)} instead. */
-    @Deprecated(forRemoval = true)
-    public CliSession.CommandResult executeCommandOnHost(String projectPath, String command) {
-        return executeOnHost(HostExecutionRequest.builder()
-                .projectPath(projectPath).command(command).build()).toCommandResult();
-    }
-
-    /** @deprecated Use {@link #executeStepOnHost(HostExecutionRequest)} instead. */
-    @Deprecated(forRemoval = true)
-    public StepResult executeStepOnHost(String projectPath, BlockDefinition block,
-                                         int stepIndex, String instructionPrefix, String model) {
-        return executeStepOnHost(HostExecutionRequest.builder()
-                .projectPath(projectPath).block(block).stepIndex(stepIndex)
-                .systemPrompt(instructionPrefix).model(model).build());
-    }
-
-    /** @deprecated Use {@link #executeStepOnHost(HostExecutionRequest)} instead. */
-    @Deprecated(forRemoval = true)
-    public StepResult executeStepOnHost(String projectPath, BlockDefinition block,
-                                         int stepIndex, String instructionPrefix, String model,
-                                         Integer timeoutSeconds) {
-        return executeStepOnHost(HostExecutionRequest.builder()
-                .projectPath(projectPath).block(block).stepIndex(stepIndex)
-                .systemPrompt(instructionPrefix).model(model).timeoutSeconds(timeoutSeconds).build());
-    }
-
     private StepResult executeStepOnHostInternal(HostExecutionRequest request) {
         StepResult step = new StepResult();
         int stepIndex = request.stepIndex() != null ? request.stepIndex() : 0;
@@ -281,7 +225,10 @@ public class CommandExecutorService {
 
         String aggregatedContext = buildSkillContext(skills);
         if (!aggregatedContext.isEmpty()) {
-            executeCommandOnHost(projectPath, aggregatedContext);
+            executeOnHost(HostExecutionRequest.builder()
+                    .projectPath(projectPath)
+                    .command(aggregatedContext)
+                    .build());
         }
     }
 
