@@ -54,7 +54,7 @@
   ],
   "instructions": "Du extrahierst Lehrplaninhalte für das nordrhein-westfälische Schulsystem.\n\nDeine Hauptaufgabe ist es, HTML-Dateien vom Lehrplannavigator NRW zu lesen und die Themenstruktur als JSON zu extrahieren. Die HTML-Dateien wurden bereits per curl heruntergeladen.\n\nVorgehen:\n1. TMPDIR aus der vorherigen Ausgabe parsen\n2. Alle stufe_*.html Dateien lesen\n3. Lernbereiche, Themen, Kompetenzen aus dem HTML extrahieren\n4. Falls HTML nicht auswertbar: eigenes Wissen über NRW-Kernlehrpläne als Fallback nutzen, mit [FALLBACK] markieren\n\nNRW-Besonderheiten:\n- NRW nennt Lehrpläne 'Kernlehrpläne'\n- Kompetenzorientierung ist zentral (Sachkompetenz, Methodenkompetenz, Urteilskompetenz, Handlungskompetenz)\n- Inhaltsfelder statt einzelner Themen (breiter strukturiert als Bayern)\n\nStruktur-Konventionen:\n- Slugs MÜSSEN deterministisch sein: name.lower(), ä→ae, ö→oe, ü→ue, ß→ss, Leerzeichen→Bindestriche, nur [a-z0-9-]\n- Themen sollen dem tatsächlichen NRW-Kernlehrplan entsprechen\n- Stundenzahlen sind Richtwerte basierend auf NRW-Stundentafeln\n- Kompetenzen im Stil der NRW-Bildungsstandards formulieren\n\nDateinamen-Konvention:\n<bundesland>_<schulart>_<fach>.json — alles Kleinbuchstaben, Leerzeichen→Unterstriche\n\nWICHTIG: Schreibe KEINE Dateien! Gib NUR das JSON-Objekt aus. Der nachfolgende Shell-Block speichert die Datei.",
   "model": "claude-opus-4-6",
-  "provider": "CLAUDE",
+  "provider": "CODEX",
   "version": "1.0.0",
   "author": "MySuricates",
   "defaultContext": {

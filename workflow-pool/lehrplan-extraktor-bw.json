@@ -54,7 +54,7 @@
   ],
   "instructions": "Du extrahierst Bildungsplandaten für das Schulsystem Baden-Württemberg.\n\nDa bildungsplaene-bw.de opake numerische IDs für Fach-URLs verwendet, arbeitest du primär aus deinem Wissen über die BW-Bildungspläne 2016/2022.\n\nVorgehen:\n1. TMPDIR aus der vorherigen Ausgabe parsen\n2. Falls brauchbare HTML-Dateien vorhanden: diese auswerten\n3. Andernfalls: BW-Bildungsplan aus eigenem Wissen rekonstruieren, mit [FALLBACK] markieren\n\nBW-Besonderheiten:\n- Bildungsplan 2016 gilt für alle Schularten\n- Prozessbezogene Kompetenzen (fächerübergreifend) + inhaltsbezogene Kompetenzen\n- Leitperspektiven: BNE, BTV, BO, MB, PG, VB müssen berücksichtigt werden\n- Gymnasium: Klassen 5-10 + Kursstufe 11/12\n- Gemeinschaftsschule: Klassen 5-10\n- Werkrealschule: Klassen 5-9/10\n\nStruktur-Konventionen:\n- Slugs MÜSSEN deterministisch sein: name.lower(), ä→ae, ö→oe, ü→ue, ß→ss, Leerzeichen→Bindestriche, nur [a-z0-9-]\n- Themen sollen dem tatsächlichen BW-Bildungsplan entsprechen\n- Stundenzahlen nach BW-Stundentafel\n\nDateinamen-Konvention:\n<bundesland>_<schulart>_<fach>.json — alles Kleinbuchstaben, Leerzeichen→Unterstriche\n\nWICHTIG: Schreibe KEINE Dateien! Gib NUR das JSON-Objekt aus. Der nachfolgende Shell-Block speichert die Datei.",
   "model": "claude-opus-4-6",
-  "provider": "CLAUDE",
+  "provider": "CODEX",
   "version": "1.0.0",
   "author": "MySuricates",
   "defaultContext": {

@@ -54,7 +54,7 @@
   ],
   "instructions": "Du extrahierst Kerncurriculum-Daten für das niedersächsische Schulsystem.\n\nDeine Hauptaufgabe ist es, HTML-Dateien von cuvo.nibis.de zu lesen und die Themenstruktur als JSON zu extrahieren. Die HTML-Dateien wurden bereits per curl heruntergeladen.\n\nVorgehen:\n1. TMPDIR aus der vorherigen Ausgabe parsen\n2. Falls vorhanden: alle HTML-Dateien lesen und auswerten\n3. Lernbereiche, Themen, Kompetenzen aus dem HTML extrahieren\n4. Falls HTML nicht auswertbar: Wissen über niedersächsische Kerncurricula als Fallback nutzen, mit [FALLBACK] markieren\n\nNiedersachsen-Besonderheiten:\n- Niedersachsen nennt Lehrpläne 'Kerncurricula'\n- Doppeljahrgänge (5/6, 7/8, 9/10) in Einzeljahrgänge expandieren\n- Oberschule: spezifisch für Niedersachsen, kombiniert Hauptschul- und Realschulzweig\n- Kompetenzorientierung mit prozessbezogenen und inhaltsbezogenen Kompetenzen\n- NIBIS = Niedersächsisches Bildungsserver\n\nStruktur-Konventionen:\n- Slugs MÜSSEN deterministisch sein: name.lower(), ä→ae, ö→oe, ü→ue, ß→ss, Leerzeichen→Bindestriche, nur [a-z0-9-]\n- Themen sollen dem tatsächlichen Kerncurriculum Niedersachsen entsprechen\n- Stundenzahlen sind Richtwerte basierend auf niedersächsischen Stundentafeln\n\nDateinamen-Konvention:\n<bundesland>_<schulart>_<fach>.json — alles Kleinbuchstaben, Leerzeichen→Unterstriche\n\nWICHTIG: Schreibe KEINE Dateien! Gib NUR das JSON-Objekt aus. Der nachfolgende Shell-Block speichert die Datei.",
   "model": "claude-opus-4-6",
-  "provider": "CLAUDE",
+  "provider": "CODEX",
   "version": "1.0.0",
   "author": "MySuricates",
   "defaultContext": {
