@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { CheckCircle, FileText, Search } from 'lucide-react';
+import { CheckCircle, Download, FileText, Search } from 'lucide-react';
 import { Card, Input, Spinner } from '../ui';
 import { useT } from '../../i18n';
 import { useI18nStore } from '../../i18n';
-import { useTemplates } from '../../hooks/useTemplates';
+import { useTemplates, exportTemplate } from '../../hooks/useTemplates';
 import { resolveTemplateName } from '../../utils/templateUtils';
 import { ExecutionBadges } from '../shared/ExecutionBadges';
 import { PoolBrowser } from './PoolBrowser';
@@ -22,15 +22,20 @@ export function TemplateSelector({ onSelect, onPoolSelect }: TemplateSelectorPro
   const { data: templates, isLoading } = useTemplates();
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<Tab>('templates');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  const filtered = search.trim()
-    ? (templates ?? []).filter((tmpl) => {
-        const name = resolveTemplateName(tmpl.name, locale).toLowerCase();
-        const desc = resolveTemplateName(tmpl.description, locale).toLowerCase();
-        const q = search.toLowerCase();
-        return name.includes(q) || desc.includes(q);
-      })
-    : (templates ?? []);
+  const allCategories = Array.from(
+    new Set((templates ?? []).map((tmpl) => tmpl.category).filter(Boolean) as string[]),
+  ).sort();
+
+  const filtered = (templates ?? []).filter((tmpl) => {
+    if (selectedCategory && tmpl.category !== selectedCategory) return false;
+    if (!search.trim()) return true;
+    const name = resolveTemplateName(tmpl.name, locale).toLowerCase();
+    const desc = resolveTemplateName(tmpl.description, locale).toLowerCase();
+    const q = search.toLowerCase();
+    return name.includes(q) || desc.includes(q);
+  });
 
   return (
     <div className="space-y-4">
@@ -74,6 +79,34 @@ export function TemplateSelector({ onSelect, onPoolSelect }: TemplateSelectorPro
             icon={<Search className="w-4 h-4 text-text-tertiary" />}
           />
 
+          {allCategories.length > 1 && (
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                onClick={() => setSelectedCategory(null)}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                  !selectedCategory
+                    ? 'bg-accent text-white'
+                    : 'bg-surface-raised text-text-secondary hover:text-text'
+                }`}
+              >
+                {t.common.all}
+              </button>
+              {allCategories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(selectedCategory === cat ? null : cat)}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                    selectedCategory === cat
+                      ? 'bg-accent text-white'
+                      : 'bg-surface-raised text-text-secondary hover:text-text'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          )}
+
           {isLoading ? (
             <div className="flex justify-center py-8">
               <Spinner text={t.common.loading} />
@@ -108,8 +141,8 @@ export function TemplateSelector({ onSelect, onPoolSelect }: TemplateSelectorPro
                     className="cursor-pointer hover:border-border-strong transition-colors"
                     onClick={() => onSelect(tmpl)}
                   >
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className="text-2xl">{tmpl.icon}</span>
+                    <div className="flex items-start gap-3 mb-2">
+                      <span className="text-2xl mt-0.5">{tmpl.icon}</span>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <h4 className="font-semibold text-text truncate">
@@ -132,6 +165,16 @@ export function TemplateSelector({ onSelect, onPoolSelect }: TemplateSelectorPro
                           <ExecutionBadges blocks={tmpl.blocks} />
                         </div>
                       </div>
+                      <button
+                        className="p-1 rounded text-text-tertiary hover:text-text hover:bg-surface-raised transition-colors shrink-0"
+                        title={t.templates.exportTemplate}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          exportTemplate(tmpl, locale);
+                        }}
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                     <p className="text-xs text-text-secondary">
                       {resolveTemplateName(tmpl.description, locale)}

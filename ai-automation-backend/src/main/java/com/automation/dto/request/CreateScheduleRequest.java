@@ -11,5 +11,6 @@ public record CreateScheduleRequest(
         String description,
         Map<String, Object> inputContext,
         String scheduleType,
-        Instant scheduledAt
+        Instant scheduledAt,
+        String delayExpression
 ) {}

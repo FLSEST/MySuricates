@@ -22,6 +22,7 @@ import com.automation.dto.request.UpdateScheduleRequest;
 import com.automation.dto.response.UpcomingScheduleResponse;
 
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -72,7 +73,8 @@ public class SchedulerService {
     public ScheduledWorkflow create(String workflowId, String chainId,
                                      String targetTypeStr, String cronExpression,
                                      String description, Map<String, Object> inputContext,
-                                     String scheduleType, Instant scheduledAt) {
+                                     String scheduleType, Instant scheduledAt,
+                                     String delayExpression) {
         TargetType targetType = parseTargetType(targetTypeStr);
 
         // Validate mutual exclusivity
@@ -115,6 +117,15 @@ public class SchedulerService {
             builder.cronExpression("");
             builder.scheduledAt(scheduledAt);
             builder.nextRunAt(scheduledAt);
+        } else if (type == ScheduleType.DELAYED) {
+            if (delayExpression == null || delayExpression.isBlank()) {
+                throw new IllegalArgumentException("delayExpression is required for DELAYED schedules (e.g. '2h', '30m', '1d')");
+            }
+            Instant runAt = Instant.now().plus(parseDelay(delayExpression));
+            builder.cronExpression("");
+            builder.scheduledAt(runAt);
+            builder.nextRunAt(runAt);
+            builder.delayExpression(delayExpression);
         } else {
             if (cronExpression == null || cronExpression.isBlank()) {
                 throw new IllegalArgumentException("cronExpression is required for CRON schedules");
@@ -170,7 +181,8 @@ public class SchedulerService {
         ScheduledWorkflow scheduled = findById(id);
         scheduled.setEnabled(true);
 
-        if (scheduled.getScheduleType() == ScheduleType.ONCE) {
+        if (scheduled.getScheduleType() == ScheduleType.ONCE
+                || scheduled.getScheduleType() == ScheduleType.DELAYED) {
             scheduled.setNextRunAt(scheduled.getScheduledAt());
         } else {
             scheduled.setNextRunAt(calculateNextRun(scheduled.getCronExpression()));
@@ -241,7 +253,8 @@ public class SchedulerService {
                             chainId, chainName, targetType, nextInstant));
                     next = cron.next(next);
                 }
-            } else if (sw.getScheduleType() == ScheduleType.ONCE) {
+            } else if (sw.getScheduleType() == ScheduleType.ONCE
+                    || sw.getScheduleType() == ScheduleType.DELAYED) {
                 if (sw.getScheduledAt() != null
                         && sw.getScheduledAt().isAfter(now)
                         && sw.getScheduledAt().isBefore(until)) {
@@ -298,5 +311,25 @@ public class SchedulerService {
         LocalDateTime next = cron.next(LocalDateTime.now());
         if (next == null) return null;
         return next.atZone(ZoneId.systemDefault()).toInstant();
+    }
+
+    /**
+     * Parses a human-readable delay expression into a {@link Duration}.
+     * Supported formats: {@code 30s} (seconds), {@code 10m} (minutes), {@code 2h} (hours), {@code 1d} (days).
+     */
+    static Duration parseDelay(String expr) {
+        if (expr == null || expr.isBlank()) {
+            throw new IllegalArgumentException("Delay expression must not be empty");
+        }
+        String trimmed = expr.trim().toLowerCase();
+        try {
+            if (trimmed.endsWith("s")) return Duration.ofSeconds(Long.parseLong(trimmed.substring(0, trimmed.length() - 1)));
+            if (trimmed.endsWith("m")) return Duration.ofMinutes(Long.parseLong(trimmed.substring(0, trimmed.length() - 1)));
+            if (trimmed.endsWith("h")) return Duration.ofHours(Long.parseLong(trimmed.substring(0, trimmed.length() - 1)));
+            if (trimmed.endsWith("d")) return Duration.ofDays(Long.parseLong(trimmed.substring(0, trimmed.length() - 1)));
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid delay expression: '" + expr + "'. Expected format: 30s, 10m, 2h, 1d");
+        }
+        throw new IllegalArgumentException("Invalid delay expression: '" + expr + "'. Supported suffixes: s, m, h, d");
     }
 }

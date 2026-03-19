@@ -15,6 +15,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import com.automation.entity.RunStatus;
@@ -31,6 +32,7 @@ public class ExecutionController {
     private final WorkflowMapper workflowMapper;
 
     @GetMapping
+    @Transactional(readOnly = true)
     public PageResponse<WorkflowRunResponse> listExecutions(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
@@ -70,6 +72,7 @@ public class ExecutionController {
     }
 
     @GetMapping("/{id}")
+    @Transactional(readOnly = true)
     public ResponseEntity<WorkflowRunResponse> getExecution(@PathVariable String id) {
         var run = runRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Execution", id));

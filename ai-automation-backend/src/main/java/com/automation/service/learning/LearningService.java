@@ -81,6 +81,11 @@ public class LearningService {
         return insightsService.getRunInsights(runId);
     }
 
+    /** Strips trailing date version suffixes like {@code -20251001} from model IDs. */
+    static String normalizeModelId(String model) {
+        return model.replaceAll("-\\d{8,}$", "");
+    }
+
     @Transactional(readOnly = true)
     public DashboardResponse getDashboard() {
         long totalWorkflows = workflowRepository.count();
@@ -126,15 +131,72 @@ public class LearningService {
 
         double totalCostUsd30d = 0.0;
         long totalTokens30d = 0;
+
+        Map<String, long[]> providerRunCount = new LinkedHashMap<>();
+        Map<String, long[]> providerSuccessCount = new LinkedHashMap<>();
+        Map<String, long[]> providerTokens = new LinkedHashMap<>();
+        Map<String, double[]> providerCost = new LinkedHashMap<>();
+        Map<String, long[]> modelStepCount = new LinkedHashMap<>();
+        Map<String, long[]> modelTokens = new LinkedHashMap<>();
+        Map<String, double[]> modelCost = new LinkedHashMap<>();
+
         for (WorkflowRun run : recentWindow) {
+            String runProvider = null;
+            boolean runSuccess = run.getStatus() == RunStatus.COMPLETED;
+            long runTokens = 0;
+            double runCost = 0.0;
+
             for (StepResult step : run.getSteps()) {
-                if (step.getMetadata() != null) {
-                    totalCostUsd30d += extractDouble(step.getMetadata(), "costUsd");
-                    totalTokens30d += extractLong(step.getMetadata(), "inputTokens");
-                    totalTokens30d += extractLong(step.getMetadata(), "outputTokens");
+                if (step.getMetadata() == null) continue;
+                Map<String, Object> meta = step.getMetadata();
+
+                double stepCost = extractDouble(meta, "costUsd");
+                long stepTokens = extractLong(meta, "inputTokens") + extractLong(meta, "outputTokens");
+                totalCostUsd30d += stepCost;
+                totalTokens30d += stepTokens;
+                runCost += stepCost;
+                runTokens += stepTokens;
+
+                if (runProvider == null && meta.get("provider") instanceof String p) runProvider = p;
+
+                if (meta.get("model") instanceof String m && !m.isBlank()) {
+                    String nm = normalizeModelId(m);
+                    modelStepCount.computeIfAbsent(nm, k -> new long[1])[0]++;
+                    modelTokens.computeIfAbsent(nm, k -> new long[1])[0] += stepTokens;
+                    modelCost.computeIfAbsent(nm, k -> new double[1])[0] += stepCost;
                 }
             }
+
+            if (runProvider != null) {
+                providerRunCount.computeIfAbsent(runProvider, k -> new long[1])[0]++;
+                if (runSuccess) providerSuccessCount.computeIfAbsent(runProvider, k -> new long[1])[0]++;
+                providerTokens.computeIfAbsent(runProvider, k -> new long[1])[0] += runTokens;
+                providerCost.computeIfAbsent(runProvider, k -> new double[1])[0] += runCost;
+            }
         }
+
+        List<DashboardResponse.ProviderStats> providerStats = providerRunCount.entrySet().stream()
+                .map(e -> {
+                    String p = e.getKey();
+                    long runs = e.getValue()[0];
+                    long successes = providerSuccessCount.getOrDefault(p, new long[]{0})[0];
+                    long tokens = providerTokens.getOrDefault(p, new long[]{0})[0];
+                    double cost = providerCost.getOrDefault(p, new double[]{0.0})[0];
+                    return new DashboardResponse.ProviderStats(p, runs, tokens, cost, runs > 0 ? (double) successes / runs : 0.0);
+                })
+                .sorted(Comparator.comparingLong(DashboardResponse.ProviderStats::runCount).reversed())
+                .toList();
+
+        List<DashboardResponse.ModelStats> modelStats = modelStepCount.entrySet().stream()
+                .map(e -> {
+                    String m = e.getKey();
+                    long steps = e.getValue()[0];
+                    long tokens = modelTokens.getOrDefault(m, new long[]{0})[0];
+                    double cost = modelCost.getOrDefault(m, new double[]{0.0})[0];
+                    return new DashboardResponse.ModelStats(m, steps, tokens, cost);
+                })
+                .sorted(Comparator.comparingLong(DashboardResponse.ModelStats::totalTokens).reversed())
+                .toList();
 
         return new DashboardResponse(
                 totalWorkflows,
@@ -148,7 +210,9 @@ public class LearningService {
                 totalTokens30d,
                 topWorkflows,
                 recentRuns,
-                timeSeries
+                timeSeries,
+                providerStats,
+                modelStats
         );
     }
 }

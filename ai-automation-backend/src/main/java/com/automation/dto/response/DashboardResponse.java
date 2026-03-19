@@ -14,7 +14,9 @@ public record DashboardResponse(
         long totalTokens30d,
         List<TopWorkflowEntry> topWorkflows,
         List<WorkflowRunResponse> recentRuns,
-        List<TimeSeriesPoint> timeSeries
+        List<TimeSeriesPoint> timeSeries,
+        List<ProviderStats> providerStats,
+        List<ModelStats> modelStats
 ) {
     public record TopWorkflowEntry(
             String workflowId,
@@ -26,5 +28,20 @@ public record DashboardResponse(
             String date,
             long count,
             double successRate
+    ) {}
+
+    public record ProviderStats(
+            String provider,
+            long runCount,
+            long totalTokens,
+            double totalCostUsd,
+            double successRate
+    ) {}
+
+    public record ModelStats(
+            String model,
+            long stepCount,
+            long totalTokens,
+            double totalCostUsd
     ) {}
 }

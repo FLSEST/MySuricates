@@ -7,6 +7,7 @@ import com.automation.executor.ExecutionContext;
 import com.automation.service.cli.CliSession;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
+import com.automation.service.workflow.ExecutionBroadcaster;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,6 +28,9 @@ class ForEachBlockExecutorTest {
 
     @Mock
     private CommandExecutorService commandExecutor;
+
+    @Mock
+    private ExecutionBroadcaster broadcaster;
 
     @InjectMocks
     private ForEachBlockExecutor executor;

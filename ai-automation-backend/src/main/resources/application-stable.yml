@@ -8,8 +8,6 @@ server:
 automation:
   cors:
     allowed-origins: http://localhost:9091
-  tray:
-    enabled: false
   staging:
     auto-start: false
   serve-frontend: true

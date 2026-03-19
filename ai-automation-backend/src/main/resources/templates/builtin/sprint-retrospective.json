@@ -1,0 +1,30 @@
+{
+  "id" : "sprint-retrospective",
+  "icon" : "🔄",
+  "name" : {
+    "en" : "Sprint Retrospective",
+    "de" : "Sprint-Retrospektive"
+  },
+  "description" : {
+    "en" : "AI-assisted sprint retrospective: collect data, identify patterns, generate action items",
+    "de" : "KI-gestützte Sprint-Retrospektive: Daten sammeln, Muster erkennen, Maßnahmen ableiten"
+  },
+  "category" : "TEAM",
+  "sortOrder" : 51,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Führe eine Sprint-Retrospektive durch. Variablen: sprint_name, sprint_duration_days (default 14), team_size (default 3), sprint_goal (beschreibt was erreicht werden sollte), sprint_notes (optionale Notizen/Beobachtungen).",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "command" : "set -euo pipefail\nSPRINT_DURATION={{ sprint_duration_days }}\nSPRINT_DURATION=${SPRINT_DURATION:-14}\necho \"=== Sprint Data Collection ===\"\necho \"Sprint: {{ sprint_name }}\"\necho \"Duration: ${SPRINT_DURATION} days\"\necho \"Team size: {{ team_size }}\"\necho \"\"\necho \"--- Git Activity (last ${SPRINT_DURATION} days) ---\"\ngit log --since=\"${SPRINT_DURATION} days ago\" --pretty=format:\"%an|%s\" --no-merges 2>/dev/null | \\\n  awk -F'|' '{count[$1]++; types[$1]=types[$1] NR\": \"$2\"\\n\"} END {for(a in count) print a\": \"count[a]\" commits\"}' | sort -t: -k2 -rn\necho \"\"\necho \"--- Files Changed Most ---\"\ngit log --since=\"${SPRINT_DURATION} days ago\" --name-only --pretty=format:\"\" --no-merges 2>/dev/null | \\\n  grep -v '^$' | sort | uniq -c | sort -rn | head -10 || true\necho \"\"\necho \"--- Open TODOs/FIXMEs ---\"\ngrep -rn 'TODO\\|FIXME\\|HACK\\|XXX' --include='*.java' --include='*.ts' --include='*.tsx' --include='*.py' . 2>/dev/null | grep -v '.git' | wc -l || echo 'Could not count'\necho \"tech debt markers found\"\necho \"=== Data Collection Complete ===\""
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Analysiere die Sprint-Daten und die folgenden Notizen für '{{ sprint_name }}':\n\nSprint-Ziel: {{ sprint_goal }}\nTeam-Notizen: {{ sprint_notes }}\n\nErstelle eine vollständige Retrospektive mit:\n1. **Was lief gut?** (aus Daten und Notizen ableiten)\n2. **Was lief nicht gut?** (Probleme, Blocker, technische Schulden)\n3. **Erkenntnisse** (Muster über mehrere Sprints, wenn erkennbar)\n4. **Maßnahmen** (konkrete, zuweisbare Action Items mit Priorität)\n5. **Team-Gesundheit** (Einschätzung aus verfügbaren Daten)\n\nHalte jeden Abschnitt prägnant und handlungsorientiert."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

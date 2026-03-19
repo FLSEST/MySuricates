@@ -74,6 +74,68 @@ Immer beim Anlegen eines TODOs (das eine längere Arbeitssequenz beschreibt) in 
 
 ---
 
+## PFLICHT: Workflow-First vor Code-Änderungen
+
+WICHTIG: Dieser Abschnitt hat hohe Priorität. Bevor du Code an der Plattform änderst, MUSS geprüft werden, ob das Problem durch einen Workflow lösbar ist.
+
+### Leitfrage (immer stellen)
+
+> „Ist das eine Aufgabe für einen **Workflow** — oder muss wirklich **Plattform-Code** geändert werden?"
+
+MySuricates ist eine selbstverbessernde Plattform. Die bevorzugte Lösung für Automatisierungs-Aufgaben ist **immer ein Workflow**, kein Code-Eingriff.
+
+### Entscheidungsmatrix
+
+| Aufgabe | Workflow-Lösung? | Code-Änderung nötig? |
+|---|---|---|
+| Daten verarbeiten, transformieren, analysieren | ✅ Workflow | Nein |
+| Externe API aufrufen, integrieren | ✅ Workflow | Nein |
+| Dateien lesen, schreiben, umbenennen | ✅ Shell-Block | Nein |
+| Build-, Deploy-, Release-Prozesse | ✅ Workflow | Nein |
+| Berichte, Zusammenfassungen generieren | ✅ Simple/Agentic-Block | Nein |
+| Monitoring, Alerting, Scheduled Tasks | ✅ Schedule + Workflow | Nein |
+| Batch-Operationen über Listen | ✅ ForEach-Block | Nein |
+| **Neuer Block-Typ fehlt** | ❌ | Ja — neues Feature |
+| **Plattform-Bug** (falsche Ausführung, Fehler) | ❌ | Ja — Bugfix |
+| **UI-Komponente fehlt / ist falsch** | ❌ | Ja — Frontend-Änderung |
+| **Security-Fix** | ❌ | Ja — immer Code |
+
+### Pflicht-Rückfrage vor Code-Änderungen
+
+Wenn ein Problem durch einen Workflow lösbar wäre, DARF NICHT sofort Code geändert werden. Stattdessen:
+
+1. **Stopp** — Keine Code-Änderung vornehmen
+2. **Rückfrage stellen**: „Dieses Problem könnte als Workflow gelöst werden (z. B. mit [Block-Typ/Pattern]). Soll ich stattdessen einen Workflow erstellen — oder soll die Plattform selbst geändert werden?"
+3. **Explizite Bestätigung abwarten**, bevor Code geändert wird
+
+### Beispiele
+
+```
+❌ FALSCH: User möchte Logs analysieren → sofort LogAnalysis-Feature im Backend bauen
+✅ RICHTIG: User möchte Logs analysieren → Workflow mit Shell-Block (log lesen) + Simple-Block (Claude analysiert) vorschlagen
+
+❌ FALSCH: User möchte tägliche Reports → ScheduledReportService.java schreiben
+✅ RICHTIG: User möchte tägliche Reports → Workflow + Schedule-Trigger vorschlagen
+
+❌ FALSCH: User möchte Git-Webhook verarbeiten → WebhookHandler-Code schreiben
+✅ RICHTIG: User möchte Git-Webhook verarbeiten → Webhook-Trigger + Workflow konfigurieren
+```
+
+### Ausnahmen (Code-Änderung ist richtig)
+
+- Neuer Block-Typ oder Executor wird gebraucht (kein existierender Typ reicht)
+- Plattform-Bug verhindert korrekte Workflow-Ausführung
+- Sicherheitslücke muss geschlossen werden
+- UI-Darstellung / UX-Problem in der App
+- Performance-Problem in der Plattform selbst
+- Der User hat **explizit** eine Code-Änderung angefordert
+
+### Verweis
+
+Verfügbare Mechanismen: [docs/WORKFLOW-GUIDE.md](docs/WORKFLOW-GUIDE.md) — Block-Typen, Patterns, Timeouts, Agentic-Blöcke
+
+---
+
 AI-powered workflow automation platform with a skill system, Docker-based execution, and a React frontend.
 
 **Workflow Building Guide**: See [docs/WORKFLOW-GUIDE.md](docs/WORKFLOW-GUIDE.md) for a practical guide on building workflows — block types, patterns, timeouts, and pitfalls.

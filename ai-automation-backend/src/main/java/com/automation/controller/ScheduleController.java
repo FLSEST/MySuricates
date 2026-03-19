@@ -74,7 +74,8 @@ public class ScheduleController {
                 request.workflowId(), request.chainId(),
                 request.targetType(), request.cronExpression(),
                 request.description(), request.inputContext(),
-                request.scheduleType(), request.scheduledAt());
+                request.scheduleType(), request.scheduledAt(),
+                request.delayExpression());
         return ResponseEntity.status(HttpStatus.CREATED).body(scheduleMapper.toResponse(scheduled));
     }
 

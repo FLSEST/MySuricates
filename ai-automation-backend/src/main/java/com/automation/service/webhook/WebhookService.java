@@ -9,6 +9,7 @@ import com.automation.repository.WorkflowRepository;
 import com.automation.service.workflow.WorkflowExecutor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +28,7 @@ public class WebhookService {
     private final WebhookTriggerRepository webhookRepository;
     private final WorkflowRepository workflowRepository;
     private final WorkflowExecutor workflowExecutor;
+    private final GitWebhookPayloadParser gitPayloadParser;
 
     @Transactional(readOnly = true)
     public List<WebhookTrigger> findAll() {
@@ -92,9 +94,11 @@ public class WebhookService {
     /**
      * Trigger a workflow execution via webhook token.
      * Merges provided payload with default context.
+     * Git provider headers (X-GitHub-Event, X-Gitlab-Event, X-Gitea-Event) are used
+     * to auto-extract standardized {@code git_*} context variables from the payload.
      */
     @Transactional
-    public WorkflowRun trigger(String token, Map<String, Object> payload) {
+    public WorkflowRun trigger(String token, Map<String, Object> payload, HttpHeaders headers) {
         WebhookTrigger webhook = webhookRepository.findBySecretToken(token)
                 .orElseThrow(() -> new ResourceNotFoundException("WebhookTrigger", "token"));
 
@@ -110,6 +114,10 @@ public class WebhookService {
             }
             context.putAll(payload);
         }
+
+        // Extract git_* fields from recognized Git provider payloads (non-overriding)
+        Map<String, Object> gitFields = gitPayloadParser.parse(payload, headers != null ? headers : HttpHeaders.EMPTY);
+        gitFields.forEach(context::putIfAbsent);
 
         WorkflowRun run = workflowExecutor.execute(webhook.getWorkflow(), context);
 

@@ -1,0 +1,30 @@
+{
+  "id" : "standup-from-git",
+  "icon" : "☀️",
+  "name" : {
+    "en" : "Standup Report from Git",
+    "de" : "Standup-Report aus Git"
+  },
+  "description" : {
+    "en" : "Generate a daily standup summary from recent git commits per author",
+    "de" : "Tägliches Standup-Summary aus den letzten Git-Commits je Autor erstellen"
+  },
+  "category" : "TEAM",
+  "sortOrder" : 50,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Erstelle Standup-Reports. Variablen: since (Zeitraum, default '24 hours ago'), branch (default 'HEAD'), max_commits (default 50).",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "command" : "set -euo pipefail\nSINCE=\"{{ since }}\"\nSINCE=${SINCE:-24 hours ago}\nBRANCH=\"{{ branch }}\"\nBRANCH=${BRANCH:-HEAD}\nMAX={{ max_commits }}\nMAX=${MAX:-50}\necho \"=== Git Activity since: $SINCE ===\"\necho \"Branch: $BRANCH\"\necho \"\"\ngit log \"$BRANCH\" --since=\"$SINCE\" --pretty=format:\"%an|%s|%h|%ar\" --no-merges -n \"$MAX\" 2>/dev/null | awk -F'|' '\n{\n  author=$1; msg=$2; hash=$3; when=$4\n  commits[author] = commits[author] \"|\" msg \" (\" hash \", \" when \")\"\n  count[author]++\n}\nEND {\n  for (a in commits) {\n    print \"\\n### \" a \" (\" count[a] \" commits)\"\n    n=split(commits[a], items, \"|\")\n    for (i=2; i<=n; i++) print \"- \" items[i]\n  }\n}' || echo \"No commits found in the given time range.\"\necho \"\"\necho \"--- Changed Files ---\"\ngit diff --name-only HEAD~5 HEAD 2>/dev/null | sort -u | head -20 || true\necho \"=== Git Activity Complete ===\""
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Erstelle einen strukturierten Standup-Report im klassischen Format: Was wurde gemacht? Was ist geplant? Gibt es Blocker? Gruppiere nach Autor und leite aus den Commit-Nachrichten und geänderten Dateien thematische Schwerpunkte ab. Halte es knapp und handlungsorientiert."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

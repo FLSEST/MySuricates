@@ -271,8 +271,9 @@ export interface ScheduledWorkflow {
   chainName: string | null;
   targetType: 'WORKFLOW' | 'CHAIN';
   cronExpression: string;
-  scheduleType: 'CRON' | 'ONCE';
+  scheduleType: 'CRON' | 'ONCE' | 'DELAYED';
   scheduledAt: string | null;
+  delayExpression: string | null;
   description: string;
   inputContext: Record<string, unknown>;
   enabled: boolean;
@@ -289,8 +290,9 @@ export interface CreateScheduleRequest {
   cronExpression?: string;
   description?: string;
   inputContext?: Record<string, unknown>;
-  scheduleType?: 'CRON' | 'ONCE';
+  scheduleType?: 'CRON' | 'ONCE' | 'DELAYED';
   scheduledAt?: string;
+  delayExpression?: string;
 }
 
 export interface UpdateScheduleRequest {
@@ -456,6 +458,21 @@ export interface TimeSeriesPoint {
   successRate: number;
 }
 
+export interface ProviderStats {
+  provider: string;
+  runCount: number;
+  totalTokens: number;
+  totalCostUsd: number;
+  successRate: number;
+}
+
+export interface ModelStats {
+  model: string;
+  stepCount: number;
+  totalTokens: number;
+  totalCostUsd: number;
+}
+
 export interface DashboardData {
   totalWorkflows: number;
   totalRuns: number;
@@ -469,6 +486,8 @@ export interface DashboardData {
   topWorkflows: Array<{ workflowId: string; workflowName: string; runCount: number }>;
   recentRuns: WorkflowRun[];
   timeSeries?: TimeSeriesPoint[];
+  providerStats?: ProviderStats[];
+  modelStats?: ModelStats[];
 }
 
 // ── Agentic Loop ─────────────────────────────────────────
@@ -808,6 +827,27 @@ export interface FactoryTopicCategory {
   id: string;
   name: string;
   description: string;
+}
+
+// ── Chain Templates ──────────────────────────────────────
+
+export interface ChainTemplate {
+  id: string;
+  name: Record<string, string>;
+  description: Record<string, string>;
+  icon: string;
+  entries: ChainTemplateEntry[];
+}
+
+export interface ChainTemplateEntry {
+  templateId: string;
+  label: Record<string, string>;
+}
+
+export interface ChainInstallResponse {
+  chainId: string;
+  chainName: string;
+  workflowIds: string[];
 }
 
 // ── API Error ────────────────────────────────────────────

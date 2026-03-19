@@ -11,6 +11,7 @@ import { LogViewer } from '../components/shared/LogViewer';
 import { ApprovalDialog } from '../components/shared/ApprovalDialog';
 import { HumanInputDialog } from '../components/shared/HumanInputDialog';
 import { AgenticStepCard } from '../components/shared/AgenticStepCard';
+import { ForEachStepCard } from '../components/shared/ForEachStepCard';
 import { PathLinkedOutput } from '../components/shared/PathLinkedOutput';
 import { InsightsPanel } from '../components/shared/InsightsPanel';
 import { ConversionSuggestion } from '../components/shared/ConversionSuggestion';
@@ -78,7 +79,7 @@ export function WorkflowExecution() {
 
   const { data: workflow } = useWorkflow(id!);
   const { data: runs, error: runsError, refetch: refetchRuns } = useWorkflowRuns(id!);
-  const { logs, connected, pendingApproval, pendingHumanInput, agenticStates } = useExecutionWebSocket(runId!, id);
+  const { logs, connected, pendingApproval, pendingHumanInput, agenticStates, forEachStates } = useExecutionWebSocket(runId!, id);
   const toast = useToast();
   const rateRun = useRateRun();
   const pauseExecution = usePauseExecution();
@@ -289,6 +290,8 @@ export function WorkflowExecution() {
             {run.steps.map((step) =>
               step.blockType === 'agentic' ? (
                 <AgenticStepCard key={step.id} step={step} agenticState={agenticStates.get(step.stepIndex)} />
+              ) : step.blockType === 'foreach' ? (
+                <ForEachStepCard key={step.id} step={step} forEachState={forEachStates.get(step.stepIndex)} />
               ) : (
                 <StepCard key={step.id} step={step} />
               ),

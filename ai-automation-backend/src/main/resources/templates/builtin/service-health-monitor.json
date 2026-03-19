@@ -1,0 +1,40 @@
+{
+  "id" : "service-health-monitor",
+  "icon" : "🩺",
+  "name" : {
+    "en" : "Service Health Monitor",
+    "de" : "Service-Health-Monitor"
+  },
+  "description" : {
+    "en" : "Check health, response time, and disk/memory usage across services",
+    "de" : "Health, Antwortzeit und Disk/Memory-Nutzung über mehrere Services prüfen"
+  },
+  "category" : "INFRA",
+  "sortOrder" : 48,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Prüfe Service-Health. Variablen: service_urls (zeilengetrennte HTTP/HTTPS URLs), timeout_seconds (default 10).",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "command" : "set -euo pipefail\necho \"=== System Resources ===\"\necho \"Hostname: $(hostname)\"\necho \"Uptime: $(uptime -p 2>/dev/null || uptime)\"\necho \"\"\necho \"--- Disk Usage ---\"\ndf -h | grep -v tmpfs | grep -v udev\necho \"\"\necho \"--- Memory Usage ---\"\nfree -h 2>/dev/null || vm_stat 2>/dev/null | head -10\necho \"\"\necho \"--- Top Processes (CPU) ---\"\nps aux --sort=-%cpu 2>/dev/null | head -6 || ps aux | head -6\necho \"=== Resource Check Complete ===\""
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "foreach",
+    "config" : {
+      "variable_name" : "service_url",
+      "items_source" : "list",
+      "items" : "{{ service_urls }}",
+      "execution_mode" : "shell",
+      "command" : "set -euo pipefail\nURL=\"{{ service_url }}\"\nTIMEOUT={{ timeout_seconds }}\nTIMEOUT=${TIMEOUT:-10}\necho \"=== Checking $URL ===\"\nRESULT=$(curl -o /dev/null -s -w \"%{http_code} %{time_total}s\" --max-time \"$TIMEOUT\" \"$URL\" 2>&1 || echo \"FAILED\")\nHTTP_CODE=$(echo \"$RESULT\" | awk '{print $1}')\nRESP_TIME=$(echo \"$RESULT\" | awk '{print $2}')\nif [ \"$RESULT\" = \"FAILED\" ]; then\n  echo \"DOWN: $URL (connection failed)\"\nelif [ \"$HTTP_CODE\" -ge 500 ]; then\n  echo \"ERROR: $URL returned HTTP $HTTP_CODE (${RESP_TIME})\"\nelif [ \"$HTTP_CODE\" -ge 400 ]; then\n  echo \"WARN: $URL returned HTTP $HTTP_CODE (${RESP_TIME})\"\nelse\n  echo \"OK: $URL HTTP $HTTP_CODE (${RESP_TIME})\"\nfi"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Erstelle einen strukturierten Health-Report basierend auf den Ressourcen- und Service-Prüfergebnissen. Markiere kritische Services, ungewöhnlich hohe Ressourcennutzung und gib konkrete Empfehlungen. Format: Executive Summary, dann Details pro Service."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

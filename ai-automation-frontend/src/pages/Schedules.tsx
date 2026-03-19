@@ -35,9 +35,10 @@ export function Schedules() {
     chainId: '',
     cronExpression: '',
     scheduleType: 'CRON',
+    delayExpression: '',
   });
 
-  const defaultForm: FormState = { targetType: 'WORKFLOW', workflowId: '', chainId: '', cronExpression: '', scheduleType: 'CRON' };
+  const defaultForm: FormState = { targetType: 'WORKFLOW', workflowId: '', chainId: '', cronExpression: '', scheduleType: 'CRON', delayExpression: '' };
 
   const closeModal = () => {
     setShowCreate(false);
@@ -74,11 +75,12 @@ export function Schedules() {
     } else {
       const payload: CreateScheduleRequest = {
         targetType: form.targetType,
-        cronExpression: form.scheduleType === 'ONCE' ? undefined : form.cronExpression,
+        cronExpression: form.scheduleType === 'CRON' ? form.cronExpression : undefined,
         description: form.description,
         inputContext: form.inputContext,
         scheduleType: form.scheduleType,
-        scheduledAt: form.scheduledAt,
+        scheduledAt: form.scheduleType === 'ONCE' ? form.scheduledAt : undefined,
+        delayExpression: form.scheduleType === 'DELAYED' ? form.delayExpression : undefined,
       };
       if (form.targetType === 'CHAIN') {
         payload.chainId = form.chainId;
@@ -92,7 +94,9 @@ export function Schedules() {
   const isFormValid = (
     form.targetType === 'CHAIN' ? !!form.chainId : !!form.workflowId
   ) && (
-    form.scheduleType === 'ONCE' ? !!form.scheduledAt : !!form.cronExpression
+    form.scheduleType === 'ONCE' ? !!form.scheduledAt
+    : form.scheduleType === 'DELAYED' ? !!form.delayExpression
+    : !!form.cronExpression
   );
 
   if (isLoading) {
@@ -136,9 +140,13 @@ export function Schedules() {
         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
           s.scheduleType === 'ONCE'
             ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+            : s.scheduleType === 'DELAYED'
+            ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
             : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
         }`}>
-          {s.scheduleType === 'ONCE' ? t.schedules.once : t.schedules.recurring}
+          {s.scheduleType === 'ONCE' ? t.schedules.once
+            : s.scheduleType === 'DELAYED' ? t.schedules.delayed
+            : t.schedules.recurring}
         </span>
       ),
       width: '120px',
@@ -148,9 +156,12 @@ export function Schedules() {
       header: t.schedules.cronExpression,
       render: (s: ScheduledWorkflow) => (
         <span className="font-mono text-xs text-text-secondary">
-          {s.scheduleType === 'ONCE'
+          {s.scheduleType === 'ONCE' || s.scheduleType === 'DELAYED'
             ? (s.scheduledAt ? new Date(s.scheduledAt).toLocaleString() : '-')
             : s.cronExpression}
+          {s.scheduleType === 'DELAYED' && s.delayExpression && (
+            <span className="ml-1 text-orange-500">({s.delayExpression})</span>
+          )}
         </span>
       ),
     },
@@ -159,7 +170,7 @@ export function Schedules() {
       header: t.schedules.nextRun,
       render: (s: ScheduledWorkflow) => (
         <span className="text-text-secondary">
-          {s.scheduleType === 'ONCE' && !s.enabled
+          {(s.scheduleType === 'ONCE' || s.scheduleType === 'DELAYED') && !s.enabled
             ? (<span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">{t.schedules.completed}</span>)
             : s.nextRunAt ? new Date(s.nextRunAt).toLocaleString() : '-'}
         </span>
@@ -374,15 +385,17 @@ export function Schedules() {
             <label className="block text-sm font-medium text-text mb-1.5">{t.schedules.scheduleType}</label>
             {editingSchedule ? (
               <div className="px-3 py-2 rounded-lg border border-border bg-surface-secondary text-text text-sm">
-                {form.scheduleType === 'ONCE' ? t.schedules.once : t.schedules.recurring}
+                {form.scheduleType === 'ONCE' ? t.schedules.once
+                  : form.scheduleType === 'DELAYED' ? t.schedules.delayed
+                  : t.schedules.recurring}
               </div>
             ) : (
               <div className="flex items-center bg-surface-secondary rounded-lg p-0.5 border border-border">
                 <button
                   type="button"
-                  onClick={() => setForm({ ...form, scheduleType: 'CRON', scheduledAt: undefined })}
+                  onClick={() => setForm({ ...form, scheduleType: 'CRON', scheduledAt: undefined, delayExpression: '' })}
                   className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                    form.scheduleType !== 'ONCE'
+                    form.scheduleType === 'CRON'
                       ? 'bg-surface text-text shadow-xs'
                       : 'text-text-secondary hover:text-text'
                   }`}
@@ -391,7 +404,7 @@ export function Schedules() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setForm({ ...form, scheduleType: 'ONCE', cronExpression: '' })}
+                  onClick={() => setForm({ ...form, scheduleType: 'ONCE', cronExpression: '', delayExpression: '' })}
                   className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                     form.scheduleType === 'ONCE'
                       ? 'bg-surface text-text shadow-xs'
@@ -400,11 +413,22 @@ export function Schedules() {
                 >
                   {t.schedules.once}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, scheduleType: 'DELAYED', cronExpression: '', scheduledAt: undefined })}
+                  className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    form.scheduleType === 'DELAYED'
+                      ? 'bg-surface text-text shadow-xs'
+                      : 'text-text-secondary hover:text-text'
+                  }`}
+                >
+                  {t.schedules.delayed}
+                </button>
               </div>
             )}
           </div>
 
-          {/* Cron or DateTime picker */}
+          {/* Cron, DateTime or Delay picker */}
           {form.scheduleType === 'ONCE' ? (
             <div>
               <label className="block text-sm font-medium text-text mb-1.5">{t.schedules.scheduledAt}</label>
@@ -418,6 +442,13 @@ export function Schedules() {
                 className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm focus:outline-hidden focus:ring-2 focus:ring-accent/50"
               />
             </div>
+          ) : form.scheduleType === 'DELAYED' ? (
+            <Input
+              label={t.schedules.delayExpression}
+              value={form.delayExpression ?? ''}
+              onChange={(e) => setForm({ ...form, delayExpression: e.target.value })}
+              placeholder={t.schedules.delayExpressionPlaceholder}
+            />
           ) : (
             <CronPicker
               label={t.schedules.cronExpression}

@@ -208,7 +208,7 @@ class WebhookControllerTest {
                 null, null, null, null, Map.of(), Map.of(), Map.of()
         );
 
-        when(webhookService.trigger(eq("abc123token"), any())).thenReturn(run);
+        when(webhookService.trigger(eq("abc123token"), any(), any())).thenReturn(run);
         when(workflowMapper.toRunResponse(run)).thenReturn(runResponse);
 
         String body = """
@@ -225,7 +225,7 @@ class WebhookControllerTest {
 
     @Test
     void triggerWebhook_invalidToken_returns404() throws Exception {
-        when(webhookService.trigger(eq("invalid"), any()))
+        when(webhookService.trigger(eq("invalid"), any(), any()))
                 .thenThrow(new ResourceNotFoundException("WebhookTrigger", "token"));
 
         mockMvc.perform(post("/api/v1/webhook/trigger/invalid")
@@ -236,7 +236,7 @@ class WebhookControllerTest {
 
     @Test
     void triggerWebhook_disabledWebhook_returns409() throws Exception {
-        when(webhookService.trigger(eq("disabled-token"), any()))
+        when(webhookService.trigger(eq("disabled-token"), any(), any()))
                 .thenThrow(new IllegalStateException("Webhook trigger is disabled"));
 
         mockMvc.perform(post("/api/v1/webhook/trigger/disabled-token")
@@ -253,7 +253,7 @@ class WebhookControllerTest {
                 null, null, null, null, Map.of(), Map.of(), Map.of()
         );
 
-        when(webhookService.trigger(eq("abc123token"), isNull())).thenReturn(run);
+        when(webhookService.trigger(eq("abc123token"), isNull(), any())).thenReturn(run);
         when(workflowMapper.toRunResponse(run)).thenReturn(runResponse);
 
         mockMvc.perform(post("/api/v1/webhook/trigger/abc123token"))

@@ -1,0 +1,30 @@
+{
+  "id" : "log-rotate-cleanup",
+  "icon" : "🗄️",
+  "name" : {
+    "en" : "Log Rotation & Cleanup",
+    "de" : "Log-Rotation & Bereinigung"
+  },
+  "description" : {
+    "en" : "Compress old logs, remove expired files, and report freed space",
+    "de" : "Alte Logs komprimieren, abgelaufene Dateien entfernen und freigegebenen Speicher melden"
+  },
+  "category" : "INFRA",
+  "sortOrder" : 49,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Bereinige Log-Dateien. Variablen: log_dir (Verzeichnis), compress_days (ältere Logs komprimieren, default 7), delete_days (ältere Logs löschen, default 30), pattern (Datei-Muster, default '*.log').",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "command" : "set -euo pipefail\nLOG_DIR=\"{{ log_dir }}\"\nPATTERN=\"{{ pattern }}\"\nPATTERN=${PATTERN:-*.log}\nCOMPRESS_DAYS={{ compress_days }}\nCOMPRESS_DAYS=${COMPRESS_DAYS:-7}\nDELETE_DAYS={{ delete_days }}\nDELETE_DAYS=${DELETE_DAYS:-30}\necho \"=== Log Rotation: $LOG_DIR ===\"\necho \"Pattern: $PATTERN | Compress after: ${COMPRESS_DAYS}d | Delete after: ${DELETE_DAYS}d\"\necho \"\"\necho \"--- Before cleanup ---\"\ndu -sh \"$LOG_DIR\" 2>/dev/null || echo \"Cannot measure directory\"\nFILE_COUNT=$(find \"$LOG_DIR\" -name \"$PATTERN\" -o -name \"${PATTERN}.gz\" 2>/dev/null | wc -l)\necho \"Total log files: $FILE_COUNT\"\necho \"\"\necho \"--- Compressing old logs (>${COMPRESS_DAYS} days) ---\"\nfind \"$LOG_DIR\" -name \"$PATTERN\" -mtime +\"$COMPRESS_DAYS\" 2>/dev/null | while read -r f; do\n  echo \"Compressing: $f\"\n  gzip -f \"$f\"\ndone\nCOMPRESSED=$(find \"$LOG_DIR\" -name \"${PATTERN}.gz\" -mtime +\"$COMPRESS_DAYS\" 2>/dev/null | wc -l)\necho \"Compressed: $COMPRESSED files\"\necho \"\"\necho \"--- Deleting old compressed logs (>${DELETE_DAYS} days) ---\"\nDELETED=0\nfind \"$LOG_DIR\" -name \"${PATTERN}.gz\" -mtime +\"$DELETE_DAYS\" 2>/dev/null | while read -r f; do\n  echo \"Deleting: $f\"\n  rm -f \"$f\"\ndone\necho \"\"\necho \"--- After cleanup ---\"\ndu -sh \"$LOG_DIR\" 2>/dev/null || echo \"Cannot measure directory\"\nFILE_COUNT_AFTER=$(find \"$LOG_DIR\" -name \"$PATTERN\" -o -name \"${PATTERN}.gz\" 2>/dev/null | wc -l)\necho \"Remaining log files: $FILE_COUNT_AFTER\"\necho \"=== Rotation complete ===\""
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Fasse das Log-Rotation-Ergebnis zusammen. Berichte über komprimierte und gelöschte Dateien, den freigegebenen Speicherplatz und ob die Konfiguration (compress_days, delete_days) sinnvoll erscheint. Gib Empfehlungen bei auffälligen Befunden."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

@@ -13,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpHeaders;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -36,6 +37,9 @@ class WebhookServiceTest {
     @Mock
     private WorkflowExecutor workflowExecutor;
 
+    @Mock
+    private GitWebhookPayloadParser gitPayloadParser;
+
     @InjectMocks
     private WebhookService webhookService;
 
@@ -58,6 +62,9 @@ class WebhookServiceTest {
                 .defaultContext(new HashMap<>(Map.of("env", "test")))
                 .triggerCount(0)
                 .build();
+
+        // Default: parser returns no git fields (non-git webhooks)
+        lenient().when(gitPayloadParser.parse(any(), any())).thenReturn(Map.of());
     }
 
     @Test
@@ -171,7 +178,7 @@ class WebhookServiceTest {
         when(workflowExecutor.execute(any(), any())).thenReturn(expectedRun);
 
         Map<String, Object> payload = Map.of("action", "deploy");
-        WorkflowRun result = webhookService.trigger("abc123token", payload);
+        WorkflowRun result = webhookService.trigger("abc123token", payload, HttpHeaders.EMPTY);
 
         assertThat(result.getId()).isEqualTo("run-1");
 
@@ -190,7 +197,7 @@ class WebhookServiceTest {
         when(webhookRepository.findBySecretToken("abc123token")).thenReturn(Optional.of(testWebhook));
         when(workflowExecutor.execute(any(), any())).thenReturn(WorkflowRun.builder().id("run-1").build());
 
-        webhookService.trigger("abc123token", Map.of("env", "prod"));
+        webhookService.trigger("abc123token", Map.of("env", "prod"), HttpHeaders.EMPTY);
 
         verify(workflowExecutor).execute(eq(testWorkflow), argThat(ctx ->
                 "prod".equals(ctx.get("env")) && "false".equals(ctx.get("debug"))
@@ -202,7 +209,7 @@ class WebhookServiceTest {
         when(webhookRepository.findBySecretToken("abc123token")).thenReturn(Optional.of(testWebhook));
         when(workflowExecutor.execute(any(), any())).thenReturn(WorkflowRun.builder().id("run-1").build());
 
-        webhookService.trigger("abc123token", null);
+        webhookService.trigger("abc123token", null, HttpHeaders.EMPTY);
 
         verify(workflowExecutor).execute(eq(testWorkflow), argThat(ctx ->
                 ctx.containsKey("env") && ctx.size() == 1
@@ -214,7 +221,7 @@ class WebhookServiceTest {
         testWebhook.setEnabled(false);
         when(webhookRepository.findBySecretToken("abc123token")).thenReturn(Optional.of(testWebhook));
 
-        assertThatThrownBy(() -> webhookService.trigger("abc123token", null))
+        assertThatThrownBy(() -> webhookService.trigger("abc123token", null, HttpHeaders.EMPTY))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("disabled");
 
@@ -225,7 +232,7 @@ class WebhookServiceTest {
     void trigger_invalidToken_throwsException() {
         when(webhookRepository.findBySecretToken("invalid")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> webhookService.trigger("invalid", null))
+        assertThatThrownBy(() -> webhookService.trigger("invalid", null, HttpHeaders.EMPTY))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 }

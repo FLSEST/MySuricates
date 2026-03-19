@@ -22,7 +22,7 @@ import java.util.Map;
 public class ScheduledWorkflow {
 
     public enum ScheduleType {
-        CRON, ONCE
+        CRON, ONCE, DELAYED
     }
 
     public enum TargetType {
@@ -56,6 +56,10 @@ public class ScheduledWorkflow {
 
     @Column(name = "scheduled_at")
     private Instant scheduledAt;
+
+    /** Human-readable delay expression for DELAYED schedules, e.g. "2h", "30m", "1d". */
+    @Column(name = "delay_expression")
+    private String delayExpression;
 
     @Builder.Default
     private boolean enabled = true;

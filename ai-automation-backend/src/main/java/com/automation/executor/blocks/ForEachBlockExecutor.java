@@ -7,6 +7,7 @@ import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
+import com.automation.service.workflow.ExecutionBroadcaster;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -24,6 +25,7 @@ import static com.automation.config.ExecutionDefaults.SHELL_TIMEOUT_SECONDS;
 public class ForEachBlockExecutor implements BlockExecutor {
 
     private final CommandExecutorService commandExecutor;
+    private final ExecutionBroadcaster broadcaster;
 
     @Override
     @SuppressWarnings("unchecked")
@@ -66,9 +68,20 @@ public class ForEachBlockExecutor implements BlockExecutor {
 
         StringBuilder outputs = new StringBuilder();
         boolean anyFailed = false;
+        String runId = context.getWorkflowRunId();
+        int stepIndex = aggregateResult.getStepIndex();
+        int totalItems = items.size();
 
-        for (String item : items) {
+        for (int i = 0; i < items.size(); i++) {
+            String item = items.get(i);
             if (context.shouldStop()) break;
+
+            broadcaster.broadcastLogMessage(runId, "foreach_item_started", Map.of(
+                    "stepIndex", stepIndex,
+                    "itemIndex", i,
+                    "item", item,
+                    "totalItems", totalItems
+            ));
 
             context.setVariable(variableName, item);
             String resolvedCommand = context.resolveTemplate(command);
@@ -101,8 +114,18 @@ public class ForEachBlockExecutor implements BlockExecutor {
                 );
             }
 
+            boolean failed = itemResult.getStatus() == StepStatus.FAILED;
+            broadcaster.broadcastLogMessage(runId, "foreach_item_completed", Map.of(
+                    "stepIndex", stepIndex,
+                    "itemIndex", i,
+                    "item", item,
+                    "totalItems", totalItems,
+                    "status", itemResult.getStatus().name(),
+                    "output", itemResult.getOutput() != null ? itemResult.getOutput() : ""
+            ));
+
             outputs.append("[").append(item).append("]: ").append(itemResult.getOutput()).append("\n");
-            if (itemResult.getStatus() == StepStatus.FAILED) {
+            if (failed) {
                 anyFailed = true;
             }
         }

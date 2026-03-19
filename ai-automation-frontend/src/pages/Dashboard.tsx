@@ -12,6 +12,8 @@ import { SuccessRateChart } from '../components/dashboard/SuccessRateChart';
 import { TodosDonutChart } from '../components/dashboard/TodosDonutChart';
 import { UpcomingSchedulesCard } from '../components/dashboard/UpcomingSchedulesCard';
 import { FailingWorkflowsCard } from '../components/dashboard/FailingWorkflowsCard';
+import { ProviderStatsCard } from '../components/dashboard/ProviderStatsCard';
+import { ModelStatsCard } from '../components/dashboard/ModelStatsCard';
 import { TodosWidget } from '../components/dashboard/TodosWidget';
 import { useDashboard } from '../hooks/useLearning';
 import { useProjects } from '../hooks/useProjects';
@@ -208,6 +210,14 @@ export function Dashboard() {
         <UpcomingSchedulesCard />
         <FailingWorkflowsCard recentRuns={stats?.recentRuns} />
       </div>
+
+      {/* Provider / model stats row */}
+      {((stats?.providerStats?.length ?? 0) > 0 || (stats?.modelStats?.length ?? 0) > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <ProviderStatsCard data={stats?.providerStats} />
+          <ModelStatsCard data={stats?.modelStats} />
+        </div>
+      )}
 
       {/* Todos overview */}
       <TodosWidget />

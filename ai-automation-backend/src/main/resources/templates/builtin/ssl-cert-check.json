@@ -1,0 +1,34 @@
+{
+  "id" : "ssl-cert-check",
+  "icon" : "🔒",
+  "name" : {
+    "en" : "SSL Certificate Check",
+    "de" : "SSL-Zertifikat-Prüfung"
+  },
+  "description" : {
+    "en" : "Check expiry dates for multiple domains and report upcoming renewals",
+    "de" : "Ablaufdaten für mehrere Domains prüfen und anstehende Verlängerungen melden"
+  },
+  "category" : "INFRA",
+  "sortOrder" : 47,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Prüfe SSL-Zertifikate. Variablen: domains (zeilengetrennte Liste von Hostnamen), warn_days (Warnung wenn Ablauf innerhalb N Tage, default 30).",
+  "blocks" : [ {
+    "type" : "foreach",
+    "config" : {
+      "variable_name" : "domain",
+      "items_source" : "list",
+      "items" : "{{ domains }}",
+      "execution_mode" : "shell",
+      "command" : "set -euo pipefail\nDOMAIN=\"{{ domain }}\"\nWARN_DAYS={{ warn_days }}\nWARN_DAYS=${WARN_DAYS:-30}\necho \"=== Checking $DOMAIN ===\"\nEXPIRY=$(echo | openssl s_client -connect \"$DOMAIN:443\" -servername \"$DOMAIN\" 2>/dev/null | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)\nif [ -z \"$EXPIRY\" ]; then\n  echo \"WARN: Could not retrieve certificate for $DOMAIN\"\n  exit 0\nfi\nEXPIRY_EPOCH=$(date -d \"$EXPIRY\" +%s 2>/dev/null || date -j -f \"%b %d %T %Y %Z\" \"$EXPIRY\" +%s 2>/dev/null)\nNOW_EPOCH=$(date +%s)\nDAYS_LEFT=$(( (EXPIRY_EPOCH - NOW_EPOCH) / 86400 ))\nif [ \"$DAYS_LEFT\" -le \"$WARN_DAYS\" ]; then\n  echo \"WARN: $DOMAIN expires in $DAYS_LEFT days ($EXPIRY)\"\nelif [ \"$DAYS_LEFT\" -le 0 ]; then\n  echo \"ERROR: $DOMAIN certificate EXPIRED ($EXPIRY)\"\nelse\n  echo \"OK: $DOMAIN expires in $DAYS_LEFT days ($EXPIRY)\"\nfi"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "command" : "Analysiere die SSL-Zertifikat-Prüfergebnisse. Identifiziere kritische (abgelaufen), dringende (<14 Tage), und bald ablaufende Zertifikate. Erstelle eine strukturierte Zusammenfassung mit konkreten Handlungsempfehlungen für jede Domain."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

@@ -83,7 +83,7 @@ class ScheduleControllerTest {
         testResponse = new ScheduledWorkflowResponse(
                 "sched-1", "wf-1", "Test Workflow", null,
                 null, null, "WORKFLOW",
-                "0 0 * * * *", "CRON", null,
+                "0 0 * * * *", "CRON", null, null,
                 true, "Hourly run", Map.of(), null,
                 Instant.parse("2026-02-16T00:00:00Z"), testScheduled.getCreatedAt()
         );
@@ -132,7 +132,7 @@ class ScheduleControllerTest {
 
     @Test
     void createSchedule_validCronRequest_returns201() throws Exception {
-        when(schedulerService.create(any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(testScheduled);
+        when(schedulerService.create(any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(testScheduled);
         when(scheduleMapper.toResponse(testScheduled)).thenReturn(testResponse);
 
         String body = """
@@ -152,7 +152,7 @@ class ScheduleControllerTest {
 
     @Test
     void createSchedule_missingWorkflowId_returns400() throws Exception {
-        when(schedulerService.create(any(), any(), any(), any(), any(), any(), any(), any()))
+        when(schedulerService.create(any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenThrow(new IllegalArgumentException("workflowId is required for WORKFLOW schedules"));
 
         String body = """
@@ -181,12 +181,12 @@ class ScheduleControllerTest {
                 "sched-once", "wf-1", "Test Workflow", null,
                 null, null, "WORKFLOW",
                 "", "ONCE",
-                Instant.parse("2026-03-01T10:00:00Z"),
+                Instant.parse("2026-03-01T10:00:00Z"), null,
                 true, null, Map.of(), null,
                 Instant.parse("2026-03-01T10:00:00Z"), null
         );
 
-        when(schedulerService.create(any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(onceScheduled);
+        when(schedulerService.create(any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(onceScheduled);
         when(scheduleMapper.toResponse(onceScheduled)).thenReturn(onceResponse);
 
         String body = """
@@ -223,7 +223,7 @@ class ScheduleControllerTest {
         ScheduledWorkflowResponse disabledResponse = new ScheduledWorkflowResponse(
                 "sched-1", "wf-1", "Test Workflow", null,
                 null, null, "WORKFLOW",
-                "0 0 * * * *", "CRON", null,
+                "0 0 * * * *", "CRON", null, null,
                 false, "Hourly run", Map.of(), null, null, testScheduled.getCreatedAt()
         );
         when(scheduleMapper.toResponse(testScheduled)).thenReturn(disabledResponse);

@@ -28,8 +28,19 @@ public class ScheduledWorkflowExecutor {
     private final ChainExecutor chainExecutor;
     private final ActivityLogService activityLogService;
 
-    @Transactional
+    /**
+     * Execute a scheduled workflow/chain.
+     * <p>
+     * Intentionally NOT @Transactional on the outer method: with SQLite pool-size=1, a
+     * long-running @Transactional would hold the single HikariCP connection for the entire
+     * workflow duration (potentially 30+ minutes), blocking all other DB operations including
+     * read-only Executions API calls.
+     * <p>
+     * Schedule metadata reads/writes use their own short-lived repository transactions, and
+     * workflow execution manages its own transaction scope internally.
+     */
     public void executeSingleSchedule(String scheduleId) {
+        // Short read transaction (repository method is @Transactional by default)
         ScheduledWorkflow scheduled = scheduledRepository.findById(scheduleId).orElse(null);
 
         if (scheduled == null || !scheduled.isEnabled()
@@ -54,16 +65,27 @@ public class ScheduledWorkflowExecutor {
             return;
         }
 
+        // Short write transaction for schedule metadata update
+        updateScheduleAfterRun(scheduleId, scheduled.getScheduleType(),
+                scheduled.getCronExpression());
+    }
+
+    @Transactional
+    public void updateScheduleAfterRun(String scheduleId, ScheduleType scheduleType,
+                                        String cronExpression) {
+        ScheduledWorkflow scheduled = scheduledRepository.findById(scheduleId).orElse(null);
+        if (scheduled == null) return;
+
         scheduled.setLastRunAt(Instant.now());
 
-        if (scheduled.getScheduleType() == ScheduleType.ONCE) {
+        if (scheduleType == ScheduleType.ONCE || scheduleType == ScheduleType.DELAYED) {
             scheduled.setNextRunAt(null);
             scheduled.setEnabled(false);
-            log.info("ONCE schedule {} executed and disabled", scheduled.getId());
+            log.info("{} schedule {} executed and disabled", scheduleType, scheduleId);
         } else {
-            scheduled.setNextRunAt(calculateNextRun(scheduled.getCronExpression()));
+            scheduled.setNextRunAt(calculateNextRun(cronExpression));
             log.info("Schedule {} executed, next run at: {}",
-                    scheduled.getId(), scheduled.getNextRunAt());
+                    scheduleId, scheduled.getNextRunAt());
         }
 
         scheduledRepository.save(scheduled);

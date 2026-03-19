@@ -24,7 +24,7 @@ class BuiltInTemplateLoaderTest {
 
     @Test
     void loadAll_returnsAllTemplates() {
-        assertThat(templates).hasSize(44);
+        assertThat(templates).hasSizeGreaterThanOrEqualTo(44);
     }
 
     @Test

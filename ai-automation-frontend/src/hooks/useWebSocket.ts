@@ -131,7 +131,41 @@ type AgenticMessage =
   | AgenticErrorMessage
   | AgenticApprovalMessage;
 
-type WsMessage = StepMessage | StatusMessage | ApprovalRequiredMessage | ApprovalResolvedMessage | HumanInputRequiredMessage | HumanInputResolvedMessage | AgenticMessage;
+interface ForEachItemStartedMessage {
+  type: 'foreach_item_started';
+  stepIndex: number;
+  itemIndex: number;
+  item: string;
+  totalItems: number;
+}
+
+interface ForEachItemCompletedMessage {
+  type: 'foreach_item_completed';
+  stepIndex: number;
+  itemIndex: number;
+  item: string;
+  totalItems: number;
+  status: string;
+  output: string;
+}
+
+type ForEachMessage = ForEachItemStartedMessage | ForEachItemCompletedMessage;
+
+export interface ForEachItemState {
+  itemIndex: number;
+  item: string;
+  status: 'running' | 'completed' | 'failed';
+  output?: string;
+}
+
+export interface ForEachState {
+  stepIndex: number;
+  totalItems: number;
+  completedItems: number;
+  items: ForEachItemState[];
+}
+
+type WsMessage = StepMessage | StatusMessage | ApprovalRequiredMessage | ApprovalResolvedMessage | HumanInputRequiredMessage | HumanInputResolvedMessage | AgenticMessage | ForEachMessage;
 
 export interface PendingApproval {
   blockId: string;
@@ -162,6 +196,48 @@ function isHumanInputResolved(data: WsMessage): data is HumanInputResolvedMessag
 
 function isAgenticMessage(data: WsMessage): data is AgenticMessage {
   return 'type' in data && typeof data.type === 'string' && data.type.startsWith('agentic_');
+}
+
+function isForEachMessage(data: WsMessage): data is ForEachMessage {
+  return 'type' in data && typeof data.type === 'string' && data.type.startsWith('foreach_');
+}
+
+function handleForEachMessage(
+  msg: ForEachMessage,
+  setForEachStates: React.Dispatch<React.SetStateAction<Map<number, ForEachState>>>,
+) {
+  setForEachStates((prev) => {
+    const updated = new Map(prev);
+    const current = updated.get(msg.stepIndex) || {
+      stepIndex: msg.stepIndex,
+      totalItems: msg.totalItems,
+      completedItems: 0,
+      items: [],
+    };
+
+    if (msg.type === 'foreach_item_started') {
+      const item: ForEachItemState = { itemIndex: msg.itemIndex, item: msg.item, status: 'running' };
+      updated.set(msg.stepIndex, {
+        ...current,
+        totalItems: msg.totalItems,
+        items: [...current.items.filter((i) => i.itemIndex !== msg.itemIndex), item],
+      });
+    } else if (msg.type === 'foreach_item_completed') {
+      const items = current.items.map((i) =>
+        i.itemIndex === msg.itemIndex
+          ? { ...i, status: (msg.status === 'FAILED' ? 'failed' : 'completed') as ForEachItemState['status'], output: msg.output }
+          : i,
+      );
+      updated.set(msg.stepIndex, {
+        ...current,
+        totalItems: msg.totalItems,
+        completedItems: items.filter((i) => i.status !== 'running').length,
+        items,
+      });
+    }
+
+    return updated;
+  });
 }
 
 function handleAgenticMessage(
@@ -280,6 +356,7 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string)
   const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null);
   const [pendingHumanInput, setPendingHumanInput] = useState<PendingHumanInput | null>(null);
   const [agenticStates, setAgenticStates] = useState<Map<number, AgenticState>>(new Map());
+  const [forEachStates, setForEachStates] = useState<Map<number, ForEachState>>(new Map());
   const clientRef = useRef<Client | null>(null);
   const queryClient = useQueryClient();
 
@@ -308,7 +385,20 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string)
           try {
             const data = JSON.parse(message.body) as WsMessage;
 
-            if (isAgenticMessage(data)) {
+            if (isForEachMessage(data)) {
+              handleForEachMessage(data, setForEachStates);
+              const pct = data.type === 'foreach_item_completed'
+                ? `${Math.round(((data.itemIndex + 1) / data.totalItems) * 100)}%`
+                : '';
+              const status = data.type === 'foreach_item_completed' ? ` [${data.status}]` : '';
+              appendLog({
+                timestamp: new Date().toISOString(),
+                level: data.type === 'foreach_item_completed' && data.status === 'FAILED' ? 'ERROR' : 'INFO',
+                message: data.type === 'foreach_item_started'
+                  ? `[forEach] Starting item ${data.itemIndex + 1}/${data.totalItems}: ${data.item}`
+                  : `[forEach] ${data.itemIndex + 1}/${data.totalItems} (${pct})${status}: ${data.item}`,
+              });
+            } else if (isAgenticMessage(data)) {
               handleAgenticMessage(data, setAgenticStates);
 
               // Also add to logs for log viewer
@@ -413,5 +503,5 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string)
 
   const clearLogs = useCallback(() => setLogs([]), []);
 
-  return { logs, connected, clearLogs, pendingApproval, pendingHumanInput, agenticStates };
+  return { logs, connected, clearLogs, pendingApproval, pendingHumanInput, agenticStates, forEachStates };
 }

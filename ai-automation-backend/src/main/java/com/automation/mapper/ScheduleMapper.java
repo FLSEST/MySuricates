@@ -39,6 +39,7 @@ public class ScheduleMapper {
                 s.getCronExpression(),
                 s.getScheduleType().name(),
                 s.getScheduledAt(),
+                s.getDelayExpression(),
                 s.isEnabled(),
                 s.getDescription(),
                 s.getInputContext(),

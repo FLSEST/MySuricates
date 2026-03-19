@@ -38,7 +38,7 @@ class LearningControllerTest {
     void getDashboard_returnsOk() throws Exception {
         DashboardResponse dashboard = new DashboardResponse(
                 5L, 20L, 3L, 15L, 5L, 1500.0, 0.75, 0.42, 5000L,
-                List.of(), List.of(), List.of()
+                List.of(), List.of(), List.of(), List.of(), List.of()
         );
         when(learningService.getDashboard()).thenReturn(dashboard);
 

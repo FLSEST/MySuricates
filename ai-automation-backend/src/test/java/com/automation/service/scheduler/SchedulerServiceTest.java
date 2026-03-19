@@ -113,7 +113,7 @@ class SchedulerServiceTest {
         });
 
         ScheduledWorkflow result = schedulerService.create(
-                "wf-1", null, null, "0 0 * * * *", "Hourly", Map.of("env", "prod"), "CRON", null);
+                "wf-1", null, null, "0 0 * * * *", "Hourly", Map.of("env", "prod"), "CRON", null, null);
 
         assertThat(result.getId()).isEqualTo("sched-new");
         assertThat(result.getCronExpression()).isEqualTo("0 0 * * * *");
@@ -134,7 +134,7 @@ class SchedulerServiceTest {
         });
 
         ScheduledWorkflow result = schedulerService.create(
-                "wf-1", null, null, null, "One-time run", null, "ONCE", futureTime);
+                "wf-1", null, null, null, "One-time run", null, "ONCE", futureTime, null);
 
         assertThat(result.getId()).isEqualTo("sched-once");
         assertThat(result.getScheduleType()).isEqualTo(ScheduleType.ONCE);
@@ -149,7 +149,7 @@ class SchedulerServiceTest {
         when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
 
         assertThatThrownBy(() -> schedulerService.create(
-                "wf-1", null, null, null, "Test", null, "ONCE", null))
+                "wf-1", null, null, null, "Test", null, "ONCE", null, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("scheduledAt is required");
     }
@@ -159,7 +159,7 @@ class SchedulerServiceTest {
         when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
 
         assertThatThrownBy(() -> schedulerService.create(
-                "wf-1", null, null, null, "Test", null, "CRON", null))
+                "wf-1", null, null, null, "Test", null, "CRON", null, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("cronExpression is required");
     }
@@ -169,7 +169,7 @@ class SchedulerServiceTest {
         when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
 
         assertThatThrownBy(() -> schedulerService.create(
-                "wf-1", null, null, "invalid-cron", "Test", null, null, null))
+                "wf-1", null, null, "invalid-cron", "Test", null, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Invalid cron expression");
     }
@@ -179,7 +179,7 @@ class SchedulerServiceTest {
         when(workflowRepository.findById("unknown")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> schedulerService.create(
-                "unknown", null, null, "0 0 * * * *", "Test", null, null, null))
+                "unknown", null, null, "0 0 * * * *", "Test", null, null, null, null))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
@@ -189,7 +189,7 @@ class SchedulerServiceTest {
         when(scheduledRepository.save(any(ScheduledWorkflow.class))).thenAnswer(inv -> inv.getArgument(0));
 
         ScheduledWorkflow result = schedulerService.create(
-                "wf-1", null, null, "0 0 * * * *", "Test", null, null, null);
+                "wf-1", null, null, "0 0 * * * *", "Test", null, null, null, null);
 
         assertThat(result.getScheduleType()).isEqualTo(ScheduleType.CRON);
     }
@@ -199,7 +199,7 @@ class SchedulerServiceTest {
         when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
         when(scheduledRepository.save(any(ScheduledWorkflow.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        ScheduledWorkflow result = schedulerService.create("wf-1", null, null, "0 0 * * * *", "Test", null, null, null);
+        ScheduledWorkflow result = schedulerService.create("wf-1", null, null, "0 0 * * * *", "Test", null, null, null, null);
 
         assertThat(result.getInputContext()).isNotNull().isEmpty();
     }

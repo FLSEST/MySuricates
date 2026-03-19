@@ -180,28 +180,50 @@ public class CommandExecutorService {
         step.setInput(command);
         step.setStatus(StepStatus.RUNNING);
 
-        try {
-            CliSession.EnrichedCommandResult result = executeOnHost(HostExecutionRequest.builder()
-                    .projectPath(request.projectPath())
-                    .command(command)
-                    .model(request.model())
-                    .systemPrompt(request.systemPrompt())
-                    .timeoutSeconds(request.timeoutSeconds())
-                    .providerId(request.providerId())
-                    .build());
-            step.setOutput(result.output());
-            step.setStatus(result.exitCode() == 0 ? StepStatus.COMPLETED : StepStatus.FAILED);
+        String providerId = request.providerId();
+        boolean isNonClaude = providerId != null && !providerId.isBlank() && !"CLAUDE".equalsIgnoreCase(providerId);
 
-            if (result.parsed() != null) {
-                Map<String, Object> meta = new LinkedHashMap<>(result.parsed().toMetadata());
-                if (request.model() != null && !meta.containsKey("model")) meta.put("model", request.model());
-                meta.put("provider", request.providerId() != null ? request.providerId() : "CLAUDE");
+        try {
+            if (isNonClaude) {
+                // Call provider directly to preserve token metadata
+                AiProvider provider = aiProviderRegistry.resolve(providerId);
+                AiProvider.ActionResult providerResult = provider.executeAction(
+                        new AiProvider.ActionRequest(command, request.model(), request.systemPrompt(),
+                                request.projectPath(), request.timeoutSeconds()));
+                step.setOutput(providerResult.text());
+                step.setStatus(providerResult.exitCode() == 0 ? StepStatus.COMPLETED : StepStatus.FAILED);
+
+                Map<String, Object> meta = new LinkedHashMap<>(
+                        providerResult.metadata() != null ? providerResult.metadata().toMap() : Map.of());
+                // Fall back to provider ID as model name when no model is reported
+                if (!meta.containsKey("model") || meta.get("model") == null) {
+                    meta.put("model", providerId.toLowerCase());
+                }
+                meta.put("provider", providerId);
                 step.setMetadata(meta);
             } else {
-                Map<String, Object> meta = new LinkedHashMap<>();
-                if (request.model() != null) meta.put("model", request.model());
-                meta.put("provider", request.providerId() != null ? request.providerId() : "CLAUDE");
-                step.setMetadata(meta);
+                CliSession.EnrichedCommandResult result = executeOnHost(HostExecutionRequest.builder()
+                        .projectPath(request.projectPath())
+                        .command(command)
+                        .model(request.model())
+                        .systemPrompt(request.systemPrompt())
+                        .timeoutSeconds(request.timeoutSeconds())
+                        .providerId(request.providerId())
+                        .build());
+                step.setOutput(result.output());
+                step.setStatus(result.exitCode() == 0 ? StepStatus.COMPLETED : StepStatus.FAILED);
+
+                if (result.parsed() != null) {
+                    Map<String, Object> meta = new LinkedHashMap<>(result.parsed().toMetadata());
+                    if (request.model() != null && !meta.containsKey("model")) meta.put("model", request.model());
+                    meta.put("provider", "CLAUDE");
+                    step.setMetadata(meta);
+                } else {
+                    Map<String, Object> meta = new LinkedHashMap<>();
+                    if (request.model() != null) meta.put("model", request.model());
+                    meta.put("provider", "CLAUDE");
+                    step.setMetadata(meta);
+                }
             }
         } catch (Exception e) {
             log.error("Host step execution failed for project {}: {}", request.projectPath(), e.getMessage(), e);

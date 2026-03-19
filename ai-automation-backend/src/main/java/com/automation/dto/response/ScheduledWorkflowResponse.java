@@ -14,6 +14,7 @@ public record ScheduledWorkflowResponse(
         String cronExpression,
         String scheduleType,
         Instant scheduledAt,
+        String delayExpression,
         boolean enabled,
         String description,
         Map<String, Object> inputContext,

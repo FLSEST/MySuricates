@@ -11,6 +11,7 @@ import com.automation.service.webhook.WebhookService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -76,8 +77,9 @@ public class WebhookController {
     @PostMapping("/api/v1/webhook/trigger/{token}")
     public ResponseEntity<WorkflowRunResponse> triggerWebhook(
             @PathVariable String token,
+            @RequestHeader HttpHeaders headers,
             @RequestBody(required = false) Map<String, Object> payload) {
-        WorkflowRun run = webhookService.trigger(token, payload);
+        WorkflowRun run = webhookService.trigger(token, payload, headers);
         return ResponseEntity.ok(workflowMapper.toRunResponse(run));
     }
 
