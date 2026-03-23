@@ -18,6 +18,7 @@ import java.util.List;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import com.automation.service.activitylog.ActivityLogService;
 
 @WebMvcTest(StagingController.class)
 @Import(GlobalExceptionHandler.class)
@@ -29,6 +30,9 @@ class StagingControllerTest {
 
     @MockBean
     private StagingService stagingService;
+    @MockBean
+    private ActivityLogService activityLogService;
+
 
     @MockBean
     private ApiKeyService apiKeyService;

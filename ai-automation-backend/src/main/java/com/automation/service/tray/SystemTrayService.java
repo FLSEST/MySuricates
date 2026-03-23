@@ -377,6 +377,22 @@ public class SystemTrayService {
         }
     }
 
+    /**
+     * Shows a desktop notification via the system tray icon.
+     * Silently does nothing if the tray is not available.
+     */
+    public void showNotification(String title, String message, boolean isError) {
+        if (!initialized || trayIcon == null) return;
+        java.awt.EventQueue.invokeLater(() -> {
+            try {
+                trayIcon.displayMessage(title, message,
+                        isError ? TrayIcon.MessageType.WARNING : TrayIcon.MessageType.INFO);
+            } catch (Exception e) {
+                log.debug("Failed to show desktop notification: {}", e.getMessage());
+            }
+        });
+    }
+
     @PreDestroy
     public void cleanup() {
         if (initialized && trayIcon != null) {

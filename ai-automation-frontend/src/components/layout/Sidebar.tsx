@@ -1,14 +1,32 @@
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, GitBranch, History, Zap, Sparkles, Factory,
-  Calendar, Webhook, ScrollText, CheckSquare, Settings, ChevronLeft, ChevronRight, Link2, BookOpen,
+  Calendar, Webhook, ScrollText, CheckSquare, Settings, ChevronLeft, ChevronRight, Link2, BookOpen, BarChart2,
+  Pencil, Check, RotateCcw, Plus,
 } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable';
 import { useSidebarStore } from '../../stores/sidebarStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useSystemInfo } from '../../hooks/useSystem';
 import { useT } from '../../i18n';
 import { HealthIndicator } from './HealthIndicator';
+import { SortableNavItem } from './SortableNavItem';
 
 const SIMPLE_MODE_ROUTES = new Set(['/', '/workflows', '/runs']);
 
@@ -96,19 +114,66 @@ const navItems = [
   { to: '/webhooks', icon: Webhook, labelKey: 'webhooks' as const },
   { to: '/todos', icon: CheckSquare, labelKey: 'todos' as const },
   { to: '/activity', icon: ScrollText, labelKey: 'activityLog' as const },
+  { to: '/insights', icon: BarChart2, labelKey: 'insights' as const },
   { to: '/docs', icon: BookOpen, labelKey: 'docs' as const },
 ];
 
 export function Sidebar() {
   const { collapsed, toggle, mobileOpen, setMobileOpen } = useSidebarStore();
-  const { simpleMode, setSimpleMode } = useSettingsStore();
+  const { simpleMode, setSimpleMode, sidebarItemOrder, sidebarHiddenItems, setSidebarItemOrder, setSidebarHiddenItems } = useSettingsStore();
   const isMobile = useIsMobile();
   const { data: systemInfo } = useSystemInfo();
   const t = useT();
+  const [editMode, setEditMode] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  // Build label-enriched nav items once (needed for edit mode display)
+  const navItemsWithLabels = navItems.map((item) => ({
+    ...item,
+    label: t.nav[item.labelKey],
+  }));
+
+  // Compute ordered nav items (respecting custom order, minus hidden)
+  const orderedNavItems = (() => {
+    if (sidebarItemOrder.length === 0) return navItemsWithLabels;
+    const byRoute = Object.fromEntries(navItemsWithLabels.map((i) => [i.to, i]));
+    const ordered = sidebarItemOrder.map((to) => byRoute[to]).filter((x): x is NonNullable<typeof x> => x != null);
+    // append any new items not yet in custom order
+    const extra = navItemsWithLabels.filter((i) => !sidebarItemOrder.includes(i.to));
+    return [...ordered, ...extra];
+  })();
 
   const visibleNavItems = simpleMode
-    ? navItems.filter((item) => SIMPLE_MODE_ROUTES.has(item.to))
-    : navItems;
+    ? orderedNavItems.filter((item) => SIMPLE_MODE_ROUTES.has(item.to))
+    : orderedNavItems.filter((item) => !sidebarHiddenItems.includes(item.to));
+
+  const hiddenNavItems = navItemsWithLabels.filter((item) => sidebarHiddenItems.includes(item.to));
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const currentOrder = orderedNavItems.map((i) => i.to);
+    const oldIndex = currentOrder.indexOf(active.id as string);
+    const newIndex = currentOrder.indexOf(over.id as string);
+    setSidebarItemOrder(arrayMove(currentOrder, oldIndex, newIndex));
+  };
+
+  const handleHide = (to: string) => {
+    setSidebarHiddenItems([...sidebarHiddenItems, to]);
+  };
+
+  const handleShow = (to: string) => {
+    setSidebarHiddenItems(sidebarHiddenItems.filter((h) => h !== to));
+  };
+
+  const handleReset = () => {
+    setSidebarItemOrder([]);
+    setSidebarHiddenItems([]);
+  };
 
   const isOpen = isMobile ? mobileOpen : true;
   const showLabels = isMobile ? true : !collapsed;
@@ -172,27 +237,59 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
-        {visibleNavItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.to === '/'}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors
-               ${isActive
-                 ? 'text-white'
-                 : 'text-[#8a7d6e] hover:text-white'
-               }`
-            }
-            style={({ isActive }) => ({
-              backgroundColor: isActive ? 'var(--color-sidebar-active)' : undefined,
-            })}
-            onClick={() => { if (isMobile) setMobileOpen(false); }}
-          >
-            <item.icon className="w-4.5 h-4.5 shrink-0" style={{ width: 18, height: 18 }} />
-            {showLabels && <span className="truncate">{t.nav[item.labelKey]}</span>}
-          </NavLink>
-        ))}
+        {editMode && !collapsed ? (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={orderedNavItems.map((i) => i.to)} strategy={verticalListSortingStrategy}>
+              {orderedNavItems.map((item) => (
+                <SortableNavItem
+                  key={item.to}
+                  id={item.to}
+                  item={item}
+                  onHide={handleHide}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
+        ) : (
+          visibleNavItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === '/'}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                 ${isActive
+                   ? 'text-white'
+                   : 'text-[#8a7d6e] hover:text-white'
+                 }`
+              }
+              style={({ isActive }) => ({
+                backgroundColor: isActive ? 'var(--color-sidebar-active)' : undefined,
+              })}
+              onClick={() => { if (isMobile) setMobileOpen(false); }}
+            >
+              <item.icon className="w-4.5 h-4.5 shrink-0" style={{ width: 18, height: 18 }} />
+              {showLabels && <span className="truncate">{item.label}</span>}
+            </NavLink>
+          ))
+        )}
+
+        {/* Hidden items — show as "+ add back" in edit mode */}
+        {editMode && !collapsed && hiddenNavItems.length > 0 && (
+          <div className="pt-2 mt-2 border-t border-white/10 space-y-0.5">
+            {hiddenNavItems.map((item) => (
+              <button
+                key={item.to}
+                onClick={() => handleShow(item.to)}
+                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-sm text-[#5a4e44] hover:text-[#8a7d6e] transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5 shrink-0" />
+                <item.icon style={{ width: 14, height: 14 }} className="shrink-0" />
+                <span className="truncate">{item.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </nav>
 
       {/* Settings + Collapse */}
@@ -213,6 +310,42 @@ export function Sidebar() {
         </NavLink>
 
         <HealthIndicator collapsed={collapsed && !isMobile} />
+
+        {showLabels && (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setEditMode((v) => !v)}
+              className={`flex items-center gap-2 flex-1 px-3 py-2 rounded-lg text-sm transition-colors ${
+                editMode
+                  ? 'text-accent bg-accent/10'
+                  : 'text-[#7a6e60] hover:text-[#a89a8a]'
+              }`}
+              aria-label={editMode ? 'Bearbeitung beenden' : 'Navigation bearbeiten'}
+            >
+              {editMode ? (
+                <>
+                  <Check className="w-[16px] h-[16px] shrink-0" />
+                  <span>Fertig</span>
+                </>
+              ) : (
+                <>
+                  <Pencil className="w-[16px] h-[16px] shrink-0" />
+                  <span>Bearbeiten</span>
+                </>
+              )}
+            </button>
+            {editMode && (
+              <button
+                onClick={handleReset}
+                className="p-2 rounded-lg text-[#5a4e44] hover:text-[#8a7d6e] transition-colors"
+                aria-label="Zurücksetzen"
+                title="Reihenfolge zurücksetzen"
+              >
+                <RotateCcw className="w-[14px] h-[14px]" />
+              </button>
+            )}
+          </div>
+        )}
 
         {!isMobile && (
           <button

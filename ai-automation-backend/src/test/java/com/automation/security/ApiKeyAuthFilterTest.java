@@ -1,5 +1,6 @@
 package com.automation.security;
 
+import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.system.ApiKeyService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,6 +25,9 @@ class ApiKeyAuthFilterTest {
     private ApiKeyService apiKeyService;
 
     @Mock
+    private ActivityLogService activityLogService;
+
+    @Mock
     private HttpServletRequest request;
 
     @Mock
@@ -34,7 +38,7 @@ class ApiKeyAuthFilterTest {
 
     @BeforeEach
     void setUp() {
-        filter = new ApiKeyAuthFilter(apiKeyService);
+        filter = new ApiKeyAuthFilter(apiKeyService, activityLogService);
         SecurityContextHolder.clearContext();
     }
 

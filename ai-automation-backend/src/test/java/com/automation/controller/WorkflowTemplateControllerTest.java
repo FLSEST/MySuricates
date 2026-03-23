@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import com.automation.service.activitylog.ActivityLogService;
 
 @WebMvcTest(WorkflowTemplateController.class)
 @Import(GlobalExceptionHandler.class)
@@ -35,6 +36,9 @@ class WorkflowTemplateControllerTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @MockBean private WorkflowTemplateService templateService;
+    @MockBean
+    private ActivityLogService activityLogService;
+
     @MockBean private WorkflowTemplateMapper templateMapper;
     @MockBean private TemplateVerificationService verificationService;
     @MockBean private ProjectRepository projectRepository;

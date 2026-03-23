@@ -19,6 +19,10 @@ import java.util.Map;
 @Table(name = "workflows")
 @SQLRestriction("deleted_at IS NULL")
 @EntityListeners(AuditingEntityListener.class)
+@NamedEntityGraph(
+        name = "Workflow.forExecution",
+        attributeNodes = @NamedAttributeNode("activatedSkills")
+)
 @Getter
 @Setter
 @NoArgsConstructor

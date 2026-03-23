@@ -7,6 +7,7 @@ import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.SkillRepository;
 import com.automation.repository.WorkflowRepository;
+import com.automation.service.activitylog.ActivityLogService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,6 +36,9 @@ class WorkflowServiceTest {
 
     @Mock
     private SkillRepository skillRepository;
+
+    @Mock
+    private ActivityLogService activityLogService;
 
     @InjectMocks
     private WorkflowService workflowService;

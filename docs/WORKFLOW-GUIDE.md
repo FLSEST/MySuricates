@@ -824,14 +824,37 @@ Token usage (input + output) is tracked across all iterations. When the budget i
 
 ### Workflow Memory
 
-Workflows can accumulate knowledge across runs:
+Workflows can accumulate knowledge across runs. Memory is **manually extracted** — it does not happen automatically after a run.
 
-1. After a run completes, `WorkflowMemoryService` extracts knowledge
-2. Knowledge is stored as `WorkflowMemory` entries (title, content, tags)
-3. Before execution, active memory is written to `.claude/rules/project-memory.md` in the project directory
-4. Claude CLI picks up these rules automatically
+#### How it works
 
-**API**: `/api/v1/workflows/{workflowId}/memory` (GET, POST, PUT, DELETE)
+1. **Extract** (manual): After one or more runs, trigger extraction via UI ("Memory"-Tab on the workflow detail page) or API. Select which runs to include and choose a provider (Claude or Codex). The `ConversationPreprocessor` compresses the step outputs by ~50–70% before sending them to the AI, which produces a structured knowledge entry (title, Markdown content, tags).
+2. **Activate** (manual): Extracted memory starts as `active=false`. You must explicitly activate a version before it takes effect. Only one version can be active at a time.
+3. **Used on next run**: Before each workflow execution, the active memory is written to `.claude/rules/project-memory.md` in the project directory. Claude CLI picks up this file automatically via its rules system.
+4. **Versioning**: Multiple memory versions per workflow are retained. You can revert to an older version by activating it.
+5. **Edit**: Title and content can be manually refined in the UI (Monaco editor).
+
+#### When to use
+
+Extract memory after a workflow has produced a run with valuable insights — patterns, gotchas, domain knowledge — that should guide future runs. It's especially useful for agentic workflows that learn project-specific conventions over time.
+
+#### API
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/v1/workflows/{id}/memory` | List all memory versions |
+| POST | `/api/v1/workflows/{id}/memory/extract` | Extract from runs (`runIds`, `provider`) |
+| PUT | `/api/v1/workflows/{id}/memory/{mid}` | Update title/content |
+| PUT | `/api/v1/workflows/{id}/memory/{mid}/activate` | Activate a version |
+| DELETE | `/api/v1/workflows/{id}/memory/{mid}` | Delete a version |
+
+```json
+// POST /api/v1/workflows/{id}/memory/extract
+{
+  "runIds": ["run-id-1", "run-id-2"],  // optional — omit to use last 10 runs
+  "provider": "CLAUDE"                  // or "CODEX"
+}
+```
 
 ---
 

@@ -1,0 +1,25 @@
+{
+  "name": {
+    "de": "Release Readiness Report",
+    "en": "Release Readiness Report"
+  },
+  "description": {
+    "de": "Fasst alle Quality-Gate-Ergebnisse zu einem Release-Bereitschaftsbericht zusammen",
+    "en": "Summarizes all quality gate results into a release readiness report"
+  },
+  "icon": "📋",
+  "category": "CUSTOM",
+  "tags": ["quality-gate", "report", "release"],
+  "blocks": [
+    {
+      "type": "simple",
+      "config": {
+        "label": "Release-Bericht erstellen",
+        "command": "Erstelle einen strukturierten Release-Readiness-Bericht aus den folgenden Quality-Gate-Ergebnissen:\n\n{{ previous_chain_output }}\n\nFormat (Markdown):\n\n## Release Readiness: [FREIGEGEBEN / BLOCKIERT / MIT VORBEHALT]\n\n| Produkt | Status | Details |\n|---------|--------|---------|\n| Hunt-Daten | ... | ... |\n| Flutter App | ... | ... |\n| Website | ... | ... |\n| Backend | ... | ... |\n\n## Zusammenfassung\nKurze Bewertung in 2-3 Sätzen.\n\n## Nächste Schritte\n- Konkrete Handlungsempfehlungen basierend auf den Gate-Ergebnissen\n\nVerwende die gate_status-Werte aus den Outputs: GREEN = ✅, YELLOW = ⚠️, RED = ❌.\nWenn kein gate_status gefunden wurde, analysiere den Output selbst.\n\nGesamtstatus:\n- FREIGEGEBEN: Alle Gates GREEN\n- MIT VORBEHALT: Mindestens ein YELLOW, kein RED\n- BLOCKIERT: Mindestens ein RED"
+      }
+    }
+  ],
+  "model": "claude-opus-4-6",
+  "version": "1.0.0",
+  "author": "MySuricates"
+}

@@ -7,6 +7,7 @@ import com.automation.entity.ProjectStatus;
 import com.automation.entity.ProjectType;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ProjectRepository;
+import com.automation.service.activitylog.ActivityLogService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,6 +36,9 @@ class ProjectServiceTest {
 
     @Mock
     private PathValidator pathValidator;
+
+    @Mock
+    private ActivityLogService activityLogService;
 
     @InjectMocks
     private ProjectService projectService;

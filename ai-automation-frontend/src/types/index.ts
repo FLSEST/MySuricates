@@ -193,7 +193,7 @@ export interface PoolWorkflowEntry {
 
 // ── Workflow Run ─────────────────────────────────────────
 
-export type RunStatus = 'PENDING' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'COMPLETED_WITH_ERRORS' | 'FAILED' | 'CANCELLED';
+export type RunStatus = 'PENDING' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'COMPLETED_WITH_ERRORS' | 'FAILED' | 'CANCELLED' | 'INTERRUPTED';
 export type StepStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'SKIPPED' | 'WAITING_APPROVAL';
 
 export interface WorkflowRunError {
@@ -351,6 +351,64 @@ export interface CreateWebhookRequest {
   workflowId: string;
   description?: string;
   defaultContext?: Record<string, unknown>;
+}
+
+// ── Notifications ─────────────────────────────────────────
+
+export type NotificationChannelType = 'WEBHOOK' | 'DESKTOP';
+
+export interface NotificationConfig {
+  id: string;
+  name: string;
+  enabled: boolean;
+  channelType: NotificationChannelType;
+  webhookUrl: string | null;
+  workflowId: string | null;
+  triggerOnSuccess: boolean;
+  triggerOnFailure: boolean;
+  triggerAlways: boolean;
+  messageTemplate: string | null;
+  createdAt: string;
+}
+
+export interface CreateNotificationConfigRequest {
+  name: string;
+  channelType: NotificationChannelType;
+  webhookUrl?: string;
+  workflowId?: string;
+  triggerOnSuccess: boolean;
+  triggerOnFailure: boolean;
+  triggerAlways: boolean;
+  messageTemplate?: string;
+}
+
+// ── Completion Trigger ────────────────────────────────────
+
+export interface CompletionTrigger {
+  id: string;
+  sourceWorkflowId: string;
+  sourceWorkflowName: string;
+  targetWorkflowId: string;
+  targetWorkflowName: string;
+  enabled: boolean;
+  triggerOnSuccess: boolean;
+  triggerOnFailure: boolean;
+  triggerAlways: boolean;
+  description: string;
+  contextVariables: Record<string, unknown>;
+  lastTriggeredAt: string | null;
+  triggerCount: number;
+  createdAt: string;
+}
+
+export interface CreateCompletionTriggerRequest {
+  sourceWorkflowId: string;
+  targetWorkflowId: string;
+  triggerOnSuccess: boolean;
+  triggerOnFailure: boolean;
+  triggerAlways: boolean;
+  description?: string;
+  contextVariables?: Record<string, unknown>;
 }
 
 // ── System ───────────────────────────────────────────────

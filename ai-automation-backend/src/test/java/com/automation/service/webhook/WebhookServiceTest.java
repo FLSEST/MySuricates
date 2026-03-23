@@ -6,6 +6,7 @@ import com.automation.entity.WorkflowRun;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.WebhookTriggerRepository;
 import com.automation.repository.WorkflowRepository;
+import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.workflow.WorkflowExecutor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,6 +40,9 @@ class WebhookServiceTest {
 
     @Mock
     private GitWebhookPayloadParser gitPayloadParser;
+
+    @Mock
+    private ActivityLogService activityLogService;
 
     @InjectMocks
     private WebhookService webhookService;

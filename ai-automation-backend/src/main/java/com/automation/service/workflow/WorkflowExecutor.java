@@ -70,27 +70,47 @@ public class WorkflowExecutor {
                 .build();
         run = runRepository.save(run);
 
-        // Eagerly initialize lazy collections before leaving the transaction/session
-        Project project = workflow.getProject();
-        List<BlockDefinition> blocks = List.copyOf(workflow.getBlocks());
-        List<Skill> skills = List.copyOf(workflow.getActivatedSkills());
-        String instructions = workflow.getInstructions();
-        String model = workflow.getModel();
-        String provider = workflow.getProvider();
-        Map<String, Object> workflowMeta = Map.copyOf(workflow.getMetadata());
+        // Eagerly initialize lazy collections before leaving the transaction/session.
+        // Wrapped in try-catch: if a LazyInitializationException or similar occurs here
+        // (e.g. when called from a scheduled executor without an active JPA session),
+        // the run is immediately marked as FAILED instead of being stuck as a ghost run.
+        final Project project;
+        final List<BlockDefinition> blocks;
+        final List<Skill> skills;
+        final String instructions;
+        final String model;
+        final String provider;
+        final Map<String, Object> workflowMeta;
+        final String templateId;
+        final Map<String, Object> contextVars;
+        try {
+            project = workflow.getProject();
+            blocks = List.copyOf(workflow.getBlocks());
+            skills = List.copyOf(workflow.getActivatedSkills());
+            instructions = workflow.getInstructions();
+            model = workflow.getModel();
+            provider = workflow.getProvider();
+            workflowMeta = Map.copyOf(workflow.getMetadata());
+            templateId = workflow.getTemplateId();
 
-        String templateId = workflow.getTemplateId();
+            Map<String, Object> mergedContext = new HashMap<>(workflow.getDefaultContext());
+            if (inputContext != null) {
+                mergedContext.putAll(inputContext);
+            }
+            contextVars = Map.copyOf(mergedContext);
 
-        Map<String, Object> mergedContext = new HashMap<>(workflow.getDefaultContext());
-        if (inputContext != null) {
-            mergedContext.putAll(inputContext);
-        }
-        Map<String, Object> contextVars = Map.copyOf(mergedContext);
-
-        // Persist input context so it's visible in execution details
-        if (!contextVars.isEmpty()) {
-            run.setInputContext(new HashMap<>(contextVars));
-            run = runRepository.save(run);
+            // Persist input context so it's visible in execution details
+            if (!contextVars.isEmpty()) {
+                run.setInputContext(new HashMap<>(contextVars));
+                runRepository.save(run);
+            }
+        } catch (Exception e) {
+            log.error("Failed to initialize workflow data for run {}: {}", run.getId(), e.getMessage(), e);
+            run.setStatus(RunStatus.FAILED);
+            run.setCompletedAt(Instant.now());
+            run.setError(Map.of("message", "Failed to initialize workflow data: " + e.getMessage()));
+            runRepository.save(run);
+            throw new WorkflowExecutionException("Failed to initialize workflow '" + workflow.getName() + "' for execution", e);
         }
 
         // Execute asynchronously — return the run immediately
@@ -165,12 +185,22 @@ public class WorkflowExecutor {
                     break;
                 }
 
-                while (context.isPaused() && !context.shouldStop()) {
-                    try {
-                        Thread.sleep(500);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        break;
+                if (context.isPaused() && !context.shouldStop()) {
+                    run.setStatus(RunStatus.PAUSED);
+                    runRepository.save(run);
+                    broadcaster.broadcastRunStatus(run.getId(), RunStatus.PAUSED);
+                    while (context.isPaused() && !context.shouldStop()) {
+                        try {
+                            Thread.sleep(500);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                    }
+                    if (!context.shouldStop()) {
+                        run.setStatus(RunStatus.RUNNING);
+                        runRepository.save(run);
+                        broadcaster.broadcastRunStatus(run.getId(), RunStatus.RUNNING);
                     }
                 }
 
@@ -351,19 +381,22 @@ public class WorkflowExecutor {
      */
     @EventListener(ApplicationReadyEvent.class)
     public void cleanupZombieRuns() {
-        List<WorkflowRun> zombies = runRepository.findByStatus(RunStatus.RUNNING);
+        // Collect all runs that were in-flight when the application was last shut down
+        List<WorkflowRun> zombies = new java.util.ArrayList<>();
+        zombies.addAll(runRepository.findByStatus(RunStatus.RUNNING));
+        zombies.addAll(runRepository.findByStatus(RunStatus.PAUSED));
         if (zombies.isEmpty()) return;
-        log.warn("Found {} zombie run(s) stuck in RUNNING status — marking as FAILED", zombies.size());
+        log.warn("Found {} run(s) stuck in RUNNING/PAUSED status — marking as INTERRUPTED", zombies.size());
         for (WorkflowRun zombie : zombies) {
-            zombie.setStatus(RunStatus.FAILED);
+            zombie.setStatus(RunStatus.INTERRUPTED);
             zombie.setCompletedAt(Instant.now());
             zombie.setDurationMs(zombie.getCompletedAt().toEpochMilli() - zombie.getStartedAt().toEpochMilli());
-            zombie.setError(Map.of("message", "Cleaned up: run was stuck in RUNNING after application restart"));
+            zombie.setError(Map.of("message", "Workflow was interrupted by an application restart"));
             runRepository.save(zombie);
-            log.info("Cleaned up zombie run: {}", zombie.getId());
+            log.info("Marked interrupted run: {}", zombie.getId());
         }
         activityLogService.warn(LogCategory.EXECUTION,
-                "Startup cleanup: marked " + zombies.size() + " zombie run(s) as FAILED",
+                "Startup cleanup: marked " + zombies.size() + " run(s) as INTERRUPTED",
                 "WorkflowExecutor");
     }
 
@@ -372,6 +405,9 @@ public class WorkflowExecutor {
         if (context != null) {
             context.pause();
             log.info("Paused execution: {}", runId);
+            // The execution loop will persist the PAUSED status when it enters the pause wait
+        } else {
+            log.warn("pauseExecution: no active execution found for run {}", runId);
         }
     }
 
@@ -380,6 +416,9 @@ public class WorkflowExecutor {
         if (context != null) {
             context.resume();
             log.info("Resumed execution: {}", runId);
+            // The execution loop will persist RUNNING status when it exits the pause wait
+        } else {
+            log.warn("resumeExecution: no active execution found for run {}", runId);
         }
     }
 

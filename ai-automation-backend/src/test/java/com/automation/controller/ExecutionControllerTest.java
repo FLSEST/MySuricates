@@ -26,6 +26,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import com.automation.service.activitylog.ActivityLogService;
 
 @WebMvcTest(ExecutionController.class)
 @Import(GlobalExceptionHandler.class)
@@ -37,6 +38,9 @@ class ExecutionControllerTest {
 
     @MockBean
     private WorkflowExecutor workflowExecutor;
+    @MockBean
+    private ActivityLogService activityLogService;
+
 
     @MockBean
     private WorkflowRunRepository runRepository;

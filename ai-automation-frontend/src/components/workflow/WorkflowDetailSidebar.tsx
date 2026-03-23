@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Plus, Pencil, Zap, Clock, FileText, Bot, Trash2 } from 'lucide-react';
 import { Card, CardHeader, Button, Input, Select } from '../ui';
 import { StatusBadge } from '../shared/StatusBadge';
+import { GateStatusBadge } from '../shared/GateStatusBadge';
 import { WorkflowMemoryPanel } from './WorkflowMemoryPanel';
 import { useUpdateWorkflow } from '../../hooks/useWorkflows';
 import { useAiProviders } from '../../hooks/useSystem';
@@ -167,7 +168,10 @@ export function WorkflowDetailSidebar({
                 className="flex items-center justify-between px-5 py-3 hover:bg-surface transition-colors cursor-pointer"
                 onClick={() => onNavigateToRun(run.id)}
               >
-                <StatusBadge status={run.status} />
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={run.status} />
+                  <GateStatusBadge run={run} />
+                </div>
                 <div className="flex items-center gap-2 text-xs text-text-tertiary">
                   <Clock className="w-3 h-3" />
                   {formatDuration(run.durationMs)}
@@ -191,7 +195,7 @@ export function WorkflowDetailSidebar({
           </div>
           <div className="flex justify-between">
             <span className="text-text-secondary">{t.common.created}</span>
-            <span className="text-text">{new Date(workflow.createdAt).toLocaleDateString()}</span>
+            <span className="text-text">{new Date(workflow.createdAt).toLocaleString(undefined, { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
           </div>
         </div>
       </Card>

@@ -2,10 +2,12 @@ package com.automation.service.project;
 
 import com.automation.dto.request.CreateProjectRequest;
 import com.automation.dto.request.UpdateProjectRequest;
+import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectStatus;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ProjectRepository;
+import com.automation.service.activitylog.ActivityLogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,6 +24,7 @@ public class ProjectService {
     private final ProjectRepository projectRepository;
     private final ContainerService containerService;
     private final PathValidator pathValidator;
+    private final ActivityLogService activityLogService;
 
     @Transactional(readOnly = true)
     public List<Project> findAll() {
@@ -55,6 +58,7 @@ public class ProjectService {
 
         Project saved = projectRepository.save(project);
         log.info("Created project: {} ({})", saved.getName(), saved.getId());
+        activityLogService.info(LogCategory.SYSTEM, "Project created: " + saved.getName(), "ProjectService", saved.getId());
         return saved;
     }
 
@@ -87,6 +91,7 @@ public class ProjectService {
 
         Project saved = projectRepository.save(project);
         log.info("Updated project: {} ({})", saved.getName(), saved.getId());
+        activityLogService.info(LogCategory.SYSTEM, "Project updated: " + saved.getName(), "ProjectService", saved.getId());
         return saved;
     }
 
@@ -102,6 +107,7 @@ public class ProjectService {
         project.setArchivedAt(Instant.now());
         projectRepository.save(project);
         log.info("Archived project: {} ({})", project.getName(), project.getId());
+        activityLogService.warn(LogCategory.SYSTEM, "Project archived: " + project.getName(), "ProjectService", project.getId());
     }
 
     @Transactional(readOnly = true)
@@ -116,6 +122,7 @@ public class ProjectService {
         project.setArchivedAt(null);
         Project saved = projectRepository.save(project);
         log.info("Restored project: {} ({})", saved.getName(), saved.getId());
+        activityLogService.info(LogCategory.SYSTEM, "Project restored: " + saved.getName(), "ProjectService", saved.getId());
         return saved;
     }
 

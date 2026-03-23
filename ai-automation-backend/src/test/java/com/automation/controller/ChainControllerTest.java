@@ -32,6 +32,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import com.automation.service.activitylog.ActivityLogService;
 
 @WebMvcTest(ChainController.class)
 @Import(GlobalExceptionHandler.class)
@@ -41,6 +42,9 @@ class ChainControllerTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @MockBean private ChainService chainService;
+    @MockBean
+    private ActivityLogService activityLogService;
+
     @MockBean private ChainExecutor chainExecutor;
     @MockBean private ChainMapper chainMapper;
     @MockBean private ChainRunRepository chainRunRepository;

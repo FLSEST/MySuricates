@@ -42,7 +42,7 @@ public class GateStatusResolver {
                     extractErrorMessage(event.getError()));
             case COMPLETED -> new GateResult(GateStatus.GREEN, "success", null);
             case COMPLETED_WITH_ERRORS -> new GateResult(GateStatus.YELLOW, "partial-success", null);
-            case CANCELLED, PAUSED, PENDING, RUNNING -> null;
+            case CANCELLED, PAUSED, PENDING, RUNNING, INTERRUPTED -> null;
         };
     }
 

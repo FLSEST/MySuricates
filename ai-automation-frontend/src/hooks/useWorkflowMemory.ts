@@ -23,7 +23,10 @@ export function useExtractMemory(workflowId: string) {
       qc.invalidateQueries({ queryKey: ['workflow-memory', workflowId] });
       toast.success(t.memory.extracted);
     },
-    onError: () => toast.error(t.memory.extractFailed),
+    onError: (error) => {
+      const msg = (error as { error?: string })?.error;
+      toast.error(msg ? `${t.memory.extractFailed}: ${msg}` : t.memory.extractFailed);
+    },
   });
 }
 

@@ -97,6 +97,15 @@ public class ExecutionController {
         return ResponseEntity.ok().build();
     }
 
+    @PostMapping("/{id}/retry")
+    @Transactional
+    public ResponseEntity<WorkflowRunResponse> retryExecution(@PathVariable String id) {
+        var run = runRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Execution", id));
+        var newRun = workflowExecutor.execute(run.getWorkflow(), run.getInputContext());
+        return ResponseEntity.ok(workflowMapper.toRunResponse(newRun));
+    }
+
     @PostMapping("/{id}/approve")
     public ResponseEntity<Void> approveExecution(
             @PathVariable String id,

@@ -224,8 +224,8 @@ These use non-obvious paths — always use these, never guess:
 | Run workflow | POST | `/api/v1/workflows/{id}/execute` |
 | Run chain | POST | `/api/v1/chains/{id}/execute` |
 | Cancel execution | POST | `/api/v1/executions/{id}/cancel` |
-| Approve step | POST | `/api/v1/executions/{id}/approve` |
-| Check approval | GET | `/api/v1/executions/{id}/approval` |
+| Approve step | POST | `/api/v1/executions/{id}/approve` — body: `{"answer": "Yes"}` (field is `answer`, NOT `approved`) |
+| Check approval | GET | `/api/v1/executions/{id}/approval` — returns `{"pending": true, "options": [...]}` or `{"pending": false}` |
 | Pause execution | POST | `/api/v1/executions/{id}/pause` |
 | Resume execution | POST | `/api/v1/executions/{id}/resume` |
 

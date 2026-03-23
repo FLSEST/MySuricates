@@ -11,6 +11,7 @@ import { BackupCard } from '../components/settings/BackupCard';
 import { SystemInfoCard } from '../components/settings/SystemInfoCard';
 import { StagingCard } from '../components/settings/StagingCard';
 import { TestingCard } from '../components/settings/TestingCard';
+import { NotificationsCard } from '../components/settings/NotificationsCard';
 
 export function Settings() {
   const t = useT();
@@ -44,6 +45,7 @@ export function Settings() {
       <SecurityCard />
       {!simpleMode && <RemoteAccessCard />}
       {!simpleMode && <BackupCard />}
+      {!simpleMode && <NotificationsCard />}
 
       {advancedMode && (
         <StagingCard

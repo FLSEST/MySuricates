@@ -1,11 +1,13 @@
 package com.automation.service.webhook;
 
+import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.WebhookTrigger;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.WebhookTriggerRepository;
 import com.automation.repository.WorkflowRepository;
+import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.workflow.WorkflowExecutor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +31,7 @@ public class WebhookService {
     private final WorkflowRepository workflowRepository;
     private final WorkflowExecutor workflowExecutor;
     private final GitWebhookPayloadParser gitPayloadParser;
+    private final ActivityLogService activityLogService;
 
     @Transactional(readOnly = true)
     public List<WebhookTrigger> findAll() {
@@ -67,6 +70,7 @@ public class WebhookService {
         WebhookTrigger saved = webhookRepository.save(webhook);
         log.info("Created webhook trigger: {} for workflow {} (token: {}...)",
                 saved.getId(), workflowId, token.substring(0, 8));
+        activityLogService.info(LogCategory.WEBHOOK, "Webhook created for workflow: " + workflow.getName(), "WebhookService", saved.getId());
         return saved;
     }
 
@@ -89,6 +93,7 @@ public class WebhookService {
         WebhookTrigger webhook = findById(id);
         webhookRepository.delete(webhook);
         log.info("Deleted webhook trigger: {}", id);
+        activityLogService.warn(LogCategory.WEBHOOK, "Webhook deleted: " + id, "WebhookService", id);
     }
 
     /**
@@ -125,6 +130,7 @@ public class WebhookService {
 
         log.info("Webhook {} triggered workflow {}, run: {}",
                 webhook.getId(), webhook.getWorkflow().getId(), run.getId());
+        activityLogService.info(LogCategory.WEBHOOK, "Webhook triggered: " + webhook.getWorkflow().getName(), "WebhookService", run.getId(), webhook.getWorkflow().getId());
 
         return run;
     }

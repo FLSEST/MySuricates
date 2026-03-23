@@ -90,7 +90,8 @@ public class LearningService {
     public DashboardResponse getDashboard() {
         long totalWorkflows = workflowRepository.count();
         long totalRuns = runRepository.count();
-        long successfulRuns = runRepository.countByStatus(RunStatus.COMPLETED);
+        long successfulRuns = runRepository.countByStatus(RunStatus.COMPLETED)
+                + runRepository.countByStatus(RunStatus.COMPLETED_WITH_ERRORS);
         long failedRuns = runRepository.countByStatus(RunStatus.FAILED);
         double successRate = totalRuns > 0 ? (double) successfulRuns / totalRuns : 0;
 
@@ -123,7 +124,8 @@ public class LearningService {
                 .map(e -> {
                     long count = e.getValue().size();
                     long completed = e.getValue().stream()
-                            .filter(r -> r.getStatus() == RunStatus.COMPLETED).count();
+                            .filter(r -> r.getStatus() == RunStatus.COMPLETED
+                                    || r.getStatus() == RunStatus.COMPLETED_WITH_ERRORS).count();
                     double rate = count > 0 ? (double) completed / count : 0;
                     return new DashboardResponse.TimeSeriesPoint(e.getKey().toString(), count, rate);
                 })

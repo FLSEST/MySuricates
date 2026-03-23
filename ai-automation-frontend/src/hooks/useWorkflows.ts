@@ -174,6 +174,21 @@ export function useCancelExecution() {
   });
 }
 
+export function useRetryExecution() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
+  return useMutation({
+    mutationFn: (runId: string) => api.post(`/executions/${runId}/retry`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workflows'] });
+      qc.invalidateQueries({ queryKey: ['learning'] });
+      toast.success(t.toast.workflowExecuted);
+    },
+    onError: () => toast.error(t.toast.workflowExecuteFailed),
+  });
+}
+
 export function useRunCommand() {
   return useMutation({
     mutationFn: ({ runId, command }: { runId: string; command: string }) =>

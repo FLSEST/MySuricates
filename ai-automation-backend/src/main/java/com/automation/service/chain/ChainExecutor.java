@@ -2,10 +2,12 @@ package com.automation.service.chain;
 
 import com.automation.config.ChainConfig;
 import com.automation.entity.*;
+import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.repository.ChainRunRepository;
 import com.automation.repository.StepResultRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.exception.WorkflowExecutionException;
+import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +36,7 @@ public class ChainExecutor {
     private final WorkflowExecutor workflowExecutor;
     private final SimpMessagingTemplate messagingTemplate;
     private final ExecutorService virtualThreadExecutor;
+    private final ActivityLogService activityLogService;
 
     private final Map<String, AtomicBoolean> activeCancellations = new ConcurrentHashMap<>();
 
@@ -45,7 +48,8 @@ public class ChainExecutor {
             WorkflowService workflowService,
             @Lazy WorkflowExecutor workflowExecutor,
             SimpMessagingTemplate messagingTemplate,
-            ExecutorService virtualThreadExecutor
+            ExecutorService virtualThreadExecutor,
+            ActivityLogService activityLogService
     ) {
         this.chainConfig = chainConfig;
         this.chainRunRepository = chainRunRepository;
@@ -55,6 +59,7 @@ public class ChainExecutor {
         this.workflowExecutor = workflowExecutor;
         this.messagingTemplate = messagingTemplate;
         this.virtualThreadExecutor = virtualThreadExecutor;
+        this.activityLogService = activityLogService;
     }
 
     public ChainRun execute(WorkflowChain chain, Map<String, Object> inputContext) {
@@ -69,6 +74,8 @@ public class ChainExecutor {
 
         final String runId = run.getId();
         activeCancellations.put(runId, new AtomicBoolean(false));
+
+        activityLogService.info(LogCategory.EXECUTION, "Chain execution started: " + chain.getName(), "ChainExecutor", runId, null);
 
         virtualThreadExecutor.submit(() -> executeEntries(runId, chain, inputContext));
 
@@ -237,6 +244,16 @@ public class ChainExecutor {
             chainRunRepository.save(run);
             broadcastStatus(runId, run);
             activeCancellations.remove(runId);
+
+            if (run.getStatus() == RunStatus.COMPLETED) {
+                activityLogService.info(LogCategory.EXECUTION, "Chain execution completed: " + chain.getName(), "ChainExecutor", runId, null);
+            } else if (run.getStatus() == RunStatus.COMPLETED_WITH_ERRORS) {
+                activityLogService.warn(LogCategory.EXECUTION, "Chain completed with warnings: " + chain.getName(), "ChainExecutor", runId, null);
+            } else if (run.getStatus() == RunStatus.FAILED) {
+                activityLogService.error(LogCategory.EXECUTION, "Chain execution failed: " + chain.getName(), "ChainExecutor", runId, null);
+            } else if (run.getStatus() == RunStatus.CANCELLED) {
+                activityLogService.warn(LogCategory.EXECUTION, "Chain execution cancelled: " + chain.getName(), "ChainExecutor", runId, null);
+            }
         }
     }
 

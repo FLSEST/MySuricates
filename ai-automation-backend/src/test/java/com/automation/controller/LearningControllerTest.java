@@ -19,6 +19,7 @@ import java.util.Map;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import com.automation.service.activitylog.ActivityLogService;
 
 @WebMvcTest(LearningController.class)
 @Import(GlobalExceptionHandler.class)
@@ -30,6 +31,9 @@ class LearningControllerTest {
 
     @MockBean
     private LearningService learningService;
+    @MockBean
+    private ActivityLogService activityLogService;
+
 
     @MockBean
     private ApiKeyService apiKeyService;

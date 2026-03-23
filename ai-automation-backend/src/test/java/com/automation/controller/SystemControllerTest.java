@@ -28,6 +28,7 @@ import java.util.Optional;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import com.automation.service.activitylog.ActivityLogService;
 
 @WebMvcTest(SystemController.class)
 @Import(GlobalExceptionHandler.class)
@@ -39,6 +40,9 @@ class SystemControllerTest {
 
     @MockBean
     private DockerClient dockerClient;
+    @MockBean
+    private ActivityLogService activityLogService;
+
 
     @MockBean
     private TailscaleService tailscaleService;

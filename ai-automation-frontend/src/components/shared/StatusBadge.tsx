@@ -17,6 +17,7 @@ const statusConfig: Record<string, { variant: 'success' | 'warning' | 'danger' |
   COMPLETED_WITH_ERRORS: { variant: 'warning', label: 'Partial' },
   FAILED: { variant: 'danger' },
   CANCELLED: { variant: 'default' },
+  INTERRUPTED: { variant: 'warning', label: 'Interrupted' },
   // Step
   SKIPPED: { variant: 'default' },
   WAITING_APPROVAL: { variant: 'warning', label: 'Approval' },

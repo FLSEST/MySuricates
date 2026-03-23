@@ -36,6 +36,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import com.automation.service.activitylog.ActivityLogService;
 
 @WebMvcTest(WorkflowController.class)
 @Import(GlobalExceptionHandler.class)
@@ -50,6 +51,9 @@ class WorkflowControllerTest {
 
     @MockBean
     private WorkflowService workflowService;
+    @MockBean
+    private ActivityLogService activityLogService;
+
 
     @MockBean
     private WorkflowExecutor workflowExecutor;

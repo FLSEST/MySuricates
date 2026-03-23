@@ -450,23 +450,25 @@ class WorkflowExecutorTest {
     }
 
     @Test
-    void cleanupZombieRuns_marksRunningRunsAsFailed() {
+    void cleanupZombieRuns_marksRunningRunsAsInterrupted() {
         WorkflowRun orphan1 = WorkflowRun.builder().id("orphan-1").status(RunStatus.RUNNING).startedAt(Instant.now()).build();
         WorkflowRun orphan2 = WorkflowRun.builder().id("orphan-2").status(RunStatus.RUNNING).startedAt(Instant.now()).build();
         when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of(orphan1, orphan2));
+        when(runRepository.findByStatus(RunStatus.PAUSED)).thenReturn(List.of());
 
         workflowExecutor.cleanupZombieRuns();
 
-        assertThat(orphan1.getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(orphan1.getStatus()).isEqualTo(RunStatus.INTERRUPTED);
         assertThat(orphan1.getCompletedAt()).isNotNull();
         assertThat(orphan1.getError()).containsKey("message");
-        assertThat(orphan2.getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(orphan2.getStatus()).isEqualTo(RunStatus.INTERRUPTED);
         verify(runRepository, times(2)).save(any(WorkflowRun.class));
     }
 
     @Test
     void cleanupZombieRuns_noZombies_doesNothing() {
         when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of());
+        when(runRepository.findByStatus(RunStatus.PAUSED)).thenReturn(List.of());
 
         workflowExecutor.cleanupZombieRuns();
 

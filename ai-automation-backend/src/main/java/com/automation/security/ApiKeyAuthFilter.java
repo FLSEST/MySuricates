@@ -1,5 +1,7 @@
 package com.automation.security;
 
+import com.automation.entity.ActivityLog.LogCategory;
+import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.system.ApiKeyService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -27,6 +29,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
     private static final String API_KEY_HEADER = "X-API-Key";
 
     private final ApiKeyService apiKeyService;
+    private final ActivityLogService activityLogService;
 
     @Value("${automation.security.enabled:true}")
     private boolean securityEnabled;
@@ -51,6 +54,12 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
             setAuthenticated("api-key-user");
             filterChain.doFilter(request, response);
         } else {
+            if (apiKey != null) {
+                // Key was provided but is wrong — log as security event
+                activityLogService.warn(LogCategory.SECURITY,
+                        "Authentication failed: invalid API key for " + request.getRequestURI(),
+                        "ApiKeyAuthFilter", null);
+            }
             // Let Spring Security handle unauthenticated request
             // (will return 403 for protected endpoints, pass through for public ones)
             filterChain.doFilter(request, response);

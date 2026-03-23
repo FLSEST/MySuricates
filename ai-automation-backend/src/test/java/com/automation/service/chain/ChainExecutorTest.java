@@ -5,6 +5,7 @@ import com.automation.entity.*;
 import com.automation.repository.ChainRunRepository;
 import com.automation.repository.StepResultRepository;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,6 +50,9 @@ class ChainExecutorTest {
     @Mock
     private ExecutorService virtualThreadExecutor;
 
+    @Mock
+    private ActivityLogService activityLogService;
+
     private ChainExecutor chainExecutor;
 
     private WorkflowChain testChain;
@@ -66,7 +70,8 @@ class ChainExecutorTest {
                 workflowService,
                 workflowExecutor,
                 messagingTemplate,
-                virtualThreadExecutor
+                virtualThreadExecutor,
+                activityLogService
         );
 
         testChain = WorkflowChain.builder()

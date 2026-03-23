@@ -30,6 +30,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import com.automation.service.activitylog.ActivityLogService;
 
 @WebMvcTest(ScheduleController.class)
 @Import(GlobalExceptionHandler.class)
@@ -44,6 +45,9 @@ class ScheduleControllerTest {
 
     @MockBean
     private SchedulerService schedulerService;
+    @MockBean
+    private ActivityLogService activityLogService;
+
 
     @MockBean
     private ScheduleMapper scheduleMapper;

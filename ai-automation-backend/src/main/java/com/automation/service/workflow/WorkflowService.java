@@ -5,10 +5,12 @@ import com.automation.dto.request.UpdateWorkflowRequest;
 import com.automation.entity.Project;
 import com.automation.entity.Skill;
 import com.automation.entity.Workflow;
+import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.SkillRepository;
 import com.automation.repository.WorkflowRepository;
+import com.automation.service.activitylog.ActivityLogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,6 +30,7 @@ public class WorkflowService {
     private final WorkflowRepository workflowRepository;
     private final ProjectRepository projectRepository;
     private final SkillRepository skillRepository;
+    private final ActivityLogService activityLogService;
 
     @Transactional(readOnly = true)
     public List<Workflow> findAll() {
@@ -88,6 +91,7 @@ public class WorkflowService {
 
         Workflow saved = workflowRepository.save(workflow);
         log.info("Created workflow: {} ({})", saved.getName(), saved.getId());
+        activityLogService.info(LogCategory.SYSTEM, "Workflow created: " + saved.getName(), "WorkflowService", saved.getId(), saved.getId());
         return saved;
     }
 
@@ -127,6 +131,7 @@ public class WorkflowService {
 
         Workflow saved = workflowRepository.save(workflow);
         log.info("Updated workflow: {} ({})", saved.getName(), saved.getId());
+        activityLogService.info(LogCategory.SYSTEM, "Workflow updated: " + saved.getName(), "WorkflowService", saved.getId(), saved.getId());
         return saved;
     }
 
@@ -141,6 +146,7 @@ public class WorkflowService {
         workflow.setDeletedAt(java.time.Instant.now());
         workflowRepository.save(workflow);
         log.info("Soft-deleted workflow: {} ({})", workflow.getName(), workflow.getId());
+        activityLogService.warn(LogCategory.SYSTEM, "Workflow deleted: " + workflow.getName(), "WorkflowService", workflow.getId(), workflow.getId());
     }
 
     @Transactional

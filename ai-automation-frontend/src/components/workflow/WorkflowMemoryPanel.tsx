@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Brain, ChevronDown, ChevronUp, Check, Pencil, Trash2, Sparkles } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Brain, ChevronDown, ChevronUp, Check, Pencil, Trash2, Sparkles, Loader2 } from 'lucide-react';
 import { Card, CardHeader, Button, Modal, Select } from '../ui';
 import { MonacoEditor } from '../shared/MonacoEditor';
 import {
@@ -31,6 +31,16 @@ export function WorkflowMemoryPanel({ workflowId, runs }: Props) {
     id: '', title: '', content: '',
   });
   const [showDelete, setShowDelete] = useState<string | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!extractMemory.isPending) {
+      setElapsedSeconds(0);
+      return;
+    }
+    const interval = setInterval(() => setElapsedSeconds((s) => s + 1), 1000);
+    return () => clearInterval(interval);
+  }, [extractMemory.isPending]);
 
   const handleExtract = () => {
     extractMemory.mutate(
@@ -174,57 +184,67 @@ export function WorkflowMemoryPanel({ workflowId, runs }: Props) {
       {/* Extract Modal */}
       <Modal
         open={showExtract}
-        onClose={() => setShowExtract(false)}
+        onClose={extractMemory.isPending ? () => {} : () => setShowExtract(false)}
         title={t.memory.extractKnowledge}
         size="sm"
         footer={
-          <>
-            <Button variant="secondary" onClick={() => setShowExtract(false)}>{t.common.cancel}</Button>
-            <Button onClick={handleExtract} loading={extractMemory.isPending}>
-              {extractMemory.isPending ? t.memory.extracting : t.memory.extractKnowledge}
-            </Button>
-          </>
+          extractMemory.isPending ? undefined : (
+            <>
+              <Button variant="secondary" onClick={() => setShowExtract(false)}>{t.common.cancel}</Button>
+              <Button onClick={handleExtract}>
+                {t.memory.extractKnowledge}
+              </Button>
+            </>
+          )
         }
       >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-text mb-1.5">{t.memory.selectRuns}</label>
-            <p className="text-xs text-text-tertiary mb-2">{t.memory.selectRunsHint}</p>
-            <div className="max-h-40 overflow-y-auto space-y-1 border border-border rounded-lg p-2">
-              {runs?.slice(0, 20).map((run) => (
-                <label key={run.id} className="flex items-center gap-2 text-sm text-text py-1 px-1 rounded-sm hover:bg-surface-raised cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedRunIds.includes(run.id)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedRunIds([...selectedRunIds, run.id]);
-                      } else {
-                        setSelectedRunIds(selectedRunIds.filter((id) => id !== run.id));
-                      }
-                    }}
-                    className="rounded-sm border-border"
-                  />
-                  <span className={`w-2 h-2 rounded-full ${
-                    run.status === 'COMPLETED' ? 'bg-success' :
-                    run.status === 'FAILED' ? 'bg-danger' : 'bg-warning'
-                  }`} />
-                  <span className="truncate">{new Date(run.startedAt).toLocaleString()}</span>
-                  <span className="text-xs text-text-tertiary ml-auto">{run.status}</span>
-                </label>
-              ))}
-            </div>
+        {extractMemory.isPending ? (
+          <div className="flex flex-col items-center gap-3 py-8 text-center">
+            <Loader2 className="w-8 h-8 text-accent animate-spin" />
+            <p className="text-sm font-medium text-text">{t.memory.extracting}</p>
+            <p className="text-xs text-text-tertiary">{elapsedSeconds}s — {t.memory.extractingHint}</p>
           </div>
-          <Select
-            label={t.memory.selectProvider}
-            value={provider}
-            onChange={(e) => setProvider(e.target.value)}
-            options={[
-              { value: 'CLAUDE', label: 'Claude' },
-              { value: 'CODEX', label: 'Codex (OpenAI)' },
-            ]}
-          />
-        </div>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-text mb-1.5">{t.memory.selectRuns}</label>
+              <p className="text-xs text-text-tertiary mb-2">{t.memory.selectRunsHint}</p>
+              <div className="max-h-40 overflow-y-auto space-y-1 border border-border rounded-lg p-2">
+                {runs?.slice(0, 20).map((run) => (
+                  <label key={run.id} className="flex items-center gap-2 text-sm text-text py-1 px-1 rounded-sm hover:bg-surface-raised cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedRunIds.includes(run.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedRunIds([...selectedRunIds, run.id]);
+                        } else {
+                          setSelectedRunIds(selectedRunIds.filter((id) => id !== run.id));
+                        }
+                      }}
+                      className="rounded-sm border-border"
+                    />
+                    <span className={`w-2 h-2 rounded-full ${
+                      run.status === 'COMPLETED' ? 'bg-success' :
+                      run.status === 'FAILED' ? 'bg-danger' : 'bg-warning'
+                    }`} />
+                    <span className="truncate">{new Date(run.startedAt).toLocaleString()}</span>
+                    <span className="text-xs text-text-tertiary ml-auto">{run.status}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <Select
+              label={t.memory.selectProvider}
+              value={provider}
+              onChange={(e) => setProvider(e.target.value)}
+              options={[
+                { value: 'CLAUDE', label: 'Claude' },
+                { value: 'CODEX', label: 'Codex (OpenAI)' },
+              ]}
+            />
+          </div>
+        )}
       </Modal>
 
       {/* Edit Modal */}

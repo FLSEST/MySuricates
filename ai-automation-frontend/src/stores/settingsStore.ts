@@ -8,12 +8,16 @@ interface SettingsState {
   autoTodoDefault: boolean;
   autoRepairDefault: boolean;
   defaultAiProvider: string;
+  sidebarItemOrder: string[];
+  sidebarHiddenItems: string[];
   setApiKey: (key: string) => void;
   setSimpleMode: (enabled: boolean) => void;
   setAdvancedMode: (enabled: boolean) => void;
   setAutoTodoDefault: (enabled: boolean) => void;
   setAutoRepairDefault: (enabled: boolean) => void;
   setDefaultAiProvider: (provider: string) => void;
+  setSidebarItemOrder: (order: string[]) => void;
+  setSidebarHiddenItems: (hidden: string[]) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -25,12 +29,16 @@ export const useSettingsStore = create<SettingsState>()(
       autoTodoDefault: false,
       autoRepairDefault: false,
       defaultAiProvider: '',
+      sidebarItemOrder: [],
+      sidebarHiddenItems: [],
       setApiKey: (apiKey) => set({ apiKey }),
       setSimpleMode: (simpleMode) => set({ simpleMode }),
       setAdvancedMode: (advancedMode) => set({ advancedMode }),
       setAutoTodoDefault: (autoTodoDefault) => set({ autoTodoDefault }),
       setAutoRepairDefault: (autoRepairDefault) => set({ autoRepairDefault }),
       setDefaultAiProvider: (defaultAiProvider) => set({ defaultAiProvider }),
+      setSidebarItemOrder: (sidebarItemOrder) => set({ sidebarItemOrder }),
+      setSidebarHiddenItems: (sidebarHiddenItems) => set({ sidebarHiddenItems }),
     }),
     { name: 'app-settings' }
   )

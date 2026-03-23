@@ -47,6 +47,7 @@ const Todos = lazy(() => import('./pages/Todos').then(m => ({ default: m.Todos }
 const ActivityLog = lazy(() => import('./pages/ActivityLog').then(m => ({ default: m.ActivityLog })));
 const WorkflowFactory = lazy(() => import('./pages/WorkflowFactory').then(m => ({ default: m.WorkflowFactory })));
 const Docs = lazy(() => import('./pages/Docs').then(m => ({ default: m.Docs })));
+const Insights = lazy(() => import('./pages/Insights').then(m => ({ default: m.Insights })));
 
 const router = createBrowserRouter([
   {
@@ -71,6 +72,7 @@ const router = createBrowserRouter([
       { path: 'todos', element: <Todos /> },
       { path: 'activity', element: <ActivityLog /> },
       { path: 'docs', element: <Docs /> },
+      { path: 'insights', element: <Insights /> },
       { path: 'settings', element: <Settings /> },
     ],
   },

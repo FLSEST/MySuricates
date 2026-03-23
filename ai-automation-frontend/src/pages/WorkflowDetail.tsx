@@ -13,6 +13,7 @@ import { SortableBlockList } from '../components/workflow/SortableBlockList';
 import { WorkflowDetailHeader } from '../components/workflow/WorkflowDetailHeader';
 import { WorkflowDetailSidebar } from '../components/workflow/WorkflowDetailSidebar';
 import { WorkflowDetailModals } from '../components/workflow/WorkflowDetailModals';
+import { CompletionTriggerSection } from '../components/workflow/CompletionTriggerSection';
 import { useT } from '../i18n';
 import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
 import type { BlockType, OptimizeResult, UpdateWorkflowRequest } from '../types';
@@ -295,6 +296,8 @@ export function WorkflowDetail() {
           onNavigateToRun={(runId) => navigate(`/workflows/${workflow.id}/run/${runId}`)}
         />
       </div>
+
+      <CompletionTriggerSection workflowId={workflow.id} allWorkflows={allWorkflows} />
 
       <WorkflowDetailModals
         workflow={workflow}

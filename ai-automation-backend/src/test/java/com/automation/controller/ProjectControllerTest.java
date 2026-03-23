@@ -33,6 +33,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import com.automation.service.activitylog.ActivityLogService;
 
 @WebMvcTest(ProjectController.class)
 @Import(GlobalExceptionHandler.class)
@@ -47,6 +48,9 @@ class ProjectControllerTest {
 
     @MockBean
     private ProjectService projectService;
+    @MockBean
+    private ActivityLogService activityLogService;
+
 
     @MockBean
     private WorkflowService workflowService;

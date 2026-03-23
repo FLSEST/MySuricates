@@ -1,10 +1,12 @@
 package com.automation.service.scheduler;
 
 import com.automation.entity.ActivityLog.LogCategory;
+import com.automation.entity.RunStatus;
 import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.ScheduledWorkflow.ScheduleType;
 import com.automation.entity.ScheduledWorkflow.TargetType;
 import com.automation.repository.ScheduledWorkflowRepository;
+import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.chain.ChainExecutor;
 import com.automation.service.workflow.WorkflowExecutor;
@@ -24,6 +26,7 @@ import java.time.ZoneId;
 public class ScheduledWorkflowExecutor {
 
     private final ScheduledWorkflowRepository scheduledRepository;
+    private final WorkflowRunRepository workflowRunRepository;
     private final WorkflowExecutor workflowExecutor;
     private final ChainExecutor chainExecutor;
     private final ActivityLogService activityLogService;
@@ -40,13 +43,26 @@ public class ScheduledWorkflowExecutor {
      * workflow execution manages its own transaction scope internally.
      */
     public void executeSingleSchedule(String scheduleId) {
-        // Short read transaction (repository method is @Transactional by default)
-        ScheduledWorkflow scheduled = scheduledRepository.findById(scheduleId).orElse(null);
+        // Use JOIN FETCH query to eagerly load workflow.activatedSkills within the repository's
+        // own transaction. Plain findById() leaves the JPA session closed, causing
+        // LazyInitializationException when WorkflowExecutor.execute() accesses activatedSkills.
+        ScheduledWorkflow scheduled = scheduledRepository.findByIdWithWorkflowSkills(scheduleId).orElse(null);
 
         if (scheduled == null || !scheduled.isEnabled()
                 || scheduled.getNextRunAt() == null
                 || scheduled.getNextRunAt().isAfter(Instant.now())) {
             return;
+        }
+
+        // Ghost-run protection: skip if the workflow already has a RUNNING execution.
+        // Prevents duplicate runs when e.g. a previous execution throws before updateScheduleAfterRun.
+        if (scheduled.getTargetType() == TargetType.WORKFLOW && scheduled.getWorkflow() != null) {
+            if (workflowRunRepository.existsByWorkflowIdAndStatus(
+                    scheduled.getWorkflow().getId(), RunStatus.RUNNING)) {
+                log.warn("Schedule {} skipped — workflow '{}' already has a RUNNING execution",
+                        scheduleId, scheduled.getWorkflow().getName());
+                return;
+            }
         }
 
         log.info("Executing scheduled {}: {} (type: {})",
@@ -56,18 +72,23 @@ public class ScheduledWorkflowExecutor {
                 "Schedule triggered: " + scheduled.getTargetName(),
                 "ScheduledWorkflowExecutor", scheduled.getId());
 
-        if (scheduled.getTargetType() == TargetType.CHAIN && scheduled.getChain() != null) {
-            chainExecutor.execute(scheduled.getChain(), scheduled.getInputContext());
-        } else if (scheduled.getWorkflow() != null) {
-            workflowExecutor.execute(scheduled.getWorkflow(), scheduled.getInputContext());
-        } else {
-            log.error("Schedule {} has no valid target", scheduled.getId());
-            return;
+        // try-finally ensures updateScheduleAfterRun is ALWAYS called, even if execute() throws.
+        // Without this, a failing execute() leaves nextRunAt in the past, causing an infinite
+        // retry loop on the next @Scheduled tick.
+        try {
+            if (scheduled.getTargetType() == TargetType.CHAIN && scheduled.getChain() != null) {
+                chainExecutor.execute(scheduled.getChain(), scheduled.getInputContext());
+            } else if (scheduled.getWorkflow() != null) {
+                workflowExecutor.execute(scheduled.getWorkflow(), scheduled.getInputContext());
+            } else {
+                log.error("Schedule {} has no valid target", scheduled.getId());
+                return;
+            }
+        } finally {
+            // Short write transaction for schedule metadata update
+            updateScheduleAfterRun(scheduleId, scheduled.getScheduleType(),
+                    scheduled.getCronExpression());
         }
-
-        // Short write transaction for schedule metadata update
-        updateScheduleAfterRun(scheduleId, scheduled.getScheduleType(),
-                scheduled.getCronExpression());
     }
 
     @Transactional

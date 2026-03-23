@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Card, CardHeader, Button, Spinner, Badge, Input } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
+import { GateStatusBadge } from '../components/shared/GateStatusBadge';
 import { ErrorState } from '../components/shared/ErrorState';
 import { LogViewer } from '../components/shared/LogViewer';
 import { ApprovalDialog } from '../components/shared/ApprovalDialog';
@@ -18,6 +19,7 @@ import { ConversionSuggestion } from '../components/shared/ConversionSuggestion'
 import {
   useWorkflow, useWorkflowRuns,
   usePauseExecution, useResumeExecution, useCancelExecution, useRunCommand, useSubmitApproval,
+  useRetryExecution,
 } from '../hooks/useWorkflows';
 import { useExecutionWebSocket } from '../hooks/useWebSocket';
 import { useRateRun } from '../hooks/useLearning';
@@ -85,6 +87,7 @@ export function WorkflowExecution() {
   const pauseExecution = usePauseExecution();
   const resumeExecution = useResumeExecution();
   const cancelExecution = useCancelExecution();
+  const retryExecution = useRetryExecution();
   const runCommand = useRunCommand();
   const submitApproval = useSubmitApproval();
 
@@ -175,6 +178,7 @@ export function WorkflowExecution() {
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-text">{t.workflows.execution.title}</h1>
             <StatusBadge status={run.status} />
+            <GateStatusBadge run={run} />
             {connected && isRunning && (
               <span className="flex items-center gap-1 text-xs text-success">
                 <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
@@ -204,6 +208,16 @@ export function WorkflowExecution() {
             )}
           </p>
         </div>
+        {(run.status === 'INTERRUPTED' || run.status === 'FAILED') && (
+          <Button
+            variant="secondary" size="sm"
+            icon={<Play className="w-4 h-4" />}
+            onClick={() => retryExecution.mutate(runId!)}
+            loading={retryExecution.isPending}
+          >
+            {t.workflows.execution.retry}
+          </Button>
+        )}
         {isRunning && (
           <div className="flex items-center gap-2">
             {run.status === 'RUNNING' && (

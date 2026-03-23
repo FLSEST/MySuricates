@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import com.automation.service.activitylog.ActivityLogService;
 
 @WebMvcTest(TodoController.class)
 @Import(GlobalExceptionHandler.class)
@@ -36,6 +37,9 @@ class TodoControllerTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @MockBean private TodoService todoService;
+    @MockBean
+    private ActivityLogService activityLogService;
+
     @MockBean private TodoMapper todoMapper;
     @MockBean private ApiKeyService apiKeyService;
 

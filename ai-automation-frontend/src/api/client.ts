@@ -15,7 +15,7 @@ class ApiClient {
 
   private async request<T>(path: string, options?: RequestInit): Promise<T> {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30_000);
+    const timeout = setTimeout(() => controller.abort(), 300_000);
     try {
       const response = await fetch(`${BASE_URL}${path}`, {
         ...options,
