@@ -123,6 +123,22 @@ check_dependencies() {
     fi
 }
 
+check_backend_stopped() {
+    # CRITICAL: Writing directly to SQLite while the backend is running causes
+    # WAL-mode corruption. The backend MUST be stopped before any direct DB write.
+    if curl -s --connect-timeout 2 "$BASE_URL/api/v1/system/health" &>/dev/null; then
+        err "Das Backend läuft noch auf $BASE_URL!"
+        err ""
+        err "Direkter SQLite-Write mit laufendem Backend korumpiert die Datenbank"
+        err "(WAL-Mode-Konflikt). Backend erst stoppen:"
+        err ""
+        err "  kill \$(pgrep -f 'ai-automation-backend.*jar')"
+        err ""
+        err "Danach Script erneut ausführen, dann Backend neu starten."
+        exit 1
+    fi
+}
+
 validate_statuses() {
     IFS=',' read -ra requested <<< "$STATUS_FILTER"
     for s in "${requested[@]}"; do
@@ -300,10 +316,14 @@ PYEOF
 
 do_delete() {
     local where="$1"
-    local api_key="$2"
 
-    # Backup first
-    do_backup "$api_key"
+    # Backup via file copy (backend is stopped, so API backup is unavailable)
+    local backup_dir="$HOME/.autotrigger/backups"
+    local backup_file="$backup_dir/mysuricates-manual-$(date +%Y-%m-%d_%H-%M-%S).db"
+    mkdir -p "$backup_dir"
+    log "Erstelle Backup: $backup_file"
+    cp "$DB_PATH" "$backup_file"
+    log "Backup erstellt ($(du -h "$backup_file" | cut -f1))"
 
     # Show preview
     show_preview "$where"
@@ -367,9 +387,6 @@ main() {
     validate_statuses
 
     export DB_PATH
-    local api_key
-    api_key=$(resolve_api_key)
-
     local where
     where=$(build_where_clause)
 
@@ -381,6 +398,10 @@ main() {
     [[ -n "$BEFORE_DATE" ]]     && info "Before:   ${BEFORE_DATE}"
     info "Mode:     $MODE"
 
+    if [[ "$MODE" == "execute" ]]; then
+        check_backend_stopped
+    fi
+
     if [[ "$MODE" == "dry-run" ]]; then
         show_preview "$where"
         local run_count
@@ -391,7 +412,7 @@ main() {
             warn "Dry-run only. Use --execute to delete."
         fi
     else
-        do_delete "$where" "$api_key"
+        do_delete "$where"
     fi
 }
 
