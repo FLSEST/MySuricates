@@ -18,6 +18,7 @@ class StagingServiceTest {
     private StagingConfig config;
     private InstanceSyncHelper syncHelper;
     private ApiKeyService apiKeyService;
+    private DockerContainerManager dockerManager;
     private StagingService service;
 
     @BeforeEach
@@ -29,7 +30,8 @@ class StagingServiceTest {
         config.setStableFrontendDir("stable-frontend");
         syncHelper = mock(InstanceSyncHelper.class);
         apiKeyService = mock(ApiKeyService.class);
-        service = new StagingService(config, syncHelper, apiKeyService);
+        dockerManager = mock(DockerContainerManager.class);
+        service = new StagingService(config, syncHelper, apiKeyService, dockerManager);
     }
 
     @Test

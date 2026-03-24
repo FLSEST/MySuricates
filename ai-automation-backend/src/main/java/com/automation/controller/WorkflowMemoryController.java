@@ -65,7 +65,7 @@ public class WorkflowMemoryController {
             @PathVariable String workflowId,
             @PathVariable String memoryId) {
         memoryService.activate(workflowId, memoryId);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{memoryId}")

@@ -3,22 +3,28 @@ import { Card, CardHeader, Toggle, Select } from '../ui';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useI18nStore, type Locale } from '../../i18n';
 import { useT } from '../../i18n';
-import { useUpdateSystemSetting } from '../../hooks/useSystem';
-import { useAiProviders } from '../../hooks/useSystem';
+import { useUpdateSystemSetting, useAiProviders, useAssistantModelSetting } from '../../hooks/useSystem';
 import { Globe, Bot } from 'lucide-react';
 
 export function GeneralSettingsCard() {
   const t = useT();
-  const { simpleMode, setSimpleMode, advancedMode, setAdvancedMode, autoTodoDefault, setAutoTodoDefault, autoRepairDefault, setAutoRepairDefault, defaultAiProvider, setDefaultAiProvider } = useSettingsStore();
+  const { simpleMode, setSimpleMode, advancedMode, setAdvancedMode, autoTodoDefault, setAutoTodoDefault, autoRepairDefault, setAutoRepairDefault, defaultAiProvider, setDefaultAiProvider, assistantModel, setAssistantModel } = useSettingsStore();
   const updateSetting = useUpdateSystemSetting();
   const { locale, setLocale } = useI18nStore();
   const { data: aiProviders } = useAiProviders();
+  const { data: fetchedAssistantModel } = useAssistantModelSetting();
 
   useEffect(() => {
     if (aiProviders && !defaultAiProvider) {
       setDefaultAiProvider(aiProviders.default);
     }
   }, [aiProviders, defaultAiProvider, setDefaultAiProvider]);
+
+  useEffect(() => {
+    if (fetchedAssistantModel !== undefined && fetchedAssistantModel !== assistantModel) {
+      setAssistantModel(fetchedAssistantModel);
+    }
+  }, [fetchedAssistantModel]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <Card>
@@ -67,6 +73,29 @@ export function GeneralSettingsCard() {
               value: p,
               label: p === 'CLAUDE' ? 'Claude CLI' : p === 'CODEX' ? 'Codex CLI' : p,
             }))}
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Bot className="w-5 h-5 text-text-secondary" />
+            <div>
+              <p className="text-sm font-medium text-text">{t.settings.assistantModel}</p>
+              <p className="text-xs text-text-tertiary">{t.settings.assistantModelHint}</p>
+            </div>
+          </div>
+          <Select
+            value={assistantModel}
+            onChange={(e) => {
+              setAssistantModel(e.target.value);
+              updateSetting.mutate({ key: 'assistant-model', value: e.target.value });
+            }}
+            options={[
+              { value: '', label: 'Standard (Provider-Standard)' },
+              { value: 'claude-haiku-4-5-20251001', label: 'Haiku (schnell)' },
+              { value: 'claude-sonnet-4-6', label: 'Sonnet (präzise)' },
+              { value: 'claude-opus-4-6', label: 'Opus (komplex)' },
+            ]}
           />
         </div>
 

@@ -63,6 +63,33 @@ export function useUpdateSystemSetting() {
   });
 }
 
+export function useAssistantModelSetting() {
+  return useQuery({
+    queryKey: ['system', 'settings', 'assistant-model'],
+    queryFn: async () => {
+      const r = await api.get<{ value: string }>('/system/settings/assistant-model');
+      return r.value ?? '';
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+const DEFAULT_THINKING_PHRASES = [
+  'Analysiere Runs…', 'Durchsuche Todos…', 'Prüfe Workflows…', 'Denke nach…',
+];
+
+export function useAssistantThinkingPhrases() {
+  return useQuery({
+    queryKey: ['system', 'settings', 'assistant-thinking-phrases'],
+    queryFn: async () => {
+      const r = await api.get<{ value: string }>('/system/settings/assistant-thinking-phrases');
+      return JSON.parse(r.value) as string[];
+    },
+    staleTime: 10 * 60 * 1000,
+    placeholderData: DEFAULT_THINKING_PHRASES,
+  });
+}
+
 export function useRepairAllFailed() {
   const qc = useQueryClient();
   const toast = useToast();

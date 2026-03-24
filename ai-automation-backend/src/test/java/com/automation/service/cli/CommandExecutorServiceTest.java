@@ -6,9 +6,8 @@ import com.automation.entity.SkillCategory;
 import com.automation.entity.StepStatus;
 import com.automation.entity.StepResult;
 import com.automation.exception.WorkflowExecutionException;
+import com.automation.service.ai.AiProvider;
 import com.automation.service.ai.AiProviderRegistry;
-import com.automation.service.ai.HostClaudeService;
-import com.automation.service.ai.HostClaudeService.ActionResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,20 +33,21 @@ class CommandExecutorServiceTest {
     private CliSession cliSession;
 
     @Mock
-    private HostClaudeService hostClaudeService;
-
-    @Mock
     private ShellCommandService shellCommandService;
 
     @Mock
     private AiProviderRegistry aiProviderRegistry;
 
+    @Mock
+    private AiProvider aiProvider;
+
     private CommandExecutorService commandExecutorService;
 
     @BeforeEach
     void setUp() throws IOException {
-        commandExecutorService = new CommandExecutorService(sessionManager, hostClaudeService, shellCommandService, aiProviderRegistry);
+        commandExecutorService = new CommandExecutorService(sessionManager, shellCommandService, aiProviderRegistry);
         lenient().when(sessionManager.getOrCreateSession(anyString(), anyString())).thenReturn(cliSession);
+        lenient().when(aiProviderRegistry.resolve(any())).thenReturn(aiProvider);
     }
 
     @Test
@@ -193,8 +193,7 @@ class CommandExecutorServiceTest {
 
     @Test
     void executeOnHost_success_returnsEnrichedResult() throws IOException {
-        when(hostClaudeService.executeAction(eq("hello"), eq("sonnet"), eq("sys prompt"), eq("/project"), isNull()))
-                .thenReturn(new ActionResult("Hello world", 0, null));
+        when(aiProvider.executeAction(any())).thenReturn(new AiProvider.ActionResult("Hello world", 0, null));
 
         CliSession.EnrichedCommandResult result = commandExecutorService.executeOnHost(
                 HostExecutionRequest.builder()
@@ -210,8 +209,7 @@ class CommandExecutorServiceTest {
 
     @Test
     void executeOnHost_ioException_throwsWorkflowExecutionException() throws IOException {
-        when(hostClaudeService.executeAction(anyString(), any(), any(), anyString(), isNull()))
-                .thenThrow(new IOException("Claude not found"));
+        when(aiProvider.executeAction(any())).thenThrow(new IOException("Claude not found"));
 
         assertThatThrownBy(() -> commandExecutorService.executeOnHost(
                 HostExecutionRequest.builder()
@@ -223,9 +221,24 @@ class CommandExecutorServiceTest {
     }
 
     @Test
+    void executeOnHost_routesThroughRegistry_forClaudeProvider() throws IOException {
+        when(aiProvider.executeAction(any())).thenReturn(new AiProvider.ActionResult("result", 0, null));
+
+        commandExecutorService.executeOnHost(
+                HostExecutionRequest.builder()
+                        .projectPath("/project")
+                        .command("cmd")
+                        .providerId("CLAUDE")
+                        .build());
+
+        verify(aiProviderRegistry).resolve("CLAUDE");
+        verify(aiProvider).executeAction(any());
+    }
+
+    @Test
     void executeStepOnHost_success_returnsCompletedStep() throws IOException {
-        when(hostClaudeService.executeAction(eq("npm test"), any(), any(), eq("/project"), isNull()))
-                .thenReturn(new ActionResult("All tests passed", 0, null));
+        when(aiProvider.executeAction(any())).thenReturn(new AiProvider.ActionResult("All tests passed", 0, null));
+        when(aiProvider.getId()).thenReturn("CLAUDE");
 
         BlockDefinition block = BlockDefinition.builder()
                 .type("simple")
@@ -248,8 +261,8 @@ class CommandExecutorServiceTest {
 
     @Test
     void executeStepOnHost_nonZeroExitCode_returnsFailedStep() throws IOException {
-        when(hostClaudeService.executeAction(eq("npm test"), any(), any(), eq("/project"), isNull()))
-                .thenReturn(new ActionResult("Error: tests failed", 1, null));
+        when(aiProvider.executeAction(any())).thenReturn(new AiProvider.ActionResult("Error: tests failed", 1, null));
+        when(aiProvider.getId()).thenReturn("CLAUDE");
 
         BlockDefinition block = BlockDefinition.builder()
                 .type("simple")
@@ -264,5 +277,26 @@ class CommandExecutorServiceTest {
                         .build());
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+    }
+
+    @Test
+    void executeStepOnHost_storesProviderIdInMetadata() throws IOException {
+        when(aiProvider.executeAction(any())).thenReturn(new AiProvider.ActionResult("output", 0, null));
+        when(aiProvider.getId()).thenReturn("CODEX");
+        when(aiProviderRegistry.resolve("CODEX")).thenReturn(aiProvider);
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("simple")
+                .config(Map.of("command", "codex task"))
+                .build();
+
+        StepResult result = commandExecutorService.executeStepOnHost(
+                HostExecutionRequest.builder()
+                        .projectPath("/project")
+                        .block(block)
+                        .providerId("CODEX")
+                        .build());
+
+        assertThat(result.getMetadata()).containsEntry("provider", "CODEX");
     }
 }

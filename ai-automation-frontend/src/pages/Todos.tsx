@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { usePersistedState } from '../hooks/usePersistedState';
 import {
   CheckSquare, Plus, Search, Trash2, Pencil, Bot, User, GitBranch,
   X, List, LayoutGrid, Circle,
@@ -408,11 +409,11 @@ function TodoListItem({ todo, onEdit, onStatusChange, onDelete }: {
 export function Todos() {
   const t = useT();
   // Filter state (declared before useTodos so we can pass filters to the API)
-  const [statusFilter, setStatusFilter] = useState<TodoStatus | 'ALL'>('ALL');
-  const [sourceFilter, setSourceFilter] = useState<TodoSource | 'ALL'>('ALL');
-  const [projectFilter, setProjectFilter] = useState('');
-  const [search, setSearch] = useState('');
-  const [tagFilter, setTagFilter] = useState('');
+  const [statusFilter, setStatusFilter] = usePersistedState<TodoStatus | 'ALL'>('todos-status-filter', 'ALL');
+  const [sourceFilter, setSourceFilter] = usePersistedState<TodoSource | 'ALL'>('todos-source-filter', 'ALL');
+  const [projectFilter, setProjectFilter] = usePersistedState('todos-project-filter', '');
+  const [search, setSearch] = usePersistedState('todos-search', '');
+  const [tagFilter, setTagFilter] = usePersistedState('todos-tag-filter', '');
   const [showAllTags, setShowAllTags] = useState(false);
 
   // Build server-side filter params
@@ -444,13 +445,7 @@ export function Todos() {
   const quickInputRef = useRef<HTMLInputElement>(null);
 
   // View mode
-  const [viewMode, setViewModeState] = useState<ViewMode>(
-    () => (localStorage.getItem('todos-view-mode') as ViewMode) || 'list'
-  );
-  const setViewMode = (mode: ViewMode) => {
-    setViewModeState(mode);
-    localStorage.setItem('todos-view-mode', mode);
-  };
+  const [viewMode, setViewMode] = usePersistedState<ViewMode>('todos-view-mode', 'list');
 
   // Edit modal state
   const [editTodo, setEditTodo] = useState<Todo | null>(null);

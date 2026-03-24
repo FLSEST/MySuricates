@@ -16,8 +16,6 @@ import org.springframework.stereotype.Service;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
@@ -33,6 +31,7 @@ public class StagingService {
     private final StagingConfig config;
     private final InstanceSyncHelper syncHelper;
     private final ApiKeyService apiKeyService;
+    private final DockerContainerManager dockerManager;
 
     public enum PromotePhase {
         IDLE, STOPPING, BUILDING_BACKEND, BUILDING_FRONTEND, BUILDING_IMAGE, STARTING, ERROR
@@ -246,32 +245,11 @@ public class StagingService {
     // ── Internal helpers ──────────────────────────────────
 
     boolean isContainerRunning() {
-        try {
-            ProcessBuilder pb = new ProcessBuilder("docker", "ps", "--filter",
-                    "name=" + config.getContainerName(), "--format", "{{.Status}}");
-            pb.redirectErrorStream(true);
-            Process p = pb.start();
-            String output = new String(p.getInputStream().readAllBytes()).trim();
-            p.waitFor();
-            return !output.isEmpty();
-        } catch (Exception e) {
-            log.debug("Container status check failed: {}", e.getMessage());
-            return false;
-        }
+        return dockerManager.isRunning(config.getContainerName());
     }
 
     public boolean isHealthy() {
-        try {
-            HttpURLConnection conn = (HttpURLConnection) URI.create(config.getHealthUrl()).toURL().openConnection();
-            conn.setConnectTimeout(3000);
-            conn.setReadTimeout(3000);
-            int code = conn.getResponseCode();
-            conn.disconnect();
-            return code == 200;
-        } catch (Exception e) {
-            log.debug("Health check failed for {}: {}", config.getHealthUrl(), e.getMessage());
-            return false;
-        }
+        return dockerManager.isHealthy(config.getHealthUrl());
     }
 
     String findLastSnapshot() {

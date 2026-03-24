@@ -2,6 +2,7 @@ package com.automation.controller;
 
 import com.automation.dto.response.RemoteAccessResponse;
 import com.automation.repository.AppSettingsRepository;
+import com.automation.service.AssistantService;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.repair.AutoRepairService;
 import com.automation.service.system.DatabaseBackupService;
@@ -43,6 +44,10 @@ public class SystemController {
     private final DataSource dataSource;
     private final SystemIdentityService systemIdentity;
     private final AiProviderRegistry aiProviderRegistry;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private AssistantService assistantService;
 
     @Value("${automation.security.enabled:true}")
     private boolean securityEnabled;
@@ -203,7 +208,10 @@ public class SystemController {
                 .body(resource);
     }
 
-    private static final Set<String> ALLOWED_SETTINGS = Set.of("auto-todo-default", "auto-repair-default", "default-ai-provider");
+    private static final Set<String> ALLOWED_SETTINGS = Set.of(
+            "auto-todo-default", "auto-repair-default", "default-ai-provider",
+            "assistant-thinking-phrases", "assistant-model"
+    );
 
     @GetMapping("/settings/{key}")
     public ResponseEntity<Map<String, String>> getSetting(@PathVariable String key) {
@@ -224,6 +232,12 @@ public class SystemController {
             return ResponseEntity.badRequest().build();
         }
         appSettingsRepository.set(key, value);
+        if ("assistant-model".equals(key)) {
+            assistantService.refreshCachedModel();
+        }
+        if ("default-ai-provider".equals(key)) {
+            aiProviderRegistry.refreshDefaultProviderCache();
+        }
         return ResponseEntity.ok().build();
     }
 

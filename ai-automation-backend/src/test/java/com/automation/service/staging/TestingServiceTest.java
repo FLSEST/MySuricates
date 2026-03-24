@@ -43,6 +43,9 @@ class TestingServiceTest {
     @Mock
     private ApiKeyService apiKeyService;
 
+    @Mock
+    private DockerContainerManager dockerContainerManager;
+
     @InjectMocks
     private TestingService testingService;
 

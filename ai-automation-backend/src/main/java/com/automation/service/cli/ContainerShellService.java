@@ -1,8 +1,9 @@
 package com.automation.service.cli;
 
 import com.automation.service.cli.ShellCommandService.ShellResult;
+import com.automation.util.HostProcessUtils;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
@@ -17,13 +18,11 @@ import java.util.concurrent.TimeUnit;
  * Same ShellResult return type as ShellCommandService for easy interchangeability.
  */
 @Service
+@RequiredArgsConstructor
 @Slf4j
 public class ContainerShellService {
 
-    @Value("${automation.cli.host-uid:#{null}}")
-    private String configuredHostUid;
-
-    private volatile String cachedHostUid;
+    private final HostProcessUtils hostProcessUtils;
 
     /**
      * Execute a command inside an ephemeral container.
@@ -100,7 +99,7 @@ public class ContainerShellService {
 
         // Run as host user to match file ownership
         cmd.add("--user");
-        cmd.add(getHostUid());
+        cmd.add(hostProcessUtils.getHostUid());
 
         cmd.add("--workdir");
         cmd.add("/workspace");
@@ -135,25 +134,5 @@ public class ContainerShellService {
         cmd.add(command);
 
         return cmd;
-    }
-
-    private String getHostUid() {
-        if (configuredHostUid != null && !configuredHostUid.isBlank()) {
-            return configuredHostUid;
-        }
-        if (cachedHostUid != null) {
-            return cachedHostUid;
-        }
-        try {
-            Process p = new ProcessBuilder("id", "-u").start();
-            String uid = new String(p.getInputStream().readAllBytes()).trim();
-            p.waitFor(5, TimeUnit.SECONDS);
-            cachedHostUid = uid;
-            return uid;
-        } catch (Exception e) {
-            log.warn("Could not determine host UID, defaulting to 1000");
-            cachedHostUid = "1000";
-            return "1000";
-        }
     }
 }

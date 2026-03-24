@@ -2,6 +2,7 @@ package com.automation.service.ai;
 
 import com.automation.config.AiProviderConfig;
 import com.automation.repository.AppSettingsRepository;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -22,6 +23,9 @@ public class AiProviderRegistry {
     private final AiProviderConfig config;
     private final AppSettingsRepository appSettingsRepository;
 
+    /** Cached default provider ID — loaded at startup, refreshed on settings change. Never read from DB during a request. */
+    private volatile String cachedDefaultProviderId = null;
+
     public AiProviderRegistry(List<AiProvider> providerList, AiProviderConfig config,
                                AppSettingsRepository appSettingsRepository) {
         this.providers = providerList.stream()
@@ -30,6 +34,24 @@ public class AiProviderRegistry {
         this.appSettingsRepository = appSettingsRepository;
         log.info("AI providers registered: {} (default: {})",
                 providers.keySet(), config.getDefaultProvider());
+    }
+
+    @PostConstruct
+    public void initCache() {
+        cachedDefaultProviderId = appSettingsRepository.get("default-ai-provider")
+                .filter(v -> !v.isBlank() && providers.containsKey(v.toUpperCase()))
+                .map(String::toUpperCase)
+                .orElse(config.getDefaultProvider());
+        log.info("Default AI provider cached: {}", cachedDefaultProviderId);
+    }
+
+    /** Called by SystemController when default-ai-provider setting changes. */
+    public void refreshDefaultProviderCache() {
+        cachedDefaultProviderId = appSettingsRepository.get("default-ai-provider")
+                .filter(v -> !v.isBlank() && providers.containsKey(v.toUpperCase()))
+                .map(String::toUpperCase)
+                .orElse(config.getDefaultProvider());
+        log.info("Default AI provider cache refreshed: {}", cachedDefaultProviderId);
     }
 
     /**
@@ -56,12 +78,9 @@ public class AiProviderRegistry {
         return List.copyOf(providers.keySet());
     }
 
-    /** Returns the global default provider ID (DB setting > config fallback). */
+    /** Returns the global default provider ID (from cache — never reads DB during a request). */
     public String getDefaultProviderId() {
-        return appSettingsRepository.get("default-ai-provider")
-                .filter(v -> !v.isBlank() && providers.containsKey(v.toUpperCase()))
-                .map(String::toUpperCase)
-                .orElse(config.getDefaultProvider());
+        return cachedDefaultProviderId != null ? cachedDefaultProviderId : config.getDefaultProvider();
     }
 
     private String resolveId(String workflowProvider) {

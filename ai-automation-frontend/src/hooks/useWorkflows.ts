@@ -207,6 +207,17 @@ export function useSubmitApproval() {
   });
 }
 
+export function useApproveTodos() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ runId, approved }: { runId: string; approved: boolean }) =>
+      api.post(`/executions/${runId}/todos/approve`, { approved }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workflows'] });
+    },
+  });
+}
+
 export async function exportWorkflow(id: string, filename: string) {
   const data = await api.get<WorkflowExportData>(`/workflows/export/${id}`);
   downloadJSON(data, filename);

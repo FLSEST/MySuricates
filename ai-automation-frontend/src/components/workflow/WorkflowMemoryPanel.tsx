@@ -113,9 +113,25 @@ export function WorkflowMemoryPanel({ workflowId, runs }: Props) {
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-3 mt-1 text-xs text-text-tertiary">
-                    <span>{new Date(mem.createdAt).toLocaleDateString()}</span>
+                  <div className="flex items-center gap-3 mt-1 text-xs text-text-tertiary flex-wrap">
+                    <span>{new Date(mem.createdAt).toLocaleString()}</span>
                     <span>{mem.provider}</span>
+                    {mem.sourceRunIds.length > 0 && (() => {
+                      const sourceRuns = runs?.filter(r => mem.sourceRunIds.includes(r.id)) ?? [];
+                      return (
+                        <span className="flex items-center gap-1 flex-wrap">
+                          <span>{t.memory.sourceRuns}:</span>
+                          {sourceRuns.length > 0
+                            ? sourceRuns.map(r => (
+                                <span key={r.id} className="px-1.5 py-0.5 rounded-sm bg-surface-raised text-[10px]">
+                                  {new Date(r.startedAt).toLocaleString()}
+                                </span>
+                              ))
+                            : <span>{mem.sourceRunIds.length} Runs</span>
+                          }
+                        </span>
+                      );
+                    })()}
                   </div>
                   {mem.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1.5">

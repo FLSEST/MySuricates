@@ -26,6 +26,9 @@
   --color-sidebar: #1a1614;
   --color-sidebar-hover: #252019;
   --color-sidebar-active: #332b22;
+  --color-assistant: #1c1812;
+  --color-assistant-raised: #252019;
+  --color-assistant-border: #3d3020;
 }
 
 @theme inline {
@@ -53,6 +56,10 @@
 
   --color-danger: var(--color-danger);
   --color-danger-subtle: var(--color-danger-subtle);
+
+  --color-assistant: var(--color-assistant);
+  --color-assistant-raised: var(--color-assistant-raised);
+  --color-assistant-border: var(--color-assistant-border);
 
   --font-sans: Plus Jakarta Sans, system-ui, sans-serif;
   --font-mono: JetBrains Mono, Fira Code, monospace;

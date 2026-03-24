@@ -15,10 +15,6 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -40,6 +36,7 @@ public class TestingService {
     private final InstanceSyncHelper syncHelper;
     private final WorkflowRepository workflowRepository;
     private final ApiKeyService apiKeyService;
+    private final DockerContainerManager dockerManager;
 
     @EventListener(ApplicationReadyEvent.class)
     void autoStartTest() {
@@ -334,28 +331,11 @@ public class TestingService {
     }
 
     boolean isContainerRunning() {
-        try {
-            Process p = createDockerProcess("docker", "ps", "--filter",
-                    "name=" + config.getTestContainerName(), "--format", "{{.Status}}");
-            String output = new String(p.getInputStream().readAllBytes()).trim();
-            p.waitFor();
-            return !output.isEmpty();
-        } catch (Exception e) {
-            return false;
-        }
+        return dockerManager.isRunning(config.getTestContainerName());
     }
 
     public boolean isHealthy() {
-        try {
-            HttpURLConnection conn = (HttpURLConnection) URI.create(config.getTestHealthUrl()).toURL().openConnection();
-            conn.setConnectTimeout(HEALTH_CHECK_TIMEOUT_MS);
-            conn.setReadTimeout(HEALTH_CHECK_TIMEOUT_MS);
-            int code = conn.getResponseCode();
-            conn.disconnect();
-            return code == 200;
-        } catch (Exception e) {
-            return false;
-        }
+        return dockerManager.isHealthy(config.getTestHealthUrl());
     }
 
     String deriveTestBaseUrl() {
@@ -388,44 +368,11 @@ public class TestingService {
     }
 
     private void runCommand(Path workDir, String... command) {
-        runCommand(workDir, Map.of(), command);
-    }
-
-    private Process createDockerProcess(String... command) throws java.io.IOException {
-        ProcessBuilder pb = new ProcessBuilder(command);
-        pb.redirectErrorStream(true);
-        return pb.start();
+        dockerManager.runCommand("testing", workDir, command);
     }
 
     private void runCommand(Path workDir, Map<String, String> extraEnv, String... command) {
-        try {
-            ProcessBuilder pb = new ProcessBuilder(command);
-            pb.directory(workDir.toFile());
-            pb.redirectErrorStream(true);
-            if (!extraEnv.isEmpty()) {
-                pb.environment().putAll(extraEnv);
-            }
-            Process p = pb.start();
-
-            try (var reader = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    log.debug("[testing] {}", line);
-                }
-            }
-
-            int exitCode = p.waitFor();
-            if (exitCode != 0) {
-                throw new RuntimeException("Command failed (exit " + exitCode + "): " + String.join(" ", command));
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Command interrupted", e);
-        } catch (RuntimeException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new RuntimeException("Command execution failed: " + e.getMessage(), e);
-        }
+        dockerManager.runCommand("testing", workDir, extraEnv, command);
     }
 
     private void waitForHealth(int maxWaitSeconds) {

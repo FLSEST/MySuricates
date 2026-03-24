@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { usePersistedState } from '../hooks/usePersistedState';
 import { useNavigate } from 'react-router-dom';
 import { History, Link2 } from 'lucide-react';
 import { Card, Select, Spinner, Table } from '../components/ui';
@@ -18,19 +19,19 @@ export function Runs() {
   const t = useT();
   const navigate = useNavigate();
 
-  const [viewMode, setViewMode] = useState<ViewMode>('workflows');
+  const [viewMode, setViewMode] = usePersistedState<ViewMode>('runs-view-mode', 'workflows');
 
   // Workflow filters
-  const [statusFilter, setStatusFilter] = useState('');
-  const [workflowFilter, setWorkflowFilter] = useState('');
-  const [projectFilter, setProjectFilter] = useState('');
-  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = usePersistedState('runs-status-filter', '');
+  const [workflowFilter, setWorkflowFilter] = usePersistedState('runs-workflow-filter', '');
+  const [projectFilter, setProjectFilter] = usePersistedState('runs-project-filter', '');
+  const [search, setSearch] = usePersistedState('runs-search', '');
   const [page, setPage] = useState(0);
   const pageSize = 50;
 
   // Chain filters
-  const [chainStatusFilter, setChainStatusFilter] = useState('');
-  const [chainSearch, setChainSearch] = useState('');
+  const [chainStatusFilter, setChainStatusFilter] = usePersistedState('runs-chain-status-filter', '');
+  const [chainSearch, setChainSearch] = usePersistedState('runs-chain-search', '');
   const [chainPage, setChainPage] = useState(0);
 
   const { data: runsPage, isLoading, error, refetch } = useAllRuns({

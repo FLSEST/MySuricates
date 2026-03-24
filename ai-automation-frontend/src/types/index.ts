@@ -58,8 +58,18 @@ export interface Container {
 
 export interface AutoTodoConfig {
   enabled: boolean;
+  mode?: 'auto' | 'approval';
   priority?: TodoPriority;
   tags?: string[];
+}
+
+export interface PendingTodoItem {
+  title: string;
+  priority: TodoPriority;
+  description?: string;
+  category?: string;
+  gateStatus?: string;
+  projectId?: string;
 }
 
 export interface WorkflowMetadata {

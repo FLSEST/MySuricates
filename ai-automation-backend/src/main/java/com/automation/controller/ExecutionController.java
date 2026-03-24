@@ -1,7 +1,9 @@
 package com.automation.controller;
 
+import com.automation.dto.request.ApproveTodosRequest;
 import com.automation.dto.request.ApproveExecutionRequest;
 import com.automation.dto.request.ExecuteCommandRequest;
+import com.automation.service.todo.AutoTodoService;
 import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.exception.ResourceNotFoundException;
@@ -30,6 +32,7 @@ public class ExecutionController {
     private final WorkflowExecutor workflowExecutor;
     private final WorkflowRunRepository runRepository;
     private final WorkflowMapper workflowMapper;
+    private final AutoTodoService autoTodoService;
 
     @GetMapping
     @Transactional(readOnly = true)
@@ -136,6 +139,14 @@ public class ExecutionController {
             response.put("validationPattern", request.getValidationPattern());
         }
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{id}/todos/approve")
+    public ResponseEntity<Void> approveTodos(
+            @PathVariable String id,
+            @RequestBody ApproveTodosRequest request) {
+        autoTodoService.approvePendingTodos(id, request.approved());
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/{id}/command")

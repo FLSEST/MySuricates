@@ -10,6 +10,8 @@ automation:
     allowed-origins: http://localhost:9091
   staging:
     auto-start: false
+  tray:
+    enabled: false
   serve-frontend: true
   frontend-path: /app/frontend
   environment: Produktiv

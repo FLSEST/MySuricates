@@ -8,6 +8,7 @@ import com.automation.exception.ContainerException;
 import com.automation.repository.ContainerRepository;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.workflow.WorkflowExecutor;
+import com.automation.util.HostProcessUtils;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,23 +44,27 @@ class ContainerServiceTest {
     @Mock
     private ActivityLogService activityLogService;
 
+    @Mock
+    private HostProcessUtils hostProcessUtils;
+
     private ContainerService service;
 
     private Project testProject;
 
     @BeforeEach
     void setUp() {
+        lenient().when(hostProcessUtils.getHostUid()).thenReturn("1000");
         service = new ContainerService(
                 dockerClient,
                 containerRepository,
                 workflowExecutor,
                 activityLogService,
-                100_000L,   // cpuQuota
-                4_294_967_296L, // memoryLimit (4GB)
-                100L,       // pidsLimit
-                60,         // idleTimeoutMinutes
-                "/home/test", // hostHome
-                "1000"      // hostUid
+                hostProcessUtils,
+                100_000L,           // cpuQuota
+                4_294_967_296L,     // memoryLimit (4GB)
+                100L,               // pidsLimit
+                60,                 // idleTimeoutMinutes
+                "/home/test"        // hostHome
         );
 
         testProject = Project.builder()

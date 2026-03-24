@@ -3,10 +3,13 @@ package com.automation.service.todo;
 import com.automation.entity.GateStatus;
 import com.automation.entity.Project;
 import com.automation.entity.Todo;
+import com.automation.entity.WorkflowRun;
 import com.automation.event.WorkflowRunCompletedEvent;
+import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.TodoMapper;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.repository.TodoRepository;
+import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.todo.GateStatusResolver.GateResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -34,6 +38,7 @@ public class AutoTodoService {
     private final GateStatusResolver gateStatusResolver;
     private final ProjectPathResolver projectPathResolver;
     private final AppSettingsRepository appSettingsRepository;
+    private final WorkflowRunRepository workflowRunRepository;
 
     @Async
     @EventListener
@@ -50,11 +55,18 @@ public class AutoTodoService {
             return;
         }
 
-        log.info("Auto-todo: workflow={}, gate={}, category={}", event.getWorkflowName(), gate.status(), gate.category());
+        log.info("Auto-todo: workflow={}, gate={}, category={}, mode={}", event.getWorkflowName(), gate.status(), gate.category(), getMode(event));
 
-        // Resolve target projects (multi-repo support)
         List<String> targetProjectIds = resolveTargetProjectIds(event);
 
+        if ("approval".equals(getMode(event))) {
+            handleApprovalMode(event, gate, targetProjectIds);
+        } else {
+            handleAutoMode(event, gate, targetProjectIds);
+        }
+    }
+
+    private void handleAutoMode(WorkflowRunCompletedEvent event, GateResult gate, List<String> targetProjectIds) {
         for (String projectId : targetProjectIds) {
             switch (gate.status()) {
                 case GREEN -> closeOpenTodos(projectId, event);
@@ -62,6 +74,115 @@ public class AutoTodoService {
                 case RED -> upsertTodo(projectId, event, gate, Todo.Priority.HIGH);
             }
         }
+    }
+
+    private void handleApprovalMode(WorkflowRunCompletedEvent event, GateResult gate, List<String> targetProjectIds) {
+        if (gate.status() == GateStatus.GREEN) {
+            // On GREEN, auto-close open todos even in approval mode
+            for (String projectId : targetProjectIds) {
+                closeOpenTodos(projectId, event);
+            }
+            return;
+        }
+
+        List<Map<String, Object>> pendingTodos = new ArrayList<>();
+        for (String projectId : targetProjectIds) {
+            pendingTodos.add(buildPendingTodo(projectId, event, gate));
+        }
+
+        workflowRunRepository.findById(event.getRunId()).ifPresent(run -> {
+            run.getMetadata().put("pending_todos", pendingTodos);
+            workflowRunRepository.save(run);
+            log.info("Auto-todo (approval): stored {} pending todo(s) for run {}", pendingTodos.size(), event.getRunId());
+        });
+    }
+
+    @Transactional
+    public void approvePendingTodos(String runId, boolean approved) {
+        WorkflowRun run = workflowRunRepository.findById(runId)
+                .orElseThrow(() -> new ResourceNotFoundException("WorkflowRun", runId));
+
+        Object pendingObj = run.getMetadata().get("pending_todos");
+        if (approved && pendingObj instanceof List<?> pendingList) {
+            for (Object item : pendingList) {
+                if (item instanceof Map<?, ?> todoMap) {
+                    createTodoFromPending(todoMap, run);
+                }
+            }
+            log.info("Auto-todo approved: created todos for run {}", runId);
+        } else {
+            log.info("Auto-todo rejected: discarded pending todos for run {}", runId);
+        }
+
+        run.getMetadata().remove("pending_todos");
+        workflowRunRepository.save(run);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void createTodoFromPending(Map<?, ?> todoMap, WorkflowRun run) {
+        String title = String.valueOf(todoMap.get("title"));
+        Todo.Priority priority = Todo.Priority.valueOf(String.valueOf(todoMap.get("priority")));
+        String description = todoMap.containsKey("description") ? String.valueOf(todoMap.get("description")) : null;
+        String projectId = String.valueOf(todoMap.get("projectId"));
+        String category = String.valueOf(todoMap.get("category"));
+        String tagsJson = todoMap.containsKey("tags") ? String.valueOf(todoMap.get("tags")) : "[]";
+
+        Optional<Todo> existing = todoRepository.findOpenByCompositeKey(
+                projectId, REFERENCE_TYPE, run.getWorkflow().getId(), "category:" + category);
+
+        if (existing.isPresent()) {
+            Todo todo = existing.get();
+            todo.setDescription(description);
+            todo.setWorkflowRunId(run.getId());
+            todo.setPriority(priority);
+            todo.setTags(tagsJson);
+            todoRepository.save(todo);
+            log.info("Auto-todo (approved) updated: {} ({})", todo.getTitle(), todo.getId());
+        } else {
+            Todo todo = Todo.builder()
+                    .title(title)
+                    .description(description)
+                    .status(Todo.Status.OPEN)
+                    .priority(priority)
+                    .tags(tagsJson)
+                    .projectId(projectId)
+                    .source(Todo.Source.WORKFLOW)
+                    .sourceAgent(SOURCE_AGENT)
+                    .workflowRunId(run.getId())
+                    .referenceType(REFERENCE_TYPE)
+                    .referenceId(run.getWorkflow().getId())
+                    .build();
+            todoRepository.save(todo);
+            log.info("Auto-todo (approved) created: {} ({})", todo.getTitle(), todo.getId());
+        }
+    }
+
+    private Map<String, Object> buildPendingTodo(String projectId, WorkflowRunCompletedEvent event, GateResult gate) {
+        String prefix = gate.status() == GateStatus.RED ? "[Incident]" : "[Follow-up]";
+        String title = prefix + " " + event.getWorkflowName() + " \u2014 " + gate.category();
+        Todo.Priority priority = gate.status() == GateStatus.RED ? Todo.Priority.HIGH : Todo.Priority.MEDIUM;
+
+        Map<String, Object> proposed = new HashMap<>();
+        proposed.put("title", title);
+        proposed.put("priority", priority.name());
+        proposed.put("description", buildDescription(event, gate));
+        proposed.put("category", gate.category());
+        proposed.put("gateStatus", gate.status().name());
+        proposed.put("projectId", projectId);
+        proposed.put("tags", buildTagsJson(gate));
+        return proposed;
+    }
+
+    @SuppressWarnings("unchecked")
+    String getMode(WorkflowRunCompletedEvent event) {
+        Object autoTodo = event.getWorkflowMetadata().get("autoTodo");
+        if (autoTodo instanceof Map<?, ?> map) {
+            Object mode = map.get("mode");
+            if (mode instanceof String s && !s.isBlank()) {
+                return s;
+            }
+        }
+        return "auto";
     }
 
     /**

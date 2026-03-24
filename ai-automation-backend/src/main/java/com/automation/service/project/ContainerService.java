@@ -9,6 +9,7 @@ import com.automation.exception.ContainerException;
 import com.automation.repository.ContainerRepository;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.workflow.WorkflowExecutor;
+import com.automation.util.HostProcessUtils;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.CreateContainerResponse;
 import com.github.dockerjava.api.model.Bind;
@@ -34,6 +35,7 @@ public class ContainerService {
     private final ContainerRepository containerRepository;
     private final WorkflowExecutor workflowExecutor;
     private final ActivityLogService activityLogService;
+    private final HostProcessUtils hostProcessUtils;
     private static final String CONTAINER_HOME = "/home/agent";
 
     private final long cpuQuota;
@@ -41,31 +43,29 @@ public class ContainerService {
     private final long pidsLimit;
     private final int idleTimeoutMinutes;
     private final String hostHome;
-    private final String hostUid;
 
     public ContainerService(
             DockerClient dockerClient,
             ContainerRepository containerRepository,
             @Lazy WorkflowExecutor workflowExecutor,
             ActivityLogService activityLogService,
+            HostProcessUtils hostProcessUtils,
             @Value("${docker.container.cpu-quota}") long cpuQuota,
             @Value("${docker.container.memory-limit}") long memoryLimit,
             @Value("${docker.container.pids-limit}") long pidsLimit,
             @Value("${docker.container.idle-timeout-minutes}") int idleTimeoutMinutes,
-            @Value("${automation.cli.host-home:}") String hostHome,
-            @Value("${automation.cli.host-uid:}") String hostUid) {
+            @Value("${automation.cli.host-home:}") String hostHome) {
         this.dockerClient = dockerClient;
         this.containerRepository = containerRepository;
         this.workflowExecutor = workflowExecutor;
         this.activityLogService = activityLogService;
+        this.hostProcessUtils = hostProcessUtils;
         this.cpuQuota = cpuQuota;
         this.memoryLimit = memoryLimit;
         this.pidsLimit = pidsLimit;
         this.idleTimeoutMinutes = idleTimeoutMinutes;
         this.hostHome = hostHome != null && !hostHome.isBlank()
                 ? hostHome : System.getProperty("user.home");
-        this.hostUid = hostUid != null && !hostUid.isBlank()
-                ? hostUid : detectHostUid();
     }
 
     @Transactional
@@ -112,7 +112,7 @@ public class ContainerService {
                                             Bind.parse(hostHome + "/.claude.json:" + CONTAINER_HOME + "/.claude.json")
                                     )
                     )
-                    .withUser(hostUid)
+                    .withUser(hostProcessUtils.getHostUid())
                     .withWorkingDir("/workspace")
                     .withCmd("tail", "-f", "/dev/null")
                     .exec();
@@ -241,14 +241,4 @@ public class ContainerService {
         };
     }
 
-    private static String detectHostUid() {
-        try {
-            Process p = new ProcessBuilder("id", "-u").start();
-            String uid = new String(p.getInputStream().readAllBytes()).trim();
-            p.waitFor();
-            return uid;
-        } catch (Exception e) {
-            return "1000";
-        }
-    }
 }

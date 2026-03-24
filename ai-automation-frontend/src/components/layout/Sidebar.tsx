@@ -153,6 +153,8 @@ export function Sidebar() {
 
   const hiddenNavItems = navItemsWithLabels.filter((item) => sidebarHiddenItems.includes(item.to));
 
+  const editModeNavItems = orderedNavItems.filter((item) => !sidebarHiddenItems.includes(item.to));
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -239,8 +241,8 @@ export function Sidebar() {
       <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
         {editMode && !collapsed ? (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={orderedNavItems.map((i) => i.to)} strategy={verticalListSortingStrategy}>
-              {orderedNavItems.map((item) => (
+            <SortableContext items={editModeNavItems.map((i) => i.to)} strategy={verticalListSortingStrategy}>
+              {editModeNavItems.map((item) => (
                 <SortableNavItem
                   key={item.to}
                   id={item.to}
@@ -292,6 +294,43 @@ export function Sidebar() {
         )}
       </nav>
 
+      {/* Menü bearbeiten */}
+      {showLabels && (
+        <div className="flex items-center gap-1 px-2 py-1">
+          <button
+            onClick={() => setEditMode((v) => !v)}
+            className={`flex items-center gap-2 flex-1 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+              editMode
+                ? 'text-accent bg-accent/10'
+                : 'text-[#7a6e60] hover:text-[#a89a8a]'
+            }`}
+            aria-label={editMode ? 'Bearbeitung beenden' : 'Menü bearbeiten'}
+          >
+            {editMode ? (
+              <>
+                <Check className="w-[16px] h-[16px] shrink-0" />
+                <span>Fertig</span>
+              </>
+            ) : (
+              <>
+                <Pencil className="w-[16px] h-[16px] shrink-0" />
+                <span>Menü bearbeiten</span>
+              </>
+            )}
+          </button>
+          {editMode && (
+            <button
+              onClick={handleReset}
+              className="p-2 rounded-lg text-[#5a4e44] hover:text-[#8a7d6e] transition-colors"
+              aria-label="Zurücksetzen"
+              title="Reihenfolge zurücksetzen"
+            >
+              <RotateCcw className="w-[14px] h-[14px]" />
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Settings + Collapse */}
       <div className="p-2 border-t border-white/10 space-y-0.5">
         <NavLink
@@ -310,42 +349,6 @@ export function Sidebar() {
         </NavLink>
 
         <HealthIndicator collapsed={collapsed && !isMobile} />
-
-        {showLabels && (
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setEditMode((v) => !v)}
-              className={`flex items-center gap-2 flex-1 px-3 py-2 rounded-lg text-sm transition-colors ${
-                editMode
-                  ? 'text-accent bg-accent/10'
-                  : 'text-[#7a6e60] hover:text-[#a89a8a]'
-              }`}
-              aria-label={editMode ? 'Bearbeitung beenden' : 'Navigation bearbeiten'}
-            >
-              {editMode ? (
-                <>
-                  <Check className="w-[16px] h-[16px] shrink-0" />
-                  <span>Fertig</span>
-                </>
-              ) : (
-                <>
-                  <Pencil className="w-[16px] h-[16px] shrink-0" />
-                  <span>Bearbeiten</span>
-                </>
-              )}
-            </button>
-            {editMode && (
-              <button
-                onClick={handleReset}
-                className="p-2 rounded-lg text-[#5a4e44] hover:text-[#8a7d6e] transition-colors"
-                aria-label="Zurücksetzen"
-                title="Reihenfolge zurücksetzen"
-              >
-                <RotateCcw className="w-[14px] h-[14px]" />
-              </button>
-            )}
-          </div>
-        )}
 
         {!isMobile && (
           <button

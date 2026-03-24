@@ -4,8 +4,6 @@ import com.automation.entity.*;
 import com.automation.exception.WorkflowExecutionException;
 import com.automation.service.ai.AiProvider;
 import com.automation.service.ai.AiProviderRegistry;
-import com.automation.service.ai.HostClaudeService;
-import com.automation.service.ai.HostClaudeService.ActionResult;
 import com.automation.service.cli.ShellCommandService.ShellResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +22,6 @@ import java.util.stream.Collectors;
 public class CommandExecutorService {
 
     private final CliSessionManager sessionManager;
-    private final HostClaudeService hostClaudeService;
     private final ShellCommandService shellCommandService;
     private final AiProviderRegistry aiProviderRegistry;
 
@@ -131,23 +128,12 @@ public class CommandExecutorService {
      */
     public CliSession.EnrichedCommandResult executeOnHost(HostExecutionRequest request) {
         String providerId = request.providerId();
-        if (providerId != null && !providerId.isBlank() && !"CLAUDE".equalsIgnoreCase(providerId)) {
-            try {
-                AiProvider provider = aiProviderRegistry.resolve(providerId);
-                AiProvider.ActionResult result = provider.executeAction(
-                        new AiProvider.ActionRequest(request.command(), request.model(),
-                                request.systemPrompt(), request.projectPath(), request.timeoutSeconds()));
-                return new CliSession.EnrichedCommandResult(result.text(), result.exitCode(), null);
-            } catch (IOException e) {
-                throw new WorkflowExecutionException(
-                        "Failed to execute command on host via provider " + providerId, e);
-            }
-        }
         try {
-            ActionResult result = hostClaudeService.executeAction(
-                    request.command(), request.model(), request.systemPrompt(),
-                    request.projectPath(), request.timeoutSeconds());
-            return new CliSession.EnrichedCommandResult(result.text(), result.exitCode(), result.parsed());
+            AiProvider provider = aiProviderRegistry.resolve(providerId);
+            AiProvider.ActionResult result = provider.executeAction(
+                    new AiProvider.ActionRequest(request.command(), request.model(),
+                            request.systemPrompt(), request.projectPath(), request.timeoutSeconds()));
+            return new CliSession.EnrichedCommandResult(result.text(), result.exitCode(), null);
         } catch (IOException e) {
             throw new WorkflowExecutionException(
                     "Failed to execute command on host (project: " + request.projectPath() + ")", e);
@@ -180,51 +166,21 @@ public class CommandExecutorService {
         step.setInput(command);
         step.setStatus(StepStatus.RUNNING);
 
-        String providerId = request.providerId();
-        boolean isNonClaude = providerId != null && !providerId.isBlank() && !"CLAUDE".equalsIgnoreCase(providerId);
-
         try {
-            if (isNonClaude) {
-                // Call provider directly to preserve token metadata
-                AiProvider provider = aiProviderRegistry.resolve(providerId);
-                AiProvider.ActionResult providerResult = provider.executeAction(
-                        new AiProvider.ActionRequest(command, request.model(), request.systemPrompt(),
-                                request.projectPath(), request.timeoutSeconds()));
-                step.setOutput(providerResult.text());
-                step.setStatus(providerResult.exitCode() == 0 ? StepStatus.COMPLETED : StepStatus.FAILED);
+            AiProvider provider = aiProviderRegistry.resolve(request.providerId());
+            AiProvider.ActionResult providerResult = provider.executeAction(
+                    new AiProvider.ActionRequest(command, request.model(), request.systemPrompt(),
+                            request.projectPath(), request.timeoutSeconds()));
+            step.setOutput(providerResult.text());
+            step.setStatus(providerResult.exitCode() == 0 ? StepStatus.COMPLETED : StepStatus.FAILED);
 
-                Map<String, Object> meta = new LinkedHashMap<>(
-                        providerResult.metadata() != null ? providerResult.metadata().toMap() : Map.of());
-                // Fall back to provider ID as model name when no model is reported
-                if (!meta.containsKey("model") || meta.get("model") == null) {
-                    meta.put("model", providerId.toLowerCase());
-                }
-                meta.put("provider", providerId);
-                step.setMetadata(meta);
-            } else {
-                CliSession.EnrichedCommandResult result = executeOnHost(HostExecutionRequest.builder()
-                        .projectPath(request.projectPath())
-                        .command(command)
-                        .model(request.model())
-                        .systemPrompt(request.systemPrompt())
-                        .timeoutSeconds(request.timeoutSeconds())
-                        .providerId(request.providerId())
-                        .build());
-                step.setOutput(result.output());
-                step.setStatus(result.exitCode() == 0 ? StepStatus.COMPLETED : StepStatus.FAILED);
-
-                if (result.parsed() != null) {
-                    Map<String, Object> meta = new LinkedHashMap<>(result.parsed().toMetadata());
-                    if (request.model() != null && !meta.containsKey("model")) meta.put("model", request.model());
-                    meta.put("provider", "CLAUDE");
-                    step.setMetadata(meta);
-                } else {
-                    Map<String, Object> meta = new LinkedHashMap<>();
-                    if (request.model() != null) meta.put("model", request.model());
-                    meta.put("provider", "CLAUDE");
-                    step.setMetadata(meta);
-                }
+            Map<String, Object> meta = new LinkedHashMap<>(
+                    providerResult.metadata() != null ? providerResult.metadata().toMap() : Map.of());
+            if ((!meta.containsKey("model") || meta.get("model") == null) && request.model() != null) {
+                meta.put("model", request.model());
             }
+            meta.put("provider", provider.getId());
+            step.setMetadata(meta);
         } catch (Exception e) {
             log.error("Host step execution failed for project {}: {}", request.projectPath(), e.getMessage(), e);
             step.setOutput("Error: " + e.getMessage());

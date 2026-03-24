@@ -44,6 +44,7 @@ export function WorkflowDetailPanel({
   const recentRuns = runsPage?.content ?? [];
   const updateWorkflow = useUpdateWorkflow();
   const autoTodoEnabled = !!workflow.metadata?.autoTodo?.enabled;
+  const autoTodoMode = workflow.metadata?.autoTodo?.mode ?? 'auto';
 
   return (
     <div className="bg-surface border border-border rounded-xl p-6 space-y-6">
@@ -117,7 +118,7 @@ export function WorkflowDetailPanel({
           onClick={() =>
             updateWorkflow.mutate({
               id: workflow.id,
-              data: { metadata: { autoTodo: { enabled: !autoTodoEnabled } } },
+              data: { metadata: { autoTodo: { ...workflow.metadata?.autoTodo, enabled: !autoTodoEnabled } } },
             })
           }
           className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
@@ -131,6 +132,26 @@ export function WorkflowDetailPanel({
           />
         </button>
       </div>
+
+      {autoTodoEnabled && (
+        <div className="px-3 py-2 rounded-lg bg-surface-raised border border-border space-y-1">
+          <span className="text-xs font-medium text-text-secondary">{t.workflows.autoTodoMode}</span>
+          <select
+            value={autoTodoMode}
+            onChange={(e) =>
+              updateWorkflow.mutate({
+                id: workflow.id,
+                data: { metadata: { autoTodo: { ...workflow.metadata?.autoTodo, mode: e.target.value as 'auto' | 'approval' } } },
+              })
+            }
+            className="w-full text-xs bg-surface border border-border rounded-md px-2 py-1.5 text-text focus:outline-none focus:ring-1 focus:ring-accent"
+          >
+            <option value="auto">{t.workflows.autoTodoModeAuto}</option>
+            <option value="approval">{t.workflows.autoTodoModeApproval}</option>
+          </select>
+          <p className="text-xs text-text-tertiary">{t.workflows.autoTodoModeHint}</p>
+        </div>
+      )}
 
       <div>
         <h3 className="text-sm font-semibold text-text mb-2 flex items-center gap-1.5">

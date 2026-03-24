@@ -4,6 +4,7 @@ import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { SecurityBanner } from './SecurityBanner';
 import { ApiKeyGuard } from './ApiKeyGuard';
+import { AssistantPanel } from '../AssistantPanel';
 import { Spinner } from '../ui';
 import { useSidebarStore } from '../../stores/sidebarStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
@@ -40,6 +41,7 @@ export function Layout() {
           </main>
         </div>
       </div>
+      <AssistantPanel />
     </ApiKeyGuard>
   );
 }

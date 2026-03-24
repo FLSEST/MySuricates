@@ -28,6 +28,9 @@ export interface ThemeTokens {
   '--color-sidebar': string;
   '--color-sidebar-hover': string;
   '--color-sidebar-active': string;
+  '--color-assistant': string;
+  '--color-assistant-raised': string;
+  '--color-assistant-border': string;
 }
 
 export const lightTheme: ThemeTokens = {
@@ -52,6 +55,9 @@ export const lightTheme: ThemeTokens = {
   '--color-sidebar': '#2a2320',
   '--color-sidebar-hover': '#362e28',
   '--color-sidebar-active': '#443a32',
+  '--color-assistant': '#fdf5ec',
+  '--color-assistant-raised': '#ffffff',
+  '--color-assistant-border': '#e8d5bc',
 };
 
 export const darkTheme: ThemeTokens = {
@@ -76,6 +82,9 @@ export const darkTheme: ThemeTokens = {
   '--color-sidebar': '#1a1614',
   '--color-sidebar-hover': '#252019',
   '--color-sidebar-active': '#332b22',
+  '--color-assistant': '#1c1812',
+  '--color-assistant-raised': '#252019',
+  '--color-assistant-border': '#3d3020',
 };
 
 export function applyTheme(tokens: ThemeTokens): void {
