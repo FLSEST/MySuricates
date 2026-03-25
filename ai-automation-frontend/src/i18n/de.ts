@@ -525,6 +525,11 @@ export const de: TranslationKeys = {
     syncItemCount: '{count} Items synchronisieren',
     syncNoProject: 'Ohne Projekt',
     syncNoChanges: 'Alle Definitionen sind identisch',
+    syncDiffBlocksAdded: '+{n} Block(s)',
+    syncDiffBlocksRemoved: '-{n} Block(s)',
+    syncDiffBlocksChanged: 'Blöcke geändert',
+    syncDiffInstructions: 'instructions',
+    syncDiffDescription: 'description',
   },
   toast: {
     projectCreated: 'Projekt erfolgreich erstellt',

@@ -206,6 +206,7 @@ public class WorkflowController {
                 null,
                 null,
                 null,
+                null,
                 null
         );
         var workflow = workflowService.create(createRequest);

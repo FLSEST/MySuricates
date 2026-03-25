@@ -4,6 +4,7 @@ import com.automation.dto.request.SyncDefinitionsRequest;
 import com.automation.dto.response.SyncPreview;
 import com.automation.dto.response.SyncPreviewItem;
 import com.automation.dto.response.SyncResult;
+import com.automation.dto.response.WorkflowDiff;
 import com.automation.entity.Project;
 import com.automation.entity.Skill;
 import com.automation.entity.Workflow;
@@ -94,12 +95,20 @@ public class InstanceSyncHelper {
             String projectName = workflow.getProject() != null ? workflow.getProject().getName() : "";
             String wKey = workflow.getName() + "|" + projectName;
             JsonNode existing = target.workflowsByNameProject().get(wKey);
-            String action = existing != null ? "UPDATE" : "NEW";
+            String action;
+            WorkflowDiff diff = null;
+            if (existing != null) {
+                diff = computeWorkflowDiff(workflow, existing);
+                action = diff.changedFields().isEmpty() ? "SKIP" : "UPDATE";
+            } else {
+                action = "NEW";
+            }
             workflows.add(new SyncPreviewItem(
                     workflow.getId(),
                     workflow.getName(),
                     projectName.isEmpty() ? null : projectName,
-                    action
+                    action,
+                    diff
             ));
         }
 
@@ -321,6 +330,47 @@ public class InstanceSyncHelper {
                 projectsSynced, workflowsSynced, skillsSynced, skipped, errors.size());
 
         return new SyncResult(projectsSynced, workflowsSynced, skillsSynced, skipped, errors);
+    }
+
+    // ── Workflow diff ────────────────────────────────────────
+
+    private WorkflowDiff computeWorkflowDiff(Workflow dev, JsonNode target) {
+        List<String> changedFields = new ArrayList<>();
+
+        String devDesc = dev.getDescription() != null ? dev.getDescription() : "";
+        String targetDesc = target.path("description").asText("");
+        if (!devDesc.equals(targetDesc)) changedFields.add("description");
+
+        String devModel = dev.getModel() != null ? dev.getModel() : "";
+        String targetModel = target.path("model").asText("");
+        String modelBefore = null, modelAfter = null;
+        if (!devModel.equals(targetModel)) {
+            changedFields.add("model");
+            modelBefore = targetModel.isBlank() ? null : targetModel;
+            modelAfter = devModel.isBlank() ? null : devModel;
+        }
+
+        String devInstr = dev.getInstructions() != null ? dev.getInstructions() : "";
+        String targetInstr = target.path("instructions").asText("");
+        if (!devInstr.equals(targetInstr)) changedFields.add("instructions");
+
+        int blocksAdded = 0, blocksRemoved = 0;
+        try {
+            String devBlocksJson = objectMapper.writeValueAsString(dev.getBlocks());
+            String targetBlocksJson = target.path("blocks").toString();
+            if (!objectMapper.readTree(devBlocksJson).equals(objectMapper.readTree(targetBlocksJson))) {
+                changedFields.add("blocks");
+                int devCount = dev.getBlocks() != null ? dev.getBlocks().size() : 0;
+                int targetCount = target.path("blocks").size();
+                if (devCount > targetCount) blocksAdded = devCount - targetCount;
+                else if (targetCount > devCount) blocksRemoved = targetCount - devCount;
+            }
+        } catch (Exception e) {
+            log.warn("Block diff failed for workflow '{}': {}", dev.getName(), e.getMessage());
+            changedFields.add("blocks");
+        }
+
+        return new WorkflowDiff(changedFields, modelBefore, modelAfter, blocksAdded, blocksRemoved);
     }
 
     // ── HTTP helpers ──────────────────────────────────────

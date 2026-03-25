@@ -3,6 +3,7 @@ package com.automation.service.pool;
 import com.automation.config.WorkflowPoolConfig;
 import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.dto.request.InstallPoolWorkflowRequest;
+import com.automation.dto.request.UpdateWorkflowRequest;
 import com.automation.dto.response.PoolWorkflowEntry;
 import com.automation.entity.BlockDefinition;
 import com.automation.entity.Workflow;
@@ -23,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -76,17 +78,34 @@ public class WorkflowPoolService {
                 .orElseThrow(() -> new ResourceNotFoundException("PoolWorkflow", id));
     }
 
-    public Workflow install(String poolId, InstallPoolWorkflowRequest request) {
+    public record InstallResult(Workflow workflow, boolean created) {}
+
+    public InstallResult install(String poolId, InstallPoolWorkflowRequest request) {
         PoolWorkflowEntry entry = findById(poolId);
 
         String resolvedName = request.name() != null && !request.name().isBlank()
                 ? request.name()
                 : entry.name().getOrDefault("en", entry.name().values().iterator().next());
+        String description = entry.description() != null ? entry.description().getOrDefault("en", "") : null;
+
+        if (!Boolean.TRUE.equals(request.forceCreate())) {
+            Optional<Workflow> existing = workflowService.findByNameAndProjectId(resolvedName, request.projectId());
+            if (existing.isPresent()) {
+                UpdateWorkflowRequest updateRequest = new UpdateWorkflowRequest(
+                        resolvedName, description, entry.icon(), entry.blocks(),
+                        entry.instructions(), entry.model(), null, null,
+                        entry.defaultContext()
+                );
+                Workflow updated = workflowService.update(existing.get().getId(), updateRequest);
+                log.info("Updated pool workflow '{}' in-place: workflow '{}' ({})", poolId, updated.getName(), updated.getId());
+                return new InstallResult(updated, false);
+            }
+        }
 
         CreateWorkflowRequest createRequest = new CreateWorkflowRequest(
                 request.projectId(),
                 resolvedName,
-                entry.description() != null ? entry.description().getOrDefault("en", "") : null,
+                description,
                 entry.icon(),
                 entry.blocks(),
                 List.of(),
@@ -95,12 +114,13 @@ public class WorkflowPoolService {
                 null,
                 null,
                 null,
-                entry.defaultContext()
+                entry.defaultContext(),
+                entry.version()
         );
 
         Workflow workflow = workflowService.create(createRequest);
-        log.info("Installed pool workflow '{}' as workflow '{}' ({})", poolId, workflow.getName(), workflow.getId());
-        return workflow;
+        log.info("Installed pool workflow '{}' as new workflow '{}' ({})", poolId, workflow.getName(), workflow.getId());
+        return new InstallResult(workflow, true);
     }
 
     private PoolWorkflowEntry parsePoolFile(Path file) throws IOException {

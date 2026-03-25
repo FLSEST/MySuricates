@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useToast } from './useToast';
-import { useT } from '../i18n';
+import { useT, useI18nStore } from '../i18n';
 import type { SystemHealth, SystemInfo, RemoteAccessStatus, BrowseDirectoryResponse, BackupInfo } from '../types';
 
 export function useSystemHealth() {
@@ -74,19 +74,27 @@ export function useAssistantModelSetting() {
   });
 }
 
-const DEFAULT_THINKING_PHRASES = [
-  'Analysiere Runs…', 'Durchsuche Todos…', 'Prüfe Workflows…', 'Denke nach…',
-];
+const DEFAULT_THINKING_PHRASES: Record<string, string[]> = {
+  de: ['Denke nach…', 'Analysiere…', 'Überlege kurz…', 'Einen Moment…'],
+  en: ['Thinking…', 'Analyzing…', 'Just a moment…', 'Processing…'],
+};
 
 export function useAssistantThinkingPhrases() {
+  const locale = useI18nStore((s) => s.locale);
   return useQuery({
-    queryKey: ['system', 'settings', 'assistant-thinking-phrases'],
+    queryKey: ['system', 'settings', 'assistant-thinking-phrases', locale],
     queryFn: async () => {
       const r = await api.get<{ value: string }>('/system/settings/assistant-thinking-phrases');
-      return JSON.parse(r.value) as string[];
+      const parsed = JSON.parse(r.value) as string[] | Record<string, string[]>;
+      // Locale-keyed map (new format)
+      if (!Array.isArray(parsed)) {
+        return (parsed[locale] ?? parsed['de'] ?? Object.values(parsed)[0]) as string[];
+      }
+      // Legacy plain array
+      return parsed as string[];
     },
     staleTime: 10 * 60 * 1000,
-    placeholderData: DEFAULT_THINKING_PHRASES,
+    placeholderData: DEFAULT_THINKING_PHRASES[locale] ?? DEFAULT_THINKING_PHRASES['de'],
   });
 }
 

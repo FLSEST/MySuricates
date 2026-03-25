@@ -18,7 +18,8 @@ public record CreateWorkflowRequest(
         String provider,
         String templateId,
         Map<String, Object> metadata,
-        Map<String, Object> defaultContext
+        Map<String, Object> defaultContext,
+        String version
 ) {
     public CreateWorkflowRequest {
         if (blocks == null) blocks = List.of();

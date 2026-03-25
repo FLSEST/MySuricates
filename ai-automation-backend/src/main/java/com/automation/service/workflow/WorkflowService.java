@@ -75,6 +75,10 @@ public class WorkflowService {
                 .templateId(request.templateId())
                 .build();
 
+        if (request.version() != null && !request.version().isBlank()) {
+            workflow.setVersion(request.version());
+        }
+
         if (request.metadata() != null) {
             workflow.getMetadata().putAll(request.metadata());
         }

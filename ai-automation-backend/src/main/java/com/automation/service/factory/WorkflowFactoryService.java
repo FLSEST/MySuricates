@@ -86,7 +86,7 @@ public class WorkflowFactoryService {
 
         CreateWorkflowRequest createRequest = new CreateWorkflowRequest(
                 project.getId(), name, description, icon, blocks,
-                List.of(), instructions, null, null, null, metadata, defaultContext
+                List.of(), instructions, null, null, null, metadata, defaultContext, null
         );
 
         Workflow workflow = workflowService.create(createRequest);

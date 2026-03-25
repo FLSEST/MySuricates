@@ -2,7 +2,6 @@ package com.automation.controller;
 
 import com.automation.dto.request.InstallPoolWorkflowRequest;
 import com.automation.dto.response.PoolWorkflowEntry;
-import com.automation.entity.Workflow;
 import com.automation.service.pool.WorkflowPoolService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -31,14 +30,14 @@ public class WorkflowPoolController {
     }
 
     @PostMapping("/{id}/install")
-    public ResponseEntity<Map<String, String>> install(
+    public ResponseEntity<Map<String, Object>> install(
             @PathVariable String id,
             @Valid @RequestBody InstallPoolWorkflowRequest request) {
-        Workflow workflow = poolService.install(id, request);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(Map.of(
-                        "workflowId", workflow.getId(),
-                        "workflowName", workflow.getName()
-                ));
+        WorkflowPoolService.InstallResult result = poolService.install(id, request);
+        return ResponseEntity.ok(Map.of(
+                "workflowId", result.workflow().getId(),
+                "workflowName", result.workflow().getName(),
+                "created", result.created()
+        ));
     }
 }

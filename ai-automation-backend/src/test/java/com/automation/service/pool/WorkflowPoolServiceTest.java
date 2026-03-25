@@ -195,7 +195,7 @@ class WorkflowPoolServiceTest {
                 .build();
         when(workflowService.create(any())).thenReturn(mockWorkflow);
 
-        InstallPoolWorkflowRequest request = new InstallPoolWorkflowRequest("proj-1", null);
+        InstallPoolWorkflowRequest request = new InstallPoolWorkflowRequest("proj-1", null, null);
         Workflow result = poolService.install("test-flow", request);
 
         assertThat(result.getId()).isEqualTo("wf-1");
@@ -214,7 +214,7 @@ class WorkflowPoolServiceTest {
                 .build();
         when(workflowService.create(any())).thenReturn(mockWorkflow);
 
-        InstallPoolWorkflowRequest request = new InstallPoolWorkflowRequest("proj-1", "Custom Name");
+        InstallPoolWorkflowRequest request = new InstallPoolWorkflowRequest("proj-1", "Custom Name", null);
         poolService.install("test-flow", request);
 
         verify(workflowService).create(argThat(req -> req.name().equals("Custom Name")));
@@ -222,7 +222,7 @@ class WorkflowPoolServiceTest {
 
     @Test
     void install_nonExistentPool_throwsResourceNotFoundException() {
-        InstallPoolWorkflowRequest request = new InstallPoolWorkflowRequest("proj-1", null);
+        InstallPoolWorkflowRequest request = new InstallPoolWorkflowRequest("proj-1", null, null);
         assertThatThrownBy(() -> poolService.install("nonexistent", request))
                 .isInstanceOf(ResourceNotFoundException.class);
     }

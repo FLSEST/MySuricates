@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { Modal, Button } from '../ui';
 import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
-import type { SyncPreview, SyncPreviewItem, SyncDefinitionsRequest, SyncResult } from '../../types';
+import type { SyncPreview, SyncPreviewItem, SyncDefinitionsRequest, SyncResult, WorkflowDiff } from '../../types';
 import type { useT } from '../../i18n';
 
 interface SyncSelectModalProps {
@@ -190,6 +190,7 @@ export function SyncSelectModal({ open, onClose, preview, previewLoading, onSync
                   onToggle={() => toggle(`project:${p.id}`)}
                   actionLabel={actionLabel(p.action)}
                   actionStyle={ACTION_STYLES[p.action] ?? ''}
+                  t={t}
                 />
               ))}
             </Section>
@@ -218,6 +219,7 @@ export function SyncSelectModal({ open, onClose, preview, previewLoading, onSync
                       actionLabel={actionLabel(w.action)}
                       actionStyle={ACTION_STYLES[w.action] ?? ''}
                       indent
+                      t={t}
                     />
                   ))}
                 </div>
@@ -242,6 +244,7 @@ export function SyncSelectModal({ open, onClose, preview, previewLoading, onSync
                   onToggle={() => toggle(`skill:${s.id}`)}
                   actionLabel={actionLabel(s.action)}
                   actionStyle={ACTION_STYLES[s.action] ?? ''}
+                  t={t}
                 />
               ))}
             </Section>
@@ -279,30 +282,57 @@ function Section({ label, count, total, collapsed, onToggle, children }: {
   );
 }
 
-function ItemRow({ item, checked, onToggle, actionLabel, actionStyle, indent }: {
+function blocksDiffLabel(diff: WorkflowDiff, t: ReturnType<typeof useT>): string {
+  if (diff.blocksAdded > 0) return t.settings.syncDiffBlocksAdded.replace('{n}', String(diff.blocksAdded));
+  if (diff.blocksRemoved > 0) return t.settings.syncDiffBlocksRemoved.replace('{n}', String(diff.blocksRemoved));
+  return t.settings.syncDiffBlocksChanged;
+}
+
+function DiffDetails({ diff, t }: { diff: WorkflowDiff; t: ReturnType<typeof useT> }) {
+  const parts: string[] = [];
+  if (diff.changedFields.includes('blocks')) parts.push(blocksDiffLabel(diff, t));
+  if (diff.changedFields.includes('model') && diff.modelBefore != null)
+    parts.push(`model: ${diff.modelBefore} → ${diff.modelAfter}`);
+  if (diff.changedFields.includes('instructions')) parts.push(t.settings.syncDiffInstructions);
+  if (diff.changedFields.includes('description')) parts.push(t.settings.syncDiffDescription);
+  if (parts.length === 0) return null;
+  return (
+    <div className="ml-6 mt-0.5 text-[10px] text-text-tertiary leading-tight">
+      {parts.join(' · ')}
+    </div>
+  );
+}
+
+function ItemRow({ item, checked, onToggle, actionLabel, actionStyle, indent, t }: {
   item: SyncPreviewItem;
   checked: boolean;
   onToggle: () => void;
   actionLabel: string;
   actionStyle: string;
   indent?: boolean;
+  t: ReturnType<typeof useT>;
 }) {
   return (
     <label
-      className={`flex items-center justify-between gap-2 py-1 px-1 rounded hover:bg-surface-raised cursor-pointer transition-colors ${indent ? 'ml-4' : ''}`}
+      className={`block py-1 px-1 rounded hover:bg-surface-raised cursor-pointer transition-colors ${indent ? 'ml-4' : ''}`}
     >
-      <div className="flex items-center gap-2 min-w-0">
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={onToggle}
-          className="rounded border-border text-accent focus:ring-accent shrink-0"
-        />
-        <span className="text-sm text-text truncate">{item.name}</span>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={onToggle}
+            className="rounded border-border text-accent focus:ring-accent shrink-0"
+          />
+          <span className="text-sm text-text truncate">{item.name}</span>
+        </div>
+        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0 ${actionStyle}`}>
+          {actionLabel}
+        </span>
       </div>
-      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0 ${actionStyle}`}>
-        {actionLabel}
-      </span>
+      {item.action === 'UPDATE' && item.diff && item.diff.changedFields.length > 0 && (
+        <DiffDetails diff={item.diff} t={t} />
+      )}
     </label>
   );
 }

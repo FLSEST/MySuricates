@@ -496,11 +496,20 @@ export interface SyncPreview {
   skills: SyncPreviewItem[];
 }
 
+export interface WorkflowDiff {
+  changedFields: string[];
+  modelBefore: string | null;
+  modelAfter: string | null;
+  blocksAdded: number;
+  blocksRemoved: number;
+}
+
 export interface SyncPreviewItem {
   id: string;
   name: string;
   projectName?: string;
   action: 'NEW' | 'UPDATE' | 'SKIP';
+  diff?: WorkflowDiff | null;
 }
 
 export interface SyncDefinitionsRequest {

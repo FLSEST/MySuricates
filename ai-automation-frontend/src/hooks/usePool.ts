@@ -16,11 +16,11 @@ export function useInstallPoolWorkflow() {
   const toast = useToast();
   const t = useT();
   return useMutation({
-    mutationFn: ({ poolId, projectId, name }: { poolId: string; projectId: string; name?: string }) =>
-      api.post<{ workflowId: string; workflowName: string }>(`/pool/${poolId}/install`, { projectId, name }),
-    onSuccess: () => {
+    mutationFn: ({ poolId, projectId, name, forceCreate }: { poolId: string; projectId: string; name?: string; forceCreate?: boolean }) =>
+      api.post<{ workflowId: string; workflowName: string; created: boolean }>(`/pool/${poolId}/install`, { projectId, name, forceCreate }),
+    onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['workflows'] });
-      toast.success(t.toast.poolWorkflowInstalled);
+      toast.success(data.created ? t.toast.poolWorkflowInstalled : t.toast.poolWorkflowUpdated);
     },
     onError: () => toast.error(t.toast.poolInstallFailed),
   });

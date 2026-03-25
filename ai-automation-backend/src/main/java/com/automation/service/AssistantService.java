@@ -59,16 +59,19 @@ public class AssistantService {
     private final AppSettingsRepository appSettingsRepository;
 
     private static final String DEFAULT_THINKING_PHRASES =
-            "[\"Analysiere Runs…\",\"Durchsuche Todos…\",\"Prüfe Workflows…\"," +
-            "\"Überlege kurz…\",\"Schaue in meine Logs…\",\"Checke Schedules…\"," +
-            "\"Denke nach…\",\"Lade Kontext…\"]";
+            "{\"de\":[\"Denke nach…\",\"Analysiere…\",\"Überlege kurz…\",\"Einen Moment…\"," +
+            "\"Bereite Antwort vor…\",\"Lade Kontext…\",\"Formuliere…\",\"Gleich fertig…\"]," +
+            "\"en\":[\"Thinking…\",\"Analyzing…\",\"Just a moment…\",\"Loading context…\"," +
+            "\"Preparing answer…\",\"Formulating…\",\"Almost there…\",\"Processing…\"]}";
 
     /** Cached model — loaded at startup, never read during a web request (avoids HikariCP pool-size=1 contention). */
     private volatile String cachedAssistantModel = null;
 
     @PostConstruct
     public void seedSettings() {
-        if (appSettingsRepository.get("assistant-thinking-phrases").isEmpty()) {
+        String existing = appSettingsRepository.get("assistant-thinking-phrases").orElse(null);
+        // Migrate old plain-array format to locale-keyed map, or seed fresh
+        if (existing == null || existing.trim().startsWith("[")) {
             appSettingsRepository.set("assistant-thinking-phrases", DEFAULT_THINKING_PHRASES);
         }
         if (appSettingsRepository.get("assistant-model").isEmpty()) {

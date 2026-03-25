@@ -107,7 +107,7 @@ class WorkflowServiceTest {
         List<BlockDefinition> blocks = List.of(
                 BlockDefinition.builder().type("simple").config(Map.of("command", "npm test")).build()
         );
-        var request = new CreateWorkflowRequest("proj-1", "New Workflow", "desc", "icon", blocks, null, null, null, null, null, null, null);
+        var request = new CreateWorkflowRequest("proj-1", "New Workflow", "desc", "icon", blocks, null, null, null, null, null, null, null, null);
         when(projectRepository.findById("proj-1")).thenReturn(Optional.of(testProject));
         when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> {
             Workflow w = inv.getArgument(0);
@@ -125,7 +125,7 @@ class WorkflowServiceTest {
     @Test
     void create_withActivatedSkills_activatesSkills() {
         var request = new CreateWorkflowRequest("proj-1", "Skilled", "desc", null,
-                List.of(), List.of("skill-1", "skill-2"), null, null, null, null, null, null);
+                List.of(), List.of("skill-1", "skill-2"), null, null, null, null, null, null, null);
         Skill skill1 = Skill.builder().id("skill-1").name("Skill A").category(SkillCategory.CODE).build();
         Skill skill2 = Skill.builder().id("skill-2").name("Skill B").category(SkillCategory.DOCUMENT).build();
 
@@ -141,7 +141,7 @@ class WorkflowServiceTest {
 
     @Test
     void create_nonExistentProject_throwsException() {
-        var request = new CreateWorkflowRequest("unknown", "Name", null, null, List.of(), null, null, null, null, null, null, null);
+        var request = new CreateWorkflowRequest("unknown", "Name", null, null, List.of(), null, null, null, null, null, null, null, null);
         when(projectRepository.findById("unknown")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> workflowService.create(request))
@@ -194,7 +194,7 @@ class WorkflowServiceTest {
     void create_withDefaultContext_setsDefaults() {
         var ctx = Map.<String, Object>of("branch", "main", "env", "staging");
         var request = new CreateWorkflowRequest("proj-1", "WF", null, null,
-                List.of(), null, null, null, null, null, null, ctx);
+                List.of(), null, null, null, null, null, null, ctx, null);
         when(projectRepository.findById("proj-1")).thenReturn(Optional.of(testProject));
         when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> {
             Workflow w = inv.getArgument(0);

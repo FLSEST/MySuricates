@@ -134,6 +134,7 @@ public class ChainTemplateService {
                     null,
                     wfTemplate.getId(),
                     null,
+                    null,
                     null
             ));
 

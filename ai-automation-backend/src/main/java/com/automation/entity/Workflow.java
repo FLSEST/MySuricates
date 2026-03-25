@@ -91,7 +91,7 @@ public class Workflow {
 
     private Instant lastTestedAt;
 
-    @OneToMany(mappedBy = "workflow", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "workflow", fetch = FetchType.LAZY)
     @Builder.Default
     private List<WorkflowRun> runs = new ArrayList<>();
 

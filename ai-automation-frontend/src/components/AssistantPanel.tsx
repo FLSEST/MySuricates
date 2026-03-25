@@ -154,7 +154,7 @@ function MessageBubble({ msg, onClose }: { msg: ChatMessage; onClose: () => void
   );
 }
 
-const DEFAULT_PHRASES = ['Analysiere Runs…', 'Durchsuche Todos…', 'Prüfe Workflows…', 'Denke nach…'];
+const DEFAULT_PHRASES = ['Denke nach…', 'Analysiere…', 'Überlege kurz…', 'Einen Moment…'];
 
 function TypingIndicator() {
   const { data: phrases = DEFAULT_PHRASES } = useAssistantThinkingPhrases();
