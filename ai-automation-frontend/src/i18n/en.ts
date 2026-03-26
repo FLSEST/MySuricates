@@ -596,6 +596,7 @@ export const en = {
     chainExecuted: 'Chain execution started',
     chainExecuteFailed: 'Failed to execute chain',
     poolWorkflowInstalled: 'Pool workflow installed successfully',
+    poolWorkflowUpdated: 'Workflow updated',
     poolInstallFailed: 'Failed to install pool workflow',
     todoCreated: 'Todo created',
     todoUpdated: 'Todo updated',

@@ -598,6 +598,7 @@ export const de: TranslationKeys = {
     chainExecuted: 'Ketten-Ausführung gestartet',
     chainExecuteFailed: 'Kette konnte nicht ausgeführt werden',
     poolWorkflowInstalled: 'Pool-Workflow erfolgreich installiert',
+    poolWorkflowUpdated: 'Workflow aktualisiert',
     poolInstallFailed: 'Pool-Workflow konnte nicht installiert werden',
     todoCreated: 'Todo erstellt',
     todoUpdated: 'Todo aktualisiert',
