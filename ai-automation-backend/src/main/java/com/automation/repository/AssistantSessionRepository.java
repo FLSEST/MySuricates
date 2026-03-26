@@ -9,5 +9,7 @@ public interface AssistantSessionRepository extends JpaRepository<AssistantSessi
 
     List<AssistantSession> findTop10ByPageOrderByStartedAtDesc(String page);
 
+    List<AssistantSession> findTop3ByOrderByStartedAtDesc();
+
     long countByPage(String page);
 }

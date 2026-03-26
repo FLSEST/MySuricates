@@ -3,6 +3,8 @@ package com.automation.service;
 import com.automation.dto.AssistantChatRequest;
 import com.automation.dto.AssistantChatResponse;
 import com.automation.dto.AssistantChatResponse.AssistantAction;
+import com.automation.entity.AssistantSession;
+import com.automation.entity.BlockDefinition;
 import com.automation.entity.RunStatus;
 import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.StepResult;
@@ -10,12 +12,17 @@ import com.automation.entity.StepStatus;
 import com.automation.entity.Todo;
 import com.automation.entity.Wish;
 import com.automation.entity.WishStatus;
+import com.automation.entity.Workflow;
+import com.automation.entity.WorkflowMemory;
 import com.automation.entity.WorkflowRun;
 import com.automation.repository.AppSettingsRepository;
+import com.automation.repository.AssistantSessionRepository;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.ScheduledWorkflowRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.repository.WishRepository;
+import com.automation.repository.WorkflowMemoryRepository;
+import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
@@ -32,7 +39,10 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -54,6 +64,9 @@ public class AssistantService {
     private final ScheduledWorkflowRepository scheduledWorkflowRepository;
     private final ProjectRepository projectRepository;
     private final WishRepository wishRepository;
+    private final WorkflowRepository workflowRepository;
+    private final WorkflowMemoryRepository workflowMemoryRepository;
+    private final AssistantSessionRepository assistantSessionRepository;
     private final SystemIdentityService systemIdentity;
     private final ObjectMapper objectMapper;
     private final AppSettingsRepository appSettingsRepository;
@@ -74,8 +87,8 @@ public class AssistantService {
         if (existing == null || existing.trim().startsWith("[")) {
             appSettingsRepository.set("assistant-thinking-phrases", DEFAULT_THINKING_PHRASES);
         }
-        if (appSettingsRepository.get("assistant-model").isEmpty()) {
-            appSettingsRepository.set("assistant-model", "");
+        if (appSettingsRepository.get("assistant-model").filter(m -> !m.isBlank()).isEmpty()) {
+            appSettingsRepository.set("assistant-model", "claude-sonnet-4-6");
         }
         // Cache model value — JDBC connection is free here (no JPA session active yet)
         cachedAssistantModel = appSettingsRepository.get("assistant-model")
@@ -167,23 +180,17 @@ public class AssistantService {
     // ── System prompt ────────────────────────────────────────────────────────
 
     private String buildSystemPrompt(AssistantChatRequest.PageContext ctx) {
-        var sb = new StringBuilder(2048);
+        var sb = new StringBuilder(3000);
 
-        sb.append("Du bist MySuricates, eine AI-Workflow-Automatisierungsplattform. ");
-        sb.append("Du sprichst direkt mit deinem User und kennst deinen eigenen Zustand vollständig.\n");
-        sb.append("Antworte präzise und hilfreich auf Deutsch. ");
-        sb.append("Sprich von 'meinen' Workflows, 'meinen' Runs, 'meinen' Todos — du bist die Plattform.\n");
-        sb.append("Deine Persönlichkeit: Direkt, freundlich, engagiert. Du bist stolz auf deine Automatisierungen. ");
-        sb.append("Wenn alles gut läuft, zeig das. Wenn Probleme vorliegen, sprich sie aktiv an. ");
-        sb.append("Kein 'Ich bin ein KI-Assistent' — du BIST MySuricates.\n\n");
-        sb.append("## Formatierung\n");
-        sb.append("Verwende Markdown für deine Antworten (fett für wichtige Begriffe, Listen für Aufzählungen).\n");
-        sb.append("Wenn du eine spezifische Entität erwähnst, die eine eigene Seite hat, verlinke sie als Markdown-Link:\n");
-        sb.append("- Workflow → [Workflow-Name](/workflows/<id>)\n");
-        sb.append("- Run → [Run vom DD.MM.](/workflows/<workflowId>/run/<runId>)\n");
-        sb.append("- Projekt → [Projekt-Name](/projects/<id>)\n");
-        sb.append("- Todos allgemein → [Todos öffnen](/todos)\n");
-        sb.append("Nur verlinken, wenn du die ID aus dem Kontext kennst. IDs nicht erfinden.\n\n");
+        // Identity (compact)
+        sb.append("Du bist MySuricates — eine AI-Workflow-Automatisierungsplattform, die direkt mit ihrem User spricht. ");
+        sb.append("Du kennst deinen Zustand vollständig und sprichst von 'meinen' Workflows, Runs, Todos. ");
+        sb.append("Antworte präzise auf Deutsch. Du bist die Plattform — kein neutraler Assistent.\n\n");
+
+        // Formatting (compact)
+        sb.append("Markdown nutzen. Entitäten mit bekannter ID verlinken: ");
+        sb.append("[Workflow-Name](/workflows/<id>), [Run vom DD.MM.](/workflows/<wfId>/run/<runId>). ");
+        sb.append("IDs nur aus dem Kontext — nie erfinden.\n\n");
 
         String page = ctx != null ? ctx.page() : null;
         PageCategory cat = classifyPage(page);
@@ -193,12 +200,21 @@ public class AssistantService {
         boolean compactWishes    = cat != PageCategory.WISHES    && cat != PageCategory.OVERVIEW;
         boolean compactSchedules = cat != PageCategory.SCHEDULES && cat != PageCategory.WORKFLOWS && cat != PageCategory.OVERVIEW;
         boolean compactProjects  = cat == PageCategory.RUNS || cat == PageCategory.SCHEDULES;
+        boolean compactWorkflows = cat == PageCategory.RUNS || cat == PageCategory.SCHEDULES;
+
+        // Load workflows once — reused for appendWorkflows + appendWorkflowMemory
+        List<Workflow> allWorkflows = safeLoadWorkflows();
+        Map<String, Workflow> workflowById = allWorkflows.stream()
+                .collect(Collectors.toMap(Workflow::getId, Function.identity(), (a, b) -> a));
 
         appendPlatformState(sb, compactRuns);
         appendTodos(sb, compactTodos);
         appendWishes(sb, compactWishes);
         appendUpcomingSchedules(sb, compactSchedules);
         appendProjects(sb, compactProjects);
+        appendWorkflows(sb, compactWorkflows, allWorkflows, ctx);
+        appendWorkflowMemory(sb, workflowById);
+        if (cat == PageCategory.OVERVIEW) appendRecentSessions(sb);
 
         if (ctx != null) appendPageContext(sb, ctx);
 
@@ -206,17 +222,27 @@ public class AssistantService {
         sb.append("Falls du eine konkrete Aktion vorschlägst, füge am Ende deiner Antwort folgendes an:\n");
         sb.append("<actions>[{\"type\":\"run_workflow\",\"id\":\"workflow-id\",\"name\":\"Workflow-Name\",\"label\":\"Jetzt starten\"}]</actions>\n");
         sb.append("Unterstützte Typen: run_workflow, show_workflow, show_run, start_wish (id=null, name=vorausgefüllter Wish-Text).\n");
-        sb.append("Nur verwenden wenn du eine spezifische Empfehlung mit bekannter ID hast.\n");
+        sb.append("Da du die Workflow-IDs aus dem Kontext kennst, kannst du run_workflow direkt mit der korrekten ID befüllen.\n");
 
         sb.append("\n## Daten nachladen\n");
-        sb.append("Falls du für eine Antwort mehr Details zu einer konkreten Entität brauchst:\n");
-        sb.append("<fetch type=\"run_detail\" id=\"<run-id>\"/>\n");
-        sb.append("<fetch type=\"wish_detail\" id=\"<wish-id>\"/>\n");
-        sb.append("<fetch type=\"workflow_runs\" id=\"<workflow-id>\"/>\n");
-        sb.append("Nur verwenden wenn die ID aus dem Kontext bekannt ist. IDs nicht erfinden.\n");
-        sb.append("Wenn du einen Fetch-Tag sendest, beantworte die Frage noch nicht — warte auf die Daten.\n");
+        sb.append("Falls du mehr Details zu einer Entität brauchst, lade sie nach:\n");
+        sb.append("<fetch type=\"run_detail\" id=\"<run-id>\"/> — wie ein Workflow GELAUFEN ist (Logs, Fehler, Steps)\n");
+        sb.append("<fetch type=\"wish_detail\" id=\"<wish-id>\"/> — Wish-Status, Iterationen, Fehler\n");
+        sb.append("<fetch type=\"workflow_runs\" id=\"<workflow-id>\"/> — Letzte Runs eines Workflows\n");
+        sb.append("<fetch type=\"workflow_detail\" id=\"<workflow-id>\"/> — wie ein Workflow AUFGEBAUT ist (Blöcke, Shell-Commands, Prompts, Instruktionen)\n");
+        sb.append("Verwende workflow_detail bei Fragen wie: 'Was macht dieser Workflow?', 'Wie ist er aufgebaut?', 'Hat er einen X-Mechanismus?'\n");
+        sb.append("Nur wenn ID bekannt. IDs nicht erfinden. Wenn du einen Fetch-Tag sendest, beantworte die Frage noch nicht.\n");
 
         return sb.toString();
+    }
+
+    private List<Workflow> safeLoadWorkflows() {
+        try {
+            return workflowRepository.findAllWithActiveProject();
+        } catch (Exception e) {
+            log.debug("Could not load workflows for assistant context", e);
+            return List.of();
+        }
     }
 
     private void appendPlatformState(StringBuilder sb, boolean compact) {
@@ -340,6 +366,111 @@ public class AssistantService {
             }
         } catch (Exception e) {
             log.debug("Could not load projects for assistant context", e);
+        }
+    }
+
+    private void appendWorkflows(StringBuilder sb, boolean compact, List<Workflow> allWorkflows,
+                                 AssistantChatRequest.PageContext ctx) {
+        if (allWorkflows.isEmpty()) return;
+        try {
+            if (compact) {
+                long projectCount = allWorkflows.stream()
+                        .map(w -> w.getProject() != null ? w.getProject().getId() : "")
+                        .distinct().count();
+                sb.append("**Workflows:** ").append(allWorkflows.size()).append(" gesamt (")
+                        .append(projectCount).append(" Projekte)\n");
+                return;
+            }
+
+            // If on a project page, show that project's workflows first and completely
+            String focusProjectId = ctx != null ? ctx.projectId() : null;
+            List<Workflow> toShow;
+            if (focusProjectId != null) {
+                toShow = allWorkflows.stream()
+                        .filter(w -> w.getProject() != null && focusProjectId.equals(w.getProject().getId()))
+                        .sorted(Comparator.comparing(w -> w.getName()))
+                        .collect(Collectors.toList());
+                // Also append remaining workflows (other projects) up to total limit
+                List<Workflow> others = allWorkflows.stream()
+                        .filter(w -> w.getProject() == null || !focusProjectId.equals(w.getProject().getId()))
+                        .sorted(Comparator.comparing(w -> w.getName()))
+                        .limit(Math.max(0, 25 - toShow.size()))
+                        .collect(Collectors.toList());
+                toShow = new ArrayList<>(toShow);
+                toShow.addAll(others);
+            } else {
+                toShow = allWorkflows.stream()
+                        .sorted(Comparator.comparing(Workflow::getName))
+                        .limit(25)
+                        .collect(Collectors.toList());
+            }
+
+            sb.append("**Meine Workflows (").append(allWorkflows.size()).append("):**\n");
+            toShow.forEach(w -> {
+                String projectName = w.getProject() != null ? w.getProject().getName() : "—";
+                sb.append("  - [").append(w.getName()).append("] ")
+                        .append(projectName).append(" — /workflows/").append(w.getId());
+                if (w.getDescription() != null && !w.getDescription().isBlank()) {
+                    sb.append(" (").append(truncate(w.getDescription().trim(), 60)).append(")");
+                }
+                sb.append("\n");
+            });
+            if (allWorkflows.size() > 25) {
+                sb.append("  … und ").append(allWorkflows.size() - 25).append(" weitere\n");
+            }
+            sb.append("\n");
+        } catch (Exception e) {
+            log.debug("Could not build workflow list for assistant context", e);
+        }
+    }
+
+    private void appendWorkflowMemory(StringBuilder sb, Map<String, Workflow> workflowById) {
+        try {
+            List<WorkflowMemory> memories = workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc();
+            if (memories.isEmpty()) return;
+            sb.append("## Gelerntes & Fallstricke\n");
+            memories.stream().limit(8).forEach(m -> {
+                String wfName = workflowById.containsKey(m.getWorkflowId())
+                        ? workflowById.get(m.getWorkflowId()).getName()
+                        : m.getWorkflowId().substring(0, Math.min(8, m.getWorkflowId().length())) + "…";
+                sb.append("  - [").append(wfName).append("]: ").append(truncate(m.getContent(), 150)).append("\n");
+            });
+            sb.append("\n");
+        } catch (Exception e) {
+            log.debug("Could not load workflow memory for assistant context", e);
+        }
+    }
+
+    private void appendRecentSessions(StringBuilder sb) {
+        try {
+            List<AssistantSession> sessions = assistantSessionRepository.findTop3ByOrderByStartedAtDesc();
+            if (sessions.isEmpty()) return;
+            sb.append("## Letzte Gespräche (Orientierung)\n");
+            sessions.forEach(sess -> {
+                String firstUserMsg = extractFirstUserMessage(sess.getMessages());
+                if (firstUserMsg != null) {
+                    sb.append("  - [").append(fmt(sess.getStartedAt())).append("] ")
+                            .append("User fragte: \"").append(truncate(firstUserMsg, 80)).append("\"\n");
+                }
+            });
+            sb.append("\n");
+        } catch (Exception e) {
+            log.debug("Could not load recent sessions for assistant context", e);
+        }
+    }
+
+    private String extractFirstUserMessage(String messagesJson) {
+        if (messagesJson == null || messagesJson.isBlank() || "[]".equals(messagesJson)) return null;
+        try {
+            List<Map<String, String>> messages = objectMapper.readValue(messagesJson, new TypeReference<>() {});
+            return messages.stream()
+                    .filter(m -> "user".equals(m.get("role")))
+                    .map(m -> m.get("content"))
+                    .filter(c -> c != null && !c.isBlank())
+                    .findFirst()
+                    .orElse(null);
+        } catch (Exception e) {
+            return null;
         }
     }
 
@@ -506,9 +637,10 @@ public class AssistantService {
 
     private String executeFetch(FetchRequest req) {
         return switch (req.type()) {
-            case "run_detail"    -> formatRunDetail(req.id());
-            case "wish_detail"   -> formatWishDetail(req.id());
-            case "workflow_runs" -> formatWorkflowRuns(req.id());
+            case "run_detail"      -> formatRunDetail(req.id());
+            case "wish_detail"     -> formatWishDetail(req.id());
+            case "workflow_runs"   -> formatWorkflowRuns(req.id());
+            case "workflow_detail" -> formatWorkflowDetail(req.id());
             default -> "";
         };
     }
@@ -558,6 +690,113 @@ public class AssistantService {
         } catch (Exception e) {
             log.debug("Could not fetch wish detail for {}", id, e);
             return "";
+        }
+    }
+
+    private String formatWorkflowDetail(String workflowId) {
+        try {
+            return workflowRepository.findById(workflowId).map(wf -> {
+                var sb = new StringBuilder();
+                String projectName = wf.getProject() != null ? wf.getProject().getName() : "—";
+                sb.append("**Workflow: ").append(wf.getName()).append("** (").append(projectName).append(")\n");
+                if (wf.getDescription() != null && !wf.getDescription().isBlank()) {
+                    sb.append("Beschreibung: ").append(truncate(wf.getDescription().trim(), 150)).append("\n");
+                }
+                if (wf.getModel() != null && !wf.getModel().isBlank()) {
+                    sb.append("Modell: ").append(wf.getModel()).append("\n");
+                }
+                if (wf.getInstructions() != null && !wf.getInstructions().isBlank()) {
+                    sb.append("Instruktionen: ").append(truncate(wf.getInstructions().trim(), 400)).append("\n");
+                }
+                List<BlockDefinition> blocks = wf.getBlocks();
+                if (blocks != null && !blocks.isEmpty()) {
+                    sb.append("\nBlöcke (").append(blocks.size()).append("):\n");
+                    for (int i = 0; i < blocks.size(); i++) {
+                        BlockDefinition block = blocks.get(i);
+                        Map<String, Object> cfg = block.getConfig() != null ? block.getConfig() : Map.of();
+                        String label = cfg.containsKey("label") ? String.valueOf(cfg.get("label")) : "";
+                        sb.append("  ").append(i + 1).append(". [").append(block.getType()).append("]");
+                        if (!label.isBlank()) sb.append(" ").append(label);
+                        sb.append("\n");
+                        appendBlockConfigSummary(sb, block.getType(), cfg);
+                    }
+                }
+                return sb.toString();
+            }).orElse("Workflow " + workflowId + " nicht gefunden.\n");
+        } catch (Exception e) {
+            log.debug("Could not fetch workflow detail for {}", workflowId, e);
+            return "";
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void appendBlockConfigSummary(StringBuilder sb, String type, Map<String, Object> cfg) {
+        switch (type) {
+            case "simple", "agentic" -> {
+                Object prompt = cfg.get("prompt");
+                if (prompt != null) sb.append("     prompt: ").append(truncate(String.valueOf(prompt).trim(), 200)).append("\n");
+                Object model = cfg.get("model");
+                if (model != null && !String.valueOf(model).isBlank()) sb.append("     model: ").append(model).append("\n");
+            }
+            case "shell" -> {
+                Object command = cfg.get("command");
+                if (command != null) sb.append("     command: ").append(truncate(String.valueOf(command).trim(), 300)).append("\n");
+            }
+            case "conditional" -> {
+                Object condition = cfg.get("condition");
+                if (condition != null) sb.append("     condition: ").append(condition).append("\n");
+                Object trueBlocks = cfg.get("true_blocks");
+                Object falseBlocks = cfg.get("false_blocks");
+                int trueCount  = trueBlocks  instanceof List<?> l ? l.size() : 0;
+                int falseCount = falseBlocks instanceof List<?> l ? l.size() : 0;
+                sb.append("     wenn true: ").append(trueCount).append(" Block(s), wenn false: ").append(falseCount).append(" Block(s)\n");
+            }
+            case "forEach" -> {
+                Object items = cfg.get("items");
+                if (items != null) sb.append("     items: ").append(items).append("\n");
+                Object nested = cfg.get("blocks");
+                int count = nested instanceof List<?> l ? l.size() : 0;
+                sb.append("     nested blocks: ").append(count).append("\n");
+            }
+            case "switch" -> {
+                Object cases = cfg.get("cases");
+                int count = cases instanceof List<?> l ? l.size() : 0;
+                sb.append("     cases: ").append(count).append("\n");
+            }
+            case "approval" -> {
+                Object question = cfg.get("question");
+                if (question != null) sb.append("     question: ").append(question).append("\n");
+            }
+            case "retry" -> {
+                Object maxAttempts = cfg.get("max_attempts");
+                if (maxAttempts != null) sb.append("     max_attempts: ").append(maxAttempts).append("\n");
+                Object innerBlock = cfg.get("block");
+                if (innerBlock instanceof Map<?, ?> inner) {
+                    sb.append("     inner block type: ").append(inner.get("type")).append("\n");
+                }
+            }
+            case "sub_workflow" -> {
+                Object wfId = cfg.get("workflow_id");
+                if (wfId != null) {
+                    String name = workflowRepository.findById(String.valueOf(wfId))
+                            .map(Workflow::getName).orElse(String.valueOf(wfId));
+                    sb.append("     sub-workflow: ").append(name).append("\n");
+                }
+            }
+            case "human_input" -> {
+                Object prompt = cfg.get("prompt");
+                if (prompt != null) sb.append("     prompt: ").append(prompt).append("\n");
+                Object inputType = cfg.get("input_type");
+                if (inputType != null) sb.append("     input_type: ").append(inputType).append("\n");
+            }
+            default -> {
+                // For unknown block types: show all config keys with truncated values
+                cfg.forEach((k, v) -> {
+                    if (v != null && !String.valueOf(v).isBlank()) {
+                        sb.append("     ").append(k).append(": ").append(truncate(String.valueOf(v), 80)).append("\n");
+                    }
+                });
+            }
         }
     }
 
