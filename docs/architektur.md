@@ -157,7 +157,7 @@ Der Agentic-Block implementiert eine autonome Ausführungsschleife:
 | `max_repeated_actions` | 3 | Abbruch nach N identischen Aktionen |
 | `require_approval` | false | Approval-Gate vor jeder Aktion |
 
-Zusätzlich: History-Kompression nach 7 Turns, Token-Tracking-Warnungen im Log.
+Zusätzlich: History-Kompression nach 7 Turns, Token-Tracking-Warnungen im Log. Alle 6 Safety-Felder werden im Frontend-"Block hinzufügen"-Dialog als Defaults vorbelegt.
 
 ### Switch Block
 
@@ -167,6 +167,7 @@ Der Switch-Block evaluiert einen Ausdruck gegen mehrere Cases:
 - Pipe-getrennte Alternativen: `"error|critical"` matched beide
 - `default`-Case, wenn kein anderer Case zutrifft
 - Jeder Case enthält eine Liste von Nested-Blocks (shell oder claude)
+- Gibt `COMPLETED` mit `matchedCase: "none"` zurück, wenn kein Treffer und kein Default
 
 ### Sub-Workflow Block
 
@@ -182,6 +183,7 @@ Der Switch-Block evaluiert einen Ausdruck gegen mehrere Cases:
 - Sendet `human_input_required`-Event via WebSocket an `/topic/executions/{runId}/logs`
 - Nutzerantwort wird als Kontext-Variable gespeichert (`variable_name`)
 - Unterstützt Text- und Select-Eingaben, Validierungsmuster, Timeout mit optionalem Default
+- Nutzt den `ApprovalRequest`-Mechanismus des Approval-Blocks
 
 ## Gate Status System
 
@@ -225,7 +227,11 @@ Chains gruppieren mehrere Workflows für sequenzielle Ausführung:
 Workflows können über Runs hinweg Wissen akkumulieren:
 - `WorkflowMemoryService` — extrahiert Wissen aus abgeschlossenen Runs
 - `ClaudeSummarizer` / `CodexSummarizer` — AI-basierte Zusammenfassung
+- `KnowledgeSummarizer` — Interface für die Summarization-Backends
+- `HostCodexService` — führt OpenAI Codex CLI auf dem Host aus (analog zu `HostClaudeService`)
+- `SummarizationConfig` — Konfiguration der Backend-Auswahl
 - Aktive Memory-Einträge werden in nachfolgende Runs als Kontext injiziert
+- `WorkflowMemory`-Entity (V16-Migration)
 
 ## Agent Instructions System
 
@@ -245,7 +251,33 @@ Alle Claude-CLI-Aufrufe erfolgen auf dem Host (nicht im Container):
 - `HostClaudeService.reasonStructured()` — REASON-Phase, nutzt `--system-prompt`, `--max-turns 3`, kein Modell-Flag
 - Prompt wird via **stdin** an den Prozess geschrieben (`writePromptToStdin()`) — vermeidet Linux ARG_MAX-Limit
 - `CLAUDE_CODE` und `CLAUDECODE` Umgebungsvariablen werden aus dem Prozess-Environment entfernt (verhindert Nested-Session-Fehler)
-- `CommandExecutorService` bietet `executeCommandOnHost()` / `executeStepOnHost()` / `injectSkillContextOnHost()`
+- `CommandExecutorService` bietet `executeOnHost(HostExecutionRequest)` / `executeStepOnHost(HostExecutionRequest)` / `injectSkillContextOnHost()` — alle Overloads nutzen die `HostExecutionRequest`-Builder-API
+
+## Provider Routing
+
+Alle Block-Executors (simple, retry, conditional, forEach, while, switch, skill-capability) leiten `context.getProvider()` als `providerId` via `HostExecutionRequest.builder()` an den `CommandExecutorService` weiter. Das Setzen von `"provider": "CODEX"` in einem Workflow-JSON gilt damit für jeden nicht-Shell-Block-Typ.
+
+`AiProviderRegistry.resolve()` fällt auf den konfigurierten Standard-Provider zurück (nicht hardcodiertes CLAUDE), wenn eine unbekannte Provider-ID übergeben wird.
+
+## Model Selection
+
+- `workflow.model`-Feld (z.B. `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5`)
+- Wird via `--model`-Flag an die Claude CLI auf dem Host übergeben
+- Die Agentic-REASON-Phase verwendet das lokal konfigurierte Standard-Modell
+
+## Per-Call Token Limit
+
+- `HostClaudeConfig.maxTokens` (Property `automation.host-claude.max-tokens`) — optionales Output-Token-Limit pro Aufruf
+- Angewendet via `--max-tokens`-Flag in `reasonStructured()` und `executeAction()`
+- Unterscheidet sich vom `max_total_tokens`-Budget des Agentic-Blocks (der kumulativen Input+Output über alle Iterationen trackt)
+
+## Per-Block Claude CLI Timeout
+
+- Alle Block-Typen unterstützen ein optionales `timeout_seconds`-Feld in der Block-Config
+- Überschreibt den globalen `automation.host-claude.timeout-seconds`-Wert (Default: 300s) für diesen Block
+- Ohne `timeout_seconds` in der Config → globaler Default gilt
+- Für Dual-Mode-Blöcke (shell/claude) steuert `timeout_seconds` sowohl den Shell- als auch den Claude-CLI-Timeout
+- Gilt für `reasonStructured()` und `executeAction()` in Agentic-Blöcken
 
 ## Workflow Conversion
 
@@ -253,6 +285,37 @@ Erfolgreiche Agentic-Runs können in deterministische Workflows konvertiert werd
 - `WorkflowConversionService` — analysiert den Run und schlägt einen strukturierten Workflow vor (regelbasiert + AI)
 - `ConversionController` — API-Endpunkte für Vorschau und Erstellung
 - Frontend: Konversions-Dialog im Execution-View
+
+## Workflow Templates
+
+- Templates werden in der `workflow_templates`-DB-Tabelle gespeichert (V19-Migration), nicht hardcodiert
+- **44 Built-in Templates** werden beim Start durch `WorkflowTemplateSeeder` eingespielt (idempotent, fügt fehlende ein, aktualisiert bei Version-Bump)
+- Template-Definitionen liegen als einzelne JSON-Dateien in `src/main/resources/templates/builtin/` (eine Datei pro Template, geladen durch `BuiltInTemplateLoader`)
+- Name und Beschreibung sind i18n JSON-Maps: `{"de":"...","en":"..."}` — gespeichert via `JsonStringMapConverter`
+- Built-in Templates (`builtIn=true`) können nicht gelöscht werden; nur `sortOrder` und `category` sind aktualisierbar
+- Nutzer können eigene Templates via API oder durch Speichern eines bestehenden Workflows anlegen
+- `workflow.templateId` — optionale Back-Referenz auf das Quell-Template
+- Frontend löst lokalisierte Template-Namen via `resolveTemplateName()` in `utils/templateUtils.ts` auf
+- CRUD-API unter `/api/v1/workflow-templates`
+
+## Built-in Skills
+
+- Skills werden in der `skills`-DB-Tabelle gespeichert, nicht in Frontend oder In-Memory-Beans hardcodiert
+- **16 Built-in Skills** werden beim Start durch `SkillSeeder` eingespielt (idempotent)
+- Skill-Definitionen liegen in `BuiltInSkills.java` (`config/`-Package)
+- Built-in Skills haben stabile IDs (z.B. `builtin-code-review`, `builtin-test-generator`)
+- `SkillSeeder` registriert alle Skills auch im In-Memory `SkillRegistry` für Capability-Lookups
+- `SkillRegistry` hängt nicht mehr von `SkillProvider`-Beans ab — Seeder übernimmt die Registrierung
+- Capability-Handler-Klassen (z.B. `LintHandler`, `OCRHandler`) bleiben als unabhängige `@Component`-Beans in `skills/handlers/`
+- Nutzer können eigene Skills via Import-API anlegen (`POST /api/v1/skills/import`)
+- `Skill.java`-Entity nutzt `@PrePersist ensureId()` (statt `@GeneratedValue`) für explizite IDs bei Built-ins
+
+## Template Verification
+
+- `TemplateVerification`-Entity (V22-Migration) — trackt den Qualitätsstatus von Workflow-Templates
+- `TemplateVerificationService` — verwaltet den Verifizierungs-Status pro Template+Projekt-Paar
+- Workflows, die aus Templates erstellt wurden, können test-gestartet werden, um die Template-Korrektheit zu prüfen
+- Verifizierungs-Ergebnisse sind in Template-CRUD-API-Responses sichtbar
 
 ## Workflow Factory
 
@@ -408,7 +471,7 @@ autotrigger/
 │           ├── application-stable.yml ← Stable-Profil
 │           ├── agent-instructions.md  ← Basis-Agent-Instructions
 │           ├── templates/builtin/     ← Built-in Template JSON-Dateien
-│           └── db/migration/          ← 36 Flyway-Migrationen
+│           └── db/migration/          ← 24 Flyway-Migrationen (V1–V24)
 │
 └── ai-automation-frontend/
     ├── package.json

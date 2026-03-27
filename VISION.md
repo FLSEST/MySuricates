@@ -103,11 +103,11 @@ Workflows accumulate knowledge across runs:
 
 ---
 
-## Was schon gebaut ist (v0.2.2)
+## Was schon gebaut ist (v0.5.0)
 
 | Baustein | Status |
 |----------|--------|
-| Block-basierte Workflows (11 Block-Typen) | Done |
+| Block-basierte Workflows (12 Block-Typen) | Done |
 | Docker-Container-Execution | Done |
 | Agentic Blocks (Goal → Reason → Act → Observe) | Done |
 | Workflow Chains (sequentielle Komposition) | Done |
@@ -117,7 +117,7 @@ Workflows accumulate knowledge across runs:
 | Pre-flight Verification + Auto-Fix | Done |
 | Learning-Feedback in Prompts | Done |
 | Cross-Project Workflow-Erkennung | Done |
-| 48+ Templates (Dev + Buero + Alltag) | Done |
+| 44 Built-in Templates (Dev + Buero + Alltag) | Done |
 | Staging (Dev + Stable + Test) | Done |
 | Multi-Provider (Claude + Codex) | Done |
 
