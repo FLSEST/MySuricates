@@ -3,10 +3,13 @@ package com.automation.service;
 import com.automation.dto.AssistantChatRequest;
 import com.automation.dto.AssistantChatResponse;
 import com.automation.repository.AppSettingsRepository;
+import com.automation.repository.AssistantSessionRepository;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.ScheduledWorkflowRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.repository.WishRepository;
+import com.automation.repository.WorkflowMemoryRepository;
+import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.cli.CliSession;
 import com.automation.service.cli.CommandExecutorService;
@@ -34,6 +37,9 @@ class AssistantServiceTest {
     @Mock private ScheduledWorkflowRepository scheduledWorkflowRepository;
     @Mock private ProjectRepository projectRepository;
     @Mock private WishRepository wishRepository;
+    @Mock private WorkflowRepository workflowRepository;
+    @Mock private WorkflowMemoryRepository workflowMemoryRepository;
+    @Mock private AssistantSessionRepository assistantSessionRepository;
     @Mock private SystemIdentityService systemIdentity;
     @Mock private AppSettingsRepository appSettingsRepository;
 
@@ -44,6 +50,7 @@ class AssistantServiceTest {
         service = new AssistantService(
                 commandExecutorService, workflowRunRepository, todoRepository,
                 scheduledWorkflowRepository, projectRepository, wishRepository,
+                workflowRepository, workflowMemoryRepository, assistantSessionRepository,
                 systemIdentity, new ObjectMapper(), appSettingsRepository
         );
         // Benign defaults so context building doesn't blow up

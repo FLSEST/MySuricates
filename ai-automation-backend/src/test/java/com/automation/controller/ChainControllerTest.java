@@ -57,7 +57,7 @@ class ChainControllerTest {
 
     private ChainRunResponse sampleRun() {
         return new ChainRunResponse("r-1", "c-1", "My Chain", RunStatus.COMPLETED,
-                List.of(), Map.of(), Instant.now(), Instant.now(), 1000L, null, Map.of());
+                List.of(), Map.of(), Instant.now(), Instant.now(), 1000L, null, Map.of(), null);
     }
 
     @Test

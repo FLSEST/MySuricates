@@ -326,6 +326,7 @@ class LearningServiceTest {
             when(workflowRepository.count()).thenReturn(2L);
             when(runRepository.count()).thenReturn(3L);
             when(runRepository.countByStatus(RunStatus.COMPLETED)).thenReturn(2L);
+            when(runRepository.countByStatus(RunStatus.COMPLETED_WITH_ERRORS)).thenReturn(0L);
             when(runRepository.countByStatus(RunStatus.FAILED)).thenReturn(1L);
             when(runRepository.countByStartedAtAfter(any(Instant.class))).thenReturn(0L);
             when(runRepository.findByStartedAtAfterOrderByStartedAtDesc(any(Instant.class))).thenReturn(List.of());

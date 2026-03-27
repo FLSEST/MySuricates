@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import com.automation.service.activitylog.ActivityLogService;
+import com.automation.service.todo.AutoTodoService;
 
 @WebMvcTest(ExecutionController.class)
 @Import(GlobalExceptionHandler.class)
@@ -40,7 +41,8 @@ class ExecutionControllerTest {
     private WorkflowExecutor workflowExecutor;
     @MockBean
     private ActivityLogService activityLogService;
-
+    @MockBean
+    private AutoTodoService autoTodoService;
 
     @MockBean
     private WorkflowRunRepository runRepository;
@@ -57,7 +59,7 @@ class ExecutionControllerTest {
                 .id("run-1").status(RunStatus.COMPLETED).build();
         WorkflowRunResponse response = new WorkflowRunResponse(
                 "run-1", "wf-1", "Test Workflow", null, null, RunStatus.COMPLETED, List.of(),
-                Instant.now(), Instant.now(), 1000L, null, null, Map.of(), Map.of()
+                Instant.now(), Instant.now(), 1000L, null, null, Map.of(), Map.of(), null
         );
 
         when(runRepository.findById("run-1")).thenReturn(Optional.of(run));

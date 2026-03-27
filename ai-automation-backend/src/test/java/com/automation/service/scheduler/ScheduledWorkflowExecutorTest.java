@@ -3,7 +3,10 @@ package com.automation.service.scheduler;
 import com.automation.entity.RunStatus;
 import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.ScheduledWorkflow.ScheduleType;
+import com.automation.entity.ScheduledWorkflow.TargetType;
 import com.automation.entity.Workflow;
+import com.automation.entity.WorkflowChain;
+import com.automation.repository.ChainRunRepository;
 import com.automation.repository.ScheduledWorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.activitylog.ActivityLogService;
@@ -34,6 +37,9 @@ class ScheduledWorkflowExecutorTest {
 
     @Mock
     private WorkflowRunRepository workflowRunRepository;
+
+    @Mock
+    private ChainRunRepository chainRunRepository;
 
     @Mock
     private WorkflowExecutor workflowExecutor;
@@ -77,7 +83,7 @@ class ScheduledWorkflowExecutorTest {
 
         executor.executeSingleSchedule("sched-cron");
 
-        verify(workflowExecutor).execute(testWorkflow, Map.of());
+        verify(workflowExecutor).execute(eq(testWorkflow), eq(Map.of()), any());
         assertThat(scheduled.getLastRunAt()).isNotNull();
         assertThat(scheduled.getNextRunAt()).isNotNull();
         assertThat(scheduled.isEnabled()).isTrue();
@@ -104,7 +110,7 @@ class ScheduledWorkflowExecutorTest {
 
         executor.executeSingleSchedule("sched-once");
 
-        verify(workflowExecutor).execute(testWorkflow, Map.of());
+        verify(workflowExecutor).execute(eq(testWorkflow), eq(Map.of()), any());
         assertThat(scheduled.getLastRunAt()).isNotNull();
         assertThat(scheduled.getNextRunAt()).isNull();
         assertThat(scheduled.isEnabled()).isFalse();
@@ -173,6 +179,31 @@ class ScheduledWorkflowExecutorTest {
         executor.executeSingleSchedule("sched-ghost");
 
         verify(workflowExecutor, never()).execute(any(), any());
+    }
+
+    @Test
+    void executeSingleSchedule_chainAlreadyRunning_skipsExecution() {
+        WorkflowChain chain = WorkflowChain.builder()
+                .id("chain-1")
+                .name("Test Chain")
+                .build();
+        ScheduledWorkflow scheduled = ScheduledWorkflow.builder()
+                .id("sched-chain-ghost")
+                .chain(chain)
+                .targetType(TargetType.CHAIN)
+                .cronExpression("0 0 * * * *")
+                .scheduleType(ScheduleType.CRON)
+                .enabled(true)
+                .nextRunAt(Instant.now().minusSeconds(60))
+                .inputContext(Map.of())
+                .build();
+
+        when(scheduledRepository.findByIdWithWorkflowSkills("sched-chain-ghost")).thenReturn(Optional.of(scheduled));
+        when(chainRunRepository.existsByChainIdAndStatus(eq("chain-1"), eq(RunStatus.RUNNING))).thenReturn(true);
+
+        executor.executeSingleSchedule("sched-chain-ghost");
+
+        verify(chainExecutor, never()).execute(any(), any());
     }
 
     @Test

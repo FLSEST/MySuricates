@@ -196,9 +196,9 @@ class WorkflowPoolServiceTest {
         when(workflowService.create(any())).thenReturn(mockWorkflow);
 
         InstallPoolWorkflowRequest request = new InstallPoolWorkflowRequest("proj-1", null, null);
-        Workflow result = poolService.install("test-flow", request);
+        WorkflowPoolService.InstallResult result = poolService.install("test-flow", request);
 
-        assertThat(result.getId()).isEqualTo("wf-1");
+        assertThat(result.workflow().getId()).isEqualTo("wf-1");
         verify(workflowService).create(any());
     }
 

@@ -6,8 +6,10 @@ import com.automation.entity.ScheduledWorkflow.ScheduleType;
 import com.automation.entity.Workflow;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
+import com.automation.mapper.ChainMapper;
 import com.automation.mapper.ScheduleMapper;
 import com.automation.mapper.WorkflowMapper;
+import com.automation.repository.ChainRunRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.scheduler.SchedulerService;
 import com.automation.service.system.ApiKeyService;
@@ -59,6 +61,12 @@ class ScheduleControllerTest {
     private WorkflowMapper workflowMapper;
 
     @MockBean
+    private ChainRunRepository chainRunRepository;
+
+    @MockBean
+    private ChainMapper chainMapper;
+
+    @MockBean
     private ApiKeyService apiKeyService;
 
     private Workflow testWorkflow;
@@ -89,7 +97,8 @@ class ScheduleControllerTest {
                 null, null, "WORKFLOW",
                 "0 0 * * * *", "CRON", null, null,
                 true, "Hourly run", Map.of(), null,
-                Instant.parse("2026-02-16T00:00:00Z"), testScheduled.getCreatedAt()
+                Instant.parse("2026-02-16T00:00:00Z"), testScheduled.getCreatedAt(),
+                null, null, 0, 0, "SKIP"
         );
     }
 
@@ -136,7 +145,7 @@ class ScheduleControllerTest {
 
     @Test
     void createSchedule_validCronRequest_returns201() throws Exception {
-        when(schedulerService.create(any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(testScheduled);
+        when(schedulerService.create(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(testScheduled);
         when(scheduleMapper.toResponse(testScheduled)).thenReturn(testResponse);
 
         String body = """
@@ -156,7 +165,7 @@ class ScheduleControllerTest {
 
     @Test
     void createSchedule_missingWorkflowId_returns400() throws Exception {
-        when(schedulerService.create(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        when(schedulerService.create(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenThrow(new IllegalArgumentException("workflowId is required for WORKFLOW schedules"));
 
         String body = """
@@ -187,10 +196,11 @@ class ScheduleControllerTest {
                 "", "ONCE",
                 Instant.parse("2026-03-01T10:00:00Z"), null,
                 true, null, Map.of(), null,
-                Instant.parse("2026-03-01T10:00:00Z"), null
+                Instant.parse("2026-03-01T10:00:00Z"), null,
+                null, null, 0, 0, "SKIP"
         );
 
-        when(schedulerService.create(any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(onceScheduled);
+        when(schedulerService.create(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(onceScheduled);
         when(scheduleMapper.toResponse(onceScheduled)).thenReturn(onceResponse);
 
         String body = """
@@ -228,7 +238,8 @@ class ScheduleControllerTest {
                 "sched-1", "wf-1", "Test Workflow", null,
                 null, null, "WORKFLOW",
                 "0 0 * * * *", "CRON", null, null,
-                false, "Hourly run", Map.of(), null, null, testScheduled.getCreatedAt()
+                false, "Hourly run", Map.of(), null, null, testScheduled.getCreatedAt(),
+                null, null, 0, 0, "SKIP"
         );
         when(scheduleMapper.toResponse(testScheduled)).thenReturn(disabledResponse);
 
