@@ -56,4 +56,7 @@ public class ChainRun {
     @Column(columnDefinition = "text")
     @Builder.Default
     private Map<String, Object> metadata = new HashMap<>();
+
+    @Column(name = "triggered_by_schedule_id")
+    private String triggeredByScheduleId;
 }

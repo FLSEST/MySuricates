@@ -63,12 +63,17 @@ public class ChainExecutor {
     }
 
     public ChainRun execute(WorkflowChain chain, Map<String, Object> inputContext) {
+        return execute(chain, inputContext, null);
+    }
+
+    public ChainRun execute(WorkflowChain chain, Map<String, Object> inputContext, String triggeredByScheduleId) {
         ChainRun run = ChainRun.builder()
                 .chain(chain)
                 .status(RunStatus.RUNNING)
                 .startedAt(Instant.now())
                 .inputContext(inputContext != null ? new HashMap<>(inputContext) : new HashMap<>())
                 .entryRuns(new ArrayList<>())
+                .triggeredByScheduleId(triggeredByScheduleId)
                 .build();
         run = chainRunRepository.save(run);
 

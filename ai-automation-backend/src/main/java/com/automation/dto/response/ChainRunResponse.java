@@ -17,7 +17,8 @@ public record ChainRunResponse(
         Instant completedAt,
         Long durationMs,
         String error,
-        Map<String, Object> metadata
+        Map<String, Object> metadata,
+        String triggeredByScheduleId
 ) {
     public record ChainRunEntryResponse(
             int entryIndex,

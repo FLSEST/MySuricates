@@ -63,10 +63,15 @@ public class WorkflowExecutor {
      * The actual block execution happens in a background virtual thread.
      */
     public WorkflowRun execute(Workflow workflow, Map<String, Object> inputContext) {
+        return execute(workflow, inputContext, null);
+    }
+
+    public WorkflowRun execute(Workflow workflow, Map<String, Object> inputContext, String triggeredByScheduleId) {
         WorkflowRun run = WorkflowRun.builder()
                 .workflow(workflow)
                 .status(RunStatus.RUNNING)
                 .startedAt(Instant.now())
+                .triggeredByScheduleId(triggeredByScheduleId)
                 .build();
         run = runRepository.save(run);
 
@@ -152,6 +157,15 @@ public class WorkflowExecutor {
                     .build();
             context.setProjectPath(project.getPath());
             inputContext.forEach(context::setVariable);
+
+            // Inject workflow & run metadata as template variables
+            context.setVariable("workflow_run_id", runId);
+            context.setVariable("workflow_id", workflowId);
+            context.setVariable("workflow_name", workflowName != null ? workflowName : "");
+            context.setVariable("project_path", project.getPath() != null ? project.getPath() : "");
+            context.setVariable("model", model != null ? model : "");
+            context.setVariable("provider", provider != null ? provider : "");
+            context.setVariable("started_at", java.time.Instant.now().toString());
 
             // Stamp run metadata with system identity
             context.setRunMetadata("system", systemIdentity.getName());

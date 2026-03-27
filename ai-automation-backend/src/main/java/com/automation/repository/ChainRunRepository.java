@@ -19,4 +19,8 @@ public interface ChainRunRepository extends JpaRepository<ChainRun, String> {
     Page<ChainRun> findByOrderByStartedAtDesc(Pageable pageable);
 
     Page<ChainRun> findByStatusOrderByStartedAtDesc(RunStatus status, Pageable pageable);
+
+    boolean existsByChainIdAndStatus(String chainId, RunStatus status);
+
+    List<ChainRun> findByTriggeredByScheduleIdOrderByStartedAtDesc(String scheduleId);
 }

@@ -60,6 +60,9 @@ public class WorkflowRun {
     @Builder.Default
     private Map<String, Object> inputContext = new HashMap<>();
 
+    @Column(name = "triggered_by_schedule_id")
+    private String triggeredByScheduleId;
+
     public void addStep(StepResult step) {
         step.setWorkflowRun(this);
         if (step.getStepIndex() <= 0) {

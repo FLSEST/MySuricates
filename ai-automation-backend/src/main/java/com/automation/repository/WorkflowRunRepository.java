@@ -77,4 +77,6 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
     Optional<WorkflowRun> findByIdWithSteps(@Param("id") String id);
 
     List<WorkflowRun> findTop5ByWorkflowIdOrderByStartedAtDesc(String workflowId);
+
+    List<WorkflowRun> findByTriggeredByScheduleIdOrderByStartedAtDesc(String scheduleId);
 }

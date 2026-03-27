@@ -20,5 +20,6 @@ public record WorkflowRunResponse(
         Integer userRating,
         Map<String, Object> error,
         Map<String, Object> metadata,
-        Map<String, Object> inputContext
+        Map<String, Object> inputContext,
+        String triggeredByScheduleId
 ) {}
