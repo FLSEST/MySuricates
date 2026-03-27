@@ -98,6 +98,9 @@ public class Workflow {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    @Column(name = "stable_synced_at")
+    private Instant stableSyncedAt;
+
     @CreatedDate
     @Column(updatable = false)
     private Instant createdAt;

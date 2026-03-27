@@ -2,9 +2,11 @@ package com.automation.repository;
 
 import com.automation.entity.Workflow;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -37,4 +39,12 @@ public interface WorkflowRepository extends JpaRepository<Workflow, String> {
      */
     @Query("SELECT w FROM Workflow w WHERE w.blockTypes IS NULL OR w.blockTypes = ''")
     List<Workflow> findWithEmptyBlockTypes();
+
+    /**
+     * Updates stable_synced_at without triggering @LastModifiedDate on updatedAt.
+     */
+    @Modifying
+    @Transactional
+    @Query(value = "UPDATE workflows SET stable_synced_at = :syncedAt WHERE id = :id", nativeQuery = true)
+    void updateStableSyncedAt(@Param("id") String id, @Param("syncedAt") String syncedAt);
 }

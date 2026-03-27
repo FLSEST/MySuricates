@@ -23,6 +23,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.*;
 
 @Component
@@ -243,6 +244,7 @@ public class InstanceSyncHelper {
                     }
                     httpPut(targetBaseUrl + "/workflows/" + targetWorkflowId, updateBody);
                     workflowsSynced++;
+                    workflowRepository.updateStableSyncedAt(workflow.getId(), Instant.now().toString());
                     log.info("Updated workflow on target: {}", workflow.getName());
                 } else {
                     Map<String, Object> importBody = new LinkedHashMap<>();
@@ -255,6 +257,7 @@ public class InstanceSyncHelper {
                     if (workflow.getModel() != null) importBody.put("model", workflow.getModel());
                     httpPost(targetBaseUrl + "/workflows/import", importBody);
                     workflowsSynced++;
+                    workflowRepository.updateStableSyncedAt(workflow.getId(), Instant.now().toString());
                     log.info("Created workflow on target: {}", workflow.getName());
                 }
             } catch (Exception e) {

@@ -28,5 +28,6 @@ public record WorkflowResponse(
         String testStatus,
         Instant lastTestedAt,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        Instant stableSyncedAt
 ) {}

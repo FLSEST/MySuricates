@@ -5,6 +5,7 @@ import {
   Square,
   Bell,
   FlaskConical,
+  Cloud,
 } from 'lucide-react';
 import { ExecutionBadges } from '../shared/ExecutionBadges';
 import { WorkflowIcon } from '../../utils/workflowIcon';
@@ -81,6 +82,16 @@ export function WorkflowRow({
       {!selectMode && workflow.testStatus === 'FAILED' && (
         <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-sm bg-danger/10 text-danger text-[9px] font-medium shrink-0" title={workflow.lastTestedAt ? new Date(workflow.lastTestedAt).toLocaleString() : undefined}>
           <FlaskConical className="w-2.5 h-2.5" />
+        </span>
+      )}
+      {!selectMode && workflow.stableSyncedAt && workflow.updatedAt <= workflow.stableSyncedAt && (
+        <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-sm bg-success/10 text-success text-[9px] font-medium shrink-0" title={`Auf Stable deployed — ${new Date(workflow.stableSyncedAt).toLocaleString()}`}>
+          <Cloud className="w-2.5 h-2.5" />
+        </span>
+      )}
+      {!selectMode && workflow.stableSyncedAt && workflow.updatedAt > workflow.stableSyncedAt && (
+        <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-sm bg-warning/10 text-warning text-[9px] font-medium shrink-0" title={`Lokal verändert seit letztem Stable-Deploy — ${new Date(workflow.stableSyncedAt).toLocaleString()}`}>
+          <Cloud className="w-2.5 h-2.5" />
         </span>
       )}
       {!selectMode && (
