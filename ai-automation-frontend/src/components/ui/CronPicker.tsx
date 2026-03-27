@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Input } from './Input';
 import { useT } from '../../i18n';
+import { useCronPreview } from '../../hooks/useSchedules';
 
 type Frequency = 'daily' | 'weekly' | 'monthly' | 'advanced';
 
@@ -75,6 +76,7 @@ export function CronPicker({ value, onChange, label }: CronPickerProps) {
   const t = useT();
   const [state, setState] = useState<CronState>(() => parseCronToState(value));
   const [rawValue, setRawValue] = useState(value);
+  const [debouncedCron, setDebouncedCron] = useState(value);
 
   // Sync from external value changes
   useEffect(() => {
@@ -82,6 +84,14 @@ export function CronPicker({ value, onChange, label }: CronPickerProps) {
     setState(parsed);
     setRawValue(value);
   }, [value]);
+
+  // Debounce cron for preview API call
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedCron(rawValue), 400);
+    return () => clearTimeout(timer);
+  }, [rawValue]);
+
+  const { data: previewData } = useCronPreview(debouncedCron);
 
   const updateState = (update: Partial<CronState>) => {
     const newState = { ...state, ...update };
@@ -203,6 +213,18 @@ export function CronPicker({ value, onChange, label }: CronPickerProps) {
             <span className="text-text-tertiary">Cron:</span>
             <code className="font-mono text-text">{stateToCron(state)}</code>
           </div>
+        </div>
+      )}
+
+      {/* Next runs preview */}
+      {previewData?.runs && previewData.runs.length > 0 && (
+        <div className="p-2.5 rounded-lg bg-surface-secondary border border-border text-xs space-y-1">
+          <span className="text-text-tertiary font-medium">{t.schedules.nextRunsPreview}:</span>
+          {previewData.runs.map((run) => (
+            <div key={run} className="text-text-secondary pl-2">
+              {new Date(run).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            </div>
+          ))}
         </div>
       )}
     </div>

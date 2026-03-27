@@ -7,5 +7,7 @@ public record UpdateScheduleRequest(
         String cronExpression,
         String description,
         Map<String, Object> inputContext,
-        Instant scheduledAt
+        Instant scheduledAt,
+        Instant endDate,
+        Integer maxRuns
 ) {}

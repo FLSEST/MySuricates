@@ -1,5 +1,7 @@
 package com.automation.dto.response;
 
+import com.automation.entity.RunStatus;
+
 import java.time.Instant;
 import java.util.Map;
 
@@ -20,5 +22,10 @@ public record ScheduledWorkflowResponse(
         Map<String, Object> inputContext,
         Instant lastRunAt,
         Instant nextRunAt,
-        Instant createdAt
+        Instant createdAt,
+        RunStatus lastRunStatus,
+        Instant endDate,
+        int maxRuns,
+        int runCount,
+        String conflictBehavior
 ) {}

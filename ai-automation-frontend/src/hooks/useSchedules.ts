@@ -2,12 +2,31 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
-import type { ScheduledWorkflow, CreateScheduleRequest, UpdateScheduleRequest, CalendarDataResponse, UpcomingScheduleData } from '../types';
+import type { ScheduledWorkflow, CreateScheduleRequest, UpdateScheduleRequest, CalendarDataResponse, UpcomingScheduleData, ScheduleRunsResponse } from '../types';
 
 export function useSchedules() {
   return useQuery({
     queryKey: ['schedules'],
     queryFn: () => api.get<ScheduledWorkflow[]>('/schedules'),
+  });
+}
+
+export function useMaintenanceMode() {
+  return useQuery({
+    queryKey: ['schedules', 'maintenance'],
+    queryFn: () => api.get<{ enabled: boolean }>('/schedules/maintenance'),
+    staleTime: 15_000,
+  });
+}
+
+export function useSetMaintenanceMode() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) =>
+      api.post<{ enabled: boolean }>('/schedules/maintenance', { enabled }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['schedules', 'maintenance'] });
+    },
   });
 }
 
@@ -32,6 +51,24 @@ export function useRemainingThisWeek() {
     queryKey: ['schedules', 'remaining-this-week'],
     queryFn: () => api.get<UpcomingScheduleData>('/schedules/remaining-this-week'),
     refetchInterval: 60_000,
+  });
+}
+
+export function useCronPreview(cronExpression: string) {
+  return useQuery({
+    queryKey: ['schedules', 'preview', cronExpression],
+    queryFn: () => api.post<{ runs: string[] }>('/schedules/preview', { cronExpression }),
+    enabled: !!cronExpression,
+    staleTime: 30_000,
+  });
+}
+
+export function useScheduleRuns(scheduleId: string | null) {
+  return useQuery({
+    queryKey: ['schedules', scheduleId, 'runs'],
+    queryFn: () => api.get<ScheduleRunsResponse>(`/schedules/${scheduleId}/runs`),
+    enabled: !!scheduleId,
+    staleTime: 10_000,
   });
 }
 

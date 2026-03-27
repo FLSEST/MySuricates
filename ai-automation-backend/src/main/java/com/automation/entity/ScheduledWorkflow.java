@@ -29,6 +29,10 @@ public class ScheduledWorkflow {
         WORKFLOW, CHAIN
     }
 
+    public enum ConflictBehavior {
+        SKIP, OVERLAP
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
@@ -74,6 +78,26 @@ public class ScheduledWorkflow {
     private Instant lastRunAt;
 
     private Instant nextRunAt;
+
+    /** Optional end date for CRON schedules — disables the schedule when now >= endDate. */
+    @Column(name = "end_date")
+    private Instant endDate;
+
+    /** Maximum number of runs for CRON schedules (0 = unlimited). */
+    @Column(name = "max_runs")
+    @Builder.Default
+    private int maxRuns = 0;
+
+    /** Counter incremented after each execution. */
+    @Column(name = "run_count")
+    @Builder.Default
+    private int runCount = 0;
+
+    /** Whether to skip or overlap when the target already has a RUNNING execution. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "conflict_behavior")
+    @Builder.Default
+    private ConflictBehavior conflictBehavior = ConflictBehavior.SKIP;
 
     @CreatedDate
     @Column(updatable = false)

@@ -1,14 +1,26 @@
 package com.automation.mapper;
 
 import com.automation.dto.response.ScheduledWorkflowResponse;
+import com.automation.entity.RunStatus;
 import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.ScheduledWorkflow.TargetType;
+import com.automation.repository.ChainRunRepository;
+import com.automation.repository.WorkflowRunRepository;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 @Component
 public class ScheduleMapper {
+
+    private final WorkflowRunRepository workflowRunRepository;
+    private final ChainRunRepository chainRunRepository;
+
+    public ScheduleMapper(WorkflowRunRepository workflowRunRepository,
+                          ChainRunRepository chainRunRepository) {
+        this.workflowRunRepository = workflowRunRepository;
+        this.chainRunRepository = chainRunRepository;
+    }
 
     public ScheduledWorkflowResponse toResponse(ScheduledWorkflow s) {
         String workflowId = null;
@@ -28,6 +40,8 @@ public class ScheduleMapper {
             }
         }
 
+        RunStatus lastRunStatus = resolveLastRunStatus(s);
+
         return new ScheduledWorkflowResponse(
                 s.getId(),
                 workflowId,
@@ -45,8 +59,25 @@ public class ScheduleMapper {
                 s.getInputContext(),
                 s.getLastRunAt(),
                 s.getNextRunAt(),
-                s.getCreatedAt()
+                s.getCreatedAt(),
+                lastRunStatus,
+                s.getEndDate(),
+                s.getMaxRuns(),
+                s.getRunCount(),
+                s.getConflictBehavior() != null ? s.getConflictBehavior().name() : "SKIP"
         );
+    }
+
+    private RunStatus resolveLastRunStatus(ScheduledWorkflow s) {
+        var workflowRuns = workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(s.getId());
+        if (!workflowRuns.isEmpty()) {
+            return workflowRuns.get(0).getStatus();
+        }
+        var chainRuns = chainRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(s.getId());
+        if (!chainRuns.isEmpty()) {
+            return chainRuns.get(0).getStatus();
+        }
+        return null;
     }
 
     public List<ScheduledWorkflowResponse> toResponseList(List<ScheduledWorkflow> scheduled) {

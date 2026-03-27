@@ -12,5 +12,8 @@ public record CreateScheduleRequest(
         Map<String, Object> inputContext,
         String scheduleType,
         Instant scheduledAt,
-        String delayExpression
+        String delayExpression,
+        Instant endDate,
+        Integer maxRuns,
+        String conflictBehavior
 ) {}

@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.automation.dto.request.UpdateScheduleRequest;
 import com.automation.dto.response.UpcomingScheduleResponse;
+import com.automation.repository.AppSettingsRepository;
 
 import java.time.DayOfWeek;
 import java.time.Duration;
@@ -42,6 +43,9 @@ public class SchedulerService {
     private final WorkflowChainRepository workflowChainRepository;
     private final ScheduledWorkflowExecutor scheduledExecutor;
     private final ActivityLogService activityLogService;
+    private final AppSettingsRepository appSettingsRepository;
+
+    private static final String MAINTENANCE_MODE_KEY = "scheduler.maintenance-mode";
 
     @Transactional(readOnly = true)
     public List<ScheduledWorkflow> findAll() {
@@ -74,7 +78,8 @@ public class SchedulerService {
                                      String targetTypeStr, String cronExpression,
                                      String description, Map<String, Object> inputContext,
                                      String scheduleType, Instant scheduledAt,
-                                     String delayExpression) {
+                                     String delayExpression, Instant endDate, Integer maxRuns,
+                                     String conflictBehaviorStr) {
         TargetType targetType = parseTargetType(targetTypeStr);
 
         // Validate mutual exclusivity
@@ -93,12 +98,22 @@ public class SchedulerService {
 
         ScheduleType type = parseScheduleType(scheduleType);
 
+        ScheduledWorkflow.ConflictBehavior conflictBehavior = ScheduledWorkflow.ConflictBehavior.SKIP;
+        if (conflictBehaviorStr != null && !conflictBehaviorStr.isBlank()) {
+            try {
+                conflictBehavior = ScheduledWorkflow.ConflictBehavior.valueOf(conflictBehaviorStr.toUpperCase());
+            } catch (IllegalArgumentException ignored) {}
+        }
+
         ScheduledWorkflow.ScheduledWorkflowBuilder builder = ScheduledWorkflow.builder()
                 .targetType(targetType)
                 .description(description)
                 .inputContext(inputContext != null ? inputContext : Map.of())
                 .enabled(true)
-                .scheduleType(type);
+                .scheduleType(type)
+                .endDate(endDate)
+                .maxRuns(maxRuns != null ? maxRuns : 0)
+                .conflictBehavior(conflictBehavior);
 
         if (targetType == TargetType.CHAIN) {
             WorkflowChain chain = workflowChainRepository.findById(chainId)
@@ -169,6 +184,15 @@ public class SchedulerService {
             scheduled.setScheduledAt(request.scheduledAt());
             if (scheduled.isEnabled()) {
                 scheduled.setNextRunAt(request.scheduledAt());
+            }
+        }
+
+        if (scheduled.getScheduleType() == ScheduleType.CRON) {
+            if (request.endDate() != null) {
+                scheduled.setEndDate(request.endDate());
+            }
+            if (request.maxRuns() != null) {
+                scheduled.setMaxRuns(request.maxRuns());
             }
         }
 
@@ -268,8 +292,37 @@ public class SchedulerService {
         return new UpcomingScheduleResponse(upcoming.size(), upcoming);
     }
 
+    public List<Instant> getNextRuns(String cronExpression, int count) {
+        if (!CronExpression.isValidExpression(cronExpression)) {
+            throw new IllegalArgumentException("Invalid cron expression: " + cronExpression);
+        }
+        CronExpression cron = CronExpression.parse(cronExpression);
+        List<Instant> result = new ArrayList<>();
+        LocalDateTime next = cron.next(LocalDateTime.now());
+        while (next != null && result.size() < count) {
+            result.add(next.atZone(ZoneId.systemDefault()).toInstant());
+            next = cron.next(next);
+        }
+        return result;
+    }
+
+    public boolean isMaintenanceMode() {
+        return appSettingsRepository.get(MAINTENANCE_MODE_KEY)
+                .map("true"::equals).orElse(false);
+    }
+
+    public void setMaintenanceMode(boolean enabled) {
+        appSettingsRepository.set(MAINTENANCE_MODE_KEY, String.valueOf(enabled));
+        log.info("Scheduler maintenance mode {}", enabled ? "enabled" : "disabled");
+    }
+
     @Scheduled(fixedRate = 60_000)
     public void checkAndExecuteScheduled() {
+        if (isMaintenanceMode()) {
+            log.debug("Scheduler in maintenance mode — skipping execution");
+            return;
+        }
+
         List<ScheduledWorkflow> dueSchedules = scheduledRepository.findDueSchedules(Instant.now());
 
         for (ScheduledWorkflow scheduled : dueSchedules) {

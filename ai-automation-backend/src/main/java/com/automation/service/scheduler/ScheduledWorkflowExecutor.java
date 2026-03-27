@@ -5,6 +5,7 @@ import com.automation.entity.RunStatus;
 import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.ScheduledWorkflow.ScheduleType;
 import com.automation.entity.ScheduledWorkflow.TargetType;
+import com.automation.repository.ChainRunRepository;
 import com.automation.repository.ScheduledWorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.activitylog.ActivityLogService;
@@ -27,6 +28,7 @@ public class ScheduledWorkflowExecutor {
 
     private final ScheduledWorkflowRepository scheduledRepository;
     private final WorkflowRunRepository workflowRunRepository;
+    private final ChainRunRepository chainRunRepository;
     private final WorkflowExecutor workflowExecutor;
     private final ChainExecutor chainExecutor;
     private final ActivityLogService activityLogService;
@@ -54,14 +56,24 @@ public class ScheduledWorkflowExecutor {
             return;
         }
 
-        // Ghost-run protection: skip if the workflow already has a RUNNING execution.
-        // Prevents duplicate runs when e.g. a previous execution throws before updateScheduleAfterRun.
-        if (scheduled.getTargetType() == TargetType.WORKFLOW && scheduled.getWorkflow() != null) {
-            if (workflowRunRepository.existsByWorkflowIdAndStatus(
-                    scheduled.getWorkflow().getId(), RunStatus.RUNNING)) {
-                log.warn("Schedule {} skipped — workflow '{}' already has a RUNNING execution",
-                        scheduleId, scheduled.getWorkflow().getName());
-                return;
+        // Ghost-run protection: skip if the target already has a RUNNING execution.
+        // Only enforced when conflictBehavior == SKIP (OVERLAP allows parallel runs).
+        if (scheduled.getConflictBehavior() != ScheduledWorkflow.ConflictBehavior.OVERLAP) {
+            if (scheduled.getTargetType() == TargetType.WORKFLOW && scheduled.getWorkflow() != null) {
+                if (workflowRunRepository.existsByWorkflowIdAndStatus(
+                        scheduled.getWorkflow().getId(), RunStatus.RUNNING)) {
+                    log.warn("Schedule {} skipped — workflow '{}' already has a RUNNING execution",
+                            scheduleId, scheduled.getWorkflow().getName());
+                    return;
+                }
+            }
+            if (scheduled.getTargetType() == TargetType.CHAIN && scheduled.getChain() != null) {
+                if (chainRunRepository.existsByChainIdAndStatus(
+                        scheduled.getChain().getId(), RunStatus.RUNNING)) {
+                    log.warn("Schedule {} skipped — chain '{}' already has a RUNNING execution",
+                            scheduleId, scheduled.getChain().getName());
+                    return;
+                }
             }
         }
 
@@ -77,9 +89,9 @@ public class ScheduledWorkflowExecutor {
         // retry loop on the next @Scheduled tick.
         try {
             if (scheduled.getTargetType() == TargetType.CHAIN && scheduled.getChain() != null) {
-                chainExecutor.execute(scheduled.getChain(), scheduled.getInputContext());
+                chainExecutor.execute(scheduled.getChain(), scheduled.getInputContext(), scheduleId);
             } else if (scheduled.getWorkflow() != null) {
-                workflowExecutor.execute(scheduled.getWorkflow(), scheduled.getInputContext());
+                workflowExecutor.execute(scheduled.getWorkflow(), scheduled.getInputContext(), scheduleId);
             } else {
                 log.error("Schedule {} has no valid target", scheduled.getId());
                 return;
@@ -104,9 +116,24 @@ public class ScheduledWorkflowExecutor {
             scheduled.setEnabled(false);
             log.info("{} schedule {} executed and disabled", scheduleType, scheduleId);
         } else {
-            scheduled.setNextRunAt(calculateNextRun(cronExpression));
-            log.info("Schedule {} executed, next run at: {}",
-                    scheduleId, scheduled.getNextRunAt());
+            // Increment run counter and check end conditions for CRON schedules
+            scheduled.setRunCount(scheduled.getRunCount() + 1);
+
+            boolean maxRunsReached = scheduled.getMaxRuns() > 0
+                    && scheduled.getRunCount() >= scheduled.getMaxRuns();
+            boolean endDateReached = scheduled.getEndDate() != null
+                    && Instant.now().isAfter(scheduled.getEndDate());
+
+            if (maxRunsReached || endDateReached) {
+                scheduled.setNextRunAt(null);
+                scheduled.setEnabled(false);
+                log.info("Schedule {} disabled — end condition met (maxRuns={}, runCount={}, endDate={})",
+                        scheduleId, scheduled.getMaxRuns(), scheduled.getRunCount(), scheduled.getEndDate());
+            } else {
+                scheduled.setNextRunAt(calculateNextRun(cronExpression));
+                log.info("Schedule {} executed, next run at: {}",
+                        scheduleId, scheduled.getNextRunAt());
+            }
         }
 
         scheduledRepository.save(scheduled);
