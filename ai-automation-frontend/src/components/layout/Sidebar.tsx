@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, GitBranch, History, Zap, Sparkles, Factory,
   Calendar, Webhook, ScrollText, CheckSquare, Settings, ChevronLeft, ChevronRight, Link2, BookOpen, BarChart2,
-  Pencil, Check, RotateCcw, Plus,
+  Pencil, Check, RotateCcw, Plus, MessageCircle,
 } from 'lucide-react';
 import {
   DndContext,
@@ -107,6 +107,7 @@ const navItems = [
   { to: '/wishes', icon: Sparkles, labelKey: 'wishes' as const },
   { to: '/workflows', icon: GitBranch, labelKey: 'workflows' as const },
   { to: '/factory', icon: Factory, labelKey: 'factory' as const },
+  { to: '/dialogs', icon: MessageCircle, labelKey: 'dialogs' as const },
   { to: '/chains', icon: Link2, labelKey: 'chains' as const },
   { to: '/runs', icon: History, labelKey: 'runs' as const },
   { to: '/skills', icon: Zap, labelKey: 'skills' as const },

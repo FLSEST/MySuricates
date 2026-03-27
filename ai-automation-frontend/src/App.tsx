@@ -48,6 +48,7 @@ const ActivityLog = lazy(() => import('./pages/ActivityLog').then(m => ({ defaul
 const WorkflowFactory = lazy(() => import('./pages/WorkflowFactory').then(m => ({ default: m.WorkflowFactory })));
 const Docs = lazy(() => import('./pages/Docs').then(m => ({ default: m.Docs })));
 const Insights = lazy(() => import('./pages/Insights').then(m => ({ default: m.Insights })));
+const DialogImport = lazy(() => import('./pages/DialogImport').then(m => ({ default: m.DialogImport })));
 
 const router = createBrowserRouter([
   {
@@ -63,6 +64,7 @@ const router = createBrowserRouter([
       { path: 'workflows/:id', element: <WorkflowDetailRoute /> },
       { path: 'workflows/:id/run/:runId', element: <WorkflowExecutionRoute /> },
       { path: 'factory', element: <WorkflowFactory /> },
+      { path: 'dialogs', element: <DialogImport /> },
       { path: 'chains', element: <Chains /> },
       { path: 'chains/:id/run/:runId', element: <ChainExecution /> },
       { path: 'runs', element: <Runs /> },

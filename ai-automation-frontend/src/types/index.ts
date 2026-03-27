@@ -100,6 +100,7 @@ export interface Workflow {
   lastTestedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  stableSyncedAt?: string | null;
 }
 
 export interface CreateWorkflowRequest {
@@ -228,6 +229,7 @@ export interface WorkflowRun {
   error: WorkflowRunError | null;
   metadata: Record<string, unknown>;
   inputContext?: Record<string, unknown>;
+  triggeredByScheduleId?: string | null;
 }
 
 export interface StepResult {
@@ -291,6 +293,11 @@ export interface ScheduledWorkflow {
   lastRunAt: string | null;
   createdAt: string;
   updatedAt: string;
+  lastRunStatus?: RunStatus | null;
+  endDate?: string | null;
+  maxRuns?: number;
+  runCount?: number;
+  conflictBehavior?: 'SKIP' | 'OVERLAP';
 }
 
 export interface CreateScheduleRequest {
@@ -303,6 +310,9 @@ export interface CreateScheduleRequest {
   scheduleType?: 'CRON' | 'ONCE' | 'DELAYED';
   scheduledAt?: string;
   delayExpression?: string;
+  endDate?: string | null;
+  maxRuns?: number | null;
+  conflictBehavior?: 'SKIP' | 'OVERLAP';
 }
 
 export interface UpdateScheduleRequest {
@@ -310,6 +320,8 @@ export interface UpdateScheduleRequest {
   description?: string;
   inputContext?: Record<string, unknown>;
   scheduledAt?: string;
+  endDate?: string | null;
+  maxRuns?: number | null;
 }
 
 export interface CalendarEvent {
@@ -805,6 +817,12 @@ export interface ChainRun {
   durationMs: number | null;
   error: string | null;
   metadata: Record<string, unknown>;
+  triggeredByScheduleId?: string | null;
+}
+
+export interface ScheduleRunsResponse {
+  workflowRuns: WorkflowRun[];
+  chainRuns: ChainRun[];
 }
 
 export interface ChainRunEntry {
@@ -925,6 +943,35 @@ export interface ChainInstallResponse {
   chainId: string;
   chainName: string;
   workflowIds: string[];
+}
+
+// ── Dialog Import ────────────────────────────────────────
+
+export interface DialogSessionInfo {
+  sessionId: string;
+  filePath: string;
+  projectPath: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  turnCount: number;
+  toolCallCount: number;
+  dominantTools: string[];
+  firstUserMessage: string | null;
+  substantial: boolean;
+}
+
+export interface DialogWorkflowSuggestion {
+  suggestedName: string | null;
+  suggestedDescription: string | null;
+  blocks: BlockDefinition[];
+  sessionId: string | null;
+  sourceFilePath: string | null;
+  projectPath: string | null;
+  confidence: number;
+  patternType: string | null;
+  notAvailableReason: string | null;
+  toolCallsAnalyzed: number;
+  available: boolean;
 }
 
 // ── API Error ────────────────────────────────────────────
