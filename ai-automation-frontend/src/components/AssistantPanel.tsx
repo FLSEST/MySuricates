@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { X, Send, Play, Eye, Sparkles, Clock, Plus, Trash2, ArrowLeft } from 'lucide-react';
+import { X, Send, Play, Eye, Sparkles, Clock, Plus, Trash2, ArrowLeft, MessageCircle } from 'lucide-react';
 import { useAssistantStore } from '../stores/assistantStore';
 import { useAssistantChat, useAssistantSuggestions, type ChatMessage, type AssistantAction } from '../hooks/useAssistant';
 import { useAssistantThinkingPhrases } from '../hooks/useSystem';
+import { useExecuteWorkflow } from '../hooks/useWorkflows';
 import { MeerkatIcon } from './layout/Sidebar';
 
 function parsePageContext(pathname: string) {
@@ -23,8 +24,32 @@ function parsePageContext(pathname: string) {
   return { page: segments[0] || 'dashboard' };
 }
 
-function ActionButton({ action, onClose }: { action: AssistantAction; onClose: () => void }) {
+function ActionButton({ action, onClose, onSend, onExecute }: {
+  action: AssistantAction;
+  onClose: () => void;
+  onSend?: (text: string) => void;
+  onExecute?: (workflowId: string) => void;
+}) {
   const navigate = useNavigate();
+
+  // ask_choice: render each option as its own button
+  if (action.type === 'ask_choice' && action.options) {
+    return (
+      <>
+        {action.options.map((opt) => (
+          <button
+            key={opt}
+            onClick={() => onSend?.(opt)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium
+                       bg-accent/15 text-accent hover:bg-accent/25 transition-colors border border-accent/20"
+          >
+            <MessageCircle className="w-3 h-3" />
+            {opt}
+          </button>
+        ))}
+      </>
+    );
+  }
 
   const icon = action.type === 'run_workflow' ? <Play className="w-3 h-3" />
     : action.type === 'show_workflow' || action.type === 'show_run' ? <Eye className="w-3 h-3" />
@@ -33,6 +58,8 @@ function ActionButton({ action, onClose }: { action: AssistantAction; onClose: (
   const handleClick = () => {
     switch (action.type) {
       case 'run_workflow':
+        if (action.id) onExecute?.(action.id);
+        break;
       case 'show_workflow':
         navigate(`/workflows/${action.id}`);
         onClose();
@@ -84,7 +111,12 @@ function MarkdownLink({ href, children, onNavigate }: {
   );
 }
 
-function MessageBubble({ msg, onClose }: { msg: ChatMessage; onClose: () => void }) {
+function MessageBubble({ msg, onClose, onSend, onExecute }: {
+  msg: ChatMessage;
+  onClose: () => void;
+  onSend?: (text: string) => void;
+  onExecute?: (workflowId: string) => void;
+}) {
   const navigate = useNavigate();
   const isUser = msg.role === 'user';
 
@@ -145,7 +177,7 @@ function MessageBubble({ msg, onClose }: { msg: ChatMessage; onClose: () => void
         {msg.actions && msg.actions.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-0.5">
             {msg.actions.map((action, i) => (
-              <ActionButton key={i} action={action} onClose={onClose} />
+              <ActionButton key={i} action={action} onClose={onClose} onSend={onSend} onExecute={onExecute} />
             ))}
           </div>
         )}
@@ -328,6 +360,8 @@ export function AssistantPanel() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { mutate: sendMessage, isPending } = useAssistantChat();
+  const { mutate: executeWorkflow } = useExecuteWorkflow();
+  const navigate = useNavigate();
 
   const ctx = parsePageContext(location.pathname);
 
@@ -409,8 +443,7 @@ export function AssistantPanel() {
     setIsResizing(false);
   };
 
-  const handleSend = () => {
-    const text = input.trim();
+  const handleSendText = (text: string) => {
     if (!text || isPending) return;
 
     // Get or create session
@@ -421,7 +454,6 @@ export function AssistantPanel() {
 
     const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: text };
     appendMessage(sessionId, userMsg);
-    setInput('');
 
     const currentSession = useAssistantStore.getState().sessions.find((s) => s.id === sessionId);
     const history = (currentSession?.messages ?? [])
@@ -449,6 +481,22 @@ export function AssistantPanel() {
         },
       }
     );
+  };
+
+  const handleSend = () => {
+    const text = input.trim();
+    if (!text) return;
+    setInput('');
+    handleSendText(text);
+  };
+
+  const handleExecute = (workflowId: string) => {
+    executeWorkflow({ id: workflowId }, {
+      onSuccess: (run) => {
+        navigate(`/runs/${run.id}`);
+        setOpen(false);
+      },
+    });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -589,7 +637,7 @@ export function AssistantPanel() {
               )}
 
               {messages.map((msg) => (
-                <MessageBubble key={msg.id} msg={msg} onClose={() => setOpen(false)} />
+                <MessageBubble key={msg.id} msg={msg} onClose={() => setOpen(false)} onSend={handleSendText} onExecute={handleExecute} />
               ))}
 
               {isPending && <TypingIndicator />}

@@ -63,7 +63,7 @@ public class ConversationPreprocessor {
     /**
      * Applies all compression rules to a single output string.
      */
-    String processOutput(String output) {
+    public String processOutput(String output) {
         String result = output;
         result = compressCodeBlocks(result);
         result = compressDataDumps(result);

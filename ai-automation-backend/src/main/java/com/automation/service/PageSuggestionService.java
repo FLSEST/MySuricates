@@ -2,9 +2,11 @@ package com.automation.service;
 
 import com.automation.entity.AssistantSession;
 import com.automation.entity.PageSuggestion;
+import com.automation.entity.WorkflowMemory;
 import com.automation.event.AssistantSessionUpdatedEvent;
 import com.automation.repository.AssistantSessionRepository;
 import com.automation.repository.PageSuggestionRepository;
+import com.automation.repository.WorkflowMemoryRepository;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -40,6 +42,7 @@ public class PageSuggestionService {
 
     private final AssistantSessionRepository sessionRepository;
     private final PageSuggestionRepository suggestionRepository;
+    private final WorkflowMemoryRepository workflowMemoryRepository;
     private final CommandExecutorService commandExecutorService;
     private final ObjectMapper objectMapper;
 
@@ -114,6 +117,20 @@ public class PageSuggestionService {
                         .filter(m -> "user".equals(m.get("role")))
                         .limit(2)
                         .forEach(m -> sb.append("- ").append(m.get("content")).append("\n"));
+            });
+            sb.append("\n");
+        }
+
+        List<WorkflowMemory> memories = workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()
+                .stream().limit(5).toList();
+        if (!memories.isEmpty()) {
+            sb.append("Bekannte Erkenntnisse aus vergangenen Workflow-Runs:\n");
+            memories.forEach(m -> {
+                String entry = m.getTitle() != null && !m.getTitle().isBlank()
+                        ? m.getTitle() + ": " + m.getContent()
+                        : m.getContent();
+                if (entry.length() > 120) entry = entry.substring(0, 120) + "…";
+                sb.append("- ").append(entry).append("\n");
             });
             sb.append("\n");
         }

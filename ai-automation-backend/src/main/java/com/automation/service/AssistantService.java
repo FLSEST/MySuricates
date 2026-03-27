@@ -32,8 +32,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -221,16 +223,33 @@ public class AssistantService {
         sb.append("\n## Aktionen empfehlen\n");
         sb.append("Falls du eine konkrete Aktion vorschlägst, füge am Ende deiner Antwort folgendes an:\n");
         sb.append("<actions>[{\"type\":\"run_workflow\",\"id\":\"workflow-id\",\"name\":\"Workflow-Name\",\"label\":\"Jetzt starten\"}]</actions>\n");
-        sb.append("Unterstützte Typen: run_workflow, show_workflow, show_run, start_wish (id=null, name=vorausgefüllter Wish-Text).\n");
+        sb.append("Unterstützte Typen:\n");
+        sb.append("- run_workflow: Workflow starten (id = Workflow-ID)\n");
+        sb.append("- show_workflow: Zur Workflow-Detail-Seite navigieren (id = Workflow-ID)\n");
+        sb.append("- show_run: Zum Run navigieren (id = Run-ID)\n");
+        sb.append("- start_wish: Wish vorausfüllen (id=null, name=Wish-Text)\n");
+        sb.append("- ask_choice: Auswahl anbieten — rendert mehrere klickbare Buttons, jeder sendet seine Option als Nachricht.\n");
+        sb.append("  Format: {\"type\":\"ask_choice\",\"id\":null,\"name\":\"Auswahl\",\"label\":\"Was möchtest du?\",\"options\":[\"Option A\",\"Option B\"]}\n");
+        sb.append("  Verwende ask_choice wenn unklar ist was der User meint (z.B. welcher von mehreren ähnlichen Workflows gemeint ist).\n");
         sb.append("Da du die Workflow-IDs aus dem Kontext kennst, kannst du run_workflow direkt mit der korrekten ID befüllen.\n");
 
         sb.append("\n## Daten nachladen\n");
         sb.append("Falls du mehr Details zu einer Entität brauchst, lade sie nach:\n");
-        sb.append("<fetch type=\"run_detail\" id=\"<run-id>\"/> — wie ein Workflow GELAUFEN ist (Logs, Fehler, Steps)\n");
+        sb.append("<fetch type=\"run_detail\" id=\"<run-id>\"/> — wie ein Workflow GELAUFEN ist (Status, Fehler, Step-Übersicht)\n");
+        sb.append("<fetch type=\"step_output\" id=\"<run-id>/<schrittnummer>\"/> — vollständiger Output eines einzelnen Steps (1-basiert)\n");
+        sb.append("Verwende step_output wenn der User fragt: 'Was hat Step 3 ausgegeben?', 'Zeig mir Schritt 4', 'Was stand in Step X?'\n");
+        sb.append("Kombinierbar: erst run_detail für Überblick, dann step_output für Detailansicht eines bestimmten Steps.\n");
         sb.append("<fetch type=\"wish_detail\" id=\"<wish-id>\"/> — Wish-Status, Iterationen, Fehler\n");
         sb.append("<fetch type=\"workflow_runs\" id=\"<workflow-id>\"/> — Letzte Runs eines Workflows\n");
         sb.append("<fetch type=\"workflow_detail\" id=\"<workflow-id>\"/> — wie ein Workflow AUFGEBAUT ist (Blöcke, Shell-Commands, Prompts, Instruktionen)\n");
         sb.append("Verwende workflow_detail bei Fragen wie: 'Was macht dieser Workflow?', 'Wie ist er aufgebaut?', 'Hat er einen X-Mechanismus?'\n");
+        sb.append("<fetch type=\"docs\" id=\"workflow-guide\"/> — liefert Inhaltsübersicht\n");
+        sb.append("<fetch type=\"docs\" id=\"workflow-guide/<sektion>\"/> — liefert eine Sektion; Sektions-IDs: block-types, patterns, timeouts, agentic, dos-and-donts, variables, models, memory, chains, quick-start, appendix\n");
+        sb.append("<fetch type=\"docs\" id=\"architektur\"/> — Systemarchitektur, Komponenten\n");
+        sb.append("<fetch type=\"docs\" id=\"vision\"/> — Produkt-Vision, Roadmap\n");
+        sb.append("Verwende docs-Fetch bei Fragen zu Block-Typen, Konfiguration, Timeouts, Patterns, Architektur oder Vision.\n");
+        sb.append("Beispiel: 'Welche Block-Typen gibt es?' → <fetch type=\"docs\" id=\"workflow-guide/block-types\"/>\n");
+        sb.append("Du kannst mehrere Fetch-Tags gleichzeitig senden.\n");
         sb.append("Nur wenn ID bekannt. IDs nicht erfinden. Wenn du einen Fetch-Tag sendest, beantworte die Frage noch nicht.\n");
 
         return sb.toString();
@@ -641,8 +660,139 @@ public class AssistantService {
             case "wish_detail"     -> formatWishDetail(req.id());
             case "workflow_runs"   -> formatWorkflowRuns(req.id());
             case "workflow_detail" -> formatWorkflowDetail(req.id());
+            case "step_output"     -> formatStepOutput(req.id());
+            case "docs"            -> formatDocsSection(req.id());
             default -> "";
         };
+    }
+
+    private String formatStepOutput(String idAndStep) {
+        int slash = idAndStep.lastIndexOf('/');
+        if (slash < 0) return "Ungültiges Format. Erwartet: <runId>/<schrittnummer>\n";
+        String runId = idAndStep.substring(0, slash);
+        int stepNum;
+        try {
+            stepNum = Integer.parseInt(idAndStep.substring(slash + 1));
+        } catch (NumberFormatException e) {
+            return "Schrittnummer ungültig: " + idAndStep.substring(slash + 1) + "\n";
+        }
+        int targetIndex = stepNum - 1; // user counts 1-based
+        return workflowRunRepository.findByIdWithSteps(runId).map(run -> {
+            return run.getSteps().stream()
+                    .filter(s -> s.getStepIndex() == targetIndex)
+                    .findFirst()
+                    .map(s -> {
+                        var sb = new StringBuilder();
+                        sb.append("**Step ").append(stepNum).append("** (").append(s.getStatus()).append(")");
+                        if (s.getDurationMs() != null) sb.append(" — ").append(s.getDurationMs() / 1000).append("s");
+                        sb.append("\n");
+                        String out = s.getOutput();
+                        if (out != null && !out.isBlank()) {
+                            if (out.length() > 3000) out = out.substring(0, 3000) + "\n[...gekürzt]";
+                            sb.append(out).append("\n");
+                        } else {
+                            sb.append("(Kein Output)\n");
+                        }
+                        return sb.toString();
+                    })
+                    .orElse("Step " + stepNum + " nicht gefunden in Run " + runId.substring(0, Math.min(8, runId.length())) + "…\n");
+        }).orElse("Run " + runId + " nicht gefunden.\n");
+    }
+
+    /** Maps doc IDs (with optional /section suffix) to classpath resources and section keywords. */
+    private static final Map<String, String> DOC_FILES = Map.of(
+            "workflow-guide", "docs/WORKFLOW-GUIDE.md",
+            "architektur",    "docs/architektur.md",
+            "vision",         "docs/vision.md"
+    );
+
+    /** Maps section keywords to their ## header patterns in WORKFLOW-GUIDE.md */
+    private static final Map<String, String> WF_GUIDE_SECTIONS = Map.ofEntries(
+            Map.entry("quick-start",    "## 1."),
+            Map.entry("block-types",    "## 2."),
+            Map.entry("variables",      "## 3."),
+            Map.entry("patterns",       "## 4."),
+            Map.entry("timeouts",       "## 5."),
+            Map.entry("models",         "## 6."),
+            Map.entry("environment",    "## 7."),
+            Map.entry("agentic",        "## 8."),
+            Map.entry("memory",         "## 9."),
+            Map.entry("chains",         "## 10."),
+            Map.entry("dos-and-donts",  "## 11."),
+            Map.entry("appendix",       "## Appendix")
+    );
+
+    private String formatDocsSection(String docId) {
+        // Support "workflow-guide/block-types" syntax
+        String baseId = docId;
+        String sectionKey = null;
+        int slash = docId.indexOf('/');
+        if (slash >= 0) {
+            baseId = docId.substring(0, slash);
+            sectionKey = docId.substring(slash + 1);
+        }
+
+        String filename = DOC_FILES.get(baseId);
+        if (filename == null) return "Unbekannte Dokumentation: " + baseId + "\n";
+
+        try {
+            var resource = new ClassPathResource(filename);
+            String fullContent = resource.getContentAsString(StandardCharsets.UTF_8);
+
+            // No section → return TOC (headers only) so model can plan follow-up fetches
+            if (sectionKey == null) {
+                return buildDocsToc(baseId, fullContent);
+            }
+
+            // Section requested → extract that section
+            String sectionHeader = "workflow-guide".equals(baseId)
+                    ? WF_GUIDE_SECTIONS.get(sectionKey) : null;
+            if (sectionHeader == null) {
+                // Fallback: first 8000 chars
+                String content = fullContent.length() > 8000
+                        ? fullContent.substring(0, 8000) + "\n\n[...gekürzt]" : fullContent;
+                return "**Dokumentation: " + baseId + "**\n\n" + content + "\n";
+            }
+
+            String section = extractSection(fullContent, sectionHeader);
+            if (section.isBlank()) return "Sektion '" + sectionKey + "' nicht gefunden in " + baseId + ".\n";
+            if (section.length() > 12000) section = section.substring(0, 12000) + "\n\n[...gekürzt]";
+            return "**" + baseId + " / " + sectionKey + ":**\n\n" + section + "\n";
+
+        } catch (Exception e) {
+            log.debug("Could not load doc '{}': {}", docId, e.getMessage());
+            return "Dokumentation '" + docId + "' nicht verfügbar.\n";
+        }
+    }
+
+    private String buildDocsToc(String docId, String content) {
+        var sb = new StringBuilder();
+        sb.append("**Dokumentation: ").append(docId).append("** — Inhaltsübersicht\n\n");
+        content.lines()
+                .filter(l -> l.startsWith("## "))
+                .forEach(l -> sb.append(l).append("\n"));
+        if ("workflow-guide".equals(docId)) {
+            sb.append("\nVerfügbare Sektions-IDs für `<fetch type=\"docs\" id=\"workflow-guide/<id>\"/>`:\n");
+            WF_GUIDE_SECTIONS.forEach((k, v) -> sb.append("  ").append(k).append("\n"));
+        }
+        sb.append("\nLade eine Sektion nach um Details zu erhalten.\n");
+        return sb.toString();
+    }
+
+    /** Extracts everything from the line starting with `headerPrefix` until the next `## ` header. */
+    private String extractSection(String content, String headerPrefix) {
+        String[] lines = content.split("\n");
+        var sb = new StringBuilder();
+        boolean inSection = false;
+        for (String line : lines) {
+            if (!inSection) {
+                if (line.startsWith(headerPrefix)) inSection = true;
+            } else {
+                if (line.startsWith("## ") && !line.startsWith(headerPrefix)) break;
+            }
+            if (inSection) sb.append(line).append("\n");
+        }
+        return sb.toString().trim();
     }
 
     private String formatRunDetail(String id) {

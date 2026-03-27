@@ -13,10 +13,11 @@ export interface AssistantPageContext {
 }
 
 export interface AssistantAction {
-  type: 'run_workflow' | 'show_workflow' | 'show_run' | 'start_wish';
+  type: 'run_workflow' | 'show_workflow' | 'show_run' | 'start_wish' | 'ask_choice';
   id: string | null;
   name: string;
   label: string;
+  options?: string[];
 }
 
 export interface AssistantChatRequest {
