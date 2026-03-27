@@ -47,6 +47,9 @@ class WorkflowExecutorTest {
     private WorkflowRunRepository runRepository;
 
     @Mock
+    private com.automation.repository.StepResultRepository stepResultRepository;
+
+    @Mock
     private ContainerRepository containerRepository;
 
     @Mock
@@ -100,6 +103,7 @@ class WorkflowExecutorTest {
                 containerService,
                 commandExecutorService,
                 runRepository,
+                stepResultRepository,
                 containerRepository,
                 broadcaster,
                 virtualThreadExecutor,
