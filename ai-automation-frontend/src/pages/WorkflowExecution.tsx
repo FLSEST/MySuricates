@@ -19,7 +19,7 @@ import { ConversionSuggestion } from '../components/shared/ConversionSuggestion'
 import {
   useWorkflow, useWorkflowRuns,
   usePauseExecution, useResumeExecution, useCancelExecution, useRunCommand, useSubmitApproval,
-  useRetryExecution, useApproveTodos,
+  useRetryExecution, useApproveTodos, useResumeFromStep,
 } from '../hooks/useWorkflows';
 import { useExecutionWebSocket } from '../hooks/useWebSocket';
 import { useRateRun } from '../hooks/useLearning';
@@ -88,6 +88,7 @@ export function WorkflowExecution() {
   const resumeExecution = useResumeExecution();
   const cancelExecution = useCancelExecution();
   const retryExecution = useRetryExecution();
+  const resumeFromStep = useResumeFromStep();
   const runCommand = useRunCommand();
   const submitApproval = useSubmitApproval();
   const approveTodos = useApproveTodos();
@@ -210,14 +211,26 @@ export function WorkflowExecution() {
           </p>
         </div>
         {(run.status === 'INTERRUPTED' || run.status === 'FAILED') && (
-          <Button
-            variant="secondary" size="sm"
-            icon={<Play className="w-4 h-4" />}
-            onClick={() => retryExecution.mutate(runId!)}
-            loading={retryExecution.isPending}
-          >
-            {t.workflows.execution.retry}
-          </Button>
+          <div className="flex items-center gap-2">
+            {run.status === 'INTERRUPTED' && run.steps?.some(s => s.status === 'COMPLETED') && (
+              <Button
+                variant="primary" size="sm"
+                icon={<Play className="w-4 h-4" />}
+                onClick={() => resumeFromStep.mutate(runId!)}
+                loading={resumeFromStep.isPending}
+              >
+                {t.workflows.execution.resumeFromStep}
+              </Button>
+            )}
+            <Button
+              variant="secondary" size="sm"
+              icon={<Play className="w-4 h-4" />}
+              onClick={() => retryExecution.mutate(runId!)}
+              loading={retryExecution.isPending}
+            >
+              {t.workflows.execution.retry}
+            </Button>
+          </div>
         )}
         {isRunning && (
           <div className="flex items-center gap-2">

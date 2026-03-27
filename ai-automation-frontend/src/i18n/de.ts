@@ -246,6 +246,7 @@ export const de: TranslationKeys = {
       resume: 'Fortsetzen',
       cancel: 'Abbrechen',
       retry: 'Wiederholen',
+      resumeFromStep: 'Ab letztem Schritt fortsetzen',
       interrupted: 'Unterbrochen',
       logs: 'Live-Logs',
       steps: 'Schritte',

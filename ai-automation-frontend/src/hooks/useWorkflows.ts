@@ -163,6 +163,21 @@ export function useResumeExecution() {
   });
 }
 
+export function useResumeFromStep() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
+  return useMutation({
+    mutationFn: (runId: string) => api.post(`/executions/${runId}/resume-from-step`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workflows'] });
+      qc.invalidateQueries({ queryKey: ['learning'] });
+      toast.success(t.toast.workflowExecuted);
+    },
+    onError: () => toast.error(t.toast.workflowExecuteFailed),
+  });
+}
+
 export function useCancelExecution() {
   const qc = useQueryClient();
   return useMutation({

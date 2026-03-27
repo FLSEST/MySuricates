@@ -109,6 +109,13 @@ public class ExecutionController {
         return ResponseEntity.ok(workflowMapper.toRunResponse(newRun));
     }
 
+    @PostMapping("/{id}/resume-from-step")
+    @Transactional
+    public ResponseEntity<WorkflowRunResponse> resumeFromStep(@PathVariable String id) {
+        var resumedRun = workflowExecutor.resumeFromStep(id);
+        return ResponseEntity.ok(workflowMapper.toRunResponse(resumedRun));
+    }
+
     @PostMapping("/{id}/approve")
     public ResponseEntity<Void> approveExecution(
             @PathVariable String id,

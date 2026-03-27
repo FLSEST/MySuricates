@@ -49,4 +49,13 @@ public class StepResult {
     @Column(columnDefinition = "text")
     @Builder.Default
     private Map<String, Object> metadata = new HashMap<>();
+
+    /**
+     * Cumulative snapshot of user-defined context variables at the end of this step.
+     * Excludes derivable step_N_output variables and system-injected vars.
+     * Used to reconstruct the execution context when resuming an INTERRUPTED run.
+     */
+    @Convert(converter = JsonMapConverter.class)
+    @Column(name = "context_delta", columnDefinition = "text")
+    private Map<String, Object> contextDelta;
 }

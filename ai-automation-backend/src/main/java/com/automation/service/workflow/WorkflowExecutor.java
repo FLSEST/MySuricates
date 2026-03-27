@@ -3,11 +3,13 @@ package com.automation.service.workflow;
 import com.automation.entity.*;
 import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.event.WorkflowRunCompletedEvent;
+import com.automation.exception.ResourceNotFoundException;
 import com.automation.exception.WorkflowExecutionException;
 import com.automation.executor.ApprovalRequest;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
 import com.automation.repository.ContainerRepository;
+import com.automation.repository.StepResultRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.cli.CommandExecutorService;
@@ -43,6 +45,7 @@ public class WorkflowExecutor {
     private final ContainerService containerService;
     private final CommandExecutorService commandExecutorService;
     private final WorkflowRunRepository runRepository;
+    private final StepResultRepository stepResultRepository;
     private final ContainerRepository containerRepository;
     private final ExecutionBroadcaster broadcaster;
     private final ExecutorService virtualThreadExecutor;
@@ -54,6 +57,11 @@ public class WorkflowExecutor {
     private final ApplicationEventPublisher eventPublisher;
     private final TemplateVerificationService templateVerificationService;
     private final SystemIdentityService systemIdentity;
+
+    private static final java.util.Set<String> SYSTEM_VAR_KEYS = java.util.Set.of(
+            "workflow_run_id", "workflow_id", "workflow_name", "project_path",
+            "model", "provider", "started_at"
+    );
 
     private final Map<String, ExecutionContext> activeExecutions = new ConcurrentHashMap<>();
 
@@ -125,15 +133,20 @@ public class WorkflowExecutor {
         activityLogService.info(LogCategory.EXECUTION,
                 "Workflow execution started: " + workflowName,
                 "WorkflowExecutor", runId, workflowId);
-        virtualThreadExecutor.submit(() -> executeBlocks(runId, workflowId, workflowName, project, blocks, skills, contextVars, instructions, model, provider, workflowMeta, templateId));
+        virtualThreadExecutor.submit(() -> executeBlocks(runId, workflowId, workflowName, project, blocks, skills, contextVars, instructions, model, provider, workflowMeta, templateId, 0, null));
 
         return run;
     }
 
+    /**
+     * Core execution loop.
+     * @param skipToStepIndex for resume: skip blocks with index < this value (0 = no skip)
+     * @param resumePreviousOutput for resume: pre-seed previousOutput from the last completed step
+     */
     private void executeBlocks(String runId, String workflowId, String workflowName, Project project, List<BlockDefinition> blocks,
                                List<Skill> skills, Map<String, Object> inputContext,
                                String instructions, String model, String provider, Map<String, Object> workflowMeta,
-                               String templateId) {
+                               String templateId, int skipToStepIndex, String resumePreviousOutput) {
         try {
             executionSemaphore.acquire();
         } catch (InterruptedException e) {
@@ -146,8 +159,13 @@ public class WorkflowExecutor {
         ExecutionContext context = null;
         try {
             run = runRepository.findById(runId).orElseThrow();
-            // Replace lazy proxy with fresh list — run was just created with 0 steps
-            run.setSteps(new ArrayList<>());
+            if (skipToStepIndex == 0) {
+                // Fresh run: start with empty step list
+                run.setSteps(new ArrayList<>());
+            } else {
+                // Resuming: keep existing completed steps from DB
+                run.setSteps(new ArrayList<>(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc(runId)));
+            }
 
             String containerId = ensureContainerRunning(project, runId);
 
@@ -157,6 +175,9 @@ public class WorkflowExecutor {
                     .build();
             context.setProjectPath(project.getPath());
             inputContext.forEach(context::setVariable);
+            if (resumePreviousOutput != null) {
+                context.setPreviousOutput(resumePreviousOutput);
+            }
 
             // Inject workflow & run metadata as template variables
             context.setVariable("workflow_run_id", runId);
@@ -222,6 +243,12 @@ public class WorkflowExecutor {
 
                 // Pre-create RUNNING placeholder so UI shows the step immediately
                 int stepIndex = context.preAllocateStepIndex();
+
+                // For resumed runs: skip blocks that already completed in the previous execution
+                if (stepIndex < skipToStepIndex) {
+                    continue;
+                }
+
                 StepResult step = new StepResult();
                 step.setStepIndex(stepIndex);
                 step.setStartedAt(Instant.now());
@@ -246,6 +273,11 @@ public class WorkflowExecutor {
                 context.setPreviousOutput(step.getOutput());
                 context.setVariable("step_" + step.getStepIndex() + "_output",
                         step.getOutput() != null ? step.getOutput() : "");
+
+                // Persist context delta for potential future resume
+                if (step.getStatus() == StepStatus.COMPLETED) {
+                    step.setContextDelta(computeContextDelta(context, run.getInputContext()));
+                }
 
                 // Update container last activity (skip if no container)
                 if (containerId != null) {
@@ -412,6 +444,107 @@ public class WorkflowExecutor {
         activityLogService.warn(LogCategory.EXECUTION,
                 "Startup cleanup: marked " + zombies.size() + " run(s) as INTERRUPTED",
                 "WorkflowExecutor");
+    }
+
+    /**
+     * Resumes an INTERRUPTED workflow run from the last successfully completed step.
+     * If no steps completed, falls back to a full retry.
+     */
+    public WorkflowRun resumeFromStep(String runId) {
+        WorkflowRun run = runRepository.findById(runId)
+                .orElseThrow(() -> new ResourceNotFoundException("WorkflowRun", runId));
+
+        if (run.getStatus() != RunStatus.INTERRUPTED) {
+            throw new WorkflowExecutionException("Run " + runId + " cannot be resumed: status is " + run.getStatus());
+        }
+
+        List<StepResult> completedSteps = stepResultRepository
+                .findByWorkflowRunIdOrderByStepIndexAsc(runId)
+                .stream()
+                .filter(s -> s.getStatus() == StepStatus.COMPLETED)
+                .toList();
+
+        if (completedSteps.isEmpty()) {
+            log.info("Resume requested for run {} but no completed steps found — falling back to full retry", runId);
+            return execute(run.getWorkflow(), run.getInputContext());
+        }
+
+        int resumeFromIndex = completedSteps.get(completedSteps.size() - 1).getStepIndex() + 1;
+
+        // Reconstruct context: inputContext + step outputs from DB + accumulated user vars (contextDelta)
+        Map<String, Object> reconstructed = new HashMap<>(run.getInputContext() != null ? run.getInputContext() : Map.of());
+        String lastOutput = "";
+        for (StepResult step : completedSteps) {
+            String out = step.getOutput() != null ? step.getOutput() : "";
+            reconstructed.put("step_" + step.getStepIndex() + "_output", out);
+            lastOutput = out;
+            if (step.getContextDelta() != null) {
+                reconstructed.putAll(step.getContextDelta());
+            }
+        }
+        final String previousOutput = lastOutput;
+        final Map<String, Object> contextForResume = Map.copyOf(reconstructed);
+
+        // Load workflow data eagerly before updating run status
+        final Workflow workflow = run.getWorkflow();
+        final Project project;
+        final List<BlockDefinition> blocks;
+        final List<Skill> skills;
+        final String instructions;
+        final String model;
+        final String provider;
+        final Map<String, Object> workflowMeta;
+        final String templateId;
+        try {
+            project = workflow.getProject();
+            blocks = List.copyOf(workflow.getBlocks());
+            skills = List.copyOf(workflow.getActivatedSkills());
+            instructions = workflow.getInstructions();
+            model = workflow.getModel();
+            provider = workflow.getProvider();
+            workflowMeta = Map.copyOf(workflow.getMetadata());
+            templateId = workflow.getTemplateId();
+        } catch (Exception e) {
+            throw new WorkflowExecutionException("Failed to load workflow data for resume: " + e.getMessage(), e);
+        }
+
+        // Reset run to RUNNING
+        run.setStatus(RunStatus.RUNNING);
+        run.setError(null);
+        run.setCompletedAt(null);
+        runRepository.save(run);
+        broadcaster.broadcastRunStatus(runId, RunStatus.RUNNING);
+
+        final String wfId = workflow.getId();
+        final String wfName = workflow.getName();
+        final int resumeIdx = resumeFromIndex;
+        activityLogService.info(LogCategory.EXECUTION,
+                "Resuming workflow from step " + resumeIdx + ": " + wfName,
+                "WorkflowExecutor", runId, wfId);
+
+        virtualThreadExecutor.submit(() -> executeBlocks(
+                runId, wfId, wfName, project, blocks, skills,
+                contextForResume, instructions, model, provider, workflowMeta, templateId,
+                resumeIdx, previousOutput));
+
+        return run;
+    }
+
+    /**
+     * Computes the context delta: user-defined variables that are not derivable
+     * from step outputs or system-injected keys.
+     */
+    private Map<String, Object> computeContextDelta(ExecutionContext context, Map<String, Object> inputContext) {
+        Map<String, Object> delta = new HashMap<>(context.getVariables());
+        // Remove auto-set step_N_output variables — derivable from StepResult.output
+        delta.entrySet().removeIf(e -> e.getKey().matches("step_\\d+_output"));
+        // Remove system-injected constants
+        SYSTEM_VAR_KEYS.forEach(delta::remove);
+        // Remove inputContext vars — already stored in WorkflowRun.inputContext
+        if (inputContext != null) {
+            inputContext.keySet().forEach(delta::remove);
+        }
+        return delta.isEmpty() ? null : delta;
     }
 
     public void pauseExecution(String runId) {

@@ -79,4 +79,19 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
     List<WorkflowRun> findTop5ByWorkflowIdOrderByStartedAtDesc(String workflowId);
 
     List<WorkflowRun> findByTriggeredByScheduleIdOrderByStartedAtDesc(String scheduleId);
+
+    /**
+     * INTERRUPTED runs with zero completed steps, completed before the given cutoff.
+     * Safe to delete — no resume value and no learning value.
+     */
+    @Query("SELECT wr.id FROM WorkflowRun wr WHERE wr.status = 'INTERRUPTED' AND wr.completedAt < :cutoff " +
+           "AND NOT EXISTS (SELECT 1 FROM StepResult sr WHERE sr.workflowRun = wr AND sr.status = 'COMPLETED')")
+    List<String> findInterruptedRunIdsWithNoCompletedSteps(@Param("cutoff") Instant cutoff);
+
+    /**
+     * INTERRUPTED runs (regardless of steps) older than the given cutoff.
+     * Retention period has elapsed — safe to delete.
+     */
+    @Query("SELECT wr.id FROM WorkflowRun wr WHERE wr.status = 'INTERRUPTED' AND wr.completedAt < :cutoff")
+    List<String> findInterruptedRunIdsOlderThan(@Param("cutoff") Instant cutoff);
 }
