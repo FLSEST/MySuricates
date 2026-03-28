@@ -1,21 +1,23 @@
+> *Zuletzt aktualisiert: 28. März 2026, 14:30 Uhr — Workflow: MySuricates Docs aktualisieren | Run: c47b8112-0468-445d-bfaf-a7a8a5d46264*
+
 # Workflow Building Guide
 
-Practical guide for building effective workflows in MySuricates. Covers all block types, proven patterns, timeout configuration, and common pitfalls.
+Praktischer Leitfaden zum Erstellen effektiver Workflows in MySuricates. Umfasst alle Block-Typen, bewaehrte Patterns, Timeout-Konfiguration und haeufige Fallstricke.
 
-**Audience**: AI agents (Claude, Codex) and developers creating or debugging workflows.
+**Zielgruppe**: KI-Agenten (Claude, Codex) und Entwickler, die Workflows erstellen oder debuggen.
 
 ---
 
-## 1. Quick Start
+## 1. Schnellstart
 
-A workflow is a sequence of **blocks** executed in order. Each block has a `type` and a `config` map. The output of each block is available to the next via `{{ previous_output }}`.
+Ein Workflow ist eine Sequenz von **Bloecken**, die nacheinander ausgefuehrt werden. Jeder Block hat einen `type` und eine `config`-Map. Die Ausgabe jedes Blocks steht dem naechsten via `{{ previous_output }}` zur Verfuegung.
 
-### Minimal Example: Two-Block Workflow
+### Minimales Beispiel: Zwei-Block-Workflow
 
 ```json
 {
-  "name": "Simple File Analysis",
-  "projectId": "<project-uuid>",
+  "name": "Einfache Dateianalyse",
+  "projectId": "<projekt-uuid>",
   "blocks": [
     {
       "type": "shell",
@@ -33,44 +35,44 @@ A workflow is a sequence of **blocks** executed in order. Each block has a `type
 }
 ```
 
-### API Endpoint
+### API-Endpunkt
 
 ```
 POST /api/v1/workflows
 ```
 
-All workflow CRUD and execution is under `/api/v1/workflows`. Start a run with `POST /api/v1/workflows/{id}/execute`.
+Alle Workflow-CRUD- und Ausfuehrungsoperationen liegen unter `/api/v1/workflows`. Ein Run wird gestartet mit `POST /api/v1/workflows/{id}/execute`.
 
-### Context Variables
+### Kontext-Variablen
 
-Pass variables when starting a workflow:
+Variablen beim Start uebergeben:
 
 ```
 POST /api/v1/workflows/{id}/execute
 {
   "context": {
-    "filepath": "/path/to/file.md",
+    "filepath": "/pfad/zur/datei.md",
     "language": "Deutsch"
   }
 }
 ```
 
-Access them in block configs with `{{ filepath }}` or `{{ language }}`.
+Zugriff in Block-Configs mit `{{ filepath }}` oder `{{ language }}`.
 
 ---
 
-## 2. Block Type Reference
+## 2. Block-Typ-Referenz
 
-MySuricates supports 12 block types. Each block has a `type` and `config` map.
+MySuricates unterstuetzt 12 Block-Typen. Jeder Block hat einen `type` und eine `config`-Map.
 
-### `simple` — AI Text Processing
+### `simple` — KI-Textverarbeitung
 
-Sends the prompt to Claude CLI on the host. No shell execution.
+Sendet den Prompt an die Claude CLI auf dem Host. Keine Shell-Ausfuehrung.
 
-| Config Key | Type | Default | Description |
+| Config-Schluessel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `command` | string | **required** | The prompt sent to Claude |
-| `timeout_seconds` | int | 300 | Claude CLI timeout |
+| `command` | string | **erforderlich** | Der Prompt, der an Claude gesendet wird |
+| `timeout_seconds` | int | 300 | Claude-CLI-Timeout |
 
 ```json
 {
@@ -81,50 +83,49 @@ Sends the prompt to Claude CLI on the host. No shell execution.
 }
 ```
 
-**When to use**: Text analysis, summarization, code review, content generation — any task that needs AI reasoning without shell access.
+**Wann verwenden**: Textanalyse, Zusammenfassung, Code-Review, Content-Generierung — jede Aufgabe, die KI-Reasoning ohne Shell-Zugriff benoetigt.
 
 ---
 
-### `shell` — Shell Command Execution
+### `shell` — Shell-Befehl-Ausfuehrung
 
-Runs a shell command on the host or inside a Docker container.
+Fuehrt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers aus.
 
-| Config Key | Type | Default | Description |
+| Config-Schluessel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `command` | string | **required** | Shell command(s) to execute |
-| `container_image` | string | null | Docker image (see Execution Environment) |
-| `timeout_seconds` | int | 300 | Execution timeout |
-| `on_failure` | string | `"abort"` | `"abort"` or `"continue"` |
+| `command` | string | **erforderlich** | Shell-Befehl(e) zur Ausfuehrung |
+| `container_image` | string | null | Docker-Image (siehe Ausfuehrungsumgebung) |
+| `timeout_seconds` | int | 300 | Ausfuehrungs-Timeout |
+| `mount_docker_socket` | bool | false | Docker-Socket in den Container mounten (nur wirksam wenn `container_image` gesetzt) |
 
 ```json
 {
   "type": "shell",
   "config": {
-    "command": "set -euo pipefail\ngit log --oneline -20",
-    "on_failure": "continue"
+    "command": "set -euo pipefail\ngit log --oneline -20"
   }
 }
 ```
 
-**When to use**: Running scripts, gathering data, build commands, file operations, anything that needs deterministic shell execution.
+**Wann verwenden**: Skripte ausfuehren, Daten sammeln, Build-Befehle, Dateioperationen — alles was deterministische Shell-Ausfuehrung benoetigt.
 
 ---
 
-### `agentic` — Goal-Driven AI Agent
+### `agentic` — Zielgesteuerter KI-Agent
 
-Runs an autonomous Goal-Reason-Act-Observe loop. The most powerful but also most expensive block type.
+Fuehrt eine autonome Goal-Reason-Act-Observe-Schleife aus. Der maechtigste, aber auch teuerste Block-Typ.
 
-| Config Key | Type | Default | Description |
+| Config-Schluessel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `goal` | string | **required** | What the agent should achieve |
-| `success_criteria` | string | `""` | How to determine success |
-| `max_iterations` | int | 10 | Hard iteration cap |
-| `iteration_timeout_seconds` | int | 300 | Per-iteration wall-clock timeout |
-| `total_timeout_seconds` | int | 1800 | Overall block timeout (30 min) |
-| `max_total_tokens` | int | 200000 | Token budget (input+output across all iterations) |
-| `max_repeated_actions` | int | 3 | Abort after N identical actions |
-| `require_approval` | bool | false | Approval gate before each action |
-| `timeout_seconds` | int | null | Claude CLI timeout per call (REASON + ACT) |
+| `goal` | string | **erforderlich** | Was der Agent erreichen soll |
+| `success_criteria` | string | `""` | Woran Erfolg gemessen wird |
+| `max_iterations` | int | 10 | Harte Iterationsobergrenze |
+| `iteration_timeout_seconds` | int | 300 | Wall-Clock-Timeout pro Iteration |
+| `total_timeout_seconds` | int | 1800 | Gesamt-Block-Timeout (30 Min) |
+| `max_total_tokens` | int | 200000 | Token-Budget (Input+Output ueber alle Iterationen) |
+| `max_repeated_actions` | int | 3 | Abbruch nach N identischen Aktionen |
+| `require_approval` | bool | false | Freigabe-Gate vor jeder Aktion |
+| `timeout_seconds` | int | null | Claude-CLI-Timeout pro Aufruf (REASON + ACT) |
 
 ```json
 {
@@ -139,20 +140,22 @@ Runs an autonomous Goal-Reason-Act-Observe loop. The most powerful but also most
 }
 ```
 
-**When to use**: Complex multi-step tasks that require judgment — creating files, fixing code, building projects. See [Agentic Block Deep Dive](#8-agentic-block-deep-dive) for details.
+**Wann verwenden**: Komplexe mehrstufige Aufgaben, die Urteilsvermoegen erfordern — Dateien erstellen, Code reparieren, Projekte bauen. Siehe [Agentic Block Deep Dive](#8-agentic-block-deep-dive) fuer Details.
 
 ---
 
-### `retry` — Retry on Failure
+### `retry` — Wiederholung bei Fehler
 
-Retries a command up to N times with a delay between attempts.
+Wiederholt einen Befehl bis zu N Mal mit einer Pause zwischen den Versuchen.
 
-| Config Key | Type | Default | Description |
+| Config-Schluessel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `command` | string | **required** | Command to execute |
-| `max_retries` | int | 3 | Maximum retry attempts |
-| `delay` | int | 5 | Delay between retries (seconds) |
-| `execution_mode` | string | `"simple"` | `"simple"` (AI) or `"shell"` |
+| `command` | string | **erforderlich** | Auszufuehrender Befehl |
+| `max_retries` | int | 3 | Maximale Wiederholungsversuche |
+| `delay` | int | 5 | Pause zwischen Versuchen (Sekunden) |
+| `exponential_backoff` | bool | false | Pause bei jedem Versuch verdoppeln |
+| `execution_mode` | string | `"claude"` | `"claude"` (KI) oder `"shell"` |
+| `timeout_seconds` | int | 300 | Ausfuehrungs-Timeout pro Versuch |
 
 ```json
 {
@@ -166,20 +169,23 @@ Retries a command up to N times with a delay between attempts.
 }
 ```
 
-**When to use**: Flaky tests, network-dependent operations, API calls that may fail transiently.
+**Exponential Backoff**: Wenn `exponential_backoff: true`, wird die Wartezeit bei jedem Versuch verdoppelt: 1. Versuch = `delay` Sekunden, 2. Versuch = `delay * 2`, 3. Versuch = `delay * 4`, usw.
+
+**Wann verwenden**: Instabile Tests, netzwerkabhaengige Operationen, API-Aufrufe die voruebergehend fehlschlagen koennen.
 
 ---
 
 ### `conditional` — If/Then/Else
 
-Evaluates a condition and executes one of two branches.
+Wertet eine Bedingung aus und fuehrt einen von zwei Zweigen aus.
 
-| Config Key | Type | Default | Description |
+| Config-Schluessel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `condition` | string | **required** | Condition to evaluate |
-| `then_command` | string | **required** | Command if condition is true |
-| `else_command` | string | `""` | Command if condition is false |
-| `execution_mode` | string | `"simple"` | `"simple"` (AI) or `"shell"` |
+| `condition` | string | **erforderlich** | Auszuwertende Bedingung |
+| `then_command` | string | **erforderlich** | Befehl wenn Bedingung wahr |
+| `else_command` | string | null | Befehl wenn Bedingung falsch |
+| `execution_mode` | string | `"claude"` | `"claude"` (KI) oder `"shell"` |
+| `timeout_seconds` | int | 300 | Ausfuehrungs-Timeout |
 
 ```json
 {
@@ -187,31 +193,33 @@ Evaluates a condition and executes one of two branches.
   "config": {
     "condition": "test -f package.json",
     "then_command": "npm test",
-    "else_command": "echo 'No tests'",
+    "else_command": "echo 'Keine Tests'",
     "execution_mode": "shell"
   }
 }
 ```
 
-**Condition evaluation**: In `shell` mode, exit code 0 = true. In `simple` mode, the AI answers "true" or "false".
+**Bedingungsauswertung**: Im `shell`-Modus gilt Exit-Code 0 = wahr, ungleich 0 = falsch. Im `claude`-Modus beantwortet die KI die Bedingung mit "TRUE" oder "FALSE".
 
-**When to use**: Branching logic based on file existence, previous output content, environment checks.
+**Dual-Modus**: `execution_mode` steuert sowohl die Bedingungsauswertung als auch die Ausfuehrung von `then_command`/`else_command`. `timeout_seconds` gilt fuer beide.
+
+**Wann verwenden**: Verzweigungslogik basierend auf Dateiexistenz, vorheriger Ausgabe, Umgebungspruefungen.
 
 ---
 
-### `switch` — Multi-Way Branching
+### `switch` — Mehrweg-Verzweigung
 
-Evaluates an expression and routes execution to the matching case. Like a switch/case statement.
+Wertet einen Ausdruck aus und leitet die Ausfuehrung zum passenden Case weiter. Wie eine switch/case-Anweisung.
 
-| Config Key | Type | Default | Description |
+| Config-Schluessel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `expression` | string | **required** | Expression to evaluate (supports `${var}` and `{{ var }}`) |
-| `cases` | list | **required** | List of case objects with `value` and `blocks` |
-| `default` | list | `null` | Blocks to execute when no case matches |
+| `expression` | string | **erforderlich** | Auszuwertender Ausdruck (unterstuetzt `${var}` und `{{ var }}`) |
+| `cases` | list | **erforderlich** | Liste von Case-Objekten mit `value` und `blocks` |
+| `default` | list | null | Bloecke bei keinem Treffer |
 
-Each case has:
-- `value`: String to match against (pipe-separated for alternatives: `"error|critical"`)
-- `blocks`: List of block definitions to execute if matched
+Jeder Case hat:
+- `value`: String zum Abgleich (Pipe-getrennte Alternativen: `"error|critical"`)
+- `blocks`: Liste von Block-Definitionen bei Treffer
 
 ```json
 {
@@ -221,37 +229,37 @@ Each case has:
     "cases": [
       {
         "value": "GREEN",
-        "blocks": [{ "type": "shell", "config": { "command": "echo 'All good'" } }]
+        "blocks": [{ "type": "shell", "config": { "command": "echo 'Alles gut'" } }]
       },
       {
         "value": "YELLOW|RED",
-        "blocks": [{ "type": "shell", "config": { "command": "echo 'Issues found'" } }]
+        "blocks": [{ "type": "shell", "config": { "command": "echo 'Probleme gefunden'" } }]
       }
     ],
     "default": [
-      { "type": "shell", "config": { "command": "echo 'Unknown status'" } }
+      { "type": "shell", "config": { "command": "echo 'Unbekannter Status'" } }
     ]
   }
 }
 ```
 
-**When to use**: Multi-way branching when `conditional` (binary if/else) is not expressive enough. Routing based on status codes, environment names, or gate results.
+**Wann verwenden**: Mehrweg-Verzweigung wenn `conditional` (binaeres if/else) nicht ausreicht. Routing basierend auf Status-Codes, Umgebungsnamen oder Gate-Ergebnissen.
 
 ---
 
-### `foreach` — Iterate Over Items
+### `foreach` — Ueber Items iterieren
 
-Executes a command for each item in a list.
+Fuehrt einen Befehl fuer jedes Item in einer Liste aus.
 
-| Config Key | Type | Default | Description |
+| Config-Schluessel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `variable_name` | string | **required** | Loop variable name |
-| `items_source` | string | **required** | `"command"` (shell output) or `"list"` (inline) |
-| `items_command` | string | — | Shell command producing one item per line |
-| `items` | list | — | Inline list of items |
-| `command` | string | **required** | Command to execute per item |
-| `execution_mode` | string | `"simple"` | `"simple"` (AI) or `"shell"` |
-| `timeout_seconds` | int | 300 | Timeout per iteration |
+| `variable_name` | string | `"item"` | Name der Schleifenvariable |
+| `items_source` | string | `"list"` | `"command"` (Shell-Ausgabe) oder `"list"` (inline) |
+| `items_command` | string | — | Shell-Befehl, ein Item pro Zeile (nur bei `items_source: "command"`) |
+| `items` | list | — | Inline-Liste von Items (nur bei `items_source: "list"`) |
+| `command` | string | **erforderlich** | Befehl pro Item |
+| `execution_mode` | string | `"claude"` | `"claude"` (KI) oder `"shell"` |
+| `timeout_seconds` | int | 300 | Timeout pro Iteration |
 
 ```json
 {
@@ -267,19 +275,23 @@ Executes a command for each item in a list.
 }
 ```
 
-**When to use**: Processing multiple files, repos, or items with the same operation.
+**Hinweis**: `items_command` wird immer als Shell-Befehl ausgefuehrt (unabhaengig von `execution_mode`), da es nur die Iterations-Ziele sammelt.
+
+**Wann verwenden**: Verarbeitung mehrerer Dateien, Repos oder Items mit derselben Operation.
 
 ---
 
-### `while` — Loop Until Condition
+### `while` — Schleife bis Bedingung
 
-Repeats a command until a condition is met or max iterations reached.
+Wiederholt einen Befehl bis eine Bedingung erfuellt ist oder die maximale Iterationszahl erreicht wird.
 
-| Config Key | Type | Default | Description |
+| Config-Schluessel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `condition_command` | string | **required** | Condition evaluated each iteration |
-| `command` | string | **required** | Command to execute per iteration |
-| `max_iterations` | int | 5 | Maximum loop iterations |
+| `condition_command` | string | **erforderlich** | Bedingung, die jede Iteration ausgewertet wird |
+| `command` | string | **erforderlich** | Befehl pro Iteration |
+| `max_iterations` | int | 100 | Maximale Schleifendurchlaeufe |
+| `execution_mode` | string | `"claude"` | `"claude"` (KI) oder `"shell"` |
+| `timeout_seconds` | int | 300 | Ausfuehrungs-Timeout pro Iteration |
 
 ```json
 {
@@ -292,20 +304,27 @@ Repeats a command until a condition is met or max iterations reached.
 }
 ```
 
-**When to use**: Iterative refinement, polling until a condition is met.
+**Bedingungsauswertung**: Im `shell`-Modus gilt Exit-Code 0 = weitermachen, ungleich 0 = stopp. Im `claude`-Modus gilt "false", "0" oder leere Antwort = stopp, alles andere = weitermachen.
+
+**Dual-Modus**: `execution_mode` steuert sowohl die Bedingungsauswertung als auch die Befehlsausfuehrung. `timeout_seconds` gilt fuer beide.
+
+**Wann verwenden**: Iterative Verfeinerung, Polling bis eine Bedingung erfuellt ist.
 
 ---
 
-### `approval` — Human Approval Gate
+### `approval` — Menschliche Freigabe
 
-Pauses execution and waits for human approval via WebSocket.
+Pausiert die Ausfuehrung und wartet auf menschliche Freigabe via WebSocket.
 
-| Config Key | Type | Default | Description |
+| Config-Schluessel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `question` | string | **required** | Approval prompt shown to user |
-| `options` | list | `["Yes", "No"]` | Available choices |
-| `variable_name` | string | `"approval"` | Context variable to store the answer |
-| `timeout_minutes` | int | 30 | How long to wait |
+| `question` | string | `"Approval required"` | Freigabe-Frage fuer den Benutzer |
+| `options` | list | `["Yes", "Yes always", "No"]` | Verfuegbare Antwortmoeglichkeiten |
+| `variable_name` | string | `"approval_answer"` | Kontext-Variable fuer die Antwort |
+| `timeout_minutes` | int | 30 | Wartezeit |
+| `mode` | string | `"ask"` | `"ask"` (interaktiv) oder `"auto"` (nutzt `auto_answer`) |
+| `auto_answer` | string | — | Automatische Antwort wenn `mode` = `"auto"` |
+| `on_no` | string | `"continue"` | Verhalten bei "No": `"continue"` (weiter, Status COMPLETED), `"fail"` (FAILED), oder `"skip"` (SKIPPED) |
 
 ```json
 {
@@ -314,30 +333,35 @@ Pauses execution and waits for human approval via WebSocket.
     "question": "## Ergebnis\n\n{{ previous_output }}\n\nFortfahren?",
     "options": ["Yes", "No", "Abort"],
     "variable_name": "pr_decision",
-    "timeout_minutes": 60
+    "timeout_minutes": 60,
+    "on_no": "fail"
   }
 }
 ```
 
-**When to use**: Before destructive operations (push, deploy, delete), quality gates.
+**"Yes always"**: Wenn der Benutzer "Yes always" waehlt, wird die Antwort fuer diese Frage fuer den Rest des Runs gemerkt — nachfolgende Approval-Bloecke mit derselben Frage werden automatisch beantwortet.
+
+**Auto-Modus**: Mit `"mode": "auto"` und `"auto_answer": "Yes"` wird der Block sofort ohne Benutzerinteraktion beantwortet. Nuetzlich fuer CI/CD-Pipelines.
+
+**Wann verwenden**: Vor destruktiven Operationen (Push, Deploy, Loeschen), Quality Gates.
 
 ---
 
-### `human-input` — Collect User Input
+### `human-input` — Benutzereingabe sammeln
 
-Pauses execution to collect free-form input from the user.
+Pausiert die Ausfuehrung um Freitext-Eingaben vom Benutzer zu sammeln.
 
-| Config Key | Type | Default | Description |
+| Config-Schluessel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `prompt` | string | **required** | Question shown to user |
-| `input_type` | string | `"text"` | `"text"` or `"select"` |
-| `variable_name` | string | **required** | Context variable to store input |
-| `options` | list | — | Choices (for `select` type) |
-| `default_value` | string | `""` | Default if timeout |
-| `required` | bool | true | Whether input is required |
-| `validation_pattern` | string | — | Regex pattern for validation |
-| `timeout_minutes` | int | 30 | How long to wait |
-| `use_default_on_timeout` | bool | false | Use default value on timeout |
+| `prompt` | string | `"Please provide input:"` | Frage an den Benutzer |
+| `input_type` | string | `"text"` | `"text"` oder `"select"` |
+| `variable_name` | string | `"user_input"` | Kontext-Variable fuer die Eingabe |
+| `options` | list | `[]` | Auswahlmoeglichkeiten (fuer `select`-Typ) |
+| `default_value` | string | `""` | Standardwert bei Timeout |
+| `required` | bool | true | Ob Eingabe erforderlich ist |
+| `validation_pattern` | string | — | Regex-Pattern zur Validierung |
+| `timeout_minutes` | int | 30 | Wartezeit |
+| `use_default_on_timeout` | bool | **true** | Bei Timeout den Standardwert verwenden statt fehlzuschlagen |
 
 ```json
 {
@@ -354,33 +378,36 @@ Pauses execution to collect free-form input from the user.
 }
 ```
 
-**When to use**: Collecting parameters at runtime, interactive workflows.
+**Timeout-Verhalten**: Wenn `use_default_on_timeout` = true (Standard) und ein `default_value` gesetzt ist, wird bei Timeout der Standardwert verwendet und der Block endet mit COMPLETED. Wenn false oder kein Standardwert gesetzt, endet der Block mit FAILED.
+
+**Wann verwenden**: Parameter zur Laufzeit abfragen, interaktive Workflows.
 
 ---
 
-### `sub-workflow` — Run Nested Workflow
+### `sub-workflow` — Verschachtelter Workflow
 
-Executes another workflow as a nested step.
+Fuehrt einen anderen Workflow als verschachtelten Schritt aus.
 
-| Config Key | Type | Default | Description |
+| Config-Schluessel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `workflow_id` | string | **required** | ID of the workflow to run |
+| `workflow_id` | string | **erforderlich** | ID des auszufuehrenden Workflows |
 
-**Limits**: Max nesting depth of 5 levels. Circular references are detected. 30-minute timeout.
+**Limits**: Maximale Verschachtelungstiefe von 5 Ebenen. Zirkulaere Referenzen werden erkannt. 30-Minuten-Timeout.
 
-**When to use**: Composing complex workflows from smaller reusable ones.
+**Wann verwenden**: Komplexe Workflows aus kleineren, wiederverwendbaren zusammensetzen.
 
 ---
 
-### `skill-capability` — Invoke a Skill
+### `skill-capability` — Skill aufrufen
 
-Invokes a registered skill's capability.
+Ruft die Faehigkeit eines registrierten Skills auf.
 
-| Config Key | Type | Default | Description |
+| Config-Schluessel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `capability` | string | **required** | Capability name (e.g. `"web_search"`, `"analyze"`) |
-| `input` | string | **required** | Input data |
-| `params` | map | `{}` | Additional parameters |
+| `capability` | string | **erforderlich** | Faehigkeitsname (z.B. `"web_search"`, `"analyze"`) |
+| `input` | string | **erforderlich** | Eingabedaten |
+| `params` | map | `{}` | Zusaetzliche Parameter |
+| `timeout_seconds` | int | null | Claude-CLI-Timeout |
 
 ```json
 {
@@ -393,303 +420,303 @@ Invokes a registered skill's capability.
 }
 ```
 
-**When to use**: Leveraging specialized skills (OCR, web search, analysis).
+**Wann verwenden**: Spezialisierte Skills nutzen (OCR, Web-Suche, Analyse).
 
 ---
 
-## 3. Template Variables
+## 3. Template-Variablen
 
-### Variable Syntax
+### Variablen-Syntax
 
-Variables use double-brace syntax: `{{ variable_name }}` (spaces optional: `{{variable_name}}` also works).
+Variablen verwenden doppelte Klammern: `{{ variable_name }}` (Leerzeichen optional: `{{variable_name}}` funktioniert auch).
 
-### Built-in Variables
+### Eingebaute Variablen
 
-| Variable | Source | Description |
+| Variable | Quelle | Beschreibung |
 |---|---|---|
-| `{{ previous_output }}` | Auto | Output of the previous block (Step N-1) |
-| `{{ previous_chain_output }}` | Auto | Output of the previous chain entry (chains only) |
-| `{{ item }}` / `{{ <variable_name> }}` | ForEach | Current loop item |
+| `{{ previous_output }}` | Auto | Ausgabe des vorherigen Blocks (Step N-1) |
+| `{{ previous_chain_output }}` | Auto | Ausgabe des vorherigen Chain-Eintrags (nur Chains) |
+| `{{ item }}` / `{{ <variable_name> }}` | ForEach | Aktuelles Schleifen-Item |
 
-### Context Variables
+### Kontext-Variablen
 
-Pass custom variables via the execution context:
+Eigene Variablen ueber den Ausfuehrungskontext uebergeben:
 
 ```json
 {
   "context": {
-    "filepath": "/home/user/document.md",
+    "filepath": "/home/user/dokument.md",
     "language": "Deutsch",
     "batch_size": "50"
   }
 }
 ```
 
-Access them in any block config: `{{ filepath }}`, `{{ language }}`, `{{ batch_size }}`.
+Zugriff in jeder Block-Config: `{{ filepath }}`, `{{ language }}`, `{{ batch_size }}`.
 
-### Resolution
+### Aufloesung
 
-Variables are resolved at execution time by `ExecutionContext.resolveTemplate()`. Unresolved variables remain as literal text (e.g., `{{ undefined_var }}` stays as-is).
+Variablen werden zur Laufzeit durch `ExecutionContext.resolveTemplate()` aufgeloest. Nicht aufgeloeste Variablen bleiben als Literaltext stehen (z.B. `{{ undefined_var }}` bleibt unveraendert).
 
-### Approval/Human-Input Variables
+### Approval/Human-Input-Variablen
 
-Answers from `approval` and `human-input` blocks are stored as context variables and available in subsequent blocks:
+Antworten aus `approval`- und `human-input`-Bloecken werden als Kontext-Variablen gespeichert und stehen in nachfolgenden Bloecken zur Verfuegung:
 
 ```json
-// approval block stores answer in {{ pr_decision }}
-// next block can use: {{ pr_decision }}
+// approval-Block speichert Antwort in {{ pr_decision }}
+// naechster Block kann verwenden: {{ pr_decision }}
 ```
 
 ---
 
-## 4. Proven Workflow Patterns
+## 4. Bewaehrte Workflow-Patterns
 
-These patterns are distilled from the 40+ built-in templates. Each pattern has a clear structure and use case.
+Diese Patterns sind aus den 40+ eingebauten Templates destilliert. Jedes Pattern hat eine klare Struktur und einen Anwendungsfall.
 
-### Pattern 1: Sequential Simple Chain
+### Pattern 1: Sequentielle Simple-Kette
 
-**Structure**: `simple` -> `simple` -> `simple` -> `simple`
+**Struktur**: `simple` -> `simple` -> `simple` -> `simple`
 
-All blocks are AI-only (no shell). Each block refines the output of the previous one.
+Alle Bloecke sind rein KI-basiert (kein Shell). Jeder Block verfeinert die Ausgabe des vorherigen.
 
-**Use case**: Text analysis, content creation, translation, code review.
+**Anwendungsfall**: Textanalyse, Content-Erstellung, Uebersetzung, Code-Review.
 
 **Templates**: `file-improve`, `code-refactor`, `translation-pipeline`, `fact-check-pipeline`, `project-overview`
 
 ```
-Block 1: Read/explore input
-Block 2: Analyze/evaluate
-Block 3: Improve/transform
-Block 4: Summarize/output
+Block 1: Eingabe lesen/erkunden
+Block 2: Analysieren/bewerten
+Block 3: Verbessern/transformieren
+Block 4: Zusammenfassen/ausgeben
 ```
 
 ---
 
-### Pattern 2: Shell Gather + AI Analyze
+### Pattern 2: Shell sammeln + KI analysieren
 
-**Structure**: `shell` -> `simple` (or `skill-capability`) -> `simple`
+**Struktur**: `shell` -> `simple` (oder `skill-capability`) -> `simple`
 
-Shell block gathers raw data, AI block analyzes it.
+Shell-Block sammelt Rohdaten, KI-Block analysiert sie.
 
-**Use case**: Log analysis, git history, system metrics, dependency checks.
+**Anwendungsfall**: Log-Analyse, Git-Historie, System-Metriken, Abhaengigkeitspruefungen.
 
 **Templates**: `git-to-changelog`, `log-triage`, `git-statistics-report`
 
 ```
-Block 1 (shell): Gather raw data (git log, find, grep, metrics)
-Block 2 (simple): Analyze and categorize findings
-Block 3 (simple): Create report with actionable recommendations
+Block 1 (shell): Rohdaten sammeln (git log, find, grep, Metriken)
+Block 2 (simple): Analysieren und kategorisieren
+Block 3 (simple): Bericht mit handlungsorientierten Empfehlungen erstellen
 ```
 
 ---
 
-### Pattern 3: Analyze + Agentic Create + Verify
+### Pattern 3: Analysieren + Agentic erstellen + Verifizieren
 
-**Structure**: `simple` -> `agentic` -> `simple`
+**Struktur**: `simple` -> `agentic` -> `simple`
 
-AI analyzes input, agentic block creates complex output (files, code), simple block verifies.
+KI analysiert Eingabe, Agentic-Block erstellt komplexe Ausgabe (Dateien, Code), Simple-Block verifiziert.
 
-**Use case**: Generating websites, prototypes, documentation packages, dashboards.
+**Anwendungsfall**: Webseiten, Prototypen, Dokumentationspakete, Dashboards generieren.
 
 **Templates**: `doc-to-website`, `idea-to-prototype`, `cv-to-portfolio`, `csv-to-dashboard`, `codebase-to-onboarding`
 
 ```
-Block 1 (simple): Analyze input, create a plan
-Block 2 (agentic): Execute the plan — create files, install deps, build
-Block 3 (simple): Verify output, quality check
+Block 1 (simple): Eingabe analysieren, Plan erstellen
+Block 2 (agentic): Plan ausfuehren — Dateien erstellen, Deps installieren, bauen
+Block 3 (simple): Ausgabe verifizieren, Qualitaetspruefung
 ```
 
 ---
 
-### Pattern 4: Shell + Conditional Branch
+### Pattern 4: Shell + Bedingte Verzweigung
 
-**Structure**: `shell` -> `conditional` -> `shell`/`simple`
+**Struktur**: `shell` -> `conditional` -> `shell`/`simple`
 
-Shell block generates data, conditional block branches based on result.
+Shell-Block generiert Daten, Conditional-Block verzweigt basierend auf Ergebnis.
 
-**Use case**: Deploy pipelines, CI/CD, conditional processing.
+**Anwendungsfall**: Deploy-Pipelines, CI/CD, bedingte Verarbeitung.
 
-**Templates**: `deploy-pipeline`, `git-to-changelog` (conditional migration guide)
+**Templates**: `deploy-pipeline`, `git-to-changelog` (bedingte Migrationshilfe)
 
 ```
-Block 1 (shell): Check preconditions
-Block 2 (conditional): Branch based on result
-Block 3: Execute appropriate action
+Block 1 (shell): Vorbedingungen pruefen
+Block 2 (conditional): Basierend auf Ergebnis verzweigen
+Block 3: Entsprechende Aktion ausfuehren
 ```
 
 ---
 
-### Pattern 5: Shell Scan + ForEach Process
+### Pattern 5: Shell scannen + ForEach verarbeiten
 
-**Structure**: `shell` -> `foreach` -> `simple`/`skill-capability`
+**Struktur**: `shell` -> `foreach` -> `simple`/`skill-capability`
 
-Shell block discovers items, forEach processes each one, final block aggregates.
+Shell-Block entdeckt Items, ForEach verarbeitet jedes einzelne, letzter Block aggregiert.
 
-**Use case**: Multi-repo operations, batch file processing, bulk analysis.
+**Anwendungsfall**: Multi-Repo-Operationen, Batch-Dateiverarbeitung, Massenanalyse.
 
 **Templates**: `dependency-risk-radar`
 
 ```
-Block 1 (shell): Discover items (find repos, list files, etc.)
-Block 2 (foreach): Process each item
-Block 3 (simple): Aggregate and summarize results
+Block 1 (shell): Items entdecken (Repos finden, Dateien auflisten etc.)
+Block 2 (foreach): Jedes Item verarbeiten
+Block 3 (simple): Ergebnisse aggregieren und zusammenfassen
 ```
 
 ---
 
-### Pattern 6: Audit Pipeline
+### Pattern 6: Audit-Pipeline
 
-**Structure**: `shell` -> `simple` -> `simple` -> `simple` (+ optional `conditional` + TODO block)
+**Struktur**: `shell` -> `simple` -> `simple` -> `simple` (+ optional `conditional` + TODO-Block)
 
-Shell gathers code/config data, multiple simple blocks analyze different aspects, final block creates a structured report.
+Shell sammelt Code-/Config-Daten, mehrere Simple-Bloecke analysieren verschiedene Aspekte, letzter Block erstellt strukturierten Bericht.
 
-**Use case**: Code audits, security scans, documentation checks, health assessments.
+**Anwendungsfall**: Code-Audits, Security-Scans, Dokumentationspruefungen, Gesundheitsbewertungen.
 
 **Templates**: `api-consistency-audit`, `dead-code-detector`, `doc-accuracy-check`, `codebase-health-scorecard`, `architecture-debt-radar`, `test-coverage-gaps`
 
 ```
-Block 1 (shell): Gather raw data (grep, find, wc, etc.)
-Block 2 (simple): Deep analysis with specific criteria
-Block 3 (conditional): Optional severity check
-Block 4 (simple): Structured report with findings table + action plan
-Block 5 (agentic): Optional: Create TODOs from findings
+Block 1 (shell): Rohdaten sammeln (grep, find, wc etc.)
+Block 2 (simple): Tiefenanalyse mit spezifischen Kriterien
+Block 3 (conditional): Optionale Schweregrad-Pruefung
+Block 4 (simple): Strukturierter Bericht mit Findings-Tabelle + Aktionsplan
+Block 5 (agentic): Optional: TODOs aus Findings erstellen
 ```
 
 ---
 
-### Pattern 7: Multi-Stage Pipeline with Approval Gate
+### Pattern 7: Mehrstufige Pipeline mit Freigabe-Gate
 
-**Structure**: `shell` -> `simple` -> `agentic` -> `shell` -> `conditional` -> `approval` -> `shell`
+**Struktur**: `shell` -> `simple` -> `agentic` -> `shell` -> `conditional` -> `approval` -> `shell`
 
-The most complex pattern. Safety-first with verification and human approval.
+Das komplexeste Pattern. Safety-First mit Verifikation und menschlicher Freigabe.
 
-**Use case**: Automated code fixes with PR creation, deploy with rollback.
+**Anwendungsfall**: Automatisierte Code-Fixes mit PR-Erstellung, Deploy mit Rollback.
 
 **Templates**: `audit-fix-pr-pipeline`
 
 ```
-Block 1 (shell): Git safety setup (check clean tree, create branch)
-Block 2 (simple): Parse findings, create fix plan
-Block 3 (agentic): Apply fixes, one commit per fix
-Block 4 (shell): Verification (build + test + lint)
-Block 5 (conditional): Rollback on failure
-Block 6 (approval): Human approval before push
-Block 7 (shell): Push + create PR (or abort)
+Block 1 (shell): Git-Safety-Setup (sauberen Tree pruefen, Branch erstellen)
+Block 2 (simple): Findings parsen, Fix-Plan erstellen
+Block 3 (agentic): Fixes anwenden, ein Commit pro Fix
+Block 4 (shell): Verifikation (Build + Test + Lint)
+Block 5 (conditional): Rollback bei Fehler
+Block 6 (approval): Menschliche Freigabe vor Push
+Block 7 (shell): Push + PR erstellen (oder abbrechen)
 ```
 
 ---
 
-### Quality Gate Markers
+### Quality-Gate-Marker
 
-Any block can emit gate status markers in its output to signal quality results. The `WorkflowExecutor` scans **all** block outputs and uses the highest severity.
+Jeder Block kann Gate-Status-Marker in seiner Ausgabe emittieren um Qualitaetsergebnisse zu signalisieren. Der `WorkflowExecutor` scannt **alle** Block-Ausgaben und verwendet den hoechsten Schweregrad.
 
 ```
 gate_status: GREEN|YELLOW|RED
 gate_category: lint-errors
-gate_description: Found 3 issues
+gate_description: 3 Probleme gefunden
 ```
 
-| Gate | Run Status | Auto-Todo Priority | Meaning |
+| Gate | Run-Status | Auto-Todo-Prioritaet | Bedeutung |
 |------|-----------|-------------------|---------|
-| GREEN | `COMPLETED` | — | All checks passed |
-| YELLOW | `COMPLETED_WITH_ERRORS` | MEDIUM | Warnings, non-blocking issues |
-| RED | `COMPLETED` | HIGH | Critical issues (handled by AutoTodoService) |
+| GREEN | `COMPLETED` | — | Alle Pruefungen bestanden |
+| YELLOW | `COMPLETED_WITH_ERRORS` | MEDIUM | Warnungen, nicht-blockierende Probleme |
+| RED | `COMPLETED` | HIGH | Kritische Probleme (via AutoTodoService behandelt) |
 
-**Shell block example** emitting a gate:
+**Shell-Block-Beispiel** mit Gate-Emission:
 ```bash
 set -euo pipefail
 ERRORS=$(eslint src/ --format json | jq '[.[] | .errorCount] | add // 0')
 if [ "$ERRORS" -gt 0 ]; then
   echo "gate_status: RED"
   echo "gate_category: lint-errors"
-  echo "gate_description: $ERRORS lint errors found"
+  echo "gate_description: $ERRORS Lint-Fehler gefunden"
 elif [ "$WARNINGS" -gt 0 ]; then
   echo "gate_status: YELLOW"
   echo "gate_category: lint-warnings"
-  echo "gate_description: $WARNINGS warnings found"
+  echo "gate_description: $WARNINGS Warnungen gefunden"
 else
   echo "gate_status: GREEN"
 fi
 ```
 
-When multiple blocks emit gates, the highest severity wins (RED > YELLOW > GREEN).
+Wenn mehrere Bloecke Gates emittieren, gewinnt der hoechste Schweregrad (RED > YELLOW > GREEN).
 
 ---
 
-## 5. Timeout Configuration
+## 5. Timeout-Konfiguration
 
-### Default Values
+### Standardwerte
 
-Source: `ExecutionDefaults.java`
+Quelle: `ExecutionDefaults.java`
 
-| Setting | Default | Description |
+| Einstellung | Default | Beschreibung |
 |---|---|---|
-| `SHELL_TIMEOUT_SECONDS` | 300 (5 min) | Shell and simple block timeout |
-| `AGENTIC_MAX_ITERATIONS` | 10 | Agentic block iteration cap |
-| `AGENTIC_ITERATION_TIMEOUT_SECONDS` | 300 (5 min) | Per-iteration wall-clock timeout |
-| `AGENTIC_TOTAL_TIMEOUT_SECONDS` | 1800 (30 min) | Overall agentic block timeout |
-| `AGENTIC_MAX_TOTAL_TOKENS` | 200,000 | Token budget (input+output) |
-| `INTERACTION_TIMEOUT_MINUTES` | 30 | Approval/human-input timeout |
-| `SUB_WORKFLOW_MAX_WAIT_MINUTES` | 30 | Sub-workflow completion timeout |
+| `SHELL_TIMEOUT_SECONDS` | 300 (5 Min) | Shell- und Simple-Block-Timeout |
+| `AGENTIC_MAX_ITERATIONS` | 10 | Agentic-Block-Iterationsobergrenze |
+| `AGENTIC_ITERATION_TIMEOUT_SECONDS` | 300 (5 Min) | Wall-Clock-Timeout pro Iteration |
+| `AGENTIC_TOTAL_TIMEOUT_SECONDS` | 1800 (30 Min) | Gesamt-Agentic-Block-Timeout |
+| `AGENTIC_MAX_TOTAL_TOKENS` | 200.000 | Token-Budget (Input+Output) |
+| `INTERACTION_TIMEOUT_MINUTES` | 30 | Approval-/Human-Input-Timeout |
+| `SUB_WORKFLOW_MAX_WAIT_MINUTES` | 30 | Sub-Workflow-Fertigstellungs-Timeout |
 
-### The Dual-Timeout Trap
+### Die Dual-Timeout-Falle
 
-Agentic blocks have **two independent timeouts** that must be aligned:
+Agentic-Bloecke haben **zwei unabhaengige Timeouts**, die aufeinander abgestimmt sein muessen:
 
-1. **`timeout_seconds`**: Claude CLI timeout per call (applies to both REASON and ACT phases)
-2. **`iteration_timeout_seconds`**: Wall-clock timeout for the entire iteration (REASON + ACT)
+1. **`timeout_seconds`**: Claude-CLI-Timeout pro Aufruf (gilt fuer REASON- und ACT-Phase)
+2. **`iteration_timeout_seconds`**: Wall-Clock-Timeout fuer die gesamte Iteration (REASON + ACT)
 
-**The trap**: If `timeout_seconds=900` but `iteration_timeout_seconds=300`, the CLI call can succeed in 900s but the iteration will be marked as TIMEOUT at 300s and the block FAILS.
+**Die Falle**: Wenn `timeout_seconds=900` aber `iteration_timeout_seconds=300`, kann der CLI-Aufruf in 900s erfolgreich sein, aber die Iteration wird bei 300s als TIMEOUT markiert und der Block SCHEITERT.
 
 ### Auto-Alignment
 
-`AgenticBlockConfig` automatically aligns timeouts when `timeout_seconds` is set:
+`AgenticBlockConfig` stimmt Timeouts automatisch ab wenn `timeout_seconds` gesetzt ist:
 
 ```
-iteration_timeout_seconds = max(current, timeout_seconds * 2 + 60)
+iteration_timeout_seconds = max(aktuell, timeout_seconds * 2 + 60)
 ```
 
-The formula: `timeout_seconds * 2` (room for REASON + ACT) `+ 60` (overhead).
+Die Formel: `timeout_seconds * 2` (Raum fuer REASON + ACT) `+ 60` (Overhead).
 
-If `total_timeout_seconds` can't fit at least one iteration, it's also auto-aligned.
+Wenn `total_timeout_seconds` nicht einmal eine Iteration fassen kann, wird auch das auto-aligned.
 
-### Recommended Values by Model
+### Empfohlene Werte nach Modell
 
-| Model | `timeout_seconds` | `iteration_timeout_seconds` | `total_timeout_seconds` | `max_total_tokens` |
+| Modell | `timeout_seconds` | `iteration_timeout_seconds` | `total_timeout_seconds` | `max_total_tokens` |
 |---|---|---|---|---|
-| **Opus** | 600-900 | 900-1260 | 3600-5400 | 300,000-400,000 |
-| **Sonnet** | 300-600 | 300-660 | 1800-3600 | 200,000-300,000 |
-| **Haiku** | 120-300 | 300 | 900-1800 | 100,000-200,000 |
+| **Opus** | 600-900 | 900-1260 | 3600-5400 | 300.000-400.000 |
+| **Sonnet** | 300-600 | 300-660 | 1800-3600 | 200.000-300.000 |
+| **Haiku** | 120-300 | 300 | 900-1800 | 100.000-200.000 |
 
-### Simple/Shell Block Timeouts
+### Simple-/Shell-Block-Timeouts
 
-For simple and shell blocks, only `timeout_seconds` applies:
+Fuer Simple- und Shell-Bloecke gilt nur `timeout_seconds`:
 
-| Task Complexity | Recommended `timeout_seconds` |
+| Aufgabenkomplexitaet | Empfohlenes `timeout_seconds` |
 |---|---|
-| Quick commands (git, find) | 60-120 |
-| Build/test (npm, mvn) | 300-600 |
-| Complex analysis (Opus) | 600-900 |
+| Schnelle Befehle (git, find) | 60-120 |
+| Build/Test (npm, mvn) | 300-600 |
+| Komplexe Analyse (Opus) | 600-900 |
 
 ---
 
-## 6. Model Selection
+## 6. Modellauswahl
 
-Set the model on the workflow level (`workflow.model` field) or leave it null for the system default.
+Das Modell wird auf Workflow-Ebene gesetzt (`workflow.model`-Feld) oder auf null fuer den System-Standard belassen.
 
-### When to Use Which Model
+### Welches Modell wann verwenden
 
-| Model | Use Case | Strengths | Weaknesses |
+| Modell | Anwendungsfall | Staerken | Schwaechen |
 |---|---|---|---|
-| `claude-opus-4-6` | Analysis, audits, security reviews | Precision, fewer hallucinations, deep reasoning | Slower, more expensive |
-| `claude-sonnet-4-6` | Code generation, routine tasks | Fast, good enough for most tasks | Can hallucinate findings in analysis |
-| `claude-haiku-4-5` | Simple classification, extraction | Very fast, cheap | Limited reasoning depth |
+| `claude-opus-4-6` | Analyse, Audits, Security-Reviews | Praezision, weniger Halluzinationen, tiefes Reasoning | Langsamer, teurer |
+| `claude-sonnet-4-6` | Code-Generierung, Routine-Aufgaben | Schnell, gut genug fuer die meisten Aufgaben | Kann Findings in Analysen halluzinieren |
+| `claude-haiku-4-5` | Einfache Klassifikation, Extraktion | Sehr schnell, guenstig | Begrenzte Reasoning-Tiefe |
 
-### Critical Rule
+### Kritische Regel
 
-**Always use Opus for analysis workflows.** Sonnet hallucinate findings (e.g., reporting false SQL injection vulnerabilities). For code analysis, security audits, and architecture reviews, precision is more important than speed.
+**Immer Opus fuer Analyse-Workflows verwenden.** Sonnet halluziniert Findings (z.B. falsche SQL-Injection-Schwachstellen melden). Fuer Code-Analyse, Security-Audits und Architektur-Reviews ist Praezision wichtiger als Geschwindigkeit.
 
-### Setting the Model
+### Modell setzen
 
 Via API:
 ```json
@@ -698,41 +725,41 @@ Via API:
 }
 ```
 
-In the workflow entity, the `model` field is passed via `--model` flag to Claude CLI.
+Im Workflow-Entity wird das `model`-Feld via `--model`-Flag an die Claude CLI uebergeben.
 
-**Important**: A null model field uses the system default (which may be Sonnet). If you need Opus, set it explicitly.
+**Wichtig**: Ein null-Model-Feld nutzt den System-Standard (der Sonnet sein kann). Wenn Opus benoetigt wird, explizit setzen.
 
 ---
 
-## 7. Execution Environment
+## 7. Ausfuehrungsumgebung
 
-### Host Environment (Default)
+### Host-Umgebung (Standard)
 
-Shell blocks without `container_image` run on the host. Available tools:
+Shell-Bloecke ohne `container_image` laufen auf dem Host. Verfuegbare Tools:
 
 - `curl`, `git`, `python3`, `jq`, `nodejs`, `npm`, `wget`, `unzip`, `bash`
 
-Everything else (pip packages, go, docker-cli, gh, trivy, specialized tools) is **NOT** available.
+Alles andere (pip-Pakete, go, docker-cli, gh, trivy, spezialisierte Tools) ist **NICHT** verfuegbar.
 
-### Container Images
+### Container-Images
 
-For shell blocks needing more tools, set `container_image`:
+Fuer Shell-Bloecke die mehr Tools benoetigen, `container_image` setzen:
 
-| Image | Base | Included |
+| Image | Basis | Enthalten |
 |---|---|---|
 | `automation-agent-python:latest` | Python 3.12 | pandas, numpy, requests, beautifulsoup4, pip, git, curl, jq |
 | `automation-agent-devops:latest` | Ubuntu 24.04 | git, curl, jq, python3, docker-cli, gh (GitHub CLI), trivy, gitleaks |
-| `automation-agent-node:latest` | Node.js 21 | npm (full ecosystem), git, curl, jq |
+| `automation-agent-node:latest` | Node.js 21 | npm (volles Oekosystem), git, curl, jq |
 | `automation-agent-go:latest` | Go 1.22 | git, curl, bash, jq |
 
-### Rules
+### Regeln
 
-- Shell blocks WITHOUT `container_image` can ONLY use host tools
-- If a command needs pip, go, docker, gh, or other specialized tools -> set `container_image`
-- Containers mount the project directory to `/workspace`
-- Claude CLI always runs on the host (not inside containers) to avoid nested-session detection
+- Shell-Bloecke OHNE `container_image` koennen NUR Host-Tools verwenden
+- Braucht ein Befehl pip, go, docker, gh oder andere spezialisierte Tools -> `container_image` setzen
+- Container mounten das Projektverzeichnis nach `/workspace`
+- Claude CLI laeuft immer auf dem Host (nicht in Containern), um Nested-Session-Erkennung zu vermeiden
 
-### Example: Shell Block with Container
+### Beispiel: Shell-Block mit Container
 
 ```json
 {
@@ -744,40 +771,53 @@ For shell blocks needing more tools, set `container_image`:
 }
 ```
 
+### Beispiel: Shell-Block mit Docker-Socket
+
+```json
+{
+  "type": "shell",
+  "config": {
+    "command": "docker build -t myapp:latest .",
+    "container_image": "automation-agent-devops:latest",
+    "mount_docker_socket": true
+  }
+}
+```
+
 ---
 
 ## 8. Agentic Block Deep Dive
 
-### The Goal-Reason-Act-Observe Loop
+### Die Goal-Reason-Act-Observe-Schleife
 
-Each iteration:
-1. **REASON**: Claude analyzes the current state, conversation history, and decides the next ACTION (uses `--system-prompt`, `--max-turns 3`)
-2. **ACT**: A **separate** Claude CLI call executes the ACTION (uses `--append-system-prompt`, `--model`, project directory)
-3. **OBSERVE**: The result is recorded and fed back into the next REASON phase
+Jede Iteration:
+1. **REASON**: Claude analysiert den aktuellen Stand, Gespraechsverlauf und entscheidet die naechste ACTION (nutzt `--system-prompt`, `--max-turns 3`)
+2. **ACT**: Ein **separater** Claude-CLI-Aufruf fuehrt die ACTION aus (nutzt `--append-system-prompt`, `--model`, Projektverzeichnis)
+3. **OBSERVE**: Das Ergebnis wird aufgezeichnet und in die naechste REASON-Phase zurueckgefuehrt
 
-### Critical: ACT Has No Context from REASON
+### Kritisch: ACT hat keinen Kontext aus REASON
 
-The ACT phase is a **fresh Claude CLI call**. It does not share conversation context with REASON. This means:
+Die ACT-Phase ist ein **frischer Claude-CLI-Aufruf**. Sie teilt keinen Gespraechskontext mit REASON. Das bedeutet:
 
-**Every ACTION must be self-contained:**
-- Use **absolute paths** (not relative, not "the file from earlier")
-- Include **specific names** (not "the function we discussed")
-- Provide **exact instructions** (not "fix the bug" but "in `/path/to/File.java` line 42, change `foo` to `bar`")
+**Jede ACTION muss eigenstaendig sein:**
+- **Absolute Pfade** verwenden (nicht relativ, nicht "die Datei von vorhin")
+- **Spezifische Namen** angeben (nicht "die Funktion die wir besprochen haben")
+- **Exakte Anweisungen** geben (nicht "den Bug fixen" sondern "in `/pfad/zur/Datei.java` Zeile 42, `foo` zu `bar` aendern")
 
 ```
-WRONG: "Fix the bug in the service class"
-RIGHT: "In /home/user/project/src/main/java/com/example/UserService.java,
-        change the method getUserById() to handle null input by adding
-        a null check at the start of the method."
+FALSCH: "Den Bug in der Service-Klasse fixen"
+RICHTIG: "In /home/user/project/src/main/java/com/example/UserService.java
+         die Methode getUserById() anpassen, um null-Eingaben zu behandeln
+         indem am Anfang der Methode eine Null-Pruefung eingefuegt wird."
 ```
 
-### History Compression
+### History-Komprimierung
 
-After 7 turns, older turns are summarized to manage the context window. This means early observations may be compressed. Design goals and success criteria to be evaluable from recent context.
+Nach 7 Turns werden aeltere Turns zusammengefasst um das Context-Window zu verwalten. Das bedeutet, fruehere Beobachtungen koennen komprimiert werden. Ziele und Erfolgskriterien so gestalten, dass sie aus dem juengsten Kontext auswertbar sind.
 
-### Stale File Pollution
+### Verschmutzung durch veraltete Dateien
 
-Old files from previous runs can pollute the agentic block's context (e.g., glob patterns picking up stale reports). Add a cleanup step before agentic blocks:
+Alte Dateien aus vorherigen Runs koennen den Kontext des Agentic-Blocks verschmutzen (z.B. Glob-Patterns die veraltete Reports aufgreifen). Einen Aufraeum-Schritt vor Agentic-Bloecken einfuegen:
 
 ```json
 {
@@ -788,71 +828,71 @@ Old files from previous runs can pollute the agentic block's context (e.g., glob
 }
 ```
 
-### Safety Limits
+### Sicherheitslimits
 
-| Config Key | Default | Purpose |
+| Config-Schluessel | Default | Zweck |
 |---|---|---|
-| `max_iterations` | 10 | Hard stop after N iterations |
-| `iteration_timeout_seconds` | 300 | Wall-clock timeout per iteration |
-| `total_timeout_seconds` | 1800 | Overall timeout (30 min) |
-| `max_total_tokens` | 200,000 | Token budget (input+output) |
-| `max_repeated_actions` | 3 | Abort after N identical actions |
-| `require_approval` | false | Human gate before each action |
+| `max_iterations` | 10 | Harter Stopp nach N Iterationen |
+| `iteration_timeout_seconds` | 300 | Wall-Clock-Timeout pro Iteration |
+| `total_timeout_seconds` | 1800 | Gesamt-Timeout (30 Min) |
+| `max_total_tokens` | 200.000 | Token-Budget (Input+Output) |
+| `max_repeated_actions` | 3 | Abbruch nach N identischen Aktionen |
+| `require_approval` | false | Menschliches Gate vor jeder Aktion |
 
-### Action Compression
+### Action-Komprimierung
 
-When an ACTION exceeds 100,000 characters, it is compressed via a separate Claude CLI call (60s timeout) before being sent to the ACT phase.
+Wenn eine ACTION 100.000 Zeichen ueberschreitet, wird sie via separatem Claude-CLI-Aufruf (60s Timeout) komprimiert bevor sie an die ACT-Phase gesendet wird.
 
-### Token Tracking
+### Token-Tracking
 
-Token usage (input + output) is tracked across all iterations. When the budget is exhausted, the block stops. If REASON or ACT returns no usage data, a WARN is logged — the budget is not being enforced.
+Token-Nutzung (Input + Output) wird ueber alle Iterationen getrackt. Wenn das Budget erschoepft ist, stoppt der Block. Wenn REASON oder ACT keine Nutzungsdaten liefern, wird ein WARN geloggt — das Budget wird nicht durchgesetzt.
 
 ---
 
-## 9. Workflow Instructions & Memory
+## 9. Workflow-Instruktionen & Memory
 
-### Two-Level Instruction System
+### Zweistufiges Instruktionssystem
 
-1. **Base instructions** (`src/main/resources/agent-instructions.md`): Loaded at startup, apply to ALL workflows. Cover working directory, file output, error handling, quality standards.
+1. **Basis-Instruktionen** (`src/main/resources/agent-instructions.md`): Beim Start geladen, gelten fuer ALLE Workflows. Umfassen Arbeitsverzeichnis, Dateiausgabe, Fehlerbehandlung, Qualitaetsstandards.
 
-2. **Workflow-specific instructions** (`workflow.instructions` field): Per-workflow, editable in the UI (Monaco editor). Appear as part of the system prompt.
+2. **Workflow-spezifische Instruktionen** (`workflow.instructions`-Feld): Pro Workflow, editierbar in der UI (Monaco-Editor). Erscheinen als Teil des System-Prompts.
 
-### How Instructions Are Injected
+### Wie Instruktionen injiziert werden
 
-- **Block execution** (all block types): Via `--append-system-prompt` flag on Claude CLI
-- **Agentic REASON phase**: Via `--system-prompt` flag, includes workflow instructions in `## Workflow Instructions` section
+- **Block-Ausfuehrung** (alle Block-Typen): Via `--append-system-prompt`-Flag an der Claude CLI
+- **Agentic REASON-Phase**: Via `--system-prompt`-Flag, beinhaltet Workflow-Instruktionen im Abschnitt `## Workflow Instructions`
 
 ### Workflow Memory
 
-Workflows can accumulate knowledge across runs. Memory is **manually extracted** — it does not happen automatically after a run.
+Workflows koennen ueber Runs hinweg Wissen ansammeln. Memory wird **manuell extrahiert** — es passiert nicht automatisch nach einem Run.
 
-#### How it works
+#### Wie es funktioniert
 
-1. **Extract** (manual): After one or more runs, trigger extraction via UI ("Memory"-Tab on the workflow detail page) or API. Select which runs to include and choose a provider (Claude or Codex). The `ConversationPreprocessor` compresses the step outputs by ~50–70% before sending them to the AI, which produces a structured knowledge entry (title, Markdown content, tags).
-2. **Activate** (manual): Extracted memory starts as `active=false`. You must explicitly activate a version before it takes effect. Only one version can be active at a time.
-3. **Used on next run**: Before each workflow execution, the active memory is written to `.claude/rules/project-memory.md` in the project directory. Claude CLI picks up this file automatically via its rules system.
-4. **Versioning**: Multiple memory versions per workflow are retained. You can revert to an older version by activating it.
-5. **Edit**: Title and content can be manually refined in the UI (Monaco editor).
+1. **Extrahieren** (manuell): Nach einem oder mehreren Runs, Extraktion ueber UI ("Memory"-Tab auf der Workflow-Detailseite) oder API ausloesen. Runs auswaehlen und Provider waehlen (Claude oder Codex). Der `ConversationPreprocessor` komprimiert die Step-Outputs um ~50-70% bevor sie an die KI gesendet werden, die einen strukturierten Wissenseintrag (Titel, Markdown-Inhalt, Tags) erstellt.
+2. **Aktivieren** (manuell): Extrahiertes Memory startet als `active=false`. Explizit aktivieren bevor es wirksam wird. Nur eine Version kann gleichzeitig aktiv sein.
+3. **Beim naechsten Run verwendet**: Vor jeder Workflow-Ausfuehrung wird das aktive Memory nach `.claude/rules/project-memory.md` im Projektverzeichnis geschrieben. Die Claude CLI greift auf diese Datei automatisch via Rules-System zu.
+4. **Versionierung**: Mehrere Memory-Versionen pro Workflow werden aufbewahrt. Aeltere Versionen koennen durch Aktivierung wiederhergestellt werden.
+5. **Bearbeiten**: Titel und Inhalt koennen in der UI (Monaco-Editor) manuell verfeinert werden.
 
-#### When to use
+#### Wann verwenden
 
-Extract memory after a workflow has produced a run with valuable insights — patterns, gotchas, domain knowledge — that should guide future runs. It's especially useful for agentic workflows that learn project-specific conventions over time.
+Memory extrahieren nachdem ein Workflow einen Run mit wertvollen Erkenntnissen produziert hat — Patterns, Fallstricke, Domain-Wissen — die zukuenftige Runs leiten sollen. Besonders nuetzlich fuer Agentic-Workflows die projektspezifische Konventionen ueber die Zeit lernen.
 
 #### API
 
-| Method | Path | Description |
+| Methode | Pfad | Beschreibung |
 |---|---|---|
-| GET | `/api/v1/workflows/{id}/memory` | List all memory versions |
-| POST | `/api/v1/workflows/{id}/memory/extract` | Extract from runs (`runIds`, `provider`) |
-| PUT | `/api/v1/workflows/{id}/memory/{mid}` | Update title/content |
-| PUT | `/api/v1/workflows/{id}/memory/{mid}/activate` | Activate a version |
-| DELETE | `/api/v1/workflows/{id}/memory/{mid}` | Delete a version |
+| GET | `/api/v1/workflows/{id}/memory` | Alle Memory-Versionen auflisten |
+| POST | `/api/v1/workflows/{id}/memory/extract` | Aus Runs extrahieren (`runIds`, `provider`) |
+| PUT | `/api/v1/workflows/{id}/memory/{mid}` | Titel/Inhalt aktualisieren |
+| PUT | `/api/v1/workflows/{id}/memory/{mid}/activate` | Version aktivieren |
+| DELETE | `/api/v1/workflows/{id}/memory/{mid}` | Version loeschen |
 
 ```json
 // POST /api/v1/workflows/{id}/memory/extract
 {
-  "runIds": ["run-id-1", "run-id-2"],  // optional — omit to use last 10 runs
-  "provider": "CLAUDE"                  // or "CODEX"
+  "runIds": ["run-id-1", "run-id-2"],  // optional — weglassen fuer letzte 10 Runs
+  "provider": "CLAUDE"                  // oder "CODEX"
 }
 ```
 
@@ -860,20 +900,20 @@ Extract memory after a workflow has produced a run with valuable insights — pa
 
 ## 10. Chains
 
-Chains group multiple workflows for **sequential execution**.
+Chains gruppieren mehrere Workflows zur **sequentiellen Ausfuehrung**.
 
-### Key Properties
+### Kerneigenschaften
 
-- **Cross-project**: A chain can reference workflows from any project
-- **Sequential**: Workflows run one after another (not parallel)
-- **Context passing**: Each entry can access `{{ previous_chain_output }}` from the last completed workflow
-- **stopOnFailure**: Controls whether the chain stops on workflow failure (configurable per chain and per entry)
+- **Projektuebergreifend**: Eine Chain kann Workflows aus beliebigen Projekten referenzieren
+- **Sequentiell**: Workflows laufen nacheinander (nicht parallel)
+- **Kontextweitergabe**: Jeder Eintrag kann auf `{{ previous_chain_output }}` des letzten abgeschlossenen Workflows zugreifen
+- **stopOnFailure**: Steuert ob die Chain bei Workflow-Fehler stoppt (konfigurierbar pro Chain und pro Eintrag)
 
-### Chain Structure
+### Chain-Struktur
 
 ```json
 {
-  "name": "Full Audit + Fix Pipeline",
+  "name": "Vollstaendige Audit + Fix Pipeline",
   "entries": [
     {
       "workflowId": "<audit-workflow-id>",
@@ -894,102 +934,100 @@ Chains group multiple workflows for **sequential execution**.
 ### API
 
 ```
-POST   /api/v1/chains              # Create chain
-POST   /api/v1/chains/{id}/execute  # Start execution
-DELETE /api/v1/chains/{id}          # Delete chain
+POST   /api/v1/chains              # Chain erstellen
+POST   /api/v1/chains/{id}/execute  # Ausfuehrung starten
+DELETE /api/v1/chains/{id}          # Chain loeschen
 ```
 
 ### Limits
 
-- Polling-based completion check (2s interval)
-- 30-minute timeout per workflow in the chain
+- Polling-basierte Fertigstellungspruefung (2s Intervall)
+- 30-Minuten-Timeout pro Workflow in der Chain
 
 ---
 
-## 11. Dos and Don'ts
+## 11. Dos und Don'ts
 
 ### DO
 
-- **Set `timeout_seconds` explicitly** for complex blocks — don't rely on defaults
-- **Use Opus for analysis/audit workflows** — Sonnet hallucinate findings
-- **Use `set -euo pipefail`** at the start of multi-line shell commands
-- **Use absolute paths** in agentic block goals and actions
-- **Add cleanup steps** before agentic blocks to prevent stale file pollution
-- **Set `on_failure: "continue"`** on shell blocks that gather data (partial results are better than abort)
-- **Keep agentic block goals specific** — "Create index.html in output/" not "build a website"
-- **Use `{{ previous_output }}`** to chain block outputs — data flows forward through the pipeline
-- **Set both `timeout_seconds` and `iteration_timeout_seconds`** for agentic blocks — the auto-alignment helps but explicit is better
-- **Add a verification block** after agentic blocks (check files exist, run tests, validate output)
+- **`timeout_seconds` explizit setzen** fuer komplexe Bloecke — nicht auf Defaults verlassen
+- **Opus fuer Analyse-/Audit-Workflows verwenden** — Sonnet halluziniert Findings
+- **`set -euo pipefail`** am Anfang mehrzeiliger Shell-Befehle verwenden
+- **Absolute Pfade** in Agentic-Block-Zielen und -Aktionen verwenden
+- **Aufraeum-Schritte** vor Agentic-Bloecken einfuegen um Verschmutzung durch veraltete Dateien zu vermeiden
+- **Agentic-Block-Ziele spezifisch halten** — "Erstelle index.html in output/" statt "Baue eine Webseite"
+- **`{{ previous_output }}`** verwenden um Block-Ausgaben zu verketten — Daten fliessen vorwaerts durch die Pipeline
+- **Sowohl `timeout_seconds` als auch `iteration_timeout_seconds`** fuer Agentic-Bloecke setzen — das Auto-Alignment hilft, aber explizit ist besser
+- **Verifikations-Block** nach Agentic-Bloecken einfuegen (Dateien pruefen, Tests ausfuehren, Ausgabe validieren)
 
 ### DON'T
 
-- **Don't use Sonnet for code analysis** — it hallucinates false positives (fake SQL injection, fake security issues)
-- **Don't set `iteration_timeout_seconds` lower than `timeout_seconds`** — the CLI will succeed but the iteration will be marked TIMEOUT
-- **Don't assume ACT has context from REASON** — every action is a fresh CLI call
-- **Don't use relative paths in agentic actions** — the ACT phase may not share the same working directory context
-- **Don't run Opus workflows in parallel** when `max-concurrent-calls` is low (e.g., 3) — workflows block each other
-- **Don't use `container_image` for simple blocks** — simple blocks always use the host Claude CLI
-- **Don't forget to set `model` explicitly** — null uses system default which may not be what you want
-- **Don't use shell blocks for AI reasoning** — use simple blocks instead (shell blocks just run commands)
-- **Don't chain more than 5-7 blocks** without good reason — each block adds latency and cost
-- **Don't skip the verification step** after agentic blocks — trust but verify
+- **Sonnet nicht fuer Code-Analyse verwenden** — halluziniert falsche Positives (gefaelschte SQL-Injection, gefaelschte Security-Issues)
+- **`iteration_timeout_seconds` nicht niedriger als `timeout_seconds` setzen** — die CLI wird erfolgreich sein, aber die Iteration wird als TIMEOUT markiert
+- **Nicht annehmen, dass ACT Kontext aus REASON hat** — jede Aktion ist ein frischer CLI-Aufruf
+- **Keine relativen Pfade in Agentic-Aktionen** — die ACT-Phase teilt moeglicherweise nicht denselben Working-Directory-Kontext
+- **Opus-Workflows nicht parallel ausfuehren** wenn `max-concurrent-calls` niedrig ist (z.B. 3) — Workflows blockieren sich gegenseitig
+- **`container_image` nicht fuer Simple-Bloecke verwenden** — Simple-Bloecke nutzen immer die Host-Claude-CLI
+- **Nicht vergessen, `model` explizit zu setzen** — null nutzt den System-Standard der moeglicherweise nicht gewuenscht ist
+- **Shell-Bloecke nicht fuer KI-Reasoning verwenden** — stattdessen Simple-Bloecke nutzen (Shell-Bloecke fuehren nur Befehle aus)
+- **Nicht mehr als 5-7 Bloecke** ohne guten Grund verketten — jeder Block fuegt Latenz und Kosten hinzu
+- **Den Verifikationsschritt** nach Agentic-Bloecken nicht ueberspringen — Vertrauen ist gut, Kontrolle ist besser
 
 ### Anti-Patterns
 
-| Anti-Pattern | Problem | Fix |
+| Anti-Pattern | Problem | Loesung |
 |---|---|---|
-| Agentic block with vague goal | Agent loops without progress | Make goal concrete with file paths and success criteria |
-| Missing `on_failure` on data-gathering shell | Workflow aborts on partial data | Add `on_failure: "continue"` |
-| 100+ words per agentic action | ACT phase times out or gets confused | Break into smaller, specific actions |
-| No cleanup before agentic block | Stale files from previous runs pollute context | Add `rm -rf output/` shell block before |
-| `timeout_seconds: 900` with default `iteration_timeout_seconds` | Iteration times out at 300s despite CLI succeeding | Set both timeouts or let auto-alignment handle it |
+| Agentic-Block mit vagem Ziel | Agent dreht sich ohne Fortschritt | Ziel konkret mit Dateipfaden und Erfolgskriterien formulieren |
+| 100+ Woerter pro Agentic-Aktion | ACT-Phase laeuft in Timeout oder wird verwirrt | In kleinere, spezifische Aktionen aufteilen |
+| Kein Aufraeum vor Agentic-Block | Veraltete Dateien aus vorherigen Runs verschmutzen Kontext | `rm -rf output/`-Shell-Block davor einfuegen |
+| `timeout_seconds: 900` mit Standard-`iteration_timeout_seconds` | Iteration laeuft bei 300s in Timeout obwohl CLI erfolgreich | Beide Timeouts setzen oder Auto-Alignment nutzen |
 
 ---
 
-## Appendix: Template Quick Reference
+## Anhang: Template-Kurzreferenz
 
-All 40+ built-in templates with their primary pattern:
+Alle 40+ eingebauten Templates mit ihrem primaeren Pattern:
 
-| Template | Pattern | Category |
+| Template | Pattern | Kategorie |
 |---|---|---|
-| `file-improve` | Sequential Simple | CONTENT |
-| `code-refactor` | Sequential Simple | CODE |
-| `translation-pipeline` | Sequential Simple | CONTENT |
-| `fact-check-pipeline` | Sequential Simple + Conditional | RESEARCH |
-| `project-overview` | Sequential Simple | CODE |
-| `iterative-refine` | Simple + While Loop | CONTENT |
-| `document-review` | Skill-Capability Chain | CONTENT |
-| `research-assistant` | Skill-Capability Chain | RESEARCH |
-| `data-analysis` | Skill-Capability Chain | DATA |
+| `file-improve` | Sequentielle Simple-Kette | CONTENT |
+| `code-refactor` | Sequentielle Simple-Kette | CODE |
+| `translation-pipeline` | Sequentielle Simple-Kette | CONTENT |
+| `fact-check-pipeline` | Sequentielle Simple-Kette + Conditional | RESEARCH |
+| `project-overview` | Sequentielle Simple-Kette | CODE |
+| `iterative-refine` | Simple + While-Schleife | CONTENT |
+| `document-review` | Skill-Capability-Kette | CONTENT |
+| `research-assistant` | Skill-Capability-Kette | RESEARCH |
+| `data-analysis` | Skill-Capability-Kette | DATA |
 | `deploy-pipeline` | Conditional + Shell | CODE |
 | `code-quality` | Shell + Retry | CODE |
-| `git-to-changelog` | Shell Gather + AI Analyze | CODE |
-| `log-triage` | Shell Gather + AI Analyze | CODE |
-| `git-statistics-report` | Shell Gather + AI Analyze | CODE |
-| `doc-to-website` | Analyze + Agentic + Verify | TRANSFORM |
-| `idea-to-prototype` | Analyze + Agentic + Verify | TRANSFORM |
-| `cv-to-portfolio` | Analyze + Agentic + Verify | TRANSFORM |
-| `csv-to-dashboard` | Analyze + Agentic + Verify | DATA |
-| `codebase-to-onboarding` | Analyze + Agentic + Verify | CODE |
-| `notes-to-presentation` | Analyze + Agentic + Verify | TRANSFORM |
-| `api-to-sdk` | Analyze + Agentic + Verify | TRANSFORM |
-| `markdown-to-ebook` | Analyze + Agentic + Verify | TRANSFORM |
-| `bug-to-fix` | Analyze + Agentic + Verify | CODE |
-| `dependency-risk-radar` | Shell Scan + ForEach | CODE |
-| `api-consistency-audit` | Audit Pipeline | CODE |
-| `dead-code-detector` | Audit Pipeline | CODE |
-| `doc-accuracy-check` | Audit Pipeline | CODE |
-| `codebase-health-scorecard` | Audit Pipeline | CODE |
-| `architecture-debt-radar` | Audit Pipeline | CODE |
-| `test-coverage-gaps` | Audit Pipeline | CODE |
-| `audit-fix-pr-pipeline` | Multi-Stage + Approval | CODE |
-| `hunt-quality-pipeline` | Multi-Stage Pipeline | CODE |
-| `folder-backup` | Shell Chain | UTILITY |
-| `github-project-bootstrap` | Shell Chain | CODE |
+| `git-to-changelog` | Shell sammeln + KI analysieren | CODE |
+| `log-triage` | Shell sammeln + KI analysieren | CODE |
+| `git-statistics-report` | Shell sammeln + KI analysieren | CODE |
+| `doc-to-website` | Analysieren + Agentic + Verifizieren | TRANSFORM |
+| `idea-to-prototype` | Analysieren + Agentic + Verifizieren | TRANSFORM |
+| `cv-to-portfolio` | Analysieren + Agentic + Verifizieren | TRANSFORM |
+| `csv-to-dashboard` | Analysieren + Agentic + Verifizieren | DATA |
+| `codebase-to-onboarding` | Analysieren + Agentic + Verifizieren | CODE |
+| `notes-to-presentation` | Analysieren + Agentic + Verifizieren | TRANSFORM |
+| `api-to-sdk` | Analysieren + Agentic + Verifizieren | TRANSFORM |
+| `markdown-to-ebook` | Analysieren + Agentic + Verifizieren | TRANSFORM |
+| `bug-to-fix` | Analysieren + Agentic + Verifizieren | CODE |
+| `dependency-risk-radar` | Shell scannen + ForEach | CODE |
+| `api-consistency-audit` | Audit-Pipeline | CODE |
+| `dead-code-detector` | Audit-Pipeline | CODE |
+| `doc-accuracy-check` | Audit-Pipeline | CODE |
+| `codebase-health-scorecard` | Audit-Pipeline | CODE |
+| `architecture-debt-radar` | Audit-Pipeline | CODE |
+| `test-coverage-gaps` | Audit-Pipeline | CODE |
+| `audit-fix-pr-pipeline` | Mehrstufig + Freigabe | CODE |
+| `hunt-quality-pipeline` | Mehrstufige Pipeline | CODE |
+| `folder-backup` | Shell-Kette | UTILITY |
+| `github-project-bootstrap` | Shell-Kette | CODE |
 | `dependency-update-check` | Shell + Conditional | CODE |
 | `secret-scanner` | Shell + Conditional | CODE |
 | `container-vuln-scan` | Shell + Conditional | CODE |
-| `database-backup-verify` | Shell Chain | CODE |
-| `directory-sync` | Shell Chain | UTILITY |
+| `database-backup-verify` | Shell-Kette | CODE |
+| `directory-sync` | Shell-Kette | UTILITY |
 | `docker-image-build-push` | Shell + Conditional | CODE |
 | `todo-creator` | Agentic | UTILITY |

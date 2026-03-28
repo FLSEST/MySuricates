@@ -1,3 +1,5 @@
+> *Zuletzt aktualisiert: 28. März 2026, 14:30 Uhr — Workflow: MySuricates Docs aktualisieren | Run: c47b8112-0468-445d-bfaf-a7a8a5d46264*
+
 # Architektur
 
 ## Systemübersicht
@@ -55,7 +57,7 @@ Dev startet Stable und Test bei Boot automatisch, wenn ein Snapshot vorhanden is
 ### Schichtenmodell
 
 ```
-Controller (REST API, 20 Controller)
+Controller (REST API, 26 Controller)
     ↓ DTO (Request/Response Records)
 Service (Geschäftslogik)
     ↓ Entity (JPA)
@@ -68,7 +70,7 @@ SQLite (Datei: data/automation.db)
 
 ```
 com.automation
-├── controller/          20 REST-Controller
+├── controller/          26 REST-Controller
 ├── service/
 │   ├── project/         Projekte + Container-Lifecycle
 │   ├── workflow/        WorkflowExecutor, WorkflowService, ExecutionBroadcaster, TemplateVerificationService
@@ -79,15 +81,24 @@ com.automation
 │   ├── system/          Tailscale Remote-Access
 │   ├── ai/              HostClaudeService, HostCodexService
 │   ├── cli/             CommandExecutorService, CliSessionManager, ClaudeOutputParser
-│   ├── chain/           ChainService, ChainExecutor
+│   ├── chain/           ChainService, ChainExecutor, ChainTemplateService
 │   ├── memory/          WorkflowMemoryService, ClaudeSummarizer, CodexSummarizer
 │   ├── staging/         StagingService, TestingService, InstanceSyncHelper
 │   ├── todo/            TodoService, AutoTodoService, GateStatusResolver
-│   ├── conversion/      WorkflowConversionService
+│   ├── conversion/      WorkflowConversionService, DialogConversionService
+│   ├── dialog/          DialogSessionScanner, DialogConversionService
 │   ├── factory/         WorkflowFactoryService
 │   ├── pool/            WorkflowPoolService
 │   ├── wish/            WishService
-│   └── activitylog/     ActivityLogService
+│   ├── notification/    NotificationService
+│   ├── trigger/         CompletionTriggerService
+│   ├── health/          Health-Checks
+│   ├── repair/          WorkflowRepairService
+│   ├── tray/            System-Tray-Integration
+│   ├── activitylog/     ActivityLogService
+│   ├── AssistantService.java        Chat-Assistent (Claude CLI)
+│   ├── AssistantSessionService.java Session-Persistierung
+│   └── PageSuggestionService.java   Kontext-sensitive UI-Vorschläge
 ├── entity/              JPA-Entities + Enums
 ├── dto/
 │   ├── request/         Request-Records
@@ -100,9 +111,40 @@ com.automation
 ├── security/            ApiKeyAuthFilter, RateLimitFilter
 ├── exception/           GlobalExceptionHandler + Exception-Klassen
 ├── websocket/           WebSocket-Konfiguration
-├── event/               WorkflowRunCompletedEvent
+├── event/               WorkflowRunCompletedEvent, AssistantSessionUpdatedEvent
 └── util/                JPA-Converter (JSON, BlockDefinitions)
 ```
+
+### Alle 26 REST-Controller
+
+| Controller | Base-Path | Beschreibung |
+|---|---|---|
+| `ProjectController` | `/api/v1/projects` | CRUD, Archivierung, Container-Lifecycle, Kontext-Generierung |
+| `WorkflowController` | `/api/v1/workflows` | CRUD, Ausführung, Export/Import, Skills, Optimize, Repair |
+| `ExecutionController` | `/api/v1/executions` | Pause, Resume, Resume-from-Step, Cancel, Retry, Approve, Todos-Approve, Command |
+| `SkillController` | `/api/v1/skills` | CRUD, Capabilities, Export/Import |
+| `ScheduleController` | `/api/v1/schedules` | CRUD, Enable/Disable, Runs, Calendar, Preview, Remaining-Stats, Chain-Schedules, Maintenance |
+| `WebhookController` | `/api/v1/webhooks` | CRUD, Enable/Disable; Trigger via `/api/v1/webhook/trigger/{token}` |
+| `ChainController` | `/api/v1/chains` | CRUD, Ausführung, Runs |
+| `ChainTemplateController` | `/api/v1/chain-templates` | Liste, Abrufen, Installieren als Chain |
+| `WorkflowTemplateController` | `/api/v1/workflow-templates` | CRUD, Aus-Workflow erstellen |
+| `WorkflowMemoryController` | `/api/v1/workflows/{id}/memory` | CRUD, Extrahieren, Aktivieren |
+| `WorkflowFactoryController` | `/api/v1/factory` | Generate, Run, Verify, Promote, Topics |
+| `WorkflowPoolController` | `/api/v1/pool` | Liste, Abrufen, Installieren |
+| `ConversionController` | `/api/v1/conversions` | Suggest, Create-Workflow aus Run |
+| `DialogController` | `/api/v1/dialog` | Sessions, Projekte, Claude-Session-Analyse, Workflow-Erstellung |
+| `LearningController` | `/api/v1/learning` | Dashboard, Stats, Step-Analytics, Suggestions, Similar, Agentic-History, Agentic-Analytics, Tool-Patterns, Execution-Insights, Run-Insights, Rate |
+| `TodoController` | `/api/v1/todos` | CRUD, Status-Patch, Count |
+| `ActivityLogController` | `/api/v1/activity-log` | Liste |
+| `AssistantController` | `/api/v1/assistant` | Chat (`POST /chat`) |
+| `PageSuggestionController` | `/api/v1/assistant` | Suggestions per Page (Get/Refresh) |
+| `CompletionTriggerController` | `/api/v1/completion-triggers` | CRUD, Enable/Disable, Filter by Workflow |
+| `NotificationController` | `/api/v1/notifications` | CRUD, Enable/Disable |
+| `WishController` | `/api/v1/wishes` | CRUD, Cancel, Respond, Crystallize |
+| `StagingController` | `/api/v1/staging` | Status, Start, Stop, Promote, Promote-Cancel, Sync-Preview, Sync-Definitions |
+| `TestingController` | `/api/v1/testing` | Status, Start, Stop, Reset, Sync-Preview, Sync-Definitions, Report-Result, Pull-Changes |
+| `SystemController` | `/api/v1/system` | Health, Auth-Status, Info, Settings, AI-Providers, Backup, Backups, Remote-Access, Browse, Open-Path, Repair, Client-Errors |
+| `DocsController` | `/api/v1/docs` | Markdown-Dokumentation lesen |
 
 ### Workflow-Ausführung
 
@@ -222,6 +264,40 @@ Chains gruppieren mehrere Workflows für sequenzielle Ausführung:
 - **Cancellation:** Via `ConcurrentHashMap<String, AtomicBoolean>`
 - **WebSocket:** Status-Broadcasts an `/topic/chains/{chainRunId}/status`
 
+### Chain Templates
+
+Vorgefertigte Chain-Definitionen, die sich aus bestehenden Workflow-Templates zusammensetzen:
+- `ChainTemplateService` — verwaltet Built-in Chain Templates (`BuiltInChainTemplate` Records)
+- `ChainTemplateController` — `/api/v1/chain-templates` mit List, Get, Install-Endpunkten
+- Install: Erstellt eine neue Chain (ggf. mit zugehörigen Workflows) in einem Zielprojekt
+
+## Completion Triggers (V39)
+
+Automatische Verkettung von Workflows auf Basis von Abschluss-Ereignissen:
+- `CompletionTriggerService` — verwaltet Trigger-Definitionen
+- `CompletionTriggerController` — `/api/v1/completion-triggers`
+- Trigger verknüpfen einen Source-Workflow (Auslöser) mit einem Target-Workflow (wird nach Abschluss gestartet)
+- API: List, Get, Create, Enable/Disable, Delete; Filter by Source- oder Target-Workflow-ID
+
+## Notification System (V40)
+
+Benachrichtigungs-Konfigurationen für Workflow-Ereignisse:
+- `NotificationService` — CRUD für Benachrichtigungs-Konfigurationen
+- `NotificationController` — `/api/v1/notifications`
+- API: List, Get, Create, Enable/Disable, Delete
+
+## Assistant System (V41+V42)
+
+Kontext-sensitiver Chat-Assistent für die Plattform. Siehe auch: [assistant-system.md](assistant-system.md)
+
+- `AssistantService` — Chat-Logik, Kontext-Aufbereitung, Claude-CLI-Aufruf
+- `AssistantSessionService` — Session-Persistierung in DB (V41-Migration: `assistant_sessions`)
+- `PageSuggestionService` — generiert und cached kontextsensitive UI-Vorschläge pro Seite (V42-Migration: `page_suggestions`)
+- `AssistantController` — `POST /api/v1/assistant/chat`
+- `PageSuggestionController` — `GET /api/v1/assistant/suggestions?page=...`, `POST /api/v1/assistant/suggestions/refresh?page=...`
+- Sessions werden nach jedem Chat-Aufruf persistiert; `AssistantSessionUpdatedEvent` triggert Page-Suggestion-Refresh
+- Standard-Modell: `claude-sonnet-4-6`
+
 ## Workflow Memory
 
 Workflows können über Runs hinweg Wissen akkumulieren:
@@ -286,6 +362,14 @@ Erfolgreiche Agentic-Runs können in deterministische Workflows konvertiert werd
 - `ConversionController` — API-Endpunkte für Vorschau und Erstellung
 - Frontend: Konversions-Dialog im Execution-View
 
+### Dialog-to-Workflow Conversion
+
+Claude-Code-Sessions können ebenfalls als Vorlage für Workflows dienen:
+- `DialogSessionScanner` — scannt `~/.claude/projects/` nach JSONL-Session-Dateien
+- `DialogConversionService` — analysiert eine Session mit Claude und generiert eine Workflow-Suggestion
+- `DialogController` — `/api/v1/dialog` mit Session-List, Analyse und Workflow-Erstellung
+- Pfad-Traversal-Schutz: nur Pfade unter `~/.claude/projects/` mit `.jsonl`-Endung sind erlaubt
+
 ## Workflow Templates
 
 - Templates werden in der `workflow_templates`-DB-Tabelle gespeichert (V19-Migration), nicht hardcodiert
@@ -321,15 +405,22 @@ Erfolgreiche Agentic-Runs können in deterministische Workflows konvertiert werd
 
 Automatisches Generieren und Verifizieren von Workflows aus einem Topic:
 - `WorkflowFactoryService` — generiert, deployt auf Test-Instanz, verifiziert, promotet optional
-- `WorkflowFactoryController` — `/api/v1/factory` mit Endpunkten `generate`, `run`, `verify`, `promote`, `topics`
+- `WorkflowFactoryController` — `/api/v1/factory` mit Endpunkten:
+  - `POST /generate` — Workflow aus Topic generieren
+  - `POST /run` — generierten Workflow auf Test-Instanz ausführen
+  - `POST /verify/{id}` — Workflow verifizieren
+  - `POST /promote/{id}` — Workflow in Produktion promoten
+  - `GET /topics` — verfügbare Topics auflisten
 - Nutzt die Test-Instanz (Port 8090) für sichere Ausführung
 
 ## Workflow Pool
 
 Vorgefertigte Workflow-Definitionen aus dem `workflow-pool/`-Verzeichnis:
 - `WorkflowPoolService` — liest JSON-Dateien aus dem konfigurierten Pool-Verzeichnis
-- `WorkflowPoolController` — `/api/v1/pool` mit List, Get, Install-Endpunkten
-- Install: Importiert Workflow aus dem Pool in ein Zielprojekt
+- `WorkflowPoolController` — `/api/v1/pool` mit Endpunkten:
+  - `GET /` — alle Pool-Workflows auflisten
+  - `GET /{id}` — einzelnen Pool-Workflow abrufen
+  - `POST /{id}/install` — Workflow aus Pool in Zielprojekt importieren
 
 ## Wishes (Wunsch-System)
 
@@ -441,6 +532,50 @@ Response (DTO) → React Query Cache → UI-Update
 - Alle Origins erlaubt (`*`) mit Credentials
 - Alle HTTP-Methoden (GET, POST, PUT, DELETE, PATCH, OPTIONS)
 
+## Datenbankmigrationen (Flyway)
+
+Die DB-Migrationen (`src/main/resources/db/migration/`) dokumentieren die Feature-Timeline:
+
+| Migration | Feature |
+|---|---|
+| V1–V9 | Basistabellen: Projects, Containers, Skills, Capabilities, Workflows, Runs, Schedules, Webhooks, Timestamps |
+| V10–V11 | Performance-Indexes, Container-Last-Activity |
+| V12 | App-Settings |
+| V13 | Workflow-Modell + Instructions |
+| V14 | Schedule-Typen + Scheduled-At |
+| V15 | Activity-Log-Tabelle |
+| V16 | Workflow-Memory-Tabelle |
+| V17 | Todos-Tabelle |
+| V18 | Project-Subtitle + Description |
+| V19 | Workflow-Templates-Tabelle |
+| V20 | Input-Context in Workflow-Runs |
+| V21 | Workflow-Chains |
+| V22 | Template-Quality-Status |
+| V23 | Default-Context in Workflows |
+| V24 | Activity-Log Composite Index |
+| V25 | Workflow-Test-Status |
+| V26 | Block-Types-Column |
+| V27 | Chain-Support für Schedules |
+| V28–V29 | Wishes + Wish-Reference-Workflow-IDs |
+| V30 | Project-AI-Context |
+| V31 | Workflow-ID im Activity-Log |
+| V32 | Workflow Soft-Delete (deleted_at) |
+| V33 | Wish-Iteration-History |
+| V34 | Workflow-Provider |
+| V35 | Project-Archivierung (archived_at) |
+| V36 | Todo-Session-ID |
+| V37 | Delayed-Schedule-Type |
+| V38 | Scheduled-Workflow-ID nullable |
+| V39 | Completion-Triggers-Tabelle |
+| V40 | Notification-Configs-Tabelle |
+| V41 | Assistant-Sessions-Tabelle |
+| V42 | Page-Suggestions-Tabelle |
+| V43 | Triggered-By-Schedule-ID |
+| V44 | Schedule-End-Conditions |
+| V45 | Schedule-Conflict-Behavior |
+| V46 | Stable-Synced-At |
+| V47 | Context-Delta in Step-Results |
+
 ## Verzeichnisstruktur
 
 ```
@@ -471,7 +606,7 @@ autotrigger/
 │           ├── application-stable.yml ← Stable-Profil
 │           ├── agent-instructions.md  ← Basis-Agent-Instructions
 │           ├── templates/builtin/     ← Built-in Template JSON-Dateien
-│           └── db/migration/          ← 24 Flyway-Migrationen (V1–V24)
+│           └── db/migration/          ← 47 Flyway-Migrationen (V1–V47)
 │
 └── ai-automation-frontend/
     ├── package.json
