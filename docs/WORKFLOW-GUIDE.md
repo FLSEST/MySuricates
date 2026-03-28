@@ -1,4 +1,4 @@
-> *Zuletzt aktualisiert: 28. März 2026, 14:30 Uhr — Workflow: MySuricates Docs aktualisieren | Run: c47b8112-0468-445d-bfaf-a7a8a5d46264*
+> *Zuletzt aktualisiert: 28. März 2026, 19:45 Uhr — Workflow: MySuricates Docs aktualisieren | Run: 01102949-3825-4cd9-b4b9-8aa84917c4c2*
 
 # Workflow Building Guide
 
@@ -64,6 +64,18 @@ Zugriff in Block-Configs mit `{{ filepath }}` oder `{{ language }}`.
 ## 2. Block-Typ-Referenz
 
 MySuricates unterstuetzt 12 Block-Typen. Jeder Block hat einen `type` und eine `config`-Map.
+
+### Allgemeine Block-Eigenschaften
+
+Jeder Block unterstuetzt neben seinen typspezifischen Config-Feldern auch diese allgemeinen Eigenschaften:
+
+| Config-Schluessel | Typ | Default | Beschreibung |
+|---|---|---|---|
+| `on_failure` | string | `"stop"` | Verhalten bei Fehler: `"stop"` (Workflow beenden) oder `"continue"` (mit naechstem Block fortfahren) |
+
+**Standard-Verhalten**: Wenn ein Block fehlschlaegt (Status `FAILED`), stoppt der Workflow und der Run wird als `FAILED` markiert. Mit `"on_failure": "continue"` faehrt der Workflow mit dem naechsten Block fort.
+
+---
 
 ### `simple` — KI-Textverarbeitung
 
@@ -287,7 +299,7 @@ Wiederholt einen Befehl bis eine Bedingung erfuellt ist oder die maximale Iterat
 
 | Config-Schluessel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `condition_command` | string | **erforderlich** | Bedingung, die jede Iteration ausgewertet wird |
+| `condition_command` | string | null | Bedingung, die jede Iteration ausgewertet wird. Ohne `condition_command` laeuft die Schleife bis `max_iterations` oder Kommando-Fehler |
 | `command` | string | **erforderlich** | Befehl pro Iteration |
 | `max_iterations` | int | 100 | Maximale Schleifendurchlaeufe |
 | `execution_mode` | string | `"claude"` | `"claude"` (KI) oder `"shell"` |
@@ -405,7 +417,7 @@ Ruft die Faehigkeit eines registrierten Skills auf.
 | Config-Schluessel | Typ | Default | Beschreibung |
 |---|---|---|---|
 | `capability` | string | **erforderlich** | Faehigkeitsname (z.B. `"web_search"`, `"analyze"`) |
-| `input` | string | **erforderlich** | Eingabedaten |
+| `input` | string | `""` | Eingabedaten (optional, Default: leerer String) |
 | `params` | map | `{}` | Zusaetzliche Parameter |
 | `timeout_seconds` | int | null | Claude-CLI-Timeout |
 
@@ -435,8 +447,23 @@ Variablen verwenden doppelte Klammern: `{{ variable_name }}` (Leerzeichen option
 | Variable | Quelle | Beschreibung |
 |---|---|---|
 | `{{ previous_output }}` | Auto | Ausgabe des vorherigen Blocks (Step N-1) |
+| `{{ step_N_output }}` | Auto | Ausgabe von Step N (z.B. `{{ step_0_output }}` fuer den ersten Block) |
 | `{{ previous_chain_output }}` | Auto | Ausgabe des vorherigen Chain-Eintrags (nur Chains) |
 | `{{ item }}` / `{{ <variable_name> }}` | ForEach | Aktuelles Schleifen-Item |
+
+### System-injizierte Variablen
+
+Folgende Variablen werden vom `WorkflowExecutor` automatisch bei jedem Run gesetzt und stehen in allen Bloecken zur Verfuegung:
+
+| Variable | Beschreibung |
+|---|---|
+| `{{ workflow_run_id }}` | Eindeutige Run-ID |
+| `{{ workflow_id }}` | Workflow-ID |
+| `{{ workflow_name }}` | Workflow-Name |
+| `{{ project_path }}` | Projektpfad |
+| `{{ model }}` | Konfiguriertes Modell (oder leer) |
+| `{{ provider }}` | Konfigurierter AI-Provider (oder leer) |
+| `{{ started_at }}` | Startzeitpunkt des Runs (ISO-8601) |
 
 ### Kontext-Variablen
 

@@ -1,4 +1,4 @@
-> *Zuletzt aktualisiert: 28. März 2026, 14:30 Uhr — Workflow: MySuricates Docs aktualisieren | Run: c47b8112-0468-445d-bfaf-a7a8a5d46264*
+> *Zuletzt aktualisiert: 28. März 2026, 19:45 Uhr — Workflow: MySuricates Docs aktualisieren | Run: 01102949-3825-4cd9-b4b9-8aa84917c4c2*
 
 # Architektur
 
@@ -72,30 +72,30 @@ SQLite (Datei: data/automation.db)
 com.automation
 ├── controller/          26 REST-Controller
 ├── service/
-│   ├── project/         Projekte + Container-Lifecycle
-│   ├── workflow/        WorkflowExecutor, WorkflowService, ExecutionBroadcaster, TemplateVerificationService
-│   ├── skill/           Skills + Import/Export
-│   ├── scheduler/       Cron-basierte Ausführung
-│   ├── webhook/         Webhook-Trigger
-│   ├── learning/        Dashboard-Analytics
-│   ├── system/          Tailscale Remote-Access
-│   ├── ai/              HostClaudeService, HostCodexService
-│   ├── cli/             CommandExecutorService, CliSessionManager, ClaudeOutputParser
-│   ├── chain/           ChainService, ChainExecutor, ChainTemplateService
-│   ├── memory/          WorkflowMemoryService, ClaudeSummarizer, CodexSummarizer
-│   ├── staging/         StagingService, TestingService, InstanceSyncHelper
-│   ├── todo/            TodoService, AutoTodoService, GateStatusResolver
-│   ├── conversion/      WorkflowConversionService, DialogConversionService
-│   ├── dialog/          DialogSessionScanner, DialogConversionService
-│   ├── factory/         WorkflowFactoryService
+│   ├── project/         ProjectService, ContainerService, ProjectContextService, PathValidator
+│   ├── workflow/        WorkflowExecutor, WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService, GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService
+│   ├── skill/           SkillService, SkillImportExportService, SkillRegistry, CapabilityRegistry
+│   ├── scheduler/       SchedulerService, ScheduledWorkflowExecutor
+│   ├── webhook/         WebhookService, GitWebhookPayloadParser
+│   ├── learning/        LearningService, AgenticLearningService, ExecutionInsightsService, WorkflowStatsService, WorkflowSimilarityService, BlockTypesBackfillService, MetadataExtractor
+│   ├── system/          ApiKeyService, DatabaseBackupService, ExecutionSettingsService, SystemIdentityService, TailscaleService
+│   ├── ai/              HostClaudeService, HostCodexService, AiProviderRegistry, ClaudeAiProvider, CodexAiProvider
+│   ├── cli/             CommandExecutorService, CliSessionManager, ClaudeOutputParser, ShellCommandService, ContainerShellService
+│   ├── chain/           ChainService, ChainExecutor, ChainTemplateService, BuiltInChainTemplate
+│   ├── memory/          WorkflowMemoryService, ClaudeSummarizer, CodexSummarizer, KnowledgeSummarizer, ConversationPreprocessor, SummarizationSetupService
+│   ├── staging/         StagingService, TestingService, InstanceSyncHelper, DockerContainerManager
+│   ├── todo/            TodoService, AutoTodoService, GateStatusResolver, GateStatusOutputParser, ProjectPathResolver
+│   ├── conversion/      WorkflowConversionService, WorkflowSuggestion, DialogWorkflowSuggestion
+│   ├── dialog/          DialogSessionScanner, DialogConversionService, ClaudeJsonlParser
+│   ├── factory/         WorkflowFactoryService, ClaudeWorkflowGenerator, CodexWorkflowGenerator, WorkflowTextGenerator, FactorySetupService
 │   ├── pool/            WorkflowPoolService
-│   ├── wish/            WishService
+│   ├── wish/            WishService, WishWatchdogService
 │   ├── notification/    NotificationService
 │   ├── trigger/         CompletionTriggerService
-│   ├── health/          Health-Checks
-│   ├── repair/          WorkflowRepairService
-│   ├── tray/            System-Tray-Integration
-│   ├── activitylog/     ActivityLogService
+│   ├── health/          HealthAutoTodoService
+│   ├── repair/          AutoRepairService
+│   ├── tray/            SystemTrayService
+│   ├── activitylog/     ActivityLogService, ActivityLogLifecycleListener
 │   ├── AssistantService.java        Chat-Assistent (Claude CLI)
 │   ├── AssistantSessionService.java Session-Persistierung
 │   └── PageSuggestionService.java   Kontext-sensitive UI-Vorschläge
@@ -143,7 +143,7 @@ com.automation
 | `WishController` | `/api/v1/wishes` | CRUD, Cancel, Respond, Crystallize |
 | `StagingController` | `/api/v1/staging` | Status, Start, Stop, Promote, Promote-Cancel, Sync-Preview, Sync-Definitions |
 | `TestingController` | `/api/v1/testing` | Status, Start, Stop, Reset, Sync-Preview, Sync-Definitions, Report-Result, Pull-Changes |
-| `SystemController` | `/api/v1/system` | Health, Auth-Status, Info, Settings, AI-Providers, Backup, Backups, Remote-Access, Browse, Open-Path, Repair, Client-Errors |
+| `SystemController` | `/api/v1/system` | Health, Auth-Status, Info, Settings, Execution-Config, AI-Providers, Backup, Backups, Remote-Access, Browse, Open-Path, Repair, Client-Errors |
 | `DocsController` | `/api/v1/docs` | Markdown-Dokumentation lesen |
 
 ### Workflow-Ausführung
@@ -305,7 +305,8 @@ Workflows können über Runs hinweg Wissen akkumulieren:
 - `ClaudeSummarizer` / `CodexSummarizer` — AI-basierte Zusammenfassung
 - `KnowledgeSummarizer` — Interface für die Summarization-Backends
 - `HostCodexService` — führt OpenAI Codex CLI auf dem Host aus (analog zu `HostClaudeService`)
-- `SummarizationConfig` — Konfiguration der Backend-Auswahl
+- `SummarizationSetupService` — Konfiguration und Setup der Summarization-Backends
+- `ConversationPreprocessor` — Vorverarbeitung von Konversationsdaten für Summarization
 - Aktive Memory-Einträge werden in nachfolgende Runs als Kontext injiziert
 - `WorkflowMemory`-Entity (V16-Migration)
 
@@ -367,6 +368,7 @@ Erfolgreiche Agentic-Runs können in deterministische Workflows konvertiert werd
 Claude-Code-Sessions können ebenfalls als Vorlage für Workflows dienen:
 - `DialogSessionScanner` — scannt `~/.claude/projects/` nach JSONL-Session-Dateien
 - `DialogConversionService` — analysiert eine Session mit Claude und generiert eine Workflow-Suggestion
+- `ClaudeJsonlParser` — parst JSONL-Session-Dateien
 - `DialogController` — `/api/v1/dialog` mit Session-List, Analyse und Workflow-Erstellung
 - Pfad-Traversal-Schutz: nur Pfade unter `~/.claude/projects/` mit `.jsonl`-Endung sind erlaubt
 
@@ -404,7 +406,10 @@ Claude-Code-Sessions können ebenfalls als Vorlage für Workflows dienen:
 ## Workflow Factory
 
 Automatisches Generieren und Verifizieren von Workflows aus einem Topic:
-- `WorkflowFactoryService` — generiert, deployt auf Test-Instanz, verifiziert, promotet optional
+- `WorkflowFactoryService` — orchestriert den gesamten Factory-Prozess
+- `ClaudeWorkflowGenerator` / `CodexWorkflowGenerator` — AI-basierte Workflow-Generierung
+- `WorkflowTextGenerator` — Textbasierte Workflow-Generierung
+- `FactorySetupService` — Konfiguration und Setup der Factory-Umgebung
 - `WorkflowFactoryController` — `/api/v1/factory` mit Endpunkten:
   - `POST /generate` — Workflow aus Topic generieren
   - `POST /run` — generierten Workflow auf Test-Instanz ausführen
@@ -426,6 +431,7 @@ Vorgefertigte Workflow-Definitionen aus dem `workflow-pool/`-Verzeichnis:
 
 Natürlichsprachige Wünsche werden automatisch in Workflows/Chains umgesetzt:
 - `WishService` — erstellt Wish, startet asynchrone Erfüllung
+- `WishWatchdogService` — überwacht laufende Wishes auf Stale-/Timeout-Zustände
 - Iterativer Prozess: Decomposition → Workflow-/Chain-Generierung → Ausführung → Feedback
 - Unterstützt bis zu `max_iterations` Iterationen für Verbesserungen
 - `crystallize()` — promotet erfolgreichen Wish als Template
@@ -436,6 +442,59 @@ Backend liest Markdown-Dokumentationsdateien und stellt sie als API bereit:
 - `DocsController` — `/api/v1/docs`, liest `.md`-Dateien aus konfiguriertem `docs/`-Verzeichnis
 - Pfad-Traversal-Schutz eingebaut
 - Frontend zeigt Docs in Split-Layout mit Markdown-Rendering
+
+## Entities
+
+Alle JPA-Entities und Enums im `com.automation.entity`-Package:
+
+| Entity | Tabelle | Beschreibung |
+|---|---|---|
+| `ActivityLog` | `activity_log` | System-/Ausführungs-Logeinträge mit Level, Category, Metadata |
+| `AssistantSession` | `assistant_sessions` | Persistierte Chat-Sessions des Assistenten |
+| `BlockDefinition` | *(eingebettet)* | Block-Definition mit Typ, Config, Required-Capabilities (Value Object) |
+| `Capability` | `capabilities` | Skill-Capabilities mit Schema und Handler-Referenz |
+| `ChainEntry` | *(eingebettet)* | Eintrag in einer Chain mit Workflow-Referenz und Kontext (Value Object) |
+| `ChainRun` | `chain_runs` | Ausführungs-Instanz einer Chain mit Entry-Runs |
+| `ChainRunEntry` | *(eingebettet)* | Status eines einzelnen Chain-Eintrags während der Ausführung (Value Object) |
+| `CompletionTrigger` | `completion_triggers` | Verknüpfung Source→Target-Workflow bei Abschluss |
+| `Container` | `containers` | Docker-Container pro Projekt mit Status und Mounts |
+| `NotificationConfig` | `notification_configs` | Benachrichtigungs-Konfiguration (Webhook/Desktop) |
+| `PageSuggestion` | `page_suggestions` | Gecachte UI-Vorschläge pro Seite |
+| `Project` | `projects` | Projekt mit Typ, Pfad, Status, AI-Kontext |
+| `ScheduledWorkflow` | `scheduled_workflows` | Cron-/Once-/Delayed-Schedule für Workflows und Chains |
+| `Skill` | `skills` | Skill mit Kategorie, Capabilities, Konfigurationsschema |
+| `StepResult` | `step_results` | Ergebnis eines einzelnen Workflow-Schritts mit Context-Delta |
+| `TemplateVerification` | `template_verifications` | Qualitätsstatus eines Templates pro Projekt |
+| `Todo` | `todos` | Aufgabe mit Status, Priorität, Source, Tags |
+| `WebhookTrigger` | `webhook_triggers` | Webhook-Trigger für Workflows mit Secret-Token |
+| `Wish` | `wishes` | Natürlichsprachiger Wunsch mit Decomposition und Iteration-History |
+| `Workflow` | `workflows` | Workflow mit Blöcken, Instructions, Modell, Provider (Soft-Delete) |
+| `WorkflowChain` | `workflow_chains` | Chain mit sortierten Entries und Stop-on-Failure |
+| `WorkflowMemory` | `workflow_memory` | Extrahiertes Wissen aus Workflow-Runs |
+| `WorkflowRun` | `workflow_runs` | Ausführungs-Instanz eines Workflows mit Steps und Metadata |
+| `WorkflowTemplate` | `workflow_templates` | Template mit i18n Name/Description und Blöcken |
+
+**Enums:**
+
+| Enum | Werte |
+|---|---|
+| `ContainerStatus` | CREATED, RUNNING, STOPPED, ERROR |
+| `GateStatus` | GREEN, YELLOW, RED |
+| `ProjectStatus` | STOPPED, STARTING, RUNNING, ERROR |
+| `ProjectType` | CODE, CONTENT, RESEARCH, BUSINESS, PERSONAL |
+| `RunStatus` | PENDING, RUNNING, PAUSED, COMPLETED, COMPLETED_WITH_ERRORS, FAILED, CANCELLED, INTERRUPTED |
+| `SkillCategory` | DOCUMENT, CODE, DATA, CONTENT, RESEARCH, BUSINESS, PRODUCTIVITY |
+| `StepStatus` | PENDING, RUNNING, COMPLETED, FAILED, SKIPPED, WAITING_APPROVAL |
+| `WishStatus` | RECEIVED, DECOMPOSING, AWAITING_DECOMPOSE_APPROVAL, EXECUTING, EVALUATING, REFINING, AWAITING_CLARIFICATION, AWAITING_APPROVAL, COMPLETED, FAILED, CANCELLED |
+| `Todo.Status` | OPEN, IN_PROGRESS, DONE, BACKLOG |
+| `Todo.Priority` | LOW, MEDIUM, HIGH |
+| `Todo.Source` | USER, AI, WORKFLOW |
+| `ActivityLog.LogLevel` | DEBUG, INFO, WARN, ERROR |
+| `ActivityLog.LogCategory` | SYSTEM, EXECUTION, SCHEDULE, WEBHOOK, SECURITY, CONTAINER |
+| `ScheduledWorkflow.ScheduleType` | CRON, ONCE, DELAYED |
+| `ScheduledWorkflow.TargetType` | WORKFLOW, CHAIN |
+| `ScheduledWorkflow.ConflictBehavior` | SKIP, OVERLAP |
+| `NotificationConfig.ChannelType` | WEBHOOK, DESKTOP |
 
 ## Frontend-Architektur
 
@@ -592,6 +651,7 @@ autotrigger/
 │   ├── pom.xml
 │   ├── docker-compose.yml
 │   ├── docker-compose.stable.yml      ← Stable-Container
+│   ├── docker-compose.test.yml        ← Test-Container
 │   ├── docker/
 │   │   ├── Dockerfile.backend
 │   │   ├── Dockerfile.stable          ← Ubuntu-basiert (glibc für Claude CLI)

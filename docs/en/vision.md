@@ -1,4 +1,4 @@
-> *Last updated: 28. März 2026, 14:30 Uhr — Workflow: MySuricates Docs aktualisieren | Run: c47b8112-0468-445d-bfaf-a7a8a5d46264*
+> *Last updated: 28. März 2026, 19:45 Uhr — Workflow: MySuricates Docs aktualisieren | Run: 01102949-3825-4cd9-b4b9-8aa84917c4c2*
 
 # MySuricates — Vision
 
@@ -15,7 +15,7 @@ Not just for developers. For anyone who wants to solve real problems.
 
 ## The Principle of Continuous Approximation
 
-Perfection is not a state — it is a direction. A system that considers perfection achievable will eventually stop learning. This one won't.
+Perfection is not a state — it is a direction. A system that considers perfection achievable will eventually stop learning. This one will not.
 
 Every run produces data. Every iteration refines the next attempt. Learning, Memory, Factory, and Wishes are not features — they are the mechanisms of this continuous approximation. The system will never be perfect. But with every step it gets closer to perfection — and that is exactly the point.
 
@@ -23,22 +23,22 @@ Every run produces data. Every iteration refines the next attempt. Learning, Mem
 
 ## Pillar 1: Universal Problem Solver
 
-MySuricates solves real problems — in private life and in the professional world. Workflows are the building blocks, Chains combine them into complex solutions.
+MySuricates solves real problems — in personal life and in the professional world. Workflows are the building blocks, Chains combine them into complex solutions.
 
 ### Professional
 
 - **Morning Briefing**: News, calendar, priorities — everything at a glance
 - **Meeting Minutes**: Recording → Summary → Action Items → Distribution
-- **Social Media Calendar**: Content ideas → Texts → Schedule → Posting
-- **Security Audit**: Scan codebase → Evaluate vulnerabilities → Report
+- **Social Media Calendar**: Content ideas → Copy → Schedule → Posting
+- **Security Audit**: Scan codebase → Assess vulnerabilities → Report
 - **Code Review**: Automatic analysis → Improvement suggestions → PR comments
 
 ### Personal
 
 - **Application Coach**: Analyze job posting → Cover letter → Adapt resume
-- **Travel Planning**: Budget, interests, timeframe → complete travel plan
-- **Vocabulary Songs**: Frequency-based song generation for language learning
-- **Event Organization**: Guest list, location, schedule, invitations
+- **Travel Planning**: Budget, interests, timeframe → Complete travel plan
+- **Vocabulary Songs**: Generate frequency-based songs for language learning
+- **Event Organization**: Guest list, venue, schedule, invitations
 
 ### Combined (Chains)
 
@@ -46,7 +46,7 @@ MySuricates solves real problems — in private life and in the professional wor
 - **Website Audit**: Performance → SEO → Accessibility → Overall Report
 - **Office Morning Routine**: Check emails → Calendar → Briefing → Prioritize todos
 
-The core: Every workflow is a solved problem. Every chain is a solved problem chain. The template library grows — and with it the range of problems that MySuricates can solve out-of-the-box.
+The core idea: Every workflow is a solved problem. Every chain is a solved problem chain. The template library grows — and with it the number of problems MySuricates can solve out-of-the-box.
 
 ---
 
@@ -105,32 +105,36 @@ Workflows accumulate knowledge across runs:
 
 ---
 
-## What Has Been Built (v0.6.0)
+## What Has Been Built (v0.6.1)
 
 | Component | Status |
-|----------|--------|
-| Block-based Workflows (12 block types) | Done |
-| Docker Container Execution | Done |
+|-----------|--------|
+| Block-based workflows (12 block types) | Done |
+| Docker container execution | Done |
 | Agentic Blocks (Goal → Reason → Act → Observe) | Done |
 | Workflow Chains (sequential composition) | Done |
 | Workflow Factory (AI-generated + auto-test) | Done |
 | Wishes (Intent → Decompose → Execute → Evaluate) | Done |
 | Decompose-Approval Gate | Done |
 | Pre-flight Verification + Auto-Fix | Done |
-| Learning Feedback in Prompts | Done |
-| Cross-Project Workflow Recognition | Done |
-| 44 Built-in Templates (Dev + Office + Everyday) | Done |
-| 16 Built-in Skills (Code Review, Test Generator, OCR, etc.) | Done |
+| Learning feedback in prompts | Done |
+| Cross-project workflow recognition | Done |
+| 44 built-in templates (dev + office + everyday) | Done |
+| 16 built-in skills (code review, test generator, OCR, etc.) | Done |
 | Staging (Dev + Stable + Test) | Done |
-| Multi-Provider (Claude + Codex) | Done |
-| Assistant System (contextual floating chat with page suggestions) | Done |
+| Multi-provider (Claude + Codex) | Done |
+| Assistant system (contextual floating chat with page suggestions) | Done |
 | Gate Status System (quality gates, AutoTodo integration) | Done |
 | Agent Instructions System (base and per-workflow instructions) | Done |
-| CompletionTrigger System (automatic actions after workflow completion) | Done |
-| Notification System (NotificationConfig) | Done |
+| CompletionTrigger system (automatic actions after workflow completion) | Done |
+| Notification system (NotificationConfig) | Done |
 | Workflow Memory (knowledge extraction and accumulation across runs) | Done |
-| Template Verification (quality assurance for workflow templates) | Done |
+| Template Verification (quality checks for workflow templates) | Done |
 | Workflow Conversion (agentic runs → deterministic workflows) | Done |
+| Run resumption (continue from last step after interruption) | Done |
+| Session-to-workflow import (Claude sessions as workflows) | Done |
+| Extended schedule control (end conditions, conflict behavior) | Done |
+| In-app documentation (DocsController, contextual help) | Done |
 
 ---
 
@@ -139,7 +143,7 @@ Workflows accumulate knowledge across runs:
 ### Phase 2: Cost & Intelligence (next step)
 
 - **Cost estimation before execution** — User sees expected token costs before a Wish runs
-- **Model selection per Wish** — Automatic or manual selection of the appropriate model
+- **Model selection per Wish** — Automatic or manual choice of the appropriate model
 - **Auto-refine without user intervention** — Wish iterates independently until target quality is reached
 - **Iteration history with delta tracking** — Traceable what changed between iterations
 
@@ -151,9 +155,9 @@ Workflows accumulate knowledge across runs:
 
 ### Long-term: Ecosystem
 
-- **External Skill Packages** — Installable packages (Git repo/ZIP) with new Skills + Capabilities
-- **MCP Servers as Skills** — Automatically make MCP servers available as Skills/Capabilities
-- **Integration Plugins** — Slack, Jira, GitHub, Email as workflow blocks
+- **External skill packages** — Installable packages (Git repo/ZIP) with new skills + capabilities
+- **MCP servers as skills** — Automatically make MCP servers available as skills/capabilities
+- **Integration plugins** — Slack, Jira, GitHub, Email as workflow blocks
 - **Workflow Marketplace** — Share and discover community templates
 
 ---

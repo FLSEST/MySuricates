@@ -1,0 +1,333 @@
+> *Last updated: 28. März 2026, 19:45 Uhr — Workflow: MySuricates Docs aktualisieren | Run: 01102949-3825-4cd9-b4b9-8aa84917c4c2*
+
+# Deployment
+
+## Docker Compose
+
+The project is deployed via Docker Compose. The configuration is located in `ai-automation-backend/docker-compose.yml`.
+
+### Starting
+
+```bash
+cd ai-automation-backend
+
+# 1. Build JAR
+mvn clean package -DskipTests
+
+# 2. Start backend
+docker compose up --build -d
+
+# 3. Build agent images (one-time)
+docker compose --profile build-only build
+```
+
+The backend is then accessible at `http://localhost:9090`.
+
+### Services
+
+| Service | Image | Port | Description |
+|---|---|---|---|
+| `backend` | `Dockerfile.backend` | 9090 | Spring Boot Backend |
+| `agent-node` | `Dockerfile.agent-node` | - | Node.js 21 Agent Container |
+| `agent-python` | `Dockerfile.agent-python` | - | Python 3.12 Agent Container |
+| `agent-go` | `Dockerfile.agent-go` | - | Go 1.22 Agent Container |
+
+The agent images are only built (`profiles: build-only`), not started directly via Compose. The backend creates and manages agent containers dynamically via the Docker API.
+
+## Dockerfiles
+
+### Backend (`docker/Dockerfile.backend`)
+
+- **Base:** `eclipse-temurin:21-jre-alpine`
+- **User:** `appuser` (UID 1000, non-root)
+- **JVM:** ZGC (Generational), 256MB–1GB Heap
+- **Extras:** Tailscale CLI (optional, for remote access)
+- **Healthcheck:** `curl http://localhost:9090/api/v1/system/health`
+
+### Agent Node (`docker/Dockerfile.agent-node`)
+
+- **Base:** `node:21-slim`
+- **Tools:** git, curl, jq
+- **User:** `agent` (UID 1000)
+- **Claude CLI:** Directories prepared (binary + config mounted from host)
+- **CMD:** `tail -f /dev/null` (container stays active for `docker exec`)
+
+### Agent Python (`docker/Dockerfile.agent-python`)
+
+- **Base:** `python:3.12-slim`
+- **Tools:** git, curl, jq
+- **Packages:** anthropic, pandas, numpy, requests, beautifulsoup4
+
+### Agent Go (`docker/Dockerfile.agent-go`)
+
+- **Base:** `golang:1.22-alpine`
+- **Tools:** git, curl, bash, jq
+
+### Agent DevOps (`docker/Dockerfile.agent-devops`)
+
+- **Base:** `ubuntu:24.04`
+- **Tools:** git, curl, jq, bash, python3
+- **GitHub CLI:** `gh` from the official APT repository
+- **Security Tools:** gitleaks (binary from GitHub Releases), trivy (official installer)
+- **Docker:** Docker CE CLI (client only, no daemon)
+- **User:** `agent` (UID 1000)
+- **CMD:** `tail -f /dev/null`
+
+### Stable (`docker/Dockerfile.stable`)
+
+- **Base:** `eclipse-temurin:21-jre-jammy` (Ubuntu-based, glibc for Claude CLI)
+- **ARGs:** `HOST_USER`, `HOST_UID`, `HOST_GID`, `HOST_HOME` — for user mapping with the host
+- **Tools:** curl, git, gosu, python3, jq, nodejs, npm, wget, unzip
+- **Entrypoint:** `entrypoint.sh` (user switching via gosu)
+- **Port:** 9091
+- **Healthcheck:** `curl http://localhost:9091/api/v1/system/health`
+- **JVM:** ZGC (Generational), 256MB–1GB Heap, headless AWT
+
+## Docker Compose Files
+
+### `docker-compose.yml` (Main)
+
+Backend + agent images (build-only). Network: `automation` (Bridge).
+
+### `docker-compose.stable.yml`
+
+Stable environment on port 9091:
+- Container: `mysuricates-stable`
+- Profile: `SPRING_PROFILES_ACTIVE=stable`
+- Volumes: `stable-data` (persistent DB), `stable-frontend/` (read-only), Docker Socket, Claude CLI directories from host
+- Named Volume: `stable-data`
+
+### `docker-compose.test.yml`
+
+Test instance on port 8090:
+- Container: `mysuricates-test`
+- Image: `ai-automation-backend-test`
+- Profile: `SPRING_PROFILES_ACTIVE=test`
+- Volumes: `test-data` (persistent DB), `stable-frontend/` (read-only), `application-test.yml` (read-only), Docker Socket, Claude CLI directories from host
+- Healthcheck: `curl http://localhost:8090/api/v1/system/health`
+- Named Volume: `test-data`
+
+## Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `AUTOMATION_DB_PATH` | `./data/automation.db` | Path to SQLite database |
+| `AUTOMATION_PORT` | `9090` | Server port |
+| `AUTOMATION_SECURITY_ENABLED` | `true` | API key authentication |
+| `AUTOMATION_API_KEY` | (empty) | API key for authentication |
+| `AUTOMATION_RATE_LIMIT_ENABLED` | `false` | Enable rate limiting |
+| `AUTOMATION_RATE_LIMIT_RPM` | `120` | Requests per minute |
+| `AUTOMATION_TAILSCALE_ENABLED` | `false` | Tailscale remote access |
+| `AUTOMATION_HOST_CLAUDE_MAX_TOKENS` | (empty) | Optional per-call token limit for Claude CLI |
+| `AUTOMATION_HOST_CLAUDE_TIMEOUT_SECONDS` | `300` | Global Claude CLI timeout in seconds |
+| `DOCKER_HOST` | `unix:///var/run/docker.sock` | Docker socket path |
+
+### Container Limits (application.yml)
+
+| Property | Default | Description |
+|---|---|---|
+| `docker.container.cpu-quota` | `200000` | CPU quota (2 cores) |
+| `docker.container.memory-limit` | `4000000000` | RAM limit (~4GB) |
+| `docker.container.pids-limit` | `100` | Max. processes |
+| `docker.container.idle-timeout-minutes` | `60` | Auto-stop after inactivity |
+
+## Profiles
+
+### Development (Default)
+
+```yaml
+# application.yml defaults
+automation.security.enabled: true
+automation.security.rate-limit.enabled: false
+automation.tailscale.enabled: false
+logging.level.com.automation: DEBUG
+```
+
+- API key authentication active (key is auto-generated on first start)
+- No rate limiting
+- Debug logging
+- SQLite at `./data/automation.db`
+
+### Production
+
+```bash
+# docker-compose.yml environment
+AUTOMATION_SECURITY_ENABLED=true
+AUTOMATION_API_KEY=<secure-key>
+AUTOMATION_TAILSCALE_ENABLED=true    # optional
+AUTOMATION_RATE_LIMIT_ENABLED=true   # optional
+```
+
+- API key authentication active
+- Rate limiting recommended
+- Docker socket mounted (`/var/run/docker.sock`)
+
+## Volumes
+
+```yaml
+volumes:
+  - ./data:/app/data                    # SQLite database
+  - /var/run/docker.sock:/var/run/docker.sock  # Docker socket
+```
+
+**Important:** The Docker socket mount gives the backend full control over the host Docker. In production environments, API key auth should be enabled.
+
+**Note:** HikariCP pool size is set to 1. SQLite only allows one concurrent write. Pool size=1 serializes all DB operations — no lock contention. Increasing pool size only makes sense when switching to PostgreSQL.
+
+## Tailscale Remote Access
+
+The backend can be made accessible from outside the local network via Tailscale.
+
+### Prerequisites
+
+- Tailscale CLI installed in the container (Dockerfile.backend includes this)
+- `AUTOMATION_TAILSCALE_ENABLED=true` in environment variables
+
+### Activation
+
+1. Call API endpoint: `POST /api/v1/system/remote-access/enable`
+2. Backend starts Tailscale in the container
+3. IP and hostname are returned in the response
+
+### Status
+
+- `GET /api/v1/system/remote-access/status` → `{ enabled, ip, hostname }`
+- Visible in the frontend under Settings → Remote Access
+
+## Healthcheck
+
+Docker Compose and the Dockerfile define a healthcheck:
+
+```
+GET http://localhost:9090/api/v1/system/health
+
+Interval: 30s
+Timeout: 5s
+Retries: 3
+Start Period: 15s
+```
+
+Response on success:
+
+```json
+{
+  "status": "UP",
+  "timestamp": "...",
+  "docker": "CONNECTED"
+}
+```
+
+## Database Backup
+
+The SQLite database is a single file:
+
+```bash
+# Create backup
+cp data/automation.db data/automation.db.backup
+
+# Or while the system is running (WAL mode)
+sqlite3 data/automation.db ".backup 'data/automation.db.backup'"
+```
+
+**Location:** `ai-automation-backend/data/automation.db` (local) or `/app/data/automation.db` (Docker)
+
+The file contains all projects, workflows, runs, skills, schedules, and webhooks. A backup of this file saves the entire state of the platform.
+
+## Network
+
+Docker Compose creates an `automation` bridge network. The backend container and the dynamically created agent containers can communicate through it.
+
+```yaml
+networks:
+  automation:
+    driver: bridge
+```
+
+## Three-Environment Setup
+
+The project supports three parallel environments:
+
+| Environment | Port | Description |
+|---|---|---|
+| **Dev** | 3000 (Frontend) / 9090 (Backend) | From source code, Vite dev server |
+| **Stable** | 9091 | Docker container, backend + embedded frontend |
+| **Test** | 8090 | Docker container, dedicated test instance for workflow testing |
+
+### Auto-Start
+
+Dev automatically starts Stable and Test on boot (`ApplicationReadyEvent`) when:
+1. A snapshot is available (`stable-frontend/` directory exists)
+2. The container is not already running
+
+Controlled via `automation.staging.auto-start` (default: `true`, disabled in `application-stable.yml`).
+
+### Stable Environment (Port 9091)
+
+The stable environment is a Docker container that includes the backend + embedded React frontend.
+
+**Key files:**
+- `ai-automation-backend/docker/Dockerfile.stable` — Ubuntu-based (glibc for Claude CLI)
+- `ai-automation-backend/docker-compose.stable.yml` — Volume mounts for Claude CLI + projects
+- `ai-automation-backend/src/main/resources/application-stable.yml` — Port 9091, auto-start disabled, frontend serving enabled
+
+### Test Instance (Port 8090)
+
+The test instance is a dedicated Docker container for automated workflow testing:
+
+- `TestingService` — manages the test Docker container
+- Auto-starts on boot when `automation.staging.test-auto-start=true` and a snapshot is available
+- Auto-syncs Dev definitions on startup
+- Database can be reset via API (`POST /api/v1/testing/reset`)
+
+**Key files:**
+- `ai-automation-backend/docker-compose.test.yml` — Container `mysuricates-test`, port 8090, profile `test`
+
+### Staging CLI Management
+
+```bash
+./scripts/staging.sh snapshot    # Build JAR + frontend + Docker image, tag git commit
+./scripts/staging.sh start       # Start stable container on :9091
+./scripts/staging.sh stop        # Stop stable container
+./scripts/staging.sh status      # Container status + health check
+./scripts/staging.sh log         # Show container logs (tail)
+./scripts/staging.sh db-seed     # Raw DB copy (emergency only, overwrites everything)
+./scripts/staging.sh clean       # Remove container + volume + image
+./scripts/staging.sh promote     # stop → snapshot → start (one-liner)
+```
+
+### Definition Sync (Dev → Stable / Dev → Test)
+
+`POST /api/v1/staging/sync-definitions` and `POST /api/v1/testing/sync-definitions` synchronize **definitions only**:
+
+| Synced | Matching | Behavior |
+|---|---|---|
+| Projects | Name + Path | Skip if exists, create if new |
+| Workflows | Name + Project name | Update if exists, import if new |
+| Custom Skills | Name | Skip if exists, import if new |
+
+**Not synced** (preserved on Stable/Test): workflow_runs, step_results, scheduled_workflows, webhook_triggers, activity_log, todos, built-in skills/templates. Archived projects and soft-deleted workflows are automatically excluded.
+
+### Version Display
+
+In Settings → Stable, a version comparison is shown:
+- **Dev**: Version from `/api/v1/system/info`
+- **Stable**: Version from the Stable container's `/api/v1/system/info`
+
+When versions differ (e.g. after a release), a promote is recommended.
+
+### Release + Promote Workflow
+
+```bash
+# 1. Bump version
+./scripts/release.sh           # e.g. 0.3.2 → 0.3.3
+
+# 2. Deploy new version to Stable
+./scripts/staging.sh promote   # Builds and starts Stable with the new version
+```
+
+### Git Tags
+
+| Tag Format | Created by | Purpose |
+|---|---|---|
+| `v0.3.2` | `release.sh` | Semver release marker |
+| `stable-20250225-143022` | `staging.sh promote` | Deployment timestamp |

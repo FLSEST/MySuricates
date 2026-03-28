@@ -1,4 +1,4 @@
-> *Zuletzt aktualisiert: 28. März 2026, 14:30 Uhr — Workflow: MySuricates Docs aktualisieren | Run: c47b8112-0468-445d-bfaf-a7a8a5d46264*
+> *Zuletzt aktualisiert: 28. März 2026, 19:45 Uhr — Workflow: MySuricates Docs aktualisieren | Run: 01102949-3825-4cd9-b4b9-8aa84917c4c2*
 
 # MySuricates — Vision
 
@@ -105,7 +105,7 @@ Workflows accumulate knowledge across runs:
 
 ---
 
-## Was schon gebaut ist (v0.6.0)
+## Was schon gebaut ist (v0.6.1)
 
 | Baustein | Status |
 |----------|--------|
@@ -131,6 +131,10 @@ Workflows accumulate knowledge across runs:
 | Workflow Memory (Wissensextraktion und -akkumulation über Runs) | Done |
 | Template Verification (Qualitätsprüfung von Workflow-Templates) | Done |
 | Workflow Conversion (Agentic-Runs → deterministische Workflows) | Done |
+| Run-Resumption (ab letztem Step fortsetzen nach Unterbrechung) | Done |
+| Session-zu-Workflow-Import (Claude-Sessions als Workflows) | Done |
+| Erweiterte Schedule-Steuerung (End-Conditions, Konflikt-Verhalten) | Done |
+| In-App Dokumentation (DocsController, kontextuelle Hilfe) | Done |
 
 ---
 

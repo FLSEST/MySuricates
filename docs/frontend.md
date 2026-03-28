@@ -1,3 +1,5 @@
+> *Zuletzt aktualisiert: 28. März 2026, 19:45 Uhr — Workflow: MySuricates Docs aktualisieren | Run: 01102949-3825-4cd9-b4b9-8aa84917c4c2*
+
 # Frontend
 
 ## Routing
@@ -7,23 +9,38 @@
 | `/` | Dashboard | Statistiken, Charts, letzte Runs |
 | `/projects` | Projects | Projektliste, Erstellen |
 | `/projects/:id` | ProjectDetail | Projektdetails, Container, Workflows |
+| `/wishes` | Wishes | Wunsch-System, iterative Erfüllung |
 | `/workflows` | Workflows | Workflow-Liste, Erstellen mit Templates |
 | `/workflows/:id` | WorkflowDetail | Block-Editor, Skills, Runs, Memory |
 | `/workflows/:id/run/:runId` | WorkflowExecution | Live-Ausführung, Logs, Steps |
+| `/factory` | WorkflowFactory | Workflow-Generator aus Topics |
+| `/dialogs` | DialogImport | Claude-Sessions als Workflows importieren |
+| `/chains` | Chains | Workflow-Chains, Split-Panel-Layout |
+| `/chains/:id/run/:runId` | ChainExecution | Live Chain-Ausführung, Entry-Status |
 | `/runs` | Runs | Alle Workflow-Runs (globale Liste) |
 | `/skills` | Skills | Skill-Katalog mit Capabilities |
 | `/schedules` | Schedules | Cron-basierte Zeitpläne |
 | `/webhooks` | Webhooks | Webhook-Trigger-Verwaltung |
-| `/chains` | Chains | Workflow-Chains, Split-Panel-Layout |
-| `/chains/:id/run/:runId` | ChainExecution | Live Chain-Ausführung, Entry-Status |
 | `/todos` | Todos | TODO-Liste, Filter, Statusverwaltung |
-| `/activity-log` | ActivityLog | System-Activity-Log mit Filtern |
-| `/wishes` | Wishes | Wunsch-System, iterative Erfüllung |
-| `/factory` | WorkflowFactory | Workflow-Generator aus Topics |
+| `/activity` | ActivityLog | System-Activity-Log mit Filtern |
 | `/docs` | Docs | Markdown-Dokumentation (Split-Layout) |
+| `/insights` | Insights | Plattform-Einblicke und Analysen |
 | `/settings` | Settings | Sprache, Theme, API-Key, Tailscale, Staging, Testing |
 
 Alle Routen sind in `src/App.tsx` definiert und von einem `<Layout>`-Wrapper umgeben (Sidebar + Header).
+
+### Simple Mode
+
+`useSettingsStore().simpleMode` schaltet vier Seiten zwischen Normal- und Simple-Variante um:
+
+| Route | Normal | Simple |
+|---|---|---|
+| `/` | `Dashboard` | `SimpleDashboard` |
+| `/workflows` | `Workflows` | `SimpleWorkflows` |
+| `/workflows/:id` | `WorkflowDetail` | `SimpleWorkflowDetail` |
+| `/workflows/:id/run/:runId` | `WorkflowExecution` | `SimpleWorkflowExecution` |
+
+Die Umschaltung erfolgt über Route-Wrapper-Komponenten (z.B. `DashboardRoute`, `WorkflowsRoute`) in `App.tsx`, die je nach `simpleMode`-Flag die entsprechende Variante rendern.
 
 ## Seiten
 
@@ -91,7 +108,7 @@ Alle Routen sind in `src/App.tsx` definiert und von einem `<Layout>`-Wrapper umg
 - Erkennt automatisch von AI erstellte TODOs (source: AI, sourceAgent: claude-code)
 - Badge-Anzeige in der Sidebar für offene TODOs
 
-### ActivityLog (`/activity-log`)
+### ActivityLog (`/activity`)
 
 - Paginierte Log-Tabelle mit Filter nach Level, Kategorie, Workflow
 - Kategorien: WORKFLOW, SKILL, SYSTEM, SECURITY, u.a.
@@ -107,11 +124,21 @@ Alle Routen sind in `src/App.tsx` definiert und von einem `<Layout>`-Wrapper umg
 - Vollständige Pipeline: Generieren → Test-Instanz → Verifizieren → Promoten
 - Topic-Kategorien-Auswahl
 
+### DialogImport (`/dialogs`)
+
+- Claude-Sessions scannen und als Workflows importieren
+- Session-Auswahl, Vorschau, Import mit Projekt-Zuordnung
+
 ### Docs (`/docs`)
 
 - Split-Layout: Dokument-Liste links, Markdown-Rendering rechts
 - Dokumente werden via `GET /api/v1/docs` aus `docs/`-Verzeichnis geladen
 - Markdown-Rendering mit `react-markdown` + `remark-gfm` + `@tailwindcss/typography`
+
+### Insights (`/insights`)
+
+- Plattform-Analysen und Statistiken
+- Visualisierung von Workflow-Performance und Nutzungsmustern
 
 ### WorkflowDetail (`/workflows/:id`) — Erweiterungen
 
@@ -128,6 +155,30 @@ Alle Routen sind in `src/App.tsx` definiert und von einem `<Layout>`-Wrapper umg
 - **Stable:** Versionsvergleich Dev/Stable, Sync-Preview, Sync-Definitions, Start/Stop/Promote
 - **Testing:** Test-Instanz-Status, Start/Stop/Reset, Sync-Preview, Sync-Definitions
 - System: Health-Status, Systeminfos, Docker-Status
+
+## Komponenten
+
+### `AssistantPanel.tsx` (`src/components/AssistantPanel.tsx`)
+
+- Floating-Chat-Panel, global über dem Layout eingeblendet
+- Kontext-sensitiver Chat mit Page Suggestions
+- Persistierte Sessions, WebSocket-Integration
+- Siehe [Assistant System](assistant-system.md) für Details
+
+### `src/components/settings/`
+
+- Settings-Unterkomponenten für die modulare Settings-Seite
+- Separate Komponenten für Allgemein, Darstellung, Sicherheit, Stable, Testing, System
+
+### Shared-Komponenten (`src/components/shared/`)
+
+| Komponente | Beschreibung |
+|---|---|
+| `StatusBadge` | Mappt Status-Strings auf Badge-Varianten |
+| `LogViewer` | Log-Anzeige mit Level-Farben und Auto-Scroll |
+| `MonacoEditor` | JSON-Editor (Monaco, Dark Theme) |
+| `ErrorState` | Fehlermeldung mit Icon |
+| `EmptyState` | Leerer Zustand mit Beschreibung |
 
 ## UI-Komponentenbibliothek
 
@@ -146,16 +197,6 @@ Alle Komponenten in `src/components/ui/`:
 | `Spinner` | `size` (sm/md/lg), `text` | Lade-Indikator |
 | `Table<T>` | `columns`, `data`, `keyExtractor`, `onRowClick`, `emptyText` | Generische Tabelle |
 | `ToastContainer` | (global) | Toast-Benachrichtigungen (max. 5) |
-
-### Shared-Komponenten (`src/components/shared/`)
-
-| Komponente | Beschreibung |
-|---|---|
-| `StatusBadge` | Mappt Status-Strings auf Badge-Varianten |
-| `LogViewer` | Log-Anzeige mit Level-Farben und Auto-Scroll |
-| `MonacoEditor` | JSON-Editor (Monaco, Dark Theme) |
-| `ErrorState` | Fehlermeldung mit Icon |
-| `EmptyState` | Leerer Zustand mit Beschreibung |
 
 ## Design-System
 
@@ -212,7 +253,7 @@ Das Theme wird über CSS Custom Properties gesteuert (`src/index.css`, `src/them
 |---|---|---|
 | `useSidebarStore` | `collapsed: boolean`, `toggle()`, `setCollapsed()` | `localStorage: sidebar-state` |
 | `useThemeStore` | `mode: 'light'\|'dark'`, `overrides`, `toggleMode()`, `apply()` | `localStorage: theme-settings` |
-| `useSettingsStore` | `apiKey: string`, `advancedMode: boolean` | `localStorage: app-settings` |
+| `useSettingsStore` | `apiKey: string`, `advancedMode: boolean`, `simpleMode: boolean` | `localStorage: app-settings` |
 | `useI18nStore` | `locale: 'en'\|'de'`, `setLocale()` | `localStorage: i18n-locale` |
 | `useToastStore` | `toasts[]`, `addToast()`, `removeToast()` | Kein (flüchtig) |
 
@@ -381,6 +422,58 @@ Alle API-Daten werden über React Query verwaltet:
 |---|---|---|
 | `usePool()` | Query | Pool-Workflows |
 | `useInstallPoolWorkflow()` | Mutation | Workflow aus Pool installieren |
+
+### `useAssistant.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useAssistantChat()` | Mutation | Chat-Nachricht an den Assistenten senden |
+| `useAssistantSuggestions(page)` | Query | Seitenspezifische Vorschläge laden |
+| `useRefreshSuggestions()` | Mutation | Vorschläge neu generieren |
+
+### `useChainTemplates.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useChainTemplates()` | Query | Verfügbare Chain-Templates |
+
+### `useCompletionTriggers.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useCompletionTriggers(workflowId)` | Query | CompletionTrigger eines Workflows |
+| `useCreateCompletionTrigger()` | Mutation | Trigger erstellen |
+| `useDeleteCompletionTrigger()` | Mutation | Trigger löschen |
+
+### `useDialog.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useDialogSessions()` | Query | Verfügbare Claude-Sessions |
+| `useImportDialog()` | Mutation | Session als Workflow importieren |
+
+### `useInsights.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useInsights()` | Query | Plattform-Einblicke und Statistiken |
+
+### `useNotifications.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useNotifications()` | Query | Benachrichtigungen laden |
+
+### `usePersistedState.ts`
+
+Generischer Hook für persistierten State via `localStorage`.
+
+### `useWorkflowFactory.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useGenerateWorkflow()` | Mutation | Workflow aus Topic generieren |
+| `useFactoryStatus()` | Query | Status der Factory-Pipeline |
 
 ### `useWebSocket.ts`
 

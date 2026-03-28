@@ -1,3 +1,5 @@
+> *Zuletzt aktualisiert: 28. März 2026, 19:45 Uhr — Workflow: MySuricates Docs aktualisieren | Run: 01102949-3825-4cd9-b4b9-8aa84917c4c2*
+
 # Entwicklung
 
 ## Voraussetzungen
@@ -27,7 +29,7 @@ mvn spring-boot:run
 
 # Alternativ: JAR bauen und ausführen
 mvn clean package -DskipTests
-java -jar target/ai-automation-backend-0.1.0-SNAPSHOT.jar
+java -jar target/ai-automation-backend-0.6.2-SNAPSHOT.jar
 ```
 
 Das Backend erstellt automatisch `data/automation.db` beim ersten Start und führt Flyway-Migrationen aus.
@@ -76,7 +78,7 @@ mvn clean package -DskipTests
 # JAR bauen (mit Tests)
 mvn clean package
 
-# Ergebnis: target/ai-automation-backend-0.1.0-SNAPSHOT.jar
+# Ergebnis: target/ai-automation-backend-0.6.2-SNAPSHOT.jar
 ```
 
 ### Frontend
@@ -183,8 +185,8 @@ cypress/
 
 | Datei | Format | Beispiel |
 |---|---|---|
-| `ai-automation-backend/pom.xml` | `X.Y.Z-SNAPSHOT` | `0.1.1-SNAPSHOT` |
-| `ai-automation-frontend/package.json` | `X.Y.Z` | `0.1.1` |
+| `ai-automation-backend/pom.xml` | `X.Y.Z-SNAPSHOT` | `0.6.2-SNAPSHOT` |
+| `ai-automation-frontend/package.json` | `X.Y.Z` | `0.6.2` |
 | `application.yml` | via `@project.version@` (Maven-Filtering) | automatisch |
 
 Das Dashboard zeigt die Version über den `/api/v1/system/info`-Endpunkt an.
@@ -261,11 +263,13 @@ Das Backend nutzt drei Annotation-Prozessoren, die in der Compiler-Konfiguration
 
 ### Backend-Struktur
 
-Das Backend umfasst **20 REST-Controller** und **12 Block-Typen**:
+Das Backend umfasst **26 REST-Controller** und **12 Block-Typen**:
 
-**Controller:** Workflow, WorkflowTemplate, Skill, Execution, Learning, Schedule, Webhook, System, Project, Conversion, Todo, ActivityLog, WorkflowMemory, Staging, Testing, Chain, WorkflowPool, WorkflowFactory, Wish, Docs
+**Controller:** Workflow, WorkflowTemplate, Skill, Execution, Learning, Schedule, Webhook, System, Project, Conversion, Todo, ActivityLog, WorkflowMemory, Staging, Testing, Chain, ChainTemplate, WorkflowPool, WorkflowFactory, Wish, Docs, Assistant, PageSuggestion, CompletionTrigger, Notification, Dialog
 
 **Block-Typen:** `simple`, `shell`, `retry`, `conditional`, `forEach`, `while`, `switch`, `agentic`, `approval`, `sub-workflow`, `skill-capability`, `human-input`
+
+**Flyway-Migrationen:** V1–V47 (SQLite)
 
 ### Gate Status System
 

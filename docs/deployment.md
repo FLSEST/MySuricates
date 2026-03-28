@@ -1,3 +1,5 @@
+> *Zuletzt aktualisiert: 28. März 2026, 19:45 Uhr — Workflow: MySuricates Docs aktualisieren | Run: 01102949-3825-4cd9-b4b9-8aa84917c4c2*
+
 # Deployment
 
 ## Docker Compose
@@ -44,9 +46,10 @@ Die Agent-Images werden nur gebaut (`profiles: build-only`), nicht direkt über 
 
 ### Agent Node (`docker/Dockerfile.agent-node`)
 
-- **Base:** `node:21-alpine`
-- **Tools:** git, curl, bash, jq
-- **Pakete:** `@anthropic-ai/claude-code` (optional)
+- **Base:** `node:21-slim`
+- **Tools:** git, curl, jq
+- **User:** `agent` (UID 1000)
+- **Claude CLI:** Verzeichnisse vorbereitet (Binary + Config vom Host gemountet)
 - **CMD:** `tail -f /dev/null` (Container bleibt aktiv für `docker exec`)
 
 ### Agent Python (`docker/Dockerfile.agent-python`)
@@ -60,13 +63,57 @@ Die Agent-Images werden nur gebaut (`profiles: build-only`), nicht direkt über 
 - **Base:** `golang:1.22-alpine`
 - **Tools:** git, curl, bash, jq
 
+### Agent DevOps (`docker/Dockerfile.agent-devops`)
+
+- **Base:** `ubuntu:24.04`
+- **Tools:** git, curl, jq, bash, python3
+- **GitHub CLI:** `gh` aus dem offiziellen APT-Repository
+- **Security-Tools:** gitleaks (Binary von GitHub Releases), trivy (offizieller Installer)
+- **Docker:** Docker CE CLI (nur Client, kein Daemon)
+- **User:** `agent` (UID 1000)
+- **CMD:** `tail -f /dev/null`
+
+### Stable (`docker/Dockerfile.stable`)
+
+- **Base:** `eclipse-temurin:21-jre-jammy` (Ubuntu-basiert, glibc für Claude CLI)
+- **ARGs:** `HOST_USER`, `HOST_UID`, `HOST_GID`, `HOST_HOME` — für User-Mapping mit dem Host
+- **Tools:** curl, git, gosu, python3, jq, nodejs, npm, wget, unzip
+- **Entrypoint:** `entrypoint.sh` (User-Switching via gosu)
+- **Port:** 9091
+- **Healthcheck:** `curl http://localhost:9091/api/v1/system/health`
+- **JVM:** ZGC (Generational), 256MB–1GB Heap, headless AWT
+
+## Docker Compose Files
+
+### `docker-compose.yml` (Haupt)
+
+Backend + Agent-Images (build-only). Netzwerk: `automation` (Bridge).
+
+### `docker-compose.stable.yml`
+
+Stable-Umgebung auf Port 9091:
+- Container: `mysuricates-stable`
+- Profil: `SPRING_PROFILES_ACTIVE=stable`
+- Volumes: `stable-data` (persistente DB), `stable-frontend/` (read-only), Docker Socket, Claude CLI Directories vom Host
+- Named Volume: `stable-data`
+
+### `docker-compose.test.yml`
+
+Test-Instanz auf Port 8090:
+- Container: `mysuricates-test`
+- Image: `ai-automation-backend-test`
+- Profil: `SPRING_PROFILES_ACTIVE=test`
+- Volumes: `test-data` (persistente DB), `stable-frontend/` (read-only), `application-test.yml` (read-only), Docker Socket, Claude CLI Directories vom Host
+- Healthcheck: `curl http://localhost:8090/api/v1/system/health`
+- Named Volume: `test-data`
+
 ## Umgebungsvariablen
 
 | Variable | Standard | Beschreibung |
 |---|---|---|
 | `AUTOMATION_DB_PATH` | `./data/automation.db` | Pfad zur SQLite-Datenbank |
 | `AUTOMATION_PORT` | `9090` | Server-Port |
-| `AUTOMATION_SECURITY_ENABLED` | `false` | API-Key-Authentifizierung |
+| `AUTOMATION_SECURITY_ENABLED` | `true` | API-Key-Authentifizierung |
 | `AUTOMATION_API_KEY` | (leer) | API-Key für Authentifizierung |
 | `AUTOMATION_RATE_LIMIT_ENABLED` | `false` | Rate Limiting aktivieren |
 | `AUTOMATION_RATE_LIMIT_RPM` | `120` | Requests pro Minute |
@@ -90,13 +137,13 @@ Die Agent-Images werden nur gebaut (`profiles: build-only`), nicht direkt über 
 
 ```yaml
 # application.yml Defaults
-automation.security.enabled: false
+automation.security.enabled: true
 automation.security.rate-limit.enabled: false
 automation.tailscale.enabled: false
 logging.level.com.automation: DEBUG
 ```
 
-- Keine Authentifizierung
+- API-Key-Authentifizierung aktiv (Key wird beim ersten Start auto-generiert)
 - Kein Rate Limiting
 - Debug-Logging
 - SQLite unter `./data/automation.db`
@@ -231,6 +278,9 @@ Die Test-Instanz ist ein dedizierter Docker-Container für automatisierte Workfl
 - Auto-Start beim Boot wenn `automation.staging.test-auto-start=true` und Snapshot vorhanden
 - Auto-Sync von Dev-Definitionen beim Start
 - Datenbank kann via API zurückgesetzt werden (`POST /api/v1/testing/reset`)
+
+**Key-Dateien:**
+- `ai-automation-backend/docker-compose.test.yml` — Container `mysuricates-test`, Port 8090, Profil `test`
 
 ### Staging CLI-Verwaltung
 

@@ -1,4 +1,4 @@
-> *Last updated: 28. März 2026, 14:30 Uhr — Workflow: MySuricates Docs aktualisieren | Run: c47b8112-0468-445d-bfaf-a7a8a5d46264*
+> *Last updated: 28. März 2026, 19:45 Uhr — Workflow: MySuricates Docs aktualisieren | Run: 01102949-3825-4cd9-b4b9-8aa84917c4c2*
 
 # Workflow Building Guide
 
@@ -52,7 +52,7 @@ POST /api/v1/workflows/{id}/execute
 {
   "context": {
     "filepath": "/path/to/file.md",
-    "language": "English"
+    "language": "German"
   }
 }
 ```
@@ -64,6 +64,18 @@ Access in block configs with `{{ filepath }}` or `{{ language }}`.
 ## 2. Block Type Reference
 
 MySuricates supports 12 block types. Each block has a `type` and a `config` map.
+
+### Common Block Properties
+
+In addition to its type-specific config fields, every block also supports these common properties:
+
+| Config Key | Type | Default | Description |
+|---|---|---|---|
+| `on_failure` | string | `"stop"` | Behavior on failure: `"stop"` (terminate workflow) or `"continue"` (proceed with next block) |
+
+**Default behavior**: When a block fails (status `FAILED`), the workflow stops and the run is marked as `FAILED`. With `"on_failure": "continue"`, the workflow proceeds with the next block.
+
+---
 
 ### `simple` — AI Text Processing
 
@@ -78,7 +90,7 @@ Sends the prompt to the Claude CLI on the host. No shell execution.
 {
   "type": "simple",
   "config": {
-    "command": "Analyze the following code and list suggestions for improvement:\n\n{{ previous_output }}"
+    "command": "Analyze the following code and list improvement suggestions:\n\n{{ previous_output }}"
   }
 }
 ```
@@ -117,11 +129,11 @@ Executes an autonomous Goal-Reason-Act-Observe loop. The most powerful but also 
 
 | Config Key | Type | Default | Description |
 |---|---|---|---|
-| `goal` | string | **required** | What the agent should achieve |
+| `goal` | string | **required** | What the agent should accomplish |
 | `success_criteria` | string | `""` | How success is measured |
 | `max_iterations` | int | 10 | Hard iteration cap |
 | `iteration_timeout_seconds` | int | 300 | Wall-clock timeout per iteration |
-| `total_timeout_seconds` | int | 1800 | Total block timeout (30 min) |
+| `total_timeout_seconds` | int | 1800 | Overall block timeout (30 min) |
 | `max_total_tokens` | int | 200000 | Token budget (input+output across all iterations) |
 | `max_repeated_actions` | int | 3 | Abort after N identical actions |
 | `require_approval` | bool | false | Approval gate before each action |
@@ -182,8 +194,8 @@ Evaluates a condition and executes one of two branches.
 | Config Key | Type | Default | Description |
 |---|---|---|---|
 | `condition` | string | **required** | Condition to evaluate |
-| `then_command` | string | **required** | Command when condition is true |
-| `else_command` | string | null | Command when condition is false |
+| `then_command` | string | **required** | Command if condition is true |
+| `else_command` | string | null | Command if condition is false |
 | `execution_mode` | string | `"claude"` | `"claude"` (AI) or `"shell"` |
 | `timeout_seconds` | int | 300 | Execution timeout |
 
@@ -233,7 +245,7 @@ Each case has:
       },
       {
         "value": "YELLOW|RED",
-        "blocks": [{ "type": "shell", "config": { "command": "echo 'Problems found'" } }]
+        "blocks": [{ "type": "shell", "config": { "command": "echo 'Issues found'" } }]
       }
     ],
     "default": [
@@ -287,7 +299,7 @@ Repeats a command until a condition is met or the maximum iteration count is rea
 
 | Config Key | Type | Default | Description |
 |---|---|---|---|
-| `condition_command` | string | **required** | Condition evaluated each iteration |
+| `condition_command` | string | null | Condition evaluated each iteration. Without `condition_command`, the loop runs until `max_iterations` or command failure |
 | `command` | string | **required** | Command per iteration |
 | `max_iterations` | int | 100 | Maximum loop iterations |
 | `execution_mode` | string | `"claude"` | `"claude"` (AI) or `"shell"` |
@@ -297,7 +309,7 @@ Repeats a command until a condition is met or the maximum iteration count is rea
 {
   "type": "while",
   "config": {
-    "condition_command": "Rate the quality on a scale of 1-10. Answer ONLY with 'true' if below 8, or 'false' if 8 or higher.",
+    "condition_command": "Rate the quality on a scale of 1-10. Reply ONLY with 'true' if below 8, or 'false' if 8 or higher.",
     "command": "Improve the text. Output the fully revised version.",
     "max_iterations": 3
   }
@@ -319,7 +331,7 @@ Pauses execution and waits for human approval via WebSocket.
 | Config Key | Type | Default | Description |
 |---|---|---|---|
 | `question` | string | `"Approval required"` | Approval question for the user |
-| `options` | list | `["Yes", "Yes always", "No"]` | Available answer options |
+| `options` | list | `["Yes", "Yes always", "No"]` | Available response options |
 | `variable_name` | string | `"approval_answer"` | Context variable for the answer |
 | `timeout_minutes` | int | 30 | Wait time |
 | `mode` | string | `"ask"` | `"ask"` (interactive) or `"auto"` (uses `auto_answer`) |
@@ -339,7 +351,7 @@ Pauses execution and waits for human approval via WebSocket.
 }
 ```
 
-**"Yes always"**: When the user selects "Yes always", the answer is remembered for this question for the rest of the run — subsequent approval blocks with the same question are answered automatically.
+**"Yes always"**: When the user selects "Yes always", the answer is remembered for this question for the rest of the run — subsequent approval blocks with the same question are automatically answered.
 
 **Auto mode**: With `"mode": "auto"` and `"auto_answer": "Yes"`, the block is answered immediately without user interaction. Useful for CI/CD pipelines.
 
@@ -370,15 +382,15 @@ Pauses execution to collect free-text input from the user.
     "prompt": "What language should the documentation be in?",
     "input_type": "select",
     "variable_name": "doc_language",
-    "options": ["German", "English", "French"],
-    "default_value": "German",
+    "options": ["Deutsch", "English", "Francais"],
+    "default_value": "Deutsch",
     "timeout_minutes": 15,
     "use_default_on_timeout": true
   }
 }
 ```
 
-**Timeout behavior**: When `use_default_on_timeout` = true (default) and a `default_value` is set, the default value is used on timeout and the block ends with COMPLETED. When false or no default value is set, the block ends with FAILED.
+**Timeout behavior**: If `use_default_on_timeout` = true (default) and a `default_value` is set, the default value is used on timeout and the block ends with COMPLETED. If false or no default value is set, the block ends with FAILED.
 
 **When to use**: Querying parameters at runtime, interactive workflows.
 
@@ -405,7 +417,7 @@ Invokes the capability of a registered skill.
 | Config Key | Type | Default | Description |
 |---|---|---|---|
 | `capability` | string | **required** | Capability name (e.g. `"web_search"`, `"analyze"`) |
-| `input` | string | **required** | Input data |
+| `input` | string | `""` | Input data (optional, default: empty string) |
 | `params` | map | `{}` | Additional parameters |
 | `timeout_seconds` | int | null | Claude CLI timeout |
 
@@ -435,8 +447,23 @@ Variables use double braces: `{{ variable_name }}` (spaces optional: `{{variable
 | Variable | Source | Description |
 |---|---|---|
 | `{{ previous_output }}` | Auto | Output of the previous block (step N-1) |
+| `{{ step_N_output }}` | Auto | Output of step N (e.g. `{{ step_0_output }}` for the first block) |
 | `{{ previous_chain_output }}` | Auto | Output of the previous chain entry (chains only) |
 | `{{ item }}` / `{{ <variable_name> }}` | ForEach | Current loop item |
+
+### System-Injected Variables
+
+The following variables are automatically set by the `WorkflowExecutor` on every run and are available in all blocks:
+
+| Variable | Description |
+|---|---|
+| `{{ workflow_run_id }}` | Unique run ID |
+| `{{ workflow_id }}` | Workflow ID |
+| `{{ workflow_name }}` | Workflow name |
+| `{{ project_path }}` | Project path |
+| `{{ model }}` | Configured model (or empty) |
+| `{{ provider }}` | Configured AI provider (or empty) |
+| `{{ started_at }}` | Run start time (ISO-8601) |
 
 ### Context Variables
 
@@ -446,7 +473,7 @@ Pass custom variables via the execution context:
 {
   "context": {
     "filepath": "/home/user/document.md",
-    "language": "English",
+    "language": "German",
     "batch_size": "50"
   }
 }
@@ -536,7 +563,7 @@ Shell block generates data, conditional block branches based on result.
 
 **Use case**: Deploy pipelines, CI/CD, conditional processing.
 
-**Templates**: `deploy-pipeline`, `git-to-changelog` (conditional migration help)
+**Templates**: `deploy-pipeline`, `git-to-changelog` (conditional migration aid)
 
 ```
 Block 1 (shell): Check preconditions
@@ -654,7 +681,7 @@ Source: `ExecutionDefaults.java`
 | `SHELL_TIMEOUT_SECONDS` | 300 (5 min) | Shell and simple block timeout |
 | `AGENTIC_MAX_ITERATIONS` | 10 | Agentic block iteration cap |
 | `AGENTIC_ITERATION_TIMEOUT_SECONDS` | 300 (5 min) | Wall-clock timeout per iteration |
-| `AGENTIC_TOTAL_TIMEOUT_SECONDS` | 1800 (30 min) | Total agentic block timeout |
+| `AGENTIC_TOTAL_TIMEOUT_SECONDS` | 1800 (30 min) | Overall agentic block timeout |
 | `AGENTIC_MAX_TOTAL_TOKENS` | 200,000 | Token budget (input+output) |
 | `INTERACTION_TIMEOUT_MINUTES` | 30 | Approval/human-input timeout |
 | `SUB_WORKFLOW_MAX_WAIT_MINUTES` | 30 | Sub-workflow completion timeout |
@@ -714,7 +741,7 @@ The model is set at the workflow level (`workflow.model` field) or left as null 
 
 ### Critical Rule
 
-**Always use Opus for analysis workflows.** Sonnet hallucinates findings (e.g. reporting false SQL injection vulnerabilities). For code analysis, security audits, and architecture reviews, precision is more important than speed.
+**Always use Opus for analysis workflows.** Sonnet hallucinates findings (e.g. reporting false SQL injection vulnerabilities). For code analysis, security audits, and architecture reviews, precision matters more than speed.
 
 ### Setting the Model
 
@@ -792,7 +819,7 @@ For shell blocks that need more tools, set `container_image`:
 
 Each iteration:
 1. **REASON**: Claude analyzes the current state, conversation history, and decides the next ACTION (uses `--system-prompt`, `--max-turns 3`)
-2. **ACT**: A **separate** Claude CLI call executes the ACTION (uses `--append-system-prompt`, `--model`, project directory)
+2. **ACT**: A **separate** Claude CLI call executes the ACTION (uses `--append-system-prompt`, `--model`, project working directory)
 3. **OBSERVE**: The result is recorded and fed back into the next REASON phase
 
 ### Critical: ACT Has No Context from REASON
@@ -800,15 +827,15 @@ Each iteration:
 The ACT phase is a **fresh Claude CLI call**. It shares no conversation context with REASON. This means:
 
 **Every ACTION must be self-contained:**
-- Use **absolute paths** (not relative, not "the file from before")
-- Specify **concrete names** (not "the function we discussed")
-- Give **exact instructions** (not "fix the bug" but "in `/path/to/File.java` line 42, change `foo` to `bar`")
+- Use **absolute paths** (not relative, not "the file from earlier")
+- Specify **exact names** (not "the function we discussed")
+- Give **precise instructions** (not "fix the bug" but "in `/path/to/File.java` line 42, change `foo` to `bar`")
 
 ```
 WRONG: "Fix the bug in the service class"
 RIGHT: "In /home/user/project/src/main/java/com/example/UserService.java
-         modify the getUserById() method to handle null inputs
-         by adding a null check at the beginning of the method."
+        modify the getUserById() method to handle null inputs
+        by adding a null check at the beginning of the method."
 ```
 
 ### History Compression
@@ -834,7 +861,7 @@ Old files from previous runs can pollute the agentic block's context (e.g. glob 
 |---|---|---|
 | `max_iterations` | 10 | Hard stop after N iterations |
 | `iteration_timeout_seconds` | 300 | Wall-clock timeout per iteration |
-| `total_timeout_seconds` | 1800 | Total timeout (30 min) |
+| `total_timeout_seconds` | 1800 | Overall timeout (30 min) |
 | `max_total_tokens` | 200,000 | Token budget (input+output) |
 | `max_repeated_actions` | 3 | Abort after N identical actions |
 | `require_approval` | false | Human gate before each action |
@@ -966,7 +993,7 @@ DELETE /api/v1/chains/{id}          # Delete chain
 - **Don't set `iteration_timeout_seconds` lower than `timeout_seconds`** — the CLI will succeed, but the iteration will be marked as TIMEOUT
 - **Don't assume ACT has context from REASON** — every action is a fresh CLI call
 - **Don't use relative paths in agentic actions** — the ACT phase may not share the same working directory context
-- **Don't run Opus workflows in parallel** when `max-concurrent-calls` is low (e.g. 3) — workflows block each other
+- **Don't run Opus workflows in parallel** when `max-concurrent-calls` is low (e.g. 3) — workflows will block each other
 - **Don't use `container_image` for simple blocks** — simple blocks always use the host Claude CLI
 - **Don't forget to set `model` explicitly** — null uses the system default which may not be desired
 - **Don't use shell blocks for AI reasoning** — use simple blocks instead (shell blocks only execute commands)
@@ -978,7 +1005,7 @@ DELETE /api/v1/chains/{id}          # Delete chain
 | Anti-Pattern | Problem | Solution |
 |---|---|---|
 | Agentic block with vague goal | Agent spins without progress | Formulate goal concretely with file paths and success criteria |
-| 100+ words per agentic action | ACT phase runs into timeout or gets confused | Break into smaller, specific actions |
+| 100+ words per agentic action | ACT phase runs into timeout or gets confused | Split into smaller, specific actions |
 | No cleanup before agentic block | Stale files from previous runs pollute context | Insert `rm -rf output/` shell block before |
 | `timeout_seconds: 900` with default `iteration_timeout_seconds` | Iteration times out at 300s even though CLI succeeds | Set both timeouts or use auto-alignment |
 

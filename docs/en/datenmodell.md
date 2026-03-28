@@ -1,0 +1,964 @@
+> *Last updated: 28. März 2026, 19:45 Uhr — Workflow: MySuricates Docs aktualisieren | Run: 01102949-3825-4cd9-b4b9-8aa84917c4c2*
+
+# Data Model
+
+## ER Diagram (Core)
+
+```mermaid
+erDiagram
+    projects ||--o| containers : "has"
+    projects ||--o{ workflows : "contains"
+    workflows ||--o{ workflow_runs : "has"
+    workflows }o--o{ skills : "activates"
+    workflow_runs ||--o{ step_results : "contains"
+    skills ||--o{ capabilities : "has"
+    workflows ||--o{ scheduled_workflows : "scheduled"
+    workflows ||--o{ webhook_triggers : "triggered"
+    workflows ||--o{ workflow_memory : "has"
+    workflow_templates ||--o{ workflows : "instantiates"
+    workflow_chains ||--o{ chain_runs : "has"
+    projects ||--o{ todos : "has"
+    projects ||--o{ wishes : "has"
+    workflows ||--o{ completion_triggers_source : "triggers"
+    workflows ||--o{ completion_triggers_target : "is triggered"
+    workflows ||--o{ notification_configs : "notifies"
+
+    projects {
+        TEXT id PK
+        TEXT name "NOT NULL"
+        TEXT subtitle
+        TEXT description
+        TEXT type "NOT NULL"
+        TEXT path "NOT NULL"
+        TEXT config "JSON"
+        TEXT status "NOT NULL, DEFAULT STOPPED"
+        TEXT ai_context
+        TEXT archived_at
+        TEXT created_at
+        TEXT updated_at
+    }
+
+    workflows {
+        TEXT id PK
+        TEXT project_id FK "NOT NULL"
+        TEXT name "NOT NULL"
+        TEXT description
+        TEXT icon
+        TEXT blocks "JSON"
+        TEXT instructions
+        TEXT model
+        TEXT provider
+        TEXT default_context "JSON"
+        TEXT template_id FK
+        TEXT test_status "DEFAULT UNTESTED"
+        TEXT last_tested_at
+        TEXT block_types
+        TEXT version "DEFAULT 1.0.0"
+        TEXT metadata "JSON"
+        TEXT deleted_at
+        TEXT stable_synced_at
+        TEXT created_at
+        TEXT updated_at
+    }
+
+    workflow_runs {
+        TEXT id PK
+        TEXT workflow_id FK "NOT NULL"
+        TEXT status "NOT NULL, DEFAULT PENDING"
+        TEXT input_context "JSON"
+        TEXT started_at
+        TEXT completed_at
+        INTEGER duration_ms
+        INTEGER user_rating
+        TEXT error "JSON"
+        TEXT metadata "JSON"
+        TEXT triggered_by_schedule_id
+    }
+
+    step_results {
+        TEXT id PK
+        TEXT workflow_run_id FK "NOT NULL"
+        INTEGER step_index "NOT NULL"
+        TEXT input
+        TEXT output
+        TEXT status "NOT NULL, DEFAULT PENDING"
+        TEXT started_at
+        TEXT completed_at
+        INTEGER duration_ms
+        TEXT metadata "JSON"
+        TEXT context_delta "JSON"
+    }
+
+    workflow_templates {
+        TEXT id PK
+        TEXT name "JSON i18n map"
+        TEXT description "JSON i18n map"
+        TEXT icon
+        TEXT category
+        TEXT blocks "JSON"
+        TEXT instructions
+        TEXT model
+        INTEGER built_in "DEFAULT 0"
+        INTEGER sort_order "DEFAULT 0"
+        TEXT quality_status "DEFAULT UNTESTED"
+        TEXT version "DEFAULT 1.0.0"
+        TEXT created_at
+        TEXT updated_at
+    }
+
+    template_verifications {
+        TEXT id PK
+        TEXT template_id FK "NOT NULL"
+        TEXT project_id FK "NOT NULL"
+        TEXT last_run_id FK
+        TIMESTAMP verified_at "NOT NULL"
+    }
+
+    workflow_memory {
+        TEXT id PK
+        TEXT workflow_id FK "NOT NULL"
+        TEXT title
+        TEXT content "NOT NULL"
+        TEXT tags
+        TEXT source_run_ids
+        TEXT provider "NOT NULL"
+        INTEGER active "DEFAULT 0"
+        TEXT created_at "NOT NULL"
+    }
+
+    workflow_chains {
+        TEXT id PK
+        TEXT name "NOT NULL"
+        TEXT description
+        TEXT icon
+        TEXT entries "JSON"
+        INTEGER stop_on_failure "DEFAULT 1"
+        TEXT metadata "JSON"
+        TEXT created_at
+        TEXT updated_at
+    }
+
+    chain_runs {
+        TEXT id PK
+        TEXT chain_id FK "NOT NULL"
+        TEXT status "DEFAULT PENDING"
+        TEXT entry_runs "JSON"
+        TEXT input_context "JSON"
+        TEXT started_at
+        TEXT completed_at
+        INTEGER duration_ms
+        TEXT error
+        TEXT metadata
+        TEXT triggered_by_schedule_id
+    }
+
+    scheduled_workflows {
+        TEXT id PK
+        TEXT workflow_id FK
+        TEXT chain_id FK
+        TEXT target_type "DEFAULT WORKFLOW"
+        TEXT schedule_type "DEFAULT CRON"
+        TEXT cron_expression "NOT NULL"
+        TEXT scheduled_at
+        TEXT delay_expression
+        INTEGER enabled "DEFAULT 1"
+        TEXT description
+        TEXT input_context "JSON"
+        TEXT last_run_at
+        TEXT next_run_at
+        TEXT end_date
+        INTEGER max_runs "DEFAULT 0"
+        INTEGER run_count "DEFAULT 0"
+        TEXT conflict_behavior "DEFAULT SKIP"
+        TEXT created_at
+        TEXT updated_at
+    }
+
+    todos {
+        TEXT id PK
+        TEXT title "NOT NULL"
+        TEXT description
+        TEXT status "DEFAULT OPEN"
+        TEXT priority "DEFAULT MEDIUM"
+        TEXT tags
+        TEXT project_id FK
+        TEXT source "DEFAULT USER"
+        TEXT source_agent
+        TEXT session_id
+        TEXT workflow_run_id
+        TEXT reference_type
+        TEXT reference_id
+        TEXT created_at
+        TEXT updated_at
+    }
+
+    activity_log {
+        TEXT id PK
+        TEXT timestamp "NOT NULL"
+        TEXT level "NOT NULL"
+        TEXT category "NOT NULL"
+        TEXT message "NOT NULL"
+        TEXT source
+        TEXT reference_id
+        TEXT workflow_id
+        TEXT metadata
+        TEXT created_at "NOT NULL"
+    }
+
+    wishes {
+        TEXT id PK
+        TEXT original_text "NOT NULL"
+        TEXT status "DEFAULT RECEIVED"
+        TEXT project_id FK
+        TEXT decomposition
+        TEXT generated_workflow_ids
+        TEXT generated_chain_id
+        TEXT reference_workflow_ids
+        INTEGER iteration_count "DEFAULT 0"
+        INTEGER max_iterations "DEFAULT 5"
+        TEXT current_run_id
+        TEXT result_summary
+        TEXT iteration_history
+        TEXT error
+        TEXT metadata
+        TEXT created_at
+        TEXT updated_at
+    }
+
+    completion_triggers {
+        TEXT id PK
+        TEXT source_workflow_id FK "NOT NULL"
+        TEXT target_workflow_id FK "NOT NULL"
+        INTEGER enabled "DEFAULT 1"
+        INTEGER trigger_on_success "DEFAULT 1"
+        INTEGER trigger_on_failure "DEFAULT 0"
+        INTEGER trigger_always "DEFAULT 0"
+        TEXT description
+        TEXT context_variables "JSON"
+        TEXT last_triggered_at
+        INTEGER trigger_count "DEFAULT 0"
+        TEXT created_at
+        TEXT updated_at
+    }
+
+    notification_configs {
+        TEXT id PK
+        TEXT name "NOT NULL"
+        INTEGER enabled "DEFAULT 1"
+        TEXT channel_type "DEFAULT WEBHOOK"
+        TEXT webhook_url
+        TEXT workflow_id FK
+        INTEGER trigger_on_success "DEFAULT 1"
+        INTEGER trigger_on_failure "DEFAULT 1"
+        INTEGER trigger_always "DEFAULT 0"
+        TEXT message_template
+        TEXT created_at
+        TEXT updated_at
+    }
+
+    assistant_sessions {
+        TEXT id PK
+        TEXT page "NOT NULL"
+        TEXT entity_id
+        TEXT messages "NOT NULL, DEFAULT []"
+        INTEGER message_count "DEFAULT 0"
+        TEXT started_at "NOT NULL"
+        TEXT ended_at
+    }
+
+    page_suggestions {
+        TEXT id PK
+        TEXT page "NOT NULL, UNIQUE"
+        TEXT suggestions "NOT NULL, DEFAULT []"
+        TEXT generated_by "DEFAULT CLAUDE"
+        TEXT generated_at "NOT NULL"
+        INTEGER based_on_sessions "DEFAULT 0"
+    }
+
+    app_settings {
+        TEXT key PK
+        TEXT value "NOT NULL"
+        TEXT created_at
+    }
+```
+
+## Tables
+
+### `projects`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `name` | TEXT | NOT NULL | Project name |
+| `subtitle` | TEXT | | Short description (V18) |
+| `description` | TEXT | | Detailed description (V18) |
+| `type` | TEXT | NOT NULL | Enum: ProjectType |
+| `path` | TEXT | NOT NULL | Working directory (host path) |
+| `config` | TEXT | | JSON configuration |
+| `status` | TEXT | NOT NULL, DEFAULT 'STOPPED' | Enum: ProjectStatus |
+| `ai_context` | TEXT | | Additional AI context for the project (V30) |
+| `archived_at` | TEXT | | Archival timestamp, NULL = active (V35) |
+| `created_at` | TEXT | | ISO-8601 Timestamp |
+| `updated_at` | TEXT | | ISO-8601 Timestamp |
+
+**Note:** Projects are not hard-deleted but archived (`archived_at IS NOT NULL`). Archived projects retain all workflows, runs, and data.
+
+### `containers`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `project_id` | TEXT | FK -> projects, UNIQUE, NOT NULL | 1:1 relationship |
+| `docker_container_id` | TEXT | NOT NULL | Docker Container ID |
+| `image_name` | TEXT | NOT NULL | Docker Image Name |
+| `status` | TEXT | NOT NULL, DEFAULT 'CREATED' | Enum: ContainerStatus |
+| `mounts` | TEXT | | JSON: mounted volumes |
+| `started_at` | TEXT | | Start timestamp |
+| `stopped_at` | TEXT | | Stop timestamp |
+| `last_activity_at` | TEXT | | Last activity (V11, auto-stop timeout) |
+
+### `skills`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID (stable ID for built-ins) |
+| `name` | TEXT | NOT NULL | Skill name |
+| `description` | TEXT | | Description |
+| `icon` | TEXT | | Emoji or icon name |
+| `category` | TEXT | NOT NULL | Enum: SkillCategory |
+| `ai_context` | TEXT | | System prompt for AI |
+| `config_schema` | TEXT | | JSON schema |
+| `builtin` | INTEGER | NOT NULL, DEFAULT 0 | 0=custom, 1=builtin |
+| `version` | TEXT | DEFAULT '1.0.0' | Version number |
+| `created_at` | TEXT | | Creation timestamp |
+| `updated_at` | TEXT | | Update timestamp |
+
+16 built-in skills are created by `SkillSeeder` on startup (idempotent). Built-in skills have stable IDs (e.g. `builtin-code-review`).
+
+### `capabilities`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `skill_id` | TEXT | FK -> skills, NOT NULL | Belongs to skill |
+| `name` | TEXT | NOT NULL | Capability name |
+| `description` | TEXT | | Description |
+| `handler_class` | TEXT | | Java handler class |
+| `input_schema` | TEXT | | JSON schema for input |
+| `output_schema` | TEXT | | JSON schema for output |
+| `async` | INTEGER | NOT NULL, DEFAULT 0 | Asynchronous execution |
+
+### `workflows`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `project_id` | TEXT | FK -> projects, NOT NULL | Belongs to project |
+| `name` | TEXT | NOT NULL | Workflow name |
+| `description` | TEXT | | Description |
+| `icon` | TEXT | | Emoji |
+| `blocks` | TEXT | | JSON: list of BlockDefinitions |
+| `instructions` | TEXT | | Workflow-specific agent instructions (V13) |
+| `model` | TEXT | | Claude model override (V13), e.g. `claude-opus-4-6` |
+| `provider` | TEXT | | AI provider override (V34), e.g. `CLAUDE`, `CODEX` |
+| `default_context` | TEXT | DEFAULT '{}' | JSON: default context variables (V23) |
+| `template_id` | TEXT | FK -> workflow_templates, ON DELETE SET NULL | Source template (V19) |
+| `test_status` | TEXT | DEFAULT 'UNTESTED' | Test status: UNTESTED, PASSED, FAILED (V25) |
+| `last_tested_at` | TEXT | | Last test timestamp (V25) |
+| `block_types` | TEXT | DEFAULT '' | Denormalized block types, comma-separated (V26) |
+| `version` | TEXT | DEFAULT '1.0.0' | Version number |
+| `metadata` | TEXT | | JSON: additional metadata |
+| `deleted_at` | TEXT | | Soft-delete timestamp (V32). `@SQLRestriction("deleted_at IS NULL")` |
+| `stable_synced_at` | TEXT | | Timestamp of last synchronization to Stable (V46) |
+| `created_at` | TEXT | | Creation timestamp |
+| `updated_at` | TEXT | | Update timestamp |
+
+**Soft-Delete:** The entity class carries `@SQLRestriction("deleted_at IS NULL")`. Deleted workflows are permanently hidden from all queries.
+
+### `workflow_skills` (Join Table)
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `workflow_id` | TEXT | PK, FK -> workflows | Workflow |
+| `skill_id` | TEXT | PK, FK -> skills | Activated skill |
+
+M:N relationship between workflows and skills.
+
+### `workflow_runs`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `workflow_id` | TEXT | FK -> workflows, NOT NULL | Associated workflow |
+| `status` | TEXT | NOT NULL, DEFAULT 'PENDING' | Enum: RunStatus |
+| `input_context` | TEXT | | JSON: input context at start (V20) |
+| `started_at` | TEXT | | Start timestamp |
+| `completed_at` | TEXT | | End timestamp |
+| `duration_ms` | INTEGER | | Duration in milliseconds |
+| `user_rating` | INTEGER | | Rating 1-5 |
+| `error` | TEXT | | JSON: error description |
+| `metadata` | TEXT | | JSON: gate status, additional info (`gate_status`, `gate_category`, `gate_description`) |
+| `triggered_by_schedule_id` | TEXT | | ID of the triggering schedule (V43) |
+
+### `step_results`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `workflow_run_id` | TEXT | FK -> workflow_runs, NOT NULL | Associated run |
+| `step_index` | INTEGER | NOT NULL | Order (0-based) |
+| `input` | TEXT | | Input/prompt of the step |
+| `output` | TEXT | | Output of the step |
+| `status` | TEXT | NOT NULL, DEFAULT 'PENDING' | Enum: StepStatus |
+| `started_at` | TEXT | | Start timestamp |
+| `completed_at` | TEXT | | End timestamp |
+| `duration_ms` | INTEGER | | Duration in milliseconds |
+| `metadata` | TEXT | | JSON: additional metadata |
+| `context_delta` | TEXT | | JSON: cumulative snapshot of context variables at the end of the step (V47). Used for context restoration on INTERRUPTED runs |
+
+### `scheduled_workflows`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `workflow_id` | TEXT | FK -> workflows | Workflow (or NULL for chain targets) (V38) |
+| `chain_id` | TEXT | FK -> workflow_chains | Chain (V27, when `target_type = CHAIN`) |
+| `target_type` | TEXT | NOT NULL, DEFAULT 'WORKFLOW' | `WORKFLOW` or `CHAIN` (V27) |
+| `schedule_type` | TEXT | NOT NULL, DEFAULT 'CRON' | `CRON`, `ONCE` (V14) or `DELAYED` (V37) |
+| `cron_expression` | TEXT | NOT NULL | Spring Cron (6 fields) |
+| `scheduled_at` | TEXT | | One-time execution timestamp (V14, for `ONCE`) |
+| `delay_expression` | TEXT | | Human-readable delay for `DELAYED`, e.g. `"2h"`, `"30m"`, `"1d"` (V37) |
+| `enabled` | INTEGER | NOT NULL, DEFAULT 1 | Active/Inactive |
+| `description` | TEXT | | Description |
+| `input_context` | TEXT | DEFAULT '{}' | JSON: context variables |
+| `last_run_at` | TEXT | | Last execution |
+| `next_run_at` | TEXT | | Next scheduled execution |
+| `end_date` | TEXT | | Optional end date for CRON schedules -- schedule is disabled when `now >= endDate` (V44) |
+| `max_runs` | INTEGER | DEFAULT 0 | Maximum number of executions (0 = unlimited) (V44) |
+| `run_count` | INTEGER | DEFAULT 0 | Counter, incremented after each execution (V44) |
+| `conflict_behavior` | TEXT | DEFAULT 'SKIP' | Behavior when target is already running: `SKIP` or `OVERLAP` (V45) |
+| `created_at` | TEXT | | Creation timestamp |
+| `updated_at` | TEXT | | Update timestamp |
+
+### `webhook_triggers`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `workflow_id` | TEXT | FK -> workflows, NOT NULL | Workflow |
+| `secret_token` | TEXT | NOT NULL, UNIQUE | Trigger token |
+| `enabled` | INTEGER | NOT NULL, DEFAULT 1 | Active/Inactive |
+| `description` | TEXT | | Description |
+| `default_context` | TEXT | DEFAULT '{}' | JSON: default context |
+| `last_triggered_at` | TEXT | | Last trigger time |
+| `trigger_count` | INTEGER | NOT NULL, DEFAULT 0 | Number of triggers |
+| `created_at` | TEXT | | Creation timestamp |
+| `updated_at` | TEXT | | Update timestamp |
+
+**Index:** `idx_webhook_triggers_token` on `secret_token` (UNIQUE)
+
+### `workflow_templates`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `name` | TEXT | NOT NULL | JSON i18n map: `{"de":"...","en":"..."}` |
+| `description` | TEXT | | JSON i18n map |
+| `icon` | TEXT | | Emoji |
+| `category` | TEXT | | Category label |
+| `blocks` | TEXT | NOT NULL | JSON: BlockDefinition list |
+| `instructions` | TEXT | | Agent instructions |
+| `model` | TEXT | | Model override |
+| `built_in` | INTEGER | DEFAULT 0 | 1 = Built-in (immutable) |
+| `sort_order` | INTEGER | DEFAULT 0 | Sort order |
+| `quality_status` | TEXT | NOT NULL, DEFAULT 'UNTESTED' | Quality status (V22) |
+| `version` | TEXT | DEFAULT '1.0.0' | Template version |
+| `created_at` | TEXT | | |
+| `updated_at` | TEXT | | |
+
+44 built-in templates are created by `WorkflowTemplateSeeder` on startup. Template definitions are stored as JSON files under `src/main/resources/templates/builtin/`.
+
+### `template_verifications`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `template_id` | TEXT | FK -> workflow_templates, NOT NULL | Template |
+| `project_id` | TEXT | FK -> projects, NOT NULL | Project |
+| `last_run_id` | TEXT | FK -> workflow_runs, ON DELETE SET NULL | Last test run |
+| `verified_at` | TIMESTAMP | NOT NULL | Verification timestamp |
+
+**Unique Constraint:** `(template_id, project_id)` -- one entry per template+project combination.
+
+### `workflow_memory`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `workflow_id` | TEXT | FK -> workflows, NOT NULL, ON DELETE CASCADE | Associated workflow |
+| `title` | TEXT | | Short title of the knowledge entry |
+| `content` | TEXT | NOT NULL | Extracted knowledge (Markdown) |
+| `tags` | TEXT | | Comma-separated tags (JSON array as text) |
+| `source_run_ids` | TEXT | | JSON array of run IDs from which knowledge was extracted |
+| `provider` | TEXT | NOT NULL | `CLAUDE` or `CODEX` |
+| `active` | INTEGER | NOT NULL, DEFAULT 0 | 1 = inject into subsequent runs |
+| `created_at` | TEXT | NOT NULL | |
+
+**Indexes:** `idx_workflow_memory_workflow`, `idx_workflow_memory_active`
+
+### `workflow_chains`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `name` | TEXT | NOT NULL | Chain name |
+| `description` | TEXT | | Description |
+| `icon` | TEXT | | Emoji |
+| `entries` | TEXT | | JSON: list of `ChainEntry` objects (sorted by `sortOrder`) |
+| `stop_on_failure` | INTEGER | NOT NULL, DEFAULT 1 | Chain-level stop-on-failure flag |
+| `metadata` | TEXT | | JSON: additional metadata |
+| `created_at` | TEXT | NOT NULL | |
+| `updated_at` | TEXT | NOT NULL | |
+
+A chain does not belong to any project and can reference workflows from different projects.
+
+**ChainEntry (JSON structure within `entries`):**
+```json
+{
+  "workflowId": "uuid",
+  "label": "optional display name",
+  "sortOrder": 0,
+  "inputContext": {},
+  "stopOnFailure": true
+}
+```
+
+### `chain_runs`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `chain_id` | TEXT | FK -> workflow_chains, NOT NULL, ON DELETE CASCADE | Associated chain |
+| `status` | TEXT | NOT NULL, DEFAULT 'PENDING' | Enum: RunStatus |
+| `entry_runs` | TEXT | | JSON: list of `ChainRunEntry` objects (run IDs per entry) |
+| `input_context` | TEXT | | JSON: input context |
+| `started_at` | TEXT | | |
+| `completed_at` | TEXT | | |
+| `duration_ms` | INTEGER | | |
+| `error` | TEXT | | Error message |
+| `metadata` | TEXT | | JSON: additional metadata |
+| `triggered_by_schedule_id` | TEXT | | ID of the triggering schedule (V43) |
+
+**ChainRunEntry (JSON structure within `entry_runs`):**
+```json
+{
+  "entryIndex": 0,
+  "workflowId": "uuid",
+  "workflowName": "Name",
+  "projectName": "Project",
+  "workflowRunId": "uuid",
+  "status": "PENDING",
+  "startedAt": null,
+  "completedAt": null,
+  "durationMs": null
+}
+```
+
+**Indexes:** `idx_chain_runs_chain_id`, `idx_chain_runs_status`
+
+### `todos`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `title` | TEXT | NOT NULL | Short title in imperative form |
+| `description` | TEXT | | Markdown description |
+| `status` | TEXT | NOT NULL, DEFAULT 'OPEN' | `OPEN`, `IN_PROGRESS`, `DONE`, `BACKLOG` |
+| `priority` | TEXT | NOT NULL, DEFAULT 'MEDIUM' | `HIGH`, `MEDIUM`, `LOW` |
+| `tags` | TEXT | | JSON array as text |
+| `project_id` | TEXT | FK -> projects, ON DELETE SET NULL | Optional project assignment |
+| `source` | TEXT | NOT NULL, DEFAULT 'USER' | `USER`, `AI`, `WORKFLOW` |
+| `source_agent` | TEXT | | e.g. `claude-code` |
+| `session_id` | TEXT | | Shell session ID of the creator (V36) |
+| `workflow_run_id` | TEXT | | Linked workflow run (when automatically created) |
+| `reference_type` | TEXT | | Type of the referenced object |
+| `reference_id` | TEXT | | ID of the referenced object |
+| `created_at` | TEXT | NOT NULL | |
+| `updated_at` | TEXT | NOT NULL | |
+
+**Indexes:** `idx_todos_status`, `idx_todos_project`, `idx_todos_source`, `idx_todos_created`
+
+TODOs are automatically created by `AutoTodoService` on RED/YELLOW gate status (RED -> HIGH, YELLOW -> MEDIUM).
+
+### `activity_log`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `timestamp` | TEXT | NOT NULL | ISO-8601 event timestamp |
+| `level` | TEXT | NOT NULL | `DEBUG`, `INFO`, `WARN`, `ERROR` |
+| `category` | TEXT | NOT NULL | `SYSTEM`, `EXECUTION`, `SCHEDULE`, `WEBHOOK`, `SECURITY`, `CONTAINER` |
+| `message` | TEXT | NOT NULL | Log message |
+| `source` | TEXT | | Source (service name, etc.) |
+| `reference_id` | TEXT | | ID of the affected object |
+| `workflow_id` | TEXT | | Linked workflow (V31) |
+| `metadata` | TEXT | | JSON: additional info |
+| `created_at` | TEXT | NOT NULL | DB insertion timestamp |
+
+**Indexes:** `idx_activity_log_timestamp`, `idx_activity_log_level`, `idx_activity_log_category`, `idx_activity_log_level_created`, `idx_activity_log_workflow_id` (V31)
+
+### `wishes`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `original_text` | TEXT | NOT NULL | Natural language wish |
+| `status` | TEXT | NOT NULL, DEFAULT 'RECEIVED' | Enum: WishStatus |
+| `project_id` | TEXT | FK -> projects | Optional project assignment |
+| `decomposition` | TEXT | | JSON: analysis and task decomposition |
+| `generated_workflow_ids` | TEXT | | JSON array of generated workflow IDs |
+| `generated_chain_id` | TEXT | | ID of the generated chain |
+| `reference_workflow_ids` | TEXT | | JSON array of reference workflows for the wish (V29) |
+| `iteration_count` | INTEGER | NOT NULL, DEFAULT 0 | Current iteration count |
+| `max_iterations` | INTEGER | NOT NULL, DEFAULT 5 | Maximum iteration count |
+| `current_run_id` | TEXT | | Currently running run |
+| `result_summary` | TEXT | | Summary of the result |
+| `iteration_history` | TEXT | | JSON: history of all iterations (V33) |
+| `error` | TEXT | | Error message |
+| `metadata` | TEXT | | JSON: additional info |
+| `created_at` | TEXT | NOT NULL | |
+| `updated_at` | TEXT | NOT NULL | |
+
+**Indexes:** `idx_wishes_status`, `idx_wishes_project_id`
+
+### `completion_triggers`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `source_workflow_id` | TEXT | FK -> workflows, NOT NULL | Workflow that fires the trigger |
+| `target_workflow_id` | TEXT | FK -> workflows, NOT NULL | Workflow that gets started |
+| `enabled` | INTEGER | NOT NULL, DEFAULT 1 | Active/Inactive |
+| `trigger_on_success` | INTEGER | NOT NULL, DEFAULT 1 | Trigger on successful completion |
+| `trigger_on_failure` | INTEGER | NOT NULL, DEFAULT 0 | Trigger on failure |
+| `trigger_always` | INTEGER | NOT NULL, DEFAULT 0 | Always trigger, regardless of status |
+| `description` | TEXT | | Description |
+| `context_variables` | TEXT | | JSON: context variables for the target workflow |
+| `last_triggered_at` | TEXT | | Last trigger time |
+| `trigger_count` | INTEGER | NOT NULL, DEFAULT 0 | Number of triggers |
+| `created_at` | TEXT | | Creation timestamp |
+| `updated_at` | TEXT | | Update timestamp |
+
+Automatically starts a target workflow when a source workflow completes. The trigger condition (success, failure, always) is configurable (V39).
+
+### `notification_configs`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `name` | TEXT | NOT NULL | Name of the notification configuration |
+| `enabled` | INTEGER | NOT NULL, DEFAULT 1 | Active/Inactive |
+| `channel_type` | TEXT | NOT NULL, DEFAULT 'WEBHOOK' | `WEBHOOK` or `DESKTOP` |
+| `webhook_url` | TEXT | | URL for WEBHOOK channel (Slack/Discord/Teams incoming webhook) |
+| `workflow_id` | TEXT | FK -> workflows | Optional workflow filter (NULL = global for all workflows) |
+| `trigger_on_success` | INTEGER | NOT NULL, DEFAULT 1 | Notify on success |
+| `trigger_on_failure` | INTEGER | NOT NULL, DEFAULT 1 | Notify on failure |
+| `trigger_always` | INTEGER | NOT NULL, DEFAULT 0 | Always notify |
+| `message_template` | TEXT | | Optional message template with variables: `{{workflow_name}}`, `{{status}}`, `{{duration}}`, `{{error_message}}` |
+| `created_at` | TEXT | | Creation timestamp |
+| `updated_at` | TEXT | | Update timestamp |
+
+Configurable notifications via webhook or desktop on workflow completion (V40).
+
+### `assistant_sessions`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `page` | TEXT | NOT NULL | Page/context of the assistant session |
+| `entity_id` | TEXT | | Optional entity ID for context-aware sessions |
+| `messages` | TEXT | NOT NULL, DEFAULT '[]' | JSON array of chat messages |
+| `message_count` | INTEGER | NOT NULL, DEFAULT 0 | Number of messages |
+| `started_at` | TEXT | NOT NULL | Session start |
+| `ended_at` | TEXT | | Session end |
+
+Stores assistant chat sessions for the floating chat panel (V41).
+
+### `page_suggestions`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `page` | TEXT | NOT NULL, UNIQUE | Page identifier |
+| `suggestions` | TEXT | NOT NULL, DEFAULT '[]' | JSON array of suggestions |
+| `generated_by` | TEXT | NOT NULL, DEFAULT 'CLAUDE' | Generator (e.g. `CLAUDE`) |
+| `generated_at` | TEXT | NOT NULL | Generation timestamp |
+| `based_on_sessions` | INTEGER | NOT NULL, DEFAULT 0 | Number of underlying sessions |
+
+AI-generated action suggestions per page, based on assistant sessions (V42).
+
+### `app_settings`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `key` | TEXT | PK | Setting key, e.g. `api-key` |
+| `value` | TEXT | NOT NULL | Setting value |
+| `created_at` | TEXT | NOT NULL, DEFAULT `datetime('now')` | |
+
+The only persistent system configuration outside of `application.yml`.
+
+## Enums
+
+### ProjectType
+
+| Value | Description |
+|---|---|
+| `CODE` | Software project |
+| `CONTENT` | Content creation |
+| `RESEARCH` | Research project |
+| `BUSINESS` | Business project |
+| `PERSONAL` | Personal project |
+
+### ProjectStatus
+
+| Value | Description |
+|---|---|
+| `STOPPED` | Container stopped |
+| `STARTING` | Container is starting |
+| `RUNNING` | Container is running |
+| `ERROR` | Error during container start |
+
+### ContainerStatus
+
+| Value | Description |
+|---|---|
+| `CREATED` | Container created, not yet started |
+| `RUNNING` | Container is running |
+| `STOPPED` | Container stopped |
+| `ERROR` | Container error |
+
+### RunStatus
+
+| Value | Description |
+|---|---|
+| `PENDING` | Waiting for execution |
+| `RUNNING` | Currently executing |
+| `PAUSED` | Paused (approval/human-input block waiting) |
+| `COMPLETED` | Successfully completed |
+| `COMPLETED_WITH_ERRORS` | Completed, but with YELLOW gate status |
+| `FAILED` | Failed |
+| `CANCELLED` | Cancelled |
+| `INTERRUPTED` | Interrupted (e.g. by server restart), can be resumed |
+
+### StepStatus
+
+| Value | Description |
+|---|---|
+| `PENDING` | Not yet started |
+| `RUNNING` | Currently executing |
+| `COMPLETED` | Successful |
+| `FAILED` | Failed |
+| `SKIPPED` | Skipped (e.g. in conditional) |
+| `WAITING_APPROVAL` | Waiting for approval (approval/human-input block) |
+
+### SkillCategory
+
+| Value | Description |
+|---|---|
+| `DOCUMENT` | Document processing |
+| `CODE` | Code analysis and creation |
+| `DATA` | Data analysis |
+| `CONTENT` | Content creation |
+| `RESEARCH` | Research |
+| `BUSINESS` | Business operations |
+| `PRODUCTIVITY` | Productivity |
+
+### GateStatus
+
+| Value | Description |
+|---|---|
+| `GREEN` | Quality gate passed |
+| `YELLOW` | Gate passed with warnings (run status becomes `COMPLETED_WITH_ERRORS`) |
+| `RED` | Gate not passed (AutoTodoService creates HIGH-priority TODO) |
+
+### WishStatus
+
+| Value | Description |
+|---|---|
+| `RECEIVED` | Wish received, not yet processed |
+| `DECOMPOSING` | Wish is being decomposed into tasks |
+| `AWAITING_DECOMPOSE_APPROVAL` | Waiting for decomposition confirmation |
+| `EXECUTING` | Generated workflows are being executed |
+| `EVALUATING` | Results are being evaluated |
+| `REFINING` | Workflows are being refined (iteration) |
+| `AWAITING_CLARIFICATION` | Waiting for clarification from the user |
+| `AWAITING_APPROVAL` | Waiting for final approval |
+| `COMPLETED` | Wish successfully fulfilled |
+| `FAILED` | Fulfillment failed |
+| `CANCELLED` | Wish cancelled |
+
+### Todo.Status
+
+| Value | Description |
+|---|---|
+| `OPEN` | Open, ready for processing |
+| `IN_PROGRESS` | In progress |
+| `DONE` | Done |
+| `BACKLOG` | Deferred |
+
+### Todo.Priority
+
+| Value | Description |
+|---|---|
+| `LOW` | Nice-to-have |
+| `MEDIUM` | Do soon |
+| `HIGH` | Blocking, do immediately |
+
+### Todo.Source
+
+| Value | Description |
+|---|---|
+| `USER` | Manually created |
+| `AI` | Created by AI agent (e.g. Claude Code) |
+| `WORKFLOW` | Automatically created by workflow (e.g. AutoTodoService) |
+
+### LogLevel (ActivityLog)
+
+| Value | Description |
+|---|---|
+| `DEBUG` | Debug information |
+| `INFO` | Information |
+| `WARN` | Warning |
+| `ERROR` | Error |
+
+### LogCategory (ActivityLog)
+
+| Value | Description |
+|---|---|
+| `SYSTEM` | System events |
+| `EXECUTION` | Workflow executions |
+| `SCHEDULE` | Schedule events |
+| `WEBHOOK` | Webhook events |
+| `SECURITY` | Security events |
+| `CONTAINER` | Container events |
+
+### ScheduleType (ScheduledWorkflow)
+
+| Value | Description |
+|---|---|
+| `CRON` | Recurring according to cron expression |
+| `ONCE` | One-time execution at a specific point in time |
+| `DELAYED` | Delayed execution (e.g. `"2h"`, `"30m"`) |
+
+### ConflictBehavior (ScheduledWorkflow)
+
+| Value | Description |
+|---|---|
+| `SKIP` | Skip if the target is already running |
+| `OVERLAP` | Start anyway, even if the target is already running |
+
+### ChannelType (NotificationConfig)
+
+| Value | Description |
+|---|---|
+| `WEBHOOK` | Notification via webhook (Slack/Discord/Teams) |
+| `DESKTOP` | Desktop notification |
+
+## BlockDefinition (JSON Structure)
+
+Blocks are stored as a JSON array in the `blocks` column of the `workflows` table.
+
+```json
+{
+  "type": "simple | shell | retry | conditional | forEach | while | switch | agentic | approval | sub-workflow | skill-capability | human-input",
+  "config": {
+    "prompt": "Instruction or command",
+    "timeout_seconds": 300,
+    "on_failure": "stop | continue"
+  },
+  "requiredCapabilities": []
+}
+```
+
+**Type-specific config fields:**
+
+| Type | Key Config Fields |
+|---|---|
+| `simple` | `prompt`, `on_failure`, `timeout_seconds` |
+| `shell` | `command` (shell script), `on_failure`, `timeout_seconds` |
+| `retry` | `prompt`, `maxRetries`, `on_failure`, `timeout_seconds` |
+| `conditional` | `condition`, `thenPrompt`, `elsePrompt` |
+| `forEach` | `items`, `prompt`, `on_failure` |
+| `while` | `condition`, `prompt`, `maxIterations` |
+| `switch` | `expression`, `cases` (list with `value`, `blocks`) |
+| `agentic` | `goal`, `max_iterations` (10), `iteration_timeout_seconds` (300), `total_timeout_seconds` (1800), `max_total_tokens` (200000), `max_repeated_actions` (3), `require_approval` (false) |
+| `approval` | `message`, `timeout_minutes` |
+| `sub-workflow` | `workflowId`, `inputContext` |
+| `skill-capability` | `skillId`, `capabilityName`, `input` |
+| `human-input` | `prompt`, `input_type` (text/select), `variable_name`, `options`, `default_value`, `required`, `timeout_minutes` (30), `use_default_on_timeout` |
+
+**Common optional field** `timeout_seconds` overrides the global Claude CLI timeout (`automation.host-claude.timeout-seconds`, default 300s) for all block types.
+
+## Flyway Migrations
+
+| Version | File | Description |
+|---|---|---|
+| V1 | `V1__create_projects_table.sql` | Projects table |
+| V2 | `V2__create_containers_table.sql` | Containers table (FK -> projects) |
+| V3 | `V3__create_skills_table.sql` | Skills table |
+| V4 | `V4__create_capabilities_table.sql` | Capabilities table (FK -> skills) |
+| V5 | `V5__create_workflows_table.sql` | Workflows + workflow_skills join table |
+| V6 | `V6__create_workflow_runs_table.sql` | workflow_runs + step_results |
+| V7 | `V7__create_scheduled_workflows_table.sql` | Scheduled workflows |
+| V8 | `V8__create_webhook_triggers_table.sql` | Webhook triggers + index |
+| V9 | `V9__add_updated_at_columns.sql` | `updated_at` for scheduled_workflows, webhook_triggers, skills |
+| V10 | `V10__add_performance_indexes.sql` | Performance indexes |
+| V11 | `V11__add_container_last_activity.sql` | `last_activity_at` for containers (auto-stop) |
+| V12 | `V12__create_app_settings.sql` | App settings (API key) |
+| V13 | `V13__add_workflow_model_and_instructions.sql` | `instructions`, `model` for workflows |
+| V14 | `V14__add_schedule_type_and_scheduled_at.sql` | `schedule_type`, `scheduled_at` for one-time schedules |
+| V15 | `V15__create_activity_log_table.sql` | Activity log table + indexes |
+| V16 | `V16__create_workflow_memory_table.sql` | Workflow memory table |
+| V17 | `V17__create_todos_table.sql` | TODOs table |
+| V18 | `V18__add_project_subtitle_description.sql` | `subtitle`, `description` for projects |
+| V19 | `V19__create_workflow_templates_table.sql` | Workflow templates + `template_id` in workflows |
+| V20 | `V20__add_input_context_to_workflow_runs.sql` | `input_context` in workflow_runs |
+| V21 | `V21__create_workflow_chains.sql` | workflow_chains + chain_runs |
+| V22 | `V22__add_template_quality_status.sql` | `quality_status` + template_verifications table |
+| V23 | `V23__add_default_context_to_workflows.sql` | `default_context` in workflows |
+| V24 | `V24__add_activity_log_composite_index.sql` | Composite index on activity_log |
+| V25 | `V25__add_workflow_test_status.sql` | `test_status`, `last_tested_at` in workflows |
+| V26 | `V26__add_block_types_column.sql` | `block_types` (denormalized) in workflows |
+| V27 | `V27__add_chain_support_to_schedules.sql` | `chain_id`, `target_type` in scheduled_workflows |
+| V28 | `V28__create_wishes.sql` | Wishes table |
+| V29 | `V29__add_wish_reference_workflow_ids.sql` | `reference_workflow_ids` in wishes |
+| V30 | `V30__add_project_ai_context.sql` | `ai_context` in projects |
+| V31 | `V31__add_workflow_id_to_activity_log.sql` | `workflow_id` + index in activity_log |
+| V32 | `V32__add_workflow_deleted_at.sql` | `deleted_at` (soft-delete) in workflows |
+| V33 | `V33__add_wish_iteration_history.sql` | `iteration_history` in wishes |
+| V34 | `V34__add_workflow_provider.sql` | `provider` (AI provider override) in workflows |
+| V35 | `V35__add_project_archived_at.sql` | `archived_at` (soft-archive) in projects |
+| V36 | `V36__add_todo_session_id.sql` | `session_id` in todos |
+| V37 | `V37__add_delayed_schedule_type.sql` | `DELAYED` schedule type + `delay_expression` in scheduled_workflows |
+| V38 | `V38__make_scheduled_workflow_id_nullable.sql` | `workflow_id` in scheduled_workflows optional (for chain targets) |
+| V39 | `V39__create_completion_triggers.sql` | completion_triggers table |
+| V40 | `V40__create_notification_configs.sql` | notification_configs table |
+| V41 | `V41__create_assistant_sessions.sql` | assistant_sessions table |
+| V42 | `V42__create_page_suggestions.sql` | page_suggestions table |
+| V43 | `V43__add_triggered_by_schedule_id.sql` | `triggered_by_schedule_id` in workflow_runs and chain_runs |
+| V44 | `V44__add_schedule_end_conditions.sql` | `end_date`, `max_runs`, `run_count` in scheduled_workflows |
+| V45 | `V45__add_schedule_conflict_behavior.sql` | `conflict_behavior` in scheduled_workflows |
+| V46 | `V46__add_stable_synced_at.sql` | `stable_synced_at` in workflows |
+| V47 | `V47__add_context_delta_to_step_results.sql` | `context_delta` in step_results |
+
+## SQLite Specifics
+
+- **No native TIMESTAMP type:** All timestamps are stored as `TEXT` in ISO-8601 format (`Instant.toString()`)
+- **No native BOOLEAN type:** Booleans are stored as `INTEGER` (`0` = false, `1` = true)
+- **JSON as TEXT:** All JSON fields are stored as `TEXT` and mapped via JPA `@Convert` annotations (`JsonMapConverter`, `BlockDefinitionListConverter`, `JsonStringMapConverter`, `ChainEntryListConverter`, `ChainRunEntryListConverter`, `StringListConverter`, `JsonListConverter`)
+- **UUID as TEXT:** IDs are stored as `TEXT`
+- **WAL mode:** Enabled for better concurrent read performance (`?journal_mode=WAL`)
+- **Busy Timeout:** 10 seconds (`?busy_timeout=10000`)
+- **Connection Pool:** HikariCP with max 1 connection (SQLite only allows one concurrent writer; pool-size=1 serializes all DB operations)
+- **Dialect:** `org.hibernate.community.dialect.SQLiteDialect`
+- **NEVER write directly to the DB** (via `sqlite3` CLI or SQL). Always use the REST API or the service/repository layer -- direct writes bypass the Hibernate cache and cause inconsistent state.

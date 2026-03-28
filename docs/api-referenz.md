@@ -1,3 +1,5 @@
+> *Zuletzt aktualisiert: 28. März 2026, 19:45 Uhr — Workflow: MySuricates Docs aktualisieren | Run: 01102949-3825-4cd9-b4b9-8aa84917c4c2*
+
 # API-Referenz
 
 ## Allgemein
@@ -36,13 +38,14 @@ Bei Validierungsfehlern (400) zusätzlich:
 |---|---|
 | 200 | Erfolg |
 | 201 | Ressource erstellt |
+| 202 | Akzeptiert (asynchrone Verarbeitung) |
 | 204 | Gelöscht (kein Body) |
 | 400 | Validierungsfehler |
 | 404 | Ressource nicht gefunden |
 | 409 | Konflikt (ungültiger Zustand) |
 | 429 | Rate Limit überschritten |
 | 500 | Interner Serverfehler |
-| 503 | Service nicht verfügbar (z.B. Tailscale) |
+| 503 | Service nicht verfügbar (z.B. Test-Instanz nicht gesund) |
 
 ---
 
@@ -125,6 +128,18 @@ Projekt löschen (inkl. Container und Workflows).
 
 **Response:** `204 No Content`
 
+### `GET /api/v1/projects/archived`
+
+Archivierte Projekte auflisten.
+
+**Response:** `ProjectResponse[]`
+
+### `POST /api/v1/projects/{id}/restore`
+
+Archiviertes Projekt wiederherstellen.
+
+**Response:** `ProjectResponse`
+
 ### `POST /api/v1/projects/{id}/start`
 
 Docker-Container für das Projekt starten.
@@ -142,6 +157,12 @@ Docker-Container stoppen.
 Alle Workflows eines Projekts auflisten.
 
 **Response:** `WorkflowResponse[]`
+
+### `POST /api/v1/projects/{id}/generate-context`
+
+KI-Kontext für das Projekt generieren (analysiert das Projekt-Verzeichnis).
+
+**Response:** `{ "context": "..." }`
 
 ---
 
@@ -200,7 +221,13 @@ Neuen Workflow erstellen.
 | `icon` | String | Nein |
 | `blocks` | BlockDefinition[] | Ja |
 | `activatedSkillIds` | String[] | Nein |
-| `templateId` | String | Nein | ID des Quell-Templates (wenn aus Template erstellt) |
+| `instructions` | String | Nein |
+| `model` | String | Nein |
+| `provider` | String | Nein |
+| `templateId` | String | Nein |
+| `metadata` | Object | Nein |
+| `defaultContext` | Object | Nein |
+| `version` | String | Nein |
 
 **Response:** `201` mit `WorkflowResponse`
 
@@ -270,19 +297,23 @@ Workflow aus JSON importieren (exportiertes Format + Zielprojekt).
     { "type": "simple", "config": { "prompt": "Review code" }, "requiredCapabilities": [] }
   ],
   "instructions": null,
-  "model": null
+  "model": null,
+  "updateIfExists": false
 }
 ```
 
 | Feld | Typ | Pflicht |
 |---|---|---|
-| `projectId` | String | Ja |
+| `projectId` | String | Nein (Fallback: "Sammlung"-Projekt) |
 | `name` | String | Ja |
 | `description` | String | Nein |
 | `icon` | String | Nein |
 | `blocks` | BlockDefinition[] | Nein |
 | `instructions` | String | Nein |
 | `model` | String | Nein |
+| `updateIfExists` | Boolean | Nein (Standard: `false`) |
+
+Wenn `updateIfExists=true` und ein Workflow gleichen Namens im Zielprojekt existiert, wird dieser aktualisiert statt neu erstellt.
 
 #### Block-Config: `timeout_seconds`
 
@@ -348,15 +379,29 @@ Workflow ausführen.
 
 ### `GET /api/v1/workflows/{id}/runs`
 
-Alle Runs eines Workflows (absteigend nach Startzeit).
+Alle Runs eines Workflows (absteigend nach Startzeit, paginiert).
 
-**Response:** `WorkflowRunResponse[]`
+**Query-Parameter:** `page` (Standard: 0), `size` (Standard: 50)
+
+**Response:** `PageResponse<WorkflowRunResponse>`
 
 ### `GET /api/v1/workflows/{id}/runs/{runId}`
 
 Einzelnen Run abrufen.
 
 **Response:** `WorkflowRunResponse`
+
+### `POST /api/v1/workflows/{id}/optimize`
+
+Optimierungsvorschlag für einen Workflow generieren (KI-basiert).
+
+**Response:** `Map<String, Object>` mit Optimierungsvorschlag
+
+### `POST /api/v1/workflows/{id}/repair`
+
+Fehlgeschlagenen Workflow auf der Test-Instanz reparieren. Setzt voraus, dass der Workflow fehlgeschlagene Runs hat und die Test-Instanz gesund ist.
+
+**Response:** `202 Accepted` mit `{ "status": "repair_started", "workflowId": "...", "workflowName": "..." }`
 
 ### `POST /api/v1/workflows/{id}/skills`
 
@@ -481,6 +526,22 @@ Einen bestehenden Workflow als neues Template speichern (Name, Beschreibung, Bl�
 
 ## Executions
 
+### `GET /api/v1/executions`
+
+Alle Ausführungen auflisten (paginiert, filterbar).
+
+**Query-Parameter:**
+
+| Parameter | Typ | Beschreibung |
+|---|---|---|
+| `page` | int | Seite (Standard: 0) |
+| `size` | int | Einträge pro Seite (Standard: 50) |
+| `status` | String | Filter nach Status: `PENDING`, `RUNNING`, `PAUSED`, `COMPLETED`, `COMPLETED_WITH_ERRORS`, `FAILED`, `CANCELLED`, `INTERRUPTED` |
+| `workflowId` | String | Filter nach Workflow |
+| `projectId` | String | Filter nach Projekt |
+
+**Response:** `PageResponse<WorkflowRunResponse>`
+
 ### `GET /api/v1/executions/{id}`
 
 Execution-Status abrufen (inkl. Steps).
@@ -504,6 +565,115 @@ Pausierte Ausführung fortsetzen.
 Ausführung abbrechen.
 
 **Response:** `200 OK`
+
+### `POST /api/v1/executions/{id}/retry`
+
+Fehlgeschlagene Ausführung erneut starten (erstellt einen neuen Run mit gleichem Input-Kontext).
+
+**Response:** `WorkflowRunResponse`
+
+### `POST /api/v1/executions/{id}/resume-from-step`
+
+Unterbrochene Ausführung ab dem fehlgeschlagenen Step fortsetzen.
+
+**Response:** `WorkflowRunResponse`
+
+### `POST /api/v1/executions/{id}/approve`
+
+Approval-Gate oder Human-Input beantworten.
+
+**Request:**
+
+```json
+{
+  "answer": "Yes"
+}
+```
+
+| Feld | Typ | Pflicht |
+|---|---|---|
+| `answer` | String | Ja |
+
+**Hinweis:** Das Feld heißt `answer`, nicht `approved`.
+
+**Response:** `200 OK`
+
+### `GET /api/v1/executions/{id}/approval`
+
+Prüfen ob ein Approval oder Human-Input ansteht.
+
+**Response (kein Approval anstehend):**
+
+```json
+{
+  "pending": false
+}
+```
+
+**Response (Approval anstehend):**
+
+```json
+{
+  "pending": true,
+  "blockId": "block-id",
+  "question": "Soll fortgefahren werden?",
+  "options": ["Yes", "No"],
+  "stepIndex": 2,
+  "type": "approval"
+}
+```
+
+**Response (Human-Input anstehend):**
+
+```json
+{
+  "pending": true,
+  "blockId": "block-id",
+  "question": "Bitte Dateiname eingeben:",
+  "options": [],
+  "stepIndex": 3,
+  "type": "human-input",
+  "inputType": "text",
+  "defaultValue": "",
+  "variableName": "filename",
+  "required": true,
+  "validationPattern": null
+}
+```
+
+### `POST /api/v1/executions/{id}/todos/approve`
+
+Auto-generierte TODOs eines Runs genehmigen oder ablehnen.
+
+**Request:**
+
+```json
+{
+  "approved": true
+}
+```
+
+**Response:** `200 OK`
+
+### `POST /api/v1/executions/{id}/command`
+
+Ad-hoc-Kommando im Kontext einer laufenden Ausführung senden.
+
+**Request:**
+
+```json
+{
+  "command": "ls -la"
+}
+```
+
+**Response:**
+
+```json
+{
+  "output": "..."
+}
+```
 
 ---
 
@@ -629,17 +799,75 @@ Alle Schedules auflisten.
 ]
 ```
 
+### `GET /api/v1/schedules/remaining-today`
+
+Verbleibende geplante Ausführungen für heute.
+
+**Response:** `UpcomingScheduleResponse`
+
+### `GET /api/v1/schedules/remaining-this-week`
+
+Verbleibende geplante Ausführungen für diese Woche.
+
+**Response:** `UpcomingScheduleResponse`
+
 ### `GET /api/v1/schedules/{id}`
 
 Einzelnen Schedule abrufen.
 
 **Response:** `ScheduledWorkflowResponse`
 
+### `GET /api/v1/schedules/{id}/runs`
+
+Runs die durch diesen Schedule ausgelöst wurden.
+
+**Response:**
+
+```json
+{
+  "workflowRuns": [...],
+  "chainRuns": [...]
+}
+```
+
 ### `GET /api/v1/schedules/workflow/{workflowId}`
 
 Schedules eines bestimmten Workflows.
 
 **Response:** `ScheduledWorkflowResponse[]`
+
+### `GET /api/v1/schedules/chain/{chainId}`
+
+Schedules einer bestimmten Chain.
+
+**Response:** `ScheduledWorkflowResponse[]`
+
+### `GET /api/v1/schedules/calendar`
+
+Kalender-Daten: geplante Ausführungen und vergangene Runs in einem Zeitraum.
+
+**Query-Parameter:**
+
+| Parameter | Typ | Pflicht |
+|---|---|---|
+| `from` | Instant | Ja |
+| `to` | Instant | Ja |
+
+**Response:** `CalendarDataResponse` mit `upcoming` und `pastRuns`
+
+### `POST /api/v1/schedules/preview`
+
+Vorschau der nächsten 5 Ausführungszeitpunkte für einen Cron-Ausdruck.
+
+**Request:**
+
+```json
+{
+  "cronExpression": "0 0 2 * * ?"
+}
+```
+
+**Response:** `{ "runs": ["2025-01-16T02:00:00Z", ...] }`
 
 ### `POST /api/v1/schedules`
 
@@ -658,12 +886,40 @@ Neuen Schedule erstellen.
 
 | Feld | Typ | Pflicht |
 |---|---|---|
-| `workflowId` | String | Ja |
+| `workflowId` | String | Ja (wenn `targetType` = `WORKFLOW`) |
+| `chainId` | String | Ja (wenn `targetType` = `CHAIN`) |
+| `targetType` | String | Nein (Standard: `WORKFLOW`, Werte: `WORKFLOW`, `CHAIN`) |
 | `cronExpression` | String | Ja (Spring Cron, 6 Felder) |
 | `description` | String | Nein |
 | `inputContext` | Object | Nein |
+| `scheduleType` | String | Nein (Standard: `CRON`, Werte: `CRON`, `ONCE`, `DELAYED`) |
+| `scheduledAt` | Instant | Nein (für `ONCE`-Schedules) |
+| `delayExpression` | String | Nein (für `DELAYED`-Schedules, z.B. `"2h"`, `"30m"`) |
+| `endDate` | Instant | Nein (optionales Ende für `CRON`-Schedules) |
+| `maxRuns` | Integer | Nein (max. Ausführungen, 0 = unbegrenzt) |
+| `conflictBehavior` | String | Nein (Standard: `SKIP`, Werte: `SKIP`, `OVERLAP`) |
 
 **Response:** `201` mit `ScheduledWorkflowResponse`
+
+### `PUT /api/v1/schedules/{id}`
+
+Schedule aktualisieren.
+
+**Request:**
+
+```json
+{
+  "cronExpression": "0 30 1 * * ?",
+  "description": "Neuer Zeitplan",
+  "inputContext": {},
+  "endDate": null,
+  "maxRuns": 10
+}
+```
+
+Alle Felder sind optional; nur übergebene Felder werden aktualisiert.
+
+**Response:** `ScheduledWorkflowResponse`
 
 ### `POST /api/v1/schedules/{id}/enable`
 
@@ -682,6 +938,26 @@ Schedule deaktivieren.
 Schedule löschen.
 
 **Response:** `204 No Content`
+
+### `GET /api/v1/schedules/maintenance`
+
+Wartungsmodus-Status abfragen.
+
+**Response:** `{ "enabled": false }`
+
+### `POST /api/v1/schedules/maintenance`
+
+Wartungsmodus ein-/ausschalten. Im Wartungsmodus werden keine geplanten Ausführungen gestartet.
+
+**Request:**
+
+```json
+{
+  "enabled": true
+}
+```
+
+**Response:** `{ "enabled": true }`
 
 ---
 
@@ -782,6 +1058,152 @@ Der Payload wird mit dem `defaultContext` des Webhooks gemergt und als Kontext a
 
 ---
 
+## Completion Triggers
+
+Completion-Trigger lösen automatisch einen Ziel-Workflow aus, wenn ein Quell-Workflow abgeschlossen wird.
+
+### `GET /api/v1/completion-triggers`
+
+Alle Completion-Trigger auflisten.
+
+**Response:** `CompletionTriggerResponse[]`
+
+### `GET /api/v1/completion-triggers/{id}`
+
+Einzelnen Trigger abrufen.
+
+**Response:** `CompletionTriggerResponse`
+
+### `GET /api/v1/completion-triggers/workflow/{workflowId}/as-source`
+
+Trigger abrufen, bei denen der angegebene Workflow als Quelle fungiert.
+
+**Response:** `CompletionTriggerResponse[]`
+
+### `GET /api/v1/completion-triggers/workflow/{workflowId}/as-target`
+
+Trigger abrufen, bei denen der angegebene Workflow als Ziel fungiert.
+
+**Response:** `CompletionTriggerResponse[]`
+
+### `POST /api/v1/completion-triggers`
+
+Neuen Completion-Trigger erstellen.
+
+**Request:**
+
+```json
+{
+  "sourceWorkflowId": "uuid",
+  "targetWorkflowId": "uuid",
+  "triggerOnSuccess": true,
+  "triggerOnFailure": false,
+  "triggerAlways": false,
+  "description": "Nach erfolgreichem Build: Deployment starten",
+  "contextVariables": {}
+}
+```
+
+| Feld | Typ | Pflicht |
+|---|---|---|
+| `sourceWorkflowId` | String | Ja |
+| `targetWorkflowId` | String | Ja |
+| `triggerOnSuccess` | boolean | Nein |
+| `triggerOnFailure` | boolean | Nein |
+| `triggerAlways` | boolean | Nein |
+| `description` | String | Nein |
+| `contextVariables` | Object | Nein |
+
+**Response:** `201` mit `CompletionTriggerResponse`
+
+### `POST /api/v1/completion-triggers/{id}/enable`
+
+Trigger aktivieren.
+
+**Response:** `CompletionTriggerResponse`
+
+### `POST /api/v1/completion-triggers/{id}/disable`
+
+Trigger deaktivieren.
+
+**Response:** `CompletionTriggerResponse`
+
+### `DELETE /api/v1/completion-triggers/{id}`
+
+Trigger löschen.
+
+**Response:** `204 No Content`
+
+---
+
+## Notifications
+
+Benachrichtigungen bei Workflow-Abschluss (Webhook oder Desktop).
+
+### `GET /api/v1/notifications`
+
+Alle Benachrichtigungs-Konfigurationen auflisten.
+
+**Response:** `NotificationConfigResponse[]`
+
+### `GET /api/v1/notifications/{id}`
+
+Einzelne Benachrichtigungs-Konfiguration abrufen.
+
+**Response:** `NotificationConfigResponse`
+
+### `POST /api/v1/notifications`
+
+Neue Benachrichtigungs-Konfiguration erstellen.
+
+**Request:**
+
+```json
+{
+  "name": "Slack Deployment",
+  "channelType": "WEBHOOK",
+  "webhookUrl": "https://hooks.slack.com/...",
+  "workflowId": null,
+  "triggerOnSuccess": true,
+  "triggerOnFailure": true,
+  "triggerAlways": false,
+  "messageTemplate": "Workflow {{workflow_name}} {{status}} ({{duration}})"
+}
+```
+
+| Feld | Typ | Pflicht | Werte |
+|---|---|---|---|
+| `name` | String | Ja | |
+| `channelType` | Enum | Ja | `WEBHOOK`, `DESKTOP` |
+| `webhookUrl` | String | Nein (Pflicht bei `WEBHOOK`) | Slack/Discord/Teams Webhook-URL |
+| `workflowId` | String | Nein | `null` = global (alle Workflows) |
+| `triggerOnSuccess` | boolean | Nein | |
+| `triggerOnFailure` | boolean | Nein | |
+| `triggerAlways` | boolean | Nein | |
+| `messageTemplate` | String | Nein | Unterstützt `{{workflow_name}}`, `{{status}}`, `{{duration}}`, `{{error_message}}` |
+
+**Response:** `201` mit `NotificationConfigResponse`
+
+### `POST /api/v1/notifications/{id}/enable`
+
+Benachrichtigung aktivieren.
+
+**Response:** `NotificationConfigResponse`
+
+### `POST /api/v1/notifications/{id}/disable`
+
+Benachrichtigung deaktivieren.
+
+**Response:** `NotificationConfigResponse`
+
+### `DELETE /api/v1/notifications/{id}`
+
+Benachrichtigungs-Konfiguration löschen.
+
+**Response:** `204 No Content`
+
+---
+
 ## System
 
 ### `GET /api/v1/system/health` (Öffentlich)
@@ -794,10 +1216,15 @@ Health-Check.
 {
   "status": "UP",
   "timestamp": "2025-01-15T10:00:00Z",
-  "docker": "CONNECTED"
+  "docker": "CONNECTED",
+  "components": {
+    "database": { "status": "UP", "responseTimeMs": 2 },
+    "docker": { "status": "UP" }
+  }
 }
 ```
 
+`status` kann `UP`, `DEGRADED` (Docker nicht verfügbar) oder `DOWN` (Datenbank nicht verfügbar) sein.
 `docker` kann `CONNECTED` oder `UNAVAILABLE` sein.
 
 ### `GET /api/v1/system/info` (Öffentlich)
@@ -808,12 +1235,52 @@ Systeminformationen.
 
 ```json
 {
-  "name": "AI Automation Platform",
-  "version": "0.1.0",
+  "name": "MySuricates",
+  "version": "0.6.2",
+  "buildType": "dev",
+  "buildTimestamp": null,
   "java": "21.0.1",
-  "tailscale": "DISABLED"
+  "tailscale": "DISABLED",
+  "environment": "Dev"
 }
 ```
+
+### `GET /api/v1/system/auth-status`
+
+Authentifizierungsstatus abfragen.
+
+**Response:** `{ "securityEnabled": true }`
+
+### `GET /api/v1/system/ai-providers`
+
+Verfügbare KI-Provider und Standard-Provider abfragen.
+
+**Response:**
+
+```json
+{
+  "providers": ["CLAUDE", "CODEX"],
+  "default": "CLAUDE"
+}
+```
+
+### `POST /api/v1/system/client-errors`
+
+Frontend-Fehler melden (für Logging).
+
+**Request:**
+
+```json
+{
+  "message": "TypeError: ...",
+  "stack": "...",
+  "source": "component",
+  "url": "/workflows",
+  "timestamp": "2025-01-15T10:00:00Z"
+}
+```
+
+**Response:** `202 Accepted`
 
 ### `POST /api/v1/system/remote-access/enable`
 
@@ -840,6 +1307,100 @@ Tailscale Remote-Access deaktivieren.
 Tailscale-Status abfragen.
 
 **Response:** `RemoteAccessResponse`
+
+### `GET /api/v1/system/backup`
+
+Datenbank-Backup erstellen und herunterladen.
+
+**Response:** Datei-Download (SQLite-Backup)
+
+### `GET /api/v1/system/backups`
+
+Alle verfügbaren Backups auflisten.
+
+**Response:** `BackupInfo[]`
+
+### `GET /api/v1/system/backups/{filename}`
+
+Bestimmtes Backup herunterladen.
+
+**Response:** Datei-Download
+
+### `GET /api/v1/system/settings/{key}`
+
+Anwendungs-Einstellung abrufen.
+
+**Erlaubte Keys:** `auto-todo-default`, `auto-repair-default`, `default-ai-provider`, `assistant-thinking-phrases`, `assistant-model`
+
+**Response:** `{ "key": "...", "value": "..." }`
+
+### `PUT /api/v1/system/settings/{key}`
+
+Anwendungs-Einstellung setzen.
+
+**Request:**
+
+```json
+{
+  "value": "true"
+}
+```
+
+**Response:** `200 OK`
+
+### `GET /api/v1/system/execution-config`
+
+Aktuelle Execution-Konfiguration abrufen (Timeouts, Token-Limits etc.).
+
+**Response:** `Map<String, Object>` mit aktuellen Einstellungen
+
+### `PUT /api/v1/system/execution-config`
+
+Execution-Konfiguration aktualisieren.
+
+**Request:** `Map<String, String>` mit den zu ändernden Einstellungen
+
+**Response:** `Map<String, Object>` mit aktualisierten Einstellungen
+
+### `POST /api/v1/system/repair-failed`
+
+Alle fehlgeschlagenen Workflows automatisch reparieren lassen. Setzt gesunde Test-Instanz voraus.
+
+**Query-Parameter:** `force` (boolean, Standard: `false`)
+
+**Response:** `202 Accepted` mit `{ "status": "repair_started", "workflowsQueued": 3, "force": false }`
+
+### `POST /api/v1/system/open-path`
+
+Datei oder Verzeichnis im nativen Dateimanager öffnen (Linux: `xdg-open`).
+
+**Request:**
+
+```json
+{
+  "path": "/home/user/projekt"
+}
+```
+
+**Response:** `{ "status": "ok" }`
+
+### `GET /api/v1/system/browse`
+
+Verzeichnisinhalt durchsuchen (nur Unterverzeichnisse, keine versteckten Ordner).
+
+**Query-Parameter:** `path` (String, optional, Standard: Home-Verzeichnis)
+
+**Response:**
+
+```json
+{
+  "current": "/home/user",
+  "parent": "/home",
+  "directories": [
+    { "name": "Documents", "path": "/home/user/Documents" }
+  ]
+}
+```
 
 ---
 
@@ -901,6 +1462,36 @@ Optimierungsvorschläge basierend auf Run-Daten.
 Ähnliche Workflows finden.
 
 **Response:** `Array<Object>` mit ähnlichen Workflows
+
+### `GET /api/v1/learning/workflows/{workflowId}/agentic-history`
+
+Agentic-Strategie-Verlauf eines Workflows (wie sich die KI-Strategie über Runs hinweg entwickelt hat).
+
+**Response:** `Array<Object>`
+
+### `GET /api/v1/learning/workflows/{workflowId}/agentic-analytics`
+
+Agentic-Block-Analyse: Iterationen, Token-Verbrauch, Erfolgsquote.
+
+**Response:** `Map<String, Object>`
+
+### `GET /api/v1/learning/workflows/{workflowId}/tool-patterns`
+
+Tool-Nutzungsmuster eines Workflows (welche Tools wie oft genutzt werden).
+
+**Response:** `Map<String, Object>`
+
+### `GET /api/v1/learning/workflows/{workflowId}/execution-insights`
+
+Ausführungs-Insights: Trends, Anomalien, Performance-Metriken.
+
+**Response:** `Map<String, Object>`
+
+### `GET /api/v1/learning/runs/{runId}/insights`
+
+Detaillierte Insights für einen einzelnen Run.
+
+**Response:** `Map<String, Object>`
 
 ### `POST /api/v1/learning/runs/{runId}/rate?rating={1-5}`
 
@@ -996,6 +1587,66 @@ Chain-Run abbrechen.
 
 ---
 
+## Chain Templates
+
+Vordefinierte Chain-Vorlagen, die als Chains in ein Projekt installiert werden können.
+
+### `GET /api/v1/chain-templates`
+
+Alle Chain-Templates auflisten.
+
+**Response:** `ChainTemplateResponse[]`
+
+```json
+[
+  {
+    "id": "template-id",
+    "name": "CI/CD Pipeline",
+    "description": "Build, Test, Deploy Chain",
+    "icon": "🔄",
+    "entries": [
+      { "templateId": "workflow-template-id", "label": "Build" }
+    ]
+  }
+]
+```
+
+### `GET /api/v1/chain-templates/{id}`
+
+Einzelnes Chain-Template abrufen.
+
+**Response:** `ChainTemplateResponse`
+
+### `POST /api/v1/chain-templates/{id}/install`
+
+Chain-Template in ein Projekt installieren (erstellt die Chain und alle referenzierten Workflows).
+
+**Request:**
+
+```json
+{
+  "projectId": "uuid",
+  "chainName": "Meine CI/CD Pipeline"
+}
+```
+
+| Feld | Typ | Pflicht |
+|---|---|---|
+| `projectId` | String | Ja |
+| `chainName` | String | Nein |
+
+**Response:** `201` mit `ChainInstallResponse`
+
+```json
+{
+  "chainId": "uuid",
+  "chainName": "CI/CD Pipeline",
+  "workflowIds": ["uuid-1", "uuid-2"]
+}
+```
+
+---
+
 ## TODOs
 
 ### `GET /api/v1/todos`
@@ -1009,7 +1660,7 @@ TODOs auflisten (paginiert, filterbar).
 | `page` | int | Seite (Standard: 0) |
 | `size` | int | Einträge pro Seite (Standard: 50) |
 | `projectId` | String | Filter nach Projekt |
-| `status` | String[] | Filter nach Status: `OPEN`, `IN_PROGRESS`, `DONE`, `CANCELLED` |
+| `status` | String[] | Filter nach Status: `OPEN`, `IN_PROGRESS`, `DONE`, `BACKLOG` |
 | `priority` | String | Filter nach Priorität: `HIGH`, `MEDIUM`, `LOW` |
 | `source` | String | Filter nach Quelle: `USER`, `AI`, `WORKFLOW` |
 | `tag` | String | Filter nach Tag |
@@ -1133,6 +1784,143 @@ Activity-Log auflisten (paginiert, filterbar).
 **Query-Parameter:** `page`, `size`, `level` (`INFO`, `WARN`, `ERROR`, `DEBUG`), `category`, `workflowId`
 
 **Response:** `PageResponse<ActivityLogResponse>`
+
+---
+
+## Assistant
+
+### `POST /api/v1/assistant/chat`
+
+Chat-Nachricht an den KI-Assistenten senden.
+
+**Request:**
+
+```json
+{
+  "message": "Wie erstelle ich einen Workflow für Code-Reviews?",
+  "history": [
+    { "role": "user", "content": "Hallo" },
+    { "role": "assistant", "content": "Hallo! Wie kann ich helfen?" }
+  ],
+  "context": {
+    "page": "workflows",
+    "entityId": "workflow-uuid",
+    "projectId": "project-uuid"
+  },
+  "provider": "CLAUDE",
+  "sessionId": "session-uuid"
+}
+```
+
+| Feld | Typ | Pflicht |
+|---|---|---|
+| `message` | String | Ja |
+| `history` | MessageEntry[] | Nein |
+| `context` | PageContext | Nein |
+| `provider` | String | Nein |
+| `sessionId` | String | Nein |
+
+**Response:** `AssistantChatResponse`
+
+```json
+{
+  "message": "Hier ist eine Anleitung...",
+  "actions": [
+    {
+      "type": "run_workflow",
+      "id": "workflow-uuid",
+      "name": "Code Review",
+      "label": "Workflow starten"
+    }
+  ],
+  "model": "claude-sonnet-4-6"
+}
+```
+
+Action-Typen: `run_workflow`, `show_workflow`, `start_wish`, `show_run`, `ask_choice`
+
+### `GET /api/v1/assistant/suggestions`
+
+Kontext-bezogene Vorschläge für eine Seite abrufen.
+
+**Query-Parameter:** `page` (String, Pflicht)
+
+**Response:** `String[]`
+
+### `POST /api/v1/assistant/suggestions/refresh`
+
+Vorschläge für eine Seite neu generieren.
+
+**Query-Parameter:** `page` (String, Pflicht)
+
+**Response:** `String[]`
+
+---
+
+## Dialog Import
+
+Analyse und Import von Claude-Code-Dialog-Sessions als Workflows.
+
+### `GET /api/v1/dialog/sessions/count`
+
+Anzahl Sessions pro Projekt-Verzeichnis zählen (schnell, kein File-Lesen).
+
+**Response:** `Map<String, Integer>`
+
+### `GET /api/v1/dialog/sessions`
+
+Sessions mit Metadaten auflisten.
+
+**Query-Parameter:**
+
+| Parameter | Typ | Beschreibung |
+|---|---|---|
+| `projectPath` | String | Nein (optional: Filter auf ein Projekt) |
+| `limit` | int | Standard: 50 (Max: 2000 mit projectPath, 500 ohne) |
+
+**Response:** `DialogSessionInfo[]`
+
+### `GET /api/v1/dialog/projects`
+
+Alle bekannten Projekt-Pfade auflisten (für Filter-Dropdown).
+
+**Response:** `String[]`
+
+### `POST /api/v1/dialog/sessions/analyze`
+
+Session mit KI analysieren und Workflow-Vorschlag generieren.
+
+**Request:**
+
+```json
+{
+  "filePath": "/home/user/.claude/projects/.../session.jsonl"
+}
+```
+
+**Response:** `DialogWorkflowSuggestion`
+
+### `POST /api/v1/dialog/sessions/create-workflow`
+
+Workflow aus einer Suggestion erstellen.
+
+**Request:**
+
+```json
+{
+  "projectId": "uuid",
+  "name": "Workflow-Name",
+  "suggestion": { ... }
+}
+```
+
+| Feld | Typ | Pflicht |
+|---|---|---|
+| `projectId` | String | Ja |
+| `name` | String | Nein |
+| `suggestion` | DialogWorkflowSuggestion | Ja |
+
+**Response:** `WorkflowResponse`
 
 ---
 
@@ -1305,7 +2093,33 @@ Verfügbare Topic-Kategorien abrufen.
 
 Workflow aus Topic generieren (Vorschau, ohne Test-Ausführung).
 
-**Request:** `WorkflowFactoryRequest`
+**Request:**
+
+```json
+{
+  "topic": "code-review",
+  "description": "Automatisiertes Code-Review",
+  "category": "CODE",
+  "projectId": "uuid",
+  "testInputs": {},
+  "autoPromote": false,
+  "autoFix": false,
+  "maxRetries": 2,
+  "provider": "CLAUDE"
+}
+```
+
+| Feld | Typ | Pflicht |
+|---|---|---|
+| `topic` | String | Ja |
+| `description` | String | Nein |
+| `category` | String | Nein |
+| `projectId` | String | Nein |
+| `testInputs` | Object | Nein |
+| `autoPromote` | boolean | Nein |
+| `autoFix` | boolean | Nein |
+| `maxRetries` | int | Nein (Standard: 2) |
+| `provider` | String | Nein |
 
 **Response:** `201` mit `WorkflowResponse`
 
@@ -1313,7 +2127,7 @@ Workflow aus Topic generieren (Vorschau, ohne Test-Ausführung).
 
 Vollständige Factory-Pipeline: Generieren → Test-Instanz → Verifizieren → optional Promoten.
 
-**Request:** `WorkflowFactoryRequest`
+**Request:** `WorkflowFactoryRequest` (wie oben)
 
 **Response:** `WorkflowFactoryResult`
 
@@ -1354,6 +2168,13 @@ Neuen Wunsch erstellen und asynchron erfüllen.
 }
 ```
 
+| Feld | Typ | Pflicht |
+|---|---|---|
+| `text` | String | Ja |
+| `projectId` | String | Ja |
+| `maxIterations` | Integer | Nein |
+| `referenceWorkflowIds` | String[] | Nein |
+
 **Response:** `201` mit `WishResponse`
 
 ### `GET /api/v1/wishes/{id}`
@@ -1372,7 +2193,19 @@ Wish abbrechen.
 
 Feedback zur aktuellen Iteration geben.
 
-**Request:** `WishRespondRequest`
+**Request:**
+
+```json
+{
+  "action": "ACCEPT",
+  "feedback": "Optional: Anpassungswünsche"
+}
+```
+
+| Feld | Typ | Pflicht | Werte |
+|---|---|---|---|
+| `action` | Enum | Ja | `ACCEPT`, `REFINE`, `CANCEL`, `CLARIFY`, `RETRY` |
+| `feedback` | String | Nein | |
 
 **Response:** `WishResponse`
 

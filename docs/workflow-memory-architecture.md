@@ -1,3 +1,5 @@
+> *Zuletzt aktualisiert: 28. März 2026, 19:45 Uhr — Workflow: MySuricates Docs aktualisieren | Run: 01102949-3825-4cd9-b4b9-8aa84917c4c2*
+
 # Workflow Memory — Architektur & Datenfluss
 
 ## Uebersicht
