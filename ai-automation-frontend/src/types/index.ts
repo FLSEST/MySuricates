@@ -205,6 +205,7 @@ export interface PoolWorkflowEntry {
 // ── Workflow Run ─────────────────────────────────────────
 
 export type RunStatus = 'PENDING' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'COMPLETED_WITH_ERRORS' | 'FAILED' | 'CANCELLED' | 'INTERRUPTED';
+export const TERMINAL_RUN_STATUSES: ReadonlySet<RunStatus> = new Set(['COMPLETED', 'COMPLETED_WITH_ERRORS', 'FAILED', 'CANCELLED']);
 export type StepStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'SKIPPED' | 'WAITING_APPROVAL';
 
 export interface WorkflowRunError {

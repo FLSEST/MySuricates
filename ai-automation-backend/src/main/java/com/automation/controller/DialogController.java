@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/dialog")
@@ -29,16 +30,24 @@ public class DialogController {
             Path.of(System.getProperty("user.home"), ".claude", "projects");
 
     /**
-     * Listet Sessions mit Metadaten. Kein KI-Aufruf.
-     *
-     * @param projectPath optionaler Pfad-Filter (z.B. /home/user/myproject)
-     * @param limit       maximale Anzahl Sessions (default 50)
+     * Zählt Sessions pro Projekt-Verzeichnis (schnell, kein File-Lesen).
+     */
+    @GetMapping("/sessions/count")
+    public Map<String, Integer> countSessionsPerProject() {
+        return scanner.countPerProject();
+    }
+
+    /**
+     * Listet Sessions mit Metadaten.
+     * Mit projectPath: hohes Limit (einzelnes Projekt, alle Sessions sichtbar).
+     * Ohne projectPath: konservativeres Limit (für "Other Sessions").
      */
     @GetMapping("/sessions")
     public List<DialogSessionInfo> listSessions(
             @RequestParam(required = false) String projectPath,
             @RequestParam(defaultValue = "50") int limit) {
-        return scanner.scanSessions(projectPath, Math.min(limit, 200));
+        int cap = projectPath != null ? 2000 : 500;
+        return scanner.scanSessions(projectPath, Math.min(limit, cap));
     }
 
     /**
@@ -84,9 +93,6 @@ public class DialogController {
 
     // ---- Security ----
 
-    /**
-     * Verhindert Path-Traversal-Angriffe: nur Pfade unter ~/.claude/projects/ erlaubt.
-     */
     private void validateJsonlPath(String filePath) {
         if (filePath == null) throw new IllegalArgumentException("filePath darf nicht null sein");
         Path resolved = Path.of(filePath).toAbsolutePath().normalize();

@@ -4,6 +4,7 @@ import { useToast } from './useToast';
 import { useT } from '../i18n';
 import { downloadJSON } from '../utils/downloadFile';
 import type { Workflow, WorkflowRun, CreateWorkflowRequest, UpdateWorkflowRequest, WorkflowExportData, PageResponse } from '../types';
+import { TERMINAL_RUN_STATUSES } from '../types';
 
 interface WorkflowApiResponse {
   id: string;
@@ -69,6 +70,12 @@ export function useWorkflowRuns(workflowId: string, page = 0, size = 50) {
     queryKey: ['workflows', workflowId, 'runs', page, size],
     queryFn: () => api.get<PageResponse<WorkflowRun>>(`/workflows/${workflowId}/runs?page=${page}&size=${size}`),
     enabled: !!workflowId,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (!data?.content?.length) return false;
+      const hasActiveRuns = data.content.some((run) => !TERMINAL_RUN_STATUSES.has(run.status));
+      return hasActiveRuns ? 5_000 : false;
+    },
   });
 }
 
@@ -83,6 +90,12 @@ export function useAllRuns(params?: { status?: string; workflowId?: string; proj
       if (params?.workflowId) searchParams.set('workflowId', params.workflowId);
       if (params?.projectId) searchParams.set('projectId', params.projectId);
       return api.get<PageResponse<WorkflowRun>>(`/executions?${searchParams.toString()}`);
+    },
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (!data?.content?.length) return false;
+      const hasActiveRuns = data.content.some((run) => !TERMINAL_RUN_STATUSES.has(run.status));
+      return hasActiveRuns ? 5_000 : 30_000;
     },
   });
 }

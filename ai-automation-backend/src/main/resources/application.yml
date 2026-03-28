@@ -8,6 +8,7 @@ spring:
     hikari:
       maximum-pool-size: 1  # SQLite supports only one writer at a time — pool=1 serializes via Hikari queue instead of SQLite locks (avoids SQLITE_BUSY under concurrent workflow runs)
       minimum-idle: 1
+      connection-timeout: 120000  # 120s (default: 30s) — safety net for pool-size=1 contention during concurrent workflow runs
       connection-test-query: SELECT 1
       connection-init-sql: "PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 30000;"
 

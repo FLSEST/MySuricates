@@ -27,6 +27,15 @@ public class ExecutionSettingsService {
             "chain-workflow-timeout-minutes",  new long[]{5, 1440}
     );
 
+    // Frontend sends camelCase keys, backend uses kebab-case internally
+    private static final Map<String, String> KEY_ALIASES = Map.of(
+            "executionMaxConcurrent",       "execution-max-concurrent",
+            "claudeMaxConcurrentCalls",     "claude-max-concurrent-calls",
+            "claudeTimeoutSeconds",         "claude-timeout-seconds",
+            "claudeInterCallDelayMs",       "claude-inter-call-delay-ms",
+            "chainWorkflowTimeoutMinutes",  "chain-workflow-timeout-minutes"
+    );
+
     private final AppSettingsRepository appSettingsRepository;
     private final DynamicSemaphore executionSemaphore;
     private final HostClaudeService hostClaudeService;
@@ -85,10 +94,12 @@ public class ExecutionSettingsService {
     }
 
     public void validateAndApply(String key, String value) {
-        long[] bounds = BOUNDS.get(key);
+        String resolvedKey = KEY_ALIASES.getOrDefault(key, key);
+        long[] bounds = BOUNDS.get(resolvedKey);
         if (bounds == null) {
             throw new IllegalArgumentException("Unknown execution setting: " + key);
         }
+        key = resolvedKey;
 
         long parsed;
         try {

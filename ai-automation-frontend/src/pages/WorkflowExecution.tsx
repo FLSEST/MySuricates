@@ -21,6 +21,7 @@ import {
   usePauseExecution, useResumeExecution, useCancelExecution, useRunCommand, useSubmitApproval,
   useRetryExecution, useApproveTodos, useResumeFromStep,
 } from '../hooks/useWorkflows';
+import { useCreateTodo } from '../hooks/useTodos';
 import { useExecutionWebSocket } from '../hooks/useWebSocket';
 import { useRateRun } from '../hooks/useLearning';
 import { useToast } from '../hooks/useToast';
@@ -92,6 +93,7 @@ export function WorkflowExecution() {
   const runCommand = useRunCommand();
   const submitApproval = useSubmitApproval();
   const approveTodos = useApproveTodos();
+  const createTodo = useCreateTodo();
 
   const [command, setCommand] = useState('');
   const [containerTab, setContainerTab] = useState<'command' | 'terminal'>('command');
@@ -153,6 +155,29 @@ export function WorkflowExecution() {
     rateRun.mutate({ runId: runId!, rating });
   };
 
+  const handleCreateFailedTodo = () => {
+    if (!run) return;
+    const failedStep = run.steps?.find(s => s.status === 'FAILED');
+    const stepInfo = failedStep ? `Step ${failedStep.stepIndex + 1} (${failedStep.blockType})` : null;
+
+    const descParts: string[] = [];
+    descParts.push(`**Workflow:** ${workflow?.name || run.workflowName}`);
+    descParts.push(`**Run:** [${new Date(run.startedAt).toLocaleString()}](/workflows/${id}/run/${runId})`);
+    if (stepInfo) descParts.push(`**Fehlgeschlagener Step:** ${stepInfo}`);
+    if (run.error?.message) descParts.push(`**Fehler:** ${run.error.message}`);
+    if (failedStep?.error) descParts.push(`**Step-Fehler:** ${failedStep.error}`);
+
+    createTodo.mutate({
+      title: `${workflow?.name || run.workflowName}: Run fehlgeschlagen`,
+      description: descParts.join('\n'),
+      priority: 'HIGH',
+      tags: ['failed-run'],
+      projectId: workflow?.projectId || undefined,
+      source: 'WORKFLOW',
+      workflowRunId: run.id,
+    });
+  };
+
   if (runsError) {
     return <ErrorState message={runsError.message} onRetry={() => refetchRuns()} />;
   }
@@ -170,7 +195,7 @@ export function WorkflowExecution() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <button
-          onClick={() => navigate(`/workflows/${id}`)}
+          onClick={() => window.history.length > 1 ? navigate(-1) : navigate(`/workflows/${id}`)}
           className="p-2 rounded-lg hover:bg-surface-raised text-text-secondary hover:text-text transition-colors"
           aria-label={t.common.back}
         >
@@ -212,6 +237,16 @@ export function WorkflowExecution() {
         </div>
         {(run.status === 'INTERRUPTED' || run.status === 'FAILED') && (
           <div className="flex items-center gap-2">
+            {run.status === 'FAILED' && (
+              <Button
+                variant="secondary" size="sm"
+                icon={<ListTodo className="w-4 h-4" />}
+                onClick={handleCreateFailedTodo}
+                loading={createTodo.isPending}
+              >
+                {t.workflows.execution.createTodo}
+              </Button>
+            )}
             {run.status === 'INTERRUPTED' && run.steps?.some(s => s.status === 'COMPLETED') && (
               <Button
                 variant="primary" size="sm"

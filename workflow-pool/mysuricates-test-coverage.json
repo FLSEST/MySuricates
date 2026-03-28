@@ -9,7 +9,13 @@
   },
   "icon": "🧪",
   "category": "CUSTOM",
-  "tags": ["quality", "mysuricates", "testing", "audit", "todo-creating"],
+  "tags": [
+    "quality",
+    "mysuricates",
+    "testing",
+    "audit",
+    "todo-creating"
+  ],
   "model": "claude-opus-4-6",
   "instructions": "Du analysierst die Test-Abdeckung des MySuricates-Projekts. Backend ist Spring Boot (Java 21), Frontend ist React 18 (TypeScript). Sei praezise und melde nur echte Luecken — keine Halluzinationen. Nutze Opus fuer akkurate Analyse.",
   "blocks": [
@@ -17,7 +23,7 @@
       "type": "shell",
       "config": {
         "label": "Coverage-Daten sammeln",
-        "command": "set -euo pipefail\nBASE=/home/flo/Entwicklung/tools/autotrigger\n\necho '=== Backend: Source Files ==='\nfind \"$BASE/ai-automation-backend/src/main/java\" -name '*.java' -not -name '*Test*' | sort > /tmp/ms_src.txt\nSRC_COUNT=$(wc -l < /tmp/ms_src.txt)\necho \"Source files: $SRC_COUNT\"\ncat /tmp/ms_src.txt\n\necho ''\necho '=== Backend: Test Files ==='\nfind \"$BASE/ai-automation-backend/src/test/java\" -name '*Test.java' -o -name '*Tests.java' -o -name '*IT.java' 2>/dev/null | sort > /tmp/ms_test.txt\nTEST_COUNT=$(wc -l < /tmp/ms_test.txt)\necho \"Test files: $TEST_COUNT\"\ncat /tmp/ms_test.txt\n\necho ''\necho '=== Coverage Ratio ==='\necho \"Ratio: $(python3 -c \"print(f'{$TEST_COUNT/$SRC_COUNT*100:.1f}%' if $SRC_COUNT>0 else '0%')\")\"\n\necho ''\necho '=== Untested Source Files (kein korrespondierender Test) ==='\nwhile IFS= read -r src; do\n  base=$(basename \"$src\" .java)\n  if ! grep -qi \"${base}Test\\|${base}Tests\\|${base}IT\" /tmp/ms_test.txt 2>/dev/null; then\n    lines=$(wc -l < \"$src\")\n    pkg=$(echo \"$src\" | sed 's|.*/com/automation/||' | sed 's|/[^/]*$||')\n    echo \"$lines LOC | $pkg | $base\"\n  fi\ndone < /tmp/ms_src.txt | sort -rn | head -40\n\necho ''\necho '=== Test-Methoden pro Test-Datei ==='\nwhile IFS= read -r tf; do\n  methods=$(grep -c '@Test' \"$tf\" 2>/dev/null || echo 0)\n  base=$(basename \"$tf\" .java)\n  echo \"$methods tests: $base\"\ndone < /tmp/ms_test.txt | sort -rn\n\necho ''\necho '=== Frontend: Test Files ==='\nfind \"$BASE/ai-automation-frontend/src\" -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' 2>/dev/null | sort\necho ''\necho '=== Cypress E2E Tests ==='\nfind \"$BASE/ai-automation-frontend/cypress\" -name '*.cy.ts' -o -name '*.cy.tsx' 2>/dev/null | sort\n\necho ''\necho '=== Frontend: Untested Components/Hooks ==='\nfind \"$BASE/ai-automation-frontend/src\" -name '*.ts' -o -name '*.tsx' | grep -v test | grep -v spec | grep -v node_modules | grep -v '.d.ts' | while read f; do\n  base=$(basename \"$f\" | sed 's/\\.[^.]*$//')\n  if ! find \"$BASE/ai-automation-frontend\" -name \"${base}.test.*\" -o -name \"${base}.spec.*\" 2>/dev/null | grep -q .; then\n    lines=$(wc -l < \"$f\")\n    if [ \"$lines\" -gt 50 ]; then\n      echo \"$lines LOC | $base\"\n    fi\n  fi\ndone | sort -rn | head -30",
+        "command": "BASE=/home/flo/Entwicklung/tools/autotrigger\n\necho '=== Backend: Source Files ==='\nfind \"$BASE/ai-automation-backend/src/main/java\" -name '*.java' -not -name '*Test*' | sort > /tmp/ms_src.txt\nSRC_COUNT=$(wc -l < /tmp/ms_src.txt)\necho \"Source files: $SRC_COUNT\"\ncat /tmp/ms_src.txt\n\necho ''\necho '=== Backend: Test Files ==='\nfind \"$BASE/ai-automation-backend/src/test/java\" -name '*Test.java' -o -name '*Tests.java' -o -name '*IT.java' 2>/dev/null | sort > /tmp/ms_test.txt\nTEST_COUNT=$(wc -l < /tmp/ms_test.txt)\necho \"Test files: $TEST_COUNT\"\ncat /tmp/ms_test.txt\n\necho ''\necho '=== Coverage Ratio ==='\necho \"Ratio: $(python3 -c \"print(f'{$TEST_COUNT/$SRC_COUNT*100:.1f}%' if $SRC_COUNT>0 else '0%')\")\"\n\necho ''\necho '=== Untested Source Files (kein korrespondierender Test) ==='\nwhile IFS= read -r src; do\n  base=$(basename \"$src\" .java)\n  if ! grep -qi \"${base}Test\\|${base}Tests\\|${base}IT\" /tmp/ms_test.txt 2>/dev/null; then\n    lines=$(wc -l < \"$src\")\n    pkg=$(echo \"$src\" | sed 's|.*/com/automation/||' | sed 's|/[^/]*$||')\n    echo \"$lines LOC | $pkg | $base\"\n  fi\ndone < /tmp/ms_src.txt | sort -rn | head -40\n\necho ''\necho '=== Test-Methoden pro Test-Datei ==='\nwhile IFS= read -r tf; do\n  methods=$(grep -c '@Test' \"$tf\" 2>/dev/null || echo 0)\n  base=$(basename \"$tf\" .java)\n  echo \"$methods tests: $base\"\ndone < /tmp/ms_test.txt | sort -rn\n\necho ''\necho '=== Frontend: Test Files ==='\nfind \"$BASE/ai-automation-frontend/src\" -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' 2>/dev/null | sort\necho ''\necho '=== Cypress E2E Tests ==='\nfind \"$BASE/ai-automation-frontend/cypress\" -name '*.cy.ts' -o -name '*.cy.tsx' 2>/dev/null | sort\n\necho ''\necho '=== Frontend: Untested Components/Hooks ==='\nfind \"$BASE/ai-automation-frontend/src\" -name '*.ts' -o -name '*.tsx' | grep -v test | grep -v spec | grep -v node_modules | grep -v '.d.ts' | while read f; do\n  base=$(basename \"$f\" | sed 's/\\.[^.]*$//')\n  if ! find \"$BASE/ai-automation-frontend\" -name \"${base}.test.*\" -o -name \"${base}.spec.*\" 2>/dev/null | grep -q .; then\n    lines=$(wc -l < \"$f\")\n    if [ \"$lines\" -gt 50 ]; then\n      echo \"$lines LOC | $base\"\n    fi\n  fi\ndone | sort -rn | head -30",
         "timeout_seconds": 60,
         "on_failure": "continue"
       }
@@ -26,7 +32,7 @@
       "type": "simple",
       "config": {
         "label": "Coverage-Analyse (Opus)",
-        "timeout_seconds": 600,
+        "timeout_seconds": 900,
         "command": "Analysiere die Test-Coverage-Daten des MySuricates-Projekts:\n\n{{ previous_output }}\n\nBewerte systematisch:\n\n1. **Kritische Luecken (Backend)**:\n   - Controller ohne Tests: API-Contracts muessen getestet werden\n   - Services mit Business-Logik ohne Tests (besonders WorkflowExecutor, StagingService, ChainExecutor)\n   - Block-Executors ohne Tests (SimpleBlockExecutor, ShellBlockExecutor, AgenticBlockExecutor etc.)\n   - Security-Klassen ohne Tests (ApiKeyFilter, RateLimiting)\n\n2. **Kritische Luecken (Frontend)**:\n   - Hooks ohne Tests (useWorkflows, useWebSocket etc.)\n   - Komplexe Seiten ohne E2E-Tests\n\n3. **Duenne Tests**: Test-Dateien mit wenigen @Test-Methoden fuer grosse Klassen\n\n4. **Fehlende Test-Typen**: Nur Unit vs. auch Integration?\n\nFuer jeden Fund:\n- Datei/Klasse\n- Schweregrad: CRITICAL (Security, Core-Execution), HIGH (Business-Logik), MEDIUM (Utilities), LOW (DTOs, Config)\n- Was genau getestet werden sollte\n- Geschaetzter Aufwand (klein/mittel/gross)\n\nWICHTIG: Sei praezise. Melde nur Klassen die WIRKLICH keinen Test haben laut den Daten oben."
       }
     },
@@ -34,7 +40,7 @@
       "type": "simple",
       "config": {
         "label": "Coverage-Report erstellen",
-        "timeout_seconds": 300,
+        "timeout_seconds": 900,
         "command": "Erstelle den Test-Coverage-Report fuer MySuricates:\n\n{{ previous_output }}\n\n## Format:\n\n### Executive Summary\n- Gesamt-Coverage-Ratio (Dateien mit Tests / Gesamt)\n- Anzahl kritisch untesteter Klassen\n- Bewertung der Test-Qualitaet (1-10)\n\n### Coverage-Matrix\n| Package | Source Files | Test Files | Coverage | Kritischste Luecke |\n|---------|-------------|-----------|---------|-------------------|\n| controller | | | | |\n| service | | | | |\n| executor | | | | |\n| security | | | | |\n| config | | | | |\n| (frontend) | | | | |\n\n### Top-10 Prioritaeten\n| # | Klasse | LOC | Schweregrad | Was testen | Aufwand |\n\n### Quick Wins\nKleine Klassen die mit wenig Aufwand getestet werden koennen.\n\n### Empfohlene Test-Strategie\nWelche Test-Typen fuer welche Module priorisiert werden sollten.\n\ngate_status: GREEN wenn Coverage > 60%, YELLOW wenn 30-60%, RED wenn < 30%"
       }
     },
@@ -56,7 +62,7 @@
       "type": "simple",
       "config": {
         "label": "Ergebnis erklären",
-        "timeout_seconds": 60,
+        "timeout_seconds": 120,
         "command": "Fasse das Ergebnis des Test-Coverage-Audits in maximal 5 Zeilen zusammen:\n\n{{ previous_output }}\n\n- Coverage-Ratio\n- Anzahl kritischer Luecken\n- Wichtigste 1-2 Luecken benennen\n- Ob TODOs erstellt wurden\n\nAm Ende GENAU diese Zeile:\ngate_status: GREEN wenn Coverage gut (>60%), YELLOW wenn mittel (30-60%), RED wenn schlecht (<30%)"
       }
     },

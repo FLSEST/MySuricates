@@ -2,7 +2,19 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import type { DialogSessionInfo, DialogWorkflowSuggestion, Workflow } from '../types';
 
-export function useDialogSessions(projectPath?: string, limit = 50) {
+export function useDialogSessionCounts() {
+  return useQuery({
+    queryKey: ['dialog', 'counts'],
+    queryFn: () => api.get<Record<string, number>>('/dialog/sessions/count'),
+    staleTime: 60_000,
+  });
+}
+
+export function useDialogSessions(
+  projectPath?: string,
+  limit = 2000,
+  options?: { enabled?: boolean },
+) {
   const params = new URLSearchParams({ limit: String(limit) });
   if (projectPath) params.set('projectPath', projectPath);
 
@@ -10,6 +22,7 @@ export function useDialogSessions(projectPath?: string, limit = 50) {
     queryKey: ['dialog', 'sessions', projectPath, limit],
     queryFn: () => api.get<DialogSessionInfo[]>(`/dialog/sessions?${params}`),
     staleTime: 30_000,
+    enabled: options?.enabled ?? true,
   });
 }
 

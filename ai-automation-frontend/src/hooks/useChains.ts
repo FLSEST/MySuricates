@@ -3,6 +3,7 @@ import { api } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
 import type { WorkflowChain, ChainRun, CreateChainRequest, UpdateChainRequest, PageResponse } from '../types';
+import { TERMINAL_RUN_STATUSES } from '../types';
 
 export function useChains() {
   return useQuery({
@@ -20,15 +21,21 @@ export function useChain(id: string) {
 }
 
 export function useAllChainRuns(params: { page: number; size: number; status?: string }) {
-  const query = new URLSearchParams({
+  const searchParams = new URLSearchParams({
     page: String(params.page),
     size: String(params.size),
   });
-  if (params.status) query.set('status', params.status);
+  if (params.status) searchParams.set('status', params.status);
 
   return useQuery({
     queryKey: ['chainRuns', params],
-    queryFn: () => api.get<PageResponse<ChainRun>>(`/chains/runs?${query}`),
+    queryFn: () => api.get<PageResponse<ChainRun>>(`/chains/runs?${searchParams}`),
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (!data?.content?.length) return false;
+      const hasActiveRuns = data.content.some((run) => !TERMINAL_RUN_STATUSES.has(run.status));
+      return hasActiveRuns ? 5_000 : 30_000;
+    },
   });
 }
 
@@ -47,9 +54,7 @@ export function useChainRun(chainId: string, runId: string) {
     enabled: !!chainId && !!runId,
     refetchInterval: (query) => {
       const data = query.state.data;
-      if (data && (data.status === 'COMPLETED' || data.status === 'FAILED' || data.status === 'CANCELLED' || data.status === 'COMPLETED_WITH_ERRORS')) {
-        return false;
-      }
+      if (data && TERMINAL_RUN_STATUSES.has(data.status)) return false;
       return 2000;
     },
   });

@@ -148,17 +148,14 @@ public class WorkflowExecutor {
                                List<Skill> skills, Map<String, Object> inputContext,
                                String instructions, String model, String provider, Map<String, Object> workflowMeta,
                                String templateId, int skipToStepIndex, String resumePreviousOutput) {
-        try {
-            executionSemaphore.acquire();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            failRun(runId, "Interrupted while waiting for execution slot");
-            return;
-        }
-
+        // Single try-finally ensures semaphore is always released, even if the thread
+        // dies between acquire() and the execution body (eliminates the leak window).
         WorkflowRun run = null;
         ExecutionContext context = null;
+        boolean semaphoreAcquired = false;
         try {
+            executionSemaphore.acquire();
+            semaphoreAcquired = true;
             run = runRepository.findById(runId).orElseThrow();
             if (skipToStepIndex == 0) {
                 // Fresh run: start with empty step list
@@ -354,6 +351,10 @@ public class WorkflowExecutor {
                         "WorkflowExecutor", runId, workflowId);
             }
 
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            failRun(runId, "Interrupted while waiting for execution slot");
+            return;
         } catch (Exception e) {
             log.error("Workflow execution failed: {}", runId, e);
             if (run != null) {
@@ -364,7 +365,10 @@ public class WorkflowExecutor {
                     "Workflow execution error: " + (e.getMessage() != null ? e.getMessage() : e.getClass().getName()),
                     "WorkflowExecutor", runId, workflowId);
         } finally {
-            executionSemaphore.release();
+            if (semaphoreAcquired) {
+                executionSemaphore.release();
+            }
+            activeExecutions.remove(runId);
 
             if (run != null) {
                 run.setCompletedAt(Instant.now());
@@ -380,7 +384,6 @@ public class WorkflowExecutor {
                 }
 
                 runRepository.save(run);
-                activeExecutions.remove(run.getId());
 
                 // Broadcast final status
                 broadcaster.broadcastRunStatus(run.getId(), run.getStatus());
@@ -618,6 +621,10 @@ public class WorkflowExecutor {
 
     public int getActiveRunCount() {
         return activeExecutions.size();
+    }
+
+    public boolean isRunActive(String runId) {
+        return activeExecutions.containsKey(runId);
     }
 
     public int getPendingApprovalCount() {

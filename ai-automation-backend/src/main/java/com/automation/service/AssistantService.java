@@ -694,8 +694,10 @@ public class AssistantService {
 
     private List<ToolRequest> parseToolRequests(String response) {
         if (response == null) return List.of();
+        // Remove code blocks to prevent accidental tool execution from examples
+        String cleaned = response.replaceAll("```[\\s\\S]*?```", "");
         List<ToolRequest> result = new ArrayList<>();
-        Matcher m = TOOL_PATTERN.matcher(response);
+        Matcher m = TOOL_PATTERN.matcher(cleaned);
         while (m.find()) result.add(new ToolRequest(m.group(1), m.group(2).trim()));
         return result;
     }
@@ -703,15 +705,16 @@ public class AssistantService {
     /** Replaces all &lt;tool&gt; tags in the response with their execution results. */
     private String executeTools(String response) {
         if (response == null) return response;
-        List<ToolRequest> tools = parseToolRequests(response);
-        if (tools.isEmpty()) return response;
-        String modified = response;
-        for (ToolRequest tool : tools) {
-            String tag = "<tool type=\"" + tool.type() + "\">" + tool.payload() + "</tool>";
-            String result = executeTool(tool);
-            modified = modified.replace(tag, result);
-        }
-        return modified;
+        Matcher m = TOOL_PATTERN.matcher(response);
+        if (!m.find()) return response;
+
+        StringBuffer sb = new StringBuffer();
+        do {
+            String result = executeTool(new ToolRequest(m.group(1), m.group(2).trim()));
+            m.appendReplacement(sb, Matcher.quoteReplacement(result));
+        } while (m.find());
+        m.appendTail(sb);
+        return sb.toString();
     }
 
     private String executeTool(ToolRequest req) {

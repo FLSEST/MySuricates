@@ -9,7 +9,13 @@
   },
   "icon": "🏗️",
   "category": "CUSTOM",
-  "tags": ["quality-gate", "mysuricates", "build", "test", "release"],
+  "tags": [
+    "quality-gate",
+    "mysuricates",
+    "build",
+    "test",
+    "release"
+  ],
   "blocks": [
     {
       "type": "shell",
@@ -24,7 +30,7 @@
       "type": "simple",
       "config": {
         "label": "Ergebnis erklären",
-        "timeout_seconds": 60,
+        "timeout_seconds": 120,
         "command": "Analysiere das Build-Gate-Ergebnis und gib eine knappe, klare Zusammenfassung:\n\n{{ previous_output }}\n\nRegeln:\n- Maximal 5 Zeilen\n- Bei VERDICT: GREEN → Kurze Bestätigung dass alles OK ist\n- Bei VERDICT: RED → Erkläre WAS genau fehlgeschlagen ist und WAS der wahrscheinliche Fix ist\n- Keine Wiederholung der vollen Logs\n- Kein Markdown, kein Fließtext — stichpunktartig\n\nAm Ende GENAU diese Zeile (nicht in Markdown):\ngate_status: GREEN oder RED (je nach VERDICT oben)"
       }
     },

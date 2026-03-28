@@ -1,10 +1,14 @@
 package com.automation.repository;
 
 import com.automation.entity.Workflow;
+import jakarta.persistence.QueryHint;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -38,4 +42,19 @@ public interface WorkflowRepository extends JpaRepository<Workflow, String> {
     @Query("SELECT w FROM Workflow w WHERE w.blockTypes IS NULL OR w.blockTypes = ''")
     List<Workflow> findWithEmptyBlockTypes();
 
+    /**
+     * Loads all workflows in Hibernate read-only mode — prevents dirty-checking and flushes.
+     * Used by InstanceSyncHelper to avoid Hibernate overwriting stable_synced_at via dirty-check flush.
+     */
+    @QueryHints(@QueryHint(name = "org.hibernate.readOnly", value = "true"))
+    @Query("SELECT w FROM Workflow w")
+    List<Workflow> findAllReadOnly();
+
+    /**
+     * Updates stable_synced_at via native SQL — bypasses @LastModifiedDate on updatedAt.
+     */
+    @Modifying
+    @Transactional
+    @Query(value = "UPDATE workflows SET stable_synced_at = :syncedAt WHERE id = :id", nativeQuery = true)
+    void updateStableSyncedAt(@Param("id") String id, @Param("syncedAt") String syncedAt);
 }

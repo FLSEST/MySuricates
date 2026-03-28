@@ -1,0 +1,76 @@
+{
+  "name": {
+    "de": "Performance-Audit MySuricates",
+    "en": "MySuricates Performance Audit"
+  },
+  "description": {
+    "de": "API-Latenzen, Log-Analyse, DB-Performance, Frontend-Bundle-Größen messen — erstellt TODOs bei Problemen",
+    "en": "Measure API latencies, analyze logs, DB performance, frontend bundle sizes — creates TODOs for issues"
+  },
+  "icon": "⚡",
+  "category": "CUSTOM",
+  "tags": [
+    "quality",
+    "mysuricates",
+    "performance",
+    "audit",
+    "todo-creating"
+  ],
+  "model": "claude-opus-4-6",
+  "instructions": "Du analysierst die Performance der MySuricates-Plattform. Sei praezise und melde nur echte, messbare Probleme. Bekannte Patterns: SQLite pool-size=1 (beabsichtigt), Claude CLI 5min Timeout (extern), TerminalPanel 329KB (xterm, korrekt lazy-loaded).",
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "label": "Backend-Performance messen",
+        "command": "BASE=/home/flo/Entwicklung/tools/autotrigger\nAPI_KEY=$(python3 -c \"import sqlite3; conn = sqlite3.connect('$BASE/ai-automation-backend/data/automation.db'); c = conn.cursor(); c.execute(\\\"SELECT value FROM app_settings WHERE key = 'api-key'\\\"); print(c.fetchone()[0]); conn.close()\")\n\necho '========================================'\necho '  SYSTEM-METRIKEN'\necho '========================================'\necho '--- Load & CPU ---'\nuptime\necho \"CPU Kerne: $(nproc)\"\necho ''\necho '--- Memory ---'\nfree -h\necho ''\necho '--- Disk ---'\ndf -h / | tail -1\n\necho ''\necho '========================================'\necho '  JVM-METRIKEN (Actuator)'\necho '========================================'\ncurl -s http://localhost:9090/actuator/metrics/jvm.memory.used 2>/dev/null | python3 -c \"\nimport sys,json\ntry:\n    d=json.load(sys.stdin)\n    for m in d.get('measurements',[]):\n        if m['statistic']=='VALUE': print(f'JVM Heap Used: {m[\"value\"]/1024/1024:.0f} MB')\nexcept: print('JVM: nicht verfuegbar')\" || true\ncurl -s http://localhost:9090/actuator/metrics/jvm.memory.max 2>/dev/null | python3 -c \"\nimport sys,json\ntry:\n    d=json.load(sys.stdin)\n    for m in d.get('measurements',[]):\n        if m['statistic']=='VALUE' and m['value']>0: print(f'JVM Heap Max: {m[\"value\"]/1024/1024:.0f} MB')\nexcept: print('JVM Max: nicht verfuegbar')\" || true\ncurl -s http://localhost:9090/actuator/metrics/jvm.gc.pause 2>/dev/null | python3 -c \"\nimport sys,json\ntry:\n    d=json.load(sys.stdin)\n    for m in d.get('measurements',[]): print(f'GC {m[\"statistic\"]}: {m[\"value\"]:.3f}s')\nexcept: print('GC: nicht verfuegbar')\" || true\n\necho ''\necho '========================================'\necho '  API-ENDPOINT-LATENZEN'\necho '========================================'\nfor EP in \\\n  '/api/v1/system/health' \\\n  '/api/v1/workflows?projectId=ebf4f50c-20c2-4c35-a84a-a0b350124523&size=20' \\\n  '/api/v1/executions?size=50' \\\n  '/api/v1/todos?size=20' \\\n  '/api/v1/learning/dashboard' \\\n  '/api/v1/projects'; do\n  TIME=$(curl -s -o /dev/null -w '%{time_total}' -H \"X-API-Key: $API_KEY\" \"http://localhost:9090$EP\" 2>/dev/null || echo 'FAIL')\n  printf '  %6ss  %s\\n' \"$TIME\" \"$EP\"\ndone\n\necho ''\necho '========================================'\necho '  DATENBANK-PERFORMANCE'\necho '========================================'\nDB=$BASE/ai-automation-backend/data/automation.db\necho \"DB-Groesse: $(du -sh $DB | cut -f1)\"\npython3 -c \"\nimport sqlite3\nconn = sqlite3.connect('$DB')\nc = conn.cursor()\nc.execute('PRAGMA page_count')\npages = c.fetchone()[0]\nc.execute('PRAGMA page_size')\npage_size = c.fetchone()[0]\nc.execute('PRAGMA freelist_count')\nfree = c.fetchone()[0]\nprint(f'Pages: {pages}, Page-Size: {page_size}B, Freelist: {free} ({free*page_size/1024/1024:.1f} MB fragmentiert)')\nprint()\nprint('Row-Counts (groesste Tabellen):')\nc.execute(\\\"SELECT name FROM sqlite_master WHERE type='table' ORDER BY name\\\")\nfor (t,) in c.fetchall():\n    try:\n        c.execute(f'SELECT COUNT(*) FROM {t}')\n        n = c.fetchone()[0]\n        if n > 0: print(f'  {n:>8}  {t}')\n    except: pass\nconn.close()\"\n\necho ''\necho '========================================'\necho '  WORKFLOW-RUN-PERFORMANCE'\necho '========================================'\ncurl -s -H \"X-API-Key: $API_KEY\" 'http://localhost:9090/api/v1/executions?size=50' 2>/dev/null | python3 -c \"\nimport sys,json\ntry:\n    raw=json.load(sys.stdin)\n    runs=raw if isinstance(raw,list) else raw.get('content',raw.get('data',[]))\n    with_dur=[(r.get('workflowName','?'),r.get('durationMs',0),r.get('status','?')) for r in runs if r.get('durationMs')]\n    with_dur.sort(key=lambda x:-x[1])\n    print('Top-10 langsamste Runs:')\n    for name,ms,status in with_dur[:10]:\n        print(f'  {ms:>8}ms  [{status:>10}]  {name}')\n    if with_dur:\n        durs=sorted([d[1] for d in with_dur])\n        print(f'\\nMedian: {durs[len(durs)//2]}ms, P95: {durs[int(len(durs)*0.95)]}ms, Max: {durs[-1]}ms')\n        print(f'Runs > 60s: {sum(1 for d in durs if d>60000)}, Runs > 5min: {sum(1 for d in durs if d>300000)}')\nexcept Exception as e: print(f'Run-Analyse fehlgeschlagen: {e}')\"",
+        "timeout_seconds": 120,
+        "on_failure": "continue"
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "label": "Log-Analyse",
+        "command": "LOG=/home/flo/Entwicklung/tools/autotrigger/ai-automation-backend/data/logs/mysuricates.log\nERRLOG=/home/flo/Entwicklung/tools/autotrigger/ai-automation-backend/data/logs/mysuricates-error.log\n\necho '========================================'\necho '  LOG-DATEIEN'\necho '========================================'\nls -lh /home/flo/Entwicklung/tools/autotrigger/ai-automation-backend/data/logs/ 2>/dev/null || echo 'Kein Log-Verzeichnis'\n\nif [ ! -f \"$LOG\" ]; then\n  echo 'Haupt-Log nicht gefunden'\n  exit 0\nfi\n\necho ''\necho '========================================'\necho '  ERROR/WARN ZAEHLUNG'\necho '========================================'\nTODAY=$(date +%Y-%m-%d)\nYESTERDAY=$(date -d 'yesterday' +%Y-%m-%d 2>/dev/null || date -v-1d +%Y-%m-%d 2>/dev/null || echo '')\nWEEK_AGO=$(date -d '7 days ago' +%Y-%m-%d 2>/dev/null || date -v-7d +%Y-%m-%d 2>/dev/null || echo '')\n\nTOTAL_ERR=$(grep -c ' ERROR ' \"$LOG\" 2>/dev/null || echo 0)\nTOTAL_WARN=$(grep -c ' WARN ' \"$LOG\" 2>/dev/null || echo 0)\nTODAY_ERR=$(grep \"$TODAY\" \"$LOG\" 2>/dev/null | grep -c ' ERROR ' || echo 0)\nTODAY_WARN=$(grep \"$TODAY\" \"$LOG\" 2>/dev/null | grep -c ' WARN ' || echo 0)\n\necho \"Gesamt: $TOTAL_ERR ERRORs, $TOTAL_WARN WARNs\"\necho \"Heute ($TODAY): $TODAY_ERR ERRORs, $TODAY_WARN WARNs\"\n\necho ''\necho '========================================'\necho '  TOP-10 HAEUFIGSTE ERRORS'\necho '========================================'\ngrep ' ERROR ' \"$LOG\" 2>/dev/null | sed 's/^.*ERROR [^ ]* - //' | sort | uniq -c | sort -rn | head -10\n\necho ''\necho '========================================'\necho '  TIMEOUT / SLOW / EXCEEDED'\necho '========================================'\ngrep -i 'timeout\\|timed out\\|exceeded\\|too long\\|slow' \"$LOG\" 2>/dev/null | tail -15 || echo 'Keine Timeout-Eintraege'\n\necho ''\necho '========================================'\necho '  HIKARICP / DB-WARNUNGEN'\necho '========================================'\ngrep -i 'hikari\\|connection.*wait\\|pool.*exhaust\\|SQLITE_BUSY\\|database.*locked' \"$LOG\" 2>/dev/null | tail -10 || echo 'Keine HikariCP-Warnungen'\n\necho ''\necho '========================================'\necho '  MEMORY / GC WARNUNGEN'\necho '========================================'\ngrep -i 'OutOfMemory\\|heap.*space\\|GC overhead\\|memory.*pressure' \"$LOG\" 2>/dev/null | tail -10 || echo 'Keine Memory-Warnungen'\n\necho ''\necho '========================================'\necho '  LETZTE 10 ERRORS (chronologisch)'\necho '========================================'\ngrep ' ERROR ' \"$LOG\" 2>/dev/null | tail -10 || echo 'Keine Errors'",
+        "timeout_seconds": 30,
+        "on_failure": "continue"
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "label": "Frontend-Performance messen",
+        "command": "BASE=/home/flo/Entwicklung/tools/autotrigger/ai-automation-frontend\n\necho '========================================'\necho '  FRONTEND BUNDLE-GROESSEN'\necho '========================================'\nif [ -d \"$BASE/dist/assets\" ]; then\n  echo '--- JS-Chunks > 50KB ---'\n  find \"$BASE/dist/assets\" -name '*.js' -size +50k -exec ls -lhS {} + 2>/dev/null | awk '{print $5, $NF}' | sed \"s|$BASE/dist/assets/||\" | head -20\n  echo ''\n  echo '--- CSS ---'\n  find \"$BASE/dist/assets\" -name '*.css' -exec ls -lhS {} + 2>/dev/null | awk '{print $5, $NF}' | sed \"s|$BASE/dist/assets/||\"\n  echo ''\n  TOTAL_JS=$(find \"$BASE/dist/assets\" -name '*.js' -exec cat {} + 2>/dev/null | wc -c)\n  TOTAL_CSS=$(find \"$BASE/dist/assets\" -name '*.css' -exec cat {} + 2>/dev/null | wc -c)\n  echo \"Total JS: $((TOTAL_JS / 1024)) KB\"\n  echo \"Total CSS: $((TOTAL_CSS / 1024)) KB\"\nelse\n  echo 'Kein dist-Verzeichnis — baue Frontend...'\n  cd \"$BASE\" && npm run build 2>&1 | tail -5\n  echo ''\n  echo '--- JS-Chunks > 50KB ---'\n  find \"$BASE/dist/assets\" -name '*.js' -size +50k -exec ls -lhS {} + 2>/dev/null | awk '{print $5, $NF}' | sed \"s|$BASE/dist/assets/||\" | head -20\nfi\n\necho ''\necho '========================================'\necho '  DEPENDENCIES'\necho '========================================'\nDEP_COUNT=$(python3 -c \"import json; d=json.load(open('$BASE/package.json')); print(len(d.get('dependencies',{})))\" 2>/dev/null || echo '?')\nDEVDEP_COUNT=$(python3 -c \"import json; d=json.load(open('$BASE/package.json')); print(len(d.get('devDependencies',{})))\" 2>/dev/null || echo '?')\nNM_SIZE=$(du -sh \"$BASE/node_modules\" 2>/dev/null | cut -f1 || echo '?')\necho \"Dependencies: $DEP_COUNT, DevDependencies: $DEV_DEP_COUNT\"\necho \"node_modules: $NM_SIZE\"\n\necho ''\necho '========================================'\necho '  GROESSTE QUELLDATEIEN (>300 LOC)'\necho '========================================'\nfind \"$BASE/src\" \\( -name '*.ts' -o -name '*.tsx' \\) -not -path '*/node_modules/*' | while read f; do\n  l=$(wc -l < \"$f\")\n  [ \"$l\" -gt 300 ] && echo \"$l $(echo $f | sed \"s|$BASE/src/||\")\"\ndone | sort -rn | head -10",
+        "timeout_seconds": 120,
+        "on_failure": "continue"
+      }
+    },
+    {
+      "type": "simple",
+      "config": {
+        "label": "Performance-Tiefenanalyse (Opus)",
+        "timeout_seconds": 900,
+        "command": "Analysiere die Performance-Daten der MySuricates-Plattform:\n\n{{ previous_output }}\n\nBewerte systematisch:\n\n### API-Latenzen\n- < 100ms = gut, 100-500ms = akzeptabel, 500ms-2s = langsam, > 2s = kritisch\n- Welche Endpoints sind am langsamsten? Warum?\n- Dashboard-Endpoint ist oft der Flaschenhals (aggregiert viele Daten)\n\n### Datenbank\n- DB-Groesse: > 100MB = pruefen, > 500MB = Cleanup noetig\n- Fragmentierung: freelist_count > 10% der page_count = VACUUM empfehlen\n- Grosse Tabellen: step_results und workflow_runs wachsen am schnellsten — Cleanup-Policy?\n- Pool-Size=1 ist beabsichtigt (SQLite) — KEIN Finding\n\n### JVM & System\n- Heap > 70% = Warnung, > 85% = Alarm\n- GC-Pausen > 500ms = Performance-Problem\n- System-Load > CPU-Kerne = ueberlastet\n\n### Logs\n- Wiederkehrende Errors = Bug-Kandidaten\n- Timeouts = Engpaesse identifizieren\n- HikariCP-Warnungen = DB-Contention\n\n### Frontend\n- Chunks > 200KB = Splitting-Kandidaten\n- Gesamt-JS > 2MB = zu gross\n- Dashboard 443KB = Recharts koennte lazy-loaded werden\n- index 632KB = Vendor-Chunk, schwer zu reduzieren\n\n### Workflow-Runs\n- Median > 60s = normal fuer Opus-Workflows\n- Runs > 5min = potentiell haengend\n\nBEKANNTE PATTERNS (KEIN Finding):\n- SQLite pool-size=1\n- Claude CLI 5min Timeout\n- TerminalPanel 329KB (xterm, korrekt lazy-loaded)\n- Lange Agentic-Runs (>5min) sind normal\n\nPro Finding: Schweregrad (CRITICAL/HIGH/MEDIUM/LOW), Messwert, konkreter Fix.\n\n## Report-Format\n\n### Performance-Scorecard\n| Bereich | Score (1-10) | Kritischster Befund |\n|---------|-------------|--------------------|\n| API-Latenzen | | |\n| Datenbank | | |\n| JVM/System | | |\n| Logs/Errors | | |\n| Frontend | | |\n| Workflow-Runs | | |\n\n### Top-5 Optimierungen\n| # | Problem | Messwert | Fix | Aufwand | Erwartete Verbesserung |\n\ngate_status: RED wenn CRITICAL, YELLOW wenn HIGH, GREEN wenn nur MEDIUM/LOW"
+      }
+    },
+    {
+      "type": "simple",
+      "config": {
+        "label": "Ergebnis erklären",
+        "timeout_seconds": 120,
+        "command": "Fasse das Performance-Audit in maximal 5 Zeilen zusammen:\n\n{{ previous_output }}\n\n- Gesamtbewertung der Performance\n- Langsamster API-Endpoint und Latenz\n- Groesster Befund aus den Logs\n- Frontend-Bundle-Status\n\nAm Ende GENAU diese Zeile:\ngate_status: GREEN wenn Performance akzeptabel, YELLOW wenn Optimierungsbedarf, RED wenn kritische Engpaesse"
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "label": "Gate-Verdict",
+        "command": "PREV='{{ previous_output }}'\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Performance-Audit: KRITISCH'\n  echo 'gate_status: RED'\n  echo 'gate_category: performance'\n  echo 'gate_description: Kritische Performance-Engpaesse gefunden'\n  exit 1\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Performance-Audit: Optimierungsbedarf'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: performance'\n  echo 'gate_description: Performance-Optimierungen empfohlen'\nelse\n  echo 'Performance-Audit: OK'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: performance'\n  echo 'gate_description: Performance akzeptabel'\nfi",
+        "timeout_seconds": 10
+      }
+    }
+  ],
+  "version": "1.0.0",
+  "author": "MySuricates"
+}

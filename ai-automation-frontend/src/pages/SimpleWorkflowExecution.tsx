@@ -139,7 +139,7 @@ export function SimpleWorkflowExecution() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <button
-          onClick={() => navigate(`/workflows/${id}`)}
+          onClick={() => window.history.length > 1 ? navigate(-1) : navigate(`/workflows/${id}`)}
           className="p-2 rounded-lg hover:bg-surface-raised text-text-secondary hover:text-text transition-colors"
           aria-label={t.common.back}
         >

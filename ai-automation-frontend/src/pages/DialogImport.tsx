@@ -6,7 +6,10 @@ import {
 } from 'lucide-react';
 import { Card, Button, Input, Select, Spinner, Badge, Toggle } from '../components/ui';
 import { useProjects } from '../hooks/useProjects';
-import { useDialogSessions, useAnalyzeDialog, useCreateWorkflowFromDialog } from '../hooks/useDialog';
+import {
+  useDialogSessionCounts, useDialogSessions,
+  useAnalyzeDialog, useCreateWorkflowFromDialog,
+} from '../hooks/useDialog';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { useT } from '../i18n';
 import { useToast } from '../hooks/useToast';
@@ -39,8 +42,6 @@ function projectShortName(path: string): string {
   return parts[parts.length - 1] || path;
 }
 
-// ── Konfidenz-Badge ───────────────────────────────────────
-
 function ConfidenceBadge({ confidence }: { confidence: number }) {
   const pct = Math.round(confidence * 100);
   if (confidence >= 0.7) return <Badge variant="success">{pct}%</Badge>;
@@ -48,20 +49,20 @@ function ConfidenceBadge({ confidence }: { confidence: number }) {
   return <Badge variant="danger">{pct}%</Badge>;
 }
 
-// ── Panel 1: Projekt-Sidebar ──────────────────────────────
+// ── Typen ─────────────────────────────────────────────────
 
 interface ProjectGroup {
-  id: string;            // project.id or OTHER_KEY
+  id: string;
   label: string;
   path: string | null;
-  sessions: DialogSessionInfo[];
+  count: number;
   isOther: boolean;
 }
 
+// ── Panel 1: Projekt-Sidebar ──────────────────────────────
+
 function ProjectSidebar({
-  groups,
-  selectedId,
-  onSelect,
+  groups, selectedId, onSelect,
 }: {
   groups: ProjectGroup[];
   selectedId: string | null;
@@ -84,13 +85,10 @@ function ProjectSidebar({
             <div className="flex items-center gap-2 min-w-0">
               {g.isOther
                 ? <Layers className="w-4 h-4 shrink-0 text-text-secondary" />
-                : <GitBranch className="w-4 h-4 shrink-0 text-text-secondary" />
-              }
+                : <GitBranch className="w-4 h-4 shrink-0 text-text-secondary" />}
               <span className="text-sm font-medium truncate">{g.label}</span>
             </div>
-            <Badge variant={g.sessions.length > 0 ? 'default' : 'default'}>
-              {g.sessions.length}
-            </Badge>
+            <Badge variant="default">{g.count}</Badge>
           </button>
         );
       })}
@@ -98,12 +96,10 @@ function ProjectSidebar({
   );
 }
 
-// ── Panel 2: Session-Liste ────────────────────────────────
+// ── Panel 2: Session-Karte ────────────────────────────────
 
 function SessionCard({
-  session,
-  selected,
-  onClick,
+  session, selected, onClick,
 }: {
   session: DialogSessionInfo;
   selected: boolean;
@@ -131,9 +127,7 @@ function SessionCard({
                 {tool}
               </span>
             ))}
-            {!session.substantial && (
-              <Badge variant="default">small</Badge>
-            )}
+            {!session.substantial && <Badge variant="default">small</Badge>}
           </div>
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0 text-xs text-text-secondary">
@@ -146,7 +140,7 @@ function SessionCard({
   );
 }
 
-// ── Panel 3: Detail (Workflows + Analyse) ────────────────
+// ── Panel 3: Bestehende Workflows ─────────────────────────
 
 function ExistingWorkflowsList({ workflows }: { workflows: Workflow[] }) {
   const t = useT();
@@ -156,9 +150,7 @@ function ExistingWorkflowsList({ workflows }: { workflows: Workflow[] }) {
   const rest = workflows.length - MAX_VISIBLE;
 
   if (workflows.length === 0) {
-    return (
-      <p className="text-xs text-text-secondary italic">{t.dialog.noExistingWorkflows}</p>
-    );
+    return <p className="text-xs text-text-secondary italic">{t.dialog.noExistingWorkflows}</p>;
   }
 
   return (
@@ -182,11 +174,10 @@ function ExistingWorkflowsList({ workflows }: { workflows: Workflow[] }) {
   );
 }
 
+// ── Panel 3: Suggestion ───────────────────────────────────
+
 function SuggestionPanel({
-  suggestion,
-  projects,
-  onCreateWorkflow,
-  isCreating,
+  suggestion, projects, onCreateWorkflow, isCreating,
 }: {
   suggestion: DialogWorkflowSuggestion;
   projects: { id: string; name: string }[];
@@ -284,55 +275,78 @@ export function DialogImport() {
   const [substantialOnly, setSubstantialOnly] = useState(true);
 
   const { data: projects } = useProjects();
-  const { data: allSessions, isLoading: sessionsLoading } = useDialogSessions(undefined, 200);
+  const { data: counts, isLoading: countsLoading } = useDialogSessionCounts();
   const { data: allWorkflows } = useWorkflows();
   const analyzeMutation = useAnalyzeDialog();
   const createMutation = useCreateWorkflowFromDialog();
 
-  // Alle Sessions nach MySuricates-Projekten gruppieren
-  const groups = useMemo<ProjectGroup[]>(() => {
-    if (!allSessions) return [];
-
-    const activeProjects = (projects ?? []).filter(p => !p.archivedAt);
-    const usedPaths = new Set<string>();
-
-    const projectGroups: ProjectGroup[] = activeProjects
-      .map(p => {
-        const sessions = allSessions.filter(s => s.projectPath === p.path);
-        sessions.forEach(s => usedPaths.add(s.projectPath));
-        return {
-          id: p.id,
-          label: p.name,
-          path: p.path,
-          sessions,
-          isOther: false,
-        };
-      })
-      .filter(g => g.sessions.length > 0);
-
-    const other = allSessions.filter(s => !usedPaths.has(s.projectPath));
-    if (other.length > 0) {
-      projectGroups.push({
-        id: OTHER_KEY,
-        label: t.dialog.otherSessions,
-        path: null,
-        sessions: other,
-        isOther: true,
-      });
-    }
-
-    return projectGroups;
-  }, [allSessions, projects, t.dialog.otherSessions]);
-
-  // Sessions für gewählte Gruppe (gefiltert)
-  const selectedGroup = useMemo(
-    () => groups.find(g => g.id === selectedGroupId) ?? null,
-    [groups, selectedGroupId]
+  // Aktives Projekt bestimmen
+  const activeProjects = useMemo(
+    () => (projects ?? []).filter(p => !p.archivedAt),
+    [projects],
   );
 
+  const knownProjectPaths = useMemo(
+    () => new Set(activeProjects.map(p => p.path)),
+    [activeProjects],
+  );
+
+  // Gruppen aus Projekten + Counts
+  const groups = useMemo<ProjectGroup[]>(() => {
+    if (!counts) return [];
+
+    const projectGroups: ProjectGroup[] = activeProjects
+      .map(p => ({
+        id: p.id, label: p.name, path: p.path,
+        count: counts[p.path] ?? 0, isOther: false,
+      }))
+      .filter(g => g.count > 0)
+      .sort((a, b) => b.count - a.count);
+
+    const otherCount = Object.entries(counts)
+      .filter(([path]) => !knownProjectPaths.has(path))
+      .reduce((sum, [, c]) => sum + c, 0);
+
+    if (otherCount > 0) {
+      projectGroups.push({
+        id: OTHER_KEY, label: t.dialog.otherSessions,
+        path: null, count: otherCount, isOther: true,
+      });
+    }
+    return projectGroups;
+  }, [counts, activeProjects, knownProjectPaths, t.dialog.otherSessions]);
+
+  const selectedGroup = useMemo(
+    () => groups.find(g => g.id === selectedGroupId) ?? null,
+    [groups, selectedGroupId],
+  );
+
+  // Lazy-Load: Sessions nur für das gewählte Projekt
+  const isProjectSelected = !!selectedGroup && !selectedGroup.isOther;
+  const isOtherSelected = selectedGroup?.isOther === true;
+
+  const { data: projectSessions, isLoading: sessionsLoading } = useDialogSessions(
+    selectedGroup?.path ?? undefined,
+    2000,
+    { enabled: isProjectSelected },
+  );
+
+  // "Other Sessions": global laden, im Frontend filtern
+  const { data: otherSessionsRaw, isLoading: otherLoading } = useDialogSessions(
+    undefined, 500,
+    { enabled: isOtherSelected },
+  );
+  const otherSessions = useMemo(() => {
+    if (!otherSessionsRaw) return [];
+    return otherSessionsRaw.filter(s => !knownProjectPaths.has(s.projectPath));
+  }, [otherSessionsRaw, knownProjectPaths]);
+
+  // Sessions für die Anzeige (gefiltert)
+  const currentSessions = isOtherSelected ? otherSessions : (projectSessions ?? []);
+  const currentLoading = isOtherSelected ? otherLoading : sessionsLoading;
+
   const filteredSessions = useMemo(() => {
-    if (!selectedGroup) return [];
-    return selectedGroup.sessions.filter(s => {
+    return currentSessions.filter(s => {
       if (substantialOnly && !s.substantial) return false;
       if (search) {
         const q = search.toLowerCase();
@@ -340,7 +354,7 @@ export function DialogImport() {
       }
       return true;
     });
-  }, [selectedGroup, substantialOnly, search]);
+  }, [currentSessions, substantialOnly, search]);
 
   // Workflows des gewählten Projekts
   const projectWorkflows = useMemo<Workflow[]>(() => {
@@ -377,8 +391,6 @@ export function DialogImport() {
     }
   }
 
-  const allProjectsForForm = (projects ?? []).map(p => ({ id: p.id, name: p.name }));
-
   return (
     <div className="flex flex-col gap-4 p-6 max-w-screen-xl mx-auto">
       {/* Header */}
@@ -406,12 +418,11 @@ export function DialogImport() {
             <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2 px-1">
               {t.nav.projects}
             </p>
-            {sessionsLoading
+            {countsLoading
               ? <div className="flex justify-center py-4"><Spinner size="sm" /></div>
               : groups.length === 0
                 ? <p className="text-xs text-text-secondary px-1">{t.dialog.noSessions}</p>
-                : <ProjectSidebar groups={groups} selectedId={selectedGroupId} onSelect={handleSelectGroup} />
-            }
+                : <ProjectSidebar groups={groups} selectedId={selectedGroupId} onSelect={handleSelectGroup} />}
           </div>
         </Card>
 
@@ -430,7 +441,6 @@ export function DialogImport() {
               </div>
             ) : (
               <>
-                {/* Filter-Leiste */}
                 <div className="flex items-center gap-2">
                   <div className="flex-1">
                     <Input
@@ -440,15 +450,14 @@ export function DialogImport() {
                     />
                   </div>
                   <div className="shrink-0 pt-4">
-                    <Toggle
-                      enabled={substantialOnly}
-                      onChange={setSubstantialOnly}
-                    />
+                    <Toggle enabled={substantialOnly} onChange={setSubstantialOnly} />
                   </div>
                 </div>
 
                 <div className="flex flex-col gap-1.5 max-h-[65vh] overflow-y-auto pr-0.5">
-                  {filteredSessions.length === 0 ? (
+                  {currentLoading ? (
+                    <div className="flex justify-center py-8"><Spinner size="sm" /></div>
+                  ) : filteredSessions.length === 0 ? (
                     <div className="flex flex-col items-center gap-2 py-8 text-center">
                       <Clock className="w-7 h-7 text-text-secondary/30" />
                       <p className="text-xs text-text-secondary">
@@ -473,8 +482,6 @@ export function DialogImport() {
 
         {/* Panel 3: Detail (col-span-2) */}
         <div className="lg:col-span-2 flex flex-col gap-4">
-
-          {/* Bestehende Workflows */}
           {selectedGroup && !selectedGroup.isOther && (
             <Card>
               <div className="p-3">
@@ -486,7 +493,6 @@ export function DialogImport() {
             </Card>
           )}
 
-          {/* Analyse / Suggestion */}
           <Card>
             <div className="p-4">
               {!selectedSession && !analyzeMutation.isPending && (
@@ -522,7 +528,7 @@ export function DialogImport() {
                   </div>
                   <SuggestionPanel
                     suggestion={suggestion}
-                    projects={allProjectsForForm}
+                    projects={activeProjects.map(p => ({ id: p.id, name: p.name }))}
                     onCreateWorkflow={handleCreate}
                     isCreating={createMutation.isPending}
                   />
@@ -531,7 +537,6 @@ export function DialogImport() {
             </div>
           </Card>
         </div>
-
       </div>
     </div>
   );

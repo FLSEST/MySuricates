@@ -9,7 +9,13 @@
   },
   "icon": "🏛️",
   "category": "CUSTOM",
-  "tags": ["quality", "mysuricates", "architecture", "audit", "todo-creating"],
+  "tags": [
+    "quality",
+    "mysuricates",
+    "architecture",
+    "audit",
+    "todo-creating"
+  ],
   "model": "claude-opus-4-6",
   "instructions": "Du analysierst die Architektur des MySuricates-Projekts. Backend: Spring Boot 3.4 (Java 21), Frontend: React 18 (TypeScript). Sei praezise und melde nur echte strukturelle Probleme. Bekannte Patterns: @Lazy fuer zirkulaere DI-Referenzen (SubWorkflowBlockExecutor→WorkflowExecutor), SQLRestriction fuer Soft-Delete.",
   "blocks": [
@@ -17,7 +23,7 @@
       "type": "shell",
       "config": {
         "label": "Architektur-Metriken sammeln",
-        "command": "set -euo pipefail\nBASE=/home/flo/Entwicklung/tools/autotrigger\n\necho '=== Grosse Dateien (>200 LOC, God-Class-Kandidaten) ==='\nfind \"$BASE/ai-automation-backend/src/main/java\" -name '*.java' | while read f; do\n  lines=$(wc -l < \"$f\")\n  if [ \"$lines\" -gt 200 ]; then\n    methods=$(grep -c 'public \\|private \\|protected ' \"$f\" 2>/dev/null || echo 0)\n    injections=$(grep -c 'private final.*Service\\|private final.*Repository\\|private final.*Executor\\|private final.*Helper\\|@Autowired' \"$f\" 2>/dev/null || echo 0)\n    class=$(basename \"$f\" .java)\n    pkg=$(echo \"$f\" | sed \"s|$BASE/ai-automation-backend/src/main/java/com/automation/||\" | sed 's|/[^/]*$||')\n    echo \"$lines LOC | $methods methods | $injections deps | $pkg/$class\"\n  fi\ndone | sort -rn | head -25\n\necho ''\necho '=== Frontend grosse Dateien (>200 LOC) ==='\nfind \"$BASE/ai-automation-frontend/src\" \\( -name '*.ts' -o -name '*.tsx' \\) -not -path '*/node_modules/*' | while read f; do\n  lines=$(wc -l < \"$f\")\n  if [ \"$lines\" -gt 200 ]; then\n    name=$(echo \"$f\" | sed \"s|$BASE/ai-automation-frontend/src/||\")\n    echo \"$lines LOC | $name\"\n  fi\ndone | sort -rn | head -20\n\necho ''\necho '=== DI-Injections pro Klasse (>5 = zu viel Kopplung) ==='\nfind \"$BASE/ai-automation-backend/src/main/java\" -name '*.java' | while read f; do\n  count=$(grep -c 'private final.*Service\\|private final.*Repository\\|private final.*Executor\\|private final.*Helper\\|private final.*Client\\|@Autowired' \"$f\" 2>/dev/null || echo 0)\n  if [ \"$count\" -gt 5 ]; then\n    echo \"$count deps: $(basename \"$f\" .java)\"\n  fi\ndone | sort -rn\n\necho ''\necho '=== @Lazy Annotationen (Zeichen fuer zirkulaere Deps) ==='\ngrep -rn '@Lazy' --include='*.java' \"$BASE/ai-automation-backend/src/main/java\" 2>/dev/null\n\necho ''\necho '=== Cross-Layer Imports ==='\necho '--- Controller importiert aus nicht-service/dto/entity ---'\ngrep -rn 'import com.automation' --include='*.java' \"$BASE/ai-automation-backend/src/main/java/com/automation/controller/\" 2>/dev/null | grep -v 'dto\\|entity\\|service\\|security\\|mapper' | head -10\necho '--- Service importiert Controller ---'\ngrep -rn 'import com.automation.controller' --include='*.java' \"$BASE/ai-automation-backend/src/main/java/com/automation/service/\" 2>/dev/null | head -10\necho '--- Repository importiert Service ---'\ngrep -rn 'import com.automation.service' --include='*.java' \"$BASE/ai-automation-backend/src/main/java/com/automation/repository/\" 2>/dev/null | head -10\n\necho ''\necho '=== Package-Import-Graph (Top-30) ==='\ngrep -rn '^import com.automation' --include='*.java' \"$BASE/ai-automation-backend/src/main/java\" 2>/dev/null | grep -v target | sed 's/.*import com\\.automation\\.\\([a-z.]*\\)\\..*/\\1/' | sort | uniq -c | sort -rn | head -30",
+        "command": "BASE=/home/flo/Entwicklung/tools/autotrigger\n\necho '=== Grosse Dateien (>200 LOC, God-Class-Kandidaten) ==='\nfind \"$BASE/ai-automation-backend/src/main/java\" -name '*.java' | while read f; do\n  lines=$(wc -l < \"$f\")\n  if [ \"$lines\" -gt 200 ]; then\n    methods=$(grep -c 'public \\|private \\|protected ' \"$f\" 2>/dev/null || echo 0)\n    injections=$(grep -c 'private final.*Service\\|private final.*Repository\\|private final.*Executor\\|private final.*Helper\\|@Autowired' \"$f\" 2>/dev/null || echo 0)\n    class=$(basename \"$f\" .java)\n    pkg=$(echo \"$f\" | sed \"s|$BASE/ai-automation-backend/src/main/java/com/automation/||\" | sed 's|/[^/]*$||')\n    echo \"$lines LOC | $methods methods | $injections deps | $pkg/$class\"\n  fi\ndone | sort -rn | head -25\n\necho ''\necho '=== Frontend grosse Dateien (>200 LOC) ==='\nfind \"$BASE/ai-automation-frontend/src\" \\( -name '*.ts' -o -name '*.tsx' \\) -not -path '*/node_modules/*' | while read f; do\n  lines=$(wc -l < \"$f\")\n  if [ \"$lines\" -gt 200 ]; then\n    name=$(echo \"$f\" | sed \"s|$BASE/ai-automation-frontend/src/||\")\n    echo \"$lines LOC | $name\"\n  fi\ndone | sort -rn | head -20\n\necho ''\necho '=== DI-Injections pro Klasse (>5 = zu viel Kopplung) ==='\nfind \"$BASE/ai-automation-backend/src/main/java\" -name '*.java' | while read f; do\n  count=$(grep -c 'private final.*Service\\|private final.*Repository\\|private final.*Executor\\|private final.*Helper\\|private final.*Client\\|@Autowired' \"$f\" 2>/dev/null || echo 0)\n  if [ \"$count\" -gt 5 ]; then\n    echo \"$count deps: $(basename \"$f\" .java)\"\n  fi\ndone | sort -rn\n\necho ''\necho '=== @Lazy Annotationen (Zeichen fuer zirkulaere Deps) ==='\ngrep -rn '@Lazy' --include='*.java' \"$BASE/ai-automation-backend/src/main/java\" 2>/dev/null\n\necho ''\necho '=== Cross-Layer Imports ==='\necho '--- Controller importiert aus nicht-service/dto/entity ---'\ngrep -rn 'import com.automation' --include='*.java' \"$BASE/ai-automation-backend/src/main/java/com/automation/controller/\" 2>/dev/null | grep -v 'dto\\|entity\\|service\\|security\\|mapper' | head -10\necho '--- Service importiert Controller ---'\ngrep -rn 'import com.automation.controller' --include='*.java' \"$BASE/ai-automation-backend/src/main/java/com/automation/service/\" 2>/dev/null | head -10\necho '--- Repository importiert Service ---'\ngrep -rn 'import com.automation.service' --include='*.java' \"$BASE/ai-automation-backend/src/main/java/com/automation/repository/\" 2>/dev/null | head -10\n\necho ''\necho '=== Package-Import-Graph (Top-30) ==='\ngrep -rn '^import com.automation' --include='*.java' \"$BASE/ai-automation-backend/src/main/java\" 2>/dev/null | grep -v target | sed 's/.*import com\\.automation\\.\\([a-z.]*\\)\\..*/\\1/' | sort | uniq -c | sort -rn | head -30",
         "timeout_seconds": 60,
         "on_failure": "continue"
       }
@@ -26,7 +32,7 @@
       "type": "simple",
       "config": {
         "label": "Architektur-Tiefenanalyse (Opus)",
-        "timeout_seconds": 600,
+        "timeout_seconds": 900,
         "command": "Analysiere die Architektur-Metriken des MySuricates-Projekts:\n\n{{ previous_output }}\n\nKontext: MySuricates ist eine AI-Workflow-Automation-Plattform mit Spring Boot Backend und React Frontend.\n\nUntersuche systematisch:\n\n1. **God Classes**: Dateien mit >300 LOC, >10 Methoden oder >5 DI-Injections.\n   - Welche Verantwortlichkeiten hat die Klasse?\n   - Welche koennten in eigene Services extrahiert werden?\n   - Besonders kritisch: WorkflowExecutor, StagingService, AssistantService\n\n2. **Zirkulaere Abhaengigkeiten**: @Lazy als Symptom.\n   - Ist die @Lazy-Nutzung gerechtfertigt (SubWorkflow→WorkflowExecutor ist bekannt/akzeptiert)?\n   - Gibt es weitere versteckte Zyklen?\n\n3. **Schichtverletzungen**: Controller→Repository direkt, Service→Controller, etc.\n   - Klare Schichten: Controller → Service → Repository\n   - Executor → Service ist OK (Executors sind Service-Layer)\n\n4. **Frontend-Architektur**: Grosse Pages/Komponenten die aufgeteilt werden sollten.\n   - Pages > 400 LOC sind Kandidaten\n   - Hooks mit zu vielen Verantwortlichkeiten\n\n5. **Uebermassige Kopplung**: Klassen mit >7 DI-Injections.\n\nPro Finding: Schweregrad (CRITICAL/HIGH/MEDIUM/LOW), konkrete Datei, spezifischer Refactoring-Vorschlag.\n\nBEKANNTE PATTERNS (KEIN Finding melden):\n- @Lazy auf SubWorkflowBlockExecutor (beabsichtigt, dokumentiert)\n- @SQLRestriction fuer Soft-Delete (beabsichtigt)\n- HikariCP pool-size=1 (SQLite-Limitation, dokumentiert)"
       }
     },
@@ -34,7 +40,7 @@
       "type": "simple",
       "config": {
         "label": "Architektur-Radar Report",
-        "timeout_seconds": 300,
+        "timeout_seconds": 900,
         "command": "Erstelle den Architektur-Review-Report fuer MySuricates:\n\n{{ previous_output }}\n\n## Format:\n\n### Radar-Uebersicht\n| Dimension | Score (1-10) | Findings | Kritischster Fund |\n|-----------|-------------|----------|-------------------|\n| God Classes | | | |\n| Zirkulaere Deps | | | |\n| Schichtverletzungen | | | |\n| Kopplung | | | |\n| Package-Struktur | | | |\n| Frontend-Architektur | | | |\n\n### Top-5 Refactoring-Prioritaeten\n| # | Klasse/Datei | Problem | Vorgeschlagene Loesung | Aufwand | Risiko |\n\n### Refactoring-Roadmap\nPhase 1 (Quick Wins): Isolierte, risikoarme Aenderungen\nPhase 2 (Mittelfristig): Aenderungen mit Abhaengigkeiten\nPhase 3 (Langfristig): Groessere Umbauten\n\ngate_status: GREEN wenn keine CRITICAL Findings, YELLOW wenn CRITICAL vorhanden, RED wenn strukturelle Integritaet gefaehrdet"
       }
     },
@@ -56,7 +62,7 @@
       "type": "simple",
       "config": {
         "label": "Ergebnis erklären",
-        "timeout_seconds": 60,
+        "timeout_seconds": 120,
         "command": "Fasse das Ergebnis des Architektur-Reviews in maximal 5 Zeilen zusammen:\n\n{{ previous_output }}\n\n- Gesamtbewertung (gut/mittel/schlecht)\n- Anzahl CRITICAL/HIGH Findings\n- Wichtigste 1-2 Probleme benennen\n- Ob TODOs erstellt wurden\n\nAm Ende GENAU diese Zeile:\ngate_status: GREEN wenn keine CRITICAL/HIGH, YELLOW wenn HIGH vorhanden, RED wenn CRITICAL vorhanden"
       }
     },

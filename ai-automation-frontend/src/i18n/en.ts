@@ -244,6 +244,7 @@ export const en = {
       resume: 'Resume',
       cancel: 'Cancel',
       retry: 'Retry',
+      createTodo: 'Create Todo',
       resumeFromStep: 'Resume from last step',
       interrupted: 'Interrupted',
       logs: 'Live Logs',
