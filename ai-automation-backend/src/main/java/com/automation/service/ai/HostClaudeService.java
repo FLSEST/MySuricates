@@ -14,9 +14,10 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import com.automation.concurrency.DynamicSemaphore;
+
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -33,15 +34,20 @@ public class HostClaudeService {
 
     private final HostClaudeConfig config;
     private final CliPermissionsConfig permissionsConfig;
-    private final Semaphore callSemaphore;
+    private final DynamicSemaphore callSemaphore;
     private final AtomicLong lastCallTimestamp = new AtomicLong(0);
 
     public HostClaudeService(HostClaudeConfig config, CliPermissionsConfig permissionsConfig) {
         this.config = config;
         this.permissionsConfig = permissionsConfig;
-        this.callSemaphore = new Semaphore(config.getMaxConcurrentCalls());
+        this.callSemaphore = new DynamicSemaphore(config.getMaxConcurrentCalls());
         log.info("Claude CLI throttle: maxConcurrent={}, interCallDelay={}ms",
                 config.getMaxConcurrentCalls(), config.getInterCallDelayMs());
+    }
+
+    public void updateMaxConcurrentCalls(int newMax) {
+        callSemaphore.setMaxPermits(newMax);
+        log.info("Claude CLI max concurrent calls updated to {}", newMax);
     }
 
     /**

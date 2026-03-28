@@ -22,30 +22,37 @@ public class ApiKeyService {
     @Value("${automation.security.enabled:true}")
     private boolean securityEnabled;
 
+    /** Cached in-memory — loaded once at startup, never re-read per request. */
+    private volatile String cachedApiKey;
+
     @PostConstruct
     public void init() {
         if (!securityEnabled) {
+            cachedApiKey = "";
             return;
         }
-        if (configuredApiKey.isBlank()) {
-            settingsRepo.get("api-key").ifPresentOrElse(
-                key -> log.info("Using stored API key from database"),
-                () -> {
-                    String generated = UUID.randomUUID().toString();
-                    settingsRepo.set("api-key", generated);
-                    log.warn("========================================");
-                    log.warn("  AUTO-GENERATED API KEY: {}", generated);
-                    log.warn("  Set AUTOMATION_API_KEY env var to use your own.");
-                    log.warn("========================================");
-                }
-            );
+        if (!configuredApiKey.isBlank()) {
+            cachedApiKey = configuredApiKey;
+            return;
         }
+        settingsRepo.get("api-key").ifPresentOrElse(
+            key -> {
+                cachedApiKey = key;
+                log.info("Using stored API key from database");
+            },
+            () -> {
+                String generated = UUID.randomUUID().toString();
+                settingsRepo.set("api-key", generated);
+                cachedApiKey = generated;
+                log.warn("========================================");
+                log.warn("  AUTO-GENERATED API KEY: {}", generated);
+                log.warn("  Set AUTOMATION_API_KEY env var to use your own.");
+                log.warn("========================================");
+            }
+        );
     }
 
     public String getEffectiveApiKey() {
-        if (!configuredApiKey.isBlank()) {
-            return configuredApiKey;
-        }
-        return settingsRepo.get("api-key").orElse("");
+        return cachedApiKey != null ? cachedApiKey : "";
     }
 }

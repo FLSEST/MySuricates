@@ -15,14 +15,18 @@ import com.automation.repository.WorkflowRepository;
 import com.automation.service.system.ApiKeyService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import javax.sql.DataSource;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.time.Instant;
 import java.util.*;
 
@@ -39,6 +43,11 @@ public class InstanceSyncHelper {
     private final SkillRepository skillRepository;
     private final ApiKeyService apiKeyService;
     private final ObjectMapper objectMapper;
+    private final DataSource dataSource;
+    private final EntityManager entityManager;
+
+    /** Overrides the API key for outgoing HTTP calls within the current thread (used for Stable/Test targets). */
+    private final ThreadLocal<String> targetApiKeyOverride = new ThreadLocal<>();
 
     // ── Target maps record ──────────────────────────────────
 
@@ -125,12 +134,34 @@ public class InstanceSyncHelper {
     // ── Sync all (backwards compatible) ─────────────────────
 
     public SyncResult syncDefinitionsTo(String targetBaseUrl) {
-        return syncDefinitionsTo(targetBaseUrl, null);
+        return syncDefinitionsTo(targetBaseUrl, null, null);
+    }
+
+    public SyncResult syncDefinitionsTo(String targetBaseUrl, SyncDefinitionsRequest request) {
+        return syncDefinitionsTo(targetBaseUrl, null, request);
+    }
+
+    public SyncResult syncDefinitionsTo(String targetBaseUrl, String targetApiKey, SyncDefinitionsRequest request) {
+        targetApiKeyOverride.set(targetApiKey);
+        try {
+            return doSyncDefinitionsTo(targetBaseUrl, request);
+        } finally {
+            targetApiKeyOverride.remove();
+        }
+    }
+
+    public SyncPreview syncPreview(String targetBaseUrl, String targetApiKey) {
+        targetApiKeyOverride.set(targetApiKey);
+        try {
+            return syncPreview(targetBaseUrl);
+        } finally {
+            targetApiKeyOverride.remove();
+        }
     }
 
     // ── Selective sync ──────────────────────────────────────
 
-    public SyncResult syncDefinitionsTo(String targetBaseUrl, SyncDefinitionsRequest request) {
+    private SyncResult doSyncDefinitionsTo(String targetBaseUrl, SyncDefinitionsRequest request) {
         int projectsSynced = 0;
         int workflowsSynced = 0;
         int skillsSynced = 0;
@@ -209,6 +240,10 @@ public class InstanceSyncHelper {
 
         // 2. Sync workflows
         List<Workflow> devWorkflows = workflowRepository.findAll();
+        // Detach all entities to prevent Hibernate dirty-check flushes from overwriting
+        // native SQL updates to stable_synced_at. All accessed fields (name, blocks, project)
+        // are eagerly loaded and remain accessible on the detached objects.
+        entityManager.clear();
         JsonNode targetWorkflows = httpGet(targetBaseUrl + "/workflows");
         Map<String, JsonNode> targetWorkflowsByNameProject = new HashMap<>();
         if (targetWorkflows != null && targetWorkflows.isArray()) {
@@ -244,7 +279,7 @@ public class InstanceSyncHelper {
                     }
                     httpPut(targetBaseUrl + "/workflows/" + targetWorkflowId, updateBody);
                     workflowsSynced++;
-                    workflowRepository.updateStableSyncedAt(workflow.getId(), Instant.now().toString());
+                    markStableSynced(workflow.getId());
                     log.info("Updated workflow on target: {}", workflow.getName());
                 } else {
                     Map<String, Object> importBody = new LinkedHashMap<>();
@@ -257,7 +292,7 @@ public class InstanceSyncHelper {
                     if (workflow.getModel() != null) importBody.put("model", workflow.getModel());
                     httpPost(targetBaseUrl + "/workflows/import", importBody);
                     workflowsSynced++;
-                    workflowRepository.updateStableSyncedAt(workflow.getId(), Instant.now().toString());
+                    markStableSynced(workflow.getId());
                     log.info("Created workflow on target: {}", workflow.getName());
                 }
             } catch (Exception e) {
@@ -306,28 +341,38 @@ public class InstanceSyncHelper {
         }
 
         // 4. Sync auto-todo-default setting
-        appSettingsRepository.get("auto-todo-default").ifPresent(value -> {
-            try {
-                httpPut(targetBaseUrl + "/system/settings/auto-todo-default",
-                        Map.of("value", value));
-                log.info("Synced auto-todo-default setting: {}", value);
-            } catch (Exception e) {
-                errors.add("Setting 'auto-todo-default': " + e.getMessage());
-                log.warn("Failed to sync auto-todo-default: {}", e.getMessage());
-            }
-        });
+        try {
+            appSettingsRepository.get("auto-todo-default").ifPresent(value -> {
+                try {
+                    httpPut(targetBaseUrl + "/system/settings/auto-todo-default",
+                            Map.of("value", value));
+                    log.info("Synced auto-todo-default setting: {}", value);
+                } catch (Exception e) {
+                    errors.add("Setting 'auto-todo-default': " + e.getMessage());
+                    log.warn("Failed to sync auto-todo-default: {}", e.getMessage());
+                }
+            });
+        } catch (Exception e) {
+            errors.add("Setting 'auto-todo-default' (read): " + e.getMessage());
+            log.warn("Failed to read auto-todo-default: {}", e.getMessage());
+        }
 
         // 5. Sync auto-repair-default setting
-        appSettingsRepository.get("auto-repair-default").ifPresent(value -> {
-            try {
-                httpPut(targetBaseUrl + "/system/settings/auto-repair-default",
-                        Map.of("value", value));
-                log.info("Synced auto-repair-default setting: {}", value);
-            } catch (Exception e) {
-                errors.add("Setting 'auto-repair-default': " + e.getMessage());
-                log.warn("Failed to sync auto-repair-default: {}", e.getMessage());
-            }
-        });
+        try {
+            appSettingsRepository.get("auto-repair-default").ifPresent(value -> {
+                try {
+                    httpPut(targetBaseUrl + "/system/settings/auto-repair-default",
+                            Map.of("value", value));
+                    log.info("Synced auto-repair-default setting: {}", value);
+                } catch (Exception e) {
+                    errors.add("Setting 'auto-repair-default': " + e.getMessage());
+                    log.warn("Failed to sync auto-repair-default: {}", e.getMessage());
+                }
+            });
+        } catch (Exception e) {
+            errors.add("Setting 'auto-repair-default' (read): " + e.getMessage());
+            log.warn("Failed to read auto-repair-default: {}", e.getMessage());
+        }
 
         log.info("Definition sync complete: {} projects, {} workflows, {} skills synced, {} skipped, {} errors",
                 projectsSynced, workflowsSynced, skillsSynced, skipped, errors.size());
@@ -443,8 +488,36 @@ public class InstanceSyncHelper {
         }
     }
 
+    /**
+     * Updates stable_synced_at via raw JDBC on the OSIV-held connection.
+     * Uses Session.doWork() to access the existing Hibernate connection (pool-size=1 means
+     * we can't get a second connection from HikariCP while OSIV holds the first).
+     * entityManager.clear() must be called before the sync loop to prevent dirty-check flushes.
+     */
+    private void markStableSynced(String workflowId) {
+        try {
+            entityManager.unwrap(org.hibernate.Session.class).doWork(connection -> {
+                boolean wasAutoCommit = connection.getAutoCommit();
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "UPDATE workflows SET stable_synced_at = ? WHERE id = ?")) {
+                    ps.setString(1, Instant.now().toString());
+                    ps.setString(2, workflowId);
+                    ps.executeUpdate();
+                }
+                if (!wasAutoCommit) {
+                    connection.commit();
+                }
+            });
+        } catch (Exception e) {
+            log.warn("Failed to mark workflow {} as stable-synced: {}", workflowId, e.getMessage());
+        }
+    }
+
     private void addApiKeyHeader(HttpURLConnection conn) {
-        String apiKey = apiKeyService.getEffectiveApiKey();
+        String apiKey = targetApiKeyOverride.get();
+        if (apiKey == null) {
+            apiKey = apiKeyService.getEffectiveApiKey();
+        }
         if (apiKey != null && !apiKey.isBlank()) {
             conn.setRequestProperty(API_KEY_HEADER, apiKey);
         }

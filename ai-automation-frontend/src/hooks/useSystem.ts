@@ -113,6 +113,38 @@ export function useRepairAllFailed() {
   });
 }
 
+export interface ExecutionConfig {
+  executionMaxConcurrent: number;
+  claudeMaxConcurrentCalls: number;
+  claudeTimeoutSeconds: number;
+  claudeInterCallDelayMs: number;
+  chainWorkflowTimeoutMinutes: number;
+  activeRuns: number;
+}
+
+export function useExecutionConfig() {
+  return useQuery({
+    queryKey: ['system', 'execution-config'],
+    queryFn: () => api.get<ExecutionConfig>('/system/execution-config'),
+    staleTime: 30_000,
+  });
+}
+
+export function useUpdateExecutionConfig() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
+  return useMutation({
+    mutationFn: (config: Omit<ExecutionConfig, 'activeRuns'>) =>
+      api.put<ExecutionConfig>('/system/execution-config', config),
+    onSuccess: (data) => {
+      qc.setQueryData(['system', 'execution-config'], data);
+      toast.success(t.settings.executionSaved);
+    },
+    onError: () => toast.error(t.settings.executionSaveFailed),
+  });
+}
+
 export function useBrowseDirectory(path: string | null) {
   return useQuery({
     queryKey: ['system', 'browse', path],

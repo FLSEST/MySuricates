@@ -24,9 +24,12 @@ import com.automation.repository.WishRepository;
 import com.automation.repository.WorkflowMemoryRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.dto.request.CreateTodoRequest;
+import com.automation.dto.request.UpdateTodoStatusRequest;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
 import com.automation.service.system.SystemIdentityService;
+import com.automation.service.todo.TodoService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
@@ -59,10 +62,13 @@ public class AssistantService {
     private static final int TIMEOUT_SECONDS = 120;
     private static final Pattern FETCH_PATTERN =
             Pattern.compile("<fetch type=\"([^\"]+)\" id=\"([^\"]+)\"/>");
+    private static final Pattern TOOL_PATTERN =
+            Pattern.compile("<tool type=\"([^\"]+)\">(.*?)</tool>", Pattern.DOTALL);
 
     private final CommandExecutorService commandExecutorService;
     private final WorkflowRunRepository workflowRunRepository;
     private final TodoRepository todoRepository;
+    private final TodoService todoService;
     private final ScheduledWorkflowRepository scheduledWorkflowRepository;
     private final ProjectRepository projectRepository;
     private final WishRepository wishRepository;
@@ -166,7 +172,12 @@ public class AssistantService {
                 }
             }
 
-            AssistantChatResponse parsed = parseResponse(result.output());
+            // Execute tools in final response (create_todo, update_todo_status, ...)
+            String finalOutput = executeTools(result.output());
+            // Strip leftover <fetch> tags from response (user should never see them)
+            finalOutput = FETCH_PATTERN.matcher(finalOutput).replaceAll("").trim();
+
+            AssistantChatResponse parsed = parseResponse(finalOutput);
             return new AssistantChatResponse(parsed.message(), parsed.actions(), model);
 
         } catch (Exception e) {
@@ -233,23 +244,34 @@ public class AssistantService {
         sb.append("  Verwende ask_choice wenn unklar ist was der User meint (z.B. welcher von mehreren ähnlichen Workflows gemeint ist).\n");
         sb.append("Da du die Workflow-IDs aus dem Kontext kennst, kannst du run_workflow direkt mit der korrekten ID befüllen.\n");
 
+        sb.append("\n## Aktionen direkt ausführen (Tool-Mechanismus)\n");
+        sb.append("Wenn der User EXPLIZIT eine Aktion fordert (z.B. 'erstelle ein Todo', 'markiere Todo X als DONE'), nutze Tools statt Buttons:\n");
+        sb.append("<tool type=\"create_todo\">{\"title\":\"Imperativ-Titel\",\"priority\":\"HIGH\",\"description\":\"Optional\",\"tags\":[\"backend\"],\"projectId\":\"optional\"}</tool>\n");
+        sb.append("  create_todo: Pflicht: title (Imperativ, z.B. 'CS2BIM Fehler untersuchen'). Optional: description (Markdown), priority (HIGH/MEDIUM/LOW, Default: MEDIUM), tags (String-Array), projectId.\n");
+        sb.append("<tool type=\"update_todo_status\">{\"id\":\"vollständige-todo-uuid\",\"status\":\"DONE\"}</tool>\n");
+        sb.append("  update_todo_status: Ändert den Status eines Todos. id = vollständige Todo-UUID (aus dem Kontext). status = DONE|IN_PROGRESS|OPEN|BACKLOG.\n");
+        sb.append("Das Tool wird sofort serverseitig ausgeführt — das Ergebnis erscheint direkt in deiner Antwort.\n");
+        sb.append("Kündige die Ausführung kurz an bevor du das Tool-Tag sendest. Kombinierbar mit <fetch>: erst Daten nachladen, dann Tool ausführen.\n");
+        sb.append("Buttons (<actions>) nutzen wenn du eine Aktion nur VORSCHLÄGST und der User bestätigen soll.\n");
+        sb.append("Wenn du dem User mehrere Optionen anbietest und er mit 'ja' oder einer unspezifischen Bestätigung antwortet, ");
+        sb.append("benenne explizit welche Option du wählst bevor du handelst.\n");
+
         sb.append("\n## Daten nachladen\n");
-        sb.append("Falls du mehr Details zu einer Entität brauchst, lade sie nach:\n");
+        sb.append("Wenn du Details brauchst um eine Frage zu beantworten, sende SOFORT den passenden Fetch-Tag. ");
+        sb.append("Frage NICHT 'Soll ich nachladen?' oder 'Möchtest du mehr Details?' — lade einfach proaktiv nach.\n");
+        sb.append("Bei Run-Fehler-Fragen: Lade sofort die relevanten Step-Outputs per Fetch. ");
+        sb.append("Bei einem fehlgeschlagenen Gate-/Validierungs-Step auch den vorherigen Step laden (dort steckt meist der eigentliche Fehler). ");
+        sb.append("Du kannst mehrere Fetch-Tags gleichzeitig senden.\n\n");
+        sb.append("Verfügbare Fetch-Typen:\n");
         sb.append("<fetch type=\"run_detail\" id=\"<run-id>\"/> — wie ein Workflow GELAUFEN ist (Status, Fehler, Step-Übersicht)\n");
         sb.append("<fetch type=\"step_output\" id=\"<run-id>/<schrittnummer>\"/> — vollständiger Output eines einzelnen Steps (1-basiert)\n");
-        sb.append("Verwende step_output wenn der User fragt: 'Was hat Step 3 ausgegeben?', 'Zeig mir Schritt 4', 'Was stand in Step X?'\n");
-        sb.append("Kombinierbar: erst run_detail für Überblick, dann step_output für Detailansicht eines bestimmten Steps.\n");
         sb.append("<fetch type=\"wish_detail\" id=\"<wish-id>\"/> — Wish-Status, Iterationen, Fehler\n");
         sb.append("<fetch type=\"workflow_runs\" id=\"<workflow-id>\"/> — Letzte Runs eines Workflows\n");
         sb.append("<fetch type=\"workflow_detail\" id=\"<workflow-id>\"/> — wie ein Workflow AUFGEBAUT ist (Blöcke, Shell-Commands, Prompts, Instruktionen)\n");
-        sb.append("Verwende workflow_detail bei Fragen wie: 'Was macht dieser Workflow?', 'Wie ist er aufgebaut?', 'Hat er einen X-Mechanismus?'\n");
         sb.append("<fetch type=\"docs\" id=\"workflow-guide\"/> — liefert Inhaltsübersicht\n");
-        sb.append("<fetch type=\"docs\" id=\"workflow-guide/<sektion>\"/> — liefert eine Sektion; Sektions-IDs: block-types, patterns, timeouts, agentic, dos-and-donts, variables, models, memory, chains, quick-start, appendix\n");
+        sb.append("<fetch type=\"docs\" id=\"workflow-guide/<sektion>\"/> — Sektions-IDs: block-types, patterns, timeouts, agentic, dos-and-donts, variables, models, memory, chains, quick-start, appendix\n");
         sb.append("<fetch type=\"docs\" id=\"architektur\"/> — Systemarchitektur, Komponenten\n");
         sb.append("<fetch type=\"docs\" id=\"vision\"/> — Produkt-Vision, Roadmap\n");
-        sb.append("Verwende docs-Fetch bei Fragen zu Block-Typen, Konfiguration, Timeouts, Patterns, Architektur oder Vision.\n");
-        sb.append("Beispiel: 'Welche Block-Typen gibt es?' → <fetch type=\"docs\" id=\"workflow-guide/block-types\"/>\n");
-        sb.append("Du kannst mehrere Fetch-Tags gleichzeitig senden.\n");
         sb.append("Nur wenn ID bekannt. IDs nicht erfinden. Wenn du einen Fetch-Tag sendest, beantworte die Frage noch nicht.\n");
 
         return sb.toString();
@@ -570,7 +592,7 @@ public class AssistantService {
                                 sb.append("  ").append(s.getStepIndex() + 1).append(". ")
                                         .append(s.getStatus());
                                 if (s.getStatus() == StepStatus.FAILED && s.getOutput() != null) {
-                                    sb.append(": ").append(truncate(s.getOutput(), 300));
+                                    sb.append(": ").append(truncate(s.getOutput(), 600));
                                 }
                                 sb.append("\n");
                             });
@@ -664,6 +686,92 @@ public class AssistantService {
             case "docs"            -> formatDocsSection(req.id());
             default -> "";
         };
+    }
+
+    // ── Tool execution ────────────────────────────────────────────────────────
+
+    private record ToolRequest(String type, String payload) {}
+
+    private List<ToolRequest> parseToolRequests(String response) {
+        if (response == null) return List.of();
+        List<ToolRequest> result = new ArrayList<>();
+        Matcher m = TOOL_PATTERN.matcher(response);
+        while (m.find()) result.add(new ToolRequest(m.group(1), m.group(2).trim()));
+        return result;
+    }
+
+    /** Replaces all &lt;tool&gt; tags in the response with their execution results. */
+    private String executeTools(String response) {
+        if (response == null) return response;
+        List<ToolRequest> tools = parseToolRequests(response);
+        if (tools.isEmpty()) return response;
+        String modified = response;
+        for (ToolRequest tool : tools) {
+            String tag = "<tool type=\"" + tool.type() + "\">" + tool.payload() + "</tool>";
+            String result = executeTool(tool);
+            modified = modified.replace(tag, result);
+        }
+        return modified;
+    }
+
+    private String executeTool(ToolRequest req) {
+        return switch (req.type()) {
+            case "create_todo"        -> executeCreateTodo(req.payload());
+            case "update_todo_status" -> executeUpdateTodoStatus(req.payload());
+            default -> "[Unbekanntes Tool: " + req.type() + "]";
+        };
+    }
+
+    private String executeCreateTodo(String json) {
+        try {
+            Map<String, Object> params = objectMapper.readValue(json, new TypeReference<>() {});
+            String title = (String) params.get("title");
+            if (title == null || title.isBlank()) return "⚠ Todo konnte nicht angelegt werden: Titel fehlt.";
+
+            String description = (String) params.getOrDefault("description", null);
+            String priorityStr = (String) params.getOrDefault("priority", "MEDIUM");
+            Object tagsObj = params.get("tags");
+            String projectId = (String) params.getOrDefault("projectId", null);
+
+            Todo.Priority priority;
+            try { priority = Todo.Priority.valueOf(priorityStr.toUpperCase()); }
+            catch (Exception e) { priority = Todo.Priority.MEDIUM; }
+
+            List<String> tags = tagsObj instanceof List<?> list
+                    ? list.stream().map(Object::toString).toList()
+                    : List.of();
+
+            var request = new CreateTodoRequest(
+                    title, description, Todo.Status.OPEN, priority, tags,
+                    projectId, Todo.Source.AI, "assistant", null, null, null, null
+            );
+            Todo created = todoService.create(request);
+            String tagStr = tags.isEmpty() ? "" : ", Tags: " + String.join(", ", tags);
+            String shortId = created.getId().substring(0, Math.min(8, created.getId().length()));
+            return "✓ Todo angelegt: \"" + created.getTitle() + "\" (Priorität: " + priority + tagStr + ", ID: " + shortId + "…)";
+        } catch (Exception e) {
+            log.warn("Assistant create_todo tool failed", e);
+            return "⚠ Todo konnte nicht angelegt werden: " + e.getMessage();
+        }
+    }
+
+    private String executeUpdateTodoStatus(String json) {
+        try {
+            Map<String, Object> params = objectMapper.readValue(json, new TypeReference<>() {});
+            String id = (String) params.get("id");
+            String statusStr = (String) params.get("status");
+            if (id == null || statusStr == null) return "⚠ update_todo_status: id und status sind Pflichtfelder.";
+
+            Todo.Status status;
+            try { status = Todo.Status.valueOf(statusStr.toUpperCase()); }
+            catch (Exception e) { return "⚠ Ungültiger Status: " + statusStr + ". Erlaubt: OPEN, IN_PROGRESS, DONE, BACKLOG"; }
+
+            todoService.updateStatus(id, new UpdateTodoStatusRequest(status, null));
+            return "✓ Todo-Status aktualisiert: " + status + " (ID: " + id.substring(0, Math.min(8, id.length())) + "…)";
+        } catch (Exception e) {
+            log.warn("Assistant update_todo_status tool failed", e);
+            return "⚠ Status konnte nicht aktualisiert werden: " + e.getMessage();
+        }
     }
 
     private String formatStepOutput(String idAndStep) {

@@ -74,6 +74,19 @@ Immer beim Anlegen eines TODOs (das eine längere Arbeitssequenz beschreibt) in 
 
 ---
 
+## PFLICHT: Laufende Workflows vor Backend-Neustart prüfen
+
+BEVOR du das Backend neu startest (z. B. `mvn spring-boot:run`, Prozess killen, oder Port 9090 neu binden), MUSST du prüfen, ob noch Workflow-Runs laufen:
+
+```bash
+curl -s http://localhost:9090/api/v1/executions?status=RUNNING -H "X-API-Key: <key>" | python3 -c "import sys,json; runs=json.load(sys.stdin); print(f'{len(runs)} laufende Runs') if runs else print('Keine laufenden Runs')"
+```
+
+- **Runs laufen** → User fragen: „Es laufen noch X Workflow-Runs. Soll ich das Backend trotzdem neu starten?"
+- **Keine Runs** → Neustart ohne Rückfrage erlaubt
+
+---
+
 ## PFLICHT: Workflow-First vor Code-Änderungen
 
 WICHTIG: Dieser Abschnitt hat hohe Priorität. Bevor du Code an der Plattform änderst, MUSS geprüft werden, ob das Problem durch einen Workflow lösbar ist.

@@ -1,0 +1,74 @@
+{
+  "name": {
+    "de": "Security-Audit MySuricates",
+    "en": "MySuricates Security Audit"
+  },
+  "description": {
+    "de": "OWASP Top 10, API-Key-Handling, Injection-Risiken und Dependency-Vulnerabilities prüfen — erstellt TODOs",
+    "en": "Check OWASP Top 10, API key handling, injection risks, and dependency vulnerabilities — creates TODOs"
+  },
+  "icon": "🔒",
+  "category": "CUSTOM",
+  "tags": ["quality", "mysuricates", "security", "audit", "todo-creating"],
+  "model": "claude-opus-4-6",
+  "instructions": "Du fuehrst ein Security-Audit des MySuricates-Projekts durch. Sei extrem praezise — falsche Security-Findings sind schaedlicher als fehlende. Nutze Opus fuer akkurate Analyse. Bekannte Patterns: API-Key-Auth via X-API-Key Header, Rate-Limiting, Tailscale-Netzwerk, SQLite (kein Multi-User-DB-Server).",
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "label": "Security-Daten sammeln",
+        "command": "set -euo pipefail\nBASE=/home/flo/Entwicklung/tools/autotrigger\n\necho '=== npm audit (Frontend) ==='\ncd \"$BASE/ai-automation-frontend\" && npm audit 2>&1 || true\n\necho ''\necho '=== Maven Dependency Check ==='\ncd \"$BASE/ai-automation-backend\" && mvn dependency:tree -DoutputType=text 2>/dev/null | grep -E 'spring-boot|spring-security|jackson|flyway|sqlite|lombok|mapstruct' | head -30 || true\n\necho ''\necho '=== Hardcoded Secrets Scan ==='\necho '--- Java ---'\ngrep -rn 'password\\s*=\\s*\"\\|secret\\s*=\\s*\"\\|apiKey\\s*=\\s*\"\\|token\\s*=\\s*\"' --include='*.java' \"$BASE/ai-automation-backend/src/main\" 2>/dev/null | grep -v 'Test\\|test\\|// \\|getProperty\\|@Value' | head -15\necho '--- TypeScript ---'\ngrep -rn 'password\\s*=\\s*[\"'\\''`]\\|secret\\s*=\\s*[\"'\\''`]\\|apiKey\\s*=\\s*[\"'\\''`]' --include='*.ts' --include='*.tsx' \"$BASE/ai-automation-frontend/src\" 2>/dev/null | grep -v 'test\\|spec\\|node_modules\\|localStorage\\|getItem' | head -15\necho '--- Config Files ---'\ngrep -rn 'password:\\|secret:\\|api-key:' \"$BASE/ai-automation-backend/src/main/resources/\" 2>/dev/null | grep -v '#\\|placeholder' | head -10\n\necho ''\necho '=== SQL Injection Candidates ==='\ngrep -rn 'nativeQuery\\|@Query.*\\+\\|String.format.*SELECT\\|\"SELECT.*\" +\\|\"INSERT.*\" +\\|\"UPDATE.*\" +\\|\"DELETE.*\" +' --include='*.java' \"$BASE/ai-automation-backend/src/main\" 2>/dev/null | head -15\n\necho ''\necho '=== Command Injection Candidates ==='\ngrep -rn 'Runtime.exec\\|ProcessBuilder\\|exec(\\|ShellCommandService' --include='*.java' \"$BASE/ai-automation-backend/src/main\" 2>/dev/null | head -15\n\necho ''\necho '=== Auth-Coverage: Endpoints ohne Security ==='\necho '--- Controller-Klassen ---'\nfor f in $(find \"$BASE/ai-automation-backend/src/main/java/com/automation/controller\" -name '*.java'); do\n  class=$(basename \"$f\" .java)\n  has_auth=$(grep -c '@ApiKeyRequired\\|@PreAuthorize\\|@Secured' \"$f\" 2>/dev/null || echo 0)\n  endpoints=$(grep -c '@GetMapping\\|@PostMapping\\|@PutMapping\\|@DeleteMapping\\|@PatchMapping\\|@RequestMapping' \"$f\" 2>/dev/null || echo 0)\n  echo \"$class: $endpoints endpoints, $has_auth auth annotations\"\ndone\n\necho ''\necho '=== CORS Config ==='\ngrep -rn 'CorsConfiguration\\|allowedOrigins\\|cors' --include='*.java' \"$BASE/ai-automation-backend/src/main\" 2>/dev/null | head -10\n\necho ''\necho '=== Rate Limiting ==='\ngrep -rn 'RateLimit\\|rateLim\\|Bucket\\|throttle' --include='*.java' \"$BASE/ai-automation-backend/src/main\" 2>/dev/null | head -10\n\necho ''\necho '=== XSS: Unescaped Output ==='\ngrep -rn 'dangerouslySetInnerHTML\\|v-html\\|innerHTML' --include='*.tsx' --include='*.ts' \"$BASE/ai-automation-frontend/src\" 2>/dev/null | head -10\n\necho ''\necho '=== .gitignore Check ==='\ncat \"$BASE/.gitignore\" 2>/dev/null | grep -E 'env|secret|key|password|token|credential' || echo 'Keine Security-relevanten .gitignore Eintraege'",
+        "timeout_seconds": 120,
+        "on_failure": "continue"
+      }
+    },
+    {
+      "type": "simple",
+      "config": {
+        "label": "Security-Analyse (Opus)",
+        "timeout_seconds": 600,
+        "command": "Fuehre ein Security-Audit des MySuricates-Projekts durch basierend auf:\n\n{{ previous_output }}\n\nKontext: MySuricates ist eine lokal laufende AI-Workflow-Plattform (nicht oeffentlich im Internet). Nutzer-Auth via API-Key (auto-generiert). Laeuft hinter Tailscale VPN.\n\nPruefe systematisch nach OWASP Top 10:\n\n1. **Injection (SQL/Command)**: Native Queries, ProcessBuilder-Nutzung, String-Konkatenation in SQL\n2. **Broken Authentication**: API-Key-Handling, Session-Management, Default-Credentials\n3. **Sensitive Data Exposure**: Secrets in Code/Config, API-Keys in Logs, unverschluesselte Kommunikation\n4. **XML External Entities (XXE)**: XML-Parser-Konfiguration\n5. **Broken Access Control**: Endpoints ohne Auth, fehlende Autorisierung (kann jeder API-Key alles?)\n6. **Security Misconfiguration**: CORS zu permissiv, fehlende Security-Headers, Debug-Endpoints aktiv\n7. **XSS**: dangerouslySetInnerHTML, unescaped User-Input im Frontend\n8. **Insecure Deserialization**: Jackson-Config, untypisierte Deserialisierung\n9. **Known Vulnerabilities**: npm audit Findings, veraltete Dependencies\n10. **Insufficient Logging**: Werden Security-Events geloggt? Login-Versuche, API-Key-Nutzung?\n\nBEKANNTE/AKZEPTIERTE PATTERNS (kein Finding):\n- ProcessBuilder fuer Claude CLI Host-Execution (beabsichtigt, Kernfunktion)\n- SQLite single-writer (HikariCP pool-size=1, dokumentiert)\n- API-Key in localStorage (SPA-Pattern, lokal genutztes Tool)\n- Tailscale-Netzwerk als aeussere Schutzschicht\n\nPro Finding: Schweregrad (CRITICAL/HIGH/MEDIUM/LOW), betroffene Datei(en), konkreter Fix-Vorschlag.\nSei EXTREM praezise — melde NUR echte Risiken, keine theoretischen Probleme bei einem lokalen Tool."
+      }
+    },
+    {
+      "type": "simple",
+      "config": {
+        "label": "Security-Report erstellen",
+        "timeout_seconds": 300,
+        "command": "Erstelle den Security-Audit-Report fuer MySuricates:\n\n{{ previous_output }}\n\n## Format:\n\n### Executive Summary\n- Gesamtrisiko-Bewertung: NIEDRIG / MITTEL / HOCH / KRITISCH\n- Anzahl Findings nach Schweregrad\n- Top-3 dringendste Massnahmen\n\n### OWASP Scorecard\n| Kategorie | Status | Findings | Dringendster Fund |\n|-----------|--------|----------|-------------------|\n| Injection | OK/WARN/FAIL | | |\n| Authentication | | | |\n| Data Exposure | | | |\n| Access Control | | | |\n| Misconfiguration | | | |\n| XSS | | | |\n| Dependencies | | | |\n\n### Findings Detail\nPro Finding: Beschreibung, Risk-Rating, betroffene Dateien, Empfohlener Fix, Aufwand.\n\n### Dependency-Vulnerabilities\nAus npm audit und Maven: CVE-Nummern, betroffene Pakete, Fix-Versionen.\n\ngate_status: GREEN wenn keine CRITICAL/HIGH, YELLOW wenn HIGH vorhanden, RED wenn CRITICAL"
+      }
+    },
+    {
+      "type": "agentic",
+      "config": {
+        "label": "Security-TODOs erstellen",
+        "goal": "Erstelle oder aktualisiere TODOs basierend auf den Security-Findings aus {{ previous_output }}.\n\nVORGEHEN:\n1. API-Key lesen:\n   python3 -c \"import sqlite3; conn = sqlite3.connect('/home/flo/Entwicklung/tools/autotrigger/ai-automation-backend/data/automation.db'); c = conn.cursor(); c.execute(\\\"SELECT value FROM app_settings WHERE key = 'api-key'\\\"); print(c.fetchone()[0]); conn.close()\"\n\n2. Bestehende TODOs laden:\n   curl -s -H 'X-API-Key: <KEY>' 'http://localhost:9090/api/v1/todos?tag=audit:security&status=OPEN&status=IN_PROGRESS'\n\n3. Fuer jeden CRITICAL oder HIGH Finding:\n   a) Pruefen ob TODO existiert\n   b) Falls ja: aktualisieren (PATCH /api/v1/todos/<id>)\n   c) Falls nein: anlegen (POST /api/v1/todos) mit:\n      - title: \"Security: <kurze Beschreibung>\"\n      - description: Markdown mit OWASP-Kategorie, betroffene Dateien, Fix-Vorschlag\n      - priority: CRITICAL→HIGH, HIGH→HIGH (Security immer mindestens HIGH)\n      - tags: [\"audit:security\", \"security\", \"backend\" oder \"frontend\"]\n      - projectId: \"ebf4f50c-20c2-4c35-a84a-a0b350124523\"\n      - source: \"AI\"\n      - sourceAgent: \"quality-workflow\"\n\n4. Geloeste Security-TODOs → DONE setzen\n\nWICHTIG: Security-TODOs immer mindestens HIGH priority.\nWICHTIG: Absolute Pfade fuer DB.",
+        "max_iterations": 10,
+        "max_total_tokens": 150000,
+        "iteration_timeout_seconds": 120,
+        "total_timeout_seconds": 900,
+        "max_repeated_actions": 3,
+        "require_approval": false,
+        "success_criteria": "Alle CRITICAL/HIGH Security-Findings sind als TODOs angelegt."
+      }
+    },
+    {
+      "type": "simple",
+      "config": {
+        "label": "Ergebnis erklären",
+        "timeout_seconds": 60,
+        "command": "Fasse das Ergebnis des Security-Audits in maximal 5 Zeilen zusammen:\n\n{{ previous_output }}\n\n- Gesamtrisiko-Bewertung\n- Anzahl CRITICAL/HIGH Findings\n- Wichtigste 1-2 Risiken benennen\n- Ob TODOs erstellt wurden\n\nAm Ende GENAU diese Zeile:\ngate_status: GREEN wenn keine CRITICAL/HIGH, YELLOW wenn HIGH vorhanden, RED wenn CRITICAL vorhanden"
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "label": "Gate-Verdict",
+        "command": "PREV='{{ previous_output }}'\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Security-Audit: CRITICAL Findings'\n  echo 'gate_status: RED'\n  echo 'gate_category: security'\n  echo 'gate_description: Kritische Sicherheitsprobleme gefunden'\n  exit 1\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Security-Audit: Haertungsbedarf'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: security'\n  echo 'gate_description: Sicherheits-Verbesserungen empfohlen'\nelse\n  echo 'Security-Audit: OK'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: security'\n  echo 'gate_description: Keine kritischen Sicherheitsprobleme'\nfi",
+        "timeout_seconds": 10
+      }
+    }
+  ],
+  "version": "1.1.0",
+  "author": "MySuricates"
+}

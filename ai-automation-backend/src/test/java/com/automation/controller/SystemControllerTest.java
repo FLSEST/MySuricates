@@ -68,6 +68,9 @@ class SystemControllerTest {
     @MockBean
     private com.automation.service.ai.AiProviderRegistry aiProviderRegistry;
 
+    @MockBean
+    private com.automation.service.system.ExecutionSettingsService executionSettingsService;
+
     private void mockDbHealthy() throws Exception {
         Connection conn = mock(Connection.class);
         Statement stmt = mock(Statement.class);

@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +26,7 @@ public class DocsController {
             Map.entry("WORKFLOW-GUIDE.md", "Workflow Guide"),
             Map.entry("architektur.md", "Architektur"),
             Map.entry("api-referenz.md", "API-Referenz"),
+            Map.entry("assistant-system.md", "Assistant System"),
             Map.entry("datenmodell.md", "Datenmodell"),
             Map.entry("deployment.md", "Deployment"),
             Map.entry("entwicklung.md", "Entwicklung"),
@@ -37,27 +39,42 @@ public class DocsController {
     @GetMapping
     public List<Map<String, String>> listDocs() {
         Path docsDir = resolveDocsDir();
+        List<Map<String, String>> result = new ArrayList<>(scanDir(docsDir, "de"));
+        Path enDir = docsDir.resolve("en");
+        if (Files.isDirectory(enDir)) {
+            result.addAll(scanDir(enDir, "en"));
+        }
+        return result;
+    }
+
+    private List<Map<String, String>> scanDir(Path dir, String lang) {
         try {
-            return Files.list(docsDir)
+            return Files.list(dir)
                     .filter(p -> p.getFileName().toString().endsWith(".md"))
                     .sorted(Comparator.comparing(p -> p.getFileName().toString()))
                     .map(p -> {
                         String name = p.getFileName().toString();
                         String label = LABEL_MAP.getOrDefault(name, formatLabel(name));
-                        return Map.of("name", name, "label", label);
+                        return Map.of("name", name, "label", label, "lang", lang);
                     })
                     .toList();
         } catch (IOException e) {
-            log.error("Failed to list docs directory: {}", docsDir, e);
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not list docs directory");
+            log.warn("Could not scan docs directory {}: {}", dir, e.getMessage());
+            return List.of();
         }
     }
 
     @GetMapping("/{name}")
-    public ResponseEntity<Map<String, String>> getDoc(@PathVariable String name) {
+    public ResponseEntity<Map<String, String>> getDoc(
+            @PathVariable String name,
+            @RequestParam(defaultValue = "de") String lang) {
         validateName(name);
+        if (!"de".equals(lang) && !"en".equals(lang)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid lang parameter");
+        }
         Path docsDir = resolveDocsDir();
-        Path file = docsDir.resolve(name).normalize();
+        Path baseDir = "en".equals(lang) ? docsDir.resolve("en") : docsDir;
+        Path file = baseDir.resolve(name).normalize();
 
         if (!file.startsWith(docsDir)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid document name");
@@ -90,6 +107,14 @@ public class DocsController {
 
     private String formatLabel(String filename) {
         String base = filename.endsWith(".md") ? filename.substring(0, filename.length() - 3) : filename;
-        return base.replace("-", " ").replace("_", " ");
+        String[] words = base.replace("-", " ").replace("_", " ").split(" ");
+        StringBuilder sb = new StringBuilder();
+        for (String word : words) {
+            if (!sb.isEmpty()) sb.append(" ");
+            if (!word.isEmpty()) {
+                sb.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
+            }
+        }
+        return sb.toString();
     }
 }

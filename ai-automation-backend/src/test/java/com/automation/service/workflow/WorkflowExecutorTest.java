@@ -25,7 +25,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Semaphore;
+import com.automation.concurrency.DynamicSemaphore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -107,7 +107,7 @@ class WorkflowExecutorTest {
                 containerRepository,
                 broadcaster,
                 virtualThreadExecutor,
-                new Semaphore(10),
+                new DynamicSemaphore(10),
                 agentInstructionsService,
                 activityLogService,
                 workflowMemoryService,

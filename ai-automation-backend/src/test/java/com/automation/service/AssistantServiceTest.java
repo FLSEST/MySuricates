@@ -15,6 +15,7 @@ import com.automation.service.cli.CliSession;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
 import com.automation.service.system.SystemIdentityService;
+import com.automation.service.todo.TodoService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,13 +43,14 @@ class AssistantServiceTest {
     @Mock private AssistantSessionRepository assistantSessionRepository;
     @Mock private SystemIdentityService systemIdentity;
     @Mock private AppSettingsRepository appSettingsRepository;
+    @Mock private TodoService todoService;
 
     private AssistantService service;
 
     @BeforeEach
     void setUp() {
         service = new AssistantService(
-                commandExecutorService, workflowRunRepository, todoRepository,
+                commandExecutorService, workflowRunRepository, todoRepository, todoService,
                 scheduledWorkflowRepository, projectRepository, wishRepository,
                 workflowRepository, workflowMemoryRepository, assistantSessionRepository,
                 systemIdentity, new ObjectMapper(), appSettingsRepository

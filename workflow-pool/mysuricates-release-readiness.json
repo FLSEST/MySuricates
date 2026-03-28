@@ -1,0 +1,44 @@
+{
+  "name": {
+    "de": "Release-Bereitschaft MySuricates",
+    "en": "MySuricates Release Readiness"
+  },
+  "description": {
+    "de": "Aggregiert alle Quality-Gate-Ergebnisse zu einer Release-Entscheidung: FREIGEGEBEN / BLOCKIERT / MIT VORBEHALT",
+    "en": "Aggregates all quality gate results into a release decision: APPROVED / BLOCKED / CONDITIONAL"
+  },
+  "icon": "🚀",
+  "category": "CUSTOM",
+  "tags": ["quality", "mysuricates", "release", "gate", "report"],
+  "model": "claude-sonnet-4-6",
+  "instructions": "Du erstellst einen Release-Bereitschafts-Report fuer MySuricates. Aggregiere die letzten Quality-Gate-Ergebnisse und gib eine klare Release-Empfehlung.",
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "label": "Quality-Gate-Ergebnisse sammeln",
+        "command": "set -euo pipefail\n\n# API-Key lesen\nAPI_KEY=$(python3 -c \"import sqlite3; conn = sqlite3.connect('/home/flo/Entwicklung/tools/autotrigger/ai-automation-backend/data/automation.db'); c = conn.cursor(); c.execute(\\\"SELECT value FROM app_settings WHERE key = 'api-key'\\\"); print(c.fetchone()[0]); conn.close()\")\n\necho '=== Letzte Workflow-Runs (Quality-Workflows) ==='\n\n# Alle Runs laden und nach Quality-Workflows filtern\nRUNS=$(curl -s -H \"X-API-Key: $API_KEY\" 'http://localhost:9090/api/v1/runs?size=50&sort=startedAt,desc')\n\necho '--- Letzte Runs mit Gate-Status ---'\necho \"$RUNS\" | python3 -c \"\nimport json, sys\ntry:\n    data = json.load(sys.stdin)\n    runs = data.get('content', data) if isinstance(data, dict) else data\n    quality_keywords = ['build-gate', 'health-check', 'test-coverage', 'architektur', 'security', 'i18n', 'test-sync', 'release']\n    for run in (runs if isinstance(runs, list) else []):\n        name = run.get('workflowName', '')\n        if any(kw in name.lower() for kw in quality_keywords):\n            status = run.get('status', '?')\n            gate = run.get('metadata', {}).get('gate_status', 'N/A') if run.get('metadata') else 'N/A'\n            started = run.get('startedAt', '?')[:19]\n            print(f'{name} | {status} | gate: {gate} | {started}')\nexcept Exception as e:\n    print(f'Parse error: {e}')\n\" 2>/dev/null\n\necho ''\necho '=== Offene Quality-TODOs ==='\nfor tag in audit:test-coverage audit:arch-debt audit:security; do\n  COUNT=$(curl -s -H \"X-API-Key: $API_KEY\" \"http://localhost:9090/api/v1/todos?tag=$tag&status=OPEN&status=IN_PROGRESS\" | python3 -c \"import json,sys; d=json.load(sys.stdin); print(len(d.get('content',d)) if isinstance(d,dict) else len(d))\" 2>/dev/null || echo '?')\n  echo \"$tag: $COUNT offene TODOs\"\ndone\n\necho ''\necho '=== Aktuelle Version ==='\ncd /home/flo/Entwicklung/tools/autotrigger\nVERSION=$(grep '<version>' ai-automation-backend/pom.xml | head -1 | sed 's/.*<version>\\(.*\\)<\\/version>/\\1/' | tr -d ' ')\nTAG=$(git describe --tags --abbrev=0 2>/dev/null || echo 'kein Tag')\nLAST_COMMIT=$(git log -1 --pretty=format:'%h %s (%cr)')\necho \"POM Version: $VERSION\"\necho \"Letzter Tag: $TAG\"\necho \"Letzter Commit: $LAST_COMMIT\"\n\necho ''\necho '=== Quick Build Check ==='\ncd /home/flo/Entwicklung/tools/autotrigger/ai-automation-backend\nmvn compile -q 2>&1 && echo 'Backend: KOMPILIERT' || echo 'Backend: FEHLER'\ncd /home/flo/Entwicklung/tools/autotrigger/ai-automation-frontend\nnpm run build --silent 2>&1 && echo 'Frontend: KOMPILIERT' || echo 'Frontend: FEHLER'",
+        "timeout_seconds": 300,
+        "on_failure": "continue"
+      }
+    },
+    {
+      "type": "simple",
+      "config": {
+        "label": "Release-Report erstellen",
+        "timeout_seconds": 300,
+        "command": "Erstelle den Release-Bereitschafts-Report fuer MySuricates:\n\n{{ previous_output }}\n\n## Format:\n\n### Release-Bereitschaft MySuricates\n**Version**: [aus POM]\n**Datum**: [heute]\n**Bewertung**: FREIGEGEBEN / MIT VORBEHALT / BLOCKIERT\n\n### Quality-Gate-Uebersicht\n| Gate | Letzter Run | Status | Gate-Ergebnis | Alter |\n|------|------------|--------|--------------|-------|\n| Build Gate | | | | |\n| Health Check | | | | |\n| Test Coverage | | | | |\n| Architektur Review | | | | |\n| Security Audit | | | | |\n| i18n Sync | | | | |\n| Test Sync | | | | |\n\n### Offene Quality-TODOs\n| Kategorie | Anzahl | Hoechste Prioritaet |\n|-----------|--------|---------------------|\n| Test-Coverage | | |\n| Architektur | | |\n| Security | | |\n\n### Release-Entscheidung\n- **FREIGEGEBEN**: Alle Gates GREEN, keine CRITICAL TODOs, Build OK\n- **MIT VORBEHALT**: Gates YELLOW, oder einige HIGH TODOs, Build OK\n- **BLOCKIERT**: Gates RED, CRITICAL TODOs, oder Build fehlschlaegt\n\n### Voraussetzungen fuer Release (falls nicht FREIGEGEBEN)\n1. [Was muss noch erledigt werden]\n\ngate_status: GREEN wenn FREIGEGEBEN, YELLOW wenn MIT VORBEHALT, RED wenn BLOCKIERT\ngate_category: release-readiness\ngate_description: Release [Version] — [FREIGEGEBEN/MIT VORBEHALT/BLOCKIERT]"
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "label": "Gate-Verdict",
+        "command": "PREV='{{ previous_output }}'\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Release: BLOCKIERT'\n  echo 'gate_status: RED'\n  echo 'gate_category: release-readiness'\n  echo 'gate_description: Release blockiert — Voraussetzungen nicht erfuellt'\n  exit 1\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Release: MIT VORBEHALT'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: release-readiness'\n  echo 'gate_description: Release moeglich mit Vorbehalten'\nelse\n  echo 'Release: FREIGEGEBEN'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: release-readiness'\n  echo 'gate_description: Release freigegeben'\nfi",
+        "timeout_seconds": 10
+      }
+    }
+  ],
+  "version": "1.1.0",
+  "author": "MySuricates"
+}

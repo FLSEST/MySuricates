@@ -70,6 +70,7 @@ class ApiKeyServiceTest {
     @Test
     void getEffectiveApiKey_envVarSet_returnsEnvVar() {
         ReflectionTestUtils.setField(service, "configuredApiKey", "env-key");
+        service.init();
 
         assertThat(service.getEffectiveApiKey()).isEqualTo("env-key");
     }
@@ -77,14 +78,27 @@ class ApiKeyServiceTest {
     @Test
     void getEffectiveApiKey_noEnvVar_dbKeyExists_returnsDbKey() {
         when(settingsRepo.get("api-key")).thenReturn(Optional.of("db-key"));
+        service.init();
 
         assertThat(service.getEffectiveApiKey()).isEqualTo("db-key");
     }
 
     @Test
-    void getEffectiveApiKey_noEnvVar_noDbKey_returnsEmpty() {
+    void getEffectiveApiKey_noEnvVar_noDbKey_generatesKey() {
         when(settingsRepo.get("api-key")).thenReturn(Optional.empty());
+        service.init();
 
-        assertThat(service.getEffectiveApiKey()).isEmpty();
+        assertThat(service.getEffectiveApiKey()).isNotBlank();
+    }
+
+    @Test
+    void getEffectiveApiKey_doesNotReadDbAfterInit() {
+        when(settingsRepo.get("api-key")).thenReturn(Optional.of("db-key"));
+        service.init();
+        clearInvocations(settingsRepo);
+
+        for (int i = 0; i < 1000; i++) service.getEffectiveApiKey();
+
+        verifyNoInteractions(settingsRepo);
     }
 }

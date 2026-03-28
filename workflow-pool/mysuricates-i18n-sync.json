@@ -1,0 +1,66 @@
+{
+  "name": {
+    "de": "i18n Sync prüfen und fixen",
+    "en": "i18n Sync Check and Fix"
+  },
+  "description": {
+    "de": "Fehlende Übersetzungs-Keys zwischen de.ts und en.ts finden und automatisch ergänzen",
+    "en": "Find missing translation keys between de.ts and en.ts and auto-fill them"
+  },
+  "icon": "🌐",
+  "category": "CUSTOM",
+  "tags": ["quality", "mysuricates", "i18n", "auto-fix", "frontend"],
+  "model": "claude-opus-4-6",
+  "instructions": "Du arbeitest an den i18n-Dateien des MySuricates-Frontends. de.ts ist die primaere Sprache, en.ts die Uebersetzung. Beide muessen exakt die gleiche Key-Struktur haben. Aenderungen muessen TypeScript-kompatibel sein (export default Objekt-Literal).",
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "label": "i18n Keys extrahieren und vergleichen",
+        "command": "set -euo pipefail\nDE_FILE=/home/flo/Entwicklung/tools/autotrigger/ai-automation-frontend/src/i18n/de.ts\nEN_FILE=/home/flo/Entwicklung/tools/autotrigger/ai-automation-frontend/src/i18n/en.ts\n\necho '=== Dateigroessen ==='\nwc -l \"$DE_FILE\" \"$EN_FILE\"\n\necho ''\necho '=== Top-Level Keys DE ==='\ngrep -E '^  [a-zA-Z_]+:' \"$DE_FILE\" | sed 's/:.*//' | tr -d ' ' | sort > /tmp/de_keys.txt\ncat /tmp/de_keys.txt\n\necho ''\necho '=== Top-Level Keys EN ==='\ngrep -E '^  [a-zA-Z_]+:' \"$EN_FILE\" | sed 's/:.*//' | tr -d ' ' | sort > /tmp/en_keys.txt\ncat /tmp/en_keys.txt\n\necho ''\necho '=== Keys nur in DE (fehlen in EN) ==='\ncomm -23 /tmp/de_keys.txt /tmp/en_keys.txt\n\necho ''\necho '=== Keys nur in EN (fehlen in DE) ==='\ncomm -13 /tmp/de_keys.txt /tmp/en_keys.txt\n\necho ''\necho '=== Verschachtelte Key-Anzahl pro Top-Level ==='\nfor key in $(cat /tmp/de_keys.txt); do\n  DE_COUNT=$(grep -c \"^    \" \"$DE_FILE\" 2>/dev/null | head -1 || echo '?')\n  echo \"$key: DE hat Top-Level-Key\"\ndone\n\necho ''\necho '=== Gesamtstatistik ==='\nDE_TOTAL=$(grep -cE '^    [a-zA-Z_]+:' \"$DE_FILE\" || echo 0)\nEN_TOTAL=$(grep -cE '^    [a-zA-Z_]+:' \"$EN_FILE\" || echo 0)\necho \"DE nested keys: $DE_TOTAL\"\necho \"EN nested keys: $EN_TOTAL\"\necho \"Differenz: $((DE_TOTAL - EN_TOTAL))\"",
+        "timeout_seconds": 30,
+        "on_failure": "continue"
+      }
+    },
+    {
+      "type": "agentic",
+      "config": {
+        "goal": "Synchronisiere die i18n-Dateien von MySuricates.\n\nDATEIEN:\n- DE (primaer): /home/flo/Entwicklung/tools/autotrigger/ai-automation-frontend/src/i18n/de.ts\n- EN (Uebersetzung): /home/flo/Entwicklung/tools/autotrigger/ai-automation-frontend/src/i18n/en.ts\n\nVORGEHEN:\n1. Lies beide Dateien vollstaendig\n2. Vergleiche die Key-Struktur (Top-Level UND verschachtelte Keys)\n3. Fuer jeden Key der in DE existiert aber nicht in EN:\n   - Uebersetze den deutschen Wert ins Englische\n   - Fuege den Key an der gleichen Position in en.ts ein\n4. Fuer jeden Key der in EN existiert aber nicht in DE:\n   - Uebersetze den englischen Wert ins Deutsche\n   - Fuege den Key an der gleichen Position in de.ts ein\n5. Schreibe die aktualisierten Dateien\n\nWICHTIG:\n- Beide Dateien sind TypeScript: `export default { ... } as const;` oder aehnliches Format\n- Behalte die bestehende Formatierung und Reihenfolge bei\n- Absolute Pfade verwenden: /home/flo/Entwicklung/tools/autotrigger/ai-automation-frontend/src/i18n/de.ts\n- Nur fehlende Keys ergaenzen, bestehende Uebersetzungen NICHT aendern\n- Bei verschachtelten Objekten die komplette Struktur synchronisieren",
+        "max_iterations": 15,
+        "max_total_tokens": 200000,
+        "iteration_timeout_seconds": 120,
+        "total_timeout_seconds": 900,
+        "max_repeated_actions": 3,
+        "require_approval": false,
+        "success_criteria": "Beide i18n-Dateien haben exakt die gleiche Key-Struktur. Kein Key fehlt in einer der beiden Dateien."
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "label": "Frontend Build Verifikation",
+        "command": "cd /home/flo/Entwicklung/tools/autotrigger/ai-automation-frontend\n\necho '=== TypeScript + Vite Build ==='\nnpm run build 2>&1\nBUILD_EXIT=$?\n\nDE_LINES=$(wc -l < src/i18n/de.ts)\nEN_LINES=$(wc -l < src/i18n/en.ts)\nDIFF=$((DE_LINES - EN_LINES))\n\necho ''\necho '--- i18n Sync Ergebnis ---'\necho \"DE: $DE_LINES Zeilen, EN: $EN_LINES Zeilen, Differenz: $DIFF\"\necho \"Build: $([ $BUILD_EXIT -eq 0 ] && echo 'OK' || echo 'FAILED')\"",
+        "timeout_seconds": 120,
+        "on_failure": "continue"
+      }
+    },
+    {
+      "type": "simple",
+      "config": {
+        "label": "Ergebnis erklären",
+        "timeout_seconds": 60,
+        "command": "Fasse das i18n-Sync-Ergebnis in maximal 5 Zeilen zusammen:\n\n{{ previous_output }}\n\n- Wurden Keys ergaenzt? Wenn ja, wie viele und in welcher Datei?\n- Build-Ergebnis\n- Zeilen-Differenz zwischen de.ts und en.ts\n\nAm Ende GENAU diese Zeile:\ngate_status: GREEN wenn Build OK und Differenz < 5, YELLOW wenn Differenz > 5, RED wenn Build fehlgeschlagen"
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "label": "Gate-Verdict",
+        "command": "PREV='{{ previous_output }}'\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'i18n Sync: FAILED'\n  echo 'gate_status: RED'\n  echo 'gate_category: i18n-sync'\n  echo 'gate_description: i18n-Sync fehlgeschlagen'\n  exit 1\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'i18n Sync: Differenz vorhanden'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: i18n-sync'\n  echo 'gate_description: i18n-Dateien haben groessere Differenz'\nelse\n  echo 'i18n Sync: OK'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: i18n-sync'\n  echo 'gate_description: i18n-Dateien synchron'\nfi",
+        "timeout_seconds": 10
+      }
+    }
+  ],
+  "version": "1.1.0",
+  "author": "MySuricates"
+}

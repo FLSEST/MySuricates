@@ -31,9 +31,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import com.automation.concurrency.DynamicSemaphore;
+
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Semaphore;
 import java.util.stream.Collectors;
 
 @Service
@@ -49,7 +50,7 @@ public class WorkflowExecutor {
     private final ContainerRepository containerRepository;
     private final ExecutionBroadcaster broadcaster;
     private final ExecutorService virtualThreadExecutor;
-    private final Semaphore executionSemaphore;
+    private final DynamicSemaphore executionSemaphore;
     private final AgentInstructionsService agentInstructionsService;
     private final ActivityLogService activityLogService;
     private final WorkflowMemoryService workflowMemoryService;

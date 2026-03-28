@@ -462,7 +462,7 @@ public class AgenticBlockExecutor implements BlockExecutor {
             StringBuilder sb = new StringBuilder();
             sb.append("\n## Previously Tried Strategies (from past runs)\n");
             for (Map<String, Object> entry : agenticHistory) {
-                sb.append("- Goal: ").append(entry.get("goal"))
+                sb.append("- Goal: ").append(truncate(entry.get("goal").toString(), 500))
                         .append(" | Iterations: ").append(entry.get("totalIterations"))
                         .append(" | Outcome: ").append(entry.get("outcome")).append("\n");
                 Object strategy = entry.get("strategy");

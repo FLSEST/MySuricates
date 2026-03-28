@@ -217,7 +217,7 @@ public class StagingService {
         if (!isHealthy()) {
             throw new IllegalStateException("Stable instance is not running or not healthy. Start it first.");
         }
-        return syncHelper.syncPreview(deriveStableBaseUrl());
+        return syncHelper.syncPreview(deriveStableBaseUrl(), readContainerApiKey(config.getContainerName()));
     }
 
     public SyncResult syncDefinitions() {
@@ -228,7 +228,8 @@ public class StagingService {
         if (!isHealthy()) {
             throw new IllegalStateException("Stable instance is not running or not healthy. Start it first.");
         }
-        return syncHelper.syncDefinitionsTo(deriveStableBaseUrl(), request);
+        String stableApiKey = readContainerApiKey(config.getContainerName());
+        return syncHelper.syncDefinitionsTo(deriveStableBaseUrl(), stableApiKey, request);
     }
 
     // ── Stable API URL helper ─────────────────────────────
@@ -240,6 +241,27 @@ public class StagingService {
             return healthUrl.substring(0, apiIdx) + "/api/v1";
         }
         return "http://localhost:9091/api/v1";
+    }
+
+    // ── Container API key helper ──────────────────────────
+
+    String readContainerApiKey(String containerName) {
+        try {
+            ProcessBuilder pb = new ProcessBuilder("docker", "exec", containerName,
+                    "python3", "-c",
+                    "import sqlite3; conn=sqlite3.connect('/app/data/automation.db'); c=conn.cursor(); c.execute(\"SELECT value FROM app_settings WHERE key='api-key'\"); r=c.fetchone(); print(r[0] if r else ''); conn.close()");
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+            String output = new String(p.getInputStream().readAllBytes()).trim();
+            int exit = p.waitFor();
+            if (exit == 0 && !output.isEmpty()) {
+                log.debug("Read API key from container {}", containerName);
+                return output;
+            }
+        } catch (Exception e) {
+            log.warn("Failed to read API key from container {}: {}", containerName, e.getMessage());
+        }
+        return null;
     }
 
     // ── Internal helpers ──────────────────────────────────

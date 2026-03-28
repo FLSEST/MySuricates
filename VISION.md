@@ -1,63 +1,65 @@
+> *Zuletzt aktualisiert: 28. März 2026 — Workflow: MySuricates Docs aktualisieren*
+
 # MySuricates — Vision
 
 ## Die Idee
 
 MySuricates verfolgt zwei Ziele:
 
-1. **Ein universeller Problemloeser** — fuer Alltag und Beruf
-2. **Eine selbstverbessernde AI-Plattform** — die mit jeder Ausfuehrung schlauer wird
+1. **Ein universeller Problemlöser** — für Alltag und Beruf
+2. **Eine selbstverbessernde AI-Plattform** — die mit jeder Ausführung schlauer wird
 
-Nicht nur fuer Entwickler. Fuer jeden, der reale Probleme loesen will.
+Nicht nur für Entwickler. Für jeden, der reale Probleme lösen will.
 
 ---
 
-## Das Prinzip der stätigen Annäherung
+## Das Prinzip der stetigen Annäherung
 
 Perfektion ist kein Zustand — sie ist eine Richtung. Ein System, das Perfektion für erreichbar hält, hört irgendwann auf zu lernen. Dieses nicht.
 
-Jeder Lauf produziert Daten. Jede Iteration verfeinert den nächsten Versuch. Learning, Memory, Factory und Wishes sind keine Features — sie sind die Mechanismen dieser stätigen Annäherung. Das System wird nie perfekt sein. Aber mit jedem Schritt kommt es der Perfektion näher — und genau das ist der Punkt.
+Jeder Lauf produziert Daten. Jede Iteration verfeinert den nächsten Versuch. Learning, Memory, Factory und Wishes sind keine Features — sie sind die Mechanismen dieser stetigen Annäherung. Das System wird nie perfekt sein. Aber mit jedem Schritt kommt es der Perfektion näher — und genau das ist der Punkt.
 
 ---
 
-## Saeule 1: Universeller Problemloeser
+## Säule 1: Universeller Problemlöser
 
-MySuricates loest echte Probleme — im Privatleben und in der Berufswelt. Workflows sind die Bausteine, Chains kombinieren sie zu komplexen Loesungen.
+MySuricates löst echte Probleme — im Privatleben und in der Berufswelt. Workflows sind die Bausteine, Chains kombinieren sie zu komplexen Lösungen.
 
 ### Beruf
 
-- **Morgen-Briefing**: News, Kalender, Prioritaeten — alles auf einen Blick
+- **Morgen-Briefing**: News, Kalender, Prioritäten — alles auf einen Blick
 - **Meeting-Protokoll**: Aufnahme → Zusammenfassung → Action Items → Verteilung
 - **Social Media Kalender**: Content-Ideen → Texte → Zeitplan → Posting
 - **Security Audit**: Codebase scannen → Schwachstellen bewerten → Report
-- **Code Review**: Automatische Analyse → Verbesserungsvorschlaege → PR-Kommentare
+- **Code Review**: Automatische Analyse → Verbesserungsvorschläge → PR-Kommentare
 
 ### Privat
 
 - **Bewerbungs-Coach**: Stellenanzeige analysieren → Anschreiben → Lebenslauf anpassen
 - **Reiseplanung**: Budget, Interessen, Zeitraum → kompletter Reiseplan
 - **Vokabel-Songs**: Frequenz-basiert Lieder generieren zum Sprachenlernen
-- **Event-Organisation**: Gaesteliste, Location, Zeitplan, Einladungen
+- **Event-Organisation**: Gästeliste, Location, Zeitplan, Einladungen
 
 ### Kombiniert (Chains)
 
 - **Content-Maschine**: Recherche → Artikel → Social Posts → Newsletter
 - **Website-Audit**: Performance → SEO → Accessibility → Gesamtreport
-- **Buero-Morgen-Routine**: Mails checken → Kalender → Briefing → Todos priorisieren
+- **Büro-Morgen-Routine**: Mails checken → Kalender → Briefing → Todos priorisieren
 
-Der Kern: Jeder Workflow ist ein geloestes Problem. Jede Chain ist eine geloeste Problemkette. Die Template-Bibliothek waechst — und damit die Menge der Probleme, die MySuricates out-of-the-box loesen kann.
+Der Kern: Jeder Workflow ist ein gelöstes Problem. Jede Chain ist eine gelöste Problemkette. Die Template-Bibliothek wächst — und damit die Menge der Probleme, die MySuricates out-of-the-box lösen kann.
 
 ---
 
-## Saeule 2: Selbstverbessernde AI-Plattform
+## Säule 2: Selbstverbessernde AI-Plattform
 
-Das System wird mit jeder Ausfuehrung besser. Vier Mechanismen treiben die Evolution:
+Das System wird mit jeder Ausführung besser. Vier Mechanismen treiben die Evolution:
 
 ### Wishes — From Intent to Solution
 
 The user says what they want in natural language. The system decomposes, builds, tests, executes, evaluates, and iterates.
 
 ```
-User: "Ich brauche einen woechentlichen Security-Report fuer mein Projekt"
+User: "Ich brauche einen wöchentlichen Security-Report für mein Projekt"
 
 MySuricates:
   1. Decompose → 3 sub-tasks identified
@@ -103,7 +105,7 @@ Workflows accumulate knowledge across runs:
 
 ---
 
-## Was schon gebaut ist (v0.5.0)
+## Was schon gebaut ist (v0.6.0)
 
 | Baustein | Status |
 |----------|--------|
@@ -117,20 +119,33 @@ Workflows accumulate knowledge across runs:
 | Pre-flight Verification + Auto-Fix | Done |
 | Learning-Feedback in Prompts | Done |
 | Cross-Project Workflow-Erkennung | Done |
-| 44 Built-in Templates (Dev + Buero + Alltag) | Done |
+| 44 Built-in Templates (Dev + Büro + Alltag) | Done |
+| 16 Built-in Skills (Code-Review, Test-Generator, OCR u.a.) | Done |
 | Staging (Dev + Stable + Test) | Done |
 | Multi-Provider (Claude + Codex) | Done |
+| Assistent-System (kontextueller Floating-Chat mit Page-Suggestions) | Done |
+| Gate Status System (Quality-Gates, AutoTodo-Integration) | Done |
+| Agent Instructions System (Base- und Per-Workflow-Instruktionen) | Done |
+| CompletionTrigger-System (automatische Aktionen nach Workflow-Abschluss) | Done |
+| Notification-System (NotificationConfig) | Done |
+| Workflow Memory (Wissensextraktion und -akkumulation über Runs) | Done |
+| Template Verification (Qualitätsprüfung von Workflow-Templates) | Done |
+| Workflow Conversion (Agentic-Runs → deterministische Workflows) | Done |
+| Run-Resumption (ab letztem Step fortsetzen nach Unterbrechung) | Done |
+| Session-zu-Workflow-Import (Claude-Sessions als Workflows) | Done |
+| Erweiterte Schedule-Steuerung (End-Conditions, Konflikt-Verhalten) | Done |
+| In-App Dokumentation (DocsController, kontextuelle Hilfe) | Done |
 
 ---
 
 ## Roadmap
 
-### Phase 2: Kosten & Intelligenz (naechster Schritt)
+### Phase 2: Kosten & Intelligenz (nächster Schritt)
 
-- **Kosten-Schaetzung vor Ausfuehrung** — User sieht erwartete Token-Kosten bevor ein Wish laeuft
+- **Kosten-Schätzung vor Ausführung** — User sieht erwartete Token-Kosten bevor ein Wish läuft
 - **Modell-Auswahl pro Wish** — Automatische oder manuelle Wahl des passenden Modells
-- **Auto-Refine ohne User-Intervention** — Wish iteriert selbststaendig bis zur Zielqualitaet
-- **Iterations-Historie mit Delta-Tracking** — Nachvollziehbar, was sich zwischen Iterationen veraendert hat
+- **Auto-Refine ohne User-Intervention** — Wish iteriert selbständig bis zur Zielqualität
+- **Iterations-Historie mit Delta-Tracking** — Nachvollziehbar, was sich zwischen Iterationen verändert hat
 
 ### Phase 3: Crystallize & Discovery
 
@@ -138,21 +153,21 @@ Workflows accumulate knowledge across runs:
 - **Template-Discovery & Suche** — Templates finden nach Problem, nicht nach Namen
 - **Wish-Analytics Dashboard** — Erfolgsraten, Kosten, Trends visualisieren
 
-### Langfrist: Oekosystem
+### Langfrist: Ökosystem
 
 - **Externe Skill-Pakete** — Installierbare Pakete (Git-Repo/ZIP) mit neuen Skills + Capabilities
-- **MCP-Server als Skills** — MCP-Server automatisch als Skills/Capabilities verfuegbar machen
-- **Integrations-Plugins** — Slack, Jira, GitHub, Email als Workflow-Bloecke
+- **MCP-Server als Skills** — MCP-Server automatisch als Skills/Capabilities verfügbar machen
+- **Integrations-Plugins** — Slack, Jira, GitHub, Email als Workflow-Blöcke
 - **Workflow-Marketplace** — Community-Templates teilen und entdecken
 
 ---
 
-## Architektur-Ueberblick
+## Architektur-Überblick
 
 ```
                     User
                       |
-              "Ich will X loesen"
+              "Ich will X lösen"
                       |
                   [ Wish API ]
                       |

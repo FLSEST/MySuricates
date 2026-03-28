@@ -6,6 +6,7 @@ import com.automation.service.AssistantService;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.repair.AutoRepairService;
 import com.automation.service.system.DatabaseBackupService;
+import com.automation.service.system.ExecutionSettingsService;
 import com.automation.service.system.SystemIdentityService;
 import com.automation.service.system.TailscaleService;
 import com.github.dockerjava.api.DockerClient;
@@ -44,6 +45,7 @@ public class SystemController {
     private final DataSource dataSource;
     private final SystemIdentityService systemIdentity;
     private final AiProviderRegistry aiProviderRegistry;
+    private final ExecutionSettingsService executionSettingsService;
 
     @org.springframework.beans.factory.annotation.Autowired
     @org.springframework.context.annotation.Lazy
@@ -239,6 +241,21 @@ public class SystemController {
             aiProviderRegistry.refreshDefaultProviderCache();
         }
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/execution-config")
+    public ResponseEntity<Map<String, Object>> getExecutionConfig() {
+        return ResponseEntity.ok(executionSettingsService.getCurrentSettings());
+    }
+
+    @PutMapping("/execution-config")
+    public ResponseEntity<?> updateExecutionConfig(@RequestBody Map<String, String> settings) {
+        try {
+            executionSettingsService.updateAll(settings);
+            return ResponseEntity.ok(executionSettingsService.getCurrentSettings());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 
     private static final Set<String> BLOCKED_PREFIXES = Set.of(
