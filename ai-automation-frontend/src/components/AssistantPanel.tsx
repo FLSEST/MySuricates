@@ -288,7 +288,7 @@ function HistoryView({
   );
 }
 
-function EmptyState({ page, onSuggestionClick }: { page: string; onSuggestionClick: (text: string) => void }) {
+function EmptyState({ page, onSuggestionClick, inputRef }: { page: string; onSuggestionClick: (text: string) => void; inputRef: React.RefObject<HTMLTextAreaElement | null> }) {
   const { data: suggestions } = useAssistantSuggestions(page);
   const items = suggestions?.length
     ? suggestions
@@ -309,7 +309,7 @@ function EmptyState({ page, onSuggestionClick }: { page: string; onSuggestionCli
         {items.map((s) => (
           <button
             key={s}
-            onClick={() => onSuggestionClick(s)}
+            onClick={() => { onSuggestionClick(s); setTimeout(() => inputRef.current?.focus(), 0); }}
             className="text-left px-3 py-2 rounded-xl text-xs text-text-secondary
                        border border-[var(--color-assistant-border)]
                        hover:border-accent/40 hover:text-text
@@ -323,23 +323,38 @@ function EmptyState({ page, onSuggestionClick }: { page: string; onSuggestionCli
   );
 }
 
-function ContextChips({ page, onChipClick }: { page: string; onChipClick: (text: string) => void }) {
+function ContextChips({ page, onChipClick, inputRef }: { page: string; onChipClick: (text: string) => void; inputRef: React.RefObject<HTMLTextAreaElement | null> }) {
   const { data: suggestions } = useAssistantSuggestions(page);
-  if (!suggestions?.length) return null;
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+
+  const visible = suggestions?.filter((s) => !dismissed.has(s));
+  if (!visible?.length) return null;
+
   return (
     <div
       className="flex gap-2 px-4 py-2 overflow-x-auto shrink-0 scrollbar-none"
       style={{ borderBottom: '1px solid var(--color-assistant-border)' }}
     >
-      {suggestions.map((s) => (
-        <button
+      {visible.map((s) => (
+        <span
           key={s}
-          onClick={() => onChipClick(s)}
-          className="shrink-0 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap
-                     bg-accent/10 text-accent hover:bg-accent/20 border border-accent/20 transition-colors"
+          className="group/chip shrink-0 inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium
+                     whitespace-nowrap bg-accent/10 text-accent border border-accent/20 transition-colors"
         >
-          {s}
-        </button>
+          <button
+            onClick={() => { onChipClick(s); setTimeout(() => inputRef.current?.focus(), 0); }}
+            className="hover:underline"
+          >
+            {s}
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setDismissed((prev) => new Set(prev).add(s)); }}
+            className="opacity-0 group-hover/chip:opacity-100 hover:text-danger transition-all"
+            aria-label="Entfernen"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </span>
       ))}
     </div>
   );
@@ -624,7 +639,7 @@ export function AssistantPanel() {
           <>
             {/* Context chips — only when conversation has started */}
             {messages.length > 0 && (
-              <ContextChips page={ctx.page ?? 'dashboard'} onChipClick={setInput} />
+              <ContextChips page={ctx.page ?? 'dashboard'} onChipClick={setInput} inputRef={inputRef} />
             )}
 
             {/* Messages */}
@@ -633,7 +648,7 @@ export function AssistantPanel() {
               style={{ backgroundColor: 'var(--color-assistant-raised)' }}
             >
               {messages.length === 0 && (
-                <EmptyState page={ctx.page ?? 'dashboard'} onSuggestionClick={setInput} />
+                <EmptyState page={ctx.page ?? 'dashboard'} onSuggestionClick={setInput} inputRef={inputRef} />
               )}
 
               {messages.map((msg) => (
