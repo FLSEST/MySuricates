@@ -244,6 +244,10 @@ These use non-obvious paths — always use these, never guess:
 | Pause execution | POST | `/api/v1/executions/{id}/pause` |
 | Resume execution | POST | `/api/v1/executions/{id}/resume` |
 
+## Codex / External Agents
+
+See [AGENTS.md](AGENTS.md) for a complete REST API reference for creating workflows, chains, and running them on the test instance. Intended for OpenAI Codex CLI and other external agents.
+
 ## Key Conventions
 
 - **Backend ORM**: Lombok for boilerplate, MapStruct for entity-DTO mapping
@@ -269,8 +273,8 @@ These use non-obvious paths — always use these, never guess:
   - `CommandExecutorService` provides `executeOnHost(HostExecutionRequest)` / `executeStepOnHost(HostExecutionRequest)` / `writeSkillContextToProject()` methods — all overloads use the `HostExecutionRequest` builder API. Skill context is written to `.claude/rules/skills-context.md` (file-based, not CLI-process-based) so all subsequent Claude CLI calls pick it up automatically.
 - Docker containers have resource limits: 4GB memory, CPU quota, 100 PIDs, 60min idle timeout
 - Security is enabled by default: API key auth via `X-API-Key` header (auto-generated if not configured), rate limiting
-- Block types: simple, shell, retry, conditional, forEach, while, switch, agentic, approval, sub-workflow, skill-capability, human-input
-- **Provider routing**: All block executors (simple, retry, conditional, forEach, while, switch, skill-capability) pass `context.getProvider()` as `providerId` via `HostExecutionRequest.builder()` to `CommandExecutorService`. Setting `"provider": "CODEX"` in a workflow JSON therefore applies to every non-shell block type. `AiProviderRegistry.resolve()` falls back to the configured default provider (not hardcoded CLAUDE) when an unknown provider ID is given.
+- Block types: simple, shell, retry, conditional, foreach, while, switch, agentic, approval, sub-workflow, skill-capability, human-input
+- **Provider routing**: All block executors (simple, retry, conditional, foreach, while, switch, skill-capability) pass `context.getProvider()` as `providerId` via `HostExecutionRequest.builder()` to `CommandExecutorService`. Setting `"provider": "CODEX"` in a workflow JSON therefore applies to every non-shell block type. `AiProviderRegistry.resolve()` falls back to the configured default provider (not hardcoded CLAUDE) when an unknown provider ID is given.
 - Agentic blocks use a Goal→Reason→Act→Observe loop powered by Host Claude CLI
 - Workflow Conversion: Successful agentic runs can be converted to deterministic workflows (rule-based + AI)
 - Terminal WebSocket at `/ws/terminal` for real-time container access
