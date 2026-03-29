@@ -61,10 +61,11 @@ public class WorkflowExecutor {
     private final ApplicationEventPublisher eventPublisher;
     private final TemplateVerificationService templateVerificationService;
     private final SystemIdentityService systemIdentity;
+    private final com.automation.repository.TodoRepository todoRepository;
 
     private static final java.util.Set<String> SYSTEM_VAR_KEYS = java.util.Set.of(
             "workflow_run_id", "workflow_id", "workflow_name", "project_path",
-            "model", "provider", "started_at"
+            "model", "provider", "started_at", "previous_report", "open_todos"
     );
 
     private final Map<String, ExecutionContext> activeExecutions = new ConcurrentHashMap<>();
@@ -211,6 +212,9 @@ public class WorkflowExecutor {
             // Stamp run metadata with system identity
             context.setRunMetadata("system", systemIdentity.getName());
             context.setRunMetadata("systemVersion", systemIdentity.getVersion());
+
+            // Inject platform data as context variables (so workflows don't need API/DB access)
+            injectPlatformData(context, workflowId, project.getId());
 
             // Set instruction prefix and model from workflow
             String instructionPrefix = agentInstructionsService.buildInstructionPrefix(instructions);
@@ -791,4 +795,69 @@ public class WorkflowExecutor {
         }
     }
 
+    /**
+     * Injects platform data into the execution context so workflows don't need
+     * direct DB or API access. Available as {{ variable_name }} in block templates.
+     */
+    private void injectPlatformData(ExecutionContext context, String workflowId, String projectId) {
+        try {
+            context.setVariable("previous_report", loadPreviousReport(workflowId));
+            context.setVariable("open_todos", loadOpenTodos(projectId));
+        } catch (Exception e) {
+            log.warn("Failed to inject platform data: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Loads the analysis report from the last completed run of the same workflow.
+     * Returns the longest non-shell step output (the Opus analysis), truncated to 3000 chars.
+     */
+    private String loadPreviousReport(String workflowId) {
+        try {
+            List<WorkflowRun> previousRuns = runRepository.findTop5ByWorkflowIdOrderByStartedAtDesc(workflowId);
+            for (WorkflowRun prev : previousRuns) {
+                if (prev.getStatus() != RunStatus.COMPLETED && prev.getStatus() != RunStatus.COMPLETED_WITH_ERRORS) {
+                    continue;
+                }
+                List<StepResult> steps = stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc(prev.getId());
+                // Find the longest completed non-first step output (skip shell data-collection block)
+                String bestOutput = null;
+                int bestLength = 0;
+                for (int i = 1; i < steps.size(); i++) {
+                    StepResult step = steps.get(i);
+                    if (step.getStatus() != StepStatus.COMPLETED) continue;
+                    String output = step.getOutput();
+                    if (output != null && output.length() > bestLength) {
+                        bestLength = output.length();
+                        bestOutput = output;
+                    }
+                }
+                if (bestOutput != null && bestLength > 200) {
+                    return bestLength > 3000 ? bestOutput.substring(0, 3000) + "\n[...gekürzt]" : bestOutput;
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Could not load previous report for workflow {}: {}", workflowId, e.getMessage());
+        }
+        return "(kein vorheriger Report vorhanden)";
+    }
+
+    /**
+     * Loads open TODOs for the project as a markdown list.
+     */
+    private String loadOpenTodos(String projectId) {
+        try {
+            List<com.automation.entity.Todo> todos = todoRepository.findByProjectIdAndStatusIn(
+                    projectId, List.of(com.automation.entity.Todo.Status.OPEN, com.automation.entity.Todo.Status.IN_PROGRESS));
+            if (todos.isEmpty()) return "(keine offenen TODOs)";
+            StringBuilder sb = new StringBuilder();
+            for (com.automation.entity.Todo t : todos) {
+                sb.append("- [").append(t.getPriority()).append("] ").append(t.getTitle()).append("\n");
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            log.debug("Could not load open TODOs for project {}: {}", projectId, e.getMessage());
+        }
+        return "(TODOs nicht verfügbar)";
+    }
 }
