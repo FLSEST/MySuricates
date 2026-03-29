@@ -42,10 +42,11 @@ class ApiClient {
     return this.request<T>(path);
   }
 
-  post<T>(path: string, body?: unknown): Promise<T> {
+  post<T>(path: string, body?: unknown, options?: RequestInit): Promise<T> {
     return this.request<T>(path, {
       method: 'POST',
       body: body ? JSON.stringify(body) : undefined,
+      ...options,
     });
   }
 

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { X, Send, Play, Eye, Sparkles, Clock, Plus, Trash2, ArrowLeft, MessageCircle, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import { X, Send, Play, Eye, Sparkles, Clock, Plus, Trash2, ArrowLeft, MessageCircle, ChevronDown, ChevronUp, RefreshCw, CheckCheck, XCircle, Square } from 'lucide-react';
 import { useAssistantStore } from '../stores/assistantStore';
 import { useAssistantChat, useAssistantSuggestions, type ChatMessage, type AssistantAction } from '../hooks/useAssistant';
 import { useAssistantThinkingPhrases } from '../hooks/useSystem';
@@ -260,12 +260,15 @@ function MessageBubble({ msg, onClose, onSend, onExecute, onRetry }: {
           </button>
         )}
 
-        {/* Timestamp + response time */}
-        <span className="text-[10px] text-text-tertiary ml-1">
+        {/* Timestamp + response time + status */}
+        <span className="text-[10px] text-text-tertiary ml-1 flex items-center gap-1">
           {time}
           {!isUser && respTime && (
             <>{time ? ' · ' : ''}{respTime}</>
           )}
+          {isUser && msg.status === 'sending' && <Clock className="w-2.5 h-2.5 text-text-tertiary" />}
+          {isUser && msg.status === 'sent' && <CheckCheck className="w-2.5 h-2.5 text-accent" />}
+          {isUser && msg.status === 'error' && <XCircle className="w-2.5 h-2.5 text-danger" />}
         </span>
       </div>
     </div>
@@ -454,6 +457,7 @@ export function AssistantPanel() {
     startNewSession, appendMessage,
     setShowHistory, setPanelWidth, setPanelHeight,
   } = useAssistantStore();
+  const updateMessageStatus = useAssistantStore((s) => s.updateMessageStatus);
 
   const location = useLocation();
   const [input, setInput] = useState('');
@@ -463,6 +467,8 @@ export function AssistantPanel() {
   const { mutate: sendMessage, isPending } = useAssistantChat();
   const { mutate: executeWorkflow } = useExecuteWorkflow();
   const navigate = useNavigate();
+  const abortRef = useRef<AbortController | null>(null);
+  const queueRef = useRef<{ text: string; sessionId: string }[]>([]);
 
   const ctx = parsePageContext(location.pathname);
 
@@ -544,29 +550,24 @@ export function AssistantPanel() {
     setIsResizing(false);
   };
 
-  const handleSendText = (text: string) => {
-    if (!text || isPending) return;
-
-    // Get or create session
-    let sessionId = activeSessionId;
-    if (!sessionId || !sessions.find((s) => s.id === sessionId)) {
-      sessionId = startNewSession();
-    }
-
-    const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: text, timestamp: Date.now() };
-    appendMessage(sessionId, userMsg);
-
+  const dispatchChat = (text: string, sessionId: string, userMsgId: string) => {
     const currentSession = useAssistantStore.getState().sessions.find((s) => s.id === sessionId);
     const history = (currentSession?.messages ?? [])
-      .filter((m) => m.id !== userMsg.id)
+      .filter((m) => m.id !== userMsgId && m.role !== 'assistant' || m.role === 'assistant')
+      .filter((m) => m.id !== userMsgId)
       .map((m) => ({ role: m.role, content: m.content }));
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     sendMessage(
-      { message: text, history, context: ctx, sessionId },
+      { req: { message: text, history, context: ctx, sessionId }, signal: controller.signal },
       {
         onSuccess: (res) => {
+          abortRef.current = null;
+          updateMessageStatus(sessionId, userMsgId, 'sent');
           if (res.model) setLastModel(res.model);
-          appendMessage(sessionId!, {
+          appendMessage(sessionId, {
             id: crypto.randomUUID(),
             role: 'assistant',
             content: res.message,
@@ -574,18 +575,65 @@ export function AssistantPanel() {
             responseTimeMs: res.responseTimeMs ?? undefined,
             timestamp: Date.now(),
           });
+          processQueue();
         },
-        onError: () => {
-          appendMessage(sessionId!, {
+        onError: (err) => {
+          abortRef.current = null;
+          // AbortError = user cancelled, don't show error bubble
+          const isAbort = err instanceof DOMException && err.name === 'AbortError';
+          if (isAbort) {
+            updateMessageStatus(sessionId, userMsgId, undefined as unknown as 'sending');
+            // Clear status silently — message stays but no error shown
+            processQueue();
+            return;
+          }
+          updateMessageStatus(sessionId, userMsgId, 'error');
+          appendMessage(sessionId, {
             id: crypto.randomUUID(),
             role: 'assistant',
             content: 'Entschuldigung, ein Fehler ist aufgetreten. Bitte versuche es erneut.',
             timestamp: Date.now(),
             isError: true,
           });
+          processQueue();
         },
       }
     );
+  };
+
+  const processQueue = () => {
+    const next = queueRef.current.shift();
+    if (next) {
+      const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: next.text, timestamp: Date.now(), status: 'sending' };
+      appendMessage(next.sessionId, userMsg);
+      dispatchChat(next.text, next.sessionId, userMsg.id);
+    }
+  };
+
+  const handleSendText = (text: string) => {
+    if (!text) return;
+
+    // Get or create session
+    let sessionId = activeSessionId;
+    if (!sessionId || !sessions.find((s) => s.id === sessionId)) {
+      sessionId = startNewSession();
+    }
+
+    const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: text, timestamp: Date.now(), status: 'sending' };
+    appendMessage(sessionId, userMsg);
+
+    if (isPending) {
+      // Queue for later — message is already visible with ⏳
+      queueRef.current.push({ text, sessionId });
+      return;
+    }
+
+    dispatchChat(text, sessionId, userMsg.id);
+  };
+
+  const handleCancel = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
   };
 
   const handleSend = () => {
@@ -755,7 +803,18 @@ export function AssistantPanel() {
                 />
               ))}
 
-              {isPending && <TypingIndicator />}
+              {isPending && (
+                <div className="flex items-center gap-2">
+                  <TypingIndicator />
+                  <button
+                    onClick={handleCancel}
+                    className="shrink-0 flex items-center gap-1 text-[11px] text-text-tertiary hover:text-text-secondary"
+                  >
+                    <Square className="w-3 h-3" />
+                    Abbrechen
+                  </button>
+                </div>
+              )}
 
               <div ref={bottomRef} />
             </div>
@@ -780,7 +839,6 @@ export function AssistantPanel() {
                   onKeyDown={handleKeyDown}
                   placeholder="Nachricht eingeben… (Enter zum Senden)"
                   rows={1}
-                  disabled={isPending}
                   className="flex-1 resize-none bg-transparent text-sm text-text placeholder-text-tertiary
                              outline-none min-h-[24px] max-h-[120px] leading-6 py-0"
                   style={{ height: 'auto' }}
@@ -792,7 +850,7 @@ export function AssistantPanel() {
                 />
                 <button
                   onClick={handleSend}
-                  disabled={!input.trim() || isPending}
+                  disabled={!input.trim()}
                   className="shrink-0 w-7 h-7 rounded-lg bg-accent text-white flex items-center justify-center
                              disabled:opacity-40 hover:bg-accent-hover transition-colors"
                 >

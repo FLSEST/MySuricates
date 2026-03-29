@@ -43,12 +43,13 @@ export interface ChatMessage {
   responseTimeMs?: number;
   timestamp?: number;
   isError?: boolean;
+  status?: 'sending' | 'sent' | 'error';
 }
 
 export function useAssistantChat() {
   return useMutation({
-    mutationFn: (req: AssistantChatRequest) =>
-      api.post<AssistantChatResponse>('/assistant/chat', req),
+    mutationFn: ({ req, signal }: { req: AssistantChatRequest; signal?: AbortSignal }) =>
+      api.post<AssistantChatResponse>('/assistant/chat', req, { signal }),
   });
 }
 

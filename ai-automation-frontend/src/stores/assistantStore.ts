@@ -27,6 +27,7 @@ interface AssistantState {
 
   startNewSession: () => string;
   appendMessage: (sessionId: string, msg: ChatMessage) => void;
+  updateMessageStatus: (sessionId: string, msgId: string, status: ChatMessage['status']) => void;
   deleteSession: (id: string) => void;
   loadSession: (id: string) => void;
 }
@@ -76,6 +77,20 @@ export const useAssistantStore = create<AssistantState>()(
               ? firstUser.content.slice(0, 60) + (firstUser.content.length > 60 ? '…' : '')
               : sess.preview;
             return { ...sess, messages, preview };
+          }),
+        }));
+      },
+
+      updateMessageStatus: (sessionId, msgId, status) => {
+        set((s) => ({
+          sessions: s.sessions.map((sess) => {
+            if (sess.id !== sessionId) return sess;
+            return {
+              ...sess,
+              messages: sess.messages.map((m) =>
+                m.id === msgId ? { ...m, status } : m
+              ),
+            };
           }),
         }));
       },
