@@ -266,7 +266,6 @@ function MessageBubble({ msg, onClose, onSend, onExecute, onRetry }: {
           {!isUser && respTime && (
             <>{time ? ' · ' : ''}{respTime}</>
           )}
-          {isUser && msg.status === 'sending' && <Clock className="w-2.5 h-2.5 text-text-tertiary" />}
           {isUser && msg.status === 'sent' && <CheckCheck className="w-2.5 h-2.5 text-accent" />}
           {isUser && msg.status === 'error' && <XCircle className="w-2.5 h-2.5 text-danger" />}
         </span>
