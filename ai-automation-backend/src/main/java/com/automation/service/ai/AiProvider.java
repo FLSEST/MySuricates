@@ -56,10 +56,15 @@ public interface AiProvider {
             String model,
             String systemPrompt,
             String workingDirectory,
-            Integer timeoutSeconds
+            Integer timeoutSeconds,
+            boolean priority
     ) {
         public ActionRequest(String prompt, String model, String systemPrompt, String workingDirectory) {
-            this(prompt, model, systemPrompt, workingDirectory, null);
+            this(prompt, model, systemPrompt, workingDirectory, null, false);
+        }
+
+        public ActionRequest(String prompt, String model, String systemPrompt, String workingDirectory, Integer timeoutSeconds) {
+            this(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, false);
         }
     }
 

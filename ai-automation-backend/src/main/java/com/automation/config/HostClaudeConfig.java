@@ -29,5 +29,11 @@ public class HostClaudeConfig {
     /**
      * Maximum number of concurrent Claude CLI processes.
      */
-    private int maxConcurrentCalls = 3;
+    private int maxConcurrentCalls = 5;
+
+    /**
+     * Number of permits reserved for interactive (priority) calls like assistant chat.
+     * Background calls (workflows, suggestions) are limited to maxConcurrentCalls - reservedForInteractive.
+     */
+    private int reservedForInteractive = 1;
 }

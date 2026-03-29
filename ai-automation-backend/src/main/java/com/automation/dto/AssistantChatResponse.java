@@ -7,11 +7,21 @@ import java.util.List;
 public record AssistantChatResponse(
         String message,
         List<AssistantAction> actions,
-        String model
+        String model,
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        Long responseTimeMs
 ) {
     /** Backwards-compatible constructor — existing callsites use 2 args. */
     public AssistantChatResponse(String message, List<AssistantAction> actions) {
-        this(message, actions, null);
+        this(message, actions, null, null);
+    }
+
+    public AssistantChatResponse(String message, List<AssistantAction> actions, String model) {
+        this(message, actions, model, null);
+    }
+
+    public AssistantChatResponse withResponseTimeMs(long responseTimeMs) {
+        return new AssistantChatResponse(message, actions, model, responseTimeMs);
     }
 
     /** An actionable suggestion the assistant is offering the user. */

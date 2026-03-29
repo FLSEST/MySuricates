@@ -157,6 +157,7 @@ public class AssistantService {
                             .providerId(req.provider())
                             .model(model)
                             .timeoutSeconds(TIMEOUT_SECONDS)
+                            .priority(true)
                             .build()
             );
 
@@ -179,6 +180,7 @@ public class AssistantService {
                                     .providerId(req.provider())
                                     .model(model)
                                     .timeoutSeconds(TIMEOUT_SECONDS)
+                                    .priority(true)
                                     .build()
                     );
                 }
@@ -744,18 +746,6 @@ public class AssistantService {
     }
 
     // ── Tool execution ────────────────────────────────────────────────────────
-
-    private record ToolRequest(String type, String payload) {}
-
-    private List<ToolRequest> parseToolRequests(String response) {
-        if (response == null) return List.of();
-        // Remove code blocks to prevent accidental tool execution from examples
-        String cleaned = response.replaceAll("```[\\s\\S]*?```", "");
-        List<ToolRequest> result = new ArrayList<>();
-        Matcher m = TOOL_PATTERN.matcher(cleaned);
-        while (m.find()) result.add(new ToolRequest(m.group(1), m.group(2).trim()));
-        return result;
-    }
 
     /** Replaces all &lt;tool&gt; tags in the response with their execution results. */
     private String executeTools(String response) {

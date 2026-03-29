@@ -181,6 +181,15 @@ function MessageBubble({ msg, onClose, onSend, onExecute }: {
             ))}
           </div>
         )}
+
+        {/* Response time */}
+        {!isUser && msg.responseTimeMs != null && (
+          <span className="text-[10px] text-text-tertiary ml-1">
+            {msg.responseTimeMs >= 1000
+              ? `${(msg.responseTimeMs / 1000).toFixed(1)}s`
+              : `${msg.responseTimeMs}ms`}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -485,6 +494,7 @@ export function AssistantPanel() {
             role: 'assistant',
             content: res.message,
             actions: res.actions,
+            responseTimeMs: res.responseTimeMs ?? undefined,
           });
         },
         onError: () => {

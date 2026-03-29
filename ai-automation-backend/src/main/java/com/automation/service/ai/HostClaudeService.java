@@ -35,19 +35,31 @@ public class HostClaudeService {
     private final HostClaudeConfig config;
     private final CliPermissionsConfig permissionsConfig;
     private final DynamicSemaphore callSemaphore;
+    private final DynamicSemaphore backgroundSemaphore;
     private final AtomicLong lastCallTimestamp = new AtomicLong(0);
 
     public HostClaudeService(HostClaudeConfig config, CliPermissionsConfig permissionsConfig) {
         this.config = config;
         this.permissionsConfig = permissionsConfig;
-        this.callSemaphore = new DynamicSemaphore(config.getMaxConcurrentCalls());
-        log.info("Claude CLI throttle: maxConcurrent={}, interCallDelay={}ms",
-                config.getMaxConcurrentCalls(), config.getInterCallDelayMs());
+        int total = config.getMaxConcurrentCalls();
+        int reserved = config.getReservedForInteractive();
+        this.callSemaphore = new DynamicSemaphore(total);
+        this.backgroundSemaphore = new DynamicSemaphore(Math.max(1, total - reserved));
+        log.info("Claude CLI throttle: maxConcurrent={}, reservedForInteractive={}, backgroundLimit={}, interCallDelay={}ms",
+                total, reserved, total - reserved, config.getInterCallDelayMs());
     }
 
     public void updateMaxConcurrentCalls(int newMax) {
         callSemaphore.setMaxPermits(newMax);
-        log.info("Claude CLI max concurrent calls updated to {}", newMax);
+        int backgroundMax = Math.max(1, newMax - config.getReservedForInteractive());
+        backgroundSemaphore.setMaxPermits(backgroundMax);
+        log.info("Claude CLI max concurrent calls updated to {} (background limit: {})", newMax, backgroundMax);
+    }
+
+    public void updateReservedForInteractive(int reserved) {
+        int backgroundMax = Math.max(1, callSemaphore.getMaxPermits() - reserved);
+        backgroundSemaphore.setMaxPermits(backgroundMax);
+        log.info("Claude CLI reserved for interactive updated to {} (background limit: {})", reserved, backgroundMax);
     }
 
     /**
@@ -91,14 +103,20 @@ public class HostClaudeService {
      */
     public ActionResult executeAction(String prompt, String model,
                                        String systemPrompt, String workingDirectory) throws IOException {
-        return executeAction(prompt, model, systemPrompt, workingDirectory, null);
+        return executeAction(prompt, model, systemPrompt, workingDirectory, null, false);
     }
 
     public ActionResult executeAction(String prompt, String model,
                                        String systemPrompt, String workingDirectory,
                                        Integer timeoutSeconds) throws IOException {
+        return executeAction(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, false);
+    }
+
+    public ActionResult executeAction(String prompt, String model,
+                                       String systemPrompt, String workingDirectory,
+                                       Integer timeoutSeconds, boolean priority) throws IOException {
         List<String> cmd = buildActionCommand(prompt, model, systemPrompt);
-        var result = executeProcess(cmd, prompt, workingDirectory, timeoutSeconds, "Host Claude action");
+        var result = executeProcess(cmd, prompt, workingDirectory, timeoutSeconds, "Host Claude action", priority);
         return new ActionResult(result.text, result.exitCode, result.parsed);
     }
 
@@ -109,7 +127,12 @@ public class HostClaudeService {
 
     private ProcessResult executeProcess(List<String> cmd, String prompt, String workingDirectory,
                                           Integer timeoutSeconds, String label) throws IOException {
-        acquireThrottle();
+        return executeProcess(cmd, prompt, workingDirectory, timeoutSeconds, label, false);
+    }
+
+    private ProcessResult executeProcess(List<String> cmd, String prompt, String workingDirectory,
+                                          Integer timeoutSeconds, String label, boolean priority) throws IOException {
+        acquireThrottle(priority);
         try {
             ProcessBuilder pb = new ProcessBuilder(cmd);
             pb.redirectErrorStream(true);
@@ -136,6 +159,9 @@ public class HostClaudeService {
             return new ProcessResult(text, exitCode, parsed);
         } finally {
             callSemaphore.release();
+            if (!priority) {
+                backgroundSemaphore.release();
+            }
         }
     }
 
@@ -231,14 +257,20 @@ public class HostClaudeService {
     }
 
     /**
-     * Acquires a throttle permit: limits concurrency via semaphore and enforces
-     * a minimum inter-call delay to prevent API rate limiting.
+     * Acquires throttle permits: priority calls only need the global semaphore,
+     * background calls also need the background semaphore (reserving capacity for interactive use).
      */
-    private void acquireThrottle() throws IOException {
+    private void acquireThrottle(boolean priority) throws IOException {
         try {
+            if (!priority) {
+                backgroundSemaphore.acquire();
+            }
             callSemaphore.acquire();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            if (!priority) {
+                backgroundSemaphore.release();
+            }
             throw new IOException("Interrupted while waiting for Claude CLI throttle permit", e);
         }
         long delayMs = config.getInterCallDelayMs();
@@ -251,6 +283,9 @@ public class HostClaudeService {
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     callSemaphore.release();
+                    if (!priority) {
+                        backgroundSemaphore.release();
+                    }
                     throw new IOException("Interrupted during Claude CLI throttle delay", e);
                 }
             }

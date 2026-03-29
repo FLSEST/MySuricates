@@ -32,6 +32,7 @@ export interface AssistantChatResponse {
   message: string;
   actions: AssistantAction[];
   model?: string | null;
+  responseTimeMs?: number | null;
 }
 
 export interface ChatMessage {
@@ -39,6 +40,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   actions?: AssistantAction[];
+  responseTimeMs?: number;
 }
 
 export function useAssistantChat() {

@@ -17,6 +17,7 @@ interface FieldConfig {
 interface FormState {
   executionMaxConcurrent: number;
   claudeMaxConcurrentCalls: number;
+  claudeReservedForInteractive: number;
   claudeTimeoutSeconds: number;
   claudeInterCallDelayMs: number;
   chainWorkflowTimeoutMinutes: number;
@@ -29,7 +30,8 @@ export function ExecutionSettingsCard() {
 
   const [form, setForm] = useState<FormState>({
     executionMaxConcurrent: 10,
-    claudeMaxConcurrentCalls: 3,
+    claudeMaxConcurrentCalls: 5,
+    claudeReservedForInteractive: 1,
     claudeTimeoutSeconds: 300,
     claudeInterCallDelayMs: 0,
     chainWorkflowTimeoutMinutes: 180,
@@ -40,6 +42,7 @@ export function ExecutionSettingsCard() {
       setForm({
         executionMaxConcurrent: config.executionMaxConcurrent,
         claudeMaxConcurrentCalls: config.claudeMaxConcurrentCalls,
+        claudeReservedForInteractive: config.claudeReservedForInteractive ?? 1,
         claudeTimeoutSeconds: config.claudeTimeoutSeconds,
         claudeInterCallDelayMs: config.claudeInterCallDelayMs,
         chainWorkflowTimeoutMinutes: config.chainWorkflowTimeoutMinutes,
@@ -50,6 +53,7 @@ export function ExecutionSettingsCard() {
   const hasChanges = config && (
     form.executionMaxConcurrent !== config.executionMaxConcurrent ||
     form.claudeMaxConcurrentCalls !== config.claudeMaxConcurrentCalls ||
+    form.claudeReservedForInteractive !== (config.claudeReservedForInteractive ?? 1) ||
     form.claudeTimeoutSeconds !== config.claudeTimeoutSeconds ||
     form.claudeInterCallDelayMs !== config.claudeInterCallDelayMs ||
     form.chainWorkflowTimeoutMinutes !== config.chainWorkflowTimeoutMinutes
@@ -58,6 +62,7 @@ export function ExecutionSettingsCard() {
   const fields: FieldConfig[] = [
     { key: 'maxRuns', label: t.settings.executionMaxConcurrentRuns, hint: t.settings.executionMaxConcurrentRunsHint, min: 1, max: 50, configKey: 'executionMaxConcurrent' },
     { key: 'maxCalls', label: t.settings.executionMaxConcurrentCalls, hint: t.settings.executionMaxConcurrentCallsHint, min: 1, max: 20, configKey: 'claudeMaxConcurrentCalls' },
+    { key: 'reserved', label: t.settings.executionReservedForInteractive, hint: t.settings.executionReservedForInteractiveHint, min: 0, max: 10, configKey: 'claudeReservedForInteractive' },
     { key: 'timeout', label: t.settings.executionCliTimeout, hint: t.settings.executionCliTimeoutHint, min: 30, max: 3600, configKey: 'claudeTimeoutSeconds' },
     { key: 'delay', label: t.settings.executionInterCallDelay, hint: t.settings.executionInterCallDelayHint, min: 0, max: 30000, configKey: 'claudeInterCallDelayMs' },
     { key: 'chain', label: t.settings.executionChainTimeout, hint: t.settings.executionChainTimeoutHint, min: 5, max: 1440, configKey: 'chainWorkflowTimeoutMinutes' },
@@ -67,6 +72,7 @@ export function ExecutionSettingsCard() {
     updateConfig.mutate({
       executionMaxConcurrent: form.executionMaxConcurrent,
       claudeMaxConcurrentCalls: form.claudeMaxConcurrentCalls,
+      claudeReservedForInteractive: form.claudeReservedForInteractive,
       claudeTimeoutSeconds: form.claudeTimeoutSeconds,
       claudeInterCallDelayMs: form.claudeInterCallDelayMs,
       chainWorkflowTimeoutMinutes: form.chainWorkflowTimeoutMinutes,

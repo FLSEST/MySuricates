@@ -3,6 +3,7 @@ package com.automation.controller;
 import com.automation.dto.response.RemoteAccessResponse;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.AssistantService;
+import com.automation.service.PageSuggestionService;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.repair.AutoRepairService;
 import com.automation.service.system.DatabaseBackupService;
@@ -50,6 +51,10 @@ public class SystemController {
     @org.springframework.beans.factory.annotation.Autowired
     @org.springframework.context.annotation.Lazy
     private AssistantService assistantService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private PageSuggestionService pageSuggestionService;
 
     @Value("${automation.security.enabled:true}")
     private boolean securityEnabled;
@@ -177,18 +182,11 @@ public class SystemController {
 
     @PostMapping("/vacuum")
     public ResponseEntity<Map<String, Object>> vacuumDatabase() {
-        long startTime = System.currentTimeMillis();
-        try (var conn = dataSource.getConnection(); var stmt = conn.createStatement()) {
-            stmt.execute("VACUUM");
-            long durationMs = System.currentTimeMillis() - startTime;
-            log.info("Full VACUUM completed in {} ms", durationMs);
-            return ResponseEntity.ok(Map.of("status", "completed", "durationMs", durationMs));
-        } catch (Exception e) {
-            log.error("VACUUM failed: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError().body(Map.of(
-                    "status", "failed",
-                    "error", e.getMessage() != null ? e.getMessage() : e.getClass().getName()));
+        Map<String, Object> result = databaseBackupService.fullVacuum();
+        if ("failed".equals(result.get("status"))) {
+            return ResponseEntity.internalServerError().body(result);
         }
+        return ResponseEntity.ok(result);
     }
 
     @GetMapping("/backup")
@@ -228,7 +226,7 @@ public class SystemController {
 
     private static final Set<String> ALLOWED_SETTINGS = Set.of(
             "auto-todo-default", "auto-repair-default", "default-ai-provider",
-            "assistant-thinking-phrases", "assistant-model"
+            "assistant-thinking-phrases", "assistant-model", "suggestions-model"
     );
 
     @GetMapping("/settings/{key}")
@@ -252,6 +250,9 @@ public class SystemController {
         appSettingsRepository.set(key, value);
         if ("assistant-model".equals(key)) {
             assistantService.refreshCachedModel();
+        }
+        if ("suggestions-model".equals(key)) {
+            pageSuggestionService.refreshCachedModel();
         }
         if ("default-ai-provider".equals(key)) {
             aiProviderRegistry.refreshDefaultProviderCache();

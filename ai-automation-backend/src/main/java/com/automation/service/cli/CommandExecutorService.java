@@ -136,7 +136,8 @@ public class CommandExecutorService {
             AiProvider provider = aiProviderRegistry.resolve(providerId);
             AiProvider.ActionResult result = provider.executeAction(
                     new AiProvider.ActionRequest(request.command(), request.model(),
-                            request.systemPrompt(), request.projectPath(), request.timeoutSeconds()));
+                            request.systemPrompt(), request.projectPath(), request.timeoutSeconds(),
+                            request.priority()));
             return new CliSession.EnrichedCommandResult(result.text(), result.exitCode(), null);
         } catch (IOException e) {
             throw new WorkflowExecutionException(
@@ -174,7 +175,7 @@ public class CommandExecutorService {
             AiProvider provider = aiProviderRegistry.resolve(request.providerId());
             AiProvider.ActionResult providerResult = provider.executeAction(
                     new AiProvider.ActionRequest(command, request.model(), request.systemPrompt(),
-                            request.projectPath(), request.timeoutSeconds()));
+                            request.projectPath(), request.timeoutSeconds(), request.priority()));
             step.setOutput(providerResult.text());
             step.setStatus(providerResult.exitCode() == 0 ? StepStatus.COMPLETED : StepStatus.FAILED);
 

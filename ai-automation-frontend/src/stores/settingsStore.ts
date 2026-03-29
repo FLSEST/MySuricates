@@ -9,6 +9,7 @@ interface SettingsState {
   autoRepairDefault: boolean;
   defaultAiProvider: string;
   assistantModel: string;
+  suggestionsModel: string;
   sidebarItemOrder: string[];
   sidebarHiddenItems: string[];
   setApiKey: (key: string) => void;
@@ -18,6 +19,7 @@ interface SettingsState {
   setAutoRepairDefault: (enabled: boolean) => void;
   setDefaultAiProvider: (provider: string) => void;
   setAssistantModel: (model: string) => void;
+  setSuggestionsModel: (model: string) => void;
   setSidebarItemOrder: (order: string[]) => void;
   setSidebarHiddenItems: (hidden: string[]) => void;
 }
@@ -32,6 +34,7 @@ export const useSettingsStore = create<SettingsState>()(
       autoRepairDefault: false,
       defaultAiProvider: '',
       assistantModel: '',
+      suggestionsModel: '',
       sidebarItemOrder: [],
       sidebarHiddenItems: [],
       setApiKey: (apiKey) => set({ apiKey }),
@@ -41,6 +44,7 @@ export const useSettingsStore = create<SettingsState>()(
       setAutoRepairDefault: (autoRepairDefault) => set({ autoRepairDefault }),
       setDefaultAiProvider: (defaultAiProvider) => set({ defaultAiProvider }),
       setAssistantModel: (assistantModel) => set({ assistantModel }),
+      setSuggestionsModel: (suggestionsModel) => set({ suggestionsModel }),
       setSidebarItemOrder: (sidebarItemOrder) => set({ sidebarItemOrder }),
       setSidebarHiddenItems: (sidebarHiddenItems) => set({ sidebarHiddenItems }),
     }),

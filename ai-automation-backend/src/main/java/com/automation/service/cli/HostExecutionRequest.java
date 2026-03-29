@@ -46,7 +46,10 @@ public record HostExecutionRequest(
         String providerId,
 
         /** If true, execute as pure shell (no Claude CLI). Default false. */
-        boolean shell
+        boolean shell,
+
+        /** If true, this is a priority/interactive call (e.g. assistant chat) that uses reserved permits. */
+        boolean priority
 ) {
     public HostExecutionRequest {
         if (projectPath == null || projectPath.isBlank()) {

@@ -74,6 +74,17 @@ export function useAssistantModelSetting() {
   });
 }
 
+export function useSuggestionsModelSetting() {
+  return useQuery({
+    queryKey: ['system', 'settings', 'suggestions-model'],
+    queryFn: async () => {
+      const r = await api.get<{ value: string }>('/system/settings/suggestions-model');
+      return r.value ?? '';
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 const DEFAULT_THINKING_PHRASES: Record<string, string[]> = {
   de: ['Denke nach…', 'Analysiere…', 'Überlege kurz…', 'Einen Moment…'],
   en: ['Thinking…', 'Analyzing…', 'Just a moment…', 'Processing…'],
@@ -116,6 +127,7 @@ export function useRepairAllFailed() {
 export interface ExecutionConfig {
   executionMaxConcurrent: number;
   claudeMaxConcurrentCalls: number;
+  claudeReservedForInteractive: number;
   claudeTimeoutSeconds: number;
   claudeInterCallDelayMs: number;
   chainWorkflowTimeoutMinutes: number;

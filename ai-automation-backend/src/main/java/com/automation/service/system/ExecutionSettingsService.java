@@ -20,20 +20,22 @@ import java.util.Map;
 public class ExecutionSettingsService {
 
     private static final Map<String, long[]> BOUNDS = Map.of(
-            "execution-max-concurrent",       new long[]{1, 50},
-            "claude-max-concurrent-calls",    new long[]{1, 20},
-            "claude-timeout-seconds",         new long[]{30, 3600},
-            "claude-inter-call-delay-ms",     new long[]{0, 30000},
-            "chain-workflow-timeout-minutes",  new long[]{5, 1440}
+            "execution-max-concurrent",          new long[]{1, 50},
+            "claude-max-concurrent-calls",       new long[]{1, 20},
+            "claude-reserved-for-interactive",   new long[]{0, 10},
+            "claude-timeout-seconds",            new long[]{30, 3600},
+            "claude-inter-call-delay-ms",        new long[]{0, 30000},
+            "chain-workflow-timeout-minutes",     new long[]{5, 1440}
     );
 
     // Frontend sends camelCase keys, backend uses kebab-case internally
     private static final Map<String, String> KEY_ALIASES = Map.of(
-            "executionMaxConcurrent",       "execution-max-concurrent",
-            "claudeMaxConcurrentCalls",     "claude-max-concurrent-calls",
-            "claudeTimeoutSeconds",         "claude-timeout-seconds",
-            "claudeInterCallDelayMs",       "claude-inter-call-delay-ms",
-            "chainWorkflowTimeoutMinutes",  "chain-workflow-timeout-minutes"
+            "executionMaxConcurrent",          "execution-max-concurrent",
+            "claudeMaxConcurrentCalls",        "claude-max-concurrent-calls",
+            "claudeReservedForInteractive",    "claude-reserved-for-interactive",
+            "claudeTimeoutSeconds",            "claude-timeout-seconds",
+            "claudeInterCallDelayMs",          "claude-inter-call-delay-ms",
+            "chainWorkflowTimeoutMinutes",     "chain-workflow-timeout-minutes"
     );
 
     private final AppSettingsRepository appSettingsRepository;
@@ -77,6 +79,10 @@ public class ExecutionSettingsService {
         // Apply DB overrides if present
         applyIfPresent("execution-max-concurrent", v -> executionSemaphore.setMaxPermits(Integer.parseInt(v)));
         applyIfPresent("claude-max-concurrent-calls", v -> hostClaudeService.updateMaxConcurrentCalls(Integer.parseInt(v)));
+        applyIfPresent("claude-reserved-for-interactive", v -> {
+            hostClaudeConfig.setReservedForInteractive(Integer.parseInt(v));
+            hostClaudeService.updateReservedForInteractive(Integer.parseInt(v));
+        });
         applyIfPresent("claude-timeout-seconds", v -> hostClaudeConfig.setTimeoutSeconds(Integer.parseInt(v)));
         applyIfPresent("claude-inter-call-delay-ms", v -> hostClaudeConfig.setInterCallDelayMs(Long.parseLong(v)));
         applyIfPresent("chain-workflow-timeout-minutes", v -> chainConfig.setWorkflowTimeoutMinutes(Integer.parseInt(v)));
@@ -122,6 +128,7 @@ public class ExecutionSettingsService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("executionMaxConcurrent", executionSemaphore.getMaxPermits());
         result.put("claudeMaxConcurrentCalls", hostClaudeConfig.getMaxConcurrentCalls());
+        result.put("claudeReservedForInteractive", hostClaudeConfig.getReservedForInteractive());
         result.put("claudeTimeoutSeconds", hostClaudeConfig.getTimeoutSeconds());
         result.put("claudeInterCallDelayMs", hostClaudeConfig.getInterCallDelayMs());
         result.put("chainWorkflowTimeoutMinutes", chainConfig.getWorkflowTimeoutMinutes());
@@ -133,6 +140,10 @@ public class ExecutionSettingsService {
         switch (key) {
             case "execution-max-concurrent" -> executionSemaphore.setMaxPermits(Integer.parseInt(value));
             case "claude-max-concurrent-calls" -> hostClaudeService.updateMaxConcurrentCalls(Integer.parseInt(value));
+            case "claude-reserved-for-interactive" -> {
+                hostClaudeConfig.setReservedForInteractive(Integer.parseInt(value));
+                hostClaudeService.updateReservedForInteractive(Integer.parseInt(value));
+            }
             case "claude-timeout-seconds" -> hostClaudeConfig.setTimeoutSeconds(Integer.parseInt(value));
             case "claude-inter-call-delay-ms" -> hostClaudeConfig.setInterCallDelayMs(Long.parseLong(value));
             case "chain-workflow-timeout-minutes" -> chainConfig.setWorkflowTimeoutMinutes(Integer.parseInt(value));

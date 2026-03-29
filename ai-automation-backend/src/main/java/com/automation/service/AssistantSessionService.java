@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -45,7 +46,7 @@ public class AssistantSessionService {
                         .build());
 
         // Deserialize existing messages
-        List<Map<String, String>> messages = deserializeMessages(session.getMessages());
+        List<Map<String, Object>> messages = deserializeMessages(session.getMessages());
 
         // Append new user message
         messages.add(Map.of("role", "user", "content", req.message()));
@@ -55,7 +56,13 @@ public class AssistantSessionService {
         if (assistantContent != null && assistantContent.length() > 500) {
             assistantContent = assistantContent.substring(0, 500) + "…";
         }
-        messages.add(Map.of("role", "assistant", "content", assistantContent != null ? assistantContent : ""));
+        Map<String, Object> assistantMsg = new LinkedHashMap<>();
+        assistantMsg.put("role", "assistant");
+        assistantMsg.put("content", assistantContent != null ? assistantContent : "");
+        if (res.responseTimeMs() != null) {
+            assistantMsg.put("responseTimeMs", res.responseTimeMs());
+        }
+        messages.add(assistantMsg);
 
         session.setMessages(serializeMessages(messages));
         session.setMessageCount(messages.size());
@@ -67,7 +74,7 @@ public class AssistantSessionService {
     // ── Helpers ─────────────────────────────────────────────────────────────
 
     @SuppressWarnings("unchecked")
-    private List<Map<String, String>> deserializeMessages(String json) {
+    private List<Map<String, Object>> deserializeMessages(String json) {
         if (json == null || json.isBlank() || "[]".equals(json)) return new ArrayList<>();
         try {
             return objectMapper.readValue(json, new TypeReference<>() {});
@@ -77,7 +84,7 @@ public class AssistantSessionService {
         }
     }
 
-    private String serializeMessages(List<Map<String, String>> messages) {
+    private String serializeMessages(List<Map<String, Object>> messages) {
         try {
             return objectMapper.writeValueAsString(messages);
         } catch (Exception e) {

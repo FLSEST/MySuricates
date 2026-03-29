@@ -7,11 +7,12 @@ import com.automation.event.AssistantSessionUpdatedEvent;
 import com.automation.repository.AssistantSessionRepository;
 import com.automation.repository.PageSuggestionRepository;
 import com.automation.repository.WorkflowMemoryRepository;
+import com.automation.repository.AppSettingsRepository;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
@@ -22,9 +23,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class PageSuggestionService {
 
@@ -43,11 +44,58 @@ public class PageSuggestionService {
     private final AssistantSessionRepository sessionRepository;
     private final PageSuggestionRepository suggestionRepository;
     private final WorkflowMemoryRepository workflowMemoryRepository;
+    private final AppSettingsRepository appSettingsRepository;
     private final CommandExecutorService commandExecutorService;
     private final ObjectMapper objectMapper;
 
     /** Tracks last refresh time per page to throttle AI calls. */
     private final Map<String, Instant> lastRefreshAt = new ConcurrentHashMap<>();
+
+    /** Tracks the running async refresh thread for cancellation support. */
+    private final AtomicReference<Thread> runningRefresh = new AtomicReference<>();
+
+    /** Cached model for suggestions — loaded at startup, refreshed on settings change. */
+    private volatile String cachedSuggestionsModel = null;
+
+    public PageSuggestionService(AssistantSessionRepository sessionRepository,
+                                  PageSuggestionRepository suggestionRepository,
+                                  WorkflowMemoryRepository workflowMemoryRepository,
+                                  AppSettingsRepository appSettingsRepository,
+                                  CommandExecutorService commandExecutorService,
+                                  ObjectMapper objectMapper) {
+        this.sessionRepository = sessionRepository;
+        this.suggestionRepository = suggestionRepository;
+        this.workflowMemoryRepository = workflowMemoryRepository;
+        this.appSettingsRepository = appSettingsRepository;
+        this.commandExecutorService = commandExecutorService;
+        this.objectMapper = objectMapper;
+    }
+
+    @PostConstruct
+    public void init() {
+        appSettingsRepository.get("suggestions-model")
+                .filter(m -> !m.isBlank())
+                .ifPresentOrElse(
+                        m -> cachedSuggestionsModel = m,
+                        () -> appSettingsRepository.set("suggestions-model", "")
+                );
+    }
+
+    /** Called by SystemController when suggestions-model setting changes. */
+    public void refreshCachedModel() {
+        cachedSuggestionsModel = appSettingsRepository.get("suggestions-model")
+                .filter(m -> !m.isBlank()).orElse(null);
+        log.info("Suggestions model cache refreshed: {}", cachedSuggestionsModel);
+    }
+
+    /** Cancels a running async suggestion refresh (e.g. when chat starts). */
+    public void cancelRunning() {
+        Thread thread = runningRefresh.getAndSet(null);
+        if (thread != null && thread.isAlive()) {
+            log.info("Cancelling running suggestion refresh for chat priority");
+            thread.interrupt();
+        }
+    }
 
     // ── Public API ───────────────────────────────────────────────────────────
 
@@ -73,11 +121,18 @@ public class PageSuggestionService {
     public void onSessionUpdated(AssistantSessionUpdatedEvent event) {
         String page = event.page();
         if (!shouldRefresh(page)) return;
+        runningRefresh.set(Thread.currentThread());
         try {
             refreshSuggestions(page);
             log.debug("Refreshed suggestions for page '{}' after session update", page);
         } catch (Exception e) {
-            log.warn("Could not refresh suggestions for page '{}'", page, e);
+            if (Thread.currentThread().isInterrupted()) {
+                log.debug("Suggestion refresh for page '{}' was cancelled", page);
+            } else {
+                log.warn("Could not refresh suggestions for page '{}'", page, e);
+            }
+        } finally {
+            runningRefresh.compareAndSet(Thread.currentThread(), null);
         }
     }
 
@@ -91,6 +146,7 @@ public class PageSuggestionService {
                             .projectPath(System.getProperty("user.home"))
                             .command(prompt)
                             .systemPrompt(SYSTEM_PROMPT)
+                            .model(cachedSuggestionsModel)
                             .timeoutSeconds(SUGGESTION_TIMEOUT_SECONDS)
                             .build()
             );
