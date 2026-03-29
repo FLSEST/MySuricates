@@ -19,10 +19,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import javax.sql.DataSource;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.time.Instant;
 import java.util.*;
 
@@ -39,6 +42,7 @@ public class InstanceSyncHelper {
     private final SkillRepository skillRepository;
     private final ApiKeyService apiKeyService;
     private final ObjectMapper objectMapper;
+    private final DataSource dataSource;
 
     /** Overrides the API key for outgoing HTTP calls within the current thread (used for Stable/Test targets). */
     private final ThreadLocal<String> targetApiKeyOverride = new ThreadLocal<>();
@@ -270,7 +274,7 @@ public class InstanceSyncHelper {
                     }
                     httpPut(targetBaseUrl + "/workflows/" + targetWorkflowId, updateBody);
                     workflowsSynced++;
-                    workflowRepository.updateStableSyncedAt(workflow.getId(), Instant.now().toString());
+                    markStableSynced(workflow.getId());
                     log.info("Updated workflow on target: {}", workflow.getName());
                 } else {
                     Map<String, Object> importBody = new LinkedHashMap<>();
@@ -283,7 +287,7 @@ public class InstanceSyncHelper {
                     if (workflow.getModel() != null) importBody.put("model", workflow.getModel());
                     httpPost(targetBaseUrl + "/workflows/import", importBody);
                     workflowsSynced++;
-                    workflowRepository.updateStableSyncedAt(workflow.getId(), Instant.now().toString());
+                    markStableSynced(workflow.getId());
                     log.info("Created workflow on target: {}", workflow.getName());
                 }
             } catch (Exception e) {
@@ -476,6 +480,19 @@ public class InstanceSyncHelper {
             throw e;
         } catch (Exception e) {
             throw new RuntimeException(method + " " + url + " failed: " + e.getMessage(), e);
+        }
+    }
+
+    /** Updates stable_synced_at via raw JDBC — bypasses Hibernate to avoid @LastModifiedDate. */
+    private void markStableSynced(String workflowId) {
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "UPDATE workflows SET stable_synced_at = ? WHERE id = ?")) {
+            ps.setString(1, Instant.now().toString());
+            ps.setString(2, workflowId);
+            ps.executeUpdate();
+        } catch (Exception e) {
+            log.warn("Failed to mark workflow {} as stable-synced: {}", workflowId, e.getMessage());
         }
     }
 

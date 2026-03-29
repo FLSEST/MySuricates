@@ -33,6 +33,7 @@ class InstanceSyncHelperTest {
     @Mock private WorkflowRepository workflowRepository;
     @Mock private SkillRepository skillRepository;
     @Mock private ApiKeyService apiKeyService;
+    @Mock private javax.sql.DataSource dataSource;
 
     private ObjectMapper objectMapper = new ObjectMapper();
     private InstanceSyncHelper syncHelper;
@@ -43,7 +44,7 @@ class InstanceSyncHelperTest {
     void setUp() {
         syncHelper = spy(new InstanceSyncHelper(
                 appSettingsRepository, projectRepository, workflowRepository,
-                skillRepository, apiKeyService, objectMapper));
+                skillRepository, apiKeyService, objectMapper, dataSource));
 
         lenient().when(appSettingsRepository.get(anyString())).thenReturn(Optional.empty());
     }

@@ -24,7 +24,7 @@ public class ChainRun {
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "chain_id", nullable = false)
     private WorkflowChain chain;
 

@@ -254,6 +254,7 @@ See [AGENTS.md](AGENTS.md) for a complete REST API reference for creating workfl
 - **Database**: SQLite with Flyway migrations. Naming: `V{N}__description.sql`
 - **NEVER write to the SQLite database directly** (via `sqlite3` CLI or raw SQL). Always use the REST API or the Spring service/repository layer. Direct DB writes bypass Hibernate's entity cache and cause inconsistent state, "Internal server error" responses, and hard-to-debug issues. This applies to testing, debugging, and seeding alike — use the API.
 - **HikariCP pool-size = 1**: SQLite only supports one writer at a time. Using pool-size > 1 causes `SQLITE_BUSY` errors under concurrent workflow runs because multiple connections compete for SQLite's single write lock. With pool-size=1, Hikari serializes all DB operations via its internal queue — no lock contention. Individual DB ops (INSERT/UPDATE) are fast enough (~ms) that even 10 concurrent workflows don't cause Hikari connection timeouts. Do NOT increase the pool size without switching to a proper concurrent database (e.g. PostgreSQL).
+- **OSIV disabled** (`spring.jpa.open-in-view: false`): Open Session In View is explicitly off. With pool-size=1, OSIV holds the single connection for the entire HTTP request, blocking any raw JDBC or `DataSource.getConnection()` call. All lazy associations must be loaded within `@Transactional` service methods — do NOT rely on lazy loading in controllers or mappers. If you see `LazyInitializationException`, fix it by eager-fetching or adding `@Transactional`, not by re-enabling OSIV.
 - **API prefix**: All endpoints under `/api/v1`
 - **Frontend state**: Zustand for client state (settings, theme, sidebar), TanStack Query for server state
 - **API client**: Singleton `api` instance in `src/api/client.ts` — all hooks use this
@@ -294,12 +295,12 @@ gate_description: <description>
 - `GateStatusOutputParser` — parses these markers from block output text (tolerant of markdown formatting)
 - `WorkflowExecutor` scans **all** block outputs — highest severity wins (GREEN < YELLOW < RED by enum ordinal)
 - Gate status is stored in `WorkflowRun.metadata` (`gate_status`, `gate_category`, `gate_description`)
-- **YELLOW → `COMPLETED_WITH_ERRORS`**: If the highest gate is YELLOW, the run status is set to `COMPLETED_WITH_ERRORS` instead of `COMPLETED`
-- **RED → `COMPLETED`**: RED gates don't change the run status — `AutoTodoService` handles them via the `WorkflowRunCompletedEvent`
+- **Gate status does NOT affect run status**: A workflow that runs to completion is always `COMPLETED`, regardless of gate color. The gate badge (GREEN/YELLOW/RED) shows the outcome severity separately. `FAILED` is reserved for actual execution failures (timeouts, crashes). `COMPLETED_WITH_ERRORS` is legacy (no longer set, but old runs retain it).
 - `GateStatusResolver` — derives gate status from run status when no explicit marker exists (`FAILED` → RED, `COMPLETED` → GREEN)
 - `AutoTodoService` — creates follow-up TODOs based on gate status, configurable via `workflow.metadata.autoTodo`
   - **Modes**: `auto` (default: GREEN closes TODOs, YELLOW→MEDIUM, RED→HIGH), `approval` (queues for confirmation), `track` (always creates/updates: GREEN→LOW, YELLOW→MEDIUM, RED→HIGH, never closes)
-  - **TODO description** includes the most detailed step output (longest non-shell block output, max 4000 chars)
+  - **TODO description** includes the most detailed step output (second-to-last non-shell block, max 4000 chars)
+  - **Granular TODOs**: Blocks can emit `todo_item: <title> | HIGH/MEDIUM/LOW | <tags>` markers → `TodoOutputParser` parses them → `AutoTodoService` creates individual TODOs per finding (with dedup and auto-close for resolved items)
   - Enable per workflow: `metadata: { autoTodo: { enabled: true, mode: "track" } }`
 
 ## Agent Instructions System
