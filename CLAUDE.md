@@ -10,6 +10,8 @@ WICHTIG: Dieser Abschnitt hat höchste Priorität. BEVOR du eine Datei änderst,
 2. **IN_PROGRESS setzen** — `PATCH /api/v1/todos/<id>/status` mit `{"status": "IN_PROGRESS", "sessionId": "$SHELL_SESSION_ID"}` — BEVOR die erste Datei geändert wird
 3. **Arbeiten** — Code ändern, testen, verifizieren
 4. **DONE setzen** — `PATCH /api/v1/todos/<id>/status` mit `{"status": "DONE", "sessionId": "$SHELL_SESSION_ID"}` — NACHDEM die Arbeit abgeschlossen ist
+5. **Dokumentation aktualisieren** — Falls nötig: CLAUDE.md, MEMORY.md oder andere Docs anpassen
+6. **Committen** — Änderungen mit `git commit` festschreiben (aussagekräftige Commit-Message, kein Push ohne explizite Aufforderung)
 
 ### Wann gilt das?
 
@@ -20,7 +22,7 @@ NEVER: Reine Informationsfragen oder triviale Antworten ohne Code-Änderung
 
 ```
 ❌ FALSCH: User fragt nach Änderung → sofort Datei editieren → fertig
-✅ RICHTIG: User fragt nach Änderung → TODO anlegen → IN_PROGRESS → Datei editieren → DONE
+✅ RICHTIG: User fragt nach Änderung → TODO anlegen → IN_PROGRESS → Datei editieren → DONE → Docs aktualisieren → committen
 ```
 
 ### API-Key auslesen
