@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { X, Send, Play, Eye, Sparkles, Clock, Plus, Trash2, ArrowLeft, MessageCircle } from 'lucide-react';
+import { X, Send, Play, Eye, Sparkles, Clock, Plus, Trash2, ArrowLeft, MessageCircle, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import { useAssistantStore } from '../stores/assistantStore';
 import { useAssistantChat, useAssistantSuggestions, type ChatMessage, type AssistantAction } from '../hooks/useAssistant';
 import { useAssistantThinkingPhrases } from '../hooks/useSystem';
@@ -111,19 +111,45 @@ function MarkdownLink({ href, children, onNavigate }: {
   );
 }
 
-function MessageBubble({ msg, onClose, onSend, onExecute }: {
+const COLLAPSE_THRESHOLD = 300;
+
+function formatTime(ts?: number) {
+  if (!ts) return null;
+  const d = new Date(ts);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function formatResponseTime(ms?: number) {
+  if (ms == null) return null;
+  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
+}
+
+function MessageBubble({ msg, onClose, onSend, onExecute, onRetry }: {
   msg: ChatMessage;
   onClose: () => void;
   onSend?: (text: string) => void;
   onExecute?: (workflowId: string) => void;
+  onRetry?: () => void;
 }) {
   const navigate = useNavigate();
   const isUser = msg.role === 'user';
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!isUser && contentRef.current) {
+      setIsOverflowing(contentRef.current.scrollHeight > COLLAPSE_THRESHOLD);
+    }
+  }, [msg.content, isUser]);
 
   const handleNavigate = (path: string) => {
     navigate(path);
     onClose();
   };
+
+  const time = formatTime(msg.timestamp);
+  const respTime = formatResponseTime(msg.responseTimeMs);
 
   return (
     <div className={`flex gap-2 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -141,35 +167,76 @@ function MessageBubble({ msg, onClose, onSend, onExecute }: {
 
       <div className={`flex flex-col gap-1 max-w-[85%] ${isUser ? 'items-end' : 'items-start'}`}>
         {/* Bubble */}
-        <div className={`px-3 py-2 rounded-2xl text-sm leading-relaxed
+        <div className={`relative px-3 py-2 rounded-2xl text-sm leading-relaxed
                          ${isUser
                            ? 'bg-accent text-white rounded-tr-sm whitespace-pre-wrap'
-                           : 'bg-[var(--color-assistant-raised)] border border-[var(--color-assistant-border)] text-text rounded-tl-sm'
+                           : msg.isError
+                             ? 'bg-[var(--color-assistant-raised)] border border-danger/50 text-text rounded-tl-sm'
+                             : 'bg-[var(--color-assistant-raised)] border border-[var(--color-assistant-border)] text-text rounded-tl-sm'
                          }`}>
           {isUser ? (
             msg.content
           ) : (
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={{
-                a: ({ href, children }) => (
-                  <MarkdownLink href={href} onNavigate={handleNavigate}>{children}</MarkdownLink>
-                ),
-                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-0.5">{children}</ul>,
-                ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-0.5">{children}</ol>,
-                li: ({ children }) => <li className="text-sm">{children}</li>,
-                strong: ({ children }) => <strong className="font-semibold text-text">{children}</strong>,
-                code: ({ children }) => (
-                  <code className="px-1 py-0.5 rounded text-xs bg-black/20 font-mono">{children}</code>
-                ),
-                pre: ({ children }) => (
-                  <pre className="mt-1 mb-2 p-2 rounded-lg bg-black/20 text-xs font-mono overflow-x-auto">{children}</pre>
-                ),
-              }}
-            >
-              {msg.content}
-            </ReactMarkdown>
+            <div className="relative">
+              <div
+                ref={contentRef}
+                className={!expanded && isOverflowing ? 'max-h-[300px] overflow-hidden' : undefined}
+              >
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    a: ({ href, children }) => (
+                      <MarkdownLink href={href} onNavigate={handleNavigate}>{children}</MarkdownLink>
+                    ),
+                    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                    ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-0.5">{children}</ul>,
+                    ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-0.5">{children}</ol>,
+                    li: ({ children }) => <li className="text-sm">{children}</li>,
+                    strong: ({ children }) => <strong className="font-semibold text-text">{children}</strong>,
+                    code: ({ children }) => (
+                      <code className="px-1 py-0.5 rounded text-xs bg-black/20 font-mono">{children}</code>
+                    ),
+                    pre: ({ children }) => (
+                      <pre className="mt-1 mb-2 p-2 rounded-lg bg-black/20 text-xs font-mono overflow-x-auto max-h-[200px] overflow-y-auto">{children}</pre>
+                    ),
+                    table: ({ children }) => (
+                      <div className="overflow-x-auto my-2 -mx-1">
+                        <table className="text-xs border-collapse min-w-full">{children}</table>
+                      </div>
+                    ),
+                    th: ({ children }) => (
+                      <th className="px-2 py-1 border border-border/30 text-left font-semibold bg-black/10">{children}</th>
+                    ),
+                    td: ({ children }) => (
+                      <td className="px-2 py-1 border border-border/30">{children}</td>
+                    ),
+                  }}
+                >
+                  {msg.content}
+                </ReactMarkdown>
+              </div>
+              {/* Gradient overlay + expand button */}
+              {isOverflowing && !expanded && (
+                <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[var(--color-assistant-raised)] to-transparent flex items-end justify-center pb-1">
+                  <button
+                    onClick={() => setExpanded(true)}
+                    className="flex items-center gap-1 text-[11px] text-accent hover:text-accent-hover font-medium"
+                  >
+                    <ChevronDown className="w-3.5 h-3.5" />
+                    Mehr anzeigen
+                  </button>
+                </div>
+              )}
+              {isOverflowing && expanded && (
+                <button
+                  onClick={() => setExpanded(false)}
+                  className="flex items-center gap-1 text-[11px] text-accent hover:text-accent-hover font-medium mt-1"
+                >
+                  <ChevronUp className="w-3.5 h-3.5" />
+                  Weniger anzeigen
+                </button>
+              )}
+            </div>
           )}
         </div>
 
@@ -182,14 +249,24 @@ function MessageBubble({ msg, onClose, onSend, onExecute }: {
           </div>
         )}
 
-        {/* Response time */}
-        {!isUser && msg.responseTimeMs != null && (
-          <span className="text-[10px] text-text-tertiary ml-1">
-            {msg.responseTimeMs >= 1000
-              ? `${(msg.responseTimeMs / 1000).toFixed(1)}s`
-              : `${msg.responseTimeMs}ms`}
-          </span>
+        {/* Error retry button */}
+        {msg.isError && onRetry && (
+          <button
+            onClick={onRetry}
+            className="flex items-center gap-1 text-[11px] text-danger hover:text-danger/80 font-medium mt-0.5"
+          >
+            <RefreshCw className="w-3 h-3" />
+            Erneut versuchen
+          </button>
         )}
+
+        {/* Timestamp + response time */}
+        <span className="text-[10px] text-text-tertiary ml-1">
+          {time}
+          {!isUser && respTime && (
+            <>{time ? ' · ' : ''}{respTime}</>
+          )}
+        </span>
       </div>
     </div>
   );
@@ -476,7 +553,7 @@ export function AssistantPanel() {
       sessionId = startNewSession();
     }
 
-    const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: text };
+    const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: text, timestamp: Date.now() };
     appendMessage(sessionId, userMsg);
 
     const currentSession = useAssistantStore.getState().sessions.find((s) => s.id === sessionId);
@@ -495,6 +572,7 @@ export function AssistantPanel() {
             content: res.message,
             actions: res.actions,
             responseTimeMs: res.responseTimeMs ?? undefined,
+            timestamp: Date.now(),
           });
         },
         onError: () => {
@@ -502,6 +580,8 @@ export function AssistantPanel() {
             id: crypto.randomUUID(),
             role: 'assistant',
             content: 'Entschuldigung, ein Fehler ist aufgetreten. Bitte versuche es erneut.',
+            timestamp: Date.now(),
+            isError: true,
           });
         },
       }
@@ -661,8 +741,18 @@ export function AssistantPanel() {
                 <EmptyState page={ctx.page ?? 'dashboard'} onSuggestionClick={setInput} inputRef={inputRef} />
               )}
 
-              {messages.map((msg) => (
-                <MessageBubble key={msg.id} msg={msg} onClose={() => setOpen(false)} onSend={handleSendText} onExecute={handleExecute} />
+              {messages.map((msg, idx) => (
+                <MessageBubble
+                  key={msg.id}
+                  msg={msg}
+                  onClose={() => setOpen(false)}
+                  onSend={handleSendText}
+                  onExecute={handleExecute}
+                  onRetry={msg.isError ? () => {
+                    const lastUserMsg = messages.slice(0, idx).reverse().find(m => m.role === 'user');
+                    if (lastUserMsg) handleSendText(lastUserMsg.content);
+                  } : undefined}
+                />
               ))}
 
               {isPending && <TypingIndicator />}

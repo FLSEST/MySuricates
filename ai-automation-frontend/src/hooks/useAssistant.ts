@@ -41,6 +41,8 @@ export interface ChatMessage {
   content: string;
   actions?: AssistantAction[];
   responseTimeMs?: number;
+  timestamp?: number;
+  isError?: boolean;
 }
 
 export function useAssistantChat() {
