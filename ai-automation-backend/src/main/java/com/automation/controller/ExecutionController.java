@@ -11,6 +11,7 @@ import com.automation.executor.ApprovalRequest;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.workflow.WorkflowExecutor;
+import com.automation.service.workflow.WorkflowService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -30,6 +31,7 @@ import java.util.Map;
 public class ExecutionController {
 
     private final WorkflowExecutor workflowExecutor;
+    private final WorkflowService workflowService;
     private final WorkflowRunRepository runRepository;
     private final WorkflowMapper workflowMapper;
     private final AutoTodoService autoTodoService;
@@ -105,7 +107,8 @@ public class ExecutionController {
     public ResponseEntity<WorkflowRunResponse> retryExecution(@PathVariable String id) {
         var run = runRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Execution", id));
-        var newRun = workflowExecutor.execute(run.getWorkflow(), run.getInputContext());
+        var workflow = workflowService.findByIdEager(run.getWorkflow().getId());
+        var newRun = workflowExecutor.execute(workflow, run.getInputContext());
         return ResponseEntity.ok(workflowMapper.toRunResponse(newRun));
     }
 

@@ -42,6 +42,7 @@ public class AutoTodoService {
     private final TodoRepository todoRepository;
     private final StepResultRepository stepResultRepository;
     private final GateStatusResolver gateStatusResolver;
+    private final TodoSimilarityService similarityService;
     private final ProjectPathResolver projectPathResolver;
     private final AppSettingsRepository appSettingsRepository;
     private final WorkflowRunRepository workflowRunRepository;
@@ -139,28 +140,69 @@ public class AutoTodoService {
             tags.add(compositeTag);
             String tagsJson = TodoMapper.listToJson(tags);
 
+            String itemDescription = map.get("description") != null
+                    ? String.valueOf(map.get("description")) : null;
+            String fullDescription = buildGranularDescription(itemDescription, event);
+
             if (existing.isPresent()) {
+                // Same workflow, same item hash — update in place
                 Todo todo = existing.get();
+                todo.setDescription(fullDescription);
                 todo.setWorkflowRunId(event.getRunId());
                 todo.setPriority(priority);
                 todo.setTags(tagsJson);
                 todoRepository.save(todo);
                 log.debug("Auto-todo (granular) updated: {}", title);
             } else {
-                Todo todo = Todo.builder()
-                        .title(title)
-                        .status(Todo.Status.OPEN)
-                        .priority(priority)
-                        .tags(tagsJson)
-                        .projectId(projectId)
-                        .source(Todo.Source.WORKFLOW)
-                        .sourceAgent(SOURCE_AGENT)
-                        .workflowRunId(event.getRunId())
-                        .referenceType(REFERENCE_TYPE)
-                        .referenceId(event.getWorkflowId())
-                        .build();
-                todoRepository.save(todo);
-                log.info("Auto-todo (granular) created: {}", title);
+                // Check for similar TODOs across ALL sources (cross-source dedup)
+                List<TodoSimilarityService.SimilarTodo> similar =
+                        similarityService.findSimilar(projectId, title, null);
+
+                TodoSimilarityService.SimilarTodo sameMatch = similar.stream()
+                        .filter(s -> s.similarity() == TodoSimilarityService.Similarity.SAME)
+                        .findFirst().orElse(null);
+
+                if (sameMatch != null) {
+                    // Merge into existing TODO — append update entry
+                    Todo existingTodo = sameMatch.todo();
+                    String updateEntry = String.format("\n\n### Update %s\n*%s (Run `%s`)*\n%s",
+                            java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")),
+                            event.getWorkflowName(), event.getRunId(),
+                            itemDescription != null ? itemDescription : title);
+                    String mergedDescription = (existingTodo.getDescription() != null ? existingTodo.getDescription() : "")
+                            + updateEntry;
+                    existingTodo.setDescription(mergedDescription);
+                    existingTodo.setWorkflowRunId(event.getRunId());
+                    // Upgrade priority if new finding is more severe
+                    if (priority.ordinal() < existingTodo.getPriority().ordinal()) {
+                        existingTodo.setPriority(priority);
+                    }
+                    todoRepository.save(existingTodo);
+                    log.info("Auto-todo (granular) merged into existing '{}': {}", existingTodo.getTitle(), title);
+                } else {
+                    // No similar TODO found — create new
+                    TodoSimilarityService.SimilarTodo relatedMatch = similar.stream()
+                            .filter(s -> s.similarity() == TodoSimilarityService.Similarity.RELATED)
+                            .findFirst().orElse(null);
+
+                    Todo todo = Todo.builder()
+                            .title(title)
+                            .description(fullDescription)
+                            .status(Todo.Status.OPEN)
+                            .priority(priority)
+                            .tags(tagsJson)
+                            .projectId(projectId)
+                            .source(Todo.Source.WORKFLOW)
+                            .sourceAgent(SOURCE_AGENT)
+                            .workflowRunId(event.getRunId())
+                            .referenceType(REFERENCE_TYPE)
+                            .referenceId(event.getWorkflowId())
+                            .relatedTodoId(relatedMatch != null ? relatedMatch.todo().getId() : null)
+                            .build();
+                    todoRepository.save(todo);
+                    log.info("Auto-todo (granular) created: {}{}", title,
+                            relatedMatch != null ? " (related to: " + relatedMatch.todo().getTitle() + ")" : "");
+                }
             }
         }
 
@@ -180,6 +222,16 @@ public class AutoTodoService {
         }
 
         log.info("Auto-todo (granular): created/updated {} items for workflow {}", currentTitles.size(), event.getWorkflowName());
+    }
+
+    private String buildGranularDescription(String itemDescription, WorkflowRunCompletedEvent event) {
+        StringBuilder sb = new StringBuilder();
+        if (itemDescription != null && !itemDescription.isBlank()) {
+            sb.append(itemDescription);
+        }
+        sb.append("\n\n---\n*Workflow: ").append(event.getWorkflowName())
+                .append(" | Run: `").append(event.getRunId()).append("`*");
+        return sb.toString();
     }
 
     private void handleApprovalMode(WorkflowRunCompletedEvent event, GateResult gate, List<String> targetProjectIds) {

@@ -10,11 +10,13 @@ import java.util.regex.Pattern;
  * Parses todo_item markers from block output text.
  * Stateless utility — no Spring component.
  * <p>
- * Format: {@code todo_item: <title> | <priority> | <tags>}
+ * Format: {@code todo_item: <title> | <priority> | <tags> | <description>}
+ * <p>
+ * The description (4th field) is optional for backwards compatibility.
  * <p>
  * Example:
  * <pre>
- * todo_item: ChainExecutor vollständig testen | HIGH | backend,testing
+ * todo_item: ChainExecutor testen | HIGH | backend,testing | 160-LOC Execution-Loop ungetestet. Siehe: docs/REPORT.md#1
  * todo_item: useWebSocket Hook testen | MEDIUM | frontend,testing
  * </pre>
  * <p>
@@ -24,15 +26,12 @@ public final class TodoOutputParser {
 
     private TodoOutputParser() {}
 
-    public record ParsedTodoItem(String title, String priority, List<String> tags) {}
+    public record ParsedTodoItem(String title, String priority, List<String> tags, String description) {}
 
-    // Line-anchored pattern, tolerant of:
-    // - Markdown headings (###), bold (**), backticks (`)
-    // - Hyphens (todo-item) and underscores (todo_item)
-    // - Priority: HIGH, MEDIUM, LOW (case-insensitive)
-    // - Tags: comma-separated
+    // Line-anchored pattern with optional 4th description field:
+    // Group 1: title, Group 2: priority, Group 3: tags, Group 4: description (optional)
     private static final Pattern TODO_PATTERN = Pattern.compile(
-            "^(?:#{1,6}\\s+)?[*`]*todo[_-]item[*`]*:\\s*(.+?)\\s*\\|\\s*(HIGH|MEDIUM|LOW)\\s*\\|\\s*(.+?)\\s*$",
+            "^(?:#{1,6}\\s+)?[*`]*todo[_-]item[*`]*:\\s*(.+?)\\s*\\|\\s*(HIGH|MEDIUM|LOW)\\s*\\|\\s*(.+?)(?:\\s*\\|\\s*(.+?))?\\s*$",
             Pattern.MULTILINE | Pattern.CASE_INSENSITIVE);
 
     /**
@@ -56,18 +55,16 @@ public final class TodoOutputParser {
                     .map(String::trim)
                     .filter(s -> !s.isEmpty())
                     .toList();
+            String description = matcher.group(4) != null ? cleanMarkdown(matcher.group(4).trim()) : null;
 
             if (!title.isEmpty()) {
-                items.add(new ParsedTodoItem(title, priority, tags));
+                items.add(new ParsedTodoItem(title, priority, tags, description));
             }
         }
 
         return items;
     }
 
-    /**
-     * Strips common markdown formatting from parsed values.
-     */
     private static String cleanMarkdown(String text) {
         return text.replaceAll("[*`]", "").trim();
     }

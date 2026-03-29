@@ -16,13 +16,12 @@ import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
 import type { WorkflowChain, CreateChainRequest, UpdateChainRequest, ChainEntryRequest, ChainTemplate } from '../types';
 
 function StatusBadge({ status }: { status: string }) {
-  const variant = status === 'COMPLETED' ? 'success'
-    : status === 'COMPLETED_WITH_ERRORS' ? 'warning'
+  const variant = (status === 'COMPLETED' || status === 'COMPLETED_WITH_ERRORS') ? 'success'
     : status === 'FAILED' ? 'danger'
     : status === 'RUNNING' ? 'accent'
     : status === 'CANCELLED' ? 'warning'
     : 'default';
-  const label = status === 'COMPLETED_WITH_ERRORS' ? 'Partial' : status;
+  const label = status === 'COMPLETED_WITH_ERRORS' ? 'Completed' : status;
   return <Badge variant={variant} dot>{label}</Badge>;
 }
 

@@ -8,6 +8,7 @@ import com.automation.dto.response.TodoCountResponse;
 import com.automation.dto.response.TodoResponse;
 import com.automation.mapper.TodoMapper;
 import com.automation.service.todo.TodoService;
+import com.automation.service.todo.TodoSimilarityService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -23,6 +24,7 @@ public class TodoController {
 
     private final TodoService todoService;
     private final TodoMapper todoMapper;
+    private final TodoSimilarityService similarityService;
 
     @GetMapping
     public PageResponse<TodoResponse> listTodos(
@@ -71,4 +73,24 @@ public class TodoController {
     public TodoCountResponse countTodos() {
         return todoService.count();
     }
+
+    /**
+     * Check for similar TODOs before creating a new one.
+     * Frontend calls this to offer merge/link options to the user.
+     */
+    @GetMapping("/similar")
+    public List<SimilarTodoResponse> findSimilar(
+            @RequestParam String projectId,
+            @RequestParam String title) {
+        return similarityService.findSimilar(projectId, title, null).stream()
+                .map(s -> new SimilarTodoResponse(
+                        s.todo().getId(),
+                        s.todo().getTitle(),
+                        s.todo().getPriority().name(),
+                        s.keywordScore(),
+                        s.similarity().name()))
+                .toList();
+    }
+
+    record SimilarTodoResponse(String id, String title, String priority, double score, String similarity) {}
 }

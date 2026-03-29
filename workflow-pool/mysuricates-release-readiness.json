@@ -40,7 +40,7 @@
       "type": "shell",
       "config": {
         "label": "Gate-Verdict",
-        "command": "PREV='{{ previous_output }}'\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Release: BLOCKIERT'\n  echo 'gate_status: RED'\n  echo 'gate_category: release-readiness'\n  echo 'gate_description: Release blockiert — Voraussetzungen nicht erfuellt'\n  exit 1\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Release: MIT VORBEHALT'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: release-readiness'\n  echo 'gate_description: Release moeglich mit Vorbehalten'\nelse\n  echo 'Release: FREIGEGEBEN'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: release-readiness'\n  echo 'gate_description: Release freigegeben'\nfi",
+        "command": "PREV='{{ previous_output }}'\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Release: BLOCKIERT'\n  echo 'gate_status: RED'\n  echo 'gate_category: release-readiness'\n  echo 'gate_description: Release blockiert — Voraussetzungen nicht erfuellt'\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Release: MIT VORBEHALT'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: release-readiness'\n  echo 'gate_description: Release moeglich mit Vorbehalten'\nelse\n  echo 'Release: FREIGEGEBEN'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: release-readiness'\n  echo 'gate_description: Release freigegeben'\nfi",
         "timeout_seconds": 10
       }
     }

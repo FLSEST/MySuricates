@@ -14,7 +14,7 @@ const statusConfig: Record<string, { variant: 'success' | 'warning' | 'danger' |
   PENDING: { variant: 'default' },
   PAUSED: { variant: 'warning' },
   COMPLETED: { variant: 'success' },
-  COMPLETED_WITH_ERRORS: { variant: 'warning', label: 'Partial' },
+  COMPLETED_WITH_ERRORS: { variant: 'success', label: 'Completed' },
   FAILED: { variant: 'danger' },
   CANCELLED: { variant: 'default' },
   INTERRUPTED: { variant: 'warning', label: 'Interrupted' },

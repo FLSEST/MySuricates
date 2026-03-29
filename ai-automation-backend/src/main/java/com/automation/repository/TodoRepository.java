@@ -37,6 +37,11 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
             String referenceId, Todo.Status status);
 
     /**
+     * Find TODOs by project and status (for similarity search across all sources).
+     */
+    List<Todo> findByProjectIdAndStatusIn(String projectId, List<Todo.Status> statuses);
+
+    /**
      * Find an open todo by referenceType and referenceId (source-agnostic).
      * Used for health check deduplication.
      */

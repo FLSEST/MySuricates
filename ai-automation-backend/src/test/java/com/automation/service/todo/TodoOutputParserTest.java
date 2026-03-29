@@ -10,37 +10,48 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TodoOutputParserTest {
 
     @Test
-    void parse_singleItem() {
+    void parse_withDescription() {
         List<ParsedTodoItem> items = TodoOutputParser.parse(
-                "todo_item: ChainExecutor vollständig testen | HIGH | backend,testing");
+                "todo_item: ChainExecutor testen | HIGH | backend,testing | 160-LOC Execution-Loop komplett ungetestet. Siehe: docs/REPORT.md#1");
         assertThat(items).hasSize(1);
-        assertThat(items.get(0).title()).isEqualTo("ChainExecutor vollständig testen");
+        assertThat(items.get(0).title()).isEqualTo("ChainExecutor testen");
         assertThat(items.get(0).priority()).isEqualTo("HIGH");
         assertThat(items.get(0).tags()).containsExactly("backend", "testing");
+        assertThat(items.get(0).description()).isEqualTo("160-LOC Execution-Loop komplett ungetestet. Siehe: docs/REPORT.md#1");
     }
 
     @Test
-    void parse_multipleItems() {
+    void parse_withoutDescription() {
+        List<ParsedTodoItem> items = TodoOutputParser.parse(
+                "todo_item: ChainExecutor testen | HIGH | backend,testing");
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).title()).isEqualTo("ChainExecutor testen");
+        assertThat(items.get(0).description()).isNull();
+    }
+
+    @Test
+    void parse_multipleItems_mixedDescriptions() {
         String output = """
                 Some report text here...
 
-                todo_item: ChainExecutor testen | HIGH | backend,testing
+                todo_item: ChainExecutor testen | HIGH | backend,testing | 160 LOC, Multi-Entry/stopOnFailure ungetestet
                 todo_item: useWebSocket Hook testen | MEDIUM | frontend,testing
-                todo_item: Plugin-System dokumentieren | LOW | documentation
+                todo_item: Plugin-System dokumentieren | LOW | documentation | Fehlt komplett. Siehe: docs/PLUGINS.md
                 """;
         List<ParsedTodoItem> items = TodoOutputParser.parse(output);
         assertThat(items).hasSize(3);
-        assertThat(items.get(0).priority()).isEqualTo("HIGH");
-        assertThat(items.get(1).priority()).isEqualTo("MEDIUM");
-        assertThat(items.get(2).priority()).isEqualTo("LOW");
+        assertThat(items.get(0).description()).isEqualTo("160 LOC, Multi-Entry/stopOnFailure ungetestet");
+        assertThat(items.get(1).description()).isNull();
+        assertThat(items.get(2).description()).startsWith("Fehlt komplett");
     }
 
     @Test
     void parse_caseInsensitive() {
         List<ParsedTodoItem> items = TodoOutputParser.parse(
-                "TODO_ITEM: Test schreiben | high | backend");
+                "TODO_ITEM: Test schreiben | high | backend | Wichtig fuer Stabilitaet");
         assertThat(items).hasSize(1);
         assertThat(items.get(0).priority()).isEqualTo("HIGH");
+        assertThat(items.get(0).description()).isEqualTo("Wichtig fuer Stabilitaet");
     }
 
     @Test
@@ -62,9 +73,9 @@ class TodoOutputParserTest {
     @Test
     void parse_markdownHeading() {
         List<ParsedTodoItem> items = TodoOutputParser.parse(
-                "### todo_item: InstanceSyncHelper testen | HIGH | backend,testing");
+                "### todo_item: InstanceSyncHelper testen | HIGH | backend,testing | 491 LOC ohne Tests");
         assertThat(items).hasSize(1);
-        assertThat(items.get(0).title()).isEqualTo("InstanceSyncHelper testen");
+        assertThat(items.get(0).description()).isEqualTo("491 LOC ohne Tests");
     }
 
     @Test
@@ -82,32 +93,21 @@ class TodoOutputParserTest {
 
                 Coverage is 25.8%.
 
-                ### Findings
-                | # | Class | Severity |
-                |---|-------|----------|
-                | 1 | ChainExecutor | CRITICAL |
-
                 ### Action Items
-                todo_item: ChainExecutor vollständig testen | HIGH | backend,testing
-                todo_item: ExecutionController testen | HIGH | backend,testing
-
-                ### Summary
-                10 findings total.
+                todo_item: ChainExecutor testen | HIGH | backend,testing | 160 LOC Execution-Loop
+                todo_item: ExecutionController testen | HIGH | backend,testing | 5 von 13 Endpoints ungetestet
 
                 gate_status: YELLOW
-                gate_category: test-coverage
                 """;
         List<ParsedTodoItem> items = TodoOutputParser.parse(output);
         assertThat(items).hasSize(2);
-        assertThat(items.get(0).title()).isEqualTo("ChainExecutor vollständig testen");
-        assertThat(items.get(1).title()).isEqualTo("ExecutionController testen");
+        assertThat(items.get(0).description()).isEqualTo("160 LOC Execution-Loop");
+        assertThat(items.get(1).description()).isEqualTo("5 von 13 Endpoints ungetestet");
     }
 
     @Test
     void parse_noItems_returnsEmpty() {
-        List<ParsedTodoItem> items = TodoOutputParser.parse(
-                "Some output without any todo markers");
-        assertThat(items).isEmpty();
+        assertThat(TodoOutputParser.parse("Some output without any todo markers")).isEmpty();
     }
 
     @Test
@@ -122,31 +122,28 @@ class TodoOutputParserTest {
 
     @Test
     void parse_invalidPriority_noMatch() {
-        List<ParsedTodoItem> items = TodoOutputParser.parse(
-                "todo_item: Something | CRITICAL | backend");
-        assertThat(items).isEmpty();
+        assertThat(TodoOutputParser.parse("todo_item: Something | CRITICAL | backend")).isEmpty();
     }
 
     @Test
     void parse_midLine_noMatch() {
-        List<ParsedTodoItem> items = TodoOutputParser.parse(
-                "The output has todo_item: Test | HIGH | backend in the middle");
-        assertThat(items).isEmpty();
+        assertThat(TodoOutputParser.parse("The output has todo_item: Test | HIGH | backend in the middle")).isEmpty();
     }
 
     @Test
     void parse_multipleTagsWithSpaces() {
         List<ParsedTodoItem> items = TodoOutputParser.parse(
-                "todo_item: Fix security issue | HIGH | security, backend, urgent");
+                "todo_item: Fix issue | HIGH | security, backend, urgent | CVE-2024-1234 betroffen");
         assertThat(items).hasSize(1);
         assertThat(items.get(0).tags()).containsExactly("security", "backend", "urgent");
+        assertThat(items.get(0).description()).isEqualTo("CVE-2024-1234 betroffen");
     }
 
     @Test
-    void parse_singleTag() {
+    void parse_descriptionWithSpecialChars() {
         List<ParsedTodoItem> items = TodoOutputParser.parse(
-                "todo_item: Update docs | LOW | documentation");
+                "todo_item: Fix auth | HIGH | security | XSS in <script>-Tags, CORS zu permissiv (*.example.com)");
         assertThat(items).hasSize(1);
-        assertThat(items.get(0).tags()).containsExactly("documentation");
+        assertThat(items.get(0).description()).contains("XSS");
     }
 }

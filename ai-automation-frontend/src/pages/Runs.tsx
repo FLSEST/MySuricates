@@ -90,7 +90,7 @@ export function Runs() {
   const statusOptions = [
     { value: '', label: t.runs.allStatuses },
     { value: 'COMPLETED', label: 'Completed' },
-    { value: 'COMPLETED_WITH_ERRORS', label: 'Partial' },
+    { value: 'COMPLETED_WITH_ERRORS', label: 'Completed (legacy)' },
     { value: 'FAILED', label: 'Failed' },
     { value: 'RUNNING', label: 'Running' },
     { value: 'CANCELLED', label: 'Cancelled' },

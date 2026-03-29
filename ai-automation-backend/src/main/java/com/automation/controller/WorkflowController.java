@@ -75,7 +75,7 @@ public class WorkflowController {
             @PathVariable String id,
             @RequestBody(required = false) ExecuteWorkflowRequest request) {
 
-        Workflow workflow = workflowService.findById(id);
+        Workflow workflow = workflowService.findByIdEager(id);
         Map<String, Object> context = request != null ? request.context() : Map.of();
 
         WorkflowRun run = workflowExecutor.execute(workflow, context);

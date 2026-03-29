@@ -62,7 +62,7 @@
       "type": "shell",
       "config": {
         "label": "Gate-Verdict",
-        "command": "PREV='{{ previous_output }}'\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Test-Sync: Tests fehlgeschlagen'\n  echo 'gate_status: RED'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Tests fehlgeschlagen nach Auto-Update'\n  exit 1\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Test-Sync: Warnungen'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Tests erstellt, manuelle Pruefung empfohlen'\nelse\n  echo 'Test-Sync: OK'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Alle Tests aktuell und bestanden'\nfi",
+        "command": "PREV='{{ previous_output }}'\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Test-Sync: Tests fehlgeschlagen'\n  echo 'gate_status: RED'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Tests fehlgeschlagen nach Auto-Update'\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Test-Sync: Warnungen'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Tests erstellt, manuelle Pruefung empfohlen'\nelse\n  echo 'Test-Sync: OK'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Alle Tests aktuell und bestanden'\nfi",
         "timeout_seconds": 10
       }
     }

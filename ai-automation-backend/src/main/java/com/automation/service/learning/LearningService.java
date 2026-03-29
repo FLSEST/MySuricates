@@ -91,7 +91,7 @@ public class LearningService {
         long totalWorkflows = workflowRepository.count();
         long totalRuns = runRepository.count();
         long successfulRuns = runRepository.countByStatus(RunStatus.COMPLETED)
-                + runRepository.countByStatus(RunStatus.COMPLETED_WITH_ERRORS);
+                + runRepository.countByStatus(RunStatus.COMPLETED_WITH_ERRORS); // legacy: old runs may still have this status
         long failedRuns = runRepository.countByStatus(RunStatus.FAILED);
         double successRate = totalRuns > 0 ? (double) successfulRuns / totalRuns : 0;
 

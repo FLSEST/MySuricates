@@ -68,6 +68,9 @@ public class Todo {
     @Column(name = "reference_id")
     private String referenceId;
 
+    @Column(name = "related_todo_id")
+    private String relatedTodoId;
+
     @CreatedDate
     @Column(updatable = false)
     private Instant createdAt;

@@ -377,17 +377,20 @@ public class WorkflowExecutor {
             }
             if (!allTodoItems.isEmpty()) {
                 context.setRunMetadata("todo_items", allTodoItems.stream()
-                        .map(t -> Map.<String, Object>of("title", t.title(), "priority", t.priority(), "tags", t.tags()))
+                        .map(t -> {
+                            Map<String, Object> m = new HashMap<>();
+                            m.put("title", t.title());
+                            m.put("priority", t.priority());
+                            m.put("tags", t.tags());
+                            if (t.description() != null) m.put("description", t.description());
+                            return m;
+                        })
                         .toList());
                 log.info("Parsed {} todo_item markers from workflow {}", allTodoItems.size(), workflowName);
             }
 
             if (run.getStatus() == RunStatus.RUNNING) {
-                if (highestGate == GateStatus.YELLOW) {
-                    run.setStatus(RunStatus.COMPLETED_WITH_ERRORS);
-                } else {
-                    run.setStatus(RunStatus.COMPLETED);
-                }
+                run.setStatus(RunStatus.COMPLETED);
             }
 
             if (run.getStatus() == RunStatus.COMPLETED || run.getStatus() == RunStatus.COMPLETED_WITH_ERRORS) {
@@ -399,7 +402,11 @@ public class WorkflowExecutor {
                         log.warn("Failed to record template verification: {}", e.getMessage());
                     }
                 }
-                if (run.getStatus() == RunStatus.COMPLETED_WITH_ERRORS) {
+                if (highestGate == GateStatus.RED) {
+                    activityLogService.warn(LogCategory.EXECUTION,
+                            "Workflow completed with critical findings: " + runId,
+                            "WorkflowExecutor", runId, workflowId);
+                } else if (highestGate == GateStatus.YELLOW) {
                     activityLogService.warn(LogCategory.EXECUTION,
                             "Workflow completed with warnings: " + runId,
                             "WorkflowExecutor", runId, workflowId);

@@ -34,7 +34,7 @@ interface FormState extends CreateScheduleRequest {
 function statusDot(status: RunStatus) {
   const colors: Record<string, string> = {
     COMPLETED: 'bg-success',
-    COMPLETED_WITH_ERRORS: 'bg-warning',
+    COMPLETED_WITH_ERRORS: 'bg-success',
     FAILED: 'bg-danger',
     INTERRUPTED: 'bg-danger',
     RUNNING: 'bg-accent',
