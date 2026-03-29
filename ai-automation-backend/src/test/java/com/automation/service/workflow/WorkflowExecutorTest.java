@@ -677,7 +677,7 @@ class WorkflowExecutorTest {
     }
 
     @Test
-    void execute_yellowGateStatus_setsCompletedWithErrors() {
+    void execute_yellowGateStatus_setsCompleted() {
         StepResult step = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED)
                 .output("Check done.\n\ngate_status: YELLOW\ngate_category: warnings\ngate_description: 2 minor issues")
@@ -692,7 +692,7 @@ class WorkflowExecutorTest {
         workflowExecutor.execute(testWorkflow, null);
 
         WorkflowRun saved = captureLastSavedRun();
-        assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED_WITH_ERRORS);
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
         assertThat(saved.getMetadata()).containsEntry("gate_status", "YELLOW");
         assertThat(saved.getMetadata()).containsEntry("gate_category", "warnings");
     }
@@ -752,7 +752,7 @@ class WorkflowExecutorTest {
         workflowExecutor.execute(testWorkflow, null);
 
         WorkflowRun saved = captureLastSavedRun();
-        assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED_WITH_ERRORS);
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
         assertThat(saved.getMetadata()).containsEntry("gate_status", "YELLOW");
         assertThat(saved.getMetadata()).containsEntry("gate_category", "lint");
     }
