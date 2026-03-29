@@ -21,7 +21,9 @@ import com.automation.service.cli.HostExecutionRequest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.mockito.ArgumentCaptor;
 
 @ExtendWith(MockitoExtension.class)
 class SimpleBlockExecutorTest {
@@ -96,5 +98,75 @@ class SimpleBlockExecutorTest {
         assertThatThrownBy(() -> executor.execute(block, context))
                 .isInstanceOf(WorkflowExecutionException.class)
                 .hasMessageContaining("command");
+    }
+
+    @Test
+    void execute_customTimeout_passedToRequest() {
+        StepResult expected = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        ArgumentCaptor<HostExecutionRequest> captor = ArgumentCaptor.forClass(HostExecutionRequest.class);
+        when(commandExecutor.executeStepOnHost(captor.capture())).thenReturn(expected);
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("simple")
+                .config(new HashMap<>(Map.of("command", "test", "timeout_seconds", 120)))
+                .build();
+
+        executor.execute(block, context);
+
+        assertThat(captor.getValue().timeoutSeconds()).isEqualTo(120);
+    }
+
+    @Test
+    void execute_noTimeout_passesNull() {
+        StepResult expected = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        ArgumentCaptor<HostExecutionRequest> captor = ArgumentCaptor.forClass(HostExecutionRequest.class);
+        when(commandExecutor.executeStepOnHost(captor.capture())).thenReturn(expected);
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("simple")
+                .config(new HashMap<>(Map.of("command", "test")))
+                .build();
+
+        executor.execute(block, context);
+
+        assertThat(captor.getValue().timeoutSeconds()).isNull();
+    }
+
+    @Test
+    void execute_passesProviderFromContext() {
+        context.setProvider("CODEX");
+        StepResult expected = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        ArgumentCaptor<HostExecutionRequest> captor = ArgumentCaptor.forClass(HostExecutionRequest.class);
+        when(commandExecutor.executeStepOnHost(captor.capture())).thenReturn(expected);
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("simple")
+                .config(new HashMap<>(Map.of("command", "test")))
+                .build();
+
+        executor.execute(block, context);
+
+        assertThat(captor.getValue().providerId()).isEqualTo("CODEX");
+    }
+
+    @Test
+    void execute_passesInstructionPrefix() {
+        context.setInstructionPrefix("You are a test agent");
+        StepResult expected = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        ArgumentCaptor<HostExecutionRequest> captor = ArgumentCaptor.forClass(HostExecutionRequest.class);
+        when(commandExecutor.executeStepOnHost(captor.capture())).thenReturn(expected);
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("simple")
+                .config(new HashMap<>(Map.of("command", "test")))
+                .build();
+
+        executor.execute(block, context);
+
+        assertThat(captor.getValue().systemPrompt()).isEqualTo("You are a test agent");
     }
 }

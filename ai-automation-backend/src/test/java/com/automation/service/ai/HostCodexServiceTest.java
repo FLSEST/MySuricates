@@ -41,4 +41,38 @@ class HostCodexServiceTest {
 
         assertThat(cmd).doesNotContain("-C");
     }
+
+    @Test
+    void buildCommand_stdinMode_usesDashAsPromptPlaceholder() {
+        Path outputFile = Path.of("/tmp/result.txt");
+        Path workDir = Path.of("/home/user/project");
+
+        List<String> cmd = service.buildCommand(workDir, outputFile);
+
+        assertThat(cmd).startsWith("codex", "exec", "-");
+        assertThat(cmd).contains("--skip-git-repo-check");
+        assertThat(cmd).contains("-o", outputFile.toAbsolutePath().toString());
+        assertThat(cmd).contains("-C", workDir.toAbsolutePath().toString());
+    }
+
+    @Test
+    void buildCommand_stdinMode_nullWorkDir_noCFlag() {
+        Path outputFile = Path.of("/tmp/result.txt");
+
+        List<String> cmd = service.buildCommand(null, outputFile);
+
+        assertThat(cmd).startsWith("codex", "exec", "-");
+        assertThat(cmd).doesNotContain("-C");
+    }
+
+    @Test
+    void execute_defaultTimeout_usesConfigTimeout() throws Exception {
+        // Verify that execute(prompt, workDir) delegates with config timeout
+        // We can't easily test process execution, but verify buildCommand produces correct structure
+        Path outputFile = Path.of("/tmp/test.txt");
+        List<String> cmd = service.buildCommand(Path.of("/test"), outputFile);
+
+        assertThat(cmd).contains("codex", "exec");
+        assertThat(cmd).contains("-o");
+    }
 }

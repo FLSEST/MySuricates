@@ -155,6 +155,95 @@ class LearningServiceTest {
         }
 
         @Test
+        void getWorkflowStats_allNullDurations_avgDurationIsZero() {
+            List<WorkflowRun> runs = List.of(
+                    createRun(RunStatus.COMPLETED, null, null),
+                    createRun(RunStatus.COMPLETED, null, null)
+            );
+            when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(runs);
+
+            Map<String, Object> stats = statsService.getWorkflowStats("wf-1");
+
+            assertThat(((Number) stats.get("avgDurationMs")).doubleValue()).isEqualTo(0.0);
+            assertThat(((Number) stats.get("minDurationMs")).longValue()).isEqualTo(0L);
+            assertThat(((Number) stats.get("maxDurationMs")).longValue()).isEqualTo(0L);
+        }
+
+        @Test
+        void getWorkflowStats_onlyOneRated_avgRatingIsExact() {
+            List<WorkflowRun> runs = List.of(
+                    createRun(RunStatus.COMPLETED, 1000L, 3),
+                    createRun(RunStatus.COMPLETED, 2000L, null)
+            );
+            when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(runs);
+
+            Map<String, Object> stats = statsService.getWorkflowStats("wf-1");
+
+            assertThat((double) stats.get("avgRating")).isCloseTo(3.0, within(0.01));
+            assertThat(stats.get("ratedRuns")).isEqualTo(1L);
+        }
+
+        @Test
+        void getOptimizationSuggestions_stepFailureHotspot_detected() {
+            StepResult failStep1 = createStep(0, "flaky-cmd", StepStatus.FAILED, 500L);
+            StepResult failStep2 = createStep(0, "flaky-cmd", StepStatus.FAILED, 600L);
+            StepResult okStep = createStep(0, "flaky-cmd", StepStatus.COMPLETED, 400L);
+
+            List<WorkflowRun> runs = List.of(
+                    createRunWithSteps(List.of(failStep1)),
+                    createRunWithSteps(List.of(failStep2)),
+                    createRunWithSteps(List.of(okStep))
+            );
+            when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(runs);
+
+            List<Map<String, Object>> suggestions = statsService.getOptimizationSuggestions("wf-1", insightsService, agenticService);
+
+            assertThat(suggestions).anySatisfy(s ->
+                    assertThat(s.get("type")).isEqualTo("STEP_FAILURE_HOTSPOT")
+            );
+        }
+
+        @Test
+        void getOptimizationSuggestions_slowStep_detected() {
+            // Step takes 40s avg, total workflow avg is 50s -> 80% of total (>50%)
+            StepResult slowStep = createStep(0, "slow-cmd", StepStatus.COMPLETED, 40_000L);
+            WorkflowRun run1 = createRunWithSteps(List.of(slowStep));
+            run1.setDurationMs(50_000L);
+            WorkflowRun run2 = createRunWithSteps(List.of(createStep(0, "slow-cmd", StepStatus.COMPLETED, 40_000L)));
+            run2.setDurationMs(50_000L);
+            WorkflowRun run3 = createRunWithSteps(List.of(createStep(0, "slow-cmd", StepStatus.COMPLETED, 40_000L)));
+            run3.setDurationMs(50_000L);
+
+            when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1"))
+                    .thenReturn(List.of(run1, run2, run3));
+
+            List<Map<String, Object>> suggestions = statsService.getOptimizationSuggestions("wf-1", insightsService, agenticService);
+
+            assertThat(suggestions).anySatisfy(s ->
+                    assertThat(s.get("type")).isEqualTo("SLOW_STEP")
+            );
+        }
+
+        @Test
+        void getOptimizationSuggestions_insightsThrow_gracefullyIgnored() {
+            List<WorkflowRun> runs = List.of(
+                    createRun(RunStatus.COMPLETED, 1000L, null),
+                    createRun(RunStatus.COMPLETED, 1000L, null),
+                    createRun(RunStatus.COMPLETED, 1000L, null)
+            );
+            when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(runs);
+
+            // Should not throw even if insights/agentic fail
+            ExecutionInsightsService failingInsights = mock(ExecutionInsightsService.class);
+            when(failingInsights.getExecutionInsights(any())).thenThrow(new RuntimeException("DB error"));
+
+            List<Map<String, Object>> suggestions = statsService.getOptimizationSuggestions("wf-1", failingInsights, agenticService);
+
+            // Should still return without cost-based suggestions
+            assertThat(suggestions).isNotNull();
+        }
+
+        @Test
         void getOptimizationSuggestions_highVariance_suggestsInvestigation() {
             List<WorkflowRun> runs = List.of(
                     createRun(RunStatus.COMPLETED, 1000L, null),
@@ -427,6 +516,147 @@ class LearningServiceTest {
             assertThat(analytics.get("achievedGoals")).isEqualTo(1L);
             assertThat((double) analytics.get("agenticSuccessRate")).isCloseTo(0.5, within(0.01));
             assertThat((double) analytics.get("avgIterationsToGoal")).isCloseTo(3.5, within(0.01));
+        }
+    }
+
+    @Nested
+    class AgenticToolPatternTests {
+
+        @Test
+        void getToolPatterns_noAgenticSteps_returnsEmptyPatterns() {
+            WorkflowRun run = createRunWithSteps(List.of(
+                    createStep(0, "npm test", StepStatus.COMPLETED, 1000L)
+            ));
+            when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of(run));
+
+            Map<String, Object> patterns = agenticService.getToolPatterns("wf-1");
+
+            assertThat(patterns.get("totalAgenticRuns")).isEqualTo(0);
+            assertThat((List<?>) patterns.get("topTools")).isEmpty();
+        }
+
+        @Test
+        void getToolPatterns_countsToolsByName() {
+            StepResult step = StepResult.builder()
+                    .stepIndex(0).status(StepStatus.COMPLETED).durationMs(1000L)
+                    .metadata(Map.of(
+                            "toolNames", List.of("Read", "Edit", "Read"),
+                            "blockType", "agentic", "costUsd", 0.01
+                    ))
+                    .build();
+
+            WorkflowRun run = createRunWithSteps(List.of(step));
+            when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of(run));
+
+            Map<String, Object> result = agenticService.getToolPatterns("wf-1");
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> topTools = (List<Map<String, Object>>) result.get("topTools");
+            assertThat(topTools).isNotEmpty();
+            // Read should have count 2, Edit count 1
+            assertThat(topTools.get(0).get("name")).isEqualTo("Read");
+            assertThat(topTools.get(0).get("count")).isEqualTo(2);
+        }
+
+        @Test
+        void getToolPatterns_findsBigramPatterns() {
+            // Same sequence [Read, Edit] appears twice -> should be detected
+            StepResult step1 = StepResult.builder()
+                    .stepIndex(0).status(StepStatus.COMPLETED).durationMs(1000L)
+                    .metadata(Map.of("toolNames", List.of("Read", "Edit")))
+                    .build();
+            StepResult step2 = StepResult.builder()
+                    .stepIndex(1).status(StepStatus.COMPLETED).durationMs(1000L)
+                    .metadata(Map.of("toolNames", List.of("Read", "Edit")))
+                    .build();
+
+            WorkflowRun run = createRunWithSteps(List.of(step1, step2));
+            when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of(run));
+
+            Map<String, Object> result = agenticService.getToolPatterns("wf-1");
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> patterns = (List<Map<String, Object>>) result.get("patterns");
+            assertThat(patterns).anySatisfy(p ->
+                    assertThat(p.get("pattern")).isEqualTo("Read -> Edit")
+            );
+        }
+
+        @Test
+        void getToolPatterns_patternsFilteredByMinOccurrence2() {
+            // Single occurrence should NOT appear in patterns
+            StepResult step = StepResult.builder()
+                    .stepIndex(0).status(StepStatus.COMPLETED).durationMs(1000L)
+                    .metadata(Map.of("toolNames", List.of("Unique1", "Unique2")))
+                    .build();
+
+            WorkflowRun run = createRunWithSteps(List.of(step));
+            when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of(run));
+
+            Map<String, Object> result = agenticService.getToolPatterns("wf-1");
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> patterns = (List<Map<String, Object>>) result.get("patterns");
+            assertThat(patterns).isEmpty();
+        }
+
+        @Test
+        void getToolPatterns_accumulatesCostFromAgenticSteps() {
+            StepResult step1 = StepResult.builder()
+                    .stepIndex(0).status(StepStatus.COMPLETED).durationMs(1000L)
+                    .metadata(Map.of("blockType", "agentic", "costUsd", 0.05))
+                    .build();
+            StepResult step2 = StepResult.builder()
+                    .stepIndex(1).status(StepStatus.COMPLETED).durationMs(1000L)
+                    .metadata(Map.of("blockType", "agentic", "costUsd", 0.03))
+                    .build();
+
+            WorkflowRun run = createRunWithSteps(List.of(step1, step2));
+            when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of(run));
+
+            Map<String, Object> result = agenticService.getToolPatterns("wf-1");
+
+            assertThat((double) result.get("totalCostUsd")).isCloseTo(0.08, within(0.001));
+            assertThat(result.get("totalAgenticRuns")).isEqualTo(2);
+        }
+    }
+
+    @Nested
+    class AgenticStrategyHistoryExtendedTests {
+
+        @Test
+        void getAgenticStrategyHistory_moreThan10_limitsTo10() {
+            List<StepResult> steps = new ArrayList<>();
+            for (int i = 0; i < 15; i++) {
+                steps.add(StepResult.builder()
+                        .stepIndex(i).status(StepStatus.COMPLETED).durationMs(1000L)
+                        .startedAt(java.time.Instant.now().minusSeconds(i * 60L))
+                        .metadata(Map.of("blockType", "agentic", "goal", "Goal " + i,
+                                "totalIterations", 1, "goalAchieved", true, "iterations", List.of()))
+                        .build());
+            }
+
+            WorkflowRun run = createRunWithSteps(steps);
+            when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of(run));
+
+            List<Map<String, Object>> history = agenticService.getAgenticStrategyHistory("wf-1");
+
+            assertThat(history).hasSize(10);
+        }
+
+        @Test
+        void getAgenticStrategyHistory_nullMetadata_filtered() {
+            StepResult step = StepResult.builder()
+                    .stepIndex(0).status(StepStatus.COMPLETED).durationMs(1000L)
+                    .metadata(null)
+                    .build();
+
+            WorkflowRun run = createRunWithSteps(List.of(step));
+            when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of(run));
+
+            List<Map<String, Object>> history = agenticService.getAgenticStrategyHistory("wf-1");
+
+            assertThat(history).isEmpty();
         }
     }
 
