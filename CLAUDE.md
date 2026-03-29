@@ -334,6 +334,20 @@ Injection paths:
 - For dual-mode blocks (shell/claude), `timeout_seconds` controls both the shell timeout and the Claude CLI timeout
 - Applies to both `reasonStructured()` and `executeAction()` calls in agentic blocks
 
+## CLI Concurrency & Chat Priority
+
+- `HostClaudeService` uses a **two-tier semaphore** system:
+  - `callSemaphore` (default: 5) — total concurrent CLI processes
+  - `backgroundSemaphore` (default: 4) — limit for non-interactive calls (workflows, suggestions)
+  - **Chat (priority) calls** only acquire `callSemaphore` → at least 1 slot always reserved
+  - **Background calls** acquire both → can never starve interactive chat
+- `HostExecutionRequest.priority(true)` marks a call as interactive (used by `AssistantService`)
+- `PageSuggestionService.cancelRunning()` interrupts running suggestion refresh when chat starts
+- Configurable at runtime via Settings UI (Execution tab) or `ExecutionSettingsService`:
+  - `claude-max-concurrent-calls` (1–20, default: 5)
+  - `claude-reserved-for-interactive` (0–10, default: 1)
+- Suggestions model independently configurable via `suggestions-model` app setting
+
 ## Agentic Block Safety
 
 | Config Key | Default | Description |
