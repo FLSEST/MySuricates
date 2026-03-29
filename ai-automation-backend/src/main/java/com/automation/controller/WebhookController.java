@@ -7,6 +7,7 @@ import com.automation.entity.WebhookTrigger;
 import com.automation.entity.WorkflowRun;
 import com.automation.mapper.WebhookMapper;
 import com.automation.mapper.WorkflowMapper;
+import com.automation.security.WebhookRateLimiter;
 import com.automation.service.webhook.WebhookService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -26,6 +27,7 @@ public class WebhookController {
     private final WebhookService webhookService;
     private final WebhookMapper webhookMapper;
     private final WorkflowMapper workflowMapper;
+    private final WebhookRateLimiter webhookRateLimiter;
 
     // --- Management endpoints ---
 
@@ -78,7 +80,11 @@ public class WebhookController {
     public ResponseEntity<WorkflowRunResponse> triggerWebhook(
             @PathVariable String token,
             @RequestHeader HttpHeaders headers,
-            @RequestBody(required = false) Map<String, Object> payload) {
+            @RequestBody(required = false) Map<String, Object> payload,
+            HttpServletRequest request) {
+        if (!webhookRateLimiter.tryAcquire(request)) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
+        }
         WorkflowRun run = webhookService.trigger(token, payload, headers);
         return ResponseEntity.ok(workflowMapper.toRunResponse(run));
     }

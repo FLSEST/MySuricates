@@ -10,6 +10,7 @@ import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.WebhookMapper;
 import com.automation.mapper.WorkflowMapper;
+import com.automation.security.WebhookRateLimiter;
 import com.automation.service.system.ApiKeyService;
 import com.automation.service.webhook.WebhookService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -60,6 +61,9 @@ class WebhookControllerTest {
     @MockBean
     private ApiKeyService apiKeyService;
 
+    @MockBean
+    private WebhookRateLimiter webhookRateLimiter;
+
     private Workflow testWorkflow;
     private WebhookTrigger testWebhook;
     private WebhookTriggerResponse testResponse;
@@ -91,6 +95,7 @@ class WebhookControllerTest {
         );
 
         when(webhookMapper.toResponse(any(WebhookTrigger.class))).thenReturn(testResponse);
+        when(webhookRateLimiter.tryAcquire(any())).thenReturn(true);
     }
 
     @Test

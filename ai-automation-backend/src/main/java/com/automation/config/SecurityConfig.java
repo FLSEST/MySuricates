@@ -39,6 +39,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll()
                 )
+                .headers(headers -> headers
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(
+                                "default-src 'self'; script-src 'self'; connect-src 'self' ws://localhost:* wss://localhost:*; style-src 'self' 'unsafe-inline'; img-src 'self' data:"))
+                        .frameOptions(fo -> fo.deny()))
                 .addFilterBefore(apiKeyAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

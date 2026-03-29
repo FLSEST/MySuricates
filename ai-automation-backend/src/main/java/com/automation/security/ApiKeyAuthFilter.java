@@ -59,11 +59,24 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
                 activityLogService.warn(LogCategory.SECURITY,
                         "Authentication failed: invalid API key for " + request.getRequestURI(),
                         "ApiKeyAuthFilter", null);
+            } else if (isProtectedPath(request.getRequestURI())) {
+                activityLogService.warn(LogCategory.SECURITY,
+                        "Authentication failed: no API key provided for " + request.getRequestURI(),
+                        "ApiKeyAuthFilter", null);
             }
             // Let Spring Security handle unauthenticated request
             // (will return 403 for protected endpoints, pass through for public ones)
             filterChain.doFilter(request, response);
         }
+    }
+
+    private boolean isProtectedPath(String uri) {
+        return uri != null
+                && uri.startsWith("/api/")
+                && !uri.equals("/api/v1/system/health")
+                && !uri.equals("/api/v1/system/info")
+                && !uri.equals("/api/v1/system/auth-status")
+                && !uri.startsWith("/api/v1/webhook/trigger/");
     }
 
     private boolean constantTimeEquals(String a, String b) {

@@ -1,9 +1,12 @@
 package com.automation.service.cli;
 
+import com.automation.entity.ActivityLog.LogCategory;
+import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.cli.ShellCommandService.ShellResult;
 import com.automation.util.HostProcessUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
@@ -23,6 +26,10 @@ import java.util.concurrent.TimeUnit;
 public class ContainerShellService {
 
     private final HostProcessUtils hostProcessUtils;
+    private final ActivityLogService activityLogService;
+
+    @Value("${automation.execution.allow-docker-socket-mount:false}")
+    private boolean allowDockerSocketMount;
 
     /**
      * Execute a command inside an ephemeral container.
@@ -37,7 +44,20 @@ public class ContainerShellService {
                                String containerImage, boolean mountDockerSocket) {
         long start = System.currentTimeMillis();
 
-        List<String> dockerCmd = buildDockerCommand(command, projectPath, containerImage, mountDockerSocket);
+        boolean effectiveMount = mountDockerSocket && allowDockerSocketMount;
+        if (mountDockerSocket && !allowDockerSocketMount) {
+            log.warn("Docker socket mount requested but denied by server policy (automation.execution.allow-docker-socket-mount=false)");
+            activityLogService.warn(LogCategory.SECURITY,
+                    "Docker socket mount denied by server policy for image: " + containerImage,
+                    "ContainerShellService", null);
+        }
+        if (effectiveMount) {
+            activityLogService.warn(LogCategory.SECURITY,
+                    "Docker socket mounted for container execution (image: " + containerImage + ")",
+                    "ContainerShellService", null);
+        }
+
+        List<String> dockerCmd = buildDockerCommand(command, projectPath, containerImage, effectiveMount);
 
         log.debug("Container shell execute (image: {}, workDir: {}, timeout: {}s): {}",
                 containerImage, projectPath, timeoutSeconds,

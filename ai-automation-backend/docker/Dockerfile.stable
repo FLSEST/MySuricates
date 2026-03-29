@@ -1,9 +1,9 @@
 FROM eclipse-temurin:21-jre-jammy
 
-ARG HOST_USER=flo
+ARG HOST_USER
 ARG HOST_UID=1000
 ARG HOST_GID=1000
-ARG HOST_HOME=/home/flo
+ARG HOST_HOME
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \

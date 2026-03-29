@@ -156,8 +156,8 @@ public class CliSession implements Closeable {
     }
 
     EnrichedCommandResult executeOneOffEnriched(String command, String model, String systemPrompt) throws IOException {
-        List<String> cmd = new ArrayList<>(List.of("docker", "exec", containerId,
-                "claude", "-p", command,
+        List<String> cmd = new ArrayList<>(List.of("docker", "exec", "-i", containerId,
+                "claude", "-p",
                 "--output-format", "stream-json", "--verbose"));
         if (model != null && !model.isBlank()) {
             cmd.add("--model");
@@ -180,6 +180,11 @@ public class CliSession implements Closeable {
 
         Process proc = pb.start();
         try {
+            // Write prompt via stdin to avoid command-line injection and E2BIG errors
+            try (OutputStream stdin = proc.getOutputStream()) {
+                stdin.write(command.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                stdin.flush();
+            }
             String rawOutput = new String(proc.getInputStream().readAllBytes()).trim();
             boolean finished = proc.waitFor(READ_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
             if (!finished) {

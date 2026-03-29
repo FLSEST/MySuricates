@@ -68,8 +68,8 @@ public class WebhookService {
                 .build();
 
         WebhookTrigger saved = webhookRepository.save(webhook);
-        log.info("Created webhook trigger: {} for workflow {} (token: {}...)",
-                saved.getId(), workflowId, token.substring(0, 8));
+        log.info("Created webhook trigger: {} for workflow {}",
+                saved.getId(), workflowId);
         activityLogService.info(LogCategory.WEBHOOK, "Webhook created for workflow: " + workflow.getName(), "WebhookService", saved.getId());
         return saved;
     }

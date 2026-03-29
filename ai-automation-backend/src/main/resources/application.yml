@@ -73,7 +73,7 @@ automation:
     api-key: ${AUTOMATION_API_KEY:}
     trusted-proxies: ${AUTOMATION_TRUSTED_PROXIES:127.0.0.1,::1}
     rate-limit:
-      enabled: ${AUTOMATION_RATE_LIMIT_ENABLED:false}
+      enabled: ${AUTOMATION_RATE_LIMIT_ENABLED:true}
       requests-per-minute: ${AUTOMATION_RATE_LIMIT_RPM:120}
   tailscale:
     enabled: ${AUTOMATION_TAILSCALE_ENABLED:false}
@@ -87,6 +87,7 @@ automation:
     workflow-timeout-minutes: ${AUTOMATION_CHAIN_WORKFLOW_TIMEOUT:180}
   execution:
     max-concurrent: ${AUTOMATION_MAX_CONCURRENT_RUNS:10}
+    allow-docker-socket-mount: ${AUTOMATION_ALLOW_DOCKER_SOCKET_MOUNT:false}
   summarization:
     base-dir: ${AUTOMATION_SUMMARIZATION_DIR:${user.home}/.autotrigger/summarization}
     timeout-seconds: ${AUTOMATION_SUMMARIZATION_TIMEOUT:120}
