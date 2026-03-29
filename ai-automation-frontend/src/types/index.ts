@@ -58,7 +58,7 @@ export interface Container {
 
 export interface AutoTodoConfig {
   enabled: boolean;
-  mode?: 'auto' | 'approval';
+  mode?: 'auto' | 'approval' | 'track';
   priority?: TodoPriority;
   tags?: string[];
 }
@@ -171,6 +171,7 @@ export interface BlockDefinition {
   type: BlockType;
   config: Record<string, unknown>;
   requiredCapabilities?: string[];
+  skillIds?: string[];
 }
 
 export interface WorkflowExportData {
@@ -181,6 +182,8 @@ export interface WorkflowExportData {
   instructions?: string;
   model?: string;
   version?: string;
+  defaultContext?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
   exportedAt?: string;
 }
 

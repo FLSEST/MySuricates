@@ -69,11 +69,24 @@ MySuricates supports 12 block types. Each block has a `type` and a `config` map.
 
 In addition to its type-specific config fields, every block also supports these common properties:
 
-| Config Key | Type | Default | Description |
+| Field | Type | Default | Description |
 |---|---|---|---|
 | `on_failure` | string | `"stop"` | Behavior on failure: `"stop"` (terminate workflow) or `"continue"` (proceed with next block) |
+| `skillIds` | string[] | `[]` | Optional list of skill IDs activated for this block (additive to workflow-level skills) |
 
 **Default behavior**: When a block fails (status `FAILED`), the workflow stops and the run is marked as `FAILED`. With `"on_failure": "continue"`, the workflow proceeds with the next block.
+
+**Per-block skills**: Blocks can activate additional skills via the `skillIds` field. These are merged with the workflow-level `activatedSkills` before execution and restored to the baseline after the block completes. This allows individual blocks to use specialized skills without affecting other blocks.
+
+```json
+{
+  "type": "simple",
+  "config": {
+    "command": "Analyze the code for security vulnerabilities"
+  },
+  "skillIds": ["builtin-code-review", "builtin-security-analyzer"]
+}
+```
 
 ---
 

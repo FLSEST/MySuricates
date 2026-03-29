@@ -183,7 +183,7 @@ Alle Workflows auflisten.
     "description": "Automatisiertes Code Review",
     "icon": "🔍",
     "blocks": [
-      { "type": "simple", "config": { "prompt": "Review code" }, "requiredCapabilities": [] }
+      { "type": "simple", "config": { "prompt": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
     ],
     "version": "1.0.0",
     "metadata": {},
@@ -207,7 +207,7 @@ Neuen Workflow erstellen.
   "description": "Automatisiertes Code Review",
   "icon": "🔍",
   "blocks": [
-    { "type": "simple", "config": { "prompt": "Review code" }, "requiredCapabilities": [] }
+    { "type": "simple", "config": { "prompt": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
   ],
   "activatedSkillIds": ["skill-uuid-1"]
 }
@@ -228,6 +228,15 @@ Neuen Workflow erstellen.
 | `metadata` | Object | Nein |
 | `defaultContext` | Object | Nein |
 | `version` | String | Nein |
+
+**BlockDefinition-Felder:**
+
+| Feld | Typ | Pflicht | Beschreibung |
+|---|---|---|---|
+| `type` | String | Ja | Block-Typ (simple, shell, agentic, ...) |
+| `config` | Object | Ja | Typ-spezifische Konfiguration |
+| `requiredCapabilities` | String[] | Nein | Benoetigte Capabilities |
+| `skillIds` | String[] | Nein | Skill-IDs die zusaetzlich zu Workflow-Skills fuer diesen Block aktiviert werden (additiv) |
 
 **Response:** `201` mit `WorkflowResponse`
 
@@ -272,7 +281,7 @@ Workflow als portables JSON exportieren (ohne IDs, ohne Projekt-Zuordnung).
   "description": "Automatisiertes Code Review",
   "icon": "🔍",
   "blocks": [
-    { "type": "simple", "config": { "prompt": "Review code" }, "requiredCapabilities": [] }
+    { "type": "simple", "config": { "prompt": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
   ],
   "instructions": null,
   "model": null,
@@ -294,7 +303,7 @@ Workflow aus JSON importieren (exportiertes Format + Zielprojekt).
   "description": "Automatisiertes Code Review",
   "icon": "🔍",
   "blocks": [
-    { "type": "simple", "config": { "prompt": "Review code" }, "requiredCapabilities": [] }
+    { "type": "simple", "config": { "prompt": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
   ],
   "instructions": null,
   "model": null,

@@ -175,6 +175,22 @@ public class SystemController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/vacuum")
+    public ResponseEntity<Map<String, Object>> vacuumDatabase() {
+        long startTime = System.currentTimeMillis();
+        try (var conn = dataSource.getConnection(); var stmt = conn.createStatement()) {
+            stmt.execute("VACUUM");
+            long durationMs = System.currentTimeMillis() - startTime;
+            log.info("Full VACUUM completed in {} ms", durationMs);
+            return ResponseEntity.ok(Map.of("status", "completed", "durationMs", durationMs));
+        } catch (Exception e) {
+            log.error("VACUUM failed: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body(Map.of(
+                    "status", "failed",
+                    "error", e.getMessage() != null ? e.getMessage() : e.getClass().getName()));
+        }
+    }
+
     @GetMapping("/backup")
     public ResponseEntity<Resource> backupDatabase() throws IOException {
         Path backupPath = databaseBackupService.createBackup();

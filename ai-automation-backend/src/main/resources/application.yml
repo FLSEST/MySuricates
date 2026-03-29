@@ -10,7 +10,7 @@ spring:
       minimum-idle: 1
       connection-timeout: 120000  # 120s (default: 30s) — safety net for pool-size=1 contention during concurrent workflow runs
       connection-test-query: SELECT 1
-      connection-init-sql: "PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 30000;"
+      connection-init-sql: "PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 30000; PRAGMA auto_vacuum = INCREMENTAL;"
 
   jpa:
     database-platform: org.hibernate.community.dialect.SQLiteDialect

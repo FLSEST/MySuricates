@@ -33,7 +33,7 @@
       "config": {
         "label": "Security-Analyse (Opus)",
         "timeout_seconds": 900,
-        "command": "Fuehre ein Security-Audit des MySuricates-Projekts durch basierend auf:\n\n{{ previous_output }}\n\nKontext: MySuricates ist eine lokal laufende AI-Workflow-Plattform (nicht oeffentlich im Internet). Nutzer-Auth via API-Key (auto-generiert). Laeuft hinter Tailscale VPN.\n\nPruefe systematisch nach OWASP Top 10:\n\n1. **Injection (SQL/Command)**: Native Queries, ProcessBuilder-Nutzung, String-Konkatenation in SQL\n2. **Broken Authentication**: API-Key-Handling, Session-Management, Default-Credentials\n3. **Sensitive Data Exposure**: Secrets in Code/Config, API-Keys in Logs, unverschluesselte Kommunikation\n4. **XML External Entities (XXE)**: XML-Parser-Konfiguration\n5. **Broken Access Control**: Endpoints ohne Auth, fehlende Autorisierung (kann jeder API-Key alles?)\n6. **Security Misconfiguration**: CORS zu permissiv, fehlende Security-Headers, Debug-Endpoints aktiv\n7. **XSS**: dangerouslySetInnerHTML, unescaped User-Input im Frontend\n8. **Insecure Deserialization**: Jackson-Config, untypisierte Deserialisierung\n9. **Known Vulnerabilities**: npm audit Findings, veraltete Dependencies\n10. **Insufficient Logging**: Werden Security-Events geloggt? Login-Versuche, API-Key-Nutzung?\n\nBEKANNTE/AKZEPTIERTE PATTERNS (kein Finding):\n- ProcessBuilder fuer Claude CLI Host-Execution (beabsichtigt, Kernfunktion)\n- SQLite single-writer (HikariCP pool-size=1, dokumentiert)\n- API-Key in localStorage (SPA-Pattern, lokal genutztes Tool)\n- Tailscale-Netzwerk als aeussere Schutzschicht\n\nPro Finding: Schweregrad (CRITICAL/HIGH/MEDIUM/LOW), betroffene Datei(en), konkreter Fix-Vorschlag.\nSei EXTREM praezise — melde NUR echte Risiken, keine theoretischen Probleme bei einem lokalen Tool."
+        "command": "Fuehre ein Security-Audit des MySuricates-Projekts durch basierend auf:\n\n{{ previous_output }}\n\nKontext: MySuricates ist eine lokal laufende AI-Workflow-Plattform (nicht oeffentlich im Internet). Nutzer-Auth via API-Key (auto-generiert). Laeuft hinter Tailscale VPN.\n\nPruefe systematisch nach OWASP Top 10:\n\n1. **Injection (SQL/Command)**: Native Queries, ProcessBuilder-Nutzung, String-Konkatenation in SQL\n2. **Broken Authentication**: API-Key-Handling, Session-Management, Default-Credentials\n3. **Sensitive Data Exposure**: Secrets in Code/Config, API-Keys in Logs, unverschluesselte Kommunikation\n4. **XML External Entities (XXE)**: XML-Parser-Konfiguration\n5. **Broken Access Control**: Endpoints ohne Auth, fehlende Autorisierung (kann jeder API-Key alles?)\n6. **Security Misconfiguration**: CORS zu permissiv, fehlende Security-Headers, Debug-Endpoints aktiv\n7. **XSS**: dangerouslySetInnerHTML, unescaped User-Input im Frontend\n8. **Insecure Deserialization**: Jackson-Config, untypisierte Deserialisierung\n9. **Known Vulnerabilities**: npm audit Findings, veraltete Dependencies\n10. **Insufficient Logging**: Werden Security-Events geloggt? Login-Versuche, API-Key-Nutzung?\n\nBEKANNTE/AKZEPTIERTE PATTERNS (kein Finding):\n- ProcessBuilder fuer Claude CLI Host-Execution (beabsichtigt, Kernfunktion)\n- SQLite single-writer (HikariCP pool-size=1, dokumentiert)\n- API-Key in localStorage (SPA-Pattern, lokal genutztes Tool)\n- Tailscale-Netzwerk als aeussere Schutzschicht\n\nPro Finding: Schweregrad (CRITICAL/HIGH/MEDIUM/LOW), betroffene Datei(en), konkreter Fix-Vorschlag.\nSei EXTREM praezise — melde NUR echte Risiken, keine theoretischen Probleme bei einem lokalen Tool.\n\nAm Ende des Reports: Liste ALLE HIGH und CRITICAL Findings als todo_item-Zeilen.\nFormat (EXAKT einhalten, eine Zeile pro Finding):\ntodo_item: <Titel im Imperativ> | HIGH oder MEDIUM | <tags kommasepariert>\n\nBeispiele:\ntodo_item: ChainExecutor vollstaendig testen | HIGH | backend,testing\ntodo_item: useWebSocket Hook testen | MEDIUM | frontend,testing"
       }
     },
     {
@@ -42,20 +42,6 @@
         "label": "Security-Report erstellen",
         "timeout_seconds": 900,
         "command": "Erstelle den Security-Audit-Report fuer MySuricates:\n\n{{ previous_output }}\n\n## Format:\n\n### Executive Summary\n- Gesamtrisiko-Bewertung: NIEDRIG / MITTEL / HOCH / KRITISCH\n- Anzahl Findings nach Schweregrad\n- Top-3 dringendste Massnahmen\n\n### OWASP Scorecard\n| Kategorie | Status | Findings | Dringendster Fund |\n|-----------|--------|----------|-------------------|\n| Injection | OK/WARN/FAIL | | |\n| Authentication | | | |\n| Data Exposure | | | |\n| Access Control | | | |\n| Misconfiguration | | | |\n| XSS | | | |\n| Dependencies | | | |\n\n### Findings Detail\nPro Finding: Beschreibung, Risk-Rating, betroffene Dateien, Empfohlener Fix, Aufwand.\n\n### Dependency-Vulnerabilities\nAus npm audit und Maven: CVE-Nummern, betroffene Pakete, Fix-Versionen.\n\ngate_status: GREEN wenn keine CRITICAL/HIGH, YELLOW wenn HIGH vorhanden, RED wenn CRITICAL"
-      }
-    },
-    {
-      "type": "agentic",
-      "config": {
-        "label": "Security-TODOs erstellen",
-        "goal": "Erstelle oder aktualisiere TODOs basierend auf den Security-Findings aus {{ previous_output }}.\n\nVORGEHEN:\n1. API-Key lesen:\n   python3 -c \"import sqlite3; conn = sqlite3.connect('/home/flo/Entwicklung/tools/autotrigger/ai-automation-backend/data/automation.db'); c = conn.cursor(); c.execute(\\\"SELECT value FROM app_settings WHERE key = 'api-key'\\\"); print(c.fetchone()[0]); conn.close()\"\n\n2. Bestehende TODOs laden:\n   curl -s -H 'X-API-Key: <KEY>' 'http://localhost:9090/api/v1/todos?tag=audit:security&status=OPEN&status=IN_PROGRESS'\n\n3. Fuer jeden CRITICAL oder HIGH Finding:\n   a) Pruefen ob TODO existiert\n   b) Falls ja: aktualisieren (PATCH /api/v1/todos/<id>)\n   c) Falls nein: anlegen (POST /api/v1/todos) mit:\n      - title: \"Security: <kurze Beschreibung>\"\n      - description: Markdown mit OWASP-Kategorie, betroffene Dateien, Fix-Vorschlag\n      - priority: CRITICAL→HIGH, HIGH→HIGH (Security immer mindestens HIGH)\n      - tags: [\"audit:security\", \"security\", \"backend\" oder \"frontend\"]\n      - projectId: \"ebf4f50c-20c2-4c35-a84a-a0b350124523\"\n      - source: \"AI\"\n      - sourceAgent: \"quality-workflow\"\n\n4. Geloeste Security-TODOs → DONE setzen\n\nWICHTIG: Security-TODOs immer mindestens HIGH priority.\nWICHTIG: Absolute Pfade fuer DB.",
-        "max_iterations": 10,
-        "max_total_tokens": 150000,
-        "iteration_timeout_seconds": 120,
-        "total_timeout_seconds": 900,
-        "max_repeated_actions": 3,
-        "require_approval": false,
-        "success_criteria": "Alle CRITICAL/HIGH Security-Findings sind als TODOs angelegt."
       }
     },
     {
@@ -75,6 +61,12 @@
       }
     }
   ],
-  "version": "1.1.0",
-  "author": "MySuricates"
+  "version": "2.0.0",
+  "author": "MySuricates",
+  "metadata": {
+    "autoTodo": {
+      "enabled": true,
+      "mode": "track"
+    }
+  }
 }

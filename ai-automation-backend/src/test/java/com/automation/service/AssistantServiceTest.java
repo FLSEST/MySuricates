@@ -11,11 +11,15 @@ import com.automation.repository.WishRepository;
 import com.automation.repository.WorkflowMemoryRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.chain.ChainService;
 import com.automation.service.cli.CliSession;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
+import com.automation.service.pool.WorkflowPoolService;
+import com.automation.service.project.ProjectContextService;
 import com.automation.service.system.SystemIdentityService;
 import com.automation.service.todo.TodoService;
+import com.automation.service.workflow.WorkflowService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,6 +48,10 @@ class AssistantServiceTest {
     @Mock private SystemIdentityService systemIdentity;
     @Mock private AppSettingsRepository appSettingsRepository;
     @Mock private TodoService todoService;
+    @Mock private WorkflowService workflowService;
+    @Mock private ChainService chainService;
+    @Mock private WorkflowPoolService workflowPoolService;
+    @Mock private ProjectContextService projectContextService;
 
     private AssistantService service;
 
@@ -53,7 +61,8 @@ class AssistantServiceTest {
                 commandExecutorService, workflowRunRepository, todoRepository, todoService,
                 scheduledWorkflowRepository, projectRepository, wishRepository,
                 workflowRepository, workflowMemoryRepository, assistantSessionRepository,
-                systemIdentity, new ObjectMapper(), appSettingsRepository
+                systemIdentity, new ObjectMapper(), appSettingsRepository,
+                workflowService, chainService, workflowPoolService, projectContextService
         );
         // Benign defaults so context building doesn't blow up
         when(systemIdentity.getVersion()).thenReturn("0.4.3-TEST");

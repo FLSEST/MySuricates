@@ -328,13 +328,24 @@ Alle Claude-CLI-Aufrufe erfolgen auf dem Host (nicht im Container):
 - `HostClaudeService.reasonStructured()` — REASON-Phase, nutzt `--system-prompt`, `--max-turns 3`, kein Modell-Flag
 - Prompt wird via **stdin** an den Prozess geschrieben (`writePromptToStdin()`) — vermeidet Linux ARG_MAX-Limit
 - `CLAUDE_CODE` und `CLAUDECODE` Umgebungsvariablen werden aus dem Prozess-Environment entfernt (verhindert Nested-Session-Fehler)
-- `CommandExecutorService` bietet `executeOnHost(HostExecutionRequest)` / `executeStepOnHost(HostExecutionRequest)` / `injectSkillContextOnHost()` — alle Overloads nutzen die `HostExecutionRequest`-Builder-API
+- `CommandExecutorService` bietet `executeOnHost(HostExecutionRequest)` / `executeStepOnHost(HostExecutionRequest)` / `writeSkillContextToProject()` — alle Overloads nutzen die `HostExecutionRequest`-Builder-API
+- Skill-Kontext wird dateibasiert injiziert: `writeSkillContextToProject()` schreibt `.claude/rules/skills-context.md` ins Projektverzeichnis (ersetzt die alte CLI-prozessbasierte Methode `injectSkillContextOnHost()`)
 
 ## Provider Routing
 
 Alle Block-Executors (simple, retry, conditional, forEach, while, switch, skill-capability) leiten `context.getProvider()` als `providerId` via `HostExecutionRequest.builder()` an den `CommandExecutorService` weiter. Das Setzen von `"provider": "CODEX"` in einem Workflow-JSON gilt damit für jeden nicht-Shell-Block-Typ.
 
 `AiProviderRegistry.resolve()` fällt auf den konfigurierten Standard-Provider zurück (nicht hardcodiertes CLAUDE), wenn eine unbekannte Provider-ID übergeben wird.
+
+## Per-Block Skills
+
+Blöcke können über das `skillIds`-Feld eigene Skills mitbringen, die additiv zu den Workflow-Level-Skills gelten:
+
+- `BlockDefinition.skillIds` — optionale Liste von Skill-IDs, die nur für diesen Block aktiviert werden
+- `WorkflowExecutor` merged Workflow-Level-Skills + Block-Level-Skills vor jeder Block-Ausführung
+- Nach der Block-Ausführung wird der Baseline-Skill-Zustand wiederhergestellt
+- Skill-Kontext wird dateibasiert über `.claude/rules/skills-context.md` im Projektverzeichnis bereitgestellt (`CommandExecutorService.writeSkillContextToProject()`)
+- Frontend: Skill-Picker-Toggles in den Add/Edit-Block-Modals, Zap-Icon-Indikator auf `SortableBlock`
 
 ## Model Selection
 

@@ -10,7 +10,7 @@
   "icon": "🚉",
   "category": "CUSTOM",
   "tags": ["deploy", "hunt", "cloudflare", "sync"],
-  "context": {
+  "defaultContext": {
     "source_dir": "/home/flo/Entwicklung/IdeaProjects/treasure_hunt_level/hunts/Bahnorte",
     "app_dir": "/home/flo/Entwicklung/IdeaProjects/Test_Deutsche_Geschichte_Deutschlandticket",
     "dry_run": "false"

@@ -10,6 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,6 +22,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class CommandExecutorService {
+
+    private static final String SKILLS_CONTEXT_FILE = ".claude/rules/skills-context.md";
 
     private final CliSessionManager sessionManager;
     private final ShellCommandService shellCommandService;
@@ -197,16 +201,47 @@ public class CommandExecutorService {
     }
 
     public void injectSkillContextOnHost(String projectPath, List<Skill> skills) {
+        writeSkillContextToProject(projectPath, skills);
+    }
+
+    /**
+     * Writes aggregated skill AI context to the project's .claude/rules/skills-context.md file.
+     * This file is automatically picked up by subsequent Claude CLI calls.
+     * Deletes the file when no skills are provided (cleanup).
+     */
+    public void writeSkillContextToProject(String projectPath, List<Skill> skills) {
+        if (projectPath == null || projectPath.isBlank()) {
+            log.debug("No project path — skipping skill context file write");
+            return;
+        }
+
+        Path contextFile = Path.of(projectPath, SKILLS_CONTEXT_FILE);
+
         if (skills == null || skills.isEmpty()) {
+            try {
+                Files.deleteIfExists(contextFile);
+            } catch (IOException e) {
+                log.warn("Failed to delete skill context file {}: {}", contextFile, e.getMessage());
+            }
             return;
         }
 
         String aggregatedContext = buildSkillContext(skills);
-        if (!aggregatedContext.isEmpty()) {
-            executeOnHost(HostExecutionRequest.builder()
-                    .projectPath(projectPath)
-                    .command(aggregatedContext)
-                    .build());
+        if (aggregatedContext.isEmpty()) {
+            try {
+                Files.deleteIfExists(contextFile);
+            } catch (IOException e) {
+                log.warn("Failed to delete skill context file {}: {}", contextFile, e.getMessage());
+            }
+            return;
+        }
+
+        try {
+            Files.createDirectories(contextFile.getParent());
+            Files.writeString(contextFile, aggregatedContext);
+            log.info("Wrote skill context ({} skills) to {}", skills.size(), contextFile);
+        } catch (IOException e) {
+            log.warn("Failed to write skill context file to {}: {}", contextFile, e.getMessage());
         }
     }
 

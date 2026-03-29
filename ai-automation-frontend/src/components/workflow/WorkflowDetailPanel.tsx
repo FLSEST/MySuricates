@@ -141,13 +141,14 @@ export function WorkflowDetailPanel({
             onChange={(e) =>
               updateWorkflow.mutate({
                 id: workflow.id,
-                data: { metadata: { autoTodo: { ...workflow.metadata?.autoTodo, mode: e.target.value as 'auto' | 'approval' } } },
+                data: { metadata: { autoTodo: { ...workflow.metadata?.autoTodo, mode: e.target.value as 'auto' | 'approval' | 'track' } } },
               })
             }
             className="w-full text-xs bg-surface border border-border rounded-md px-2 py-1.5 text-text focus:outline-none focus:ring-1 focus:ring-accent"
           >
             <option value="auto">{t.workflows.autoTodoModeAuto}</option>
             <option value="approval">{t.workflows.autoTodoModeApproval}</option>
+            <option value="track">{t.workflows.autoTodoModeTrack}</option>
           </select>
           <p className="text-xs text-text-tertiary">{t.workflows.autoTodoModeHint}</p>
         </div>

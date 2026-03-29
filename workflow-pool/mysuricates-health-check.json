@@ -70,6 +70,12 @@
       }
     }
   ],
-  "version": "1.1.0",
-  "author": "MySuricates"
+  "version": "2.0.0",
+  "author": "MySuricates",
+  "metadata": {
+    "autoTodo": {
+      "enabled": true,
+      "mode": "track"
+    }
+  }
 }

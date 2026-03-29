@@ -328,7 +328,9 @@ All Claude CLI calls are made on the host (not inside the container):
 - `HostClaudeService.reasonStructured()` — REASON phase, uses `--system-prompt`, `--max-turns 3`, no model flag
 - Prompt is written via **stdin** to the process (`writePromptToStdin()`) — avoids the Linux ARG_MAX limit
 - `CLAUDE_CODE` and `CLAUDECODE` environment variables are removed from the process environment (prevents nested session errors)
-- `CommandExecutorService` provides `executeOnHost(HostExecutionRequest)` / `executeStepOnHost(HostExecutionRequest)` / `injectSkillContextOnHost()` — all overloads use the `HostExecutionRequest` builder API
+- `CommandExecutorService` provides `executeOnHost(HostExecutionRequest)` / `executeStepOnHost(HostExecutionRequest)` / `writeSkillContextToProject()` — all overloads use the `HostExecutionRequest` builder API
+- Skill context injection is **file-based**: `writeSkillContextToProject()` writes a `.claude/rules/skills-context.md` file into the project directory (replacing the former CLI-process-based `injectSkillContextOnHost()`)
+- `WorkflowExecutor` supports **per-block skills**: before each block, workflow-level and block-level skills (from `BlockDefinition.skillIds`) are merged and written to the project; after the block completes, the baseline workflow-level skills are restored
 
 ## Provider Routing
 

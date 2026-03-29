@@ -265,6 +265,8 @@ export function useImportWorkflow() {
         blocks: data.blocks,
         instructions: data.instructions,
         model: data.model,
+        defaultContext: data.defaultContext,
+        metadata: data.metadata,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['workflows'] });

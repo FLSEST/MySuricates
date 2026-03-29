@@ -343,6 +343,29 @@ This overrides the Claude CLI timeout per block (default: global value from `aut
 
 Without `timeout_seconds`, the global default (`automation.host-claude.timeout-seconds`) applies.
 
+#### Block Property: `skillIds`
+
+All block types support an optional `skillIds` field on the `BlockDefinition` (not inside `config`). This activates additional skills for the block, additive to the workflow-level `activatedSkills`.
+
+```json
+{
+  "type": "simple",
+  "config": {
+    "command": "Analyze the code for security issues"
+  },
+  "skillIds": ["builtin-code-review", "builtin-security-analyzer"]
+}
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `type` | String | Yes | Block type (e.g. `simple`, `shell`, `agentic`) |
+| `config` | Object | Yes | Type-specific configuration |
+| `requiredCapabilities` | String[] | No | Required capabilities |
+| `skillIds` | String[] | No | Skill IDs activated for this block (additive to workflow skills) |
+
+Before each block executes, the workflow-level skills and the block's `skillIds` are merged. After the block completes, the baseline is restored so that per-block skills do not leak to subsequent blocks.
+
 **Response:** `201` with `WorkflowResponse`
 
 ### `POST /api/v1/workflows/{id}/execute`

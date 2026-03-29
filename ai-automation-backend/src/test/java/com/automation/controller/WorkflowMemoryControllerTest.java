@@ -96,9 +96,9 @@ class WorkflowMemoryControllerTest {
     }
 
     @Test
-    void activate_returns200() throws Exception {
+    void activate_returns204() throws Exception {
         mockMvc.perform(put("/api/v1/workflows/w-1/memory/m-1/activate"))
-                .andExpect(status().isOk());
+                .andExpect(status().isNoContent());
         verify(memoryService).activate("w-1", "m-1");
     }
 

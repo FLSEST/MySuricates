@@ -33,7 +33,7 @@
       "config": {
         "label": "Coverage-Analyse (Opus)",
         "timeout_seconds": 900,
-        "command": "Analysiere die Test-Coverage-Daten des MySuricates-Projekts:\n\n{{ previous_output }}\n\nBewerte systematisch:\n\n1. **Kritische Luecken (Backend)**:\n   - Controller ohne Tests: API-Contracts muessen getestet werden\n   - Services mit Business-Logik ohne Tests (besonders WorkflowExecutor, StagingService, ChainExecutor)\n   - Block-Executors ohne Tests (SimpleBlockExecutor, ShellBlockExecutor, AgenticBlockExecutor etc.)\n   - Security-Klassen ohne Tests (ApiKeyFilter, RateLimiting)\n\n2. **Kritische Luecken (Frontend)**:\n   - Hooks ohne Tests (useWorkflows, useWebSocket etc.)\n   - Komplexe Seiten ohne E2E-Tests\n\n3. **Duenne Tests**: Test-Dateien mit wenigen @Test-Methoden fuer grosse Klassen\n\n4. **Fehlende Test-Typen**: Nur Unit vs. auch Integration?\n\nFuer jeden Fund:\n- Datei/Klasse\n- Schweregrad: CRITICAL (Security, Core-Execution), HIGH (Business-Logik), MEDIUM (Utilities), LOW (DTOs, Config)\n- Was genau getestet werden sollte\n- Geschaetzter Aufwand (klein/mittel/gross)\n\nWICHTIG: Sei praezise. Melde nur Klassen die WIRKLICH keinen Test haben laut den Daten oben."
+        "command": "Analysiere die Test-Coverage-Daten des MySuricates-Projekts:\n\n{{ previous_output }}\n\nBewerte systematisch:\n\n1. **Kritische Luecken (Backend)**:\n   - Controller ohne Tests: API-Contracts muessen getestet werden\n   - Services mit Business-Logik ohne Tests (besonders WorkflowExecutor, StagingService, ChainExecutor)\n   - Block-Executors ohne Tests (SimpleBlockExecutor, ShellBlockExecutor, AgenticBlockExecutor etc.)\n   - Security-Klassen ohne Tests (ApiKeyFilter, RateLimiting)\n\n2. **Kritische Luecken (Frontend)**:\n   - Hooks ohne Tests (useWorkflows, useWebSocket etc.)\n   - Komplexe Seiten ohne E2E-Tests\n\n3. **Duenne Tests**: Test-Dateien mit wenigen @Test-Methoden fuer grosse Klassen\n\n4. **Fehlende Test-Typen**: Nur Unit vs. auch Integration?\n\nFuer jeden Fund:\n- Datei/Klasse\n- Schweregrad: CRITICAL (Security, Core-Execution), HIGH (Business-Logik), MEDIUM (Utilities), LOW (DTOs, Config)\n- Was genau getestet werden sollte\n- Geschaetzter Aufwand (klein/mittel/gross)\n\nWICHTIG: Sei praezise. Melde nur Klassen die WIRKLICH keinen Test haben laut den Daten oben.\n\nAm Ende des Reports: Liste ALLE HIGH und CRITICAL Findings als todo_item-Zeilen.\nFormat (EXAKT einhalten, eine Zeile pro Finding):\ntodo_item: <Titel im Imperativ> | HIGH oder MEDIUM | <tags kommasepariert>\n\nBeispiele:\ntodo_item: ChainExecutor vollstaendig testen | HIGH | backend,testing\ntodo_item: useWebSocket Hook testen | MEDIUM | frontend,testing"
       }
     },
     {
@@ -42,20 +42,6 @@
         "label": "Coverage-Report erstellen",
         "timeout_seconds": 900,
         "command": "Erstelle den Test-Coverage-Report fuer MySuricates:\n\n{{ previous_output }}\n\n## Format:\n\n### Executive Summary\n- Gesamt-Coverage-Ratio (Dateien mit Tests / Gesamt)\n- Anzahl kritisch untesteter Klassen\n- Bewertung der Test-Qualitaet (1-10)\n\n### Coverage-Matrix\n| Package | Source Files | Test Files | Coverage | Kritischste Luecke |\n|---------|-------------|-----------|---------|-------------------|\n| controller | | | | |\n| service | | | | |\n| executor | | | | |\n| security | | | | |\n| config | | | | |\n| (frontend) | | | | |\n\n### Top-10 Prioritaeten\n| # | Klasse | LOC | Schweregrad | Was testen | Aufwand |\n\n### Quick Wins\nKleine Klassen die mit wenig Aufwand getestet werden koennen.\n\n### Empfohlene Test-Strategie\nWelche Test-Typen fuer welche Module priorisiert werden sollten.\n\ngate_status: GREEN wenn Coverage > 60%, YELLOW wenn 30-60%, RED wenn < 30%"
-      }
-    },
-    {
-      "type": "agentic",
-      "config": {
-        "label": "TODOs erstellen/aktualisieren",
-        "goal": "Erstelle oder aktualisiere TODOs basierend auf den Test-Coverage-Findings aus {{ previous_output }}.\n\nVORGEHEN:\n1. API-Key aus der SQLite-Datenbank lesen:\n   python3 -c \"import sqlite3; conn = sqlite3.connect('/home/flo/Entwicklung/tools/autotrigger/ai-automation-backend/data/automation.db'); c = conn.cursor(); c.execute(\\\"SELECT value FROM app_settings WHERE key = 'api-key'\\\"); print(c.fetchone()[0]); conn.close()\"\n\n2. Bestehende TODOs mit Tag 'audit:test-coverage' laden:\n   curl -s -H 'X-API-Key: <KEY>' 'http://localhost:9090/api/v1/todos?tag=audit:test-coverage&status=OPEN&status=IN_PROGRESS'\n\n3. Fuer jeden CRITICAL oder HIGH Finding aus dem Coverage-Report:\n   a) Pruefen ob bereits ein offenes TODO mit aehnlichem Titel existiert\n   b) Falls ja: TODO-Beschreibung aktualisieren (PATCH /api/v1/todos/<id>)\n   c) Falls nein: Neues TODO anlegen (POST /api/v1/todos) mit:\n      - title: \"Test-Abdeckung: <Klasse/Bereich testen>\"\n      - description: Markdown mit Details, betroffene Dateien, was genau getestet werden soll\n      - priority: CRITICAL→HIGH, HIGH→MEDIUM\n      - tags: [\"audit:test-coverage\", \"backend\" oder \"frontend\", \"testing\"]\n      - projectId: \"ebf4f50c-20c2-4c35-a84a-a0b350124523\"\n      - source: \"AI\"\n      - sourceAgent: \"quality-workflow\"\n\n4. Bestehende TODOs mit Tag 'audit:test-coverage' die NICHT mehr in den Findings sind:\n   → Status auf DONE setzen (PATCH /api/v1/todos/<id>/status mit {\"status\": \"DONE\"})\n\nWICHTIG: Nur CRITICAL und HIGH Findings als TODOs. MEDIUM und LOW ignorieren.\nWICHTIG: API-Key im Header X-API-Key bei jedem curl-Aufruf.\nWICHTIG: Absolute Pfade fuer SQLite-DB: /home/flo/Entwicklung/tools/autotrigger/ai-automation-backend/data/automation.db",
-        "max_iterations": 10,
-        "max_total_tokens": 150000,
-        "iteration_timeout_seconds": 120,
-        "total_timeout_seconds": 900,
-        "max_repeated_actions": 3,
-        "require_approval": false,
-        "success_criteria": "Alle CRITICAL/HIGH Test-Coverage-Findings sind als TODOs angelegt oder aktualisiert."
       }
     },
     {
@@ -75,6 +61,12 @@
       }
     }
   ],
-  "version": "1.1.0",
-  "author": "MySuricates"
+  "version": "2.0.0",
+  "author": "MySuricates",
+  "metadata": {
+    "autoTodo": {
+      "enabled": true,
+      "mode": "track"
+    }
+  }
 }

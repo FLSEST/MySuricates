@@ -8,6 +8,7 @@ import com.automation.dto.response.PoolWorkflowEntry;
 import com.automation.entity.BlockDefinition;
 import com.automation.entity.Workflow;
 import com.automation.exception.ResourceNotFoundException;
+import com.automation.repository.ProjectRepository;
 import com.automation.service.workflow.WorkflowService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,6 +35,7 @@ public class WorkflowPoolService {
     private final WorkflowPoolConfig config;
     private final ObjectMapper objectMapper;
     private final WorkflowService workflowService;
+    private final ProjectRepository projectRepository;
 
     public List<PoolWorkflowEntry> listAll() {
         if (!config.isEnabled()) {
@@ -88,13 +90,23 @@ public class WorkflowPoolService {
                 : entry.name().getOrDefault("en", entry.name().values().iterator().next());
         String description = entry.description() != null ? entry.description().getOrDefault("en", "") : null;
 
+        // Auto-inject project_path from Project entity into defaultContext
+        Map<String, Object> mergedContext = entry.defaultContext() != null
+                ? new java.util.HashMap<>(entry.defaultContext()) : new java.util.HashMap<>();
+        projectRepository.findById(request.projectId()).ifPresent(project -> {
+            if (project.getPath() != null && !project.getPath().isBlank()
+                    && !mergedContext.containsKey("project_path")) {
+                mergedContext.put("project_path", project.getPath());
+            }
+        });
+
         if (!Boolean.TRUE.equals(request.forceCreate())) {
             Optional<Workflow> existing = workflowService.findByNameAndProjectId(resolvedName, request.projectId());
             if (existing.isPresent()) {
                 UpdateWorkflowRequest updateRequest = new UpdateWorkflowRequest(
                         resolvedName, description, entry.icon(), entry.blocks(),
                         entry.instructions(), entry.model(), null, null,
-                        entry.defaultContext()
+                        mergedContext
                 );
                 Workflow updated = workflowService.update(existing.get().getId(), updateRequest);
                 log.info("Updated pool workflow '{}' in-place: workflow '{}' ({})", poolId, updated.getName(), updated.getId());
@@ -113,8 +125,8 @@ public class WorkflowPoolService {
                 entry.model(),
                 null,
                 null,
-                null,
-                entry.defaultContext(),
+                entry.metadata(),
+                mergedContext,
                 entry.version()
         );
 
@@ -166,10 +178,15 @@ public class WorkflowPoolService {
                 ? (Map<String, Object>) raw.get("defaultContext")
                 : null;
 
+        @SuppressWarnings("unchecked")
+        Map<String, Object> metadata = raw.containsKey("metadata")
+                ? (Map<String, Object>) raw.get("metadata")
+                : null;
+
         return new PoolWorkflowEntry(
                 id, name, description, icon, category, tags,
                 blocks, instructions, model, version, author,
-                defaultContext, filename
+                defaultContext, metadata, filename
         );
     }
 

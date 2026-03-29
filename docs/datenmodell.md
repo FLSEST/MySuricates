@@ -876,9 +876,17 @@ Blöcke werden als JSON-Array in der `blocks`-Spalte der `workflows`-Tabelle ges
     "timeout_seconds": 300,
     "on_failure": "stop | continue"
   },
-  "requiredCapabilities": []
+  "requiredCapabilities": [],
+  "skillIds": ["builtin-code-review"]
 }
 ```
+
+| Feld | Typ | Beschreibung |
+|---|---|---|
+| `type` | string | Block-Typ (siehe unten) |
+| `config` | object | Typ-spezifische Konfiguration |
+| `requiredCapabilities` | string[] | Optional. Benötigte Capabilities |
+| `skillIds` | string[] | Optional. Skill-IDs die zusätzlich zu Workflow-Skills für diesen Block aktiviert werden (additiv) |
 
 **Typ-spezifische Config-Felder:**
 

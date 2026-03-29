@@ -22,6 +22,9 @@ public class BlockDefinition {
     @Builder.Default
     private List<String> requiredCapabilities = new ArrayList<>();
 
+    @Builder.Default
+    private List<String> skillIds = new ArrayList<>();
+
     public boolean shouldStopOnFailure() {
         Object onFailure = config.get("on_failure");
         return onFailure == null || "stop".equals(onFailure);

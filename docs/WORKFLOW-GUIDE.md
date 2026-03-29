@@ -73,7 +73,23 @@ Jeder Block unterstuetzt neben seinen typspezifischen Config-Feldern auch diese 
 |---|---|---|---|
 | `on_failure` | string | `"stop"` | Verhalten bei Fehler: `"stop"` (Workflow beenden) oder `"continue"` (mit naechstem Block fortfahren) |
 
+Zusaetzlich unterstuetzt jeder Block ein optionales Top-Level-Feld (nicht in `config`):
+
+| Feld | Typ | Default | Beschreibung |
+|---|---|---|---|
+| `skillIds` | string[] | `[]` | Skill-IDs die **zusaetzlich** zu den Workflow-Skills fuer diesen Block aktiviert werden |
+
 **Standard-Verhalten**: Wenn ein Block fehlschlaegt (Status `FAILED`), stoppt der Workflow und der Run wird als `FAILED` markiert. Mit `"on_failure": "continue"` faehrt der Workflow mit dem naechsten Block fort.
+
+**Per-Block Skills**: Bloecke koennen ueber `skillIds` eigene Skills mitbringen, die additiv zu den Workflow-Level-Skills gelten. Der `WorkflowExecutor` merged beide Listen vor der Ausfuehrung und stellt den Baseline-Zustand nach dem Block wieder her. Beispiel:
+
+```json
+{
+  "type": "simple",
+  "config": { "command": "Analysiere den Code auf Sicherheitsluecken" },
+  "skillIds": ["builtin-code-review", "builtin-security-analyzer"]
+}
+```
 
 ---
 

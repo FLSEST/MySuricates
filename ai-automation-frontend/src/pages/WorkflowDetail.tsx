@@ -16,7 +16,7 @@ import { WorkflowDetailModals } from '../components/workflow/WorkflowDetailModal
 import { CompletionTriggerSection } from '../components/workflow/CompletionTriggerSection';
 import { useT } from '../i18n';
 import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
-import type { BlockType, OptimizeResult, UpdateWorkflowRequest } from '../types';
+import type { BlockDefinition, BlockType, OptimizeResult, UpdateWorkflowRequest } from '../types';
 
 export function WorkflowDetail() {
   const { id } = useParams<{ id: string }>();
@@ -40,9 +40,10 @@ export function WorkflowDetail() {
   const [showAddBlock, setShowAddBlock] = useState(false);
   const [showEditBlock, setShowEditBlock] = useState(false);
   const [editBlockIndex, setEditBlockIndex] = useState<number>(-1);
-  const [editBlock, setEditBlock] = useState<{ type: BlockType; config: string }>({
+  const [editBlock, setEditBlock] = useState<{ type: BlockType; config: string; skillIds: string[] }>({
     type: 'simple',
     config: '{}',
+    skillIds: [],
   });
   const [showAddSkill, setShowAddSkill] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
@@ -51,9 +52,10 @@ export function WorkflowDetail() {
   const [optimizeResult, setOptimizeResult] = useState<OptimizeResult | null>(null);
   const [editInstructions, setEditInstructions] = useState('');
   const [editForm, setEditForm] = useState({ name: '', description: '', icon: '' });
-  const [newBlock, setNewBlock] = useState<{ type: BlockType; config: string }>({
+  const [newBlock, setNewBlock] = useState<{ type: BlockType; config: string; skillIds: string[] }>({
     type: 'simple',
     config: JSON.stringify({ command: '' }, null, 2),
+    skillIds: [],
   });
   const [selectedSkillId, setSelectedSkillId] = useState('');
   const [showExecuteDialog, setShowExecuteDialog] = useState(false);
@@ -120,13 +122,13 @@ export function WorkflowDetail() {
   const handleAddBlock = () => {
     try {
       const config = JSON.parse(newBlock.config);
-      const block = { type: newBlock.type, config };
+      const block: BlockDefinition = { type: newBlock.type, config, ...(newBlock.skillIds.length > 0 ? { skillIds: newBlock.skillIds } : {}) };
       updateWorkflow.mutate(
         { id: workflow.id, data: { blocks: [...workflow.blocks, block] } },
         {
           onSuccess: () => {
             setShowAddBlock(false);
-            setNewBlock({ type: 'simple', config: JSON.stringify({ command: '' }, null, 2) });
+            setNewBlock({ type: 'simple', config: JSON.stringify({ command: '' }, null, 2), skillIds: [] });
           },
         }
       );
@@ -144,7 +146,7 @@ export function WorkflowDetail() {
     const block = workflow.blocks[index];
     if (!block) return;
     setEditBlockIndex(index);
-    setEditBlock({ type: block.type, config: JSON.stringify(block.config, null, 2) });
+    setEditBlock({ type: block.type, config: JSON.stringify(block.config, null, 2), skillIds: block.skillIds ?? [] });
     setShowEditBlock(true);
   };
 
@@ -152,7 +154,7 @@ export function WorkflowDetail() {
     try {
       const config = JSON.parse(editBlock.config);
       const blocks = [...workflow.blocks];
-      blocks[editBlockIndex] = { type: editBlock.type, config };
+      blocks[editBlockIndex] = { type: editBlock.type, config, ...(editBlock.skillIds.length > 0 ? { skillIds: editBlock.skillIds } : {}) };
       updateWorkflow.mutate(
         { id: workflow.id, data: { blocks } },
         { onSuccess: () => setShowEditBlock(false) }
@@ -314,6 +316,7 @@ export function WorkflowDetail() {
         setNewBlock={setNewBlock}
         onAddBlock={handleAddBlock}
         allWorkflows={allWorkflows}
+        allSkills={allSkills ?? []}
         showEditBlock={showEditBlock}
         setShowEditBlock={setShowEditBlock}
         editBlockIndex={editBlockIndex}

@@ -5,6 +5,7 @@ import com.automation.entity.RunStatus;
 import com.automation.entity.Todo;
 import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.repository.AppSettingsRepository;
+import com.automation.repository.StepResultRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.service.todo.GateStatusResolver.GateResult;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,12 +38,16 @@ class AutoTodoServiceTest {
     private ProjectPathResolver projectPathResolver;
 
     @Mock
+    private StepResultRepository stepResultRepository;
+
+    @Mock
     private AppSettingsRepository appSettingsRepository;
 
     @InjectMocks
     private AutoTodoService autoTodoService;
 
     private static final Map<String, Object> AUTO_TODO_ENABLED_META = Map.of("autoTodo", Map.of("enabled", true));
+    private static final Map<String, Object> AUTO_TODO_TRACK_META = Map.of("autoTodo", Map.of("enabled", true, "mode", "track"));
 
     @Test
     void toggleDisabled_noTodoCreated() {
@@ -224,6 +229,85 @@ class AutoTodoServiceTest {
 
         verifyNoInteractions(todoRepository);
         verifyNoInteractions(appSettingsRepository);
+    }
+
+    @Test
+    void trackMode_greenGate_createsLowPriorityTodo() {
+        WorkflowRunCompletedEvent event = createEvent(RunStatus.COMPLETED, Map.of(), AUTO_TODO_TRACK_META);
+        when(gateStatusResolver.resolve(event))
+                .thenReturn(new GateResult(GateStatus.GREEN, "test-coverage", "Coverage 65%"));
+        when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(Optional.empty());
+        when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-1"))
+                .thenReturn(List.of());
+
+        autoTodoService.onWorkflowRunCompleted(event);
+
+        ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+        verify(todoRepository).save(captor.capture());
+        Todo todo = captor.getValue();
+        assertThat(todo.getPriority()).isEqualTo(Todo.Priority.LOW);
+        assertThat(todo.getTitle()).contains("test-coverage");
+    }
+
+    @Test
+    void trackMode_yellowGate_createsMediumPriorityTodo() {
+        WorkflowRunCompletedEvent event = createEvent(RunStatus.COMPLETED,
+                Map.of("gate_status", "YELLOW"), AUTO_TODO_TRACK_META);
+        when(gateStatusResolver.resolve(event))
+                .thenReturn(new GateResult(GateStatus.YELLOW, "architecture", "3 HIGH findings"));
+        when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(Optional.empty());
+        when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-1"))
+                .thenReturn(List.of());
+
+        autoTodoService.onWorkflowRunCompleted(event);
+
+        ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+        verify(todoRepository).save(captor.capture());
+        Todo todo = captor.getValue();
+        assertThat(todo.getPriority()).isEqualTo(Todo.Priority.MEDIUM);
+    }
+
+    @Test
+    void trackMode_redGate_createsHighPriorityTodo() {
+        WorkflowRunCompletedEvent event = createEvent(RunStatus.COMPLETED,
+                Map.of("gate_status", "RED"), AUTO_TODO_TRACK_META);
+        when(gateStatusResolver.resolve(event))
+                .thenReturn(new GateResult(GateStatus.RED, "security", "Critical vulnerability"));
+        when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(Optional.empty());
+        when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-1"))
+                .thenReturn(List.of());
+
+        autoTodoService.onWorkflowRunCompleted(event);
+
+        ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+        verify(todoRepository).save(captor.capture());
+        Todo todo = captor.getValue();
+        assertThat(todo.getPriority()).isEqualTo(Todo.Priority.HIGH);
+    }
+
+    @Test
+    void trackMode_greenGate_doesNotCloseExistingTodos() {
+        WorkflowRunCompletedEvent event = createEvent(RunStatus.COMPLETED, Map.of(), AUTO_TODO_TRACK_META);
+        when(gateStatusResolver.resolve(event))
+                .thenReturn(new GateResult(GateStatus.GREEN, "test-coverage", "All good"));
+        when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(Optional.empty());
+        when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-1"))
+                .thenReturn(List.of());
+
+        autoTodoService.onWorkflowRunCompleted(event);
+
+        // Should create/upsert, NOT close
+        verify(todoRepository, never()).findByProjectIdAndSourceAndReferenceTypeAndReferenceIdAndStatusNot(
+                anyString(), any(), anyString(), anyString(), any());
+        verify(todoRepository).save(any(Todo.class));
     }
 
     private WorkflowRunCompletedEvent createEvent(RunStatus status,

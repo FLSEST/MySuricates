@@ -18,5 +18,6 @@ public record PoolWorkflowEntry(
         String version,
         String author,
         Map<String, Object> defaultContext,
+        Map<String, Object> metadata,
         String filename
 ) {}

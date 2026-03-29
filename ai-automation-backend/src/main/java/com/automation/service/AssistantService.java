@@ -24,12 +24,20 @@ import com.automation.repository.WishRepository;
 import com.automation.repository.WorkflowMemoryRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.dto.request.ChainEntryRequest;
+import com.automation.dto.request.CreateChainRequest;
 import com.automation.dto.request.CreateTodoRequest;
+import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.dto.request.UpdateTodoStatusRequest;
+import com.automation.dto.response.PoolWorkflowEntry;
+import com.automation.service.chain.ChainService;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
+import com.automation.service.pool.WorkflowPoolService;
+import com.automation.service.project.ProjectContextService;
 import com.automation.service.system.SystemIdentityService;
 import com.automation.service.todo.TodoService;
+import com.automation.service.workflow.WorkflowService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
@@ -78,6 +86,10 @@ public class AssistantService {
     private final SystemIdentityService systemIdentity;
     private final ObjectMapper objectMapper;
     private final AppSettingsRepository appSettingsRepository;
+    private final WorkflowService workflowService;
+    private final ChainService chainService;
+    private final WorkflowPoolService workflowPoolService;
+    private final ProjectContextService projectContextService;
 
     private static final String DEFAULT_THINKING_PHRASES =
             "{\"de\":[\"Denke nach…\",\"Analysiere…\",\"Überlege kurz…\",\"Einen Moment…\"," +
@@ -245,12 +257,26 @@ public class AssistantService {
         sb.append("Da du die Workflow-IDs aus dem Kontext kennst, kannst du run_workflow direkt mit der korrekten ID befüllen.\n");
 
         sb.append("\n## Aktionen direkt ausführen (Tool-Mechanismus)\n");
-        sb.append("Wenn der User EXPLIZIT eine Aktion fordert (z.B. 'erstelle ein Todo', 'markiere Todo X als DONE'), nutze Tools statt Buttons:\n");
+        sb.append("Wenn der User EXPLIZIT eine Aktion fordert, nutze Tools statt Buttons:\n\n");
+        sb.append("**Todo-Tools:**\n");
         sb.append("<tool type=\"create_todo\">{\"title\":\"Imperativ-Titel\",\"priority\":\"HIGH\",\"description\":\"Optional\",\"tags\":[\"backend\"],\"projectId\":\"optional\"}</tool>\n");
-        sb.append("  create_todo: Pflicht: title (Imperativ, z.B. 'CS2BIM Fehler untersuchen'). Optional: description (Markdown), priority (HIGH/MEDIUM/LOW, Default: MEDIUM), tags (String-Array), projectId.\n");
+        sb.append("  create_todo: Pflicht: title. Optional: description, priority (HIGH/MEDIUM/LOW), tags, projectId.\n");
         sb.append("<tool type=\"update_todo_status\">{\"id\":\"vollständige-todo-uuid\",\"status\":\"DONE\"}</tool>\n");
-        sb.append("  update_todo_status: Ändert den Status eines Todos. id = vollständige Todo-UUID (aus dem Kontext). status = DONE|IN_PROGRESS|OPEN|BACKLOG.\n");
-        sb.append("Das Tool wird sofort serverseitig ausgeführt — das Ergebnis erscheint direkt in deiner Antwort.\n");
+        sb.append("  update_todo_status: id + status (DONE|IN_PROGRESS|OPEN|BACKLOG).\n\n");
+        sb.append("**Workflow-Tools:**\n");
+        sb.append("<tool type=\"create_workflow\">{\"projectId\":\"projekt-uuid\",\"name\":\"Name\",\"description\":\"Beschreibung\",\"icon\":\"🔍\",");
+        sb.append("\"blocks\":[{\"type\":\"shell\",\"config\":{\"command\":\"...\",\"label\":\"...\"}},{\"type\":\"simple\",\"config\":{\"command\":\"...\",\"label\":\"...\"}}],");
+        sb.append("\"instructions\":\"Agent-Instruktionen\",\"model\":\"claude-sonnet-4-6\",");
+        sb.append("\"defaultContext\":{\"project_path\":\"/pfad/zum/projekt\"},\"metadata\":{\"poolSource\":\"referenz-id\"}}</tool>\n");
+        sb.append("  create_workflow: Erstellt einen neuen Workflow. Pflicht: projectId, name, blocks. ");
+        sb.append("Block-Typen: shell (command), simple (command=Prompt an AI), conditional, forEach, switch, retry, agentic, approval, sub_workflow, human_input. ");
+        sb.append("Bei shell-Blöcken: command ist ein Shell-Befehl. Bei simple-Blöcken: command ist ein Prompt an die AI. ");
+        sb.append("Nutze {{ project_path }} in commands und setze den echten Pfad in defaultContext.\n");
+        sb.append("<tool type=\"create_chain\">{\"name\":\"Pipeline-Name\",\"description\":\"Beschreibung\",\"icon\":\"⛓️\",\"stopOnFailure\":true,");
+        sb.append("\"entries\":[{\"workflowId\":\"wf-uuid\",\"label\":\"Step 1\",\"sortOrder\":0},{\"workflowId\":\"wf-uuid-2\",\"label\":\"Step 2\",\"sortOrder\":1}]}</tool>\n");
+        sb.append("  create_chain: Verkettet Workflows zu einer sequentiellen Pipeline. Pflicht: name, entries (je mit workflowId, sortOrder). ");
+        sb.append("Die Workflow-IDs müssen existieren — erstelle zuerst die Workflows, dann die Chain.\n\n");
+        sb.append("Tools werden sofort serverseitig ausgeführt — das Ergebnis erscheint in deiner Antwort.\n");
         sb.append("Kündige die Ausführung kurz an bevor du das Tool-Tag sendest. Kombinierbar mit <fetch>: erst Daten nachladen, dann Tool ausführen.\n");
         sb.append("Buttons (<actions>) nutzen wenn du eine Aktion nur VORSCHLÄGST und der User bestätigen soll.\n");
         sb.append("Wenn du dem User mehrere Optionen anbietest und er mit 'ja' oder einer unspezifischen Bestätigung antwortet, ");
@@ -268,11 +294,37 @@ public class AssistantService {
         sb.append("<fetch type=\"wish_detail\" id=\"<wish-id>\"/> — Wish-Status, Iterationen, Fehler\n");
         sb.append("<fetch type=\"workflow_runs\" id=\"<workflow-id>\"/> — Letzte Runs eines Workflows\n");
         sb.append("<fetch type=\"workflow_detail\" id=\"<workflow-id>\"/> — wie ein Workflow AUFGEBAUT ist (Blöcke, Shell-Commands, Prompts, Instruktionen)\n");
+        sb.append("<fetch type=\"pool_workflows\" id=\"all\"/> — Übersicht ALLER Pool-Vorlagen (Name, Kategorie, Tags, Block-Anzahl)\n");
+        sb.append("<fetch type=\"pool_workflow\" id=\"<pool-id>\"/> — Detail einer Pool-Vorlage inkl. aller Blöcke und Commands\n");
+        sb.append("<fetch type=\"project_context\" id=\"<project-id>\"/> — AI-Analyse des Projekts (Tech-Stack, Struktur, Build-Tool, Konventionen)\n");
         sb.append("<fetch type=\"docs\" id=\"workflow-guide\"/> — liefert Inhaltsübersicht\n");
         sb.append("<fetch type=\"docs\" id=\"workflow-guide/<sektion>\"/> — Sektions-IDs: block-types, patterns, timeouts, agentic, dos-and-donts, variables, models, memory, chains, quick-start, appendix\n");
         sb.append("<fetch type=\"docs\" id=\"architektur\"/> — Systemarchitektur, Komponenten\n");
         sb.append("<fetch type=\"docs\" id=\"vision\"/> — Produkt-Vision, Roadmap\n");
         sb.append("Nur wenn ID bekannt. IDs nicht erfinden. Wenn du einen Fetch-Tag sendest, beantworte die Frage noch nicht.\n");
+
+        // Workflow advisor section
+        sb.append("\n## Workflow-Erstellung und -Adaption\n");
+        sb.append("Du kannst Workflows und Chains für den User erstellen und bestehende Pool-Vorlagen für neue Projekte adaptieren.\n\n");
+        sb.append("### Neuen Workflow erstellen\n");
+        sb.append("1. Ziel verstehen: Was soll automatisiert werden? Für welches Projekt?\n");
+        sb.append("2. Referenzen laden: <fetch type=\"pool_workflows\" id=\"all\"/> — prüfe ob eine passende Vorlage existiert\n");
+        sb.append("3. Projekt analysieren: <fetch type=\"project_context\" id=\"<project-id>\"/> — Tech-Stack, Build-Tool, Struktur\n");
+        sb.append("4. Passende Vorlage laden: <fetch type=\"pool_workflow\" id=\"<best-match>\"/> — Detail mit allen Blöcken\n");
+        sb.append("5. Adaptieren: Pfade, Commands, Patterns für das Zielprojekt anpassen\n");
+        sb.append("6. Bestätigung einholen (zeige die geplanten Blöcke, frage ob der User einverstanden ist)\n");
+        sb.append("7. Erstellen: <tool type=\"create_workflow\"> mit adaptierten Blöcken\n\n");
+        sb.append("### Chain (Workflow-Pipeline) erstellen\n");
+        sb.append("1. Ziel verstehen: Welche Schritte gehören zur Pipeline? (z.B. Build → Test → Security → Deploy)\n");
+        sb.append("2. Pro Schritt: Passenden Workflow finden oder mit create_workflow neu erstellen\n");
+        sb.append("3. Chain erstellen: <tool type=\"create_chain\"> mit den Workflow-IDs und sortOrder\n\n");
+        sb.append("### Adaption-Regeln\n");
+        sb.append("- Shell-Blöcke: Build-Commands anpassen (mvn↔gradle, npm↔yarn, pip↔poetry je nach Projekt)\n");
+        sb.append("- Simple-Blöcke: Prompts projekt-spezifisch formulieren\n");
+        sb.append("- Model: claude-sonnet-4-6 als Default, claude-opus-4-6 für Analyse/Review-Workflows\n");
+        sb.append("- Nutze {{ project_path }} in shell commands und setze den echten Pfad in defaultContext\n");
+        sb.append("- Setze metadata.poolSource auf die Pool-Vorlage-ID falls adaptiert\n");
+        sb.append("- Wenn du Workflows erstellst und anschliessend eine Chain daraus bauen willst: erstelle ZUERST alle Workflows (in separaten Tool-Aufrufen), dann die Chain mit den erhaltenen IDs.\n");
 
         return sb.toString();
     }
@@ -678,12 +730,15 @@ public class AssistantService {
 
     private String executeFetch(FetchRequest req) {
         return switch (req.type()) {
-            case "run_detail"      -> formatRunDetail(req.id());
-            case "wish_detail"     -> formatWishDetail(req.id());
-            case "workflow_runs"   -> formatWorkflowRuns(req.id());
-            case "workflow_detail" -> formatWorkflowDetail(req.id());
-            case "step_output"     -> formatStepOutput(req.id());
-            case "docs"            -> formatDocsSection(req.id());
+            case "run_detail"       -> formatRunDetail(req.id());
+            case "wish_detail"      -> formatWishDetail(req.id());
+            case "workflow_runs"    -> formatWorkflowRuns(req.id());
+            case "workflow_detail"  -> formatWorkflowDetail(req.id());
+            case "step_output"      -> formatStepOutput(req.id());
+            case "docs"             -> formatDocsSection(req.id());
+            case "pool_workflows"   -> formatPoolWorkflows();
+            case "pool_workflow"    -> formatPoolWorkflowDetail(req.id());
+            case "project_context"  -> formatProjectContext(req.id());
             default -> "";
         };
     }
@@ -721,6 +776,8 @@ public class AssistantService {
         return switch (req.type()) {
             case "create_todo"        -> executeCreateTodo(req.payload());
             case "update_todo_status" -> executeUpdateTodoStatus(req.payload());
+            case "create_workflow"    -> executeCreateWorkflow(req.payload());
+            case "create_chain"      -> executeCreateChain(req.payload());
             default -> "[Unbekanntes Tool: " + req.type() + "]";
         };
     }
@@ -774,6 +831,160 @@ public class AssistantService {
         } catch (Exception e) {
             log.warn("Assistant update_todo_status tool failed", e);
             return "⚠ Status konnte nicht aktualisiert werden: " + e.getMessage();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private String executeCreateWorkflow(String json) {
+        try {
+            Map<String, Object> params = objectMapper.readValue(json, new TypeReference<>() {});
+            String projectId = (String) params.get("projectId");
+            String name = (String) params.get("name");
+            if (projectId == null || name == null || name.isBlank())
+                return "⚠ create_workflow: projectId und name sind Pflichtfelder.";
+
+            List<BlockDefinition> blocks = params.containsKey("blocks")
+                    ? objectMapper.convertValue(params.get("blocks"), new TypeReference<>() {})
+                    : List.of();
+
+            Map<String, Object> defaultContext = params.containsKey("defaultContext")
+                    ? objectMapper.convertValue(params.get("defaultContext"), new TypeReference<Map<String, Object>>() {})
+                    : null;
+            Map<String, Object> metadata = params.containsKey("metadata")
+                    ? objectMapper.convertValue(params.get("metadata"), new TypeReference<Map<String, Object>>() {})
+                    : null;
+
+            var request = new CreateWorkflowRequest(
+                    projectId, name,
+                    (String) params.getOrDefault("description", null),
+                    (String) params.getOrDefault("icon", "⚡"),
+                    blocks,
+                    null, // activatedSkillIds
+                    (String) params.getOrDefault("instructions", null),
+                    (String) params.getOrDefault("model", null),
+                    null, // provider
+                    null, // templateId
+                    metadata, defaultContext,
+                    null  // version
+            );
+            Workflow created = workflowService.create(request);
+            return "✓ Workflow erstellt: \"" + created.getName() + "\" (ID: " + created.getId() + ")";
+        } catch (Exception e) {
+            log.warn("Assistant create_workflow tool failed", e);
+            return "⚠ Workflow konnte nicht erstellt werden: " + e.getMessage();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private String executeCreateChain(String json) {
+        try {
+            Map<String, Object> params = objectMapper.readValue(json, new TypeReference<>() {});
+            String name = (String) params.get("name");
+            if (name == null || name.isBlank())
+                return "⚠ create_chain: name ist Pflichtfeld.";
+
+            List<Map<String, Object>> rawEntries = params.containsKey("entries")
+                    ? objectMapper.convertValue(params.get("entries"), new TypeReference<>() {})
+                    : List.of();
+            if (rawEntries.isEmpty())
+                return "⚠ create_chain: entries darf nicht leer sein.";
+
+            List<ChainEntryRequest> entries = rawEntries.stream().map(e -> new ChainEntryRequest(
+                    (String) e.get("workflowId"),
+                    (String) e.getOrDefault("label", null),
+                    e.containsKey("sortOrder") ? ((Number) e.get("sortOrder")).intValue() : 0,
+                    e.containsKey("stopOnFailure") ? (Boolean) e.get("stopOnFailure") : null,
+                    e.containsKey("inputContext")
+                            ? objectMapper.convertValue(e.get("inputContext"), new TypeReference<Map<String, Object>>() {})
+                            : null
+            )).toList();
+
+            var request = new CreateChainRequest(
+                    name,
+                    (String) params.getOrDefault("description", null),
+                    (String) params.getOrDefault("icon", "⛓️"),
+                    entries,
+                    params.containsKey("stopOnFailure") ? (Boolean) params.get("stopOnFailure") : true
+            );
+            var created = chainService.create(request);
+            return "✓ Chain erstellt: \"" + created.getName() + "\" mit " + entries.size() + " Workflows (ID: " + created.getId() + ")";
+        } catch (Exception e) {
+            log.warn("Assistant create_chain tool failed", e);
+            return "⚠ Chain konnte nicht erstellt werden: " + e.getMessage();
+        }
+    }
+
+    private String formatPoolWorkflows() {
+        try {
+            List<PoolWorkflowEntry> entries = workflowPoolService.listAll();
+            if (entries.isEmpty()) return "Keine Pool-Workflows verfügbar.\n";
+            var sb = new StringBuilder();
+            sb.append("**Workflow-Pool (").append(entries.size()).append(" Vorlagen):**\n\n");
+            entries.forEach(e -> {
+                String deName = e.name() != null ? e.name().getOrDefault("de", e.name().getOrDefault("en", e.id())) : e.id();
+                sb.append("- **").append(deName).append("** (ID: `").append(e.id()).append("`");
+                if (e.category() != null) sb.append(", Kat: ").append(e.category());
+                if (e.blocks() != null) sb.append(", ").append(e.blocks().size()).append(" Blöcke");
+                sb.append(")");
+                if (e.tags() != null && !e.tags().isEmpty()) sb.append(" Tags: ").append(String.join(", ", e.tags()));
+                String deDesc = e.description() != null ? e.description().getOrDefault("de", e.description().getOrDefault("en", "")) : "";
+                if (!deDesc.isBlank()) sb.append("\n  ").append(truncate(deDesc, 120));
+                sb.append("\n");
+            });
+            sb.append("\nNutze `<fetch type=\"pool_workflow\" id=\"<pool-id>\"/>` für Details inkl. Blöcke.\n");
+            return sb.toString();
+        } catch (Exception e) {
+            log.debug("Could not load pool workflows for assistant", e);
+            return "Pool-Workflows konnten nicht geladen werden.\n";
+        }
+    }
+
+    private String formatPoolWorkflowDetail(String poolId) {
+        try {
+            PoolWorkflowEntry entry = workflowPoolService.findById(poolId);
+            if (entry == null) return "Pool-Workflow '" + poolId + "' nicht gefunden.\n";
+            var sb = new StringBuilder();
+            String deName = entry.name() != null ? entry.name().getOrDefault("de", poolId) : poolId;
+            sb.append("**Pool-Workflow: ").append(deName).append("** (").append(poolId).append(")\n");
+            String deDesc = entry.description() != null ? entry.description().getOrDefault("de", "") : "";
+            if (!deDesc.isBlank()) sb.append("Beschreibung: ").append(deDesc).append("\n");
+            if (entry.model() != null) sb.append("Modell: ").append(entry.model()).append("\n");
+            if (entry.instructions() != null && !entry.instructions().isBlank())
+                sb.append("Instruktionen: ").append(truncate(entry.instructions(), 500)).append("\n");
+            if (entry.defaultContext() != null && !entry.defaultContext().isEmpty())
+                sb.append("Default-Variablen: ").append(entry.defaultContext()).append("\n");
+            if (entry.blocks() != null && !entry.blocks().isEmpty()) {
+                sb.append("\nBlöcke (").append(entry.blocks().size()).append("):\n");
+                for (int i = 0; i < entry.blocks().size(); i++) {
+                    BlockDefinition block = entry.blocks().get(i);
+                    Map<String, Object> cfg = block.getConfig() != null ? block.getConfig() : Map.of();
+                    String label = cfg.containsKey("label") ? String.valueOf(cfg.get("label")) : "";
+                    sb.append("  ").append(i + 1).append(". [").append(block.getType()).append("]");
+                    if (!label.isBlank()) sb.append(" ").append(label);
+                    sb.append("\n");
+                    appendBlockConfigSummary(sb, block.getType(), cfg);
+                }
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            log.debug("Could not load pool workflow detail for {}", poolId, e);
+            return "Pool-Workflow '" + poolId + "' nicht gefunden.\n";
+        }
+    }
+
+    private String formatProjectContext(String projectId) {
+        try {
+            var project = projectRepository.findById(projectId).orElse(null);
+            if (project == null) return "Projekt '" + projectId + "' nicht gefunden.\n";
+            if (project.getPath() == null || project.getPath().isBlank())
+                return "Projekt '" + project.getName() + "' hat keinen Pfad konfiguriert.\n";
+            String context = projectContextService.generateContext(project.getPath());
+            if (context == null || context.isBlank())
+                return "Kein Projekt-Kontext für '" + project.getName() + "' verfügbar.\n";
+            return "**Projekt-Analyse: " + project.getName() + "** (Pfad: " + project.getPath() + ")\n\n" + context + "\n";
+        } catch (Exception e) {
+            log.debug("Could not generate project context for {}", projectId, e);
+            return "Projekt-Kontext konnte nicht generiert werden: " + e.getMessage() + "\n";
         }
     }
 

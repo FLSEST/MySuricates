@@ -32,16 +32,17 @@ interface WorkflowDetailModalsProps {
 
   showAddBlock: boolean;
   setShowAddBlock: (v: boolean) => void;
-  newBlock: { type: BlockType; config: string };
-  setNewBlock: (v: { type: BlockType; config: string }) => void;
+  newBlock: { type: BlockType; config: string; skillIds: string[] };
+  setNewBlock: (v: { type: BlockType; config: string; skillIds: string[] }) => void;
   onAddBlock: () => void;
   allWorkflows: WorkflowListItem[] | undefined;
+  allSkills: AvailableSkill[];
 
   showEditBlock: boolean;
   setShowEditBlock: (v: boolean) => void;
   editBlockIndex: number;
-  editBlock: { type: BlockType; config: string };
-  setEditBlock: (v: { type: BlockType; config: string }) => void;
+  editBlock: { type: BlockType; config: string; skillIds: string[] };
+  setEditBlock: (v: { type: BlockType; config: string; skillIds: string[] }) => void;
   onSaveBlock: () => void;
 
   showAddSkill: boolean;
@@ -101,6 +102,7 @@ export function WorkflowDetailModals({
   setNewBlock,
   onAddBlock,
   allWorkflows,
+  allSkills,
 
   showEditBlock,
   setShowEditBlock,
@@ -220,7 +222,7 @@ export function WorkflowDetailModals({
                 agentic: { goal: '', success_criteria: '', max_iterations: 10, iteration_timeout_seconds: 300, total_timeout_seconds: 1800, max_total_tokens: 200000, max_repeated_actions: 3, require_approval: false },
                 'sub-workflow': { workflow_id: '' },
               };
-              setNewBlock({ type, config: JSON.stringify(defaultConfig[type], null, 2) });
+              setNewBlock({ ...newBlock, type, config: JSON.stringify(defaultConfig[type], null, 2) });
             }}
             options={BLOCK_TYPES.map((type) => ({
               value: type,
@@ -247,6 +249,34 @@ export function WorkflowDetailModals({
               height="200px"
             />
           </div>
+          {allSkills.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-text mb-1">{t.workflows.blockSkills}</label>
+              <p className="text-xs text-text-tertiary mb-2">{t.workflows.blockSkillsHint}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {allSkills.map((skill) => (
+                  <button
+                    key={skill.id}
+                    type="button"
+                    onClick={() => {
+                      const ids = newBlock.skillIds;
+                      const next = ids.includes(skill.id)
+                        ? ids.filter((id) => id !== skill.id)
+                        : [...ids, skill.id];
+                      setNewBlock({ ...newBlock, skillIds: next });
+                    }}
+                    className={`px-2 py-1 rounded-md text-xs border transition-colors ${
+                      newBlock.skillIds.includes(skill.id)
+                        ? 'bg-accent/10 border-accent text-accent'
+                        : 'border-border text-text-tertiary hover:border-accent/50'
+                    }`}
+                  >
+                    {skill.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </Modal>
 
@@ -298,6 +328,34 @@ export function WorkflowDetailModals({
               height="250px"
             />
           </div>
+          {allSkills.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-text mb-1">{t.workflows.blockSkills}</label>
+              <p className="text-xs text-text-tertiary mb-2">{t.workflows.blockSkillsHint}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {allSkills.map((skill) => (
+                  <button
+                    key={skill.id}
+                    type="button"
+                    onClick={() => {
+                      const ids = editBlock.skillIds;
+                      const next = ids.includes(skill.id)
+                        ? ids.filter((id) => id !== skill.id)
+                        : [...ids, skill.id];
+                      setEditBlock({ ...editBlock, skillIds: next });
+                    }}
+                    className={`px-2 py-1 rounded-md text-xs border transition-colors ${
+                      editBlock.skillIds.includes(skill.id)
+                        ? 'bg-accent/10 border-accent text-accent'
+                        : 'border-border text-text-tertiary hover:border-accent/50'
+                    }`}
+                  >
+                    {skill.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </Modal>
 

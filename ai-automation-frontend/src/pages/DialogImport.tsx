@@ -2,9 +2,10 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   MessageCircle, CheckCircle2, AlertCircle, XCircle,
-  Clock, ChevronRight, Sparkles, Layers, GitBranch,
+  Clock, ChevronRight, Sparkles, Layers, GitBranch, Pencil,
 } from 'lucide-react';
-import { Card, Button, Input, Select, Spinner, Badge, Toggle } from '../components/ui';
+import { Card, Button, Input, Select, Spinner, Badge, Toggle, Modal, ModalFooter } from '../components/ui';
+import { MonacoEditor } from '../components/shared/MonacoEditor';
 import { useProjects } from '../hooks/useProjects';
 import {
   useDialogSessionCounts, useDialogSessions,
@@ -14,9 +15,17 @@ import { useWorkflows } from '../hooks/useWorkflows';
 import { useT } from '../i18n';
 import { useToast } from '../hooks/useToast';
 import { WorkflowIcon } from '../utils/workflowIcon';
-import type { DialogSessionInfo, DialogWorkflowSuggestion, Workflow } from '../types';
+import type { DialogSessionInfo, DialogWorkflowSuggestion, Workflow, BlockDefinition } from '../types';
+import type { BadgeVariant } from '../components/ui/Badge';
 
 const OTHER_KEY = '__other__';
+
+const blockTypeVariant: Record<string, BadgeVariant> = {
+  simple: 'success', agentic: 'success', 'skill-capability': 'success',
+  shell: 'accent', 'sub-workflow': 'accent',
+  approval: 'warning', 'human-input': 'warning',
+  retry: 'default', foreach: 'default', while: 'default', conditional: 'default',
+};
 
 // ── Hilfsfunktionen ──────────────────────────────────────
 
@@ -181,17 +190,35 @@ function SuggestionPanel({
 }: {
   suggestion: DialogWorkflowSuggestion;
   projects: { id: string; name: string }[];
-  onCreateWorkflow: (projectId: string, name: string) => void;
+  onCreateWorkflow: (projectId: string, name: string, blocks: BlockDefinition[]) => void;
   isCreating: boolean;
 }) {
   const t = useT();
+  const toast = useToast();
   const [projectId, setProjectId] = useState('');
   const [name, setName] = useState(suggestion.suggestedName ?? '');
+  const [editedBlocks, setEditedBlocks] = useState<BlockDefinition[]>(suggestion.blocks);
+  const [editingBlock, setEditingBlock] = useState<{ index: number; config: string } | null>(null);
 
   const projectOptions = useMemo(() => [
     { value: '', label: t.common.selectProject },
     ...projects.map(p => ({ value: p.id, label: p.name })),
   ], [projects, t.common.selectProject]);
+
+  function handleSaveBlock() {
+    if (!editingBlock) return;
+    try {
+      const config = JSON.parse(editingBlock.config) as Record<string, unknown>;
+      const updated: BlockDefinition[] = [...editedBlocks];
+      const prev = updated[editingBlock.index];
+      if (!prev) return;
+      updated[editingBlock.index] = { type: prev.type, config, requiredCapabilities: prev.requiredCapabilities };
+      setEditedBlocks(updated);
+      setEditingBlock(null);
+    } catch {
+      toast.error(t.dialog.invalidJson);
+    }
+  }
 
   if (!suggestion.available) {
     return (
@@ -204,10 +231,19 @@ function SuggestionPanel({
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Badges mit Tooltips */}
       <div className="flex items-center gap-2 flex-wrap">
-        <ConfidenceBadge confidence={suggestion.confidence} />
-        {suggestion.patternType && <Badge variant="default">{suggestion.patternType}</Badge>}
-        <span className="text-xs text-text-secondary">{suggestion.toolCallsAnalyzed} {t.dialog.toolCalls}</span>
+        <span title={t.dialog.confidenceTooltip}>
+          <ConfidenceBadge confidence={suggestion.confidence} />
+        </span>
+        {suggestion.patternType && (
+          <span title={t.dialog.patternTooltip}>
+            <Badge variant="default">{suggestion.patternType}</Badge>
+          </span>
+        )}
+        <span className="text-xs text-text-secondary" title={t.dialog.toolCallsTooltip}>
+          {suggestion.toolCallsAnalyzed} {t.dialog.toolCalls}
+        </span>
       </div>
 
       {suggestion.confidence < 0.7 && (
@@ -225,20 +261,63 @@ function SuggestionPanel({
         <p className="text-xs text-text-secondary leading-relaxed">{suggestion.suggestedDescription}</p>
       )}
 
+      {/* Blöcke — klickbar + editierbar */}
       <div>
         <p className="text-xs font-medium text-text-secondary uppercase tracking-wide mb-1.5">{t.dialog.blocks}</p>
         <div className="flex flex-col gap-1">
-          {suggestion.blocks.map((block, i) => (
-            <div key={i} className="flex items-center gap-2 p-1.5 rounded-md bg-surface border border-border text-xs">
-              <Badge variant="default">{block.type}</Badge>
-              <span className="text-text-secondary truncate font-mono">
-                {String((block.config as Record<string, unknown>)?.command ?? '')}
-              </span>
-            </div>
-          ))}
+          {editedBlocks.map((block, i) => {
+            const wasEdited = block !== suggestion.blocks[i];
+            const config = block.config as Record<string, unknown>;
+            const preview = String(config?.command ?? JSON.stringify(config).slice(0, 80));
+            return (
+              <button
+                key={i}
+                onClick={() => setEditingBlock({
+                  index: i,
+                  config: JSON.stringify(block.config, null, 2),
+                })}
+                className="flex items-center gap-2 p-1.5 rounded-md bg-surface border border-border
+                           text-xs w-full text-left hover:border-accent/50 hover:bg-surface-hover
+                           transition-colors cursor-pointer group"
+              >
+                <Badge variant={blockTypeVariant[block.type] ?? 'default'}>{block.type}</Badge>
+                <span className="text-text-secondary truncate font-mono flex-1">{preview}</span>
+                {wasEdited && (
+                  <Pencil className="w-3 h-3 text-accent shrink-0" />
+                )}
+                <ChevronRight className="w-3.5 h-3.5 text-text-secondary/50 shrink-0 group-hover:text-accent transition-colors" />
+              </button>
+            );
+          })}
         </div>
       </div>
 
+      {/* Block-Editor Modal */}
+      {editingBlock && (
+        <Modal
+          open
+          onClose={() => setEditingBlock(null)}
+          title={`${editedBlocks[editingBlock.index]?.type ?? 'Block'} #${editingBlock.index + 1}`}
+          size="lg"
+          footer={
+            <ModalFooter
+              onCancel={() => setEditingBlock(null)}
+              onAction={handleSaveBlock}
+              cancelLabel={t.common.cancel}
+              actionLabel={t.common.save}
+            />
+          }
+        >
+          <MonacoEditor
+            value={editingBlock.config}
+            onChange={(val) => setEditingBlock({ ...editingBlock, config: val ?? '' })}
+            language="json"
+            height="300px"
+          />
+        </Modal>
+      )}
+
+      {/* Workflow erstellen */}
       <div className="flex flex-col gap-2 pt-2 border-t border-border">
         <Input label={t.dialog.workflowName} value={name} onChange={e => setName(e.target.value)} />
         <Select
@@ -249,7 +328,7 @@ function SuggestionPanel({
         />
         <Button
           variant="primary"
-          onClick={() => onCreateWorkflow(projectId, name)}
+          onClick={() => onCreateWorkflow(projectId, name, editedBlocks)}
           disabled={!projectId || !name.trim() || isCreating}
           className="w-full"
         >
@@ -380,10 +459,13 @@ export function DialogImport() {
     }
   }
 
-  async function handleCreate(projectId: string, name: string) {
+  async function handleCreate(projectId: string, name: string, blocks?: BlockDefinition[]) {
     if (!suggestion) return;
+    const finalSuggestion = blocks
+      ? { ...suggestion, blocks }
+      : suggestion;
     try {
-      const workflow = await createMutation.mutateAsync({ suggestion, projectId, name });
+      const workflow = await createMutation.mutateAsync({ suggestion: finalSuggestion, projectId, name });
       toast.success(t.dialog.created);
       navigate(`/workflows/${workflow.id}`);
     } catch {

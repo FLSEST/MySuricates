@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Pencil, Trash2, Link2, Terminal } from 'lucide-react';
+import { GripVertical, Pencil, Trash2, Link2, Terminal, Zap } from 'lucide-react';
 import { Badge } from '../ui';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useT } from '../../i18n';
@@ -72,6 +72,12 @@ export function SortableBlock({ id, index, block, onEdit, onRemove }: SortableBl
             #{index + 1}
           </span>
           <Badge variant={blockTypeVariant[block.type] || 'accent'}>{t.workflows.blockTypes[block.type]}</Badge>
+          {block.skillIds && block.skillIds.length > 0 && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] text-accent">
+              <Zap className="w-3 h-3" />
+              +{block.skillIds.length}
+            </span>
+          )}
         </div>
         {advancedMode ? (
           <pre className="text-xs text-text-secondary font-mono bg-surface rounded-lg p-3 mt-2 overflow-x-auto">

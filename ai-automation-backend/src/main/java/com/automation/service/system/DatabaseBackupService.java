@@ -169,6 +169,16 @@ public class DatabaseBackupService {
         return Files.exists(file) ? file : null;
     }
 
+    @Scheduled(cron = "0 0 3 * * *")
+    public void scheduledIncrementalVacuum() {
+        try (var conn = dataSource.getConnection(); var stmt = conn.createStatement()) {
+            stmt.execute("PRAGMA incremental_vacuum(1000)");
+            log.info("Incremental vacuum completed (up to 1000 pages reclaimed)");
+        } catch (Exception e) {
+            log.warn("Incremental vacuum failed: {}", e.getMessage());
+        }
+    }
+
     @Scheduled(cron = "${automation.backup.cron:0 0 2 * * *}")
     public void scheduledBackup() {
         if (!backupConfig.isEnabled()) {

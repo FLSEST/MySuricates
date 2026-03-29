@@ -53,6 +53,9 @@ class WorkflowExecutorTest {
     private ContainerRepository containerRepository;
 
     @Mock
+    private com.automation.repository.SkillRepository skillRepository;
+
+    @Mock
     private ExecutionBroadcaster broadcaster;
 
     @Mock
@@ -105,6 +108,7 @@ class WorkflowExecutorTest {
                 runRepository,
                 stepResultRepository,
                 containerRepository,
+                skillRepository,
                 broadcaster,
                 virtualThreadExecutor,
                 new DynamicSemaphore(10),
@@ -255,7 +259,7 @@ class WorkflowExecutorTest {
     }
 
     @Test
-    void execute_injectsSkillContext() {
+    void execute_writesSkillContextToProject() {
         Skill skill = Skill.builder()
                 .id("skill-1").name("Reviewer").category(SkillCategory.CODE)
                 .aiContext("Review context").build();
@@ -267,8 +271,46 @@ class WorkflowExecutorTest {
 
         workflowExecutor.execute(testWorkflow, null);
 
-        verify(commandExecutorService).injectSkillContextOnHost(
+        verify(commandExecutorService).writeSkillContextToProject(
                 eq("/workspace/test"), eq(testWorkflow.getActivatedSkills()));
+    }
+
+    @Test
+    void execute_perBlockSkills_mergesAndRestores() {
+        Skill workflowSkill = Skill.builder()
+                .id("skill-wf").name("Workflow Skill").category(SkillCategory.CODE)
+                .aiContext("Workflow context").build();
+        Skill blockSkill = Skill.builder()
+                .id("skill-block").name("Block Skill").category(SkillCategory.DATA)
+                .aiContext("Block context").build();
+        testWorkflow.setActivatedSkills(new ArrayList<>(List.of(workflowSkill)));
+
+        // Block 0: no per-block skills, Block 1: has per-block skill
+        testWorkflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder().type("simple").config(new HashMap<>(Map.of("command", "echo 1"))).build(),
+                BlockDefinition.builder().type("simple").config(new HashMap<>(Map.of("command", "echo 2")))
+                        .skillIds(new ArrayList<>(List.of("skill-block"))).build()
+        )));
+
+        when(skillRepository.findAllById(Set.of("skill-block"))).thenReturn(List.of(blockSkill));
+
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(simpleBlockExecutor.execute(any(), any())).thenReturn(step);
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        // Verify: baseline write + merged write for block 1 + restore after block 1
+        ArgumentCaptor<List<Skill>> skillCaptor = ArgumentCaptor.forClass(List.class);
+        verify(commandExecutorService, atLeast(3)).writeSkillContextToProject(eq("/workspace/test"), skillCaptor.capture());
+
+        List<List<Skill>> allCalls = skillCaptor.getAllValues();
+        // First call: baseline (workflow skills only)
+        assertThat(allCalls.get(0)).containsExactly(workflowSkill);
+        // Second call: merged (workflow + block skills) for block 1
+        assertThat(allCalls.get(1)).containsExactlyInAnyOrder(workflowSkill, blockSkill);
+        // Third call: restore baseline after block 1
+        assertThat(allCalls.get(2)).containsExactly(workflowSkill);
     }
 
     @Test

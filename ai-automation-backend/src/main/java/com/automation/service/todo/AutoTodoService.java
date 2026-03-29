@@ -2,12 +2,15 @@ package com.automation.service.todo;
 
 import com.automation.entity.GateStatus;
 import com.automation.entity.Project;
+import com.automation.entity.StepResult;
+import com.automation.entity.StepStatus;
 import com.automation.entity.Todo;
 import com.automation.entity.WorkflowRun;
 import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.TodoMapper;
 import com.automation.repository.AppSettingsRepository;
+import com.automation.repository.StepResultRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.todo.GateStatusResolver.GateResult;
@@ -34,7 +37,10 @@ public class AutoTodoService {
     static final String SOURCE_AGENT = "auto-todo";
     static final String SETTING_AUTO_TODO_DEFAULT = "auto-todo-default";
 
+    private static final int MAX_DESCRIPTION_LENGTH = 4000;
+
     private final TodoRepository todoRepository;
+    private final StepResultRepository stepResultRepository;
     private final GateStatusResolver gateStatusResolver;
     private final ProjectPathResolver projectPathResolver;
     private final AppSettingsRepository appSettingsRepository;
@@ -59,21 +65,121 @@ public class AutoTodoService {
 
         List<String> targetProjectIds = resolveTargetProjectIds(event);
 
-        if ("approval".equals(getMode(event))) {
-            handleApprovalMode(event, gate, targetProjectIds);
-        } else {
-            handleAutoMode(event, gate, targetProjectIds);
+        String mode = getMode(event);
+        switch (mode) {
+            case "track" -> handleTrackMode(event, gate, targetProjectIds);
+            case "approval" -> handleApprovalMode(event, gate, targetProjectIds);
+            default -> handleAutoMode(event, gate, targetProjectIds);
         }
     }
 
     private void handleAutoMode(WorkflowRunCompletedEvent event, GateResult gate, List<String> targetProjectIds) {
         for (String projectId : targetProjectIds) {
+            if (hasGranularTodos(event)) {
+                createGranularTodos(projectId, event);
+            }
             switch (gate.status()) {
                 case GREEN -> closeOpenTodos(projectId, event);
                 case YELLOW -> upsertTodo(projectId, event, gate, Todo.Priority.MEDIUM);
                 case RED -> upsertTodo(projectId, event, gate, Todo.Priority.HIGH);
             }
         }
+    }
+
+    private void handleTrackMode(WorkflowRunCompletedEvent event, GateResult gate, List<String> targetProjectIds) {
+        Todo.Priority priority = switch (gate.status()) {
+            case RED -> Todo.Priority.HIGH;
+            case YELLOW -> Todo.Priority.MEDIUM;
+            case GREEN -> Todo.Priority.LOW;
+        };
+        for (String projectId : targetProjectIds) {
+            if (hasGranularTodos(event)) {
+                createGranularTodos(projectId, event);
+            }
+            upsertTodo(projectId, event, gate, priority);
+        }
+    }
+
+    private boolean hasGranularTodos(WorkflowRunCompletedEvent event) {
+        Object items = event.getRunMetadata().get("todo_items");
+        return items instanceof List<?> list && !list.isEmpty();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void createGranularTodos(String projectId, WorkflowRunCompletedEvent event) {
+        Object items = event.getRunMetadata().get("todo_items");
+        if (!(items instanceof List<?> list)) return;
+
+        List<String> currentTitles = new ArrayList<>();
+
+        for (Object item : list) {
+            if (!(item instanceof Map<?, ?> map)) continue;
+
+            String title = String.valueOf(map.get("title"));
+            String priorityStr = String.valueOf(map.get("priority"));
+            List<String> itemTags = map.get("tags") instanceof List<?> tagList
+                    ? tagList.stream().map(String::valueOf).toList()
+                    : List.of();
+
+            currentTitles.add(title);
+
+            Todo.Priority priority;
+            try {
+                priority = Todo.Priority.valueOf(priorityStr);
+            } catch (IllegalArgumentException e) {
+                priority = Todo.Priority.MEDIUM;
+            }
+
+            String compositeTag = "item:" + title.hashCode();
+            Optional<Todo> existing = todoRepository.findOpenByCompositeKey(
+                    projectId, REFERENCE_TYPE, event.getWorkflowId(), compositeTag);
+
+            List<String> tags = new ArrayList<>(itemTags);
+            tags.add(TAG_AUTO_WORKFLOW);
+            tags.add(compositeTag);
+            String tagsJson = TodoMapper.listToJson(tags);
+
+            if (existing.isPresent()) {
+                Todo todo = existing.get();
+                todo.setWorkflowRunId(event.getRunId());
+                todo.setPriority(priority);
+                todo.setTags(tagsJson);
+                todoRepository.save(todo);
+                log.debug("Auto-todo (granular) updated: {}", title);
+            } else {
+                Todo todo = Todo.builder()
+                        .title(title)
+                        .status(Todo.Status.OPEN)
+                        .priority(priority)
+                        .tags(tagsJson)
+                        .projectId(projectId)
+                        .source(Todo.Source.WORKFLOW)
+                        .sourceAgent(SOURCE_AGENT)
+                        .workflowRunId(event.getRunId())
+                        .referenceType(REFERENCE_TYPE)
+                        .referenceId(event.getWorkflowId())
+                        .build();
+                todoRepository.save(todo);
+                log.info("Auto-todo (granular) created: {}", title);
+            }
+        }
+
+        // Close granular todos from previous runs that are no longer in the findings
+        List<Todo> openTodos = todoRepository.findByProjectIdAndSourceAndReferenceTypeAndReferenceIdAndStatusNot(
+                projectId, Todo.Source.WORKFLOW, REFERENCE_TYPE, event.getWorkflowId(), Todo.Status.DONE);
+        for (Todo todo : openTodos) {
+            if (todo.getTags() != null && todo.getTags().contains("item:")
+                    && todo.getTags().contains(TAG_AUTO_WORKFLOW)) {
+                String todoTitle = todo.getTitle();
+                if (!currentTitles.contains(todoTitle)) {
+                    todo.setStatus(Todo.Status.DONE);
+                    todoRepository.save(todo);
+                    log.info("Auto-todo (granular) closed — no longer in findings: {}", todoTitle);
+                }
+            }
+        }
+
+        log.info("Auto-todo (granular): created/updated {} items for workflow {}", currentTitles.size(), event.getWorkflowName());
     }
 
     private void handleApprovalMode(WorkflowRunCompletedEvent event, GateResult gate, List<String> targetProjectIds) {
@@ -279,14 +385,45 @@ public class AutoTodoService {
 
     private String buildDescription(WorkflowRunCompletedEvent event, GateResult gate) {
         StringBuilder sb = new StringBuilder();
-        sb.append("Auto-generated by workflow: ").append(event.getWorkflowName()).append("\n");
-        sb.append("Run ID: ").append(event.getRunId()).append("\n");
-        sb.append("Gate Status: ").append(gate.status()).append("\n");
-        sb.append("Category: ").append(gate.category());
-        if (gate.description() != null) {
-            sb.append("\n\n").append(gate.description());
+        sb.append("## ").append(gate.status()).append(" — ").append(gate.category()).append("\n\n");
+
+        String reportContent = loadReportFromSteps(event.getRunId());
+        if (reportContent != null && !reportContent.isBlank()) {
+            sb.append(reportContent);
+        } else if (gate.description() != null) {
+            sb.append(gate.description());
         }
+
+        sb.append("\n\n---\n*Workflow: ").append(event.getWorkflowName())
+                .append(" | Run: `").append(event.getRunId()).append("`*");
         return sb.toString();
+    }
+
+    /**
+     * Loads the most relevant report from the workflow run's step outputs.
+     * Heuristic: second-to-last completed step with substantial output (the analysis/report block).
+     * Skips the last step (typically the verdict shell block) and the first step (data collection).
+     */
+    private String loadReportFromSteps(String runId) {
+        try {
+            List<StepResult> steps = stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc(runId);
+            if (steps.size() < 2) return null;
+
+            // Walk backwards from second-to-last, find the first step with substantial output
+            for (int i = steps.size() - 2; i >= 1; i--) {
+                StepResult step = steps.get(i);
+                if (step.getStatus() != StepStatus.COMPLETED) continue;
+                String output = step.getOutput();
+                if (output != null && output.length() > 200) {
+                    return output.length() > MAX_DESCRIPTION_LENGTH
+                            ? output.substring(0, MAX_DESCRIPTION_LENGTH) + "\n\n[...gekürzt]"
+                            : output;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not load step outputs for run {}: {}", runId, e.getMessage());
+        }
+        return null;
     }
 
     private String buildTagsJson(GateResult gate) {

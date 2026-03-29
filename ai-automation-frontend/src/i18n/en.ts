@@ -158,6 +158,8 @@ export const en = {
     iconLabel: 'Icon (Emoji)',
     blockType: 'Block Type',
     blockConfig: 'Configuration (JSON)',
+    blockSkills: 'Block Skills',
+    blockSkillsHint: 'Additional skills activated for this block only (added to workflow-level skills).',
     blockTypes: {
       simple: 'Simple Command',
       shell: 'Shell Command',
@@ -191,7 +193,8 @@ export const en = {
     autoTodoMode: 'Creation mode',
     autoTodoModeAuto: 'Automatic',
     autoTodoModeApproval: 'Require approval',
-    autoTodoModeHint: 'Automatic: todos are created immediately. Approval: show a preview for confirmation.',
+    autoTodoModeTrack: 'Tracking',
+    autoTodoModeHint: 'Automatic: creates todos on issues, closes on success. Approval: preview before creating. Tracking: always keeps the latest result.',
     pendingTodos: 'Pending Todos',
     pendingTodosHint: 'This workflow proposed todos. Do you want to create them?',
     approveTodos: 'Create todos',
@@ -1044,6 +1047,11 @@ export const en = {
     otherSessions: 'Other Sessions',
     selectProjectFirst: 'Select a project to see its sessions',
     moreWorkflows: 'more',
+    confidenceTooltip: 'AI confidence: How confidently the pattern was identified (0–100%)',
+    patternTooltip: 'Pattern type: scripting = shell commands, file_editing = file changes, research = exploration, mixed = combination',
+    toolCallsTooltip: 'Number of tool calls in the session',
+    invalidJson: 'Invalid JSON',
+    blockEdited: 'edited',
   },
 } as const;
 

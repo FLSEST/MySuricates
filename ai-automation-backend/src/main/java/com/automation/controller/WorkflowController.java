@@ -163,6 +163,8 @@ public class WorkflowController {
                 workflow.getInstructions(),
                 workflow.getModel(),
                 workflow.getVersion(),
+                workflow.getDefaultContext(),
+                workflow.getMetadata(),
                 Instant.now()
         );
     }
@@ -205,8 +207,8 @@ public class WorkflowController {
                 request.model(),
                 null,
                 null,
-                null,
-                null,
+                request.metadata(),
+                request.defaultContext(),
                 null
         );
         var workflow = workflowService.create(createRequest);

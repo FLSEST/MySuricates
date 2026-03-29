@@ -5,6 +5,7 @@ import com.automation.dto.request.InstallPoolWorkflowRequest;
 import com.automation.dto.response.PoolWorkflowEntry;
 import com.automation.entity.Workflow;
 import com.automation.exception.ResourceNotFoundException;
+import com.automation.repository.ProjectRepository;
 import com.automation.service.workflow.WorkflowService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +32,9 @@ class WorkflowPoolServiceTest {
     @Mock
     private WorkflowService workflowService;
 
+    @Mock
+    private ProjectRepository projectRepository;
+
     private WorkflowPoolConfig config;
     private ObjectMapper objectMapper;
     private WorkflowPoolService poolService;
@@ -43,7 +47,7 @@ class WorkflowPoolServiceTest {
         config = new WorkflowPoolConfig();
         objectMapper = new ObjectMapper();
         config.setDirectory(tempDir.toString());
-        poolService = new WorkflowPoolService(config, objectMapper, workflowService);
+        poolService = new WorkflowPoolService(config, objectMapper, workflowService, projectRepository);
     }
 
     @Test
@@ -55,7 +59,7 @@ class WorkflowPoolServiceTest {
     @Test
     void listAll_nonExistentDirectory_returnsEmptyList() {
         config.setDirectory(tempDir.resolve("nonexistent").toString());
-        poolService = new WorkflowPoolService(config, objectMapper, workflowService);
+        poolService = new WorkflowPoolService(config, objectMapper, workflowService, projectRepository);
 
         List<PoolWorkflowEntry> result = poolService.listAll();
         assertThat(result).isEmpty();
@@ -67,7 +71,7 @@ class WorkflowPoolServiceTest {
                 {"name": {"en": "Test"}, "blocks": [{"type": "simple", "config": {"command": "test"}}]}
                 """);
         config.setEnabled(false);
-        poolService = new WorkflowPoolService(config, objectMapper, workflowService);
+        poolService = new WorkflowPoolService(config, objectMapper, workflowService, projectRepository);
 
         List<PoolWorkflowEntry> result = poolService.listAll();
         assertThat(result).isEmpty();

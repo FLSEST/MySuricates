@@ -264,7 +264,7 @@ These use non-obvious paths — always use these, never guess:
 - **All Claude CLI execution happens on the host** (not inside Docker containers) to avoid nested-session detection
   - `HostClaudeService.executeAction()` runs `claude -p` on the host with `ProcessBuilder.directory(projectPath)`
   - `CLAUDE_CODE` and `CLAUDECODE` env vars are removed from the process environment to prevent nested-session errors
-  - `CommandExecutorService` provides `executeOnHost(HostExecutionRequest)` / `executeStepOnHost(HostExecutionRequest)` / `injectSkillContextOnHost()` methods — all overloads use the `HostExecutionRequest` builder API
+  - `CommandExecutorService` provides `executeOnHost(HostExecutionRequest)` / `executeStepOnHost(HostExecutionRequest)` / `writeSkillContextToProject()` methods — all overloads use the `HostExecutionRequest` builder API. Skill context is written to `.claude/rules/skills-context.md` (file-based, not CLI-process-based) so all subsequent Claude CLI calls pick it up automatically.
 - Docker containers have resource limits: 4GB memory, CPU quota, 100 PIDs, 60min idle timeout
 - Security is enabled by default: API key auth via `X-API-Key` header (auto-generated if not configured), rate limiting
 - Block types: simple, shell, retry, conditional, forEach, while, switch, agentic, approval, sub-workflow, skill-capability, human-input
@@ -291,7 +291,10 @@ gate_description: <description>
 - **YELLOW → `COMPLETED_WITH_ERRORS`**: If the highest gate is YELLOW, the run status is set to `COMPLETED_WITH_ERRORS` instead of `COMPLETED`
 - **RED → `COMPLETED`**: RED gates don't change the run status — `AutoTodoService` handles them via the `WorkflowRunCompletedEvent`
 - `GateStatusResolver` — derives gate status from run status when no explicit marker exists (`FAILED` → RED, `COMPLETED` → GREEN)
-- `AutoTodoService` — creates follow-up TODOs based on gate status (RED → HIGH priority, YELLOW → MEDIUM priority)
+- `AutoTodoService` — creates follow-up TODOs based on gate status, configurable via `workflow.metadata.autoTodo`
+  - **Modes**: `auto` (default: GREEN closes TODOs, YELLOW→MEDIUM, RED→HIGH), `approval` (queues for confirmation), `track` (always creates/updates: GREEN→LOW, YELLOW→MEDIUM, RED→HIGH, never closes)
+  - **TODO description** includes the most detailed step output (longest non-shell block output, max 4000 chars)
+  - Enable per workflow: `metadata: { autoTodo: { enabled: true, mode: "track" } }`
 
 ## Agent Instructions System
 
@@ -363,6 +366,11 @@ Additional safety:
 - Capability handler classes (e.g. `LintHandler`, `OCRHandler`) remain as independent `@Component` beans in `skills/handlers/`
 - Users can create custom skills via the import API (`POST /api/v1/skills/import`)
 - `Skill.java` entity uses `@PrePersist ensureId()` (not `@GeneratedValue`) to allow explicit IDs for built-ins
+- **Skill activation levels**: Skills can be activated at two levels:
+  - **Workflow-level** (`Workflow.activatedSkills` ManyToMany): applies to all blocks in the workflow
+  - **Block-level** (`BlockDefinition.skillIds` list): additional skills for a specific block only (additive to workflow-level skills)
+- Skill context is written to `.claude/rules/skills-context.md` before execution; for blocks with per-block skills, the file is temporarily extended and restored to the baseline after the block completes
+- `WorkflowExecutor` pre-resolves all per-block skill IDs in a single `SkillRepository.findAllById()` call before the block loop
 
 ## Human-Input Block
 

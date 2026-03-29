@@ -9,12 +9,14 @@ import com.automation.executor.ApprovalRequest;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
 import com.automation.repository.ContainerRepository;
+import com.automation.repository.SkillRepository;
 import com.automation.repository.StepResultRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.memory.WorkflowMemoryService;
 import com.automation.service.todo.GateStatusOutputParser;
+import com.automation.service.todo.TodoOutputParser;
 import com.automation.service.project.ContainerService;
 import com.automation.service.project.ProjectContextService;
 import com.automation.service.system.SystemIdentityService;
@@ -48,6 +50,7 @@ public class WorkflowExecutor {
     private final WorkflowRunRepository runRepository;
     private final StepResultRepository stepResultRepository;
     private final ContainerRepository containerRepository;
+    private final SkillRepository skillRepository;
     private final ExecutionBroadcaster broadcaster;
     private final ExecutorService virtualThreadExecutor;
     private final DynamicSemaphore executionSemaphore;
@@ -97,6 +100,7 @@ public class WorkflowExecutor {
         final Map<String, Object> workflowMeta;
         final String templateId;
         final Map<String, Object> contextVars;
+        Map<String, Skill> blockSkillLookup;
         try {
             project = workflow.getProject();
             blocks = List.copyOf(workflow.getBlocks());
@@ -118,6 +122,23 @@ public class WorkflowExecutor {
                 run.setInputContext(new HashMap<>(contextVars));
                 runRepository.save(run);
             }
+
+            // Pre-resolve per-block skill IDs to Skill entities (single DB query)
+            Set<String> workflowSkillIds = skills.stream().map(Skill::getId).collect(Collectors.toSet());
+            Set<String> blockSkillIds = blocks.stream()
+                    .filter(b -> b.getSkillIds() != null)
+                    .flatMap(b -> b.getSkillIds().stream())
+                    .filter(id -> !workflowSkillIds.contains(id))
+                    .collect(Collectors.toSet());
+            blockSkillLookup = blockSkillIds.isEmpty()
+                    ? Map.of()
+                    : skillRepository.findAllById(blockSkillIds).stream()
+                            .collect(Collectors.toMap(Skill::getId, s -> s));
+            if (!blockSkillIds.isEmpty() && blockSkillLookup.size() < blockSkillIds.size()) {
+                Set<String> missing = new java.util.HashSet<>(blockSkillIds);
+                missing.removeAll(blockSkillLookup.keySet());
+                log.warn("Per-block skill IDs not found (deleted?): {}", missing);
+            }
         } catch (Exception e) {
             log.error("Failed to initialize workflow data for run {}: {}", run.getId(), e.getMessage(), e);
             run.setStatus(RunStatus.FAILED);
@@ -131,10 +152,11 @@ public class WorkflowExecutor {
         final String runId = run.getId();
         final String workflowId = workflow.getId();
         final String workflowName = workflow.getName();
+        final Map<String, Skill> finalBlockSkillLookup = blockSkillLookup;
         activityLogService.info(LogCategory.EXECUTION,
                 "Workflow execution started: " + workflowName,
                 "WorkflowExecutor", runId, workflowId);
-        virtualThreadExecutor.submit(() -> executeBlocks(runId, workflowId, workflowName, project, blocks, skills, contextVars, instructions, model, provider, workflowMeta, templateId, 0, null));
+        virtualThreadExecutor.submit(() -> executeBlocks(runId, workflowId, workflowName, project, blocks, skills, finalBlockSkillLookup, contextVars, instructions, model, provider, workflowMeta, templateId, 0, null));
 
         return run;
     }
@@ -145,7 +167,7 @@ public class WorkflowExecutor {
      * @param resumePreviousOutput for resume: pre-seed previousOutput from the last completed step
      */
     private void executeBlocks(String runId, String workflowId, String workflowName, Project project, List<BlockDefinition> blocks,
-                               List<Skill> skills, Map<String, Object> inputContext,
+                               List<Skill> skills, Map<String, Skill> blockSkillLookup, Map<String, Object> inputContext,
                                String instructions, String model, String provider, Map<String, Object> workflowMeta,
                                String templateId, int skipToStepIndex, String resumePreviousOutput) {
         // Single try-finally ensures semaphore is always released, even if the thread
@@ -204,7 +226,8 @@ public class WorkflowExecutor {
 
             activeExecutions.put(runId, context);
 
-            commandExecutorService.injectSkillContextOnHost(project.getPath(), skills);
+            // Write skill context to .claude/rules/ (file-based, picked up by all Claude CLI calls)
+            commandExecutorService.writeSkillContextToProject(project.getPath(), skills);
 
             // Write active workflow memory to project for executing agent
             workflowMemoryService.writeActiveMemoryToProject(workflowId, project.getPath());
@@ -237,6 +260,22 @@ public class WorkflowExecutor {
                     }
                 }
 
+                // Per-block skill context: merge block-level skills with workflow-level skills
+                boolean hasBlockSkills = block.getSkillIds() != null && !block.getSkillIds().isEmpty();
+                if (hasBlockSkills) {
+                    List<Skill> merged = new ArrayList<>(skills);
+                    Set<String> existingIds = skills.stream().map(Skill::getId).collect(Collectors.toSet());
+                    for (String id : block.getSkillIds()) {
+                        if (!existingIds.contains(id)) {
+                            Skill extra = blockSkillLookup.get(id);
+                            if (extra != null) {
+                                merged.add(extra);
+                            }
+                        }
+                    }
+                    commandExecutorService.writeSkillContextToProject(project.getPath(), merged);
+                }
+
                 BlockExecutor executor = findExecutor(block.getType());
 
                 // Pre-create RUNNING placeholder so UI shows the step immediately
@@ -244,6 +283,10 @@ public class WorkflowExecutor {
 
                 // For resumed runs: skip blocks that already completed in the previous execution
                 if (stepIndex < skipToStepIndex) {
+                    // Restore baseline skill context if this block had extra skills
+                    if (hasBlockSkills) {
+                        commandExecutorService.writeSkillContextToProject(project.getPath(), skills);
+                    }
                     continue;
                 }
 
@@ -252,8 +295,9 @@ public class WorkflowExecutor {
                 step.setStartedAt(Instant.now());
                 step.setStatus(StepStatus.RUNNING);
                 step.setMetadata(Map.of("blockType", block.getType()));
-                run.addStep(step);
-                runRepository.save(run);
+                step.setWorkflowRun(run);
+                run.getSteps().add(step);
+                stepResultRepository.save(step);
                 broadcaster.broadcastStepResult(run.getId(), step);
 
                 // Execute the block — nextStepIndex() returns the pre-allocated index
@@ -283,7 +327,12 @@ public class WorkflowExecutor {
                 }
 
                 broadcaster.broadcastStepResult(run.getId(), step);
-                runRepository.save(run);
+                stepResultRepository.save(step);
+
+                // Restore baseline skill context after a block with extra skills
+                if (hasBlockSkills) {
+                    commandExecutorService.writeSkillContextToProject(project.getPath(), skills);
+                }
 
                 if (step.getStatus() == StepStatus.FAILED && block.shouldStopOnFailure()) {
                     run.setStatus(RunStatus.FAILED);
@@ -317,6 +366,20 @@ public class WorkflowExecutor {
                 context.setRunMetadata("gate_status", highestGate.name());
                 if (gateCategory != null) context.setRunMetadata("gate_category", gateCategory);
                 if (gateDescription != null) context.setRunMetadata("gate_description", gateDescription);
+            }
+
+            // Parse todo_item markers from ALL blocks — collect granular TODO items
+            List<TodoOutputParser.ParsedTodoItem> allTodoItems = new ArrayList<>();
+            for (StepResult step : run.getSteps()) {
+                if (step.getOutput() != null) {
+                    allTodoItems.addAll(TodoOutputParser.parse(step.getOutput()));
+                }
+            }
+            if (!allTodoItems.isEmpty()) {
+                context.setRunMetadata("todo_items", allTodoItems.stream()
+                        .map(t -> Map.<String, Object>of("title", t.title(), "priority", t.priority(), "tags", t.tags()))
+                        .toList());
+                log.info("Parsed {} todo_item markers from workflow {}", allTodoItems.size(), workflowName);
             }
 
             if (run.getStatus() == RunStatus.RUNNING) {
@@ -499,6 +562,7 @@ public class WorkflowExecutor {
         final String provider;
         final Map<String, Object> workflowMeta;
         final String templateId;
+        Map<String, Skill> resumeBlockSkillLookup;
         try {
             project = workflow.getProject();
             blocks = List.copyOf(workflow.getBlocks());
@@ -508,6 +572,18 @@ public class WorkflowExecutor {
             provider = workflow.getProvider();
             workflowMeta = Map.copyOf(workflow.getMetadata());
             templateId = workflow.getTemplateId();
+
+            // Pre-resolve per-block skill IDs (same logic as execute())
+            Set<String> wfSkillIds = skills.stream().map(Skill::getId).collect(Collectors.toSet());
+            Set<String> blkSkillIds = blocks.stream()
+                    .filter(b -> b.getSkillIds() != null)
+                    .flatMap(b -> b.getSkillIds().stream())
+                    .filter(id -> !wfSkillIds.contains(id))
+                    .collect(Collectors.toSet());
+            resumeBlockSkillLookup = blkSkillIds.isEmpty()
+                    ? Map.of()
+                    : skillRepository.findAllById(blkSkillIds).stream()
+                            .collect(Collectors.toMap(Skill::getId, s -> s));
         } catch (Exception e) {
             throw new WorkflowExecutionException("Failed to load workflow data for resume: " + e.getMessage(), e);
         }
@@ -522,12 +598,13 @@ public class WorkflowExecutor {
         final String wfId = workflow.getId();
         final String wfName = workflow.getName();
         final int resumeIdx = resumeFromIndex;
+        final Map<String, Skill> finalResumeBlockSkillLookup = resumeBlockSkillLookup;
         activityLogService.info(LogCategory.EXECUTION,
                 "Resuming workflow from step " + resumeIdx + ": " + wfName,
                 "WorkflowExecutor", runId, wfId);
 
         virtualThreadExecutor.submit(() -> executeBlocks(
-                runId, wfId, wfName, project, blocks, skills,
+                runId, wfId, wfName, project, blocks, skills, finalResumeBlockSkillLookup,
                 contextForResume, instructions, model, provider, workflowMeta, templateId,
                 resumeIdx, previousOutput));
 

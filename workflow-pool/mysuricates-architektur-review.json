@@ -33,7 +33,7 @@
       "config": {
         "label": "Architektur-Tiefenanalyse (Opus)",
         "timeout_seconds": 900,
-        "command": "Analysiere die Architektur-Metriken des MySuricates-Projekts:\n\n{{ previous_output }}\n\nKontext: MySuricates ist eine AI-Workflow-Automation-Plattform mit Spring Boot Backend und React Frontend.\n\nUntersuche systematisch:\n\n1. **God Classes**: Dateien mit >300 LOC, >10 Methoden oder >5 DI-Injections.\n   - Welche Verantwortlichkeiten hat die Klasse?\n   - Welche koennten in eigene Services extrahiert werden?\n   - Besonders kritisch: WorkflowExecutor, StagingService, AssistantService\n\n2. **Zirkulaere Abhaengigkeiten**: @Lazy als Symptom.\n   - Ist die @Lazy-Nutzung gerechtfertigt (SubWorkflow→WorkflowExecutor ist bekannt/akzeptiert)?\n   - Gibt es weitere versteckte Zyklen?\n\n3. **Schichtverletzungen**: Controller→Repository direkt, Service→Controller, etc.\n   - Klare Schichten: Controller → Service → Repository\n   - Executor → Service ist OK (Executors sind Service-Layer)\n\n4. **Frontend-Architektur**: Grosse Pages/Komponenten die aufgeteilt werden sollten.\n   - Pages > 400 LOC sind Kandidaten\n   - Hooks mit zu vielen Verantwortlichkeiten\n\n5. **Uebermassige Kopplung**: Klassen mit >7 DI-Injections.\n\nPro Finding: Schweregrad (CRITICAL/HIGH/MEDIUM/LOW), konkrete Datei, spezifischer Refactoring-Vorschlag.\n\nBEKANNTE PATTERNS (KEIN Finding melden):\n- @Lazy auf SubWorkflowBlockExecutor (beabsichtigt, dokumentiert)\n- @SQLRestriction fuer Soft-Delete (beabsichtigt)\n- HikariCP pool-size=1 (SQLite-Limitation, dokumentiert)"
+        "command": "Analysiere die Architektur-Metriken des MySuricates-Projekts:\n\n{{ previous_output }}\n\nKontext: MySuricates ist eine AI-Workflow-Automation-Plattform mit Spring Boot Backend und React Frontend.\n\nUntersuche systematisch:\n\n1. **God Classes**: Dateien mit >300 LOC, >10 Methoden oder >5 DI-Injections.\n   - Welche Verantwortlichkeiten hat die Klasse?\n   - Welche koennten in eigene Services extrahiert werden?\n   - Besonders kritisch: WorkflowExecutor, StagingService, AssistantService\n\n2. **Zirkulaere Abhaengigkeiten**: @Lazy als Symptom.\n   - Ist die @Lazy-Nutzung gerechtfertigt (SubWorkflow→WorkflowExecutor ist bekannt/akzeptiert)?\n   - Gibt es weitere versteckte Zyklen?\n\n3. **Schichtverletzungen**: Controller→Repository direkt, Service→Controller, etc.\n   - Klare Schichten: Controller → Service → Repository\n   - Executor → Service ist OK (Executors sind Service-Layer)\n\n4. **Frontend-Architektur**: Grosse Pages/Komponenten die aufgeteilt werden sollten.\n   - Pages > 400 LOC sind Kandidaten\n   - Hooks mit zu vielen Verantwortlichkeiten\n\n5. **Uebermassige Kopplung**: Klassen mit >7 DI-Injections.\n\nPro Finding: Schweregrad (CRITICAL/HIGH/MEDIUM/LOW), konkrete Datei, spezifischer Refactoring-Vorschlag.\n\nBEKANNTE PATTERNS (KEIN Finding melden):\n- @Lazy auf SubWorkflowBlockExecutor (beabsichtigt, dokumentiert)\n- @SQLRestriction fuer Soft-Delete (beabsichtigt)\n- HikariCP pool-size=1 (SQLite-Limitation, dokumentiert)\n\nAm Ende des Reports: Liste ALLE HIGH und CRITICAL Findings als todo_item-Zeilen.\nFormat (EXAKT einhalten, eine Zeile pro Finding):\ntodo_item: <Titel im Imperativ> | HIGH oder MEDIUM | <tags kommasepariert>\n\nBeispiele:\ntodo_item: ChainExecutor vollstaendig testen | HIGH | backend,testing\ntodo_item: useWebSocket Hook testen | MEDIUM | frontend,testing"
       }
     },
     {
@@ -42,20 +42,6 @@
         "label": "Architektur-Radar Report",
         "timeout_seconds": 900,
         "command": "Erstelle den Architektur-Review-Report fuer MySuricates:\n\n{{ previous_output }}\n\n## Format:\n\n### Radar-Uebersicht\n| Dimension | Score (1-10) | Findings | Kritischster Fund |\n|-----------|-------------|----------|-------------------|\n| God Classes | | | |\n| Zirkulaere Deps | | | |\n| Schichtverletzungen | | | |\n| Kopplung | | | |\n| Package-Struktur | | | |\n| Frontend-Architektur | | | |\n\n### Top-5 Refactoring-Prioritaeten\n| # | Klasse/Datei | Problem | Vorgeschlagene Loesung | Aufwand | Risiko |\n\n### Refactoring-Roadmap\nPhase 1 (Quick Wins): Isolierte, risikoarme Aenderungen\nPhase 2 (Mittelfristig): Aenderungen mit Abhaengigkeiten\nPhase 3 (Langfristig): Groessere Umbauten\n\ngate_status: GREEN wenn keine CRITICAL Findings, YELLOW wenn CRITICAL vorhanden, RED wenn strukturelle Integritaet gefaehrdet"
-      }
-    },
-    {
-      "type": "agentic",
-      "config": {
-        "label": "TODOs erstellen/aktualisieren",
-        "goal": "Erstelle oder aktualisiere TODOs basierend auf den Architektur-Findings aus {{ previous_output }}.\n\nVORGEHEN:\n1. API-Key aus der SQLite-Datenbank lesen:\n   python3 -c \"import sqlite3; conn = sqlite3.connect('/home/flo/Entwicklung/tools/autotrigger/ai-automation-backend/data/automation.db'); c = conn.cursor(); c.execute(\\\"SELECT value FROM app_settings WHERE key = 'api-key'\\\"); print(c.fetchone()[0]); conn.close()\"\n\n2. Bestehende TODOs mit Tag 'audit:arch-debt' laden:\n   curl -s -H 'X-API-Key: <KEY>' 'http://localhost:9090/api/v1/todos?tag=audit:arch-debt&status=OPEN&status=IN_PROGRESS'\n\n3. Fuer jeden CRITICAL oder HIGH Finding:\n   a) Pruefen ob bereits ein offenes TODO existiert\n   b) Falls ja: Beschreibung aktualisieren (PATCH /api/v1/todos/<id>)\n   c) Falls nein: Neues TODO anlegen (POST /api/v1/todos) mit:\n      - title: \"Architektur: <kurze Beschreibung>\"\n      - description: Markdown mit Details, betroffene Dateien, Refactoring-Vorschlag\n      - priority: CRITICAL→HIGH, HIGH→MEDIUM\n      - tags: [\"audit:arch-debt\", \"architektur\", \"backend\" oder \"frontend\"]\n      - projectId: \"ebf4f50c-20c2-4c35-a84a-a0b350124523\"\n      - source: \"AI\"\n      - sourceAgent: \"quality-workflow\"\n\n4. Bestehende audit:arch-debt TODOs die nicht mehr relevant sind → DONE setzen\n\nWICHTIG: Nur CRITICAL und HIGH als TODOs. Absolute Pfade fuer DB.",
-        "max_iterations": 10,
-        "max_total_tokens": 150000,
-        "iteration_timeout_seconds": 120,
-        "total_timeout_seconds": 900,
-        "max_repeated_actions": 3,
-        "require_approval": false,
-        "success_criteria": "Alle CRITICAL/HIGH Architektur-Findings sind als TODOs angelegt oder aktualisiert."
       }
     },
     {
@@ -75,6 +61,12 @@
       }
     }
   ],
-  "version": "1.1.0",
-  "author": "MySuricates"
+  "version": "2.0.0",
+  "author": "MySuricates",
+  "metadata": {
+    "autoTodo": {
+      "enabled": true,
+      "mode": "track"
+    }
+  }
 }

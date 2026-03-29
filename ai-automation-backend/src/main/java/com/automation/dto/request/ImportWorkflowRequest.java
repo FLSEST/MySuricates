@@ -4,6 +4,7 @@ import com.automation.entity.BlockDefinition;
 import jakarta.validation.constraints.NotBlank;
 
 import java.util.List;
+import java.util.Map;
 
 public record ImportWorkflowRequest(
         String projectId,
@@ -13,7 +14,9 @@ public record ImportWorkflowRequest(
         List<BlockDefinition> blocks,
         String instructions,
         String model,
-        Boolean updateIfExists
+        Boolean updateIfExists,
+        Map<String, Object> defaultContext,
+        Map<String, Object> metadata
 ) {
     public ImportWorkflowRequest {
         if (blocks == null) blocks = List.of();
