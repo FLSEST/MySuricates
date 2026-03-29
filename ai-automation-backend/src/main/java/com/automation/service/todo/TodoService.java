@@ -172,17 +172,21 @@ public class TodoService {
                 predicates.add(cb.equal(root.get("source"), Todo.Source.valueOf(source)));
             }
             if (tag != null && !tag.isBlank()) {
-                predicates.add(cb.like(root.get("tags"), "%" + tag + "%"));
+                predicates.add(cb.like(root.get("tags"), "%" + escapeLikePattern(tag) + "%", '\\'));
             }
             if (q != null && !q.isBlank()) {
-                String pattern = "%" + q.toLowerCase() + "%";
+                String pattern = "%" + escapeLikePattern(q.toLowerCase()) + "%";
                 predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("title")), pattern),
-                        cb.like(cb.lower(root.get("description")), pattern)
+                        cb.like(cb.lower(root.get("title")), pattern, '\\'),
+                        cb.like(cb.lower(root.get("description")), pattern, '\\')
                 ));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));
         };
+    }
+
+    private String escapeLikePattern(String input) {
+        return input.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 }
