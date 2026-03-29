@@ -4,7 +4,6 @@ import com.automation.dto.response.WorkflowTemplateResponse;
 import com.automation.entity.WorkflowTemplate;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.mapper.WorkflowTemplateMapper;
-import com.automation.repository.ProjectRepository;
 import com.automation.service.system.ApiKeyService;
 import com.automation.service.workflow.TemplateVerificationService;
 import com.automation.service.workflow.WorkflowTemplateService;
@@ -41,7 +40,6 @@ class WorkflowTemplateControllerTest {
 
     @MockBean private WorkflowTemplateMapper templateMapper;
     @MockBean private TemplateVerificationService verificationService;
-    @MockBean private ProjectRepository projectRepository;
     @MockBean private ApiKeyService apiKeyService;
 
     private WorkflowTemplateResponse sampleResponse() {
@@ -54,8 +52,7 @@ class WorkflowTemplateControllerTest {
     void listTemplates_returnsAll() throws Exception {
         when(templateService.findAll()).thenReturn(List.of());
         when(templateMapper.toResponseList(any())).thenReturn(List.of(sampleResponse()));
-        when(projectRepository.findAll()).thenReturn(List.of());
-        when(verificationService.getVerifications(any())).thenReturn(List.of());
+        when(verificationService.enrichAllWithVerifications(any())).thenReturn(List.of(sampleResponse()));
 
         mockMvc.perform(get("/api/v1/workflow-templates"))
                 .andExpect(status().isOk())
@@ -67,8 +64,7 @@ class WorkflowTemplateControllerTest {
         var template = WorkflowTemplate.builder().id("t-1").build();
         when(templateService.findById("t-1")).thenReturn(template);
         when(templateMapper.toResponse(template)).thenReturn(sampleResponse());
-        when(projectRepository.findAll()).thenReturn(List.of());
-        when(verificationService.getVerifications(any())).thenReturn(List.of());
+        when(verificationService.enrichWithVerifications(any())).thenReturn(sampleResponse());
 
         mockMvc.perform(get("/api/v1/workflow-templates/t-1"))
                 .andExpect(status().isOk())

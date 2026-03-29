@@ -23,6 +23,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -176,6 +177,20 @@ public class DatabaseBackupService {
             log.info("Incremental vacuum completed (up to 1000 pages reclaimed)");
         } catch (Exception e) {
             log.warn("Incremental vacuum failed: {}", e.getMessage());
+        }
+    }
+
+    public Map<String, Object> fullVacuum() {
+        long startTime = System.currentTimeMillis();
+        try (var conn = dataSource.getConnection(); var stmt = conn.createStatement()) {
+            stmt.execute("VACUUM");
+            long durationMs = System.currentTimeMillis() - startTime;
+            log.info("Full VACUUM completed in {} ms", durationMs);
+            return Map.of("status", "completed", "durationMs", durationMs);
+        } catch (Exception e) {
+            log.error("VACUUM failed: {}", e.getMessage(), e);
+            return Map.of("status", "failed",
+                    "error", e.getMessage() != null ? e.getMessage() : e.getClass().getName());
         }
     }
 

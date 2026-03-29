@@ -747,6 +747,8 @@ public class AssistantService {
 
     // ── Tool execution ────────────────────────────────────────────────────────
 
+    private record ToolRequest(String type, String payload) {}
+
     /** Replaces all &lt;tool&gt; tags in the response with their execution results. */
     private String executeTools(String response) {
         if (response == null) return response;

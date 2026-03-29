@@ -6,8 +6,8 @@ import com.automation.entity.*;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.WorkflowMapper;
-import com.automation.repository.ProjectRepository;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.project.ProjectService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowOptimizationService;
 import com.automation.service.system.ApiKeyService;
@@ -74,7 +74,7 @@ class WorkflowControllerTest {
     private com.automation.service.repair.AutoRepairService autoRepairService;
 
     @MockBean
-    private ProjectRepository projectRepository;
+    private ProjectService projectService;
 
     private Workflow testWorkflow;
     private WorkflowResponse testResponse;

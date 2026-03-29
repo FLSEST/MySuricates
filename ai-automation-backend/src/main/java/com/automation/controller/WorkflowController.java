@@ -9,14 +9,11 @@ import com.automation.dto.response.ExportWorkflowResponse;
 import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.WorkflowResponse;
 import com.automation.dto.response.WorkflowRunResponse;
-import com.automation.entity.Project;
-import com.automation.entity.ProjectStatus;
-import com.automation.entity.ProjectType;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.mapper.WorkflowMapper;
-import com.automation.repository.ProjectRepository;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.project.ProjectService;
 import com.automation.entity.RunStatus;
 import com.automation.service.repair.AutoRepairService;
 import com.automation.service.workflow.WorkflowExecutor;
@@ -38,12 +35,10 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class WorkflowController {
 
-    private static final String COLLECTION_PROJECT_NAME = "Sammlung";
-
     private final WorkflowService workflowService;
     private final WorkflowExecutor workflowExecutor;
     private final WorkflowRunRepository runRepository;
-    private final ProjectRepository projectRepository;
+    private final ProjectService projectService;
     private final WorkflowMapper workflowMapper;
     private final WorkflowOptimizationService optimizationService;
     private final AutoRepairService autoRepairService;
@@ -173,7 +168,7 @@ public class WorkflowController {
     public ResponseEntity<WorkflowResponse> importWorkflow(@Valid @RequestBody ImportWorkflowRequest request) {
         String projectId = request.projectId();
         if (projectId == null || projectId.isBlank()) {
-            projectId = getOrCreateCollectionProject().getId();
+            projectId = projectService.getOrCreateCollectionProject().getId();
         }
 
         // Check for existing workflow if updateIfExists is true
@@ -215,17 +210,4 @@ public class WorkflowController {
         return ResponseEntity.status(HttpStatus.CREATED).body(workflowMapper.toResponse(workflow));
     }
 
-    private Project getOrCreateCollectionProject() {
-        return projectRepository.findFirstByName(COLLECTION_PROJECT_NAME)
-                .orElseGet(() -> {
-                    Project project = Project.builder()
-                            .name(COLLECTION_PROJECT_NAME)
-                            .subtitle("Importierte Workflows")
-                            .type(ProjectType.PERSONAL)
-                            .path("/tmp")
-                            .status(ProjectStatus.STOPPED)
-                            .build();
-                    return projectRepository.save(project);
-                });
-    }
 }

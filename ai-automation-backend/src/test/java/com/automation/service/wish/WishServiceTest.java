@@ -5,7 +5,6 @@ import com.automation.dto.request.WishRespondRequest;
 import com.automation.entity.*;
 import com.automation.repository.*;
 import com.automation.service.ai.AiProviderRegistry;
-import com.automation.service.ai.HostClaudeService;
 import com.automation.service.chain.ChainExecutor;
 import com.automation.service.chain.ChainService;
 import com.automation.service.factory.WorkflowFactoryService;
@@ -34,7 +33,6 @@ import static org.mockito.Mockito.*;
 class WishServiceTest {
 
     @Mock private WishRepository wishRepository;
-    @Mock private HostClaudeService hostClaude;
     @Mock private AiProviderRegistry aiProviderRegistry;
     @Mock private WorkflowService workflowService;
     @Mock private ChainService chainService;
@@ -63,7 +61,7 @@ class WishServiceTest {
         WishConfig wishConfig = new WishConfig();
         wishService = new WishService(
                 wishConfig,
-                wishRepository, hostClaude, aiProviderRegistry, workflowService, chainService,
+                wishRepository, aiProviderRegistry, workflowService, chainService,
                 chainExecutor, workflowExecutor, workflowRepository, skillRepository,
                 workflowRunRepository, chainRunRepository, stepResultRepository,
                 projectRepository, templateRepository, memoryRepository,

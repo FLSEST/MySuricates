@@ -1,6 +1,9 @@
 package com.automation.service.workflow;
 
+import com.automation.dto.response.WorkflowTemplateResponse;
+import com.automation.dto.response.WorkflowTemplateResponse.TemplateVerificationInfo;
 import com.automation.entity.TemplateVerification;
+import com.automation.repository.ProjectRepository;
 import com.automation.repository.TemplateVerificationRepository;
 import com.automation.repository.WorkflowTemplateRepository;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -18,6 +23,7 @@ public class TemplateVerificationService {
 
     private final TemplateVerificationRepository verificationRepository;
     private final WorkflowTemplateRepository templateRepository;
+    private final ProjectRepository projectRepository;
 
     @Transactional
     public void recordSuccessfulRun(String workflowId, String templateId, String projectId, String runId) {
@@ -56,5 +62,66 @@ public class TemplateVerificationService {
     @Transactional(readOnly = true)
     public List<TemplateVerification> getVerifications(String templateId) {
         return verificationRepository.findByTemplateId(templateId);
+    }
+
+    @Transactional(readOnly = true)
+    public WorkflowTemplateResponse enrichWithVerifications(WorkflowTemplateResponse response) {
+        Map<String, String> projectNames = projectRepository.findAll().stream()
+                .collect(Collectors.toMap(p -> p.getId(), p -> p.getName(), (a, b) -> a));
+
+        List<TemplateVerification> verifications = getVerifications(response.id());
+        List<TemplateVerificationInfo> infos = verifications.stream()
+                .map(v -> new TemplateVerificationInfo(
+                        v.getProjectId(),
+                        projectNames.getOrDefault(v.getProjectId(), "Unknown"),
+                        v.getLastRunId(),
+                        v.getVerifiedAt()
+                ))
+                .toList();
+
+        return new WorkflowTemplateResponse(
+                response.id(),
+                response.name(),
+                response.description(),
+                response.icon(),
+                response.category(),
+                response.blocks(),
+                response.instructions(),
+                response.model(),
+                response.builtIn(),
+                response.sortOrder(),
+                response.qualityStatus(),
+                infos,
+                response.version(),
+                response.createdAt(),
+                response.updatedAt()
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public List<WorkflowTemplateResponse> enrichAllWithVerifications(List<WorkflowTemplateResponse> responses) {
+        Map<String, String> projectNames = projectRepository.findAll().stream()
+                .collect(Collectors.toMap(p -> p.getId(), p -> p.getName(), (a, b) -> a));
+
+        return responses.stream()
+                .map(response -> {
+                    List<TemplateVerification> verifications = getVerifications(response.id());
+                    List<TemplateVerificationInfo> infos = verifications.stream()
+                            .map(v -> new TemplateVerificationInfo(
+                                    v.getProjectId(),
+                                    projectNames.getOrDefault(v.getProjectId(), "Unknown"),
+                                    v.getLastRunId(),
+                                    v.getVerifiedAt()
+                            ))
+                            .toList();
+                    return new WorkflowTemplateResponse(
+                            response.id(), response.name(), response.description(),
+                            response.icon(), response.category(), response.blocks(),
+                            response.instructions(), response.model(), response.builtIn(),
+                            response.sortOrder(), response.qualityStatus(), infos,
+                            response.version(), response.createdAt(), response.updatedAt()
+                    );
+                })
+                .toList();
     }
 }

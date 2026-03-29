@@ -8,7 +8,6 @@ import com.automation.entity.*;
 import com.automation.repository.*;
 import com.automation.service.ai.AiProvider;
 import com.automation.service.ai.AiProviderRegistry;
-import com.automation.service.ai.HostClaudeService;
 import com.automation.service.chain.ChainExecutor;
 import com.automation.service.chain.ChainService;
 import com.automation.dto.response.PoolWorkflowEntry;
@@ -47,7 +46,6 @@ public class WishService {
 
     private final WishConfig wishConfig;
     private final WishRepository wishRepository;
-    private final HostClaudeService hostClaude;
     private final AiProviderRegistry aiProviderRegistry;
     private final WorkflowService workflowService;
     private final ChainService chainService;
@@ -88,7 +86,6 @@ public class WishService {
     public WishService(
             WishConfig wishConfig,
             WishRepository wishRepository,
-            HostClaudeService hostClaude,
             AiProviderRegistry aiProviderRegistry,
             WorkflowService workflowService,
             ChainService chainService,
@@ -112,7 +109,6 @@ public class WishService {
     ) {
         this.wishConfig = wishConfig;
         this.wishRepository = wishRepository;
-        this.hostClaude = hostClaude;
         this.aiProviderRegistry = aiProviderRegistry;
         this.workflowService = workflowService;
         this.chainService = chainService;

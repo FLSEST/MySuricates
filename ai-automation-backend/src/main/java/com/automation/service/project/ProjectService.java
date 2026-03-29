@@ -5,6 +5,7 @@ import com.automation.dto.request.UpdateProjectRequest;
 import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectStatus;
+import com.automation.entity.ProjectType;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ProjectRepository;
 import com.automation.service.activitylog.ActivityLogService;
@@ -149,6 +150,21 @@ public class ProjectService {
         containerService.stopContainer(project);
         project.setStatus(ProjectStatus.STOPPED);
         return projectRepository.save(project);
+    }
+
+    @Transactional
+    public Project getOrCreateCollectionProject() {
+        return projectRepository.findFirstByName("Sammlung")
+                .orElseGet(() -> {
+                    Project project = Project.builder()
+                            .name("Sammlung")
+                            .subtitle("Importierte Workflows")
+                            .type(ProjectType.PERSONAL)
+                            .path("/tmp")
+                            .status(ProjectStatus.STOPPED)
+                            .build();
+                    return projectRepository.save(project);
+                });
     }
 
     private void validatePath(String path) {

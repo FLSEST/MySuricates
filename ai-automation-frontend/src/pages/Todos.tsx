@@ -4,9 +4,10 @@ import {
   CheckSquare, Plus, Search, Trash2, Pencil, Bot, User, GitBranch,
   X, List, LayoutGrid, Circle,
 } from 'lucide-react';
-import { Card, Button, Input, Select, Modal, Spinner, Badge, TagInput } from '../components/ui';
+import { Card, Button, Spinner, Badge, TagInput } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
+import { TodoEditModal } from '../components/shared/TodoEditModal';
 import {
   useTodos, useTodoCount, useCreateTodo, useUpdateTodo, useUpdateTodoStatus, useDeleteTodo,
 } from '../hooks/useTodos';
@@ -785,125 +786,18 @@ export function Todos() {
         </Card>
       )}
 
-      {/* Edit Modal */}
-      <Modal
-        open={!!editTodo}
+      <TodoEditModal
+        editTodo={editTodo}
+        editForm={editForm}
+        editTagsList={editTagsList}
+        projects={projects ?? []}
+        allTags={allTags}
+        isLoading={updateTodo.isPending}
         onClose={() => setEditTodo(null)}
-        title={t.todos.editTodo}
-        size="lg"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setEditTodo(null)}>
-              {t.common.cancel}
-            </Button>
-            <Button
-              onClick={handleEditSave}
-              loading={updateTodo.isPending}
-              disabled={!editForm.title?.trim()}
-            >
-              {t.common.save}
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <Input
-            label={t.todos.titleLabel}
-            value={editForm.title ?? ''}
-            onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-          />
-
-          <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-text-secondary">{t.todos.descriptionLabel}</label>
-            <textarea
-              className="input-base w-full min-h-[80px] resize-y"
-              value={editForm.description ?? ''}
-              onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-            />
-          </div>
-
-          {/* Status buttons */}
-          <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-text-secondary">{t.common.status}</label>
-            <div className="flex gap-2">
-              {STATUSES.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setEditForm({ ...editForm, status: s })}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
-                    editForm.status === s
-                      ? 'bg-accent text-text-inverse border-accent'
-                      : 'bg-surface-raised text-text-secondary border-border hover:border-border-strong'
-                  }`}
-                >
-                  {t.todos.statuses[s]}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Priority buttons */}
-          <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-text-secondary">{t.todos.priority}</label>
-            <div className="flex gap-2">
-              {PRIORITIES.map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setEditForm({ ...editForm, priority: p })}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
-                    editForm.priority === p
-                      ? 'bg-accent text-text-inverse border-accent'
-                      : 'bg-surface-raised text-text-secondary border-border hover:border-border-strong'
-                  }`}
-                >
-                  {t.todos.priorities[p]}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Project */}
-          <Select
-            label={t.common.project}
-            value={editForm.projectId ?? ''}
-            onChange={(e) => setEditForm({ ...editForm, projectId: e.target.value })}
-            options={[
-              { value: '', label: t.common.selectProject },
-              ...(projects?.map((p) => ({ value: p.id, label: p.name })) ?? []),
-            ]}
-          />
-
-          {/* Tags */}
-          <TagInput
-            label={t.todos.tags}
-            tags={editTagsList}
-            onChange={setEditTagsList}
-            suggestions={allTags}
-            placeholder="bug, performance, ux"
-          />
-
-          {/* Read-only metadata */}
-          {editTodo && (
-            <div className="pt-3 border-t border-border space-y-1">
-              <p className="text-xs text-text-tertiary">
-                {t.todos.source}: {t.todos.sources[editTodo.source]}
-                {editTodo.sourceAgent && ` (${editTodo.sourceAgent})`}
-              </p>
-              {editTodo.sessionId && (
-                <p className="text-xs text-text-tertiary">
-                  {t.todos.sessionId}: {editTodo.sessionId}
-                </p>
-              )}
-              <p className="text-xs text-text-tertiary">
-                {t.common.created}: {new Date(editTodo.createdAt).toLocaleString()}
-              </p>
-              <p className="text-xs text-text-tertiary">
-                {t.common.updated}: {new Date(editTodo.updatedAt).toLocaleString()}
-              </p>
-            </div>
-          )}
-        </div>
-      </Modal>
+        onFormChange={setEditForm}
+        onTagsChange={setEditTagsList}
+        onSave={handleEditSave}
+      />
     </div>
   );
 }
