@@ -1,15 +1,19 @@
 package com.automation.service.scheduler;
 
 import com.automation.entity.ActivityLog.LogCategory;
+import com.automation.entity.ChainRun;
 import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.ScheduledWorkflow.ScheduleType;
 import com.automation.entity.ScheduledWorkflow.TargetType;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowChain;
+import com.automation.entity.WorkflowRun;
 import com.automation.exception.ResourceNotFoundException;
+import com.automation.repository.ChainRunRepository;
 import com.automation.repository.ScheduledWorkflowRepository;
 import com.automation.repository.WorkflowChainRepository;
 import com.automation.repository.WorkflowRepository;
+import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.activitylog.ActivityLogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +45,8 @@ public class SchedulerService {
     private final ScheduledWorkflowRepository scheduledRepository;
     private final WorkflowRepository workflowRepository;
     private final WorkflowChainRepository workflowChainRepository;
+    private final WorkflowRunRepository workflowRunRepository;
+    private final ChainRunRepository chainRunRepository;
     private final ScheduledWorkflowExecutor scheduledExecutor;
     private final ActivityLogService activityLogService;
     private final AppSettingsRepository appSettingsRepository;
@@ -71,6 +77,21 @@ public class SchedulerService {
     @Transactional(readOnly = true)
     public List<ScheduledWorkflow> findSchedulesInRange(Instant from, Instant to) {
         return scheduledRepository.findSchedulesInRange(from, to);
+    }
+
+    @Transactional(readOnly = true)
+    public List<WorkflowRun> findWorkflowRunsByScheduleId(String scheduleId) {
+        return workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(scheduleId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ChainRun> findChainRunsByScheduleId(String scheduleId) {
+        return chainRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(scheduleId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<WorkflowRun> findWorkflowRunsBetween(Instant from, Instant to) {
+        return workflowRunRepository.findByStartedAtBetween(from, to);
     }
 
     @Transactional

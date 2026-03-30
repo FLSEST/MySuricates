@@ -6,7 +6,7 @@ import com.automation.entity.WorkflowRun;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.WorkflowMapper;
-import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.execution.ExecutionQueryService;
 import com.automation.service.system.ApiKeyService;
 import com.automation.service.workflow.WorkflowExecutor;
 import org.junit.jupiter.api.Test;
@@ -24,9 +24,11 @@ import org.springframework.http.MediaType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -53,7 +55,7 @@ class ExecutionControllerTest {
     private WorkflowService workflowService;
 
     @MockBean
-    private WorkflowRunRepository runRepository;
+    private ExecutionQueryService executionQueryService;
 
     @MockBean
     private WorkflowMapper workflowMapper;
@@ -70,7 +72,7 @@ class ExecutionControllerTest {
                 Instant.now(), Instant.now(), 1000L, null, null, Map.of(), Map.of(), null
         );
 
-        when(runRepository.findById("run-1")).thenReturn(Optional.of(run));
+        when(executionQueryService.findById("run-1")).thenReturn(run);
         when(workflowMapper.toRunResponse(run)).thenReturn(response);
 
         mockMvc.perform(get("/api/v1/executions/run-1"))
@@ -81,7 +83,8 @@ class ExecutionControllerTest {
 
     @Test
     void getExecution_nonExistent_returns404() throws Exception {
-        when(runRepository.findById("unknown")).thenReturn(Optional.empty());
+        when(executionQueryService.findById("unknown"))
+                .thenThrow(new ResourceNotFoundException("Execution", "unknown"));
 
         mockMvc.perform(get("/api/v1/executions/unknown"))
                 .andExpect(status().isNotFound());
@@ -118,7 +121,7 @@ class ExecutionControllerTest {
         var page = new org.springframework.data.domain.PageImpl<>(
                 List.<com.automation.entity.WorkflowRun>of(),
                 org.springframework.data.domain.PageRequest.of(0, 50), 0);
-        when(runRepository.findByOrderByStartedAtDesc(any(org.springframework.data.domain.Pageable.class)))
+        when(executionQueryService.listExecutions(0, 50, null, null, null))
                 .thenReturn(page);
         when(workflowMapper.toRunResponseList(any())).thenReturn(List.of());
 
@@ -133,7 +136,7 @@ class ExecutionControllerTest {
         var page = new org.springframework.data.domain.PageImpl<>(
                 List.<com.automation.entity.WorkflowRun>of(),
                 org.springframework.data.domain.PageRequest.of(0, 50), 0);
-        when(runRepository.findByStatusOrderByStartedAtDesc(any(RunStatus.class), any(org.springframework.data.domain.Pageable.class)))
+        when(executionQueryService.listExecutions(0, 50, "RUNNING", null, null))
                 .thenReturn(page);
         when(workflowMapper.toRunResponseList(any())).thenReturn(List.of());
 
@@ -152,7 +155,7 @@ class ExecutionControllerTest {
                 "run-2", "wf-1", "Test", null, null, RunStatus.RUNNING, List.of(),
                 Instant.now(), null, null, null, null, Map.of(), Map.of(), null);
 
-        when(runRepository.findById("run-1")).thenReturn(Optional.of(run));
+        when(executionQueryService.findById("run-1")).thenReturn(run);
         when(workflowService.findByIdEager("wf-1")).thenReturn(workflow);
         when(workflowExecutor.execute(workflow, run.getInputContext())).thenReturn(newRun);
         when(workflowMapper.toRunResponse(newRun)).thenReturn(response);
@@ -165,7 +168,8 @@ class ExecutionControllerTest {
 
     @Test
     void retryExecution_nonExistent_returns404() throws Exception {
-        when(runRepository.findById("unknown")).thenReturn(Optional.empty());
+        when(executionQueryService.findById("unknown"))
+                .thenThrow(new ResourceNotFoundException("Execution", "unknown"));
 
         mockMvc.perform(post("/api/v1/executions/unknown/retry"))
                 .andExpect(status().isNotFound());

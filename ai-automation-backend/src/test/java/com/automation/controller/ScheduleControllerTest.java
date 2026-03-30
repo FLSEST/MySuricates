@@ -9,8 +9,6 @@ import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.ChainMapper;
 import com.automation.mapper.ScheduleMapper;
 import com.automation.mapper.WorkflowMapper;
-import com.automation.repository.ChainRunRepository;
-import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.scheduler.SchedulerService;
 import com.automation.service.system.ApiKeyService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -55,13 +53,7 @@ class ScheduleControllerTest {
     private ScheduleMapper scheduleMapper;
 
     @MockBean
-    private WorkflowRunRepository workflowRunRepository;
-
-    @MockBean
     private WorkflowMapper workflowMapper;
-
-    @MockBean
-    private ChainRunRepository chainRunRepository;
 
     @MockBean
     private ChainMapper chainMapper;

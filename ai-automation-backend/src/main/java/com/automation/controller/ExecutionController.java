@@ -4,24 +4,19 @@ import com.automation.dto.request.ApproveTodosRequest;
 import com.automation.dto.request.ApproveExecutionRequest;
 import com.automation.dto.request.ExecuteCommandRequest;
 import com.automation.service.todo.AutoTodoService;
+import com.automation.service.execution.ExecutionQueryService;
 import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.WorkflowRunResponse;
-import com.automation.exception.ResourceNotFoundException;
 import com.automation.executor.ApprovalRequest;
 import com.automation.mapper.WorkflowMapper;
-import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
-
-import com.automation.entity.RunStatus;
 
 import java.util.Map;
 
@@ -32,12 +27,11 @@ public class ExecutionController {
 
     private final WorkflowExecutor workflowExecutor;
     private final WorkflowService workflowService;
-    private final WorkflowRunRepository runRepository;
+    private final ExecutionQueryService executionQueryService;
     private final WorkflowMapper workflowMapper;
     private final AutoTodoService autoTodoService;
 
     @GetMapping
-    @Transactional(readOnly = true)
     public PageResponse<WorkflowRunResponse> listExecutions(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
@@ -45,27 +39,8 @@ public class ExecutionController {
             @RequestParam(required = false) String workflowId,
             @RequestParam(required = false) String projectId) {
 
-        Pageable pageable = PageRequest.of(page, size);
-        Page<com.automation.entity.WorkflowRun> result;
-
-        RunStatus runStatus = null;
-        if (status != null && !status.isBlank()) {
-            runStatus = RunStatus.valueOf(status.toUpperCase());
-        }
-
-        if (workflowId != null && !workflowId.isBlank()) {
-            result = runRepository.findByWorkflowIdOrderByStartedAtDesc(workflowId, pageable);
-        } else if (projectId != null && !projectId.isBlank()) {
-            if (runStatus != null) {
-                result = runRepository.findByStatusAndProjectIdOrderByStartedAtDesc(runStatus, projectId, pageable);
-            } else {
-                result = runRepository.findByProjectIdOrderByStartedAtDesc(projectId, pageable);
-            }
-        } else if (runStatus != null) {
-            result = runRepository.findByStatusOrderByStartedAtDesc(runStatus, pageable);
-        } else {
-            result = runRepository.findByOrderByStartedAtDesc(pageable);
-        }
+        Page<com.automation.entity.WorkflowRun> result =
+                executionQueryService.listExecutions(page, size, status, workflowId, projectId);
 
         return new PageResponse<>(
                 workflowMapper.toRunResponseList(result.getContent()),
@@ -77,10 +52,8 @@ public class ExecutionController {
     }
 
     @GetMapping("/{id}")
-    @Transactional(readOnly = true)
     public ResponseEntity<WorkflowRunResponse> getExecution(@PathVariable String id) {
-        var run = runRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Execution", id));
+        var run = executionQueryService.findById(id);
         return ResponseEntity.ok(workflowMapper.toRunResponse(run));
     }
 
@@ -105,8 +78,7 @@ public class ExecutionController {
     @PostMapping("/{id}/retry")
     @Transactional
     public ResponseEntity<WorkflowRunResponse> retryExecution(@PathVariable String id) {
-        var run = runRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Execution", id));
+        var run = executionQueryService.findById(id);
         var workflow = workflowService.findByIdEager(run.getWorkflow().getId());
         var newRun = workflowExecutor.execute(workflow, run.getInputContext());
         return ResponseEntity.ok(workflowMapper.toRunResponse(newRun));

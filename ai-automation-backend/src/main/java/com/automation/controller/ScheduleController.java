@@ -4,20 +4,17 @@ import com.automation.dto.request.CreateScheduleRequest;
 import com.automation.dto.request.UpdateScheduleRequest;
 import com.automation.dto.response.CalendarDataResponse;
 import com.automation.dto.response.ChainRunResponse;
-import com.automation.dto.response.UpcomingScheduleResponse;
 import com.automation.dto.response.ScheduledWorkflowResponse;
+import com.automation.dto.response.UpcomingScheduleResponse;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.mapper.ChainMapper;
 import com.automation.mapper.ScheduleMapper;
 import com.automation.mapper.WorkflowMapper;
-import com.automation.repository.ChainRunRepository;
-import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.scheduler.SchedulerService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -31,9 +28,7 @@ public class ScheduleController {
 
     private final SchedulerService schedulerService;
     private final ScheduleMapper scheduleMapper;
-    private final WorkflowRunRepository workflowRunRepository;
     private final WorkflowMapper workflowMapper;
-    private final ChainRunRepository chainRunRepository;
     private final ChainMapper chainMapper;
 
     @GetMapping
@@ -57,12 +52,11 @@ public class ScheduleController {
     }
 
     @GetMapping("/{id}/runs")
-    @Transactional(readOnly = true)
     public Map<String, Object> getScheduleRuns(@PathVariable String id) {
         List<WorkflowRunResponse> workflowRuns = workflowMapper.toRunResponseList(
-                workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(id));
+                schedulerService.findWorkflowRunsByScheduleId(id));
         List<ChainRunResponse> chainRuns = chainMapper.toRunResponseList(
-                chainRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(id));
+                schedulerService.findChainRunsByScheduleId(id));
         return Map.of("workflowRuns", workflowRuns, "chainRuns", chainRuns);
     }
 
@@ -77,12 +71,11 @@ public class ScheduleController {
     }
 
     @GetMapping("/calendar")
-    @Transactional(readOnly = true)
     public CalendarDataResponse getCalendarData(
             @RequestParam Instant from,
             @RequestParam Instant to) {
         var upcoming = scheduleMapper.toResponseList(schedulerService.findSchedulesInRange(from, to));
-        var pastRuns = workflowMapper.toRunResponseList(workflowRunRepository.findByStartedAtBetween(from, to));
+        var pastRuns = workflowMapper.toRunResponseList(schedulerService.findWorkflowRunsBetween(from, to));
         return new CalendarDataResponse(upcoming, pastRuns);
     }
 
