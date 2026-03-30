@@ -443,12 +443,10 @@ class AutoTodoServiceTest {
             assertThat(captor.getAllValues()).anyMatch(t ->
                     "similar-1".equals(t.getId())
                     && t.getDescription() != null && t.getDescription().contains("Update"));
-            // Note: Priority upgrade check uses ordinal comparison (priority.ordinal() < existing.ordinal())
-            // With LOW=0, MEDIUM=1, HIGH=2: HIGH(2) < MEDIUM(1) is false → priority stays MEDIUM
-            // This is a known limitation — the comparison is inverted for upgrading
+            // Priority should be upgraded from MEDIUM to HIGH (new finding is more severe)
             Todo merged = captor.getAllValues().stream()
                     .filter(t -> "similar-1".equals(t.getId())).findFirst().orElseThrow();
-            assertThat(merged.getPriority()).isEqualTo(Todo.Priority.MEDIUM);
+            assertThat(merged.getPriority()).isEqualTo(Todo.Priority.HIGH);
         }
 
         @Test

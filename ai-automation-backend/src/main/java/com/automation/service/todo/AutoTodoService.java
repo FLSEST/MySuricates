@@ -174,7 +174,7 @@ public class AutoTodoService {
                     existingTodo.setDescription(mergedDescription);
                     existingTodo.setWorkflowRunId(event.getRunId());
                     // Upgrade priority if new finding is more severe
-                    if (priority.ordinal() < existingTodo.getPriority().ordinal()) {
+                    if (priority.ordinal() > existingTodo.getPriority().ordinal()) {
                         existingTodo.setPriority(priority);
                     }
                     todoRepository.save(existingTodo);
