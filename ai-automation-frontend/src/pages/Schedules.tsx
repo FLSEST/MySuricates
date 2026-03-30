@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, Fragment } from 'react';
 import { Calendar, Plus, Trash2, Pencil, List, Link2, ChevronDown, ChevronRight, History, Pause, Play, AlertTriangle } from 'lucide-react';
 import { Card, Button, Spinner, Toggle } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
@@ -432,8 +432,8 @@ export function Schedules() {
               </thead>
               <tbody className="divide-y divide-border">
                 {schedules.map((s) => (
-                  <>
-                    <tr key={s.id} className="transition-colors">
+                  <Fragment key={s.id}>
+                    <tr className="transition-colors">
                       <td className="pl-3 pr-0 py-3">
                         <button
                           onClick={() => setExpandedScheduleId(expandedScheduleId === s.id ? null : s.id)}
@@ -452,13 +452,13 @@ export function Schedules() {
                       ))}
                     </tr>
                     {expandedScheduleId === s.id && (
-                      <tr key={`${s.id}-runs`} className="bg-surface-secondary/50">
+                      <tr className="bg-surface-secondary/50">
                         <td colSpan={columns.length + 1} className="px-6 py-4">
                           <ScheduleRunsPanel scheduleId={s.id} />
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 ))}
               </tbody>
             </table>
