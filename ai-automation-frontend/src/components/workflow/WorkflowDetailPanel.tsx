@@ -45,6 +45,8 @@ export function WorkflowDetailPanel({
   const updateWorkflow = useUpdateWorkflow();
   const autoTodoEnabled = !!workflow.metadata?.autoTodo?.enabled;
   const autoTodoMode = workflow.metadata?.autoTodo?.mode ?? 'auto';
+  const autoRepairEnabled = !!workflow.metadata?.autoRepair?.enabled;
+  const autoRepairMode = workflow.metadata?.autoRepair?.mode ?? 'auto';
 
   return (
     <div className="bg-surface border border-border rounded-xl p-6 space-y-6">
@@ -151,6 +153,54 @@ export function WorkflowDetailPanel({
             <option value="track">{t.workflows.autoTodoModeTrack}</option>
           </select>
           <p className="text-xs text-text-tertiary">{t.workflows.autoTodoModeHint}</p>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-surface-raised border border-border">
+        <div>
+          <span className="text-sm font-medium text-text">{t.workflows.autoRepair}</span>
+          <p className="text-xs text-text-tertiary">{t.workflows.autoRepairDescription}</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={autoRepairEnabled}
+          onClick={() =>
+            updateWorkflow.mutate({
+              id: workflow.id,
+              data: { metadata: { autoRepair: { ...workflow.metadata?.autoRepair, enabled: !autoRepairEnabled } } },
+            })
+          }
+          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+            autoRepairEnabled ? 'bg-accent' : 'bg-border'
+          }`}
+        >
+          <span
+            className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${
+              autoRepairEnabled ? 'translate-x-4' : 'translate-x-0'
+            }`}
+          />
+        </button>
+      </div>
+
+      {autoRepairEnabled && (
+        <div className="px-3 py-2 rounded-lg bg-surface-raised border border-border space-y-1">
+          <span className="text-xs font-medium text-text-secondary">{t.workflows.autoRepairMode}</span>
+          <select
+            value={autoRepairMode}
+            onChange={(e) =>
+              updateWorkflow.mutate({
+                id: workflow.id,
+                data: { metadata: { autoRepair: { ...workflow.metadata?.autoRepair, mode: e.target.value } } },
+              })
+            }
+            className="w-full text-xs bg-surface border border-border rounded-md px-2 py-1.5 text-text focus:outline-none focus:ring-1 focus:ring-accent"
+          >
+            <option value="auto">{t.workflows.autoRepairModeAuto}</option>
+            <option value="test">{t.workflows.autoRepairModeTest}</option>
+            <option value="local">{t.workflows.autoRepairModeLocal}</option>
+          </select>
+          <p className="text-xs text-text-tertiary">{t.workflows.autoRepairModeHint}</p>
         </div>
       )}
 
