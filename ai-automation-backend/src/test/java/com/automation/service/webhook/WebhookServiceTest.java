@@ -39,6 +39,9 @@ class WebhookServiceTest {
     private WorkflowExecutor workflowExecutor;
 
     @Mock
+    private com.automation.service.workflow.WorkflowService workflowService;
+
+    @Mock
     private GitWebhookPayloadParser gitPayloadParser;
 
     @Mock
@@ -69,6 +72,8 @@ class WebhookServiceTest {
 
         // Default: parser returns no git fields (non-git webhooks)
         lenient().when(gitPayloadParser.parse(any(), any())).thenReturn(Map.of());
+        // findByIdEager is called in trigger() to eagerly load activatedSkills
+        lenient().when(workflowService.findByIdEager("wf-1")).thenReturn(testWorkflow);
     }
 
     @Test

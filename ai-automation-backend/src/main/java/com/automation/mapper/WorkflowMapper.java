@@ -7,14 +7,13 @@ import com.automation.entity.StepResult;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.repository.WorkflowRunRepository;
-import jakarta.persistence.EntityNotFoundException;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.List;
 
-@Mapper(componentModel = "spring", uses = {SkillMapper.class})
+@Mapper(componentModel = "spring")
 public abstract class WorkflowMapper {
 
     @Autowired
@@ -25,6 +24,8 @@ public abstract class WorkflowMapper {
     @Mapping(source = "project.subtitle", target = "projectSubtitle")
     @Mapping(source = "project.description", target = "projectDescription")
     @Mapping(target = "runCount", expression = "java(workflowRunRepository.countByWorkflowId(workflow.getId()))")
+    @Mapping(target = "activatedSkillIds", expression = "java(workflow.getActivatedSkills().stream().map(s -> s.getId()).toList())")
+    @Mapping(target = "activatedSkillNames", expression = "java(workflow.getActivatedSkills().stream().map(s -> s.getName()).toList())")
     public abstract WorkflowResponse toResponse(Workflow workflow);
 
     public abstract List<WorkflowResponse> toResponseList(List<Workflow> workflows);
@@ -42,7 +43,7 @@ public abstract class WorkflowMapper {
     protected String safeWorkflowId(WorkflowRun run) {
         try {
             return run.getWorkflow() != null ? run.getWorkflow().getId() : null;
-        } catch (EntityNotFoundException e) {
+        } catch (Exception e) {
             return null;
         }
     }
@@ -50,7 +51,7 @@ public abstract class WorkflowMapper {
     protected String safeWorkflowName(WorkflowRun run) {
         try {
             return run.getWorkflow() != null ? run.getWorkflow().getName() : "(deleted)";
-        } catch (EntityNotFoundException e) {
+        } catch (Exception e) {
             return "(deleted)";
         }
     }
@@ -61,7 +62,7 @@ public abstract class WorkflowMapper {
                 return run.getWorkflow().getProject().getName();
             }
             return null;
-        } catch (EntityNotFoundException e) {
+        } catch (Exception e) {
             return null;
         }
     }
@@ -72,7 +73,7 @@ public abstract class WorkflowMapper {
                 return run.getWorkflow().getProject().getPath();
             }
             return null;
-        } catch (EntityNotFoundException e) {
+        } catch (Exception e) {
             return null;
         }
     }

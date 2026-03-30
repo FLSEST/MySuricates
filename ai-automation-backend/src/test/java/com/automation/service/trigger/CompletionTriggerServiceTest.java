@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class CompletionTriggerServiceTest {
@@ -32,6 +33,7 @@ class CompletionTriggerServiceTest {
     @Mock private CompletionTriggerRepository repository;
     @Mock private WorkflowRepository workflowRepository;
     @Mock private WorkflowExecutor workflowExecutor;
+    @Mock private com.automation.service.workflow.WorkflowService workflowService;
 
     private CompletionTriggerService service;
 
@@ -40,10 +42,13 @@ class CompletionTriggerServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new CompletionTriggerService(repository, workflowRepository, workflowExecutor);
+        service = new CompletionTriggerService(repository, workflowRepository, workflowExecutor, workflowService);
 
         sourceWf = Workflow.builder().id("wf-src").name("Source").build();
         targetWf = Workflow.builder().id("wf-tgt").name("Target").build();
+
+        // findByIdEager is called in onWorkflowRunCompleted to eagerly load activatedSkills
+        lenient().when(workflowService.findByIdEager("wf-tgt")).thenReturn(targetWf);
     }
 
     @Test

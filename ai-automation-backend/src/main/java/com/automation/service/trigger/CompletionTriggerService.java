@@ -27,6 +27,7 @@ public class CompletionTriggerService {
     private final CompletionTriggerRepository repository;
     private final WorkflowRepository workflowRepository;
     private final WorkflowExecutor workflowExecutor;
+    private final com.automation.service.workflow.WorkflowService workflowService;
 
     @Transactional(readOnly = true)
     public List<CompletionTrigger> findAll() {
@@ -114,12 +115,16 @@ public class CompletionTriggerService {
             context.put("completion_trigger_source_status", event.getStatus().name());
 
             try {
-                workflowExecutor.execute(trigger.getTargetWorkflow(), context);
+                // Load target workflow with eagerly initialized activatedSkills —
+                // trigger.getTargetWorkflow() comes from an EAGER relationship but
+                // leaves the LAZY ManyToMany uninitialized.
+                Workflow targetWorkflow = workflowService.findByIdEager(trigger.getTargetWorkflow().getId());
+                workflowExecutor.execute(targetWorkflow, context);
                 trigger.setLastTriggeredAt(Instant.now());
                 trigger.setTriggerCount(trigger.getTriggerCount() + 1);
                 repository.save(trigger);
                 log.info("CompletionTrigger fired: {} → {} (status={})",
-                        event.getWorkflowId(), trigger.getTargetWorkflow().getId(), event.getStatus());
+                        event.getWorkflowId(), targetWorkflow.getId(), event.getStatus());
             } catch (Exception e) {
                 log.error("CompletionTrigger failed to start target workflow {}: {}",
                         trigger.getTargetWorkflow().getId(), e.getMessage());

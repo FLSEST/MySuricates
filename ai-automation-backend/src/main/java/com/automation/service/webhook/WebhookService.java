@@ -30,6 +30,7 @@ public class WebhookService {
     private final WebhookTriggerRepository webhookRepository;
     private final WorkflowRepository workflowRepository;
     private final WorkflowExecutor workflowExecutor;
+    private final com.automation.service.workflow.WorkflowService workflowService;
     private final GitWebhookPayloadParser gitPayloadParser;
     private final ActivityLogService activityLogService;
 
@@ -124,13 +125,17 @@ public class WebhookService {
         Map<String, Object> gitFields = gitPayloadParser.parse(payload, headers != null ? headers : HttpHeaders.EMPTY);
         gitFields.forEach(context::putIfAbsent);
 
-        WorkflowRun run = workflowExecutor.execute(webhook.getWorkflow(), context);
+        // Load workflow with eagerly initialized activatedSkills — webhook.getWorkflow()
+        // comes from an EAGER relationship but leaves the LAZY ManyToMany uninitialized,
+        // which causes LazyInitializationException in WorkflowExecutor.execute().
+        Workflow workflow = workflowService.findByIdEager(webhook.getWorkflow().getId());
+        WorkflowRun run = workflowExecutor.execute(workflow, context);
 
         webhookRepository.incrementTriggerCount(webhook.getId(), Instant.now());
 
         log.info("Webhook {} triggered workflow {}, run: {}",
-                webhook.getId(), webhook.getWorkflow().getId(), run.getId());
-        activityLogService.info(LogCategory.WEBHOOK, "Webhook triggered: " + webhook.getWorkflow().getName(), "WebhookService", run.getId(), webhook.getWorkflow().getId());
+                webhook.getId(), workflow.getId(), run.getId());
+        activityLogService.info(LogCategory.WEBHOOK, "Webhook triggered: " + workflow.getName(), "WebhookService", run.getId(), workflow.getId());
 
         return run;
     }

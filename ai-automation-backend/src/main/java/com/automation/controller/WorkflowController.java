@@ -24,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -84,6 +85,7 @@ public class WorkflowController {
     }
 
     @GetMapping("/{id}/runs")
+    @Transactional(readOnly = true)
     public PageResponse<WorkflowRunResponse> getWorkflowRuns(
             @PathVariable String id,
             @RequestParam(defaultValue = "0") int page,
@@ -99,6 +101,7 @@ public class WorkflowController {
     }
 
     @GetMapping("/{id}/runs/{runId}")
+    @Transactional(readOnly = true)
     public WorkflowRunResponse getWorkflowRun(@PathVariable String id, @PathVariable String runId) {
         var run = runRepository.findById(runId)
                 .orElseThrow(() -> new com.automation.exception.ResourceNotFoundException("WorkflowRun", runId));

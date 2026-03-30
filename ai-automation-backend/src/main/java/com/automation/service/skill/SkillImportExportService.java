@@ -23,6 +23,7 @@ public class SkillImportExportService {
     private final SkillRepository skillRepository;
     private final SkillRegistry skillRegistry;
 
+    @Transactional(readOnly = true)
     public ExportSkillResponse exportSkill(String skillId) {
         Skill skill = skillRepository.findById(skillId)
                 .orElseThrow(() -> new ResourceNotFoundException("Skill", skillId));
