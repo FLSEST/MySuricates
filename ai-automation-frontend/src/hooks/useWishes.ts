@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../api/client';
+import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
 import type { Wish, CreateWishRequest, WishRespondRequest } from '../types';
@@ -37,7 +37,7 @@ export function useCreateWish() {
       qc.invalidateQueries({ queryKey: ['wishes'] });
       toast.success(t.toast.wishCreated);
     },
-    onError: () => toast.error(t.toast.wishFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.wishFailed)),
   });
 }
 
@@ -78,7 +78,7 @@ export function useRespondToWish() {
       qc.invalidateQueries({ queryKey: ['wishes'] });
       toast.success(t.toast.wishResponded);
     },
-    onError: () => toast.error(t.toast.wishRespondFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.wishRespondFailed)),
   });
 }
 
@@ -94,6 +94,6 @@ export function useCrystallizeWish() {
       qc.invalidateQueries({ queryKey: ['templates'] });
       toast.success(t.toast.wishCrystallized);
     },
-    onError: () => toast.error(t.toast.wishCrystallizeFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.wishCrystallizeFailed)),
   });
 }

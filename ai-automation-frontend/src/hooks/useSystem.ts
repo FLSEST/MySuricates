@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../api/client';
+import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT, useI18nStore } from '../i18n';
 import type { SystemHealth, SystemInfo, RemoteAccessStatus, BrowseDirectoryResponse, BackupInfo } from '../types';
@@ -131,7 +131,7 @@ export function useRepairAllFailed() {
       qc.invalidateQueries({ queryKey: ['workflows'] });
       toast.success(t.toast.repairAllStarted.replace('{count}', String(data.queued)));
     },
-    onError: () => toast.error(t.toast.repairFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.repairFailed)),
   });
 }
 
@@ -164,7 +164,7 @@ export function useUpdateExecutionConfig() {
       qc.setQueryData(['system', 'execution-config'], data);
       toast.success(t.settings.executionSaved);
     },
-    onError: () => toast.error(t.settings.executionSaveFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.settings.executionSaveFailed)),
   });
 }
 

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../api/client';
+import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
 import type { ScheduledWorkflow, CreateScheduleRequest, UpdateScheduleRequest, CalendarDataResponse, UpcomingScheduleData, ScheduleRunsResponse } from '../types';
@@ -83,7 +83,7 @@ export function useCreateSchedule() {
       qc.invalidateQueries({ queryKey: ['schedules'] });
       toast.success(t.toast.scheduleCreated);
     },
-    onError: () => toast.error(t.toast.scheduleCreateFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.scheduleCreateFailed)),
   });
 }
 
@@ -98,7 +98,7 @@ export function useUpdateSchedule() {
       qc.invalidateQueries({ queryKey: ['schedules'] });
       toast.success(t.toast.scheduleUpdated);
     },
-    onError: () => toast.error(t.toast.scheduleUpdateFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.scheduleUpdateFailed)),
   });
 }
 
@@ -113,7 +113,7 @@ export function useToggleSchedule() {
       qc.invalidateQueries({ queryKey: ['schedules'] });
       toast.success(t.toast.scheduleToggled);
     },
-    onError: () => toast.error(t.toast.scheduleToggleFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.scheduleToggleFailed)),
   });
 }
 
@@ -127,6 +127,6 @@ export function useDeleteSchedule() {
       qc.invalidateQueries({ queryKey: ['schedules'] });
       toast.success(t.toast.scheduleDeleted);
     },
-    onError: () => toast.error(t.toast.scheduleDeleteFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.scheduleDeleteFailed)),
   });
 }

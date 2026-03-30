@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../api/client';
+import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
 import type { Project, CreateProjectRequest, UpdateProjectRequest } from '../types';
@@ -29,7 +29,7 @@ export function useCreateProject() {
       qc.invalidateQueries({ queryKey: ['projects'] });
       toast.success(t.toast.projectCreated);
     },
-    onError: () => toast.error(t.toast.projectCreateFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.projectCreateFailed)),
   });
 }
 
@@ -44,7 +44,7 @@ export function useUpdateProject() {
       qc.invalidateQueries({ queryKey: ['projects'] });
       toast.success(t.toast.projectUpdated);
     },
-    onError: () => toast.error(t.toast.projectUpdateFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.projectUpdateFailed)),
   });
 }
 
@@ -59,7 +59,7 @@ export function useArchiveProject() {
       qc.invalidateQueries({ queryKey: ['projects', 'archived'] });
       toast.success(t.toast.projectArchived);
     },
-    onError: () => toast.error(t.toast.projectArchiveFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.projectArchiveFailed)),
   });
 }
 
@@ -74,7 +74,7 @@ export function useRestoreProject() {
       qc.invalidateQueries({ queryKey: ['projects', 'archived'] });
       toast.success(t.toast.projectRestored);
     },
-    onError: () => toast.error(t.toast.projectRestoreFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.projectRestoreFailed)),
   });
 }
 
@@ -96,7 +96,7 @@ export function useStartContainer() {
       qc.invalidateQueries({ queryKey: ['projects'] });
       toast.success(t.toast.containerStarted);
     },
-    onError: () => toast.error(t.toast.containerStartFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.containerStartFailed)),
   });
 }
 
@@ -110,7 +110,7 @@ export function useStopContainer() {
       qc.invalidateQueries({ queryKey: ['projects'] });
       toast.success(t.toast.containerStopped);
     },
-    onError: () => toast.error(t.toast.containerStopFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.containerStopFailed)),
   });
 }
 

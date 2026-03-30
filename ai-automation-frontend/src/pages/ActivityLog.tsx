@@ -87,21 +87,39 @@ export function ActivityLog() {
                 </tr>
               </thead>
               <tbody>
-                {data.content.map(entry => (
-                  <tr key={entry.id} className="border-b border-border/50 hover:bg-surface">
-                    <td className="px-4 py-2.5 whitespace-nowrap text-text-secondary text-xs">
-                      {formatTime(entry.timestamp)}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span className={`inline-block px-2 py-0.5 rounded-sm text-xs font-medium ${levelColors[entry.level]}`}>
-                        {entry.level}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-text-secondary">{entry.category}</td>
-                    <td className="px-4 py-2.5 max-w-md truncate">{entry.message}</td>
-                    <td className="px-4 py-2.5 text-xs text-text-secondary">{entry.source || '—'}</td>
-                  </tr>
-                ))}
+                {(() => {
+                  const rows: Array<{ entry: typeof data.content[0]; count: number; firstId: string }> = [];
+                  for (const entry of data.content) {
+                    const prev = rows[rows.length - 1];
+                    if (prev && prev.entry.message === entry.message && prev.entry.level === entry.level && prev.entry.category === entry.category) {
+                      prev.count++;
+                    } else {
+                      rows.push({ entry, count: 1, firstId: entry.id });
+                    }
+                  }
+                  return rows.map(({ entry, count, firstId }) => (
+                    <tr key={firstId} className="border-b border-border/50 hover:bg-surface">
+                      <td className="px-4 py-2.5 whitespace-nowrap text-text-secondary text-xs">
+                        {formatTime(entry.timestamp)}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span className={`inline-block px-2 py-0.5 rounded-sm text-xs font-medium ${levelColors[entry.level]}`}>
+                          {entry.level}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-text-secondary">{entry.category}</td>
+                      <td className="px-4 py-2.5 max-w-md truncate">
+                        {entry.message}
+                        {count > 1 && (
+                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-surface-raised text-text-secondary">
+                            &times;{count}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-text-secondary">{entry.source || '—'}</td>
+                    </tr>
+                  ));
+                })()}
               </tbody>
             </table>
           </div>

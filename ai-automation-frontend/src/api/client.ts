@@ -74,3 +74,12 @@ export const api = new ApiClient();
 export function openPath(path: string): Promise<{ status: string }> {
   return api.post('/system/open-path', { path });
 }
+
+/** Extract the error message from an API error response, with i18n fallback */
+export function apiErrorMessage(err: unknown, fallback: string): string {
+  if (err && typeof err === 'object' && 'error' in err) {
+    const msg = (err as { error: string }).error;
+    if (typeof msg === 'string' && msg.length > 0) return `${fallback}: ${msg}`;
+  }
+  return fallback;
+}

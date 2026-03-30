@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Pause, Play, XCircle, Clock, CheckCircle2, AlertCircle, Send, TerminalSquare,
   FolderOpen, ListTodo,
+  Terminal, Sparkles, Brain, Repeat, GitBranch, RefreshCw, ShieldCheck, Layers,
+  MessageSquare, Route, RotateCcw, Wrench,
 } from 'lucide-react';
 import { Card, CardHeader, Button, Spinner, Badge, Input } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
@@ -32,6 +34,21 @@ import type { WorkflowRun, StepResult, PendingHumanInput, PendingTodoItem } from
 
 const TerminalPanel = lazy(() => import('../components/shared/TerminalPanel').then(m => ({ default: m.TerminalPanel })));
 
+const BLOCK_TYPE_ICONS: Record<string, React.ReactNode> = {
+  shell: <Terminal className="w-3 h-3" />,
+  simple: <Sparkles className="w-3 h-3" />,
+  agentic: <Brain className="w-3 h-3" />,
+  foreach: <Repeat className="w-3 h-3" />,
+  conditional: <GitBranch className="w-3 h-3" />,
+  while: <RefreshCw className="w-3 h-3" />,
+  approval: <ShieldCheck className="w-3 h-3" />,
+  'sub-workflow': <Layers className="w-3 h-3" />,
+  'human-input': <MessageSquare className="w-3 h-3" />,
+  switch: <Route className="w-3 h-3" />,
+  retry: <RotateCcw className="w-3 h-3" />,
+  'skill-capability': <Wrench className="w-3 h-3" />,
+};
+
 function StepCard({ step }: { step: StepResult }) {
   return (
     <div className="flex gap-3 py-3">
@@ -50,7 +67,10 @@ function StepCard({ step }: { step: StepResult }) {
         <div className="flex items-center gap-2 mb-1">
           <span className="text-xs font-mono text-text-tertiary">Step {step.stepIndex + 1}</span>
           <Badge variant={step.status === 'COMPLETED' ? 'success' : step.status === 'FAILED' ? 'danger' : 'default'}>
-            {step.blockType}
+            <span className="inline-flex items-center gap-1">
+              {BLOCK_TYPE_ICONS[step.blockType]}
+              {step.blockType}
+            </span>
           </Badge>
           {step.durationMs != null && (
             <span className="text-xs text-text-tertiary flex items-center gap-1">
@@ -330,16 +350,29 @@ export function WorkflowExecution() {
       {run.inputContext && Object.keys(run.inputContext).length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-text-secondary">{t.workflows.execution.inputVariables}:</span>
-          {Object.entries(run.inputContext).map(([key, value]) => (
-            <span
-              key={key}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised text-xs font-mono"
-            >
-              <span className="text-text-secondary">{key}</span>
-              <span className="text-text-tertiary">=</span>
-              <span className="text-text">{String(value)}</span>
-            </span>
-          ))}
+          {Object.entries(run.inputContext).map(([key, value]) => {
+            const strVal = String(value);
+            const isPath = /^\/(?:[\w.-]+\/)+[\w.-]*$/.test(strVal);
+            return (
+              <span
+                key={key}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised text-xs font-mono"
+              >
+                <span className="text-text-secondary">{key}</span>
+                <span className="text-text-tertiary">=</span>
+                <span className="text-text">{strVal}</span>
+                {isPath && (
+                  <button
+                    onClick={() => openPath(strVal).catch(() => toast.error(t.workflows.execution.openPathFailed))}
+                    className="ml-0.5 text-text-tertiary hover:text-accent transition-colors"
+                    title={t.workflows.execution.openFolder}
+                  >
+                    <FolderOpen className="w-3 h-3" />
+                  </button>
+                )}
+              </span>
+            );
+          })}
         </div>
       )}
 

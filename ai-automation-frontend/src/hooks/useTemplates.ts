@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../api/client';
+import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
 import { downloadJSON } from '../utils/downloadFile';
@@ -23,7 +23,7 @@ export function useCreateTemplate() {
       qc.invalidateQueries({ queryKey: ['workflow-templates'] });
       toast.success(t.toast.workflowCreated);
     },
-    onError: () => toast.error(t.toast.workflowCreateFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.workflowCreateFailed)),
   });
 }
 
@@ -38,7 +38,7 @@ export function useSaveWorkflowAsTemplate() {
       qc.invalidateQueries({ queryKey: ['workflow-templates'] });
       toast.success(t.templates.savedAsTemplate);
     },
-    onError: () => toast.error(t.toast.workflowCreateFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.workflowCreateFailed)),
   });
 }
 

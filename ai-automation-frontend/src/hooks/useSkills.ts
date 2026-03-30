@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../api/client';
+import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
 import type { Skill, Capability } from '../types';
@@ -38,7 +38,7 @@ export function useActivateSkills() {
       qc.invalidateQueries({ queryKey: ['workflows'] });
       toast.success(t.toast.skillsActivated);
     },
-    onError: () => toast.error(t.toast.skillsActivateFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.skillsActivateFailed)),
   });
 }
 
@@ -53,6 +53,6 @@ export function useDeactivateSkill() {
       qc.invalidateQueries({ queryKey: ['workflows'] });
       toast.success(t.toast.skillDeactivated);
     },
-    onError: () => toast.error(t.toast.skillDeactivateFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.skillDeactivateFailed)),
   });
 }

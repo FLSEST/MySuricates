@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../api/client';
+import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
 import type { WebhookTrigger, CreateWebhookRequest } from '../types';
@@ -22,7 +22,7 @@ export function useCreateWebhook() {
       qc.invalidateQueries({ queryKey: ['webhooks'] });
       toast.success(t.toast.webhookCreated);
     },
-    onError: () => toast.error(t.toast.webhookCreateFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.webhookCreateFailed)),
   });
 }
 
@@ -37,7 +37,7 @@ export function useToggleWebhook() {
       qc.invalidateQueries({ queryKey: ['webhooks'] });
       toast.success(t.toast.webhookToggled);
     },
-    onError: () => toast.error(t.toast.webhookToggleFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.webhookToggleFailed)),
   });
 }
 
@@ -51,6 +51,6 @@ export function useDeleteWebhook() {
       qc.invalidateQueries({ queryKey: ['webhooks'] });
       toast.success(t.toast.webhookDeleted);
     },
-    onError: () => toast.error(t.toast.webhookDeleteFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.webhookDeleteFailed)),
   });
 }

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../api/client';
+import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
 import type { CompletionTrigger, CreateCompletionTriggerRequest } from '../types';
@@ -32,7 +32,7 @@ export function useCreateCompletionTrigger() {
       qc.invalidateQueries({ queryKey: ['completion-triggers', 'target', variables.targetWorkflowId] });
       toast.success(t.toast.completionTriggerCreated);
     },
-    onError: () => toast.error(t.toast.completionTriggerCreateFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.completionTriggerCreateFailed)),
   });
 }
 
@@ -48,7 +48,7 @@ export function useToggleCompletionTrigger(workflowId: string) {
       qc.invalidateQueries({ queryKey: ['completion-triggers', 'target', workflowId] });
       toast.success(t.toast.completionTriggerToggled);
     },
-    onError: () => toast.error(t.toast.completionTriggerToggleFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.completionTriggerToggleFailed)),
   });
 }
 
@@ -63,6 +63,6 @@ export function useDeleteCompletionTrigger(workflowId: string) {
       qc.invalidateQueries({ queryKey: ['completion-triggers', 'target', workflowId] });
       toast.success(t.toast.completionTriggerDeleted);
     },
-    onError: () => toast.error(t.toast.completionTriggerDeleteFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.completionTriggerDeleteFailed)),
   });
 }

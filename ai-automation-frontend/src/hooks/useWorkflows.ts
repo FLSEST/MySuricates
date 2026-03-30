@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../api/client';
+import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
 import { downloadJSON } from '../utils/downloadFile';
@@ -111,7 +111,7 @@ export function useCreateWorkflow() {
       qc.invalidateQueries({ queryKey: ['workflows'] });
       toast.success(t.toast.workflowCreated);
     },
-    onError: () => toast.error(t.toast.workflowCreateFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.workflowCreateFailed)),
   });
 }
 
@@ -134,7 +134,7 @@ export function useDeleteWorkflow() {
       qc.invalidateQueries({ queryKey: ['workflows'] });
       toast.success(t.toast.workflowDeleted);
     },
-    onError: () => toast.error(t.toast.workflowDeleteFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.workflowDeleteFailed)),
   });
 }
 
@@ -151,7 +151,7 @@ export function useExecuteWorkflow() {
       qc.invalidateQueries({ queryKey: ['learning', 'dashboard'] });
       toast.success(t.toast.workflowExecuted);
     },
-    onError: () => toast.error(t.toast.workflowExecuteFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.workflowExecuteFailed)),
   });
 }
 
@@ -188,7 +188,7 @@ export function useResumeFromStep() {
       qc.invalidateQueries({ queryKey: ['learning'] });
       toast.success(t.toast.workflowExecuted);
     },
-    onError: () => toast.error(t.toast.workflowExecuteFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.workflowExecuteFailed)),
   });
 }
 
@@ -214,7 +214,7 @@ export function useRetryExecution() {
       qc.invalidateQueries({ queryKey: ['learning'] });
       toast.success(t.toast.workflowExecuted);
     },
-    onError: () => toast.error(t.toast.workflowExecuteFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.workflowExecuteFailed)),
   });
 }
 
@@ -273,7 +273,7 @@ export function useImportWorkflow() {
       qc.invalidateQueries({ queryKey: ['workflows'] });
       toast.success(t.toast.workflowImported);
     },
-    onError: () => toast.error(t.toast.workflowImportFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.workflowImportFailed)),
   });
 }
 
@@ -287,7 +287,7 @@ export function useOptimizeWorkflow() {
     onSuccess: (_, workflowId) => {
       qc.invalidateQueries({ queryKey: ['workflows', workflowId] });
     },
-    onError: () => toast.error(t.workflows.optimizeFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.workflows.optimizeFailed)),
   });
 }
 
@@ -303,6 +303,6 @@ export function useRepairWorkflow() {
       qc.invalidateQueries({ queryKey: ['workflows', workflowId, 'runs'] });
       toast.success(t.toast.repairStarted);
     },
-    onError: () => toast.error(t.toast.repairFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.repairFailed)),
   });
 }

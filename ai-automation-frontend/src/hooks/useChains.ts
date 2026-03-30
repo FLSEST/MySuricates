@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../api/client';
+import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
 import type { WorkflowChain, ChainRun, CreateChainRequest, UpdateChainRequest, PageResponse } from '../types';
@@ -71,7 +71,7 @@ export function useCreateChain() {
       qc.invalidateQueries({ queryKey: ['chains'] });
       toast.success(t.toast.chainCreated);
     },
-    onError: () => toast.error(t.toast.chainCreateFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.chainCreateFailed)),
   });
 }
 
@@ -86,7 +86,7 @@ export function useUpdateChain() {
       qc.invalidateQueries({ queryKey: ['chains'] });
       toast.success(t.toast.chainUpdated);
     },
-    onError: () => toast.error(t.toast.chainUpdateFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.chainUpdateFailed)),
   });
 }
 
@@ -100,7 +100,7 @@ export function useDeleteChain() {
       qc.invalidateQueries({ queryKey: ['chains'] });
       toast.success(t.toast.chainDeleted);
     },
-    onError: () => toast.error(t.toast.chainDeleteFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.chainDeleteFailed)),
   });
 }
 
@@ -116,7 +116,7 @@ export function useExecuteChain() {
       qc.invalidateQueries({ queryKey: ['chains', variables.id, 'runs'] });
       toast.success(t.toast.chainExecuted);
     },
-    onError: () => toast.error(t.toast.chainExecuteFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.chainExecuteFailed)),
   });
 }
 

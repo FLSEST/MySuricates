@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../api/client';
+import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
 import type { WorkflowMemory, ExtractMemoryRequest } from '../types';
@@ -23,10 +23,7 @@ export function useExtractMemory(workflowId: string) {
       qc.invalidateQueries({ queryKey: ['workflow-memory', workflowId] });
       toast.success(t.memory.extracted);
     },
-    onError: (error) => {
-      const msg = (error as { error?: string })?.error;
-      toast.error(msg ? `${t.memory.extractFailed}: ${msg}` : t.memory.extractFailed);
-    },
+    onError: (err) => toast.error(apiErrorMessage(err, t.memory.extractFailed)),
   });
 }
 
@@ -41,7 +38,7 @@ export function useActivateMemory(workflowId: string) {
       qc.invalidateQueries({ queryKey: ['workflow-memory', workflowId] });
       toast.success(t.memory.activated);
     },
-    onError: () => toast.error(t.memory.activateFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.memory.activateFailed)),
   });
 }
 
@@ -56,7 +53,7 @@ export function useUpdateMemory(workflowId: string) {
       qc.invalidateQueries({ queryKey: ['workflow-memory', workflowId] });
       toast.success(t.memory.updated);
     },
-    onError: () => toast.error(t.memory.updateFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.memory.updateFailed)),
   });
 }
 
@@ -71,6 +68,6 @@ export function useDeleteMemory(workflowId: string) {
       qc.invalidateQueries({ queryKey: ['workflow-memory', workflowId] });
       toast.success(t.memory.deleted);
     },
-    onError: () => toast.error(t.memory.deleteFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.memory.deleteFailed)),
   });
 }

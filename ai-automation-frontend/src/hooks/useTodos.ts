@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../api/client';
+import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
 import type { Todo, CreateTodoRequest, UpdateTodoRequest, TodoCountResponse, TodoStatus, PageResponse } from '../types';
@@ -46,7 +46,7 @@ export function useCreateTodo() {
       qc.invalidateQueries({ queryKey: ['todos'] });
       toast.success(t.toast.todoCreated);
     },
-    onError: () => toast.error(t.toast.todoCreateFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.todoCreateFailed)),
   });
 }
 
@@ -61,7 +61,7 @@ export function useUpdateTodo() {
       qc.invalidateQueries({ queryKey: ['todos'] });
       toast.success(t.toast.todoUpdated);
     },
-    onError: () => toast.error(t.toast.todoUpdateFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.todoUpdateFailed)),
   });
 }
 
@@ -86,6 +86,6 @@ export function useDeleteTodo() {
       qc.invalidateQueries({ queryKey: ['todos'] });
       toast.success(t.toast.todoDeleted);
     },
-    onError: () => toast.error(t.toast.todoDeleteFailed),
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.todoDeleteFailed)),
   });
 }
