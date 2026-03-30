@@ -14,9 +14,10 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -52,8 +53,19 @@ class AutoTodoServiceTest {
     @Mock
     private WorkflowRunRepository workflowRunRepository;
 
-    @InjectMocks
+    @Mock
+    private PlatformTransactionManager transactionManager;
+
     private AutoTodoService autoTodoService;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(transactionManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
+        autoTodoService = new AutoTodoService(
+                todoRepository, stepResultRepository, gateStatusResolver,
+                similarityService, projectPathResolver, appSettingsRepository,
+                workflowRunRepository, transactionManager);
+    }
 
     private static final Map<String, Object> AUTO_TODO_ENABLED_META = Map.of("autoTodo", Map.of("enabled", true));
     private static final Map<String, Object> AUTO_TODO_TRACK_META = Map.of("autoTodo", Map.of("enabled", true, "mode", "track"));
@@ -429,6 +441,7 @@ class AutoTodoServiceTest {
             when(similarityService.findSimilar(eq("proj-1"), eq("Fix memory leak"), any()))
                     .thenReturn(List.of(new TodoSimilarityService.SimilarTodo(
                             similarTodo, 0.9, TodoSimilarityService.Similarity.SAME)));
+            when(todoRepository.findById("similar-1")).thenReturn(Optional.of(similarTodo));
 
             when(todoRepository.findByProjectIdAndSourceAndReferenceTypeAndReferenceIdAndStatusNot(
                     anyString(), any(), anyString(), anyString(), any()))
