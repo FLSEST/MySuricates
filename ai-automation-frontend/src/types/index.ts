@@ -63,6 +63,11 @@ export interface AutoTodoConfig {
   tags?: string[];
 }
 
+export interface AutoRepairConfig {
+  enabled: boolean;
+  mode?: 'auto' | 'test' | 'local';
+}
+
 export interface PendingTodoItem {
   title: string;
   priority: TodoPriority;
@@ -74,6 +79,7 @@ export interface PendingTodoItem {
 
 export interface WorkflowMetadata {
   autoTodo?: AutoTodoConfig;
+  autoRepair?: AutoRepairConfig;
   [key: string]: unknown;
 }
 

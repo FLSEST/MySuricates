@@ -109,6 +109,55 @@ export function WorkflowDetailSidebar({
         </p>
       </Card>
 
+      <Card>
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-sm font-medium text-text">{t.workflows.autoRepair}</span>
+            <p className="text-xs text-text-tertiary">{t.workflows.autoRepairDescription}</p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={!!workflow.metadata?.autoRepair?.enabled}
+            onClick={() =>
+              updateWorkflow.mutate({
+                id: workflow.id,
+                data: { metadata: { autoRepair: { ...workflow.metadata?.autoRepair, enabled: !workflow.metadata?.autoRepair?.enabled } } },
+              })
+            }
+            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+              workflow.metadata?.autoRepair?.enabled ? 'bg-accent' : 'bg-border'
+            }`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${
+                workflow.metadata?.autoRepair?.enabled ? 'translate-x-4' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+        {workflow.metadata?.autoRepair?.enabled && (
+          <div className="mt-3 space-y-1">
+            <span className="text-xs font-medium text-text-secondary">{t.workflows.autoRepairMode}</span>
+            <select
+              value={workflow.metadata?.autoRepair?.mode ?? 'auto'}
+              onChange={(e) =>
+                updateWorkflow.mutate({
+                  id: workflow.id,
+                  data: { metadata: { autoRepair: { ...workflow.metadata?.autoRepair, mode: e.target.value } } },
+                })
+              }
+              className="w-full text-xs bg-surface border border-border rounded-md px-2 py-1.5 text-text focus:outline-none focus:ring-1 focus:ring-accent"
+            >
+              <option value="auto">{t.workflows.autoRepairModeAuto}</option>
+              <option value="test">{t.workflows.autoRepairModeTest}</option>
+              <option value="local">{t.workflows.autoRepairModeLocal}</option>
+            </select>
+            <p className="text-xs text-text-tertiary">{t.workflows.autoRepairModeHint}</p>
+          </div>
+        )}
+      </Card>
+
       {workflowVariables.length > 0 && (
         <DefaultContextEditor
           workflowId={workflow.id}
