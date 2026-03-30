@@ -153,10 +153,33 @@ class ExecutionSettingsServiceTest {
 
         assertThat(settings).containsKeys(
                 "executionMaxConcurrent", "claudeMaxConcurrentCalls",
+                "claudeReservedForInteractive",
                 "claudeTimeoutSeconds", "claudeInterCallDelayMs",
                 "chainWorkflowTimeoutMinutes", "activeRuns"
         );
         assertThat(settings.get("activeRuns")).isEqualTo(3);
+    }
+
+    @Test
+    void validateAndApply_reservedForInteractive_updatesConfig() {
+        service.validateAndApply("claude-reserved-for-interactive", "2");
+
+        verify(appSettingsRepository).set("claude-reserved-for-interactive", "2");
+        verify(hostClaudeService).updateReservedForInteractive(2);
+    }
+
+    @Test
+    void validateAndApply_reservedForInteractive_aboveMax_throws() {
+        assertThatThrownBy(() -> service.validateAndApply("claude-reserved-for-interactive", "15"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must be between");
+    }
+
+    @Test
+    void validateAndApply_reservedForInteractive_belowMin_throws() {
+        assertThatThrownBy(() -> service.validateAndApply("claude-reserved-for-interactive", "-1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must be between");
     }
 
     @Test

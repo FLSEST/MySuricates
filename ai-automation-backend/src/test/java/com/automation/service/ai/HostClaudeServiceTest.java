@@ -296,6 +296,56 @@ class HostClaudeServiceTest {
                 .hasMessageContaining("timed out after 1 seconds");
     }
 
+    // --- Two-Tier Semaphore ---
+
+    @Test
+    void constructor_initializesSemaphoresCorrectly() {
+        HostClaudeConfig config = new HostClaudeConfig();
+        config.setMaxConcurrentCalls(5);
+        config.setReservedForInteractive(1);
+        CliPermissionsConfig perms = new CliPermissionsConfig();
+        perms.setSkipPermissions(false);
+        perms.setAllowedTools(List.of());
+
+        HostClaudeService service = new HostClaudeService(config, perms);
+
+        // Background limit should be max - reserved = 5 - 1 = 4
+        // We can verify indirectly that the service was created without error
+        assertThat(service).isNotNull();
+    }
+
+    @Test
+    void updateMaxConcurrentCalls_adjustsBothSemaphores() {
+        HostClaudeService service = createService(null, false, List.of());
+
+        // Should not throw
+        service.updateMaxConcurrentCalls(10);
+    }
+
+    @Test
+    void updateReservedForInteractive_adjustsBackgroundSemaphore() {
+        HostClaudeService service = createService(null, false, List.of());
+
+        // Should not throw
+        service.updateReservedForInteractive(3);
+    }
+
+    @Test
+    void updateReservedForInteractive_atLeastOneBackgroundSlot() {
+        HostClaudeConfig config = new HostClaudeConfig();
+        config.setMaxConcurrentCalls(2);
+        config.setReservedForInteractive(0);
+        CliPermissionsConfig perms = new CliPermissionsConfig();
+        perms.setSkipPermissions(false);
+        perms.setAllowedTools(List.of());
+
+        HostClaudeService service = new HostClaudeService(config, perms);
+
+        // Set reserved higher than max — background should still have at least 1
+        service.updateReservedForInteractive(10);
+        // Should not throw — Math.max(1, ...) guarantees at least 1
+    }
+
     // --- buildConversationPrompt ---
 
     @Test

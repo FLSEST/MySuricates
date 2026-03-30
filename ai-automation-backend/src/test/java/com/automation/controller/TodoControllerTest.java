@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import com.automation.entity.Todo.Priority;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.todo.TodoSimilarityService;
 
@@ -136,5 +137,48 @@ class TodoControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.open").value(5))
                 .andExpect(jsonPath("$.done").value(10));
+    }
+
+    @Test
+    void findSimilar_validParams_returnsOk() throws Exception {
+        Todo similar = Todo.builder()
+                .id("t-2").title("Similar bug").priority(Priority.HIGH).build();
+        when(todoSimilarityService.findSimilar(eq("proj-1"), eq("Fix bug"), isNull()))
+                .thenReturn(List.of(new TodoSimilarityService.SimilarTodo(
+                        similar, 0.85, TodoSimilarityService.Similarity.SAME)));
+
+        mockMvc.perform(get("/api/v1/todos/similar")
+                        .param("projectId", "proj-1")
+                        .param("title", "Fix bug"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value("t-2"))
+                .andExpect(jsonPath("$[0].title").value("Similar bug"))
+                .andExpect(jsonPath("$[0].similarity").value("SAME"));
+    }
+
+    @Test
+    void findSimilar_noMatches_returnsEmptyList() throws Exception {
+        when(todoSimilarityService.findSimilar(anyString(), anyString(), isNull()))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/todos/similar")
+                        .param("projectId", "proj-1")
+                        .param("title", "Unique"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    void findSimilar_missingProjectId_returnsError() throws Exception {
+        mockMvc.perform(get("/api/v1/todos/similar")
+                        .param("title", "Fix bug"))
+                .andExpect(status().is5xxServerError());
+    }
+
+    @Test
+    void findSimilar_missingTitle_returnsError() throws Exception {
+        mockMvc.perform(get("/api/v1/todos/similar")
+                        .param("projectId", "proj-1"))
+                .andExpect(status().is5xxServerError());
     }
 }
