@@ -3,23 +3,12 @@ package com.automation.service;
 import com.automation.dto.AssistantChatRequest;
 import com.automation.dto.AssistantChatResponse;
 import com.automation.repository.AppSettingsRepository;
-import com.automation.repository.AssistantSessionRepository;
-import com.automation.repository.ProjectRepository;
-import com.automation.repository.ScheduledWorkflowRepository;
-import com.automation.repository.TodoRepository;
-import com.automation.repository.WishRepository;
-import com.automation.repository.WorkflowMemoryRepository;
-import com.automation.repository.WorkflowRepository;
-import com.automation.repository.WorkflowRunRepository;
-import com.automation.service.chain.ChainService;
+import com.automation.service.assistant.AssistantContextBuilder;
+import com.automation.service.assistant.AssistantFetchService;
+import com.automation.service.assistant.AssistantToolExecutor;
 import com.automation.service.cli.CliSession;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
-import com.automation.service.pool.WorkflowPoolService;
-import com.automation.service.project.ProjectContextService;
-import com.automation.service.system.SystemIdentityService;
-import com.automation.service.todo.TodoService;
-import com.automation.service.workflow.WorkflowService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,50 +17,56 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AssistantServiceTest {
 
     @Mock private CommandExecutorService commandExecutorService;
-    @Mock private WorkflowRunRepository workflowRunRepository;
-    @Mock private TodoRepository todoRepository;
-    @Mock private ScheduledWorkflowRepository scheduledWorkflowRepository;
-    @Mock private ProjectRepository projectRepository;
-    @Mock private WishRepository wishRepository;
-    @Mock private WorkflowRepository workflowRepository;
-    @Mock private WorkflowMemoryRepository workflowMemoryRepository;
-    @Mock private AssistantSessionRepository assistantSessionRepository;
-    @Mock private SystemIdentityService systemIdentity;
+    @Mock private AssistantContextBuilder contextBuilder;
+    @Mock private AssistantFetchService fetchService;
+    @Mock private AssistantToolExecutor toolExecutor;
     @Mock private AppSettingsRepository appSettingsRepository;
-    @Mock private TodoService todoService;
-    @Mock private WorkflowService workflowService;
-    @Mock private ChainService chainService;
-    @Mock private WorkflowPoolService workflowPoolService;
-    @Mock private ProjectContextService projectContextService;
 
     private AssistantService service;
 
     @BeforeEach
     void setUp() {
         service = new AssistantService(
-                commandExecutorService, workflowRunRepository, todoRepository, todoService,
-                scheduledWorkflowRepository, projectRepository, wishRepository,
-                workflowRepository, workflowMemoryRepository, assistantSessionRepository,
-                systemIdentity, new ObjectMapper(), appSettingsRepository,
-                workflowService, chainService, workflowPoolService, projectContextService
+                commandExecutorService, contextBuilder, fetchService, toolExecutor,
+                appSettingsRepository, new ObjectMapper()
         );
-        // Benign defaults so context building doesn't blow up
-        when(systemIdentity.getVersion()).thenReturn("0.4.3-TEST");
-        when(workflowRunRepository.findByStatus(any())).thenReturn(List.of());
-        when(workflowRunRepository.findTop10ByOrderByStartedAtDesc()).thenReturn(List.of());
-        when(todoRepository.findAll()).thenReturn(List.of());
-        when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
-        when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of());
-        when(wishRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
+        // Context builder defaults (lenient — not all tests call chat())
+        lenient().when(contextBuilder.buildSystemPrompt(any(), any())).thenReturn("System prompt");
+        lenient().when(contextBuilder.buildPrompt(any(), anyString())).thenAnswer(inv -> inv.getArgument(1));
+        lenient().when(contextBuilder.resolveWorkingDir(any())).thenReturn("/tmp");
+        // Fetch service defaults — no fetches
+        lenient().when(fetchService.parseFetchRequests(any())).thenReturn(List.of());
+        // Tool executor — pass through (no tools)
+        lenient().when(toolExecutor.executeTools(any())).thenAnswer(inv -> inv.getArgument(0));
+        // Fetch strip — pass through
+        lenient().when(fetchService.stripFetchTags(any())).thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    // ── Base instructions loading ────────────────────────────────────────────
+
+    @Test
+    void seedSettings_loadsBaseInstructionsFromClasspath() {
+        when(appSettingsRepository.get(anyString())).thenReturn(Optional.of("dummy"));
+
+        service.seedSettings();
+
+        // After seedSettings, the chat should work with base instructions loaded
+        stubClaude("Test response");
+        var result = chat("Test");
+        assertThat(result.message()).isEqualTo("Test response");
     }
 
     // ── Response parsing ──────────────────────────────────────────────────────
@@ -122,7 +117,6 @@ class AssistantServiceTest {
 
         var result = chat("Test");
 
-        // Message before <actions> should still be returned, actions empty (parse failure)
         assertThat(result.message()).contains("Hier die Aktion:");
         assertThat(result.actions()).isEmpty();
     }
