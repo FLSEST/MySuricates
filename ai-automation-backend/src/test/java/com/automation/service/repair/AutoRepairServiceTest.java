@@ -205,6 +205,66 @@ class AutoRepairServiceTest {
         assertThat(service.isAutoRepairEnabled(event)).isFalse();
     }
 
+    // ── resolveMaxRetries tests ──────────────────────────────
+
+    @Test
+    void resolveMaxRetries_usesWorkflowMetadata() {
+        var workflow = createWorkflow(Map.of("autoRepair", Map.of("maxRetries", 4)));
+        assertThat(service.resolveMaxRetries(workflow)).isEqualTo(4);
+    }
+
+    @Test
+    void resolveMaxRetries_fallsBackToGlobalSetting() {
+        var workflow = createWorkflow(Map.of());
+        when(appSettingsRepository.get("auto-repair-max-retries")).thenReturn(Optional.of("3"));
+        assertThat(service.resolveMaxRetries(workflow)).isEqualTo(3);
+    }
+
+    @Test
+    void resolveMaxRetries_defaultsTo2() {
+        var workflow = createWorkflow(Map.of());
+        when(appSettingsRepository.get("auto-repair-max-retries")).thenReturn(Optional.empty());
+        assertThat(service.resolveMaxRetries(workflow)).isEqualTo(2);
+    }
+
+    @Test
+    void resolveMaxRetries_clampsToRange() {
+        var workflow = createWorkflow(Map.of("autoRepair", Map.of("maxRetries", 10)));
+        when(appSettingsRepository.get("auto-repair-max-retries")).thenReturn(Optional.empty());
+        // Out of range (>5), falls back to global/default
+        assertThat(service.resolveMaxRetries(workflow)).isEqualTo(2);
+    }
+
+    // ── resolveTimeoutSeconds tests ──────────────────────────────
+
+    @Test
+    void resolveTimeoutSeconds_usesWorkflowMetadata() {
+        var workflow = createWorkflow(Map.of("autoRepair", Map.of("timeoutSeconds", 300)));
+        assertThat(service.resolveTimeoutSeconds(workflow)).isEqualTo(300);
+    }
+
+    @Test
+    void resolveTimeoutSeconds_fallsBackToGlobalSetting() {
+        var workflow = createWorkflow(Map.of());
+        when(appSettingsRepository.get("auto-repair-timeout-seconds")).thenReturn(Optional.of("900"));
+        assertThat(service.resolveTimeoutSeconds(workflow)).isEqualTo(900);
+    }
+
+    @Test
+    void resolveTimeoutSeconds_defaultsTo600() {
+        var workflow = createWorkflow(Map.of());
+        when(appSettingsRepository.get("auto-repair-timeout-seconds")).thenReturn(Optional.empty());
+        assertThat(service.resolveTimeoutSeconds(workflow)).isEqualTo(600);
+    }
+
+    @Test
+    void resolveTimeoutSeconds_clampsToRange() {
+        var workflow = createWorkflow(Map.of("autoRepair", Map.of("timeoutSeconds", 10)));
+        when(appSettingsRepository.get("auto-repair-timeout-seconds")).thenReturn(Optional.empty());
+        // Out of range (<60), falls back to global/default
+        assertThat(service.resolveTimeoutSeconds(workflow)).isEqualTo(600);
+    }
+
     // ── repairLocally tests ──────────────────────────────
 
     @Test
@@ -217,7 +277,7 @@ class AutoRepairServiceTest {
         when(workflowExecutor.execute(any(Workflow.class), anyMap(), isNull(), anyMap())).thenReturn(completedRun);
         when(workflowRunRepository.findById("run-1")).thenReturn(Optional.of(completedRun));
 
-        FactoryTestResult result = service.repairLocally("wf-1", "some error", 2);
+        FactoryTestResult result = service.repairLocally("wf-1", "some error", 2, 600);
 
         assertThat(result.status()).isEqualTo("PASSED");
         assertThat(result.runId()).isEqualTo("run-1");
@@ -242,7 +302,7 @@ class AutoRepairServiceTest {
         when(workflowRunRepository.findById("run-fail")).thenReturn(Optional.of(failedRun));
         when(workflowRunRepository.findById("run-pass")).thenReturn(Optional.of(passedRun));
 
-        FactoryTestResult result = service.repairLocally("wf-1", "original error", 2);
+        FactoryTestResult result = service.repairLocally("wf-1", "original error", 2, 600);
 
         assertThat(result.status()).isEqualTo("PASSED");
         verify(workflowFactoryService, times(2)).autoFixWorkflow(any(), anyString());
@@ -260,7 +320,7 @@ class AutoRepairServiceTest {
         when(workflowExecutor.execute(any(Workflow.class), anyMap(), isNull(), anyMap())).thenReturn(failedRun);
         when(workflowRunRepository.findById("run-fail")).thenReturn(Optional.of(failedRun));
 
-        FactoryTestResult result = service.repairLocally("wf-1", "original error", 2);
+        FactoryTestResult result = service.repairLocally("wf-1", "original error", 2, 600);
 
         assertThat(result.status()).isEqualTo("FAILED");
         assertThat(result.error()).isEqualTo("still broken");
@@ -277,7 +337,7 @@ class AutoRepairServiceTest {
         when(workflowExecutor.execute(any(Workflow.class), anyMap(), isNull(), anyMap())).thenReturn(completedRun);
         when(workflowRunRepository.findById("run-1")).thenReturn(Optional.of(completedRun));
 
-        service.repairLocally("wf-1", "error", 1);
+        service.repairLocally("wf-1", "error", 1, 600);
 
         verify(workflowExecutor).execute(any(Workflow.class), anyMap(), isNull(), argThat(meta ->
                 Boolean.TRUE.equals(meta.get("autoRepairAttempt"))));

@@ -154,6 +154,43 @@ export function WorkflowDetailSidebar({
               <option value="local">{t.workflows.autoRepairModeLocal}</option>
             </select>
             <p className="text-xs text-text-tertiary">{t.workflows.autoRepairModeHint}</p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-text-secondary">{t.workflows.autoRepairMaxRetries}</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={5}
+                  value={workflow.metadata?.autoRepair?.maxRetries ?? 2}
+                  onChange={(e) => {
+                    const val = Math.max(1, Math.min(5, parseInt(e.target.value) || 2));
+                    updateWorkflow.mutate({
+                      id: workflow.id,
+                      data: { metadata: { autoRepair: { ...workflow.metadata?.autoRepair, maxRetries: val } } },
+                    });
+                  }}
+                  className="w-full text-xs bg-surface border border-border rounded-md px-2 py-1.5 text-text focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-text-secondary">{t.workflows.autoRepairTimeout}</label>
+                <input
+                  type="number"
+                  min={60}
+                  max={3600}
+                  step={60}
+                  value={workflow.metadata?.autoRepair?.timeoutSeconds ?? 600}
+                  onChange={(e) => {
+                    const val = Math.max(60, Math.min(3600, parseInt(e.target.value) || 600));
+                    updateWorkflow.mutate({
+                      id: workflow.id,
+                      data: { metadata: { autoRepair: { ...workflow.metadata?.autoRepair, timeoutSeconds: val } } },
+                    });
+                  }}
+                  className="w-full text-xs bg-surface border border-border rounded-md px-2 py-1.5 text-text focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+              </div>
+            </div>
           </div>
         )}
       </Card>

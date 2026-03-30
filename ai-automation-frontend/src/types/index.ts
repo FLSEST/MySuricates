@@ -66,6 +66,8 @@ export interface AutoTodoConfig {
 export interface AutoRepairConfig {
   enabled: boolean;
   mode?: 'auto' | 'test' | 'local';
+  maxRetries?: number;
+  timeoutSeconds?: number;
 }
 
 export interface PendingTodoItem {

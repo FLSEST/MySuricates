@@ -198,6 +198,42 @@ export function GeneralSettingsCard() {
             />
           </div>
         )}
+
+        {!simpleMode && autoRepairDefault && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm font-medium text-text">{t.workflows.autoRepairMaxRetries}</p>
+              <p className="text-xs text-text-tertiary mb-1">{t.workflows.autoRepairMaxRetriesHint}</p>
+              <input
+                type="number"
+                min={1}
+                max={5}
+                defaultValue={2}
+                onBlur={(e) => {
+                  const val = Math.max(1, Math.min(5, parseInt(e.target.value) || 2));
+                  updateSetting.mutate({ key: 'auto-repair-max-retries', value: String(val) });
+                }}
+                className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-text">{t.workflows.autoRepairTimeout}</p>
+              <p className="text-xs text-text-tertiary mb-1">{t.workflows.autoRepairTimeoutHint}</p>
+              <input
+                type="number"
+                min={60}
+                max={3600}
+                step={60}
+                defaultValue={600}
+                onBlur={(e) => {
+                  const val = Math.max(60, Math.min(3600, parseInt(e.target.value) || 600));
+                  updateSetting.mutate({ key: 'auto-repair-timeout-seconds', value: String(val) });
+                }}
+                className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+            </div>
+          </div>
+        )}
       </div>
     </Card>
   );

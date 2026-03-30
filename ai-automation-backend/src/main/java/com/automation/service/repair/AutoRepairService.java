@@ -30,9 +30,11 @@ public class AutoRepairService {
 
     static final String SETTING_AUTO_REPAIR_DEFAULT = "auto-repair-default";
     static final String SETTING_AUTO_REPAIR_MODE = "auto-repair-mode";
+    static final String SETTING_MAX_RETRIES = "auto-repair-max-retries";
+    static final String SETTING_TIMEOUT_SECONDS = "auto-repair-timeout-seconds";
     private static final int DEFAULT_MAX_RETRIES = 2;
+    private static final long DEFAULT_TIMEOUT_SECONDS = 600;
     private static final long POLLING_INTERVAL_MS = 2000;
-    private static final long LOCAL_REPAIR_TIMEOUT_SECONDS = 600;
 
     private final WorkflowFactoryService workflowFactoryService;
     private final WorkflowService workflowService;
@@ -79,7 +81,10 @@ public class AutoRepairService {
 
         String workflowId = event.getWorkflowId();
         String workflowName = event.getWorkflowName();
-        String mode = resolveRepairMode(workflowService.findById(workflowId));
+        Workflow workflow = workflowService.findById(workflowId);
+        String mode = resolveRepairMode(workflow);
+        int maxRetries = resolveMaxRetries(workflow);
+        long timeoutSeconds = resolveTimeoutSeconds(workflow);
 
         if ("test".equals(mode) && !testingService.isHealthy()) {
             log.debug("Auto-repair skipped: mode=test but test instance not healthy (workflow {})", workflowId);
@@ -87,16 +92,16 @@ public class AutoRepairService {
         }
 
         activityLogService.info(LogCategory.EXECUTION,
-                "Auto-repair started for workflow: " + workflowName + " (mode: " + mode + ")",
+                "Auto-repair started for workflow: " + workflowName + " (mode: " + mode + ", retries: " + maxRetries + ", timeout: " + timeoutSeconds + "s)",
                 "AutoRepairService", event.getRunId(), workflowId);
 
         try {
             FactoryTestResult result;
             if (shouldUseTestInstance(mode)) {
-                result = workflowFactoryService.verifyAndFix(workflowId, DEFAULT_MAX_RETRIES);
+                result = workflowFactoryService.verifyAndFix(workflowId, maxRetries);
             } else {
                 String errorMsg = extractErrorMessage(event.getError());
-                result = repairLocally(workflowId, errorMsg, DEFAULT_MAX_RETRIES);
+                result = repairLocally(workflowId, errorMsg, maxRetries, timeoutSeconds);
             }
 
             logRepairResult(result, workflowName, workflowId);
@@ -116,18 +121,20 @@ public class AutoRepairService {
     public void repairWorkflow(String workflowId) {
         Workflow workflow = workflowService.findById(workflowId);
         String mode = resolveRepairMode(workflow);
+        int maxRetries = resolveMaxRetries(workflow);
+        long timeoutSeconds = resolveTimeoutSeconds(workflow);
 
         activityLogService.info(LogCategory.EXECUTION,
-                "Retroactive repair started for workflow: " + workflow.getName() + " (mode: " + mode + ")",
+                "Retroactive repair started for workflow: " + workflow.getName() + " (mode: " + mode + ", retries: " + maxRetries + ", timeout: " + timeoutSeconds + "s)",
                 "AutoRepairService", null, workflowId);
 
         try {
             FactoryTestResult result;
             if (shouldUseTestInstance(mode)) {
-                result = workflowFactoryService.verifyAndFix(workflowId, DEFAULT_MAX_RETRIES);
+                result = workflowFactoryService.verifyAndFix(workflowId, maxRetries);
             } else {
                 String errorMsg = extractLastFailedRunError(workflowId);
-                result = repairLocally(workflowId, errorMsg, DEFAULT_MAX_RETRIES);
+                result = repairLocally(workflowId, errorMsg, maxRetries, timeoutSeconds);
             }
 
             logRepairResult(result, workflow.getName(), workflowId);
@@ -201,12 +208,54 @@ public class AutoRepairService {
                 .orElse("auto");
     }
 
+    /**
+     * Resolves max retries for a workflow.
+     * Priority: workflow metadata > global setting > default 2.
+     */
+    @SuppressWarnings("unchecked")
+    int resolveMaxRetries(Workflow workflow) {
+        Map<String, Object> metadata = workflow.getMetadata();
+        if (metadata != null) {
+            Object autoRepair = metadata.get("autoRepair");
+            if (autoRepair instanceof Map<?, ?> map) {
+                Object retries = map.get("maxRetries");
+                if (retries instanceof Number n && n.intValue() >= 1 && n.intValue() <= 5) {
+                    return n.intValue();
+                }
+            }
+        }
+        return appSettingsRepository.get(SETTING_MAX_RETRIES)
+                .map(s -> { try { return Math.max(1, Math.min(5, Integer.parseInt(s))); } catch (NumberFormatException e) { return DEFAULT_MAX_RETRIES; } })
+                .orElse(DEFAULT_MAX_RETRIES);
+    }
+
+    /**
+     * Resolves timeout in seconds for a workflow.
+     * Priority: workflow metadata > global setting > default 600.
+     */
+    @SuppressWarnings("unchecked")
+    long resolveTimeoutSeconds(Workflow workflow) {
+        Map<String, Object> metadata = workflow.getMetadata();
+        if (metadata != null) {
+            Object autoRepair = metadata.get("autoRepair");
+            if (autoRepair instanceof Map<?, ?> map) {
+                Object timeout = map.get("timeoutSeconds");
+                if (timeout instanceof Number n && n.longValue() >= 60 && n.longValue() <= 3600) {
+                    return n.longValue();
+                }
+            }
+        }
+        return appSettingsRepository.get(SETTING_TIMEOUT_SECONDS)
+                .map(s -> { try { return Math.max(60, Math.min(3600, Long.parseLong(s))); } catch (NumberFormatException e) { return DEFAULT_TIMEOUT_SECONDS; } })
+                .orElse(DEFAULT_TIMEOUT_SECONDS);
+    }
+
     // ── Local repair pipeline ──────────────────────────────
 
     /**
      * Repairs a workflow locally: AI-fix the blocks, then re-execute on this instance.
      */
-    FactoryTestResult repairLocally(String workflowId, String errorMessage, int maxRetries) {
+    FactoryTestResult repairLocally(String workflowId, String errorMessage, int maxRetries, long timeoutSeconds) {
         Workflow workflow = workflowService.findById(workflowId);
         String lastError = errorMessage;
 
@@ -222,7 +271,7 @@ public class AutoRepairService {
                 Map<String, Object> repairMeta = Map.of("autoRepairAttempt", true);
 
                 WorkflowRun run = workflowExecutor.execute(workflow, context, null, repairMeta);
-                WorkflowRun completed = waitForRunCompletion(run.getId());
+                WorkflowRun completed = waitForRunCompletion(run.getId(), timeoutSeconds);
 
                 if (completed != null && completed.getStatus() == RunStatus.COMPLETED) {
                     return new FactoryTestResult(completed.getId(), "PASSED", null);
@@ -246,8 +295,8 @@ public class AutoRepairService {
     /**
      * Polls for workflow run completion with timeout.
      */
-    private WorkflowRun waitForRunCompletion(String runId) {
-        long deadline = System.currentTimeMillis() + LOCAL_REPAIR_TIMEOUT_SECONDS * 1000;
+    private WorkflowRun waitForRunCompletion(String runId, long timeoutSeconds) {
+        long deadline = System.currentTimeMillis() + timeoutSeconds * 1000;
 
         while (System.currentTimeMillis() < deadline) {
             WorkflowRun run = workflowRunRepository.findById(runId).orElse(null);
@@ -263,7 +312,7 @@ public class AutoRepairService {
             }
         }
 
-        log.warn("Local repair: timeout waiting for run {} ({}s)", runId, LOCAL_REPAIR_TIMEOUT_SECONDS);
+        log.warn("Local repair: timeout waiting for run {} ({}s)", runId, timeoutSeconds);
         return null;
     }
 

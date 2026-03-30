@@ -220,8 +220,9 @@ public class SystemController {
     }
 
     private static final Set<String> ALLOWED_SETTINGS = Set.of(
-            "auto-todo-default", "auto-repair-default", "auto-repair-mode", "default-ai-provider",
-            "assistant-thinking-phrases", "assistant-model", "suggestions-model"
+            "auto-todo-default", "auto-repair-default", "auto-repair-mode",
+            "auto-repair-max-retries", "auto-repair-timeout-seconds",
+            "default-ai-provider", "assistant-thinking-phrases", "assistant-model", "suggestions-model"
     );
 
     @GetMapping("/settings/{key}")
