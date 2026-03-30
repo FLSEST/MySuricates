@@ -8,8 +8,11 @@ import com.automation.dto.request.CreateChainRequest;
 import com.automation.dto.request.CreateTodoRequest;
 import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.dto.request.UpdateTodoStatusRequest;
+import com.automation.dto.request.UpdateWorkflowRequest;
+import com.automation.entity.WorkflowRun;
 import com.automation.service.chain.ChainService;
 import com.automation.service.todo.TodoService;
+import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,6 +40,7 @@ public class AssistantToolExecutor {
 
     private final TodoService todoService;
     private final WorkflowService workflowService;
+    private final WorkflowExecutor workflowExecutor;
     private final ChainService chainService;
     private final ObjectMapper objectMapper;
 
@@ -58,13 +62,38 @@ public class AssistantToolExecutor {
     }
 
     private String executeTool(ToolRequest req) {
+        String payload = sanitizeJson(req.payload());
         return switch (req.type()) {
-            case "create_todo"        -> executeCreateTodo(req.payload());
-            case "update_todo_status" -> executeUpdateTodoStatus(req.payload());
-            case "create_workflow"    -> executeCreateWorkflow(req.payload());
-            case "create_chain"      -> executeCreateChain(req.payload());
+            case "create_todo"        -> executeCreateTodo(payload);
+            case "update_todo_status" -> executeUpdateTodoStatus(payload);
+            case "create_workflow"    -> executeCreateWorkflow(payload);
+            case "update_workflow"   -> executeUpdateWorkflow(payload);
+            case "delete_workflow"   -> executeDeleteWorkflow(payload);
+            case "start_workflow"    -> executeStartWorkflow(payload);
+            case "cancel_run"        -> executeCancelRun(payload);
+            case "create_chain"      -> executeCreateChain(payload);
             default -> "[Unbekanntes Tool: " + req.type() + "]";
         };
+    }
+
+    /**
+     * Normalizes fullwidth Unicode punctuation to ASCII equivalents.
+     * Claude occasionally generates these characters in JSON payloads,
+     * which Jackson's parser rejects.
+     */
+    private static String sanitizeJson(String json) {
+        if (json == null || json.isEmpty()) return json;
+        return json
+                .replace('\uff0c', ',')   // ， → ,
+                .replace('\uff1a', ':')   // ： → :
+                .replace('\uff1b', ';')   // ； → ;
+                .replace('\uff5b', '{')   // ｛ → {
+                .replace('\uff5d', '}')   // ｝ → }
+                .replace('\uff3b', '[')   // ［ → [
+                .replace('\uff3d', ']')   // ］ → ]
+                .replace('\uff02', '"')   // ＂ → "
+                .replace('\u201c', '"')   // " → "
+                .replace('\u201d', '"');  // " → "
     }
 
     private String executeCreateTodo(String json) {
@@ -95,7 +124,7 @@ public class AssistantToolExecutor {
             String shortId = created.getId().substring(0, Math.min(8, created.getId().length()));
             return "✓ Todo angelegt: \"" + created.getTitle() + "\" (Priorität: " + priority + tagStr + ", ID: " + shortId + "…)";
         } catch (Exception e) {
-            log.warn("Assistant create_todo tool failed", e);
+            log.warn("Assistant create_todo tool failed. Payload: {}", json, e);
             return "⚠ Todo konnte nicht angelegt werden: " + e.getMessage();
         }
     }
@@ -114,7 +143,7 @@ public class AssistantToolExecutor {
             todoService.updateStatus(id, new UpdateTodoStatusRequest(status, null));
             return "✓ Todo-Status aktualisiert: " + status + " (ID: " + id.substring(0, Math.min(8, id.length())) + "…)";
         } catch (Exception e) {
-            log.warn("Assistant update_todo_status tool failed", e);
+            log.warn("Assistant update_todo_status tool failed. Payload: {}", json, e);
             return "⚠ Status konnte nicht aktualisiert werden: " + e.getMessage();
         }
     }
@@ -155,8 +184,99 @@ public class AssistantToolExecutor {
             Workflow created = workflowService.create(request);
             return "✓ Workflow erstellt: \"" + created.getName() + "\" (ID: " + created.getId() + ")";
         } catch (Exception e) {
-            log.warn("Assistant create_workflow tool failed", e);
+            log.warn("Assistant create_workflow tool failed. Payload: {}", json, e);
             return "⚠ Workflow konnte nicht erstellt werden: " + e.getMessage();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private String executeUpdateWorkflow(String json) {
+        try {
+            Map<String, Object> params = objectMapper.readValue(json, new TypeReference<>() {});
+            String workflowId = (String) params.get("workflowId");
+            if (workflowId == null || workflowId.isBlank())
+                return "⚠ update_workflow: workflowId ist Pflichtfeld.";
+
+            List<BlockDefinition> blocks = params.containsKey("blocks")
+                    ? objectMapper.convertValue(params.get("blocks"), new TypeReference<>() {})
+                    : null;
+            Map<String, Object> defaultContext = params.containsKey("defaultContext")
+                    ? objectMapper.convertValue(params.get("defaultContext"), new TypeReference<Map<String, Object>>() {})
+                    : null;
+            Map<String, Object> metadata = params.containsKey("metadata")
+                    ? objectMapper.convertValue(params.get("metadata"), new TypeReference<Map<String, Object>>() {})
+                    : null;
+
+            var request = new UpdateWorkflowRequest(
+                    (String) params.getOrDefault("name", null),
+                    (String) params.getOrDefault("description", null),
+                    (String) params.getOrDefault("icon", null),
+                    blocks,
+                    (String) params.getOrDefault("instructions", null),
+                    (String) params.getOrDefault("model", null),
+                    null, // provider
+                    metadata, defaultContext
+            );
+            Workflow updated = workflowService.update(workflowId, request);
+            return "✓ Workflow aktualisiert: \"" + updated.getName() + "\" (ID: " + workflowId + ")";
+        } catch (Exception e) {
+            log.warn("Assistant update_workflow tool failed. Payload: {}", json, e);
+            return "⚠ Workflow konnte nicht aktualisiert werden: " + e.getMessage();
+        }
+    }
+
+    private String executeDeleteWorkflow(String json) {
+        try {
+            Map<String, Object> params = objectMapper.readValue(json, new TypeReference<>() {});
+            String workflowId = (String) params.get("workflowId");
+            if (workflowId == null || workflowId.isBlank())
+                return "⚠ delete_workflow: workflowId ist Pflichtfeld.";
+
+            Workflow workflow = workflowService.findById(workflowId);
+            String name = workflow.getName();
+            workflowService.delete(workflowId);
+            return "✓ Workflow gelöscht: \"" + name + "\" (ID: " + workflowId + ")";
+        } catch (Exception e) {
+            log.warn("Assistant delete_workflow tool failed. Payload: {}", json, e);
+            return "⚠ Workflow konnte nicht gelöscht werden: " + e.getMessage();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private String executeStartWorkflow(String json) {
+        try {
+            Map<String, Object> params = objectMapper.readValue(json, new TypeReference<>() {});
+            String workflowId = (String) params.get("workflowId");
+            if (workflowId == null || workflowId.isBlank())
+                return "⚠ start_workflow: workflowId ist Pflichtfeld.";
+
+            Workflow workflow = workflowService.findById(workflowId);
+            Map<String, Object> context = params.containsKey("context")
+                    ? objectMapper.convertValue(params.get("context"), new TypeReference<Map<String, Object>>() {})
+                    : Map.of();
+
+            WorkflowRun run = workflowExecutor.execute(workflow, context);
+            String shortId = run.getId().substring(0, Math.min(8, run.getId().length()));
+            return "✓ Workflow gestartet: \"" + workflow.getName() + "\" (Run-ID: " + shortId + "…)";
+        } catch (Exception e) {
+            log.warn("Assistant start_workflow tool failed. Payload: {}", json, e);
+            return "⚠ Workflow konnte nicht gestartet werden: " + e.getMessage();
+        }
+    }
+
+    private String executeCancelRun(String json) {
+        try {
+            Map<String, Object> params = objectMapper.readValue(json, new TypeReference<>() {});
+            String runId = (String) params.get("runId");
+            if (runId == null || runId.isBlank())
+                return "⚠ cancel_run: runId ist Pflichtfeld.";
+
+            workflowExecutor.cancelExecution(runId);
+            String shortId = runId.substring(0, Math.min(8, runId.length()));
+            return "✓ Run abgebrochen (ID: " + shortId + "…)";
+        } catch (Exception e) {
+            log.warn("Assistant cancel_run tool failed. Payload: {}", json, e);
+            return "⚠ Run konnte nicht abgebrochen werden: " + e.getMessage();
         }
     }
 
@@ -194,7 +314,7 @@ public class AssistantToolExecutor {
             var created = chainService.create(request);
             return "✓ Chain erstellt: \"" + created.getName() + "\" mit " + entries.size() + " Workflows (ID: " + created.getId() + ")";
         } catch (Exception e) {
-            log.warn("Assistant create_chain tool failed", e);
+            log.warn("Assistant create_chain tool failed. Payload: {}", json, e);
             return "⚠ Chain konnte nicht erstellt werden: " + e.getMessage();
         }
     }

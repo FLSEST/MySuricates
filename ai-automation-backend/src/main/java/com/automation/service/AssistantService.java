@@ -106,29 +106,32 @@ public class AssistantService {
                             .build()
             );
 
-            // Dynamic fetch loop (max 1 round)
-            List<FetchRequest> fetches = fetchService.parseFetchRequests(result.output());
-            if (!fetches.isEmpty()) {
+            // Dynamic fetch loop (max 2 rounds)
+            for (int fetchRound = 0; fetchRound < 2; fetchRound++) {
+                List<FetchRequest> fetches = fetchService.parseFetchRequests(result.output());
+                if (fetches.isEmpty()) break;
                 String supplemental = fetches.stream()
                         .map(fetchService::executeFetch)
                         .filter(s -> !s.isBlank())
                         .collect(Collectors.joining("\n"));
-                if (!supplemental.isBlank()) {
-                    String enrichedPrompt = prompt
-                            + "\n\n---\nNachgeladene Details:\n" + supplemental
-                            + "\n\n[Bitte beantworte die ursprüngliche Frage jetzt mit diesen Details.]";
-                    result = commandExecutorService.executeOnHost(
-                            HostExecutionRequest.builder()
-                                    .projectPath(workingDir)
-                                    .command(enrichedPrompt)
-                                    .systemPrompt(systemPrompt)
-                                    .providerId(req.provider())
-                                    .model(model)
-                                    .timeoutSeconds(TIMEOUT_SECONDS)
-                                    .priority(true)
-                                    .build()
-                    );
-                }
+                if (supplemental.isBlank()) break;
+                String hint = fetchRound == 0
+                        ? "[Bitte beantworte die ursprüngliche Frage jetzt mit diesen Details.]"
+                        : "[Bitte beantworte die Frage JETZT mit den verfügbaren Daten. Keine weiteren Fetches möglich.]";
+                String enrichedPrompt = prompt
+                        + "\n\n---\nNachgeladene Details (Runde " + (fetchRound + 1) + "):\n" + supplemental
+                        + "\n\n" + hint;
+                result = commandExecutorService.executeOnHost(
+                        HostExecutionRequest.builder()
+                                .projectPath(workingDir)
+                                .command(enrichedPrompt)
+                                .systemPrompt(systemPrompt)
+                                .providerId(req.provider())
+                                .model(model)
+                                .timeoutSeconds(TIMEOUT_SECONDS)
+                                .priority(true)
+                                .build()
+                );
             }
 
             // Execute tools in final response

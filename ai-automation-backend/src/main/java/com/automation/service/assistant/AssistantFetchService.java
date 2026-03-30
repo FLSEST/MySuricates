@@ -87,14 +87,14 @@ public class AssistantFetchService {
                     sb.append(" (").append(run.getDurationMs() / 1000).append("s)");
                 sb.append("\n");
                 String err = contextBuilder.extractError(run);
-                if (err != null) sb.append("Run-Fehler: ").append(contextBuilder.truncate(err, 300)).append("\n");
+                if (err != null) sb.append("Run-Fehler: ").append(contextBuilder.truncate(err, 600)).append("\n");
                 var steps = run.getSteps();
                 if (!steps.isEmpty()) {
                     sb.append("Schritte:\n");
                     steps.forEach(s -> {
                         sb.append("  ").append(s.getStepIndex() + 1).append(". ").append(s.getStatus());
                         if (s.getStatus() == StepStatus.FAILED && s.getOutput() != null)
-                            sb.append(": ").append(contextBuilder.truncate(s.getOutput(), 400));
+                            sb.append(": ").append(contextBuilder.truncate(s.getOutput(), 800));
                         sb.append("\n");
                     });
                 }
@@ -208,7 +208,7 @@ public class AssistantFetchService {
                             sb.append("\n");
                             String out = s.getOutput();
                             if (out != null && !out.isBlank()) {
-                                if (out.length() > 3000) out = out.substring(0, 3000) + "\n[...gekürzt]";
+                                if (out.length() > 8000) out = out.substring(0, 8000) + "\n[Ausgabe gekürzt: 8000 von " + s.getOutput().length() + " Zeichen]";
                                 sb.append(out).append("\n");
                             } else {
                                 sb.append("(Kein Output)\n");
@@ -266,13 +266,13 @@ public class AssistantFetchService {
                     ? WF_GUIDE_SECTIONS.get(sectionKey) : null;
             if (sectionHeader == null) {
                 String content = fullContent.length() > 8000
-                        ? fullContent.substring(0, 8000) + "\n\n[...gekürzt]" : fullContent;
+                        ? fullContent.substring(0, 8000) + "\n\n[Ausgabe gekürzt: 8000 von " + fullContent.length() + " Zeichen]" : fullContent;
                 return "**Dokumentation: " + baseId + "**\n\n" + content + "\n";
             }
 
             String section = extractSection(fullContent, sectionHeader);
             if (section.isBlank()) return "Sektion '" + sectionKey + "' nicht gefunden in " + baseId + ".\n";
-            if (section.length() > 12000) section = section.substring(0, 12000) + "\n\n[...gekürzt]";
+            if (section.length() > 12000) section = section.substring(0, 12000) + "\n\n[Ausgabe gekürzt: 12000 von " + section.length() + " Zeichen]";
             return "**" + baseId + " / " + sectionKey + ":**\n\n" + section + "\n";
 
         } catch (Exception e) {

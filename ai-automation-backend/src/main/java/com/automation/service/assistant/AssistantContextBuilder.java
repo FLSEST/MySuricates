@@ -469,10 +469,10 @@ public class AssistantContextBuilder {
                                 boolean isFailed = s.getStatus() == StepStatus.FAILED;
                                 boolean isBeforeFailed = firstFailedIdx > 0 && i == firstFailedIdx - 1;
                                 if (isFailed && s.getOutput() != null) {
-                                    sb.append(":\n    ").append(truncate(s.getOutput(), 1200));
+                                    sb.append(":\n    ").append(truncate(s.getOutput(), 3000));
                                 } else if (isBeforeFailed && s.getOutput() != null) {
                                     sb.append(" (vorheriger Step — Kontext für Fehleranalyse):\n    ")
-                                            .append(truncate(s.getOutput(), 800));
+                                            .append(truncate(s.getOutput(), 1500));
                                 }
                                 sb.append("\n");
                             }
@@ -536,6 +536,6 @@ public class AssistantContextBuilder {
 
     public String truncate(String s, int max) {
         if (s == null || s.length() <= max) return s != null ? s : "";
-        return s.substring(0, max) + "…";
+        return s.substring(0, max) + "\n[Ausgabe gekürzt: " + max + " von " + s.length() + " Zeichen]";
     }
 }
