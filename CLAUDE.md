@@ -258,7 +258,7 @@ See [AGENTS.md](AGENTS.md) for a complete REST API reference for creating workfl
 - **OSIV disabled** (`spring.jpa.open-in-view: false`): Open Session In View is explicitly off. With pool-size=1, OSIV holds the single connection for the entire HTTP request, blocking any raw JDBC or `DataSource.getConnection()` call. All lazy associations must be loaded within `@Transactional` service methods — do NOT rely on lazy loading in controllers or mappers. If you see `LazyInitializationException`, fix it by eager-fetching or adding `@Transactional`, not by re-enabling OSIV.
 - **API prefix**: All endpoints under `/api/v1`
 - **Frontend state**: Zustand for client state (settings, theme, sidebar), TanStack Query for server state
-- **API client**: Singleton `api` instance in `src/api/client.ts` — all hooks use this
+- **API client**: Singleton `api` instance in `src/api/client.ts` — all hooks use this. `apiErrorMessage(err, fallback)` extracts the error message from API responses for toast display — use this in all `onError` handlers instead of generic i18n strings
 - **i18n**: German (`de.ts`) and English (`en.ts`), both must be updated together
 - **Styling**: TailwindCSS utility classes, dark mode support via theme store
 - **PWA**: Vite PWA plugin configured, app name "MySuricates"
@@ -276,6 +276,7 @@ See [AGENTS.md](AGENTS.md) for a complete REST API reference for creating workfl
 - Docker containers have resource limits: 4GB memory, CPU quota, 100 PIDs, 60min idle timeout
 - Security is enabled by default: API key auth via `X-API-Key` header (auto-generated if not configured), rate limiting
 - Block types: simple, shell, retry, conditional, foreach, while, switch, agentic, approval, sub-workflow, skill-capability, human-input
+- **Block-type icons**: `BLOCK_TYPE_ICONS` map in `WorkflowExecution.tsx` assigns a Lucide icon per block type (Terminal, Sparkles, Brain, etc.) — update when adding new block types
 - **Provider routing**: All block executors (simple, retry, conditional, foreach, while, switch, skill-capability) pass `context.getProvider()` as `providerId` via `HostExecutionRequest.builder()` to `CommandExecutorService`. Setting `"provider": "CODEX"` in a workflow JSON therefore applies to every non-shell block type. `AiProviderRegistry.resolve()` falls back to the configured default provider (not hardcoded CLAUDE) when an unknown provider ID is given.
 - Agentic blocks use a Goal→Reason→Act→Observe loop powered by Host Claude CLI
 - Workflow Conversion: Successful agentic runs can be converted to deterministic workflows (rule-based + AI)
