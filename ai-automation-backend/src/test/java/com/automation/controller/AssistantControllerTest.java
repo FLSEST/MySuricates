@@ -5,6 +5,7 @@ import com.automation.dto.AssistantChatResponse;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.service.AssistantService;
 import com.automation.service.AssistantSessionService;
+import com.automation.service.PageSuggestionService;
 import org.springframework.context.ApplicationEventPublisher;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.system.ApiKeyService;
@@ -41,6 +42,8 @@ class AssistantControllerTest {
     private AssistantService assistantService;
     @MockBean
     private AssistantSessionService assistantSessionService;
+    @MockBean
+    private PageSuggestionService pageSuggestionService;
     @MockBean
     private ApplicationEventPublisher eventPublisher;
     @MockBean

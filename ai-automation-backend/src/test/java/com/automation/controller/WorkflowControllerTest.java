@@ -94,7 +94,7 @@ class WorkflowControllerTest {
         testResponse = new WorkflowResponse(
                 "wf-1", "proj-1", "Test Project", null, null,
                 "Test Workflow", "A test workflow",
-                null, List.of(), "1.0.0", Map.of(), List.of(), 0L,
+                null, List.of(), "1.0.0", Map.of(), List.of(), List.of(), 0L,
                 null, null, null, null, Map.of(), null, null, Instant.now(), Instant.now(), null
         );
     }
@@ -220,7 +220,7 @@ class WorkflowControllerTest {
                 Instant.now(), null, null, null, null, Map.of(), Map.of(), null
         );
 
-        when(workflowService.findById("wf-1")).thenReturn(testWorkflow);
+        when(workflowService.findByIdEager("wf-1")).thenReturn(testWorkflow);
         when(workflowExecutor.execute(eq(testWorkflow), any())).thenReturn(run);
         when(workflowMapper.toRunResponse(run)).thenReturn(runResponse);
 
@@ -247,7 +247,7 @@ class WorkflowControllerTest {
                 null, null, null, null, null, null, null, null
         );
 
-        when(workflowService.findById("wf-1")).thenReturn(testWorkflow);
+        when(workflowService.findByIdEager("wf-1")).thenReturn(testWorkflow);
         when(workflowExecutor.execute(eq(testWorkflow), any())).thenReturn(run);
         when(workflowMapper.toRunResponse(run)).thenReturn(runResponse);
 

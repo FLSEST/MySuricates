@@ -60,6 +60,7 @@ class ExecutionSettingsServiceTest {
     void init_withDbOverrides_appliesThem() {
         when(appSettingsRepository.get("execution-max-concurrent")).thenReturn(Optional.of("5"));
         when(appSettingsRepository.get("claude-max-concurrent-calls")).thenReturn(Optional.of("2"));
+        when(appSettingsRepository.get("claude-reserved-for-interactive")).thenReturn(Optional.empty());
         when(appSettingsRepository.get("claude-timeout-seconds")).thenReturn(Optional.of("600"));
         when(appSettingsRepository.get("claude-inter-call-delay-ms")).thenReturn(Optional.of("100"));
         when(appSettingsRepository.get("chain-workflow-timeout-minutes")).thenReturn(Optional.of("60"));
@@ -162,6 +163,7 @@ class ExecutionSettingsServiceTest {
     void init_ignoresOutOfBoundsDbValue() {
         when(appSettingsRepository.get("execution-max-concurrent")).thenReturn(Optional.of("999"));
         when(appSettingsRepository.get("claude-max-concurrent-calls")).thenReturn(Optional.empty());
+        when(appSettingsRepository.get("claude-reserved-for-interactive")).thenReturn(Optional.empty());
         when(appSettingsRepository.get("claude-timeout-seconds")).thenReturn(Optional.empty());
         when(appSettingsRepository.get("claude-inter-call-delay-ms")).thenReturn(Optional.empty());
         when(appSettingsRepository.get("chain-workflow-timeout-minutes")).thenReturn(Optional.empty());

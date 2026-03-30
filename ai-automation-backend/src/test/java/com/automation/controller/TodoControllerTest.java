@@ -28,6 +28,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import com.automation.service.activitylog.ActivityLogService;
+import com.automation.service.todo.TodoSimilarityService;
 
 @WebMvcTest(TodoController.class)
 @Import(GlobalExceptionHandler.class)
@@ -42,6 +43,7 @@ class TodoControllerTest {
 
     @MockBean private TodoMapper todoMapper;
     @MockBean private ApiKeyService apiKeyService;
+    @MockBean private TodoSimilarityService todoSimilarityService;
 
     private TodoResponse sampleResponse() {
         return new TodoResponse("t-1", "Fix bug", "desc", Todo.Status.OPEN, Todo.Priority.HIGH,

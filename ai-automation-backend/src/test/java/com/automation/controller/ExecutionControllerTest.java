@@ -33,6 +33,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.todo.AutoTodoService;
+import com.automation.service.workflow.WorkflowService;
 
 @WebMvcTest(ExecutionController.class)
 @Import(GlobalExceptionHandler.class)
@@ -48,6 +49,8 @@ class ExecutionControllerTest {
     private ActivityLogService activityLogService;
     @MockBean
     private AutoTodoService autoTodoService;
+    @MockBean
+    private WorkflowService workflowService;
 
     @MockBean
     private WorkflowRunRepository runRepository;
@@ -150,6 +153,7 @@ class ExecutionControllerTest {
                 Instant.now(), null, null, null, null, Map.of(), Map.of(), null);
 
         when(runRepository.findById("run-1")).thenReturn(Optional.of(run));
+        when(workflowService.findByIdEager("wf-1")).thenReturn(workflow);
         when(workflowExecutor.execute(workflow, run.getInputContext())).thenReturn(newRun);
         when(workflowMapper.toRunResponse(newRun)).thenReturn(response);
 
