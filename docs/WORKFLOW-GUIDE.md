@@ -1074,3 +1074,60 @@ Alle 40+ eingebauten Templates mit ihrem primaeren Pattern:
 | `directory-sync` | Shell-Kette | UTILITY |
 | `docker-image-build-push` | Shell + Conditional | CODE |
 | `todo-creator` | Agentic | UTILITY |
+
+---
+
+## Auto-Repair
+
+Auto-Repair ist der Self-Healing-Mechanismus der Plattform: Wenn ein Workflow fehlschlägt, analysiert die KI den Fehler, korrigiert die Workflow-Blocks und verifiziert die Reparatur automatisch.
+
+### Wie es funktioniert
+
+1. **Erkennung** — Ein `WorkflowRunCompletedEvent` mit Status `FAILED` wird erkannt
+2. **Analyse** — Die KI (`WorkflowTextGenerator`) analysiert den Fehler und die aktuellen Blocks
+3. **Fix** — Korrigierte Blocks werden als JSON generiert und im Workflow gespeichert
+4. **Verifikation** — Der reparierte Workflow wird erneut ausgeführt (bis zu 2 Versuche)
+5. **Loop-Schutz** — Repair-Runs werden mit `autoRepairAttempt=true` markiert, um Endlosschleifen zu verhindern
+
+### Repair-Modi
+
+| Modus | Verhalten |
+|-------|-----------|
+| `auto` (Standard) | Bevorzugt Test-Instanz, fällt auf lokale Ausführung zurück |
+| `test` | Nur über Test-Instanz — überspringt wenn Test nicht verfügbar |
+| `local` | Immer lokale Ausführung auf der gleichen Instanz |
+
+### Konfiguration
+
+**Global** (Settings → General → Auto-Repair):
+- Toggle: Auto-Repair aktivieren/deaktivieren
+- Dropdown: Repair-Modus (Auto/Test/Lokal)
+
+**Per Workflow** (Workflow-Metadata):
+```json
+{
+  "metadata": {
+    "autoRepair": {
+      "enabled": true,
+      "mode": "auto"
+    }
+  }
+}
+```
+
+Priorität: Workflow-Metadata > Globales Setting > Default (`auto`, deaktiviert).
+
+### API-Endpoints
+
+| Aktion | Methode | Pfad |
+|--------|---------|------|
+| Einzelnen Workflow reparieren | POST | `/api/v1/workflows/{id}/repair` |
+| Alle fehlgeschlagenen reparieren | POST | `/api/v1/system/repair-failed?force=false` |
+| Globalen Repair-Modus setzen | PUT | `/api/v1/system/settings/auto-repair-mode` — body: `{"value": "auto"}` |
+
+### Hinweise
+
+- Im Modus `auto` oder `local` braucht die Test-Instanz **nicht** zu laufen
+- Maximal 2 Reparaturversuche pro Fehlschlag (hardcoded)
+- Repair-Runs erscheinen im ActivityLog
+- Die KI-Reparatur nutzt das konfigurierte `WorkflowTextGenerator`-Interface (Claude oder Codex)

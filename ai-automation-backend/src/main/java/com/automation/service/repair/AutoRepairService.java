@@ -3,6 +3,7 @@ package com.automation.service.repair;
 import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.RunStatus;
 import com.automation.entity.Workflow;
+import com.automation.entity.WorkflowRun;
 import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.repository.WorkflowRunRepository;
@@ -10,23 +11,28 @@ import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.factory.WorkflowFactoryService;
 import com.automation.service.factory.WorkflowFactoryService.FactoryTestResult;
 import com.automation.service.staging.TestingService;
+import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class AutoRepairService {
 
     static final String SETTING_AUTO_REPAIR_DEFAULT = "auto-repair-default";
+    static final String SETTING_AUTO_REPAIR_MODE = "auto-repair-mode";
     private static final int DEFAULT_MAX_RETRIES = 2;
+    private static final long POLLING_INTERVAL_MS = 2000;
+    private static final long LOCAL_REPAIR_TIMEOUT_SECONDS = 600;
 
     private final WorkflowFactoryService workflowFactoryService;
     private final WorkflowService workflowService;
@@ -34,6 +40,23 @@ public class AutoRepairService {
     private final ActivityLogService activityLogService;
     private final AppSettingsRepository appSettingsRepository;
     private final WorkflowRunRepository workflowRunRepository;
+    private final WorkflowExecutor workflowExecutor;
+
+    public AutoRepairService(WorkflowFactoryService workflowFactoryService,
+                             WorkflowService workflowService,
+                             TestingService testingService,
+                             ActivityLogService activityLogService,
+                             AppSettingsRepository appSettingsRepository,
+                             WorkflowRunRepository workflowRunRepository,
+                             @Lazy WorkflowExecutor workflowExecutor) {
+        this.workflowFactoryService = workflowFactoryService;
+        this.workflowService = workflowService;
+        this.testingService = testingService;
+        this.activityLogService = activityLogService;
+        this.appSettingsRepository = appSettingsRepository;
+        this.workflowRunRepository = workflowRunRepository;
+        this.workflowExecutor = workflowExecutor;
+    }
 
     @Async
     @EventListener
@@ -54,32 +77,29 @@ public class AutoRepairService {
             return;
         }
 
-        if (!testingService.isHealthy()) {
-            log.debug("Auto-repair skipped: test instance not healthy (workflow {})", event.getWorkflowId());
+        String workflowId = event.getWorkflowId();
+        String workflowName = event.getWorkflowName();
+        String mode = resolveRepairMode(workflowService.findById(workflowId));
+
+        if ("test".equals(mode) && !testingService.isHealthy()) {
+            log.debug("Auto-repair skipped: mode=test but test instance not healthy (workflow {})", workflowId);
             return;
         }
 
-        String workflowId = event.getWorkflowId();
-        String workflowName = event.getWorkflowName();
-
         activityLogService.info(LogCategory.EXECUTION,
-                "Auto-repair started for workflow: " + workflowName,
+                "Auto-repair started for workflow: " + workflowName + " (mode: " + mode + ")",
                 "AutoRepairService", event.getRunId(), workflowId);
 
         try {
-            FactoryTestResult result = workflowFactoryService.verifyAndFix(workflowId, DEFAULT_MAX_RETRIES);
-
-            if ("PASSED".equals(result.status())) {
-                activityLogService.info(LogCategory.EXECUTION,
-                        "Auto-repair succeeded for workflow: " + workflowName,
-                        "AutoRepairService", result.runId(), workflowId);
-                log.info("Auto-repair succeeded for workflow '{}' ({})", workflowName, workflowId);
+            FactoryTestResult result;
+            if (shouldUseTestInstance(mode)) {
+                result = workflowFactoryService.verifyAndFix(workflowId, DEFAULT_MAX_RETRIES);
             } else {
-                activityLogService.warn(LogCategory.EXECUTION,
-                        "Auto-repair failed for workflow: " + workflowName + " — " + result.error(),
-                        "AutoRepairService", result.runId(), workflowId);
-                log.warn("Auto-repair failed for workflow '{}': {}", workflowName, result.error());
+                String errorMsg = extractErrorMessage(event.getError());
+                result = repairLocally(workflowId, errorMsg, DEFAULT_MAX_RETRIES);
             }
+
+            logRepairResult(result, workflowName, workflowId);
         } catch (Exception e) {
             activityLogService.error(LogCategory.EXECUTION,
                     "Auto-repair error for workflow: " + workflowName + " — " + e.getMessage(),
@@ -90,30 +110,27 @@ public class AutoRepairService {
 
     /**
      * Retroactively repair a single workflow by ID.
-     * Checks for FAILED runs and delegates to verifyAndFix.
+     * Uses resolved repair mode (test/local/auto).
      */
     @Async
     public void repairWorkflow(String workflowId) {
         Workflow workflow = workflowService.findById(workflowId);
+        String mode = resolveRepairMode(workflow);
 
         activityLogService.info(LogCategory.EXECUTION,
-                "Retroactive repair started for workflow: " + workflow.getName(),
+                "Retroactive repair started for workflow: " + workflow.getName() + " (mode: " + mode + ")",
                 "AutoRepairService", null, workflowId);
 
         try {
-            FactoryTestResult result = workflowFactoryService.verifyAndFix(workflowId, DEFAULT_MAX_RETRIES);
-
-            if ("PASSED".equals(result.status())) {
-                activityLogService.info(LogCategory.EXECUTION,
-                        "Retroactive repair succeeded for workflow: " + workflow.getName(),
-                        "AutoRepairService", result.runId(), workflowId);
-                log.info("Retroactive repair succeeded for workflow '{}' ({})", workflow.getName(), workflowId);
+            FactoryTestResult result;
+            if (shouldUseTestInstance(mode)) {
+                result = workflowFactoryService.verifyAndFix(workflowId, DEFAULT_MAX_RETRIES);
             } else {
-                activityLogService.warn(LogCategory.EXECUTION,
-                        "Retroactive repair failed for workflow: " + workflow.getName() + " — " + result.error(),
-                        "AutoRepairService", result.runId(), workflowId);
-                log.warn("Retroactive repair failed for workflow '{}': {}", workflow.getName(), result.error());
+                String errorMsg = extractLastFailedRunError(workflowId);
+                result = repairLocally(workflowId, errorMsg, DEFAULT_MAX_RETRIES);
             }
+
+            logRepairResult(result, workflow.getName(), workflowId);
         } catch (Exception e) {
             activityLogService.error(LogCategory.EXECUTION,
                     "Retroactive repair error for workflow: " + workflow.getName() + " — " + e.getMessage(),
@@ -159,6 +176,139 @@ public class AutoRepairService {
         return queued;
     }
 
+    public boolean isTestInstanceHealthy() {
+        return testingService.isHealthy();
+    }
+
+    /**
+     * Resolves the effective repair mode for a workflow.
+     * Priority: workflow metadata > global setting > default "auto".
+     */
+    @SuppressWarnings("unchecked")
+    String resolveRepairMode(Workflow workflow) {
+        Map<String, Object> metadata = workflow.getMetadata();
+        if (metadata != null) {
+            Object autoRepair = metadata.get("autoRepair");
+            if (autoRepair instanceof Map<?, ?> map) {
+                Object mode = map.get("mode");
+                if (mode instanceof String m && List.of("test", "local", "auto").contains(m)) {
+                    return m;
+                }
+            }
+        }
+        return appSettingsRepository.get(SETTING_AUTO_REPAIR_MODE)
+                .filter(m -> List.of("test", "local", "auto").contains(m))
+                .orElse("auto");
+    }
+
+    // ── Local repair pipeline ──────────────────────────────
+
+    /**
+     * Repairs a workflow locally: AI-fix the blocks, then re-execute on this instance.
+     */
+    FactoryTestResult repairLocally(String workflowId, String errorMessage, int maxRetries) {
+        Workflow workflow = workflowService.findById(workflowId);
+        String lastError = errorMessage;
+
+        for (int i = 0; i < maxRetries; i++) {
+            log.info("Local repair: attempt {}/{} for workflow '{}'", i + 1, maxRetries, workflow.getName());
+
+            try {
+                workflowFactoryService.autoFixWorkflow(workflow, lastError);
+                workflow = workflowService.findById(workflowId);
+
+                Map<String, Object> context = workflow.getDefaultContext() != null
+                        ? new HashMap<>(workflow.getDefaultContext()) : new HashMap<>();
+                Map<String, Object> repairMeta = Map.of("autoRepairAttempt", true);
+
+                WorkflowRun run = workflowExecutor.execute(workflow, context, null, repairMeta);
+                WorkflowRun completed = waitForRunCompletion(run.getId());
+
+                if (completed != null && completed.getStatus() == RunStatus.COMPLETED) {
+                    return new FactoryTestResult(completed.getId(), "PASSED", null);
+                }
+
+                // Extract error for next iteration
+                if (completed != null && completed.getError() != null) {
+                    lastError = extractErrorMessage(completed.getError());
+                } else {
+                    lastError = "Workflow failed without error details";
+                }
+            } catch (Exception e) {
+                log.warn("Local repair: attempt {} failed: {}", i + 1, e.getMessage());
+                lastError = e.getMessage();
+            }
+        }
+
+        return new FactoryTestResult(null, "FAILED", lastError);
+    }
+
+    /**
+     * Polls for workflow run completion with timeout.
+     */
+    private WorkflowRun waitForRunCompletion(String runId) {
+        long deadline = System.currentTimeMillis() + LOCAL_REPAIR_TIMEOUT_SECONDS * 1000;
+
+        while (System.currentTimeMillis() < deadline) {
+            WorkflowRun run = workflowRunRepository.findById(runId).orElse(null);
+            if (run != null && run.getStatus() != RunStatus.RUNNING && run.getStatus() != RunStatus.PAUSED) {
+                return run;
+            }
+            try {
+                Thread.sleep(POLLING_INTERVAL_MS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("Local repair: polling interrupted for run {}", runId);
+                return null;
+            }
+        }
+
+        log.warn("Local repair: timeout waiting for run {} ({}s)", runId, LOCAL_REPAIR_TIMEOUT_SECONDS);
+        return null;
+    }
+
+    // ── Helpers ──────────────────────────────
+
+    private boolean shouldUseTestInstance(String mode) {
+        return switch (mode) {
+            case "test" -> true;
+            case "local" -> false;
+            case "auto" -> testingService.isHealthy();
+            default -> testingService.isHealthy();
+        };
+    }
+
+    private String extractErrorMessage(Map<String, Object> error) {
+        if (error == null || error.isEmpty()) {
+            return "Unknown error";
+        }
+        Object message = error.get("message");
+        if (message instanceof String s) {
+            return s;
+        }
+        return error.toString();
+    }
+
+    private String extractLastFailedRunError(String workflowId) {
+        return workflowRunRepository.findTopByWorkflowIdAndStatusOrderByStartedAtDesc(workflowId, RunStatus.FAILED)
+                .map(run -> extractErrorMessage(run.getError()))
+                .orElse("Unknown error (no failed run found)");
+    }
+
+    private void logRepairResult(FactoryTestResult result, String workflowName, String workflowId) {
+        if ("PASSED".equals(result.status())) {
+            activityLogService.info(LogCategory.EXECUTION,
+                    "Auto-repair succeeded for workflow: " + workflowName,
+                    "AutoRepairService", result.runId(), workflowId);
+            log.info("Auto-repair succeeded for workflow '{}' ({})", workflowName, workflowId);
+        } else {
+            activityLogService.warn(LogCategory.EXECUTION,
+                    "Auto-repair failed for workflow: " + workflowName + " — " + result.error(),
+                    "AutoRepairService", result.runId(), workflowId);
+            log.warn("Auto-repair failed for workflow '{}': {}", workflowName, result.error());
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private boolean isAutoRepairEnabledForWorkflow(Workflow workflow) {
         Map<String, Object> metadata = workflow.getMetadata();
@@ -175,10 +325,6 @@ public class AutoRepairService {
         return appSettingsRepository.get(SETTING_AUTO_REPAIR_DEFAULT)
                 .map("true"::equals)
                 .orElse(false);
-    }
-
-    public boolean isTestInstanceHealthy() {
-        return testingService.isHealthy();
     }
 
     @SuppressWarnings("unchecked")

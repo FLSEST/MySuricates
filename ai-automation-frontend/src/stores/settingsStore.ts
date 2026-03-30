@@ -7,6 +7,7 @@ interface SettingsState {
   advancedMode: boolean;
   autoTodoDefault: boolean;
   autoRepairDefault: boolean;
+  autoRepairMode: string;
   defaultAiProvider: string;
   assistantModel: string;
   suggestionsModel: string;
@@ -17,6 +18,7 @@ interface SettingsState {
   setAdvancedMode: (enabled: boolean) => void;
   setAutoTodoDefault: (enabled: boolean) => void;
   setAutoRepairDefault: (enabled: boolean) => void;
+  setAutoRepairMode: (mode: string) => void;
   setDefaultAiProvider: (provider: string) => void;
   setAssistantModel: (model: string) => void;
   setSuggestionsModel: (model: string) => void;
@@ -32,6 +34,7 @@ export const useSettingsStore = create<SettingsState>()(
       advancedMode: false,
       autoTodoDefault: false,
       autoRepairDefault: false,
+      autoRepairMode: 'auto',
       defaultAiProvider: '',
       assistantModel: '',
       suggestionsModel: '',
@@ -42,6 +45,7 @@ export const useSettingsStore = create<SettingsState>()(
       setAdvancedMode: (advancedMode) => set({ advancedMode }),
       setAutoTodoDefault: (autoTodoDefault) => set({ autoTodoDefault }),
       setAutoRepairDefault: (autoRepairDefault) => set({ autoRepairDefault }),
+      setAutoRepairMode: (autoRepairMode) => set({ autoRepairMode }),
       setDefaultAiProvider: (defaultAiProvider) => set({ defaultAiProvider }),
       setAssistantModel: (assistantModel) => set({ assistantModel }),
       setSuggestionsModel: (suggestionsModel) => set({ suggestionsModel }),

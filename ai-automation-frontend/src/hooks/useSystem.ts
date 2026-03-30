@@ -74,6 +74,17 @@ export function useAssistantModelSetting() {
   });
 }
 
+export function useAutoRepairModeSetting() {
+  return useQuery({
+    queryKey: ['system', 'settings', 'auto-repair-mode'],
+    queryFn: async () => {
+      const r = await api.get<{ value: string }>('/system/settings/auto-repair-mode');
+      return r.value || 'auto';
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useSuggestionsModelSetting() {
   return useQuery({
     queryKey: ['system', 'settings', 'suggestions-model'],

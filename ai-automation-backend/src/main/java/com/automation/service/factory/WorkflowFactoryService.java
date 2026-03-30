@@ -284,11 +284,11 @@ public class WorkflowFactoryService {
 
     public record FactoryTestResult(String runId, String status, String error) {}
 
-    private void autoFixWorkflow(Workflow workflow, String errorMessage) throws IOException {
+    public void autoFixWorkflow(Workflow workflow, String errorMessage) throws IOException {
         autoFixWorkflow(workflow, errorMessage, null);
     }
 
-    private void autoFixWorkflow(Workflow workflow, String errorMessage, String provider) throws IOException {
+    public void autoFixWorkflow(Workflow workflow, String errorMessage, String provider) throws IOException {
         String resolvedProvider = resolveProvider(provider);
         String blocksJson = objectMapper.writeValueAsString(workflow.getBlocks());
 

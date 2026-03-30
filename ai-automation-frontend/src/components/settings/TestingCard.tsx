@@ -270,7 +270,6 @@ export function TestingCard({ testing, devVersion, onStart, onStop, onReset, onS
                 icon={<Wrench className="w-3.5 h-3.5" />}
                 onClick={() => setRepairConfirm(true)}
                 loading={repairAllLoading}
-                disabled={!testing?.healthy}
               >
                 {t.settings.repairAll}
               </Button>

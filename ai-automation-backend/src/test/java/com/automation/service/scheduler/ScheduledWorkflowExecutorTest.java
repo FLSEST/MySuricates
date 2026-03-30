@@ -83,7 +83,7 @@ class ScheduledWorkflowExecutorTest {
 
         executor.executeSingleSchedule("sched-cron");
 
-        verify(workflowExecutor).execute(eq(testWorkflow), eq(Map.of()), any());
+        verify(workflowExecutor).execute(eq(testWorkflow), eq(Map.of()), any(String.class), isNull());
         assertThat(scheduled.getLastRunAt()).isNotNull();
         assertThat(scheduled.getNextRunAt()).isNotNull();
         assertThat(scheduled.isEnabled()).isTrue();
@@ -110,7 +110,7 @@ class ScheduledWorkflowExecutorTest {
 
         executor.executeSingleSchedule("sched-once");
 
-        verify(workflowExecutor).execute(eq(testWorkflow), eq(Map.of()), any());
+        verify(workflowExecutor).execute(eq(testWorkflow), eq(Map.of()), any(String.class), isNull());
         assertThat(scheduled.getLastRunAt()).isNotNull();
         assertThat(scheduled.getNextRunAt()).isNull();
         assertThat(scheduled.isEnabled()).isFalse();

@@ -125,12 +125,6 @@ public class WorkflowController {
                     "error", "Workflow '" + workflow.getName() + "' has no failed runs"));
         }
 
-        // Check test instance health
-        if (!autoRepairService.isTestInstanceHealthy()) {
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
-                    "error", "Test instance is not healthy"));
-        }
-
         autoRepairService.repairWorkflow(id);
         return ResponseEntity.accepted().body(Map.of(
                 "status", "repair_started",

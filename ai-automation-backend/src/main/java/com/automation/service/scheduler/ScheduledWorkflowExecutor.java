@@ -91,7 +91,7 @@ public class ScheduledWorkflowExecutor {
             if (scheduled.getTargetType() == TargetType.CHAIN && scheduled.getChain() != null) {
                 chainExecutor.execute(scheduled.getChain(), scheduled.getInputContext(), scheduleId);
             } else if (scheduled.getWorkflow() != null) {
-                workflowExecutor.execute(scheduled.getWorkflow(), scheduled.getInputContext(), scheduleId);
+                workflowExecutor.execute(scheduled.getWorkflow(), scheduled.getInputContext(), scheduleId, null);
             } else {
                 log.error("Schedule {} has no valid target", scheduled.getId());
                 return;

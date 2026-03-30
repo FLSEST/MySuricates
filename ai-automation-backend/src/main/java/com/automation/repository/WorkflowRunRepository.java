@@ -73,6 +73,8 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
 
     boolean existsByWorkflowIdAndStatus(String workflowId, RunStatus status);
 
+    Optional<WorkflowRun> findTopByWorkflowIdAndStatusOrderByStartedAtDesc(String workflowId, RunStatus status);
+
     @Query("SELECT r FROM WorkflowRun r LEFT JOIN FETCH r.steps WHERE r.id = :id")
     Optional<WorkflowRun> findByIdWithSteps(@Param("id") String id);
 

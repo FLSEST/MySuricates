@@ -150,11 +150,6 @@ public class SystemController {
     @PostMapping("/repair-failed")
     public ResponseEntity<Map<String, Object>> repairAllFailed(
             @RequestParam(defaultValue = "false") boolean force) {
-        if (!autoRepairService.isTestInstanceHealthy()) {
-            return ResponseEntity.status(503).body(Map.of(
-                    "error", "Test instance is not healthy"));
-        }
-
         int queued = autoRepairService.repairAllFailed(force);
         return ResponseEntity.accepted().body(Map.of(
                 "status", "repair_started",
@@ -225,7 +220,7 @@ public class SystemController {
     }
 
     private static final Set<String> ALLOWED_SETTINGS = Set.of(
-            "auto-todo-default", "auto-repair-default", "default-ai-provider",
+            "auto-todo-default", "auto-repair-default", "auto-repair-mode", "default-ai-provider",
             "assistant-thinking-phrases", "assistant-model", "suggestions-model"
     );
 

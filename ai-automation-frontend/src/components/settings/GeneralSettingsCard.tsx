@@ -3,17 +3,18 @@ import { Card, CardHeader, Toggle, Select } from '../ui';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useI18nStore, type Locale } from '../../i18n';
 import { useT } from '../../i18n';
-import { useUpdateSystemSetting, useAiProviders, useAssistantModelSetting, useSuggestionsModelSetting } from '../../hooks/useSystem';
+import { useUpdateSystemSetting, useAiProviders, useAssistantModelSetting, useSuggestionsModelSetting, useAutoRepairModeSetting } from '../../hooks/useSystem';
 import { Globe, Bot, Sparkles } from 'lucide-react';
 
 export function GeneralSettingsCard() {
   const t = useT();
-  const { simpleMode, setSimpleMode, advancedMode, setAdvancedMode, autoTodoDefault, setAutoTodoDefault, autoRepairDefault, setAutoRepairDefault, defaultAiProvider, setDefaultAiProvider, assistantModel, setAssistantModel, suggestionsModel, setSuggestionsModel } = useSettingsStore();
+  const { simpleMode, setSimpleMode, advancedMode, setAdvancedMode, autoTodoDefault, setAutoTodoDefault, autoRepairDefault, setAutoRepairDefault, autoRepairMode, setAutoRepairMode, defaultAiProvider, setDefaultAiProvider, assistantModel, setAssistantModel, suggestionsModel, setSuggestionsModel } = useSettingsStore();
   const updateSetting = useUpdateSystemSetting();
   const { locale, setLocale } = useI18nStore();
   const { data: aiProviders } = useAiProviders();
   const { data: fetchedAssistantModel } = useAssistantModelSetting();
   const { data: fetchedSuggestionsModel } = useSuggestionsModelSetting();
+  const { data: fetchedRepairMode } = useAutoRepairModeSetting();
 
   useEffect(() => {
     if (aiProviders && !defaultAiProvider) {
@@ -32,6 +33,12 @@ export function GeneralSettingsCard() {
       setSuggestionsModel(fetchedSuggestionsModel);
     }
   }, [fetchedSuggestionsModel]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (fetchedRepairMode !== undefined && fetchedRepairMode !== autoRepairMode) {
+      setAutoRepairMode(fetchedRepairMode);
+    }
+  }, [fetchedRepairMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <Card>
@@ -167,6 +174,27 @@ export function GeneralSettingsCard() {
                 setAutoRepairDefault(enabled);
                 updateSetting.mutate({ key: 'auto-repair-default', value: String(enabled) });
               }}
+            />
+          </div>
+        )}
+
+        {!simpleMode && autoRepairDefault && (
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-text">{t.settings.autoRepairMode}</p>
+              <p className="text-xs text-text-tertiary">{t.settings.autoRepairModeHint}</p>
+            </div>
+            <Select
+              value={autoRepairMode}
+              onChange={(e) => {
+                setAutoRepairMode(e.target.value);
+                updateSetting.mutate({ key: 'auto-repair-mode', value: e.target.value });
+              }}
+              options={[
+                { value: 'auto', label: t.settings.autoRepairModeAuto },
+                { value: 'test', label: t.settings.autoRepairModeTest },
+                { value: 'local', label: t.settings.autoRepairModeLocal },
+              ]}
             />
           </div>
         )}

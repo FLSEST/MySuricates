@@ -76,16 +76,20 @@ public class WorkflowExecutor {
      * The actual block execution happens in a background virtual thread.
      */
     public WorkflowRun execute(Workflow workflow, Map<String, Object> inputContext) {
-        return execute(workflow, inputContext, null);
+        return execute(workflow, inputContext, null, null);
     }
 
-    public WorkflowRun execute(Workflow workflow, Map<String, Object> inputContext, String triggeredByScheduleId) {
+    public WorkflowRun execute(Workflow workflow, Map<String, Object> inputContext,
+                               String triggeredByScheduleId, Map<String, Object> initialRunMetadata) {
         WorkflowRun run = WorkflowRun.builder()
                 .workflow(workflow)
                 .status(RunStatus.RUNNING)
                 .startedAt(Instant.now())
                 .triggeredByScheduleId(triggeredByScheduleId)
                 .build();
+        if (initialRunMetadata != null && !initialRunMetadata.isEmpty()) {
+            run.setMetadata(new HashMap<>(initialRunMetadata));
+        }
         run = runRepository.save(run);
 
         // Eagerly initialize lazy collections before leaving the transaction/session.
