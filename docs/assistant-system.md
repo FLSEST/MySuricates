@@ -1,4 +1,4 @@
-> *Zuletzt aktualisiert: 28. März 2026, 19:45 Uhr — Workflow: MySuricates Docs aktualisieren | Run: 01102949-3825-4cd9-b4b9-8aa84917c4c2*
+> *Zuletzt aktualisiert: 31. März 2026 — manuell*
 
 # Assistant System
 
@@ -115,6 +115,39 @@ Beide Controller sind unter dem Base-Path `/api/v1/assistant` registriert:
 |---|---|---|
 | `AssistantController` | `POST /chat` | Chat-Anfrage verarbeiten, Session persistieren |
 | `PageSuggestionController` | `GET /suggestions`, `POST /suggestions/refresh` | Seitenspezifische Vorschläge |
+
+## Tools (Server-seitige Aktionen)
+
+Der Assistent kann über `<tool type="...">JSON</tool>`-Tags direkt Aktionen ausführen. Die Tags werden von `AssistantToolExecutor` geparst und serverseitig ausgeführt, bevor die Antwort an den User geht.
+
+### Verfügbare Tools
+
+| Tool | Pflichtfelder | Beschreibung |
+|------|--------------|--------------|
+| `create_todo` | `title` | Todo anlegen (optional: description, priority, tags, projectId) |
+| `update_todo_status` | `id`, `status` | Todo-Status ändern (OPEN/IN_PROGRESS/DONE/BACKLOG) |
+| `create_workflow` | `projectId`, `name` | Workflow anlegen (optional: blocks, instructions, model, defaultContext) |
+| `update_workflow` | `workflowId` | Workflow-Felder aktualisieren (nur übergebene Felder werden geändert) |
+| `delete_workflow` | `workflowId` | Workflow soft-deleten (Bestätigung durch User im Prompt vorgeschrieben) |
+| `start_workflow` | `workflowId` | Workflow starten (optional: context für Input-Variablen) |
+| `cancel_run` | `runId` | Laufenden Run abbrechen (Bestätigung durch User im Prompt vorgeschrieben) |
+| `create_chain` | `name`, `entries` | Workflow-Chain anlegen |
+
+### JSON-Sanitization
+
+`AssistantToolExecutor.sanitizeJson()` normalisiert Fullwidth-Unicode-Zeichen (z.B. `，` → `,`) vor dem JSON-Parse, da Claude gelegentlich solche Zeichen generiert.
+
+### Safety-Regeln
+
+Destruktive Tools (`delete_workflow`, `cancel_run`) erfordern laut System-Prompt eine explizite Bestätigung durch den User vor der Ausführung.
+
+## Fetch-Mechanismus (Dynamisches Nachladen)
+
+Der Assistent kann über `<fetch type="..." id="..."/>`-Tags zusätzliche Daten nachladen. `AssistantFetchService` löst diese auf und liefert die Daten als Supplemental-Kontext zurück.
+
+- **Max. 2 Fetch-Runden** pro Chat-Anfrage (konfiguriert in `AssistantService`)
+- Truncation-Marker zeigen Größeninfo: `[Ausgabe gekürzt: 8000 von 23456 Zeichen]`
+- Verfügbare Fetch-Typen: `run_detail`, `step_output`, `workflow_detail`, `workflow_runs`, `wish_detail`, `docs`, `pool_workflows`, `pool_workflow`, `project_context`
 
 ## Kontext-Injektion
 
