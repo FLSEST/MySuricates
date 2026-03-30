@@ -87,7 +87,7 @@ class WorkflowServiceTest {
 
     @Test
     void findById_existingWorkflow_returnsWorkflow() {
-        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
+        when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(testWorkflow));
 
         Workflow result = workflowService.findById("wf-1");
 
@@ -96,7 +96,7 @@ class WorkflowServiceTest {
 
     @Test
     void findById_nonExistent_throwsException() {
-        when(workflowRepository.findById("unknown")).thenReturn(Optional.empty());
+        when(workflowRepository.findByIdWithSkills("unknown")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> workflowService.findById("unknown"))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -151,7 +151,7 @@ class WorkflowServiceTest {
 
     @Test
     void update_updatesOnlyNonNullFields() {
-        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
+        when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(testWorkflow));
         when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
 
         var request = new UpdateWorkflowRequest("Updated Name", null, null, null, null, null, null, null, null);
@@ -163,7 +163,7 @@ class WorkflowServiceTest {
 
     @Test
     void delete_existingWorkflow_softDeletes() {
-        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
+        when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(testWorkflow));
         when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
 
         workflowService.delete("wf-1");
@@ -179,7 +179,7 @@ class WorkflowServiceTest {
 
         Skill newSkill = Skill.builder().id("skill-2").name("New").category(SkillCategory.DOCUMENT).build();
 
-        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
+        when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(testWorkflow));
         when(skillRepository.findAllById(List.of("skill-1", "skill-2")))
                 .thenReturn(List.of(existingSkill, newSkill));
         when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -211,7 +211,7 @@ class WorkflowServiceTest {
     @Test
     void update_withDefaultContext_replacesDefaults() {
         testWorkflow.setDefaultContext(new java.util.HashMap<>(Map.of("branch", "main", "env", "prod")));
-        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
+        when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(testWorkflow));
         when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
 
         var request = new UpdateWorkflowRequest(null, null, null, null, null, null, null, null,
@@ -227,7 +227,7 @@ class WorkflowServiceTest {
         Skill skill = Skill.builder().id("skill-1").name("Skill").category(SkillCategory.CODE).build();
         testWorkflow.setActivatedSkills(new ArrayList<>(List.of(skill)));
 
-        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
+        when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(testWorkflow));
         when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Workflow result = workflowService.deactivateSkill("wf-1", "skill-1");

@@ -39,6 +39,10 @@
     "sockjs-client": "^1.6.1",
     "zustand": "^4.4.7"
   },
+  "overrides": {
+    "dompurify": "^3.3.3",
+    "serialize-javascript": "^7.0.5"
+  },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@playwright/test": "^1.58.2",

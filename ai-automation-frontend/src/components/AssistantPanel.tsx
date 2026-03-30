@@ -240,14 +240,19 @@ function MessageBubble({ msg, onClose, onSend, onExecute, onRetry }: {
           )}
         </div>
 
-        {/* Actions */}
-        {msg.actions && msg.actions.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-0.5">
-            {msg.actions.map((action, i) => (
-              <ActionButton key={i} action={action} onClose={onClose} onSend={onSend} onExecute={onExecute} />
-            ))}
-          </div>
-        )}
+        {/* Actions — filter out run_workflow/show_workflow/show_run with missing id */}
+        {msg.actions && msg.actions.length > 0 && (() => {
+          const visible = msg.actions!.filter(a =>
+            a.type === 'ask_choice' || a.type === 'start_wish' || a.id
+          );
+          return visible.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5 mt-0.5">
+              {visible.map((action, i) => (
+                <ActionButton key={i} action={action} onClose={onClose} onSend={onSend} onExecute={onExecute} />
+              ))}
+            </div>
+          ) : null;
+        })()}
 
         {/* Error retry button */}
         {msg.isError && onRetry && (

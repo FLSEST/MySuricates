@@ -2,6 +2,7 @@ package com.automation.repository;
 
 import com.automation.entity.Workflow;
 import jakarta.persistence.QueryHint;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -16,6 +17,7 @@ import java.util.Optional;
 @Repository
 public interface WorkflowRepository extends JpaRepository<Workflow, String> {
 
+    @EntityGraph(attributePaths = {"activatedSkills", "project"})
     List<Workflow> findByProjectId(String projectId);
 
     List<Workflow> findByNameContainingIgnoreCase(String name);
@@ -32,9 +34,18 @@ public interface WorkflowRepository extends JpaRepository<Workflow, String> {
 
     /**
      * Finds all workflows whose project is not archived.
+     * Eagerly fetches activatedSkills to avoid LazyInitializationException (OSIV disabled).
      */
+    @EntityGraph(attributePaths = {"activatedSkills", "project"})
     @Query("SELECT w FROM Workflow w WHERE w.project.archivedAt IS NULL")
     List<Workflow> findAllWithActiveProject();
+
+    /**
+     * Finds a workflow by ID with eagerly fetched activatedSkills and project.
+     */
+    @EntityGraph(attributePaths = {"activatedSkills", "project"})
+    @Query("SELECT w FROM Workflow w WHERE w.id = :id")
+    Optional<Workflow> findByIdWithSkills(@Param("id") String id);
 
     /**
      * Finds workflows that need block_types backfill (null or empty).

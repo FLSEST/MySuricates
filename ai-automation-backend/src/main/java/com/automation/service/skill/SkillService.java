@@ -25,13 +25,18 @@ public class SkillService {
 
     @Transactional(readOnly = true)
     public List<Skill> findAll() {
-        return skillRepository.findAll();
+        List<Skill> skills = skillRepository.findAll();
+        // Force-initialize lazy capabilities while still in transaction (OSIV is off)
+        skills.forEach(s -> s.getCapabilities().size());
+        return skills;
     }
 
     @Transactional(readOnly = true)
     public Skill findById(String id) {
-        return skillRepository.findById(id)
+        Skill skill = skillRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Skill", id));
+        skill.getCapabilities().size();
+        return skill;
     }
 
     @Transactional(readOnly = true)

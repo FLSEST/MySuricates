@@ -27,7 +27,7 @@ describe('useWorkflows', () => {
     expect(workflows[0].projectName).toBe('Test Project');
   });
 
-  it('maps activatedSkills to activatedSkillIds and activatedSkillNames', async () => {
+  it('passes activatedSkillIds and activatedSkillNames from API response', async () => {
     const { result } = renderHook(() => useWorkflows(), { wrapper: createWrapper() });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));

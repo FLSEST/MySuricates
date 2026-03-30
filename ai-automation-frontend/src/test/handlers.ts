@@ -17,7 +17,7 @@ export const handlers = [
   // Workflows
   http.get(`${BASE}/workflows`, () =>
     HttpResponse.json([
-      { id: 'w1', projectId: 'p1', projectName: 'Test Project', projectSubtitle: null, projectDescription: null, name: 'Test Workflow', description: 'A test', icon: '🔧', blocks: [], version: '1', metadata: {}, activatedSkills: [{ id: 's1', name: 'Code Review' }], runCount: 5, instructions: null, model: null, templateId: null, createdAt: '2025-01-01T00:00:00Z', updatedAt: '2025-01-01T00:00:00Z' },
+      { id: 'w1', projectId: 'p1', projectName: 'Test Project', projectSubtitle: null, projectDescription: null, name: 'Test Workflow', description: 'A test', icon: '🔧', blocks: [], version: '1', metadata: {}, activatedSkillIds: ['s1'], activatedSkillNames: ['Code Review'], runCount: 5, instructions: null, model: null, templateId: null, createdAt: '2025-01-01T00:00:00Z', updatedAt: '2025-01-01T00:00:00Z' },
     ]),
   ),
 

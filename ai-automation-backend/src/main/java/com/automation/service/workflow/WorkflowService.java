@@ -44,7 +44,7 @@ public class WorkflowService {
 
     @Transactional(readOnly = true)
     public Workflow findById(String id) {
-        return workflowRepository.findById(id)
+        return workflowRepository.findByIdWithSkills(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Workflow", id));
     }
 
@@ -141,7 +141,9 @@ public class WorkflowService {
 
     @Transactional(readOnly = true)
     public Optional<Workflow> findByNameAndProjectId(String name, String projectId) {
-        return workflowRepository.findByNameAndProjectId(name, projectId);
+        Optional<Workflow> result = workflowRepository.findByNameAndProjectId(name, projectId);
+        result.ifPresent(w -> w.getActivatedSkills().size());
+        return result;
     }
 
     @Transactional

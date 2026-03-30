@@ -49,7 +49,12 @@ public class AssistantSessionService {
         List<Map<String, Object>> messages = deserializeMessages(session.getMessages());
 
         // Append new user message
-        messages.add(Map.of("role", "user", "content", req.message()));
+        long now = Instant.now().toEpochMilli();
+        Map<String, Object> userMsg = new LinkedHashMap<>();
+        userMsg.put("role", "user");
+        userMsg.put("content", req.message());
+        userMsg.put("timestamp", now);
+        messages.add(userMsg);
 
         // Append assistant response (truncated to 500 chars to keep DB lean)
         String assistantContent = res.message();
@@ -59,6 +64,7 @@ public class AssistantSessionService {
         Map<String, Object> assistantMsg = new LinkedHashMap<>();
         assistantMsg.put("role", "assistant");
         assistantMsg.put("content", assistantContent != null ? assistantContent : "");
+        assistantMsg.put("timestamp", Instant.now().toEpochMilli());
         if (res.responseTimeMs() != null) {
             assistantMsg.put("responseTimeMs", res.responseTimeMs());
         }

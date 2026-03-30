@@ -18,7 +18,8 @@ interface WorkflowApiResponse {
   blocks: Workflow['blocks'];
   version: string;
   metadata: Record<string, unknown>;
-  activatedSkills: Array<{ id: string; name: string }>;
+  activatedSkillIds: string[];
+  activatedSkillNames: string[];
   runCount: number;
   instructions: string | null;
   model: string | null;
@@ -34,8 +35,8 @@ function mapWorkflow(raw: WorkflowApiResponse): Workflow {
     projectName: raw.projectName ?? '',
     projectSubtitle: raw.projectSubtitle ?? undefined,
     projectDescription: raw.projectDescription ?? undefined,
-    activatedSkillIds: raw.activatedSkills?.map((s) => s.id) ?? [],
-    activatedSkillNames: raw.activatedSkills?.map((s) => s.name) ?? [],
+    activatedSkillIds: raw.activatedSkillIds ?? [],
+    activatedSkillNames: raw.activatedSkillNames ?? [],
     runCount: raw.runCount ?? 0,
     instructions: raw.instructions ?? null,
     model: raw.model ?? null,
