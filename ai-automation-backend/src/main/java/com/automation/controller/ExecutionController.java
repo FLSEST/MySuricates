@@ -32,6 +32,7 @@ public class ExecutionController {
     private final AutoTodoService autoTodoService;
 
     @GetMapping
+    @Transactional(readOnly = true)
     public PageResponse<WorkflowRunResponse> listExecutions(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
@@ -52,6 +53,7 @@ public class ExecutionController {
     }
 
     @GetMapping("/{id}")
+    @Transactional(readOnly = true)
     public ResponseEntity<WorkflowRunResponse> getExecution(@PathVariable String id) {
         var run = executionQueryService.findById(id);
         return ResponseEntity.ok(workflowMapper.toRunResponse(run));

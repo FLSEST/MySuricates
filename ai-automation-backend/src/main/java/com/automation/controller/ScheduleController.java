@@ -15,6 +15,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -52,6 +53,7 @@ public class ScheduleController {
     }
 
     @GetMapping("/{id}/runs")
+    @Transactional(readOnly = true)
     public Map<String, Object> getScheduleRuns(@PathVariable String id) {
         List<WorkflowRunResponse> workflowRuns = workflowMapper.toRunResponseList(
                 schedulerService.findWorkflowRunsByScheduleId(id));
@@ -71,6 +73,7 @@ public class ScheduleController {
     }
 
     @GetMapping("/calendar")
+    @Transactional(readOnly = true)
     public CalendarDataResponse getCalendarData(
             @RequestParam Instant from,
             @RequestParam Instant to) {
