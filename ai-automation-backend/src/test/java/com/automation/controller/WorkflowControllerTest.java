@@ -76,6 +76,12 @@ class WorkflowControllerTest {
     @MockBean
     private ProjectService projectService;
 
+    @MockBean
+    private com.automation.service.workflow.WorkflowVersionService workflowVersionService;
+
+    @MockBean
+    private com.automation.mapper.WorkflowVersionMapper workflowVersionMapper;
+
     private Workflow testWorkflow;
     private WorkflowResponse testResponse;
 

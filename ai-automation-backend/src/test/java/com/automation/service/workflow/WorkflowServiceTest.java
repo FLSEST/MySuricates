@@ -40,6 +40,9 @@ class WorkflowServiceTest {
     @Mock
     private ActivityLogService activityLogService;
 
+    @Mock
+    private WorkflowVersionService workflowVersionService;
+
     @InjectMocks
     private WorkflowService workflowService;
 

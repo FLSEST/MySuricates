@@ -14,5 +14,15 @@ public record UpdateWorkflowRequest(
         String model,
         String provider,
         Map<String, Object> metadata,
-        Map<String, Object> defaultContext
-) {}
+        Map<String, Object> defaultContext,
+        String changeSource,
+        String changeMessage
+) {
+    public UpdateWorkflowRequest(String name, String description, String icon,
+                                  List<BlockDefinition> blocks, String instructions,
+                                  String model, String provider,
+                                  Map<String, Object> metadata, Map<String, Object> defaultContext) {
+        this(name, description, icon, blocks, instructions, model, provider,
+                metadata, defaultContext, null, null);
+    }
+}

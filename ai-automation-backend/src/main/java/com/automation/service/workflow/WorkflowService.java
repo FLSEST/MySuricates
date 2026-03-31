@@ -1,7 +1,9 @@
 package com.automation.service.workflow;
 
+import com.automation.dto.WorkflowSnapshot;
 import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.dto.request.UpdateWorkflowRequest;
+import com.automation.entity.BlockDefinition;
 import com.automation.entity.Project;
 import com.automation.entity.Skill;
 import com.automation.entity.Workflow;
@@ -31,6 +33,7 @@ public class WorkflowService {
     private final ProjectRepository projectRepository;
     private final SkillRepository skillRepository;
     private final ActivityLogService activityLogService;
+    private final WorkflowVersionService workflowVersionService;
 
     @Transactional(readOnly = true)
     public List<Workflow> findAll() {
@@ -103,6 +106,11 @@ public class WorkflowService {
     public Workflow update(String id, UpdateWorkflowRequest request) {
         Workflow workflow = findById(id);
 
+        // Snapshot before update (only if execution-relevant fields changed)
+        WorkflowSnapshot incomingSnapshot = computeIncomingSnapshot(workflow, request);
+        String changeSource = request.changeSource() != null ? request.changeSource() : "user";
+        workflowVersionService.snapshotBeforeUpdate(workflow, incomingSnapshot, changeSource, request.changeMessage());
+
         if (request.name() != null) {
             workflow.setName(request.name());
         }
@@ -137,6 +145,29 @@ public class WorkflowService {
         log.info("Updated workflow: {} ({})", saved.getName(), saved.getId());
         activityLogService.info(LogCategory.SYSTEM, "Workflow updated: " + saved.getName(), "WorkflowService", saved.getId(), saved.getId());
         return saved;
+    }
+
+    private WorkflowSnapshot computeIncomingSnapshot(Workflow current, UpdateWorkflowRequest request) {
+        List<BlockDefinition> blocks = request.blocks() != null ? request.blocks() : current.getBlocks();
+        String instructions = request.instructions() != null ? request.instructions() : current.getInstructions();
+        String model = request.model() != null ? request.model() : current.getModel();
+        String provider = request.provider() != null ? request.provider() : current.getProvider();
+
+        Map<String, Object> metadata;
+        if (request.metadata() != null) {
+            metadata = new HashMap<>(current.getMetadata());
+            metadata.putAll(request.metadata());
+        } else {
+            metadata = current.getMetadata();
+        }
+
+        Map<String, Object> defaultContext = request.defaultContext() != null
+                ? request.defaultContext() : current.getDefaultContext();
+
+        List<String> skillIds = current.getActivatedSkills().stream()
+                .map(Skill::getId).toList();
+
+        return new WorkflowSnapshot(blocks, instructions, model, provider, metadata, defaultContext, skillIds);
     }
 
     @Transactional(readOnly = true)

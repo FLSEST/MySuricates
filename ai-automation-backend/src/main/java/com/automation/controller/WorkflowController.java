@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.dto.WorkflowSnapshot;
 import com.automation.dto.request.ActivateSkillsRequest;
 import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.dto.request.ExecuteWorkflowRequest;
@@ -9,9 +10,12 @@ import com.automation.dto.response.ExportWorkflowResponse;
 import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.WorkflowResponse;
 import com.automation.dto.response.WorkflowRunResponse;
+import com.automation.dto.response.WorkflowVersionResponse;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
+import com.automation.entity.WorkflowVersion;
 import com.automation.mapper.WorkflowMapper;
+import com.automation.mapper.WorkflowVersionMapper;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.project.ProjectService;
 import com.automation.entity.RunStatus;
@@ -19,6 +23,8 @@ import com.automation.service.repair.AutoRepairService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowOptimizationService;
 import com.automation.service.workflow.WorkflowService;
+import com.automation.service.workflow.WorkflowVersionService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -43,6 +49,9 @@ public class WorkflowController {
     private final WorkflowMapper workflowMapper;
     private final WorkflowOptimizationService optimizationService;
     private final AutoRepairService autoRepairService;
+    private final WorkflowVersionService workflowVersionService;
+    private final WorkflowVersionMapper workflowVersionMapper;
+    private final ObjectMapper objectMapper;
 
     @GetMapping
     public List<WorkflowResponse> listWorkflows() {
@@ -161,6 +170,52 @@ public class WorkflowController {
         );
     }
 
+    // --- Workflow Versions ---
+
+    @GetMapping("/{id}/versions")
+    public PageResponse<WorkflowVersionResponse> getVersions(
+            @PathVariable String id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        workflowService.findById(id);
+        var result = workflowVersionService.findByWorkflowId(id, PageRequest.of(page, size));
+        return new PageResponse<>(
+                workflowVersionMapper.toResponseList(result.getContent()),
+                result.getNumber(), result.getSize(),
+                result.getTotalElements(), result.getTotalPages()
+        );
+    }
+
+    @GetMapping("/{id}/versions/{versionId}")
+    public WorkflowVersionResponse getVersion(@PathVariable String id, @PathVariable String versionId) {
+        WorkflowVersion version = workflowVersionService.findById(versionId);
+        if (!version.getWorkflowId().equals(id)) {
+            throw new com.automation.exception.ResourceNotFoundException("WorkflowVersion", versionId);
+        }
+        return workflowVersionMapper.toResponse(version);
+    }
+
+    @PostMapping("/{id}/versions/{versionId}/restore")
+    public ResponseEntity<WorkflowResponse> restoreVersion(@PathVariable String id, @PathVariable String versionId) {
+        WorkflowVersion version = workflowVersionService.findById(versionId);
+        if (!version.getWorkflowId().equals(id)) {
+            throw new com.automation.exception.ResourceNotFoundException("WorkflowVersion", versionId);
+        }
+        try {
+            WorkflowSnapshot snapshot = objectMapper.readValue(version.getSnapshot(), WorkflowSnapshot.class);
+            UpdateWorkflowRequest request = new UpdateWorkflowRequest(
+                    null, null, null,
+                    snapshot.blocks(), snapshot.instructions(), snapshot.model(), snapshot.provider(),
+                    snapshot.metadata(), snapshot.defaultContext(),
+                    "user", "Restored from version " + version.getVersionNumber()
+            );
+            Workflow restored = workflowService.update(id, request);
+            return ResponseEntity.ok(workflowMapper.toResponse(restored));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
     @PostMapping("/import")
     public ResponseEntity<WorkflowResponse> importWorkflow(@Valid @RequestBody ImportWorkflowRequest request) {
         String projectId = request.projectId();
@@ -181,7 +236,9 @@ public class WorkflowController {
                         request.model(),
                         null,
                         null,
-                        null
+                        null,
+                        "import",
+                        "Imported workflow update"
                 );
                 var updated = workflowService.update(existing.get().getId(), updateRequest);
                 return ResponseEntity.ok(workflowMapper.toResponse(updated));

@@ -62,10 +62,12 @@ public class WorkflowExecutor {
     private final TemplateVerificationService templateVerificationService;
     private final SystemIdentityService systemIdentity;
     private final com.automation.repository.TodoRepository todoRepository;
+    private final WorkflowVersionService workflowVersionService;
 
     private static final java.util.Set<String> SYSTEM_VAR_KEYS = java.util.Set.of(
             "workflow_run_id", "workflow_id", "workflow_name", "project_path",
-            "model", "provider", "started_at", "previous_report", "open_todos"
+            "model", "provider", "started_at", "previous_report", "open_todos",
+            "workflow_version", "workflow_changed_since_last_run"
     );
 
     private final Map<String, ExecutionContext> activeExecutions = new ConcurrentHashMap<>();
@@ -212,6 +214,26 @@ public class WorkflowExecutor {
             context.setVariable("model", model != null ? model : "");
             context.setVariable("provider", provider != null ? provider : "");
             context.setVariable("started_at", java.time.Instant.now().toString());
+
+            // Inject workflow version info for delta-based quality workflows
+            int versionCount = workflowVersionService.getVersionCount(workflowId);
+            context.setVariable("workflow_version", String.valueOf(versionCount > 0 ? versionCount : 0));
+            try {
+                var latestVersion = workflowVersionService.findLatest(workflowId);
+                if (latestVersion.isPresent()) {
+                    var lastSuccessfulRun = runRepository
+                            .findTopByWorkflowIdAndStatusOrderByStartedAtDesc(workflowId, com.automation.entity.RunStatus.COMPLETED);
+                    boolean changedSinceLastRun = lastSuccessfulRun
+                            .map(r -> r.getCompletedAt() != null && latestVersion.get().getCreatedAt().isAfter(r.getCompletedAt()))
+                            .orElse(true);
+                    context.setVariable("workflow_changed_since_last_run", String.valueOf(changedSinceLastRun));
+                } else {
+                    context.setVariable("workflow_changed_since_last_run", "false");
+                }
+            } catch (Exception e) {
+                log.warn("Failed to inject workflow version info: {}", e.getMessage());
+                context.setVariable("workflow_changed_since_last_run", "false");
+            }
 
             // Stamp run metadata with system identity
             context.setRunMetadata("system", systemIdentity.getName());

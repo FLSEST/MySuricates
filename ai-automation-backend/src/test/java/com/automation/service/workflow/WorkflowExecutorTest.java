@@ -59,6 +59,9 @@ class WorkflowExecutorTest {
     private com.automation.repository.TodoRepository todoRepository;
 
     @Mock
+    private WorkflowVersionService workflowVersionService;
+
+    @Mock
     private ExecutionBroadcaster broadcaster;
 
     @Mock
@@ -122,7 +125,8 @@ class WorkflowExecutorTest {
                 eventPublisher,
                 templateVerificationService,
                 systemIdentity,
-                todoRepository
+                todoRepository,
+                workflowVersionService
         );
 
         testProject = Project.builder()

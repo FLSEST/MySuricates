@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { Plus, History } from 'lucide-react';
+
+const WorkflowVersionsTab = lazy(() => import('../components/workflow/WorkflowVersionsTab'));
 import { Card, CardHeader, Button, Spinner } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
 import {
@@ -58,6 +60,7 @@ export function WorkflowDetail() {
     skillIds: [],
   });
   const [selectedSkillId, setSelectedSkillId] = useState('');
+  const [activeTab, setActiveTab] = useState<'blocks' | 'versions'>('blocks');
   const [showExecuteDialog, setShowExecuteDialog] = useState(false);
   const [showClone, setShowClone] = useState(false);
   const [cloneForm, setCloneForm] = useState({ projectId: '', name: '' });
@@ -254,35 +257,67 @@ export function WorkflowDetail() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
-          <Card padding={false}>
-            <div className="p-5 pb-0">
-              <CardHeader
-                title={`${t.workflows.blocks} (${workflow.blocks.length})`}
-                action={
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    icon={<Plus className="w-4 h-4" />}
-                    onClick={() => setShowAddBlock(true)}
-                  >
-                    {t.workflows.addBlock}
-                  </Button>
-                }
-              />
-            </div>
-            {workflow.blocks.length === 0 ? (
-              <div className="px-5 py-12 text-center text-sm text-text-tertiary">
-                {t.workflows.noBlocks}
+          <div className="flex border-b border-border mb-0">
+            <button
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'blocks'
+                  ? 'border-accent text-accent'
+                  : 'border-transparent text-text-secondary hover:text-text hover:border-border'
+              }`}
+              onClick={() => setActiveTab('blocks')}
+            >
+              {t.workflows.blocksTab} ({workflow.blocks.length})
+            </button>
+            <button
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors inline-flex items-center gap-1.5 ${
+                activeTab === 'versions'
+                  ? 'border-accent text-accent'
+                  : 'border-transparent text-text-secondary hover:text-text hover:border-border'
+              }`}
+              onClick={() => setActiveTab('versions')}
+            >
+              <History className="w-3.5 h-3.5" />
+              {t.workflows.versionsTab}
+            </button>
+          </div>
+
+          {activeTab === 'blocks' && (
+            <Card padding={false}>
+              <div className="p-5 pb-0">
+                <CardHeader
+                  title={`${t.workflows.blocks} (${workflow.blocks.length})`}
+                  action={
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      icon={<Plus className="w-4 h-4" />}
+                      onClick={() => setShowAddBlock(true)}
+                    >
+                      {t.workflows.addBlock}
+                    </Button>
+                  }
+                />
               </div>
-            ) : (
-              <SortableBlockList
-                workflowId={workflow.id}
-                blocks={workflow.blocks}
-                onEditBlock={handleOpenEditBlock}
-                onRemoveBlock={handleRemoveBlock}
-              />
-            )}
-          </Card>
+              {workflow.blocks.length === 0 ? (
+                <div className="px-5 py-12 text-center text-sm text-text-tertiary">
+                  {t.workflows.noBlocks}
+                </div>
+              ) : (
+                <SortableBlockList
+                  workflowId={workflow.id}
+                  blocks={workflow.blocks}
+                  onEditBlock={handleOpenEditBlock}
+                  onRemoveBlock={handleRemoveBlock}
+                />
+              )}
+            </Card>
+          )}
+
+          {activeTab === 'versions' && (
+            <Suspense fallback={<div className="py-8 text-center text-text-secondary">{t.common.loading}</div>}>
+              <WorkflowVersionsTab workflowId={workflow.id} />
+            </Suspense>
+          )}
         </div>
 
         <WorkflowDetailSidebar

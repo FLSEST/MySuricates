@@ -125,6 +125,18 @@ export interface CreateWorkflowRequest {
   metadata?: WorkflowMetadata;
 }
 
+// ── Workflow Version ─────────────────────────────────────
+
+export interface WorkflowVersion {
+  id: string;
+  workflowId: string;
+  versionNumber: number;
+  snapshot: string;
+  changeSource: string;
+  changeMessage: string | null;
+  createdAt: string;
+}
+
 // ── Workflow Template ────────────────────────────────────
 export interface TemplateVerification {
   projectId: string;

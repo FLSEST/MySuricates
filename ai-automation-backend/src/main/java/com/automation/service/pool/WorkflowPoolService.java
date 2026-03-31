@@ -106,7 +106,7 @@ public class WorkflowPoolService {
                 UpdateWorkflowRequest updateRequest = new UpdateWorkflowRequest(
                         resolvedName, description, entry.icon(), entry.blocks(),
                         entry.instructions(), entry.model(), null, null,
-                        mergedContext
+                        mergedContext, "pool-install", "Pool install: " + poolId
                 );
                 Workflow updated = workflowService.update(existing.get().getId(), updateRequest);
                 log.info("Updated pool workflow '{}' in-place: workflow '{}' ({})", poolId, updated.getName(), updated.getId());
