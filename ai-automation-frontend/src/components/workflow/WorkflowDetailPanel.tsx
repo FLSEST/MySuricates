@@ -5,6 +5,18 @@ import {
   Download,
   Save,
   FlaskConical,
+  Terminal,
+  Sparkles,
+  Brain,
+  Repeat,
+  GitBranch,
+  RefreshCw,
+  ShieldCheck,
+  Layers,
+  MessageSquare,
+  Route,
+  RotateCcw,
+  Wrench,
 } from 'lucide-react';
 import { Button, Spinner } from '../ui';
 import { StatusBadge } from '../shared/StatusBadge';
@@ -16,6 +28,28 @@ import { formatDuration, formatDateTime } from '../../utils/formatTime';
 import type { useNavigate } from 'react-router-dom';
 import type { Workflow } from '../../types';
 import type { TranslationKeys } from '../../i18n';
+
+const BLOCK_TYPE_ICONS: Record<string, React.ReactNode> = {
+  shell: <Terminal className="w-3.5 h-3.5" />,
+  simple: <Sparkles className="w-3.5 h-3.5" />,
+  agentic: <Brain className="w-3.5 h-3.5" />,
+  foreach: <Repeat className="w-3.5 h-3.5" />,
+  conditional: <GitBranch className="w-3.5 h-3.5" />,
+  while: <RefreshCw className="w-3.5 h-3.5" />,
+  approval: <ShieldCheck className="w-3.5 h-3.5" />,
+  'sub-workflow': <Layers className="w-3.5 h-3.5" />,
+  'human-input': <MessageSquare className="w-3.5 h-3.5" />,
+  switch: <Route className="w-3.5 h-3.5" />,
+  retry: <RotateCcw className="w-3.5 h-3.5" />,
+  'skill-capability': <Wrench className="w-3.5 h-3.5" />,
+};
+
+function getBlockLabel(block: { type: string; config: Record<string, unknown> }): string {
+  const prompt = block.config.prompt as string | undefined;
+  const command = block.config.command as string | undefined;
+  const label = prompt || command || '';
+  return label.length > 60 ? label.slice(0, 60) + '…' : label;
+}
 
 function pluralize(count: number, singular: string, plural: string) {
   return count === 1 ? singular : plural;
@@ -107,6 +141,28 @@ export function WorkflowDetailPanel({
           </div>
         )}
       </div>
+
+      {workflow.blocks.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-text mb-2">{t.workflows.blocks}</h3>
+          <div className="space-y-1">
+            {workflow.blocks.map((block, idx) => (
+              <div
+                key={idx}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-raised border border-border text-xs"
+              >
+                <span className="text-text-tertiary shrink-0">
+                  {BLOCK_TYPE_ICONS[block.type] ?? <Sparkles className="w-3.5 h-3.5" />}
+                </span>
+                <span className="text-text-secondary font-medium shrink-0">{block.type}</span>
+                {getBlockLabel(block) && (
+                  <span className="text-text-tertiary truncate font-mono">{getBlockLabel(block)}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-surface-raised border border-border">
         <div>
@@ -269,6 +325,7 @@ export function WorkflowDetailPanel({
             const safeName = workflow.name.replace(/[^a-zA-Z0-9_-]/g, '_');
             exportWorkflow(workflow.id, `${safeName}.json`);
           }}
+          title={t.workflows.exportWorkflow}
           aria-label={t.workflows.exportWorkflow}
         />
         <Button
@@ -277,6 +334,7 @@ export function WorkflowDetailPanel({
           icon={<Save className="w-4 h-4" />}
           onClick={onSaveAsTemplate}
           loading={saveAsTemplateLoading}
+          title={t.templates.saveAsTemplate}
           aria-label={t.templates.saveAsTemplate}
         />
       </div>

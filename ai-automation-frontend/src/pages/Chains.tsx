@@ -378,8 +378,8 @@ function ChainDetail({ chain, onExecute, onEdit, onDelete }: {
               )}
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} onClick={onEdit} />
-              <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4" />} onClick={onDelete} />
+              <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} onClick={onEdit} title={t.common.edit} />
+              <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4" />} onClick={onDelete} title={t.common.delete} />
               <Button icon={<Play className="w-4 h-4" />} onClick={onExecute} disabled={chain.entries.length === 0}>
                 {t.chains.execute}
               </Button>
@@ -608,7 +608,7 @@ function ChainFormModal({ title, chain, workflows, onSave, onClose, saving }: Ch
                       {i < entries.length - 1 && (
                         <Button variant="ghost" size="sm" onClick={() => moveEntry(i, i + 1)}>↓</Button>
                       )}
-                      <Button variant="ghost" size="sm" icon={<X className="w-3 h-3" />} onClick={() => removeEntry(i)} />
+                      <Button variant="ghost" size="sm" icon={<X className="w-3 h-3" />} onClick={() => removeEntry(i)} title={t.common.delete} />
                     </div>
                   </div>
                 );

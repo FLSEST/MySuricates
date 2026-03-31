@@ -64,4 +64,49 @@ class ActivityLogControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isEmpty());
     }
+
+    @Test
+    void getLogs_withWorkflowIdFilter() throws Exception {
+        var page = new PageImpl<ActivityLog>(List.of(), PageRequest.of(0, 50), 0);
+        when(activityLogService.findAll(0, 50, null, null, "wf-123")).thenReturn(page);
+        when(activityLogMapper.toResponseList(any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/activity-log").param("workflowId", "wf-123"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void getLogs_invalidLevel_returns400() throws Exception {
+        mockMvc.perform(get("/api/v1/activity-log").param("level", "NONEXISTENT"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getLogs_invalidCategory_returns400() throws Exception {
+        mockMvc.perform(get("/api/v1/activity-log").param("category", "INVALID"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getLogs_customPageSize() throws Exception {
+        var page = new PageImpl<ActivityLog>(List.of(), PageRequest.of(2, 10), 0);
+        when(activityLogService.findAll(2, 10, null, null, null)).thenReturn(page);
+        when(activityLogMapper.toResponseList(any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/activity-log").param("page", "2").param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(2))
+                .andExpect(jsonPath("$.size").value(10));
+    }
+
+    @Test
+    void getLogs_emptyStringParams_treatedAsNull() throws Exception {
+        var page = new PageImpl<ActivityLog>(List.of(), PageRequest.of(0, 50), 0);
+        when(activityLogService.findAll(0, 50, null, null, null)).thenReturn(page);
+        when(activityLogMapper.toResponseList(any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/activity-log")
+                        .param("level", "").param("category", "").param("workflowId", ""))
+                .andExpect(status().isOk());
+    }
 }

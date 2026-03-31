@@ -105,4 +105,52 @@ class ApiKeyAuthFilterTest {
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
         verify(filterChain).doFilter(request, response);
     }
+
+    @Test
+    void securityEnabled_invalidKey_logsSecurityEvent() throws Exception {
+        ReflectionTestUtils.setField(filter, "securityEnabled", true);
+        when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
+        when(request.getHeader("X-API-Key")).thenReturn("wrong-key");
+        when(request.getRequestURI()).thenReturn("/api/v1/workflows");
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(activityLogService).warn(any(), contains("invalid API key"), eq("ApiKeyAuthFilter"), isNull());
+    }
+
+    @Test
+    void securityEnabled_noKey_protectedPath_logsSecurityEvent() throws Exception {
+        ReflectionTestUtils.setField(filter, "securityEnabled", true);
+        when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
+        when(request.getHeader("X-API-Key")).thenReturn(null);
+        when(request.getRequestURI()).thenReturn("/api/v1/workflows");
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(activityLogService).warn(any(), contains("no API key"), eq("ApiKeyAuthFilter"), isNull());
+    }
+
+    @Test
+    void securityEnabled_noKey_publicPath_noSecurityLog() throws Exception {
+        ReflectionTestUtils.setField(filter, "securityEnabled", true);
+        when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
+        when(request.getHeader("X-API-Key")).thenReturn(null);
+        when(request.getRequestURI()).thenReturn("/api/v1/system/health");
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(activityLogService, never()).warn(any(), anyString(), anyString(), any());
+    }
+
+    @Test
+    void securityEnabled_noKey_webhookTriggerPath_noSecurityLog() throws Exception {
+        ReflectionTestUtils.setField(filter, "securityEnabled", true);
+        when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
+        when(request.getHeader("X-API-Key")).thenReturn(null);
+        when(request.getRequestURI()).thenReturn("/api/v1/webhook/trigger/abc-123");
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(activityLogService, never()).warn(any(), anyString(), anyString(), any());
+    }
 }

@@ -5,6 +5,7 @@ import com.automation.dto.request.ApproveExecutionRequest;
 import com.automation.dto.request.ExecuteCommandRequest;
 import com.automation.service.todo.AutoTodoService;
 import com.automation.service.execution.ExecutionQueryService;
+import com.automation.repository.WorkflowRunRepository;
 import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.executor.ApprovalRequest;
@@ -18,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -30,6 +32,7 @@ public class ExecutionController {
     private final ExecutionQueryService executionQueryService;
     private final WorkflowMapper workflowMapper;
     private final AutoTodoService autoTodoService;
+    private final WorkflowRunRepository workflowRunRepository;
 
     @GetMapping
     @Transactional(readOnly = true)
@@ -131,6 +134,24 @@ public class ExecutionController {
             @RequestBody ApproveTodosRequest request) {
         autoTodoService.approvePendingTodos(id, request.approved());
         return ResponseEntity.ok().build();
+    }
+
+    @PatchMapping("/{id}/notes")
+    @Transactional
+    public ResponseEntity<WorkflowRunResponse> updateNotes(
+            @PathVariable String id,
+            @RequestBody Map<String, String> body) {
+        var run = executionQueryService.findById(id);
+        var metadata = run.getMetadata() != null ? new HashMap<>(run.getMetadata()) : new HashMap<String, Object>();
+        String notes = body.get("notes");
+        if (notes != null && !notes.isBlank()) {
+            metadata.put("notes", notes);
+        } else {
+            metadata.remove("notes");
+        }
+        run.setMetadata(metadata);
+        workflowRunRepository.save(run);
+        return ResponseEntity.ok(workflowMapper.toRunResponse(run));
     }
 
     @PostMapping("/{id}/command")

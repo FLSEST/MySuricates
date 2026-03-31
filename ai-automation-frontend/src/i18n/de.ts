@@ -287,6 +287,9 @@ export const de: TranslationKeys = {
         error: 'Verbindungsfehler',
         reconnect: 'Neu verbinden',
       },
+      notes: 'Notizen',
+      notesPlaceholder: 'Notizen zu diesem Run hinzufügen...',
+      notesSaved: 'Notizen gespeichert',
       approval: {
         title: 'Genehmigung erforderlich',
         description: 'Dieser Workflow-Schritt erfordert Ihre Entscheidung zum Fortfahren.',

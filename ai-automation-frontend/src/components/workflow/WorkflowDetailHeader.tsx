@@ -82,12 +82,13 @@ export function WorkflowDetailHeader({
         >
           {t.workflows.execute}
         </Button>
-        <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} onClick={onEdit} aria-label={t.common.edit} />
+        <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} onClick={onEdit} title={t.common.edit} aria-label={t.common.edit} />
         <Button
           variant="ghost"
           size="sm"
           icon={<Copy className="w-4 h-4" />}
           onClick={onClone}
+          title={t.workflows.clone}
           aria-label={t.workflows.clone}
         />
         <Button
@@ -98,9 +99,10 @@ export function WorkflowDetailHeader({
             const safeName = workflow.name.replace(/[^a-zA-Z0-9_-]/g, '_');
             exportWorkflow(workflow.id, `${safeName}.json`);
           }}
+          title={t.workflows.exportWorkflow}
           aria-label={t.workflows.exportWorkflow}
         />
-        <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4" />} onClick={onDelete} aria-label={t.common.delete} />
+        <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4" />} onClick={onDelete} title={t.common.delete} aria-label={t.common.delete} />
       </div>
     </div>
   );

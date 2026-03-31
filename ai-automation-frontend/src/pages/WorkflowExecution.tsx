@@ -2,7 +2,7 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Pause, Play, XCircle, Clock, CheckCircle2, AlertCircle, Send, TerminalSquare,
-  FolderOpen, ListTodo,
+  FolderOpen, ListTodo, Save,
   Terminal, Sparkles, Brain, Repeat, GitBranch, RefreshCw, ShieldCheck, Layers,
   MessageSquare, Route, RotateCcw, Wrench,
 } from 'lucide-react';
@@ -21,7 +21,7 @@ import { ConversionSuggestion } from '../components/shared/ConversionSuggestion'
 import {
   useWorkflow, useWorkflowRuns,
   usePauseExecution, useResumeExecution, useCancelExecution, useRunCommand, useSubmitApproval,
-  useRetryExecution, useApproveTodos, useResumeFromStep,
+  useRetryExecution, useApproveTodos, useResumeFromStep, useUpdateRunNotes,
 } from '../hooks/useWorkflows';
 import { useCreateTodo } from '../hooks/useTodos';
 import { useExecutionWebSocket } from '../hooks/useWebSocket';
@@ -114,8 +114,10 @@ export function WorkflowExecution() {
   const submitApproval = useSubmitApproval();
   const approveTodos = useApproveTodos();
   const createTodo = useCreateTodo();
+  const updateNotes = useUpdateRunNotes();
 
   const [command, setCommand] = useState('');
+  const [notesText, setNotesText] = useState<string | null>(null);
   const [containerTab, setContainerTab] = useState<'command' | 'terminal'>('command');
   const [recoveredApproval, setRecoveredApproval] = useState<{
     blockId: string; question: string; options: string[]; stepIndex: number;
@@ -217,6 +219,7 @@ export function WorkflowExecution() {
         <button
           onClick={() => window.history.length > 1 ? navigate(-1) : navigate(`/workflows/${id}`)}
           className="p-2 rounded-lg hover:bg-surface-raised text-text-secondary hover:text-text transition-colors"
+          title={t.common.back}
           aria-label={t.common.back}
         >
           <ArrowLeft className="w-5 h-5" />
@@ -536,6 +539,42 @@ export function WorkflowExecution() {
       {run.status === 'COMPLETED' && run.steps.some(s => s.blockType === 'agentic') && (
         <ConversionSuggestion runId={runId!} />
       )}
+
+      {/* Notes */}
+      <Card>
+        <CardHeader
+          title={t.workflows.execution.notes}
+          action={
+            (notesText ?? '') !== ((run.metadata?.notes as string) ?? '') ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={<Save className="w-3.5 h-3.5" />}
+                onClick={() => {
+                  updateNotes.mutate({ runId: runId!, notes: notesText ?? '' }, {
+                    onSuccess: () => toast.success(t.workflows.execution.notesSaved),
+                  });
+                }}
+                loading={updateNotes.isPending}
+              >
+                {t.common.save}
+              </Button>
+            ) : undefined
+          }
+        />
+        <textarea
+          className="w-full bg-surface border border-border rounded-lg p-3 text-sm text-text placeholder-text-tertiary resize-y min-h-[60px] focus:outline-none focus:ring-1 focus:ring-accent"
+          placeholder={t.workflows.execution.notesPlaceholder}
+          value={notesText ?? (run.metadata?.notes as string) ?? ''}
+          onChange={(e) => setNotesText(e.target.value)}
+          onBlur={() => {
+            const current = (run.metadata?.notes as string) ?? '';
+            if (notesText !== null && notesText !== current) {
+              updateNotes.mutate({ runId: runId!, notes: notesText });
+            }
+          }}
+        />
+      </Card>
 
       {/* Error */}
       {run.error && Object.keys(run.error).length > 0 && (

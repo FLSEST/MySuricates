@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Zap, Clock, FileText, Bot, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Zap, Clock, FileText, Bot, Trash2, StickyNote } from 'lucide-react';
 import { Card, CardHeader, Button, Input, Select } from '../ui';
 import { StatusBadge } from '../shared/StatusBadge';
 import { GateStatusBadge } from '../shared/GateStatusBadge';
@@ -42,6 +42,24 @@ export function WorkflowDetailSidebar({
 
   return (
     <div className="space-y-4">
+      <Card>
+        <CardHeader title={t.common.info} />
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-text-secondary">{t.common.project}</span>
+            <span className="text-text">{workflow.projectName}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-text-secondary">{t.common.version}</span>
+            <span className="text-text font-mono">{workflow.version}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-text-secondary">{t.common.created}</span>
+            <span className="text-text">{new Date(workflow.createdAt).toLocaleString(undefined, { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
+        </div>
+      </Card>
+
       <Card>
         <CardHeader
           title={t.workflows.instructions}
@@ -230,6 +248,7 @@ export function WorkflowDetailSidebar({
                 <button
                   onClick={() => onDeactivateSkill(workflow.id, skillId)}
                   className="p-1 rounded-sm text-text-tertiary hover:text-danger sm:opacity-0 sm:group-hover:opacity-100 transition-all"
+                  title={t.skills.deactivate}
                   aria-label={t.skills.deactivate}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -259,6 +278,11 @@ export function WorkflowDetailSidebar({
                   <GateStatusBadge run={run} />
                 </div>
                 <div className="flex items-center gap-2 text-xs text-text-tertiary">
+                  {(run.metadata?.notes as string) && (
+                    <span title={run.metadata.notes as string}>
+                      <StickyNote className="w-3 h-3 text-accent" />
+                    </span>
+                  )}
                   <Clock className="w-3 h-3" />
                   {formatDuration(run.durationMs)}
                 </div>
@@ -268,23 +292,6 @@ export function WorkflowDetailSidebar({
         )}
       </Card>
 
-      <Card>
-        <CardHeader title={t.common.info} />
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-text-secondary">{t.common.project}</span>
-            <span className="text-text">{workflow.projectName}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-text-secondary">{t.common.version}</span>
-            <span className="text-text font-mono">{workflow.version}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-text-secondary">{t.common.created}</span>
-            <span className="text-text">{new Date(workflow.createdAt).toLocaleString(undefined, { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-          </div>
-        </div>
-      </Card>
     </div>
   );
 }

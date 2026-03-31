@@ -51,7 +51,7 @@ export function ChainExecution() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-4 h-4" />} onClick={() => navigate('/chains')} />
+          <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-4 h-4" />} onClick={() => navigate('/chains')} title={t.common.back} />
           <div>
             <h1 className="text-2xl font-bold text-text-primary">{t.chains.execution.title}</h1>
             {run.chainName && (

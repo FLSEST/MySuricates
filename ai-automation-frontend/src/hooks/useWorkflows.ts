@@ -306,3 +306,15 @@ export function useRepairWorkflow() {
     onError: (err) => toast.error(apiErrorMessage(err, t.toast.repairFailed)),
   });
 }
+
+export function useUpdateRunNotes() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ runId, notes }: { runId: string; notes: string }) =>
+      api.patch<WorkflowRun>(`/executions/${runId}/notes`, { notes }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workflows'] });
+      qc.invalidateQueries({ queryKey: ['runs'] });
+    },
+  });
+}

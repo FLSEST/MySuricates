@@ -285,6 +285,9 @@ export const en = {
         error: 'Connection error',
         reconnect: 'Reconnect',
       },
+      notes: 'Notes',
+      notesPlaceholder: 'Add notes about this run...',
+      notesSaved: 'Notes saved',
       approval: {
         title: 'Approval Required',
         description: 'This workflow step requires your decision to continue.',

@@ -372,7 +372,7 @@ function WishDetail({ wishId, onCancel, onDelete, navigate, isTerminal, isPaused
                 </Button>
               )}
               {isTerminal(wish.status) && (
-                <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4" />} onClick={onDelete} />
+                <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4" />} onClick={onDelete} title={t.common.delete} />
               )}
             </div>
           </div>
