@@ -147,6 +147,27 @@ public class WorkflowService {
         return saved;
     }
 
+    @Transactional
+    public Workflow restoreFromSnapshot(String id, WorkflowSnapshot snapshot, String changeMessage) {
+        Workflow workflow = findById(id);
+
+        // Snapshot current state before restore
+        workflowVersionService.snapshotBeforeUpdate(workflow, snapshot, "user", changeMessage);
+
+        // Set ALL versioned fields unconditionally (including null)
+        workflow.setBlocks(snapshot.blocks() != null ? snapshot.blocks() : new ArrayList<>());
+        workflow.setInstructions(snapshot.instructions());
+        workflow.setModel(snapshot.model());
+        workflow.setProvider(snapshot.provider());
+        workflow.setMetadata(snapshot.metadata() != null ? new HashMap<>(snapshot.metadata()) : new HashMap<>());
+        workflow.setDefaultContext(snapshot.defaultContext() != null ? new HashMap<>(snapshot.defaultContext()) : new HashMap<>());
+
+        Workflow saved = workflowRepository.save(workflow);
+        log.info("Restored workflow: {} ({}) from snapshot", saved.getName(), saved.getId());
+        activityLogService.info(LogCategory.SYSTEM, "Workflow restored: " + saved.getName(), "WorkflowService", saved.getId(), saved.getId());
+        return saved;
+    }
+
     private WorkflowSnapshot computeIncomingSnapshot(Workflow current, UpdateWorkflowRequest request) {
         List<BlockDefinition> blocks = request.blocks() != null ? request.blocks() : current.getBlocks();
         String instructions = request.instructions() != null ? request.instructions() : current.getInstructions();

@@ -203,13 +203,8 @@ public class WorkflowController {
         }
         try {
             WorkflowSnapshot snapshot = objectMapper.readValue(version.getSnapshot(), WorkflowSnapshot.class);
-            UpdateWorkflowRequest request = new UpdateWorkflowRequest(
-                    null, null, null,
-                    snapshot.blocks(), snapshot.instructions(), snapshot.model(), snapshot.provider(),
-                    snapshot.metadata(), snapshot.defaultContext(),
-                    "user", "Restored from version " + version.getVersionNumber()
-            );
-            Workflow restored = workflowService.update(id, request);
+            Workflow restored = workflowService.restoreFromSnapshot(
+                    id, snapshot, "Restored from version " + version.getVersionNumber());
             return ResponseEntity.ok(workflowMapper.toResponse(restored));
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
