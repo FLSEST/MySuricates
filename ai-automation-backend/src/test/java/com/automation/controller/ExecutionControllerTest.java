@@ -35,6 +35,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.todo.AutoTodoService;
+import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.workflow.WorkflowService;
 
 @WebMvcTest(ExecutionController.class)
@@ -53,6 +54,8 @@ class ExecutionControllerTest {
     private AutoTodoService autoTodoService;
     @MockBean
     private WorkflowService workflowService;
+    @MockBean
+    private WorkflowRunRepository workflowRunRepository;
 
     @MockBean
     private ExecutionQueryService executionQueryService;
