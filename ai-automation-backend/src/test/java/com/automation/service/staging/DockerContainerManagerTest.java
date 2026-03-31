@@ -56,4 +56,51 @@ class DockerContainerManagerTest {
                 manager.runCommand("test", Path.of("/tmp"), "nonexistent-cmd-12345"))
                 .isInstanceOf(RuntimeException.class);
     }
+
+    @Test
+    void runCommand_withEnvVars_commandCanAccessThem() {
+        // env vars are merged into process environment — "printenv" reads them
+        manager.runCommand("test", Path.of("/tmp"),
+                java.util.Map.of("MY_TEST_VAR", "hello123"),
+                "printenv", "MY_TEST_VAR");
+        // No exception = success, env var was accessible
+    }
+
+    @Test
+    void runCommand_emptyEnvMap_succeeds() {
+        manager.runCommand("test", Path.of("/tmp"), java.util.Map.of(), "echo", "ok");
+    }
+
+    @Test
+    void runCommand_workingDirectory_honored() throws Exception {
+        java.nio.file.Path tmpDir = java.nio.file.Files.createTempDirectory("dcm-test");
+        try {
+            // Create a marker file in the temp dir
+            java.nio.file.Files.writeString(tmpDir.resolve("marker.txt"), "found");
+            // "cat marker.txt" will only work if working directory is correctly set
+            manager.runCommand("test", tmpDir, "cat", "marker.txt");
+        } finally {
+            java.nio.file.Files.deleteIfExists(tmpDir.resolve("marker.txt"));
+            java.nio.file.Files.deleteIfExists(tmpDir);
+        }
+    }
+
+    @Test
+    void isHealthy_malformedUrl_returnsFalse() {
+        assertThat(manager.isHealthy("not-a-url")).isFalse();
+    }
+
+    @Test
+    void isRunning_emptyName_noException() {
+        // Empty container name — docker ps may match running containers, but should not throw
+        manager.isRunning("");
+    }
+
+    @Test
+    void runCommand_exitCode1_includesExitCodeInMessage() {
+        assertThatThrownBy(() ->
+                manager.runCommand("test", Path.of("/tmp"), "bash", "-c", "exit 42"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("exit 42");
+    }
 }

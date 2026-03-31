@@ -176,4 +176,154 @@ class AssistantToolExecutorTest {
 
         assertThat(result).contains("Unbekanntes Tool");
     }
+
+    @Test
+    void executeTools_multipleTools_allProcessed() {
+        Todo todo = Todo.builder().id("12345678-t").title("T1").build();
+        when(todoService.create(any())).thenReturn(todo);
+
+        String input = "Ich erstelle: <tool type=\"create_todo\">{\"title\": \"T1\"}</tool> und " +
+                "<tool type=\"cancel_run\">{\"runId\": \"run-99998888\"}</tool> fertig.";
+        String result = executor.executeTools(input);
+
+        assertThat(result).contains("✓ Todo angelegt");
+        assertThat(result).contains("✓ Run abgebrochen");
+        assertThat(result).contains("Ich erstelle:");
+        assertThat(result).contains("fertig.");
+        verify(todoService).create(any());
+        verify(workflowExecutor).cancelExecution("run-99998888");
+    }
+
+    @Test
+    void executeTools_updateWorkflow_success() {
+        Workflow updated = Workflow.builder().id("wf-1").name("Updated WF").build();
+        when(workflowService.update(eq("wf-1"), any())).thenReturn(updated);
+
+        String input = "<tool type=\"update_workflow\">{\"workflowId\": \"wf-1\", \"name\": \"Updated WF\"}</tool>";
+        String result = executor.executeTools(input);
+
+        assertThat(result).contains("✓");
+        assertThat(result).contains("aktualisiert");
+        verify(workflowService).update(eq("wf-1"), any());
+    }
+
+    @Test
+    void executeTools_updateWorkflow_missingWorkflowId_returnsError() {
+        String input = "<tool type=\"update_workflow\">{\"name\": \"New Name\"}</tool>";
+        String result = executor.executeTools(input);
+
+        assertThat(result).contains("⚠");
+        assertThat(result).contains("workflowId");
+    }
+
+    @Test
+    void executeTools_startWorkflow_missingWorkflowId_returnsError() {
+        String input = "<tool type=\"start_workflow\">{\"context\": {}}</tool>";
+        String result = executor.executeTools(input);
+
+        assertThat(result).contains("⚠");
+        assertThat(result).contains("workflowId");
+    }
+
+    @Test
+    void executeTools_deleteWorkflow_missingWorkflowId_returnsError() {
+        String input = "<tool type=\"delete_workflow\">{}</tool>";
+        String result = executor.executeTools(input);
+
+        assertThat(result).contains("⚠");
+        assertThat(result).contains("workflowId");
+    }
+
+    @Test
+    void executeTools_cancelRun_missingRunId_returnsError() {
+        String input = "<tool type=\"cancel_run\">{}</tool>";
+        String result = executor.executeTools(input);
+
+        assertThat(result).contains("⚠");
+        assertThat(result).contains("runId");
+    }
+
+    @Test
+    void executeTools_createChain_missingName_returnsError() {
+        String input = "<tool type=\"create_chain\">{\"entries\": [{\"workflowId\": \"wf-1\"}]}</tool>";
+        String result = executor.executeTools(input);
+
+        assertThat(result).contains("⚠");
+        assertThat(result).contains("name");
+    }
+
+    @Test
+    void executeTools_createChain_emptyEntries_returnsError() {
+        String input = "<tool type=\"create_chain\">{\"name\": \"Chain\", \"entries\": []}</tool>";
+        String result = executor.executeTools(input);
+
+        assertThat(result).contains("⚠");
+        assertThat(result).contains("entries");
+    }
+
+    @Test
+    void executeTools_createTodo_withTags_includesInResult() {
+        Todo created = Todo.builder().id("12345678-abcd-1234").title("Tagged Todo").build();
+        when(todoService.create(any())).thenReturn(created);
+
+        String input = "<tool type=\"create_todo\">{\"title\": \"Tagged Todo\", \"tags\": [\"backend\", \"bug\"]}</tool>";
+        String result = executor.executeTools(input);
+
+        assertThat(result).contains("✓");
+        assertThat(result).contains("Tags: backend, bug");
+    }
+
+    @Test
+    void executeTools_createTodo_invalidPriority_fallsBackToMedium() {
+        Todo created = Todo.builder().id("12345678-abcd-1234").title("Test").build();
+        when(todoService.create(any())).thenReturn(created);
+
+        String input = "<tool type=\"create_todo\">{\"title\": \"Test\", \"priority\": \"BOGUS\"}</tool>";
+        String result = executor.executeTools(input);
+
+        assertThat(result).contains("✓");
+        assertThat(result).contains("MEDIUM");
+    }
+
+    @Test
+    void executeTools_createTodo_serviceException_returnsError() {
+        when(todoService.create(any())).thenThrow(new RuntimeException("DB error"));
+
+        String input = "<tool type=\"create_todo\">{\"title\": \"Test\"}</tool>";
+        String result = executor.executeTools(input);
+
+        assertThat(result).contains("⚠");
+        assertThat(result).contains("DB error");
+    }
+
+    @Test
+    void executeTools_startWorkflow_withContext_passedToExecutor() {
+        Workflow wf = Workflow.builder().id("wf-1").name("WF").build();
+        when(workflowService.findById("wf-1")).thenReturn(wf);
+        WorkflowRun run = WorkflowRun.builder().id("run-12345678").build();
+        when(workflowExecutor.execute(eq(wf), any())).thenReturn(run);
+
+        String input = "<tool type=\"start_workflow\">{\"workflowId\": \"wf-1\", \"context\": {\"key\": \"val\"}}</tool>";
+        String result = executor.executeTools(input);
+
+        assertThat(result).contains("✓");
+        verify(workflowExecutor).execute(eq(wf), argThat(ctx -> "val".equals(ctx.get("key"))));
+    }
+
+    @Test
+    void executeTools_invalidJson_returnsError() {
+        String input = "<tool type=\"create_todo\">{invalid json!!!}</tool>";
+        String result = executor.executeTools(input);
+
+        assertThat(result).contains("⚠");
+    }
+
+    @Test
+    void executeTools_updateTodoStatus_missingFields_returnsError() {
+        String input = "<tool type=\"update_todo_status\">{}</tool>";
+        String result = executor.executeTools(input);
+
+        assertThat(result).contains("⚠");
+        assertThat(result).contains("Pflichtfelder");
+    }
 }

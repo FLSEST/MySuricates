@@ -129,4 +129,167 @@ class AssistantFetchServiceTest {
 
         assertThat(result).contains("Build me a thing");
     }
+
+    @Test
+    void executeFetch_wishDetail_notFound_returnsMessage() {
+        when(wishRepository.findById("missing")).thenReturn(Optional.empty());
+
+        String result = service.executeFetch(new AssistantFetchService.FetchRequest("wish_detail", "missing"));
+
+        assertThat(result).contains("nicht gefunden");
+    }
+
+    @Test
+    void executeFetch_runDetail_withError_includesError() {
+        WorkflowRun run = WorkflowRun.builder().id("r1").status(RunStatus.FAILED)
+                .durationMs(3000L).steps(new ArrayList<>()).build();
+        when(workflowRunRepository.findByIdWithSteps("r1")).thenReturn(Optional.of(run));
+        when(contextBuilder.runLabel(run)).thenReturn("TestWF");
+        when(contextBuilder.extractError(run)).thenReturn("Something broke");
+        when(contextBuilder.truncate("Something broke", 600)).thenReturn("Something broke");
+
+        String result = service.executeFetch(new AssistantFetchService.FetchRequest("run_detail", "r1"));
+
+        assertThat(result).contains("FAILED");
+        assertThat(result).contains("Something broke");
+    }
+
+    @Test
+    void executeFetch_runDetail_withSteps_formatsSteps() {
+        StepResult step1 = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).build();
+        StepResult step2 = StepResult.builder().stepIndex(1).status(StepStatus.FAILED)
+                .output("error output").build();
+        WorkflowRun run = WorkflowRun.builder().id("r1").status(RunStatus.FAILED)
+                .steps(new ArrayList<>(List.of(step1, step2))).build();
+        when(workflowRunRepository.findByIdWithSteps("r1")).thenReturn(Optional.of(run));
+        when(contextBuilder.runLabel(run)).thenReturn("TestWF");
+        when(contextBuilder.extractError(run)).thenReturn(null);
+        when(contextBuilder.truncate("error output", 800)).thenReturn("error output");
+
+        String result = service.executeFetch(new AssistantFetchService.FetchRequest("run_detail", "r1"));
+
+        assertThat(result).contains("Schritte");
+        assertThat(result).contains("COMPLETED");
+        assertThat(result).contains("FAILED");
+        assertThat(result).contains("error output");
+    }
+
+    @Test
+    void executeFetch_stepOutput_invalidFormat_returnsError() {
+        String result = service.executeFetch(new AssistantFetchService.FetchRequest("step_output", "no-slash"));
+
+        assertThat(result).contains("Ungültiges Format");
+    }
+
+    @Test
+    void executeFetch_stepOutput_invalidStepNumber_returnsError() {
+        String result = service.executeFetch(new AssistantFetchService.FetchRequest("step_output", "r1/abc"));
+
+        assertThat(result).contains("Schrittnummer ungültig");
+    }
+
+    @Test
+    void executeFetch_stepOutput_runNotFound_returnsMessage() {
+        when(workflowRunRepository.findByIdWithSteps("r1")).thenReturn(Optional.empty());
+
+        String result = service.executeFetch(new AssistantFetchService.FetchRequest("step_output", "r1/1"));
+
+        assertThat(result).contains("nicht gefunden");
+    }
+
+    @Test
+    void executeFetch_stepOutput_stepNotFound_returnsMessage() {
+        WorkflowRun run = WorkflowRun.builder().id("r1").status(RunStatus.COMPLETED)
+                .steps(new ArrayList<>()).build();
+        when(workflowRunRepository.findByIdWithSteps("r1")).thenReturn(Optional.of(run));
+
+        String result = service.executeFetch(new AssistantFetchService.FetchRequest("step_output", "r1/5"));
+
+        assertThat(result).contains("Step 5 nicht gefunden");
+    }
+
+    @Test
+    void executeFetch_stepOutput_noOutput_returnsKeinOutput() {
+        StepResult step = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED)
+                .output(null).build();
+        WorkflowRun run = WorkflowRun.builder().id("r1").status(RunStatus.COMPLETED)
+                .steps(new ArrayList<>(List.of(step))).build();
+        when(workflowRunRepository.findByIdWithSteps("r1")).thenReturn(Optional.of(run));
+
+        String result = service.executeFetch(new AssistantFetchService.FetchRequest("step_output", "r1/1"));
+
+        assertThat(result).contains("Kein Output");
+    }
+
+    @Test
+    void executeFetch_workflowDetail_notFound_returnsMessage() {
+        when(workflowRepository.findById("wf-missing")).thenReturn(Optional.empty());
+
+        String result = service.executeFetch(new AssistantFetchService.FetchRequest("workflow_detail", "wf-missing"));
+
+        assertThat(result).contains("nicht gefunden");
+    }
+
+    @Test
+    void executeFetch_workflowRuns_noRuns_returnsMessage() {
+        when(workflowRunRepository.findTop5ByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of());
+
+        String result = service.executeFetch(new AssistantFetchService.FetchRequest("workflow_runs", "wf-1"));
+
+        assertThat(result).contains("Keine Runs");
+    }
+
+    @Test
+    void executeFetch_projectContext_notFound_returnsMessage() {
+        when(projectRepository.findById("p-missing")).thenReturn(Optional.empty());
+
+        String result = service.executeFetch(new AssistantFetchService.FetchRequest("project_context", "p-missing"));
+
+        assertThat(result).contains("nicht gefunden");
+    }
+
+    @Test
+    void executeFetch_docs_unknownDoc_returnsError() {
+        String result = service.executeFetch(new AssistantFetchService.FetchRequest("docs", "nonexistent-doc"));
+
+        assertThat(result).contains("Unbekannte Dokumentation");
+    }
+
+    @Test
+    void executeFetch_poolWorkflows_empty_returnsMessage() {
+        when(workflowPoolService.listAll()).thenReturn(List.of());
+
+        String result = service.executeFetch(new AssistantFetchService.FetchRequest("pool_workflows", "all"));
+
+        assertThat(result).contains("Keine Pool-Workflows");
+    }
+
+    @Test
+    void executeFetch_poolWorkflowDetail_notFound_returnsMessage() {
+        when(workflowPoolService.findById("missing")).thenReturn(null);
+
+        String result = service.executeFetch(new AssistantFetchService.FetchRequest("pool_workflow", "missing"));
+
+        assertThat(result).contains("nicht gefunden");
+    }
+
+    @Test
+    void parseFetchRequests_multipleTags_allParsed() {
+        String response = "<fetch type=\"a\" id=\"1\"/><fetch type=\"b\" id=\"2\"/><fetch type=\"c\" id=\"3\"/>";
+        List<AssistantFetchService.FetchRequest> result = service.parseFetchRequests(response);
+
+        assertThat(result).hasSize(3);
+        assertThat(result.get(2).type()).isEqualTo("c");
+        assertThat(result.get(2).id()).isEqualTo("3");
+    }
+
+    @Test
+    void stripFetchTags_multipleTags_allRemoved() {
+        String input = "A <fetch type=\"x\" id=\"1\"/> B <fetch type=\"y\" id=\"2\"/> C";
+        String result = service.stripFetchTags(input);
+
+        assertThat(result).doesNotContain("<fetch");
+        assertThat(result).contains("A");
+        assertThat(result).contains("C");
+    }
 }

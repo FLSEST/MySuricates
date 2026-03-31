@@ -1,23 +1,25 @@
 package com.automation.service.assistant;
 
 import com.automation.dto.AssistantChatRequest;
-import com.automation.entity.RunStatus;
-import com.automation.entity.WorkflowRun;
+import com.automation.entity.*;
 import com.automation.repository.*;
 import com.automation.service.system.SystemIdentityService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -154,5 +156,201 @@ class AssistantContextBuilderTest {
         // runLabel accesses lazy-loaded workflow — in test env returns null-safe
         String result = builder.runLabel(run);
         assertThat(result).isNotNull();
+    }
+
+    @Test
+    void fmt_nullInstant_returnsDash() {
+        assertThat(builder.fmt(null)).isEqualTo("—");
+    }
+
+    @Test
+    void runLink_noWorkflow_returnsRunPath() {
+        WorkflowRun run = WorkflowRun.builder().id("run-123").build();
+        String result = builder.runLink(run);
+        assertThat(result).isEqualTo("/runs/run-123");
+    }
+
+    @Test
+    void runLabel_noWorkflow_returnsUnbekannt() {
+        WorkflowRun run = WorkflowRun.builder().id("r1").build();
+        String result = builder.runLabel(run);
+        assertThat(result).isEqualTo("Unbekannt");
+    }
+
+    @Test
+    void extractError_nullErrorMap_returnsNull() {
+        WorkflowRun run = WorkflowRun.builder().id("r1").error(null).build();
+        assertThat(builder.extractError(run)).isNull();
+    }
+
+    @Test
+    void extractError_noMessageKey_returnsNull() {
+        WorkflowRun run = WorkflowRun.builder().id("r1")
+                .error(Map.of("other", "data")).build();
+        assertThat(builder.extractError(run)).isNull();
+    }
+
+    @Test
+    void truncate_exactMaxLength_unchanged() {
+        String exact = "x".repeat(50);
+        assertThat(builder.truncate(exact, 50)).isEqualTo(exact);
+    }
+
+    @Nested
+    class ResolveWorkingDir {
+
+        @Test
+        void withProject_returnsPath() {
+            Project project = new Project();
+            project.setId("p1");
+            project.setPath("/home/test/project");
+            when(projectRepository.findById("p1")).thenReturn(Optional.of(project));
+
+            var ctx = new AssistantChatRequest.PageContext("workflows", null, "p1");
+            String result = builder.resolveWorkingDir(ctx);
+
+            assertThat(result).isEqualTo("/home/test/project");
+        }
+
+        @Test
+        void withProjectNoPath_returnsHome() {
+            Project project = new Project();
+            project.setId("p1");
+            project.setPath(null);
+            when(projectRepository.findById("p1")).thenReturn(Optional.of(project));
+
+            var ctx = new AssistantChatRequest.PageContext("workflows", null, "p1");
+            String result = builder.resolveWorkingDir(ctx);
+
+            assertThat(result).isEqualTo(System.getProperty("user.home"));
+        }
+
+        @Test
+        void nullContext_returnsHome() {
+            String result = builder.resolveWorkingDir(null);
+            assertThat(result).isEqualTo(System.getProperty("user.home"));
+        }
+
+        @Test
+        void noProjectId_returnsHome() {
+            var ctx = new AssistantChatRequest.PageContext("workflows", null, null);
+            String result = builder.resolveWorkingDir(ctx);
+            assertThat(result).isEqualTo(System.getProperty("user.home"));
+        }
+    }
+
+    @Nested
+    class BuildSystemPrompt {
+
+        @Test
+        void includesBaseInstructions() {
+            when(systemIdentity.getVersion()).thenReturn("1.0.0");
+            when(workflowRepository.findAllWithActiveProject()).thenReturn(List.of());
+            when(workflowRunRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of());
+            when(workflowRunRepository.findTop10ByOrderByStartedAtDesc()).thenReturn(List.of());
+            when(todoRepository.findAll()).thenReturn(List.of());
+            when(wishRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
+            when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
+            when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of());
+            when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
+            when(assistantSessionRepository.findTop3ByOrderByStartedAtDesc()).thenReturn(List.of());
+
+            String result = builder.buildSystemPrompt(null, "Du bist MySuricates.");
+
+            assertThat(result).startsWith("Du bist MySuricates.");
+            assertThat(result).contains("Mein aktueller Zustand");
+            assertThat(result).contains("1.0.0");
+        }
+
+        @Test
+        void nullBaseInstructions_noError() {
+            when(systemIdentity.getVersion()).thenReturn("1.0.0");
+            when(workflowRepository.findAllWithActiveProject()).thenReturn(List.of());
+            when(workflowRunRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of());
+            when(workflowRunRepository.findTop10ByOrderByStartedAtDesc()).thenReturn(List.of());
+            when(todoRepository.findAll()).thenReturn(List.of());
+            when(wishRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
+            when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
+            when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of());
+            when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
+            when(assistantSessionRepository.findTop3ByOrderByStartedAtDesc()).thenReturn(List.of());
+
+            String result = builder.buildSystemPrompt(null, null);
+
+            assertThat(result).contains("Mein aktueller Zustand");
+        }
+
+        @Test
+        void withTodos_showsInFullMode() {
+            when(systemIdentity.getVersion()).thenReturn("1.0.0");
+            when(workflowRepository.findAllWithActiveProject()).thenReturn(List.of());
+            when(workflowRunRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of());
+            when(workflowRunRepository.findTop10ByOrderByStartedAtDesc()).thenReturn(List.of());
+            when(wishRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
+            when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
+            when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of());
+            when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
+            when(assistantSessionRepository.findTop3ByOrderByStartedAtDesc()).thenReturn(List.of());
+
+            Todo todo = Todo.builder().id("t1").title("Fix Bug").status(Todo.Status.OPEN)
+                    .priority(Todo.Priority.HIGH).build();
+            when(todoRepository.findAll()).thenReturn(List.of(todo));
+
+            // OVERVIEW page → todos in full mode
+            String result = builder.buildSystemPrompt(null, "");
+
+            assertThat(result).contains("Offene Todos");
+            assertThat(result).contains("Fix Bug");
+        }
+
+        @Test
+        void runsPage_compactTodos() {
+            when(systemIdentity.getVersion()).thenReturn("1.0.0");
+            when(workflowRepository.findAllWithActiveProject()).thenReturn(List.of());
+            // RUNS page → full mode for runs: uses findByStatus + findTop10
+            when(workflowRunRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of());
+            when(workflowRunRepository.findTop10ByOrderByStartedAtDesc()).thenReturn(List.of());
+            when(wishRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
+            when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
+            when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of());
+            when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
+
+            Todo todo = Todo.builder().id("t1").title("Fix Bug").status(Todo.Status.OPEN)
+                    .priority(Todo.Priority.HIGH).build();
+            when(todoRepository.findAll()).thenReturn(List.of(todo));
+
+            var ctx = new AssistantChatRequest.PageContext("runs", null, null);
+            String result = builder.buildSystemPrompt(ctx, "");
+
+            // Compact: shows count, not individual todo titles
+            assertThat(result).contains("Todos:");
+            assertThat(result).contains("1 offen");
+        }
+
+        @Test
+        void pageContext_run_showsRunDetails() {
+            when(systemIdentity.getVersion()).thenReturn("1.0.0");
+            when(workflowRepository.findAllWithActiveProject()).thenReturn(List.of());
+            // RUNS page → full mode for runs
+            when(workflowRunRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of());
+            when(workflowRunRepository.findTop10ByOrderByStartedAtDesc()).thenReturn(List.of());
+            when(todoRepository.findAll()).thenReturn(List.of());
+            when(wishRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
+            when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
+            when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of());
+            when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
+
+            StepResult step = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED)
+                    .output("step output").build();
+            WorkflowRun run = WorkflowRun.builder().id("run-1").status(RunStatus.COMPLETED)
+                    .durationMs(5000L).steps(new ArrayList<>(List.of(step))).build();
+            when(workflowRunRepository.findByIdWithSteps("run-1")).thenReturn(Optional.of(run));
+
+            var ctx = new AssistantChatRequest.PageContext("runs", "run-1", null);
+            String result = builder.buildSystemPrompt(ctx, "");
+
+            assertThat(result).contains("Aktuell angezeigter Run");
+            assertThat(result).contains("COMPLETED");
+        }
     }
 }
