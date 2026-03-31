@@ -1,9 +1,10 @@
-import { lazy } from 'react';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { lazy, useEffect, useState } from 'react';
+import { createBrowserRouter, RouterProvider, useParams, Navigate } from 'react-router-dom';
 import { Layout } from './components/layout/Layout';
 import { RouteErrorFallback } from './components/shared/RouteErrorFallback';
 import { ToastContainer } from './components/ui/ToastContainer';
 import { useSettingsStore } from './stores/settingsStore';
+import { api } from './api/client';
 
 const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
 const SimpleDashboard = lazy(() => import('./pages/SimpleDashboard').then(m => ({ default: m.SimpleDashboard })));
@@ -35,6 +36,24 @@ function WorkflowExecutionRoute() {
   const { simpleMode } = useSettingsStore();
   return simpleMode ? <SimpleWorkflowExecution /> : <WorkflowExecution />;
 }
+
+/** Redirects /runs/:runId to /workflows/:workflowId/run/:runId */
+function RunRedirect() {
+  const { runId } = useParams<{ runId: string }>();
+  const [workflowId, setWorkflowId] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (!runId) { setError(true); return; }
+    api.get<{ workflowId: string }>(`/executions/${runId}`)
+      .then(run => setWorkflowId(run.workflowId))
+      .catch(() => setError(true));
+  }, [runId]);
+
+  if (error) return <Navigate to="/runs" replace />;
+  if (workflowId) return <Navigate to={`/workflows/${workflowId}/run/${runId}`} replace />;
+  return null;
+}
 const Runs = lazy(() => import('./pages/Runs').then(m => ({ default: m.Runs })));
 const Skills = lazy(() => import('./pages/Skills').then(m => ({ default: m.Skills })));
 const Schedules = lazy(() => import('./pages/Schedules').then(m => ({ default: m.Schedules })));
@@ -49,6 +68,7 @@ const WorkflowFactory = lazy(() => import('./pages/WorkflowFactory').then(m => (
 const Docs = lazy(() => import('./pages/Docs').then(m => ({ default: m.Docs })));
 const Insights = lazy(() => import('./pages/Insights').then(m => ({ default: m.Insights })));
 const DialogImport = lazy(() => import('./pages/DialogImport').then(m => ({ default: m.DialogImport })));
+const OnboardingProfiles = lazy(() => import('./pages/OnboardingProfiles').then(m => ({ default: m.OnboardingProfiles })));
 
 const router = createBrowserRouter([
   {
@@ -68,6 +88,7 @@ const router = createBrowserRouter([
       { path: 'chains', element: <Chains /> },
       { path: 'chains/:id/run/:runId', element: <ChainExecution /> },
       { path: 'runs', element: <Runs /> },
+      { path: 'runs/:runId', element: <RunRedirect /> },
       { path: 'skills', element: <Skills /> },
       { path: 'schedules', element: <Schedules /> },
       { path: 'webhooks', element: <Webhooks /> },
@@ -75,6 +96,7 @@ const router = createBrowserRouter([
       { path: 'activity', element: <ActivityLog /> },
       { path: 'docs', element: <Docs /> },
       { path: 'insights', element: <Insights /> },
+      { path: 'onboarding-profiles', element: <OnboardingProfiles /> },
       { path: 'settings', element: <Settings /> },
     ],
   },

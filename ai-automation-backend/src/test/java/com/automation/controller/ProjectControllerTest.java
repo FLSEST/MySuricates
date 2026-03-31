@@ -9,6 +9,7 @@ import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.ProjectMapper;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.service.project.ProjectContextService;
+import com.automation.service.project.ProjectOnboardingService;
 import com.automation.service.project.ProjectService;
 import com.automation.service.system.ApiKeyService;
 import com.automation.service.workflow.WorkflowService;
@@ -57,6 +58,9 @@ class ProjectControllerTest {
 
     @MockBean
     private ProjectContextService projectContextService;
+
+    @MockBean
+    private ProjectOnboardingService projectOnboardingService;
 
     @MockBean
     private ProjectMapper projectMapper;

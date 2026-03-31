@@ -13,6 +13,7 @@ import {
   useProject, useUpdateProject, useArchiveProject, useRestoreProject,
   useStartContainer, useStopContainer, useGenerateProjectContext,
 } from '../hooks/useProjects';
+import { OnboardingCard } from '../components/project/OnboardingCard';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { useT } from '../i18n';
 import type { ProjectType } from '../types';
@@ -225,6 +226,9 @@ export function ProjectDetail() {
           <p className="text-sm text-text-tertiary">{t.projects.noAiContext}</p>
         )}
       </Card>
+
+      {/* MySuricates Integration */}
+      <OnboardingCard projectId={project.id} />
 
       {/* Workflows in project */}
       <Card padding={false}>

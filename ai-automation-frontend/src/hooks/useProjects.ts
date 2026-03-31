@@ -119,3 +119,72 @@ export function useGenerateProjectContext() {
     mutationFn: (id: string) => api.post<{ context: string }>(`/projects/${id}/generate-context`),
   });
 }
+
+// Onboarding hooks
+
+export interface OnboardingStatus {
+  enabled: boolean;
+  format: string;
+  profileIds: string[];
+  fileExists: boolean;
+  filePath: string;
+}
+
+export function useOnboardingStatus(projectId: string) {
+  return useQuery({
+    queryKey: ['projects', projectId, 'onboarding'],
+    queryFn: () => api.get<OnboardingStatus>(`/projects/${projectId}/onboarding/status`),
+    enabled: !!projectId,
+  });
+}
+
+export function useEnableOnboarding() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
+  return useMutation({
+    mutationFn: ({ id, config }: { id: string; config: { format?: string; profileIds?: string[] } }) =>
+      api.post<OnboardingStatus>(`/projects/${id}/onboarding/enable`, config),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['projects', vars.id, 'onboarding'] });
+      toast.success(t.toast.onboardingEnabled);
+    },
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.onboardingFailed)),
+  });
+}
+
+export function useDisableOnboarding() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
+  return useMutation({
+    mutationFn: (id: string) => api.post<OnboardingStatus>(`/projects/${id}/onboarding/disable`),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: ['projects', id, 'onboarding'] });
+      toast.success(t.toast.onboardingDisabled);
+    },
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.onboardingFailed)),
+  });
+}
+
+export function useRefreshOnboarding() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
+  return useMutation({
+    mutationFn: (id: string) => api.post<OnboardingStatus>(`/projects/${id}/onboarding/refresh`),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: ['projects', id, 'onboarding'] });
+      toast.success(t.toast.onboardingRefreshed);
+    },
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.onboardingFailed)),
+  });
+}
+
+export function useOnboardingPreview(projectId: string) {
+  return useQuery({
+    queryKey: ['projects', projectId, 'onboarding', 'preview'],
+    queryFn: () => api.get<{ content: string }>(`/projects/${projectId}/onboarding/preview`),
+    enabled: false,
+  });
+}

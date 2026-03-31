@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -94,6 +95,13 @@ public class ProjectService {
         log.info("Updated project: {} ({})", saved.getName(), saved.getId());
         activityLogService.info(LogCategory.SYSTEM, "Project updated: " + saved.getName(), "ProjectService", saved.getId());
         return saved;
+    }
+
+    @Transactional
+    public void updateConfig(String id, Map<String, Object> config) {
+        Project project = findById(id);
+        project.setConfig(config);
+        projectRepository.save(project);
     }
 
     @Transactional
