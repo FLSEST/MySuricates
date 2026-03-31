@@ -50,6 +50,16 @@ export function deleteWorkflow(id: string) {
   return cy.request({ method: 'DELETE', url: `${API}/workflows/${id}`, headers: apiHeaders(), failOnStatusCode: false });
 }
 
+// ── Chains ──────────────────────────────────────────────
+
+export function getChains() {
+  return cy.request({ method: 'GET', url: `${API}/chains`, headers: apiHeaders() }).its('body');
+}
+
+export function deleteChain(id: string) {
+  return cy.request({ method: 'DELETE', url: `${API}/chains/${id}`, headers: apiHeaders(), failOnStatusCode: false });
+}
+
 // ── Schedules ───────────────────────────────────────────
 
 export function getSchedules() {
@@ -142,7 +152,7 @@ function isTestData(name: string | null | undefined): boolean {
 
 /**
  * Deletes only Cypress test data (names starting with "Cypress") in dependency order:
- * Webhooks -> Schedules -> Workflows -> Projects
+ * Webhooks -> Schedules -> Chains -> Workflows -> Projects
  *
  * User-created data is never touched.
  */
@@ -166,6 +176,13 @@ export function cleanupAll() {
     schedules
       .filter((s) => isTestData(s.description) || isTestData(s.workflowName))
       .forEach((s) => deleteSchedule(s.id));
+  });
+
+  // Chains (depend on workflows)
+  getChains().then((chains: { id: string; name: string }[]) => {
+    chains
+      .filter((c) => isTestData(c.name))
+      .forEach((c) => deleteChain(c.id));
   });
 
   // Workflows (depend on projects)
