@@ -19,7 +19,7 @@ import java.time.Instant;
 public class Todo {
 
     public enum Status { OPEN, IN_PROGRESS, DONE, BACKLOG }
-    public enum Priority { LOW, MEDIUM, HIGH }
+    public enum Priority { LOW, MEDIUM, HIGH, CRITICAL }
     public enum Source { USER, AI, WORKFLOW }
 
     @Id

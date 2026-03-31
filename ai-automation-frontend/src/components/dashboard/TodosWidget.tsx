@@ -7,6 +7,7 @@ import { formatRelativeTime } from '../../utils/formatTime';
 import type { Todo, TodoPriority } from '../../types';
 
 const priorityColor: Record<TodoPriority, string> = {
+  CRITICAL: 'bg-red-700 dark:bg-red-600',
   HIGH: 'bg-danger',
   MEDIUM: 'bg-accent',
   LOW: 'bg-text-tertiary',

@@ -39,9 +39,10 @@ public class TodoService {
 
     private static final Comparator<Todo> PRIORITY_COMPARATOR =
             Comparator.comparingInt((Todo t) -> switch (t.getPriority()) {
-                case HIGH -> 0;
-                case MEDIUM -> 1;
-                case LOW -> 2;
+                case CRITICAL -> 0;
+                case HIGH -> 1;
+                case MEDIUM -> 2;
+                case LOW -> 3;
             }).thenComparing(Todo::getCreatedAt, Comparator.reverseOrder());
 
     @Transactional(readOnly = true)

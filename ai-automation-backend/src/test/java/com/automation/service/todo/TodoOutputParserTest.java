@@ -87,6 +87,15 @@ class TodoOutputParserTest {
     }
 
     @Test
+    void parse_criticalPriority() {
+        List<ParsedTodoItem> items = TodoOutputParser.parse(
+                "todo_item: AssistantContextBuilder testen | CRITICAL | backend,testing | 541 LOC, baut Kontext");
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).priority()).isEqualTo("CRITICAL");
+        assertThat(items.get(0).description()).contains("541 LOC");
+    }
+
+    @Test
     void parse_embeddedInLongerOutput() {
         String output = """
                 ## Test Coverage Report
@@ -122,7 +131,7 @@ class TodoOutputParserTest {
 
     @Test
     void parse_invalidPriority_noMatch() {
-        assertThat(TodoOutputParser.parse("todo_item: Something | CRITICAL | backend")).isEmpty();
+        assertThat(TodoOutputParser.parse("todo_item: Something | URGENT | backend")).isEmpty();
     }
 
     @Test

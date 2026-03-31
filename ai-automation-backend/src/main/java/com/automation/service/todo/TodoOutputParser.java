@@ -31,7 +31,7 @@ public final class TodoOutputParser {
     // Line-anchored pattern with optional 4th description field:
     // Group 1: title, Group 2: priority, Group 3: tags, Group 4: description (optional)
     private static final Pattern TODO_PATTERN = Pattern.compile(
-            "^(?:#{1,6}\\s+)?[*`]*todo[_-]item[*`]*:\\s*(.+?)\\s*\\|\\s*(HIGH|MEDIUM|LOW)\\s*\\|\\s*(.+?)(?:\\s*\\|\\s*(.+?))?\\s*$",
+            "^(?:#{1,6}\\s+)?[*`]*todo[_-]item[*`]*:\\s*(.+?)\\s*\\|\\s*(CRITICAL|HIGH|MEDIUM|LOW)\\s*\\|\\s*(.+?)(?:\\s*\\|\\s*(.+?))?\\s*$",
             Pattern.MULTILINE | Pattern.CASE_INSENSITIVE);
 
     /**

@@ -717,7 +717,7 @@ export interface ExtractMemoryRequest {
 // ── Todo ────────────────────────────────────────────────
 
 export type TodoStatus = 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'BACKLOG';
-export type TodoPriority = 'LOW' | 'MEDIUM' | 'HIGH';
+export type TodoPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type TodoSource = 'USER' | 'AI' | 'WORKFLOW';
 
 export interface Todo {

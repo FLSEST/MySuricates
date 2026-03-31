@@ -16,7 +16,7 @@ import { useT } from '../i18n';
 import type { Todo, TodoStatus, TodoPriority, TodoSource, CreateTodoRequest, UpdateTodoRequest } from '../types';
 
 const STATUSES: TodoStatus[] = ['OPEN', 'IN_PROGRESS', 'DONE', 'BACKLOG'];
-const PRIORITIES: TodoPriority[] = ['LOW', 'MEDIUM', 'HIGH'];
+const PRIORITIES: TodoPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 const SOURCES: TodoSource[] = ['USER', 'AI', 'WORKFLOW'];
 
 const MAX_VISIBLE_TAGS = 8;
@@ -24,6 +24,7 @@ const MAX_VISIBLE_TAGS = 8;
 type ViewMode = 'list' | 'board';
 
 const priorityColor: Record<TodoPriority, string> = {
+  CRITICAL: 'bg-red-700 dark:bg-red-600',
   HIGH: 'bg-danger',
   MEDIUM: 'bg-warning',
   LOW: 'bg-text-tertiary',
