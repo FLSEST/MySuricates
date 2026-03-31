@@ -76,6 +76,28 @@ Immer beim Anlegen eines TODOs (das eine längere Arbeitssequenz beschreibt) in 
 
 ---
 
+## PFLICHT: Tests müssen nach JEDER Code-Änderung grün sein
+
+BEVOR eine Änderung als fertig gilt oder committet wird, MÜSSEN alle relevanten Tests bestehen.
+
+### Ablauf
+
+1. **Vor der Änderung** — Bestehende Tests im betroffenen Bereich laufen lassen, um den Ist-Zustand zu kennen
+2. **Nach der Änderung** — ALLE betroffenen Tests laufen lassen (nicht nur neue):
+   - Backend: `mvn test` (oder gezielt `mvn test -Dtest="BetroffeneTests"`)
+   - Frontend: `npx tsc --noEmit` + `npm run lint`
+   - E2E (falls betroffen): `npm run test:e2e`
+3. **Wenn Tests brechen** — Sofort fixen. NICHT committen mit kaputten Tests. Ursache untersuchen, nicht einfach Tests anpassen oder löschen.
+4. **Neue Funktionalität** — Tests schreiben für neue/geänderte Logik
+
+### Was NICHT erlaubt ist
+
+- Tests löschen oder `@Disabled`/`.skip()` setzen, weil sie nach einer Änderung fehlschlagen
+- Tests so anpassen, dass sie den Fehler maskieren statt die Ursache zu beheben
+- Committen ohne die Tests im betroffenen Bereich laufen zu lassen
+
+---
+
 ## PFLICHT: Laufende Workflows vor Backend-Neustart prüfen
 
 BEVOR du das Backend neu startest (z. B. `mvn spring-boot:run`, Prozess killen, oder Port 9090 neu binden), MUSST du prüfen, ob noch Workflow-Runs laufen:
