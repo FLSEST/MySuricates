@@ -111,10 +111,8 @@ class TodoControllerTest {
 
     @Test
     void updateTodoStatus_patchesStatus() throws Exception {
-        var todo = Todo.builder().id("t-1").title("Fix bug").build();
         var statusRequest = new UpdateTodoStatusRequest(Todo.Status.DONE, null);
-        when(todoService.updateStatus(eq("t-1"), any(UpdateTodoStatusRequest.class))).thenReturn(todo);
-        when(todoService.findByIdResponse("t-1")).thenReturn(sampleResponse());
+        when(todoService.updateStatusAndReturn(eq("t-1"), any(UpdateTodoStatusRequest.class))).thenReturn(sampleResponse());
 
         mockMvc.perform(patch("/api/v1/todos/t-1/status")
                         .contentType(MediaType.APPLICATION_JSON)

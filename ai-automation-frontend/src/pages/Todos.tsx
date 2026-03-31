@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { usePersistedState } from '../hooks/usePersistedState';
 import {
   CheckSquare, Plus, Search, Trash2, Pencil, Bot, User, GitBranch,
-  X, List, LayoutGrid, Circle,
+  X, List, LayoutGrid, Circle, Clock, RefreshCw,
 } from 'lucide-react';
 import { Card, Button, Spinner, Badge, TagInput } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
@@ -206,7 +206,16 @@ function KanbanCard({ todo, onEdit, onStatusChange }: {
       </div>
       {/* Quick status change buttons (on hover) */}
       <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
-        <span className="text-[10px] text-text-tertiary">{formatRelative(todo.createdAt)}</span>
+        <span className="text-[10px] text-text-tertiary inline-flex items-center gap-0.5" title={`Erstellt: ${new Date(todo.createdAt).toLocaleString()}`}>
+          <Clock className="w-2.5 h-2.5" />
+          {formatRelative(todo.createdAt)}
+        </span>
+        {todo.updatedAt && Math.abs(new Date(todo.updatedAt).getTime() - new Date(todo.createdAt).getTime()) > 1000 && (
+          <span className="text-[10px] text-text-tertiary inline-flex items-center gap-0.5" title={`Aktualisiert: ${new Date(todo.updatedAt).toLocaleString()}`}>
+            <RefreshCw className="w-2.5 h-2.5" />
+            {formatRelative(todo.updatedAt)}
+          </span>
+        )}
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           {todo.status !== 'OPEN' && (
             <button
@@ -378,9 +387,16 @@ function TodoListItem({ todo, onEdit, onStatusChange, onDelete }: {
             )}
 
             {/* Time */}
-            <span className="text-xs text-text-tertiary shrink-0">
+            <span className="text-xs text-text-tertiary shrink-0 inline-flex items-center gap-0.5" title={`Erstellt: ${new Date(todo.createdAt).toLocaleString()}`}>
+              <Clock className="w-3 h-3" />
               {formatRelative(todo.createdAt)}
             </span>
+            {todo.updatedAt && Math.abs(new Date(todo.updatedAt).getTime() - new Date(todo.createdAt).getTime()) > 1000 && (
+              <span className="text-xs text-text-tertiary shrink-0 inline-flex items-center gap-0.5" title={`Aktualisiert: ${new Date(todo.updatedAt).toLocaleString()}`}>
+                <RefreshCw className="w-3 h-3" />
+                {formatRelative(todo.updatedAt)}
+              </span>
+            )}
           </div>
         </div>
       </div>

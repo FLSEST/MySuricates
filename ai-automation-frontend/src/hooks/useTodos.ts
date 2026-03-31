@@ -16,7 +16,8 @@ export function useTodos(params?: Record<string, string>, page = 0, size = 50) {
       }
       return api.get<PageResponse<Todo>>(`/todos?${searchParams.toString()}`);
     },
-    refetchInterval: 5_000,
+    refetchInterval: 15_000,
+    staleTime: 10_000,
   });
 }
 
@@ -32,7 +33,8 @@ export function useTodoCount() {
   return useQuery({
     queryKey: ['todos', 'count'],
     queryFn: () => api.get<TodoCountResponse>('/todos/count'),
-    refetchInterval: 5_000,
+    refetchInterval: 15_000,
+    staleTime: 10_000,
   });
 }
 

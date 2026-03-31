@@ -1,5 +1,6 @@
 package com.automation.repository;
 
+import com.automation.dto.response.TodoCountResponse;
 import com.automation.entity.Todo;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -14,6 +15,13 @@ import java.util.Optional;
 public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecificationExecutor<Todo> {
 
     long countByStatus(Todo.Status status);
+
+    @Query("SELECT new com.automation.dto.response.TodoCountResponse("
+         + "SUM(CASE WHEN t.status = 'OPEN' THEN 1 ELSE 0 END), "
+         + "SUM(CASE WHEN t.status = 'IN_PROGRESS' THEN 1 ELSE 0 END), "
+         + "SUM(CASE WHEN t.status = 'DONE' THEN 1 ELSE 0 END), "
+         + "SUM(CASE WHEN t.status = 'BACKLOG' THEN 1 ELSE 0 END)) FROM Todo t")
+    TodoCountResponse countGroupedByStatus();
 
     /**
      * Find an open auto-todo by composite key (projectId + source=WORKFLOW + referenceType + referenceId + category tag).

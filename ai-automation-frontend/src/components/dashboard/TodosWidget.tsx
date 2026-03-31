@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { CheckSquare, ArrowRight, Circle, Bot, Workflow } from 'lucide-react';
+import { CheckSquare, ArrowRight, Circle, Bot, Workflow, Clock, RefreshCw } from 'lucide-react';
 import { Card, CardHeader } from '../ui';
 import { useTodoCount, useTodos } from '../../hooks/useTodos';
 import { useT } from '../../i18n';
@@ -51,9 +51,16 @@ function TodoRow({ todo }: { todo: Todo }) {
       </div>
 
       {/* Time */}
-      <span className="text-[10px] text-text-tertiary shrink-0">
+      <span className="text-[10px] text-text-tertiary shrink-0 inline-flex items-center gap-0.5" title={`Erstellt: ${new Date(todo.createdAt).toLocaleString()}`}>
+        <Clock className="w-2.5 h-2.5" />
         {formatRelativeTime(todo.createdAt)}
       </span>
+      {todo.updatedAt && Math.abs(new Date(todo.updatedAt).getTime() - new Date(todo.createdAt).getTime()) > 1000 && (
+        <span className="text-[10px] text-text-tertiary shrink-0 inline-flex items-center gap-0.5" title={`Aktualisiert: ${new Date(todo.updatedAt).toLocaleString()}`}>
+          <RefreshCw className="w-2.5 h-2.5" />
+          {formatRelativeTime(todo.updatedAt)}
+        </span>
+      )}
     </div>
   );
 }

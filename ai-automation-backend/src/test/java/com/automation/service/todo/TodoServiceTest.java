@@ -175,10 +175,7 @@ class TodoServiceTest {
 
     @Test
     void count_returnsCounts() {
-        when(todoRepository.countByStatus(Todo.Status.OPEN)).thenReturn(5L);
-        when(todoRepository.countByStatus(Todo.Status.IN_PROGRESS)).thenReturn(3L);
-        when(todoRepository.countByStatus(Todo.Status.DONE)).thenReturn(12L);
-        when(todoRepository.countByStatus(Todo.Status.BACKLOG)).thenReturn(2L);
+        when(todoRepository.countGroupedByStatus()).thenReturn(new TodoCountResponse(5L, 3L, 12L, 2L));
 
         TodoCountResponse counts = todoService.count();
 

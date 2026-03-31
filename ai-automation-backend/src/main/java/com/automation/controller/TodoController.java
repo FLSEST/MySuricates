@@ -52,15 +52,13 @@ public class TodoController {
 
     @PutMapping("/{id}")
     public TodoResponse updateTodo(@PathVariable String id, @RequestBody UpdateTodoRequest request) {
-        var todo = todoService.update(id, request);
-        return todoService.findByIdResponse(todo.getId());
+        return todoService.updateAndReturn(id, request);
     }
 
     @PatchMapping("/{id}/status")
     public TodoResponse updateTodoStatus(@PathVariable String id,
                                          @Valid @RequestBody UpdateTodoStatusRequest request) {
-        var todo = todoService.updateStatus(id, request);
-        return todoService.findByIdResponse(todo.getId());
+        return todoService.updateStatusAndReturn(id, request);
     }
 
     @DeleteMapping("/{id}")

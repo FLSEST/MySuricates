@@ -24,6 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -46,7 +49,20 @@ public class TodoService {
         Specification<Todo> spec = buildSpec(projectId, status, priority, source, tag, q);
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Order.asc("priority"), Sort.Order.desc("createdAt")));
         Page<Todo> result = todoRepository.findAll(spec, pageRequest);
-        List<TodoResponse> content = result.getContent().stream().map(this::toResponseWithProject).toList();
+
+        // Batch-load all project names in one query instead of N+1
+        Set<String> projectIds = result.getContent().stream()
+                .map(Todo::getProjectId)
+                .filter(pid -> pid != null && !pid.isBlank())
+                .collect(Collectors.toSet());
+        Map<String, String> projectNames = projectIds.isEmpty()
+                ? Map.of()
+                : projectRepository.findAllById(projectIds).stream()
+                    .collect(Collectors.toMap(p -> p.getId(), p -> p.getName()));
+
+        List<TodoResponse> content = result.getContent().stream()
+                .map(todo -> toResponseWithProjectName(todo, projectNames.get(todo.getProjectId())))
+                .toList();
         return new PageResponse<>(content, result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
     }
 
@@ -102,6 +118,12 @@ public class TodoService {
     }
 
     @Transactional
+    public TodoResponse updateAndReturn(String id, UpdateTodoRequest request) {
+        Todo saved = update(id, request);
+        return toResponseWithProject(saved);
+    }
+
+    @Transactional
     public Todo updateStatus(String id, UpdateTodoStatusRequest request) {
         Todo todo = findById(id);
         todo.setStatus(request.status());
@@ -114,6 +136,12 @@ public class TodoService {
     }
 
     @Transactional
+    public TodoResponse updateStatusAndReturn(String id, UpdateTodoStatusRequest request) {
+        Todo saved = updateStatus(id, request);
+        return toResponseWithProject(saved);
+    }
+
+    @Transactional
     public void delete(String id) {
         Todo todo = findById(id);
         todoRepository.delete(todo);
@@ -122,21 +150,21 @@ public class TodoService {
 
     @Transactional(readOnly = true)
     public TodoCountResponse count() {
-        long open = todoRepository.countByStatus(Todo.Status.OPEN);
-        long inProgress = todoRepository.countByStatus(Todo.Status.IN_PROGRESS);
-        long done = todoRepository.countByStatus(Todo.Status.DONE);
-        long backlog = todoRepository.countByStatus(Todo.Status.BACKLOG);
-        return new TodoCountResponse(open, inProgress, done, backlog);
+        return todoRepository.countGroupedByStatus();
     }
 
     private TodoResponse toResponseWithProject(Todo todo) {
-        TodoResponse base = todoMapper.toResponse(todo);
         String projectName = null;
         if (todo.getProjectId() != null) {
             projectName = projectRepository.findById(todo.getProjectId())
                     .map(p -> p.getName())
                     .orElse(null);
         }
+        return toResponseWithProjectName(todo, projectName);
+    }
+
+    private TodoResponse toResponseWithProjectName(Todo todo, String projectName) {
+        TodoResponse base = todoMapper.toResponse(todo);
         return new TodoResponse(
                 base.id(), base.title(), base.description(),
                 base.status(), base.priority(), base.tags(),
