@@ -243,6 +243,9 @@ These use non-obvious paths — always use these, never guess:
 | Check approval | GET | `/api/v1/executions/{id}/approval` — returns `{"pending": true, "options": [...]}` or `{"pending": false}` |
 | Pause execution | POST | `/api/v1/executions/{id}/pause` |
 | Resume execution | POST | `/api/v1/executions/{id}/resume` |
+| List workflow versions | GET | `/api/v1/workflows/{id}/versions?page=0&size=20` |
+| Get workflow version | GET | `/api/v1/workflows/{id}/versions/{versionId}` |
+| Restore workflow version | POST | `/api/v1/workflows/{id}/versions/{versionId}/restore` |
 
 ## Codex / External Agents
 

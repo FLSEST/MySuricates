@@ -14,6 +14,54 @@ Anleitung für OpenAI Codex CLI, um eigenständig Workflows und Chains über die
 DEV_KEY=$(python3 -c "import sqlite3; conn = sqlite3.connect('ai-automation-backend/data/automation.db'); c = conn.cursor(); c.execute(\"SELECT value FROM app_settings WHERE key = 'api-key'\"); print(c.fetchone()[0]); conn.close()")
 ```
 
+## Cypress E2E gegen Dev oder Test
+
+Die Cypress-Tests koennen jetzt gegen **Dev** (`9090`) oder **Test** (`8090`) laufen. Wichtig ist, dass **Frontend-Proxy und Cypress immer dasselbe Ziel verwenden**.
+
+### Zielwahl
+
+- Standard: kein `CYPRESS_TARGET` gesetzt -> **Dev**
+- `CYPRESS_TARGET=test` -> **Test-Instanz**
+
+### Dev-Target
+
+```bash
+cd ai-automation-frontend
+
+# Frontend proxied /api und /ws nach localhost:9090
+npm run dev
+
+# Cypress-Helper sprechen ebenfalls localhost:9090/api/v1
+npm run test:e2e
+```
+
+Der Dev-API-Key wird in `cypress.config.ts` automatisch aus `ai-automation-backend/data/automation.db` gelesen, falls vorhanden.
+
+### Test-Target
+
+```bash
+# Test-Instanz mit bekanntem API-Key starten
+cd ai-automation-backend
+AUTOMATION_API_KEY=test-e2e-key docker compose -f docker-compose.test.yml up -d
+
+# Optional: Definitionen von Dev nach Test synchronisieren
+curl -s -X POST http://localhost:9090/api/v1/testing/sync-definitions \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $DEV_KEY" \
+  -d '{}'
+
+# Frontend und Cypress beide auf Test schalten
+cd ../ai-automation-frontend
+CYPRESS_TARGET=test CYPRESS_TEST_API_KEY=test-e2e-key npm run dev:e2e:test
+CYPRESS_TARGET=test CYPRESS_TEST_API_KEY=test-e2e-key npm run test:e2e:test
+```
+
+Hinweise:
+- `CYPRESS_TEST_API_KEY` ist fuer die Test-Instanz gedacht; `CYPRESS_API_KEY` ueberschreibt beide Ziele global.
+- Falls `AUTOMATION_API_KEY` beim Test-Container gesetzt wurde, kann derselbe Wert fuer `CYPRESS_TEST_API_KEY` verwendet werden.
+- Direkte Cypress-Setup-Calls (`cypress/support/api.ts`) und UI-Traffic nutzen dann beide `localhost:8090`.
+- Damit bleiben fachliche Testdaten auf der Test-Instanz statt in Dev.
+
 ## API-Endpunkte
 
 ### 1. Workflow erstellen
@@ -172,7 +220,26 @@ Headers: X-API-Key: <key>
 | Genehmigen | `POST /api/v1/executions/{id}/approve` — Body: `{"answer": "Yes"}` |
 | Genehmigung prüfen | `GET /api/v1/executions/{id}/approval` |
 
-### 7. Test-Instanz
+### 7. Workflow-Versionen
+
+```bash
+# Versionen eines Workflows auflisten (neueste zuerst, paginiert)
+GET /api/v1/workflows/{id}/versions?page=0&size=20
+
+# Einzelne Version mit Snapshot
+GET /api/v1/workflows/{id}/versions/{versionId}
+
+# Version wiederherstellen (erstellt automatisch neuen Snapshot des aktuellen Zustands)
+POST /api/v1/workflows/{id}/versions/{versionId}/restore
+```
+
+**Hinweise:**
+- Versionen werden automatisch bei jedem Update erstellt (nur bei Änderung an Blocks, Instructions, Model, Provider, Metadata, DefaultContext, Skills)
+- `changeSource` zeigt die Quelle: `user`, `ai`, `pool-install`, `import`, `api`
+- Kosmetische Änderungen (Name, Beschreibung, Icon) erzeugen keine Version
+- Context-Variablen in Workflows: `{{ workflow_version }}` (Versionsnummer), `{{ workflow_changed_since_last_run }}` (true/false)
+
+### 8. Test-Instanz
 
 ```bash
 # Status prüfen
