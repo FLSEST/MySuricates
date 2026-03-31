@@ -45,6 +45,8 @@ class AssistantControllerTest {
     @MockBean
     private PageSuggestionService pageSuggestionService;
     @MockBean
+    private com.automation.service.assistant.AssistantChatBroadcaster broadcaster;
+    @MockBean
     private ApplicationEventPublisher eventPublisher;
     @MockBean
     private ApiKeyService apiKeyService;
@@ -56,7 +58,7 @@ class AssistantControllerTest {
         var response = new AssistantChatResponse("Ich bin MySuricates.", List.of());
         when(assistantService.chat(any())).thenReturn(response);
 
-        var request = new AssistantChatRequest("Hallo", List.of(), null, null, null);
+        var request = new AssistantChatRequest("Hallo", List.of(), null, null, null, null);
 
         mockMvc.perform(post("/api/v1/assistant/chat")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -75,7 +77,7 @@ class AssistantControllerTest {
         var response = new AssistantChatResponse("Starte den Daily Report?", List.of(action));
         when(assistantService.chat(any())).thenReturn(response);
 
-        var request = new AssistantChatRequest("Starte Daily Report", List.of(), null, null, null);
+        var request = new AssistantChatRequest("Starte Daily Report", List.of(), null, null, null, null);
 
         mockMvc.perform(post("/api/v1/assistant/chat")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -95,7 +97,7 @@ class AssistantControllerTest {
         when(assistantService.chat(any()))
                 .thenReturn(new AssistantChatResponse("OK", List.of()));
 
-        var request = new AssistantChatRequest("Und gestern?", history, null, null, null);
+        var request = new AssistantChatRequest("Und gestern?", history, null, null, null, null);
 
         mockMvc.perform(post("/api/v1/assistant/chat")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -111,7 +113,7 @@ class AssistantControllerTest {
                 .thenReturn(new AssistantChatResponse("Context received", List.of()));
 
         var ctx = new AssistantChatRequest.PageContext("run", "run-abc", "proj-xyz");
-        var request = new AssistantChatRequest("Was ist hier passiert?", List.of(), ctx, null, null);
+        var request = new AssistantChatRequest("Was ist hier passiert?", List.of(), ctx, null, null, null);
 
         mockMvc.perform(post("/api/v1/assistant/chat")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -122,7 +124,7 @@ class AssistantControllerTest {
 
     @Test
     void chat_emptyMessage_returns400() throws Exception {
-        var request = new AssistantChatRequest("", List.of(), null, null, null);
+        var request = new AssistantChatRequest("", List.of(), null, null, null, null);
 
         mockMvc.perform(post("/api/v1/assistant/chat")
                         .contentType(MediaType.APPLICATION_JSON)

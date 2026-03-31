@@ -6,6 +6,7 @@ import { X, Send, Play, Eye, Sparkles, Clock, Plus, Trash2, ArrowLeft, MessageCi
 import { useAssistantStore } from '../stores/assistantStore';
 import { useAssistantChat, useAssistantSuggestions, type ChatMessage, type AssistantAction } from '../hooks/useAssistant';
 import { useAssistantThinkingPhrases } from '../hooks/useSystem';
+import { useAssistantWebSocket, type AssistantStatus } from '../hooks/useAssistantWebSocket';
 import { useExecuteWorkflow } from '../hooks/useWorkflows';
 import { MeerkatIcon } from './layout/Sidebar';
 
@@ -281,7 +282,17 @@ function MessageBubble({ msg, onClose, onSend, onExecute, onRetry }: {
 
 const DEFAULT_PHRASES = ['Denke nach…', 'Analysiere…', 'Überlege kurz…', 'Einen Moment…'];
 
-function TypingIndicator() {
+const PHASE_LABELS: Record<string, string> = {
+  RECEIVED: 'Anfrage empfangen…',
+  BUILDING_CONTEXT: 'Kontext wird aufgebaut…',
+  THINKING: 'Denke nach…',
+  FETCHING_DATA: 'Lade Daten nach…',
+  EXECUTING_TOOLS: 'Führe Aktionen aus…',
+  COMPLETED: 'Fertig',
+  ERROR: 'Fehler',
+};
+
+function StatusIndicator({ phase }: { phase: AssistantStatus | null }) {
   const { data: phrases = DEFAULT_PHRASES } = useAssistantThinkingPhrases();
   const [idx, setIdx] = useState(() => Math.floor(Math.random() * Math.max(phrases.length, 1)));
 
@@ -290,7 +301,12 @@ function TypingIndicator() {
     return () => clearInterval(t);
   }, [phrases.length]);
 
-  const phrase = phrases[idx % phrases.length] ?? phrases[0] ?? '…';
+  // Use WebSocket phase if available, otherwise fall back to rotating phrases
+  const label = phase
+    ? (PHASE_LABELS[phase.phase] ?? phase.phase)
+    : (phrases[idx % phrases.length] ?? '…');
+  const detail = phase?.detail;
+  const elapsed = phase ? Math.round(phase.elapsedMs / 1000) : null;
 
   return (
     <div className="flex gap-2 items-start">
@@ -299,8 +315,12 @@ function TypingIndicator() {
         <MeerkatIcon className="text-accent" size={18} />
       </div>
       <div className="px-3 py-2.5 rounded-2xl rounded-tl-sm bg-[var(--color-assistant-raised)]
-                      border border-[var(--color-assistant-border)]">
-        <span className="text-sm text-text-secondary animate-pulse">{phrase}</span>
+                      border border-[var(--color-assistant-border)] flex items-center gap-2">
+        <span className="text-sm text-text-secondary animate-pulse">{label}</span>
+        {detail && <span className="text-[11px] text-text-tertiary">({detail})</span>}
+        {elapsed !== null && elapsed > 0 && (
+          <span className="text-[11px] text-text-tertiary tabular-nums">{elapsed}s</span>
+        )}
       </div>
     </div>
   );
@@ -473,6 +493,8 @@ export function AssistantPanel() {
   const navigate = useNavigate();
   const abortRef = useRef<AbortController | null>(null);
   const queueRef = useRef<{ text: string; sessionId: string }[]>([]);
+  const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
+  const { currentPhase } = useAssistantWebSocket(activeRequestId, activeSessionId);
 
   const ctx = parsePageContext(location.pathname);
 
@@ -563,12 +585,15 @@ export function AssistantPanel() {
 
     const controller = new AbortController();
     abortRef.current = controller;
+    const requestId = crypto.randomUUID();
+    setActiveRequestId(requestId);
 
     sendMessage(
-      { req: { message: text, history, context: ctx, sessionId }, signal: controller.signal },
+      { req: { message: text, history, context: ctx, sessionId, requestId }, signal: controller.signal },
       {
         onSuccess: (res) => {
           abortRef.current = null;
+          setActiveRequestId(null);
           updateMessageStatus(sessionId, userMsgId, 'sent');
           if (res.model) setLastModel(res.model);
           appendMessage(sessionId, {
@@ -583,6 +608,7 @@ export function AssistantPanel() {
         },
         onError: (err) => {
           abortRef.current = null;
+          setActiveRequestId(null);
           // AbortError = user cancelled, don't show error bubble
           const isAbort = err instanceof DOMException && err.name === 'AbortError';
           if (isAbort) {
@@ -638,6 +664,7 @@ export function AssistantPanel() {
   const handleCancel = () => {
     abortRef.current?.abort();
     abortRef.current = null;
+    setActiveRequestId(null);
   };
 
   const handleSend = () => {
@@ -809,7 +836,7 @@ export function AssistantPanel() {
 
               {isPending && (
                 <div className="flex items-center gap-2">
-                  <TypingIndicator />
+                  <StatusIndicator phase={currentPhase} />
                   <button
                     onClick={handleCancel}
                     className="shrink-0 flex items-center gap-1 text-[11px] text-text-tertiary hover:text-text-secondary"

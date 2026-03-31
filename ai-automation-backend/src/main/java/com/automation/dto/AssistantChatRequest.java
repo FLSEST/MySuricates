@@ -8,7 +8,8 @@ public record AssistantChatRequest(
         List<MessageEntry> history,
         PageContext context,
         String provider,
-        String sessionId
+        String sessionId,
+        String requestId
 ) {
     public record MessageEntry(String role, String content) {}
 

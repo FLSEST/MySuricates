@@ -4,6 +4,7 @@ import com.automation.dto.AssistantChatRequest;
 import com.automation.dto.AssistantChatResponse;
 import com.automation.dto.AssistantChatResponse.AssistantAction;
 import com.automation.repository.AppSettingsRepository;
+import com.automation.service.assistant.AssistantChatBroadcaster;
 import com.automation.service.assistant.AssistantContextBuilder;
 import com.automation.service.assistant.AssistantFetchService;
 import com.automation.service.assistant.AssistantFetchService.FetchRequest;
@@ -47,6 +48,7 @@ public class AssistantService {
     private final AssistantContextBuilder contextBuilder;
     private final AssistantFetchService fetchService;
     private final AssistantToolExecutor toolExecutor;
+    private final AssistantChatBroadcaster broadcaster;
     private final AppSettingsRepository appSettingsRepository;
     private final ObjectMapper objectMapper;
 
@@ -88,12 +90,16 @@ public class AssistantService {
     // ── Chat ─────────────────────────────────────────────────────────────────
 
     public AssistantChatResponse chat(AssistantChatRequest req) {
+        long startNanos = System.nanoTime();
+        String requestId = req.requestId();
         try {
+            broadcaster.broadcastStatus(requestId, "BUILDING_CONTEXT", null, startNanos);
             String systemPrompt = contextBuilder.buildSystemPrompt(req.context(), cachedBaseInstructions);
             String prompt = contextBuilder.buildPrompt(req.history(), req.message());
             String workingDir = contextBuilder.resolveWorkingDir(req.context());
             String model = cachedAssistantModel;
 
+            broadcaster.broadcastStatus(requestId, "THINKING", null, startNanos);
             var result = commandExecutorService.executeOnHost(
                     HostExecutionRequest.builder()
                             .projectPath(workingDir)
@@ -110,6 +116,7 @@ public class AssistantService {
             for (int fetchRound = 0; fetchRound < 2; fetchRound++) {
                 List<FetchRequest> fetches = fetchService.parseFetchRequests(result.output());
                 if (fetches.isEmpty()) break;
+                broadcaster.broadcastStatus(requestId, "FETCHING_DATA", "Runde " + (fetchRound + 1), startNanos);
                 String supplemental = fetches.stream()
                         .map(fetchService::executeFetch)
                         .filter(s -> !s.isBlank())
@@ -121,6 +128,7 @@ public class AssistantService {
                 String enrichedPrompt = prompt
                         + "\n\n---\nNachgeladene Details (Runde " + (fetchRound + 1) + "):\n" + supplemental
                         + "\n\n" + hint;
+                broadcaster.broadcastStatus(requestId, "THINKING", "Runde " + (fetchRound + 1), startNanos);
                 result = commandExecutorService.executeOnHost(
                         HostExecutionRequest.builder()
                                 .projectPath(workingDir)
@@ -135,15 +143,18 @@ public class AssistantService {
             }
 
             // Execute tools in final response
+            broadcaster.broadcastStatus(requestId, "EXECUTING_TOOLS", null, startNanos);
             String finalOutput = toolExecutor.executeTools(result.output());
             // Strip leftover <fetch> tags
             finalOutput = fetchService.stripFetchTags(finalOutput);
 
             AssistantChatResponse parsed = parseResponse(finalOutput);
+            broadcaster.broadcastStatus(requestId, "COMPLETED", null, startNanos);
             return new AssistantChatResponse(parsed.message(), parsed.actions(), model);
 
         } catch (Exception e) {
             log.error("Assistant chat failed", e);
+            broadcaster.broadcastStatus(requestId, "ERROR", e.getMessage(), startNanos);
             return new AssistantChatResponse(
                     "Entschuldigung, ich konnte deine Anfrage gerade nicht verarbeiten. " +
                     "Bitte versuche es erneut oder prüfe ob der KI-Provider konfiguriert ist.",

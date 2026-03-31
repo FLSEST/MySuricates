@@ -6,6 +6,7 @@ import com.automation.event.AssistantSessionUpdatedEvent;
 import com.automation.service.AssistantService;
 import com.automation.service.AssistantSessionService;
 import com.automation.service.PageSuggestionService;
+import com.automation.service.assistant.AssistantChatBroadcaster;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -19,6 +20,7 @@ public class AssistantController {
     private final AssistantService assistantService;
     private final AssistantSessionService assistantSessionService;
     private final PageSuggestionService pageSuggestionService;
+    private final AssistantChatBroadcaster broadcaster;
     private final ApplicationEventPublisher eventPublisher;
 
     @PostMapping("/chat")
@@ -27,6 +29,7 @@ public class AssistantController {
         pageSuggestionService.cancelRunning();
 
         long startNanos = System.nanoTime();
+        broadcaster.broadcastStatus(request.requestId(), "RECEIVED", null, startNanos);
         AssistantChatResponse response = assistantService.chat(request);
         long responseTimeMs = (System.nanoTime() - startNanos) / 1_000_000;
         response = response.withResponseTimeMs(responseTimeMs);

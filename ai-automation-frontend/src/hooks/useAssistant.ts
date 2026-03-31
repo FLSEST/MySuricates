@@ -26,6 +26,7 @@ export interface AssistantChatRequest {
   context?: AssistantPageContext;
   provider?: string;
   sessionId?: string;
+  requestId?: string;
 }
 
 export interface AssistantChatResponse {

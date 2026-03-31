@@ -3,6 +3,7 @@ package com.automation.service;
 import com.automation.dto.AssistantChatRequest;
 import com.automation.dto.AssistantChatResponse;
 import com.automation.repository.AppSettingsRepository;
+import com.automation.service.assistant.AssistantChatBroadcaster;
 import com.automation.service.assistant.AssistantContextBuilder;
 import com.automation.service.assistant.AssistantFetchService;
 import com.automation.service.assistant.AssistantToolExecutor;
@@ -33,6 +34,7 @@ class AssistantServiceTest {
     @Mock private AssistantContextBuilder contextBuilder;
     @Mock private AssistantFetchService fetchService;
     @Mock private AssistantToolExecutor toolExecutor;
+    @Mock private AssistantChatBroadcaster broadcaster;
     @Mock private AppSettingsRepository appSettingsRepository;
 
     private AssistantService service;
@@ -41,7 +43,7 @@ class AssistantServiceTest {
     void setUp() {
         service = new AssistantService(
                 commandExecutorService, contextBuilder, fetchService, toolExecutor,
-                appSettingsRepository, new ObjectMapper()
+                broadcaster, appSettingsRepository, new ObjectMapper()
         );
         // Context builder defaults (lenient — not all tests call chat())
         lenient().when(contextBuilder.buildSystemPrompt(any(), any())).thenReturn("System prompt");
@@ -150,7 +152,7 @@ class AssistantServiceTest {
                 new AssistantChatRequest.MessageEntry("assistant", "Erste Antwort")
         );
 
-        var req = new AssistantChatRequest("Zweite Frage", history, null, null, null);
+        var req = new AssistantChatRequest("Zweite Frage", history, null, null, null, null);
         var result = service.chat(req);
 
         assertThat(result.message()).isEqualTo("Antwort mit Kontext");
@@ -186,6 +188,6 @@ class AssistantServiceTest {
     }
 
     private AssistantChatResponse chat(String message) {
-        return service.chat(new AssistantChatRequest(message, List.of(), null, null, null));
+        return service.chat(new AssistantChatRequest(message, List.of(), null, null, null, null));
     }
 }
