@@ -1,15 +1,9 @@
 package com.automation.controller;
 
 import com.automation.dto.response.RemoteAccessResponse;
-import com.automation.repository.AppSettingsRepository;
-import com.automation.service.AssistantService;
-import com.automation.service.PageSuggestionService;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.repair.AutoRepairService;
-import com.automation.service.system.DatabaseBackupService;
-import com.automation.service.system.ExecutionSettingsService;
-import com.automation.service.system.SystemIdentityService;
-import com.automation.service.system.TailscaleService;
+import com.automation.service.system.*;
 import com.github.dockerjava.api.DockerClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,8 +23,6 @@ import java.sql.Connection;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
 
 @RestController
 @RequestMapping("/api/v1/system")
@@ -41,20 +33,13 @@ public class SystemController {
     private final DockerClient dockerClient;
     private final TailscaleService tailscaleService;
     private final DatabaseBackupService databaseBackupService;
-    private final AppSettingsRepository appSettingsRepository;
     private final AutoRepairService autoRepairService;
     private final DataSource dataSource;
     private final SystemIdentityService systemIdentity;
     private final AiProviderRegistry aiProviderRegistry;
     private final ExecutionSettingsService executionSettingsService;
-
-    @org.springframework.beans.factory.annotation.Autowired
-    @org.springframework.context.annotation.Lazy
-    private AssistantService assistantService;
-
-    @org.springframework.beans.factory.annotation.Autowired
-    @org.springframework.context.annotation.Lazy
-    private PageSuggestionService pageSuggestionService;
+    private final SystemSettingsService systemSettingsService;
+    private final FileBrowserService fileBrowserService;
 
     @Value("${automation.security.enabled:true}")
     private boolean securityEnabled;
@@ -219,40 +204,25 @@ public class SystemController {
                 .body(resource);
     }
 
-    private static final Set<String> ALLOWED_SETTINGS = Set.of(
-            "auto-todo-default", "auto-repair-default", "auto-repair-mode",
-            "auto-repair-max-retries", "auto-repair-timeout-seconds",
-            "default-ai-provider", "assistant-thinking-phrases", "assistant-model", "suggestions-model"
-    );
-
     @GetMapping("/settings/{key}")
     public ResponseEntity<Map<String, String>> getSetting(@PathVariable String key) {
-        if (!ALLOWED_SETTINGS.contains(key)) {
+        if (!systemSettingsService.isAllowedKey(key)) {
             return ResponseEntity.badRequest().build();
         }
-        String value = appSettingsRepository.get(key).orElse(null);
-        return ResponseEntity.ok(Map.of("key", key, "value", value != null ? value : ""));
+        String value = systemSettingsService.getSetting(key).orElse("");
+        return ResponseEntity.ok(Map.of("key", key, "value", value));
     }
 
     @PutMapping("/settings/{key}")
     public ResponseEntity<Void> setSetting(@PathVariable String key, @RequestBody Map<String, String> body) {
-        if (!ALLOWED_SETTINGS.contains(key)) {
+        if (!systemSettingsService.isAllowedKey(key)) {
             return ResponseEntity.badRequest().build();
         }
         String value = body.get("value");
         if (value == null) {
             return ResponseEntity.badRequest().build();
         }
-        appSettingsRepository.set(key, value);
-        if ("assistant-model".equals(key)) {
-            assistantService.refreshCachedModel();
-        }
-        if ("suggestions-model".equals(key)) {
-            pageSuggestionService.refreshCachedModel();
-        }
-        if ("default-ai-provider".equals(key)) {
-            aiProviderRegistry.refreshDefaultProviderCache();
-        }
+        systemSettingsService.setSetting(key, value);
         return ResponseEntity.ok().build();
     }
 
@@ -271,53 +241,18 @@ public class SystemController {
         }
     }
 
-    private static final Set<String> BLOCKED_PREFIXES = Set.of(
-            "/etc", "/proc", "/sys", "/dev", "/var/run"
-    );
-
     record OpenPathRequest(String path) {}
 
     @PostMapping("/open-path")
     public ResponseEntity<Map<String, String>> openPath(@RequestBody OpenPathRequest request) {
-        if (request.path() == null || request.path().isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Path must not be empty"));
-        }
-
-        Path targetPath = Path.of(request.path()).normalize().toAbsolutePath();
-        String normalized = targetPath.toString();
-
-        for (String prefix : BLOCKED_PREFIXES) {
-            if (normalized.startsWith(prefix)) {
-                return ResponseEntity.badRequest().body(Map.of(
-                        "error", "Access to system directory is restricted: " + prefix));
-            }
-        }
-
-        if (!Files.exists(targetPath)) {
-            return ResponseEntity.status(404).body(Map.of("error", "Path does not exist: " + normalized));
-        }
-
         try {
-            ProcessBuilder pb = new ProcessBuilder("xdg-open", normalized);
-            pb.redirectErrorStream(true);
-            Process process = pb.start();
-
-            // Drain output to prevent blocking
-            try (InputStream is = process.getInputStream()) {
-                is.readAllBytes();
-            }
-
-            boolean exited = process.waitFor(3, TimeUnit.SECONDS);
-            if (exited && process.exitValue() != 0) {
-                log.warn("xdg-open exited with code {} for path: {}", process.exitValue(), normalized);
-                return ResponseEntity.internalServerError().body(Map.of(
-                        "error", "Failed to open path (exit code " + process.exitValue() + ")"));
-            }
-            // Either exited successfully or still running (file manager is open)
+            fileBrowserService.openPath(request.path());
             return ResponseEntity.ok(Map.of("status", "ok"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (IOException e) {
-            log.error("Failed to open path: {}", normalized, e);
-            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to open path: " + e.getMessage()));
+            log.error("Failed to open path: {}", request.path(), e);
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return ResponseEntity.internalServerError().body(Map.of("error", "Interrupted while opening path"));
@@ -327,53 +262,20 @@ public class SystemController {
     @GetMapping("/browse")
     public ResponseEntity<Map<String, Object>> browseDirectory(
             @RequestParam(required = false) String path) {
-
-        Path dirPath;
-        if (path == null || path.isBlank()) {
-            dirPath = Path.of(System.getProperty("user.home"));
-        } else {
-            dirPath = Path.of(path).normalize().toAbsolutePath();
-        }
-
-        String normalized = dirPath.toString();
-
-        // Block sensitive system directories
-        if (normalized.equals("/")) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", "Cannot browse root directory"));
-        }
-        for (String prefix : BLOCKED_PREFIXES) {
-            if (normalized.startsWith(prefix)) {
-                return ResponseEntity.badRequest().body(Map.of(
-                        "error", "Access to system directory is restricted: " + prefix));
-            }
-        }
-
-        if (!Files.isDirectory(dirPath)) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", "Path is not a directory: " + normalized));
-        }
-
-        List<Map<String, String>> directories = new ArrayList<>();
-        try (Stream<Path> entries = Files.list(dirPath)) {
-            entries.filter(Files::isDirectory)
-                    .filter(p -> !p.getFileName().toString().startsWith("."))
-                    .sorted(Comparator.comparing(p -> p.getFileName().toString().toLowerCase()))
-                    .forEach(p -> directories.add(Map.of(
-                            "name", p.getFileName().toString(),
-                            "path", p.toAbsolutePath().toString()
-                    )));
+        try {
+            FileBrowserService.BrowseResult result = fileBrowserService.browseDirectory(path);
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("current", result.current());
+            response.put("parent", result.parent());
+            List<Map<String, String>> dirs = result.directories().stream()
+                    .map(d -> Map.of("name", d.name(), "path", d.path()))
+                    .toList();
+            response.put("directories", dirs);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (IOException e) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", "Cannot read directory: " + e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", "Cannot read directory: " + e.getMessage()));
         }
-
-        Path parent = dirPath.getParent();
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("current", normalized);
-        result.put("parent", parent != null ? parent.toString() : null);
-        result.put("directories", directories);
-
-        return ResponseEntity.ok(result);
     }
 }

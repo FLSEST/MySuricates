@@ -176,6 +176,7 @@ function KanbanCard({ todo, onEdit, onStatusChange }: {
   onEdit: (todo: Todo) => void;
   onStatusChange: (todo: Todo, status: TodoStatus) => void;
 }) {
+  const t = useT();
   return (
     <div
       className="bg-surface-base border border-border rounded-lg p-3 hover:border-border-strong transition-colors cursor-pointer group"
@@ -390,6 +391,19 @@ function TodoListItem({ todo, onEdit, onStatusChange, onDelete }: {
                   {todo.sourceAgent || t.todos.sources[todo.source]}
                 </span>
               </Badge>
+            )}
+
+            {/* Run link */}
+            {todo.workflowRunId && (
+              <Link
+                to={`/runs/${todo.workflowRunId}`}
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-accent/10 text-accent font-medium hover:bg-accent/20 transition-colors"
+                title={t.todos.viewRun}
+              >
+                <ExternalLink className="w-2.5 h-2.5" />
+                Run
+              </Link>
             )}
 
             {/* Tags */}

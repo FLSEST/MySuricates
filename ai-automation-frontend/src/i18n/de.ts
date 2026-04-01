@@ -940,6 +940,7 @@ export const de: TranslationKeys = {
     viewList: 'Liste',
     viewBoard: 'Board',
     description: 'Beschreibung',
+    viewRun: 'Workflow-Run anzeigen',
   },
   wishes: {
     title: 'Wünsche',

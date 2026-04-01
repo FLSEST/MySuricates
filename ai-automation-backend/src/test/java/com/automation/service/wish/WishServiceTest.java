@@ -3,15 +3,10 @@ package com.automation.service.wish;
 import com.automation.config.WishConfig;
 import com.automation.dto.request.WishRespondRequest;
 import com.automation.entity.*;
-import com.automation.repository.*;
+import com.automation.repository.ProjectRepository;
+import com.automation.repository.WishRepository;
 import com.automation.service.ai.AiProviderRegistry;
-import com.automation.service.chain.ChainExecutor;
-import com.automation.service.chain.ChainService;
-import com.automation.service.factory.WorkflowFactoryService;
 import com.automation.service.learning.LearningService;
-import com.automation.service.pool.WorkflowPoolService;
-import com.automation.service.workflow.AgentInstructionsService;
-import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
 import com.automation.service.workflow.WorkflowTemplateService;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,24 +30,14 @@ class WishServiceTest {
     @Mock private WishRepository wishRepository;
     @Mock private AiProviderRegistry aiProviderRegistry;
     @Mock private WorkflowService workflowService;
-    @Mock private ChainService chainService;
-    @Mock private ChainExecutor chainExecutor;
-    @Mock private WorkflowExecutor workflowExecutor;
-    @Mock private WorkflowRepository workflowRepository;
-    @Mock private SkillRepository skillRepository;
-    @Mock private WorkflowRunRepository workflowRunRepository;
-    @Mock private ChainRunRepository chainRunRepository;
-    @Mock private StepResultRepository stepResultRepository;
     @Mock private ProjectRepository projectRepository;
-    @Mock private WorkflowTemplateRepository templateRepository;
-    @Mock private WorkflowMemoryRepository memoryRepository;
-    @Mock private AgentInstructionsService agentInstructionsService;
     @Mock private WorkflowTemplateService workflowTemplateService;
-    @Mock private WorkflowPoolService workflowPoolService;
-    @Mock private WorkflowFactoryService workflowFactoryService;
     @Mock private LearningService learningService;
     @Mock private SimpMessagingTemplate messagingTemplate;
     @Mock private ExecutorService virtualThreadExecutor;
+    @Mock private WishPromptBuilder promptBuilder;
+    @Mock private WishDecomposeService decomposeService;
+    @Mock private WishExecutionService executionService;
 
     private WishService wishService;
 
@@ -61,12 +46,10 @@ class WishServiceTest {
         WishConfig wishConfig = new WishConfig();
         wishService = new WishService(
                 wishConfig,
-                wishRepository, aiProviderRegistry, workflowService, chainService,
-                chainExecutor, workflowExecutor, workflowRepository, skillRepository,
-                workflowRunRepository, chainRunRepository, stepResultRepository,
-                projectRepository, templateRepository, memoryRepository,
-                agentInstructionsService, workflowTemplateService, workflowPoolService,
-                workflowFactoryService, learningService, messagingTemplate, virtualThreadExecutor
+                wishRepository, aiProviderRegistry, workflowService,
+                projectRepository, workflowTemplateService, learningService,
+                messagingTemplate, virtualThreadExecutor,
+                promptBuilder, decomposeService, executionService
         );
     }
 

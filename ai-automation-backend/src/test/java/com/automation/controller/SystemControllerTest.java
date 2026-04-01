@@ -3,11 +3,7 @@ package com.automation.controller;
 import com.automation.dto.response.RemoteAccessResponse;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.TailscaleException;
-import com.automation.repository.AppSettingsRepository;
-import com.automation.service.system.ApiKeyService;
-import com.automation.service.system.DatabaseBackupService;
-import com.automation.service.system.SystemIdentityService;
-import com.automation.service.system.TailscaleService;
+import com.automation.service.system.*;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.PingCmd;
 import org.junit.jupiter.api.Test;
@@ -43,7 +39,6 @@ class SystemControllerTest {
     @MockBean
     private ActivityLogService activityLogService;
 
-
     @MockBean
     private TailscaleService tailscaleService;
 
@@ -54,7 +49,10 @@ class SystemControllerTest {
     private ApiKeyService apiKeyService;
 
     @MockBean
-    private AppSettingsRepository appSettingsRepository;
+    private SystemSettingsService systemSettingsService;
+
+    @MockBean
+    private FileBrowserService fileBrowserService;
 
     @MockBean
     private DataSource dataSource;
@@ -69,7 +67,7 @@ class SystemControllerTest {
     private com.automation.service.ai.AiProviderRegistry aiProviderRegistry;
 
     @MockBean
-    private com.automation.service.system.ExecutionSettingsService executionSettingsService;
+    private ExecutionSettingsService executionSettingsService;
 
     private void mockDbHealthy() throws Exception {
         Connection conn = mock(Connection.class);
@@ -223,7 +221,8 @@ class SystemControllerTest {
 
     @Test
     void getSetting_defaultAiProvider_returnsValue() throws Exception {
-        when(appSettingsRepository.get("default-ai-provider")).thenReturn(Optional.of("CLAUDE"));
+        when(systemSettingsService.isAllowedKey("default-ai-provider")).thenReturn(true);
+        when(systemSettingsService.getSetting("default-ai-provider")).thenReturn(Optional.of("CLAUDE"));
 
         mockMvc.perform(get("/api/v1/system/settings/default-ai-provider"))
                 .andExpect(status().isOk())
@@ -233,16 +232,20 @@ class SystemControllerTest {
 
     @Test
     void setSetting_defaultAiProvider_succeeds() throws Exception {
+        when(systemSettingsService.isAllowedKey("default-ai-provider")).thenReturn(true);
+
         mockMvc.perform(put("/api/v1/system/settings/default-ai-provider")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"value\":\"CODEX\"}"))
                 .andExpect(status().isOk());
 
-        verify(appSettingsRepository).set("default-ai-provider", "CODEX");
+        verify(systemSettingsService).setSetting("default-ai-provider", "CODEX");
     }
 
     @Test
     void getSetting_disallowedKey_returns400() throws Exception {
+        when(systemSettingsService.isAllowedKey("secret-key")).thenReturn(false);
+
         mockMvc.perform(get("/api/v1/system/settings/secret-key"))
                 .andExpect(status().isBadRequest());
     }

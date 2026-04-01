@@ -938,6 +938,7 @@ export const en = {
     viewList: 'List',
     viewBoard: 'Board',
     description: 'Description',
+    viewRun: 'View workflow run',
   },
   wishes: {
     title: 'Wishes',
