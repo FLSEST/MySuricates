@@ -140,10 +140,21 @@ npm run lint
 
 The E2E tests run with [Cypress](https://www.cypress.io/) against the **real backend** (no mocking). Test data is created and deleted directly via the API using `cy.request()`.
 
-**Prerequisite:** Backend (Port 9090) and Frontend (Port 3000) must be running.
+There are two target modes:
+- **Dev**: frontend proxy and Cypress helpers point to `localhost:9090`
+- **Test**: frontend proxy and Cypress helpers point to `localhost:8090`
+
+**Important:** Frontend and Cypress must always use the same `CYPRESS_TARGET`, otherwise the UI can write data to a different instance than setup/cleanup.
+
+### Dev Target (default)
+
+**Prerequisite:** Dev backend (port 9090) and frontend (port 3000) must be running.
 
 ```bash
 cd ai-automation-frontend
+
+# Frontend starts with proxy to Dev (:9090)
+npm run dev
 
 # Open Cypress interactively (browser UI)
 npm run cy:open
@@ -154,6 +165,46 @@ npm run cy:run
 # Alias
 npm run test:e2e
 ```
+
+The Dev API key is auto-detected from `ai-automation-backend/data/automation.db` when available.
+
+### Test Target (isolated, no business test data in Dev)
+
+**Prerequisite:** Test instance on port `8090` is running.
+
+```bash
+# Example: start the test instance with a fixed API key
+cd ai-automation-backend
+AUTOMATION_API_KEY=test-e2e-key docker compose -f docker-compose.test.yml up -d
+
+# Optional: sync current definitions from Dev to Test
+curl -s -X POST http://localhost:9090/api/v1/testing/sync-definitions \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $DEV_KEY" \
+  -d '{}'
+
+cd ../ai-automation-frontend
+
+# Frontend proxy to Test (:8090)
+CYPRESS_TARGET=test CYPRESS_TEST_API_KEY=test-e2e-key npm run dev:e2e:test
+
+# Cypress against the same test instance
+CYPRESS_TARGET=test CYPRESS_TEST_API_KEY=test-e2e-key npm run test:e2e:test
+```
+
+You can also override the target URLs directly:
+
+```bash
+CYPRESS_API_BASE_URL=http://localhost:8090/api/v1
+CYPRESS_WS_BASE_URL=ws://localhost:8090
+```
+
+### Test Data and Cleanup
+
+- **Dev target:** Cypress-created projects, workflows, chains, and runs land on Dev
+- **Test target:** the same data lands on the test instance
+- `cy.apiCleanup()` only removes Cypress data with the `Cypress` prefix
+- For the test instance, `POST /api/v1/testing/reset` can be used when a full reset is needed
 
 **Test Structure:**
 

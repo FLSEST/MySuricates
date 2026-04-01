@@ -677,7 +677,7 @@ export function AssistantPanel() {
   const handleExecute = (workflowId: string) => {
     executeWorkflow({ id: workflowId }, {
       onSuccess: (run) => {
-        navigate(`/runs/${run.id}`);
+        navigate(`/workflows/${workflowId}/run/${run.id}`);
         setOpen(false);
       },
     });

@@ -69,12 +69,15 @@ export function useUpdateTodo() {
 
 export function useUpdateTodoStatus() {
   const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: TodoStatus }) =>
       api.patch<Todo>(`/todos/${id}/status`, { status }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['todos'] });
     },
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.todoUpdateFailed)),
   });
 }
 

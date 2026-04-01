@@ -138,22 +138,73 @@ npm run lint
 
 ### E2E-Tests (Cypress)
 
-Die E2E-Tests laufen mit [Cypress](https://www.cypress.io/) gegen das **echte Backend** (kein Mocking). Testdaten werden per `cy.request()` direkt über die API angelegt und gelöscht.
+Die E2E-Tests laufen mit [Cypress](https://www.cypress.io/) gegen das **echte Backend** (kein Mocking). Testdaten werden per `cy.request()` direkt ueber die API angelegt und geloescht.
 
-**Voraussetzung:** Backend (Port 9090) und Frontend (Port 3000) müssen laufen.
+Es gibt zwei Zielmodi:
+- **Dev**: Frontend-Proxy und Cypress-Helper zeigen auf `localhost:9090`
+- **Test**: Frontend-Proxy und Cypress-Helper zeigen auf `localhost:8090`
+
+**Wichtig:** Frontend und Cypress muessen immer mit demselben `CYPRESS_TARGET` gestartet werden, sonst erzeugt das UI Daten auf einer anderen Instanz als das Setup/Cleanup.
+
+### Dev-Target (Standard)
+
+**Voraussetzung:** Dev-Backend (Port 9090) und Frontend (Port 3000) laufen.
 
 ```bash
 cd ai-automation-frontend
 
-# Cypress interaktiv öffnen (Browser-UI)
+# Frontend startet mit Proxy auf Dev (:9090)
+npm run dev
+
+# Cypress interaktiv oeffnen (Browser-UI)
 npm run cy:open
 
-# Cypress headless ausführen (CI-Modus)
+# Cypress headless ausfuehren (CI-Modus)
 npm run cy:run
 
 # Alias
 npm run test:e2e
 ```
+
+Der Dev-API-Key wird automatisch aus `ai-automation-backend/data/automation.db` gelesen, falls vorhanden.
+
+### Test-Target (isoliert, keine fachlichen Testdaten in Dev)
+
+**Voraussetzung:** Test-Instanz auf Port `8090` laeuft.
+
+```bash
+# Beispiel: Test-Instanz mit festem API-Key starten
+cd ai-automation-backend
+AUTOMATION_API_KEY=test-e2e-key docker compose -f docker-compose.test.yml up -d
+
+# Optional: aktuelle Definitionen von Dev nach Test synchronisieren
+curl -s -X POST http://localhost:9090/api/v1/testing/sync-definitions \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $DEV_KEY" \
+  -d '{}'
+
+cd ../ai-automation-frontend
+
+# Frontend mit Proxy auf Test (:8090)
+CYPRESS_TARGET=test CYPRESS_TEST_API_KEY=test-e2e-key npm run dev:e2e:test
+
+# Cypress gegen dieselbe Test-Instanz
+CYPRESS_TARGET=test CYPRESS_TEST_API_KEY=test-e2e-key npm run test:e2e:test
+```
+
+Optional koennen die Ziele auch direkt ueberschrieben werden:
+
+```bash
+CYPRESS_API_BASE_URL=http://localhost:8090/api/v1
+CYPRESS_WS_BASE_URL=ws://localhost:8090
+```
+
+### Testdaten und Cleanup
+
+- **Dev-Target:** erzeugte Cypress-Projekte, Workflows, Chains und Runs landen auf Dev
+- **Test-Target:** dieselben Daten landen auf der Test-Instanz
+- `cy.apiCleanup()` raeumt nur Cypress-Testdaten mit dem Prefix `Cypress` auf
+- Fuer die Test-Instanz kann zusaetzlich `POST /api/v1/testing/reset` verwendet werden, wenn ein kompletter Reset gewuenscht ist
 
 **Teststruktur:**
 

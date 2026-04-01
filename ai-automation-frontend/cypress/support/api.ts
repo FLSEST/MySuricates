@@ -1,9 +1,18 @@
 /**
- * Direct HTTP helpers for test-data setup against the real backend.
- * All calls go to http://localhost:9090/api/v1 (bypassing the Vite proxy).
+ * Direct HTTP helpers for test-data setup against the selected E2E backend.
+ * The target comes from Cypress env (`API_BASE_URL`) so setup/cleanup and UI traffic
+ * can point to the same instance (dev on :9090 or test on :8090).
  */
 
-const API = 'http://localhost:9090/api/v1';
+const DEFAULT_API = 'http://localhost:9090/api/v1';
+
+function apiBaseUrl(): string {
+  return String(Cypress.env('API_BASE_URL') || DEFAULT_API).replace(/\/$/, '');
+}
+
+function apiUrl(path: string): string {
+  return `${apiBaseUrl()}${path}`;
+}
 
 function apiHeaders(): Record<string, string> {
   const headers: Record<string, string> = {};
@@ -17,7 +26,7 @@ function apiHeaders(): Record<string, string> {
 // ── Projects ────────────────────────────────────────────
 
 export function getProjects() {
-  return cy.request({ method: 'GET', url: `${API}/projects`, headers: apiHeaders() }).its('body');
+  return cy.request({ method: 'GET', url: apiUrl('/projects'), headers: apiHeaders() }).its('body');
 }
 
 export function createProject(
@@ -25,17 +34,17 @@ export function createProject(
   type = 'CODE',
   path = '/tmp/cypress-test',
 ) {
-  return cy.request({ method: 'POST', url: `${API}/projects`, headers: apiHeaders(), body: { name, type, path } }).its('body');
+  return cy.request({ method: 'POST', url: apiUrl('/projects'), headers: apiHeaders(), body: { name, type, path } }).its('body');
 }
 
 export function deleteProject(id: string) {
-  return cy.request({ method: 'DELETE', url: `${API}/projects/${id}`, headers: apiHeaders(), failOnStatusCode: false });
+  return cy.request({ method: 'DELETE', url: apiUrl(`/projects/${id}`), headers: apiHeaders(), failOnStatusCode: false });
 }
 
 // ── Workflows ───────────────────────────────────────────
 
 export function getWorkflows() {
-  return cy.request({ method: 'GET', url: `${API}/workflows`, headers: apiHeaders() }).its('body');
+  return cy.request({ method: 'GET', url: apiUrl('/workflows'), headers: apiHeaders() }).its('body');
 }
 
 export function createWorkflow(
@@ -43,27 +52,27 @@ export function createWorkflow(
   name = `Cypress Workflow ${Date.now()}`,
   description = 'Cypress test data',
 ) {
-  return cy.request({ method: 'POST', url: `${API}/workflows`, headers: apiHeaders(), body: { projectId, name, description } }).its('body');
+  return cy.request({ method: 'POST', url: apiUrl('/workflows'), headers: apiHeaders(), body: { projectId, name, description } }).its('body');
 }
 
 export function deleteWorkflow(id: string) {
-  return cy.request({ method: 'DELETE', url: `${API}/workflows/${id}`, headers: apiHeaders(), failOnStatusCode: false });
+  return cy.request({ method: 'DELETE', url: apiUrl(`/workflows/${id}`), headers: apiHeaders(), failOnStatusCode: false });
 }
 
 // ── Chains ──────────────────────────────────────────────
 
 export function getChains() {
-  return cy.request({ method: 'GET', url: `${API}/chains`, headers: apiHeaders() }).its('body');
+  return cy.request({ method: 'GET', url: apiUrl('/chains'), headers: apiHeaders() }).its('body');
 }
 
 export function deleteChain(id: string) {
-  return cy.request({ method: 'DELETE', url: `${API}/chains/${id}`, headers: apiHeaders(), failOnStatusCode: false });
+  return cy.request({ method: 'DELETE', url: apiUrl(`/chains/${id}`), headers: apiHeaders(), failOnStatusCode: false });
 }
 
 // ── Schedules ───────────────────────────────────────────
 
 export function getSchedules() {
-  return cy.request({ method: 'GET', url: `${API}/schedules`, headers: apiHeaders() }).its('body');
+  return cy.request({ method: 'GET', url: apiUrl('/schedules'), headers: apiHeaders() }).its('body');
 }
 
 export function createSchedule(
@@ -71,31 +80,31 @@ export function createSchedule(
   cronExpression = '0 0 * * *',
   description = 'Cypress test schedule',
 ) {
-  return cy.request({ method: 'POST', url: `${API}/schedules`, headers: apiHeaders(), body: { workflowId, cronExpression, description } }).its('body');
+  return cy.request({ method: 'POST', url: apiUrl('/schedules'), headers: apiHeaders(), body: { workflowId, cronExpression, description } }).its('body');
 }
 
 export function deleteSchedule(id: string) {
-  return cy.request({ method: 'DELETE', url: `${API}/schedules/${id}`, headers: apiHeaders(), failOnStatusCode: false });
+  return cy.request({ method: 'DELETE', url: apiUrl(`/schedules/${id}`), headers: apiHeaders(), failOnStatusCode: false });
 }
 
 // ── Webhooks ────────────────────────────────────────────
 
 export function getWebhooks() {
-  return cy.request({ method: 'GET', url: `${API}/webhooks`, headers: apiHeaders() }).its('body');
+  return cy.request({ method: 'GET', url: apiUrl('/webhooks'), headers: apiHeaders() }).its('body');
 }
 
 export function createWebhook(workflowId: string, description = 'Cypress test webhook') {
-  return cy.request({ method: 'POST', url: `${API}/webhooks`, headers: apiHeaders(), body: { workflowId, description } }).its('body');
+  return cy.request({ method: 'POST', url: apiUrl('/webhooks'), headers: apiHeaders(), body: { workflowId, description } }).its('body');
 }
 
 export function deleteWebhook(id: string) {
-  return cy.request({ method: 'DELETE', url: `${API}/webhooks/${id}`, headers: apiHeaders(), failOnStatusCode: false });
+  return cy.request({ method: 'DELETE', url: apiUrl(`/webhooks/${id}`), headers: apiHeaders(), failOnStatusCode: false });
 }
 
 // ── Todos ──────────────────────────────────────────────
 
 export function getTodos() {
-  return cy.request({ method: 'GET', url: `${API}/todos`, headers: apiHeaders() }).then((resp) => {
+  return cy.request({ method: 'GET', url: apiUrl('/todos'), headers: apiHeaders() }).then((resp) => {
     const body = resp.body;
     // Handle both paginated ({content: []}) and plain array responses
     return Array.isArray(body) ? body : (body.content ?? []);
@@ -110,20 +119,20 @@ export function createTodo(
 ) {
   return cy.request({
     method: 'POST',
-    url: `${API}/todos`,
+    url: apiUrl('/todos'),
     headers: apiHeaders(),
     body: { title, priority, tags, projectId, source: 'USER' },
   }).its('body');
 }
 
 export function deleteTodo(id: string) {
-  return cy.request({ method: 'DELETE', url: `${API}/todos/${id}`, headers: apiHeaders(), failOnStatusCode: false });
+  return cy.request({ method: 'DELETE', url: apiUrl(`/todos/${id}`), headers: apiHeaders(), failOnStatusCode: false });
 }
 
 // ── Executions ─────────────────────────────────────────
 
 export function getExecutions() {
-  return cy.request({ method: 'GET', url: `${API}/executions`, headers: apiHeaders() }).then((resp) => {
+  return cy.request({ method: 'GET', url: apiUrl('/executions'), headers: apiHeaders() }).then((resp) => {
     const body = resp.body;
     return Array.isArray(body) ? body : (body.content ?? []);
   });
@@ -132,13 +141,13 @@ export function getExecutions() {
 // ── Skills ──────────────────────────────────────────────
 
 export function getSkills() {
-  return cy.request({ method: 'GET', url: `${API}/skills`, headers: apiHeaders() }).its('body');
+  return cy.request({ method: 'GET', url: apiUrl('/skills'), headers: apiHeaders() }).its('body');
 }
 
 // ── System ──────────────────────────────────────────────
 
 export function getHealth() {
-  return cy.request({ method: 'GET', url: `${API}/system/health`, headers: apiHeaders() }).its('body');
+  return cy.request({ method: 'GET', url: apiUrl('/system/health'), headers: apiHeaders() }).its('body');
 }
 
 // ── Cleanup ─────────────────────────────────────────────
