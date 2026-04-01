@@ -192,6 +192,7 @@ export const de: TranslationKeys = {
       agentic: 'Agentisch (KI-Loop)',
       'sub-workflow': 'Sub-Workflow',
       'human-input': 'Benutzereingabe',
+      switch: 'Verzweigung',
     },
     instructions: 'Agent-Anweisungen',
     allProjects: 'Alle Projekte',

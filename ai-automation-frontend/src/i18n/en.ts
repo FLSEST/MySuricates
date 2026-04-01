@@ -190,6 +190,7 @@ export const en = {
       agentic: 'Agentic (AI Loop)',
       'sub-workflow': 'Sub-Workflow',
       'human-input': 'Human Input',
+      switch: 'Switch',
     },
     instructions: 'Agent Instructions',
     allProjects: 'All Projects',

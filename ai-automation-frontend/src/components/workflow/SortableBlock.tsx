@@ -19,6 +19,7 @@ const blockTypeVariant: Record<BlockType, BadgeVariant> = {
   foreach: 'default',
   while: 'default',
   conditional: 'default',
+  switch: 'default',
 };
 
 interface SortableBlockProps {

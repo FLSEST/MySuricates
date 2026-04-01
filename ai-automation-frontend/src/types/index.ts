@@ -185,7 +185,7 @@ export interface UpdateWorkflowRequest {
   defaultContext?: Record<string, string>;
 }
 
-export type BlockType = 'simple' | 'shell' | 'retry' | 'foreach' | 'while' | 'conditional' | 'skill-capability' | 'approval' | 'agentic' | 'sub-workflow' | 'human-input';
+export type BlockType = 'simple' | 'shell' | 'retry' | 'foreach' | 'while' | 'conditional' | 'switch' | 'skill-capability' | 'approval' | 'agentic' | 'sub-workflow' | 'human-input';
 
 export interface BlockDefinition {
   type: BlockType;

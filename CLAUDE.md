@@ -331,6 +331,33 @@ gate_description: <description>
   - **Granular TODOs**: Blocks can emit `todo_item: <title> | HIGH/MEDIUM/LOW | <tags>` markers → `TodoOutputParser` parses them → `AutoTodoService` creates individual TODOs per finding (with dedup and auto-close for resolved items)
   - Enable per workflow: `metadata: { autoTodo: { enabled: true, mode: "track" } }`
 
+## TodoTrigger System (Self-Improvement Loop)
+
+TodoTriggers close the self-improvement loop: when `AutoTodoService` creates a TODO from workflow findings, a `TodoTrigger` can automatically start a fix workflow to resolve it.
+
+```
+Audit Workflow → AutoTodoService → TODO (OPEN)
+                                     ↓ TodoCreatedEvent
+                             TodoTriggerService → Fix Workflow
+                                                     ↓ WorkflowRunCompletedEvent
+                                             TodoFeedbackListener → TODO (DONE)
+```
+
+- `TodoTrigger` entity (`todo_triggers` table, V51 migration) — maps TODO tag patterns to fix workflows
+  - **Tag matching**: `tagPattern` is comma-separated (AND semantics). All pattern tags must be present in the TODO's tag list
+  - **Filters**: optional `projectId`, `sourceFilter` (e.g. `"WORKFLOW"`), `minPriority` (e.g. `"HIGH"`)
+  - **Config**: `maxAttempts` (default: 3), `autoClose` (default: true)
+- `TodoCreatedEvent` — Spring ApplicationEvent published by `TodoService.create()` and `AutoTodoService` when new OPEN TODOs are created
+- `TodoTriggerService` — `@TransactionalEventListener(AFTER_COMMIT)` on `TodoCreatedEvent`, matches TODO against all enabled triggers, executes target workflow with TODO data as context variables (`todo_id`, `todo_title`, `todo_description`, `todo_tags`, `todo_priority`, `todo_project_id`, etc.)
+- `TodoFeedbackListener` — `@EventListener` on `WorkflowRunCompletedEvent`, checks for `todoTriggerId`/`todoId` in run metadata, closes TODO on GREEN gate (if `autoClose=true`), logs escalation when `fixAttempts >= maxAttempts`
+- **Fix attempt tracking**: `Todo.fixAttempts` (int) and `Todo.lastFixRunId` (V52 migration) — incremented on each trigger fire, prevents duplicate triggers while a fix run is still RUNNING
+- **Loop prevention** (3 layers):
+  1. **Metadata flag**: Fix runs set `todoTriggerRun: true` in run metadata → `AutoTodoService` skips TODO creation for these runs (prevents Audit→TODO→Fix→TODO→Fix… loops)
+  2. **Max attempts**: `todo.fixAttempts >= trigger.maxAttempts` → trigger stops firing
+  3. **Running check**: `todo.lastFixRunId` still RUNNING/PENDING → no duplicate trigger
+- CRUD API at `/api/v1/todo-triggers` (see `TodoTriggerController`)
+- Enable per workflow by configuring a TodoTrigger that matches the workflow's auto-generated TODO tags
+
 ## Agent Instructions System
 
 Two-level instruction injection via Claude CLI `--append-system-prompt` / `--system-prompt` flags:
@@ -395,7 +422,7 @@ Additional safety:
 ## Workflow Templates
 
 - Templates are stored in the `workflow_templates` DB table (V19 migration), not hardcoded
-- 44 built-in templates are seeded on startup by `WorkflowTemplateSeeder` (idempotent, inserts missing, updates on version bump)
+- 53 built-in templates are seeded on startup by `WorkflowTemplateSeeder` (idempotent, inserts missing, updates on version bump)
 - Template definitions live as individual JSON files in `src/main/resources/templates/builtin/` (one file per template, loaded by `BuiltInTemplateLoader`)
 - Name and description are i18n JSON maps: `{"de":"...","en":"..."}` — stored via `JsonStringMapConverter`
 - Built-in templates (`builtIn=true`) cannot be deleted; only `sortOrder` and `category` can be updated
