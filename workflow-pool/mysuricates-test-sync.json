@@ -33,10 +33,11 @@
       "config": {
         "label": "Test schreiben (Opus)",
         "goal": "Schreibe einen Test fuer die Klasse aus dem TODO.\n\nKONTEXT:\n{{ previous_output }}\n\nOFFENE TODOS (fuer Kontext):\n{{ open_todos }}\n\nVORGEHEN:\n1. Lies die Source-Datei vollstaendig\n2. Falls ein Test existiert: Lies ihn und ergaenze fehlende Test-Methoden\n3. Falls kein Test existiert: Lies 1-2 Referenz-Tests im gleichen Package als Vorlage\n4. Schreibe den Test:\n   - JUnit 5 (@Test, @BeforeEach, @ExtendWith(MockitoExtension.class))\n   - @Mock fuer alle Dependencies, @InjectMocks fuer die Ziel-Klasse\n   - Naming: should_<expected>_when_<condition>\n   - AssertJ Assertions (assertThat)\n   - Mindestens: Happy-Path + Error-Path fuer jede wichtige public Methode\n   - Edge Cases fuer kritische Logik\n5. Fuehre den Test aus: cd /home/flo/Entwicklung/tools/autotrigger/ai-automation-backend && mvn test -Dtest=\"<TestName>\" -q\n6. Falls der Test fehlschlaegt: Korrigiere und erneut ausfuehren\n7. Wenn der Test besteht: git add + git commit mit Message 'test: Add tests for <ClassName>'\n\nWICHTIG:\n- Absolute Pfade: /home/flo/Entwicklung/tools/autotrigger/...\n- NUR Test-Dateien erstellen/aendern, NIEMALS Production-Code\n- Falls die Klasse nicht gefunden wird: Melde Fehler und beende\n- Falls mvn test nach 3 Versuchen nicht besteht: Aenderungen verwerfen (git checkout), Fehler melden",
+        "timeout_seconds": 900,
         "max_iterations": 15,
         "max_total_tokens": 250000,
-        "iteration_timeout_seconds": 180,
-        "total_timeout_seconds": 1200,
+        "iteration_timeout_seconds": 600,
+        "total_timeout_seconds": 1800,
         "max_repeated_actions": 3,
         "require_approval": false,
         "success_criteria": "Test-Datei erstellt, mvn test besteht, Commit erstellt."
