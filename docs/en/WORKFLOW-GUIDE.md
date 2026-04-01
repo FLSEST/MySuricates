@@ -1071,3 +1071,77 @@ All 40+ built-in templates with their primary pattern:
 | `directory-sync` | Shell Chain | UTILITY |
 | `docker-image-build-push` | Shell + Conditional | CODE |
 | `todo-creator` | Agentic | UTILITY |
+
+---
+
+## TodoTrigger — Self-Improvement Loop
+
+TodoTriggers close the self-improvement loop: when an audit workflow discovers an issue and creates a TODO, a TodoTrigger can automatically start a fix workflow to resolve it.
+
+### Flow
+
+```
+Audit Workflow → AutoTodoService → TODO (OPEN)
+                                     ↓ TodoCreatedEvent
+                             TodoTriggerService → Fix Workflow
+                                                     ↓ WorkflowRunCompletedEvent
+                                             TodoFeedbackListener → TODO (DONE)
+```
+
+### Setting Up a Trigger
+
+**POST** `/api/v1/todo-triggers`
+
+```json
+{
+  "tagPattern": "backend,bug",
+  "targetWorkflowId": "<fix-workflow-id>",
+  "description": "Automatically fix backend bugs",
+  "maxAttempts": 3,
+  "autoClose": true
+}
+```
+
+**Tag matching**: Comma-separated with AND semantics. All tags in the pattern must be present in the TODO's tag list. Example: `"backend,bug"` matches a TODO with tags `["backend", "bug", "security"]`, but not `["backend", "feature"]`.
+
+### Optional Filters
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| `projectId` | Only TODOs from this project | `"ebf4f50c-..."` |
+| `sourceFilter` | Only TODOs from this source | `"WORKFLOW"` |
+| `minPriority` | Minimum priority (HIGH, MEDIUM, LOW) | `"HIGH"` |
+
+### Context Variables in the Fix Workflow
+
+The fix workflow automatically receives these variables:
+
+| Variable | Content |
+|----------|---------|
+| `todo_id` | UUID of the TODO |
+| `todo_title` | Title |
+| `todo_description` | Description (Markdown) |
+| `todo_tags` | Comma-separated tags |
+| `todo_priority` | HIGH / MEDIUM / LOW |
+| `todo_project_id` | Project UUID |
+| `todo_source` | USER / AI / WORKFLOW |
+| `todo_reference_type` | e.g. `WORKFLOW_RUN` |
+| `todo_reference_id` | Run UUID |
+| `todo_trigger_id` | Trigger UUID |
+
+### Loop Prevention (3 Layers)
+
+1. **Max attempts**: After `maxAttempts` failed fix attempts, the trigger won't fire again
+2. **Source filter**: Triggers can be restricted to `sourceFilter: "WORKFLOW"` — manually created TODOs won't trigger a fix
+3. **Fix attempt tracking**: `todo.fixAttempts` counts attempts, `todo.lastFixRunId` stores the last run
+
+### Auto-Close
+
+With `autoClose: true` (default): when the fix workflow completes with a **GREEN** gate status, the TODO is automatically set to DONE. With YELLOW or RED, it stays open.
+
+### Best Practices
+
+- **Keep tag patterns specific** — `"backend,security,bug"` instead of just `"bug"`, otherwise the fix workflow triggers on every bug
+- **Design fix workflows to be idempotent** — they may run multiple times
+- **Set gate status in fix workflows** — so auto-close works correctly
+- **Limit maxAttempts** — default 3 is reasonable; higher values risk infinite loops on systematic failures

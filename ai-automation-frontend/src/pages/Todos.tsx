@@ -1,8 +1,11 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { usePersistedState } from '../hooks/usePersistedState';
 import {
   CheckSquare, Plus, Search, Trash2, Pencil, Bot, User, GitBranch,
-  X, List, LayoutGrid, Circle, Clock, RefreshCw,
+  X, List, LayoutGrid, Circle, Clock, RefreshCw, ExternalLink,
 } from 'lucide-react';
 import { Card, Button, Spinner, Badge, TagInput } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
@@ -186,7 +189,9 @@ function KanbanCard({ todo, onEdit, onStatusChange }: {
           <p className="text-sm font-medium text-text leading-snug">{todo.title}</p>
           {/* Description */}
           {todo.description && (
-            <p className="text-xs text-text-tertiary mt-1 line-clamp-2">{todo.description}</p>
+            <div className="text-xs text-text-tertiary mt-1 line-clamp-2 [&_a]:text-accent [&_a]:underline [&_p]:m-0 [&_code]:text-[10px] [&_code]:bg-surface-raised [&_code]:px-1 [&_code]:rounded">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{todo.description}</ReactMarkdown>
+            </div>
           )}
           {/* Bottom row: badges */}
           <div className="flex flex-wrap items-center gap-1.5 mt-2">
@@ -194,6 +199,17 @@ function KanbanCard({ todo, onEdit, onStatusChange }: {
               <span className="px-1.5 py-0.5 rounded text-[10px] bg-accent/10 text-accent font-medium">
                 {todo.projectName}
               </span>
+            )}
+            {todo.workflowRunId && (
+              <Link
+                to={`/runs/${todo.workflowRunId}`}
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-accent/10 text-accent font-medium hover:bg-accent/20 transition-colors"
+                title={t.todos.viewRun}
+              >
+                <ExternalLink className="w-2.5 h-2.5" />
+                Run
+              </Link>
             )}
             {todo.tags.slice(0, 3).map((tag) => (
               <span key={tag} className="px-1.5 py-0.5 rounded text-[10px] bg-surface-raised text-text-tertiary border border-border">
@@ -352,7 +368,9 @@ function TodoListItem({ todo, onEdit, onStatusChange, onDelete }: {
         {/* Line 2: Description + meta */}
         <div className="flex items-center gap-2 mt-1 flex-wrap">
           {todo.description && (
-            <p className="text-xs text-text-tertiary line-clamp-2 flex-1 min-w-[120px]">{todo.description}</p>
+            <div className="text-xs text-text-tertiary line-clamp-2 flex-1 min-w-[120px] [&_a]:text-accent [&_a]:underline [&_p]:m-0 [&_code]:text-[10px] [&_code]:bg-surface-raised [&_code]:px-1 [&_code]:rounded">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{todo.description}</ReactMarkdown>
+            </div>
           )}
           {!todo.description && <div className="flex-1" />}
 

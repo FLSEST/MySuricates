@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { X, Send, Play, Eye, Sparkles, Clock, Plus, Trash2, ArrowLeft, MessageCircle, ChevronDown, ChevronUp, RefreshCw, CheckCheck, XCircle, Square } from 'lucide-react';
+import { CopyButton } from './shared/CopyButton';
 import { useAssistantStore } from '../stores/assistantStore';
 import { useAssistantChat, useAssistantSuggestions, type ChatMessage, type AssistantAction } from '../hooks/useAssistant';
 import { useAssistantThinkingPhrases } from '../hooks/useSystem';
@@ -166,7 +167,7 @@ function MessageBubble({ msg, onClose, onSend, onExecute, onRetry }: {
         }
       </div>
 
-      <div className={`flex flex-col gap-1 max-w-[85%] ${isUser ? 'items-end' : 'items-start'}`}>
+      <div className={`group/msg flex flex-col gap-1 max-w-[85%] ${isUser ? 'items-end' : 'items-start'}`}>
         {/* Bubble */}
         <div className={`relative px-3 py-2 rounded-2xl text-sm leading-relaxed
                          ${isUser
@@ -266,7 +267,7 @@ function MessageBubble({ msg, onClose, onSend, onExecute, onRetry }: {
           </button>
         )}
 
-        {/* Timestamp + response time + status */}
+        {/* Timestamp + response time + status + copy */}
         <span className="text-[10px] text-text-tertiary ml-1 flex items-center gap-1">
           {time}
           {!isUser && respTime && (
@@ -274,6 +275,7 @@ function MessageBubble({ msg, onClose, onSend, onExecute, onRetry }: {
           )}
           {isUser && msg.status === 'sent' && <CheckCheck className="w-2.5 h-2.5 text-accent" />}
           {isUser && msg.status === 'error' && <XCircle className="w-2.5 h-2.5 text-danger" />}
+          <CopyButton text={msg.content} className="p-0 rounded-sm text-text-tertiary hover:text-accent transition-colors opacity-0 group-hover/msg:opacity-100" />
         </span>
       </div>
     </div>

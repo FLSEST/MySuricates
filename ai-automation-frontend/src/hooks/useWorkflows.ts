@@ -171,6 +171,7 @@ export function useResumeExecution() {
   return useMutation({
     mutationFn: (runId: string) => api.post(`/executions/${runId}/resume`),
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['runs'] });
       qc.invalidateQueries({ queryKey: ['workflows'] });
       qc.invalidateQueries({ queryKey: ['learning'] });
     },
@@ -184,6 +185,7 @@ export function useResumeFromStep() {
   return useMutation({
     mutationFn: (runId: string) => api.post(`/executions/${runId}/resume-from-step`),
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['runs'] });
       qc.invalidateQueries({ queryKey: ['workflows'] });
       qc.invalidateQueries({ queryKey: ['learning'] });
       toast.success(t.toast.workflowExecuted);
@@ -210,6 +212,7 @@ export function useRetryExecution() {
   return useMutation({
     mutationFn: (runId: string) => api.post(`/executions/${runId}/retry`),
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['runs'] });
       qc.invalidateQueries({ queryKey: ['workflows'] });
       qc.invalidateQueries({ queryKey: ['learning'] });
       toast.success(t.toast.workflowExecuted);

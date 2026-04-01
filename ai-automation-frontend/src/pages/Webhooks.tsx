@@ -1,37 +1,13 @@
 import { useState } from 'react';
-import { Webhook, Plus, Trash2, Copy, Check } from 'lucide-react';
+import { Webhook, Plus, Trash2 } from 'lucide-react';
 import { Card, Button, Input, Select, Modal, Spinner, Table, Toggle, Badge } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
+import { CopyButton } from '../components/shared/CopyButton';
 import { useWebhooks, useCreateWebhook, useToggleWebhook, useDeleteWebhook } from '../hooks/useWebhooks';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { useT } from '../i18n';
 import type { WebhookTrigger, CreateWebhookRequest } from '../types';
-
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(text)
-      .then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      })
-      .catch(() => { /* ignore - non-HTTPS or permission denied */ });
-  };
-
-  return (
-    <button
-      onClick={handleCopy}
-      className="p-1 rounded-sm text-text-tertiary hover:text-accent transition-colors"
-      title="Copy"
-      aria-label="Copy"
-    >
-      {copied ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
-    </button>
-  );
-}
 
 export function Webhooks() {
   const t = useT();
