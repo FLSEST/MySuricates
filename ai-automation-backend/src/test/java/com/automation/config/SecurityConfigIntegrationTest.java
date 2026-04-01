@@ -1,0 +1,128 @@
+package com.automation.config;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
+
+import static org.hamcrest.Matchers.not;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("integration")
+@TestPropertySource(properties = {
+        "automation.security.enabled=true",
+        "automation.security.api-key=test-api-key-12345"
+})
+class SecurityConfigIntegrationTest {
+
+    private static final String VALID_API_KEY = "test-api-key-12345";
+    private static final String API_KEY_HEADER = "X-API-Key";
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    // --- Group 1: Public endpoints accessible without auth ---
+
+    @Test
+    void publicEndpoint_health_accessibleWithoutAuth() throws Exception {
+        mockMvc.perform(get("/api/v1/system/health"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void publicEndpoint_info_accessibleWithoutAuth() throws Exception {
+        mockMvc.perform(get("/api/v1/system/info"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void publicEndpoint_authStatus_accessibleWithoutAuth() throws Exception {
+        mockMvc.perform(get("/api/v1/system/auth-status"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void publicEndpoint_actuatorHealth_accessibleWithoutAuth() throws Exception {
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void publicEndpoint_webhookTrigger_accessibleWithoutAuth() throws Exception {
+        mockMvc.perform(post("/api/v1/webhook/trigger/test-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().is(not(403)));
+    }
+
+    @Test
+    void publicEndpoint_websocket_accessibleWithoutAuth() throws Exception {
+        mockMvc.perform(get("/ws/test"))
+                .andExpect(status().is(not(403)));
+    }
+
+    // --- Group 2: Protected endpoints require auth ---
+
+    @Test
+    void protectedEndpoint_apiWithoutAuth_returns403() throws Exception {
+        mockMvc.perform(get("/api/v1/projects"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void protectedEndpoint_actuatorInfoWithoutAuth_returns403() throws Exception {
+        mockMvc.perform(get("/actuator/info"))
+                .andExpect(status().isForbidden());
+    }
+
+    // --- Group 3: Protected endpoints with valid API key ---
+
+    @Test
+    void protectedEndpoint_apiWithValidKey_succeeds() throws Exception {
+        mockMvc.perform(get("/api/v1/projects")
+                        .header(API_KEY_HEADER, VALID_API_KEY))
+                .andExpect(status().isOk());
+    }
+
+    // --- Group 4: CSRF disabled ---
+
+    @Test
+    void csrf_postWithoutCsrfToken_notRejected() throws Exception {
+        mockMvc.perform(post("/api/v1/webhook/trigger/csrf-test")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().is(not(403)));
+    }
+
+    // --- Group 5: Stateless session ---
+
+    @Test
+    void sessionManagement_noSessionCookie() throws Exception {
+        mockMvc.perform(get("/api/v1/system/health"))
+                .andExpect(header().doesNotExist("Set-Cookie"));
+    }
+
+    // --- Group 6: Security headers ---
+
+    @Test
+    void headers_cspHeaderIsSet() throws Exception {
+        mockMvc.perform(get("/api/v1/system/health"))
+                .andExpect(header().string("Content-Security-Policy",
+                        "default-src 'self'; script-src 'self'; connect-src 'self' ws://localhost:* wss://localhost:*; style-src 'self' 'unsafe-inline'; img-src 'self' data:"));
+    }
+
+    @Test
+    void headers_xFrameOptionsDeny() throws Exception {
+        mockMvc.perform(get("/api/v1/system/health"))
+                .andExpect(header().string("X-Frame-Options", "DENY"));
+    }
+}
