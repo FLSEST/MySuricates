@@ -21,6 +21,7 @@ erDiagram
     projects ||--o{ wishes : "hat"
     workflows ||--o{ completion_triggers_source : "löst aus"
     workflows ||--o{ completion_triggers_target : "wird ausgelöst"
+    workflows ||--o{ todo_triggers : "Fix-Workflow"
     workflows ||--o{ notification_configs : "benachrichtigt"
 
     projects {
@@ -235,6 +236,24 @@ erDiagram
         INTEGER trigger_always "DEFAULT 0"
         TEXT description
         TEXT context_variables "JSON"
+        TEXT last_triggered_at
+        INTEGER trigger_count "DEFAULT 0"
+        TEXT created_at
+        TEXT updated_at
+    }
+
+    todo_triggers {
+        TEXT id PK
+        TEXT tag_pattern "NOT NULL"
+        TEXT project_id
+        TEXT source_filter
+        TEXT min_priority
+        TEXT target_workflow_id FK "NOT NULL"
+        TEXT context_template "JSON DEFAULT '{}'"
+        INTEGER enabled "DEFAULT 1"
+        INTEGER max_attempts "DEFAULT 3"
+        INTEGER auto_close "DEFAULT 1"
+        TEXT description
         TEXT last_triggered_at
         INTEGER trigger_count "DEFAULT 0"
         TEXT created_at
@@ -583,12 +602,15 @@ Eine Chain gehört zu keinem Projekt und kann Workflows aus verschiedenen Projek
 | `workflow_run_id` | TEXT | | Verknüpfter Workflow-Run (bei automatisch erstellt) |
 | `reference_type` | TEXT | | Typ des Referenz-Objekts |
 | `reference_id` | TEXT | | ID des Referenz-Objekts |
+| `related_todo_id` | TEXT | | Verwandtes TODO (bei AI-Similarity-Match) (V48) |
+| `fix_attempts` | INTEGER | NOT NULL, DEFAULT 0 | Anzahl automatischer Fix-Versuche durch TodoTrigger (V52) |
+| `last_fix_run_id` | TEXT | | ID des letzten Fix-Workflow-Runs (V52) |
 | `created_at` | TEXT | NOT NULL | |
 | `updated_at` | TEXT | NOT NULL | |
 
 **Indizes:** `idx_todos_status`, `idx_todos_project`, `idx_todos_source`, `idx_todos_created`
 
-TODOs werden von `AutoTodoService` automatisch bei RED/YELLOW Gate-Status erstellt (RED → HIGH, YELLOW → MEDIUM).
+TODOs werden von `AutoTodoService` automatisch bei RED/YELLOW Gate-Status erstellt (RED → HIGH, YELLOW → MEDIUM). Bei konfiguriertem `TodoTrigger` werden Fix-Workflows automatisch gestartet (Self-Improvement-Loop).
 
 ### `activity_log`
 
@@ -650,6 +672,30 @@ TODOs werden von `AutoTodoService` automatisch bei RED/YELLOW Gate-Status erstel
 | `updated_at` | TEXT | | Aktualisierungszeitpunkt |
 
 Startet automatisch einen Ziel-Workflow, wenn ein Quell-Workflow abgeschlossen wird. Die Trigger-Bedingung (Erfolg, Fehler, immer) ist konfigurierbar (V39).
+
+### `todo_triggers`
+
+| Spalte | Typ | Constraints | Beschreibung |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `tag_pattern` | TEXT | NOT NULL | Kommagetrennte Tags (AND-Logik), z.B. `"backend,testing"` |
+| `project_id` | TEXT | | Optional: nur TODOs in diesem Projekt matchen |
+| `source_filter` | TEXT | | Optional: `"USER"`, `"AI"` oder `"WORKFLOW"` |
+| `min_priority` | TEXT | | Optional: `"LOW"`, `"MEDIUM"`, `"HIGH"`, `"CRITICAL"` |
+| `target_workflow_id` | TEXT | FK → workflows, NOT NULL | Fix-Workflow der gestartet wird |
+| `context_template` | TEXT | DEFAULT '{}' | JSON: Statische Context-Variablen (gemerged mit TODO-Daten) |
+| `enabled` | INTEGER | NOT NULL, DEFAULT 1 | Aktiv/Inaktiv |
+| `max_attempts` | INTEGER | NOT NULL, DEFAULT 3 | Max. Fix-Versuche pro TODO |
+| `auto_close` | INTEGER | NOT NULL, DEFAULT 1 | TODO bei GREEN Gate automatisch schliessen |
+| `description` | TEXT | | Menschenlesbare Beschreibung |
+| `last_triggered_at` | TEXT | | Letzte Auslösung |
+| `trigger_count` | INTEGER | NOT NULL, DEFAULT 0 | Anzahl Auslösungen |
+| `created_at` | TEXT | | Erstellzeitpunkt |
+| `updated_at` | TEXT | | Aktualisierungszeitpunkt |
+
+**Indizes:** `idx_todo_triggers_enabled`
+
+Schliesst den Self-Improvement-Loop: Wenn ein TODO erstellt wird (z.B. durch AutoTodoService), prüft `TodoTriggerService` alle aktiven TodoTrigger. Bei Tag-Match wird der Fix-Workflow gestartet, bei GREEN Gate das TODO geschlossen. Loop-Prevention über `todoTriggerRun`-Metadata-Flag, Max-Attempts-Zähler und Running-Check (V51/V52).
 
 ### `notification_configs`
 
@@ -958,6 +1004,11 @@ Blöcke werden als JSON-Array in der `blocks`-Spalte der `workflows`-Tabelle ges
 | V45 | `V45__add_schedule_conflict_behavior.sql` | `conflict_behavior` in scheduled_workflows |
 | V46 | `V46__add_stable_synced_at.sql` | `stable_synced_at` in workflows |
 | V47 | `V47__add_context_delta_to_step_results.sql` | `context_delta` in step_results |
+| V48 | `V48__add_related_todo_id.sql` | `related_todo_id` in todos |
+| V49 | `V49__onboarding_profiles.sql` | Onboarding-Profiles-Tabelle |
+| V50 | `V50__workflow_versions.sql` | Workflow-Versions-Tabelle |
+| V51 | `V51__create_todo_triggers.sql` | todo_triggers-Tabelle (Self-Improvement-Loop) |
+| V52 | `V52__add_fix_attempts_to_todos.sql` | `fix_attempts`, `last_fix_run_id` in todos |
 
 ## SQLite-Besonderheiten
 

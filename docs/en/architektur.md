@@ -91,7 +91,7 @@ com.automation
 │   ├── pool/            WorkflowPoolService
 │   ├── wish/            WishService, WishWatchdogService
 │   ├── notification/    NotificationService
-│   ├── trigger/         CompletionTriggerService
+│   ├── trigger/         CompletionTriggerService, TodoTriggerService, TodoFeedbackListener
 │   ├── health/          HealthAutoTodoService
 │   ├── repair/          AutoRepairService
 │   ├── tray/            SystemTrayService
@@ -139,6 +139,7 @@ com.automation
 | `AssistantController` | `/api/v1/assistant` | Chat (`POST /chat`) |
 | `PageSuggestionController` | `/api/v1/assistant` | Suggestions per page (get/refresh) |
 | `CompletionTriggerController` | `/api/v1/completion-triggers` | CRUD, enable/disable, filter by workflow |
+| `TodoTriggerController` | `/api/v1/todo-triggers` | CRUD, enable/disable, filter by target workflow |
 | `NotificationController` | `/api/v1/notifications` | CRUD, enable/disable |
 | `WishController` | `/api/v1/wishes` | CRUD, cancel, respond, crystallize |
 | `StagingController` | `/api/v1/staging` | Status, start, stop, promote, promote-cancel, sync-preview, sync-definitions |
@@ -278,6 +279,25 @@ Automatic chaining of workflows based on completion events:
 - `CompletionTriggerController` — `/api/v1/completion-triggers`
 - Triggers link a source workflow (trigger) with a target workflow (started after completion)
 - API: List, get, create, enable/disable, delete; filter by source or target workflow ID
+
+## Todo Triggers — Self-Improvement Loop (V51/V52)
+
+Automatic execution of fix workflows when TODOs are created — closes the self-improvement loop:
+
+```
+Audit Workflow → AutoTodoService → TODO (OPEN)
+                                     ↓ TodoCreatedEvent
+                             TodoTriggerService → Fix Workflow
+                                                     ↓ WorkflowRunCompletedEvent
+                                             TodoFeedbackListener → TODO (DONE)
+```
+
+- `TodoTriggerService` — `@TransactionalEventListener` on `TodoCreatedEvent`, matches TODOs against configured triggers (tag pattern AND semantics, priority filter, project filter), starts fix workflow with TODO data as context variables
+- `TodoFeedbackListener` — `@EventListener` on `WorkflowRunCompletedEvent`, closes TODO on GREEN gate (if `autoClose=true`), logs escalation when fix attempts exhausted
+- `TodoTriggerController` — `/api/v1/todo-triggers`
+- API: List, get, create, enable/disable, delete
+- **Loop prevention**: 3 layers — metadata flag (`todoTriggerRun`), max attempts counter (`todo.fixAttempts`), running check (`todo.lastFixRunId`)
+- **Context variables** for fix workflow: `todo_id`, `todo_title`, `todo_description`, `todo_tags`, `todo_priority`, `todo_project_id`, `todo_trigger_id`
 
 ## Notification System (V40)
 
@@ -459,6 +479,7 @@ All JPA entities and enums in the `com.automation.entity` package:
 | `ChainRun` | `chain_runs` | Execution instance of a chain with entry runs |
 | `ChainRunEntry` | *(embedded)* | Status of a single chain entry during execution (value object) |
 | `CompletionTrigger` | `completion_triggers` | Source→target workflow link on completion |
+| `TodoTrigger` | `todo_triggers` | Automatic fix workflow execution on TODO creation (self-improvement loop) |
 | `Container` | `containers` | Docker container per project with status and mounts |
 | `NotificationConfig` | `notification_configs` | Notification configuration (webhook/desktop) |
 | `PageSuggestion` | `page_suggestions` | Cached UI suggestions per page |

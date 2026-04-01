@@ -21,6 +21,7 @@ erDiagram
     projects ||--o{ wishes : "has"
     workflows ||--o{ completion_triggers_source : "triggers"
     workflows ||--o{ completion_triggers_target : "is triggered"
+    workflows ||--o{ todo_triggers : "fix workflow"
     workflows ||--o{ notification_configs : "notifies"
 
     projects {
@@ -235,6 +236,24 @@ erDiagram
         INTEGER trigger_always "DEFAULT 0"
         TEXT description
         TEXT context_variables "JSON"
+        TEXT last_triggered_at
+        INTEGER trigger_count "DEFAULT 0"
+        TEXT created_at
+        TEXT updated_at
+    }
+
+    todo_triggers {
+        TEXT id PK
+        TEXT tag_pattern "NOT NULL"
+        TEXT project_id
+        TEXT source_filter
+        TEXT min_priority
+        TEXT target_workflow_id FK "NOT NULL"
+        TEXT context_template "JSON DEFAULT '{}'"
+        INTEGER enabled "DEFAULT 1"
+        INTEGER max_attempts "DEFAULT 3"
+        INTEGER auto_close "DEFAULT 1"
+        TEXT description
         TEXT last_triggered_at
         INTEGER trigger_count "DEFAULT 0"
         TEXT created_at
@@ -583,6 +602,9 @@ A chain does not belong to any project and can reference workflows from differen
 | `workflow_run_id` | TEXT | | Linked workflow run (when automatically created) |
 | `reference_type` | TEXT | | Type of the referenced object |
 | `reference_id` | TEXT | | ID of the referenced object |
+| `related_todo_id` | TEXT | | Related TODO (from AI similarity match) (V48) |
+| `fix_attempts` | INTEGER | NOT NULL, DEFAULT 0 | Number of automatic fix attempts by TodoTrigger (V52) |
+| `last_fix_run_id` | TEXT | | ID of the last fix workflow run (V52) |
 | `created_at` | TEXT | NOT NULL | |
 | `updated_at` | TEXT | NOT NULL | |
 
@@ -650,6 +672,30 @@ TODOs are automatically created by `AutoTodoService` on RED/YELLOW gate status (
 | `updated_at` | TEXT | | Update timestamp |
 
 Automatically starts a target workflow when a source workflow completes. The trigger condition (success, failure, always) is configurable (V39).
+
+### `todo_triggers`
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `tag_pattern` | TEXT | NOT NULL | Comma-separated tags (AND logic), e.g. `"backend,testing"` |
+| `project_id` | TEXT | | Optional: only match TODOs in this project |
+| `source_filter` | TEXT | | Optional: `"USER"`, `"AI"` or `"WORKFLOW"` |
+| `min_priority` | TEXT | | Optional: `"LOW"`, `"MEDIUM"`, `"HIGH"`, `"CRITICAL"` |
+| `target_workflow_id` | TEXT | FK → workflows, NOT NULL | Fix workflow to start |
+| `context_template` | TEXT | DEFAULT '{}' | JSON: Static context variables (merged with TODO data) |
+| `enabled` | INTEGER | NOT NULL, DEFAULT 1 | Active/inactive |
+| `max_attempts` | INTEGER | NOT NULL, DEFAULT 3 | Max fix attempts per TODO |
+| `auto_close` | INTEGER | NOT NULL, DEFAULT 1 | Close TODO on GREEN gate |
+| `description` | TEXT | | Human-readable description |
+| `last_triggered_at` | TEXT | | Last trigger time |
+| `trigger_count` | INTEGER | NOT NULL, DEFAULT 0 | Number of triggers |
+| `created_at` | TEXT | | Creation timestamp |
+| `updated_at` | TEXT | | Update timestamp |
+
+**Indexes:** `idx_todo_triggers_enabled`
+
+Closes the self-improvement loop: When a TODO is created (e.g. by AutoTodoService), `TodoTriggerService` checks all active TodoTriggers. On tag match, the fix workflow is started; on GREEN gate the TODO is closed. Loop prevention via `todoTriggerRun` metadata flag, max attempts counter, and running check (V51/V52).
 
 ### `notification_configs`
 
@@ -950,6 +996,11 @@ Blocks are stored as a JSON array in the `blocks` column of the `workflows` tabl
 | V45 | `V45__add_schedule_conflict_behavior.sql` | `conflict_behavior` in scheduled_workflows |
 | V46 | `V46__add_stable_synced_at.sql` | `stable_synced_at` in workflows |
 | V47 | `V47__add_context_delta_to_step_results.sql` | `context_delta` in step_results |
+| V48 | `V48__add_related_todo_id.sql` | `related_todo_id` in todos |
+| V49 | `V49__onboarding_profiles.sql` | Onboarding profiles table |
+| V50 | `V50__workflow_versions.sql` | Workflow versions table |
+| V51 | `V51__create_todo_triggers.sql` | todo_triggers table (self-improvement loop) |
+| V52 | `V52__add_fix_attempts_to_todos.sql` | `fix_attempts`, `last_fix_run_id` in todos |
 
 ## SQLite Specifics
 

@@ -1145,6 +1145,104 @@ Trigger löschen.
 
 ---
 
+## Todo-Trigger (Self-Improvement Loop)
+
+Todo-Trigger starten automatisch Fix-Workflows wenn TODOs erstellt werden. Schliesst den Self-Improvement-Loop: Audit → TODO → Fix → Verify → Close.
+
+### `GET /api/v1/todo-triggers`
+
+Alle Todo-Trigger auflisten.
+
+**Response:** `TodoTriggerResponse[]`
+
+### `GET /api/v1/todo-triggers/{id}`
+
+Einzelnen Todo-Trigger abrufen.
+
+**Response:** `TodoTriggerResponse`
+
+### `GET /api/v1/todo-triggers/workflow/{workflowId}`
+
+Todo-Trigger abrufen, die den angegebenen Workflow als Ziel haben.
+
+**Response:** `TodoTriggerResponse[]`
+
+### `POST /api/v1/todo-triggers`
+
+Neuen Todo-Trigger erstellen.
+
+**Request:**
+
+```json
+{
+  "tagPattern": "backend,testing",
+  "targetWorkflowId": "<workflow-id>",
+  "projectId": null,
+  "sourceFilter": "WORKFLOW",
+  "minPriority": "HIGH",
+  "description": "Auto-Fix: fehlende Backend-Tests",
+  "maxAttempts": 3,
+  "autoClose": true,
+  "contextTemplate": { "extra_key": "extra_value" }
+}
+```
+
+| Feld | Pflicht | Beschreibung |
+|---|---|---|
+| `tagPattern` | Ja | Kommagetrennte Tags (AND-Logik). Alle Tags müssen im TODO vorhanden sein |
+| `targetWorkflowId` | Ja | ID des Fix-Workflows der gestartet wird |
+| `projectId` | Nein | Optional: nur TODOs in diesem Projekt matchen |
+| `sourceFilter` | Nein | Optional: `"USER"`, `"AI"` oder `"WORKFLOW"` |
+| `minPriority` | Nein | Optional: Minimum-Priorität (`"LOW"`, `"MEDIUM"`, `"HIGH"`, `"CRITICAL"`) |
+| `description` | Nein | Menschenlesbare Beschreibung |
+| `maxAttempts` | Nein | Max. Fix-Versuche pro TODO (Default: 3) |
+| `autoClose` | Nein | TODO bei GREEN Gate automatisch schliessen (Default: true) |
+| `contextTemplate` | Nein | Statische Context-Variablen, gemerged mit TODO-Daten |
+
+**Response:** `201` mit `TodoTriggerResponse`
+
+**Context-Variablen** die der Fix-Workflow automatisch erhält:
+
+| Variable | Beschreibung |
+|---|---|
+| `todo_id` | TODO-UUID |
+| `todo_title` | TODO-Titel |
+| `todo_description` | TODO-Beschreibung (Markdown) |
+| `todo_tags` | TODO-Tags als JSON-Array |
+| `todo_priority` | `LOW`, `MEDIUM`, `HIGH` oder `CRITICAL` |
+| `todo_project_id` | Projekt-UUID des TODOs |
+| `todo_source` | `USER`, `AI` oder `WORKFLOW` |
+| `todo_reference_type` | Referenz-Typ (z.B. `workflow_run`) |
+| `todo_reference_id` | Referenz-ID (z.B. Workflow-ID) |
+| `todo_trigger_id` | ID des auslösenden TodoTriggers |
+
+### `POST /api/v1/todo-triggers/{id}/enable`
+
+Trigger aktivieren.
+
+**Response:** `TodoTriggerResponse`
+
+### `POST /api/v1/todo-triggers/{id}/disable`
+
+Trigger deaktivieren.
+
+**Response:** `TodoTriggerResponse`
+
+### `DELETE /api/v1/todo-triggers/{id}`
+
+Trigger löschen.
+
+**Response:** `204 No Content`
+
+### Loop-Prevention
+
+Fix-Workflows die durch einen TodoTrigger gestartet werden, setzen `todoTriggerRun: true` in der Run-Metadata. Dies verhindert:
+- **AutoTodoService** überspringt TODO-Erstellung für diese Runs (kein Audit→TODO→Fix→TODO-Loop)
+- **Max-Attempts**: Nach `maxAttempts` Fehlversuchen wird der Trigger für dieses TODO nicht mehr ausgelöst
+- **Running-Check**: Wenn `lastFixRunId` noch RUNNING ist, wird kein zweiter Fix-Run gestartet
+
+---
+
 ## Notifications
 
 Benachrichtigungen bei Workflow-Abschluss (Webhook oder Desktop).

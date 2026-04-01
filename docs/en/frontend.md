@@ -445,6 +445,15 @@ All API data is managed via React Query:
 | `useCreateCompletionTrigger()` | Mutation | Create trigger |
 | `useDeleteCompletionTrigger()` | Mutation | Delete trigger |
 
+### `useTodoTriggers.ts`
+
+| Hook | Type | Description |
+|---|---|---|
+| `useTodoTriggers()` | Query | All TodoTriggers |
+| `useCreateTodoTrigger()` | Mutation | Create TodoTrigger |
+| `useToggleTodoTrigger()` | Mutation | Enable/disable TodoTrigger |
+| `useDeleteTodoTrigger()` | Mutation | Delete TodoTrigger |
+
 ### `useDialog.ts`
 
 | Hook | Type | Description |
