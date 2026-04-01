@@ -20,6 +20,8 @@ public record TodoResponse(
         String workflowRunId,
         String referenceType,
         String referenceId,
+        int fixAttempts,
+        String lastFixRunId,
         Instant createdAt,
         Instant updatedAt
 ) {}

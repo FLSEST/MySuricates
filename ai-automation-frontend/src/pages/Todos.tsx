@@ -8,6 +8,7 @@ import { Card, Button, Spinner, Badge, TagInput } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
 import { TodoEditModal } from '../components/shared/TodoEditModal';
+import { TodoTriggerSection } from '../components/todo/TodoTriggerSection';
 import {
   useTodos, useTodoCount, useCreateTodo, useUpdateTodo, useUpdateTodoStatus, useDeleteTodo,
 } from '../hooks/useTodos';
@@ -802,6 +803,10 @@ export function Todos() {
           </div>
         </Card>
       )}
+
+      <div className="mt-8">
+        <TodoTriggerSection />
+      </div>
 
       <TodoEditModal
         editTodo={editTodo}

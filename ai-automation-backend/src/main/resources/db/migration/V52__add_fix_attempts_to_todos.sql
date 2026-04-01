@@ -1,0 +1,2 @@
+ALTER TABLE todos ADD COLUMN fix_attempts INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE todos ADD COLUMN last_fix_run_id TEXT;

@@ -12,8 +12,10 @@ import com.automation.mapper.TodoMapper;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.TodoRepository;
 import jakarta.persistence.criteria.Predicate;
+import com.automation.event.TodoCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -36,6 +38,7 @@ public class TodoService {
     private final TodoRepository todoRepository;
     private final ProjectRepository projectRepository;
     private final TodoMapper todoMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     private static final Comparator<Todo> PRIORITY_COMPARATOR =
             Comparator.comparingInt((Todo t) -> switch (t.getPriority()) {
@@ -97,6 +100,9 @@ public class TodoService {
 
         Todo saved = todoRepository.save(todo);
         log.info("Created todo: {} ({})", saved.getTitle(), saved.getId());
+        if (saved.getStatus() == Todo.Status.OPEN) {
+            eventPublisher.publishEvent(new TodoCreatedEvent(this, saved));
+        }
         return saved;
     }
 
@@ -173,6 +179,7 @@ public class TodoService {
                 base.source(), base.sourceAgent(), base.sessionId(),
                 base.workflowRunId(),
                 base.referenceType(), base.referenceId(),
+                base.fixAttempts(), base.lastFixRunId(),
                 base.createdAt(), base.updatedAt()
         );
     }

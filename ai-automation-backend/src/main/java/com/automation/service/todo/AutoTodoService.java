@@ -6,6 +6,7 @@ import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.entity.Todo;
 import com.automation.entity.WorkflowRun;
+import com.automation.event.TodoCreatedEvent;
 import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.TodoMapper;
@@ -16,6 +17,7 @@ import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.todo.GateStatusResolver.GateResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -49,10 +51,18 @@ public class AutoTodoService {
     private final AppSettingsRepository appSettingsRepository;
     private final WorkflowRunRepository workflowRunRepository;
     private final PlatformTransactionManager transactionManager;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Async
     @EventListener
     public void onWorkflowRunCompleted(WorkflowRunCompletedEvent event) {
+        // Loop prevention: skip TODO creation for fix-attempt runs triggered by TodoTrigger
+        Object todoTriggerRun = event.getRunMetadata().get("todoTriggerRun");
+        if (Boolean.TRUE.equals(todoTriggerRun)) {
+            log.debug("Skipping auto-todo for run {} (todo trigger fix attempt)", event.getRunId());
+            return;
+        }
+
         if (!isAutoTodoEnabled(event)) {
             log.debug("Auto-todo disabled for workflow {}", event.getWorkflowId());
             return;
@@ -209,7 +219,8 @@ public class AutoTodoService {
                                 .referenceId(event.getWorkflowId())
                                 .relatedTodoId(relatedMatch != null ? relatedMatch.todo().getId() : null)
                                 .build();
-                        todoRepository.save(todo);
+                        Todo saved = todoRepository.save(todo);
+                        eventPublisher.publishEvent(new TodoCreatedEvent(AutoTodoService.this, saved));
                         log.info("Auto-todo (granular) created: {}{}", title,
                                 relatedMatch != null ? " (related to: " + relatedMatch.todo().getTitle() + ")" : "");
                     }
@@ -328,8 +339,9 @@ public class AutoTodoService {
                     .referenceType(REFERENCE_TYPE)
                     .referenceId(run.getWorkflow().getId())
                     .build();
-            todoRepository.save(todo);
-            log.info("Auto-todo (approved) created: {} ({})", todo.getTitle(), todo.getId());
+            Todo saved = todoRepository.save(todo);
+            eventPublisher.publishEvent(new TodoCreatedEvent(this, saved));
+            log.info("Auto-todo (approved) created: {} ({})", saved.getTitle(), saved.getId());
         }
     }
 
@@ -467,8 +479,9 @@ public class AutoTodoService {
                         .referenceType(REFERENCE_TYPE)
                         .referenceId(event.getWorkflowId())
                         .build();
-                todoRepository.save(todo);
-                log.info("Auto-todo created: {} ({})", todo.getTitle(), todo.getId());
+                Todo saved = todoRepository.save(todo);
+                eventPublisher.publishEvent(new TodoCreatedEvent(AutoTodoService.this, saved));
+                log.info("Auto-todo created: {} ({})", saved.getTitle(), saved.getId());
             }
             return null;
         });

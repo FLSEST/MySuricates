@@ -457,6 +457,38 @@ export interface CreateCompletionTriggerRequest {
   contextVariables?: Record<string, unknown>;
 }
 
+// ── Todo Trigger ─────────────────────────────────────────
+
+export interface TodoTrigger {
+  id: string;
+  tagPattern: string;
+  projectId: string | null;
+  sourceFilter: string | null;
+  minPriority: string | null;
+  targetWorkflowId: string;
+  targetWorkflowName: string;
+  contextTemplate: Record<string, unknown>;
+  enabled: boolean;
+  maxAttempts: number;
+  autoClose: boolean;
+  description: string | null;
+  lastTriggeredAt: string | null;
+  triggerCount: number;
+  createdAt: string;
+}
+
+export interface CreateTodoTriggerRequest {
+  tagPattern: string;
+  projectId?: string;
+  sourceFilter?: string;
+  minPriority?: string;
+  targetWorkflowId: string;
+  contextTemplate?: Record<string, unknown>;
+  description?: string;
+  maxAttempts?: number;
+  autoClose?: boolean;
+}
+
 // ── System ───────────────────────────────────────────────
 
 export interface HealthComponent {

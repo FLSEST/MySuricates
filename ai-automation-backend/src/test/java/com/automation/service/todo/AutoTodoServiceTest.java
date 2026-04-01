@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
 
@@ -56,6 +57,9 @@ class AutoTodoServiceTest {
     @Mock
     private PlatformTransactionManager transactionManager;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private AutoTodoService autoTodoService;
 
     @BeforeEach
@@ -64,7 +68,7 @@ class AutoTodoServiceTest {
         autoTodoService = new AutoTodoService(
                 todoRepository, stepResultRepository, gateStatusResolver,
                 similarityService, projectPathResolver, appSettingsRepository,
-                workflowRunRepository, transactionManager);
+                workflowRunRepository, transactionManager, eventPublisher);
     }
 
     private static final Map<String, Object> AUTO_TODO_ENABLED_META = Map.of("autoTodo", Map.of("enabled", true));

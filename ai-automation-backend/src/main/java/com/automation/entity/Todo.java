@@ -71,6 +71,13 @@ public class Todo {
     @Column(name = "related_todo_id")
     private String relatedTodoId;
 
+    @Column(name = "fix_attempts")
+    @Builder.Default
+    private int fixAttempts = 0;
+
+    @Column(name = "last_fix_run_id")
+    private String lastFixRunId;
+
     @CreatedDate
     @Column(updatable = false)
     private Instant createdAt;
