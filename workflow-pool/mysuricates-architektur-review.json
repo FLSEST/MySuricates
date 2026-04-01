@@ -4,8 +4,8 @@
     "en": "MySuricates Architecture Review"
   },
   "description": {
-    "de": "God Classes, Layer-Verletzungen, Kopplung und Package-Struktur prüfen — erstellt TODOs",
-    "en": "Check for god classes, layer violations, coupling, and package structure — creates TODOs"
+    "de": "Delta-basiertes Architektur-Review — God Classes, Layer-Verletzungen, Kopplung. Erstellt TODOs für neue Findings.",
+    "en": "Delta-based architecture review — god classes, layer violations, coupling. Creates TODOs for new findings."
   },
   "icon": "🏛️",
   "category": "CUSTOM",
@@ -14,34 +14,27 @@
     "mysuricates",
     "architecture",
     "audit",
-    "todo-creating"
+    "todo-creating",
+    "delta-based"
   ],
   "model": "claude-opus-4-6",
-  "instructions": "Du analysierst die Architektur des MySuricates-Projekts. Backend: Spring Boot 3.4 (Java 21), Frontend: React 18 (TypeScript). Sei praezise und melde nur echte strukturelle Probleme. Bekannte Patterns: @Lazy fuer zirkulaere DI-Referenzen (SubWorkflowBlockExecutor→WorkflowExecutor), SQLRestriction fuer Soft-Delete.",
+  "instructions": "Du analysierst die Architektur des MySuricates-Projekts im DELTA-MODUS. Bekannte Patterns: @Lazy fuer SubWorkflow→WorkflowExecutor (beabsichtigt), SQLRestriction fuer Soft-Delete, HikariCP pool-size=1.",
   "blocks": [
     {
       "type": "shell",
       "config": {
-        "label": "Architektur-Metriken sammeln",
-        "command": "BASE=/home/flo/Entwicklung/tools/autotrigger\n\necho '=== Grosse Dateien (>200 LOC, God-Class-Kandidaten) ==='\nfind \"$BASE/ai-automation-backend/src/main/java\" -name '*.java' | while read f; do\n  lines=$(wc -l < \"$f\")\n  if [ \"$lines\" -gt 200 ]; then\n    methods=$(grep -c 'public \\|private \\|protected ' \"$f\" 2>/dev/null || echo 0)\n    injections=$(grep -c 'private final.*Service\\|private final.*Repository\\|private final.*Executor\\|private final.*Helper\\|@Autowired' \"$f\" 2>/dev/null || echo 0)\n    class=$(basename \"$f\" .java)\n    pkg=$(echo \"$f\" | sed \"s|$BASE/ai-automation-backend/src/main/java/com/automation/||\" | sed 's|/[^/]*$||')\n    echo \"$lines LOC | $methods methods | $injections deps | $pkg/$class\"\n  fi\ndone | sort -rn | head -25\n\necho ''\necho '=== Frontend grosse Dateien (>200 LOC) ==='\nfind \"$BASE/ai-automation-frontend/src\" \\( -name '*.ts' -o -name '*.tsx' \\) -not -path '*/node_modules/*' | while read f; do\n  lines=$(wc -l < \"$f\")\n  if [ \"$lines\" -gt 200 ]; then\n    name=$(echo \"$f\" | sed \"s|$BASE/ai-automation-frontend/src/||\")\n    echo \"$lines LOC | $name\"\n  fi\ndone | sort -rn | head -20\n\necho ''\necho '=== DI-Injections pro Klasse (>5 = zu viel Kopplung) ==='\nfind \"$BASE/ai-automation-backend/src/main/java\" -name '*.java' | while read f; do\n  count=$(grep -c 'private final.*Service\\|private final.*Repository\\|private final.*Executor\\|private final.*Helper\\|private final.*Client\\|@Autowired' \"$f\" 2>/dev/null || echo 0)\n  if [ \"$count\" -gt 5 ]; then\n    echo \"$count deps: $(basename \"$f\" .java)\"\n  fi\ndone | sort -rn\n\necho ''\necho '=== @Lazy Annotationen (Zeichen fuer zirkulaere Deps) ==='\ngrep -rn '@Lazy' --include='*.java' \"$BASE/ai-automation-backend/src/main/java\" 2>/dev/null\n\necho ''\necho '=== Cross-Layer Imports ==='\necho '--- Controller importiert aus nicht-service/dto/entity ---'\ngrep -rn 'import com.automation' --include='*.java' \"$BASE/ai-automation-backend/src/main/java/com/automation/controller/\" 2>/dev/null | grep -v 'dto\\|entity\\|service\\|security\\|mapper' | head -10\necho '--- Service importiert Controller ---'\ngrep -rn 'import com.automation.controller' --include='*.java' \"$BASE/ai-automation-backend/src/main/java/com/automation/service/\" 2>/dev/null | head -10\necho '--- Repository importiert Service ---'\ngrep -rn 'import com.automation.service' --include='*.java' \"$BASE/ai-automation-backend/src/main/java/com/automation/repository/\" 2>/dev/null | head -10\n\necho ''\necho '=== Package-Import-Graph (Top-30) ==='\ngrep -rn '^import com.automation' --include='*.java' \"$BASE/ai-automation-backend/src/main/java\" 2>/dev/null | grep -v target | sed 's/.*import com\\.automation\\.\\([a-z.]*\\)\\..*/\\1/' | sort | uniq -c | sort -rn | head -30\n",
-        "timeout_seconds": 60,
+        "label": "Architektur-Metriken + Delta",
+        "command": "BASE=/home/flo/Entwicklung/tools/autotrigger\n\necho '========================================'\necho '  GOD-CLASS-KANDIDATEN (>200 LOC)'\necho '========================================'\nfind \"$BASE/ai-automation-backend/src/main/java\" -name '*.java' | while read f; do\n  lines=$(wc -l < \"$f\")\n  if [ \"$lines\" -gt 200 ]; then\n    deps=$(grep -c 'private final' \"$f\" 2>/dev/null || echo 0)\n    class=$(basename \"$f\" .java)\n    pkg=$(echo \"$f\" | sed \"s|$BASE/ai-automation-backend/src/main/java/com/automation/||\" | sed 's|/[^/]*$||')\n    echo \"$lines LOC | $deps deps | $pkg/$class\"\n  fi\ndone | sort -rn | head -15\n\necho ''\necho '========================================'\necho '  FRONTEND >300 LOC'\necho '========================================'\nfind \"$BASE/ai-automation-frontend/src\" \\( -name '*.ts' -o -name '*.tsx' \\) -not -path '*/node_modules/*' | while read f; do\n  lines=$(wc -l < \"$f\")\n  if [ \"$lines\" -gt 300 ]; then\n    echo \"$lines LOC | $(echo $f | sed \"s|$BASE/ai-automation-frontend/src/||\")\"\n  fi\ndone | sort -rn | head -10\n\necho ''\necho '========================================'\necho '  KOPPLUNG (>5 Dependencies)'\necho '========================================'\nfind \"$BASE/ai-automation-backend/src/main/java\" -name '*.java' | while read f; do\n  count=$(grep -c 'private final' \"$f\" 2>/dev/null || echo 0)\n  if [ \"$count\" -gt 5 ]; then\n    echo \"$count deps: $(basename \"$f\" .java)\"\n  fi\ndone | sort -rn\n\necho ''\necho '========================================'\necho '  CROSS-LAYER + @LAZY'\necho '========================================'\necho '--- @Lazy ---'\ngrep -rn '@Lazy' --include='*.java' \"$BASE/ai-automation-backend/src/main/java\" 2>/dev/null || echo '(keine)'\necho '--- Service→Controller ---'\ngrep -rn 'import com.automation.controller' --include='*.java' \"$BASE/ai-automation-backend/src/main/java/com/automation/service/\" 2>/dev/null || echo '(keine)'\n\necho ''\necho '========================================'\necho '  GIT-DELTA (letzte 7 Tage)'\necho '========================================'\ncd \"$BASE\"\necho '--- Neue/geaenderte Java-Dateien ---'\ngit log --since='7 days ago' --name-only --pretty=format: -- 'ai-automation-backend/src/main/java/**/*.java' 2>/dev/null | sort -u | grep -v '^$' | head -20 || echo '(keine)'\necho ''\necho '--- Geloeschte Dateien ---'\ngit log --since='7 days ago' --diff-filter=D --name-only --pretty=format: -- '*.java' 2>/dev/null | sort -u | grep -v '^$' | head -10 || echo '(keine)'\necho ''\necho \"Commits (7d): $(git log --since='7 days ago' --oneline | wc -l)\"",
+        "timeout_seconds": 30,
         "on_failure": "continue"
       }
     },
     {
       "type": "simple",
       "config": {
-        "label": "Architektur-Tiefenanalyse (Opus)",
+        "label": "Delta-Analyse + Report (Opus)",
         "timeout_seconds": 900,
-        "command": "Analysiere die Architektur-Metriken des MySuricates-Projekts:\n\n{{ previous_output }}\n\nKONTEXT AUS DER PLATTFORM:\n\nLetzter Report dieses Workflows:\n{{ previous_report }}\n\nOffene TODOs im Projekt:\n{{ open_todos }}\n\nKontext: MySuricates ist eine AI-Workflow-Automation-Plattform mit Spring Boot Backend und React Frontend.\n\nUntersuche systematisch:\n\n1. **God Classes**: Dateien mit >300 LOC, >10 Methoden oder >5 DI-Injections.\n   - Welche Verantwortlichkeiten hat die Klasse?\n   - Welche koennten in eigene Services extrahiert werden?\n   - Besonders kritisch: WorkflowExecutor, StagingService, AssistantService\n\n2. **Zirkulaere Abhaengigkeiten**: @Lazy als Symptom.\n   - Ist die @Lazy-Nutzung gerechtfertigt (SubWorkflow→WorkflowExecutor ist bekannt/akzeptiert)?\n   - Gibt es weitere versteckte Zyklen?\n\n3. **Schichtverletzungen**: Controller→Repository direkt, Service→Controller, etc.\n   - Klare Schichten: Controller → Service → Repository\n   - Executor → Service ist OK (Executors sind Service-Layer)\n\n4. **Frontend-Architektur**: Grosse Pages/Komponenten die aufgeteilt werden sollten.\n   - Pages > 400 LOC sind Kandidaten\n   - Hooks mit zu vielen Verantwortlichkeiten\n\n5. **Uebermassige Kopplung**: Klassen mit >7 DI-Injections.\n\nPro Finding: Schweregrad (CRITICAL/HIGH/MEDIUM/LOW), konkrete Datei, spezifischer Refactoring-Vorschlag.\n\nBEKANNTE PATTERNS (KEIN Finding melden):\n- @Lazy auf SubWorkflowBlockExecutor (beabsichtigt, dokumentiert)\n- @SQLRestriction fuer Soft-Delete (beabsichtigt)\n- HikariCP pool-size=1 (SQLite-Limitation, dokumentiert)\n\nVERGLEICH MIT LETZTEM RUN:\nFalls unter \"LETZTER AUDIT-REPORT\" ein vorheriger Report vorhanden ist:\n- Vergleiche die Findings: Was ist NEU, was war schon bekannt, was wurde GELOEST?\n- Zeige einen Trend: Besser/Schlechter/Gleich\n- Erstelle NUR todo_items fuer NEUE Findings (nicht fuer bereits bekannte)\n\nAm Ende des Reports: Liste ALLE HIGH und CRITICAL Findings als todo_item-Zeilen.\nFormat (EXAKT einhalten, eine Zeile pro Finding):\ntodo_item: <Titel im Imperativ> | HIGH oder MEDIUM | <tags kommasepariert> | <Beschreibung: was genau, warum, welche Dateien, ggf. Referenz auf Reports>\n\nBeispiele:\ntodo_item: ChainExecutor vollstaendig testen | HIGH | backend,testing | 160 LOC Execution-Loop mit Multi-Entry und stopOnFailure komplett ungetestet\ntodo_item: useWebSocket Hook testen | MEDIUM | frontend,testing | 507 LOC, zentral fuer Real-Time-UI, kein einziger Unit-Test"
-      }
-    },
-    {
-      "type": "simple",
-      "config": {
-        "label": "Architektur-Radar Report",
-        "timeout_seconds": 900,
-        "command": "Erstelle den Architektur-Review-Report fuer MySuricates:\n\n{{ previous_output }}\n\n## Format:\n\n### Radar-Uebersicht\n| Dimension | Score (1-10) | Findings | Kritischster Fund |\n|-----------|-------------|----------|-------------------|\n| God Classes | | | |\n| Zirkulaere Deps | | | |\n| Schichtverletzungen | | | |\n| Kopplung | | | |\n| Package-Struktur | | | |\n| Frontend-Architektur | | | |\n\n### Top-5 Refactoring-Prioritaeten\n| # | Klasse/Datei | Problem | Vorgeschlagene Loesung | Aufwand | Risiko |\n\n### Refactoring-Roadmap\nPhase 1 (Quick Wins): Isolierte, risikoarme Aenderungen\nPhase 2 (Mittelfristig): Aenderungen mit Abhaengigkeiten\nPhase 3 (Langfristig): Groessere Umbauten\n\ngate_status: GREEN wenn keine CRITICAL Findings, YELLOW wenn CRITICAL vorhanden, RED wenn strukturelle Integritaet gefaehrdet"
+        "command": "Du bist der Architektur-Auditor fuer MySuricates (Spring Boot + React).\n\nAKTUELLE METRIKEN UND DELTA:\n{{ previous_output }}\n\nLETZTER REPORT:\n{{ previous_report }}\n\nOFFENE TODOS:\n{{ open_todos }}\n\nWORKFLOW GEAENDERT: {{ workflow_changed_since_last_run }}\n\n---\n\nMODUS:\n\nFalls KEIN letzter Report oder workflow_changed_since_last_run == 'true':\n→ VOLLE ANALYSE aller Metriken.\n\nFalls letzter Report vorhanden UND Workflow unveraendert:\n→ DELTA-ANALYSE:\n  1. Was ist NEU? Neue God Classes, neue Kopplung, neue Layer-Verletzungen?\n  2. Was wurde VERBESSERT? Aufgeteilte Klassen, reduzierte Dependencies?\n  3. Was ist UNVERAENDERT? Bekannte Probleme die als TODO existieren → nicht nochmal melden\n\n---\n\nBEWERTUNGSKRITERIEN:\n- God Classes: >300 LOC UND >7 deps = CRITICAL, >200 LOC UND >5 deps = HIGH\n- @Lazy: SubWorkflow→WorkflowExecutor ist BEKANNT/AKZEPTIERT → kein Finding\n- Cross-Layer: Service→Controller = CRITICAL, Controller→Repository = HIGH\n- Kopplung: >10 deps = CRITICAL, >7 = HIGH, >5 = MEDIUM\n- Frontend: >500 LOC Komponente = HIGH, >300 = MEDIUM\n\nREPORT-FORMAT:\n\n### Architektur-Review — {{ workflow_name }}\n**Modus**: [VOLL / DELTA]\n\n### Radar\n| Dimension | Score (1-10) | Trend | Kritischster Fund |\n|-----------|-------------|-------|-------------------|\n| God Classes | | | |\n| Kopplung | | | |\n| Schichtverletzungen | | | |\n| Frontend-Komplexitaet | | | |\n\n### Findings (nur NEUE bei Delta)\n| # | Klasse | Problem | Schweregrad | Empfehlung |\n\n### Naechste Schritte (Top 3 mit groesstem Impact)\n1. ...\n2. ...\n3. ...\n\n### todo_items (NUR fuer NEUE Findings)\n\ntodo_item: <Titel> | CRITICAL oder HIGH oder MEDIUM | <tags> | <Beschreibung>\n\nWICHTIG:\n- NUR todo_items fuer NEUE Findings\n- Pruefe offene TODOs — kein Duplikat erstellen\n- CRITICAL fuer: Cross-Layer-Verletzungen, >10 deps, >500 LOC God Classes\n\ngate_status: GREEN wenn kein CRITICAL, YELLOW wenn CRITICAL vorhanden aber bekannt, RED wenn neues CRITICAL\ngate_category: architecture\ngate_description: <Score>, <Anzahl> Findings, Trend <besser/schlechter/gleich>"
       }
     },
     {
@@ -49,19 +42,19 @@
       "config": {
         "label": "Ergebnis erklären",
         "timeout_seconds": 120,
-        "command": "Fasse das Ergebnis des Architektur-Reviews in maximal 5 Zeilen zusammen:\n\n{{ previous_output }}\n\n- Gesamtbewertung (gut/mittel/schlecht)\n- Anzahl CRITICAL/HIGH Findings\n- Wichtigste 1-2 Probleme benennen\n- Ob TODOs erstellt wurden\n\nAm Ende GENAU diese Zeile:\ngate_status: GREEN wenn keine CRITICAL/HIGH, YELLOW wenn HIGH vorhanden, RED wenn CRITICAL vorhanden"
+        "command": "Fasse das Ergebnis in maximal 5 Zeilen zusammen:\n\n{{ previous_output }}\n\n- Architektur-Score und Trend\n- Anzahl NEUE vs BEKANNTE Findings\n- Wichtigstes neues Finding\n- Modus (Voll/Delta)\n\ngate_status: GREEN wenn sauber, YELLOW wenn Verbesserungsbedarf, RED wenn kritisch"
       }
     },
     {
       "type": "shell",
       "config": {
         "label": "Gate-Verdict",
-        "command": "PREV='{{ previous_output }}'\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Architektur-Review: CRITICAL Findings'\n  echo 'gate_status: RED'\n  echo 'gate_category: architecture'\n  echo 'gate_description: Kritische Architektur-Probleme gefunden'\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Architektur-Review: Verbesserungsbedarf'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: architecture'\n  echo 'gate_description: Architektur-Verbesserungen empfohlen'\nelse\n  echo 'Architektur-Review: OK'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: architecture'\n  echo 'gate_description: Architektur sauber'\nfi",
+        "command": "PREV='{{ previous_output }}'\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Architektur-Review: KRITISCH'\n  echo 'gate_status: RED'\n  echo 'gate_category: architecture'\n  echo 'gate_description: Kritische Architektur-Probleme'\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Architektur-Review: Verbesserungsbedarf'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: architecture'\n  echo 'gate_description: Architektur-Verbesserungen empfohlen'\nelse\n  echo 'Architektur-Review: OK'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: architecture'\n  echo 'gate_description: Architektur sauber'\nfi",
         "timeout_seconds": 10
       }
     }
   ],
-  "version": "2.0.0",
+  "version": "3.0.0",
   "author": "MySuricates",
   "metadata": {
     "autoTodo": {
