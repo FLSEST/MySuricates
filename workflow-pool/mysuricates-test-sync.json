@@ -1,51 +1,52 @@
 {
   "name": {
-    "de": "Tests aktualisieren",
-    "en": "Sync Tests with Code Changes"
+    "de": "Test schreiben (TODO-gesteuert)",
+    "en": "Write Test (TODO-driven)"
   },
   "description": {
-    "de": "Geänderte Source-Files ohne Test-Update erkennen und Tests automatisch generieren/aktualisieren",
-    "en": "Detect changed source files without test updates and auto-generate/update tests"
+    "de": "Schreibt einen Test für eine konkrete Klasse aus einem TODO. Pro Klasse ein Commit, bei Fehler verwerfen.",
+    "en": "Writes a test for a specific class from a TODO. One commit per class, discard on failure."
   },
-  "icon": "🔄",
+  "icon": "✍️",
   "category": "CUSTOM",
   "tags": [
     "quality",
     "mysuricates",
     "testing",
-    "auto-fix"
+    "auto-fix",
+    "todo-driven"
   ],
   "model": "claude-opus-4-6",
-  "instructions": "Du aktualisierst Tests fuer das MySuricates-Projekt. Backend: Spring Boot mit JUnit 5 + Mockito. Frontend: React mit Vitest/Cypress. Orientiere dich an bestehenden Test-Patterns im Projekt. Schreibe nur Tests fuer tatsaechlich geaenderten Code.",
+  "instructions": "Du schreibst Tests fuer das MySuricates-Projekt. REGELN: 1) NUR Test-Dateien schreiben/aendern, NIEMALS Production-Code. 2) JUnit 5 + Mockito + AssertJ. 3) Bestehende Test-Patterns als Vorlage nutzen. 4) Nach dem Schreiben: mvn test -Dtest=NeuerTest ausfuehren.",
   "blocks": [
     {
       "type": "shell",
       "config": {
-        "label": "Geänderte Files ohne Test-Update identifizieren",
-        "command": "BASE=/home/flo/Entwicklung/tools/autotrigger\ncd \"$BASE\"\n\nDAYS=${lookback_days:-7}\n\necho \"=== Geaenderte Source-Files (letzte $DAYS Tage) ===\"\ngit log --since=\"$DAYS days ago\" --name-only --pretty=format: -- '*.java' '*.ts' '*.tsx' | sort -u | grep -v '^$' > /tmp/ms_changed.txt\n\necho '--- Geaenderte Backend-Source-Files ---'\ngrep 'ai-automation-backend/src/main' /tmp/ms_changed.txt | grep -v 'Test\\|test\\|resources' || echo '(keine)'\n\necho ''\necho '--- Geaenderte Backend-Test-Files ---'\ngrep 'ai-automation-backend/src/test' /tmp/ms_changed.txt || echo '(keine)'\n\necho ''\necho '--- Geaenderte Frontend-Files ---'\ngrep 'ai-automation-frontend/src' /tmp/ms_changed.txt | grep -v 'test\\|spec' || echo '(keine)'\n\necho ''\necho '=== Source-Files ohne korrespondierenden Test-Change ==='\nwhile IFS= read -r src; do\n  # Nur main-Source-Files\n  if echo \"$src\" | grep -q 'ai-automation-backend/src/main.*\\.java$'; then\n    base=$(basename \"$src\" .java)\n    # Pruefen ob der korrespondierende Test auch geaendert wurde\n    if ! grep -q \"${base}Test\\|${base}Tests\" /tmp/ms_changed.txt 2>/dev/null; then\n      lines=$(wc -l < \"$src\" 2>/dev/null || echo '?')\n      # Pruefen ob ein Test ueberhaupt existiert\n      existing_test=$(find \"$BASE/ai-automation-backend/src/test\" -name \"${base}Test.java\" -o -name \"${base}Tests.java\" 2>/dev/null | head -1)\n      if [ -n \"$existing_test\" ]; then\n        echo \"UPDATE_NEEDED | $lines LOC | $base (Test existiert: $(basename $existing_test))\"\n      else\n        echo \"CREATE_NEEDED | $lines LOC | $base (kein Test vorhanden)\"\n      fi\n    fi\n  fi\ndone < /tmp/ms_changed.txt | sort\n\necho ''\necho '=== Zusammenfassung ==='\nSRC_CHANGED=$(grep 'ai-automation-backend/src/main.*\\.java$' /tmp/ms_changed.txt | grep -v 'Test\\|test\\|resources' | wc -l)\nTEST_CHANGED=$(grep 'ai-automation-backend/src/test.*\\.java$' /tmp/ms_changed.txt | wc -l)\necho \"Source-Files geaendert: $SRC_CHANGED\"\necho \"Test-Files geaendert: $TEST_CHANGED\"",
-        "timeout_seconds": 30,
+        "label": "TODO-Kontext laden",
+        "command": "BASE=/home/flo/Entwicklung/tools/autotrigger\n\necho '========================================'\necho '  AUFGABE'\necho '========================================'\necho 'TODO-Titel: {{ todo_title }}'\necho 'TODO-Beschreibung: {{ todo_description }}'\necho ''\n\necho '========================================'\necho '  ZIEL-KLASSE ANALYSIEREN'\necho '========================================'\n# Versuche die Klasse aus dem TODO-Titel zu extrahieren\nCLASS_NAME=$(echo '{{ todo_title }}' | grep -oE '[A-Z][a-zA-Z]+' | head -1)\necho \"Erkannte Klasse: $CLASS_NAME\"\n\n# Finde die Source-Datei\nSRC=$(find \"$BASE/ai-automation-backend/src/main/java\" -name \"${CLASS_NAME}.java\" 2>/dev/null | head -1)\nif [ -n \"$SRC\" ]; then\n  echo \"Source: $SRC\"\n  echo \"LOC: $(wc -l < \"$SRC\")\"\n  echo ''\n  echo '--- Public Methoden ---'\n  grep -n 'public ' \"$SRC\" | grep -v 'class \\|interface ' | head -20\nelse\n  echo \"Source NICHT GEFUNDEN fuer: $CLASS_NAME\"\n  # Breitere Suche\n  echo '--- Aehnliche Dateien ---'\n  find \"$BASE/ai-automation-backend/src/main/java\" -name \"*${CLASS_NAME}*\" 2>/dev/null | head -5\n  find \"$BASE/ai-automation-frontend/src\" -name \"*${CLASS_NAME}*\" 2>/dev/null | head -5\nfi\n\n# Prüfe ob schon ein Test existiert\nTEST=$(find \"$BASE/ai-automation-backend/src/test/java\" -name \"${CLASS_NAME}Test.java\" -o -name \"${CLASS_NAME}Tests.java\" 2>/dev/null | head -1)\nif [ -n \"$TEST\" ]; then\n  echo ''\n  echo \"Existierender Test: $TEST\"\n  echo \"Test LOC: $(wc -l < \"$TEST\")\"\n  echo \"Test-Methoden: $(grep -c '@Test' \"$TEST\")\"\nelse\n  echo ''\n  echo 'Kein existierender Test'\nfi\n\necho ''\necho '========================================'\necho '  REFERENZ-TESTS (gleiches Package)'\necho '========================================'\nif [ -n \"$SRC\" ]; then\n  PKG_DIR=$(dirname \"$SRC\" | sed 's|src/main/java|src/test/java|')\n  if [ -d \"$PKG_DIR\" ]; then\n    ls \"$PKG_DIR\"/*Test.java 2>/dev/null | head -3 | while read tf; do\n      echo \"Referenz: $(basename $tf) ($(grep -c '@Test' \"$tf\") tests)\"\n    done\n  else\n    echo '(kein Test-Package vorhanden)'\n  fi\nfi",
+        "timeout_seconds": 15,
         "on_failure": "continue"
       }
     },
     {
       "type": "agentic",
       "config": {
-        "label": "Tests generieren/aktualisieren (Opus)",
-        "goal": "Aktualisiere oder erstelle Tests fuer die geaenderten Source-Files des MySuricates-Projekts.\n\nGEAENDERTE FILES:\n{{ previous_output }}\n\nVORGEHEN fuer jedes File mit UPDATE_NEEDED oder CREATE_NEEDED:\n\n1. Lies den Source-Code:\n   /home/flo/Entwicklung/tools/autotrigger/ai-automation-backend/src/main/java/com/automation/<package>/<ClassName>.java\n\n2. Lies den existierenden Test (falls vorhanden):\n   /home/flo/Entwicklung/tools/autotrigger/ai-automation-backend/src/test/java/com/automation/<package>/<ClassName>Test.java\n\n3. Lies 1-2 andere Tests im gleichen Package als Referenz fuer Patterns/Style\n\n4. UPDATE_NEEDED: Ergaenze den existierenden Test um neue/geaenderte Methoden.\n   CREATE_NEEDED: Erstelle einen neuen Test nach dem Pattern der existierenden Tests.\n\nTEST-KONVENTIONEN:\n- JUnit 5 (@Test, @BeforeEach, @ExtendWith)\n- Mockito fuer Dependencies (@Mock, @InjectMocks)\n- Naming: should_<expected>_when_<condition>\n- Assertions: assertThat (AssertJ) oder assertEquals/assertTrue\n- Jede public Methode sollte mindestens einen Happy-Path und einen Error-Path Test haben\n- Integration-Tests mit @SpringBootTest nur wenn noetig (Repository-Tests)\n\nWICHTIG:\n- Absolute Pfade verwenden: /home/flo/Entwicklung/tools/autotrigger/...\n- Nur Tests fuer die geaenderten Files schreiben, nicht fuer alles\n- Bestehende Tests NICHT loeschen, nur ergaenzen\n- Wenn keine Files mit UPDATE_NEEDED/CREATE_NEEDED vorhanden: Nichts tun, Erfolg melden",
-        "max_iterations": 20,
-        "max_total_tokens": 300000,
+        "label": "Test schreiben (Opus)",
+        "goal": "Schreibe einen Test fuer die Klasse aus dem TODO.\n\nKONTEXT:\n{{ previous_output }}\n\nOFFENE TODOS (fuer Kontext):\n{{ open_todos }}\n\nVORGEHEN:\n1. Lies die Source-Datei vollstaendig\n2. Falls ein Test existiert: Lies ihn und ergaenze fehlende Test-Methoden\n3. Falls kein Test existiert: Lies 1-2 Referenz-Tests im gleichen Package als Vorlage\n4. Schreibe den Test:\n   - JUnit 5 (@Test, @BeforeEach, @ExtendWith(MockitoExtension.class))\n   - @Mock fuer alle Dependencies, @InjectMocks fuer die Ziel-Klasse\n   - Naming: should_<expected>_when_<condition>\n   - AssertJ Assertions (assertThat)\n   - Mindestens: Happy-Path + Error-Path fuer jede wichtige public Methode\n   - Edge Cases fuer kritische Logik\n5. Fuehre den Test aus: cd /home/flo/Entwicklung/tools/autotrigger/ai-automation-backend && mvn test -Dtest=\"<TestName>\" -q\n6. Falls der Test fehlschlaegt: Korrigiere und erneut ausfuehren\n7. Wenn der Test besteht: git add + git commit mit Message 'test: Add tests for <ClassName>'\n\nWICHTIG:\n- Absolute Pfade: /home/flo/Entwicklung/tools/autotrigger/...\n- NUR Test-Dateien erstellen/aendern, NIEMALS Production-Code\n- Falls die Klasse nicht gefunden wird: Melde Fehler und beende\n- Falls mvn test nach 3 Versuchen nicht besteht: Aenderungen verwerfen (git checkout), Fehler melden",
+        "max_iterations": 15,
+        "max_total_tokens": 250000,
         "iteration_timeout_seconds": 180,
-        "total_timeout_seconds": 1800,
+        "total_timeout_seconds": 1200,
         "max_repeated_actions": 3,
         "require_approval": false,
-        "success_criteria": "Alle geaenderten Source-Files mit UPDATE_NEEDED oder CREATE_NEEDED haben aktuelle Tests."
+        "success_criteria": "Test-Datei erstellt, mvn test besteht, Commit erstellt."
       }
     },
     {
       "type": "shell",
       "config": {
-        "label": "Tests ausführen",
-        "command": "cd /home/flo/Entwicklung/tools/autotrigger/ai-automation-backend\n\necho '=== Maven Tests ausfuehren ==='\nmvn test -q 2>&1\nTEST_EXIT=$?\n\necho ''\necho '--- Test-Ergebnis ---'\necho \"Exit code: $TEST_EXIT\"\n\nif [ $TEST_EXIT -ne 0 ]; then\n  echo \"gate_status: RED\"\n  echo \"gate_category: test-sync\"\n  echo \"gate_description: Tests fehlgeschlagen nach Auto-Update — manuelle Korrektur noetig\"\nelse\n  echo \"gate_status: GREEN\"\n  echo \"gate_category: test-sync\"\n  echo \"gate_description: Alle Tests bestanden nach Auto-Update\"\nfi",
+        "label": "Gesamttest verifizieren",
+        "command": "cd /home/flo/Entwicklung/tools/autotrigger/ai-automation-backend\n\necho '=== Gesamter Test-Suite ==='\nmvn test -q 2>&1 | tail -10\nTEST_EXIT=$?\n\necho ''\necho '--- Letzter Commit ---'\ngit log -1 --oneline\n\necho ''\nif [ $TEST_EXIT -ne 0 ]; then\n  echo 'WARNUNG: Gesamte Test-Suite fehlgeschlagen — letzten Commit pruefen'\n  echo 'gate_status: RED'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Gesamte Test-Suite fehlgeschlagen nach neuem Test'\nelse\n  echo 'Alle Tests bestanden'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Neuer Test geschrieben und verifiziert'\nfi",
         "timeout_seconds": 600,
         "on_failure": "continue"
       }
@@ -53,23 +54,24 @@
     {
       "type": "simple",
       "config": {
-        "label": "Test-Sync Report",
+        "label": "Ergebnis erklären",
         "timeout_seconds": 120,
-        "command": "Fasse das Test-Sync-Ergebnis in maximal 5 Zeilen zusammen:\n\n{{ previous_output }}\n\n- Wie viele Source-Files hatten kein Test-Update\n- Wie viele Tests erstellt/aktualisiert\n- Ob Tests bestanden oder fehlgeschlagen\n- Wichtigster neuer Test\n\nAm Ende GENAU diese Zeile:\ngate_status: GREEN wenn alle Tests bestanden, YELLOW wenn Tests erstellt aber Warnungen, RED wenn Tests fehlschlagen"
+        "command": "Fasse das Ergebnis in maximal 5 Zeilen zusammen:\n\n{{ previous_output }}\n\n- Welche Klasse wurde getestet\n- Wie viele Test-Methoden geschrieben\n- Ob Tests bestanden\n- Ob ein Commit erstellt wurde\n\ngate_status: GREEN wenn Test besteht und committed, YELLOW wenn Test besteht aber nicht committed, RED wenn Test fehlschlaegt"
       }
     },
     {
       "type": "shell",
       "config": {
         "label": "Gate-Verdict",
-        "command": "PREV='{{ previous_output }}'\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Test-Sync: Tests fehlgeschlagen'\n  echo 'gate_status: RED'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Tests fehlgeschlagen nach Auto-Update'\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Test-Sync: Warnungen'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Tests erstellt, manuelle Pruefung empfohlen'\nelse\n  echo 'Test-Sync: OK'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Alle Tests aktuell und bestanden'\nfi",
+        "command": "PREV='{{ previous_output }}'\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Test-Sync: FEHLGESCHLAGEN'\n  echo 'gate_status: RED'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Test konnte nicht geschrieben werden'\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Test-Sync: TEILWEISE'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Test geschrieben, manuelle Pruefung empfohlen'\nelse\n  echo 'Test-Sync: ERFOLGREICH'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Test geschrieben, verifiziert und committed'\nfi",
         "timeout_seconds": 10
       }
     }
   ],
-  "version": "1.1.0",
+  "version": "3.0.0",
   "author": "MySuricates",
   "defaultContext": {
-    "lookback_days": "7"
+    "todo_title": "",
+    "todo_description": ""
   }
 }
