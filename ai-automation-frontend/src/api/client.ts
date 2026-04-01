@@ -24,11 +24,11 @@ class ApiClient {
       });
 
       if (!response.ok) {
-        const error: ApiError = await response.json().catch(() => ({
+        const body: ApiError = await response.json().catch(() => ({
           error: `HTTP ${response.status}: ${response.statusText}`,
           timestamp: new Date().toISOString(),
         }));
-        throw error;
+        throw { ...body, status: response.status, message: body.error };
       }
 
       if (response.status === 204) return undefined as T;

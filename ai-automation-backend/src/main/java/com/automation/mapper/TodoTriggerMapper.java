@@ -10,8 +10,8 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public interface TodoTriggerMapper {
 
-    @Mapping(source = "targetWorkflow.id", target = "targetWorkflowId")
-    @Mapping(source = "targetWorkflow.name", target = "targetWorkflowName")
+    @Mapping(target = "targetWorkflowId", expression = "java(trigger.getTargetWorkflow() != null ? trigger.getTargetWorkflow().getId() : null)")
+    @Mapping(target = "targetWorkflowName", expression = "java(trigger.getTargetWorkflow() != null ? trigger.getTargetWorkflow().getName() : \"[gelöscht]\")")
     TodoTriggerResponse toResponse(TodoTrigger trigger);
 
     List<TodoTriggerResponse> toResponseList(List<TodoTrigger> triggers);

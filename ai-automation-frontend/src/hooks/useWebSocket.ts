@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
+import { useSettingsStore } from '../stores/settingsStore';
 import type { AgenticState, PendingHumanInput } from '../types';
 import type { WsMessage, ForEachState, PendingApproval } from '../types/websocket';
 import {
@@ -40,8 +41,11 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string)
   useEffect(() => {
     if (!runId) return;
 
+    const apiKey = useSettingsStore.getState().apiKey;
+    const wsUrl = `${window.location.origin}/ws${apiKey ? `?apiKey=${apiKey}` : ''}`;
+
     const client = new Client({
-      webSocketFactory: () => new SockJS(`${window.location.origin}/ws`),
+      webSocketFactory: () => new SockJS(wsUrl),
       reconnectDelay: 5000,
       onConnect: () => {
         setConnected(true);
