@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
+import { useSettingsStore } from '../stores/settingsStore';
 
 export interface AssistantStatus {
   type: 'assistant_status';
@@ -38,9 +39,7 @@ export function useAssistantWebSocket(
     // Reuse existing client if connected
     if (clientRef.current?.connected) return;
 
-    const apiKey = localStorage.getItem('app-settings')
-      ? JSON.parse(localStorage.getItem('app-settings') || '{}')?.apiKey
-      : undefined;
+    const apiKey = useSettingsStore.getState().apiKey;
     const wsUrl = `${window.location.origin}/ws${apiKey ? `?apiKey=${apiKey}` : ''}`;
 
     const client = new Client({
