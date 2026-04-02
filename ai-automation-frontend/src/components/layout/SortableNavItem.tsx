@@ -35,21 +35,21 @@ export function SortableNavItem({ id, item, onHide }: SortableNavItemProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-1 px-1 py-1 rounded-lg group ${isDragging ? 'bg-white/10' : ''}`}
+      className={`group flex items-center gap-1 rounded-lg px-1 py-1 ${isDragging ? 'bg-[var(--color-sidebar-hover)]' : ''}`}
     >
       <button
         {...attributes}
         {...listeners}
-        className="p-1 text-[#5a4e44] hover:text-[#8a7d6e] cursor-grab active:cursor-grabbing touch-none shrink-0"
+        className="shrink-0 cursor-grab touch-none p-1 text-[var(--color-sidebar-text-muted)] hover:text-[var(--color-sidebar-text)] active:cursor-grabbing"
         aria-label="Verschieben"
       >
         <GripVertical className="w-3.5 h-3.5" />
       </button>
-      <item.icon style={{ width: 16, height: 16 }} className="text-[#8a7d6e] shrink-0" />
-      <span className="flex-1 text-sm text-[#8a7d6e] truncate">{item.label}</span>
+      <item.icon style={{ width: 16, height: 16 }} className="shrink-0 text-[var(--color-sidebar-text-muted)]" />
+      <span className="flex-1 truncate text-sm text-[var(--color-sidebar-text)]">{item.label}</span>
       <button
         onClick={() => onHide(item.to)}
-        className="p-1 text-[#5a4e44] hover:text-[#c0392b] shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        className="shrink-0 p-1 text-[var(--color-sidebar-text-muted)] opacity-0 transition-all group-hover:opacity-100 hover:text-danger"
         aria-label="Ausblenden"
       >
         <X className="w-3.5 h-3.5" />

@@ -35,7 +35,7 @@ export function HealthIndicator({ collapsed }: Props) {
   return (
     <button
       onClick={() => navigate('/settings')}
-      className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs text-[#8a7d6e] hover:text-white transition-colors w-full"
+      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-xs text-[var(--color-sidebar-text-muted)] transition-colors hover:bg-[var(--color-sidebar-hover)] hover:text-[var(--color-sidebar-text)]"
       title={label}
     >
       <span className={`w-2 h-2 rounded-full shrink-0 ${color}`} />

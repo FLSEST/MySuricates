@@ -82,7 +82,7 @@ export function SettingsNav({ sections, onNavigate }: SettingsNavProps) {
             onClick={() => handleClick(s.id)}
             className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
               activeId === s.id
-                ? 'bg-accent text-white'
+                ? 'bg-accent text-text-inverse'
                 : 'bg-surface-hover text-text-secondary'
             }`}
           >

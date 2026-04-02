@@ -190,11 +190,14 @@ export function Sidebar() {
       style={{ backgroundColor: 'var(--color-sidebar)' }}
     >
       {/* Logo */}
-      <div className={`flex flex-col items-center border-b border-white/10 ${collapsed && !isMobile ? 'px-2 py-3' : 'px-3 pt-4 pb-3'}`}>
+      <div
+        className={`flex flex-col items-center ${collapsed && !isMobile ? 'px-2 py-3' : 'px-3 pt-4 pb-3'}`}
+        style={{ borderBottom: '1px solid var(--color-sidebar-border)' }}
+      >
         <MeerkatIcon className="text-accent" size={collapsed && !isMobile ? 48 : 140} />
         {showLabels ? (
           <>
-            <span className="text-lg font-bold text-white tracking-tight mt-1.5">
+            <span className="mt-1.5 text-lg font-bold tracking-tight text-[var(--color-sidebar-text)]">
               MySuricates
             </span>
             {systemInfo?.environment && (
@@ -206,7 +209,10 @@ export function Sidebar() {
                 {systemInfo.environment}
               </span>
             )}
-            <div className="mt-2 flex rounded-full bg-black/25 p-0.5 text-xs relative">
+            <div
+              className="relative mt-2 flex rounded-full p-0.5 text-xs"
+              style={{ backgroundColor: 'color-mix(in srgb, var(--color-sidebar-text) 10%, transparent)' }}
+            >
               <div
                 className={`absolute inset-y-0.5 w-[calc(50%-2px)] rounded-full bg-accent/25 transition-transform duration-200 ease-in-out ${
                   simpleMode ? 'translate-x-0.5' : 'translate-x-[calc(100%+2px)]'
@@ -215,7 +221,9 @@ export function Sidebar() {
               <button
                 onClick={() => setSimpleMode(true)}
                 className={`relative z-10 flex items-center gap-1 px-3 py-1 rounded-full font-medium transition-colors ${
-                  simpleMode ? 'text-accent' : 'text-[#5a4e44] hover:text-[#8a7d6e]'
+                  simpleMode
+                    ? 'text-accent'
+                    : 'text-[var(--color-sidebar-text-muted)] hover:text-[var(--color-sidebar-text)]'
                 }`}
               >
                 <Zap className="w-3 h-3" />
@@ -224,7 +232,9 @@ export function Sidebar() {
               <button
                 onClick={() => setSimpleMode(false)}
                 className={`relative z-10 flex items-center gap-1 px-3 py-1 rounded-full font-medium transition-colors ${
-                  !simpleMode ? 'text-accent' : 'text-[#5a4e44] hover:text-[#8a7d6e]'
+                  !simpleMode
+                    ? 'text-accent'
+                    : 'text-[var(--color-sidebar-text-muted)] hover:text-[var(--color-sidebar-text)]'
                 }`}
               >
                 <Sparkles className="w-3 h-3" />
@@ -263,8 +273,8 @@ export function Sidebar() {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors
                  ${isActive
-                   ? 'text-white'
-                   : 'text-[#8a7d6e] hover:text-white'
+                   ? 'text-[var(--color-sidebar-text)]'
+                   : 'text-[var(--color-sidebar-text-muted)] hover:bg-[var(--color-sidebar-hover)] hover:text-[var(--color-sidebar-text)]'
                  }`
               }
               style={({ isActive }) => ({
@@ -280,12 +290,12 @@ export function Sidebar() {
 
         {/* Hidden items — show as "+ add back" in edit mode */}
         {editMode && !collapsed && hiddenNavItems.length > 0 && (
-          <div className="pt-2 mt-2 border-t border-white/10 space-y-0.5">
+          <div className="space-y-0.5 pt-2 mt-2" style={{ borderTop: '1px solid var(--color-sidebar-border)' }}>
             {hiddenNavItems.map((item) => (
               <button
                 key={item.to}
                 onClick={() => handleShow(item.to)}
-                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-sm text-[#5a4e44] hover:text-[#8a7d6e] transition-colors"
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-[var(--color-sidebar-text-muted)] transition-colors hover:bg-[var(--color-sidebar-hover)] hover:text-[var(--color-sidebar-text)]"
               >
                 <Plus className="w-3.5 h-3.5 shrink-0" />
                 <item.icon style={{ width: 14, height: 14 }} className="shrink-0" />
@@ -304,7 +314,7 @@ export function Sidebar() {
             className={`flex items-center gap-2 flex-1 px-3 py-1.5 rounded-lg text-sm transition-colors ${
               editMode
                 ? 'text-accent bg-accent/10'
-                : 'text-[#7a6e60] hover:text-[#a89a8a]'
+                : 'text-[var(--color-sidebar-text-muted)] hover:bg-[var(--color-sidebar-hover)] hover:text-[var(--color-sidebar-text)]'
             }`}
             aria-label={editMode ? 'Bearbeitung beenden' : 'Menü bearbeiten'}
           >
@@ -323,7 +333,7 @@ export function Sidebar() {
           {editMode && (
             <button
               onClick={handleReset}
-              className="p-2 rounded-lg text-[#5a4e44] hover:text-[#8a7d6e] transition-colors"
+              className="rounded-lg p-2 text-[var(--color-sidebar-text-muted)] transition-colors hover:bg-[var(--color-sidebar-hover)] hover:text-[var(--color-sidebar-text)]"
               aria-label="Zurücksetzen"
               title="Reihenfolge zurücksetzen"
             >
@@ -334,12 +344,14 @@ export function Sidebar() {
       )}
 
       {/* Settings + Collapse */}
-      <div className="p-2 border-t border-white/10 space-y-0.5">
+      <div className="space-y-0.5 p-2" style={{ borderTop: '1px solid var(--color-sidebar-border)' }}>
         <NavLink
           to="/settings"
           className={({ isActive }) =>
             `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors
-             ${isActive ? 'text-white' : 'text-[#8a7d6e] hover:text-white'}`
+             ${isActive
+               ? 'text-[var(--color-sidebar-text)]'
+               : 'text-[var(--color-sidebar-text-muted)] hover:bg-[var(--color-sidebar-hover)] hover:text-[var(--color-sidebar-text)]'}`
           }
           style={({ isActive }) => ({
             backgroundColor: isActive ? 'var(--color-sidebar-active)' : undefined,
@@ -355,8 +367,8 @@ export function Sidebar() {
         {!isMobile && (
           <button
             onClick={toggle}
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-[#7a6e60]
-                       hover:text-[#a89a8a] transition-colors w-full"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-[var(--color-sidebar-text-muted)]
+                       transition-colors hover:bg-[var(--color-sidebar-hover)] hover:text-[var(--color-sidebar-text)]"
             aria-label={collapsed ? t.common.expand : t.common.collapse}
           >
             {collapsed ? (

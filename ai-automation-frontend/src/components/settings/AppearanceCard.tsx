@@ -11,8 +11,13 @@ const COLOR_KEYS: Array<{ key: keyof ThemeTokens; label: string }> = [
   { key: '--color-warning', label: 'Warning' },
   { key: '--color-danger', label: 'Danger' },
   { key: '--color-surface', label: 'Surface' },
+  { key: '--color-surface-secondary', label: 'Surface Secondary' },
+  { key: '--color-surface-hover', label: 'Surface Hover' },
   { key: '--color-surface-raised', label: 'Surface Raised' },
   { key: '--color-border', label: 'Border' },
+  { key: '--color-sidebar', label: 'Sidebar' },
+  { key: '--color-sidebar-active', label: 'Sidebar Active' },
+  { key: '--color-sidebar-text', label: 'Sidebar Text' },
   { key: '--color-text', label: 'Text' },
   { key: '--color-text-secondary', label: 'Text Secondary' },
 ];
