@@ -63,7 +63,7 @@ class TodoTriggerServiceTest {
             when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             TodoTrigger result = service.create(new CreateTodoTriggerRequest(
-                    "backend,testing", null, null, null, "wf-1", null, "test trigger", 5, true));
+                    "backend,testing", null, null, null, "wf-1", null, "test trigger", 5, true, null));
 
             assertThat(result.getTagPattern()).isEqualTo("backend,testing");
             assertThat(result.getTargetWorkflow()).isEqualTo(wf);
@@ -76,7 +76,7 @@ class TodoTriggerServiceTest {
             when(workflowRepository.findById("wf-x")).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.create(new CreateTodoTriggerRequest(
-                    "tag", null, null, null, "wf-x", null, null, null, null)))
+                    "tag", null, null, null, "wf-x", null, null, null, null, null)))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
 

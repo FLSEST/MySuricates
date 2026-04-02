@@ -57,6 +57,10 @@ public class TodoTrigger {
     @Builder.Default
     private boolean autoClose = true;
 
+    @Column(name = "process_backlog")
+    @Builder.Default
+    private boolean processBacklog = true;
+
     private String description;
 
     @Column(name = "last_triggered_at")

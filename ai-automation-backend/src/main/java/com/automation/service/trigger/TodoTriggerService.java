@@ -17,7 +17,9 @@ import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
@@ -84,6 +86,7 @@ public class TodoTriggerService {
                 .description(req.description())
                 .maxAttempts(req.maxAttempts() != null ? req.maxAttempts() : 3)
                 .autoClose(req.autoClose() != null ? req.autoClose() : true)
+                .processBacklog(req.processBacklog() != null ? req.processBacklog() : true)
                 .build();
 
         return repository.save(trigger);
@@ -127,27 +130,62 @@ public class TodoTriggerService {
         }
 
         for (TodoTrigger trigger : triggers) {
-            if (!matches(trigger, todo)) {
-                continue;
-            }
-            if (todo.getFixAttempts() >= trigger.getMaxAttempts()) {
-                log.debug("TodoTrigger {}: skipping todo '{}' — max attempts reached ({}/{})",
-                        trigger.getId(), todo.getTitle(), todo.getFixAttempts(), trigger.getMaxAttempts());
-                continue;
-            }
-            if (isFixRunStillRunning(todo)) {
-                log.debug("TodoTrigger {}: skipping todo '{}' — fix run still running ({})",
-                        trigger.getId(), todo.getTitle(), todo.getLastFixRunId());
-                continue;
-            }
-
-            try {
-                fireTrigger(trigger, todo);
-            } catch (Exception e) {
-                log.error("TodoTrigger {} failed for todo '{}': {}",
-                        trigger.getId(), todo.getTitle(), e.getMessage());
+            if (matches(trigger, todo) && canFire(trigger, todo)) {
+                try {
+                    fireTrigger(trigger, todo);
+                } catch (Exception e) {
+                    log.error("TodoTrigger {} failed for todo '{}': {}",
+                            trigger.getId(), todo.getTitle(), e.getMessage());
+                }
             }
         }
+    }
+
+    // ── Scheduled backlog processing ───────────────────
+
+    @Scheduled(fixedDelayString = "${automation.todo-trigger.poll-interval-ms:300000}")
+    public void processBacklog() {
+        List<TodoTrigger> triggers = repository.findByEnabledTrue().stream()
+                .filter(TodoTrigger::isProcessBacklog)
+                .toList();
+        if (triggers.isEmpty()) {
+            return;
+        }
+
+        int globalMaxAttempts = triggers.stream()
+                .mapToInt(TodoTrigger::getMaxAttempts)
+                .max().orElse(3);
+
+        List<Todo> candidates = todoRepository.findBacklogCandidates(globalMaxAttempts, PageRequest.of(0, 20));
+
+        for (Todo todo : candidates) {
+            for (TodoTrigger trigger : triggers) {
+                if (matches(trigger, todo) && canFire(trigger, todo)) {
+                    try {
+                        fireTrigger(trigger, todo);
+                        log.info("Backlog processing: triggered fix for todo '{}'", todo.getTitle());
+                    } catch (Exception e) {
+                        log.error("Backlog processing: trigger {} failed for todo '{}': {}",
+                                trigger.getId(), todo.getTitle(), e.getMessage());
+                    }
+                    return; // Only 1 per tick
+                }
+            }
+        }
+    }
+
+    private boolean canFire(TodoTrigger trigger, Todo todo) {
+        if (todo.getFixAttempts() >= trigger.getMaxAttempts()) {
+            log.debug("TodoTrigger {}: skipping todo '{}' — max attempts reached ({}/{})",
+                    trigger.getId(), todo.getTitle(), todo.getFixAttempts(), trigger.getMaxAttempts());
+            return false;
+        }
+        if (isFixRunStillRunning(todo)) {
+            log.debug("TodoTrigger {}: skipping todo '{}' — fix run still running ({})",
+                    trigger.getId(), todo.getTitle(), todo.getLastFixRunId());
+            return false;
+        }
+        return true;
     }
 
     private void fireTrigger(TodoTrigger trigger, Todo todo) {

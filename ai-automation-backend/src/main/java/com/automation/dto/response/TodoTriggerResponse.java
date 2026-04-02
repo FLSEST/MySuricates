@@ -15,6 +15,7 @@ public record TodoTriggerResponse(
         boolean enabled,
         int maxAttempts,
         boolean autoClose,
+        boolean processBacklog,
         String description,
         Instant lastTriggeredAt,
         long triggerCount,

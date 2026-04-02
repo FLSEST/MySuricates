@@ -1,0 +1,1 @@
+ALTER TABLE todo_triggers ADD COLUMN process_backlog INTEGER NOT NULL DEFAULT 1;

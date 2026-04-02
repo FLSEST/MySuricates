@@ -13,5 +13,6 @@ public record CreateTodoTriggerRequest(
         Map<String, Object> contextTemplate,
         String description,
         Integer maxAttempts,
-        Boolean autoClose
+        Boolean autoClose,
+        Boolean processBacklog
 ) {}

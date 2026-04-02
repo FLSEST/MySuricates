@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import org.springframework.data.domain.Pageable;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -48,6 +50,16 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
      * Find TODOs by project and status (for similarity search across all sources).
      */
     List<Todo> findByProjectIdAndStatusIn(String projectId, List<Todo.Status> statuses);
+
+    /**
+     * Find open/backlog TODOs ordered by priority (CRITICAL first) for backlog processing.
+     * Used by TodoTriggerService.processBacklog() to pick the next candidate.
+     */
+    @Query("SELECT t FROM Todo t WHERE t.status IN ('OPEN', 'BACKLOG') "
+         + "AND t.fixAttempts < :maxAttempts "
+         + "ORDER BY CASE t.priority WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 "
+         + "WHEN 'MEDIUM' THEN 2 ELSE 3 END, t.createdAt ASC")
+    List<Todo> findBacklogCandidates(@Param("maxAttempts") int maxAttempts, Pageable pageable);
 
     /**
      * Find an open todo by referenceType and referenceId (source-agnostic).
