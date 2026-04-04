@@ -38,12 +38,17 @@ class WishPromptBuilderTest {
 
     @BeforeEach
     void setUp() {
-        builder = new WishPromptBuilder(
-                workflowRepository, projectRepository, skillRepository,
-                templateRepository, memoryRepository, workflowPoolService,
-                agentInstructionsService, learningService,
-                workflowRunRepository, chainRunRepository, stepResultRepository
+        WishPromptHelper helper = new WishPromptHelper(
+                workflowRepository, skillRepository, learningService, workflowRunRepository
         );
+        WishDecomposePromptBuilder decomposeBuilder = new WishDecomposePromptBuilder(
+                workflowRepository, projectRepository, templateRepository,
+                memoryRepository, workflowPoolService, agentInstructionsService, helper
+        );
+        WishEvaluatePromptBuilder evaluateBuilder = new WishEvaluatePromptBuilder(
+                workflowRunRepository, chainRunRepository, stepResultRepository, learningService
+        );
+        builder = new WishPromptBuilder(decomposeBuilder, evaluateBuilder, helper);
     }
 
     @Nested
