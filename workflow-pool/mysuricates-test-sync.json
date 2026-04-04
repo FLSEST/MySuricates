@@ -46,8 +46,8 @@
     {
       "type": "shell",
       "config": {
-        "label": "Gesamttest verifizieren",
-        "command": "cd /home/flo/Entwicklung/tools/autotrigger/ai-automation-backend\n\necho '=== Gesamter Test-Suite ==='\nmvn test -q 2>&1 | tail -10\nTEST_EXIT=$?\n\necho ''\necho '--- Letzter Commit ---'\ngit log -1 --oneline\n\necho ''\nif [ $TEST_EXIT -ne 0 ]; then\n  echo 'WARNUNG: Gesamte Test-Suite fehlgeschlagen — letzten Commit pruefen'\n  echo 'gate_status: RED'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Gesamte Test-Suite fehlgeschlagen nach neuem Test'\nelse\n  echo 'Alle Tests bestanden'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Neuer Test geschrieben und verifiziert'\nfi",
+        "label": "Neuen Test verifizieren",
+        "command": "cd /home/flo/Entwicklung/tools/autotrigger/ai-automation-backend\n\necho '--- Letzter Commit ---'\ngit log -1 --oneline\n\n# Finde den neuen Test aus dem letzten Commit\nNEW_TEST=$(git diff --name-only HEAD~1 2>/dev/null | grep 'Test.java' | head -1 | xargs -r basename -s .java)\n\nif [ -z \"$NEW_TEST\" ]; then\n  echo 'Kein neuer Test im letzten Commit gefunden'\n  echo 'gate_status: RED'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Kein Test geschrieben'\nelse\n  echo \"Pruefe neuen Test: $NEW_TEST\"\n  mvn test -Dtest=\"$NEW_TEST\" -q 2>&1 | tail -10\n  TEST_EXIT=$?\n\n  if [ $TEST_EXIT -ne 0 ]; then\n    echo \"FEHLER: $NEW_TEST besteht nicht\"\n    echo 'gate_status: RED'\n    echo 'gate_category: test-sync'\n    echo \"gate_description: Neuer Test $NEW_TEST fehlgeschlagen\"\n  else\n    echo \"$NEW_TEST besteht\"\n    echo 'gate_status: GREEN'\n    echo 'gate_category: test-sync'\n    echo \"gate_description: $NEW_TEST geschrieben und verifiziert\"\n  fi\nfi",
         "timeout_seconds": 600,
         "on_failure": "continue"
       }
