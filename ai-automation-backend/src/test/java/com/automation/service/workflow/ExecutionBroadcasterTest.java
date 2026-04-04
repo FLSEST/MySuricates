@@ -165,4 +165,60 @@ class ExecutionBroadcasterTest {
 
         verify(messagingTemplate).convertAndSend(anyString(), any(Object.class));
     }
+
+    @Test
+    void broadcastLogMessage_overridesConflictingKeysInData() {
+        Map<String, Object> data = new HashMap<>();
+        data.put("type", "old-type");
+        data.put("runId", "old-run-id");
+        data.put("timestamp", "old-timestamp");
+        data.put("extra", "kept");
+
+        broadcaster.broadcastLogMessage(RUN_ID, "new-type", data);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(messagingTemplate).convertAndSend(eq(EXPECTED_TOPIC), captor.capture());
+
+        Map<String, Object> payload = captor.getValue();
+        assertThat(payload).containsEntry("type", "new-type");
+        assertThat(payload).containsEntry("runId", RUN_ID);
+        assertThat(payload).containsEntry("extra", "kept");
+        assertThat(payload.get("timestamp")).isNotEqualTo("old-timestamp");
+    }
+
+    @Test
+    void broadcastLogMessage_handlesEmptyDataMap() {
+        broadcaster.broadcastLogMessage(RUN_ID, "heartbeat", new HashMap<>());
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(messagingTemplate).convertAndSend(eq(EXPECTED_TOPIC), captor.capture());
+
+        Map<String, Object> payload = captor.getValue();
+        assertThat(payload).containsEntry("type", "heartbeat");
+        assertThat(payload).containsEntry("runId", RUN_ID);
+        assertThat(payload).containsKey("timestamp");
+        assertThat(payload).hasSize(3);
+    }
+
+    @Test
+    void broadcastStepResult_payloadContainsExactlyFiveEntries() {
+        StepResult step = StepResult.builder()
+                .stepIndex(1)
+                .status(StepStatus.COMPLETED)
+                .input("in")
+                .output("out")
+                .durationMs(42L)
+                .build();
+
+        broadcaster.broadcastStepResult(RUN_ID, step);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(messagingTemplate).convertAndSend(eq(EXPECTED_TOPIC), captor.capture());
+
+        assertThat(captor.getValue()).hasSize(5)
+                .containsOnlyKeys("stepIndex", "status", "input", "output", "durationMs");
+    }
 }
