@@ -89,7 +89,7 @@ public class AutoTodoService {
     private void handleAutoMode(WorkflowRunCompletedEvent event, GateResult gate, List<String> targetProjectIds) {
         for (String projectId : targetProjectIds) {
             if (hasGranularTodos(event)) {
-                createGranularTodos(projectId, event);
+                createGranularTodos(projectId, event, gate);
             }
             switch (gate.status()) {
                 case GREEN -> closeOpenTodos(projectId, event);
@@ -107,7 +107,7 @@ public class AutoTodoService {
         };
         for (String projectId : targetProjectIds) {
             if (hasGranularTodos(event)) {
-                createGranularTodos(projectId, event);
+                createGranularTodos(projectId, event, gate);
             }
             upsertTodo(projectId, event, gate, priority);
         }
@@ -119,7 +119,7 @@ public class AutoTodoService {
     }
 
     @SuppressWarnings("unchecked")
-    private void createGranularTodos(String projectId, WorkflowRunCompletedEvent event) {
+    private void createGranularTodos(String projectId, WorkflowRunCompletedEvent event, GateResult gate) {
         Object items = event.getRunMetadata().get("todo_items");
         if (!(items instanceof List<?> list)) return;
 
@@ -148,6 +148,9 @@ public class AutoTodoService {
             List<String> tags = new ArrayList<>(itemTags);
             tags.add(TAG_AUTO_WORKFLOW);
             tags.add(compositeTag);
+            if (gate != null && gate.category() != null) {
+                tags.add("category:" + gate.category());
+            }
             String tagsJson = TodoMapper.listToJson(tags);
 
             String itemDescription = map.get("description") != null
