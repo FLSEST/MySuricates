@@ -18,6 +18,8 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
 
     long countByStatus(Todo.Status status);
 
+    long countBySource(Todo.Source source);
+
     @Query("SELECT new com.automation.dto.response.TodoCountResponse("
          + "SUM(CASE WHEN t.status = 'OPEN' THEN 1 ELSE 0 END), "
          + "SUM(CASE WHEN t.status = 'IN_PROGRESS' THEN 1 ELSE 0 END), "

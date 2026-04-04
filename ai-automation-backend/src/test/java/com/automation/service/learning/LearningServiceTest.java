@@ -422,7 +422,7 @@ class LearningServiceTest {
             when(runRepository.findTopWorkflows()).thenReturn(List.of());
             when(runRepository.findTop10ByOrderByStartedAtDesc()).thenReturn(List.of());
 
-            DashboardResponse dashboard = learningService.getDashboard();
+            DashboardResponse dashboard = learningService.getDashboard(30, null);
 
             assertThat(dashboard.totalWorkflows()).isEqualTo(2L);
             assertThat(dashboard.totalRuns()).isEqualTo(3L);

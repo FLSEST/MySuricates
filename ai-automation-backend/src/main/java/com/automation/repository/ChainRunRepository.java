@@ -14,6 +14,8 @@ public interface ChainRunRepository extends JpaRepository<ChainRun, String> {
 
     long countByChainId(String chainId);
 
+    long countByStatus(RunStatus status);
+
     List<ChainRun> findByChainIdOrderByStartedAtDesc(String chainId);
 
     Page<ChainRun> findByOrderByStartedAtDesc(Pageable pageable);

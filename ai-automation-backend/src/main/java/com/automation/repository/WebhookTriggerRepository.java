@@ -18,6 +18,8 @@ public interface WebhookTriggerRepository extends JpaRepository<WebhookTrigger, 
 
     List<WebhookTrigger> findByWorkflowId(String workflowId);
 
+    long countByEnabledTrue();
+
     @Modifying
     @Query("UPDATE WebhookTrigger w SET w.triggerCount = w.triggerCount + 1, w.lastTriggeredAt = :timestamp WHERE w.id = :id")
     void incrementTriggerCount(@Param("id") String id, @Param("timestamp") Instant timestamp);

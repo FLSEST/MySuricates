@@ -17,4 +17,10 @@ public final class MetadataExtractor {
         if (val instanceof Number n) return n.longValue();
         return 0;
     }
+
+    public static String extractString(Map<String, Object> map, String key) {
+        Object val = map.get(key);
+        if (val instanceof String s) return s;
+        return null;
+    }
 }

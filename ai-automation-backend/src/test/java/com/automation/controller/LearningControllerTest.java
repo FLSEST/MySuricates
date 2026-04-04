@@ -1,9 +1,11 @@
 package com.automation.controller;
 
 import com.automation.dto.response.DashboardResponse;
+import com.automation.dto.response.PlatformStatsResponse;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.service.learning.LearningService;
+import com.automation.service.learning.PlatformStatsService;
 import com.automation.service.system.ApiKeyService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,8 +34,9 @@ class LearningControllerTest {
     @MockBean
     private LearningService learningService;
     @MockBean
+    private PlatformStatsService platformStatsService;
+    @MockBean
     private ActivityLogService activityLogService;
-
 
     @MockBean
     private ApiKeyService apiKeyService;
@@ -42,14 +45,60 @@ class LearningControllerTest {
     void getDashboard_returnsOk() throws Exception {
         DashboardResponse dashboard = new DashboardResponse(
                 5L, 20L, 3L, 15L, 5L, 1500.0, 0.75, 0.42, 5000L,
-                List.of(), List.of(), List.of(), List.of(), List.of()
+                3000L, 2000L,
+                List.of(), List.of(), List.of(), List.of(), List.of(),
+                List.of(), List.of(), List.of(), List.of(),
+                new DashboardResponse.TriggerDistribution(15, 3, 0, 0, 2)
         );
-        when(learningService.getDashboard()).thenReturn(dashboard);
+        when(learningService.getDashboard(30, null)).thenReturn(dashboard);
 
         mockMvc.perform(get("/api/v1/learning/dashboard"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalWorkflows").value(5))
-                .andExpect(jsonPath("$.totalRuns").value(20));
+                .andExpect(jsonPath("$.totalRuns").value(20))
+                .andExpect(jsonPath("$.totalInputTokens").value(3000))
+                .andExpect(jsonPath("$.triggerDistribution.manual").value(15));
+    }
+
+    @Test
+    void getDashboard_withParams_passesToService() throws Exception {
+        DashboardResponse dashboard = new DashboardResponse(
+                5L, 10L, 1L, 8L, 2L, 1000.0, 0.8, 0.1, 1000L,
+                500L, 500L,
+                List.of(), List.of(), List.of(), List.of(), List.of(),
+                List.of(), List.of(), List.of(), List.of(),
+                new DashboardResponse.TriggerDistribution(10, 0, 0, 0, 0)
+        );
+        when(learningService.getDashboard(7, "proj-1")).thenReturn(dashboard);
+
+        mockMvc.perform(get("/api/v1/learning/dashboard")
+                        .param("days", "7")
+                        .param("projectId", "proj-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalRuns").value(10));
+
+        verify(learningService).getDashboard(7, "proj-1");
+    }
+
+    @Test
+    void getPlatformStats_returnsOk() throws Exception {
+        PlatformStatsResponse stats = new PlatformStatsResponse(
+                3, 1, 10, 35, 16, 10, 6, List.of(),
+                53, 50, 3, 5, 8, 3, 4,
+                new PlatformStatsResponse.ChainStats(2, 5, 4, 1),
+                2, 1, 8,
+                new PlatformStatsResponse.TodoStats(5, 2, 10, 1, 8, 5, 5),
+                new PlatformStatsResponse.WishStats(3, 2, 1, 0),
+                new PlatformStatsResponse.AssistantStats(15, 4.5)
+        );
+        when(platformStatsService.getPlatformStats()).thenReturn(stats);
+
+        mockMvc.perform(get("/api/v1/learning/platform-stats"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.activeProjects").value(3))
+                .andExpect(jsonPath("$.totalSkills").value(16))
+                .andExpect(jsonPath("$.chainStats.totalChains").value(2))
+                .andExpect(jsonPath("$.assistantStats.totalSessions").value(15));
     }
 
     @Test

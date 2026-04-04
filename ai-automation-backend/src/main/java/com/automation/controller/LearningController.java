@@ -1,7 +1,9 @@
 package com.automation.controller;
 
 import com.automation.dto.response.DashboardResponse;
+import com.automation.dto.response.PlatformStatsResponse;
 import com.automation.service.learning.LearningService;
+import com.automation.service.learning.PlatformStatsService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
@@ -17,10 +19,18 @@ import java.util.Map;
 public class LearningController {
 
     private final LearningService learningService;
+    private final PlatformStatsService platformStatsService;
 
     @GetMapping("/dashboard")
-    public DashboardResponse getDashboard() {
-        return learningService.getDashboard();
+    public DashboardResponse getDashboard(
+            @RequestParam(defaultValue = "30") int days,
+            @RequestParam(required = false) String projectId) {
+        return learningService.getDashboard(days, projectId);
+    }
+
+    @GetMapping("/platform-stats")
+    public PlatformStatsResponse getPlatformStats() {
+        return platformStatsService.getPlatformStats();
     }
 
     @GetMapping("/workflows/{workflowId}/stats")

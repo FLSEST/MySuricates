@@ -16,4 +16,6 @@ public interface CompletionTriggerRepository extends JpaRepository<CompletionTri
     List<CompletionTrigger> findBySourceWorkflowIdAndEnabledTrue(String sourceWorkflowId);
 
     boolean existsBySourceWorkflowIdAndTargetWorkflowId(String sourceId, String targetId);
+
+    long countByEnabledTrue();
 }

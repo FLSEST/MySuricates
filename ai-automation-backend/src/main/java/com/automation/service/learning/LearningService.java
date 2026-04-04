@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 
 import static com.automation.service.learning.MetadataExtractor.extractDouble;
 import static com.automation.service.learning.MetadataExtractor.extractLong;
+import static com.automation.service.learning.MetadataExtractor.extractString;
 
 @Service
 @RequiredArgsConstructor
@@ -88,19 +89,34 @@ public class LearningService {
 
     @Transactional(readOnly = true)
     public DashboardResponse getDashboard() {
+        return getDashboard(30, null);
+    }
+
+    @Transactional(readOnly = true)
+    public DashboardResponse getDashboard(int days, String projectId) {
         long totalWorkflows = workflowRepository.count();
         long totalRuns = runRepository.count();
         long successfulRuns = runRepository.countByStatus(RunStatus.COMPLETED)
-                + runRepository.countByStatus(RunStatus.COMPLETED_WITH_ERRORS); // legacy: old runs may still have this status
+                + runRepository.countByStatus(RunStatus.COMPLETED_WITH_ERRORS);
         long failedRuns = runRepository.countByStatus(RunStatus.FAILED);
         double successRate = totalRuns > 0 ? (double) successfulRuns / totalRuns : 0;
 
         Instant todayStart = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant();
         long runsToday = runRepository.countByStartedAtAfter(todayStart);
 
-        Instant thirtyDaysAgoInstant = LocalDate.now().minusDays(30)
+        Instant windowStart = LocalDate.now().minusDays(days)
                 .atStartOfDay(ZoneId.systemDefault()).toInstant();
-        List<WorkflowRun> recentWindow = runRepository.findByStartedAtAfterOrderByStartedAtDesc(thirtyDaysAgoInstant);
+        List<WorkflowRun> recentWindow = runRepository.findByStartedAtAfterOrderByStartedAtDesc(windowStart);
+
+        // Apply optional project filter
+        if (projectId != null && !projectId.isBlank()) {
+            recentWindow = recentWindow.stream()
+                    .filter(r -> r.getWorkflow() != null
+                            && r.getWorkflow().getProject() != null
+                            && projectId.equals(r.getWorkflow().getProject().getId()))
+                    .toList();
+        }
+
         double avgDurationMs = recentWindow.stream()
                 .filter(r -> r.getDurationMs() != null)
                 .mapToLong(WorkflowRun::getDurationMs)
@@ -116,46 +132,95 @@ public class LearningService {
                 .map(workflowMapper::toRunResponse)
                 .toList();
 
-        List<DashboardResponse.TimeSeriesPoint> timeSeries = recentWindow.stream()
-                .filter(r -> r.getStartedAt() != null)
-                .collect(Collectors.groupingBy(r -> r.getStartedAt().atZone(ZoneId.systemDefault()).toLocalDate()))
-                .entrySet().stream()
-                .sorted(Map.Entry.comparingByKey())
-                .map(e -> {
-                    long count = e.getValue().size();
-                    long completed = e.getValue().stream()
-                            .filter(r -> r.getStatus() == RunStatus.COMPLETED
-                                    || r.getStatus() == RunStatus.COMPLETED_WITH_ERRORS).count();
-                    double rate = count > 0 ? (double) completed / count : 0;
-                    return new DashboardResponse.TimeSeriesPoint(e.getKey().toString(), count, rate);
-                })
-                .toList();
+        // --- Per-run aggregation pass ---
+        double totalCostUsd = 0.0;
+        long totalTokens = 0;
+        long totalInputTokens = 0;
+        long totalOutputTokens = 0;
 
-        double totalCostUsd30d = 0.0;
-        long totalTokens30d = 0;
+        // Per-run cost/tokens for time series
+        Map<String, double[]> runCostMap = new HashMap<>();
+        Map<String, long[]> runTokensMap = new HashMap<>();
 
+        // Provider aggregation
         Map<String, long[]> providerRunCount = new LinkedHashMap<>();
         Map<String, long[]> providerSuccessCount = new LinkedHashMap<>();
         Map<String, long[]> providerTokens = new LinkedHashMap<>();
         Map<String, double[]> providerCost = new LinkedHashMap<>();
+
+        // Model aggregation
         Map<String, long[]> modelStepCount = new LinkedHashMap<>();
         Map<String, long[]> modelTokens = new LinkedHashMap<>();
         Map<String, double[]> modelCost = new LinkedHashMap<>();
 
+        // Gate status
+        Map<String, long[]> gateStatusCounts = new LinkedHashMap<>();
+
+        // Failure reasons
+        Map<String, long[]> failureReasonCounts = new LinkedHashMap<>();
+
+        // Cost by workflow
+        Map<String, double[]> workflowCostMap = new LinkedHashMap<>();
+        Map<String, long[]> workflowRunCountMap = new LinkedHashMap<>();
+        Map<String, String> workflowNameMap = new LinkedHashMap<>();
+
+        // Block type usage
+        Map<String, long[]> blockTypeStepCount = new LinkedHashMap<>();
+        Map<String, long[]> blockTypeFailedCount = new LinkedHashMap<>();
+
+        // Trigger distribution
+        long trigScheduled = 0, trigTodoTrigger = 0, trigManual = 0;
+
         for (WorkflowRun run : recentWindow) {
             String runProvider = null;
             boolean runSuccess = run.getStatus() == RunStatus.COMPLETED;
-            long runTokens = 0;
             double runCost = 0.0;
+            long runTokens = 0;
+
+            // Trigger classification
+            if (run.getTriggeredByScheduleId() != null) {
+                trigScheduled++;
+            } else if (run.getMetadata() != null && Boolean.TRUE.equals(run.getMetadata().get("todoTriggerRun"))) {
+                trigTodoTrigger++;
+            } else {
+                trigManual++;
+            }
+
+            // Gate status from run metadata
+            if (run.getMetadata() != null) {
+                Object gateStatus = run.getMetadata().get("gate_status");
+                if (gateStatus instanceof String gs && !gs.isBlank()) {
+                    gateStatusCounts.computeIfAbsent(gs, k -> new long[1])[0]++;
+                }
+            }
+
+            // Failure reasons
+            if (run.getStatus() == RunStatus.FAILED && run.getError() != null) {
+                Object msg = run.getError().get("message");
+                if (msg instanceof String reason && !reason.isBlank()) {
+                    String truncated = reason.length() > 100 ? reason.substring(0, 100) + "..." : reason;
+                    failureReasonCounts.computeIfAbsent(truncated, k -> new long[1])[0]++;
+                }
+            }
+
+            // Cost by workflow
+            String wfId = run.getWorkflow() != null ? run.getWorkflow().getId() : "unknown";
+            String wfName = run.getWorkflow() != null ? run.getWorkflow().getName() : "Unknown";
+            workflowRunCountMap.computeIfAbsent(wfId, k -> new long[1])[0]++;
+            workflowNameMap.putIfAbsent(wfId, wfName);
 
             for (StepResult step : run.getSteps()) {
                 if (step.getMetadata() == null) continue;
                 Map<String, Object> meta = step.getMetadata();
 
                 double stepCost = extractDouble(meta, "costUsd");
-                long stepTokens = extractLong(meta, "inputTokens") + extractLong(meta, "outputTokens");
-                totalCostUsd30d += stepCost;
-                totalTokens30d += stepTokens;
+                long stepInput = extractLong(meta, "inputTokens");
+                long stepOutput = extractLong(meta, "outputTokens");
+                long stepTokens = stepInput + stepOutput;
+                totalCostUsd += stepCost;
+                totalTokens += stepTokens;
+                totalInputTokens += stepInput;
+                totalOutputTokens += stepOutput;
                 runCost += stepCost;
                 runTokens += stepTokens;
 
@@ -167,7 +232,23 @@ public class LearningService {
                     modelTokens.computeIfAbsent(nm, k -> new long[1])[0] += stepTokens;
                     modelCost.computeIfAbsent(nm, k -> new double[1])[0] += stepCost;
                 }
+
+                // Block type usage
+                String blockType = extractString(meta, "blockType");
+                if (blockType != null && !blockType.isBlank()) {
+                    blockTypeStepCount.computeIfAbsent(blockType, k -> new long[1])[0]++;
+                    if (step.getStatus() == StepStatus.FAILED) {
+                        blockTypeFailedCount.computeIfAbsent(blockType, k -> new long[1])[0]++;
+                    }
+                }
             }
+
+            // Store per-run aggregates for time series
+            runCostMap.put(run.getId(), new double[]{runCost});
+            runTokensMap.put(run.getId(), new long[]{runTokens});
+
+            // Accumulate cost by workflow
+            workflowCostMap.computeIfAbsent(wfId, k -> new double[1])[0] += runCost;
 
             if (runProvider != null) {
                 providerRunCount.computeIfAbsent(runProvider, k -> new long[1])[0]++;
@@ -177,6 +258,37 @@ public class LearningService {
             }
         }
 
+        // --- Time series with extended fields ---
+        List<DashboardResponse.TimeSeriesPoint> timeSeries = recentWindow.stream()
+                .filter(r -> r.getStartedAt() != null)
+                .collect(Collectors.groupingBy(r -> r.getStartedAt().atZone(ZoneId.systemDefault()).toLocalDate()))
+                .entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(e -> {
+                    List<WorkflowRun> dayRuns = e.getValue();
+                    long count = dayRuns.size();
+                    long completed = dayRuns.stream()
+                            .filter(r -> r.getStatus() == RunStatus.COMPLETED
+                                    || r.getStatus() == RunStatus.COMPLETED_WITH_ERRORS).count();
+                    long failed = dayRuns.stream()
+                            .filter(r -> r.getStatus() == RunStatus.FAILED).count();
+                    double rate = count > 0 ? (double) completed / count : 0;
+                    double dayAvgDuration = dayRuns.stream()
+                            .filter(r -> r.getDurationMs() != null)
+                            .mapToLong(WorkflowRun::getDurationMs)
+                            .average().orElse(0);
+                    double dayCost = dayRuns.stream()
+                            .mapToDouble(r -> runCostMap.getOrDefault(r.getId(), new double[]{0})[0])
+                            .sum();
+                    long dayTokens = dayRuns.stream()
+                            .mapToLong(r -> runTokensMap.getOrDefault(r.getId(), new long[]{0})[0])
+                            .sum();
+                    return new DashboardResponse.TimeSeriesPoint(
+                            e.getKey().toString(), count, rate, failed, dayAvgDuration, dayCost, dayTokens);
+                })
+                .toList();
+
+        // --- Build response lists ---
         List<DashboardResponse.ProviderStats> providerStats = providerRunCount.entrySet().stream()
                 .map(e -> {
                     String p = e.getKey();
@@ -200,6 +312,41 @@ public class LearningService {
                 .sorted(Comparator.comparingLong(DashboardResponse.ModelStats::totalTokens).reversed())
                 .toList();
 
+        List<DashboardResponse.GateStatusEntry> gateStatusSummary = gateStatusCounts.entrySet().stream()
+                .map(e -> new DashboardResponse.GateStatusEntry(e.getKey(), e.getValue()[0]))
+                .sorted(Comparator.comparingLong(DashboardResponse.GateStatusEntry::count).reversed())
+                .toList();
+
+        List<DashboardResponse.FailureReasonEntry> failureReasons = failureReasonCounts.entrySet().stream()
+                .map(e -> new DashboardResponse.FailureReasonEntry(e.getKey(), e.getValue()[0]))
+                .sorted(Comparator.comparingLong(DashboardResponse.FailureReasonEntry::count).reversed())
+                .limit(10)
+                .toList();
+
+        List<DashboardResponse.CostByWorkflowEntry> costByWorkflow = workflowCostMap.entrySet().stream()
+                .map(e -> new DashboardResponse.CostByWorkflowEntry(
+                        e.getKey(),
+                        workflowNameMap.getOrDefault(e.getKey(), "Unknown"),
+                        e.getValue()[0],
+                        workflowRunCountMap.getOrDefault(e.getKey(), new long[]{0})[0]))
+                .sorted(Comparator.comparingDouble(DashboardResponse.CostByWorkflowEntry::totalCostUsd).reversed())
+                .limit(10)
+                .toList();
+
+        List<DashboardResponse.BlockTypeUsageEntry> blockTypeUsage = blockTypeStepCount.entrySet().stream()
+                .map(e -> {
+                    String bt = e.getKey();
+                    long steps = e.getValue()[0];
+                    long failed = blockTypeFailedCount.getOrDefault(bt, new long[]{0})[0];
+                    double failRate = steps > 0 ? (double) failed / steps : 0;
+                    return new DashboardResponse.BlockTypeUsageEntry(bt, steps, failed, failRate);
+                })
+                .sorted(Comparator.comparingLong(DashboardResponse.BlockTypeUsageEntry::stepCount).reversed())
+                .toList();
+
+        var triggerDistribution = new DashboardResponse.TriggerDistribution(
+                trigManual, trigScheduled, 0, 0, trigTodoTrigger);
+
         return new DashboardResponse(
                 totalWorkflows,
                 totalRuns,
@@ -208,13 +355,20 @@ public class LearningService {
                 failedRuns,
                 avgDurationMs,
                 successRate,
-                totalCostUsd30d,
-                totalTokens30d,
+                totalCostUsd,
+                totalTokens,
+                totalInputTokens,
+                totalOutputTokens,
                 topWorkflows,
                 recentRuns,
                 timeSeries,
                 providerStats,
-                modelStats
+                modelStats,
+                gateStatusSummary,
+                failureReasons,
+                costByWorkflow,
+                blockTypeUsage,
+                triggerDistribution
         );
     }
 }

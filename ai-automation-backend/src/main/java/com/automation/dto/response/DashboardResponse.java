@@ -12,11 +12,18 @@ public record DashboardResponse(
         double successRate,
         double totalCostUsd30d,
         long totalTokens30d,
+        long totalInputTokens,
+        long totalOutputTokens,
         List<TopWorkflowEntry> topWorkflows,
         List<WorkflowRunResponse> recentRuns,
         List<TimeSeriesPoint> timeSeries,
         List<ProviderStats> providerStats,
-        List<ModelStats> modelStats
+        List<ModelStats> modelStats,
+        List<GateStatusEntry> gateStatusSummary,
+        List<FailureReasonEntry> failureReasons,
+        List<CostByWorkflowEntry> costByWorkflow,
+        List<BlockTypeUsageEntry> blockTypeUsage,
+        TriggerDistribution triggerDistribution
 ) {
     public record TopWorkflowEntry(
             String workflowId,
@@ -27,7 +34,11 @@ public record DashboardResponse(
     public record TimeSeriesPoint(
             String date,
             long count,
-            double successRate
+            double successRate,
+            long failedCount,
+            double avgDurationMs,
+            double totalCostUsd,
+            long totalTokens
     ) {}
 
     public record ProviderStats(
@@ -43,5 +54,37 @@ public record DashboardResponse(
             long stepCount,
             long totalTokens,
             double totalCostUsd
+    ) {}
+
+    public record GateStatusEntry(
+            String status,
+            long count
+    ) {}
+
+    public record FailureReasonEntry(
+            String reason,
+            long count
+    ) {}
+
+    public record CostByWorkflowEntry(
+            String workflowId,
+            String workflowName,
+            double totalCostUsd,
+            long runCount
+    ) {}
+
+    public record BlockTypeUsageEntry(
+            String blockType,
+            long stepCount,
+            long failedCount,
+            double failureRate
+    ) {}
+
+    public record TriggerDistribution(
+            long manual,
+            long scheduled,
+            long webhook,
+            long completionTrigger,
+            long todoTrigger
     ) {}
 }
