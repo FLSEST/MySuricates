@@ -3,6 +3,10 @@ package com.automation.service.assistant;
 import com.automation.dto.AssistantChatRequest;
 import com.automation.entity.*;
 import com.automation.repository.*;
+import com.automation.service.assistant.context.RunsContextSection;
+import com.automation.service.assistant.context.SchedulesContextSection;
+import com.automation.service.assistant.context.TodosContextSection;
+import com.automation.service.assistant.context.WishesContextSection;
 import com.automation.service.system.SystemIdentityService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,10 +43,14 @@ class AssistantContextBuilderTest {
 
     @BeforeEach
     void setUp() {
-        builder = new AssistantContextBuilder(workflowRunRepository, todoRepository,
-                scheduledWorkflowRepository, projectRepository, wishRepository,
-                workflowRepository, workflowMemoryRepository, assistantSessionRepository,
-                systemIdentity, new ObjectMapper());
+        RunsContextSection runsSection = new RunsContextSection(workflowRunRepository, systemIdentity);
+        TodosContextSection todosSection = new TodosContextSection(todoRepository);
+        WishesContextSection wishesSection = new WishesContextSection(wishRepository);
+        SchedulesContextSection schedulesSection = new SchedulesContextSection(scheduledWorkflowRepository);
+        builder = new AssistantContextBuilder(workflowRunRepository, projectRepository,
+                wishRepository, workflowRepository, workflowMemoryRepository,
+                assistantSessionRepository, new ObjectMapper(),
+                runsSection, todosSection, wishesSection, schedulesSection);
     }
 
     @Test
@@ -237,6 +245,16 @@ class AssistantContextBuilderTest {
             String result = builder.resolveWorkingDir(ctx);
             assertThat(result).isEqualTo(System.getProperty("user.home"));
         }
+
+        @Test
+        void repositoryError_returnsHome() {
+            when(projectRepository.findById("p1")).thenThrow(new RuntimeException("boom"));
+
+            var ctx = new AssistantChatRequest.PageContext("workflows", null, "p1");
+            String result = builder.resolveWorkingDir(ctx);
+
+            assertThat(result).isEqualTo(System.getProperty("user.home"));
+        }
     }
 
     @Nested
@@ -351,6 +369,117 @@ class AssistantContextBuilderTest {
 
             assertThat(result).contains("Aktuell angezeigter Run");
             assertThat(result).contains("COMPLETED");
+        }
+
+        @Test
+        void overview_includesProjectsWorkflowMemoryAndRecentSessions() {
+            when(systemIdentity.getVersion()).thenReturn("1.0.0");
+            when(workflowRunRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of());
+            when(workflowRunRepository.findTop10ByOrderByStartedAtDesc()).thenReturn(List.of());
+            when(todoRepository.findAll()).thenReturn(List.of());
+            when(wishRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
+            when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
+
+            Project alpha = Project.builder().id("p-alpha").name("Alpha").path("/work/alpha").build();
+            Project beta = Project.builder().id("p-beta").name("Beta").path("/work/beta").build();
+            Workflow alphaWorkflow = Workflow.builder().id("wf-alpha").name("Build Alpha").project(alpha).build();
+            Workflow betaWorkflow = Workflow.builder().id("wf-beta").name("Build Beta").project(beta).build();
+            when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of(alpha, beta));
+            when(workflowRepository.findAllWithActiveProject()).thenReturn(List.of(alphaWorkflow, betaWorkflow));
+
+            WorkflowMemory memory = WorkflowMemory.builder()
+                    .workflowId("wf-alpha")
+                    .content("Vor Shell-Ausfuehrung immer den Eingabe-Kontext validieren.")
+                    .provider("assistant")
+                    .active(true)
+                    .build();
+            when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of(memory));
+
+            AssistantSession session = AssistantSession.builder()
+                    .id("session-1")
+                    .page("dashboard")
+                    .startedAt(Instant.parse("2026-03-20T10:15:00Z"))
+                    .messages("""
+                            [{"role":"assistant","content":"Hallo"},{"role":"user","content":"Wie ist der Status von Alpha?"}]
+                            """)
+                    .build();
+            when(assistantSessionRepository.findTop3ByOrderByStartedAtDesc()).thenReturn(List.of(session));
+
+            String result = builder.buildSystemPrompt(null, "Du bist MySuricates.");
+
+            assertThat(result).contains("**Meine Projekte (2):**");
+            assertThat(result).contains("Alpha (ID: p-alpha, 1 Workflows)");
+            assertThat(result).contains("Beta (ID: p-beta, 1 Workflows)");
+            assertThat(result).contains("**Meine Workflows (2):**");
+            assertThat(result).contains("[Build Alpha] Alpha (projekt: p-alpha)");
+            assertThat(result).contains("## Gelerntes & Fallstricke");
+            assertThat(result).contains("[Build Alpha]: Vor Shell-Ausfuehrung immer den Eingabe-Kontext validieren.");
+            assertThat(result).contains("## Letzte Gespräche (Orientierung)");
+            assertThat(result).contains("User fragte: \"Wie ist der Status von Alpha?\"");
+        }
+
+        @Test
+        void workflowsPage_prioritizesFocusedProjectAndShowsActiveProject() {
+            when(systemIdentity.getVersion()).thenReturn("1.0.0");
+            when(workflowRunRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of());
+            when(workflowRunRepository.findTop10ByOrderByStartedAtDesc()).thenReturn(List.of());
+            when(todoRepository.findAll()).thenReturn(List.of());
+            when(wishRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
+            when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
+            when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
+
+            Project alpha = Project.builder().id("p-alpha").name("Alpha").path("/work/alpha").build();
+            Project beta = Project.builder().id("p-beta").name("Beta").path("/work/beta").build();
+            when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of(alpha, beta));
+            when(projectRepository.findById("p-alpha")).thenReturn(Optional.of(alpha));
+
+            Workflow alphaWorkflow = Workflow.builder().id("wf-alpha").name("A Workflow").project(alpha).build();
+            Workflow betaWorkflow = Workflow.builder().id("wf-beta").name("B Workflow").project(beta).build();
+            when(workflowRepository.findAllWithActiveProject()).thenReturn(List.of(betaWorkflow, alphaWorkflow));
+
+            var ctx = new AssistantChatRequest.PageContext("workflow", "wf-alpha", "p-alpha");
+            String result = builder.buildSystemPrompt(ctx, "");
+
+            assertThat(result).contains("**Meine Projekte (2):**");
+            assertThat(result).contains("**Meine Workflows (2):**");
+            assertThat(result).contains("[A Workflow] Alpha (projekt: p-alpha)");
+            assertThat(result).contains("[B Workflow] Beta (projekt: p-beta)");
+            assertThat(result.indexOf("[A Workflow]")).isLessThan(result.indexOf("[B Workflow]"));
+            assertThat(result).contains("Aktives Projekt: Alpha (ID: p-alpha)");
+        }
+
+        @Test
+        void wishesPage_showsWishDetailsAndFullWishContext() {
+            when(systemIdentity.getVersion()).thenReturn("1.0.0");
+            when(workflowRunRepository.countByStatus(RunStatus.RUNNING)).thenReturn(0L);
+            when(workflowRunRepository.findTop10ByOrderByStartedAtDesc()).thenReturn(List.of());
+            when(todoRepository.findAll()).thenReturn(List.of());
+            when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
+            when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of());
+            when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
+
+            Project alpha = Project.builder().id("p-alpha").name("Alpha").path("/work/alpha").build();
+            Workflow alphaWorkflow = Workflow.builder().id("wf-alpha").name("Wish Workflow").project(alpha).build();
+            when(workflowRepository.findAllWithActiveProject()).thenReturn(List.of(alphaWorkflow));
+
+            Wish activeWish = Wish.builder()
+                    .id("wish-1")
+                    .originalText("Baue einen Deploy-Workflow")
+                    .status(WishStatus.EXECUTING)
+                    .iterationCount(2)
+                    .maxIterations(5)
+                    .build();
+            when(wishRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(activeWish));
+            when(wishRepository.findById("wish-1")).thenReturn(Optional.of(activeWish));
+
+            var ctx = new AssistantChatRequest.PageContext("wishes", "wish-1", null);
+            String result = builder.buildSystemPrompt(ctx, "");
+
+            assertThat(result).contains("**Aktive Wishes (1):**");
+            assertThat(result).contains("[EXECUTING] Baue einen Deploy-Workflow");
+            assertThat(result).contains("**Meine Workflows (1):**");
+            assertThat(result).contains("[Wish Workflow] Alpha (projekt: p-alpha)");
+            assertThat(result).contains("Wish-Details: [EXECUTING] Baue einen Deploy-Workflow, Iterationen: 2/5");
         }
     }
 }

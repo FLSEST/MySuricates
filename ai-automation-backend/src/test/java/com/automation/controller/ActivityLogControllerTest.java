@@ -109,4 +109,20 @@ class ActivityLogControllerTest {
                         .param("level", "").param("category", "").param("workflowId", ""))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    void getLogs_returnsPageMetadata() throws Exception {
+        var response = new ActivityLogResponse("log-1", Instant.now(), "INFO", "SYSTEM",
+                "Started", "backend", null, null, Map.of(), Instant.now());
+        var page = new PageImpl<ActivityLog>(List.of(new ActivityLog()), PageRequest.of(1, 25), 51);
+        when(activityLogService.findAll(1, 25, null, null, null)).thenReturn(page);
+        when(activityLogMapper.toResponseList(any())).thenReturn(List.of(response));
+
+        mockMvc.perform(get("/api/v1/activity-log").param("page", "1").param("size", "25"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(25))
+                .andExpect(jsonPath("$.totalElements").value(51))
+                .andExpect(jsonPath("$.totalPages").value(3));
+    }
 }

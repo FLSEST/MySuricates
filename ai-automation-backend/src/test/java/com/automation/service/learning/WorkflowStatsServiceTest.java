@@ -181,4 +181,61 @@ class WorkflowStatsServiceTest {
         assertThat(stats.getAvgRating()).hasValue(4.0);
         assertThat(stats.getRatedCount()).isEqualTo(2);
     }
+
+    @Test
+    void getOptimizationSuggestions_slowStep_suggests() {
+        StepResult slowStep = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED)
+                .durationMs(40_000L).input("backup").build();
+        StepResult fastStep = StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED)
+                .durationMs(5_000L).input("notify").build();
+        WorkflowRun run = WorkflowRun.builder().id("r1").status(RunStatus.COMPLETED)
+                .durationMs(45_000L).steps(new ArrayList<>(List.of(slowStep, fastStep))).build();
+        when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of(run));
+        when(insightsService.getExecutionInsights("wf-1")).thenReturn(Map.of("runsWithInsights", 0));
+        when(agenticService.getToolPatterns("wf-1")).thenReturn(Map.of("totalAgenticRuns", 0));
+
+        List<Map<String, Object>> suggestions = service.getOptimizationSuggestions("wf-1", insightsService, agenticService);
+
+        assertThat(suggestions).anyMatch(s -> "SLOW_STEP".equals(s.get("type")));
+    }
+
+    @Test
+    void getOptimizationSuggestions_agenticCost_suggests() {
+        WorkflowRun run = WorkflowRun.builder().id("r1").status(RunStatus.COMPLETED)
+                .durationMs(1000L).build();
+        when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of(run, run, run));
+        when(insightsService.getExecutionInsights("wf-1")).thenReturn(Map.of("runsWithInsights", 0));
+        when(agenticService.getToolPatterns("wf-1"))
+                .thenReturn(Map.of("totalAgenticRuns", 3, "totalCostUsd", 0.30));
+
+        List<Map<String, Object>> suggestions = service.getOptimizationSuggestions("wf-1", insightsService, agenticService);
+
+        assertThat(suggestions).anyMatch(s -> "AGENTIC_COST".equals(s.get("type")));
+    }
+
+    @Test
+    void getOptimizationSuggestions_optionalCostInsightsFailure_isIgnored() {
+        WorkflowRun run = WorkflowRun.builder().id("r1").status(RunStatus.COMPLETED)
+                .durationMs(1000L).build();
+        when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of(run));
+        when(insightsService.getExecutionInsights(anyString())).thenThrow(new RuntimeException("offline"));
+
+        List<Map<String, Object>> suggestions = service.getOptimizationSuggestions("wf-1", insightsService, agenticService);
+
+        assertThat(suggestions).isEmpty();
+    }
+
+    @Test
+    void calculateStepStats_withoutInput_usesUnknownAndZeroDurations() {
+        List<StepResult> steps = List.of(
+                StepResult.builder().stepIndex(2).status(StepStatus.COMPLETED).build(),
+                StepResult.builder().stepIndex(2).status(StepStatus.FAILED).build());
+
+        Map<String, Object> stats = service.calculateStepStats(2, steps);
+
+        assertThat(stats.get("command")).isEqualTo("unknown");
+        assertThat(stats.get("avgDurationMs")).isEqualTo(0.0);
+        assertThat(stats.get("maxDurationMs")).isEqualTo(0L);
+        assertThat(stats.get("failureRate")).isEqualTo(0.5);
+    }
 }

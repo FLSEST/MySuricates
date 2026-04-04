@@ -326,4 +326,121 @@ class AssistantToolExecutorTest {
         assertThat(result).contains("⚠");
         assertThat(result).contains("Pflichtfelder");
     }
+
+    @Test
+    void executeTools_createWorkflow_mapsBlocksMetadataAndDefaultContext() {
+        Workflow created = Workflow.builder().id("wf-123").name("Deploy Flow").build();
+        when(workflowService.create(any())).thenReturn(created);
+
+        String input = """
+                <tool type="create_workflow">{
+                  "projectId": "p1",
+                  "name": "Deploy Flow",
+                  "description": "Rollout",
+                  "model": "claude-sonnet",
+                  "blocks": [{"type": "shell", "config": {"command": "echo hi"}}],
+                  "metadata": {"source": "assistant"},
+                  "defaultContext": {"branch": "main"}
+                }</tool>
+                """;
+        String result = executor.executeTools(input);
+
+        assertThat(result).contains("✓ Workflow erstellt");
+        verify(workflowService).create(argThat(req ->
+                "p1".equals(req.projectId())
+                        && "Deploy Flow".equals(req.name())
+                        && "Rollout".equals(req.description())
+                        && "claude-sonnet".equals(req.model())
+                        && req.blocks().size() == 1
+                        && "shell".equals(req.blocks().get(0).getType())
+                        && "echo hi".equals(req.blocks().get(0).getConfig().get("command"))
+                        && "assistant".equals(req.metadata().get("source"))
+                        && "main".equals(req.defaultContext().get("branch"))
+        ));
+    }
+
+    @Test
+    void executeTools_updateWorkflow_mapsBlocksMetadataAndDefaultContext() {
+        Workflow updated = Workflow.builder().id("wf-1").name("Deploy Flow").build();
+        when(workflowService.update(eq("wf-1"), any())).thenReturn(updated);
+
+        String input = """
+                <tool type="update_workflow">{
+                  "workflowId": "wf-1",
+                  "name": "Deploy Flow",
+                  "blocks": [{"type": "simple", "config": {"prompt": "Deploy now"}}],
+                  "metadata": {"owner": "ops"},
+                  "defaultContext": {"env": "prod"}
+                }</tool>
+                """;
+        String result = executor.executeTools(input);
+
+        assertThat(result).contains("✓ Workflow aktualisiert");
+        verify(workflowService).update(eq("wf-1"), argThat(req ->
+                "Deploy Flow".equals(req.name())
+                        && req.blocks() != null
+                        && req.blocks().size() == 1
+                        && "simple".equals(req.blocks().get(0).getType())
+                        && "Deploy now".equals(req.blocks().get(0).getConfig().get("prompt"))
+                        && "ops".equals(req.metadata().get("owner"))
+                        && "prod".equals(req.defaultContext().get("env"))
+        ));
+    }
+
+    @Test
+    void executeTools_createChain_mapsEntriesAndFlags() {
+        WorkflowChain created = WorkflowChain.builder().id("ch-1").name("Release Chain").build();
+        when(chainService.create(any())).thenReturn(created);
+
+        String input = """
+                <tool type="create_chain">{
+                  "name": "Release Chain",
+                  "description": "CI to prod",
+                  "stopOnFailure": false,
+                  "entries": [{
+                    "workflowId": "wf-1",
+                    "label": "Build",
+                    "sortOrder": 3,
+                    "stopOnFailure": true,
+                    "inputContext": {"branch": "main"}
+                  }]
+                }</tool>
+                """;
+        String result = executor.executeTools(input);
+
+        assertThat(result).contains("✓ Chain erstellt");
+        verify(chainService).create(argThat(req ->
+                "Release Chain".equals(req.name())
+                        && "CI to prod".equals(req.description())
+                        && Boolean.FALSE.equals(req.stopOnFailure())
+                        && req.entries().size() == 1
+                        && "wf-1".equals(req.entries().get(0).workflowId())
+                        && "Build".equals(req.entries().get(0).label())
+                        && req.entries().get(0).sortOrder() == 3
+                        && Boolean.TRUE.equals(req.entries().get(0).stopOnFailure())
+                        && "main".equals(req.entries().get(0).inputContext().get("branch"))
+        ));
+    }
+
+    @Test
+    void executeTools_deleteWorkflow_serviceException_returnsError() {
+        when(workflowService.findById("wf-1")).thenThrow(new RuntimeException("not allowed"));
+
+        String input = "<tool type=\"delete_workflow\">{\"workflowId\": \"wf-1\"}</tool>";
+        String result = executor.executeTools(input);
+
+        assertThat(result).contains("⚠ Workflow konnte nicht gelöscht werden: not allowed");
+    }
+
+    @Test
+    void executeTools_startWorkflow_executorException_returnsError() {
+        Workflow workflow = Workflow.builder().id("wf-1").name("Deploy").build();
+        when(workflowService.findById("wf-1")).thenReturn(workflow);
+        when(workflowExecutor.execute(eq(workflow), any())).thenThrow(new RuntimeException("queue offline"));
+
+        String input = "<tool type=\"start_workflow\">{\"workflowId\": \"wf-1\"}</tool>";
+        String result = executor.executeTools(input);
+
+        assertThat(result).contains("⚠ Workflow konnte nicht gestartet werden: queue offline");
+    }
 }

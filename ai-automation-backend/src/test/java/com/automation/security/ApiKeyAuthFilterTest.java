@@ -153,4 +153,28 @@ class ApiKeyAuthFilterTest {
 
         verify(activityLogService, never()).warn(any(), anyString(), anyString(), any());
     }
+
+    @Test
+    void securityEnabled_noKey_systemInfoPath_noSecurityLog() throws Exception {
+        ReflectionTestUtils.setField(filter, "securityEnabled", true);
+        when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
+        when(request.getHeader("X-API-Key")).thenReturn(null);
+        when(request.getRequestURI()).thenReturn("/api/v1/system/info");
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(activityLogService, never()).warn(any(), anyString(), anyString(), any());
+    }
+
+    @Test
+    void securityEnabled_noKey_authStatusPath_noSecurityLog() throws Exception {
+        ReflectionTestUtils.setField(filter, "securityEnabled", true);
+        when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
+        when(request.getHeader("X-API-Key")).thenReturn(null);
+        when(request.getRequestURI()).thenReturn("/api/v1/system/auth-status");
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(activityLogService, never()).warn(any(), anyString(), anyString(), any());
+    }
 }
