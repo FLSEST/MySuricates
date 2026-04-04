@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
@@ -18,6 +18,7 @@ export function useTodos(params?: Record<string, string>, page = 0, size = 50) {
     },
     refetchInterval: 15_000,
     staleTime: 10_000,
+    placeholderData: keepPreviousData,
   });
 }
 

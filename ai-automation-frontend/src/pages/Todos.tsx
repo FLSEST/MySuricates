@@ -464,7 +464,13 @@ export function Todos() {
   const [sourceFilter, setSourceFilter] = usePersistedState<TodoSource | 'ALL'>('todos-source-filter', 'ALL');
   const [projectFilter, setProjectFilter] = usePersistedState('todos-project-filter', '');
   const [search, setSearch] = usePersistedState('todos-search', '');
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
   const [tagFilter, setTagFilter] = usePersistedState('todos-tag-filter', '');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
   const [showAllTags, setShowAllTags] = useState(false);
 
   // Build server-side filter params
@@ -474,9 +480,9 @@ export function Todos() {
     if (sourceFilter !== 'ALL') params.source = sourceFilter;
     if (projectFilter) params.projectId = projectFilter;
     if (tagFilter) params.tag = tagFilter;
-    if (search) params.q = search;
+    if (debouncedSearch) params.q = debouncedSearch;
     return params;
-  }, [statusFilter, sourceFilter, projectFilter, tagFilter, search]);
+  }, [statusFilter, sourceFilter, projectFilter, tagFilter, debouncedSearch]);
 
   const { data: todosPage, isLoading, error, refetch } = useTodos(apiParams, 0, 500);
   const todos = todosPage?.content;
