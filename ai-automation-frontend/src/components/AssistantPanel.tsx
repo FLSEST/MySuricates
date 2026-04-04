@@ -611,7 +611,8 @@ export function AssistantPanel() {
   const processQueue = () => {
     const next = queueRef.current.shift();
     if (next) {
-      const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: next.text, timestamp: Date.now(), status: 'sending' };
+      const now = +new Date();
+      const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: next.text, timestamp: now, status: 'sending' };
       appendMessage(next.sessionId, userMsg);
       dispatchChat(next.text, next.sessionId, userMsg.id);
     }
@@ -626,7 +627,8 @@ export function AssistantPanel() {
       sessionId = startNewSession();
     }
 
-    const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: text, timestamp: Date.now(), status: 'sending' };
+    const now = +new Date();
+    const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: text, timestamp: now, status: 'sending' };
     appendMessage(sessionId, userMsg);
 
     if (isPending) {
