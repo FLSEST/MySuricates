@@ -106,6 +106,33 @@ public class ExecutionContext {
         return resolved;
     }
 
+    /**
+     * Resolves template placeholders with shell-safe escaping.
+     * Each variable value is wrapped in POSIX single quotes with internal
+     * single quotes escaped as '\'' to prevent shell injection.
+     */
+    public String resolveTemplateShellSafe(String template) {
+        if (template == null) return null;
+
+        String resolved = template;
+        String safePreviousOutput = shellEscape(previousOutput != null ? previousOutput : "");
+        resolved = resolved.replace("{{ previous_output }}", safePreviousOutput);
+        resolved = resolved.replace("{{previous_output}}", safePreviousOutput);
+
+        for (Map.Entry<String, Object> entry : variables.entrySet()) {
+            String safeValue = shellEscape(String.valueOf(entry.getValue()));
+            resolved = resolved.replace("{{ " + entry.getKey() + " }}", safeValue);
+            resolved = resolved.replace("{{" + entry.getKey() + "}}", safeValue);
+        }
+
+        return resolved;
+    }
+
+    static String shellEscape(String value) {
+        if (value == null) return "''";
+        return "'" + value.replace("'", "'\\''") + "'";
+    }
+
     public boolean shouldStop() {
         return cancelled.get();
     }

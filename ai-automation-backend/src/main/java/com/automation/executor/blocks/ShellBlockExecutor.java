@@ -32,7 +32,10 @@ public class ShellBlockExecutor implements BlockExecutor {
             throw new WorkflowExecutionException("Shell block requires a 'command' in config");
         }
 
-        String command = context.resolveTemplate(rawCommand.toString());
+        boolean escapeVariables = Boolean.TRUE.equals(config.get("shell_escape_variables"));
+        String command = escapeVariables
+                ? context.resolveTemplateShellSafe(rawCommand.toString())
+                : context.resolveTemplate(rawCommand.toString());
         int timeout = ((Number) config.getOrDefault("timeout_seconds", SHELL_TIMEOUT_SECONDS)).intValue();
 
         StepResult step = new StepResult();

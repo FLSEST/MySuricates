@@ -106,4 +106,138 @@ class ExecutionContextTest {
         context.cancel();
         assertThat(context.shouldStop()).isTrue();
     }
+
+    // --- resolveTemplateShellSafe tests ---
+
+    @Test
+    void resolveTemplateShellSafe_simpleValue() {
+        context.setVariable("name", "world");
+
+        String result = context.resolveTemplateShellSafe("echo {{ name }}");
+
+        assertThat(result).isEqualTo("echo 'world'");
+    }
+
+    @Test
+    void resolveTemplateShellSafe_singleQuoteInValue() {
+        context.setVariable("msg", "it's fine");
+
+        String result = context.resolveTemplateShellSafe("echo {{ msg }}");
+
+        assertThat(result).isEqualTo("echo 'it'\\''s fine'");
+    }
+
+    @Test
+    void resolveTemplateShellSafe_semicolonInjection() {
+        context.setVariable("input", "; rm -rf /");
+
+        String result = context.resolveTemplateShellSafe("echo {{ input }}");
+
+        assertThat(result).isEqualTo("echo '; rm -rf /'");
+    }
+
+    @Test
+    void resolveTemplateShellSafe_commandSubstitution() {
+        context.setVariable("input", "$(cat /etc/passwd)");
+
+        String result = context.resolveTemplateShellSafe("echo {{ input }}");
+
+        assertThat(result).isEqualTo("echo '$(cat /etc/passwd)'");
+    }
+
+    @Test
+    void resolveTemplateShellSafe_backticks() {
+        context.setVariable("input", "`id`");
+
+        String result = context.resolveTemplateShellSafe("echo {{ input }}");
+
+        assertThat(result).isEqualTo("echo '`id`'");
+    }
+
+    @Test
+    void resolveTemplateShellSafe_doubleQuotesAndDollar() {
+        context.setVariable("input", "\"$HOME\"");
+
+        String result = context.resolveTemplateShellSafe("echo {{ input }}");
+
+        assertThat(result).isEqualTo("echo '\"$HOME\"'");
+    }
+
+    @Test
+    void resolveTemplateShellSafe_multilineValue() {
+        context.setVariable("data", "line1\nline2");
+
+        String result = context.resolveTemplateShellSafe("echo {{ data }}");
+
+        assertThat(result).isEqualTo("echo 'line1\nline2'");
+    }
+
+    @Test
+    void resolveTemplateShellSafe_emptyValue() {
+        context.setVariable("empty", "");
+
+        String result = context.resolveTemplateShellSafe("echo {{ empty }}");
+
+        assertThat(result).isEqualTo("echo ''");
+    }
+
+    @Test
+    void resolveTemplateShellSafe_nullTemplate() {
+        assertThat(context.resolveTemplateShellSafe(null)).isNull();
+    }
+
+    @Test
+    void resolveTemplateShellSafe_previousOutput() {
+        context.setPreviousOutput("; malicious");
+
+        String result = context.resolveTemplateShellSafe("run {{ previous_output }}");
+
+        assertThat(result).isEqualTo("run '; malicious'");
+    }
+
+    @Test
+    void resolveTemplateShellSafe_multipleVariables() {
+        context.setVariable("a", "x'y");
+        context.setVariable("b", "$(evil)");
+
+        String result = context.resolveTemplateShellSafe("cmd {{ a }} {{ b }}");
+
+        assertThat(result).isEqualTo("cmd 'x'\\''y' '$(evil)'");
+    }
+
+    @Test
+    void resolveTemplateShellSafe_withoutSpaces() {
+        context.setVariable("name", "world");
+
+        String result = context.resolveTemplateShellSafe("echo {{name}}");
+
+        assertThat(result).isEqualTo("echo 'world'");
+    }
+
+    // --- shellEscape static method tests ---
+
+    @Test
+    void shellEscape_null() {
+        assertThat(ExecutionContext.shellEscape(null)).isEqualTo("''");
+    }
+
+    @Test
+    void shellEscape_empty() {
+        assertThat(ExecutionContext.shellEscape("")).isEqualTo("''");
+    }
+
+    @Test
+    void shellEscape_simple() {
+        assertThat(ExecutionContext.shellEscape("hello")).isEqualTo("'hello'");
+    }
+
+    @Test
+    void shellEscape_singleQuote() {
+        assertThat(ExecutionContext.shellEscape("'")).isEqualTo("''\\'''");
+    }
+
+    @Test
+    void shellEscape_multipleSingleQuotes() {
+        assertThat(ExecutionContext.shellEscape("a'b'c")).isEqualTo("'a'\\''b'\\''c'");
+    }
 }

@@ -141,4 +141,52 @@ class ShellBlockExecutorTest {
         assertThat(result.getMetadata()).containsEntry("executionMode", "shell");
         assertThat(result.getMetadata()).containsEntry("exitCode", 0);
     }
+
+    @Test
+    void execute_shellEscapeVariables_escapesValues() {
+        context.setVariable("name", "it's a \"test\"");
+        when(shellService.execute(eq("echo 'it'\\''s a \"test\"'"), eq("/test/project"), eq(300), any()))
+                .thenReturn(new ShellResult("ok", 0, 10));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("shell")
+                .config(new HashMap<>(Map.of("command", "echo {{ name }}", "shell_escape_variables", true)))
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+    }
+
+    @Test
+    void execute_shellEscapeVariables_default_doesNotEscape() {
+        context.setVariable("name", "it's a \"test\"");
+        when(shellService.execute(eq("echo it's a \"test\""), eq("/test/project"), eq(300), any()))
+                .thenReturn(new ShellResult("ok", 0, 10));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("shell")
+                .config(new HashMap<>(Map.of("command", "echo {{ name }}")))
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+    }
+
+    @Test
+    void execute_shellEscapeVariables_preventsInjection() {
+        context.setVariable("input", "; rm -rf /");
+        when(shellService.execute(eq("process '; rm -rf /'"), eq("/test/project"), eq(300), any()))
+                .thenReturn(new ShellResult("safe", 0, 10));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("shell")
+                .config(new HashMap<>(Map.of("command", "process {{ input }}", "shell_escape_variables", true)))
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+    }
 }
