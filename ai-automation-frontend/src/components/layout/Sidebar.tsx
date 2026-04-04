@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, GitBranch, History, Zap, Sparkles, Factory,
   Calendar, Webhook, ScrollText, CheckSquare, Settings, ChevronLeft, ChevronRight, Link2, BookOpen, BookMarked, BarChart2,
-  Pencil, Check, RotateCcw, Plus, MessageCircle,
+  Pencil, Check, RotateCcw, Plus, MessageCircle, ClipboardList,
 } from 'lucide-react';
 import {
   DndContext,
@@ -118,6 +118,7 @@ const navItems = [
   { to: '/insights', icon: BarChart2, labelKey: 'insights' as const },
   { to: '/onboarding-profiles', icon: BookMarked, labelKey: 'onboardingProfiles' as const },
   { to: '/docs', icon: BookOpen, labelKey: 'docs' as const },
+  { to: '/reports', icon: ClipboardList, labelKey: 'reports' as const },
 ];
 
 export function Sidebar() {

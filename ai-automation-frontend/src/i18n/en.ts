@@ -62,6 +62,7 @@ export const en = {
     wishes: 'Wishes',
     factory: 'Factory',
     docs: 'Documentation',
+    reports: 'Reports',
     insights: 'Insights',
     dialogs: 'Session2Workflow',
     onboardingProfiles: 'Onboarding Profiles',
@@ -1121,6 +1122,12 @@ export const en = {
     noDocs: 'No documentation files found.',
     selectDoc: 'Select a document from the list on the left.',
     noEnVersion: 'No English version available — showing German.',
+  },
+  reports: {
+    title: 'Reports',
+    subtitle: 'Auto-generated project reports',
+    noReports: 'No reports found.',
+    selectReport: 'Select a report from the list on the left.',
   },
   errorPage: {
     somethingWentWrong: 'Something went wrong',

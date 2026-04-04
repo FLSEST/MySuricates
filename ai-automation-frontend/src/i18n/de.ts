@@ -64,6 +64,7 @@ export const de: TranslationKeys = {
     wishes: 'Wünsche',
     factory: 'Factory',
     docs: 'Dokumentation',
+    reports: 'Berichte',
     insights: 'Insights',
     dialogs: 'Session2Workflow',
     onboardingProfiles: 'Onboarding-Profile',
@@ -1123,6 +1124,12 @@ export const de: TranslationKeys = {
     noDocs: 'Keine Dokumentationsdateien gefunden.',
     selectDoc: 'Wähle links ein Dokument aus der Liste.',
     noEnVersion: 'Keine englische Version verfügbar — zeige Deutsch.',
+  },
+  reports: {
+    title: 'Berichte',
+    subtitle: 'Automatisch generierte Projektberichte',
+    noReports: 'Keine Berichte gefunden.',
+    selectReport: 'Wähle links einen Bericht aus der Liste.',
   },
   errorPage: {
     somethingWentWrong: 'Etwas ist schiefgelaufen',

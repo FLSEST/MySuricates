@@ -66,6 +66,7 @@ const Todos = lazy(() => import('./pages/Todos').then(m => ({ default: m.Todos }
 const ActivityLog = lazy(() => import('./pages/ActivityLog').then(m => ({ default: m.ActivityLog })));
 const WorkflowFactory = lazy(() => import('./pages/WorkflowFactory').then(m => ({ default: m.WorkflowFactory })));
 const Docs = lazy(() => import('./pages/Docs').then(m => ({ default: m.Docs })));
+const Reports = lazy(() => import('./pages/Reports').then(m => ({ default: m.Reports })));
 const Insights = lazy(() => import('./pages/Insights').then(m => ({ default: m.Insights })));
 const DialogImport = lazy(() => import('./pages/DialogImport').then(m => ({ default: m.DialogImport })));
 const OnboardingProfiles = lazy(() => import('./pages/OnboardingProfiles').then(m => ({ default: m.OnboardingProfiles })));
@@ -95,6 +96,7 @@ const router = createBrowserRouter([
       { path: 'todos', element: <Todos /> },
       { path: 'activity', element: <ActivityLog /> },
       { path: 'docs', element: <Docs /> },
+      { path: 'reports', element: <Reports /> },
       { path: 'insights', element: <Insights /> },
       { path: 'onboarding-profiles', element: <OnboardingProfiles /> },
       { path: 'settings', element: <Settings /> },

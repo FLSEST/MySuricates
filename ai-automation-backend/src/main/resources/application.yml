@@ -116,6 +116,8 @@ automation:
     base-dir: ${AUTOMATION_FACTORY_DIR:${user.home}/.autotrigger/factory}
   docs:
     directory: ${AUTOMATION_DOCS_DIR:../docs}
+  reports:
+    directory: ${AUTOMATION_REPORTS_DIR:../reports}
   pool:
     directory: ${AUTOMATION_POOL_DIR:workflow-pool}
     enabled: ${AUTOMATION_POOL_ENABLED:true}
