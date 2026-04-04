@@ -601,6 +601,10 @@ export interface TimeSeriesPoint {
   date: string;
   count: number;
   successRate: number;
+  failedCount: number;
+  avgDurationMs: number;
+  totalCostUsd: number;
+  totalTokens: number;
 }
 
 export interface ProviderStats {
@@ -618,6 +622,12 @@ export interface ModelStats {
   totalCostUsd: number;
 }
 
+export interface GateStatusEntry { status: string; count: number; }
+export interface FailureReasonEntry { reason: string; count: number; }
+export interface CostByWorkflowEntry { workflowId: string; workflowName: string; totalCostUsd: number; runCount: number; }
+export interface BlockTypeUsageEntry { blockType: string; stepCount: number; failedCount: number; failureRate: number; }
+export interface TriggerDistribution { manual: number; scheduled: number; webhook: number; completionTrigger: number; todoTrigger: number; }
+
 export interface DashboardData {
   totalWorkflows: number;
   totalRuns: number;
@@ -628,11 +638,51 @@ export interface DashboardData {
   successRate: number;
   totalCostUsd30d: number;
   totalTokens30d: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
   topWorkflows: Array<{ workflowId: string; workflowName: string; runCount: number }>;
   recentRuns: WorkflowRun[];
   timeSeries?: TimeSeriesPoint[];
   providerStats?: ProviderStats[];
   modelStats?: ModelStats[];
+  gateStatusSummary?: GateStatusEntry[];
+  failureReasons?: FailureReasonEntry[];
+  costByWorkflow?: CostByWorkflowEntry[];
+  blockTypeUsage?: BlockTypeUsageEntry[];
+  triggerDistribution?: TriggerDistribution;
+}
+
+// ── Platform Stats ───────────────────────────────────────
+
+export interface SkillUsageEntry { skillId: string; skillName: string; category: string; workflowCount: number; }
+export interface ChainStats { totalChains: number; totalRuns: number; successfulRuns: number; failedRuns: number; }
+export interface TodoStats { open: number; inProgress: number; done: number; backlog: number; fromUser: number; fromAi: number; fromWorkflow: number; }
+export interface WishStats { total: number; completed: number; failed: number; inProgress: number; }
+export interface AssistantStats { totalSessions: number; avgMessagesPerSession: number; }
+
+export interface PlatformStats {
+  activeProjects: number;
+  archivedProjects: number;
+  totalWorkflows: number;
+  workflowPoolSize: number;
+  totalSkills: number;
+  builtinSkills: number;
+  customSkills: number;
+  topSkillsByUsage: SkillUsageEntry[];
+  totalTemplates: number;
+  builtinTemplates: number;
+  customTemplates: number;
+  activeSchedules: number;
+  totalSchedules: number;
+  activeWebhooks: number;
+  totalWebhooks: number;
+  chainStats: ChainStats;
+  activeTodoTriggers: number;
+  activeCompletionTriggers: number;
+  activeMemoryEntries: number;
+  todoStats: TodoStats;
+  wishStats: WishStats;
+  assistantStats: AssistantStats;
 }
 
 // ── Agentic Loop ─────────────────────────────────────────
