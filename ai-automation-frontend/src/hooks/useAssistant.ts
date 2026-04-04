@@ -10,6 +10,9 @@ export interface AssistantPageContext {
   page?: string;
   entityId?: string;
   projectId?: string;
+  workflowId?: string;
+  runId?: string;
+  pathname?: string;
 }
 
 export interface AssistantAction {

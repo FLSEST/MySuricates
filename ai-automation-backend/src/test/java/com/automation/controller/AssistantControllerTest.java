@@ -112,7 +112,7 @@ class AssistantControllerTest {
         when(assistantService.chat(any()))
                 .thenReturn(new AssistantChatResponse("Context received", List.of()));
 
-        var ctx = new AssistantChatRequest.PageContext("run", "run-abc", "proj-xyz");
+        var ctx = new AssistantChatRequest.PageContext("run", "legacy-run-id", "proj-xyz", "wf-123", "run-abc", "/workflows/wf-123/run/run-abc");
         var request = new AssistantChatRequest("Was ist hier passiert?", List.of(), ctx, null, null, null);
 
         mockMvc.perform(post("/api/v1/assistant/chat")

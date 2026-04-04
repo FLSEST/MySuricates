@@ -13,5 +13,16 @@ public record AssistantChatRequest(
 ) {
     public record MessageEntry(String role, String content) {}
 
-    public record PageContext(String page, String entityId, String projectId) {}
+    public record PageContext(
+            String page,
+            String entityId,
+            String projectId,
+            String workflowId,
+            String runId,
+            String pathname
+    ) {
+        public PageContext(String page, String entityId, String projectId) {
+            this(page, entityId, projectId, null, null, null);
+        }
+    }
 }

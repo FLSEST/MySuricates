@@ -24,6 +24,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -247,6 +249,20 @@ class AssistantContextBuilderTest {
         }
 
         @Test
+        void withWorkflowId_resolvesProjectPath() {
+            Project project = new Project();
+            project.setId("p1");
+            project.setPath("/home/test/from-workflow");
+            Workflow workflow = Workflow.builder().id("wf-1").project(project).build();
+            when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(workflow));
+
+            var ctx = new AssistantChatRequest.PageContext("workflow", "wf-1", null, "wf-1", null, "/workflows/wf-1");
+            String result = builder.resolveWorkingDir(ctx);
+
+            assertThat(result).isEqualTo("/home/test/from-workflow");
+        }
+
+        @Test
         void repositoryError_returnsHome() {
             when(projectRepository.findById("p1")).thenThrow(new RuntimeException("boom"));
 
@@ -364,11 +380,15 @@ class AssistantContextBuilderTest {
                     .durationMs(5000L).steps(new ArrayList<>(List.of(step))).build();
             when(workflowRunRepository.findByIdWithSteps("run-1")).thenReturn(Optional.of(run));
 
-            var ctx = new AssistantChatRequest.PageContext("runs", "run-1", null);
+            var ctx = new AssistantChatRequest.PageContext("runs", "legacy-run", null, "wf-1", "run-1", "/workflows/wf-1/run/run-1");
             String result = builder.buildSystemPrompt(ctx, "");
 
             assertThat(result).contains("Aktuell angezeigter Run");
             assertThat(result).contains("COMPLETED");
+            assertThat(result).contains("Pfad: /workflows/wf-1/run/run-1");
+            assertThat(result).contains("Workflow-ID: wf-1");
+            assertThat(result).contains("Run-ID: run-1");
+            verify(workflowRunRepository).findByIdWithSteps("run-1");
         }
 
         @Test
@@ -431,13 +451,17 @@ class AssistantContextBuilderTest {
             Project alpha = Project.builder().id("p-alpha").name("Alpha").path("/work/alpha").build();
             Project beta = Project.builder().id("p-beta").name("Beta").path("/work/beta").build();
             when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of(alpha, beta));
-            when(projectRepository.findById("p-alpha")).thenReturn(Optional.of(alpha));
+            lenient().when(workflowRepository.findByIdWithSkills("wf-alpha")).thenReturn(Optional.of(Workflow.builder()
+                    .id("wf-alpha")
+                    .name("A Workflow")
+                    .project(alpha)
+                    .build()));
 
             Workflow alphaWorkflow = Workflow.builder().id("wf-alpha").name("A Workflow").project(alpha).build();
             Workflow betaWorkflow = Workflow.builder().id("wf-beta").name("B Workflow").project(beta).build();
             when(workflowRepository.findAllWithActiveProject()).thenReturn(List.of(betaWorkflow, alphaWorkflow));
 
-            var ctx = new AssistantChatRequest.PageContext("workflow", "wf-alpha", "p-alpha");
+            var ctx = new AssistantChatRequest.PageContext("workflow", "wf-alpha", null, "wf-alpha", null, "/workflows/wf-alpha");
             String result = builder.buildSystemPrompt(ctx, "");
 
             assertThat(result).contains("**Meine Projekte (2):**");
@@ -445,6 +469,8 @@ class AssistantContextBuilderTest {
             assertThat(result).contains("[A Workflow] Alpha (projekt: p-alpha)");
             assertThat(result).contains("[B Workflow] Beta (projekt: p-beta)");
             assertThat(result.indexOf("[A Workflow]")).isLessThan(result.indexOf("[B Workflow]"));
+            assertThat(result).contains("Pfad: /workflows/wf-alpha");
+            assertThat(result).contains("Aktiver Workflow: A Workflow (ID: wf-alpha)");
             assertThat(result).contains("Aktives Projekt: Alpha (ID: p-alpha)");
         }
 

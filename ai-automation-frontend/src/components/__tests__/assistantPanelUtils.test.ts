@@ -12,6 +12,17 @@ describe('assistantPanelUtils', () => {
       page: 'run',
       entityId: 'run-9',
       workflowId: 'wf-1',
+      runId: 'run-9',
+      pathname: '/workflows/wf-1/run/run-9',
+    });
+  });
+
+  it('parses workflow detail paths into workflow-aware context', () => {
+    expect(parsePageContext('/workflows/wf-1')).toEqual({
+      page: 'workflow',
+      entityId: 'wf-1',
+      workflowId: 'wf-1',
+      pathname: '/workflows/wf-1',
     });
   });
 
@@ -20,11 +31,12 @@ describe('assistantPanelUtils', () => {
       page: 'project',
       entityId: 'project-7',
       projectId: 'project-7',
+      pathname: '/projects/project-7',
     });
   });
 
   it('falls back to dashboard for the root path', () => {
-    expect(parsePageContext('/')).toEqual({ page: 'dashboard' });
+    expect(parsePageContext('/')).toEqual({ page: 'dashboard', pathname: '/' });
   });
 
   it('formats assistant timestamps as hh:mm', () => {
