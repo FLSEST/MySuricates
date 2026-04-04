@@ -27,6 +27,7 @@ import type { CreateWorkflowRequest, Workflow, WorkflowExportData, WorkflowTempl
 import { useI18nStore } from '../i18n';
 import { resolveTemplateName } from '../utils/templateUtils';
 import { useSaveWorkflowAsTemplate } from '../hooks/useTemplates';
+import { useInstallPoolWorkflow } from '../hooks/usePool';
 
 // ── Persistence helpers ──────────────────────────────────────
 
@@ -68,6 +69,7 @@ export function Workflows() {
   const { data: workflows, isLoading, error, refetch } = useWorkflows();
   const { data: projects } = useProjects();
   const createWorkflow = useCreateWorkflow();
+  const installPoolWorkflow = useInstallPoolWorkflow();
   const updateWorkflow = useUpdateWorkflow();
   const executeWorkflow = useExecuteWorkflow();
   const deleteWorkflow = useDeleteWorkflow();
@@ -272,17 +274,27 @@ export function Workflows() {
   };
 
   const handleCreate = () => {
+    const poolId = (form.metadata as Record<string, unknown> | undefined)?.poolSource as string | undefined;
+    const onDone = () => {
+      setCreateStep('closed');
+      setForm({ projectId: '', name: '' });
+      setSelectedTemplate(null);
+    };
+
+    if (poolId && form.projectId) {
+      installPoolWorkflow.mutate(
+        { poolId, projectId: form.projectId, name: form.name || undefined },
+        { onSuccess: (data) => { onDone(); navigate(`/workflows/${data.workflowId}`); } },
+      );
+      return;
+    }
+
     const autoTodoDefault = useSettingsStore.getState().autoTodoDefault;
     const payload = autoTodoDefault
       ? { ...form, metadata: { ...form.metadata, autoTodo: { enabled: true } } }
       : form;
     createWorkflow.mutate(payload, {
-      onSuccess: (wf) => {
-        setCreateStep('closed');
-        setForm({ projectId: '', name: '' });
-        setSelectedTemplate(null);
-        navigate(`/workflows/${wf.id}`);
-      },
+      onSuccess: (wf) => { onDone(); navigate(`/workflows/${wf.id}`); },
     });
   };
 
@@ -487,7 +499,7 @@ export function Workflows() {
         selectedTemplate={selectedTemplate}
         form={form}
         projects={projects}
-        createLoading={createWorkflow.isPending}
+        createLoading={createWorkflow.isPending || installPoolWorkflow.isPending}
         onFormChange={setForm}
         onTemplateSelect={handleTemplateSelect}
         onPoolSelect={handlePoolSelect}
