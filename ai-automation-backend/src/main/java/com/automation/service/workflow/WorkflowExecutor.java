@@ -35,7 +35,6 @@ import java.util.Map;
 import java.util.Set;
 import com.automation.concurrency.DynamicSemaphore;
 
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 
@@ -63,6 +62,7 @@ public class WorkflowExecutor {
     private final SystemIdentityService systemIdentity;
     private final com.automation.repository.TodoRepository todoRepository;
     private final WorkflowVersionService workflowVersionService;
+    private final WorkflowExecutionRegistry executionRegistry;
 
     private static final java.util.Set<String> SYSTEM_VAR_KEYS = java.util.Set.of(
             "workflow_run_id", "workflow_id", "workflow_name", "project_path",
@@ -70,7 +70,7 @@ public class WorkflowExecutor {
             "workflow_version", "workflow_changed_since_last_run"
     );
 
-    private final Map<String, ExecutionContext> activeExecutions = new ConcurrentHashMap<>();
+    // Active execution tracking is delegated to WorkflowExecutionRegistry
 
     /**
      * Starts workflow execution asynchronously.
@@ -254,7 +254,7 @@ public class WorkflowExecutor {
                 context.setProvider(provider);
             }
 
-            activeExecutions.put(runId, context);
+            executionRegistry.register(runId, context);
 
             // Write skill context to .claude/rules/ (file-based, picked up by all Claude CLI calls)
             commandExecutorService.writeSkillContextToProject(project.getPath(), skills);
@@ -468,7 +468,7 @@ public class WorkflowExecutor {
             if (semaphoreAcquired) {
                 executionSemaphore.release();
             }
-            activeExecutions.remove(runId);
+            executionRegistry.unregister(runId);
 
             if (run != null) {
                 run.setCompletedAt(Instant.now());
@@ -665,41 +665,26 @@ public class WorkflowExecutor {
         return delta.isEmpty() ? null : delta;
     }
 
+    // ── Delegation to WorkflowExecutionRegistry ──────────────────────────
+
     public void pauseExecution(String runId) {
-        ExecutionContext context = activeExecutions.get(runId);
-        if (context != null) {
-            context.pause();
-            log.info("Paused execution: {}", runId);
-            // The execution loop will persist the PAUSED status when it enters the pause wait
-        } else {
-            log.warn("pauseExecution: no active execution found for run {}", runId);
-        }
+        executionRegistry.pauseExecution(runId);
     }
 
     public void resumeExecution(String runId) {
-        ExecutionContext context = activeExecutions.get(runId);
-        if (context != null) {
-            context.resume();
-            log.info("Resumed execution: {}", runId);
-            // The execution loop will persist RUNNING status when it exits the pause wait
-        } else {
-            log.warn("resumeExecution: no active execution found for run {}", runId);
-        }
+        executionRegistry.resumeExecution(runId);
     }
 
     public Set<String> getActiveContainerIds() {
-        return activeExecutions.values().stream()
-                .map(ExecutionContext::getContainerId)
-                .collect(Collectors.toSet());
+        return executionRegistry.getActiveContainerIds();
     }
 
     public String getContainerIdForRun(String runId) {
-        ExecutionContext ctx = activeExecutions.get(runId);
-        return ctx != null ? ctx.getContainerId() : null;
+        return executionRegistry.getContainerIdForRun(runId);
     }
 
     public void cancelExecution(String runId) {
-        ExecutionContext context = activeExecutions.get(runId);
+        ExecutionContext context = executionRegistry.get(runId);
         if (context != null) {
             context.cancel();
             log.info("Cancelled execution: {}", runId);
@@ -726,37 +711,27 @@ public class WorkflowExecutor {
     }
 
     public void resolveApproval(String runId, String answer) {
-        ExecutionContext context = activeExecutions.get(runId);
-        if (context != null) {
-            context.resolveApproval(answer);
-            log.info("Resolved approval for run {}: {}", runId, answer);
-        }
+        executionRegistry.resolveApproval(runId, answer);
     }
 
     public int getActiveRunCount() {
-        return activeExecutions.size();
+        return executionRegistry.getActiveRunCount();
     }
 
     public boolean isRunActive(String runId) {
-        return activeExecutions.containsKey(runId);
+        return executionRegistry.isRunActive(runId);
     }
 
     public int getPendingApprovalCount() {
-        return (int) activeExecutions.values().stream()
-                .filter(ctx -> ctx.getCurrentApprovalRequest().get() != null)
-                .count();
+        return executionRegistry.getPendingApprovalCount();
     }
 
     public ApprovalRequest getPendingApproval(String runId) {
-        ExecutionContext context = activeExecutions.get(runId);
-        if (context != null) {
-            return context.getCurrentApprovalRequest().get();
-        }
-        return null;
+        return executionRegistry.getPendingApproval(runId);
     }
 
     public String executeAdHocCommand(String runId, String command) {
-        ExecutionContext context = activeExecutions.get(runId);
+        ExecutionContext context = executionRegistry.get(runId);
         if (context == null) {
             throw new WorkflowExecutionException("No active execution found for run: " + runId);
         }

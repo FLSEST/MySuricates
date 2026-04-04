@@ -126,7 +126,8 @@ class WorkflowExecutorTest {
                 templateVerificationService,
                 systemIdentity,
                 todoRepository,
-                workflowVersionService
+                workflowVersionService,
+                new WorkflowExecutionRegistry()
         );
 
         testProject = Project.builder()
