@@ -9,7 +9,7 @@ export function CostOverTimeChart({ data }: { data?: TimeSeriesPoint[] }) {
   const chartData = useMemo(
     () => data?.map((p) => ({
       date: new Date(p.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
-      cost: Number(p.totalCostUsd.toFixed(4)),
+      cost: Number((p.totalCostUsd ?? 0).toFixed(4)),
     })) ?? [],
     [data]
   );

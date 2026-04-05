@@ -10,8 +10,8 @@ export function DurationOverTimeChart({ data }: { data?: TimeSeriesPoint[] }) {
   const chartData = useMemo(
     () => data?.map((p) => ({
       date: new Date(p.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
-      duration: Math.round(p.avgDurationMs / 1000),
-      raw: p.avgDurationMs,
+      duration: Math.round((p.avgDurationMs ?? 0) / 1000),
+      raw: p.avgDurationMs ?? 0,
     })) ?? [],
     [data]
   );
@@ -26,7 +26,7 @@ export function DurationOverTimeChart({ data }: { data?: TimeSeriesPoint[] }) {
             <YAxis tick={{ fill: 'var(--color-text-tertiary)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}s`} />
             <Tooltip
               contentStyle={{ backgroundColor: 'var(--color-surface-overlay)', border: '1px solid var(--color-border)', borderRadius: '8px', color: 'var(--color-text)', fontSize: 12 }}
-              formatter={(_: number, __: string, entry: { payload: { raw: number } }) => [formatDuration(entry.payload.raw), t.insights.avgDuration]}
+              formatter={(value: number) => [formatDuration(value * 1000), t.insights.avgDuration]}
             />
             <Line type="monotone" dataKey="duration" stroke="var(--color-accent)" strokeWidth={2} dot={false} />
           </LineChart>
