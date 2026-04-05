@@ -155,4 +155,141 @@ class TodoOutputParserTest {
         assertThat(items).hasSize(1);
         assertThat(items.get(0).description()).contains("XSS");
     }
+
+    @Test
+    void parse_emptyString_returnsEmpty() {
+        assertThat(TodoOutputParser.parse("")).isEmpty();
+    }
+
+    @Test
+    void parse_missingAllPipes_noMatch() {
+        assertThat(TodoOutputParser.parse("todo_item: Just a title without pipes")).isEmpty();
+    }
+
+    @Test
+    void parse_missingTagsField_noMatch() {
+        assertThat(TodoOutputParser.parse("todo_item: Fix something | HIGH")).isEmpty();
+    }
+
+    @Test
+    void parse_combinedHeadingAndBold() {
+        List<ParsedTodoItem> items = TodoOutputParser.parse(
+                "### **todo_item: ComponentTest schreiben | HIGH | frontend,testing | 200 LOC ungetestet**");
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).title()).isEqualTo("ComponentTest schreiben");
+        assertThat(items.get(0).priority()).isEqualTo("HIGH");
+        assertThat(items.get(0).tags()).containsExactly("frontend", "testing");
+        assertThat(items.get(0).description()).isEqualTo("200 LOC ungetestet");
+    }
+
+    @Test
+    void parse_singleHashHeading() {
+        List<ParsedTodoItem> items = TodoOutputParser.parse(
+                "# todo_item: Top-Level Finding | CRITICAL | security");
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).title()).isEqualTo("Top-Level Finding");
+        assertThat(items.get(0).priority()).isEqualTo("CRITICAL");
+    }
+
+    @Test
+    void parse_sixHashHeading() {
+        List<ParsedTodoItem> items = TodoOutputParser.parse(
+                "###### todo_item: Deep nested heading | LOW | documentation");
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).title()).isEqualTo("Deep nested heading");
+        assertThat(items.get(0).priority()).isEqualTo("LOW");
+    }
+
+    @Test
+    void parse_descriptionContainingPipe() {
+        List<ParsedTodoItem> items = TodoOutputParser.parse(
+                "todo_item: Pipeline fixen | HIGH | backend | Step A | Step B fehlerhaft");
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).title()).isEqualTo("Pipeline fixen");
+        assertThat(items.get(0).tags()).containsExactly("backend");
+        // Description captures everything after the third pipe including additional pipes
+        assertThat(items.get(0).description()).contains("Step");
+    }
+
+    @Test
+    void parse_lowPriority() {
+        List<ParsedTodoItem> items = TodoOutputParser.parse(
+                "todo_item: Dokumentation ergaenzen | LOW | documentation | Nice-to-have Verbesserung");
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).priority()).isEqualTo("LOW");
+        assertThat(items.get(0).description()).isEqualTo("Nice-to-have Verbesserung");
+    }
+
+    @Test
+    void parse_windowsLineEndings() {
+        String output = "Report output\r\ntodo_item: Win test | HIGH | backend\r\ntodo_item: Win test 2 | MEDIUM | frontend | Desc\r\n";
+        List<ParsedTodoItem> items = TodoOutputParser.parse(output);
+        assertThat(items).hasSize(2);
+        assertThat(items.get(0).title()).isEqualTo("Win test");
+        assertThat(items.get(1).description()).isEqualTo("Desc");
+    }
+
+    @Test
+    void parse_singleTag() {
+        List<ParsedTodoItem> items = TodoOutputParser.parse(
+                "todo_item: Einfacher Test | MEDIUM | backend");
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).tags()).containsExactly("backend");
+    }
+
+    @Test
+    void parse_titleWithBackticks_cleaned() {
+        List<ParsedTodoItem> items = TodoOutputParser.parse(
+                "todo_item: `SomeClass` testen | HIGH | backend,testing");
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).title()).isEqualTo("SomeClass testen");
+    }
+
+    @Test
+    void parse_descriptionWithMarkdown_cleaned() {
+        List<ParsedTodoItem> items = TodoOutputParser.parse(
+                "todo_item: Fix issue | HIGH | security | **Critical** `vulnerability` found");
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).description()).isEqualTo("Critical vulnerability found");
+    }
+
+    @Test
+    void parse_parsedTodoItemRecord_fieldsAccessible() {
+        ParsedTodoItem item = new ParsedTodoItem("Title", "HIGH", List.of("tag1", "tag2"), "Description");
+        assertThat(item.title()).isEqualTo("Title");
+        assertThat(item.priority()).isEqualTo("HIGH");
+        assertThat(item.tags()).containsExactly("tag1", "tag2");
+        assertThat(item.description()).isEqualTo("Description");
+    }
+
+    @Test
+    void parse_parsedTodoItemRecord_nullDescription() {
+        ParsedTodoItem item = new ParsedTodoItem("Title", "HIGH", List.of("tag1"), null);
+        assertThat(item.description()).isNull();
+    }
+
+    @Test
+    void parse_manyItemsInBlock() {
+        String output = """
+                ## Audit Report
+
+                todo_item: Item 1 | CRITICAL | security | Sofort fixen
+                todo_item: Item 2 | HIGH | backend,testing
+                todo_item: Item 3 | MEDIUM | frontend | UI-Verbesserung
+                todo_item: Item 4 | LOW | documentation
+                todo_item: Item 5 | HIGH | performance | Latenz zu hoch
+
+                gate_status: RED
+                """;
+        List<ParsedTodoItem> items = TodoOutputParser.parse(output);
+        assertThat(items).hasSize(5);
+        assertThat(items.get(0).priority()).isEqualTo("CRITICAL");
+        assertThat(items.get(1).priority()).isEqualTo("HIGH");
+        assertThat(items.get(2).priority()).isEqualTo("MEDIUM");
+        assertThat(items.get(3).priority()).isEqualTo("LOW");
+        assertThat(items.get(4).priority()).isEqualTo("HIGH");
+        assertThat(items.get(0).description()).isEqualTo("Sofort fixen");
+        assertThat(items.get(1).description()).isNull();
+        assertThat(items.get(3).description()).isNull();
+    }
 }
