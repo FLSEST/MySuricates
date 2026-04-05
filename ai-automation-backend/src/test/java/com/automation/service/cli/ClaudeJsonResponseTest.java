@@ -1,5 +1,6 @@
 package com.automation.service.cli;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -244,6 +245,177 @@ class ClaudeJsonResponseTest {
             assertThat(response.usage()).isEqualTo(usage);
             assertThat(response.modelUsage()).isEqualTo(modelUsage);
             assertThat(response.toolUses()).isEqualTo(toolUses);
+        }
+    }
+
+    @Nested
+    class JsonDeserializationTests {
+
+        private final ObjectMapper mapper = new ObjectMapper();
+
+        @Test
+        void should_deserializeFullResponse_withSnakeCaseProperties() throws Exception {
+            var json = """
+                {
+                    "result": "Hello world",
+                    "session_id": "sess-123",
+                    "total_cost_usd": 0.042,
+                    "duration_ms": 5000,
+                    "duration_api_ms": 3000,
+                    "num_turns": 2,
+                    "usage": {"input_tokens": 150, "output_tokens": 300},
+                    "modelUsage": {
+                        "claude-sonnet-4-6": {"inputTokens": 150, "outputTokens": 300, "costUSD": 0.042}
+                    },
+                    "toolUses": [{"name": "Read", "input": {"path": "/tmp/test.txt"}}]
+                }
+                """;
+
+            var response = mapper.readValue(json, ClaudeJsonResponse.class);
+
+            assertThat(response.result()).isEqualTo("Hello world");
+            assertThat(response.sessionId()).isEqualTo("sess-123");
+            assertThat(response.totalCostUsd()).isEqualTo(0.042);
+            assertThat(response.durationMs()).isEqualTo(5000L);
+            assertThat(response.durationApiMs()).isEqualTo(3000L);
+            assertThat(response.numTurns()).isEqualTo(2);
+            assertThat(response.usage().inputTokens()).isEqualTo(150);
+            assertThat(response.usage().outputTokens()).isEqualTo(300);
+            assertThat(response.model()).isEqualTo("claude-sonnet-4-6");
+            assertThat(response.toolUses()).hasSize(1);
+            assertThat(response.toolUses().get(0).name()).isEqualTo("Read");
+        }
+
+        @Test
+        void should_ignoreUnknownProperties() throws Exception {
+            var json = """
+                {
+                    "result": "test",
+                    "unknown_field": "should be ignored",
+                    "another_unknown": 42
+                }
+                """;
+
+            var response = mapper.readValue(json, ClaudeJsonResponse.class);
+
+            assertThat(response.result()).isEqualTo("test");
+            assertThat(response.sessionId()).isNull();
+        }
+
+        @Test
+        void should_deserializeMinimalResponse() throws Exception {
+            var json = """
+                {"result": "ok"}
+                """;
+
+            var response = mapper.readValue(json, ClaudeJsonResponse.class);
+
+            assertThat(response.result()).isEqualTo("ok");
+            assertThat(response.sessionId()).isNull();
+            assertThat(response.totalCostUsd()).isNull();
+            assertThat(response.usage()).isNull();
+            assertThat(response.modelUsage()).isNull();
+            assertThat(response.toolUses()).isNull();
+        }
+
+        @Test
+        void should_deserializeUsage_withSnakeCaseTokenFields() throws Exception {
+            var json = """
+                {"input_tokens": 500, "output_tokens": 1000}
+                """;
+
+            var usage = mapper.readValue(json, ClaudeJsonResponse.Usage.class);
+
+            assertThat(usage.inputTokens()).isEqualTo(500);
+            assertThat(usage.outputTokens()).isEqualTo(1000);
+        }
+
+        @Test
+        void should_ignoreUnknownUsageFields() throws Exception {
+            var json = """
+                {"input_tokens": 100, "output_tokens": 200, "cache_tokens": 50}
+                """;
+
+            var usage = mapper.readValue(json, ClaudeJsonResponse.Usage.class);
+
+            assertThat(usage.inputTokens()).isEqualTo(100);
+            assertThat(usage.outputTokens()).isEqualTo(200);
+        }
+    }
+
+    @Nested
+    class MetadataEdgeCaseTests {
+
+        @Test
+        void should_excludeDurationMs_fromMetadata() {
+            var response = new ClaudeJsonResponse(
+                    "result", null, null, 5000L, null, null, null, null, null);
+
+            assertThat(response.toMetadata()).doesNotContainKey("durationMs");
+            assertThat(response.toMetadata()).doesNotContainKey("duration_ms");
+        }
+
+        @Test
+        void should_includeZeroTokens_when_usageIsNonNull() {
+            var usage = new ClaudeJsonResponse.Usage(0, 0);
+            var response = new ClaudeJsonResponse(
+                    "result", null, null, null, null, null, usage, null, null);
+
+            Map<String, Object> meta = response.toMetadata();
+            assertThat(meta).containsEntry("inputTokens", 0);
+            assertThat(meta).containsEntry("outputTokens", 0);
+        }
+
+        @Test
+        void should_preserveInsertionOrder_inMetadata() {
+            var usage = new ClaudeJsonResponse.Usage(100, 200);
+            var modelUsage = new LinkedHashMap<String, ClaudeJsonResponse.ModelUsage>();
+            modelUsage.put("claude-opus-4-6", new ClaudeJsonResponse.ModelUsage(100, 200, 0.5));
+
+            var response = new ClaudeJsonResponse(
+                    "result", "sid", 0.5, null, 1000L, 3, usage, modelUsage, null);
+
+            var keys = response.toMetadata().keySet().stream().toList();
+            assertThat(keys).containsExactly(
+                    "inputTokens", "outputTokens", "costUsd",
+                    "apiDurationMs", "numTurns", "model", "sessionId");
+        }
+    }
+
+    @Nested
+    class RecordEqualityTests {
+
+        @Test
+        void should_beEqual_when_sameValues() {
+            var usage = new ClaudeJsonResponse.Usage(100, 200);
+            var r1 = new ClaudeJsonResponse("res", "sid", 1.0, 100L, 50L, 1, usage, null, null);
+            var r2 = new ClaudeJsonResponse("res", "sid", 1.0, 100L, 50L, 1, usage, null, null);
+
+            assertThat(r1).isEqualTo(r2);
+            assertThat(r1.hashCode()).isEqualTo(r2.hashCode());
+        }
+
+        @Test
+        void should_notBeEqual_when_differentValues() {
+            var r1 = new ClaudeJsonResponse("a", null, null, null, null, null, null, null, null);
+            var r2 = new ClaudeJsonResponse("b", null, null, null, null, null, null, null, null);
+
+            assertThat(r1).isNotEqualTo(r2);
+        }
+
+        @Test
+        void should_haveConsistentEquality_forInnerRecords() {
+            var u1 = new ClaudeJsonResponse.Usage(10, 20);
+            var u2 = new ClaudeJsonResponse.Usage(10, 20);
+            assertThat(u1).isEqualTo(u2);
+
+            var m1 = new ClaudeJsonResponse.ModelUsage(10, 20, 0.5);
+            var m2 = new ClaudeJsonResponse.ModelUsage(10, 20, 0.5);
+            assertThat(m1).isEqualTo(m2);
+
+            var t1 = new ClaudeJsonResponse.ToolUseEvent("Read", Map.of("k", "v"));
+            var t2 = new ClaudeJsonResponse.ToolUseEvent("Read", Map.of("k", "v"));
+            assertThat(t1).isEqualTo(t2);
         }
     }
 
