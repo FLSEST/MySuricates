@@ -1,17 +1,36 @@
-import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, Button } from '../ui';
 import { downloadFromResponse } from '../../utils/downloadFile';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useT } from '../../i18n';
-import { useBackupList } from '../../hooks/useSystem';
-import { Database, Download, HardDrive } from 'lucide-react';
+import { useBackupList, useUpdateSystemSetting } from '../../hooks/useSystem';
+import { api } from '../../api/client';
+import { Database, Download, HardDrive, Archive } from 'lucide-react';
 
 export function BackupCard() {
   const t = useT();
   const { data: backups } = useBackupList();
   const queryClient = useQueryClient();
   const [backupLoading, setBackupLoading] = useState(false);
+
+  const { data: retainCountSetting } = useQuery({
+    queryKey: ['system', 'settings', 'backup-retain-count'],
+    queryFn: async () => {
+      const r = await api.get<{ value: string }>('/system/settings/backup-retain-count');
+      return r.value ? parseInt(r.value, 10) : 30;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  const [retainCount, setRetainCount] = useState<number>(30);
+  const [retainDirty, setRetainDirty] = useState(false);
+  const updateSetting = useUpdateSystemSetting();
+
+  useEffect(() => {
+    if (retainCountSetting != null) {
+      setRetainCount(retainCountSetting);
+    }
+  }, [retainCountSetting]);
 
   const handleBackup = async () => {
     setBackupLoading(true);
@@ -112,6 +131,43 @@ export function BackupCard() {
             </div>
           </div>
         )}
+
+        <div className="flex items-center justify-between pt-2 border-t border-border">
+          <div className="flex items-center gap-3">
+            <Archive className="w-5 h-5 text-text-secondary" />
+            <div>
+              <p className="text-sm font-medium text-text">{t.settings.backupRetainCount}</p>
+              <p className="text-xs text-text-tertiary">{t.settings.backupRetainCountDescription}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              max={365}
+              value={retainCount}
+              onChange={(e) => {
+                setRetainCount(parseInt(e.target.value, 10) || 1);
+                setRetainDirty(true);
+              }}
+              className="w-20 px-2 py-1 text-sm rounded border border-border bg-surface text-text text-right"
+            />
+            {retainDirty && (
+              <Button
+                size="sm"
+                onClick={() => {
+                  updateSetting.mutate(
+                    { key: 'backup-retain-count', value: String(retainCount) },
+                    { onSuccess: () => setRetainDirty(false) }
+                  );
+                }}
+                loading={updateSetting.isPending}
+              >
+                {t.common.save}
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
     </Card>
   );

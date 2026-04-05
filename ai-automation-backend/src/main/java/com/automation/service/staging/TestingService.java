@@ -72,8 +72,7 @@ public class TestingService {
         String testBuildTimestamp = null;
         if (healthy) {
             try {
-                String baseUrl = deriveTestBaseUrl();
-                JsonNode info = syncHelper.httpGet(baseUrl + "/system/info");
+                JsonNode info = withTestApiKey(() -> syncHelper.httpGet(deriveTestBaseUrl() + "/system/info"));
                 if (info != null) {
                     testVersion = info.path("version").asText(null);
                     testBuildTimestamp = info.path("buildTimestamp").asText(null);
@@ -130,7 +129,8 @@ public class TestingService {
         if (!isHealthy()) {
             throw new IllegalStateException("Test instance is not running or not healthy. Start it first.");
         }
-        return syncHelper.syncPreview(deriveTestBaseUrl());
+        String testApiKey = readContainerApiKey(config.getTestContainerName());
+        return syncHelper.syncPreview(deriveTestBaseUrl(), testApiKey);
     }
 
     public SyncResult syncDefinitions() {
@@ -141,7 +141,8 @@ public class TestingService {
         if (!isHealthy()) {
             throw new IllegalStateException("Test instance is not running or not healthy. Start it first.");
         }
-        return syncHelper.syncDefinitionsTo(deriveTestBaseUrl(), request);
+        String testApiKey = readContainerApiKey(config.getTestContainerName());
+        return syncHelper.syncDefinitionsTo(deriveTestBaseUrl(), testApiKey, request);
     }
 
     public void reportTestResult(String workflowName, String projectName, String status) {
@@ -163,43 +164,45 @@ public class TestingService {
             throw new IllegalStateException("Test instance is not running or not healthy. Start it first.");
         }
 
-        String testBaseUrl = deriveTestBaseUrl();
-        int workflowsUpdated = 0;
-        java.util.List<String> errors = new java.util.ArrayList<>();
+        return withTestApiKey(() -> {
+            String testBaseUrl = deriveTestBaseUrl();
+            int workflowsUpdated = 0;
+            java.util.List<String> errors = new java.util.ArrayList<>();
 
-        // Fetch all workflows from Test
-        JsonNode testWorkflows = syncHelper.httpGet(testBaseUrl + "/workflows");
-        if (testWorkflows == null || !testWorkflows.isArray()) {
-            return new SyncResult(0, 0, 0, 0, java.util.List.of("Could not fetch workflows from Test instance"));
-        }
-
-        for (JsonNode tw : testWorkflows) {
-            try {
-                String name = tw.path("name").asText();
-                String projectName = tw.path("projectName").asText("");
-
-                Optional<Workflow> devMatch = findWorkflowByNameAndProject(name, projectName);
-                if (devMatch.isEmpty()) {
-                    continue;
-                }
-
-                String testWorkflowId = tw.path("id").asText();
-                JsonNode fullTestWorkflow = syncHelper.httpGet(testBaseUrl + "/workflows/" + testWorkflowId);
-                if (fullTestWorkflow == null) {
-                    continue;
-                }
-
-                if (applyWorkflowChanges(devMatch.get(), fullTestWorkflow)) {
-                    workflowsUpdated++;
-                    log.info("Pulled changes for workflow '{}' from Test", name);
-                }
-            } catch (Exception e) {
-                errors.add("Workflow '" + tw.path("name").asText() + "': " + e.getMessage());
-                log.warn("Failed to pull changes for workflow: {}", e.getMessage());
+            // Fetch all workflows from Test
+            JsonNode testWorkflows = syncHelper.httpGet(testBaseUrl + "/workflows");
+            if (testWorkflows == null || !testWorkflows.isArray()) {
+                return new SyncResult(0, 0, 0, 0, java.util.List.of("Could not fetch workflows from Test instance"));
             }
-        }
 
-        return new SyncResult(0, workflowsUpdated, 0, 0, errors);
+            for (JsonNode tw : testWorkflows) {
+                try {
+                    String name = tw.path("name").asText();
+                    String projectName = tw.path("projectName").asText("");
+
+                    Optional<Workflow> devMatch = findWorkflowByNameAndProject(name, projectName);
+                    if (devMatch.isEmpty()) {
+                        continue;
+                    }
+
+                    String testWorkflowId = tw.path("id").asText();
+                    JsonNode fullTestWorkflow = syncHelper.httpGet(testBaseUrl + "/workflows/" + testWorkflowId);
+                    if (fullTestWorkflow == null) {
+                        continue;
+                    }
+
+                    if (applyWorkflowChanges(devMatch.get(), fullTestWorkflow)) {
+                        workflowsUpdated++;
+                        log.info("Pulled changes for workflow '{}' from Test", name);
+                    }
+                } catch (Exception e) {
+                    errors.add("Workflow '" + tw.path("name").asText() + "': " + e.getMessage());
+                    log.warn("Failed to pull changes for workflow: {}", e.getMessage());
+                }
+            }
+
+            return new SyncResult(0, workflowsUpdated, 0, 0, errors);
+        });
     }
 
     // ── Remote execution on Test ─────────────────────────
@@ -213,40 +216,43 @@ public class TestingService {
         if (!isHealthy()) {
             throw new IllegalStateException("Test instance is not running or not healthy.");
         }
-        String baseUrl = deriveTestBaseUrl();
 
-        // Find workflow on test by name + project
-        JsonNode workflows = syncHelper.httpGet(baseUrl + "/workflows");
-        if (workflows == null || !workflows.isArray()) {
-            throw new IllegalStateException("Could not fetch workflows from Test instance.");
-        }
+        return withTestApiKey(() -> {
+            String baseUrl = deriveTestBaseUrl();
 
-        String testWorkflowId = null;
-        for (JsonNode w : workflows) {
-            String name = w.path("name").asText();
-            String pName = w.path("projectName").asText("");
-            if (name.equals(workflowName) && pName.equals(projectName != null ? projectName : "")) {
-                testWorkflowId = w.path("id").asText();
-                break;
+            // Find workflow on test by name + project
+            JsonNode workflows = syncHelper.httpGet(baseUrl + "/workflows");
+            if (workflows == null || !workflows.isArray()) {
+                throw new IllegalStateException("Could not fetch workflows from Test instance.");
             }
-        }
-        if (testWorkflowId == null) {
-            throw new IllegalStateException("Workflow '" + workflowName +
-                    "' not found on Test instance (project: " + projectName + ").");
-        }
 
-        // Start execution
-        Map<String, Object> body = context != null && !context.isEmpty()
-                ? Map.of("context", context)
-                : Map.of();
-        JsonNode result = syncHelper.httpPost(baseUrl + "/workflows/" + testWorkflowId + "/execute", body);
-        if (result == null || !result.has("id")) {
-            throw new IllegalStateException("Failed to start workflow on Test instance.");
-        }
+            String testWorkflowId = null;
+            for (JsonNode w : workflows) {
+                String name = w.path("name").asText();
+                String pName = w.path("projectName").asText("");
+                if (name.equals(workflowName) && pName.equals(projectName != null ? projectName : "")) {
+                    testWorkflowId = w.path("id").asText();
+                    break;
+                }
+            }
+            if (testWorkflowId == null) {
+                throw new IllegalStateException("Workflow '" + workflowName +
+                        "' not found on Test instance (project: " + projectName + ").");
+            }
 
-        String runId = result.path("id").asText();
-        log.info("Started workflow '{}' on Test instance: runId={}", workflowName, runId);
-        return runId;
+            // Start execution
+            Map<String, Object> body = context != null && !context.isEmpty()
+                    ? Map.of("context", context)
+                    : Map.of();
+            JsonNode result = syncHelper.httpPost(baseUrl + "/workflows/" + testWorkflowId + "/execute", body);
+            if (result == null || !result.has("id")) {
+                throw new IllegalStateException("Failed to start workflow on Test instance.");
+            }
+
+            String runId = result.path("id").asText();
+            log.info("Started workflow '{}' on Test instance: runId={}", workflowName, runId);
+            return runId;
+        });
     }
 
     /**
@@ -259,28 +265,61 @@ public class TestingService {
     }
 
     public JsonNode pollTestRun(String runId, int maxWaitSeconds, int intervalMs) {
-        String baseUrl = deriveTestBaseUrl();
-        String url = baseUrl + "/executions/" + runId;
-        int waited = 0;
+        return withTestApiKey(() -> {
+            String baseUrl = deriveTestBaseUrl();
+            String url = baseUrl + "/executions/" + runId;
+            int waited = 0;
 
-        while (waited < maxWaitSeconds) {
-            JsonNode run = syncHelper.httpGet(url);
-            if (run != null) {
-                String status = run.path("status").asText("");
-                if ("COMPLETED".equals(status) || "FAILED".equals(status) || "CANCELLED".equals(status)) {
-                    log.info("Test run {} finished with status: {} ({}s)", runId, status, waited);
-                    return run;
+            while (waited < maxWaitSeconds) {
+                JsonNode run = syncHelper.httpGet(url);
+                if (run != null) {
+                    String status = run.path("status").asText("");
+                    if ("COMPLETED".equals(status) || "FAILED".equals(status) || "CANCELLED".equals(status)) {
+                        log.info("Test run {} finished with status: {} ({}s)", runId, status, waited);
+                        return run;
+                    }
                 }
+                try {
+                    Thread.sleep(intervalMs);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Polling interrupted", e);
+                }
+                waited += intervalMs / 1000;
             }
-            try {
-                Thread.sleep(intervalMs);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new RuntimeException("Polling interrupted", e);
-            }
-            waited += intervalMs / 1000;
+            throw new IllegalStateException("Test run " + runId + " did not complete within " + maxWaitSeconds + "s");
+        });
+    }
+
+    // ── API key helpers ────────────────────────────────────
+
+    private <T> T withTestApiKey(java.util.function.Supplier<T> action) {
+        String apiKey = readContainerApiKey(config.getTestContainerName());
+        syncHelper.setTargetApiKeyOverride(apiKey);
+        try {
+            return action.get();
+        } finally {
+            syncHelper.clearTargetApiKeyOverride();
         }
-        throw new IllegalStateException("Test run " + runId + " did not complete within " + maxWaitSeconds + "s");
+    }
+
+    String readContainerApiKey(String containerName) {
+        try {
+            ProcessBuilder pb = new ProcessBuilder("docker", "exec", containerName,
+                    "python3", "-c",
+                    "import sqlite3; conn=sqlite3.connect('/app/data/automation.db'); c=conn.cursor(); c.execute(\"SELECT value FROM app_settings WHERE key='api-key'\"); r=c.fetchone(); print(r[0] if r else ''); conn.close()");
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+            String output = new String(p.getInputStream().readAllBytes()).trim();
+            int exit = p.waitFor();
+            if (exit == 0 && !output.isEmpty()) {
+                log.debug("Read API key from container {}", containerName);
+                return output;
+            }
+        } catch (Exception e) {
+            log.warn("Failed to read API key from container {}: {}", containerName, e.getMessage());
+        }
+        return null;
     }
 
     // ── Internal helpers ──────────────────────────────────

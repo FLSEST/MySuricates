@@ -158,9 +158,10 @@ class TestingServiceTest {
         // Make the test spy return true for isHealthy — use a real TestingService with spied methods
         TestingService spied = spy(testingService);
         doReturn(true).when(spied).isHealthy();
+        doReturn("test-api-key").when(spied).readContainerApiKey(anyString());
 
         SyncResult expected = new SyncResult(2, 3, 1, 0, List.of());
-        when(instanceSyncHelper.syncDefinitionsTo(eq("http://localhost:8090/api/v1"), any()))
+        when(instanceSyncHelper.syncDefinitionsTo(eq("http://localhost:8090/api/v1"), eq("test-api-key"), any()))
                 .thenReturn(expected);
 
         SyncResult result = spied.syncDefinitions();
@@ -1045,17 +1046,18 @@ class TestingServiceTest {
         stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
         TestingService spied = spy(testingService);
         doReturn(true).when(spied).isHealthy();
+        doReturn("test-api-key").when(spied).readContainerApiKey(anyString());
 
         SyncDefinitionsRequest request = new SyncDefinitionsRequest(List.of("p-1"), List.of("wf-1"), List.of());
         SyncResult expected = new SyncResult(1, 2, 0, 0, List.of());
-        when(instanceSyncHelper.syncDefinitionsTo(eq("http://localhost:8090/api/v1"), eq(request)))
+        when(instanceSyncHelper.syncDefinitionsTo(eq("http://localhost:8090/api/v1"), eq("test-api-key"), eq(request)))
                 .thenReturn(expected);
 
         SyncResult result = spied.syncDefinitions(request);
 
         assertThat(result.projectsSynced()).isEqualTo(1);
         assertThat(result.workflowsSynced()).isEqualTo(2);
-        verify(instanceSyncHelper).syncDefinitionsTo("http://localhost:8090/api/v1", request);
+        verify(instanceSyncHelper).syncDefinitionsTo("http://localhost:8090/api/v1", "test-api-key", request);
     }
 
     @Test
@@ -1063,13 +1065,14 @@ class TestingServiceTest {
         stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
         TestingService spied = spy(testingService);
         doReturn(true).when(spied).isHealthy();
+        doReturn("test-api-key").when(spied).readContainerApiKey(anyString());
 
         SyncResult expected = new SyncResult(0, 0, 0, 0, List.of());
-        when(instanceSyncHelper.syncDefinitionsTo(eq("http://localhost:8090/api/v1"), isNull()))
+        when(instanceSyncHelper.syncDefinitionsTo(eq("http://localhost:8090/api/v1"), eq("test-api-key"), isNull()))
                 .thenReturn(expected);
 
         SyncResult result = spied.syncDefinitions();
 
-        verify(instanceSyncHelper).syncDefinitionsTo("http://localhost:8090/api/v1", null);
+        verify(instanceSyncHelper).syncDefinitionsTo("http://localhost:8090/api/v1", "test-api-key", null);
     }
 }

@@ -98,7 +98,7 @@ automation:
   backup:
     enabled: ${AUTOMATION_BACKUP_ENABLED:true}
     cron: ${AUTOMATION_BACKUP_CRON:0 0 2 * * *}
-    retain-count: ${AUTOMATION_BACKUP_RETAIN_COUNT:5}
+    retain-count: ${AUTOMATION_BACKUP_RETAIN_COUNT:30}
     directory: ${AUTOMATION_BACKUP_DIR:${user.home}/.autotrigger/backups}
   staging:
     compose-file: ${AUTOMATION_STAGING_COMPOSE:docker-compose.stable.yml}

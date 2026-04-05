@@ -47,6 +47,16 @@ public class InstanceSyncHelper {
     /** Overrides the API key for outgoing HTTP calls within the current thread (used for Stable/Test targets). */
     private final ThreadLocal<String> targetApiKeyOverride = new ThreadLocal<>();
 
+    /** Sets the API key override for the current thread. Call {@link #clearTargetApiKeyOverride()} in a finally block. */
+    public void setTargetApiKeyOverride(String apiKey) {
+        targetApiKeyOverride.set(apiKey);
+    }
+
+    /** Clears the API key override for the current thread. */
+    public void clearTargetApiKeyOverride() {
+        targetApiKeyOverride.remove();
+    }
+
     // ── Target maps record ──────────────────────────────────
 
     private record TargetMaps(

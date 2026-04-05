@@ -1,5 +1,6 @@
 package com.automation.service.system;
 
+import com.automation.config.BackupConfig;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.AssistantService;
 import com.automation.service.PageSuggestionService;
@@ -8,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.lang.reflect.Field;
@@ -24,12 +26,13 @@ class SystemSettingsServiceTest {
     @Mock private AiProviderRegistry aiProviderRegistry;
     @Mock private AssistantService assistantService;
     @Mock private PageSuggestionService pageSuggestionService;
+    @Spy private BackupConfig backupConfig = new BackupConfig();
 
     private SystemSettingsService service;
 
     @BeforeEach
     void setUp() throws Exception {
-        service = new SystemSettingsService(appSettingsRepository, aiProviderRegistry);
+        service = new SystemSettingsService(appSettingsRepository, aiProviderRegistry, backupConfig);
 
         // Inject @Lazy @Autowired fields via reflection
         setField(service, "assistantService", assistantService);

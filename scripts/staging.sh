@@ -250,6 +250,13 @@ cmd_test_status() {
 }
 
 cmd_test_reset() {
+    echo ""
+    echo "WARNING: This will DELETE all test data (workflows, runs, results)."
+    echo "         The test volume will be destroyed and recreated."
+    echo ""
+    read -p "Continue? [y/N] " confirm
+    [[ "$confirm" =~ ^[yY]$ ]] || { echo "Aborted."; exit 1; }
+
     log "Resetting test database..."
     cd "$BACKEND_DIR"
     docker compose -f "$TEST_COMPOSE_FILE" down -v 2>/dev/null || true
@@ -264,6 +271,13 @@ cmd_test_log() {
 }
 
 cmd_test_clean() {
+    echo ""
+    echo "WARNING: This will DELETE all test data and remove the Docker image."
+    echo "         The test volume, container, and image will be destroyed."
+    echo ""
+    read -p "Continue? [y/N] " confirm
+    [[ "$confirm" =~ ^[yY]$ ]] || { echo "Aborted."; exit 1; }
+
     log "Cleaning up test environment completely..."
     cd "$BACKEND_DIR"
     docker compose -f "$TEST_COMPOSE_FILE" down -v --rmi local 2>/dev/null || true

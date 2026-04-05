@@ -15,7 +15,7 @@ public class BackupConfig {
 
     private String cron = "0 0 2 * * *";
 
-    private int retainCount = 5;
+    private int retainCount = 30;
 
     private String directory = System.getProperty("user.home") + "/.autotrigger/backups";
 }

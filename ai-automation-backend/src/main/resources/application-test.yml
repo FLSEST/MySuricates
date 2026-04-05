@@ -12,6 +12,8 @@ automation:
     enabled: false
   staging:
     auto-start: false
+  backup:
+    directory: /app/data/backups
   serve-frontend: true
   frontend-path: /app/frontend
   environment: Test

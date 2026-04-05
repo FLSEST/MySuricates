@@ -1,5 +1,6 @@
 package com.automation.service.system;
 
+import com.automation.config.BackupConfig;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.AssistantService;
 import com.automation.service.PageSuggestionService;
@@ -19,11 +20,13 @@ public class SystemSettingsService {
     private static final Set<String> ALLOWED_SETTINGS = Set.of(
             "auto-todo-default", "auto-repair-default", "auto-repair-mode",
             "auto-repair-max-retries", "auto-repair-timeout-seconds",
-            "default-ai-provider", "assistant-thinking-phrases", "assistant-model", "suggestions-model"
+            "default-ai-provider", "assistant-thinking-phrases", "assistant-model", "suggestions-model",
+            "backup-retain-count"
     );
 
     private final AppSettingsRepository appSettingsRepository;
     private final AiProviderRegistry aiProviderRegistry;
+    private final BackupConfig backupConfig;
 
     @Autowired
     @Lazy
@@ -33,9 +36,10 @@ public class SystemSettingsService {
     @Lazy
     private PageSuggestionService pageSuggestionService;
 
-    public SystemSettingsService(AppSettingsRepository appSettingsRepository, AiProviderRegistry aiProviderRegistry) {
+    public SystemSettingsService(AppSettingsRepository appSettingsRepository, AiProviderRegistry aiProviderRegistry, BackupConfig backupConfig) {
         this.appSettingsRepository = appSettingsRepository;
         this.aiProviderRegistry = aiProviderRegistry;
+        this.backupConfig = backupConfig;
     }
 
     public boolean isAllowedKey(String key) {
@@ -58,6 +62,13 @@ public class SystemSettingsService {
         }
         appSettingsRepository.set(key, value);
 
+        if ("backup-retain-count".equals(key)) {
+            int count = Integer.parseInt(value);
+            if (count < 1 || count > 365) {
+                throw new IllegalArgumentException("backup-retain-count must be between 1 and 365");
+            }
+            backupConfig.setRetainCount(count);
+        }
         if ("assistant-model".equals(key)) {
             assistantService.refreshCachedModel();
         }
