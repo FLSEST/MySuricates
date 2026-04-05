@@ -829,6 +829,8 @@ export interface Todo {
   workflowRunId: string | null;
   referenceType: string | null;
   referenceId: string | null;
+  fixAttempts: number;
+  lastFixRunId: string | null;
   createdAt: string;
   updatedAt: string;
 }

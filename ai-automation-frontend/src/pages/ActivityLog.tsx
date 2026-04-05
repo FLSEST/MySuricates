@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { ScrollText, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState, Fragment } from 'react';
+import { Link } from 'react-router-dom';
+import { ScrollText, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightIcon } from 'lucide-react';
 import { useActivityLog } from '../hooks/useActivityLog';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { useT } from '../i18n';
@@ -15,20 +16,48 @@ const levelColors: Record<ActivityLogLevel, string> = {
   ERROR: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
 };
 
+function relativeTime(ts: string): string {
+  const diff = Date.now() - new Date(ts).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'gerade';
+  if (mins < 60) return `${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `${days}d`;
+}
+
+function referenceLink(category: ActivityLogCategory, refId: string | null): string | null {
+  if (!refId) return null;
+  switch (category) {
+    case 'EXECUTION': return `/runs/${refId}`;
+    case 'SCHEDULE': return '/schedules';
+    case 'WEBHOOK': return '/webhooks';
+    default: return null;
+  }
+}
+
 export function ActivityLog() {
   const t = useT();
   const [page, setPage] = useState(0);
   const [level, setLevel] = useState('');
   const [category, setCategory] = useState('');
   const [workflowId, setWorkflowId] = useState('');
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   const { data, isLoading } = useActivityLog(page, 50, level || undefined, category || undefined, workflowId || undefined);
   const { data: workflows } = useWorkflows();
 
-  const formatTime = (ts: string) => {
-    const d = new Date(ts);
-    return d.toLocaleString();
-  };
+  const toggleExpand = (id: string) => setExpandedIds(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+
+  const formatTime = (ts: string) => new Date(ts).toLocaleString();
+
+  const hasDetails = (entry: { metadata?: Record<string, unknown>; referenceId?: string | null }) =>
+    (entry.referenceId) || (entry.metadata && Object.keys(entry.metadata).length > 0);
 
   return (
     <div className="space-y-6">
@@ -79,6 +108,7 @@ export function ActivityLog() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-text-secondary">
+                  <th className="w-8 px-2 py-3" />
                   <th className="px-4 py-3 font-medium">{t.activityLog.timestamp}</th>
                   <th className="px-4 py-3 font-medium">{t.activityLog.level}</th>
                   <th className="px-4 py-3 font-medium">{t.activityLog.category}</th>
@@ -97,28 +127,76 @@ export function ActivityLog() {
                       rows.push({ entry, count: 1, firstId: entry.id });
                     }
                   }
-                  return rows.map(({ entry, count, firstId }) => (
-                    <tr key={firstId} className="border-b border-border/50 hover:bg-surface">
-                      <td className="px-4 py-2.5 whitespace-nowrap text-text-secondary text-xs">
-                        {formatTime(entry.timestamp)}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <span className={`inline-block px-2 py-0.5 rounded-sm text-xs font-medium ${levelColors[entry.level]}`}>
-                          {entry.level}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 text-xs text-text-secondary">{entry.category}</td>
-                      <td className="px-4 py-2.5 max-w-md truncate">
-                        {entry.message}
-                        {count > 1 && (
-                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-surface-raised text-text-secondary">
-                            &times;{count}
-                          </span>
+                  return rows.map(({ entry, count, firstId }) => {
+                    const isExpanded = expandedIds.has(firstId);
+                    const expandable = hasDetails(entry) || entry.message.length > 60;
+                    return (
+                      <Fragment key={firstId}>
+                        <tr
+                          className={`border-b border-border/50 hover:bg-surface ${expandable ? 'cursor-pointer' : ''}`}
+                          onClick={() => expandable && toggleExpand(firstId)}
+                        >
+                          <td className="px-2 py-2.5 text-text-tertiary">
+                            {expandable && (
+                              isExpanded
+                                ? <ChevronDown className="w-3.5 h-3.5" />
+                                : <ChevronRightIcon className="w-3.5 h-3.5" />
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5 whitespace-nowrap text-xs">
+                            <span className="text-text-secondary" title={formatTime(entry.timestamp)}>
+                              {relativeTime(entry.timestamp)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <span className={`inline-block px-2 py-0.5 rounded-sm text-xs font-medium ${levelColors[entry.level]}`}>
+                              {entry.level}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-text-secondary">{entry.category}</td>
+                          <td className={`px-4 py-2.5 ${isExpanded ? '' : 'max-w-md truncate'}`}>
+                            {entry.message}
+                            {count > 1 && (
+                              <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-surface-raised text-text-secondary">
+                                &times;{count}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-text-secondary">{entry.source || '—'}</td>
+                        </tr>
+                        {isExpanded && (
+                          <tr className="bg-surface/50">
+                            <td colSpan={6} className="px-6 py-3 space-y-2">
+                              <p className="text-sm text-text whitespace-pre-wrap break-words">{entry.message}</p>
+                              {entry.referenceId && referenceLink(entry.category, entry.referenceId) && (
+                                <Link
+                                  to={referenceLink(entry.category, entry.referenceId)!}
+                                  onClick={e => e.stopPropagation()}
+                                  className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
+                                >
+                                  {t.activityLog.reference}: {entry.referenceId.slice(0, 8)}...
+                                </Link>
+                              )}
+                              {entry.metadata && Object.keys(entry.metadata).length > 0 && (
+                                <div className="mt-1">
+                                  <p className="text-xs font-medium text-text-tertiary mb-1">{t.activityLog.metadata}</p>
+                                  <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-xs">
+                                    {Object.entries(entry.metadata).map(([k, v]) => (
+                                      <Fragment key={k}>
+                                        <span className="text-text-tertiary font-medium">{k}</span>
+                                        <span className="text-text-secondary break-all">{typeof v === 'object' ? JSON.stringify(v) : String(v)}</span>
+                                      </Fragment>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              <p className="text-[10px] text-text-tertiary">{formatTime(entry.timestamp)}</p>
+                            </td>
+                          </tr>
                         )}
-                      </td>
-                      <td className="px-4 py-2.5 text-xs text-text-secondary">{entry.source || '—'}</td>
-                    </tr>
-                  ));
+                      </Fragment>
+                    );
+                  });
                 })()}
               </tbody>
             </table>

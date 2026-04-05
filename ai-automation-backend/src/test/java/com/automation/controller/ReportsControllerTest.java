@@ -155,4 +155,30 @@ class ReportsControllerTest {
                 .andExpect(jsonPath("$[0].name").value("alpha-report.md"))
                 .andExpect(jsonPath("$[1].name").value("beta-report.md"));
     }
+
+    @Test
+    void getReport_emptyFile_returnsEmptyContent() throws Exception {
+        Files.writeString(tempDir.resolve("empty.md"), "");
+
+        mockMvc.perform(get("/api/v1/reports/empty.md"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").value(""));
+    }
+
+    @Test
+    void listReports_manyFiles_allReturned() throws Exception {
+        for (int i = 0; i < 20; i++) {
+            Files.writeString(tempDir.resolve(String.format("report-%02d.md", i)), "content " + i);
+        }
+
+        mockMvc.perform(get("/api/v1/reports"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(20)));
+    }
+
+    @Test
+    void getReport_slashInName_returnsError() throws Exception {
+        mockMvc.perform(get("/api/v1/reports/sub/file.md"))
+                .andExpect(status().is5xxServerError());
+    }
 }

@@ -1,5 +1,5 @@
-import { useState, useCallback, Fragment } from 'react';
-import { Calendar, Plus, Trash2, Pencil, List, Link2, ChevronDown, ChevronRight, History, Pause, Play, AlertTriangle } from 'lucide-react';
+import { useState, useCallback, useMemo, Fragment } from 'react';
+import { Calendar, Plus, Trash2, Pencil, List, Link2, ChevronDown, ChevronRight, History, Pause, Play, AlertTriangle, Search } from 'lucide-react';
 import { Card, Button, Spinner, Toggle } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
@@ -8,6 +8,7 @@ import { ScheduleFormModal, type ScheduleFormState } from '../components/schedul
 import { useSchedules, useCreateSchedule, useUpdateSchedule, useToggleSchedule, useDeleteSchedule, useScheduleRuns, useMaintenanceMode, useSetMaintenanceMode } from '../hooks/useSchedules';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { useChains } from '../hooks/useChains';
+import { usePersistedState } from '../hooks/usePersistedState';
 import { useT } from '../i18n';
 import type { ScheduledWorkflow, CreateScheduleRequest, UpdateScheduleRequest, RunStatus } from '../types';
 
@@ -104,6 +105,50 @@ export function Schedules() {
   const [showVariables, setShowVariables] = useState(false);
   const [expandedScheduleId, setExpandedScheduleId] = useState<string | null>(null);
   const [showEndConditions, setShowEndConditions] = useState(false);
+
+  // Filters
+  const [targetTypeFilter, setTargetTypeFilter] = usePersistedState<'ALL' | 'WORKFLOW' | 'CHAIN'>('schedules-target-filter', 'ALL');
+  const [scheduleTypeFilter, setScheduleTypeFilter] = usePersistedState<'ALL' | 'CRON' | 'ONCE' | 'DELAYED'>('schedules-type-filter', 'ALL');
+  const [enabledFilter, setEnabledFilter] = usePersistedState<'ALL' | 'ON' | 'OFF'>('schedules-enabled-filter', 'ALL');
+  const [projectFilter, setProjectFilter] = usePersistedState('schedules-project-filter', '');
+  const [search, setSearch] = usePersistedState('schedules-search', '');
+  const [sortBy, setSortBy] = usePersistedState<'nextRun' | 'lastRun' | 'name' | 'created'>('schedules-sort', 'nextRun');
+
+  const uniqueProjects = useMemo(() => {
+    if (!schedules) return [];
+    return [...new Set(schedules.map(s => s.projectName).filter(Boolean) as string[])].sort();
+  }, [schedules]);
+
+  const filtered = useMemo(() => {
+    if (!schedules) return [];
+    let result = [...schedules];
+
+    if (targetTypeFilter !== 'ALL') result = result.filter(s => s.targetType === targetTypeFilter);
+    if (scheduleTypeFilter !== 'ALL') result = result.filter(s => s.scheduleType === scheduleTypeFilter);
+    if (enabledFilter === 'ON') result = result.filter(s => s.enabled);
+    if (enabledFilter === 'OFF') result = result.filter(s => !s.enabled);
+    if (projectFilter) result = result.filter(s => s.projectName === projectFilter);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(s =>
+        s.workflowName?.toLowerCase().includes(q) ||
+        s.chainName?.toLowerCase().includes(q) ||
+        s.description?.toLowerCase().includes(q)
+      );
+    }
+
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case 'nextRun': return (a.nextRunAt ?? '').localeCompare(b.nextRunAt ?? '');
+        case 'lastRun': return (b.lastRunAt ?? '').localeCompare(a.lastRunAt ?? '');
+        case 'name': return (a.workflowName ?? a.chainName ?? '').localeCompare(b.workflowName ?? b.chainName ?? '');
+        case 'created': return b.createdAt.localeCompare(a.createdAt);
+        default: return 0;
+      }
+    });
+
+    return result;
+  }, [schedules, targetTypeFilter, scheduleTypeFilter, enabledFilter, projectFilter, search, sortBy]);
   const [form, setForm] = useState<ScheduleFormState>({
     targetType: 'WORKFLOW',
     workflowId: '',
@@ -398,6 +443,54 @@ export function Schedules() {
         </div>
       )}
 
+      {/* Filter bar (list view only) */}
+      {view === 'list' && schedules && schedules.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1">
+            {(['ALL', 'WORKFLOW', 'CHAIN'] as const).map(v => (
+              <button key={v} onClick={() => setTargetTypeFilter(v)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                  targetTypeFilter === v ? 'bg-accent text-white' : 'text-text-secondary hover:text-text hover:bg-surface-raised'
+                }`}>
+                {v === 'ALL' ? t.common.all : v === 'WORKFLOW' ? 'Workflow' : 'Chain'}
+              </button>
+            ))}
+          </div>
+          <select className="px-2.5 py-1.5 rounded-lg border border-border bg-surface-raised text-xs"
+            value={scheduleTypeFilter} onChange={e => setScheduleTypeFilter(e.target.value as typeof scheduleTypeFilter)}>
+            <option value="ALL">{t.schedules.scheduleType}</option>
+            <option value="CRON">{t.schedules.recurring}</option>
+            <option value="ONCE">{t.schedules.once}</option>
+            <option value="DELAYED">{t.schedules.delayed}</option>
+          </select>
+          <select className="px-2.5 py-1.5 rounded-lg border border-border bg-surface-raised text-xs"
+            value={enabledFilter} onChange={e => setEnabledFilter(e.target.value as typeof enabledFilter)}>
+            <option value="ALL">{t.common.status}</option>
+            <option value="ON">{t.common.enabled}</option>
+            <option value="OFF">{t.common.disabled}</option>
+          </select>
+          {uniqueProjects.length > 0 && (
+            <select className="px-2.5 py-1.5 rounded-lg border border-border bg-surface-raised text-xs max-w-[160px]"
+              value={projectFilter} onChange={e => setProjectFilter(e.target.value)}>
+              <option value="">{t.schedules.allProjects}</option>
+              {uniqueProjects.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          )}
+          <select className="px-2.5 py-1.5 rounded-lg border border-border bg-surface-raised text-xs"
+            value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}>
+            <option value="nextRun">{t.schedules.nextRun}</option>
+            <option value="lastRun">{t.schedules.lastRun}</option>
+            <option value="name">{t.common.name}</option>
+            <option value="created">{t.common.created}</option>
+          </select>
+          <div className="relative flex-1 min-w-[140px] max-w-xs">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-tertiary pointer-events-none" />
+            <input type="text" className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-border bg-surface-raised text-xs placeholder:text-text-tertiary"
+              placeholder={t.common.search} value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+        </div>
+      )}
+
       {/* Content */}
       {view === 'calendar' ? (
         <CalendarView />
@@ -431,7 +524,14 @@ export function Schedules() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {schedules.map((s) => (
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={columns.length + 1} className="px-4 py-8 text-center text-text-secondary text-sm">
+                      {t.common.noResults}
+                    </td>
+                  </tr>
+                )}
+                {filtered.map((s) => (
                   <Fragment key={s.id}>
                     <tr className="transition-colors">
                       <td className="pl-3 pr-0 py-3">

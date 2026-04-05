@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+import { ExternalLink } from 'lucide-react';
 import { Modal, Button, Input, Select, TagInput } from '../ui';
 import { useT } from '../../i18n';
 import type { Todo, TodoStatus, TodoPriority, UpdateTodoRequest, Project } from '../../types';
@@ -140,6 +142,32 @@ export function TodoEditModal({
               <p className="text-xs text-text-tertiary">
                 {t.todos.sessionId}: {editTodo.sessionId}
               </p>
+            )}
+            {editTodo.workflowRunId && (
+              <div className="flex items-center gap-2 text-xs text-text-tertiary">
+                <span>Run:</span>
+                <Link
+                  to={`/runs/${editTodo.workflowRunId}`}
+                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-accent/10 text-accent font-medium hover:bg-accent/20 transition-colors"
+                  title={t.todos.viewRun}
+                >
+                  <ExternalLink className="w-2.5 h-2.5" />
+                  Run
+                </Link>
+              </div>
+            )}
+            {editTodo.lastFixRunId && (
+              <div className="flex items-center gap-2 text-xs text-text-tertiary">
+                <span>{t.todos.viewFixRun}:</span>
+                <Link
+                  to={`/runs/${editTodo.lastFixRunId}`}
+                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-warning/10 text-warning font-medium hover:bg-warning/20 transition-colors"
+                  title={t.todos.viewFixRun}
+                >
+                  <ExternalLink className="w-2.5 h-2.5" />
+                  Fix Run
+                </Link>
+              </div>
             )}
             <p className="text-xs text-text-tertiary">
               {t.common.created}: {new Date(editTodo.createdAt).toLocaleString()}

@@ -492,10 +492,12 @@ public class WorkflowExecutor {
                 try {
                     eventPublisher.publishEvent(new WorkflowRunCompletedEvent(
                             this, run.getId(), workflowId, workflowName,
-                            project.getId(), project.getPath(), run.getStatus(),
+                            project != null ? project.getId() : null,
+                            project != null ? project.getPath() : null,
+                            run.getStatus(),
                             run.getMetadata(), workflowMeta, run.getError()));
                 } catch (Exception e) {
-                    log.warn("Failed to publish WorkflowRunCompletedEvent: {}", e.getMessage());
+                    log.error("Failed to publish WorkflowRunCompletedEvent for run {}: {}", run.getId(), e.getMessage(), e);
                 }
             } else {
                 // run could not be loaded — mark as failed directly

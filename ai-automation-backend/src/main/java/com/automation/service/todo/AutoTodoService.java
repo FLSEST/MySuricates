@@ -412,6 +412,11 @@ public class AutoTodoService {
             log.warn("Could not resolve affected_paths to projects, falling back to workflow project");
         }
 
+        if (event.getProjectId() == null) {
+            log.warn("WorkflowRunCompletedEvent has no projectId for workflow '{}' — skipping auto-todo creation",
+                    event.getWorkflowName());
+            return List.of();
+        }
         return List.of(event.getProjectId());
     }
 

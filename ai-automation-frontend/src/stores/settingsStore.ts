@@ -11,6 +11,7 @@ interface SettingsState {
   defaultAiProvider: string;
   assistantModel: string;
   suggestionsModel: string;
+  suggestionsEnabled: boolean;
   sidebarItemOrder: string[];
   sidebarHiddenItems: string[];
   setApiKey: (key: string) => void;
@@ -22,6 +23,7 @@ interface SettingsState {
   setDefaultAiProvider: (provider: string) => void;
   setAssistantModel: (model: string) => void;
   setSuggestionsModel: (model: string) => void;
+  setSuggestionsEnabled: (enabled: boolean) => void;
   setSidebarItemOrder: (order: string[]) => void;
   setSidebarHiddenItems: (hidden: string[]) => void;
 }
@@ -38,6 +40,7 @@ export const useSettingsStore = create<SettingsState>()(
       defaultAiProvider: '',
       assistantModel: '',
       suggestionsModel: '',
+      suggestionsEnabled: true,
       sidebarItemOrder: [],
       sidebarHiddenItems: [],
       setApiKey: (apiKey) => set({ apiKey }),
@@ -49,6 +52,7 @@ export const useSettingsStore = create<SettingsState>()(
       setDefaultAiProvider: (defaultAiProvider) => set({ defaultAiProvider }),
       setAssistantModel: (assistantModel) => set({ assistantModel }),
       setSuggestionsModel: (suggestionsModel) => set({ suggestionsModel }),
+      setSuggestionsEnabled: (suggestionsEnabled) => set({ suggestionsEnabled }),
       setSidebarItemOrder: (sidebarItemOrder) => set({ sidebarItemOrder }),
       setSidebarHiddenItems: (sidebarHiddenItems) => set({ sidebarHiddenItems }),
     }),

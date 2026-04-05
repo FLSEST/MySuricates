@@ -8,7 +8,7 @@ import { Globe, Bot, Sparkles } from 'lucide-react';
 
 export function GeneralSettingsCard() {
   const t = useT();
-  const { simpleMode, setSimpleMode, advancedMode, setAdvancedMode, autoTodoDefault, setAutoTodoDefault, autoRepairDefault, setAutoRepairDefault, autoRepairMode, setAutoRepairMode, defaultAiProvider, setDefaultAiProvider, assistantModel, setAssistantModel, suggestionsModel, setSuggestionsModel } = useSettingsStore();
+  const { simpleMode, setSimpleMode, advancedMode, setAdvancedMode, autoTodoDefault, setAutoTodoDefault, autoRepairDefault, setAutoRepairDefault, autoRepairMode, setAutoRepairMode, defaultAiProvider, setDefaultAiProvider, assistantModel, setAssistantModel, suggestionsModel, setSuggestionsModel, suggestionsEnabled, setSuggestionsEnabled } = useSettingsStore();
   const updateSetting = useUpdateSystemSetting();
   const { locale, setLocale } = useI18nStore();
   const { data: aiProviders } = useAiProviders();
@@ -117,24 +117,43 @@ export function GeneralSettingsCard() {
           <div className="flex items-center gap-3">
             <Sparkles className="w-5 h-5 text-text-secondary" />
             <div>
-              <p className="text-sm font-medium text-text">{t.settings.suggestionsModel}</p>
-              <p className="text-xs text-text-tertiary">{t.settings.suggestionsModelHint}</p>
+              <p className="text-sm font-medium text-text">{t.settings.suggestionsEnabled}</p>
+              <p className="text-xs text-text-tertiary">{t.settings.suggestionsEnabledHint}</p>
             </div>
           </div>
-          <Select
-            value={suggestionsModel}
-            onChange={(e) => {
-              setSuggestionsModel(e.target.value);
-              updateSetting.mutate({ key: 'suggestions-model', value: e.target.value });
+          <Toggle
+            enabled={suggestionsEnabled}
+            onChange={(enabled) => {
+              setSuggestionsEnabled(enabled);
+              updateSetting.mutate({ key: 'suggestions-enabled', value: String(enabled) });
             }}
-            options={[
-              { value: '', label: 'Standard (Provider-Standard)' },
-              { value: 'claude-haiku-4-5-20251001', label: 'Haiku (schnell)' },
-              { value: 'claude-sonnet-4-6', label: 'Sonnet (präzise)' },
-              { value: 'claude-opus-4-6', label: 'Opus (komplex)' },
-            ]}
           />
         </div>
+
+        {suggestionsEnabled && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Sparkles className="w-5 h-5 text-text-secondary" />
+              <div>
+                <p className="text-sm font-medium text-text">{t.settings.suggestionsModel}</p>
+                <p className="text-xs text-text-tertiary">{t.settings.suggestionsModelHint}</p>
+              </div>
+            </div>
+            <Select
+              value={suggestionsModel}
+              onChange={(e) => {
+                setSuggestionsModel(e.target.value);
+                updateSetting.mutate({ key: 'suggestions-model', value: e.target.value });
+              }}
+              options={[
+                { value: '', label: 'Standard (Provider-Standard)' },
+                { value: 'claude-haiku-4-5-20251001', label: 'Haiku (schnell)' },
+                { value: 'claude-sonnet-4-6', label: 'Sonnet (präzise)' },
+                { value: 'claude-opus-4-6', label: 'Opus (komplex)' },
+              ]}
+            />
+          </div>
+        )}
 
         {!simpleMode && (
           <div className="flex items-center justify-between">
