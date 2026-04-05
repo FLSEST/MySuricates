@@ -1,460 +1,25 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { usePersistedState } from '../hooks/usePersistedState';
 import {
-  CheckSquare, Plus, Search, Trash2, Pencil, Bot, User, GitBranch,
-  X, List, LayoutGrid, Circle, Clock, RefreshCw, ExternalLink,
+  CheckSquare, Plus, Search,
+  X, List, LayoutGrid,
 } from 'lucide-react';
-import { Card, Button, Spinner, Badge, TagInput } from '../components/ui';
+import { Card, Button, Spinner, TagInput } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
+import { Pagination } from '../components/shared/Pagination';
 import { TodoEditModal } from '../components/shared/TodoEditModal';
 import { TodoTriggerSection } from '../components/todo/TodoTriggerSection';
+import { STATUSES, PRIORITIES, SOURCES, MAX_VISIBLE_TAGS, type ViewMode } from '../components/todo/todoConstants';
+import { TodoProgressBar } from '../components/todo/TodoProgressBar';
+import { TodoKanbanView } from '../components/todo/TodoKanbanView';
+import { TodoListItem } from '../components/todo/TodoListView';
 import {
   useTodos, useTodoCount, useCreateTodo, useUpdateTodo, useUpdateTodoStatus, useDeleteTodo,
 } from '../hooks/useTodos';
 import { useProjects } from '../hooks/useProjects';
 import { useT } from '../i18n';
 import type { Todo, TodoStatus, TodoPriority, TodoSource, CreateTodoRequest, UpdateTodoRequest } from '../types';
-
-const STATUSES: TodoStatus[] = ['OPEN', 'IN_PROGRESS', 'DONE', 'BACKLOG'];
-const PRIORITIES: TodoPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
-const SOURCES: TodoSource[] = ['USER', 'AI', 'WORKFLOW'];
-
-const MAX_VISIBLE_TAGS = 8;
-
-type ViewMode = 'list' | 'board';
-
-const priorityColor: Record<TodoPriority, string> = {
-  CRITICAL: 'bg-red-700 dark:bg-red-600',
-  HIGH: 'bg-danger',
-  MEDIUM: 'bg-warning',
-  LOW: 'bg-text-tertiary',
-};
-
-const sourceIcon = (s: TodoSource) => {
-  switch (s) {
-    case 'USER': return <User className="w-3 h-3" />;
-    case 'AI': return <Bot className="w-3 h-3" />;
-    case 'WORKFLOW': return <GitBranch className="w-3 h-3" />;
-  }
-};
-
-function formatRelative(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
-}
-
-/* ─── Inline Status Buttons ─────────────────────────────── */
-function StatusDots({ current, onChange }: { current: TodoStatus; onChange: (s: TodoStatus) => void }) {
-  return (
-    <div className="flex items-center gap-1 shrink-0">
-      {/* OPEN */}
-      <button
-        onClick={(e) => { e.stopPropagation(); onChange('OPEN'); }}
-        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-          current === 'OPEN'
-            ? 'border-text-tertiary bg-surface-raised'
-            : 'border-border hover:border-text-tertiary'
-        }`}
-        title="Open"
-      />
-      {/* IN_PROGRESS */}
-      <button
-        onClick={(e) => { e.stopPropagation(); onChange('IN_PROGRESS'); }}
-        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-          current === 'IN_PROGRESS'
-            ? 'border-warning bg-warning/20'
-            : 'border-border hover:border-warning'
-        }`}
-        title="In Progress"
-      >
-        {current === 'IN_PROGRESS' && (
-          <div className="w-2.5 h-2.5 rounded-full bg-warning" style={{ clipPath: 'inset(0 50% 0 0)' }}>
-            <div className="w-full h-full rounded-full bg-warning" />
-          </div>
-        )}
-      </button>
-      {/* DONE */}
-      <button
-        onClick={(e) => { e.stopPropagation(); onChange('DONE'); }}
-        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-          current === 'DONE'
-            ? 'border-success bg-success text-white'
-            : 'border-border hover:border-success'
-        }`}
-        title="Done"
-      >
-        {current === 'DONE' && (
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-        )}
-      </button>
-      {/* BACKLOG */}
-      <button
-        onClick={(e) => { e.stopPropagation(); onChange('BACKLOG'); }}
-        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-          current === 'BACKLOG'
-            ? 'border-text-tertiary/60 bg-text-tertiary/20'
-            : 'border-border hover:border-text-tertiary/60'
-        }`}
-        title="Backlog"
-      >
-        {current === 'BACKLOG' && (
-          <div className="w-2 h-2 rounded-full bg-text-tertiary/60" />
-        )}
-      </button>
-    </div>
-  );
-}
-
-/* ─── Progress Bar ──────────────────────────────────────── */
-function ProgressBar({ open, inProgress, done, backlog }: { open: number; inProgress: number; done: number; backlog: number }) {
-  const t = useT();
-  const activeTotal = open + inProgress + done;
-  if (activeTotal + backlog === 0) return null;
-
-  return (
-    <div className="flex items-center gap-4">
-      <div className="flex-1 h-2 rounded-full bg-surface overflow-hidden flex">
-        {done > 0 && activeTotal > 0 && (
-          <div
-            className="h-full bg-success transition-all duration-500"
-            style={{ width: `${(done / activeTotal) * 100}%` }}
-          />
-        )}
-        {inProgress > 0 && activeTotal > 0 && (
-          <div
-            className="h-full bg-warning transition-all duration-500"
-            style={{ width: `${(inProgress / activeTotal) * 100}%` }}
-          />
-        )}
-        {open > 0 && activeTotal > 0 && (
-          <div
-            className="h-full bg-text-tertiary/40 transition-all duration-500"
-            style={{ width: `${(open / activeTotal) * 100}%` }}
-          />
-        )}
-      </div>
-      <div className="flex items-center gap-3 shrink-0 text-xs">
-        <span className="flex items-center gap-1 text-text-tertiary">
-          <Circle className="w-2 h-2 fill-text-tertiary/40 text-text-tertiary/40" />
-          {open} {t.todos.statuses.OPEN.toLowerCase()}
-        </span>
-        <span className="flex items-center gap-1 text-warning">
-          <Circle className="w-2 h-2 fill-warning text-warning" />
-          {inProgress} {t.todos.statuses.IN_PROGRESS.toLowerCase()}
-        </span>
-        <span className="flex items-center gap-1 text-success">
-          <Circle className="w-2 h-2 fill-success text-success" />
-          {done} {t.todos.statuses.DONE.toLowerCase()}
-        </span>
-        {backlog > 0 && (
-          <span className="flex items-center gap-1 text-text-tertiary/60">
-            <Circle className="w-2 h-2 fill-text-tertiary/30 text-text-tertiary/30" />
-            {backlog} {t.todos.statuses.BACKLOG.toLowerCase()}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ─── Kanban Card ───────────────────────────────────────── */
-function KanbanCard({ todo, onEdit, onStatusChange }: {
-  todo: Todo;
-  onEdit: (todo: Todo) => void;
-  onStatusChange: (todo: Todo, status: TodoStatus) => void;
-}) {
-  const t = useT();
-  return (
-    <div
-      className="bg-surface-base border border-border rounded-lg p-3 hover:border-border-strong transition-colors cursor-pointer group"
-      onClick={() => onEdit(todo)}
-    >
-      <div className="flex gap-2">
-        {/* Priority bar */}
-        <div className={`w-1 rounded-full shrink-0 self-stretch ${priorityColor[todo.priority]}`} />
-        <div className="flex-1 min-w-0">
-          {/* Title */}
-          <p className="text-sm font-medium text-text leading-snug">{todo.title}</p>
-          {/* Description */}
-          {todo.description && (
-            <div className="text-xs text-text-tertiary mt-1 line-clamp-2 [&_a]:text-accent [&_a]:underline [&_p]:m-0 [&_code]:text-[10px] [&_code]:bg-surface-raised [&_code]:px-1 [&_code]:rounded">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{todo.description}</ReactMarkdown>
-            </div>
-          )}
-          {/* Bottom row: badges */}
-          <div className="flex flex-wrap items-center gap-1.5 mt-2">
-            {todo.projectName && (
-              <span className="px-1.5 py-0.5 rounded text-[10px] bg-accent/10 text-accent font-medium">
-                {todo.projectName}
-              </span>
-            )}
-            {todo.workflowRunId && (
-              <Link
-                to={`/runs/${todo.workflowRunId}`}
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-accent/10 text-accent font-medium hover:bg-accent/20 transition-colors"
-                title={t.todos.viewRun}
-              >
-                <ExternalLink className="w-2.5 h-2.5" />
-                Run
-              </Link>
-            )}
-            {todo.tags.slice(0, 3).map((tag) => (
-              <span key={tag} className="px-1.5 py-0.5 rounded text-[10px] bg-surface-raised text-text-tertiary border border-border">
-                {tag}
-              </span>
-            ))}
-            {todo.tags.length > 3 && (
-              <span className="text-[10px] text-text-tertiary">+{todo.tags.length - 3}</span>
-            )}
-          </div>
-        </div>
-      </div>
-      {/* Quick status change buttons (on hover) */}
-      <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
-        <span className="text-[10px] text-text-tertiary inline-flex items-center gap-0.5" title={`Erstellt: ${new Date(todo.createdAt).toLocaleString()}`}>
-          <Clock className="w-2.5 h-2.5" />
-          {formatRelative(todo.createdAt)}
-        </span>
-        {todo.updatedAt && Math.abs(new Date(todo.updatedAt).getTime() - new Date(todo.createdAt).getTime()) > 1000 && (
-          <span className="text-[10px] text-text-tertiary inline-flex items-center gap-0.5" title={`Aktualisiert: ${new Date(todo.updatedAt).toLocaleString()}`}>
-            <RefreshCw className="w-2.5 h-2.5" />
-            {formatRelative(todo.updatedAt)}
-          </span>
-        )}
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          {todo.status !== 'OPEN' && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onStatusChange(todo, 'OPEN'); }}
-              className="px-1.5 py-0.5 rounded text-[10px] text-text-tertiary hover:bg-surface-raised transition-colors"
-            >
-              Open
-            </button>
-          )}
-          {todo.status !== 'IN_PROGRESS' && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onStatusChange(todo, 'IN_PROGRESS'); }}
-              className="px-1.5 py-0.5 rounded text-[10px] text-warning hover:bg-warning/10 transition-colors"
-            >
-              WIP
-            </button>
-          )}
-          {todo.status !== 'DONE' && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onStatusChange(todo, 'DONE'); }}
-              className="px-1.5 py-0.5 rounded text-[10px] text-success hover:bg-success/10 transition-colors"
-            >
-              Done
-            </button>
-          )}
-          {todo.status !== 'BACKLOG' && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onStatusChange(todo, 'BACKLOG'); }}
-              className="px-1.5 py-0.5 rounded text-[10px] text-text-tertiary/60 hover:bg-text-tertiary/10 transition-colors"
-            >
-              Backlog
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ─── Kanban Board ──────────────────────────────────────── */
-function KanbanBoard({ todos, onEdit, onStatusChange }: {
-  todos: Todo[];
-  onEdit: (todo: Todo) => void;
-  onStatusChange: (todo: Todo, status: TodoStatus) => void;
-}) {
-  const t = useT();
-
-  const columns: { status: TodoStatus; label: string; color: string; borderColor: string }[] = [
-    { status: 'OPEN', label: t.todos.statuses.OPEN, color: 'text-text-tertiary', borderColor: 'border-text-tertiary/30' },
-    { status: 'IN_PROGRESS', label: t.todos.statuses.IN_PROGRESS, color: 'text-warning', borderColor: 'border-warning/30' },
-    { status: 'DONE', label: t.todos.statuses.DONE, color: 'text-success', borderColor: 'border-success/30' },
-    { status: 'BACKLOG', label: t.todos.statuses.BACKLOG, color: 'text-text-tertiary/60', borderColor: 'border-text-tertiary/20' },
-  ];
-
-  const grouped = useMemo(() => {
-    const map: Record<TodoStatus, Todo[]> = { OPEN: [], IN_PROGRESS: [], DONE: [], BACKLOG: [] };
-    todos.forEach((todo) => map[todo.status].push(todo));
-    return map;
-  }, [todos]);
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-      {columns.map(({ status, label, color, borderColor }) => (
-        <div key={status} className={`rounded-xl border-2 ${borderColor} bg-surface-raised/30 p-3`}>
-          {/* Column header */}
-          <div className="flex items-center justify-between mb-3">
-            <h3 className={`text-sm font-semibold ${color}`}>{label}</h3>
-            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${color} bg-surface-raised`}>
-              {grouped[status].length}
-            </span>
-          </div>
-          {/* Cards */}
-          <div className="space-y-2">
-            {grouped[status].length === 0 ? (
-              <div className="text-center py-6 text-xs text-text-tertiary">—</div>
-            ) : (
-              grouped[status].map((todo) => (
-                <KanbanCard
-                  key={todo.id}
-                  todo={todo}
-                  onEdit={onEdit}
-                  onStatusChange={onStatusChange}
-                />
-              ))
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* ─── List Item ─────────────────────────────────────────── */
-function TodoListItem({ todo, onEdit, onStatusChange, onDelete }: {
-  todo: Todo;
-  onEdit: (todo: Todo) => void;
-  onStatusChange: (todo: Todo, status: TodoStatus) => void;
-  onDelete: (id: string) => void;
-}) {
-  const t = useT();
-
-  return (
-    <div
-      className={`flex items-start gap-3 px-4 py-3 hover:bg-surface-raised/50 transition-colors cursor-pointer group ${
-        todo.status === 'DONE' || todo.status === 'BACKLOG' ? 'opacity-50' : ''
-      }`}
-      onClick={() => onEdit(todo)}
-    >
-      {/* Status dots */}
-      <div className="pt-0.5">
-        <StatusDots current={todo.status} onChange={(s) => onStatusChange(todo, s)} />
-      </div>
-
-      {/* Priority bar */}
-      <div className={`w-1 rounded-full shrink-0 self-stretch min-h-[2.5rem] ${priorityColor[todo.priority]}`} />
-
-      {/* Content — two lines */}
-      <div className="flex-1 min-w-0">
-        {/* Line 1: Title + IN_PROGRESS badge */}
-        <div className="flex items-center gap-2">
-          <span className={`text-sm font-medium text-text leading-snug ${todo.status === 'DONE' ? 'line-through' : ''}`}>
-            {todo.title}
-          </span>
-          {todo.status === 'IN_PROGRESS' && (
-            <Badge variant="warning">{t.todos.statuses.IN_PROGRESS}</Badge>
-          )}
-          {todo.status === 'BACKLOG' && (
-            <Badge variant="default">{t.todos.statuses.BACKLOG}</Badge>
-          )}
-        </div>
-
-        {/* Line 2: Description + meta */}
-        <div className="flex items-center gap-2 mt-1 flex-wrap">
-          {todo.description && (
-            <div className="text-xs text-text-tertiary line-clamp-2 flex-1 min-w-[120px] [&_a]:text-accent [&_a]:underline [&_p]:m-0 [&_code]:text-[10px] [&_code]:bg-surface-raised [&_code]:px-1 [&_code]:rounded">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{todo.description}</ReactMarkdown>
-            </div>
-          )}
-          {!todo.description && <div className="flex-1" />}
-
-          <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-            {/* Project badge */}
-            {todo.projectName && (
-              <span className="px-1.5 py-0.5 rounded text-[10px] bg-accent/10 text-accent font-medium">
-                {todo.projectName}
-              </span>
-            )}
-
-            {/* Source badge */}
-            {todo.source !== 'USER' && (
-              <Badge variant={todo.source === 'AI' ? 'warning' : 'default'}>
-                <span className="flex items-center gap-1">
-                  {sourceIcon(todo.source)}
-                  {todo.sourceAgent || t.todos.sources[todo.source]}
-                </span>
-              </Badge>
-            )}
-
-            {/* Run link */}
-            {todo.workflowRunId && (
-              <Link
-                to={`/runs/${todo.workflowRunId}`}
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-accent/10 text-accent font-medium hover:bg-accent/20 transition-colors"
-                title={t.todos.viewRun}
-              >
-                <ExternalLink className="w-2.5 h-2.5" />
-                Run
-              </Link>
-            )}
-
-            {/* Tags */}
-            {todo.tags.length > 0 && (
-              <div className="hidden sm:flex items-center gap-1">
-                {todo.tags.slice(0, 2).map((tag) => (
-                  <span key={tag} className="px-1.5 py-0.5 rounded text-[10px] bg-surface-raised text-text-tertiary border border-border">
-                    {tag}
-                  </span>
-                ))}
-                {todo.tags.length > 2 && (
-                  <span className="text-[10px] text-text-tertiary">+{todo.tags.length - 2}</span>
-                )}
-              </div>
-            )}
-
-            {/* Time */}
-            <span className="text-xs text-text-tertiary shrink-0 inline-flex items-center gap-0.5" title={`Erstellt: ${new Date(todo.createdAt).toLocaleString()}`}>
-              <Clock className="w-3 h-3" />
-              {formatRelative(todo.createdAt)}
-            </span>
-            {todo.updatedAt && Math.abs(new Date(todo.updatedAt).getTime() - new Date(todo.createdAt).getTime()) > 1000 && (
-              <span className="text-xs text-text-tertiary shrink-0 inline-flex items-center gap-0.5" title={`Aktualisiert: ${new Date(todo.updatedAt).toLocaleString()}`}>
-                <RefreshCw className="w-3 h-3" />
-                {formatRelative(todo.updatedAt)}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div className="flex items-center gap-1 shrink-0 pt-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-        <button
-          onClick={(e) => { e.stopPropagation(); onEdit(todo); }}
-          className="p-1.5 rounded-lg text-text-tertiary hover:text-accent transition-colors"
-          aria-label={t.common.edit}
-        >
-          <Pencil className="w-3.5 h-3.5" />
-        </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(todo.id); }}
-          className="p-1.5 rounded-lg text-text-tertiary hover:text-danger transition-colors"
-          aria-label={t.common.delete}
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      </div>
-    </div>
-  );
-}
 
 /* ─── Main Todos Page ───────────────────────────────────── */
 export function Todos() {
@@ -473,6 +38,14 @@ export function Todos() {
   }, [search]);
   const [showAllTags, setShowAllTags] = useState(false);
 
+  // View mode
+  const [viewMode, setViewMode] = usePersistedState<ViewMode>('todos-view-mode', 'list');
+
+  // Pagination
+  const [page, setPage] = useState(0);
+  const LIST_PAGE_SIZE = 30;
+  const KANBAN_PAGE_SIZE = 200;
+
   // Build server-side filter params
   const apiParams = useMemo(() => {
     const params: Record<string, string> = {};
@@ -484,7 +57,11 @@ export function Todos() {
     return params;
   }, [statusFilter, sourceFilter, projectFilter, tagFilter, debouncedSearch]);
 
-  const { data: todosPage, isLoading, error, refetch } = useTodos(apiParams, 0, 500);
+  // Reset page on filter or view mode change
+  useEffect(() => { setPage(0); }, [apiParams, viewMode]);
+
+  const pageSize = viewMode === 'list' ? LIST_PAGE_SIZE : KANBAN_PAGE_SIZE;
+  const { data: todosPage, isLoading, error, refetch } = useTodos(apiParams, viewMode === 'list' ? page : 0, pageSize);
   const todos = todosPage?.content;
   const { data: counts } = useTodoCount();
   const { data: projects } = useProjects();
@@ -500,9 +77,6 @@ export function Todos() {
   const [quickPriority, setQuickPriority] = useState<TodoPriority>('MEDIUM');
   const [quickTags, setQuickTags] = useState<string[]>([]);
   const quickInputRef = useRef<HTMLInputElement>(null);
-
-  // View mode
-  const [viewMode, setViewMode] = usePersistedState<ViewMode>('todos-view-mode', 'list');
 
   // Edit modal state
   const [editTodo, setEditTodo] = useState<Todo | null>(null);
@@ -626,7 +200,7 @@ export function Todos() {
 
       {/* Progress Bar */}
       {(todos && todos.length > 0) && (
-        <ProgressBar open={openCount} inProgress={inProgressCount} done={doneCount} backlog={backlogCount} />
+        <TodoProgressBar open={openCount} inProgress={inProgressCount} done={doneCount} backlog={backlogCount} />
       )}
 
       {/* Quick-Add Bar */}
@@ -821,25 +395,45 @@ export function Todos() {
           description={search || statusFilter !== 'ALL' || tagFilter ? undefined : t.todos.noTodos}
         />
       ) : viewMode === 'board' ? (
-        <KanbanBoard
-          todos={filtered}
-          onEdit={openEdit}
-          onStatusChange={handleStatusChange}
-        />
+        <>
+          <TodoKanbanView
+            todos={filtered}
+            onEdit={openEdit}
+            onStatusChange={handleStatusChange}
+          />
+          {todosPage && todosPage.totalElements > KANBAN_PAGE_SIZE && (
+            <p className="text-xs text-text-tertiary text-center mt-2">
+              {t.todos.kanbanTruncated
+                .replace('{shown}', String(filtered.length))
+                .replace('{total}', String(todosPage.totalElements))}
+            </p>
+          )}
+        </>
       ) : (
-        <Card padding={false}>
-          <div className="divide-y divide-border">
-            {filtered.map((todo) => (
-              <TodoListItem
-                key={todo.id}
-                todo={todo}
-                onEdit={openEdit}
-                onStatusChange={handleStatusChange}
-                onDelete={(id) => deleteTodo.mutate(id)}
-              />
-            ))}
-          </div>
-        </Card>
+        <>
+          <Card padding={false}>
+            <div className="divide-y divide-border">
+              {filtered.map((todo) => (
+                <TodoListItem
+                  key={todo.id}
+                  todo={todo}
+                  onEdit={openEdit}
+                  onStatusChange={handleStatusChange}
+                  onDelete={(id) => deleteTodo.mutate(id)}
+                />
+              ))}
+            </div>
+          </Card>
+          {todosPage && (
+            <Pagination
+              page={page}
+              totalPages={todosPage.totalPages}
+              totalElements={todosPage.totalElements}
+              label={t.todos.title}
+              setPage={setPage}
+            />
+          )}
+        </>
       )}
 
       <div className="mt-8">
