@@ -28,6 +28,7 @@ services:
       - ${HOME}/.local/bin:${HOME}/.local/bin:ro
       - ${HOME}/.claude:${HOME}/.claude
       - ${HOME}/Entwicklung:${HOME}/Entwicklung
+      - ${HOME}/.autotrigger/backups/test:/host-backups/test
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8090/api/v1/system/health"]
       interval: 30s

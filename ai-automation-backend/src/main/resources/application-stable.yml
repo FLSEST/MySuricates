@@ -12,6 +12,8 @@ automation:
     auto-start: false
   tray:
     enabled: false
+  backup:
+    directory: /host-backups/stable
   serve-frontend: true
   frontend-path: /app/frontend
   environment: Produktiv

@@ -13,7 +13,7 @@ automation:
   staging:
     auto-start: false
   backup:
-    directory: /app/data/backups
+    directory: /host-backups/test
   serve-frontend: true
   frontend-path: /app/frontend
   environment: Test
