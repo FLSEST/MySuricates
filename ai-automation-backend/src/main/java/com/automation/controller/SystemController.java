@@ -40,6 +40,7 @@ public class SystemController {
     private final ExecutionSettingsService executionSettingsService;
     private final SystemSettingsService systemSettingsService;
     private final FileBrowserService fileBrowserService;
+    private final IntegrationSnippetService integrationSnippetService;
 
     @Value("${automation.security.enabled:true}")
     private boolean securityEnabled;
@@ -257,6 +258,12 @@ public class SystemController {
             Thread.currentThread().interrupt();
             return ResponseEntity.internalServerError().body(Map.of("error", "Interrupted while opening path"));
         }
+    }
+
+    @GetMapping(value = "/integration-snippet", produces = "text/markdown")
+    public ResponseEntity<String> integrationSnippet(
+            @RequestParam(required = false) String projectPath) {
+        return ResponseEntity.ok(integrationSnippetService.render(projectPath));
     }
 
     @GetMapping("/browse")

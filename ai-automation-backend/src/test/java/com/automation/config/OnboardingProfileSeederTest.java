@@ -3,6 +3,8 @@ package com.automation.config;
 import com.automation.entity.OnboardingProfile;
 import com.automation.entity.OnboardingProfileType;
 import com.automation.repository.OnboardingProfileRepository;
+import com.automation.service.project.ProjectOnboardingService;
+import com.automation.service.project.ProjectService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -10,6 +12,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -22,12 +25,14 @@ import static org.mockito.Mockito.*;
 class OnboardingProfileSeederTest {
 
     @Mock private OnboardingProfileRepository profileRepository;
+    @Mock private ProjectService projectService;
+    @Mock private ProjectOnboardingService projectOnboardingService;
 
     private OnboardingProfileSeeder seeder;
 
     @BeforeEach
     void setUp() {
-        seeder = new OnboardingProfileSeeder(profileRepository);
+        seeder = new OnboardingProfileSeeder(profileRepository, projectService, projectOnboardingService);
     }
 
     @Test
@@ -37,22 +42,22 @@ class OnboardingProfileSeederTest {
 
         seeder.run(null);
 
-        // 5 built-in profiles should be seeded
-        verify(profileRepository, times(5)).save(any());
+        // 6 built-in profiles should be seeded
+        verify(profileRepository, times(6)).save(any());
     }
 
     @Test
-    void run_skipsExistingProfileById() throws Exception {
+    void run_skipsExistingProfileById_whenVersionCurrent() throws Exception {
         OnboardingProfile existing = OnboardingProfile.builder()
-                .id("onboarding-base").key("base").build();
+                .id("onboarding-base").key("base").version(99).build();
         when(profileRepository.findById("onboarding-base")).thenReturn(Optional.of(existing));
         when(profileRepository.findById(argThat(id -> !"onboarding-base".equals(id)))).thenReturn(Optional.empty());
         when(profileRepository.findByKey(anyString())).thenReturn(Optional.empty());
 
         seeder.run(null);
 
-        // 4 profiles seeded (base skipped because found by ID)
-        verify(profileRepository, times(4)).save(any());
+        // 5 profiles seeded (base skipped because found by ID at current version)
+        verify(profileRepository, times(5)).save(any());
     }
 
     @Test
@@ -64,14 +69,14 @@ class OnboardingProfileSeederTest {
 
         seeder.run(null);
 
-        // 4 profiles seeded (developer skipped because found by key)
-        verify(profileRepository, times(4)).save(any());
+        // 5 profiles seeded (developer skipped because found by key)
+        verify(profileRepository, times(5)).save(any());
     }
 
     @Test
-    void run_allExist_seedsNothing() throws Exception {
+    void run_allExist_atCurrentVersion_seedsNothing() throws Exception {
         when(profileRepository.findById(anyString())).thenReturn(Optional.of(
-                OnboardingProfile.builder().build()));
+                OnboardingProfile.builder().version(99).build()));
 
         seeder.run(null);
 
@@ -84,12 +89,12 @@ class OnboardingProfileSeederTest {
         when(profileRepository.findById(anyString())).thenReturn(Optional.empty());
         when(profileRepository.findByKey(anyString())).thenReturn(Optional.empty());
         seeder.run(null);
-        verify(profileRepository, times(5)).save(any());
+        verify(profileRepository, times(6)).save(any());
 
-        // Second call: all exist
+        // Second call: all exist at current version
         reset(profileRepository);
         when(profileRepository.findById(anyString())).thenReturn(Optional.of(
-                OnboardingProfile.builder().build()));
+                OnboardingProfile.builder().version(99).build()));
         seeder.run(null);
         verify(profileRepository, never()).save(any());
     }
@@ -102,10 +107,10 @@ class OnboardingProfileSeederTest {
         seeder.run(null);
 
         ArgumentCaptor<OnboardingProfile> captor = ArgumentCaptor.forClass(OnboardingProfile.class);
-        verify(profileRepository, times(5)).save(captor.capture());
+        verify(profileRepository, times(6)).save(captor.capture());
         captor.getAllValues().forEach(profile -> {
             assertThat(profile.isBuiltIn()).isTrue();
-            assertThat(profile.getVersion()).isEqualTo(1);
+            assertThat(profile.getVersion()).isGreaterThanOrEqualTo(1);
             assertThat(profile.getContent()).isNotNull().isNotBlank();
         });
     }
@@ -118,7 +123,7 @@ class OnboardingProfileSeederTest {
         seeder.run(null);
 
         ArgumentCaptor<OnboardingProfile> captor = ArgumentCaptor.forClass(OnboardingProfile.class);
-        verify(profileRepository, times(5)).save(captor.capture());
+        verify(profileRepository, times(6)).save(captor.capture());
 
         OnboardingProfile base = captor.getAllValues().stream()
                 .filter(p -> "base".equals(p.getKey()))
@@ -137,13 +142,47 @@ class OnboardingProfileSeederTest {
         seeder.run(null);
 
         ArgumentCaptor<OnboardingProfile> captor = ArgumentCaptor.forClass(OnboardingProfile.class);
-        verify(profileRepository, times(5)).save(captor.capture());
+        verify(profileRepository, times(6)).save(captor.capture());
 
         var profiles = captor.getAllValues();
-        int[] expectedOrder = {0, 1, 2, 3, 4};
+        int[] expectedOrder = {0, 1, 2, 3, 4, 5};
         for (int i = 0; i < profiles.size(); i++) {
             assertThat(profiles.get(i).getSortOrder()).isEqualTo(expectedOrder[i]);
         }
+    }
+
+    @Test
+    void run_updatesProfileWhenVersionIsLower() throws Exception {
+        OnboardingProfile outdated = OnboardingProfile.builder()
+                .id("onboarding-base").key("base").version(1).content("old content").build();
+        when(profileRepository.findById("onboarding-base")).thenReturn(Optional.of(outdated));
+        when(profileRepository.findById(argThat(id -> !"onboarding-base".equals(id)))).thenReturn(Optional.empty());
+        when(profileRepository.findByKey(anyString())).thenReturn(Optional.empty());
+        when(projectService.findAll()).thenReturn(List.of());
+
+        seeder.run(null);
+
+        // base updated (version 1 < 2) + 5 others seeded = 6 saves
+        verify(profileRepository, times(6)).save(any());
+        assertThat(outdated.getVersion()).isEqualTo(2);
+        assertThat(outdated.getContent()).isNotEqualTo("old content");
+    }
+
+    @Test
+    void run_refreshesEnabledProjectsAfterUpdate() throws Exception {
+        OnboardingProfile outdated = OnboardingProfile.builder()
+                .id("onboarding-base").key("base").version(1).content("old").build();
+        when(profileRepository.findById("onboarding-base")).thenReturn(Optional.of(outdated));
+        when(profileRepository.findById(argThat(id -> !"onboarding-base".equals(id)))).thenReturn(Optional.empty());
+        when(profileRepository.findByKey(anyString())).thenReturn(Optional.empty());
+
+        var project = mock(com.automation.entity.Project.class);
+        when(project.getConfig()).thenReturn(Map.of("onboarding", Map.of("enabled", true)));
+        when(projectService.findAll()).thenReturn(List.of(project));
+
+        seeder.run(null);
+
+        verify(projectOnboardingService).refresh(project);
     }
 
     @Test

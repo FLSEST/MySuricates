@@ -27,3 +27,15 @@ Für Content-Erstellung und -Management stehen folgende Workflow-Patterns zur Ve
 - `target_audience`: Zielgruppe
 - `tone`: Tonalität (formal, casual, technical)
 - `output_format`: Ausgabeformat (markdown, html, plain)
+
+## API-Referenz für Content
+
+### Run-History (vorherige Generierungen)
+
+```
+GET http://localhost:9090/api/v1/executions?workflowId=<id>&page=0&size=10
+Headers: X-API-Key: $API_KEY
+→ { content: [{ id, status, durationMs, startedAt }], totalElements }
+```
+
+Generierten Content aus Run lesen: `GET /api/v1/executions/{runId}` → `steps[].output`

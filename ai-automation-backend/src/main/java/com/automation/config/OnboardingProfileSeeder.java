@@ -2,7 +2,10 @@ package com.automation.config;
 
 import com.automation.entity.OnboardingProfile;
 import com.automation.entity.OnboardingProfileType;
+import com.automation.entity.Project;
 import com.automation.repository.OnboardingProfileRepository;
+import com.automation.service.project.ProjectOnboardingService;
+import com.automation.service.project.ProjectService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -22,37 +25,57 @@ import java.util.Map;
 public class OnboardingProfileSeeder implements ApplicationRunner {
 
     private final OnboardingProfileRepository profileRepository;
+    private final ProjectService projectService;
+    private final ProjectOnboardingService projectOnboardingService;
 
     private static final List<ProfileDefinition> BUILT_IN_PROFILES = List.of(
             new ProfileDefinition("onboarding-base", "base",
                     Map.of("de", "Basis", "en", "Base"),
                     Map.of("de", "MySuricates API-Referenz und Grundregeln", "en", "MySuricates API reference and basic rules"),
-                    "onboarding/base.md", OnboardingProfileType.BASE, 0),
+                    "onboarding/base.md", OnboardingProfileType.BASE, 0, 2),
             new ProfileDefinition("onboarding-developer", "developer",
                     Map.of("de", "Entwickler", "en", "Developer"),
-                    Map.of("de", "Code-Review, Test-Pipelines, Auto-Fix, Quality Gates", "en", "Code review, test pipelines, auto-fix, quality gates"),
-                    "onboarding/profiles/developer.md", OnboardingProfileType.PROFILE, 1),
+                    Map.of("de", "Code-Review, Test-Pipelines, Auto-Fix, Quality Gates, vollständige API-Referenz", "en", "Code review, test pipelines, auto-fix, quality gates, full API reference"),
+                    "onboarding/profiles/developer.md", OnboardingProfileType.PROFILE, 1, 2),
             new ProfileDefinition("onboarding-research", "research",
                     Map.of("de", "Forschung", "en", "Research"),
-                    Map.of("de", "Analyse-Workflows, Zusammenfassungen, Daten-Pipelines", "en", "Analysis workflows, summaries, data pipelines"),
-                    "onboarding/profiles/research.md", OnboardingProfileType.PROFILE, 2),
+                    Map.of("de", "Analyse-Workflows, Zusammenfassungen, Daten-Pipelines, Run-History, Workflow Memory", "en", "Analysis workflows, summaries, data pipelines, run history, workflow memory"),
+                    "onboarding/profiles/research.md", OnboardingProfileType.PROFILE, 2, 2),
             new ProfileDefinition("onboarding-content", "content",
                     Map.of("de", "Content", "en", "Content"),
-                    Map.of("de", "Content-Generierung, Review, Batch-Verarbeitung", "en", "Content generation, review, batch processing"),
-                    "onboarding/profiles/content.md", OnboardingProfileType.PROFILE, 3),
+                    Map.of("de", "Content-Generierung, Review, Batch-Verarbeitung, Run-History", "en", "Content generation, review, batch processing, run history"),
+                    "onboarding/profiles/content.md", OnboardingProfileType.PROFILE, 3, 2),
             new ProfileDefinition("onboarding-ops", "ops",
                     Map.of("de", "Operations", "en", "Operations"),
-                    Map.of("de", "Monitoring, Log-Analyse, Deployment-Chains", "en", "Monitoring, log analysis, deployment chains"),
-                    "onboarding/profiles/ops.md", OnboardingProfileType.PROFILE, 4)
+                    Map.of("de", "Monitoring, Log-Analyse, Deployment-Chains, Schedules, Webhooks, Activity Log", "en", "Monitoring, log analysis, deployment chains, schedules, webhooks, activity log"),
+                    "onboarding/profiles/ops.md", OnboardingProfileType.PROFILE, 4, 2),
+            new ProfileDefinition("onboarding-platform", "platform",
+                    Map.of("de", "Plattform", "en", "Platform"),
+                    Map.of("de", "Gate-Status, AutoTodo, TodoTrigger, Modelle, Variablen, Agentic-Safety", "en", "Gate status, auto-todo, todo triggers, models, variables, agentic safety"),
+                    "onboarding/profiles/platform.md", OnboardingProfileType.PROFILE, 5, 1)
     );
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
         int seeded = 0;
+        int updated = 0;
 
         for (ProfileDefinition def : BUILT_IN_PROFILES) {
-            if (profileRepository.findById(def.id()).isPresent()) {
+            var existing = profileRepository.findById(def.id());
+            if (existing.isPresent()) {
+                OnboardingProfile profile = existing.get();
+                if (profile.getVersion() < def.version()) {
+                    String content = loadResource(def.resourcePath());
+                    if (content != null) {
+                        profile.setContent(content);
+                        profile.setVersion(def.version());
+                        profile.setDescription(def.description());
+                        profileRepository.save(profile);
+                        updated++;
+                        log.info("Updated onboarding profile '{}' to version {}", def.key(), def.version());
+                    }
+                }
                 continue;
             }
             if (profileRepository.findByKey(def.key()).isPresent()) {
@@ -74,7 +97,7 @@ public class OnboardingProfileSeeder implements ApplicationRunner {
                     .type(def.type())
                     .builtIn(true)
                     .sortOrder(def.sortOrder())
-                    .version(1)
+                    .version(def.version())
                     .build();
 
             profileRepository.save(profile);
@@ -83,6 +106,31 @@ public class OnboardingProfileSeeder implements ApplicationRunner {
 
         if (seeded > 0) {
             log.info("Seeded {} onboarding profiles", seeded);
+        }
+        if (updated > 0) {
+            log.info("Updated {} onboarding profiles", updated);
+            refreshEnabledProjects();
+        }
+    }
+
+    private void refreshEnabledProjects() {
+        try {
+            List<Project> projects = projectService.findAll();
+            int refreshed = 0;
+            for (Project project : projects) {
+                if (project.getConfig() != null) {
+                    Object onboarding = project.getConfig().get("onboarding");
+                    if (onboarding instanceof Map<?, ?> map && Boolean.TRUE.equals(map.get("enabled"))) {
+                        projectOnboardingService.refresh(project);
+                        refreshed++;
+                    }
+                }
+            }
+            if (refreshed > 0) {
+                log.info("Refreshed onboarding files for {} projects", refreshed);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to refresh onboarding files: {}", e.getMessage());
         }
     }
 
@@ -106,6 +154,6 @@ public class OnboardingProfileSeeder implements ApplicationRunner {
     private record ProfileDefinition(
             String id, String key,
             Map<String, String> name, Map<String, String> description,
-            String resourcePath, OnboardingProfileType type, int sortOrder
+            String resourcePath, OnboardingProfileType type, int sortOrder, int version
     ) {}
 }

@@ -1,13 +1,30 @@
 ## MySuricates API
 
 Dieses Projekt ist mit [MySuricates](http://localhost:9090) verbunden — einer AI Workflow Automation Plattform.
-Du kannst TODOs anlegen, Workflows triggern und Ausführungen steuern.
+Du kannst TODOs verwalten, Workflows triggern und Ausführungen steuern.
+
+### Verbindung herstellen
+
+API-Key auslesen (wird beim Backend-Start automatisch geschrieben):
+```bash
+API_KEY=$(cat ~/.autotrigger/api-key)
+```
+
+Health-Check:
+```bash
+curl -sf http://localhost:9090/api/v1/system/health | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])"
+```
+
+Projekt-ID des aktuellen Verzeichnisses nachschlagen:
+```bash
+curl -s http://localhost:9090/api/v1/projects -H "X-API-Key: $API_KEY" | python3 -c "import sys,json; [print(p['id'],p['name']) for p in json.load(sys.stdin) if p.get('path')=='$(pwd)']"
+```
 
 ### TODO anlegen
 
 ```
 POST http://localhost:9090/api/v1/todos
-Headers: Content-Type: application/json, X-API-Key: <key>
+Headers: Content-Type: application/json, X-API-Key: $API_KEY
 Body: {
   "title": "Kurzer Titel",
   "description": "Details in Markdown",
@@ -19,11 +36,32 @@ Body: {
 }
 ```
 
+### TODOs abfragen
+
+```
+GET http://localhost:9090/api/v1/todos
+Headers: X-API-Key: $API_KEY
+Query-Parameter:
+  projectId  — UUID des Projekts
+  status     — OPEN, IN_PROGRESS, DONE, BACKLOG (mehrfach: ?status=OPEN&status=IN_PROGRESS)
+  priority   — LOW, MEDIUM, HIGH, CRITICAL
+  source     — USER, AI, WORKFLOW
+  tag        — Tag-Filter (Wildcard)
+  q          — Volltextsuche in Titel und Beschreibung
+  page       — Seitennummer (ab 0, Standard: 0)
+  size       — Seitengröße (Standard: 50)
+```
+
+Status-Übersicht: `GET /api/v1/todos/count`
+Duplikat-Check: `GET /api/v1/todos/similar?projectId=<id>&title=<titel>`
+Status ändern: `PATCH /api/v1/todos/{id}/status` — Body: `{"status": "DONE"}`
+Aktualisieren: `PUT /api/v1/todos/{id}` — Body: `{ "title": "...", "priority": "HIGH", "tags": [...] }`
+
 ### Workflow ausführen
 
 ```
 POST http://localhost:9090/api/v1/workflows/{workflowId}/execute
-Headers: Content-Type: application/json, X-API-Key: <key>
+Headers: Content-Type: application/json, X-API-Key: $API_KEY
 Body: { "context": { "variable1": "wert1" } }
 ```
 
@@ -33,8 +71,16 @@ Body: { "context": { "variable1": "wert1" } }
 
 ```
 POST http://localhost:9090/api/v1/chains/{chainId}/execute
-Headers: Content-Type: application/json, X-API-Key: <key>
+Headers: Content-Type: application/json, X-API-Key: $API_KEY
 Body: { "inputContext": { "key": "value" } }
+```
+
+### Execution-Ergebnis abrufen
+
+```
+GET http://localhost:9090/api/v1/executions/{runId}
+Headers: X-API-Key: $API_KEY
+→ { status, steps: [{ blockName, output, status, durationMs }], gateStatus, durationMs, metadata }
 ```
 
 ### Execution steuern

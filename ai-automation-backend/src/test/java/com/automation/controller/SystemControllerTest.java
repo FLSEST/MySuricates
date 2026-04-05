@@ -69,6 +69,12 @@ class SystemControllerTest {
     @MockBean
     private ExecutionSettingsService executionSettingsService;
 
+    @MockBean
+    private IntegrationSnippetService integrationSnippetService;
+
+    @MockBean
+    private com.automation.config.RateLimitConfig rateLimitConfig;
+
     private void mockDbHealthy() throws Exception {
         Connection conn = mock(Connection.class);
         Statement stmt = mock(Statement.class);
@@ -248,5 +254,28 @@ class SystemControllerTest {
 
         mockMvc.perform(get("/api/v1/system/settings/secret-key"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void integrationSnippet_returnsMarkdown() throws Exception {
+        when(integrationSnippetService.render(null))
+                .thenReturn("# MySuricates Integration\n\n## MySuricates API\n");
+
+        mockMvc.perform(get("/api/v1/system/integration-snippet"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith("text/markdown"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("MySuricates")));
+    }
+
+    @Test
+    void integrationSnippet_withProjectPath_passesParam() throws Exception {
+        when(integrationSnippetService.render("/home/user/project"))
+                .thenReturn("# MySuricates Integration\n");
+
+        mockMvc.perform(get("/api/v1/system/integration-snippet")
+                        .param("projectPath", "/home/user/project"))
+                .andExpect(status().isOk());
+
+        verify(integrationSnippetService).render("/home/user/project");
     }
 }

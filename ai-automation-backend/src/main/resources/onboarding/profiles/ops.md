@@ -33,3 +33,51 @@ Für DevOps und System-Administration stehen folgende Workflow-Patterns zur Verf
 - `environment`: Zielumgebung (dev, staging, production)
 - `service_name`: Betroffener Service
 - `threshold`: Schwellwert für Alerting
+
+## API-Referenz für Operations
+
+### Schedules verwalten
+
+```
+GET http://localhost:9090/api/v1/schedules
+Headers: X-API-Key: $API_KEY
+→ [{ id, workflowId, workflowName, cronExpression, enabled, nextRunAt, lastRunStatus }]
+```
+
+Schedule erstellen:
+```
+POST http://localhost:9090/api/v1/schedules
+Headers: Content-Type: application/json, X-API-Key: $API_KEY
+Body: { "workflowId": "<id>", "cronExpression": "*/15 * * * *", "enabled": true, "description": "Health Check alle 15min" }
+```
+
+Enable/Disable: `POST /api/v1/schedules/{id}/enable` bzw. `/disable`
+Nächste Runs heute: `GET /api/v1/schedules/remaining-today`
+
+### Webhooks einrichten
+
+```
+POST http://localhost:9090/api/v1/webhooks
+Headers: Content-Type: application/json, X-API-Key: $API_KEY
+Body: { "workflowId": "<id>", "description": "Deploy Hook" }
+→ { id, secretToken, webhookUrl }
+```
+
+Trigger-URL (public): `POST /api/v1/webhook/trigger/{token}`
+
+### Activity Log
+
+```
+GET http://localhost:9090/api/v1/activity-log?level=ERROR&page=0&size=50
+Headers: X-API-Key: $API_KEY
+Filter: level (INFO/WARN/ERROR), category, workflowId
+→ { content: [{ timestamp, level, category, message, source }], totalElements }
+```
+
+### Run-History
+
+```
+GET http://localhost:9090/api/v1/executions?workflowId=<id>&status=FAILED&page=0&size=10
+Headers: X-API-Key: $API_KEY
+→ { content: [{ id, status, error, durationMs, startedAt }], totalElements }
+```

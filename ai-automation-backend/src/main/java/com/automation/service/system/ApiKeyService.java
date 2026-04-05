@@ -7,6 +7,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.UUID;
 
 @Service
@@ -50,6 +54,25 @@ public class ApiKeyService {
                 log.warn("========================================");
             }
         );
+        writeApiKeyFile(cachedApiKey);
+    }
+
+    private void writeApiKeyFile(String key) {
+        Path apiKeyFile = Path.of(System.getProperty("user.home"), ".autotrigger", "api-key");
+        try {
+            if (key == null || key.isBlank()) {
+                Files.deleteIfExists(apiKeyFile);
+                return;
+            }
+            Files.createDirectories(apiKeyFile.getParent());
+            Files.writeString(apiKeyFile, key);
+            try {
+                Files.setPosixFilePermissions(apiKeyFile, PosixFilePermissions.fromString("rw-------"));
+            } catch (UnsupportedOperationException ignored) { }
+            log.info("Wrote API key to {}", apiKeyFile);
+        } catch (IOException e) {
+            log.warn("Failed to write API key file: {}", e.getMessage());
+        }
     }
 
     public String getEffectiveApiKey() {

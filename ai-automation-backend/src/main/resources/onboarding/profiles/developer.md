@@ -26,3 +26,95 @@ Für Code-Projekte stehen folgende Workflow-Patterns zur Verfügung:
 - `branch`: Git-Branch für kontextabhängige Aktionen
 - `base_dir`: Projektverzeichnis
 - `test_filter`: Spezifische Tests ausführen
+
+## API-Referenz für Entwickler
+
+### Workflows auflisten
+
+```
+GET http://localhost:9090/api/v1/workflows
+Headers: X-API-Key: $API_KEY
+→ [{ id, name, description, blocks, model, projectId, projectName, runCount }]
+```
+
+Workflows eines Projekts: `GET /api/v1/projects/{projectId}/workflows`
+
+### Skills auflisten
+
+```
+GET http://localhost:9090/api/v1/skills
+Headers: X-API-Key: $API_KEY
+→ [{ id, name, description, category, builtin, capabilities }]
+```
+
+### Run-History
+
+```
+GET http://localhost:9090/api/v1/executions?workflowId=<id>&status=COMPLETED&page=0&size=10
+Headers: X-API-Key: $API_KEY
+→ { content: [{ id, status, durationMs, startedAt, completedAt, metadata }], totalElements }
+```
+
+Runs eines Workflows: `GET /api/v1/workflows/{id}/runs?page=0&size=10`
+
+### Projekt nachschlagen & erstellen
+
+```
+GET http://localhost:9090/api/v1/projects
+Headers: X-API-Key: $API_KEY
+→ [{ id, name, path, type, status }]
+```
+
+Neues Projekt:
+```
+POST http://localhost:9090/api/v1/projects
+Headers: Content-Type: application/json, X-API-Key: $API_KEY
+Body: { "name": "Projektname", "path": "/absoluter/pfad", "type": "CODE" }
+```
+
+### Schedules verwalten
+
+```
+GET http://localhost:9090/api/v1/schedules
+Headers: X-API-Key: $API_KEY
+→ [{ id, workflowId, workflowName, cronExpression, enabled, nextRunAt }]
+```
+
+Schedule erstellen:
+```
+POST http://localhost:9090/api/v1/schedules
+Headers: Content-Type: application/json, X-API-Key: $API_KEY
+Body: { "workflowId": "<id>", "cronExpression": "0 8 * * 1-5", "enabled": true, "description": "Täglicher Check" }
+```
+
+Enable/Disable: `POST /api/v1/schedules/{id}/enable` bzw. `/disable`
+
+### Webhooks einrichten
+
+```
+POST http://localhost:9090/api/v1/webhooks
+Headers: Content-Type: application/json, X-API-Key: $API_KEY
+Body: { "workflowId": "<id>", "description": "GitHub Push", "defaultContext": {} }
+→ { id, secretToken, webhookUrl }
+```
+
+Trigger-URL (public, kein Auth): `POST /api/v1/webhook/trigger/{token}`
+
+### Activity Log
+
+```
+GET http://localhost:9090/api/v1/activity-log?page=0&size=20
+Headers: X-API-Key: $API_KEY
+Filter: level (INFO/WARN/ERROR), category, workflowId
+→ { content: [{ timestamp, level, category, message, source }], totalElements }
+```
+
+### Workflow Memory
+
+```
+GET http://localhost:9090/api/v1/workflows/{workflowId}/memory
+Headers: X-API-Key: $API_KEY
+→ [{ id, title, content, tags, active }]
+```
+
+Wissen extrahieren: `POST /api/v1/workflows/{workflowId}/memory/extract`
