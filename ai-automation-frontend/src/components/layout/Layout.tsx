@@ -34,7 +34,7 @@ export function Layout() {
         >
           <SecurityBanner />
           <Header />
-          <main className={isMobile ? 'p-4' : 'p-6'}>
+          <main className={isMobile ? 'p-4 pb-20' : 'p-6 pb-20'}>
             <Suspense fallback={<div className="flex items-center justify-center h-64"><Spinner /></div>}>
               <Outlet />
             </Suspense>
