@@ -1,6 +1,7 @@
 package com.automation.dto;
 
 import com.automation.dto.AssistantChatResponse.AssistantAction;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.junit.jupiter.api.Test;
 
@@ -9,6 +10,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AssistantChatResponseTest {
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     // --- 2-arg constructor ---
 
@@ -205,5 +208,72 @@ class AssistantChatResponseTest {
         var b = new AssistantAction("ask_choice", null, "name", "label", List.of("B"));
 
         assertThat(a).isNotEqualTo(b);
+    }
+
+    // --- JSON serialization (@JsonInclude NON_NULL) ---
+
+    @Test
+    void should_omitResponseTimeMs_when_null() throws Exception {
+        var response = new AssistantChatResponse("msg", List.of(), "model");
+        var json = objectMapper.writeValueAsString(response);
+
+        assertThat(json).doesNotContain("responseTimeMs");
+        assertThat(json).contains("\"message\":\"msg\"");
+        assertThat(json).contains("\"model\":\"model\"");
+    }
+
+    @Test
+    void should_includeResponseTimeMs_when_present() throws Exception {
+        var response = new AssistantChatResponse("msg", List.of(), "model", 42L);
+        var json = objectMapper.writeValueAsString(response);
+
+        assertThat(json).contains("\"responseTimeMs\":42");
+    }
+
+    @Test
+    void should_omitOptions_when_nullInAction() throws Exception {
+        var action = new AssistantAction("run_workflow", "w1", "WF", "Run");
+        var json = objectMapper.writeValueAsString(action);
+
+        assertThat(json).doesNotContain("options");
+        assertThat(json).contains("\"type\":\"run_workflow\"");
+    }
+
+    @Test
+    void should_includeOptions_when_presentInAction() throws Exception {
+        var action = new AssistantAction("ask_choice", null, "Choose", "Pick", List.of("A", "B"));
+        var json = objectMapper.writeValueAsString(action);
+
+        assertThat(json).contains("\"options\":[\"A\",\"B\"]");
+    }
+
+    @Test
+    void should_includeEmptyOptions_when_emptyListInAction() throws Exception {
+        var action = new AssistantAction("ask_choice", null, "Choose", "Pick", List.of());
+        var json = objectMapper.writeValueAsString(action);
+
+        assertThat(json).contains("\"options\":[]");
+    }
+
+    @Test
+    void should_deserializeResponse_when_validJson() throws Exception {
+        var original = new AssistantChatResponse("hello", List.of(
+                new AssistantAction("run_workflow", "w1", "WF", "Run")
+        ), "claude-sonnet-4-6", 123L);
+
+        var json = objectMapper.writeValueAsString(original);
+        var deserialized = objectMapper.readValue(json, AssistantChatResponse.class);
+
+        assertThat(deserialized).isEqualTo(original);
+    }
+
+    @Test
+    void should_deserializeAction_when_optionsPresent() throws Exception {
+        var original = new AssistantAction("ask_choice", null, "Q", "Pick", List.of("X", "Y"));
+
+        var json = objectMapper.writeValueAsString(original);
+        var deserialized = objectMapper.readValue(json, AssistantAction.class);
+
+        assertThat(deserialized).isEqualTo(original);
     }
 }
