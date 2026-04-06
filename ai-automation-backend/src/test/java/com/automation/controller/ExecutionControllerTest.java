@@ -124,7 +124,7 @@ class ExecutionControllerTest {
         var page = new org.springframework.data.domain.PageImpl<>(
                 List.<com.automation.entity.WorkflowRun>of(),
                 org.springframework.data.domain.PageRequest.of(0, 50), 0);
-        when(executionQueryService.listExecutions(0, 50, null, null, null))
+        when(executionQueryService.listExecutions(0, 50, null, null, null, null))
                 .thenReturn(page);
         when(workflowMapper.toRunResponseList(any())).thenReturn(List.of());
 
@@ -139,7 +139,7 @@ class ExecutionControllerTest {
         var page = new org.springframework.data.domain.PageImpl<>(
                 List.<com.automation.entity.WorkflowRun>of(),
                 org.springframework.data.domain.PageRequest.of(0, 50), 0);
-        when(executionQueryService.listExecutions(0, 50, "RUNNING", null, null))
+        when(executionQueryService.listExecutions(0, 50, "RUNNING", null, null, null))
                 .thenReturn(page);
         when(workflowMapper.toRunResponseList(any())).thenReturn(List.of());
 

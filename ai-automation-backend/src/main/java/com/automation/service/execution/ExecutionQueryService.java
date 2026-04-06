@@ -19,7 +19,7 @@ public class ExecutionQueryService {
 
     @Transactional(readOnly = true)
     public Page<WorkflowRun> listExecutions(int page, int size, String status,
-                                             String workflowId, String projectId) {
+                                             String workflowId, String projectId, String search) {
         Pageable pageable = PageRequest.of(page, size);
 
         RunStatus runStatus = null;
@@ -27,19 +27,11 @@ public class ExecutionQueryService {
             runStatus = RunStatus.valueOf(status.toUpperCase());
         }
 
-        if (workflowId != null && !workflowId.isBlank()) {
-            return runRepository.findByWorkflowIdOrderByStartedAtDesc(workflowId, pageable);
-        } else if (projectId != null && !projectId.isBlank()) {
-            if (runStatus != null) {
-                return runRepository.findByStatusAndProjectIdOrderByStartedAtDesc(runStatus, projectId, pageable);
-            } else {
-                return runRepository.findByProjectIdOrderByStartedAtDesc(projectId, pageable);
-            }
-        } else if (runStatus != null) {
-            return runRepository.findByStatusOrderByStartedAtDesc(runStatus, pageable);
-        } else {
-            return runRepository.findByOrderByStartedAtDesc(pageable);
-        }
+        String wfId = (workflowId != null && !workflowId.isBlank()) ? workflowId : null;
+        String projId = (projectId != null && !projectId.isBlank()) ? projectId : null;
+        String q = (search != null && !search.isBlank()) ? search.trim() : null;
+
+        return runRepository.findFiltered(runStatus, wfId, projId, q, pageable);
     }
 
     @Transactional(readOnly = true)

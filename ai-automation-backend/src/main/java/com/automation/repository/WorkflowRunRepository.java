@@ -82,6 +82,18 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
 
     List<WorkflowRun> findByTriggeredByScheduleIdOrderByStartedAtDesc(String scheduleId);
 
+    @Query("SELECT wr FROM WorkflowRun wr LEFT JOIN wr.workflow w " +
+           "WHERE (:status IS NULL OR wr.status = :status) " +
+           "AND (:workflowId IS NULL OR w.id = :workflowId) " +
+           "AND (:projectId IS NULL OR w.project.id = :projectId) " +
+           "AND (:search IS NULL OR LOWER(w.name) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "ORDER BY wr.startedAt DESC")
+    Page<WorkflowRun> findFiltered(@Param("status") RunStatus status,
+                                    @Param("workflowId") String workflowId,
+                                    @Param("projectId") String projectId,
+                                    @Param("search") String search,
+                                    Pageable pageable);
+
     /**
      * INTERRUPTED runs with zero completed steps, completed before the given cutoff.
      * Safe to delete — no resume value and no learning value.

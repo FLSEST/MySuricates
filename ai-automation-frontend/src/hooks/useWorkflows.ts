@@ -80,7 +80,7 @@ export function useWorkflowRuns(workflowId: string, page = 0, size = 50) {
   });
 }
 
-export function useAllRuns(params?: { status?: string; workflowId?: string; projectId?: string; page?: number; size?: number }) {
+export function useAllRuns(params?: { status?: string; workflowId?: string; projectId?: string; search?: string; page?: number; size?: number }) {
   return useQuery({
     queryKey: ['runs', params],
     queryFn: () => {
@@ -90,6 +90,7 @@ export function useAllRuns(params?: { status?: string; workflowId?: string; proj
       if (params?.status) searchParams.set('status', params.status);
       if (params?.workflowId) searchParams.set('workflowId', params.workflowId);
       if (params?.projectId) searchParams.set('projectId', params.projectId);
+      if (params?.search) searchParams.set('search', params.search);
       return api.get<PageResponse<WorkflowRun>>(`/executions?${searchParams.toString()}`);
     },
     refetchInterval: (query) => {

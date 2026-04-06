@@ -20,12 +20,13 @@ export function useChain(id: string) {
   });
 }
 
-export function useAllChainRuns(params: { page: number; size: number; status?: string }) {
+export function useAllChainRuns(params: { page: number; size: number; status?: string; search?: string }) {
   const searchParams = new URLSearchParams({
     page: String(params.page),
     size: String(params.size),
   });
   if (params.status) searchParams.set('status', params.status);
+  if (params.search) searchParams.set('search', params.search);
 
   return useQuery({
     queryKey: ['chainRuns', params],

@@ -41,10 +41,11 @@ public class ExecutionController {
             @RequestParam(defaultValue = "50") int size,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String workflowId,
-            @RequestParam(required = false) String projectId) {
+            @RequestParam(required = false) String projectId,
+            @RequestParam(required = false) String search) {
 
         Page<com.automation.entity.WorkflowRun> result =
-                executionQueryService.listExecutions(page, size, status, workflowId, projectId);
+                executionQueryService.listExecutions(page, size, status, workflowId, projectId, search);
 
         return new PageResponse<>(
                 workflowMapper.toRunResponseList(result.getContent()),

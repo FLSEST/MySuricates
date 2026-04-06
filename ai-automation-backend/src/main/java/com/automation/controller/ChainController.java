@@ -75,17 +75,16 @@ public class ChainController {
     public PageResponse<ChainRunResponse> listAllRuns(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
-            @RequestParam(required = false) String status) {
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String search) {
 
         Pageable pageable = PageRequest.of(page, size);
-        Page<ChainRun> result;
 
-        if (status != null && !status.isBlank()) {
-            RunStatus runStatus = RunStatus.valueOf(status.toUpperCase());
-            result = chainRunRepository.findByStatusOrderByStartedAtDesc(runStatus, pageable);
-        } else {
-            result = chainRunRepository.findByOrderByStartedAtDesc(pageable);
-        }
+        RunStatus runStatus = (status != null && !status.isBlank())
+                ? RunStatus.valueOf(status.toUpperCase()) : null;
+        String q = (search != null && !search.isBlank()) ? search.trim() : null;
+
+        Page<ChainRun> result = chainRunRepository.findFiltered(runStatus, q, pageable);
 
         return new PageResponse<>(
                 chainMapper.toRunResponseList(result.getContent()),

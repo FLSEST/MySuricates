@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { usePersistedState } from '../hooks/usePersistedState';
 import { useNavigate } from 'react-router-dom';
 import { History, Link2 } from 'lucide-react';
@@ -27,18 +27,31 @@ export function Runs() {
   const [workflowFilter, setWorkflowFilter] = usePersistedState('runs-workflow-filter', '');
   const [projectFilter, setProjectFilter] = usePersistedState('runs-project-filter', '');
   const [search, setSearch] = usePersistedState('runs-search', '');
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
   const [page, setPage] = useState(0);
   const pageSize = 50;
 
   // Chain filters
   const [chainStatusFilter, setChainStatusFilter] = usePersistedState('runs-chain-status-filter', '');
   const [chainSearch, setChainSearch] = usePersistedState('runs-chain-search', '');
+  const [debouncedChainSearch, setDebouncedChainSearch] = useState(chainSearch);
   const [chainPage, setChainPage] = useState(0);
+
+  useEffect(() => {
+    const id = setTimeout(() => { setDebouncedSearch(search); setPage(0); }, 300);
+    return () => clearTimeout(id);
+  }, [search]);
+
+  useEffect(() => {
+    const id = setTimeout(() => { setDebouncedChainSearch(chainSearch); setChainPage(0); }, 300);
+    return () => clearTimeout(id);
+  }, [chainSearch]);
 
   const { data: runsPage, isLoading, error, refetch } = useAllRuns({
     status: statusFilter || undefined,
     workflowId: workflowFilter || undefined,
     projectId: projectFilter || undefined,
+    search: debouncedSearch || undefined,
     page,
     size: pageSize,
   });
@@ -52,6 +65,7 @@ export function Runs() {
     refetch: chainRefetch,
   } = useAllChainRuns({
     status: chainStatusFilter || undefined,
+    search: debouncedChainSearch || undefined,
     page: chainPage,
     size: pageSize,
   });
@@ -59,19 +73,8 @@ export function Runs() {
   const runs = runsPage?.content;
   const chainRuns = chainRunsPage?.content;
 
-  const filteredRuns = useMemo(() => {
-    if (!runs) return [];
-    if (!search.trim()) return runs;
-    const q = search.toLowerCase();
-    return runs.filter((r) => r.workflowName?.toLowerCase().includes(q));
-  }, [runs, search]);
-
-  const filteredChainRuns = useMemo(() => {
-    if (!chainRuns) return [];
-    if (!chainSearch.trim()) return chainRuns;
-    const q = chainSearch.toLowerCase();
-    return chainRuns.filter((r) => r.chainName?.toLowerCase().includes(q));
-  }, [chainRuns, chainSearch]);
+  const filteredRuns = runs ?? [];
+  const filteredChainRuns = chainRuns ?? [];
 
   const handleTabChange = (mode: ViewMode) => {
     setViewMode(mode);
