@@ -3,6 +3,7 @@ package com.automation.service.system;
 import com.automation.concurrency.DynamicSemaphore;
 import com.automation.config.ChainConfig;
 import com.automation.config.HostClaudeConfig;
+import com.automation.config.RateLimitConfig;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.ai.HostClaudeService;
 import com.automation.service.workflow.WorkflowExecutor;
@@ -25,7 +26,9 @@ public class ExecutionSettingsService {
             "claude-reserved-for-interactive",   new long[]{0, 10},
             "claude-timeout-seconds",            new long[]{30, 3600},
             "claude-inter-call-delay-ms",        new long[]{0, 30000},
-            "chain-workflow-timeout-minutes",     new long[]{5, 1440}
+            "chain-workflow-timeout-minutes",     new long[]{5, 1440},
+            "rate-limit-enabled",                new long[]{0, 1},
+            "rate-limit-requests-per-minute",    new long[]{10, 10000}
     );
 
     // Frontend sends camelCase keys, backend uses kebab-case internally
@@ -35,7 +38,9 @@ public class ExecutionSettingsService {
             "claudeReservedForInteractive",    "claude-reserved-for-interactive",
             "claudeTimeoutSeconds",            "claude-timeout-seconds",
             "claudeInterCallDelayMs",          "claude-inter-call-delay-ms",
-            "chainWorkflowTimeoutMinutes",     "chain-workflow-timeout-minutes"
+            "chainWorkflowTimeoutMinutes",     "chain-workflow-timeout-minutes",
+            "rateLimitEnabled",                "rate-limit-enabled",
+            "rateLimitRequestsPerMinute",      "rate-limit-requests-per-minute"
     );
 
     private final AppSettingsRepository appSettingsRepository;
@@ -43,6 +48,7 @@ public class ExecutionSettingsService {
     private final HostClaudeService hostClaudeService;
     private final HostClaudeConfig hostClaudeConfig;
     private final ChainConfig chainConfig;
+    private final RateLimitConfig rateLimitConfig;
     private final WorkflowExecutor workflowExecutor;
 
     // Defaults from YAML/env (captured at startup)
@@ -58,12 +64,14 @@ public class ExecutionSettingsService {
             @Lazy HostClaudeService hostClaudeService,
             HostClaudeConfig hostClaudeConfig,
             ChainConfig chainConfig,
+            RateLimitConfig rateLimitConfig,
             @Lazy WorkflowExecutor workflowExecutor) {
         this.appSettingsRepository = appSettingsRepository;
         this.executionSemaphore = executionSemaphore;
         this.hostClaudeService = hostClaudeService;
         this.hostClaudeConfig = hostClaudeConfig;
         this.chainConfig = chainConfig;
+        this.rateLimitConfig = rateLimitConfig;
         this.workflowExecutor = workflowExecutor;
     }
 
@@ -86,11 +94,14 @@ public class ExecutionSettingsService {
         applyIfPresent("claude-timeout-seconds", v -> hostClaudeConfig.setTimeoutSeconds(Integer.parseInt(v)));
         applyIfPresent("claude-inter-call-delay-ms", v -> hostClaudeConfig.setInterCallDelayMs(Long.parseLong(v)));
         applyIfPresent("chain-workflow-timeout-minutes", v -> chainConfig.setWorkflowTimeoutMinutes(Integer.parseInt(v)));
+        applyIfPresent("rate-limit-enabled", v -> rateLimitConfig.setEnabled(Integer.parseInt(v) == 1));
+        applyIfPresent("rate-limit-requests-per-minute", v -> rateLimitConfig.setRequestsPerMinute(Integer.parseInt(v)));
 
-        log.info("Execution settings initialized: maxConcurrent={}, maxCalls={}, timeout={}s, delay={}ms, chainTimeout={}min",
+        log.info("Execution settings initialized: maxConcurrent={}, maxCalls={}, timeout={}s, delay={}ms, chainTimeout={}min, rateLimit={}/{}rpm",
                 executionSemaphore.getMaxPermits(), hostClaudeConfig.getMaxConcurrentCalls(),
                 hostClaudeConfig.getTimeoutSeconds(), hostClaudeConfig.getInterCallDelayMs(),
-                chainConfig.getWorkflowTimeoutMinutes());
+                chainConfig.getWorkflowTimeoutMinutes(),
+                rateLimitConfig.isEnabled() ? "ON" : "OFF", rateLimitConfig.getRequestsPerMinute());
     }
 
     public void updateAll(Map<String, String> settings) {
@@ -132,6 +143,8 @@ public class ExecutionSettingsService {
         result.put("claudeTimeoutSeconds", hostClaudeConfig.getTimeoutSeconds());
         result.put("claudeInterCallDelayMs", hostClaudeConfig.getInterCallDelayMs());
         result.put("chainWorkflowTimeoutMinutes", chainConfig.getWorkflowTimeoutMinutes());
+        result.put("rateLimitEnabled", rateLimitConfig.isEnabled() ? 1 : 0);
+        result.put("rateLimitRequestsPerMinute", rateLimitConfig.getRequestsPerMinute());
         result.put("activeRuns", workflowExecutor.getActiveRunCount());
         return result;
     }
@@ -147,6 +160,8 @@ public class ExecutionSettingsService {
             case "claude-timeout-seconds" -> hostClaudeConfig.setTimeoutSeconds(Integer.parseInt(value));
             case "claude-inter-call-delay-ms" -> hostClaudeConfig.setInterCallDelayMs(Long.parseLong(value));
             case "chain-workflow-timeout-minutes" -> chainConfig.setWorkflowTimeoutMinutes(Integer.parseInt(value));
+            case "rate-limit-enabled" -> rateLimitConfig.setEnabled(Integer.parseInt(value) == 1);
+            case "rate-limit-requests-per-minute" -> rateLimitConfig.setRequestsPerMinute(Integer.parseInt(value));
         }
     }
 

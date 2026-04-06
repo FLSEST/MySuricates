@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.dto.AssistantChatRequest;
 import com.automation.dto.AssistantChatResponse;
 import com.automation.exception.GlobalExceptionHandler;
@@ -52,6 +53,8 @@ class AssistantControllerTest {
     private ApiKeyService apiKeyService;
     @MockBean
     private ActivityLogService activityLogService;
+    @MockBean
+    private RateLimitConfig rateLimitConfig;
 
     @Test
     void chat_returnsAssistantResponse() throws Exception {

@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.dto.request.CreateChainRequest;
 import com.automation.dto.response.ChainResponse;
 import com.automation.dto.response.ChainRunResponse;
@@ -49,6 +50,7 @@ class ChainControllerTest {
     @MockBean private ChainMapper chainMapper;
     @MockBean private ChainRunRepository chainRunRepository;
     @MockBean private ApiKeyService apiKeyService;
+    @MockBean private RateLimitConfig rateLimitConfig;
 
     private ChainResponse sampleChain() {
         return new ChainResponse("c-1", "My Chain", "desc", null, List.of(),

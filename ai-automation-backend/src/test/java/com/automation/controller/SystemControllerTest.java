@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.RemoteAccessResponse;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.TailscaleException;
@@ -73,7 +74,7 @@ class SystemControllerTest {
     private IntegrationSnippetService integrationSnippetService;
 
     @MockBean
-    private com.automation.config.RateLimitConfig rateLimitConfig;
+    private RateLimitConfig rateLimitConfig;
 
     private void mockDbHealthy() throws Exception {
         Connection conn = mock(Connection.class);

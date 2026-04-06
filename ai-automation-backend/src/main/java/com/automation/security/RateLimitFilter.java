@@ -1,5 +1,6 @@
 package com.automation.security;
 
+import com.automation.config.RateLimitConfig;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,16 +21,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Slf4j
 public class RateLimitFilter extends OncePerRequestFilter {
 
-    @Value("${automation.security.rate-limit.requests-per-minute:120}")
-    private int requestsPerMinute;
-
-    @Value("${automation.security.rate-limit.enabled:false}")
-    private boolean rateLimitEnabled;
+    private final RateLimitConfig rateLimitConfig;
 
     @Value("${automation.security.trusted-proxies:127.0.0.1,::1}")
     private String trustedProxies;
 
     private final Map<String, ClientBucket> buckets = new ConcurrentHashMap<>();
+
+    public RateLimitFilter(RateLimitConfig rateLimitConfig) {
+        this.rateLimitConfig = rateLimitConfig;
+    }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -42,16 +43,17 @@ public class RateLimitFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
 
-        if (!rateLimitEnabled) {
+        if (!rateLimitConfig.isEnabled()) {
             filterChain.doFilter(request, response);
             return;
         }
 
+        int limit = rateLimitConfig.getRequestsPerMinute();
         String clientId = getClientId(request);
         ClientBucket bucket = buckets.computeIfAbsent(clientId, k -> new ClientBucket());
 
-        if (bucket.tryConsume(requestsPerMinute)) {
-            response.setHeader("X-RateLimit-Remaining", String.valueOf(bucket.getRemaining(requestsPerMinute)));
+        if (bucket.tryConsume(limit)) {
+            response.setHeader("X-RateLimit-Remaining", String.valueOf(bucket.getRemaining(limit)));
             filterChain.doFilter(request, response);
         } else {
             log.warn("Rate limit exceeded for client: {}", clientId);

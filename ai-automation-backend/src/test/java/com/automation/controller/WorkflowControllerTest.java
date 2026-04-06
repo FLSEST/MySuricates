@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.WorkflowResponse;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.entity.*;
@@ -81,6 +82,8 @@ class WorkflowControllerTest {
 
     @MockBean
     private com.automation.mapper.WorkflowVersionMapper workflowVersionMapper;
+    @MockBean
+    private RateLimitConfig rateLimitConfig;
 
     private Workflow testWorkflow;
     private WorkflowResponse testResponse;

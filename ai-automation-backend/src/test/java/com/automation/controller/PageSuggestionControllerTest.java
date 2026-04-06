@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.service.PageSuggestionService;
 import com.automation.service.activitylog.ActivityLogService;
@@ -29,6 +30,7 @@ class PageSuggestionControllerTest {
     @MockBean private PageSuggestionService pageSuggestionService;
     @MockBean private ApiKeyService apiKeyService;
     @MockBean private ActivityLogService activityLogService;
+    @MockBean private RateLimitConfig rateLimitConfig;
 
     @Test
     void getSuggestions_returnsListForPage() throws Exception {

@@ -1,6 +1,7 @@
 package com.automation.controller;
 
 import com.automation.config.DocsConfig;
+import com.automation.config.RateLimitConfig;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.system.ApiKeyService;
@@ -30,6 +31,7 @@ class DocsControllerTest {
     @MockBean private DocsConfig docsConfig;
     @MockBean private ApiKeyService apiKeyService;
     @MockBean private ActivityLogService activityLogService;
+    @MockBean private RateLimitConfig rateLimitConfig;
 
     @TempDir
     Path tempDir;

@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.WorkflowTemplateResponse;
 import com.automation.entity.WorkflowTemplate;
 import com.automation.exception.GlobalExceptionHandler;
@@ -41,6 +42,7 @@ class WorkflowTemplateControllerTest {
     @MockBean private WorkflowTemplateMapper templateMapper;
     @MockBean private TemplateVerificationService verificationService;
     @MockBean private ApiKeyService apiKeyService;
+    @MockBean private RateLimitConfig rateLimitConfig;
 
     private WorkflowTemplateResponse sampleResponse() {
         return new WorkflowTemplateResponse("t-1", Map.of("en", "Test"), Map.of("en", "Desc"),

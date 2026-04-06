@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.WorkflowFactoryResult;
 import com.automation.dto.response.WorkflowResponse;
 import com.automation.entity.Workflow;
@@ -45,6 +46,8 @@ class WorkflowFactoryControllerTest {
 
     @MockBean
     private ApiKeyService apiKeyService;
+    @MockBean
+    private RateLimitConfig rateLimitConfig;
 
     private WorkflowFactoryResult createFactoryResult() {
         return new WorkflowFactoryResult(

@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.StagingStatusResponse;
 import com.automation.dto.response.SyncResult;
 import com.automation.exception.GlobalExceptionHandler;
@@ -36,6 +37,8 @@ class StagingControllerTest {
 
     @MockBean
     private ApiKeyService apiKeyService;
+    @MockBean
+    private RateLimitConfig rateLimitConfig;
 
     @Test
     void status_returnsCurrentState() throws Exception {

@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.DashboardResponse;
 import com.automation.dto.response.PlatformStatsResponse;
 import com.automation.exception.GlobalExceptionHandler;
@@ -40,6 +41,8 @@ class LearningControllerTest {
 
     @MockBean
     private ApiKeyService apiKeyService;
+    @MockBean
+    private RateLimitConfig rateLimitConfig;
 
     @Test
     void getDashboard_returnsOk() throws Exception {

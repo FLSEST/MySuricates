@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.ScheduledWorkflowResponse;
 import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.ScheduledWorkflow.ScheduleType;
@@ -60,6 +61,8 @@ class ScheduleControllerTest {
 
     @MockBean
     private ApiKeyService apiKeyService;
+    @MockBean
+    private RateLimitConfig rateLimitConfig;
 
     private Workflow testWorkflow;
     private ScheduledWorkflow testScheduled;

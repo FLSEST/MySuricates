@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.dto.request.CreateCompletionTriggerRequest;
 import com.automation.dto.response.CompletionTriggerResponse;
 import com.automation.exception.GlobalExceptionHandler;
@@ -38,6 +39,7 @@ class CompletionTriggerControllerTest {
     @MockBean private CompletionTriggerMapper mapper;
     @MockBean private ApiKeyService apiKeyService;
     @MockBean private ActivityLogService activityLogService;
+    @MockBean private RateLimitConfig rateLimitConfig;
 
     private static final Instant NOW = Instant.parse("2026-03-28T12:00:00Z");
 

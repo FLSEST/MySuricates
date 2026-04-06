@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.config.ReportsConfig;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.service.activitylog.ActivityLogService;
@@ -31,6 +32,7 @@ class ReportsControllerTest {
     @MockBean private ReportsConfig reportsConfig;
     @MockBean private ApiKeyService apiKeyService;
     @MockBean private ActivityLogService activityLogService;
+    @MockBean private RateLimitConfig rateLimitConfig;
 
     @TempDir
     Path tempDir;

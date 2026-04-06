@@ -1,5 +1,6 @@
 package com.automation.security;
 
+import com.automation.config.RateLimitConfig;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -19,6 +20,7 @@ import static org.mockito.Mockito.*;
 class RateLimitFilterTest {
 
     private RateLimitFilter filter;
+    private RateLimitConfig rateLimitConfig;
 
     @Mock
     private HttpServletRequest request;
@@ -31,13 +33,14 @@ class RateLimitFilterTest {
 
     @BeforeEach
     void setUp() {
-        filter = new RateLimitFilter();
+        rateLimitConfig = new RateLimitConfig();
+        filter = new RateLimitFilter(rateLimitConfig);
         ReflectionTestUtils.setField(filter, "trustedProxies", "127.0.0.1,::1");
     }
 
     @Test
     void rateLimitDisabled_passesThrough() throws Exception {
-        ReflectionTestUtils.setField(filter, "rateLimitEnabled", false);
+        rateLimitConfig.setEnabled(false);
 
         filter.doFilterInternal(request, response, filterChain);
 
@@ -46,8 +49,8 @@ class RateLimitFilterTest {
 
     @Test
     void rateLimitEnabled_underLimit_passesThrough() throws Exception {
-        ReflectionTestUtils.setField(filter, "rateLimitEnabled", true);
-        ReflectionTestUtils.setField(filter, "requestsPerMinute", 10);
+        rateLimitConfig.setEnabled(true);
+        rateLimitConfig.setRequestsPerMinute(10);
         when(request.getRemoteAddr()).thenReturn("127.0.0.1");
 
         filter.doFilterInternal(request, response, filterChain);
@@ -58,8 +61,8 @@ class RateLimitFilterTest {
 
     @Test
     void rateLimitEnabled_exceedsLimit_returns429() throws Exception {
-        ReflectionTestUtils.setField(filter, "rateLimitEnabled", true);
-        ReflectionTestUtils.setField(filter, "requestsPerMinute", 2);
+        rateLimitConfig.setEnabled(true);
+        rateLimitConfig.setRequestsPerMinute(2);
         when(request.getRemoteAddr()).thenReturn("127.0.0.1");
 
         StringWriter stringWriter = new StringWriter();
@@ -79,8 +82,8 @@ class RateLimitFilterTest {
 
     @Test
     void rateLimitEnabled_usesForwardedFor() throws Exception {
-        ReflectionTestUtils.setField(filter, "rateLimitEnabled", true);
-        ReflectionTestUtils.setField(filter, "requestsPerMinute", 1);
+        rateLimitConfig.setEnabled(true);
+        rateLimitConfig.setRequestsPerMinute(1);
         when(request.getRemoteAddr()).thenReturn("127.0.0.1");
         when(request.getHeader("X-Forwarded-For")).thenReturn("10.0.0.1, 10.0.0.2");
 
@@ -98,8 +101,8 @@ class RateLimitFilterTest {
 
     @Test
     void rateLimitEnabled_differentClients_trackedSeparately() throws Exception {
-        ReflectionTestUtils.setField(filter, "rateLimitEnabled", true);
-        ReflectionTestUtils.setField(filter, "requestsPerMinute", 1);
+        rateLimitConfig.setEnabled(true);
+        rateLimitConfig.setRequestsPerMinute(1);
 
         HttpServletRequest request2 = mock(HttpServletRequest.class);
         when(request.getRemoteAddr()).thenReturn("10.0.0.1");

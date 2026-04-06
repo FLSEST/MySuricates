@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.entity.ChainEntry;
 import com.automation.entity.WorkflowChain;
 import com.automation.exception.GlobalExceptionHandler;
@@ -42,6 +43,8 @@ class ChainTemplateControllerTest {
 
     @MockBean
     private ApiKeyService apiKeyService;
+    @MockBean
+    private RateLimitConfig rateLimitConfig;
 
     private BuiltInChainTemplate createTemplate() {
         return new BuiltInChainTemplate(

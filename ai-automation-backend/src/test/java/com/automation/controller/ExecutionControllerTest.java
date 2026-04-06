@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.entity.RunStatus;
 import com.automation.entity.WorkflowRun;
@@ -65,6 +66,8 @@ class ExecutionControllerTest {
 
     @MockBean
     private ApiKeyService apiKeyService;
+    @MockBean
+    private RateLimitConfig rateLimitConfig;
 
     @Test
     void getExecution_existingId_returnsOk() throws Exception {

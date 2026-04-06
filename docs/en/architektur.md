@@ -603,11 +603,12 @@ Response (DTO) → React Query Cache → UI Update
 
 ### Rate Limiting
 
-- **Filter:** `RateLimitFilter`
+- **Filter:** `RateLimitFilter` (reads from `RateLimitConfig` bean)
 - **Algorithm:** Sliding window (1 minute)
 - **Default:** 120 requests/minute per client IP
 - **Response header:** `X-RateLimit-Remaining`
-- **Disableable:** `automation.security.rate-limit.enabled=false`
+- **Runtime-configurable:** Settings → Execution → API Rate Limiting (toggle + RPM value)
+- **Env override:** `AUTOMATION_RATE_LIMIT_ENABLED` / `AUTOMATION_RATE_LIMIT_RPM`
 
 ### CORS
 

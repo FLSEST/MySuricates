@@ -115,8 +115,8 @@ Test-Instanz auf Port 8090:
 | `AUTOMATION_PORT` | `9090` | Server-Port |
 | `AUTOMATION_SECURITY_ENABLED` | `true` | API-Key-Authentifizierung |
 | `AUTOMATION_API_KEY` | (leer) | API-Key für Authentifizierung |
-| `AUTOMATION_RATE_LIMIT_ENABLED` | `false` | Rate Limiting aktivieren |
-| `AUTOMATION_RATE_LIMIT_RPM` | `120` | Requests pro Minute |
+| `AUTOMATION_RATE_LIMIT_ENABLED` | `true` | Rate Limiting aktivieren (auch zur Laufzeit in Settings → Execution konfigurierbar) |
+| `AUTOMATION_RATE_LIMIT_RPM` | `120` | Requests pro Minute (auch zur Laufzeit konfigurierbar, 10–10.000) |
 | `AUTOMATION_TAILSCALE_ENABLED` | `false` | Tailscale Remote-Access |
 | `AUTOMATION_HOST_CLAUDE_MAX_TOKENS` | (leer) | Optionales per-Call Token-Limit für Claude CLI |
 | `AUTOMATION_HOST_CLAUDE_TIMEOUT_SECONDS` | `300` | Globaler Claude-CLI-Timeout in Sekunden |
@@ -138,13 +138,13 @@ Test-Instanz auf Port 8090:
 ```yaml
 # application.yml Defaults
 automation.security.enabled: true
-automation.security.rate-limit.enabled: false
+automation.security.rate-limit.enabled: true
 automation.tailscale.enabled: false
 logging.level.com.automation: DEBUG
 ```
 
 - API-Key-Authentifizierung aktiv (Key wird beim ersten Start auto-generiert)
-- Kein Rate Limiting
+- Rate Limiting aktiv (120 req/min, konfigurierbar in Settings → Execution)
 - Debug-Logging
 - SQLite unter `./data/automation.db`
 

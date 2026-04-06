@@ -380,7 +380,7 @@ Workflows können Wissen über Runs hinweg akkumulieren:
 
 - Der Docker-Socket-Mount gibt dem Backend Host-Level Docker-Zugriff. In Produktionsumgebungen sollte mindestens API-Key-Auth aktiviert sein.
 - CORS ist standardmäßig offen (`*`). Für Produktion sollten spezifische Origins konfiguriert werden.
-- Das Rate Limiting ist standardmäßig deaktiviert.
+- Rate Limiting ist standardmäßig aktiv (120 req/min). Konfigurierbar zur Laufzeit in Settings → Execution.
 
 ### Frontend
 

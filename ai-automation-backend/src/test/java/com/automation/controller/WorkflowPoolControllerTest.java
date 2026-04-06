@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.dto.request.InstallPoolWorkflowRequest;
 import com.automation.dto.response.PoolWorkflowEntry;
 import com.automation.entity.Workflow;
@@ -38,6 +39,7 @@ class WorkflowPoolControllerTest {
     @MockBean private WorkflowPoolService poolService;
     @MockBean private ApiKeyService apiKeyService;
     @MockBean private ActivityLogService activityLogService;
+    @MockBean private RateLimitConfig rateLimitConfig;
 
     private PoolWorkflowEntry sampleEntry() {
         return new PoolWorkflowEntry(

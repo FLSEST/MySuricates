@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Card, CardHeader, Button } from '../ui';
+import { Card, CardHeader, Button, Toggle } from '../ui';
 import { useT } from '../../i18n';
 import { useExecutionConfig, useUpdateExecutionConfig } from '../../hooks/useSystem';
 import { Zap, Save, Loader2 } from 'lucide-react';
 import { Spinner } from '../ui';
+
+type NumericFormKeys = Exclude<keyof FormState, 'rateLimitEnabled'>;
 
 interface FieldConfig {
   key: string;
@@ -11,7 +13,7 @@ interface FieldConfig {
   hint: string;
   min: number;
   max: number;
-  configKey: keyof FormState;
+  configKey: NumericFormKeys;
 }
 
 interface FormState {
@@ -21,6 +23,8 @@ interface FormState {
   claudeTimeoutSeconds: number;
   claudeInterCallDelayMs: number;
   chainWorkflowTimeoutMinutes: number;
+  rateLimitEnabled: boolean;
+  rateLimitRequestsPerMinute: number;
 }
 
 export function ExecutionSettingsCard() {
@@ -35,6 +39,8 @@ export function ExecutionSettingsCard() {
     claudeTimeoutSeconds: 300,
     claudeInterCallDelayMs: 0,
     chainWorkflowTimeoutMinutes: 180,
+    rateLimitEnabled: true,
+    rateLimitRequestsPerMinute: 120,
   });
 
   useEffect(() => {
@@ -46,6 +52,8 @@ export function ExecutionSettingsCard() {
         claudeTimeoutSeconds: config.claudeTimeoutSeconds,
         claudeInterCallDelayMs: config.claudeInterCallDelayMs,
         chainWorkflowTimeoutMinutes: config.chainWorkflowTimeoutMinutes,
+        rateLimitEnabled: config.rateLimitEnabled === 1,
+        rateLimitRequestsPerMinute: config.rateLimitRequestsPerMinute,
       });
     }
   }, [config]);
@@ -56,7 +64,9 @@ export function ExecutionSettingsCard() {
     form.claudeReservedForInteractive !== (config.claudeReservedForInteractive ?? 1) ||
     form.claudeTimeoutSeconds !== config.claudeTimeoutSeconds ||
     form.claudeInterCallDelayMs !== config.claudeInterCallDelayMs ||
-    form.chainWorkflowTimeoutMinutes !== config.chainWorkflowTimeoutMinutes
+    form.chainWorkflowTimeoutMinutes !== config.chainWorkflowTimeoutMinutes ||
+    form.rateLimitEnabled !== (config.rateLimitEnabled === 1) ||
+    form.rateLimitRequestsPerMinute !== config.rateLimitRequestsPerMinute
   );
 
   const fields: FieldConfig[] = [
@@ -66,6 +76,7 @@ export function ExecutionSettingsCard() {
     { key: 'timeout', label: t.settings.executionCliTimeout, hint: t.settings.executionCliTimeoutHint, min: 30, max: 3600, configKey: 'claudeTimeoutSeconds' },
     { key: 'delay', label: t.settings.executionInterCallDelay, hint: t.settings.executionInterCallDelayHint, min: 0, max: 30000, configKey: 'claudeInterCallDelayMs' },
     { key: 'chain', label: t.settings.executionChainTimeout, hint: t.settings.executionChainTimeoutHint, min: 5, max: 1440, configKey: 'chainWorkflowTimeoutMinutes' },
+    { key: 'rateRpm', label: t.settings.executionRateLimitRpm, hint: t.settings.executionRateLimitRpmHint, min: 10, max: 10000, configKey: 'rateLimitRequestsPerMinute' },
   ];
 
   const handleSave = () => {
@@ -76,6 +87,8 @@ export function ExecutionSettingsCard() {
       claudeTimeoutSeconds: form.claudeTimeoutSeconds,
       claudeInterCallDelayMs: form.claudeInterCallDelayMs,
       chainWorkflowTimeoutMinutes: form.chainWorkflowTimeoutMinutes,
+      rateLimitEnabled: form.rateLimitEnabled ? 1 : 0,
+      rateLimitRequestsPerMinute: form.rateLimitRequestsPerMinute,
     });
   };
 
@@ -113,27 +126,43 @@ export function ExecutionSettingsCard() {
           </div>
         </div>
 
+        {/* Rate limiting toggle */}
+        <div className="flex items-center justify-between py-2">
+          <div>
+            <label className="block text-sm font-medium text-text">{t.settings.executionRateLimitEnabled}</label>
+            <p className="text-xs text-text-tertiary mt-0.5">{t.settings.executionRateLimitEnabledHint}</p>
+          </div>
+          <Toggle
+            enabled={form.rateLimitEnabled}
+            onChange={(v) => setForm(prev => ({ ...prev, rateLimitEnabled: v }))}
+          />
+        </div>
+
         {/* Settings grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {fields.map(({ key, label, hint, min, max, configKey }) => (
-            <div key={key}>
-              <label className="block text-sm font-medium text-text mb-1">{label}</label>
-              <input
-                type="number"
-                min={min}
-                max={max}
-                value={form[configKey]}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value, 10);
-                  if (!isNaN(val)) {
-                    setForm(prev => ({ ...prev, [configKey]: val }));
-                  }
-                }}
-                className="w-full px-3 py-1.5 text-sm bg-surface-hover border border-border rounded-lg text-text focus:outline-none focus:ring-1 focus:ring-accent font-mono"
-              />
-              <p className="text-xs text-text-tertiary mt-1">{hint}</p>
-            </div>
-          ))}
+          {fields.map(({ key, label, hint, min, max, configKey }) => {
+            const isDisabled = key === 'rateRpm' && !form.rateLimitEnabled;
+            return (
+              <div key={key} className={isDisabled ? 'opacity-50' : ''}>
+                <label className="block text-sm font-medium text-text mb-1">{label}</label>
+                <input
+                  type="number"
+                  min={min}
+                  max={max}
+                  disabled={isDisabled}
+                  value={form[configKey]}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    if (!isNaN(val)) {
+                      setForm(prev => ({ ...prev, [configKey]: val }));
+                    }
+                  }}
+                  className="w-full px-3 py-1.5 text-sm bg-surface-hover border border-border rounded-lg text-text focus:outline-none focus:ring-1 focus:ring-accent font-mono disabled:cursor-not-allowed"
+                />
+                <p className="text-xs text-text-tertiary mt-1">{hint}</p>
+              </div>
+            );
+          })}
         </div>
 
         {/* Save button */}

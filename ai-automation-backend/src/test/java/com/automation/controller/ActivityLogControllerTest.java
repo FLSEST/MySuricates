@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.ActivityLogResponse;
 import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.ActivityLog.LogLevel;
@@ -37,6 +38,7 @@ class ActivityLogControllerTest {
     @MockBean private ActivityLogService activityLogService;
     @MockBean private ActivityLogMapper activityLogMapper;
     @MockBean private ApiKeyService apiKeyService;
+    @MockBean private RateLimitConfig rateLimitConfig;
 
     @Test
     void getLogs_returnsPagedResults() throws Exception {

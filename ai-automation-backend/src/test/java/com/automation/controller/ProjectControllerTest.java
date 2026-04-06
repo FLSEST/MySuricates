@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.ProjectResponse;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectStatus;
@@ -70,6 +71,8 @@ class ProjectControllerTest {
 
     @MockBean
     private ApiKeyService apiKeyService;
+    @MockBean
+    private RateLimitConfig rateLimitConfig;
 
     private Project testProject;
     private ProjectResponse testResponse;

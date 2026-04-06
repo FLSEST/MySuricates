@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.dto.request.ExtractMemoryRequest;
 import com.automation.dto.request.UpdateMemoryRequest;
 import com.automation.dto.response.WorkflowMemoryResponse;
@@ -41,6 +42,7 @@ class WorkflowMemoryControllerTest {
 
     @MockBean private WorkflowMemoryMapper memoryMapper;
     @MockBean private ApiKeyService apiKeyService;
+    @MockBean private RateLimitConfig rateLimitConfig;
 
     private WorkflowMemoryResponse sampleResponse() {
         return new WorkflowMemoryResponse("m-1", "w-1", "Lesson learned", "Content",

@@ -142,6 +142,8 @@ export interface ExecutionConfig {
   claudeTimeoutSeconds: number;
   claudeInterCallDelayMs: number;
   chainWorkflowTimeoutMinutes: number;
+  rateLimitEnabled: number;
+  rateLimitRequestsPerMinute: number;
   activeRuns: number;
 }
 

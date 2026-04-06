@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.dto.request.CreateTodoRequest;
 import com.automation.dto.request.UpdateTodoStatusRequest;
 import com.automation.dto.response.PageResponse;
@@ -45,6 +46,7 @@ class TodoControllerTest {
     @MockBean private TodoMapper todoMapper;
     @MockBean private ApiKeyService apiKeyService;
     @MockBean private TodoSimilarityService todoSimilarityService;
+    @MockBean private RateLimitConfig rateLimitConfig;
 
     private TodoResponse sampleResponse() {
         return new TodoResponse("t-1", "Fix bug", "desc", Todo.Status.OPEN, Todo.Priority.HIGH,

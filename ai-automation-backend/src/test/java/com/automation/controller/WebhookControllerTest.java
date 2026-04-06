@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.WebhookTriggerResponse;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.entity.RunStatus;
@@ -63,6 +64,8 @@ class WebhookControllerTest {
 
     @MockBean
     private WebhookRateLimiter webhookRateLimiter;
+    @MockBean
+    private RateLimitConfig rateLimitConfig;
 
     private Workflow testWorkflow;
     private WebhookTrigger testWebhook;

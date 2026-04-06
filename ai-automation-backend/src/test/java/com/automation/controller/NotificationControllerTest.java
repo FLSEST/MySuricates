@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.NotificationConfigResponse;
 import com.automation.entity.NotificationConfig;
 import com.automation.entity.NotificationConfig.ChannelType;
@@ -46,6 +47,8 @@ class NotificationControllerTest {
 
     @MockBean
     private ApiKeyService apiKeyService;
+    @MockBean
+    private RateLimitConfig rateLimitConfig;
 
     private NotificationConfig testConfig;
     private NotificationConfigResponse testResponse;

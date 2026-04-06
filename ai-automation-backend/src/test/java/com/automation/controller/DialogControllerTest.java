@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.conversion.DialogWorkflowSuggestion;
@@ -46,6 +47,8 @@ class DialogControllerTest {
 
     @MockBean
     private ApiKeyService apiKeyService;
+    @MockBean
+    private RateLimitConfig rateLimitConfig;
 
     @Test
     void countSessionsPerProject_returnsOk() throws Exception {

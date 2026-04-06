@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.OnboardingProfileResponse;
 import com.automation.entity.OnboardingProfile;
 import com.automation.entity.OnboardingProfileType;
@@ -42,6 +43,7 @@ class OnboardingProfileControllerTest {
     @MockBean private OnboardingProfileMapper profileMapper;
     @MockBean private ActivityLogService activityLogService;
     @MockBean private ApiKeyService apiKeyService;
+    @MockBean private RateLimitConfig rateLimitConfig;
 
     private OnboardingProfile buildProfile(String id, String key) {
         return OnboardingProfile.builder()

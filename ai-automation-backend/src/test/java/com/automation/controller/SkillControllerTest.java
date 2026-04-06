@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.CapabilityResponse;
 import com.automation.dto.response.ExportSkillResponse;
 import com.automation.dto.response.SkillResponse;
@@ -58,6 +59,8 @@ class SkillControllerTest {
 
     @MockBean
     private ApiKeyService apiKeyService;
+    @MockBean
+    private RateLimitConfig rateLimitConfig;
 
     private Skill testSkill;
     private SkillResponse testResponse;

@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.WorkflowResponse;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
@@ -41,6 +42,8 @@ class ConversionControllerTest {
 
     @MockBean
     private ApiKeyService apiKeyService;
+    @MockBean
+    private RateLimitConfig rateLimitConfig;
 
     @Test
     void suggest_validRunId_returnsOk() throws Exception {

@@ -3,6 +3,7 @@ package com.automation.service.system;
 import com.automation.concurrency.DynamicSemaphore;
 import com.automation.config.ChainConfig;
 import com.automation.config.HostClaudeConfig;
+import com.automation.config.RateLimitConfig;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.ai.HostClaudeService;
 import com.automation.service.workflow.WorkflowExecutor;
@@ -29,6 +30,7 @@ class ExecutionSettingsServiceTest {
     private DynamicSemaphore executionSemaphore;
     private HostClaudeConfig hostClaudeConfig;
     private ChainConfig chainConfig;
+    private RateLimitConfig rateLimitConfig;
     private ExecutionSettingsService service;
 
     @BeforeEach
@@ -36,11 +38,12 @@ class ExecutionSettingsServiceTest {
         executionSemaphore = new DynamicSemaphore(10);
         hostClaudeConfig = new HostClaudeConfig();
         chainConfig = new ChainConfig();
+        rateLimitConfig = new RateLimitConfig();
 
         service = new ExecutionSettingsService(
                 appSettingsRepository, executionSemaphore,
                 hostClaudeService, hostClaudeConfig, chainConfig,
-                workflowExecutor
+                rateLimitConfig, workflowExecutor
         );
     }
 
@@ -64,6 +67,8 @@ class ExecutionSettingsServiceTest {
         when(appSettingsRepository.get("claude-timeout-seconds")).thenReturn(Optional.of("600"));
         when(appSettingsRepository.get("claude-inter-call-delay-ms")).thenReturn(Optional.of("100"));
         when(appSettingsRepository.get("chain-workflow-timeout-minutes")).thenReturn(Optional.of("60"));
+        when(appSettingsRepository.get("rate-limit-enabled")).thenReturn(Optional.empty());
+        when(appSettingsRepository.get("rate-limit-requests-per-minute")).thenReturn(Optional.empty());
 
         service.init();
 
@@ -155,7 +160,9 @@ class ExecutionSettingsServiceTest {
                 "executionMaxConcurrent", "claudeMaxConcurrentCalls",
                 "claudeReservedForInteractive",
                 "claudeTimeoutSeconds", "claudeInterCallDelayMs",
-                "chainWorkflowTimeoutMinutes", "activeRuns"
+                "chainWorkflowTimeoutMinutes",
+                "rateLimitEnabled", "rateLimitRequestsPerMinute",
+                "activeRuns"
         );
         assertThat(settings.get("activeRuns")).isEqualTo(3);
     }
@@ -190,6 +197,8 @@ class ExecutionSettingsServiceTest {
         when(appSettingsRepository.get("claude-timeout-seconds")).thenReturn(Optional.empty());
         when(appSettingsRepository.get("claude-inter-call-delay-ms")).thenReturn(Optional.empty());
         when(appSettingsRepository.get("chain-workflow-timeout-minutes")).thenReturn(Optional.empty());
+        when(appSettingsRepository.get("rate-limit-enabled")).thenReturn(Optional.empty());
+        when(appSettingsRepository.get("rate-limit-requests-per-minute")).thenReturn(Optional.empty());
 
         service.init();
 

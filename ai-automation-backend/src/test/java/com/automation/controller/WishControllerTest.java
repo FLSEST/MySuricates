@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.dto.request.WishRespondRequest;
 import com.automation.dto.response.WishResponse;
 import com.automation.entity.Wish;
@@ -40,6 +41,7 @@ class WishControllerTest {
     @MockBean private WishMapper wishMapper;
     @MockBean private ApiKeyService apiKeyService;
     @MockBean private ActivityLogService activityLogService;
+    @MockBean private RateLimitConfig rateLimitConfig;
 
     private WishResponse sampleResponse() {
         return new WishResponse("w-1", "Build a dashboard", WishStatus.DECOMPOSING,

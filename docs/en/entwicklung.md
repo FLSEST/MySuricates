@@ -380,7 +380,7 @@ Workflows can accumulate knowledge across runs:
 
 - The Docker socket mount gives the backend host-level Docker access. In production environments, at least API key auth should be enabled.
 - CORS is open by default (`*`). For production, specific origins should be configured.
-- Rate limiting is disabled by default.
+- Rate limiting is enabled by default (120 req/min). Configurable at runtime in Settings → Execution.
 
 ### Frontend
 

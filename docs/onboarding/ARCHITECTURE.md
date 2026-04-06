@@ -322,7 +322,7 @@ Backend → ProcessBuilder → claude (Host-Prozess)
 | Feature | Konfiguration | Standard |
 |---|---|---|
 | API-Key Auth | `AUTOMATION_SECURITY_ENABLED` | `true` |
-| Rate Limiting | `AUTOMATION_RATE_LIMIT_ENABLED` | `false` |
+| Rate Limiting | `AUTOMATION_RATE_LIMIT_ENABLED` | `true` (auch in Settings → Execution konfigurierbar) |
 | Tailscale | `AUTOMATION_TAILSCALE_ENABLED` | `false` |
 | Trusted Proxies | `AUTOMATION_TRUSTED_PROXIES` | `127.0.0.1,::1` |
 
