@@ -175,82 +175,21 @@ Verfügbare Mechanismen: [docs/WORKFLOW-GUIDE.md](docs/WORKFLOW-GUIDE.md) — Bl
 
 AI-powered workflow automation platform with a skill system, Docker-based execution, and a React frontend.
 
-**Workflow Building Guide**: See [docs/WORKFLOW-GUIDE.md](docs/WORKFLOW-GUIDE.md) for a practical guide on building workflows — block types, patterns, timeouts, and pitfalls.
-
-## Vision
-
-Two pillars: (1) universal problem solver for everyday life and work, (2) self-improving AI platform that gets smarter with every run. See [VISION.md](VISION.md) for the full vision document.
-
-## Project Structure
-
-```
-ai-automation-backend/     Spring Boot 3.4 (Java 21) REST API
-  src/main/java/com/automation/
-    controller/            REST controllers (Workflow, WorkflowTemplate, Skill, Execution, Learning, Schedule, Webhook, System, Project, Conversion, Todo, ActivityLog, WorkflowMemory, Staging, Chain, Testing)
-    entity/                JPA entities (Workflow, WorkflowTemplate, Skill, Project, Container, ScheduledWorkflow, WebhookTrigger, WorkflowRun, Todo, ActivityLog, WorkflowMemory, StepResult, BlockDefinition, WorkflowChain, ChainRun, ChainEntry, ChainRunEntry, TemplateVerification, Capability, GateStatus, ...)
-    dto/                   Request/response DTOs
-    mapper/                MapStruct mappers (Entity <-> DTO)
-    repository/            Spring Data JPA repositories
-    service/               Business logic
-    executor/              Docker-based skill execution
-    executor/blocks/       Block executors (Simple, Shell, Retry, Conditional, ForEach, While, Agentic, Approval, SubWorkflow, SkillCapability, HumanInput)
-    service/ai/            Host CLI integration (HostClaudeService, HostCodexService)
-    service/cli/           CLI execution and parsing (CommandExecutorService, CliSessionManager, ClaudeOutputParser, ClaudeJsonResponse, ShellCommandService)
-    service/conversion/    Agentic-to-workflow conversion (WorkflowConversionService)
-    service/chain/         Workflow chain CRUD and sequential execution (ChainService, ChainExecutor)
-    service/memory/        Knowledge extraction and summarization (WorkflowMemoryService, ClaudeSummarizer, CodexSummarizer, KnowledgeSummarizer)
-    service/staging/       Staging lifecycle, sync, and test instance (StagingService, TestingService, InstanceSyncHelper)
-    service/todo/          Todo management and gate resolution (TodoService, AutoTodoService, GateStatusResolver)
-    service/workflow/      Workflow execution, templates, optimization (WorkflowExecutor, ExecutionBroadcaster, WorkflowService, TemplateVerificationService)
-    security/              API key auth, rate limiting, Tailscale
-    config/                Spring configuration, built-in template/skill seeders
-    websocket/             WebSocket for real-time updates
-    event/                 Spring application events (WorkflowRunCompletedEvent)
-    exception/             Custom exception hierarchy + GlobalExceptionHandler
-    util/                  JPA converters for JSON/custom types
-  src/main/resources/
-    db/migration/          Flyway migrations (V1-V24, SQLite)
-    application.yml        App config
-  docker/                  Dockerfiles (agent containers: Python/Node/Go, backend, stable)
-
-ai-automation-frontend/    React 18 SPA (TypeScript)
-  src/
-    api/client.ts          Shared API client (fetch-based, /api/v1 prefix)
-    pages/                 Route pages (Dashboard, Projects, ProjectDetail, Workflows, WorkflowDetail, WorkflowExecution, Runs, Skills, Schedules, Webhooks, Settings, Todos, Chains, ChainExecution, ActivityLog)
-    components/            UI components (ui/, layout/, dashboard/, workflow/, shared/, skill/, schedule/)
-    hooks/                 TanStack Query hooks (useWorkflows, useSkills, useProjects, useSchedules, useWebhooks, useConversion, useInsights, useTemplates, useChains, useActivityLog, useLearning, useStaging, useTesting, useTodos, useWorkflowMemory, useSystem, useIsMobile, useToast, useWebSocket)
-    data/                  Skill constants, static data
-    utils/                 Utility functions (formatTime, extractWorkflowVariables, templateUtils, workflowIcon)
-    stores/                Zustand stores (settings, sidebar, theme, toast)
-    i18n/                  Translations (de.ts, en.ts)
-    types/index.ts         Shared TypeScript types
-    theme/                 Design tokens (colors, spacing)
-    test/                  Test utilities (MSW handlers, setup)
-  cypress/                 E2E tests (Cypress 13)
-```
-
 ## Build & Run
 
 ```bash
-# Backend
-cd ai-automation-backend
-mvn clean package                        # Build JAR
-mvn test                                 # Run tests (unit + integration)
-mvn test -Dtest="FlywayMigrationTest,RepositoryIntegrationTest,ControllerIntegrationTest"  # Integration tests only
-mvn spring-boot:run                      # Start dev server (port 9090)
+# Backend:  cd ai-automation-backend
+mvn clean package          # Build JAR
+mvn test                   # Run all tests
+mvn spring-boot:run        # Dev server (port 9090)
 
-# Frontend
-cd ai-automation-frontend
-npm install                              # Install dependencies
-npm run dev                              # Start dev server (port 3000, proxies /api to :9090)
-npm run build                            # Production build (tsc + vite)
-npm run lint                             # ESLint (flat config, eslint.config.js)
-
-# E2E Tests
-cd ai-automation-frontend
-npm run test:e2e                         # Run Cypress headless
-npm run cy:open                          # Open Cypress UI
+# Frontend: cd ai-automation-frontend
+npm run dev                # Dev server (port 3000, proxies /api → :9090)
+npm run build              # Production build (tsc + vite)
+npm run lint               # ESLint
 ```
+
+Vollständige Build-Anleitung inkl. E2E-Tests und Docker: [docs/entwicklung.md](docs/entwicklung.md)
 
 ## Key API Action Endpoints
 
@@ -269,9 +208,7 @@ These use non-obvious paths — always use these, never guess:
 | Get workflow version | GET | `/api/v1/workflows/{id}/versions/{versionId}` |
 | Restore workflow version | POST | `/api/v1/workflows/{id}/versions/{versionId}/restore` |
 
-## Codex / External Agents
-
-See [AGENTS.md](AGENTS.md) for a complete REST API reference for creating workflows, chains, and running them on the test instance. Intended for OpenAI Codex CLI and other external agents.
+See [AGENTS.md](AGENTS.md) for a complete REST API reference (workflow/chain CRUD, test instance).
 
 ## Key Conventions
 
@@ -290,359 +227,63 @@ See [AGENTS.md](AGENTS.md) for a complete REST API reference for creating workfl
 - **PWA**: Vite PWA plugin configured, app name "MySuricates"
 - **WebSocket**: Backend sends real-time updates via `/ws`, frontend connects via `useWebSocket` hook
 
-## Architecture Notes
+## Architecture Overview
 
-- Workflows consist of ordered steps; each step runs a Skill
-- Skills are categorized (see `SkillCategory` enum) and have associated Docker containers (Python/Node/Go)
-- Docker containers are used for project file mounting, lifecycle management, and ad-hoc terminal access
-- **All Claude CLI execution happens on the host** (not inside Docker containers) to avoid nested-session detection
-  - `HostClaudeService.executeAction()` runs `claude -p` on the host with `ProcessBuilder.directory(projectPath)`
-  - `CLAUDE_CODE` and `CLAUDECODE` env vars are removed from the process environment to prevent nested-session errors
-  - `CommandExecutorService` provides `executeOnHost(HostExecutionRequest)` / `executeStepOnHost(HostExecutionRequest)` / `writeSkillContextToProject()` methods — all overloads use the `HostExecutionRequest` builder API. Skill context is written to `.claude/rules/skills-context.md` (file-based, not CLI-process-based) so all subsequent Claude CLI calls pick it up automatically.
-- Docker containers have resource limits: 4GB memory, CPU quota, 100 PIDs, 60min idle timeout
-- Security is enabled by default: API key auth via `X-API-Key` header (auto-generated if not configured), rate limiting
-- Block types: simple, shell, retry, conditional, foreach, while, switch, agentic, approval, sub-workflow, skill-capability, human-input, integration
-- **Block-type icons**: `BLOCK_TYPE_ICONS` map in `WorkflowExecution.tsx` assigns a Lucide icon per block type (Terminal, Sparkles, Brain, etc.) — update when adding new block types
-- **Provider routing**: All block executors (simple, retry, conditional, foreach, while, switch, skill-capability) pass `context.getProvider()` as `providerId` via `HostExecutionRequest.builder()` to `CommandExecutorService`. Setting `"provider": "CODEX"` in a workflow JSON therefore applies to every non-shell block type. `AiProviderRegistry.resolve()` falls back to the configured default provider (not hardcoded CLAUDE) when an unknown provider ID is given.
-- Agentic blocks use a Goal→Reason→Act→Observe loop powered by Host Claude CLI
-- Workflow Conversion: Successful agentic runs can be converted to deterministic workflows (rule-based + AI)
-- Terminal WebSocket at `/ws/terminal` for real-time container access
-- **Soft-Delete Pattern**: Workflows use `@SQLRestriction("deleted_at IS NULL")` on the entity class. Projects use `archived_at` but filter via repository methods (`findByArchivedAtIsNull()`, `findByArchivedAtIsNotNull()`) instead of `@SQLRestriction` — because `@SQLRestriction` on Project would break eager-loaded `Workflow.project` associations. Archived projects retain all their workflows, runs, and data — nothing is cascade-deleted.
-- **ESLint**: Flat config (`eslint.config.js`, ESLint 9+) with `typescript-eslint`, `react-hooks`, and `react-refresh` plugins. Test files (`**/*.test.{ts,tsx}`) have `no-explicit-any` disabled.
+- **All Claude CLI execution happens on the host** (not inside Docker containers) — `HostClaudeService.executeAction()` runs `claude -p` with `ProcessBuilder.directory(projectPath)`. `CLAUDE_CODE`/`CLAUDECODE` env vars removed to prevent nested-session errors.
+- **Provider routing**: All block executors pass `context.getProvider()` as `providerId` via `HostExecutionRequest.builder()`. Setting `"provider": "CODEX"` in workflow JSON applies to every non-shell block. `AiProviderRegistry.resolve()` falls back to the configured default provider.
+- **Soft-Delete**: Workflows use `@SQLRestriction("deleted_at IS NULL")`. Projects use `archived_at` with repository filter methods (not `@SQLRestriction`, because it would break eager-loaded `Workflow.project`).
+- **ESLint**: Flat config (`eslint.config.js`, ESLint 9+) with `typescript-eslint`, `react-hooks`, `react-refresh`. Test files: `no-explicit-any` disabled.
+- **Block types**: simple, shell, retry, conditional, foreach, while, switch, agentic, approval, sub-workflow, skill-capability, human-input, integration — see [docs/WORKFLOW-GUIDE.md](docs/WORKFLOW-GUIDE.md) for details
 
-## Gate Status System
+For full architecture documentation: [docs/architektur.md](docs/architektur.md)
 
-Workflow blocks can emit gate status markers in their output to signal quality gates:
+## Execution Config
 
-```
-gate_status: GREEN|YELLOW|RED
-gate_category: <category>
-gate_description: <description>
-```
-
-- `GateStatusOutputParser` — parses these markers from block output text (tolerant of markdown formatting)
-- `WorkflowExecutor` scans **all** block outputs — highest severity wins (GREEN < YELLOW < RED by enum ordinal)
-- Gate status is stored in `WorkflowRun.metadata` (`gate_status`, `gate_category`, `gate_description`)
-- **Gate status does NOT affect run status**: A workflow that runs to completion is always `COMPLETED`, regardless of gate color. The gate badge (GREEN/YELLOW/RED) shows the outcome severity separately. `FAILED` is reserved for actual execution failures (timeouts, crashes). `COMPLETED_WITH_ERRORS` is legacy (no longer set, but old runs retain it).
-- `GateStatusResolver` — derives gate status from run status when no explicit marker exists (`FAILED` → RED, `COMPLETED` → GREEN)
-- `AutoTodoService` — creates follow-up TODOs based on gate status, configurable via `workflow.metadata.autoTodo`
-  - **Modes**: `auto` (default: GREEN closes TODOs, YELLOW→MEDIUM, RED→HIGH), `approval` (queues for confirmation), `track` (always creates/updates: GREEN→LOW, YELLOW→MEDIUM, RED→HIGH, never closes)
-  - **TODO description** includes the most detailed step output (second-to-last non-shell block, max 4000 chars)
-  - **Granular TODOs**: Blocks can emit `todo_item: <title> | HIGH/MEDIUM/LOW | <tags>` markers → `TodoOutputParser` parses them → `AutoTodoService` creates individual TODOs per finding (with dedup and auto-close for resolved items)
-  - Enable per workflow: `metadata: { autoTodo: { enabled: true, mode: "track" } }`
-
-## TodoTrigger System (Self-Improvement Loop)
-
-TodoTriggers close the self-improvement loop: when `AutoTodoService` creates a TODO from workflow findings, a `TodoTrigger` can automatically start a fix workflow to resolve it.
-
-```
-Audit Workflow → AutoTodoService → TODO (OPEN)
-                                     ↓ TodoCreatedEvent
-                             TodoTriggerService → Fix Workflow
-                                                     ↓ WorkflowRunCompletedEvent
-                                             TodoFeedbackListener → TODO (DONE)
-```
-
-- `TodoTrigger` entity (`todo_triggers` table, V51 migration) — maps TODO tag patterns to fix workflows
-  - **Tag matching**: `tagPattern` is comma-separated (AND semantics). All pattern tags must be present in the TODO's tag list
-  - **Filters**: optional `projectId`, `sourceFilter` (e.g. `"WORKFLOW"`), `minPriority` (e.g. `"HIGH"`)
-  - **Config**: `maxAttempts` (default: 3), `autoClose` (default: true)
-- `TodoCreatedEvent` — Spring ApplicationEvent published by `TodoService.create()` and `AutoTodoService` when new OPEN TODOs are created
-- `TodoTriggerService` — `@TransactionalEventListener(AFTER_COMMIT)` on `TodoCreatedEvent`, matches TODO against all enabled triggers, executes target workflow with TODO data as context variables (`todo_id`, `todo_title`, `todo_description`, `todo_tags`, `todo_priority`, `todo_project_id`, etc.)
-- `TodoFeedbackListener` — `@EventListener` on `WorkflowRunCompletedEvent`, checks for `todoTriggerId`/`todoId` in run metadata, closes TODO on GREEN gate (if `autoClose=true`), logs escalation when `fixAttempts >= maxAttempts`
-- **Fix attempt tracking**: `Todo.fixAttempts` (int) and `Todo.lastFixRunId` (V52 migration) — incremented on each trigger fire, prevents duplicate triggers while a fix run is still RUNNING
-- **Loop prevention** (3 layers):
-  1. **Metadata flag**: Fix runs set `todoTriggerRun: true` in run metadata → `AutoTodoService` skips TODO creation for these runs (prevents Audit→TODO→Fix→TODO→Fix… loops)
-  2. **Max attempts**: `todo.fixAttempts >= trigger.maxAttempts` → trigger stops firing
-  3. **Running check**: `todo.lastFixRunId` still RUNNING/PENDING → no duplicate trigger
-- CRUD API at `/api/v1/todo-triggers` (see `TodoTriggerController`)
-- Enable per workflow by configuring a TodoTrigger that matches the workflow's auto-generated TODO tags
-
-## Agent Instructions System
-
-Two-level instruction injection via Claude CLI `--append-system-prompt` / `--system-prompt` flags:
-
-1. **Base instructions** (`src/main/resources/agent-instructions.md`) — loaded at startup by `AgentInstructionsService`, apply to all workflows
-2. **Workflow-specific instructions** (`workflow.instructions` column) — per-workflow, editable in UI (Monaco editor)
-
-Injection paths:
-- **Block execution** (all block types): Instructions passed via `--append-system-prompt` flag on host Claude CLI (`HostClaudeService.executeAction()`)
-- **Agentic orchestrator** (REASON phase): System prompt passed via `--system-prompt` flag to `HostClaudeService.reasonStructured()`, includes workflow instructions in `## Workflow Instructions` section
-
-## Model Selection
-
-- `workflow.model` field (e.g. `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5`)
-- Passed via `--model` flag to Claude CLI on the host
-- Agentic REASON phase uses the locally configured default model
-
-## Per-Call Token Limit
-
-- `HostClaudeConfig.maxTokens` (property `automation.host-claude.max-tokens`) — optional per-call output token limit
-- Applied via `--max-tokens` flag in both `reasonStructured()` and `executeAction()`
-- Distinct from the agentic block's `max_total_tokens` budget (which tracks cumulative input+output across all iterations)
-
-## Per-Block Claude CLI Timeout
-
-- All block types support an optional `timeout_seconds` field in block config
-- Overrides the global `automation.host-claude.timeout-seconds` (default: 300s) for that block's Claude CLI calls
-- Without `timeout_seconds` in config → global default applies
-- For dual-mode blocks (shell/claude), `timeout_seconds` controls both the shell timeout and the Claude CLI timeout
-- Applies to both `reasonStructured()` and `executeAction()` calls in agentic blocks
+- **Agent Instructions**: Two-level injection — base instructions (`src/main/resources/agent-instructions.md`, all workflows) + per-workflow instructions (`workflow.instructions` column, editable in UI). Block execution uses `--append-system-prompt`, agentic REASON uses `--system-prompt`.
+- **Model Selection**: `workflow.model` field (e.g. `claude-opus-4-6`, `claude-sonnet-4-6`), passed via `--model` flag. Agentic REASON phase uses the locally configured default model.
+- **Per-Call Token Limit**: `HostClaudeConfig.maxTokens` (property `automation.host-claude.max-tokens`) — optional output token limit via `--max-tokens` flag. Distinct from agentic block's `max_total_tokens` budget (cumulative input+output).
+- **Per-Block Timeout**: Optional `timeout_seconds` in block config overrides global `automation.host-claude.timeout-seconds` (default: 300s). Applies to both shell and Claude CLI calls.
 
 ## CLI Concurrency & Chat Priority
 
-- `HostClaudeService` uses a **two-tier semaphore** system:
-  - `callSemaphore` (default: 5) — total concurrent CLI processes
-  - `backgroundSemaphore` (default: 4) — limit for non-interactive calls (workflows, suggestions)
-  - **Chat (priority) calls** only acquire `callSemaphore` → at least 1 slot always reserved
-  - **Background calls** acquire both → can never starve interactive chat
+- **Two-tier semaphore**: `callSemaphore` (default: 5, total concurrent CLI processes) + `backgroundSemaphore` (default: 4, non-interactive calls). Chat calls only acquire `callSemaphore` → at least 1 slot reserved for interactive use.
 - `HostExecutionRequest.priority(true)` marks a call as interactive (used by `AssistantService`)
-- `PageSuggestionService.cancelRunning()` interrupts running suggestion refresh when chat starts
-- Configurable at runtime via Settings UI (Execution tab) or `ExecutionSettingsService`:
-  - `claude-max-concurrent-calls` (1–20, default: 5)
-  - `claude-reserved-for-interactive` (0–10, default: 1)
-- Suggestions model independently configurable via `suggestions-model` app setting
-
-## Agentic Block Safety
-
-| Config Key | Default | Description |
-|---|---|---|
-| `max_iterations` | 10 | Hard iteration cap |
-| `iteration_timeout_seconds` | 300 | Per-iteration wall-clock timeout |
-| `total_timeout_seconds` | 1800 | Overall block timeout (30min) |
-| `max_total_tokens` | 200000 | Token budget (input+output, reason+act) |
-| `max_repeated_actions` | 3 | Abort after N identical consecutive actions |
-| `require_approval` | false | Approval gate before each action |
-
-Additional safety:
-- History compression (after 7 turns, older turns are summarized to manage context window)
-- Token tracking warnings: `AgenticBlockExecutor` logs `WARN` when REASON or ACT phase returns no usage data, indicating the token budget is not being enforced
-- All 6 safety fields are pre-populated in the frontend "Add Block" dialog defaults
-
-## Workflow Templates
-
-- Templates are stored in the `workflow_templates` DB table (V19 migration), not hardcoded
-- 53 built-in templates are seeded on startup by `WorkflowTemplateSeeder` (idempotent, inserts missing, updates on version bump)
-- Template definitions live as individual JSON files in `src/main/resources/templates/builtin/` (one file per template, loaded by `BuiltInTemplateLoader`)
-- Name and description are i18n JSON maps: `{"de":"...","en":"..."}` — stored via `JsonStringMapConverter`
-- Built-in templates (`builtIn=true`) cannot be deleted; only `sortOrder` and `category` can be updated
-- Users can create custom templates via API or by saving an existing workflow as a template
-- Workflows have an optional `templateId` back-reference to their source template
-- Frontend resolves locale-aware template names via `resolveTemplateName()` in `utils/templateUtils.ts`
-- CRUD API at `/api/v1/workflow-templates` (see `WorkflowTemplateController`)
-
-## Built-in Skills
-
-- Skills are stored in the `skills` DB table, not hardcoded in frontend or in-memory beans
-- 16 built-in skills are seeded on startup by `SkillSeeder` (idempotent, seeds missing skills)
-- Skill definitions live in `BuiltInSkills.java` (`config/` package)
-- Built-in skills have stable IDs (e.g. `builtin-code-review`, `builtin-test-generator`)
-- `SkillSeeder` also registers all skills in the in-memory `SkillRegistry` for capability lookups
-- `SkillRegistry` no longer depends on `SkillProvider` beans — seeder handles registration
-- Capability handler classes (e.g. `LintHandler`, `OCRHandler`) remain as independent `@Component` beans in `skills/handlers/`
-- Users can create custom skills via the import API (`POST /api/v1/skills/import`)
-- `Skill.java` entity uses `@PrePersist ensureId()` (not `@GeneratedValue`) to allow explicit IDs for built-ins
-- **Skill activation levels**: Skills can be activated at two levels:
-  - **Workflow-level** (`Workflow.activatedSkills` ManyToMany): applies to all blocks in the workflow
-  - **Block-level** (`BlockDefinition.skillIds` list): additional skills for a specific block only (additive to workflow-level skills)
-- Skill context is written to `.claude/rules/skills-context.md` before execution; for blocks with per-block skills, the file is temporarily extended and restored to the baseline after the block completes
-- `WorkflowExecutor` pre-resolves all per-block skill IDs in a single `SkillRepository.findAllById()` call before the block loop
-
-## Human-Input Block
-
-- `HumanInputBlockExecutor` — pauses workflow execution to collect input from the user via WebSocket
-- Broadcasts `human_input_required` event to `/topic/executions/{runId}/logs`, waits for response
-- Config fields: `prompt`, `input_type` (text/select), `variable_name`, `options`, `default_value`, `required`, `validation_pattern`, `timeout_minutes` (default: 30), `use_default_on_timeout`
-- User's answer is stored as a context variable (`variable_name`) for subsequent steps
-- Reuses the `ApprovalRequest` mechanism from the approval block
-
-## Sub-Workflow Block
-
-- `SubWorkflowBlockExecutor` — runs another workflow as a nested block
-- Circular reference detection via `__parent_workflow_ids` context variable
-- Max nesting depth: 5 levels
-- Polling-based completion with 30min timeout
-- `@Lazy` injection on `WorkflowExecutor` to break Spring DI cycle
-
-## Switch Block
-
-- `SwitchBlockExecutor` — multi-way branching based on expression evaluation
-- Expression supports `${varName}` and `{{ varName }}` syntax, resolved from context variables
-- Cases are evaluated in order; first match wins. Pipe-separated alternatives (e.g. `"error|critical"`) supported
-- `default` case executes when no other case matches
-- Each case contains a list of nested blocks (shell or claude) executed sequentially
-- Returns `COMPLETED` with `matchedCase: "none"` when no match and no default
-
-## Workflow Chains
-
-- Chains group multiple workflows for sequential execution as a single unit
-- Cross-project: a chain belongs to no project and can reference workflows from any project
-- `WorkflowChain` entity with `entries` (JSON list of `ChainEntry` value objects) sorted by `sortOrder`
-- `ChainRun` entity tracks execution state with `entryRuns` (JSON list of `ChainRunEntry`)
-- `ChainService` — CRUD with workflow ID validation
-- `ChainExecutor` — async sequential execution using virtual threads, polling-based workflow completion (2s interval, 30min timeout)
-- Each entry builds context: chain-level + entry-level + `previous_chain_output` from last completed workflow
-- `stopOnFailure` flag at both chain and entry level — chain stops only if both are true
-- Cancellation via `ConcurrentHashMap<String, AtomicBoolean>`
-- WebSocket status broadcasts at `/topic/chains/{chainRunId}/status`
-- CRUD + execution API at `/api/v1/chains`
-- Frontend: Chains page with split-panel layout, pipeline visualization, create/edit modal with workflow search
-- Frontend: ChainExecution page with live polling and navigation to individual workflow runs
-
-## Workflow Memory
-
-- Workflows can accumulate knowledge across runs via the memory system
-- `WorkflowMemoryController` — CRUD API at `/api/v1/workflows/{workflowId}/memory`
-- `WorkflowMemoryService` — extracts knowledge from completed runs, manages activation/deactivation
-- `KnowledgeSummarizer` — interface for summarization backends, implemented by:
-  - `ClaudeSummarizer` — uses Host Claude CLI for summarization (primary)
-  - `CodexSummarizer` — uses OpenAI Codex CLI as alternative backend
-- `HostCodexService` — runs OpenAI Codex CLI on the host for summarization tasks (analogous to `HostClaudeService`)
-- `SummarizationConfig` — configuration for the summarization backend selection
-- `WorkflowMemory` entity (V16 migration) — stores extracted knowledge entries per workflow
-- Frontend hook: `useWorkflowMemory.ts`
+- Configurable at runtime via Settings UI or `ExecutionSettingsService`: `claude-max-concurrent-calls` (1–20), `claude-reserved-for-interactive` (0–10)
 
 ## Integration / Plugin System
 
-Plugin-Framework für externe Dienste (Google Calendar, Trello, Jira, ...). Jeder Provider ist ein Spring `@Component` das `IntegrationProvider` implementiert — auto-discovered wie `BlockExecutor`.
+Plugin-Framework für externe Dienste. Jeder Provider ist ein Spring `@Component` das `IntegrationProvider` implementiert — auto-discovered via `IntegrationRegistry`.
 
-### Architektur
+**Neuen Provider hinzufügen:**
+1. Java-Klasse in `service/integration/providers/<name>/` — `IntegrationProvider` implementieren, `@Component`
+2. OAuth-Config, Actions, `executeAction()` implementieren
+3. Setup Guide in `frontend/src/data/integrationSetupGuides.ts`
+4. Optional: Kalender-Adapter in `frontend/src/hooks/calendar-adapters/`
 
-- `IntegrationProvider` Interface (`service/integration/`) — definiert Provider-ID, OAuth-Config, Actions, `executeAction()`, optional `fetchAccountInfo()` und `requiresOAuthFlow()`
-- `IntegrationRegistry` — sammelt alle Provider via Spring DI (`List<IntegrationProvider>` → `ConcurrentHashMap`)
-- `IntegrationOAuthService` — generischer OAuth2-Flow (Auth-URL, Callback, Token-Refresh, verschlüsselte Speicherung in DB)
-- `IntegrationEncryptionService` — AES-256-GCM Verschlüsselung für Tokens und Client-Credentials
-- `IntegrationBlockExecutor` — Block-Typ `integration` für Workflows, dispatcht an Provider
-- `IntegrationController` (`/api/v1/integrations`) — REST API für Provider-Liste, OAuth-Flow, Credential-Speicherung, Action-Ausführung
-- `IntegrationConnection` Entity (Flyway V55 + V56) — speichert OAuth-Tokens und Client-Credentials verschlüsselt
+Vollständige Referenz (Provider-Tabelle, Block-Config, Kalender-Adapter, Credentials): [docs/integrations.md](docs/integrations.md)
 
-### Verfügbare Provider
+## Staging (Stable + Dev + Test)
 
-| Provider | Provider-ID | Paket | Actions |
-|----------|------------|-------|---------|
-| Google Calendar | `google-calendar` | `providers/google/` | list_events, get_event, create_event, update_event, delete_event, get_free_busy |
-| Trello | `trello` | `providers/trello/` | list_boards, get_board_lists, get_list_cards, get_card, create_card, update_card, delete_card, add_comment, search |
-
-### Integration Block Config (Workflow)
-
-```json
-{
-  "type": "integration",
-  "config": {
-    "provider": "google-calendar",
-    "action": "create_event",
-    "params": {
-      "summary": "{{ workflow_name }} abgeschlossen",
-      "startDateTime": "{{ started_at }}",
-      "endDateTime": "{{ started_at }}"
-    }
-  }
-}
-```
-
-### Neuen Provider hinzufügen
-
-1. Java-Klasse in `service/integration/providers/<name>/` erstellen, `IntegrationProvider` implementieren
-2. `@Component` annotieren → wird automatisch von `IntegrationRegistry` registriert
-3. OAuth-Config, Actions und `executeAction()` implementieren
-4. Setup Guide in `frontend/src/data/integrationSetupGuides.ts` hinzufügen
-5. Optional: Kalender-Adapter in `frontend/src/hooks/calendar-adapters/` für Kalender-Integration
-
-### Kalender-Adapter (Frontend)
-
-Adapter-Pattern für die zentrale Kalender-Seite (`/calendar`). Jeder Adapter holt Events aus einer Quelle und transformiert sie in `UnifiedCalendarEvent[]`:
-- `hooks/calendar-adapters/types.ts` — `CalendarSourceAdapter` Interface mit JSDoc
-- `hooks/calendar-adapters/registry.ts` — statisches Adapter-Array (CALENDAR_ADAPTERS)
-- Neuer Adapter = neue Datei + eine Zeile in `registry.ts`
-- Aktive Adapter: `googleCalendarAdapter`, `trelloAdapter`, `schedulesAdapter`, `runsAdapter`
-
-### Credential-Speicherung
-
-Client-Credentials (Client ID + Secret) werden über die Integrationen-Seite (`/integrations`) eingegeben und AES-256-GCM-verschlüsselt in `integration_connections` gespeichert. Env-Var-Fallback (`GOOGLE_CLIENT_ID` etc.) für Deployment-Szenarien. OAuth-Tokens (Access + Refresh) werden ebenfalls verschlüsselt gespeichert, automatischer Token-Refresh 5 Minuten vor Ablauf.
-
-## Template Verification
-
-- `TemplateVerification` entity (V22 migration) — tracks quality status of workflow templates
-- `TemplateVerificationService` — manages verification state per template+project pair
-- Workflows created from templates can be test-run to verify the template works correctly
-- Verification results visible in template CRUD API responses
-
-## Staging (Stable + Dev + Test parallel)
-
-Three environments can run side-by-side:
-- **Dev**: `localhost:3000` → proxy → `localhost:9090` (from source, as usual)
-- **Stable**: `localhost:9091` (Docker container, backend serves static frontend)
-- **Test**: `localhost:8090` (Docker container, dedicated test instance for workflow testing)
-
-### Auto-Start
-
-Dev automatically starts the Stable container on boot (`ApplicationReadyEvent`) if:
-1. A snapshot exists (`stable-frontend/` directory present, i.e. promote was run at least once)
-2. The container is not already running
-
-Controlled by `automation.staging.auto-start` (default: `true`, disabled in `application-stable.yml` to prevent self-start).
-
-### Test Instance
-
-- `TestingService` — manages a dedicated test Docker container on port 8090
-- Auto-starts on boot if `automation.staging.test-auto-start` is true and a snapshot exists
-- Auto-syncs definitions from Dev to Test on startup
-- `TestingController` — REST API at `/api/v1/testing` (status, start, stop, sync)
-- Uses `InstanceSyncHelper` (shared with `StagingService`) for definition sync logic
-- Frontend hook: `useTesting.ts`
-
-### Definition Sync (Dev → Stable)
-
-`POST /api/v1/staging/sync-definitions` selectively syncs **definitions only** from Dev to Stable via Stable's REST API:
-
-| Synced | Matching | Behavior |
-|---|---|---|
-| Projects | name + path | Skip if exists, create if new |
-| Workflows | name + projectName | Update if exists, import if new |
-| Custom Skills | name | Skip if exists, import if new |
-
-**Not synced** (preserved on Stable): workflow_runs, step_results, scheduled_workflows, webhook_triggers, activity_log, todos, built-in skills/templates. Archived projects and soft-deleted workflows are automatically excluded via `@SQLRestriction`.
-
-Requires Stable to be running and healthy. In the UI: Settings → Stable → "Definitionen synchronisieren" (only enabled when Stable is healthy).
-
-### CLI Management
+Drei Umgebungen parallel:
+- **Dev**: `localhost:3000` → proxy → `localhost:9090` (from source)
+- **Stable**: `localhost:9091` (Docker container, backend + embedded frontend)
+- **Test**: `localhost:8090` (Docker container, dedicated test instance)
 
 ```bash
-./scripts/staging.sh snapshot    # Build JAR + frontend + Docker image, tag git commit
-./scripts/staging.sh start       # Start stable container on :9091
-./scripts/staging.sh stop        # Stop stable container
-./scripts/staging.sh status      # Container status + health check
-./scripts/staging.sh log         # Tail container logs
-./scripts/staging.sh db-seed     # Raw DB copy (emergency only, overwrites everything)
-./scripts/staging.sh clean       # Remove container + volume + image
-./scripts/staging.sh promote     # stop → snapshot → start (one-liner)
+./scripts/staging.sh promote     # stop → snapshot → start (Einzeiler)
+./scripts/staging.sh start|stop|status|log|snapshot|db-seed|clean
 ```
 
-Key files:
-- `ai-automation-backend/docker/Dockerfile.stable` — Ubuntu-based (glibc for Claude CLI)
-- `ai-automation-backend/docker-compose.stable.yml` — Volume mounts for Claude CLI + projects
-- `application-stable.yml` — Spring profile: port 9091, tray disabled, auto-start disabled, frontend serving enabled
-- `StaticFrontendConfig.java` — Conditional `WebMvcConfigurer` for SPA static file serving
-- `StagingService.java` — Auto-start, promote, sync-definitions, container lifecycle
-- Dev tray icon shows status of both environments via health checks
-- Staging status includes `stableVersion` and `stableBuildTimestamp` (fetched from Stable's `/system/info`)
+Vollständige Dokumentation (Auto-Start, Definition-Sync, Key-Files): [docs/deployment.md](docs/deployment.md)
 
-## Releasing
+## Detailed Documentation
 
-```bash
-./scripts/release.sh           # Patch: 0.1.0 → 0.1.1
-./scripts/release.sh minor     # Minor: 0.1.1 → 0.2.0
-./scripts/release.sh major     # Major: 0.2.0 → 1.0.0
-```
-
-The script:
-1. Reads current version from `pom.xml` (strips `-SNAPSHOT`)
-2. Bumps the requested segment (patch/minor/major)
-3. Updates `pom.xml` (`X.Y.Z-SNAPSHOT`) and `package.json` (`X.Y.Z`)
-4. Commits: `Release vX.Y.Z`
-5. Tags: `vX.Y.Z`
-
-Two kinds of Git tags:
-- **`v*`** — Semver release tags (created by `release.sh`)
-- **`stable-*`** — Deployment timestamps (created by `staging.sh promote`)
-
+| Topic | Document |
+|---|---|
+| System-Architektur, Block-Typen, Gate Status, TodoTrigger, Chains, Memory, Skills, Templates | [docs/architektur.md](docs/architektur.md) |
+| Build, Test, Conventions, Releasing | [docs/entwicklung.md](docs/entwicklung.md) |
+| Workflow-Bau: Block-Config, Patterns, Timeouts, Pitfalls | [docs/WORKFLOW-GUIDE.md](docs/WORKFLOW-GUIDE.md) |
+| Integration/Plugin-System: Provider, OAuth, Kalender-Adapter | [docs/integrations.md](docs/integrations.md) |
+| Deployment, Docker, Staging, Test-Instanz | [docs/deployment.md](docs/deployment.md) |
+| REST API Reference für externe Agents | [AGENTS.md](AGENTS.md) |
+| Vision und Roadmap | [VISION.md](VISION.md) |
