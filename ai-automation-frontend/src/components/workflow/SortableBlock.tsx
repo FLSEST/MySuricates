@@ -20,6 +20,7 @@ const blockTypeVariant: Record<BlockType, BadgeVariant> = {
   while: 'default',
   conditional: 'default',
   switch: 'default',
+  integration: 'accent',
 };
 
 interface SortableBlockProps {

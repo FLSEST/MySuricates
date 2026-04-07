@@ -301,7 +301,7 @@ See [AGENTS.md](AGENTS.md) for a complete REST API reference for creating workfl
   - `CommandExecutorService` provides `executeOnHost(HostExecutionRequest)` / `executeStepOnHost(HostExecutionRequest)` / `writeSkillContextToProject()` methods — all overloads use the `HostExecutionRequest` builder API. Skill context is written to `.claude/rules/skills-context.md` (file-based, not CLI-process-based) so all subsequent Claude CLI calls pick it up automatically.
 - Docker containers have resource limits: 4GB memory, CPU quota, 100 PIDs, 60min idle timeout
 - Security is enabled by default: API key auth via `X-API-Key` header (auto-generated if not configured), rate limiting
-- Block types: simple, shell, retry, conditional, foreach, while, switch, agentic, approval, sub-workflow, skill-capability, human-input
+- Block types: simple, shell, retry, conditional, foreach, while, switch, agentic, approval, sub-workflow, skill-capability, human-input, integration
 - **Block-type icons**: `BLOCK_TYPE_ICONS` map in `WorkflowExecution.tsx` assigns a Lucide icon per block type (Terminal, Sparkles, Brain, etc.) — update when adding new block types
 - **Provider routing**: All block executors (simple, retry, conditional, foreach, while, switch, skill-capability) pass `context.getProvider()` as `providerId` via `HostExecutionRequest.builder()` to `CommandExecutorService`. Setting `"provider": "CODEX"` in a workflow JSON therefore applies to every non-shell block type. `AiProviderRegistry.resolve()` falls back to the configured default provider (not hardcoded CLAUDE) when an unknown provider ID is given.
 - Agentic blocks use a Goal→Reason→Act→Observe loop powered by Host Claude CLI
@@ -472,6 +472,35 @@ Additional safety:
 - `default` case executes when no other case matches
 - Each case contains a list of nested blocks (shell or claude) executed sequentially
 - Returns `COMPLETED` with `matchedCase: "none"` when no match and no default
+
+## Integration System
+
+External service integrations via OAuth2 with encrypted token storage:
+
+- **IntegrationProvider** interface — auto-discovered via Spring `@Component` (like BlockExecutor)
+- **IntegrationOAuthService** — generic OAuth2 flow (auth URL, callback, token refresh, disconnect)
+- **IntegrationEncryptionService** — AES-256-GCM encryption for tokens and client credentials
+- **IntegrationBlockExecutor** — `integration` block type for workflows
+- **IntegrationRegistry** — runtime registry of all available providers
+- Credentials stored encrypted in DB (entered via UI), with env-var fallback
+- OAuth callback at `/api/v1/integrations/*/callback` (public, in SecurityConfig permitAll)
+- Frontend: dedicated Integrations page (`/integrations`) with setup guide + Calendar page (`/calendar`) with adapter-based multi-source aggregation
+
+**Available providers:** `google-calendar` (Google Calendar), `trello` (Trello boards/cards), `jira` (Jira issues)
+
+**Integration block config:**
+```json
+{
+  "type": "integration",
+  "config": {
+    "provider": "google-calendar",
+    "action": "list_events",
+    "params": { "timeMin": "{{ started_at }}", "maxResults": 10 }
+  }
+}
+```
+
+**Calendar Adapter Pattern:** Each calendar source is a `CalendarSourceAdapter` in `ai-automation-frontend/src/hooks/calendar-adapters/`. New sources = new adapter file + one line in `registry.ts`.
 
 ## Workflow Chains
 

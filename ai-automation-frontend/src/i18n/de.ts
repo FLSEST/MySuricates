@@ -196,6 +196,7 @@ export const de: TranslationKeys = {
       'sub-workflow': 'Sub-Workflow',
       'human-input': 'Benutzereingabe',
       switch: 'Verzweigung',
+      integration: 'Integration (extern)',
     },
     instructions: 'Agent-Anweisungen',
     allProjects: 'Alle Projekte',

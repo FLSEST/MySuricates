@@ -194,6 +194,7 @@ export const en = {
       'sub-workflow': 'Sub-Workflow',
       'human-input': 'Human Input',
       switch: 'Switch',
+      integration: 'Integration (external)',
     },
     instructions: 'Agent Instructions',
     allProjects: 'All Projects',
