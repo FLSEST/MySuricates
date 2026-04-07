@@ -66,7 +66,7 @@ automation:
     skip-permissions: ${AUTOMATION_CLI_SKIP_PERMISSIONS:true}
     allowed-tools: ${AUTOMATION_CLI_ALLOWED_TOOLS:}
   cors:
-    allowed-origins: ${AUTOMATION_CORS_ORIGINS:http://localhost:3000,http://localhost:5173}
+    allowed-origins: ${AUTOMATION_CORS_ORIGINS:http://localhost:3000,http://localhost:5173,http://100.*:3000}
   workspace:
     root: ${AUTOMATION_WORKSPACE_ROOT:}
   security:
@@ -77,7 +77,7 @@ automation:
       enabled: ${AUTOMATION_RATE_LIMIT_ENABLED:true}
       requests-per-minute: ${AUTOMATION_RATE_LIMIT_RPM:120}
   tailscale:
-    enabled: ${AUTOMATION_TAILSCALE_ENABLED:false}
+    enabled: ${AUTOMATION_TAILSCALE_ENABLED:true}
   ai:
     default-provider: ${AUTOMATION_AI_DEFAULT_PROVIDER:CLAUDE}
   host-claude:

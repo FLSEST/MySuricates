@@ -26,7 +26,7 @@ public class TailscaleService {
     public RemoteAccessResponse enable() {
         ensureEnabled();
 
-        int exitCode = executeCommand("sudo", "tailscale", "up", "--accept-routes");
+        int exitCode = executeCommand("tailscale", "up", "--accept-routes");
         if (exitCode != 0) {
             throw new TailscaleException("Failed to enable Tailscale (exit code: " + exitCode + ")");
         }
@@ -41,7 +41,7 @@ public class TailscaleService {
     public void disable() {
         ensureEnabled();
 
-        int exitCode = executeCommand("sudo", "tailscale", "down");
+        int exitCode = executeCommand("tailscale", "down");
         if (exitCode != 0) {
             throw new TailscaleException("Failed to disable Tailscale (exit code: " + exitCode + ")");
         }
