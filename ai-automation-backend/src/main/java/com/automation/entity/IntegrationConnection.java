@@ -41,6 +41,12 @@ public class IntegrationConnection {
 
     private String scopes;
 
+    @Column(name = "client_id_encrypted")
+    private String clientIdEncrypted;
+
+    @Column(name = "client_secret_encrypted")
+    private String clientSecretEncrypted;
+
     @Column(name = "account_info", columnDefinition = "text")
     private String accountInfo;
 

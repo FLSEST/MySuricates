@@ -29,11 +29,4 @@ public interface IntegrationProvider {
 
     /** Execute an action against the external API */
     Object executeAction(String action, Map<String, Object> params, String accessToken);
-
-    /** Check if required credentials (env vars) are configured */
-    default boolean isConfigured() {
-        OAuthConfig config = getOAuthConfig();
-        return System.getenv(config.clientIdEnvVar()) != null
-                && System.getenv(config.clientSecretEnvVar()) != null;
-    }
 }

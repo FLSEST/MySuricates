@@ -476,6 +476,8 @@ export const en = {
     setupDescription: 'This integration requires a one-time configuration. Follow the steps below.',
     checkConfig: 'Check configuration',
     configMissing: 'Environment variables not set yet',
+    enterCredentials: 'Enter credentials',
+    saveCredentials: 'Save credentials',
   },
   notifications: {
     title: 'Notifications',
@@ -741,6 +743,8 @@ export const en = {
     integrationConnectFailed: 'Connection failed',
     integrationDisconnectFailed: 'Disconnect failed',
     integrationActionFailed: 'Action failed',
+    credentialsSaved: 'Credentials saved',
+    credentialsSaveFailed: 'Failed to save credentials',
     notificationCreated: 'Notification created',
     notificationToggled: 'Notification updated',
     notificationDeleted: 'Notification deleted',

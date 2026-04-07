@@ -109,22 +109,19 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
       },
       {
         title: {
-          de: 'Umgebungsvariablen setzen & Backend neu starten',
-          en: 'Set environment variables & restart backend',
+          de: 'Zugangsdaten eintragen',
+          en: 'Enter credentials',
         },
         instructions: {
           de: [
-            'Kopiere Client ID und Client Secret aus dem vorherigen Schritt',
-            'Setze die Variablen in deiner Shell oder .env-Datei:',
-            'Starte danach das Backend neu',
+            'Kopiere Client-ID und Clientschlüssel aus dem vorherigen Schritt',
+            'Trage sie unten in die Felder ein und klicke "Speichern"',
           ],
           en: [
             'Copy Client ID and Client Secret from the previous step',
-            'Set the variables in your shell or .env file:',
-            'Then restart the backend',
+            'Enter them in the fields below and click "Save"',
           ],
         },
-        code: 'export GOOGLE_CLIENT_ID="deine-client-id.apps.googleusercontent.com"\nexport GOOGLE_CLIENT_SECRET="GOCSPX-dein-secret"',
       },
     ],
   },

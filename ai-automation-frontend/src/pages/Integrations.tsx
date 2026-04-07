@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import {
   Plug, Calendar, ExternalLink, Trash2, Play, CheckCircle2, XCircle,
-  AlertTriangle, ChevronRight, RefreshCw, Copy, Settings2,
+  AlertTriangle, ChevronRight, Copy, Settings2,
 } from 'lucide-react';
-import { Card, Button, Badge, Spinner, Modal } from '../components/ui';
+import { Card, Button, Badge, Spinner, Modal, Input } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
 import {
@@ -11,6 +11,7 @@ import {
   useConnectIntegration,
   useDisconnectIntegration,
   useTestIntegrationAction,
+  useSaveCredentials,
 } from '../hooks/useIntegrations';
 import { useT } from '../i18n';
 import { useI18nStore } from '../i18n';
@@ -68,8 +69,11 @@ function SetupGuidePanel({ providerId, displayName, onRefresh }: {
   const lang = useI18nStore.getState().locale;
   const t = useT();
   const guide = SETUP_GUIDES[providerId];
+  const saveCredentials = useSaveCredentials();
   const [openStep, setOpenStep] = useState(0);
   const [copied, setCopied] = useState<number | null>(null);
+  const [clientId, setClientId] = useState('');
+  const [clientSecret, setClientSecret] = useState('');
 
   if (!guide) return null;
 
@@ -77,6 +81,13 @@ function SetupGuidePanel({ providerId, displayName, onRefresh }: {
     navigator.clipboard.writeText(text);
     setCopied(stepIndex);
     setTimeout(() => setCopied(null), 2000);
+  };
+
+  const handleSaveCredentials = () => {
+    saveCredentials.mutate(
+      { providerId, clientId, clientSecret },
+      { onSuccess: () => onRefresh() }
+    );
   };
 
   return (
@@ -149,12 +160,30 @@ function SetupGuidePanel({ providerId, displayName, onRefresh }: {
           })}
         </div>
 
-        <div className="mt-4 flex items-center gap-3">
-          <Button size="sm" variant="secondary" onClick={onRefresh}>
-            <RefreshCw className="w-3 h-3 mr-1" />
-            {t.integrations.checkConfig}
+        {/* Credential input fields */}
+        <div className="mt-4 p-3 rounded-lg border border-border bg-surface-secondary space-y-3">
+          <h4 className="text-sm font-medium text-text">{t.integrations.enterCredentials}</h4>
+          <Input
+            placeholder="Client ID"
+            value={clientId}
+            onChange={(e) => setClientId(e.target.value)}
+          />
+          <Input
+            type="password"
+            placeholder="Client Secret"
+            value={clientSecret}
+            onChange={(e) => setClientSecret(e.target.value)}
+          />
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={handleSaveCredentials}
+            loading={saveCredentials.isPending}
+            disabled={!clientId.trim() || !clientSecret.trim()}
+          >
+            <CheckCircle2 className="w-3 h-3 mr-1" />
+            {t.integrations.saveCredentials}
           </Button>
-          <span className="text-xs text-text-tertiary">{t.integrations.configMissing}</span>
         </div>
       </div>
     </Card>

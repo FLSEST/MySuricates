@@ -478,6 +478,8 @@ export const de: TranslationKeys = {
     setupDescription: 'Diese Integration benötigt eine einmalige Konfiguration. Folge den Schritten unten.',
     checkConfig: 'Konfiguration prüfen',
     configMissing: 'Umgebungsvariablen noch nicht gesetzt',
+    enterCredentials: 'Zugangsdaten eintragen',
+    saveCredentials: 'Zugangsdaten speichern',
   },
   notifications: {
     title: 'Benachrichtigungen',
@@ -743,6 +745,8 @@ export const de: TranslationKeys = {
     integrationConnectFailed: 'Verbindung fehlgeschlagen',
     integrationDisconnectFailed: 'Trennen fehlgeschlagen',
     integrationActionFailed: 'Aktion fehlgeschlagen',
+    credentialsSaved: 'Zugangsdaten gespeichert',
+    credentialsSaveFailed: 'Fehler beim Speichern der Zugangsdaten',
     notificationCreated: 'Benachrichtigung erstellt',
     notificationToggled: 'Benachrichtigung aktualisiert',
     notificationDeleted: 'Benachrichtigung gelöscht',

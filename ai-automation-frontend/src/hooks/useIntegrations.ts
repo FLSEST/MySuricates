@@ -79,6 +79,28 @@ export function useDisconnectIntegration() {
   });
 }
 
+export function useSaveCredentials() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
+
+  return useMutation({
+    mutationFn: ({ providerId, clientId, clientSecret }: {
+      providerId: string;
+      clientId: string;
+      clientSecret: string;
+    }) => api.post<IntegrationProviderInfo>(
+      `/integrations/${providerId}/credentials`,
+      { clientId, clientSecret }
+    ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['integrations'] });
+      toast.success(t.toast.credentialsSaved);
+    },
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.credentialsSaveFailed)),
+  });
+}
+
 export function useTestIntegrationAction() {
   const toast = useToast();
   const t = useT();

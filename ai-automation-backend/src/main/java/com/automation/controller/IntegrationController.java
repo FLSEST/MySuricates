@@ -81,6 +81,19 @@ public class IntegrationController {
                 .body(html);
     }
 
+    @PostMapping("/{providerId}/credentials")
+    public IntegrationProviderResponse saveCredentials(
+            @PathVariable String providerId,
+            @RequestBody Map<String, String> body) {
+        String clientId = body.get("clientId");
+        String clientSecret = body.get("clientSecret");
+        if (clientId == null || clientSecret == null || clientId.isBlank() || clientSecret.isBlank()) {
+            throw new IllegalArgumentException("clientId and clientSecret are required");
+        }
+        oAuthService.saveCredentials(providerId, clientId, clientSecret);
+        return toProviderResponse(registry.getProvider(providerId));
+    }
+
     @DeleteMapping("/{providerId}/connection")
     public ResponseEntity<Void> disconnect(@PathVariable String providerId) {
         oAuthService.disconnect(providerId);
@@ -134,7 +147,7 @@ public class IntegrationController {
                 provider.getIcon(),
                 provider.getDescription(),
                 status,
-                provider.isConfigured(),
+                oAuthService.isProviderConfigured(provider.getProviderId()),
                 accountEmail,
                 accountName,
                 connection != null ? connection.getCreatedAt() : null,

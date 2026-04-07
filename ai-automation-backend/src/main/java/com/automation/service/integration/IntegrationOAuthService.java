@@ -42,15 +42,50 @@ public class IntegrationOAuthService {
     private final ConcurrentHashMap<String, String> pendingStates = new ConcurrentHashMap<>();
 
     /**
+     * Save OAuth client credentials (encrypted) for a provider.
+     */
+    @Transactional
+    public IntegrationConnection saveCredentials(String providerId, String clientId, String clientSecret) {
+        registry.getProvider(providerId); // validate provider exists
+
+        IntegrationConnection connection = connectionRepository.findByProviderId(providerId)
+                .orElse(IntegrationConnection.builder().providerId(providerId).build());
+
+        connection.setClientIdEncrypted(encryptionService.encrypt(clientId));
+        connection.setClientSecretEncrypted(encryptionService.encrypt(clientSecret));
+
+        log.info("Saved client credentials for provider: {}", providerId);
+        return connectionRepository.save(connection);
+    }
+
+    /**
+     * Check if a provider has credentials configured (DB or env var).
+     */
+    public boolean isProviderConfigured(String providerId) {
+        IntegrationProvider provider = registry.getProvider(providerId);
+        OAuthConfig config = provider.getOAuthConfig();
+
+        // Check DB first
+        Optional<IntegrationConnection> conn = connectionRepository.findByProviderId(providerId);
+        if (conn.isPresent() && conn.get().getClientIdEncrypted() != null && conn.get().getClientSecretEncrypted() != null) {
+            return true;
+        }
+
+        // Fallback: env vars
+        return System.getenv(config.clientIdEnvVar()) != null
+                && System.getenv(config.clientSecretEnvVar()) != null;
+    }
+
+    /**
      * Generate an OAuth2 authorization URL for the given provider.
      */
     public String getAuthorizationUrl(String providerId, String redirectUri) {
         IntegrationProvider provider = registry.getProvider(providerId);
         OAuthConfig config = provider.getOAuthConfig();
 
-        String clientId = resolveEnvVar(config.clientIdEnvVar());
+        String clientId = resolveClientId(providerId, config);
         if (clientId == null) {
-            throw new IllegalStateException("Environment variable " + config.clientIdEnvVar() + " not set");
+            throw new IllegalStateException("No client credentials configured for provider: " + providerId);
         }
 
         String state = generateState();
@@ -81,8 +116,8 @@ public class IntegrationOAuthService {
         IntegrationProvider provider = registry.getProvider(providerId);
         OAuthConfig config = provider.getOAuthConfig();
 
-        String clientId = resolveEnvVar(config.clientIdEnvVar());
-        String clientSecret = resolveEnvVar(config.clientSecretEnvVar());
+        String clientId = resolveClientId(providerId, config);
+        String clientSecret = resolveClientSecret(providerId, config);
 
         JsonNode tokenResponse = exchangeCodeForTokens(config.tokenUrl(), code, clientId, clientSecret, redirectUri);
 
@@ -158,8 +193,8 @@ public class IntegrationOAuthService {
 
         IntegrationProvider provider = registry.getProvider(connection.getProviderId());
         OAuthConfig config = provider.getOAuthConfig();
-        String clientId = resolveEnvVar(config.clientIdEnvVar());
-        String clientSecret = resolveEnvVar(config.clientSecretEnvVar());
+        String clientId = resolveClientId(connection.getProviderId(), config);
+        String clientSecret = resolveClientSecret(connection.getProviderId(), config);
 
         try {
             String body = "grant_type=refresh_token"
@@ -282,7 +317,19 @@ public class IntegrationOAuthService {
         return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
-    private static String resolveEnvVar(String envVarName) {
-        return System.getenv(envVarName);
+    /** Resolve client ID: DB first, then env var fallback */
+    private String resolveClientId(String providerId, OAuthConfig config) {
+        return connectionRepository.findByProviderId(providerId)
+                .filter(c -> c.getClientIdEncrypted() != null)
+                .map(c -> encryptionService.decrypt(c.getClientIdEncrypted()))
+                .orElseGet(() -> System.getenv(config.clientIdEnvVar()));
+    }
+
+    /** Resolve client secret: DB first, then env var fallback */
+    private String resolveClientSecret(String providerId, OAuthConfig config) {
+        return connectionRepository.findByProviderId(providerId)
+                .filter(c -> c.getClientSecretEncrypted() != null)
+                .map(c -> encryptionService.decrypt(c.getClientSecretEncrypted()))
+                .orElseGet(() -> System.getenv(config.clientSecretEnvVar()));
     }
 }
