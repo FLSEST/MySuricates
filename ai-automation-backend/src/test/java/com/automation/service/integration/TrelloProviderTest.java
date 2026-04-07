@@ -27,14 +27,15 @@ class TrelloProviderTest {
     }
 
     @Test
-    void oauthConfigIsComplete() {
+    void doesNotRequireOAuthFlow() {
+        assertThat(provider.requiresOAuthFlow()).isFalse();
+    }
+
+    @Test
+    void oauthConfigHasEnvVars() {
         OAuthConfig config = provider.getOAuthConfig();
-        assertThat(config.authorizationUrl()).contains("auth.atlassian.com");
-        assertThat(config.tokenUrl()).contains("auth.atlassian.com");
-        assertThat(config.defaultScopes()).containsExactly("read:trello", "write:trello");
-        assertThat(config.clientIdEnvVar()).isEqualTo("TRELLO_CLIENT_ID");
-        assertThat(config.clientSecretEnvVar()).isEqualTo("TRELLO_CLIENT_SECRET");
-        assertThat(config.extraAuthParams()).containsEntry("audience", "api.atlassian.com");
+        assertThat(config.clientIdEnvVar()).isEqualTo("TRELLO_API_KEY");
+        assertThat(config.clientSecretEnvVar()).isEqualTo("TRELLO_TOKEN");
     }
 
     @Test

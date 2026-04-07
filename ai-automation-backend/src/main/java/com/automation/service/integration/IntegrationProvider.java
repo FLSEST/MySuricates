@@ -34,4 +34,9 @@ public interface IntegrationProvider {
     default String fetchAccountInfo(String accessToken) {
         return null;
     }
+
+    /** Whether this provider uses the OAuth2 authorization code flow. False = direct API key/token auth. */
+    default boolean requiresOAuthFlow() {
+        return true;
+    }
 }

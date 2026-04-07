@@ -52,21 +52,37 @@ public class TrelloProvider implements IntegrationProvider {
     }
 
     @Override
+    public boolean requiresOAuthFlow() {
+        return false;
+    }
+
+    @Override
     public OAuthConfig getOAuthConfig() {
         return new OAuthConfig(
-                "https://auth.atlassian.com/authorize",
-                "https://auth.atlassian.com/oauth/token",
-                List.of("read:trello", "write:trello"),
-                "TRELLO_CLIENT_ID",
-                "TRELLO_CLIENT_SECRET",
-                Map.of("audience", "api.atlassian.com", "prompt", "consent")
+                "https://trello.com/1/authorize",
+                "https://trello.com/1/authorize",
+                List.of("read", "write"),
+                "TRELLO_API_KEY",
+                "TRELLO_TOKEN"
         );
     }
 
     @Override
-    public String fetchAccountInfo(String accessToken) {
+    public String fetchAccountInfo(String combinedToken) {
         try {
-            TrelloMember member = httpGet(BASE_URL + "/members/me", accessToken, TrelloMember.class);
+            String authParams = buildAuthParams(combinedToken);
+            String url = BASE_URL + "/members/me?" + authParams;
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .GET()
+                    .timeout(Duration.ofSeconds(15))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) return null;
+
+            TrelloMember member = objectMapper.readValue(response.body(), TrelloMember.class);
             return objectMapper.writeValueAsString(Map.of(
                     "name", member.fullName() != null ? member.fullName() : member.username(),
                     "email", member.username()
@@ -191,35 +207,35 @@ public class TrelloProvider implements IntegrationProvider {
 
     private Object listBoards(Map<String, Object> params, String accessToken) {
         String filter = paramString(params, "filter", "open");
-        String url = BASE_URL + "/members/me/boards?filter=" + urlEncode(filter);
-        return httpGet(url, accessToken, TrelloBoard[].class);
+        String url = BASE_URL + "/members/me/boards?" + buildAuthParams(accessToken) + "&filter=" + urlEncode(filter);
+        return httpGet(url, TrelloBoard[].class);
     }
 
     private Object getBoardLists(Map<String, Object> params, String accessToken) {
         String boardId = requireParam(params, "boardId");
         String filter = paramString(params, "filter", "open");
-        String url = BASE_URL + "/boards/" + urlEncode(boardId) + "/lists?filter=" + urlEncode(filter);
-        return httpGet(url, accessToken, TrelloList[].class);
+        String url = BASE_URL + "/boards/" + urlEncode(boardId) + "/lists?" + buildAuthParams(accessToken) + "&filter=" + urlEncode(filter);
+        return httpGet(url, TrelloList[].class);
     }
 
     private Object getListCards(Map<String, Object> params, String accessToken) {
         String listId = requireParam(params, "listId");
-        String url = BASE_URL + "/lists/" + urlEncode(listId) + "/cards";
-        return httpGet(url, accessToken, TrelloCard[].class);
+        String url = BASE_URL + "/lists/" + urlEncode(listId) + "/cards?" + buildAuthParams(accessToken);
+        return httpGet(url, TrelloCard[].class);
     }
 
     private Object getCard(Map<String, Object> params, String accessToken) {
         String cardId = requireParam(params, "cardId");
-        String url = BASE_URL + "/cards/" + urlEncode(cardId);
-        return httpGet(url, accessToken, TrelloCard.class);
+        String url = BASE_URL + "/cards/" + urlEncode(cardId) + "?" + buildAuthParams(accessToken);
+        return httpGet(url, TrelloCard.class);
     }
 
     private Object createCard(Map<String, Object> params, String accessToken) {
         requireParam(params, "idList");
         requireParam(params, "name");
 
-        StringBuilder url = new StringBuilder(BASE_URL + "/cards?");
-        url.append("idList=").append(urlEncode(paramString(params, "idList", "")));
+        StringBuilder url = new StringBuilder(BASE_URL + "/cards?" + buildAuthParams(accessToken));
+        url.append("&idList=").append(urlEncode(paramString(params, "idList", "")));
         url.append("&name=").append(urlEncode(paramString(params, "name", "")));
         if (params.containsKey("desc")) url.append("&desc=").append(urlEncode(paramString(params, "desc", "")));
         if (params.containsKey("due")) url.append("&due=").append(urlEncode(paramString(params, "due", "")));
@@ -227,46 +243,36 @@ public class TrelloProvider implements IntegrationProvider {
         if (params.containsKey("idLabels")) url.append("&idLabels=").append(urlEncode(paramString(params, "idLabels", "")));
         url.append("&pos=").append(urlEncode(paramString(params, "pos", "bottom")));
 
-        return httpPost(url.toString(), null, accessToken, TrelloCard.class);
+        return httpPost(url.toString(), TrelloCard.class);
     }
 
     private Object updateCard(Map<String, Object> params, String accessToken) {
         String cardId = requireParam(params, "cardId");
 
-        StringBuilder url = new StringBuilder(BASE_URL + "/cards/" + urlEncode(cardId) + "?");
-        boolean hasParam = false;
+        StringBuilder url = new StringBuilder(BASE_URL + "/cards/" + urlEncode(cardId) + "?" + buildAuthParams(accessToken));
         for (String key : List.of("name", "desc", "due", "idList", "idBoard", "pos")) {
             if (params.containsKey(key)) {
-                if (hasParam) url.append("&");
-                url.append(urlEncode(key)).append("=").append(urlEncode(paramString(params, key, "")));
-                hasParam = true;
+                url.append("&").append(urlEncode(key)).append("=").append(urlEncode(paramString(params, key, "")));
             }
         }
-        if (params.containsKey("dueComplete")) {
-            if (hasParam) url.append("&");
-            url.append("dueComplete=").append(params.get("dueComplete"));
-            hasParam = true;
-        }
-        if (params.containsKey("closed")) {
-            if (hasParam) url.append("&");
-            url.append("closed=").append(params.get("closed"));
-        }
+        if (params.containsKey("dueComplete")) url.append("&dueComplete=").append(params.get("dueComplete"));
+        if (params.containsKey("closed")) url.append("&closed=").append(params.get("closed"));
 
-        return httpPut(url.toString(), accessToken, TrelloCard.class);
+        return httpPut(url.toString(), TrelloCard.class);
     }
 
     private Object deleteCard(Map<String, Object> params, String accessToken) {
         String cardId = requireParam(params, "cardId");
-        String url = BASE_URL + "/cards/" + urlEncode(cardId);
-        httpDelete(url, accessToken);
+        String url = BASE_URL + "/cards/" + urlEncode(cardId) + "?" + buildAuthParams(accessToken);
+        httpDelete(url);
         return Map.of("deleted", true, "cardId", cardId);
     }
 
     private Object addComment(Map<String, Object> params, String accessToken) {
         String cardId = requireParam(params, "cardId");
         String text = requireParam(params, "text");
-        String url = BASE_URL + "/cards/" + urlEncode(cardId) + "/actions/comments?text=" + urlEncode(text);
-        return httpPost(url, null, accessToken, TrelloComment.class);
+        String url = BASE_URL + "/cards/" + urlEncode(cardId) + "/actions/comments?" + buildAuthParams(accessToken) + "&text=" + urlEncode(text);
+        return httpPost(url, TrelloComment.class);
     }
 
     private Object search(Map<String, Object> params, String accessToken) {
@@ -275,22 +281,31 @@ public class TrelloProvider implements IntegrationProvider {
         int cardsLimit = paramInt(params, "cards_limit", 10);
         int boardsLimit = paramInt(params, "boards_limit", 5);
 
-        String url = BASE_URL + "/search"
-                + "?query=" + urlEncode(query)
+        String url = BASE_URL + "/search?" + buildAuthParams(accessToken)
+                + "&query=" + urlEncode(query)
                 + "&modelTypes=" + urlEncode(modelTypes)
                 + "&cards_limit=" + cardsLimit
                 + "&boards_limit=" + boardsLimit;
 
-        return httpGet(url, accessToken, TrelloSearchResult.class);
+        return httpGet(url, TrelloSearchResult.class);
     }
 
-    // --- HTTP helpers ---
+    // --- Auth helper ---
 
-    private <T> T httpGet(String url, String accessToken, Class<T> responseType) {
+    private String buildAuthParams(String combinedToken) {
+        String[] parts = combinedToken.split("\\|", 2);
+        if (parts.length != 2) {
+            throw new IllegalStateException("Invalid Trello credentials. Expected 'apiKey|token' format.");
+        }
+        return "key=" + urlEncode(parts[0]) + "&token=" + urlEncode(parts[1]);
+    }
+
+    // --- HTTP helpers (no Authorization header — auth via query params) ---
+
+    private <T> T httpGet(String url, Class<T> responseType) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .header("Authorization", "Bearer " + accessToken)
                     .GET()
                     .timeout(Duration.ofSeconds(15))
                     .build();
@@ -305,22 +320,15 @@ public class TrelloProvider implements IntegrationProvider {
         }
     }
 
-    private <T> T httpPost(String url, Object body, String accessToken, Class<T> responseType) {
+    private <T> T httpPost(String url, Class<T> responseType) {
         try {
-            HttpRequest.Builder builder = HttpRequest.newBuilder()
+            HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .header("Authorization", "Bearer " + accessToken)
-                    .timeout(Duration.ofSeconds(15));
+                    .POST(HttpRequest.BodyPublishers.noBody())
+                    .timeout(Duration.ofSeconds(15))
+                    .build();
 
-            if (body != null) {
-                String json = objectMapper.writeValueAsString(body);
-                builder.header("Content-Type", "application/json")
-                        .POST(HttpRequest.BodyPublishers.ofString(json));
-            } else {
-                builder.POST(HttpRequest.BodyPublishers.noBody());
-            }
-
-            HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             checkResponse(response);
             return objectMapper.readValue(response.body(), responseType);
         } catch (IllegalStateException e) {
@@ -330,11 +338,10 @@ public class TrelloProvider implements IntegrationProvider {
         }
     }
 
-    private <T> T httpPut(String url, String accessToken, Class<T> responseType) {
+    private <T> T httpPut(String url, Class<T> responseType) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .header("Authorization", "Bearer " + accessToken)
                     .PUT(HttpRequest.BodyPublishers.noBody())
                     .timeout(Duration.ofSeconds(15))
                     .build();
@@ -349,11 +356,10 @@ public class TrelloProvider implements IntegrationProvider {
         }
     }
 
-    private void httpDelete(String url, String accessToken) {
+    private void httpDelete(String url) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .header("Authorization", "Bearer " + accessToken)
                     .DELETE()
                     .timeout(Duration.ofSeconds(15))
                     .build();

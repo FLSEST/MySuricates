@@ -46,13 +46,28 @@ public class IntegrationOAuthService {
      */
     @Transactional
     public IntegrationConnection saveCredentials(String providerId, String clientId, String clientSecret) {
-        registry.getProvider(providerId); // validate provider exists
+        IntegrationProvider provider = registry.getProvider(providerId);
 
         IntegrationConnection connection = connectionRepository.findByProviderId(providerId)
                 .orElse(IntegrationConnection.builder().providerId(providerId).build());
 
         connection.setClientIdEncrypted(encryptionService.encrypt(clientId));
         connection.setClientSecretEncrypted(encryptionService.encrypt(clientSecret));
+
+        // Non-OAuth providers: credentials ARE the auth — auto-connect on save
+        if (!provider.requiresOAuthFlow()) {
+            String combinedToken = clientId + "|" + clientSecret;
+            connection.setAccessTokenEncrypted(encryptionService.encrypt(combinedToken));
+            connection.setStatus(ConnectionStatus.CONNECTED);
+            try {
+                String accountInfo = provider.fetchAccountInfo(combinedToken);
+                if (accountInfo != null) {
+                    connection.setAccountInfo(accountInfo);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to fetch account info for non-OAuth provider {}: {}", providerId, e.getMessage());
+            }
+        }
 
         log.info("Saved client credentials for provider: {}", providerId);
         return connectionRepository.save(connection);
@@ -154,6 +169,12 @@ public class IntegrationOAuthService {
 
         if (connection.getStatus() == ConnectionStatus.DISCONNECTED) {
             throw new IllegalStateException("Provider " + providerId + " is not connected");
+        }
+
+        // Non-OAuth providers use stored credentials directly (no expiry/refresh)
+        IntegrationProvider provider = registry.getProvider(providerId);
+        if (!provider.requiresOAuthFlow()) {
+            return encryptionService.decrypt(connection.getAccessTokenEncrypted());
         }
 
         if (connection.getTokenExpiry() != null && connection.getTokenExpiry().isAfter(Instant.now().plusSeconds(300))) {
