@@ -17,12 +17,14 @@
  */
 
 import { googleCalendarAdapter } from './googleCalendarAdapter';
+import { trelloAdapter } from './trelloAdapter';
 import { schedulesAdapter } from './schedulesAdapter';
 import { runsAdapter } from './runsAdapter';
 import type { CalendarSourceAdapter } from './types';
 
 export const CALENDAR_ADAPTERS: CalendarSourceAdapter[] = [
   googleCalendarAdapter,
+  trelloAdapter,
   schedulesAdapter,
   runsAdapter,
 ];
