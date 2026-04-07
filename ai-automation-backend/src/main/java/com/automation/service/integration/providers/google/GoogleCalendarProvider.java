@@ -3,6 +3,7 @@ package com.automation.service.integration.providers.google;
 import com.automation.service.integration.IntegrationAction;
 import com.automation.service.integration.IntegrationProvider;
 import com.automation.service.integration.OAuthConfig;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -62,8 +63,29 @@ public class GoogleCalendarProvider implements IntegrationProvider {
                         "https://www.googleapis.com/auth/userinfo.profile"
                 ),
                 "GOOGLE_CLIENT_ID",
-                "GOOGLE_CLIENT_SECRET"
+                "GOOGLE_CLIENT_SECRET",
+                Map.of("access_type", "offline", "prompt", "consent")
         );
+    }
+
+    @Override
+    public String fetchAccountInfo(String accessToken) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("https://www.googleapis.com/oauth2/v2/userinfo"))
+                    .header("Authorization", "Bearer " + accessToken)
+                    .GET()
+                    .timeout(Duration.ofSeconds(10))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 200) {
+                return response.body();
+            }
+        } catch (Exception e) {
+            log.warn("Failed to fetch Google account info: {}", e.getMessage());
+        }
+        return null;
     }
 
     @Override

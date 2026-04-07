@@ -93,14 +93,18 @@ public class IntegrationOAuthService {
 
         String scopes = String.join(" ", config.defaultScopes());
 
-        return config.authorizationUrl()
-                + "?client_id=" + urlEncode(clientId)
-                + "&redirect_uri=" + urlEncode(redirectUri)
-                + "&response_type=code"
-                + "&scope=" + urlEncode(scopes)
-                + "&access_type=offline"
-                + "&prompt=consent"
-                + "&state=" + urlEncode(state);
+        StringBuilder url = new StringBuilder(config.authorizationUrl())
+                .append("?client_id=").append(urlEncode(clientId))
+                .append("&redirect_uri=").append(urlEncode(redirectUri))
+                .append("&response_type=code")
+                .append("&scope=").append(urlEncode(scopes))
+                .append("&state=").append(urlEncode(state));
+
+        for (var entry : config.extraAuthParams().entrySet()) {
+            url.append("&").append(urlEncode(entry.getKey())).append("=").append(urlEncode(entry.getValue()));
+        }
+
+        return url.toString();
     }
 
     /**
@@ -275,19 +279,8 @@ public class IntegrationOAuthService {
 
     private String fetchAccountInfo(String providerId, String accessToken) {
         try {
-            if (providerId.startsWith("google")) {
-                HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create("https://www.googleapis.com/oauth2/v2/userinfo"))
-                        .header("Authorization", "Bearer " + accessToken)
-                        .GET()
-                        .timeout(Duration.ofSeconds(10))
-                        .build();
-
-                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-                if (response.statusCode() == 200) {
-                    return response.body();
-                }
-            }
+            IntegrationProvider provider = registry.getProvider(providerId);
+            return provider.fetchAccountInfo(accessToken);
         } catch (Exception e) {
             log.warn("Failed to fetch account info for {}: {}", providerId, e.getMessage());
         }

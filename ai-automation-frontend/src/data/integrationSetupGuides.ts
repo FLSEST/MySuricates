@@ -125,4 +125,97 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
       },
     ],
   },
+  'trello': {
+    steps: [
+      {
+        title: {
+          de: 'Atlassian Developer Account',
+          en: 'Atlassian Developer Account',
+        },
+        instructions: {
+          de: [
+            'Melde dich bei der Atlassian Developer Console an',
+            'Falls nötig, erstelle einen Atlassian-Account',
+          ],
+          en: [
+            'Sign in to the Atlassian Developer Console',
+            'Create an Atlassian account if needed',
+          ],
+        },
+        link: {
+          url: 'https://developer.atlassian.com/console/myapps/',
+          label: { de: 'Atlassian Developer Console', en: 'Atlassian Developer Console' },
+        },
+      },
+      {
+        title: {
+          de: 'OAuth 2.0 App erstellen',
+          en: 'Create OAuth 2.0 App',
+        },
+        instructions: {
+          de: [
+            'Klicke "Create" → "OAuth 2.0 integration"',
+            'Name: z.B. "MySuricates Trello"',
+            'Akzeptiere die Nutzungsbedingungen → "Create"',
+          ],
+          en: [
+            'Click "Create" → "OAuth 2.0 integration"',
+            'Name: e.g. "MySuricates Trello"',
+            'Accept the terms → "Create"',
+          ],
+        },
+      },
+      {
+        title: {
+          de: 'Trello API Berechtigung aktivieren',
+          en: 'Enable Trello API Permission',
+        },
+        instructions: {
+          de: [
+            'Im Seitenmenü: "Permissions"',
+            'Bei "Trello API" auf "Add" klicken',
+            'Scopes "read:trello" und "write:trello" hinzufügen',
+          ],
+          en: [
+            'In the side menu: "Permissions"',
+            'Click "Add" next to "Trello API"',
+            'Add scopes "read:trello" and "write:trello"',
+          ],
+        },
+      },
+      {
+        title: {
+          de: 'Callback URL konfigurieren',
+          en: 'Configure Callback URL',
+        },
+        instructions: {
+          de: [
+            'Im Seitenmenü: "Authorization" → "Add" bei OAuth 2.0 (3LO)',
+            'Callback URL hinzufügen:',
+          ],
+          en: [
+            'In the side menu: "Authorization" → "Add" next to OAuth 2.0 (3LO)',
+            'Add callback URL:',
+          ],
+        },
+        code: 'http://localhost:9090/api/v1/integrations/trello/callback',
+      },
+      {
+        title: {
+          de: 'Zugangsdaten eintragen',
+          en: 'Enter credentials',
+        },
+        instructions: {
+          de: [
+            'Im Seitenmenü: "Settings" → Client-ID und Secret kopieren',
+            'Trage sie unten in die Felder ein und klicke "Speichern"',
+          ],
+          en: [
+            'In the side menu: "Settings" → copy Client ID and Secret',
+            'Enter them in the fields below and click "Save"',
+          ],
+        },
+      },
+    ],
+  },
 };

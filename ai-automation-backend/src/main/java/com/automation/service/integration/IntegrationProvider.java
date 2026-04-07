@@ -29,4 +29,9 @@ public interface IntegrationProvider {
 
     /** Execute an action against the external API */
     Object executeAction(String action, Map<String, Object> params, String accessToken);
+
+    /** Fetch account info after successful OAuth. Override to provide provider-specific user info. */
+    default String fetchAccountInfo(String accessToken) {
+        return null;
+    }
 }
