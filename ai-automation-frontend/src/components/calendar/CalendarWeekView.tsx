@@ -1,0 +1,121 @@
+import { useMemo } from 'react';
+import { MapPin, ExternalLink } from 'lucide-react';
+import type { UnifiedCalendarEvent } from '../../types';
+import { useT } from '../../i18n';
+
+function formatTime(date: Date): string {
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+const WEEKDAYS_DE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+const WEEKDAYS_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+interface Props {
+  weekStart: Date;
+  events: UnifiedCalendarEvent[];
+  onDayClick?: (date: Date) => void;
+}
+
+export function CalendarWeekView({ weekStart, events, onDayClick }: Props) {
+  const t = useT();
+  const isGerman = t.common.save === 'Speichern';
+  const weekdayLabels = isGerman ? WEEKDAYS_DE : WEEKDAYS_EN;
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+
+  const days = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(weekStart);
+      d.setDate(d.getDate() + i);
+      return d;
+    });
+  }, [weekStart]);
+
+  const eventsByDay = useMemo(() => {
+    const map: Record<string, UnifiedCalendarEvent[]> = {};
+    for (const day of days) {
+      const key = `${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`;
+      map[key] = [];
+    }
+    for (const ev of events) {
+      const key = `${ev.start.getFullYear()}-${ev.start.getMonth()}-${ev.start.getDate()}`;
+      if (map[key]) map[key].push(ev);
+    }
+    return map;
+  }, [events, days]);
+
+  return (
+    <div className="bg-surface rounded-xl border border-border overflow-hidden">
+      <div className="grid grid-cols-7 min-h-[400px]">
+        {days.map((day, i) => {
+          const key = `${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`;
+          const dayEvents = eventsByDay[key] ?? [];
+          const isToday = key === todayStr;
+
+          return (
+            <div
+              key={i}
+              className={`border-r border-border last:border-r-0 flex flex-col ${isToday ? 'bg-accent/5' : ''}`}
+            >
+              <button
+                onClick={() => onDayClick?.(day)}
+                className="py-2 px-2 border-b border-border text-center hover:bg-surface-hover transition-colors"
+              >
+                <span className="text-xs font-medium text-text-secondary uppercase">{weekdayLabels[i]}</span>
+                <span className={`
+                  block text-lg font-semibold mt-0.5
+                  ${isToday ? 'text-accent' : 'text-text'}
+                `}>
+                  {day.getDate()}
+                </span>
+                <span className="text-[10px] text-text-tertiary">
+                  {day.toLocaleDateString(isGerman ? 'de' : 'en', { month: 'short' })}
+                </span>
+              </button>
+              <div className="flex-1 p-1.5 space-y-1 overflow-y-auto">
+                {dayEvents.map((ev) => (
+                  <WeekEventCard key={ev.id} event={ev} />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function WeekEventCard({ event }: { event: UnifiedCalendarEvent }) {
+  const timeLabel = event.allDay ? '' : formatTime(event.start);
+
+  const content = (
+    <div className="flex items-start gap-1.5 p-1.5 rounded-md bg-surface-secondary hover:bg-surface-hover transition-colors group text-left">
+      <span className={`w-1 self-stretch rounded-full shrink-0 ${event.color}`} />
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-medium text-text truncate leading-tight">{event.title}</p>
+        {timeLabel && (
+          <span className="text-[10px] text-text-secondary">{timeLabel}</span>
+        )}
+        {event.location && (
+          <div className="flex items-center gap-0.5 mt-0.5">
+            <MapPin className="w-2.5 h-2.5 text-text-tertiary" />
+            <span className="text-[10px] text-text-tertiary truncate">{event.location}</span>
+          </div>
+        )}
+      </div>
+      {event.link && (
+        <ExternalLink className="w-3 h-3 text-text-tertiary opacity-0 group-hover:opacity-100 shrink-0" />
+      )}
+    </div>
+  );
+
+  if (event.link) {
+    return (
+      <a href={event.link} target={event.source === 'google-calendar' || event.source === 'trello' ? '_blank' : undefined} rel="noopener noreferrer">
+        {content}
+      </a>
+    );
+  }
+
+  return content;
+}
