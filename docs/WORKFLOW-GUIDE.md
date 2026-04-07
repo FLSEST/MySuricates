@@ -63,7 +63,7 @@ Zugriff in Block-Configs mit `{{ filepath }}` oder `{{ language }}`.
 
 ## 2. Block-Typ-Referenz
 
-MySuricates unterstuetzt 13 Block-Typen. Jeder Block hat einen `type` und eine `config`-Map.
+MySuricates unterstuetzt 12 Block-Typen. Jeder Block hat einen `type` und eine `config`-Map.
 
 ### Allgemeine Block-Eigenschaften
 
@@ -449,62 +449,6 @@ Ruft die Faehigkeit eines registrierten Skills auf.
 ```
 
 **Wann verwenden**: Spezialisierte Skills nutzen (OCR, Web-Suche, Analyse).
-
-### `integration` — Externe Service-Aktion
-
-Fuehrt eine Aktion eines verbundenen externen Dienstes aus (Google Calendar, Trello, Jira, etc.).
-**Voraussetzung**: Der Provider muss auf der Integrationen-Seite (`/integrations`) verbunden sein.
-
-| Config-Schluessel | Typ | Default | Beschreibung |
-|---|---|---|---|
-| `provider` | string | **erforderlich** | Provider-ID (`google-calendar`, `trello`, `jira`) |
-| `action` | string | **erforderlich** | Aktionsname (z.B. `list_events`, `create_card`) |
-| `params` | map | `{}` | Parameter fuer die Aktion (Template-Variablen werden aufgeloest) |
-
-**Beispiel: Google Calendar Events abrufen**
-
-```json
-{
-  "type": "integration",
-  "config": {
-    "provider": "google-calendar",
-    "action": "list_events",
-    "params": {
-      "timeMin": "{{ started_at }}",
-      "timeMax": "2026-04-30T23:59:59Z",
-      "maxResults": 20
-    }
-  }
-}
-```
-
-**Beispiel: Trello Karte erstellen**
-
-```json
-{
-  "type": "integration",
-  "config": {
-    "provider": "trello",
-    "action": "create_card",
-    "params": {
-      "idList": "abc123",
-      "name": "Neue Aufgabe: {{ previous_output }}",
-      "desc": "Automatisch erstellt von Workflow {{ workflow_name }}"
-    }
-  }
-}
-```
-
-**Verfuegbare Provider und Actions:**
-
-| Provider | ID | Actions |
-|---|---|---|
-| Google Calendar | `google-calendar` | `list_events`, `get_event`, `create_event`, `update_event`, `delete_event`, `get_free_busy` |
-| Trello | `trello` | `list_boards`, `get_board_lists`, `get_list_cards`, `get_card`, `create_card`, `update_card`, `delete_card`, `add_comment`, `search` |
-| Jira | `jira` | `search_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment`, `transition_issue`, `get_projects` |
-
-**Wann verwenden**: Daten aus/nach externen Diensten lesen/schreiben — z.B. Kalender-Events abrufen, Trello-Karten erstellen, Jira-Issues aktualisieren. Token-Management (OAuth2-Refresh) passiert automatisch.
-**Nicht fuer**: Reines API-Calling ohne Auth → `shell`-Block mit `curl`.
 
 ---
 
@@ -1042,6 +986,70 @@ DELETE /api/v1/chains/{id}          # Chain loeschen
 
 - Polling-basierte Fertigstellungspruefung (2s Intervall)
 - 30-Minuten-Timeout pro Workflow in der Chain
+
+---
+
+## Integration Block (Plugin-System)
+
+Ruft Actions von verbundenen externen Diensten auf (Google Calendar, Trello, etc.). Teil des Plugin-Systems — jeder `IntegrationProvider` stellt Actions bereit, die in Workflows als `integration`-Block genutzt werden koennen.
+
+**Voraussetzung:** Der Provider muss auf der Integrationen-Seite (`/integrations`) verbunden sein.
+
+### Config
+
+| Feld | Pflicht | Beschreibung |
+|------|---------|--------------|
+| `provider` | Ja | Provider-ID: `google-calendar`, `trello`, etc. |
+| `action` | Ja | Action-Name, z.B. `list_events`, `create_card` |
+| `params` | Nein | Parameter als Key-Value, unterstuetzt `{{ template_vars }}` |
+
+### Beispiel: Naechste Google Calendar Events abrufen
+
+```json
+{
+  "type": "integration",
+  "config": {
+    "provider": "google-calendar",
+    "action": "list_events",
+    "params": {
+      "timeMin": "{{ started_at }}",
+      "maxResults": 5
+    }
+  }
+}
+```
+
+### Beispiel: Trello-Karte erstellen nach Workflow-Abschluss
+
+```json
+{
+  "type": "integration",
+  "config": {
+    "provider": "trello",
+    "action": "create_card",
+    "params": {
+      "idList": "abc123",
+      "name": "Ergebnis: {{ workflow_name }}",
+      "desc": "{{ previous_output }}"
+    }
+  }
+}
+```
+
+### Verfuegbare Actions
+
+Alle Actions eines Providers sind auf der Integrationen-Seite sichtbar (Provider-Karte → "Test"-Button). Action-Namen und Parameter-Schemas werden dort angezeigt.
+
+### Fehlerbehandlung
+
+Wenn der Provider nicht verbunden ist oder die API fehlschlaegt, wird der Block als `FAILED` markiert mit der Fehlermeldung im Output. Token-Refresh passiert automatisch.
+
+### Neuen Provider als Workflow-Block nutzen
+
+1. Provider auf der Integrationen-Seite verbinden (OAuth-Flow)
+2. Integration-Block im Workflow-Editor hinzufuegen
+3. Provider und Action waehlen, Parameter konfigurieren
+4. Template-Variablen (`{{ previous_output }}`, `{{ started_at }}`) funktionieren in Params
 
 ---
 
