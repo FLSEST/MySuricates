@@ -80,7 +80,12 @@ public class TrelloProvider implements IntegrationProvider {
                     .build();
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) return null;
+            if (response.statusCode() == 401) {
+                throw new IllegalStateException("Trello authentication failed — check API key and token");
+            }
+            if (response.statusCode() != 200) {
+                throw new IllegalStateException("Trello API error " + response.statusCode() + ": " + response.body());
+            }
 
             TrelloMember member = objectMapper.readValue(response.body(), TrelloMember.class);
             return objectMapper.writeValueAsString(Map.of(

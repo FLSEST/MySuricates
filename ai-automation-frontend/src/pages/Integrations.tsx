@@ -166,13 +166,24 @@ function SetupGuidePanel({ providerId, displayName, onRefresh }: {
         <div className="mt-4 p-3 rounded-lg border border-border bg-surface-secondary space-y-3">
           <h4 className="text-sm font-medium text-text">{t.integrations.enterCredentials}</h4>
           <Input
-            placeholder="Client ID"
+            placeholder={guide.credentialLabels?.clientIdPlaceholder[lang] ?? 'Client ID'}
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
           />
+          {providerId === 'trello' && clientId.trim() && (
+            <a
+              href={`https://trello.com/1/authorize?expiration=never&scope=read,write&response_type=token&name=MySuricates&key=${encodeURIComponent(clientId.trim())}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+            >
+              <ExternalLink className="w-3 h-3" />
+              {lang === 'de' ? 'Token generieren' : 'Generate Token'}
+            </a>
+          )}
           <Input
             type="password"
-            placeholder="Client Secret"
+            placeholder={guide.credentialLabels?.clientSecretPlaceholder[lang] ?? 'Client Secret'}
             value={clientSecret}
             onChange={(e) => setClientSecret(e.target.value)}
           />
@@ -336,6 +347,7 @@ export function Integrations() {
       {/* Setup Guide (when not configured) */}
       {selected && !selected.configured && selected.status !== 'CONNECTED' && (
         <SetupGuidePanel
+          key={selected.providerId}
           providerId={selected.providerId}
           displayName={selected.displayName}
           onRefresh={() => refetch()}

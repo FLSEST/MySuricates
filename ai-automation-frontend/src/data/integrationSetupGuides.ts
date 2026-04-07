@@ -5,8 +5,14 @@ export interface SetupStep {
   code?: string;
 }
 
+export interface CredentialLabels {
+  clientIdPlaceholder: { de: string; en: string };
+  clientSecretPlaceholder: { de: string; en: string };
+}
+
 export interface SetupGuide {
   steps: SetupStep[];
+  credentialLabels?: CredentialLabels;
 }
 
 export const SETUP_GUIDES: Record<string, SetupGuide> = {
@@ -101,7 +107,7 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
             'Add Authorized redirect URI:',
           ],
         },
-        code: 'http://localhost:9090/api/v1/integrations/google-calendar/callback',
+        code: `${window.location.origin}/api/v1/integrations/google-calendar/callback`,
         link: {
           url: 'https://console.cloud.google.com/apis/credentials',
           label: { de: 'Credentials anlegen', en: 'Create Credentials' },
@@ -126,20 +132,28 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
     ],
   },
   'trello': {
+    credentialLabels: {
+      clientIdPlaceholder: { de: 'API-Schlüssel', en: 'API Key' },
+      clientSecretPlaceholder: { de: 'Token', en: 'Token' },
+    },
     steps: [
       {
         title: {
-          de: 'Trello Power-Up Admin öffnen',
-          en: 'Open Trello Power-Up Admin',
+          de: 'API-Schlüssel kopieren',
+          en: 'Copy API Key',
         },
         instructions: {
           de: [
-            'Melde dich bei Trello an und öffne den Power-Up Admin',
-            'Falls noch kein Power-Up existiert: "Neu" klicken und einen Namen vergeben (z.B. "MySuricates")',
+            'Öffne den Trello Power-Up Admin (Link unten)',
+            'Wähle dein Power-Up aus (oder erstelle ein neues)',
+            'Gehe zum Tab "API-Schlüssel" und kopiere den Schlüssel',
+            'Das "Secret" auf derselben Seite wird nicht benötigt',
           ],
           en: [
-            'Sign in to Trello and open the Power-Up Admin',
-            'If no Power-Up exists: click "New" and choose a name (e.g. "MySuricates")',
+            'Open the Trello Power-Up Admin (link below)',
+            'Select your Power-Up (or create a new one)',
+            'Go to the "API Key" tab and copy the key',
+            'The "Secret" on the same page is not needed',
           ],
         },
         link: {
@@ -149,53 +163,19 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
       },
       {
         title: {
-          de: 'API-Key kopieren',
-          en: 'Copy API Key',
+          de: 'API-Schlüssel eintragen & Token generieren',
+          en: 'Enter API Key & generate Token',
         },
         instructions: {
           de: [
-            'Auf der Power-Up-Seite findest du den API-Key',
-            'Kopiere den API-Key — er wird unten als "Client ID" eingetragen',
+            'Trage den API-Schlüssel unten ein — der Token-Link erscheint automatisch',
+            'Klicke den Link, erlaube den Zugriff, und kopiere den angezeigten Token',
+            'Trage den Token in das zweite Feld ein',
           ],
           en: [
-            'On the Power-Up page you will find the API Key',
-            'Copy the API Key — it will be entered below as "Client ID"',
-          ],
-        },
-      },
-      {
-        title: {
-          de: 'Token generieren',
-          en: 'Generate Token',
-        },
-        instructions: {
-          de: [
-            'Klicke auf den Link rechts neben dem API-Key: "Token manuell generieren"',
-            'Erlaube den Zugriff auf dein Trello-Konto',
-            'Kopiere den generierten Token — er wird unten als "Client Secret" eingetragen',
-          ],
-          en: [
-            'Click the link next to the API Key: "manually generate a Token"',
-            'Allow access to your Trello account',
-            'Copy the generated token — it will be entered below as "Client Secret"',
-          ],
-        },
-      },
-      {
-        title: {
-          de: 'Zugangsdaten eintragen',
-          en: 'Enter credentials',
-        },
-        instructions: {
-          de: [
-            'Trage den API-Key als "Client ID" ein',
-            'Trage den Token als "Client Secret" ein',
-            'Klicke "Speichern" — die Verbindung wird direkt hergestellt',
-          ],
-          en: [
-            'Enter the API Key as "Client ID"',
-            'Enter the Token as "Client Secret"',
-            'Click "Save" — the connection will be established immediately',
+            'Enter the API Key below — the token link will appear automatically',
+            'Click the link, allow access, and copy the displayed token',
+            'Enter the token in the second field',
           ],
         },
       },
@@ -274,7 +254,7 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
             'Add callback URL:',
           ],
         },
-        code: 'http://localhost:9090/api/v1/integrations/jira/callback',
+        code: `${window.location.origin}/api/v1/integrations/jira/callback`,
       },
       {
         title: {

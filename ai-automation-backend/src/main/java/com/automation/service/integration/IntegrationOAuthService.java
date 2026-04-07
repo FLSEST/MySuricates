@@ -54,18 +54,22 @@ public class IntegrationOAuthService {
         connection.setClientIdEncrypted(encryptionService.encrypt(clientId));
         connection.setClientSecretEncrypted(encryptionService.encrypt(clientSecret));
 
-        // Non-OAuth providers: credentials ARE the auth — auto-connect on save
+        // Non-OAuth providers: credentials ARE the auth — validate before connecting
         if (!provider.requiresOAuthFlow()) {
             String combinedToken = clientId + "|" + clientSecret;
             connection.setAccessTokenEncrypted(encryptionService.encrypt(combinedToken));
-            connection.setStatus(ConnectionStatus.CONNECTED);
             try {
                 String accountInfo = provider.fetchAccountInfo(combinedToken);
                 if (accountInfo != null) {
                     connection.setAccountInfo(accountInfo);
+                    connection.setStatus(ConnectionStatus.CONNECTED);
+                } else {
+                    log.warn("Credential validation returned no account info for provider {}", providerId);
+                    connection.setStatus(ConnectionStatus.DISCONNECTED);
                 }
             } catch (Exception e) {
-                log.warn("Failed to fetch account info for non-OAuth provider {}: {}", providerId, e.getMessage());
+                log.warn("Credential validation failed for provider {}: {}", providerId, e.getMessage());
+                connection.setStatus(ConnectionStatus.DISCONNECTED);
             }
         }
 
@@ -190,11 +194,15 @@ public class IntegrationOAuthService {
     @Transactional
     public void disconnect(String providerId) {
         connectionRepository.findByProviderId(providerId).ifPresent(connection -> {
-            try {
-                String accessToken = encryptionService.decrypt(connection.getAccessTokenEncrypted());
-                revokeToken(accessToken);
-            } catch (Exception e) {
-                log.warn("Failed to revoke token for {}: {}", providerId, e.getMessage());
+            IntegrationProvider provider = registry.getProvider(providerId);
+            // Only revoke tokens for OAuth providers (non-OAuth tokens like Trello API keys can't be revoked server-side)
+            if (provider.requiresOAuthFlow()) {
+                try {
+                    String accessToken = encryptionService.decrypt(connection.getAccessTokenEncrypted());
+                    revokeToken(accessToken);
+                } catch (Exception e) {
+                    log.warn("Failed to revoke token for {}: {}", providerId, e.getMessage());
+                }
             }
             connectionRepository.delete(connection);
         });
