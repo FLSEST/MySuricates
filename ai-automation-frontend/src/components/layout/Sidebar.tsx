@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, GitBranch, History, Zap, Sparkles, Factory,
-  Calendar, Webhook, ScrollText, CheckSquare, Settings, ChevronLeft, ChevronRight, Link2, BookOpen, BookMarked, BarChart2,
+  Calendar, Webhook, Plug, ScrollText, CheckSquare, Settings, ChevronLeft, ChevronRight, Link2, BookOpen, BookMarked, BarChart2,
   Pencil, Check, RotateCcw, Plus, MessageCircle, ClipboardList,
 } from 'lucide-react';
 import {
@@ -113,6 +113,7 @@ const navItems = [
   { to: '/skills', icon: Zap, labelKey: 'skills' as const },
   { to: '/schedules', icon: Calendar, labelKey: 'schedules' as const },
   { to: '/webhooks', icon: Webhook, labelKey: 'webhooks' as const },
+  { to: '/integrations', icon: Plug, labelKey: 'integrations' as const },
   { to: '/todos', icon: CheckSquare, labelKey: 'todos' as const },
   { to: '/activity', icon: ScrollText, labelKey: 'activityLog' as const },
   { to: '/insights', icon: BarChart2, labelKey: 'insights' as const },

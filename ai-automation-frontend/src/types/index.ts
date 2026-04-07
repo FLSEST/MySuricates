@@ -399,6 +399,27 @@ export interface CreateWebhookRequest {
   defaultContext?: Record<string, unknown>;
 }
 
+// ── Integrations ──────────────────────────────────────────
+
+export interface IntegrationProviderInfo {
+  providerId: string;
+  displayName: string;
+  icon: string;
+  description: string;
+  status: 'CONNECTED' | 'DISCONNECTED' | 'EXPIRED';
+  accountEmail: string | null;
+  accountName: string | null;
+  connectedSince: string | null;
+  scopes: string | null;
+  actions: IntegrationActionInfo[];
+}
+
+export interface IntegrationActionInfo {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+}
+
 // ── Notifications ─────────────────────────────────────────
 
 export type NotificationChannelType = 'WEBHOOK' | 'DESKTOP';

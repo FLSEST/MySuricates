@@ -4,7 +4,7 @@ import {
   ArrowLeft, Pause, Play, XCircle, Clock, CheckCircle2, AlertCircle, Send, TerminalSquare,
   FolderOpen, ListTodo, Save,
   Terminal, Sparkles, Brain, Repeat, GitBranch, RefreshCw, ShieldCheck, Layers,
-  MessageSquare, Route, RotateCcw, Wrench,
+  MessageSquare, Route, RotateCcw, Wrench, Plug,
 } from 'lucide-react';
 import { Card, CardHeader, Button, Spinner, Badge, Input } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
@@ -47,6 +47,7 @@ const BLOCK_TYPE_ICONS: Record<string, React.ReactNode> = {
   switch: <Route className="w-3 h-3" />,
   retry: <RotateCcw className="w-3 h-3" />,
   'skill-capability': <Wrench className="w-3 h-3" />,
+  integration: <Plug className="w-3 h-3" />,
 };
 
 function StepCard({ step }: { step: StepResult }) {

@@ -36,6 +36,8 @@ public class SecurityConfig {
                         .requestMatchers("/ws/**").permitAll()
                         // Public webhook trigger endpoint
                         .requestMatchers("/api/v1/webhook/trigger/**").permitAll()
+                        // OAuth2 callback endpoints (public, like webhooks)
+                        .requestMatchers("/api/v1/integrations/*/callback").permitAll()
                         // All API endpoints require API key
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll()
