@@ -473,6 +473,11 @@ export const de: TranslationKeys = {
     connectedSince: 'Verbunden seit',
     provider: 'Provider',
     action: 'Aktion',
+    setupRequired: 'Einrichtung erforderlich',
+    setupTitle: 'Einrichtung: {provider}',
+    setupDescription: 'Diese Integration benötigt eine einmalige Konfiguration. Folge den Schritten unten.',
+    checkConfig: 'Konfiguration prüfen',
+    configMissing: 'Umgebungsvariablen noch nicht gesetzt',
   },
   notifications: {
     title: 'Benachrichtigungen',

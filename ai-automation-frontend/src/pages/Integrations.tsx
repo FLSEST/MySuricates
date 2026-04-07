@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import { Plug, Calendar, ExternalLink, Trash2, Play, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+import {
+  Plug, Calendar, ExternalLink, Trash2, Play, CheckCircle2, XCircle,
+  AlertTriangle, ChevronRight, RefreshCw, Copy, Settings2,
+} from 'lucide-react';
 import { Card, Button, Badge, Spinner, Modal } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
@@ -10,7 +13,10 @@ import {
   useTestIntegrationAction,
 } from '../hooks/useIntegrations';
 import { useT } from '../i18n';
+import { useI18nStore } from '../i18n';
+import { SETUP_GUIDES } from '../data/integrationSetupGuides';
 import type { IntegrationProviderInfo, IntegrationActionInfo } from '../types';
+import type { SetupStep } from '../data/integrationSetupGuides';
 
 const ICON_MAP: Record<string, typeof Calendar> = {
   Calendar,
@@ -21,30 +27,138 @@ function ProviderIcon({ icon }: { icon: string }) {
   return <Icon className="w-8 h-8" />;
 }
 
-function StatusBadge({ status }: { status: string }) {
-  switch (status) {
-    case 'CONNECTED':
-      return (
-        <Badge variant="success">
-          <CheckCircle2 className="w-3 h-3 mr-1" />
-          Verbunden
-        </Badge>
-      );
-    case 'EXPIRED':
-      return (
-        <Badge variant="warning">
-          <AlertTriangle className="w-3 h-3 mr-1" />
-          Abgelaufen
-        </Badge>
-      );
-    default:
-      return (
-        <Badge variant="default">
-          <XCircle className="w-3 h-3 mr-1" />
-          Nicht verbunden
-        </Badge>
-      );
+function ProviderStatusBadge({ provider }: { provider: IntegrationProviderInfo }) {
+  if (provider.status === 'CONNECTED') {
+    return (
+      <Badge variant="success">
+        <CheckCircle2 className="w-3 h-3 mr-1" />
+        Verbunden
+      </Badge>
+    );
   }
+  if (provider.status === 'EXPIRED') {
+    return (
+      <Badge variant="warning">
+        <AlertTriangle className="w-3 h-3 mr-1" />
+        Abgelaufen
+      </Badge>
+    );
+  }
+  if (!provider.configured) {
+    return (
+      <Badge variant="warning">
+        <Settings2 className="w-3 h-3 mr-1" />
+        Einrichtung erforderlich
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="default">
+      <XCircle className="w-3 h-3 mr-1" />
+      Nicht verbunden
+    </Badge>
+  );
+}
+
+function SetupGuidePanel({ providerId, displayName, onRefresh }: {
+  providerId: string;
+  displayName: string;
+  onRefresh: () => void;
+}) {
+  const lang = useI18nStore.getState().locale;
+  const t = useT();
+  const guide = SETUP_GUIDES[providerId];
+  const [openStep, setOpenStep] = useState(0);
+  const [copied, setCopied] = useState<number | null>(null);
+
+  if (!guide) return null;
+
+  const copyToClipboard = (text: string, stepIndex: number) => {
+    navigator.clipboard.writeText(text);
+    setCopied(stepIndex);
+    setTimeout(() => setCopied(null), 2000);
+  };
+
+  return (
+    <Card>
+      <div className="p-4">
+        <div className="flex items-center gap-2 mb-1">
+          <Settings2 className="w-5 h-5 text-amber-500" />
+          <h3 className="font-semibold text-text">
+            {t.integrations.setupTitle.replace('{provider}', displayName)}
+          </h3>
+        </div>
+        <p className="text-sm text-text-secondary mb-4">{t.integrations.setupDescription}</p>
+
+        <div className="space-y-2">
+          {guide.steps.map((step: SetupStep, i: number) => {
+            const isOpen = openStep === i;
+            return (
+              <div key={i} className="border border-border rounded-lg overflow-hidden">
+                <button
+                  onClick={() => setOpenStep(isOpen ? -1 : i)}
+                  className="flex items-center gap-3 w-full p-3 text-left hover:bg-surface-secondary transition-colors"
+                >
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold shrink-0">
+                    {i + 1}
+                  </span>
+                  <ChevronRight className={`w-4 h-4 text-text-secondary transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-90' : ''}`} />
+                  <span className="font-medium text-sm text-text">{step.title[lang]}</span>
+                </button>
+
+                <div className={`grid transition-all duration-200 ease-in-out ${isOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+                  <div className="overflow-hidden">
+                    <div className="px-3 pb-3 pl-12 space-y-2">
+                      <ul className="list-disc list-inside space-y-1">
+                        {step.instructions[lang].map((line, j) => (
+                          <li key={j} className="text-sm text-text-secondary">{line}</li>
+                        ))}
+                      </ul>
+
+                      {step.code && (
+                        <div className="relative">
+                          <pre className="p-2 rounded bg-surface text-xs text-text font-mono border border-border overflow-x-auto">
+                            {step.code}
+                          </pre>
+                          <button
+                            onClick={() => copyToClipboard(step.code!, i)}
+                            className="absolute top-1 right-1 p-1 rounded hover:bg-surface-secondary text-text-tertiary hover:text-text transition-colors"
+                            title="Copy"
+                          >
+                            {copied === i ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      )}
+
+                      {step.link && (
+                        <a
+                          href={step.link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          {step.link.label[lang]}
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-4 flex items-center gap-3">
+          <Button size="sm" variant="secondary" onClick={onRefresh}>
+            <RefreshCw className="w-3 h-3 mr-1" />
+            {t.integrations.checkConfig}
+          </Button>
+          <span className="text-xs text-text-tertiary">{t.integrations.configMissing}</span>
+        </div>
+      </div>
+    </Card>
+  );
 }
 
 export function Integrations() {
@@ -130,14 +244,18 @@ export function Integrations() {
           >
             <div className="flex items-start gap-4 p-4">
               <div className={`p-3 rounded-lg ${
-                provider.status === 'CONNECTED' ? 'bg-green-500/10 text-green-500' : 'bg-surface-secondary text-text-secondary'
+                provider.status === 'CONNECTED'
+                  ? 'bg-green-500/10 text-green-500'
+                  : !provider.configured
+                    ? 'bg-amber-500/10 text-amber-500'
+                    : 'bg-surface-secondary text-text-secondary'
               }`}>
                 <ProviderIcon icon={provider.icon} />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <h3 className="font-semibold text-text">{provider.displayName}</h3>
-                  <StatusBadge status={provider.status} />
+                  <ProviderStatusBadge provider={provider} />
                 </div>
                 <p className="text-sm text-text-secondary mb-3">{provider.description}</p>
 
@@ -157,7 +275,7 @@ export function Integrations() {
                       <Trash2 className="w-3 h-3 mr-1" />
                       {t.integrations.disconnect}
                     </Button>
-                  ) : (
+                  ) : provider.configured ? (
                     <Button
                       size="sm"
                       variant="primary"
@@ -167,6 +285,15 @@ export function Integrations() {
                       <ExternalLink className="w-3 h-3 mr-1" />
                       {t.integrations.connect}
                     </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={(e) => { e.stopPropagation(); setSelected(provider); }}
+                    >
+                      <Settings2 className="w-3 h-3 mr-1" />
+                      {t.integrations.setupRequired}
+                    </Button>
                   )}
                 </div>
               </div>
@@ -175,7 +302,16 @@ export function Integrations() {
         ))}
       </div>
 
-      {/* Detail Panel */}
+      {/* Setup Guide (when not configured) */}
+      {selected && !selected.configured && selected.status !== 'CONNECTED' && (
+        <SetupGuidePanel
+          providerId={selected.providerId}
+          displayName={selected.displayName}
+          onRefresh={() => refetch()}
+        />
+      )}
+
+      {/* Detail Panel (when connected) */}
       {selected && selected.status === 'CONNECTED' && (
         <Card>
           <div className="p-4">

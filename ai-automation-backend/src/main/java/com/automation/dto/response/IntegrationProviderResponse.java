@@ -9,6 +9,7 @@ public record IntegrationProviderResponse(
         String icon,
         String description,
         String status,
+        boolean configured,
         String accountEmail,
         String accountName,
         Instant connectedSince,

@@ -407,6 +407,7 @@ export interface IntegrationProviderInfo {
   icon: string;
   description: string;
   status: 'CONNECTED' | 'DISCONNECTED' | 'EXPIRED';
+  configured: boolean;
   accountEmail: string | null;
   accountName: string | null;
   connectedSince: string | null;

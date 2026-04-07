@@ -471,6 +471,11 @@ export const en = {
     connectedSince: 'Connected since',
     provider: 'Provider',
     action: 'Action',
+    setupRequired: 'Setup required',
+    setupTitle: 'Setup: {provider}',
+    setupDescription: 'This integration requires a one-time configuration. Follow the steps below.',
+    checkConfig: 'Check configuration',
+    configMissing: 'Environment variables not set yet',
   },
   notifications: {
     title: 'Notifications',

@@ -134,6 +134,7 @@ public class IntegrationController {
                 provider.getIcon(),
                 provider.getDescription(),
                 status,
+                provider.isConfigured(),
                 accountEmail,
                 accountName,
                 connection != null ? connection.getCreatedAt() : null,
