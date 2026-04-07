@@ -5,6 +5,7 @@ import { useAssistantStore } from '../stores/assistantStore';
 import { useAssistantChat, type ChatMessage } from '../hooks/useAssistant';
 import { useAssistantWebSocket } from '../hooks/useAssistantWebSocket';
 import { useExecuteWorkflow } from '../hooks/useWorkflows';
+import { useSettingsStore } from '../stores/settingsStore';
 import { MeerkatIcon } from './layout/Sidebar';
 import { parsePageContext } from './assistantPanelUtils';
 import { MessageBubble } from './assistant/AssistantMessage';
@@ -20,6 +21,7 @@ export function AssistantPanel() {
     setShowHistory, setPanelWidth, setPanelHeight,
   } = useAssistantStore();
   const updateMessageStatus = useAssistantStore((s) => s.updateMessageStatus);
+  const defaultAiProvider = useSettingsStore((s) => s.defaultAiProvider);
 
   const location = useLocation();
   const [input, setInput] = useState('');
@@ -127,7 +129,7 @@ export function AssistantPanel() {
     setActiveRequestId(requestId);
 
     sendMessage(
-      { req: { message: text, history, context: ctx, sessionId, requestId }, signal: controller.signal },
+      { req: { message: text, history, context: ctx, provider: defaultAiProvider || undefined, sessionId, requestId }, signal: controller.signal },
       {
         onSuccess: (res) => {
           abortRef.current = null;

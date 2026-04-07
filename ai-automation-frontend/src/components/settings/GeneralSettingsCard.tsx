@@ -6,6 +6,24 @@ import { useT } from '../../i18n';
 import { useUpdateSystemSetting, useAiProviders, useAssistantModelSetting, useSuggestionsModelSetting, useAutoRepairModeSetting } from '../../hooks/useSystem';
 import { Globe, Bot, Sparkles } from 'lucide-react';
 
+function modelOptionsForProvider(provider: string): { value: string; label: string }[] {
+  switch (provider) {
+    case 'CODEX':
+      return [
+        { value: '', label: 'Standard' },
+        { value: 'o3', label: 'o3' },
+        { value: 'o4-mini', label: 'o4-mini' },
+      ];
+    default:
+      return [
+        { value: '', label: 'Standard (Provider-Standard)' },
+        { value: 'claude-haiku-4-5-20251001', label: 'Haiku (schnell)' },
+        { value: 'claude-sonnet-4-6', label: 'Sonnet (präzise)' },
+        { value: 'claude-opus-4-6', label: 'Opus (komplex)' },
+      ];
+  }
+}
+
 export function GeneralSettingsCard() {
   const t = useT();
   const { simpleMode, setSimpleMode, advancedMode, setAdvancedMode, autoTodoDefault, setAutoTodoDefault, autoRepairDefault, setAutoRepairDefault, autoRepairMode, setAutoRepairMode, defaultAiProvider, setDefaultAiProvider, assistantModel, setAssistantModel, suggestionsModel, setSuggestionsModel, suggestionsEnabled, setSuggestionsEnabled } = useSettingsStore();
@@ -104,12 +122,7 @@ export function GeneralSettingsCard() {
               setAssistantModel(e.target.value);
               updateSetting.mutate({ key: 'assistant-model', value: e.target.value });
             }}
-            options={[
-              { value: '', label: 'Standard (Provider-Standard)' },
-              { value: 'claude-haiku-4-5-20251001', label: 'Haiku (schnell)' },
-              { value: 'claude-sonnet-4-6', label: 'Sonnet (präzise)' },
-              { value: 'claude-opus-4-6', label: 'Opus (komplex)' },
-            ]}
+            options={modelOptionsForProvider(defaultAiProvider || aiProviders?.default || 'CLAUDE')}
           />
         </div>
 
@@ -145,12 +158,7 @@ export function GeneralSettingsCard() {
                 setSuggestionsModel(e.target.value);
                 updateSetting.mutate({ key: 'suggestions-model', value: e.target.value });
               }}
-              options={[
-                { value: '', label: 'Standard (Provider-Standard)' },
-                { value: 'claude-haiku-4-5-20251001', label: 'Haiku (schnell)' },
-                { value: 'claude-sonnet-4-6', label: 'Sonnet (präzise)' },
-                { value: 'claude-opus-4-6', label: 'Opus (komplex)' },
-              ]}
+              options={modelOptionsForProvider(defaultAiProvider || aiProviders?.default || 'CLAUDE')}
             />
           </div>
         )}
