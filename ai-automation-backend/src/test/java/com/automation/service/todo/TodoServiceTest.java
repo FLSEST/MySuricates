@@ -69,7 +69,7 @@ class TodoServiceTest {
     void create_withDefaults_setsStatusOpenPriorityMediumSourceUser() {
         CreateTodoRequest request = new CreateTodoRequest(
                 "Test Todo", "Description", null, null, null,
-                null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null);
 
         when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> {
             Todo t = inv.getArgument(0);
@@ -89,7 +89,7 @@ class TodoServiceTest {
         CreateTodoRequest request = new CreateTodoRequest(
                 "Important", "Desc", Todo.Status.IN_PROGRESS, Todo.Priority.HIGH,
                 List.of("backend", "bug"), "proj-1", Todo.Source.AI, "claude-code",
-                null, null, null, null);
+                null, null, null, null, null);
 
         when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -115,7 +115,7 @@ class TodoServiceTest {
         when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UpdateTodoRequest request = new UpdateTodoRequest(
-                "New Title", null, null, Todo.Priority.HIGH, null, null, null, null);
+                "New Title", null, null, Todo.Priority.HIGH, null, null, null, null, null);
 
         Todo result = todoService.update("t-1", request);
 
@@ -134,7 +134,7 @@ class TodoServiceTest {
         when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UpdateTodoRequest request = new UpdateTodoRequest(
-                null, null, null, null, null, "", null, null);
+                null, null, null, null, null, "", null, null, null);
 
         Todo result = todoService.update("t-1", request);
 

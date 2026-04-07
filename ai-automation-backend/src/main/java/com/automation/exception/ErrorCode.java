@@ -14,6 +14,8 @@ public enum ErrorCode {
     STAGING_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Staging error"),
     STATE_CONFLICT(HttpStatus.CONFLICT, "State conflict"),
     SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Service unavailable"),
+    TOKEN_BUDGET_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "Token budget exceeded"),
+    OPERATION_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "Operation timed out"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error");
 
     private final HttpStatus httpStatus;

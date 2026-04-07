@@ -29,7 +29,7 @@ export function CalendarDayView({ date, events }: Props) {
     const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59);
 
-    const matching = events.filter((ev) => ev.start >= dayStart && ev.start <= dayEnd);
+    const matching = events.filter((ev) => ev.start <= dayEnd && (ev.end ?? ev.start) >= dayStart);
     return {
       allDay: matching.filter((ev) => ev.allDay),
       timed: matching.filter((ev) => !ev.allDay),

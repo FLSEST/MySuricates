@@ -23,6 +23,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -96,6 +97,7 @@ public class TodoService {
                 .workflowRunId(request.workflowRunId())
                 .referenceType(request.referenceType())
                 .referenceId(request.referenceId())
+                .dueDate(request.dueDate() != null && !request.dueDate().isBlank() ? Instant.parse(request.dueDate()) : null)
                 .build();
 
         Todo saved = todoRepository.save(todo);
@@ -118,6 +120,9 @@ public class TodoService {
         if (request.projectId() != null) todo.setProjectId(request.projectId().isBlank() ? null : request.projectId());
         if (request.referenceType() != null) todo.setReferenceType(request.referenceType());
         if (request.referenceId() != null) todo.setReferenceId(request.referenceId());
+        if (request.dueDate() != null) {
+            todo.setDueDate(request.dueDate().isBlank() ? null : Instant.parse(request.dueDate()));
+        }
 
         Todo saved = todoRepository.save(todo);
         log.info("Updated todo: {} ({})", saved.getTitle(), saved.getId());
@@ -180,6 +185,7 @@ public class TodoService {
                 base.workflowRunId(),
                 base.referenceType(), base.referenceId(),
                 base.fixAttempts(), base.lastFixRunId(),
+                base.dueDate(),
                 base.createdAt(), base.updatedAt()
         );
     }

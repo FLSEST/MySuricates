@@ -111,6 +111,20 @@ export function TodoEditModal({
           </div>
         </div>
 
+        {/* Due Date */}
+        <div className="space-y-1.5">
+          <label className="block text-sm font-medium text-text-secondary">{t.todos.dueDate}</label>
+          <input
+            type="date"
+            className="input-base w-full"
+            value={editForm.dueDate ? editForm.dueDate.split('T')[0] : ''}
+            onChange={(e) => onFormChange({
+              ...editForm,
+              dueDate: e.target.value ? new Date(e.target.value + 'T23:59:59').toISOString() : '',
+            })}
+          />
+        </div>
+
         {/* Project */}
         <Select
           label={t.common.project}

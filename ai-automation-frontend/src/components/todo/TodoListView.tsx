@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Pencil, Trash2, Clock, RefreshCw, ExternalLink } from 'lucide-react';
+import { Pencil, Trash2, Clock, RefreshCw, ExternalLink, CalendarClock } from 'lucide-react';
 import { Badge } from '../ui';
 import { useT } from '../../i18n';
 import { StatusDots } from './StatusDots';
@@ -104,6 +104,24 @@ export const TodoListItem = memo(function TodoListItem({ todo, onEdit, onStatusC
                 )}
               </div>
             )}
+
+            {/* Due date */}
+            {todo.dueDate && (() => {
+              const now = new Date();
+              const due = new Date(todo.dueDate);
+              const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+              const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+              const isOverdue = dueDay < today && todo.status !== 'DONE';
+              const isDueToday = dueDay.getTime() === today.getTime() && todo.status !== 'DONE';
+              const colorClass = isOverdue ? 'text-danger' : isDueToday ? 'text-warning' : 'text-text-tertiary';
+              const label = isOverdue ? t.todos.overdue : isDueToday ? t.todos.dueToday : t.todos.dueDate;
+              return (
+                <span className={`text-xs shrink-0 inline-flex items-center gap-0.5 font-medium ${colorClass}`} title={`${label}: ${dueDay.toLocaleDateString()}`}>
+                  <CalendarClock className="w-3 h-3" />
+                  {dueDay.toLocaleDateString()}
+                </span>
+              );
+            })()}
 
             {/* Time */}
             <span className="text-xs text-text-tertiary shrink-0 inline-flex items-center gap-0.5" title={`Erstellt: ${new Date(todo.createdAt).toLocaleString()}`}>

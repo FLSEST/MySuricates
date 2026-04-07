@@ -296,6 +296,8 @@ export const en = {
       resume: 'Resume',
       cancel: 'Cancel',
       retry: 'Retry',
+      reRun: 'Run Again',
+      expandOutput: 'Expand output',
       createTodo: 'Create Todo',
       resumeFromStep: 'Resume from last step',
       interrupted: 'Interrupted',

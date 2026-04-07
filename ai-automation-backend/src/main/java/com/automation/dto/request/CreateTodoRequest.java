@@ -17,5 +17,6 @@ public record CreateTodoRequest(
         String sessionId,
         String workflowRunId,
         String referenceType,
-        String referenceId
+        String referenceId,
+        String dueDate
 ) {}

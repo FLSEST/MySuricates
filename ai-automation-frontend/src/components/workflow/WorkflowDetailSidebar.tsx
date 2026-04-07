@@ -3,12 +3,13 @@ import { Plus, Pencil, Zap, Clock, FileText, Bot, Trash2, StickyNote } from 'luc
 import { Card, CardHeader, Button, Input, Select } from '../ui';
 import { StatusBadge } from '../shared/StatusBadge';
 import { GateStatusBadge } from '../shared/GateStatusBadge';
+import { Pagination } from '../shared/Pagination';
 import { WorkflowMemoryPanel } from './WorkflowMemoryPanel';
-import { useUpdateWorkflow } from '../../hooks/useWorkflows';
+import { useUpdateWorkflow, useWorkflowRuns } from '../../hooks/useWorkflows';
 import { useAiProviders } from '../../hooks/useSystem';
 import { useT } from '../../i18n';
 import { formatDuration } from '../../utils/formatTime';
-import type { Workflow, WorkflowRun, PageResponse } from '../../types';
+import type { Workflow, WorkflowRun } from '../../types';
 
 const MODEL_OPTIONS = [
   { value: '', label: '' },
@@ -19,7 +20,6 @@ const MODEL_OPTIONS = [
 
 interface WorkflowDetailSidebarProps {
   workflow: Workflow;
-  runs: PageResponse<WorkflowRun> | undefined;
   workflowVariables: string[];
   onOpenEditInstructions: () => void;
   onOpenAddSkill: () => void;
@@ -27,9 +27,10 @@ interface WorkflowDetailSidebarProps {
   onNavigateToRun: (runId: string) => void;
 }
 
+const RUN_PAGE_SIZE = 5;
+
 export function WorkflowDetailSidebar({
   workflow,
-  runs,
   workflowVariables,
   onOpenEditInstructions,
   onOpenAddSkill,
@@ -39,6 +40,8 @@ export function WorkflowDetailSidebar({
   const t = useT();
   const updateWorkflow = useUpdateWorkflow();
   const { data: aiProviders } = useAiProviders();
+  const [runPage, setRunPage] = useState(0);
+  const { data: runs } = useWorkflowRuns(workflow.id, runPage, RUN_PAGE_SIZE);
 
   return (
     <div className="space-y-4">
@@ -261,34 +264,51 @@ export function WorkflowDetailSidebar({
 
       <Card padding={false}>
         <div className="p-5 pb-0">
-          <CardHeader title={`${t.dashboard.recentRuns} (${runs?.content?.length ?? 0})`} />
+          <CardHeader title={`${t.dashboard.recentRuns} (${runs?.totalElements ?? 0})`} />
         </div>
         {!runs?.content?.length ? (
           <div className="px-5 py-8 text-center text-sm text-text-tertiary">{t.workflows.noRuns}</div>
         ) : (
-          <div className="divide-y divide-border">
-            {runs.content.slice(0, 5).map((run: WorkflowRun) => (
-              <div
-                key={run.id}
-                className="flex items-center justify-between px-5 py-3 hover:bg-surface transition-colors cursor-pointer"
-                onClick={() => onNavigateToRun(run.id)}
-              >
-                <div className="flex items-center gap-2">
-                  <StatusBadge status={run.status} />
-                  <GateStatusBadge run={run} />
-                </div>
-                <div className="flex items-center gap-2 text-xs text-text-tertiary">
+          <>
+            <div className="divide-y divide-border">
+              {runs.content.map((run: WorkflowRun) => (
+                <div
+                  key={run.id}
+                  className="px-5 py-3 hover:bg-surface transition-colors cursor-pointer"
+                  onClick={() => onNavigateToRun(run.id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <StatusBadge status={run.status} />
+                      <GateStatusBadge run={run} />
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-text-tertiary">
+                      <Clock className="w-3 h-3" />
+                      {formatDuration(run.durationMs)}
+                    </div>
+                  </div>
                   {(run.metadata?.notes as string) && (
-                    <span title={run.metadata.notes as string}>
-                      <StickyNote className="w-3 h-3 text-accent" />
-                    </span>
+                    <p className="text-xs text-text-tertiary mt-1 truncate">
+                      <StickyNote className="w-3 h-3 text-accent inline mr-1 -mt-0.5" />
+                      {(run.metadata.notes as string).slice(0, 80)}
+                      {(run.metadata.notes as string).length > 80 ? '...' : ''}
+                    </p>
                   )}
-                  <Clock className="w-3 h-3" />
-                  {formatDuration(run.durationMs)}
                 </div>
+              ))}
+            </div>
+            {runs.totalPages > 1 && (
+              <div className="px-5 py-2">
+                <Pagination
+                  page={runPage}
+                  totalPages={runs.totalPages}
+                  totalElements={runs.totalElements}
+                  label=""
+                  setPage={setRunPage}
+                />
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </Card>
 

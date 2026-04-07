@@ -76,6 +76,7 @@ export function Todos() {
   const [quickProjectId, setQuickProjectId] = useState('');
   const [quickPriority, setQuickPriority] = useState<TodoPriority>('MEDIUM');
   const [quickTags, setQuickTags] = useState<string[]>([]);
+  const [quickDueDate, setQuickDueDate] = useState('');
   const quickInputRef = useRef<HTMLInputElement>(null);
 
   // Edit modal state
@@ -132,6 +133,7 @@ export function Todos() {
       priority: quickPriority,
       projectId: quickProjectId || undefined,
       tags: quickTags.length > 0 ? quickTags : undefined,
+      dueDate: quickDueDate ? new Date(quickDueDate + 'T23:59:59').toISOString() : undefined,
     };
     createTodo.mutate(req, {
       onSuccess: () => {
@@ -139,6 +141,7 @@ export function Todos() {
         setQuickDescription('');
         setQuickPriority('MEDIUM');
         setQuickTags([]);
+        setQuickDueDate('');
         quickInputRef.current?.focus();
       },
     });
@@ -158,6 +161,7 @@ export function Todos() {
       priority: todo.priority,
       projectId: todo.projectId ?? '',
       tags: todo.tags,
+      dueDate: todo.dueDate ?? '',
     });
     setEditTagsList([...todo.tags]);
   };
@@ -253,6 +257,13 @@ export function Todos() {
               <option key={p} value={p}>{t.todos.priorities[p]}</option>
             ))}
           </select>
+          <input
+            type="date"
+            className="input-base w-36"
+            value={quickDueDate}
+            onChange={(e) => setQuickDueDate(e.target.value)}
+            title={t.todos.dueDate}
+          />
           <Button
             icon={<Plus className="w-4 h-4" />}
             onClick={handleQuickAdd}
@@ -400,6 +411,7 @@ export function Todos() {
             todos={filtered}
             onEdit={openEdit}
             onStatusChange={handleStatusChange}
+            totalCounts={statusFilter === 'ALL' ? counts ?? undefined : undefined}
           />
           {todosPage && todosPage.totalElements > KANBAN_PAGE_SIZE && (
             <p className="text-xs text-text-tertiary text-center mt-2">

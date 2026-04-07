@@ -2,10 +2,10 @@ import { memo, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Clock, RefreshCw, ExternalLink } from 'lucide-react';
+import { Clock, RefreshCw, ExternalLink, CalendarClock } from 'lucide-react';
 import { useT } from '../../i18n';
 import { priorityColor, formatRelative } from './todoConstants';
-import type { Todo, TodoStatus } from '../../types';
+import type { Todo, TodoStatus, TodoCountResponse } from '../../types';
 
 const MemoizedMarkdown = memo(function MemoizedMarkdown({ children }: { children: string }) {
   return <ReactMarkdown remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown>;
@@ -66,10 +66,27 @@ const KanbanCard = memo(function KanbanCard({ todo, onEdit, onStatusChange }: {
       </div>
       {/* Quick status change buttons (on hover) */}
       <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
-        <span className="text-[10px] text-text-tertiary inline-flex items-center gap-0.5" title={`Erstellt: ${new Date(todo.createdAt).toLocaleString()}`}>
-          <Clock className="w-2.5 h-2.5" />
-          {formatRelative(todo.createdAt)}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-text-tertiary inline-flex items-center gap-0.5" title={`Erstellt: ${new Date(todo.createdAt).toLocaleString()}`}>
+            <Clock className="w-2.5 h-2.5" />
+            {formatRelative(todo.createdAt)}
+          </span>
+          {todo.dueDate && (() => {
+            const now = new Date();
+            const due = new Date(todo.dueDate);
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+            const isOverdue = dueDay < today && todo.status !== 'DONE';
+            const isDueToday = dueDay.getTime() === today.getTime() && todo.status !== 'DONE';
+            const colorClass = isOverdue ? 'text-danger' : isDueToday ? 'text-warning' : 'text-text-tertiary';
+            return (
+              <span className={`text-[10px] inline-flex items-center gap-0.5 font-medium ${colorClass}`}>
+                <CalendarClock className="w-2.5 h-2.5" />
+                {dueDay.toLocaleDateString()}
+              </span>
+            );
+          })()}
+        </div>
         {todo.updatedAt && Math.abs(new Date(todo.updatedAt).getTime() - new Date(todo.createdAt).getTime()) > 1000 && (
           <span className="text-[10px] text-text-tertiary inline-flex items-center gap-0.5" title={`Aktualisiert: ${new Date(todo.updatedAt).toLocaleString()}`}>
             <RefreshCw className="w-2.5 h-2.5" />
@@ -116,10 +133,11 @@ const KanbanCard = memo(function KanbanCard({ todo, onEdit, onStatusChange }: {
 });
 
 /* ─── Kanban Board ──────────────────────────────────────── */
-export function TodoKanbanView({ todos, onEdit, onStatusChange }: {
+export function TodoKanbanView({ todos, onEdit, onStatusChange, totalCounts }: {
   todos: Todo[];
   onEdit: (todo: Todo) => void;
   onStatusChange: (todo: Todo, status: TodoStatus) => void;
+  totalCounts?: TodoCountResponse;
 }) {
   const t = useT();
 
@@ -130,6 +148,10 @@ export function TodoKanbanView({ todos, onEdit, onStatusChange }: {
     { status: 'BACKLOG', label: t.todos.statuses.BACKLOG, color: 'text-text-tertiary/60', borderColor: 'border-text-tertiary/20' },
   ];
 
+  const totalCountMap: Record<TodoStatus, number | undefined> = totalCounts
+    ? { OPEN: totalCounts.open, IN_PROGRESS: totalCounts.inProgress, DONE: totalCounts.done, BACKLOG: totalCounts.backlog }
+    : { OPEN: undefined, IN_PROGRESS: undefined, DONE: undefined, BACKLOG: undefined };
+
   const grouped = useMemo(() => {
     const map: Record<TodoStatus, Todo[]> = { OPEN: [], IN_PROGRESS: [], DONE: [], BACKLOG: [] };
     todos.forEach((todo) => map[todo.status].push(todo));
@@ -138,13 +160,17 @@ export function TodoKanbanView({ todos, onEdit, onStatusChange }: {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-      {columns.map(({ status, label, color, borderColor }) => (
+      {columns.map(({ status, label, color, borderColor }) => {
+        const loadedCount = grouped[status].length;
+        const realTotal = totalCountMap[status];
+        const isTruncated = realTotal !== undefined && realTotal > loadedCount;
+        return (
         <div key={status} className={`rounded-xl border-2 ${borderColor} bg-surface-raised/30 p-3`}>
           {/* Column header */}
           <div className="flex items-center justify-between mb-3">
             <h3 className={`text-sm font-semibold ${color}`}>{label}</h3>
             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${color} bg-surface-raised`}>
-              {grouped[status].length}
+              {isTruncated ? `${loadedCount} / ${realTotal}` : (realTotal ?? loadedCount)}
             </span>
           </div>
           {/* Cards */}
@@ -161,9 +187,15 @@ export function TodoKanbanView({ todos, onEdit, onStatusChange }: {
                 />
               ))
             )}
+            {isTruncated && (
+              <div className="text-center py-2 text-[10px] text-text-tertiary">
+                +{realTotal - loadedCount} {t.todos.moreItems}
+              </div>
+            )}
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

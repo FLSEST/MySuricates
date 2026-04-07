@@ -22,6 +22,7 @@ public record TodoResponse(
         String referenceId,
         int fixAttempts,
         String lastFixRunId,
+        Instant dueDate,
         Instant createdAt,
         Instant updatedAt
 ) {}

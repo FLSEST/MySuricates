@@ -346,6 +346,9 @@ public class AssistantContextBuilder {
                         for (int i = 0; i < steps.size(); i++) {
                             if (steps.get(i).getStatus() == StepStatus.FAILED) { firstFailedIdx = i; break; }
                         }
+                        int perStepBudget = firstFailedIdx == -1 && !steps.isEmpty()
+                                ? Math.min(1500, 8000 / steps.size())
+                                : 0;
                         for (int i = 0; i < steps.size(); i++) {
                             StepResult s = steps.get(i);
                             sb.append("  ").append(s.getStepIndex() + 1).append(". ")
@@ -357,6 +360,8 @@ public class AssistantContextBuilder {
                             } else if (isBeforeFailed && s.getOutput() != null) {
                                 sb.append(" (vorheriger Step — Kontext für Fehleranalyse):\n    ")
                                         .append(truncate(s.getOutput(), 1500));
+                            } else if (firstFailedIdx == -1 && s.getOutput() != null && perStepBudget > 0) {
+                                sb.append(" Output:\n    ").append(truncate(s.getOutput(), perStepBudget));
                             }
                             sb.append("\n");
                         }

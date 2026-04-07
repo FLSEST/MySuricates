@@ -277,11 +277,15 @@ function MonthGrid({
 
   const eventsByDay = useMemo(() => {
     const map: Record<number, UnifiedCalendarEvent[]> = {};
+    const monthStart = new Date(year, month, 1);
+    const monthEnd = new Date(year, month + 1, 0);
     for (const ev of events) {
-      if (ev.start.getFullYear() === year && ev.start.getMonth() === month) {
-        const day = ev.start.getDate();
-        if (!map[day]) map[day] = [];
-        map[day].push(ev);
+      const evEnd = ev.end ?? ev.start;
+      if (evEnd < monthStart || ev.start > monthEnd) continue;
+      const rangeStart = ev.start < monthStart ? 1 : ev.start.getDate();
+      const rangeEnd = evEnd > monthEnd ? monthEnd.getDate() : evEnd.getDate();
+      for (let d = rangeStart; d <= rangeEnd; d++) {
+        (map[d] ??= []).push(ev);
       }
     }
     return map;

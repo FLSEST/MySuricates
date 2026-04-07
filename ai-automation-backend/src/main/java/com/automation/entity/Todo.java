@@ -71,6 +71,9 @@ public class Todo {
     @Column(name = "related_todo_id")
     private String relatedTodoId;
 
+    @Column(name = "due_date")
+    private Instant dueDate;
+
     @Column(name = "fix_attempts")
     @Builder.Default
     private int fixAttempts = 0;

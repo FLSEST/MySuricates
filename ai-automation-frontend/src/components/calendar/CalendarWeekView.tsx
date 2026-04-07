@@ -38,8 +38,14 @@ export function CalendarWeekView({ weekStart, events, onDayClick }: Props) {
       map[key] = [];
     }
     for (const ev of events) {
-      const key = `${ev.start.getFullYear()}-${ev.start.getMonth()}-${ev.start.getDate()}`;
-      if (map[key]) map[key].push(ev);
+      const evEnd = ev.end ?? ev.start;
+      const cursor = new Date(ev.start.getFullYear(), ev.start.getMonth(), ev.start.getDate());
+      const endDay = new Date(evEnd.getFullYear(), evEnd.getMonth(), evEnd.getDate());
+      while (cursor <= endDay) {
+        const key = `${cursor.getFullYear()}-${cursor.getMonth()}-${cursor.getDate()}`;
+        if (map[key]) map[key].push(ev);
+        cursor.setDate(cursor.getDate() + 1);
+      }
     }
     return map;
   }, [events, days]);

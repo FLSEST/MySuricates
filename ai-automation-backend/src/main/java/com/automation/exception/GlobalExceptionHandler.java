@@ -25,6 +25,12 @@ public class GlobalExceptionHandler {
         return respond(ErrorCode.RESOURCE_NOT_FOUND, ex.getMessage());
     }
 
+    @ExceptionHandler(TokenBudgetExceededException.class)
+    public ResponseEntity<ErrorResponse> handleTokenBudgetExceeded(TokenBudgetExceededException ex) {
+        log.warn("Token budget exceeded: {}", ex.getMessage());
+        return respond(ErrorCode.TOKEN_BUDGET_EXCEEDED, ex.getMessage());
+    }
+
     @ExceptionHandler(WorkflowExecutionException.class)
     public ResponseEntity<ErrorResponse> handleExecutionError(WorkflowExecutionException ex) {
         log.error("Workflow execution error", ex);
@@ -75,6 +81,12 @@ public class GlobalExceptionHandler {
                 .fieldErrors(fieldErrors)
                 .build();
         return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.getHttpStatus()).body(response);
+    }
+
+    @ExceptionHandler(java.util.concurrent.TimeoutException.class)
+    public ResponseEntity<ErrorResponse> handleTimeout(java.util.concurrent.TimeoutException ex) {
+        log.warn("Operation timed out: {}", ex.getMessage());
+        return respond(ErrorCode.OPERATION_TIMEOUT, ex.getMessage() != null ? ex.getMessage() : "Operation timed out");
     }
 
     @ExceptionHandler(Exception.class)

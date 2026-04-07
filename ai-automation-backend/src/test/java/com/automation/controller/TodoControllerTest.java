@@ -51,7 +51,7 @@ class TodoControllerTest {
     private TodoResponse sampleResponse() {
         return new TodoResponse("t-1", "Fix bug", "desc", Todo.Status.OPEN, Todo.Priority.HIGH,
                 List.of("backend"), null, null, Todo.Source.AI, "claude", null, null, null, null,
-                0, null, Instant.now(), Instant.now());
+                0, null, null, Instant.now(), Instant.now());
     }
 
     @Test
@@ -93,7 +93,7 @@ class TodoControllerTest {
         when(todoMapper.toResponse(todo)).thenReturn(sampleResponse());
 
         var request = new CreateTodoRequest("Fix bug", "desc", null, Todo.Priority.HIGH,
-                List.of("backend"), null, Todo.Source.AI, "claude", null, null, null, null);
+                List.of("backend"), null, Todo.Source.AI, "claude", null, null, null, null, null);
 
         mockMvc.perform(post("/api/v1/todos")
                         .contentType(MediaType.APPLICATION_JSON)

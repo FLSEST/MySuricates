@@ -7,13 +7,14 @@ interface ModalProps {
   title: string;
   children: ReactNode;
   footer?: ReactNode;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
 const sizeStyles = {
   sm: 'max-w-md',
   md: 'max-w-lg',
   lg: 'max-w-2xl',
+  xl: 'max-w-5xl',
 };
 
 export function Modal({ open, onClose, title, children, footer, size = 'md' }: ModalProps) {
@@ -61,7 +62,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
         </div>
 
         {/* Body */}
-        <div className="px-5 py-4 max-h-[70vh] sm:max-h-[60vh] overflow-y-auto">{children}</div>
+        <div className="px-5 py-4 max-h-[80vh] sm:max-h-[75vh] overflow-y-auto">{children}</div>
 
         {/* Footer */}
         {footer && (

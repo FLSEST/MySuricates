@@ -298,6 +298,8 @@ export const de: TranslationKeys = {
       resume: 'Fortsetzen',
       cancel: 'Abbrechen',
       retry: 'Wiederholen',
+      reRun: 'Nochmals ausführen',
+      expandOutput: 'Ausgabe vergrößern',
       createTodo: 'Todo erstellen',
       resumeFromStep: 'Ab letztem Schritt fortsetzen',
       interrupted: 'Unterbrochen',

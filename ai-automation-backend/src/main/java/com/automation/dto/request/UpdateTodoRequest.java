@@ -12,5 +12,6 @@ public record UpdateTodoRequest(
         List<String> tags,
         String projectId,
         String referenceType,
-        String referenceId
+        String referenceId,
+        String dueDate
 ) {}

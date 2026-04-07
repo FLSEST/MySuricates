@@ -322,7 +322,6 @@ export function WorkflowDetail() {
 
         <WorkflowDetailSidebar
           workflow={workflow}
-          runs={runs}
           workflowVariables={workflowVariables}
           onOpenEditInstructions={() => {
             setEditInstructions(workflow.instructions || '');

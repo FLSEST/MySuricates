@@ -185,7 +185,7 @@ export interface UpdateWorkflowRequest {
   defaultContext?: Record<string, string>;
 }
 
-export type BlockType = 'simple' | 'shell' | 'retry' | 'foreach' | 'while' | 'conditional' | 'switch' | 'skill-capability' | 'approval' | 'agentic' | 'sub-workflow' | 'human-input' | 'integration';
+export type BlockType = 'simple' | 'shell' | 'retry' | 'foreach' | 'while' | 'conditional' | 'switch' | 'skill-capability' | 'approval' | 'agentic' | 'sub-workflow' | 'human-input';
 
 export interface BlockDefinition {
   type: BlockType;
@@ -894,6 +894,7 @@ export interface Todo {
   referenceId: string | null;
   fixAttempts: number;
   lastFixRunId: string | null;
+  dueDate: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -909,6 +910,7 @@ export interface CreateTodoRequest {
   sourceAgent?: string;
   sessionId?: string;
   workflowRunId?: string;
+  dueDate?: string;
 }
 
 export interface UpdateTodoRequest {
@@ -918,6 +920,7 @@ export interface UpdateTodoRequest {
   priority?: TodoPriority;
   tags?: string[];
   projectId?: string;
+  dueDate?: string;
 }
 
 export interface TodoCountResponse {
