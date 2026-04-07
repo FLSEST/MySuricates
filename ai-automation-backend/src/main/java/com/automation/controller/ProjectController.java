@@ -89,6 +89,9 @@ public class ProjectController {
     public ResponseEntity<Map<String, String>> generateContext(@PathVariable String id) {
         var project = projectService.findById(id);
         String generated = projectContextService.generateContext(project.getPath());
+        // Persist to DB so assistant and workflows can reuse cached context
+        projectService.update(id, new UpdateProjectRequest(
+                null, null, null, null, null, null, generated));
         return ResponseEntity.ok(Map.of("context", generated));
     }
 

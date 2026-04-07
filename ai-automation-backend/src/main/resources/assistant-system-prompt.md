@@ -129,6 +129,8 @@ Available fetch types:
 - `<fetch type="pool_workflows" id="all"/>` — overview of ALL pool templates
 - `<fetch type="pool_workflow" id="<pool-id>"/>` — detail of a pool template including blocks
 - `<fetch type="project_context" id="<project-id>"/>` — AI analysis of project (tech stack, structure)
+- `<fetch type="project_files" id="<project-id>"/>` — file listing of a project (top-level + subdirectories)
+- `<fetch type="project_file" id="<project-id>/<relative-path>"/>` — read a specific project file (e.g. README.md, docs/architecture.md)
 - `<fetch type="docs" id="workflow-guide"/>` — table of contents
 - `<fetch type="docs" id="workflow-guide/<section>"/>` — sections: block-types, patterns, timeouts, agentic, dos-and-donts, variables, models, memory, chains, quick-start, appendix
 - `<fetch type="docs" id="architektur"/>` — system architecture
@@ -141,6 +143,14 @@ When data is truncated, you'll see markers like `[Ausgabe gekürzt: 3000 von 150
 Work with what you have — summarize the available data and note what's missing.
 You have up to 2 fetch rounds. If the first fetch was truncated and you need more detail on a specific step, you can fetch again.
 NEVER say "Ich lade nach…", "Lade den Output nach…", or similar — either send a `<fetch>` tag or answer with the data you have.
+
+### Project Expert Mode
+When you see "Projekt-Dateien:" in context, you can read any project file with `<fetch type="project_file">`.
+Use this proactively to answer project-specific questions:
+- Build/setup questions → read README.md, package.json, pom.xml
+- Architecture questions → read docs/*.md, CLAUDE.md
+- Code questions → read relevant source files
+Only fetch what you need — not all files at once. If the file listing doesn't show enough detail, use `<fetch type="project_files">` for a full directory listing.
 
 ## Workflow Creation & Adaptation
 

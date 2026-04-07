@@ -23,12 +23,17 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Builds the system prompt and user prompt for the assistant chat.
@@ -386,23 +391,65 @@ public class AssistantContextBuilder {
         }
         if (ctx.projectId() != null) {
             try {
-                projectRepository.findById(ctx.projectId()).ifPresent(p ->
-                        sb.append("Aktives Projekt: ").append(p.getName())
-                                .append(" (ID: ").append(p.getId()).append(")\n")
-                );
+                projectRepository.findById(ctx.projectId()).ifPresent(p -> {
+                    sb.append("Aktives Projekt: ").append(p.getName())
+                            .append(" (ID: ").append(p.getId()).append(")\n");
+                    appendProjectFileListing(sb, p.getPath(), p.getId());
+                });
             } catch (Exception ignored) {}
         } else if (workflowId != null) {
             try {
                 workflowRepository.findByIdWithSkills(workflowId)
                         .map(Workflow::getProject)
                         .filter(project -> project != null)
-                        .ifPresent(project ->
-                                sb.append("Aktives Projekt: ").append(project.getName())
-                                        .append(" (ID: ").append(project.getId()).append(")\n")
-                        );
+                        .ifPresent(project -> {
+                            sb.append("Aktives Projekt: ").append(project.getName())
+                                    .append(" (ID: ").append(project.getId()).append(")\n");
+                            appendProjectFileListing(sb, project.getPath(), project.getId());
+                        });
             } catch (Exception ignored) {}
         }
         sb.append("\n");
+    }
+
+    // ── Project file listing ──────────────────────────────────────────────
+
+    private static final Set<String> LISTING_IGNORED_DIRS = Set.of(
+            "node_modules", ".git", "target", "build", "dist", "__pycache__",
+            ".gradle", ".idea", ".vscode", ".next", "venv", ".venv", ".cache"
+    );
+
+    private void appendProjectFileListing(StringBuilder sb, String projectPath, String projectId) {
+        if (projectPath == null || projectPath.isBlank()) return;
+        Path root = Path.of(projectPath);
+        if (!Files.isDirectory(root)) return;
+
+        try (Stream<Path> topLevel = Files.list(root).sorted()) {
+            var files = new ArrayList<String>();
+            for (Path entry : topLevel.toList()) {
+                String name = entry.getFileName().toString();
+                if (Files.isDirectory(entry)) {
+                    if (!LISTING_IGNORED_DIRS.contains(name) && name.equals("docs")) {
+                        try (Stream<Path> docs = Files.list(entry).sorted()) {
+                            docs.filter(Files::isRegularFile)
+                                    .limit(5)
+                                    .forEach(f -> files.add("docs/" + f.getFileName()));
+                        }
+                    }
+                } else {
+                    files.add(name);
+                }
+            }
+            if (!files.isEmpty()) {
+                String listing = String.join(", ", files);
+                if (listing.length() > 300) listing = listing.substring(0, 300) + "…";
+                sb.append("Projekt-Dateien: ").append(listing).append("\n");
+                sb.append("_(Nutze `<fetch type=\"project_file\" id=\"").append(projectId)
+                        .append("/<pfad>\"/>` um eine Datei zu lesen)_\n");
+            }
+        } catch (IOException e) {
+            log.debug("Could not list project files for {}", projectPath, e);
+        }
     }
 
     // ── Shared helpers (delegate to RunsContextSection) ──────────────────
