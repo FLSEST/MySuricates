@@ -57,6 +57,7 @@ function RunRedirect() {
 const Runs = lazy(() => import('./pages/Runs').then(m => ({ default: m.Runs })));
 const Skills = lazy(() => import('./pages/Skills').then(m => ({ default: m.Skills })));
 const Schedules = lazy(() => import('./pages/Schedules').then(m => ({ default: m.Schedules })));
+const CalendarPage = lazy(() => import('./pages/Calendar').then(m => ({ default: m.Calendar })));
 const Webhooks = lazy(() => import('./pages/Webhooks').then(m => ({ default: m.Webhooks })));
 const Integrations = lazy(() => import('./pages/Integrations').then(m => ({ default: m.Integrations })));
 const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })));
@@ -93,6 +94,7 @@ const router = createBrowserRouter([
       { path: 'runs/:runId', element: <RunRedirect /> },
       { path: 'skills', element: <Skills /> },
       { path: 'schedules', element: <Schedules /> },
+      { path: 'calendar', element: <CalendarPage /> },
       { path: 'webhooks', element: <Webhooks /> },
       { path: 'integrations', element: <Integrations /> },
       { path: 'todos', element: <Todos /> },

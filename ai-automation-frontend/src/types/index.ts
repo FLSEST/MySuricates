@@ -421,6 +421,47 @@ export interface IntegrationActionInfo {
   inputSchema: Record<string, unknown>;
 }
 
+// ── Unified Calendar ─────────────────────────────────────
+
+export interface UnifiedCalendarEvent {
+  id: string;
+  title: string;
+  start: Date;
+  end?: Date;
+  allDay: boolean;
+  source: string;
+  sourceLabel: string;
+  color: string;
+  status?: string;
+  location?: string;
+  link?: string;
+}
+
+export interface CalendarSourceConfig {
+  sourceId: string;
+  label: string;
+  color: string;
+  enabled: boolean;
+}
+
+export interface GoogleCalendarEventResponse {
+  id: string;
+  summary: string;
+  description?: string;
+  location?: string;
+  status: string;
+  start: { dateTime?: string; date?: string; timeZone?: string };
+  end: { dateTime?: string; date?: string; timeZone?: string };
+  attendees?: { email: string; displayName?: string; responseStatus: string }[];
+  htmlLink?: string;
+}
+
+export interface GoogleEventListResponse {
+  items: GoogleCalendarEventResponse[];
+  nextPageToken?: string;
+  summary?: string;
+}
+
 // ── Notifications ─────────────────────────────────────────
 
 export type NotificationChannelType = 'WEBHOOK' | 'DESKTOP';
