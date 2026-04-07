@@ -87,6 +87,17 @@ public class LearningService {
         return model.replaceAll("-\\d{8,}$", "");
     }
 
+    /** Safely resolve workflow from run, returning null if the workflow was soft-deleted. */
+    private Workflow safeGetWorkflow(WorkflowRun run) {
+        try {
+            Workflow w = run.getWorkflow();
+            if (w != null) w.getName(); // force proxy init (getId() doesn't trigger it)
+            return w;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     @Transactional(readOnly = true)
     public DashboardResponse getDashboard() {
         return getDashboard(30, null);
@@ -111,9 +122,11 @@ public class LearningService {
         // Apply optional project filter
         if (projectId != null && !projectId.isBlank()) {
             recentWindow = recentWindow.stream()
-                    .filter(r -> r.getWorkflow() != null
-                            && r.getWorkflow().getProject() != null
-                            && projectId.equals(r.getWorkflow().getProject().getId()))
+                    .filter(r -> {
+                        Workflow w = safeGetWorkflow(r);
+                        return w != null && w.getProject() != null
+                                && projectId.equals(w.getProject().getId());
+                    })
                     .toList();
         }
 
@@ -129,6 +142,7 @@ public class LearningService {
                 .toList();
 
         List<WorkflowRunResponse> recentRuns = runRepository.findTop10ByOrderByStartedAtDesc().stream()
+                .filter(r -> safeGetWorkflow(r) != null)
                 .map(workflowMapper::toRunResponse)
                 .toList();
 
@@ -204,8 +218,9 @@ public class LearningService {
             }
 
             // Cost by workflow
-            String wfId = run.getWorkflow() != null ? run.getWorkflow().getId() : "unknown";
-            String wfName = run.getWorkflow() != null ? run.getWorkflow().getName() : "Unknown";
+            Workflow wf = safeGetWorkflow(run);
+            String wfId = wf != null ? wf.getId() : "unknown";
+            String wfName = wf != null ? wf.getName() : "Unknown";
             workflowRunCountMap.computeIfAbsent(wfId, k -> new long[1])[0]++;
             workflowNameMap.putIfAbsent(wfId, wfName);
 

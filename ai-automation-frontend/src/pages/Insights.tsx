@@ -67,7 +67,7 @@ export function Insights() {
   const { data: platform, isLoading: platLoading } = usePlatformStats();
   const { data: projects } = useProjects();
 
-  const isLoading = dashLoading && platLoading;
+  const isLoading = dashLoading || platLoading;
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-64"><Spinner /></div>;
