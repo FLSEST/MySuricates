@@ -70,6 +70,18 @@ class SecurityConfigIntegrationTest {
                 .andExpect(status().is(not(403)));
     }
 
+    @Test
+    void publicEndpoint_integrationSnippet_accessibleWithoutAuth() throws Exception {
+        mockMvc.perform(get("/api/v1/system/integration-snippet"))
+                .andExpect(status().is(not(403)));
+    }
+
+    @Test
+    void publicEndpoint_oauthCallback_accessibleWithoutAuth() throws Exception {
+        mockMvc.perform(get("/api/v1/integrations/github/callback"))
+                .andExpect(status().is(not(403)));
+    }
+
     // --- Group 2: Protected endpoints require auth ---
 
     @Test
@@ -81,6 +93,13 @@ class SecurityConfigIntegrationTest {
     @Test
     void protectedEndpoint_actuatorInfoWithoutAuth_returns403() throws Exception {
         mockMvc.perform(get("/actuator/info"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void protectedEndpoint_withInvalidApiKey_returns403() throws Exception {
+        mockMvc.perform(get("/api/v1/projects")
+                        .header(API_KEY_HEADER, "wrong-key"))
                 .andExpect(status().isForbidden());
     }
 
@@ -117,7 +136,7 @@ class SecurityConfigIntegrationTest {
     void headers_cspHeaderIsSet() throws Exception {
         mockMvc.perform(get("/api/v1/system/health"))
                 .andExpect(header().string("Content-Security-Policy",
-                        "default-src 'self'; script-src 'self'; connect-src 'self' ws://localhost:* wss://localhost:*; style-src 'self' 'unsafe-inline'; img-src 'self' data:"));
+                        "default-src 'self'; script-src 'self'; connect-src 'self' ws://localhost:* wss://localhost:* ws://100.*:* wss://100.*:*; style-src 'self' 'unsafe-inline'; img-src 'self' data:"));
     }
 
     @Test
