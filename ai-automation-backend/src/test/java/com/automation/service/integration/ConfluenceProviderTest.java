@@ -36,8 +36,8 @@ class ConfluenceProviderTest {
         OAuthConfig config = provider.getOAuthConfig();
         assertThat(config.authorizationUrl()).contains("auth.atlassian.com");
         assertThat(config.tokenUrl()).contains("auth.atlassian.com");
-        assertThat(config.defaultScopes()).contains("read:space:confluence", "read:content:confluence",
-                "read:content-details:confluence", "search:confluence", "offline_access");
+        assertThat(config.defaultScopes()).contains("read:confluence-content.all", "read:confluence-space.summary",
+                "search:confluence", "offline_access");
         assertThat(config.clientIdEnvVar()).isEqualTo("CONFLUENCE_CLIENT_ID");
         assertThat(config.clientSecretEnvVar()).isEqualTo("CONFLUENCE_CLIENT_SECRET");
         assertThat(config.extraAuthParams()).containsEntry("audience", "api.atlassian.com");

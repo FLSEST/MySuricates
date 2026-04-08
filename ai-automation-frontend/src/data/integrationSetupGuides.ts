@@ -324,12 +324,12 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
           de: [
             'Im Seitenmenü: "Permissions"',
             'Bei "Confluence API" auf "Add" klicken',
-            'Pflicht-Scopes: "read:space:confluence", "read:content:confluence", "read:content-details:confluence", "search:confluence". Optional für Schreibzugriff: "write:content:confluence"',
+            'Pflicht-Scopes: "read:confluence-content.all", "read:confluence-space.summary", "search:confluence". Optional für Schreibzugriff: "write:confluence-content"',
           ],
           en: [
             'In the side menu: "Permissions"',
             'Click "Add" next to "Confluence API"',
-            'Required scopes: "read:space:confluence", "read:content:confluence", "read:content-details:confluence", "search:confluence". Optional for write access: "write:content:confluence"',
+            'Required scopes: "read:confluence-content.all", "read:confluence-space.summary", "search:confluence". Optional for write access: "write:confluence-content"',
           ],
         },
       },
