@@ -285,6 +285,20 @@ class WorkflowChainTest {
         assertThat(chain.getRuns()).hasSize(1);
     }
 
+    @Test
+    void should_allowRemovingRuns_when_runsHasItems() {
+        List<ChainRun> runs = new ArrayList<>();
+        runs.add(new ChainRun());
+        runs.add(new ChainRun());
+        WorkflowChain chain = WorkflowChain.builder()
+                .runs(runs)
+                .build();
+
+        chain.getRuns().remove(0);
+
+        assertThat(chain.getRuns()).hasSize(1);
+    }
+
     // --- AllArgsConstructor ---
 
     @Test
