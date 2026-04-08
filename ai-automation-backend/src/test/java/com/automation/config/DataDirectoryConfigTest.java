@@ -1,11 +1,13 @@
 package com.automation.config;
 
+import jakarta.annotation.PostConstruct;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.context.annotation.Configuration;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -30,6 +32,14 @@ class DataDirectoryConfigTest {
     void should_haveConfigurationAnnotation_when_classIsInspected() {
         assertThat(DataDirectoryConfig.class.isAnnotationPresent(Configuration.class))
                 .as("DataDirectoryConfig must be annotated with @Configuration")
+                .isTrue();
+    }
+
+    @Test
+    void should_havePostConstructAnnotation_when_ensureDataDirectoryIsInspected() throws Exception {
+        Method method = DataDirectoryConfig.class.getMethod("ensureDataDirectory");
+        assertThat(method.isAnnotationPresent(PostConstruct.class))
+                .as("ensureDataDirectory must be annotated with @PostConstruct")
                 .isTrue();
     }
 
@@ -121,6 +131,21 @@ class DataDirectoryConfigTest {
         config.ensureDataDirectory();
 
         assertThat(dbFile.getParent()).exists().isDirectory();
+    }
+
+    // --- ensureDataDirectory: Error handling ---
+
+    @Test
+    void should_notThrow_when_directoryCreationFails() throws Exception {
+        // Place a regular file where a parent directory is expected.
+        // Files.createDirectories("blocker/subdir") will throw because "blocker" is a file.
+        // The catch block in createDirIfMissing must swallow the IOException silently.
+        Path blockerFile = tempDir.resolve("blocker");
+        Files.createFile(blockerFile);
+        Path dbFile = blockerFile.resolve("subdir/automation.db");
+        setDatasourceUrl("jdbc:sqlite:" + dbFile);
+
+        assertThatNoException().isThrownBy(() -> config.ensureDataDirectory());
     }
 
     // --- Helper ---
