@@ -67,10 +67,10 @@ class ConfluenceProviderTest {
     }
 
     @Test
-    void listPagesRequiresSpaceId() {
+    void listPagesRequiresSpaceKey() {
         assertThatThrownBy(() -> provider.executeAction("list_pages", java.util.Map.of(), "token"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("spaceId");
+                .hasMessageContaining("spaceKey");
     }
 
     @Test
@@ -88,15 +88,15 @@ class ConfluenceProviderTest {
     }
 
     @Test
-    void createPageRequiresSpaceId() {
+    void createPageRequiresSpaceKey() {
         assertThatThrownBy(() -> provider.executeAction("create_page", java.util.Map.of(), "token"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("spaceId");
+                .hasMessageContaining("spaceKey");
     }
 
     @Test
     void createPageRequiresTitle() {
-        assertThatThrownBy(() -> provider.executeAction("create_page", java.util.Map.of("spaceId", "SPACE1"), "token"))
+        assertThatThrownBy(() -> provider.executeAction("create_page", java.util.Map.of("spaceKey", "MYSPACE"), "token"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("title");
     }
