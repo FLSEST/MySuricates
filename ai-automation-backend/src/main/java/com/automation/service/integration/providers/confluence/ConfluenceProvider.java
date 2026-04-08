@@ -61,7 +61,7 @@ public class ConfluenceProvider implements IntegrationProvider {
                 "https://auth.atlassian.com/authorize",
                 "https://auth.atlassian.com/oauth/token",
                 List.of("read:confluence-content.all", "read:confluence-space.summary",
-                        "search:confluence", "write:confluence-content", "offline_access"),
+                        "search:confluence", "offline_access"),
                 "CONFLUENCE_CLIENT_ID",
                 "CONFLUENCE_CLIENT_SECRET",
                 Map.of("audience", "api.atlassian.com", "prompt", "consent")
