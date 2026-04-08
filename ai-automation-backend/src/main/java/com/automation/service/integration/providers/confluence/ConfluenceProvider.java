@@ -60,12 +60,9 @@ public class ConfluenceProvider implements IntegrationProvider {
         return new OAuthConfig(
                 "https://auth.atlassian.com/authorize",
                 "https://auth.atlassian.com/oauth/token",
-                List.of("read:confluence-content.all", "read:confluence-space.summary",
-                        "search:confluence", "offline_access",
-                        "read:space:confluence", "read:page:confluence",
-                        "read:content:confluence", "read:content.metadata:confluence"),
-                List.of("write:confluence-content",
-                        "write:page:confluence", "write:content:confluence"),
+                List.of("read:space:confluence", "read:content:confluence",
+                        "read:content-details:confluence", "search:confluence", "offline_access"),
+                List.of("write:content:confluence"),
                 "CONFLUENCE_CLIENT_ID",
                 "CONFLUENCE_CLIENT_SECRET",
                 Map.of("audience", "api.atlassian.com", "prompt", "consent")
@@ -140,7 +137,7 @@ public class ConfluenceProvider implements IntegrationProvider {
                                         "parentId", Map.of("type", "string", "description", "Übergeordnete Seiten-ID (optional)")
                                 ),
                                 "required", List.of("spaceId", "title")
-                        ), List.of("write:confluence-content")),
+                        ), List.of("write:content:confluence")),
                 new IntegrationAction("update_page", "Eine bestehende Seite aktualisieren",
                         Map.of(
                                 "type", "object",
@@ -151,7 +148,7 @@ public class ConfluenceProvider implements IntegrationProvider {
                                         "version", Map.of("type", "integer", "description", "Aktuelle Versionsnummer (wird um 1 erhöht)")
                                 ),
                                 "required", List.of("pageId", "version")
-                        ), List.of("write:confluence-content"))
+                        ), List.of("write:content:confluence"))
         );
     }
 
