@@ -467,6 +467,7 @@ export const en = {
     emptyDescription: 'No integration providers are configured yet.',
     connect: 'Connect',
     disconnect: 'Disconnect',
+    reset: 'Reset',
     disconnectConfirm: 'Disconnect integration?',
     disconnectWarning: 'The connection will be removed and all stored credentials deleted. You will need to re-authenticate to use this integration again.',
     availableActions: 'Available Actions',

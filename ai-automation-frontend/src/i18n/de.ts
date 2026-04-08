@@ -469,6 +469,7 @@ export const de: TranslationKeys = {
     emptyDescription: 'Es sind noch keine Integration-Provider konfiguriert.',
     connect: 'Verbinden',
     disconnect: 'Trennen',
+    reset: 'Zurücksetzen',
     disconnectConfirm: 'Integration trennen?',
     disconnectWarning: 'Die Verbindung wird getrennt und alle gespeicherten Zugangsdaten gelöscht. Du musst dich erneut authentifizieren, um diese Integration wieder zu nutzen.',
     availableActions: 'Verfügbare Aktionen',

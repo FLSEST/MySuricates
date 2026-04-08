@@ -318,15 +318,25 @@ export function Integrations() {
                       {t.integrations.disconnect}
                     </Button>
                   ) : provider.configured ? (
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      onClick={(e) => { e.stopPropagation(); handleConnect(provider.providerId); }}
-                      loading={connect.isPending}
-                    >
-                      <ExternalLink className="w-3 h-3 mr-1" />
-                      {t.integrations.connect}
-                    </Button>
+                    <>
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={(e) => { e.stopPropagation(); handleConnect(provider.providerId); }}
+                        loading={connect.isPending}
+                      >
+                        <ExternalLink className="w-3 h-3 mr-1" />
+                        {t.integrations.connect}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => { e.stopPropagation(); setShowDisconnect(provider.providerId); }}
+                      >
+                        <Trash2 className="w-3 h-3 mr-1" />
+                        {t.integrations.reset}
+                      </Button>
+                    </>
                   ) : (
                     <Button
                       size="sm"
