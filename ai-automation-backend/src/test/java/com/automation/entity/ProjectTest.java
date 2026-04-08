@@ -199,4 +199,68 @@ class ProjectTest {
             assertThat(project.getStatus()).isEqualTo(status);
         }
     }
+
+    @Test
+    void should_defaultConfigToEmptyMap_when_usingNoArgsConstructor() {
+        Project project = new Project();
+
+        assertThat(project.getConfig()).isNotNull().isEmpty();
+    }
+
+    @Test
+    void should_defaultStatusToStopped_when_usingNoArgsConstructor() {
+        Project project = new Project();
+
+        assertThat(project.getStatus()).isEqualTo(ProjectStatus.STOPPED);
+    }
+
+    @Test
+    void should_defaultWorkflowsToEmptyList_when_usingNoArgsConstructor() {
+        Project project = new Project();
+
+        assertThat(project.getWorkflows()).isNotNull().isEmpty();
+    }
+
+    @Test
+    void should_defaultAiContextToNull_when_newInstance() {
+        Project project = new Project();
+
+        assertThat(project.getAiContext()).isNull();
+    }
+
+    @Test
+    void should_allowResettingArchivedAtToNull_when_unarchiving() {
+        Project project = new Project();
+        project.setArchivedAt(Instant.parse("2024-06-15T10:00:00Z"));
+
+        project.setArchivedAt(null);
+
+        assertThat(project.getArchivedAt()).isNull();
+    }
+
+    @Test
+    void should_storeSubtitleAndDescription_when_setViaBuilder() {
+        Project project = Project.builder()
+                .name("test")
+                .type(ProjectType.CODE)
+                .path("/tmp/test")
+                .subtitle("A subtitle")
+                .description("A detailed description")
+                .build();
+
+        assertThat(project.getSubtitle()).isEqualTo("A subtitle");
+        assertThat(project.getDescription()).isEqualTo("A detailed description");
+    }
+
+    @Test
+    void should_defaultSubtitleAndDescriptionToNull_when_notSet() {
+        Project project = Project.builder()
+                .name("test")
+                .type(ProjectType.CODE)
+                .path("/tmp/test")
+                .build();
+
+        assertThat(project.getSubtitle()).isNull();
+        assertThat(project.getDescription()).isNull();
+    }
 }
