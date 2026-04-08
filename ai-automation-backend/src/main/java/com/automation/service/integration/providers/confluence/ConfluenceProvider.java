@@ -62,7 +62,6 @@ public class ConfluenceProvider implements IntegrationProvider {
                 "https://auth.atlassian.com/oauth/token",
                 List.of("read:confluence-content.all", "read:confluence-space.summary",
                         "search:confluence", "offline_access"),
-                List.of("write:confluence-content"),
                 "CONFLUENCE_CLIENT_ID",
                 "CONFLUENCE_CLIENT_SECRET",
                 Map.of("audience", "api.atlassian.com", "prompt", "consent")
@@ -125,29 +124,10 @@ public class ConfluenceProvider implements IntegrationProvider {
                                         "limit", Map.of("type", "integer", "default", 20, "description", "Max. Ergebnisse")
                                 ),
                                 "required", List.of("cql")
-                        )),
-                new IntegrationAction("create_page", "Eine neue Seite erstellen",
-                        Map.of(
-                                "type", "object",
-                                "properties", Map.of(
-                                        "spaceKey", Map.of("type", "string", "description", "Space-Key (z.B. MYSPACE)"),
-                                        "title", Map.of("type", "string", "description", "Seitentitel"),
-                                        "body", Map.of("type", "string", "description", "Seiteninhalt (HTML oder Klartext)"),
-                                        "parentId", Map.of("type", "string", "description", "Übergeordnete Seiten-ID (optional)")
-                                ),
-                                "required", List.of("spaceKey", "title")
-                        ), List.of("write:confluence-content")),
-                new IntegrationAction("update_page", "Eine bestehende Seite aktualisieren",
-                        Map.of(
-                                "type", "object",
-                                "properties", Map.of(
-                                        "pageId", Map.of("type", "string", "description", "Seiten-ID"),
-                                        "title", Map.of("type", "string", "description", "Neuer Titel"),
-                                        "body", Map.of("type", "string", "description", "Neuer Inhalt (HTML oder Klartext)"),
-                                        "version", Map.of("type", "integer", "description", "Aktuelle Versionsnummer (wird um 1 erhöht)")
-                                ),
-                                "required", List.of("pageId", "version")
-                        ), List.of("write:confluence-content"))
+                        ))
+                // Note: create_page and update_page removed — Confluence v1 content endpoints
+                // return 401 with classic OAuth scopes, and v2 requires granular scopes not
+                // available in Atlassian Developer Console for OAuth 2.0 (3LO) apps.
         );
     }
 
@@ -158,8 +138,6 @@ public class ConfluenceProvider implements IntegrationProvider {
             case "list_pages" -> listPages(params, accessToken);
             case "get_page" -> getPage(params, accessToken);
             case "search" -> search(params, accessToken);
-            case "create_page" -> createPage(params, accessToken);
-            case "update_page" -> updatePage(params, accessToken);
             default -> throw new IllegalArgumentException("Unknown action: " + action);
         };
     }
@@ -169,10 +147,11 @@ public class ConfluenceProvider implements IntegrationProvider {
     private Object listSpaces(Map<String, Object> params, String accessToken) {
         String baseUrl = resolveV1BaseUrl(accessToken);
         int limit = paramInt(params, "limit", 25);
-        String url = baseUrl + "/space?limit=" + limit;
+        String cql = "type = space";
         if (params.containsKey("type")) {
-            url += "&type=" + urlEncode(params.get("type").toString());
+            cql += " AND space.type = " + urlEncode(params.get("type").toString());
         }
+        String url = baseUrl + "/search?cql=" + urlEncode(cql) + "&limit=" + limit;
         return httpGet(url, accessToken, Object.class);
     }
 
@@ -180,14 +159,16 @@ public class ConfluenceProvider implements IntegrationProvider {
         String spaceKey = requireParam(params, "spaceKey");
         String baseUrl = resolveV1BaseUrl(accessToken);
         int limit = paramInt(params, "limit", 25);
-        String url = baseUrl + "/space/" + urlEncode(spaceKey) + "/content/page?limit=" + limit + "&expand=version";
+        String cql = "type = page AND space = " + spaceKey;
+        String url = baseUrl + "/search?cql=" + urlEncode(cql) + "&limit=" + limit;
         return httpGet(url, accessToken, Object.class);
     }
 
     private Object getPage(Map<String, Object> params, String accessToken) {
         String pageId = requireParam(params, "pageId");
         String baseUrl = resolveV1BaseUrl(accessToken);
-        String url = baseUrl + "/content/" + urlEncode(pageId) + "?expand=body.storage,version";
+        String cql = "type = page AND id = " + pageId;
+        String url = baseUrl + "/search?cql=" + urlEncode(cql) + "&expand=content.body.storage,content.version";
         return httpGet(url, accessToken, Object.class);
     }
 
@@ -199,55 +180,6 @@ public class ConfluenceProvider implements IntegrationProvider {
         return httpGet(url, accessToken, Object.class);
     }
 
-    private Object createPage(Map<String, Object> params, String accessToken) {
-        String spaceKey = requireParam(params, "spaceKey");
-        String title = requireParam(params, "title");
-        String baseUrl = resolveV1BaseUrl(accessToken);
-
-        Map<String, Object> page = new java.util.HashMap<>();
-        page.put("type", "page");
-        page.put("title", title);
-        page.put("space", Map.of("key", spaceKey));
-
-        if (params.containsKey("parentId")) {
-            page.put("ancestors", List.of(Map.of("id", params.get("parentId").toString())));
-        }
-
-        if (params.containsKey("body")) {
-            page.put("body", Map.of(
-                    "storage", Map.of(
-                            "value", params.get("body").toString(),
-                            "representation", "storage"
-                    )
-            ));
-        }
-
-        return httpPost(baseUrl + "/content", page, accessToken);
-    }
-
-    private Object updatePage(Map<String, Object> params, String accessToken) {
-        String pageId = requireParam(params, "pageId");
-        int version = paramInt(params, "version", 1);
-        String baseUrl = resolveV1BaseUrl(accessToken);
-
-        Map<String, Object> update = new java.util.HashMap<>();
-        update.put("type", "page");
-        update.put("version", Map.of("number", version + 1));
-
-        if (params.containsKey("title")) {
-            update.put("title", params.get("title").toString());
-        }
-        if (params.containsKey("body")) {
-            update.put("body", Map.of(
-                    "storage", Map.of(
-                            "value", params.get("body").toString(),
-                            "representation", "storage"
-                    )
-            ));
-        }
-
-        return httpPut(baseUrl + "/content/" + urlEncode(pageId), update, accessToken);
-    }
 
     // --- Cloud ID resolution (same as Jira, shared Atlassian OAuth) ---
 

@@ -44,11 +44,10 @@ class ConfluenceProviderTest {
     }
 
     @Test
-    void has6Actions() {
-        assertThat(provider.getAvailableActions()).hasSize(6);
+    void has4Actions() {
+        assertThat(provider.getAvailableActions()).hasSize(4);
         assertThat(provider.getAvailableActions().stream().map(IntegrationAction::name).toList())
-                .containsExactly("list_spaces", "list_pages", "get_page", "search",
-                        "create_page", "update_page");
+                .containsExactly("list_spaces", "list_pages", "get_page", "search");
     }
 
     @Test
@@ -87,24 +86,4 @@ class ConfluenceProviderTest {
                 .hasMessageContaining("cql");
     }
 
-    @Test
-    void createPageRequiresSpaceKey() {
-        assertThatThrownBy(() -> provider.executeAction("create_page", java.util.Map.of(), "token"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("spaceKey");
-    }
-
-    @Test
-    void createPageRequiresTitle() {
-        assertThatThrownBy(() -> provider.executeAction("create_page", java.util.Map.of("spaceKey", "MYSPACE"), "token"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("title");
-    }
-
-    @Test
-    void updatePageRequiresPageId() {
-        assertThatThrownBy(() -> provider.executeAction("update_page", java.util.Map.of(), "token"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("pageId");
-    }
 }
