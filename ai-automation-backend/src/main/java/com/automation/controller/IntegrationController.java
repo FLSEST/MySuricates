@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/v1/integrations")
@@ -43,9 +44,10 @@ public class IntegrationController {
     @GetMapping("/{providerId}/connect")
     public Map<String, String> getAuthorizationUrl(
             @PathVariable String providerId,
+            @RequestParam(required = false) List<String> scopes,
             HttpServletRequest request) {
         String redirectUri = buildCallbackUrl(providerId, request);
-        String authUrl = oAuthService.getAuthorizationUrl(providerId, redirectUri);
+        String authUrl = oAuthService.getAuthorizationUrl(providerId, redirectUri, scopes);
         return Map.of("authorizationUrl", authUrl);
     }
 
@@ -103,8 +105,11 @@ public class IntegrationController {
     @GetMapping("/{providerId}/actions")
     public List<IntegrationActionResponse> getActions(@PathVariable String providerId) {
         IntegrationProvider provider = registry.getProvider(providerId);
+        var connection = oAuthService.getConnection(providerId).orElse(null);
+        Set<String> grantedScopes = parseScopes(connection != null ? connection.getScopes() : null);
         return provider.getAvailableActions().stream()
-                .map(a -> new IntegrationActionResponse(a.name(), a.description(), a.inputSchema()))
+                .map(a -> new IntegrationActionResponse(a.name(), a.description(), a.inputSchema(),
+                        a.requiredScopes().isEmpty() || grantedScopes.containsAll(a.requiredScopes())))
                 .toList();
     }
 
@@ -137,8 +142,16 @@ public class IntegrationController {
             }
         }
 
+        Set<String> grantedScopes = parseScopes(connection != null ? connection.getScopes() : null);
+        var config = provider.getOAuthConfig();
+
         List<IntegrationActionResponse> actions = provider.getAvailableActions().stream()
-                .map(a -> new IntegrationActionResponse(a.name(), a.description(), a.inputSchema()))
+                .map(a -> new IntegrationActionResponse(a.name(), a.description(), a.inputSchema(),
+                        a.requiredScopes().isEmpty() || grantedScopes.containsAll(a.requiredScopes())))
+                .toList();
+
+        List<IntegrationProviderResponse.ScopeOptionResponse> optionalScopes = config.optionalScopes().stream()
+                .map(s -> new IntegrationProviderResponse.ScopeOptionResponse(s, s, grantedScopes.contains(s)))
                 .toList();
 
         return new IntegrationProviderResponse(
@@ -152,8 +165,14 @@ public class IntegrationController {
                 accountName,
                 connection != null ? connection.getCreatedAt() : null,
                 connection != null ? connection.getScopes() : null,
+                optionalScopes,
                 actions
         );
+    }
+
+    private static Set<String> parseScopes(String scopes) {
+        if (scopes == null || scopes.isBlank()) return Set.of();
+        return Set.of(scopes.split(" "));
     }
 
     private String buildCallbackUrl(String providerId, HttpServletRequest request) {

@@ -62,6 +62,7 @@ public class JiraProvider implements IntegrationProvider {
                 "https://auth.atlassian.com/authorize",
                 "https://auth.atlassian.com/oauth/token",
                 List.of("read:jira-work", "read:jira-user", "offline_access"),
+                List.of("write:jira-work"),
                 "JIRA_CLIENT_ID",
                 "JIRA_CLIENT_SECRET",
                 Map.of("audience", "api.atlassian.com", "prompt", "consent")
@@ -131,7 +132,7 @@ public class JiraProvider implements IntegrationProvider {
                                         "labels", Map.of("type", "string", "description", "Labels (kommagetrennt)")
                                 ),
                                 "required", List.of("projectKey", "summary")
-                        )),
+                        ), List.of("write:jira-work")),
                 new IntegrationAction("update_issue", "Ein Issue aktualisieren",
                         Map.of(
                                 "type", "object",
@@ -144,7 +145,7 @@ public class JiraProvider implements IntegrationProvider {
                                         "labels", Map.of("type", "string", "description", "Labels (kommagetrennt, ersetzt bestehende)")
                                 ),
                                 "required", List.of("issueKey")
-                        )),
+                        ), List.of("write:jira-work")),
                 new IntegrationAction("add_comment", "Einen Kommentar zu einem Issue hinzufügen",
                         Map.of(
                                 "type", "object",
@@ -153,7 +154,7 @@ public class JiraProvider implements IntegrationProvider {
                                         "body", Map.of("type", "string", "description", "Kommentartext")
                                 ),
                                 "required", List.of("issueKey", "body")
-                        )),
+                        ), List.of("write:jira-work")),
                 new IntegrationAction("get_transitions", "Verfügbare Status-Übergänge eines Issues abrufen",
                         Map.of(
                                 "type", "object",
@@ -170,7 +171,7 @@ public class JiraProvider implements IntegrationProvider {
                                         "transitionId", Map.of("type", "string", "description", "Transition-ID (aus get_transitions)")
                                 ),
                                 "required", List.of("issueKey", "transitionId")
-                        ))
+                        ), List.of("write:jira-work"))
         );
     }
 

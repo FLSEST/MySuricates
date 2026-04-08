@@ -14,5 +14,8 @@ public record IntegrationProviderResponse(
         String accountName,
         Instant connectedSince,
         String scopes,
+        List<ScopeOptionResponse> optionalScopes,
         List<IntegrationActionResponse> actions
-) {}
+) {
+    public record ScopeOptionResponse(String scope, String label, boolean granted) {}
+}

@@ -468,6 +468,8 @@ export const en = {
     connect: 'Connect',
     disconnect: 'Disconnect',
     reset: 'Reset',
+    optionalPermissions: 'Optional permissions',
+    scopeMissing: 'Permission missing — reconnect with the required scope',
     disconnectConfirm: 'Disconnect integration?',
     disconnectWarning: 'The connection will be removed and all stored credentials deleted. You will need to re-authenticate to use this integration again.',
     availableActions: 'Available Actions',

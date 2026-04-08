@@ -25,9 +25,10 @@ export function useConnectIntegration() {
   const t = useT();
 
   return useMutation({
-    mutationFn: async (providerId: string) => {
+    mutationFn: async ({ providerId, scopes }: { providerId: string; scopes?: string[] }) => {
+      const params = scopes?.length ? `?scopes=${scopes.map(encodeURIComponent).join('&scopes=')}` : '';
       const { authorizationUrl } = await api.get<{ authorizationUrl: string }>(
-        `/integrations/${providerId}/connect`
+        `/integrations/${providerId}/connect${params}`
       );
 
       return new Promise<void>((resolve, reject) => {

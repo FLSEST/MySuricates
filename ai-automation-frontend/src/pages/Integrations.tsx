@@ -214,6 +214,7 @@ export function Integrations() {
   const [showDisconnect, setShowDisconnect] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
   const [testingAction, setTestingAction] = useState<string | null>(null);
+  const [selectedScopes, setSelectedScopes] = useState<Record<string, boolean>>({});
 
   if (isLoading) {
     return (
@@ -238,7 +239,11 @@ export function Integrations() {
   }
 
   const handleConnect = (providerId: string) => {
-    connect.mutate(providerId);
+    const provider = providers?.find(p => p.providerId === providerId);
+    const scopes = provider?.optionalScopes
+      ?.filter(s => selectedScopes[s.scope])
+      .map(s => s.scope) ?? [];
+    connect.mutate({ providerId, scopes: scopes.length > 0 ? scopes : undefined });
   };
 
   const handleDisconnect = (providerId: string) => {
@@ -318,25 +323,43 @@ export function Integrations() {
                       {t.integrations.disconnect}
                     </Button>
                   ) : provider.configured ? (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="primary"
-                        onClick={(e) => { e.stopPropagation(); handleConnect(provider.providerId); }}
-                        loading={connect.isPending}
-                      >
-                        <ExternalLink className="w-3 h-3 mr-1" />
-                        {t.integrations.connect}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={(e) => { e.stopPropagation(); setShowDisconnect(provider.providerId); }}
-                      >
-                        <Trash2 className="w-3 h-3 mr-1" />
-                        {t.integrations.reset}
-                      </Button>
-                    </>
+                    <div className="space-y-2 w-full" onClick={(e) => e.stopPropagation()}>
+                      {provider.optionalScopes?.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-xs text-text-tertiary">{t.integrations.optionalPermissions}</p>
+                          {provider.optionalScopes.map((scope) => (
+                            <label key={scope.scope} className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={selectedScopes[scope.scope] ?? false}
+                                onChange={(e) => setSelectedScopes(prev => ({ ...prev, [scope.scope]: e.target.checked }))}
+                                className="rounded border-border"
+                              />
+                              {scope.label}
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          onClick={() => handleConnect(provider.providerId)}
+                          loading={connect.isPending}
+                        >
+                          <ExternalLink className="w-3 h-3 mr-1" />
+                          {t.integrations.connect}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setShowDisconnect(provider.providerId)}
+                        >
+                          <Trash2 className="w-3 h-3 mr-1" />
+                          {t.integrations.reset}
+                        </Button>
+                      </div>
+                    </div>
                   ) : (
                     <Button
                       size="sm"
@@ -373,20 +396,25 @@ export function Integrations() {
             </h3>
             <div className="space-y-3">
               {selected.actions.map((action) => (
-                <div key={action.name} className="flex items-center justify-between p-3 rounded-lg bg-surface-secondary">
+                <div key={action.name} className={`flex items-center justify-between p-3 rounded-lg bg-surface-secondary ${!action.available ? 'opacity-50' : ''}`}>
                   <div>
-                    <p className="font-medium text-text text-sm">{action.name}</p>
+                    <p className={`font-medium text-sm ${action.available ? 'text-text' : 'text-text-tertiary'}`}>{action.name}</p>
                     <p className="text-xs text-text-secondary">{action.description}</p>
+                    {!action.available && (
+                      <p className="text-xs text-amber-500 mt-1">{t.integrations.scopeMissing}</p>
+                    )}
                   </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleTestAction(selected.providerId, action)}
-                    loading={testingAction === action.name}
-                  >
-                    <Play className="w-3 h-3 mr-1" />
-                    {t.integrations.test}
-                  </Button>
+                  {action.available && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleTestAction(selected.providerId, action)}
+                      loading={testingAction === action.name}
+                    >
+                      <Play className="w-3 h-3 mr-1" />
+                      {t.integrations.test}
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>

@@ -98,7 +98,7 @@ public class IntegrationOAuthService {
     /**
      * Generate an OAuth2 authorization URL for the given provider.
      */
-    public String getAuthorizationUrl(String providerId, String redirectUri) {
+    public String getAuthorizationUrl(String providerId, String redirectUri, java.util.List<String> additionalScopes) {
         IntegrationProvider provider = registry.getProvider(providerId);
         OAuthConfig config = provider.getOAuthConfig();
 
@@ -110,7 +110,13 @@ public class IntegrationOAuthService {
         String state = generateState();
         pendingStates.put(state, providerId);
 
-        String scopes = String.join(" ", config.defaultScopes());
+        java.util.List<String> allScopes = new java.util.ArrayList<>(config.defaultScopes());
+        if (additionalScopes != null) {
+            additionalScopes.stream()
+                    .filter(config.optionalScopes()::contains)
+                    .forEach(allScopes::add);
+        }
+        String scopes = String.join(" ", allScopes);
 
         StringBuilder url = new StringBuilder(config.authorizationUrl())
                 .append("?client_id=").append(urlEncode(clientId))

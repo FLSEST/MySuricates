@@ -10,13 +10,20 @@ public record OAuthConfig(
         String authorizationUrl,
         String tokenUrl,
         List<String> defaultScopes,
+        List<String> optionalScopes,
         String clientIdEnvVar,
         String clientSecretEnvVar,
         Map<String, String> extraAuthParams
 ) {
-    /** Backward-compatible constructor for providers without extra auth params. */
+    /** Constructor without optional scopes. */
+    public OAuthConfig(String authorizationUrl, String tokenUrl, List<String> defaultScopes,
+                       String clientIdEnvVar, String clientSecretEnvVar, Map<String, String> extraAuthParams) {
+        this(authorizationUrl, tokenUrl, defaultScopes, List.of(), clientIdEnvVar, clientSecretEnvVar, extraAuthParams);
+    }
+
+    /** Constructor without optional scopes or extra auth params. */
     public OAuthConfig(String authorizationUrl, String tokenUrl, List<String> defaultScopes,
                        String clientIdEnvVar, String clientSecretEnvVar) {
-        this(authorizationUrl, tokenUrl, defaultScopes, clientIdEnvVar, clientSecretEnvVar, Map.of());
+        this(authorizationUrl, tokenUrl, defaultScopes, List.of(), clientIdEnvVar, clientSecretEnvVar, Map.of());
     }
 }

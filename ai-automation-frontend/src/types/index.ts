@@ -401,6 +401,12 @@ export interface CreateWebhookRequest {
 
 // ── Integrations ──────────────────────────────────────────
 
+export interface ScopeOption {
+  scope: string;
+  label: string;
+  granted: boolean;
+}
+
 export interface IntegrationProviderInfo {
   providerId: string;
   displayName: string;
@@ -412,6 +418,7 @@ export interface IntegrationProviderInfo {
   accountName: string | null;
   connectedSince: string | null;
   scopes: string | null;
+  optionalScopes: ScopeOption[];
   actions: IntegrationActionInfo[];
 }
 
@@ -419,6 +426,7 @@ export interface IntegrationActionInfo {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  available: boolean;
 }
 
 // ── Unified Calendar ─────────────────────────────────────
