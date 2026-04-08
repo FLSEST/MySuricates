@@ -61,7 +61,7 @@ public class JiraProvider implements IntegrationProvider {
         return new OAuthConfig(
                 "https://auth.atlassian.com/authorize",
                 "https://auth.atlassian.com/oauth/token",
-                List.of("read:jira-work", "write:jira-work", "read:jira-user", "offline_access"),
+                List.of("read:jira-work", "read:jira-user", "offline_access"),
                 "JIRA_CLIENT_ID",
                 "JIRA_CLIENT_SECRET",
                 Map.of("audience", "api.atlassian.com", "prompt", "consent")
@@ -202,17 +202,13 @@ public class JiraProvider implements IntegrationProvider {
         String baseUrl = resolveBaseUrl(accessToken);
         int maxResults = paramInt(params, "maxResults", 20);
         int startAt = paramInt(params, "startAt", 0);
+        String fields = paramString(params, "fields", "summary,status,assignee,priority,updated,created");
 
-        Map<String, Object> body = new java.util.HashMap<>();
-        body.put("jql", jql);
-        body.put("maxResults", maxResults);
-        body.put("startAt", startAt);
+        String url = baseUrl + "/search/jql?jql=" + urlEncode(jql)
+                + "&maxResults=" + maxResults + "&startAt=" + startAt
+                + "&fields=" + urlEncode(fields);
 
-        if (params.containsKey("fields")) {
-            body.put("fields", List.of(params.get("fields").toString().split(",")));
-        }
-
-        return httpPost(baseUrl + "/search", body, accessToken, JiraSearchResult.class);
+        return httpGet(url, accessToken, JiraSearchResult.class);
     }
 
     private Object getIssue(Map<String, Object> params, String accessToken) {

@@ -107,7 +107,7 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
             'Add Authorized redirect URI:',
           ],
         },
-        code: `${window.location.origin}/api/v1/integrations/google-calendar/callback`,
+        code: `${window.location.port === '3000' ? window.location.origin.replace(':3000', ':9090') : window.location.origin}/api/v1/integrations/google-calendar/callback`,
         link: {
           url: 'https://console.cloud.google.com/apis/credentials',
           label: { de: 'Credentials anlegen', en: 'Create Credentials' },
@@ -230,12 +230,12 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
           de: [
             'Im Seitenmenü: "Permissions"',
             'Bei "Jira API" auf "Add" klicken',
-            'Scopes hinzufügen: "read:jira-work", "write:jira-work", "read:jira-user"',
+            'Pflicht-Scopes: "read:jira-work", "read:jira-user". Optional für Schreibzugriff: "write:jira-work"',
           ],
           en: [
             'In the side menu: "Permissions"',
             'Click "Add" next to "Jira API"',
-            'Add scopes: "read:jira-work", "write:jira-work", "read:jira-user"',
+            'Required scopes: "read:jira-work", "read:jira-user". Optional for write access: "write:jira-work"',
           ],
         },
       },
@@ -254,7 +254,101 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
             'Add callback URL:',
           ],
         },
-        code: `${window.location.origin}/api/v1/integrations/jira/callback`,
+        code: `${window.location.port === '3000' ? window.location.origin.replace(':3000', ':9090') : window.location.origin}/api/v1/integrations/jira/callback`,
+      },
+      {
+        title: {
+          de: 'Zugangsdaten eintragen',
+          en: 'Enter credentials',
+        },
+        instructions: {
+          de: [
+            'Im Seitenmenü: "Settings" → Client-ID und Secret kopieren',
+            'Trage sie unten in die Felder ein und klicke "Speichern"',
+          ],
+          en: [
+            'In the side menu: "Settings" → copy Client ID and Secret',
+            'Enter them in the fields below and click "Save"',
+          ],
+        },
+      },
+    ],
+  },
+
+  'confluence': {
+    steps: [
+      {
+        title: {
+          de: 'Atlassian Developer Console öffnen',
+          en: 'Open Atlassian Developer Console',
+        },
+        instructions: {
+          de: [
+            'Melde dich bei der Atlassian Developer Console an',
+            'Du kannst dieselbe App wie für Jira verwenden, oder eine neue erstellen',
+          ],
+          en: [
+            'Sign in to the Atlassian Developer Console',
+            'You can use the same app as for Jira, or create a new one',
+          ],
+        },
+        link: {
+          url: 'https://developer.atlassian.com/console/myapps/',
+          label: { de: 'Atlassian Developer Console', en: 'Atlassian Developer Console' },
+        },
+      },
+      {
+        title: {
+          de: 'OAuth 2.0 App erstellen (falls nötig)',
+          en: 'Create OAuth 2.0 App (if needed)',
+        },
+        instructions: {
+          de: [
+            'Klicke "Create" → "OAuth 2.0 integration"',
+            'Name: z.B. "MySuricates Confluence"',
+            'Akzeptiere die Nutzungsbedingungen → "Create"',
+          ],
+          en: [
+            'Click "Create" → "OAuth 2.0 integration"',
+            'Name: e.g. "MySuricates Confluence"',
+            'Accept the terms → "Create"',
+          ],
+        },
+      },
+      {
+        title: {
+          de: 'Confluence API Berechtigungen hinzufügen',
+          en: 'Add Confluence API Permissions',
+        },
+        instructions: {
+          de: [
+            'Im Seitenmenü: "Permissions"',
+            'Bei "Confluence API" auf "Add" klicken',
+            'Pflicht-Scopes: "read:confluence-content.all", "read:confluence-space.summary", "search:confluence". Optional für Schreibzugriff: "write:confluence-content"',
+          ],
+          en: [
+            'In the side menu: "Permissions"',
+            'Click "Add" next to "Confluence API"',
+            'Required scopes: "read:confluence-content.all", "read:confluence-space.summary", "search:confluence". Optional for write access: "write:confluence-content"',
+          ],
+        },
+      },
+      {
+        title: {
+          de: 'Callback URL konfigurieren',
+          en: 'Configure Callback URL',
+        },
+        instructions: {
+          de: [
+            'Im Seitenmenü: "Authorization" → "Add" bei OAuth 2.0 (3LO)',
+            'Callback URL hinzufügen:',
+          ],
+          en: [
+            'In the side menu: "Authorization" → "Add" next to OAuth 2.0 (3LO)',
+            'Add callback URL:',
+          ],
+        },
+        code: `${window.location.port === '3000' ? window.location.origin.replace(':3000', ':9090') : window.location.origin}/api/v1/integrations/confluence/callback`,
       },
       {
         title: {

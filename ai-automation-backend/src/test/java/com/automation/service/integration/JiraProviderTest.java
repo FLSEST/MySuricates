@@ -36,7 +36,8 @@ class JiraProviderTest {
         OAuthConfig config = provider.getOAuthConfig();
         assertThat(config.authorizationUrl()).contains("auth.atlassian.com");
         assertThat(config.tokenUrl()).contains("auth.atlassian.com");
-        assertThat(config.defaultScopes()).contains("read:jira-work", "write:jira-work");
+        assertThat(config.defaultScopes()).contains("read:jira-work", "read:jira-user");
+        assertThat(config.defaultScopes()).doesNotContain("write:jira-work");
         assertThat(config.clientIdEnvVar()).isEqualTo("JIRA_CLIENT_ID");
         assertThat(config.clientSecretEnvVar()).isEqualTo("JIRA_CLIENT_SECRET");
         assertThat(config.extraAuthParams()).containsEntry("audience", "api.atlassian.com");
