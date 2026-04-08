@@ -47,30 +47,50 @@ class HostCodexServiceTest {
         Path outputFile = Path.of("/tmp/result.txt");
         Path workDir = Path.of("/home/user/project");
 
-        List<String> cmd = service.buildCommand(workDir, outputFile);
+        List<String> cmd = service.buildCommand(workDir, outputFile, false);
 
         assertThat(cmd).startsWith("codex", "exec", "-");
         assertThat(cmd).contains("--skip-git-repo-check");
         assertThat(cmd).contains("-o", outputFile.toAbsolutePath().toString());
         assertThat(cmd).contains("-C", workDir.toAbsolutePath().toString());
+        assertThat(cmd).doesNotContain("--sandbox");
     }
 
     @Test
     void buildCommand_stdinMode_nullWorkDir_noCFlag() {
         Path outputFile = Path.of("/tmp/result.txt");
 
-        List<String> cmd = service.buildCommand(null, outputFile);
+        List<String> cmd = service.buildCommand(null, outputFile, false);
 
         assertThat(cmd).startsWith("codex", "exec", "-");
         assertThat(cmd).doesNotContain("-C");
     }
 
     @Test
-    void execute_defaultTimeout_usesConfigTimeout() throws Exception {
-        // Verify that execute(prompt, workDir) delegates with config timeout
-        // We can't easily test process execution, but verify buildCommand produces correct structure
+    void buildCommand_readOnly_addsSandboxFlag() {
+        Path outputFile = Path.of("/tmp/result.txt");
+        Path workDir = Path.of("/home/user/project");
+
+        List<String> cmd = service.buildCommand(workDir, outputFile, true);
+
+        assertThat(cmd).contains("--sandbox", "read-only");
+        assertThat(cmd).contains("-C", workDir.toAbsolutePath().toString());
+    }
+
+    @Test
+    void buildCommand_notReadOnly_noSandboxFlag() {
+        Path outputFile = Path.of("/tmp/result.txt");
+
+        List<String> cmd = service.buildCommand(null, outputFile, false);
+
+        assertThat(cmd).doesNotContain("--sandbox");
+        assertThat(cmd).doesNotContain("read-only");
+    }
+
+    @Test
+    void execute_defaultTimeout_usesConfigTimeout() {
         Path outputFile = Path.of("/tmp/test.txt");
-        List<String> cmd = service.buildCommand(Path.of("/test"), outputFile);
+        List<String> cmd = service.buildCommand(Path.of("/test"), outputFile, false);
 
         assertThat(cmd).contains("codex", "exec");
         assertThat(cmd).contains("-o");

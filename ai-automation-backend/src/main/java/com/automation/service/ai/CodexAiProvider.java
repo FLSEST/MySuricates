@@ -35,13 +35,14 @@ public class CodexAiProvider implements AiProvider {
     @Override
     public ReasoningResult reason(ReasoningRequest request) throws IOException {
         // Merge system prompt into user prompt since Codex doesn't support --system-prompt
-        String fullPrompt = mergeSystemPrompt(request.systemPrompt(), request.prompt());
+        // Reasoning is always read-only (analysis only, no file writes)
+        String fullPrompt = mergeSystemPrompt(request.systemPrompt(), request.prompt(), true);
         Path workDir = request.workingDirectory() != null ? Path.of(request.workingDirectory()) : null;
         int timeout = request.timeoutSeconds() != null
                 ? request.timeoutSeconds()
                 : summarizationConfig.getTimeoutSeconds();
 
-        String output = hostCodexService.execute(fullPrompt, workDir, timeout);
+        String output = hostCodexService.execute(fullPrompt, workDir, timeout, true);
 
         return new ReasoningResult(
                 output,
@@ -51,19 +52,19 @@ public class CodexAiProvider implements AiProvider {
 
     @Override
     public ActionResult executeAction(ActionRequest request) throws IOException {
-        // Merge system prompt into action prompt
-        String fullPrompt = mergeSystemPrompt(request.systemPrompt(), request.prompt());
+        boolean readOnly = request.readOnly();
+        String fullPrompt = mergeSystemPrompt(request.systemPrompt(), request.prompt(), readOnly);
         Path workDir = request.workingDirectory() != null ? Path.of(request.workingDirectory()) : null;
         int timeout = request.timeoutSeconds() != null
                 ? request.timeoutSeconds()
                 : summarizationConfig.getTimeoutSeconds();
 
-        if (!getCapabilities().supportsAllowedTools()) {
+        if (!readOnly && !getCapabilities().supportsAllowedTools()) {
             log.warn("Codex provider does not support --allowedTools; action runs without tool restrictions");
         }
 
         try {
-            String output = hostCodexService.execute(fullPrompt, workDir, timeout);
+            String output = hostCodexService.execute(fullPrompt, workDir, timeout, readOnly);
             return new ActionResult(output, 0, AiResponseMetadata.estimated(fullPrompt, output));
         } catch (IOException e) {
             // Codex CLI exit code > 0 throws IOException — map to non-zero exit
@@ -99,11 +100,21 @@ public class CodexAiProvider implements AiProvider {
         return sb.toString();
     }
 
-    private String mergeSystemPrompt(String systemPrompt, String userPrompt) {
-        if (systemPrompt == null || systemPrompt.isBlank()) {
-            return userPrompt;
+    private String mergeSystemPrompt(String systemPrompt, String userPrompt, boolean readOnly) {
+        StringBuilder sb = new StringBuilder();
+
+        if (readOnly) {
+            sb.append("Output your entire response as direct text. Do NOT write any files.\n\n");
         }
-        return "=== SYSTEM INSTRUCTIONS ===\n" + systemPrompt +
-                "\n\n=== TASK ===\n" + userPrompt;
+
+        if (systemPrompt != null && !systemPrompt.isBlank()) {
+            sb.append("=== SYSTEM INSTRUCTIONS ===\n");
+            sb.append(systemPrompt);
+            sb.append("\n\n");
+        }
+
+        sb.append("=== TASK ===\n");
+        sb.append(userPrompt);
+        return sb.toString();
     }
 }

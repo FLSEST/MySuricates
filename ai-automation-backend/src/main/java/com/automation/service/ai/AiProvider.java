@@ -57,14 +57,20 @@ public interface AiProvider {
             String systemPrompt,
             String workingDirectory,
             Integer timeoutSeconds,
-            boolean priority
+            boolean priority,
+            boolean readOnly
     ) {
         public ActionRequest(String prompt, String model, String systemPrompt, String workingDirectory) {
-            this(prompt, model, systemPrompt, workingDirectory, null, false);
+            this(prompt, model, systemPrompt, workingDirectory, null, false, true);
         }
 
         public ActionRequest(String prompt, String model, String systemPrompt, String workingDirectory, Integer timeoutSeconds) {
-            this(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, false);
+            this(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, false, true);
+        }
+
+        /** Backward-compatible: 6-arg calls default to readOnly=true (analysis mode). */
+        public ActionRequest(String prompt, String model, String systemPrompt, String workingDirectory, Integer timeoutSeconds, boolean priority) {
+            this(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, priority, true);
         }
     }
 

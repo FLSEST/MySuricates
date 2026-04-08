@@ -223,7 +223,8 @@ public class AgenticBlockExecutor implements BlockExecutor {
             try {
                 AiProvider.ActionResult actResult = provider.executeAction(
                         new AiProvider.ActionRequest(action, context.getModel(),
-                                context.getInstructionPrefix(), context.getProjectPath(), cfg.claudeTimeout()));
+                                context.getInstructionPrefix(), context.getProjectPath(),
+                                cfg.claudeTimeout(), false, false));
                 actionOutput = actResult.text() != null ? actResult.text() : "";
                 exitCode = actResult.exitCode();
                 tokenTracker.captureActMeta(iterData, actResult.metadata(), action, actionOutput, iteration);

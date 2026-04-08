@@ -13,6 +13,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,7 +43,7 @@ class CodexAiProviderTest {
     @Test
     void reason_delegatesToHostService() throws IOException {
         when(summarizationConfig.getTimeoutSeconds()).thenReturn(120);
-        when(hostCodexService.execute(contains("SYSTEM INSTRUCTIONS"), eq(Path.of("/path")), eq(120)))
+        when(hostCodexService.execute(contains("SYSTEM INSTRUCTIONS"), eq(Path.of("/path")), eq(120), eq(true)))
                 .thenReturn("codex output");
 
         var request = new AiProvider.ReasoningRequest("prompt", "system", "/path", 3, null);
@@ -52,8 +53,20 @@ class CodexAiProviderTest {
     }
 
     @Test
+    void reason_alwaysUsesReadOnly() throws IOException {
+        when(summarizationConfig.getTimeoutSeconds()).thenReturn(120);
+        when(hostCodexService.execute(anyString(), any(), eq(120), eq(true)))
+                .thenReturn("output");
+
+        var request = new AiProvider.ReasoningRequest("prompt", null, null, 3, null);
+        provider.reason(request);
+
+        verify(hostCodexService).execute(anyString(), isNull(), eq(120), eq(true));
+    }
+
+    @Test
     void reason_usesExplicitTimeout() throws IOException {
-        when(hostCodexService.execute(anyString(), any(), eq(60)))
+        when(hostCodexService.execute(anyString(), any(), eq(60), eq(true)))
                 .thenReturn("output");
 
         var request = new AiProvider.ReasoningRequest("prompt", null, null, 3, 60);
@@ -63,29 +76,71 @@ class CodexAiProviderTest {
     }
 
     @Test
-    void executeAction_success_returnsExitCode0() throws IOException {
+    void executeAction_readOnly_passesThroughToHostService() throws IOException {
         when(summarizationConfig.getTimeoutSeconds()).thenReturn(120);
-        when(hostCodexService.execute(anyString(), isNull(), eq(120)))
+        when(hostCodexService.execute(anyString(), isNull(), eq(120), eq(true)))
                 .thenReturn("action output");
 
-        var request = new AiProvider.ActionRequest("prompt", null, null, null, null, false);
+        var request = new AiProvider.ActionRequest("prompt", null, null, null, null, false, true);
         AiProvider.ActionResult result = provider.executeAction(request);
 
         assertThat(result.text()).isEqualTo("action output");
         assertThat(result.exitCode()).isEqualTo(0);
+        verify(hostCodexService).execute(anyString(), isNull(), eq(120), eq(true));
+    }
+
+    @Test
+    void executeAction_notReadOnly_passesFalse() throws IOException {
+        when(summarizationConfig.getTimeoutSeconds()).thenReturn(120);
+        when(hostCodexService.execute(anyString(), isNull(), eq(120), eq(false)))
+                .thenReturn("action output");
+
+        var request = new AiProvider.ActionRequest("prompt", null, null, null, null, false, false);
+        AiProvider.ActionResult result = provider.executeAction(request);
+
+        assertThat(result.text()).isEqualTo("action output");
+        verify(hostCodexService).execute(anyString(), isNull(), eq(120), eq(false));
     }
 
     @Test
     void executeAction_ioException_returnsExitCode1() throws IOException {
         when(summarizationConfig.getTimeoutSeconds()).thenReturn(120);
-        when(hostCodexService.execute(anyString(), isNull(), eq(120)))
+        when(hostCodexService.execute(anyString(), isNull(), eq(120), eq(true)))
                 .thenThrow(new IOException("CLI failed"));
 
-        var request = new AiProvider.ActionRequest("prompt", null, null, null, null, false);
+        var request = new AiProvider.ActionRequest("prompt", null, null, null, null, false, true);
         AiProvider.ActionResult result = provider.executeAction(request);
 
         assertThat(result.exitCode()).isEqualTo(1);
         assertThat(result.text()).contains("CLI failed");
+    }
+
+    @Test
+    void reason_readOnly_prependsInlineInstruction() throws IOException {
+        when(hostCodexService.execute(argThat(s -> s.startsWith("Output your entire response")),
+                any(), anyInt(), eq(true))).thenReturn("output");
+
+        var request = new AiProvider.ReasoningRequest("my prompt", null, null, null, 60);
+        provider.reason(request);
+
+        verify(hostCodexService).execute(
+                argThat(s -> s.contains("Output your entire response as direct text")
+                        && s.contains("Do NOT write any files")
+                        && s.contains("my prompt")),
+                isNull(), eq(60), eq(true));
+    }
+
+    @Test
+    void executeAction_notReadOnly_noInlineInstruction() throws IOException {
+        when(hostCodexService.execute(anyString(), any(), anyInt(), eq(false)))
+                .thenReturn("output");
+
+        var request = new AiProvider.ActionRequest("my prompt", null, null, null, 60, false, false);
+        provider.executeAction(request);
+
+        verify(hostCodexService).execute(
+                argThat(s -> !s.contains("Do NOT write any files") && s.contains("my prompt")),
+                isNull(), eq(60), eq(false));
     }
 
     @Test

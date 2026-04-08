@@ -6,7 +6,7 @@ import type {
   BlockType, Workflow, OptimizeResult, Project,
 } from '../../types';
 
-const BLOCK_TYPES: BlockType[] = ['simple', 'shell', 'retry', 'foreach', 'while', 'conditional', 'switch', 'skill-capability', 'approval', 'human-input', 'agentic', 'sub-workflow', 'integration'];
+const BLOCK_TYPES: BlockType[] = ['simple', 'shell', 'retry', 'foreach', 'while', 'conditional', 'switch', 'skill-capability', 'approval', 'human-input', 'agentic', 'sub-workflow'];
 
 interface AvailableSkill {
   id: string;
@@ -222,7 +222,6 @@ export function WorkflowDetailModals({
                 agentic: { goal: '', success_criteria: '', max_iterations: 10, iteration_timeout_seconds: 300, total_timeout_seconds: 1800, max_total_tokens: 200000, max_repeated_actions: 3, require_approval: false },
                 'sub-workflow': { workflow_id: '' },
                 switch: { expression: '', cases: [{ value: 'default', blocks: [] }] },
-                integration: { provider: '', action: '', params: {} },
               };
               setNewBlock({ ...newBlock, type, config: JSON.stringify(defaultConfig[type], null, 2) });
             }}

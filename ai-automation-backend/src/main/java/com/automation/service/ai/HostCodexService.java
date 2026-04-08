@@ -33,7 +33,7 @@ public class HostCodexService {
      * Uses the default timeout from SummarizationConfig.
      */
     public String execute(String prompt, Path workingDirectory) throws IOException {
-        return execute(prompt, workingDirectory, config.getTimeoutSeconds());
+        return execute(prompt, workingDirectory, config.getTimeoutSeconds(), false);
     }
 
     /**
@@ -41,10 +41,18 @@ public class HostCodexService {
      * Prompt is delivered via stdin to avoid E2BIG errors on large prompts.
      */
     public String execute(String prompt, Path workingDirectory, int timeoutSeconds) throws IOException {
+        return execute(prompt, workingDirectory, timeoutSeconds, false);
+    }
+
+    /**
+     * Executes a one-shot codex prompt with a custom timeout and returns the text result.
+     * When readOnly is true, adds --sandbox read-only to prevent file writes (analysis mode).
+     */
+    public String execute(String prompt, Path workingDirectory, int timeoutSeconds, boolean readOnly) throws IOException {
         Path outputFile = Files.createTempFile("codex-result-", ".txt");
 
         try {
-            List<String> cmd = buildCommand(workingDirectory, outputFile);
+            List<String> cmd = buildCommand(workingDirectory, outputFile, readOnly);
 
             ProcessBuilder pb = new ProcessBuilder(cmd);
             pb.redirectErrorStream(true);
@@ -112,13 +120,19 @@ public class HostCodexService {
 
     /**
      * Builds the codex command. Uses "-" as prompt placeholder to read from stdin.
+     * When readOnly is true, adds --sandbox read-only to prevent file writes (like Claude's -p).
      */
-    List<String> buildCommand(Path workingDirectory, Path outputFile) {
+    List<String> buildCommand(Path workingDirectory, Path outputFile, boolean readOnly) {
         List<String> cmd = new ArrayList<>(List.of(
                 "codex", "exec", "-",
                 "--skip-git-repo-check",
                 "-o", outputFile.toAbsolutePath().toString()
         ));
+
+        if (readOnly) {
+            cmd.add("--sandbox");
+            cmd.add("read-only");
+        }
 
         if (workingDirectory != null) {
             cmd.add("-C");
