@@ -231,6 +231,33 @@ class InstanceSyncHelperTest {
         verify(syncHelper, times(1)).httpPost(eq(TARGET + "/workflows/import"), any());
     }
 
+    @Test
+    void sync_selectiveByProjectIds_onlySyncsWorkflowsInProject() throws Exception {
+        Project proj1 = Project.builder().id("p1").name("Proj1").path("/proj1").type(ProjectType.CODE).build();
+        Project proj2 = Project.builder().id("p2").name("Proj2").path("/proj2").type(ProjectType.CODE).build();
+        Workflow wf1 = Workflow.builder().id("wf1").name("WF1").project(proj1).blocks(List.of()).build();
+        Workflow wf2 = Workflow.builder().id("wf2").name("WF2").project(proj2).blocks(List.of()).build();
+        Workflow wf3 = Workflow.builder().id("wf3").name("WF3").project(null).blocks(List.of()).build();
+        when(projectRepository.findAll()).thenReturn(List.of(proj1, proj2));
+        when(workflowRepository.findAllReadOnly()).thenReturn(List.of(wf1, wf2, wf3));
+        when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
+
+        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/projects");
+        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/workflows");
+        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/skills");
+        doReturn(objectMapper.readTree("{\"id\":\"tp1\"}")).when(syncHelper).httpPost(eq(TARGET + "/projects"), any());
+        doReturn(objectMapper.readTree("{\"id\":\"twf1\"}")).when(syncHelper).httpPost(eq(TARGET + "/workflows/import"), any());
+
+        // Only sync proj1
+        var request = new SyncDefinitionsRequest(List.of("p1"), null, null);
+        SyncResult result = syncHelper.syncDefinitionsTo(TARGET, request);
+
+        // Only wf1 (proj1) synced — wf2 (proj2) and wf3 (no project) skipped
+        assertThat(result.workflowsSynced()).isEqualTo(1);
+        assertThat(result.projectsSynced()).isEqualTo(1);
+        verify(syncHelper, times(1)).httpPost(eq(TARGET + "/workflows/import"), any());
+    }
+
     // --- Error handling ---
 
     @Test

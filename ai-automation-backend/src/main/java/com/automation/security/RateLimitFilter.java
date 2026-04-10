@@ -35,7 +35,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return path.startsWith("/ws") || path.startsWith("/actuator");
+        if (path.startsWith("/ws") || path.startsWith("/actuator")) {
+            return true;
+        }
+        // Internal sync traffic (InstanceSyncHelper) bypasses rate limiting
+        return "true".equals(request.getHeader("X-Internal-Sync"));
     }
 
     @Override

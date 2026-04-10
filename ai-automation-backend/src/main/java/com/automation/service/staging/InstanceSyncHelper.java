@@ -262,6 +262,12 @@ public class InstanceSyncHelper {
             if (selectedWorkflowIds != null && !selectedWorkflowIds.contains(workflow.getId())) {
                 continue;
             }
+            if (selectedProjectIds != null) {
+                String wfProjectId = workflow.getProject() != null ? workflow.getProject().getId() : null;
+                if (wfProjectId == null || !selectedProjectIds.contains(wfProjectId)) {
+                    continue;
+                }
+            }
 
             try {
                 String projectName = workflow.getProject() != null ? workflow.getProject().getName() : "";
@@ -514,5 +520,6 @@ public class InstanceSyncHelper {
         if (apiKey != null && !apiKey.isBlank()) {
             conn.setRequestProperty(API_KEY_HEADER, apiKey);
         }
+        conn.setRequestProperty("X-Internal-Sync", "true");
     }
 }

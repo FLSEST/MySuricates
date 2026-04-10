@@ -14,6 +14,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -97,6 +98,28 @@ class RateLimitFilterTest {
         filter.doFilterInternal(request, response, filterChain);
 
         verify(response).setStatus(429);
+    }
+
+    @Test
+    void rateLimitEnabled_internalSync_bypassesLimit() throws Exception {
+        rateLimitConfig.setEnabled(true);
+        rateLimitConfig.setRequestsPerMinute(1);
+        when(request.getRequestURI()).thenReturn("/api/v1/workflows/import");
+        when(request.getHeader("X-Internal-Sync")).thenReturn("true");
+
+        // Should bypass rate limit entirely (shouldNotFilter returns true)
+        boolean shouldSkip = filter.shouldNotFilter(request);
+        assertThat(shouldSkip).isTrue();
+    }
+
+    @Test
+    void rateLimitEnabled_noInternalSyncHeader_notBypassed() throws Exception {
+        rateLimitConfig.setEnabled(true);
+        when(request.getRequestURI()).thenReturn("/api/v1/workflows/import");
+        when(request.getHeader("X-Internal-Sync")).thenReturn(null);
+
+        boolean shouldSkip = filter.shouldNotFilter(request);
+        assertThat(shouldSkip).isFalse();
     }
 
     @Test
