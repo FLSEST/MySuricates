@@ -57,7 +57,11 @@ public class TestingService {
                 }
                 log.info("Auto-starting Test environment...");
                 start();
-                autoSyncOnBoot();
+                // WARNING: Auto-sync on boot is intentionally disabled.
+                // It was overwriting valuable workflows that only existed on the Test instance.
+                // Sync must be triggered manually via POST /api/v1/testing/sync-definitions
+                // or through the Settings UI.
+                log.info("Test environment started. Use manual sync to push definitions from Dev.");
             } catch (Exception e) {
                 log.debug("Test auto-start skipped: {}", e.getMessage());
             }
