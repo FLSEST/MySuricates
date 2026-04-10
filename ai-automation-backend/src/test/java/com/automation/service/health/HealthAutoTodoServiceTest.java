@@ -1,6 +1,7 @@
 package com.automation.service.health;
 
 import com.automation.entity.Todo;
+import com.automation.repository.ProjectRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.service.staging.StagingService;
 import com.automation.service.staging.TestingService;
@@ -24,12 +25,13 @@ class HealthAutoTodoServiceTest {
     @Mock private StagingService stagingService;
     @Mock private TestingService testingService;
     @Mock private TodoRepository todoRepository;
+    @Mock private ProjectRepository projectRepository;
 
     private HealthAutoTodoService service;
 
     @BeforeEach
     void setUp() {
-        service = new HealthAutoTodoService(stagingService, testingService, todoRepository);
+        service = new HealthAutoTodoService(stagingService, testingService, todoRepository, projectRepository);
     }
 
     @Test
@@ -38,6 +40,7 @@ class HealthAutoTodoServiceTest {
         when(stagingService.isHealthy()).thenReturn(false);
         when(testingService.isHealthy()).thenReturn(true);
         when(todoRepository.findOpenByReferenceTypeAndId("health_check", "stable")).thenReturn(Optional.empty());
+        when(projectRepository.existsById(any())).thenReturn(true);
 
         service.checkInstanceHealth();
 
@@ -45,6 +48,22 @@ class HealthAutoTodoServiceTest {
         verify(todoRepository).save(captor.capture());
         assertThat(captor.getValue().getTitle()).contains("Stable");
         assertThat(captor.getValue().getPriority()).isEqualTo(Todo.Priority.HIGH);
+        assertThat(captor.getValue().getProjectId()).isNotNull();
+    }
+
+    @Test
+    void checkInstanceHealth_stableGoesDown_projectMissing_createsTodoWithoutProject() {
+        when(stagingService.isHealthy()).thenReturn(false);
+        when(testingService.isHealthy()).thenReturn(true);
+        when(todoRepository.findOpenByReferenceTypeAndId("health_check", "stable")).thenReturn(Optional.empty());
+        when(projectRepository.existsById(any())).thenReturn(false);
+
+        service.checkInstanceHealth();
+
+        ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+        verify(todoRepository).save(captor.capture());
+        assertThat(captor.getValue().getTitle()).contains("Stable");
+        assertThat(captor.getValue().getProjectId()).isNull();
     }
 
     @Test
@@ -53,6 +72,7 @@ class HealthAutoTodoServiceTest {
         when(stagingService.isHealthy()).thenReturn(false);
         when(testingService.isHealthy()).thenReturn(true);
         when(todoRepository.findOpenByReferenceTypeAndId("health_check", "stable")).thenReturn(Optional.empty());
+        when(projectRepository.existsById(any())).thenReturn(true);
         service.checkInstanceHealth();
 
         // Second call: stable recovers
@@ -83,6 +103,7 @@ class HealthAutoTodoServiceTest {
         when(stagingService.isHealthy()).thenReturn(true);
         when(testingService.isHealthy()).thenReturn(false);
         when(todoRepository.findOpenByReferenceTypeAndId("health_check", "test")).thenReturn(Optional.empty());
+        when(projectRepository.existsById(any())).thenReturn(true);
 
         service.checkInstanceHealth();
 
@@ -108,6 +129,7 @@ class HealthAutoTodoServiceTest {
         when(stagingService.isHealthy()).thenReturn(false);
         when(testingService.isHealthy()).thenReturn(true);
         when(todoRepository.findOpenByReferenceTypeAndId("health_check", "stable")).thenReturn(Optional.empty());
+        when(projectRepository.existsById(any())).thenReturn(true);
         service.checkInstanceHealth();
         reset(todoRepository);
 

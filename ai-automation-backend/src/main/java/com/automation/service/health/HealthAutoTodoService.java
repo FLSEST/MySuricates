@@ -1,6 +1,7 @@
 package com.automation.service.health;
 
 import com.automation.entity.Todo;
+import com.automation.repository.ProjectRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.service.staging.StagingService;
 import com.automation.service.staging.TestingService;
@@ -22,6 +23,7 @@ public class HealthAutoTodoService {
     private final StagingService stagingService;
     private final TestingService testingService;
     private final TodoRepository todoRepository;
+    private final ProjectRepository projectRepository;
 
     private volatile boolean previousStableHealthy = true;
     private volatile boolean previousTestHealthy = true;
@@ -43,6 +45,7 @@ public class HealthAutoTodoService {
             // Transition healthy → unhealthy: create todo if none open
             Optional<Todo> existing = todoRepository.findOpenByReferenceTypeAndId(REFERENCE_TYPE, refId);
             if (existing.isEmpty()) {
+                String projectId = projectRepository.existsById(AUTOPILOT_PROJECT_ID) ? AUTOPILOT_PROJECT_ID : null;
                 Todo todo = Todo.builder()
                         .title("[Health] " + label + "-Instanz nicht erreichbar")
                         .description("Die " + label + "-Instanz ist nicht mehr erreichbar. "
@@ -50,7 +53,7 @@ public class HealthAutoTodoService {
                         .priority(Todo.Priority.HIGH)
                         .source(Todo.Source.AI)
                         .sourceAgent("health-monitor")
-                        .projectId(AUTOPILOT_PROJECT_ID)
+                        .projectId(projectId)
                         .tags("auto:health,instance:" + refId)
                         .referenceType(REFERENCE_TYPE)
                         .referenceId(refId)
