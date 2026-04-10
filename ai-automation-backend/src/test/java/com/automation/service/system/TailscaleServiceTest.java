@@ -3,8 +3,12 @@ package com.automation.service.system;
 import com.automation.dto.response.RemoteAccessResponse;
 import com.automation.exception.TailscaleException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
+
+import java.io.IOException;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class TailscaleServiceTest {
 
@@ -53,11 +57,24 @@ class TailscaleServiceTest {
 
     @Test
     void enable_whenEnabledButTailscaleNotInstalled_throwsTailscaleException() {
+        assumeTrue(!isTailscaleInstalled(),
+                "Skipped: tailscale is installed on this system, so the command won't fail");
+
         TailscaleService service = new TailscaleService(true);
 
         // On a system without tailscale installed, this should throw
         assertThatThrownBy(service::enable)
                 .isInstanceOf(TailscaleException.class);
+    }
+
+    private static boolean isTailscaleInstalled() {
+        try {
+            Process p = new ProcessBuilder("which", "tailscale")
+                    .redirectErrorStream(true).start();
+            return p.waitFor() == 0;
+        } catch (IOException | InterruptedException e) {
+            return false;
+        }
     }
 
     @Test

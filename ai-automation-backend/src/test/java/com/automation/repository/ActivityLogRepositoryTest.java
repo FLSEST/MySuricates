@@ -259,8 +259,8 @@ class ActivityLogRepositoryTest {
         repository.save(entry(LogLevel.INFO, LogCategory.SYSTEM));
         repository.flush();
 
-        // Past cutoff: nothing was created before an hour ago in this test
-        int deleted = repository.deleteOlderThan(Instant.now().minusSeconds(3600));
+        // Epoch cutoff: no entry can have a createdAt before 1970, so nothing should be deleted
+        int deleted = repository.deleteOlderThan(Instant.EPOCH);
 
         assertThat(deleted).isEqualTo(0);
     }
