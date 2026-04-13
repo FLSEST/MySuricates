@@ -3,6 +3,7 @@ package com.automation.entity;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class GateStatusTest {
 
@@ -29,5 +30,11 @@ class GateStatusTest {
     @Test
     void should_resolveRedViaValueOf() {
         assertThat(GateStatus.valueOf("RED")).isEqualTo(GateStatus.RED);
+    }
+
+    @Test
+    void should_throwException_when_valueOfReceivesInvalidName() {
+        assertThatThrownBy(() -> GateStatus.valueOf("INVALID"))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }
