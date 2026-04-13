@@ -18,6 +18,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -334,5 +336,102 @@ class InstanceSyncHelperTest {
 
         // The override key is set via ThreadLocal — verify httpGet was called (key is in header, not directly testable without real HTTP)
         verify(syncHelper, atLeast(3)).httpGet(anyString());
+    }
+
+    // --- markStableSynced via DataSource ---
+
+    @Test
+    void sync_existingWorkflow_callsMarkStableSyncedWithCorrectId() throws Exception {
+        // P1 gap from mocking-gap-audit v2: markStableSynced() uses raw JDBC.
+        // Without a proper DataSource mock chain, the call silently swallows NPE.
+        // This test verifies that the prepared statement is executed with the correct workflow ID.
+        Connection conn = mock(Connection.class);
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(dataSource.getConnection()).thenReturn(conn);
+        when(conn.prepareStatement(anyString())).thenReturn(ps);
+
+        Project proj = Project.builder().id("p1").name("Proj").path("/proj").type(ProjectType.CODE).build();
+        Workflow wf = Workflow.builder().id("wf1").name("ExistingWF").project(proj)
+                .description("desc").blocks(List.of()).build();
+        when(projectRepository.findAll()).thenReturn(List.of(proj));
+        when(workflowRepository.findAllReadOnly()).thenReturn(List.of(wf));
+        when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
+
+        doReturn(objectMapper.readTree("[{\"name\":\"Proj\",\"path\":\"/proj\",\"id\":\"tp1\"}]"))
+                .when(syncHelper).httpGet(TARGET + "/projects");
+        doReturn(objectMapper.readTree("[{\"name\":\"ExistingWF\",\"projectName\":\"Proj\",\"id\":\"twf1\",\"description\":\"desc\",\"blocks\":[]}]"))
+                .when(syncHelper).httpGet(TARGET + "/workflows");
+        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/skills");
+        doReturn(null).when(syncHelper).httpPut(anyString(), any());
+
+        SyncResult result = syncHelper.syncDefinitionsTo(TARGET);
+
+        assertThat(result.workflowsSynced()).isEqualTo(1);
+        verify(dataSource).getConnection();
+        // Verify the workflow ID is passed as the second parameter
+        ArgumentCaptor<String> idCaptor = ArgumentCaptor.forClass(String.class);
+        verify(ps).setString(eq(2), idCaptor.capture());
+        assertThat(idCaptor.getValue()).isEqualTo("wf1");
+        verify(ps).executeUpdate();
+    }
+
+    // --- Combined projectIds + workflowIds filter ---
+
+    @Test
+    void sync_combinedProjectAndWorkflowFilter_autoIncludesWorkflowProject() throws Exception {
+        // P2 gap: When both projectIds and workflowIds are set, projects of selected workflows
+        // should be auto-included in selectedProjectIds, so those workflows can be synced.
+        Project proj1 = Project.builder().id("p1").name("Proj1").path("/proj1").type(ProjectType.CODE).build();
+        Project proj2 = Project.builder().id("p2").name("Proj2").path("/proj2").type(ProjectType.CODE).build();
+        Workflow wf1 = Workflow.builder().id("wf1").name("WF1").project(proj1).blocks(List.of()).build();
+        Workflow wf2 = Workflow.builder().id("wf2").name("WF2").project(proj2).blocks(List.of()).build();
+        when(projectRepository.findAll()).thenReturn(List.of(proj1, proj2));
+        when(workflowRepository.findAllReadOnly()).thenReturn(List.of(wf1, wf2));
+        when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
+
+        doReturn(objectMapper.readTree("[{\"name\":\"Proj2\",\"path\":\"/proj2\",\"id\":\"tp2\"}]"))
+                .when(syncHelper).httpGet(TARGET + "/projects");
+        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/workflows");
+        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/skills");
+        doReturn(objectMapper.readTree("{\"id\":\"twf2\"}")).when(syncHelper).httpPost(eq(TARGET + "/workflows/import"), any());
+
+        // Request: p1 in projectIds, wf2 (in p2) in workflowIds — p2 must be auto-included
+        var request = new SyncDefinitionsRequest(List.of("p1"), List.of("wf2"), null);
+        SyncResult result = syncHelper.syncDefinitionsTo(TARGET, request);
+
+        // wf2 is synced (p2 was auto-included); wf1 is not synced (not in workflowIds)
+        assertThat(result.workflowsSynced()).isEqualTo(1);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(syncHelper, times(1)).httpPost(eq(TARGET + "/workflows/import"), bodyCaptor.capture());
+        assertThat(bodyCaptor.getValue().get("name")).isEqualTo("WF2");
+    }
+
+    // --- Projectless workflow edge case ---
+
+    @Test
+    void sync_projectlessWorkflow_skippedWhenProjectIdFilterSet() throws Exception {
+        // P2 gap: When selectedProjectIds is set, workflows with null project are always skipped
+        // — even if they are explicitly selected via workflowIds.
+        // This documents the current behavior (skip) rather than asserting it is correct.
+        Project proj1 = Project.builder().id("p1").name("Proj1").path("/proj1").type(ProjectType.CODE).build();
+        Workflow wf1 = Workflow.builder().id("wf1").name("WF1").project(proj1).blocks(List.of()).build();
+        Workflow wfNoProject = Workflow.builder().id("wf3").name("WF3").project(null).blocks(List.of()).build();
+        when(projectRepository.findAll()).thenReturn(List.of(proj1));
+        when(workflowRepository.findAllReadOnly()).thenReturn(List.of(wf1, wfNoProject));
+        when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
+
+        doReturn(objectMapper.readTree("[{\"name\":\"Proj1\",\"path\":\"/proj1\",\"id\":\"tp1\"}]"))
+                .when(syncHelper).httpGet(TARGET + "/projects");
+        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/workflows");
+        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/skills");
+
+        // Request: p1 in projectIds, wf3 (no project) explicitly in workflowIds
+        var request = new SyncDefinitionsRequest(List.of("p1"), List.of("wf3"), null);
+        SyncResult result = syncHelper.syncDefinitionsTo(TARGET, request);
+
+        // wf3 is skipped: selectedProjectIds filter rejects it because wf3.project == null
+        assertThat(result.workflowsSynced()).isEqualTo(0);
+        verify(syncHelper, never()).httpPost(eq(TARGET + "/workflows/import"), any());
     }
 }
