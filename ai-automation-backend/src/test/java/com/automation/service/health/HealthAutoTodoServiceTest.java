@@ -140,4 +140,31 @@ class HealthAutoTodoServiceTest {
 
         verify(todoRepository, never()).save(any());
     }
+
+    @Test
+    void checkInstanceHealth_saveFails_retriesTransitionOnNextTick() {
+        // First call: stable goes down, but save throws
+        when(stagingService.isHealthy()).thenReturn(false);
+        when(testingService.isHealthy()).thenReturn(true);
+        when(todoRepository.findOpenByReferenceTypeAndId("health_check", "stable")).thenReturn(Optional.empty());
+        when(projectRepository.existsById(any())).thenReturn(true);
+        when(todoRepository.save(any())).thenThrow(new RuntimeException("DB locked"));
+
+        service.checkInstanceHealth();
+
+        // save was attempted but failed
+        verify(todoRepository).save(any());
+
+        // Second call: same state — transition should be re-detected because
+        // state was NOT updated after the failure
+        reset(todoRepository);
+        when(todoRepository.findOpenByReferenceTypeAndId("health_check", "stable")).thenReturn(Optional.empty());
+        when(projectRepository.existsById(any())).thenReturn(true);
+        when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.checkInstanceHealth();
+
+        // Should have retried the save
+        verify(todoRepository).save(any());
+    }
 }

@@ -13,6 +13,10 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
@@ -79,6 +83,9 @@ class RateLimitFilterTest {
 
         verify(response).setStatus(429);
         verify(response).setContentType("application/json");
+        writer.flush();
+        assertThat(stringWriter.toString()).contains("retryAfterSeconds");
+        assertThat(stringWriter.toString()).contains("Rate limit exceeded");
     }
 
     @Test
@@ -120,6 +127,58 @@ class RateLimitFilterTest {
 
         boolean shouldSkip = filter.shouldNotFilter(request);
         assertThat(shouldSkip).isFalse();
+    }
+
+    @Test
+    void rateLimitEnabled_concurrentRequests_exactlyLimitPass() throws Exception {
+        rateLimitConfig.setEnabled(true);
+        rateLimitConfig.setRequestsPerMinute(10);
+
+        int totalThreads = 20;
+        CountDownLatch ready = new CountDownLatch(totalThreads);
+        CountDownLatch go = new CountDownLatch(1);
+        AtomicInteger passed = new AtomicInteger(0);
+        AtomicInteger blocked = new AtomicInteger(0);
+
+        List<Thread> threads = new ArrayList<>();
+        for (int i = 0; i < totalThreads; i++) {
+            Thread t = new Thread(() -> {
+                try {
+                    HttpServletRequest req = mock(HttpServletRequest.class);
+                    HttpServletResponse resp = mock(HttpServletResponse.class);
+                    FilterChain chain = mock(FilterChain.class);
+                    when(req.getRemoteAddr()).thenReturn("10.0.0.99");
+                    StringWriter sw = new StringWriter();
+                    when(resp.getWriter()).thenReturn(new PrintWriter(sw));
+
+                    ready.countDown();
+                    go.await();
+
+                    filter.doFilterInternal(req, resp, chain);
+
+                    try {
+                        verify(chain).doFilter(req, resp);
+                        passed.incrementAndGet();
+                    } catch (AssertionError e) {
+                        blocked.incrementAndGet();
+                    }
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+            threads.add(t);
+            t.start();
+        }
+
+        ready.await();
+        go.countDown();
+
+        for (Thread t : threads) {
+            t.join(5000);
+        }
+
+        assertThat(passed.get()).isEqualTo(10);
+        assertThat(blocked.get()).isEqualTo(10);
     }
 
     @Test

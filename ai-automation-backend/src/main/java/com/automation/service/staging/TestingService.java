@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -134,6 +135,9 @@ public class TestingService {
             throw new IllegalStateException("Test instance is not running or not healthy. Start it first.");
         }
         String testApiKey = readContainerApiKey(config.getTestContainerName());
+        if (testApiKey == null) {
+            throw new IllegalStateException("Could not read API key from test container. Is the container running?");
+        }
         return syncHelper.syncPreview(deriveTestBaseUrl(), testApiKey);
     }
 
@@ -146,6 +150,9 @@ public class TestingService {
             throw new IllegalStateException("Test instance is not running or not healthy. Start it first.");
         }
         String testApiKey = readContainerApiKey(config.getTestContainerName());
+        if (testApiKey == null) {
+            return new SyncResult(0, 0, 0, 0, List.of("Could not read API key from test container"));
+        }
         return syncHelper.syncDefinitionsTo(deriveTestBaseUrl(), testApiKey, request);
     }
 
@@ -272,14 +279,15 @@ public class TestingService {
         return withTestApiKey(() -> {
             String baseUrl = deriveTestBaseUrl();
             String url = baseUrl + "/executions/" + runId;
-            int waited = 0;
+            long waitedMs = 0;
+            long maxWaitMs = maxWaitSeconds * 1000L;
 
-            while (waited < maxWaitSeconds) {
+            while (waitedMs < maxWaitMs) {
                 JsonNode run = syncHelper.httpGet(url);
                 if (run != null) {
                     String status = run.path("status").asText("");
                     if ("COMPLETED".equals(status) || "FAILED".equals(status) || "CANCELLED".equals(status)) {
-                        log.info("Test run {} finished with status: {} ({}s)", runId, status, waited);
+                        log.info("Test run {} finished with status: {} ({}ms)", runId, status, waitedMs);
                         return run;
                     }
                 }
@@ -289,7 +297,7 @@ public class TestingService {
                     Thread.currentThread().interrupt();
                     throw new RuntimeException("Polling interrupted", e);
                 }
-                waited += intervalMs / 1000;
+                waitedMs += intervalMs;
             }
             throw new IllegalStateException("Test run " + runId + " did not complete within " + maxWaitSeconds + "s");
         });
@@ -299,6 +307,9 @@ public class TestingService {
 
     private <T> T withTestApiKey(java.util.function.Supplier<T> action) {
         String apiKey = readContainerApiKey(config.getTestContainerName());
+        if (apiKey == null) {
+            log.warn("Could not read API key from test container — requests may fail with 401");
+        }
         syncHelper.setTargetApiKeyOverride(apiKey);
         try {
             return action.get();

@@ -35,39 +35,45 @@ public class HealthAutoTodoService {
     }
 
     private void checkInstance(String refId, boolean currentlyHealthy, boolean previouslyHealthy, String label) {
-        if (refId.equals("stable")) {
-            previousStableHealthy = currentlyHealthy;
-        } else {
-            previousTestHealthy = currentlyHealthy;
-        }
-
-        if (previouslyHealthy && !currentlyHealthy) {
-            // Transition healthy → unhealthy: create todo if none open
-            Optional<Todo> existing = todoRepository.findOpenByReferenceTypeAndId(REFERENCE_TYPE, refId);
-            if (existing.isEmpty()) {
-                String projectId = projectRepository.existsById(AUTOPILOT_PROJECT_ID) ? AUTOPILOT_PROJECT_ID : null;
-                Todo todo = Todo.builder()
-                        .title("[Health] " + label + "-Instanz nicht erreichbar")
-                        .description("Die " + label + "-Instanz ist nicht mehr erreichbar. "
-                                + "Bitte Status prüfen und ggf. neu starten.")
-                        .priority(Todo.Priority.HIGH)
-                        .source(Todo.Source.AI)
-                        .sourceAgent("health-monitor")
-                        .projectId(projectId)
-                        .tags("auto:health,instance:" + refId)
-                        .referenceType(REFERENCE_TYPE)
-                        .referenceId(refId)
-                        .build();
-                todoRepository.save(todo);
-                log.info("Created health todo for {} instance", label);
+        try {
+            if (previouslyHealthy && !currentlyHealthy) {
+                // Transition healthy → unhealthy: create todo if none open
+                Optional<Todo> existing = todoRepository.findOpenByReferenceTypeAndId(REFERENCE_TYPE, refId);
+                if (existing.isEmpty()) {
+                    String projectId = projectRepository.existsById(AUTOPILOT_PROJECT_ID) ? AUTOPILOT_PROJECT_ID : null;
+                    Todo todo = Todo.builder()
+                            .title("[Health] " + label + "-Instanz nicht erreichbar")
+                            .description("Die " + label + "-Instanz ist nicht mehr erreichbar. "
+                                    + "Bitte Status prüfen und ggf. neu starten.")
+                            .priority(Todo.Priority.HIGH)
+                            .source(Todo.Source.AI)
+                            .sourceAgent("health-monitor")
+                            .projectId(projectId)
+                            .tags("auto:health,instance:" + refId)
+                            .referenceType(REFERENCE_TYPE)
+                            .referenceId(refId)
+                            .build();
+                    todoRepository.save(todo);
+                    log.info("Created health todo for {} instance", label);
+                }
+            } else if (!previouslyHealthy && currentlyHealthy) {
+                // Transition unhealthy → healthy: close open todo
+                todoRepository.findOpenByReferenceTypeAndId(REFERENCE_TYPE, refId).ifPresent(todo -> {
+                    todo.setStatus(Todo.Status.DONE);
+                    todoRepository.save(todo);
+                    log.info("Closed health todo for {} instance (recovered)", label);
+                });
             }
-        } else if (!previouslyHealthy && currentlyHealthy) {
-            // Transition unhealthy → healthy: close open todo
-            todoRepository.findOpenByReferenceTypeAndId(REFERENCE_TYPE, refId).ifPresent(todo -> {
-                todo.setStatus(Todo.Status.DONE);
-                todoRepository.save(todo);
-                log.info("Closed health todo for {} instance (recovered)", label);
-            });
+
+            // Only update state after persistence succeeded — if save() throws,
+            // the next tick will re-detect the transition and retry
+            if (refId.equals("stable")) {
+                previousStableHealthy = currentlyHealthy;
+            } else {
+                previousTestHealthy = currentlyHealthy;
+            }
+        } catch (Exception e) {
+            log.error("Failed to process health transition for {}: {}", label, e.getMessage());
         }
     }
 }

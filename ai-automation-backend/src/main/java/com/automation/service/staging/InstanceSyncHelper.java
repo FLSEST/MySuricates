@@ -204,9 +204,12 @@ public class InstanceSyncHelper {
                 String key = sp.path("name").asText() + "|" + sp.path("path").asText();
                 targetProjectsByNamePath.put(key, sp);
             }
+        } else if (targetProjects == null) {
+            errors.add("Could not fetch projects from target — skipping project sync");
         }
 
         for (Project project : devProjects) {
+            if (targetProjects == null) break;
             // Always build the ID mapping for existing projects (needed for workflow sync)
             String key = project.getName() + "|" + project.getPath();
             JsonNode existing = targetProjectsByNamePath.get(key);
@@ -256,9 +259,12 @@ public class InstanceSyncHelper {
                 String wKey = sw.path("name").asText() + "|" + sw.path("projectName").asText();
                 targetWorkflowsByNameProject.put(wKey, sw);
             }
+        } else if (targetWorkflows == null) {
+            errors.add("Could not fetch workflows from target — skipping workflow sync");
         }
 
         for (Workflow workflow : devWorkflows) {
+            if (targetWorkflows == null) break;
             if (selectedWorkflowIds != null && !selectedWorkflowIds.contains(workflow.getId())) {
                 continue;
             }
@@ -320,9 +326,12 @@ public class InstanceSyncHelper {
             for (JsonNode ss : targetSkills) {
                 targetSkillNames.add(ss.path("name").asText());
             }
+        } else if (targetSkills == null) {
+            errors.add("Could not fetch skills from target — skipping skill sync");
         }
 
         for (Skill skill : customSkills) {
+            if (targetSkills == null) break;
             if (selectedSkillIds != null && !selectedSkillIds.contains(skill.getId())) {
                 continue;
             }

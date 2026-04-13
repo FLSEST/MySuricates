@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -103,7 +104,12 @@ class InstanceSyncHelperTest {
         SyncResult result = syncHelper.syncDefinitionsTo(TARGET);
 
         assertThat(result.projectsSynced()).isEqualTo(1);
-        verify(syncHelper).httpPost(eq(TARGET + "/projects"), any());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(syncHelper).httpPost(eq(TARGET + "/projects"), bodyCaptor.capture());
+        assertThat(bodyCaptor.getValue().get("name")).isEqualTo("NewProj");
+        assertThat(bodyCaptor.getValue().get("path")).isEqualTo("/new");
+        assertThat(bodyCaptor.getValue().get("type")).isEqualTo("CODE");
     }
 
     @Test
@@ -144,7 +150,11 @@ class InstanceSyncHelperTest {
         SyncResult result = syncHelper.syncDefinitionsTo(TARGET);
 
         assertThat(result.workflowsSynced()).isEqualTo(1);
-        verify(syncHelper).httpPost(eq(TARGET + "/workflows/import"), any());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> wfBodyCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(syncHelper).httpPost(eq(TARGET + "/workflows/import"), wfBodyCaptor.capture());
+        assertThat(wfBodyCaptor.getValue().get("name")).isEqualTo("NewWF");
+        assertThat(wfBodyCaptor.getValue().get("projectId")).isEqualTo("tp1");
     }
 
     @Test
@@ -166,7 +176,11 @@ class InstanceSyncHelperTest {
         SyncResult result = syncHelper.syncDefinitionsTo(TARGET);
 
         assertThat(result.workflowsSynced()).isEqualTo(1);
-        verify(syncHelper).httpPut(eq(TARGET + "/workflows/twf1"), any());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> updateCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(syncHelper).httpPut(eq(TARGET + "/workflows/twf1"), updateCaptor.capture());
+        assertThat(updateCaptor.getValue().get("name")).isEqualTo("ExistingWF");
+        assertThat(updateCaptor.getValue().get("description")).isEqualTo("new desc");
     }
 
     // --- Sync skills ---
@@ -228,7 +242,10 @@ class InstanceSyncHelperTest {
 
         // Only wf1 synced, wf2 skipped
         assertThat(result.workflowsSynced()).isEqualTo(1);
-        verify(syncHelper, times(1)).httpPost(eq(TARGET + "/workflows/import"), any());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(syncHelper, times(1)).httpPost(eq(TARGET + "/workflows/import"), bodyCaptor.capture());
+        assertThat(bodyCaptor.getValue().get("name")).isEqualTo("WF1");
     }
 
     @Test
@@ -255,7 +272,10 @@ class InstanceSyncHelperTest {
         // Only wf1 (proj1) synced — wf2 (proj2) and wf3 (no project) skipped
         assertThat(result.workflowsSynced()).isEqualTo(1);
         assertThat(result.projectsSynced()).isEqualTo(1);
-        verify(syncHelper, times(1)).httpPost(eq(TARGET + "/workflows/import"), any());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(syncHelper, times(1)).httpPost(eq(TARGET + "/workflows/import"), bodyCaptor.capture());
+        assertThat(bodyCaptor.getValue().get("name")).isEqualTo("WF1");
     }
 
     // --- Error handling ---
@@ -267,15 +287,37 @@ class InstanceSyncHelperTest {
         when(workflowRepository.findAllReadOnly()).thenReturn(List.of());
         when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
 
-        // httpGet returns null (target unreachable), httpPost also fails
+        // httpGet returns null (target unreachable) — with guard, httpPost is never called
         doReturn(null).when(syncHelper).httpGet(anyString());
-        doThrow(new RuntimeException("Connection refused")).when(syncHelper).httpPost(anyString(), any());
 
         SyncResult result = syncHelper.syncDefinitionsTo(TARGET);
 
-        // Should not crash, errors are collected
+        // Should not crash, errors are collected for each entity type
         assertThat(result.errors()).isNotEmpty();
-        assertThat(result.errors().get(0)).contains("Connection refused");
+        assertThat(result.projectsSynced()).isEqualTo(0);
+        verify(syncHelper, never()).httpPost(anyString(), any());
+    }
+
+    @Test
+    void sync_httpGetReturnsNull_skipsSyncAndCollectsErrors() throws Exception {
+        Project proj = Project.builder().id("p1").name("Proj").path("/proj").type(ProjectType.CODE).build();
+        Workflow wf = Workflow.builder().id("wf1").name("WF1").project(proj).blocks(List.of()).build();
+        Skill skill = Skill.builder().id("s1").name("Skill1").category(SkillCategory.CODE).builtin(false).build();
+        when(projectRepository.findAll()).thenReturn(List.of(proj));
+        when(workflowRepository.findAllReadOnly()).thenReturn(List.of(wf));
+        when(skillRepository.findByBuiltin(false)).thenReturn(List.of(skill));
+
+        // httpGet returns null for all target endpoints
+        doReturn(null).when(syncHelper).httpGet(anyString());
+
+        SyncResult result = syncHelper.syncDefinitionsTo(TARGET);
+
+        // Nothing should be synced — no POST calls at all
+        assertThat(result.projectsSynced()).isEqualTo(0);
+        assertThat(result.workflowsSynced()).isEqualTo(0);
+        assertThat(result.skillsSynced()).isEqualTo(0);
+        assertThat(result.errors()).hasSize(3);
+        verify(syncHelper, never()).httpPost(anyString(), any());
     }
 
     // --- API key override ---

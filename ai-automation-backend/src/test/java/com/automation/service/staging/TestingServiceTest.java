@@ -172,6 +172,20 @@ class TestingServiceTest {
     }
 
     @Test
+    void syncDefinitions_nullApiKey_returnsErrorResult() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+        TestingService spied = spy(testingService);
+        doReturn(true).when(spied).isHealthy();
+        doReturn(null).when(spied).readContainerApiKey(anyString());
+
+        SyncResult result = spied.syncDefinitions();
+
+        assertThat(result.errors()).isNotEmpty();
+        assertThat(result.errors().get(0)).contains("API key");
+        verify(instanceSyncHelper, never()).syncDefinitionsTo(anyString(), anyString(), any());
+    }
+
+    @Test
     void syncDefinitions_throwsIfNotHealthy() {
         TestingService spied = spy(testingService);
         doReturn(false).when(spied).isHealthy();
@@ -286,8 +300,22 @@ class TestingServiceTest {
         when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/executions/run-1"))
                 .thenReturn(runningRun);
 
-        // intervalMs/1000 must be >= 1 to avoid infinite loop (integer division)
         assertThatThrownBy(() -> testingService.pollTestRun("run-1", 1, 1000))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("did not complete within");
+    }
+
+    @Test
+    void pollTestRun_subSecondInterval_doesNotInfiniteLoop() {
+        stagingConfig.setTestHealthUrl("http://localhost:8090/api/v1/system/health");
+
+        ObjectNode runningRun = objectMapper.createObjectNode();
+        runningRun.put("status", "RUNNING");
+        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/executions/run-1"))
+                .thenReturn(runningRun);
+
+        // With intervalMs=200, maxWait=1 — must timeout, NOT infinite loop
+        assertThatThrownBy(() -> testingService.pollTestRun("run-1", 1, 200))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("did not complete within");
     }
