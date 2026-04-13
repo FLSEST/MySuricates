@@ -1,0 +1,88 @@
+package com.automation.exception;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.http.HttpStatus;
+
+import java.util.stream.Stream;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+class ErrorCodeTest {
+
+    @Test
+    void should_containAllExpectedValues_when_enumValuesQueried() {
+        assertThat(ErrorCode.values()).hasSize(11)
+                .containsExactly(
+                        ErrorCode.RESOURCE_NOT_FOUND,
+                        ErrorCode.VALIDATION_FAILED,
+                        ErrorCode.INVALID_ARGUMENT,
+                        ErrorCode.WORKFLOW_EXECUTION_FAILED,
+                        ErrorCode.CONTAINER_ERROR,
+                        ErrorCode.STAGING_ERROR,
+                        ErrorCode.STATE_CONFLICT,
+                        ErrorCode.SERVICE_UNAVAILABLE,
+                        ErrorCode.TOKEN_BUDGET_EXCEEDED,
+                        ErrorCode.OPERATION_TIMEOUT,
+                        ErrorCode.INTERNAL_ERROR
+                );
+    }
+
+    @ParameterizedTest
+    @MethodSource("errorCodeMappings")
+    void should_returnCorrectHttpStatusAndMessage_when_enumValueAccessed(
+            ErrorCode errorCode, HttpStatus expectedStatus, String expectedMessage) {
+        assertThat(errorCode.getHttpStatus()).isEqualTo(expectedStatus);
+        assertThat(errorCode.getDefaultMessage()).isEqualTo(expectedMessage);
+    }
+
+    @Test
+    void should_resolveEnumConstant_when_validNameProvided() {
+        assertThat(ErrorCode.valueOf("RESOURCE_NOT_FOUND")).isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
+        assertThat(ErrorCode.valueOf("INTERNAL_ERROR")).isEqualTo(ErrorCode.INTERNAL_ERROR);
+    }
+
+    @Test
+    void should_throwIllegalArgumentException_when_invalidNameProvided() {
+        assertThatThrownBy(() -> ErrorCode.valueOf("NON_EXISTENT"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void should_mapToClientErrorStatus_when_clientErrorCodeUsed() {
+        assertThat(ErrorCode.RESOURCE_NOT_FOUND.getHttpStatus().is4xxClientError()).isTrue();
+        assertThat(ErrorCode.VALIDATION_FAILED.getHttpStatus().is4xxClientError()).isTrue();
+        assertThat(ErrorCode.INVALID_ARGUMENT.getHttpStatus().is4xxClientError()).isTrue();
+        assertThat(ErrorCode.STATE_CONFLICT.getHttpStatus().is4xxClientError()).isTrue();
+        assertThat(ErrorCode.TOKEN_BUDGET_EXCEEDED.getHttpStatus().is4xxClientError()).isTrue();
+    }
+
+    @Test
+    void should_mapToServerErrorStatus_when_serverErrorCodeUsed() {
+        assertThat(ErrorCode.WORKFLOW_EXECUTION_FAILED.getHttpStatus().is5xxServerError()).isTrue();
+        assertThat(ErrorCode.CONTAINER_ERROR.getHttpStatus().is5xxServerError()).isTrue();
+        assertThat(ErrorCode.STAGING_ERROR.getHttpStatus().is5xxServerError()).isTrue();
+        assertThat(ErrorCode.SERVICE_UNAVAILABLE.getHttpStatus().is5xxServerError()).isTrue();
+        assertThat(ErrorCode.OPERATION_TIMEOUT.getHttpStatus().is5xxServerError()).isTrue();
+        assertThat(ErrorCode.INTERNAL_ERROR.getHttpStatus().is5xxServerError()).isTrue();
+    }
+
+    private static Stream<Arguments> errorCodeMappings() {
+        return Stream.of(
+                Arguments.of(ErrorCode.RESOURCE_NOT_FOUND, HttpStatus.NOT_FOUND, "Resource not found"),
+                Arguments.of(ErrorCode.VALIDATION_FAILED, HttpStatus.BAD_REQUEST, "Validation failed"),
+                Arguments.of(ErrorCode.INVALID_ARGUMENT, HttpStatus.BAD_REQUEST, "Invalid argument"),
+                Arguments.of(ErrorCode.WORKFLOW_EXECUTION_FAILED, HttpStatus.INTERNAL_SERVER_ERROR, "Workflow execution failed"),
+                Arguments.of(ErrorCode.CONTAINER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR, "Container error"),
+                Arguments.of(ErrorCode.STAGING_ERROR, HttpStatus.INTERNAL_SERVER_ERROR, "Staging error"),
+                Arguments.of(ErrorCode.STATE_CONFLICT, HttpStatus.CONFLICT, "State conflict"),
+                Arguments.of(ErrorCode.SERVICE_UNAVAILABLE, HttpStatus.SERVICE_UNAVAILABLE, "Service unavailable"),
+                Arguments.of(ErrorCode.TOKEN_BUDGET_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS, "Token budget exceeded"),
+                Arguments.of(ErrorCode.OPERATION_TIMEOUT, HttpStatus.GATEWAY_TIMEOUT, "Operation timed out"),
+                Arguments.of(ErrorCode.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error")
+        );
+    }
+}
