@@ -1,6 +1,9 @@
 # Screenshots
 *.png
 
+# TLS certificates (dev)
+certs/
+
 # Playwright MCP
 .playwright-mcp/
 

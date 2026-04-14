@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -56,6 +58,14 @@ export default defineConfig(() => {
       host: true,
       port: 3000,
       strictPort: true,
+      ...(process.env.VITE_HTTPS !== 'false' && fs.existsSync(path.resolve(__dirname, '../certs/dev.crt'))
+        ? {
+            https: {
+              cert: fs.readFileSync(path.resolve(__dirname, '../certs/dev.crt')),
+              key: fs.readFileSync(path.resolve(__dirname, '../certs/dev.key')),
+            },
+          }
+        : {}),
       proxy: {
         '/api': {
           target: apiProxyTarget,

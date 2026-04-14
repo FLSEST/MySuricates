@@ -7,7 +7,7 @@ server:
 
 automation:
   cors:
-    allowed-origins: http://localhost:9091
+    allowed-origins: http://localhost:9091,https://localhost:9091,http://100.*:9091,https://100.*:9091,https://*.tail*.ts.net:*
   staging:
     auto-start: false
   tray:

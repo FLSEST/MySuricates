@@ -40,6 +40,12 @@ spring:
 
 server:
   port: ${AUTOMATION_PORT:9090}
+  ssl:
+    enabled: ${AUTOMATION_SSL_ENABLED:false}
+    key-store: ${AUTOMATION_SSL_KEYSTORE:./certs/dev.p12}
+    key-store-password: ${AUTOMATION_SSL_PASSWORD:mysuricates}
+    key-store-type: PKCS12
+    key-alias: mysuricates
 
 management:
   endpoints:
@@ -66,7 +72,7 @@ automation:
     skip-permissions: ${AUTOMATION_CLI_SKIP_PERMISSIONS:true}
     allowed-tools: ${AUTOMATION_CLI_ALLOWED_TOOLS:}
   cors:
-    allowed-origins: ${AUTOMATION_CORS_ORIGINS:http://localhost:3000,http://localhost:5173,http://100.*:3000}
+    allowed-origins: ${AUTOMATION_CORS_ORIGINS:http://localhost:3000,http://localhost:5173,https://localhost:3000,https://localhost:5173,http://100.*:3000,https://100.*:3000,https://*.tail*.ts.net:*}
   workspace:
     root: ${AUTOMATION_WORKSPACE_ROOT:}
   security:

@@ -44,7 +44,7 @@ public class SecurityConfig {
                 )
                 .headers(headers -> headers
                         .contentSecurityPolicy(csp -> csp.policyDirectives(
-                                "default-src 'self'; script-src 'self'; connect-src 'self' ws://localhost:* wss://localhost:* ws://100.*:* wss://100.*:*; style-src 'self' 'unsafe-inline'; img-src 'self' data:"))
+                                "default-src 'self'; script-src 'self'; connect-src 'self' ws: wss:; style-src 'self' 'unsafe-inline'; img-src 'self' data:"))
                         .frameOptions(fo -> fo.deny()))
                 .addFilterBefore(apiKeyAuthFilter, UsernamePasswordAuthenticationFilter.class);
 

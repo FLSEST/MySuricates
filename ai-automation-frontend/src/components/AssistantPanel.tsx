@@ -6,6 +6,7 @@ import { useAssistantChat, type ChatMessage } from '../hooks/useAssistant';
 import { useAssistantWebSocket } from '../hooks/useAssistantWebSocket';
 import { useExecuteWorkflow } from '../hooks/useWorkflows';
 import { useSettingsStore } from '../stores/settingsStore';
+import { generateId } from '../utils/uuid';
 import { MeerkatIcon } from './layout/Sidebar';
 import { parsePageContext } from './assistantPanelUtils';
 import { MessageBubble } from './assistant/AssistantMessage';
@@ -125,7 +126,7 @@ export function AssistantPanel() {
 
     const controller = new AbortController();
     abortRef.current = controller;
-    const requestId = crypto.randomUUID();
+    const requestId = generateId();
     setActiveRequestId(requestId);
 
     sendMessage(
@@ -137,7 +138,7 @@ export function AssistantPanel() {
           updateMessageStatus(sessionId, userMsgId, 'sent');
           if (res.model) setLastModel(res.model);
           appendMessage(sessionId, {
-            id: crypto.randomUUID(),
+            id: generateId(),
             role: 'assistant',
             content: res.message,
             actions: res.actions,
@@ -159,7 +160,7 @@ export function AssistantPanel() {
           }
           updateMessageStatus(sessionId, userMsgId, 'error');
           appendMessage(sessionId, {
-            id: crypto.randomUUID(),
+            id: generateId(),
             role: 'assistant',
             content: 'Entschuldigung, ein Fehler ist aufgetreten. Bitte versuche es erneut.',
             timestamp: Date.now(),
@@ -175,7 +176,7 @@ export function AssistantPanel() {
     const next = queueRef.current.shift();
     if (next) {
       const now = +new Date();
-      const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: next.text, timestamp: now, status: 'sending' };
+      const userMsg: ChatMessage = { id: generateId(), role: 'user', content: next.text, timestamp: now, status: 'sending' };
       appendMessage(next.sessionId, userMsg);
       dispatchChat(next.text, next.sessionId, userMsg.id);
     }
@@ -191,7 +192,7 @@ export function AssistantPanel() {
     }
 
     const now = +new Date();
-    const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: text, timestamp: now, status: 'sending' };
+    const userMsg: ChatMessage = { id: generateId(), role: 'user', content: text, timestamp: now, status: 'sending' };
     appendMessage(sessionId, userMsg);
 
     if (isPending) {

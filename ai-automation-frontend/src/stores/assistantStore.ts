@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { ChatMessage } from '../hooks/useAssistant';
+import { generateId } from '../utils/uuid';
 
 export interface ChatSession {
   id: string;
@@ -53,7 +54,7 @@ export const useAssistantStore = create<AssistantState>()(
       setPendingInput: (pendingInput) => set({ pendingInput }),
 
       startNewSession: () => {
-        const id = crypto.randomUUID();
+        const id = generateId();
         const session: ChatSession = {
           id,
           startedAt: Date.now(),
