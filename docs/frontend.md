@@ -1,4 +1,4 @@
-> *Zuletzt aktualisiert: 28. März 2026, 19:45 Uhr — Workflow: MySuricates Docs aktualisieren | Run: 01102949-3825-4cd9-b4b9-8aa84917c4c2*
+> *Zuletzt aktualisiert: 14. April 2026 — Manuelles Doku-Audit (11 fehlende Hooks ergänzt)*
 
 # Frontend
 
@@ -503,6 +503,72 @@ useToast() → {
   success(message), error(message), info(message), warning(message)
 }
 ```
+
+### `useAssistantWebSocket.ts`
+
+WebSocket-Verbindung für Echtzeit-Status-Updates des Assistenten (Typing-Indicator, Session-Updates).
+
+### `useIntegrations.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useIntegrations()` | Query | Alle Provider mit Verbindungsstatus |
+| `useConnectIntegration()` | Mutation | OAuth-Verbindung herstellen |
+| `useDisconnectIntegration()` | Mutation | OAuth-Verbindung trennen |
+| `useTestIntegration()` | Mutation | Provider-Verbindung testen |
+
+### `useWorkflowVersions.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useWorkflowVersions(id)` | Query | Versionshistorie eines Workflows |
+| `useRestoreWorkflowVersion()` | Mutation | Version wiederherstellen |
+
+### `useOnboardingProfiles.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useOnboardingProfiles()` | Query | Alle Onboarding-Profile |
+| `useUpdateOnboardingProfile()` | Mutation | Profil aktualisieren |
+
+### `useCalendarAggregated.ts`
+
+Aggregiert Events aus mehreren Quellen (Google Calendar, Trello, Schedules, Runs) über das Calendar-Adapter-Pattern.
+
+### `useCalendarColors.ts`
+
+Verwaltet benutzerdefinierte Farben pro Kalender-Quelle (persistiert in `localStorage`).
+
+### `useConversion.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useConversionSuggestions()` | Query | Vorschläge für Workflow-Konvertierungen |
+| `useCreateConversion()` | Mutation | Agentic-Run in deterministischen Workflow konvertieren |
+
+### `useLearning.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useLearningDashboard()` | Query | Lern-Dashboard-Daten |
+| `useLearningStats()` | Query | Erfolgsraten und Statistiken |
+
+### `useReports.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useReports()` | Query | Alle generierten Reports |
+
+### `useTemplates.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useTemplates()` | Query | Alle Workflow-Templates |
+| `useCreateFromTemplate()` | Mutation | Workflow aus Template erstellen |
+
+### `useIsMobile.ts`
+
+Responsive-Hook, erkennt Mobile-Breakpoint für adaptive UI-Anpassungen.
 
 ## Internationalisierung (i18n)
 

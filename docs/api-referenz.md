@@ -1145,6 +1145,120 @@ Trigger löschen.
 
 ---
 
+## Integrations (OAuth-Provider)
+
+Plugin-System für externe Dienste (Google Calendar, Gmail, Jira, Confluence, Trello). Jeder Provider wird automatisch erkannt und bietet OAuth-Verbindung + Actions.
+
+### `GET /api/v1/integrations`
+
+Liste aller Provider mit Verbindungsstatus, Actions und Account-Info.
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "providerId": "google-calendar",
+    "displayName": "Google Calendar",
+    "icon": "calendar",
+    "description": "...",
+    "status": "CONNECTED",
+    "configured": true,
+    "accountEmail": "user@gmail.com",
+    "accountName": "Max Mustermann",
+    "connectedAt": "2026-04-01T10:00:00Z",
+    "scopes": "https://www.googleapis.com/auth/calendar",
+    "optionalScopes": [],
+    "actions": [
+      { "name": "list_events", "description": "...", "inputSchema": {...}, "available": true }
+    ]
+  }
+]
+```
+
+### `GET /api/v1/integrations/{providerId}`
+
+Einzelnen Provider mit Details abrufen.
+
+### `GET /api/v1/integrations/{providerId}/connect`
+
+OAuth-Autorisierungs-URL generieren.
+
+**Query-Parameter:** `scopes` (optional, Liste zusätzlicher OAuth-Scopes)
+
+**Response:** `200 OK`
+```json
+{ "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth?..." }
+```
+
+### `GET /api/v1/integrations/{providerId}/callback`
+
+OAuth-Callback (öffentlich, kein API-Key). Tauscht Authorization-Code gegen Tokens und schließt das Popup-Fenster via `postMessage`.
+
+### `POST /api/v1/integrations/{providerId}/credentials`
+
+Client-Credentials (Client ID + Secret) speichern. Werden AES-256-GCM-verschlüsselt in der DB abgelegt.
+
+**Body:**
+```json
+{ "clientId": "...", "clientSecret": "..." }
+```
+
+### `DELETE /api/v1/integrations/{providerId}/connection`
+
+OAuth-Verbindung trennen. Löscht gespeicherte Tokens.
+
+**Response:** `204 No Content`
+
+### `GET /api/v1/integrations/{providerId}/actions`
+
+Liste aller verfügbaren Actions des Providers. `available` ist `false` wenn benötigte OAuth-Scopes fehlen.
+
+### `POST /api/v1/integrations/{providerId}/actions/{action}`
+
+Action ausführen. Body enthält die Action-spezifischen Parameter.
+
+**Body (Beispiel Google Calendar `create_event`):**
+```json
+{
+  "summary": "Meeting",
+  "startDateTime": "2026-04-15T10:00:00+02:00",
+  "endDateTime": "2026-04-15T11:00:00+02:00"
+}
+```
+
+---
+
+## Onboarding-Profile
+
+AI-Kontext-Templates für Projekt-Onboarding. 5 Built-in-Profile (Developer, Research, Content, Ops, Base) + benutzerdefinierte Profile.
+
+### `GET /api/v1/projects/{id}/onboarding/status`
+
+Onboarding-Status eines Projekts prüfen (aktive Profile, generierte Datei).
+
+### `POST /api/v1/projects/{id}/onboarding/enable`
+
+Onboarding für ein Projekt aktivieren. Generiert die Onboarding-Datei aus den ausgewählten Profilen.
+
+**Body:**
+```json
+{ "profileKeys": ["developer", "research"] }
+```
+
+### `GET /api/v1/projects/{id}/onboarding/preview`
+
+Vorschau der generierten Onboarding-Datei.
+
+### `GET /api/v1/onboarding-profiles`
+
+Alle Onboarding-Profile auflisten.
+
+### `PUT /api/v1/onboarding-profiles/{id}`
+
+Profil-Content aktualisieren (erstellt automatisch einen History-Eintrag).
+
+---
+
 ## Todo-Trigger (Self-Improvement Loop)
 
 Todo-Trigger starten automatisch Fix-Workflows wenn TODOs erstellt werden. Schliesst den Self-Improvement-Loop: Audit → TODO → Fix → Verify → Close.

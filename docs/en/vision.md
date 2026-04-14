@@ -1,4 +1,4 @@
-> *Last updated: 28. März 2026, 19:45 Uhr — Workflow: MySuricates Docs aktualisieren | Run: 01102949-3825-4cd9-b4b9-8aa84917c4c2*
+> *Last updated: April 14, 2026 — Translated from German*
 
 # MySuricates — Vision
 
@@ -15,9 +15,9 @@ Not just for developers. For anyone who wants to solve real problems.
 
 ## The Principle of Continuous Approximation
 
-Perfection is not a state — it is a direction. A system that considers perfection achievable will eventually stop learning. This one will not.
+Perfection is not a state — it is a direction. A system that considers perfection achievable will eventually stop learning. This one won't.
 
-Every run produces data. Every iteration refines the next attempt. Learning, Memory, Factory, and Wishes are not features — they are the mechanisms of this continuous approximation. The system will never be perfect. But with every step it gets closer to perfection — and that is exactly the point.
+Every run produces data. Every iteration refines the next attempt. Learning, Memory, Factory, and Wishes are not features — they are the mechanisms of this continuous approximation. The system will never be perfect. But with every step, it gets closer to perfection — and that is exactly the point.
 
 ---
 
@@ -29,7 +29,7 @@ MySuricates solves real problems — in personal life and in the professional wo
 
 - **Morning Briefing**: News, calendar, priorities — everything at a glance
 - **Meeting Minutes**: Recording → Summary → Action Items → Distribution
-- **Social Media Calendar**: Content ideas → Copy → Schedule → Posting
+- **Social Media Calendar**: Content ideas → Texts → Schedule → Posting
 - **Security Audit**: Scan codebase → Assess vulnerabilities → Report
 - **Code Review**: Automatic analysis → Improvement suggestions → PR comments
 
@@ -37,8 +37,8 @@ MySuricates solves real problems — in personal life and in the professional wo
 
 - **Application Coach**: Analyze job posting → Cover letter → Adapt resume
 - **Travel Planning**: Budget, interests, timeframe → Complete travel plan
-- **Vocabulary Songs**: Generate frequency-based songs for language learning
-- **Event Organization**: Guest list, venue, schedule, invitations
+- **Vocabulary Songs**: Frequency-based song generation for language learning
+- **Event Organization**: Guest list, location, schedule, invitations
 
 ### Combined (Chains)
 
@@ -46,7 +46,7 @@ MySuricates solves real problems — in personal life and in the professional wo
 - **Website Audit**: Performance → SEO → Accessibility → Overall Report
 - **Office Morning Routine**: Check emails → Calendar → Briefing → Prioritize todos
 
-The core idea: Every workflow is a solved problem. Every chain is a solved problem chain. The template library grows — and with it the number of problems MySuricates can solve out-of-the-box.
+The core: Every workflow is a solved problem. Every chain is a solved problem chain. The template library grows — and with it the number of problems that MySuricates can solve out-of-the-box.
 
 ---
 
@@ -59,7 +59,7 @@ The system gets better with every execution. Four mechanisms drive the evolution
 The user says what they want in natural language. The system decomposes, builds, tests, executes, evaluates, and iterates.
 
 ```
-User: "I need a weekly security report for my project"
+User: "Ich brauche einen wöchentlichen Security-Report für mein Projekt"
 
 MySuricates:
   1. Decompose → 3 sub-tasks identified
@@ -105,36 +105,43 @@ Workflows accumulate knowledge across runs:
 
 ---
 
-## What Has Been Built (v0.6.1)
+## What Has Been Built (v0.6.4)
 
 | Component | Status |
-|-----------|--------|
-| Block-based workflows (12 block types) | Done |
-| Docker container execution | Done |
+|----------|--------|
+| Block-based Workflows (12 block types) | Done |
+| Docker Container Execution | Done |
 | Agentic Blocks (Goal → Reason → Act → Observe) | Done |
 | Workflow Chains (sequential composition) | Done |
 | Workflow Factory (AI-generated + auto-test) | Done |
 | Wishes (Intent → Decompose → Execute → Evaluate) | Done |
 | Decompose-Approval Gate | Done |
-| Pre-flight Verification + Auto-Fix | Done |
-| Learning feedback in prompts | Done |
-| Cross-project workflow recognition | Done |
-| 44 built-in templates (dev + office + everyday) | Done |
-| 16 built-in skills (code review, test generator, OCR, etc.) | Done |
+| Pre-flight Verification + Auto-Fix + AutoRepair-Config | Done |
+| Learning Feedback in Prompts | Done |
+| Cross-Project Workflow Recognition | Done |
+| 53 Built-in Templates (Dev + Office + Everyday) | Done |
+| 16 Built-in Skills (Code-Review, Test-Generator, OCR etc.) | Done |
 | Staging (Dev + Stable + Test) | Done |
-| Multi-provider (Claude + Codex) | Done |
-| Assistant system (contextual floating chat with page suggestions) | Done |
-| Gate Status System (quality gates, AutoTodo integration) | Done |
+| Multi-Provider (Claude + Codex) | Done |
+| Assistant System (contextual floating chat with page suggestions) | Done |
+| Gate Status System (Quality Gates, AutoTodo integration) | Done |
 | Agent Instructions System (base and per-workflow instructions) | Done |
-| CompletionTrigger system (automatic actions after workflow completion) | Done |
-| Notification system (NotificationConfig) | Done |
+| CompletionTrigger System (automatic actions after workflow completion) | Done |
+| TodoTrigger System (Self-Improvement Loop: TODO → Fix-Workflow → Verify → Close) | Done |
+| Notification System (NotificationConfig) | Done |
 | Workflow Memory (knowledge extraction and accumulation across runs) | Done |
 | Template Verification (quality checks for workflow templates) | Done |
 | Workflow Conversion (agentic runs → deterministic workflows) | Done |
-| Run resumption (continue from last step after interruption) | Done |
-| Session-to-workflow import (Claude sessions as workflows) | Done |
-| Extended schedule control (end conditions, conflict behavior) | Done |
-| In-app documentation (DocsController, contextual help) | Done |
+| Run Resumption (resume from last step after interruption) | Done |
+| Session-to-Workflow Import (Claude sessions as workflows) | Done |
+| Extended Schedule Control (end conditions, conflict behavior) | Done |
+| In-App Documentation (DocsController, contextual help) | Done |
+| Onboarding Profiles (guided onboarding for new users) | Done |
+| Workflow Pool & PoolBrowser (template marketplace browsing) | Done |
+| Workflow Versioning (version history + restore) | Done |
+| Simple Mode (simplified UI for beginners) | Done |
+| Insights Page (analytics dashboard) | Done |
+| Chain Templates (pre-built chain templates) | Done |
 
 ---
 
@@ -142,22 +149,22 @@ Workflows accumulate knowledge across runs:
 
 ### Phase 2: Cost & Intelligence (next step)
 
-- **Cost estimation before execution** — User sees expected token costs before a Wish runs
-- **Model selection per Wish** — Automatic or manual choice of the appropriate model
-- **Auto-refine without user intervention** — Wish iterates independently until target quality is reached
-- **Iteration history with delta tracking** — Traceable what changed between iterations
+- **Cost Estimation Before Execution** — User sees expected token costs before a Wish runs
+- **Model Selection Per Wish** — Automatic or manual selection of the appropriate model
+- ~~**Auto-Refine Without User Intervention**~~ — Basic mechanism available (maxIterations, iterationCount), autoRefine flag still missing
+- ~~**Iteration History With Delta Tracking**~~ — iterationHistory stores iterations, delta tracking/diff view still missing
 
 ### Phase 3: Crystallize & Discovery
 
-- **Crystallize Wizard** — Convert successful Wishes into reusable templates
-- **Template Discovery & Search** — Find templates by problem, not by name
+- ~~**Crystallize Wizard**~~ — Done (`WishService.crystallize()` + Controller)
+- ~~**Template Discovery & Search**~~ — Done (WorkflowPoolService + PoolBrowser)
 - **Wish Analytics Dashboard** — Visualize success rates, costs, trends
 
 ### Long-term: Ecosystem
 
-- **External skill packages** — Installable packages (Git repo/ZIP) with new skills + capabilities
-- **MCP servers as skills** — Automatically make MCP servers available as skills/capabilities
-- **Integration plugins** — Slack, Jira, GitHub, Email as workflow blocks
+- **External Skill Packages** — Installable packages (Git repo/ZIP) with new Skills + Capabilities
+- **MCP Servers as Skills** — Automatically make MCP servers available as Skills/Capabilities
+- **Integration Plugins** — Slack, Jira, GitHub, Email as workflow blocks
 - **Workflow Marketplace** — Share and discover community templates
 
 ---
@@ -167,7 +174,7 @@ Workflows accumulate knowledge across runs:
 ```
                     User
                       |
-              "I want to solve X"
+              "Ich will X lösen"
                       |
                   [ Wish API ]
                       |
@@ -191,6 +198,6 @@ Workflows accumulate knowledge across runs:
 ## Technical Stack
 
 - **Backend**: Spring Boot 3.4, Java 21, SQLite, Flyway
-- **Frontend**: React 18, TypeScript, TailwindCSS, TanStack Query, Zustand
+- **Frontend**: React 19, TypeScript, TailwindCSS, TanStack Query, Zustand
 - **Execution**: Docker containers (Python/Node/Go), Host Claude CLI, Host Codex CLI
 - **Deployment**: Dev (source) + Stable (Docker, port 9091) + Test (Docker, port 8090)

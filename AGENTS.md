@@ -118,6 +118,7 @@ Response: 201 Created
 | `sub-workflow` | `description`, `workflow_id` | Verschachtelter Workflow (max 5 Ebenen) |
 | `skill-capability` | `description`, `capability`, `input` | Skill-Ausführung |
 | `human-input` | `description`, `prompt`, `input_type`, `variable_name`, `options`, `timeout_minutes` | User-Eingabe |
+| `integration` | `description`, `provider`, `action`, `params` | Integration-Provider-Aktion (Google Calendar, Gmail, Jira, Confluence, Trello) |
 
 ### 2. Chain erstellen
 
@@ -189,7 +190,25 @@ Headers: Content-Type: application/json, X-API-Key: <key>
 }
 ```
 
-### 5. Run-Status abfragen
+### 5. Todo-Resolve-Workflow ausführen
+
+```
+POST http://localhost:9090/api/v1/todos/{id}/resolve
+Headers: X-API-Key: <key>
+Response: 200 OK
+```
+
+**Body:** keiner
+
+**Voraussetzungen und Verhalten:**
+- Das Todo muss ein `linkedWorkflowId` gesetzt haben.
+- Der Endpunkt startet den verlinkten Workflow als Resolve-Run.
+- Das Todo wechselt dabei auf `IN_PROGRESS` und speichert den Run in `lastFixRunId`.
+- Ein bereits laufender Resolve-Run fuer dasselbe Todo blockiert einen weiteren Start.
+- Der Workflow startet nur durch diesen expliziten API-Aufruf oder die UI-Aktion `Loesen`.
+- Das reine Setzen von `linkedWorkflowId` startet noch nichts.
+
+### 6. Run-Status abfragen
 
 ```
 GET http://localhost:9090/api/v1/executions/{runId}
@@ -209,7 +228,7 @@ Headers: X-API-Key: <key>
 | `CANCELLED` | Ja | Abgebrochen |
 | `INTERRUPTED` | Ja | Unterbrochen |
 
-### 6. Execution steuern
+### 7. Execution steuern
 
 | Aktion | Endpunkt |
 |--------|----------|
@@ -220,7 +239,7 @@ Headers: X-API-Key: <key>
 | Genehmigen | `POST /api/v1/executions/{id}/approve` — Body: `{"answer": "Yes"}` |
 | Genehmigung prüfen | `GET /api/v1/executions/{id}/approval` |
 
-### 7. Workflow-Versionen
+### 8. Workflow-Versionen
 
 ```bash
 # Versionen eines Workflows auflisten (neueste zuerst, paginiert)
@@ -239,7 +258,7 @@ POST /api/v1/workflows/{id}/versions/{versionId}/restore
 - Kosmetische Änderungen (Name, Beschreibung, Icon) erzeugen keine Version
 - Context-Variablen in Workflows: `{{ workflow_version }}` (Versionsnummer), `{{ workflow_changed_since_last_run }}` (true/false)
 
-### 8. Test-Instanz
+### 9. Test-Instanz
 
 ```bash
 # Status prüfen
@@ -267,7 +286,7 @@ Body: { "workflowName": "...", "status": "PASSED|FAILED|SKIPPED" }
 - Custom Skills: Match by name → skip if exists
 - **Nicht synchronisiert:** workflow_runs, step_results, scheduled_workflows, webhook_triggers
 
-### 8. Hilfreich
+### 10. Hilfreich
 
 ```bash
 # Projekte auflisten
@@ -282,7 +301,34 @@ GET /api/v1/system/backup
 
 # Alle Runs auflisten (mit Filtern)
 GET /api/v1/executions?status=FAILED&workflowId=<uuid>
+
+# Assistenten-Sessions auflisten (letzte 50)
+GET /api/v1/assistant/sessions
+
+# Einzelne Session mit Nachrichten laden
+GET /api/v1/assistant/sessions/<session-uuid>
+
+# Session loeschen
+DELETE /api/v1/assistant/sessions/<session-uuid>
 ```
+
+## Todo-Resolve in der Praxis
+
+```bash
+# Todo mit Resolver-Workflow verknuepfen
+curl -s -X PUT http://localhost:9090/api/v1/todos/$TODO_ID \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $DEV_KEY" \
+  -d "{\"linkedWorkflowId\":\"$WORKFLOW_ID\"}"
+
+# Resolver-Workflow fuer das Todo manuell starten
+curl -s -X POST http://localhost:9090/api/v1/todos/$TODO_ID/resolve \
+  -H "X-API-Key: $DEV_KEY"
+```
+
+Hinweise:
+- `linkedWorkflowId` ist optional; ohne Link ist `resolve` nicht moeglich.
+- `resolve` ist ein manueller Startpunkt und kein automatischer Trigger beim Speichern des Todos.
 
 ## Kompletter Beispiel-Flow
 

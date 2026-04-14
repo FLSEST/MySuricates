@@ -1,4 +1,4 @@
-> *Zuletzt aktualisiert: 28. März 2026, 19:45 Uhr — Workflow: MySuricates Docs aktualisieren | Run: 01102949-3825-4cd9-b4b9-8aa84917c4c2*
+> *Zuletzt aktualisiert: 14. April 2026 — Manuelles Doku-Audit (V53-V59, integration_connections, onboarding_profiles, workflow_versions)*
 
 # Datenmodell
 
@@ -23,6 +23,8 @@ erDiagram
     workflows ||--o{ completion_triggers_target : "wird ausgelöst"
     workflows ||--o{ todo_triggers : "Fix-Workflow"
     workflows ||--o{ notification_configs : "benachrichtigt"
+    workflows ||--o{ workflow_versions : "versioniert"
+    projects ||--o{ onboarding_profiles : "hat"
 
     projects {
         TEXT id PK
@@ -189,6 +191,12 @@ erDiagram
         TEXT workflow_run_id
         TEXT reference_type
         TEXT reference_id
+        TEXT related_todo_id
+        TEXT due_date
+        TEXT linked_workflow_id FK
+        TEXT resolution_state
+        INTEGER fix_attempts "DEFAULT 0"
+        TEXT last_fix_run_id
         TEXT created_at
         TEXT updated_at
     }
@@ -281,6 +289,7 @@ erDiagram
         TEXT entity_id
         TEXT messages "NOT NULL, DEFAULT []"
         INTEGER message_count "DEFAULT 0"
+        TEXT preview
         TEXT started_at "NOT NULL"
         TEXT ended_at
     }
@@ -292,6 +301,53 @@ erDiagram
         TEXT generated_by "DEFAULT CLAUDE"
         TEXT generated_at "NOT NULL"
         INTEGER based_on_sessions "DEFAULT 0"
+    }
+
+    integration_connections {
+        TEXT id PK
+        TEXT provider_id "NOT NULL, UNIQUE"
+        TEXT status "DEFAULT DISCONNECTED"
+        TEXT access_token_encrypted
+        TEXT refresh_token_encrypted
+        TEXT token_expiry
+        TEXT scopes
+        TEXT account_info
+        TEXT client_id_encrypted
+        TEXT client_secret_encrypted
+        TEXT created_at
+        TEXT updated_at
+    }
+
+    onboarding_profiles {
+        TEXT id PK
+        TEXT key "NOT NULL, UNIQUE"
+        TEXT name "NOT NULL"
+        TEXT description
+        TEXT content "NOT NULL"
+        TEXT type "NOT NULL"
+        INTEGER built_in "DEFAULT 0"
+        INTEGER sort_order "DEFAULT 0"
+        INTEGER version "DEFAULT 1"
+        TEXT created_at
+        TEXT updated_at
+    }
+
+    onboarding_profile_history {
+        TEXT id PK
+        TEXT profile_id FK "NOT NULL"
+        INTEGER version "NOT NULL"
+        TEXT content "NOT NULL"
+        TEXT changed_by "NOT NULL"
+        TEXT changed_at "NOT NULL"
+    }
+
+    workflow_versions {
+        TEXT id PK
+        TEXT workflow_id FK "NOT NULL"
+        INTEGER version_number "NOT NULL"
+        TEXT snapshot "JSON"
+        TEXT change_source
+        TEXT created_at
     }
 
     app_settings {
@@ -593,7 +649,7 @@ Eine Chain gehört zu keinem Projekt und kann Workflows aus verschiedenen Projek
 | `title` | TEXT | NOT NULL | Kurztitel im Imperativ |
 | `description` | TEXT | | Markdown-Beschreibung |
 | `status` | TEXT | NOT NULL, DEFAULT 'OPEN' | `OPEN`, `IN_PROGRESS`, `DONE`, `BACKLOG` |
-| `priority` | TEXT | NOT NULL, DEFAULT 'MEDIUM' | `HIGH`, `MEDIUM`, `LOW` |
+| `priority` | TEXT | NOT NULL, DEFAULT 'MEDIUM' | `CRITICAL`, `HIGH`, `MEDIUM`, `LOW` |
 | `tags` | TEXT | | JSON-Array als Text |
 | `project_id` | TEXT | FK → projects, ON DELETE SET NULL | Optionale Projektzuordnung |
 | `source` | TEXT | NOT NULL, DEFAULT 'USER' | `USER`, `AI`, `WORKFLOW` |
@@ -605,10 +661,13 @@ Eine Chain gehört zu keinem Projekt und kann Workflows aus verschiedenen Projek
 | `related_todo_id` | TEXT | | Verwandtes TODO (bei AI-Similarity-Match) (V48) |
 | `fix_attempts` | INTEGER | NOT NULL, DEFAULT 0 | Anzahl automatischer Fix-Versuche durch TodoTrigger (V52) |
 | `last_fix_run_id` | TEXT | | ID des letzten Fix-Workflow-Runs (V52) |
+| `due_date` | TEXT | | Fälligkeitsdatum (V57) |
+| `linked_workflow_id` | TEXT | FK → workflows, ON DELETE SET NULL | Optionaler Resolver-Workflow (V59) |
+| `resolution_state` | TEXT | | Status der Workflow-Auflösung: `RUNNING`, `FAILED` (V59) |
 | `created_at` | TEXT | NOT NULL | |
 | `updated_at` | TEXT | NOT NULL | |
 
-**Indizes:** `idx_todos_status`, `idx_todos_project`, `idx_todos_source`, `idx_todos_created`
+**Indizes:** `idx_todos_status`, `idx_todos_project`, `idx_todos_source`, `idx_todos_created`, `idx_todos_status_priority_created` (V54), `idx_todos_project_status` (V54), `idx_todos_linked_workflow_id` (V59)
 
 TODOs werden von `AutoTodoService` automatisch bei RED/YELLOW Gate-Status erstellt (RED → HIGH, YELLOW → MEDIUM). Bei konfiguriertem `TodoTrigger` werden Fix-Workflows automatisch gestartet (Self-Improvement-Loop).
 
@@ -725,10 +784,11 @@ Konfigurierbare Benachrichtigungen über Webhook oder Desktop bei Workflow-Absch
 | `entity_id` | TEXT | | Optionale Entity-ID für kontextbezogene Sessions |
 | `messages` | TEXT | NOT NULL, DEFAULT '[]' | JSON-Array der Chat-Nachrichten |
 | `message_count` | INTEGER | NOT NULL, DEFAULT 0 | Anzahl Nachrichten |
+| `preview` | TEXT | | Vorschau-Text der letzten Antwort |
 | `started_at` | TEXT | NOT NULL | Session-Start |
 | `ended_at` | TEXT | | Session-Ende |
 
-Speichert Assistenten-Chat-Sessions für das Floating-Chat-Panel (V41).
+Speichert Assistenten-Chat-Sessions für das Floating-Chat-Panel (V41, V58).
 
 ### `page_suggestions`
 
@@ -742,6 +802,69 @@ Speichert Assistenten-Chat-Sessions für das Floating-Chat-Panel (V41).
 | `based_on_sessions` | INTEGER | NOT NULL, DEFAULT 0 | Anzahl zugrunde liegender Sessions |
 
 KI-generierte Aktionsvorschläge pro Seite, basierend auf Assistenten-Sessions (V42).
+
+### `integration_connections`
+
+| Spalte | Typ | Constraints | Beschreibung |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `provider_id` | TEXT | NOT NULL, UNIQUE | Provider-Identifier (z.B. `google-calendar`, `jira`) |
+| `status` | TEXT | NOT NULL, DEFAULT 'DISCONNECTED' | Verbindungsstatus: CONNECTED, DISCONNECTED |
+| `access_token_encrypted` | TEXT | | AES-256-GCM-verschlüsselter OAuth Access Token |
+| `refresh_token_encrypted` | TEXT | | AES-256-GCM-verschlüsselter OAuth Refresh Token |
+| `token_expiry` | TEXT | | Token-Ablaufzeitpunkt (ISO-8601) |
+| `scopes` | TEXT | | Gewährte OAuth-Scopes (kommasepariert) |
+| `account_info` | TEXT | | JSON mit Account-Details (Name, E-Mail) |
+| `client_id_encrypted` | TEXT | | AES-256-GCM-verschlüsselte OAuth Client ID |
+| `client_secret_encrypted` | TEXT | | AES-256-GCM-verschlüsseltes OAuth Client Secret |
+| `created_at` | TEXT | | Erstellzeitpunkt |
+| `updated_at` | TEXT | | Aktualisierungszeitpunkt |
+
+Speichert OAuth-Verbindungen und Client-Credentials für Integration-Provider. Alle sensiblen Daten sind AES-256-GCM-verschlüsselt (V55 + V56).
+
+### `onboarding_profiles`
+
+| Spalte | Typ | Constraints | Beschreibung |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `key` | TEXT | NOT NULL, UNIQUE | Profil-Schlüssel (z.B. `developer`, `research`) |
+| `name` | TEXT | NOT NULL | Anzeigename |
+| `description` | TEXT | | Beschreibung des Profils |
+| `content` | TEXT | NOT NULL | Markdown-Content des AI-Kontext-Templates |
+| `type` | TEXT | NOT NULL | Profiltyp: BASE, DEVELOPER, RESEARCH, CONTENT, OPS |
+| `built_in` | INTEGER | NOT NULL, DEFAULT 0 | Ob Built-in (nicht löschbar) |
+| `sort_order` | INTEGER | NOT NULL, DEFAULT 0 | Sortierreihenfolge |
+| `version` | INTEGER | NOT NULL, DEFAULT 1 | Aktuelle Version |
+| `created_at` | TEXT | | Erstellzeitpunkt |
+| `updated_at` | TEXT | | Aktualisierungszeitpunkt |
+
+AI-Kontext-Templates für Projekt-Onboarding. 5 Built-in-Profile + benutzerdefinierte Profile (V49).
+
+### `onboarding_profile_history`
+
+| Spalte | Typ | Constraints | Beschreibung |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `profile_id` | TEXT | FK NOT NULL | Referenz auf `onboarding_profiles.id` |
+| `version` | INTEGER | NOT NULL | Versionsnummer |
+| `content` | TEXT | NOT NULL | Profil-Content dieser Version |
+| `changed_by` | TEXT | NOT NULL | Wer die Änderung vorgenommen hat |
+| `changed_at` | TEXT | NOT NULL | Zeitpunkt der Änderung |
+
+Versionierungshistorie für Onboarding-Profile (V49).
+
+### `workflow_versions`
+
+| Spalte | Typ | Constraints | Beschreibung |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `workflow_id` | TEXT | FK NOT NULL | Referenz auf `workflows.id` |
+| `version_number` | INTEGER | NOT NULL | Fortlaufende Versionsnummer |
+| `snapshot` | TEXT | | JSON-Snapshot des Workflow-Zustands (Blöcke, Instructions, etc.) |
+| `change_source` | TEXT | | Änderungsquelle: `user`, `ai`, `pool-install`, `import`, `api` |
+| `created_at` | TEXT | | Erstellzeitpunkt |
+
+UNIQUE-Constraint auf (`workflow_id`, `version_number`). Speichert vollständige Workflow-Snapshots für Versionshistorie und Restore (V50).
 
 ### `app_settings`
 
@@ -1009,6 +1132,13 @@ Blöcke werden als JSON-Array in der `blocks`-Spalte der `workflows`-Tabelle ges
 | V50 | `V50__workflow_versions.sql` | Workflow-Versions-Tabelle |
 | V51 | `V51__create_todo_triggers.sql` | todo_triggers-Tabelle (Self-Improvement-Loop) |
 | V52 | `V52__add_fix_attempts_to_todos.sql` | `fix_attempts`, `last_fix_run_id` in todos |
+| V53 | `V53__add_process_backlog_to_todo_triggers.sql` | `process_backlog` in todo_triggers |
+| V54 | `V54__add_todos_composite_indexes.sql` | Composite-Indexes für todos (status+priority+created_at, project+status) |
+| V55 | `V55__create_integration_connections.sql` | integration_connections-Tabelle (OAuth-Tokens) |
+| V56 | `V56__add_client_credentials_to_connections.sql` | `client_id_encrypted`, `client_secret_encrypted` in integration_connections |
+| V57 | `V57__add_due_date_to_todos.sql` | `due_date` in todos |
+| V58 | `V58__add_assistant_session_preview.sql` | `preview` in assistant_sessions |
+| V59 | `V59__add_linked_workflow_to_todos.sql` | `linked_workflow_id`, `resolution_state` in todos |
 
 ## SQLite-Besonderheiten
 

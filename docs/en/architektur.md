@@ -70,7 +70,7 @@ SQLite (File: data/automation.db)
 
 ```
 com.automation
-├── controller/          26 REST controllers
+├── controller/          30 REST controllers
 ├── service/
 │   ├── project/         ProjectService, ContainerService, ProjectContextService, PathValidator
 │   ├── workflow/        WorkflowExecutor, WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService, GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService
@@ -93,6 +93,8 @@ com.automation
 │   ├── notification/    NotificationService
 │   ├── trigger/         CompletionTriggerService, TodoTriggerService, TodoFeedbackListener
 │   ├── health/          HealthAutoTodoService
+│   ├── integration/     IntegrationRegistry, IntegrationOAuthService, IntegrationEncryptionService, IntegrationBlockExecutor, 5 Providers
+│   ├── onboarding/      OnboardingProfileService, ProjectOnboardingService, OnboardingProfileSeeder
 │   ├── repair/          AutoRepairService
 │   ├── tray/            SystemTrayService
 │   ├── activitylog/     ActivityLogService, ActivityLogLifecycleListener
@@ -115,7 +117,7 @@ com.automation
 └── util/                JPA converters (JSON, BlockDefinitions)
 ```
 
-### All 26 REST Controllers
+### All 30 REST Controllers
 
 | Controller | Base Path | Description |
 |---|---|---|
@@ -145,6 +147,9 @@ com.automation
 | `StagingController` | `/api/v1/staging` | Status, start, stop, promote, promote-cancel, sync-preview, sync-definitions |
 | `TestingController` | `/api/v1/testing` | Status, start, stop, reset, sync-preview, sync-definitions, report-result, pull-changes |
 | `SystemController` | `/api/v1/system` | Health, auth-status, info, settings, execution-config, AI-providers, backup, backups, remote-access, browse, open-path, repair, client-errors |
+| `IntegrationController` | `/api/v1/integrations` | OAuth flow, credentials, actions, provider list |
+| `OnboardingProfileController` | `/api/v1/projects/{id}/onboarding` | Onboarding profiles CRUD, enable/disable, preview |
+| `ReportsController` | `/api/v1/reports` | Report generation and retrieval |
 | `DocsController` | `/api/v1/docs` | Read Markdown documentation |
 
 ### Workflow Execution
@@ -658,6 +663,11 @@ The DB migrations (`src/main/resources/db/migration/`) document the feature time
 | V45 | Schedule conflict behavior |
 | V46 | Stable synced-at |
 | V47 | Context delta in step results |
+| V48 | Related-Todo-ID |
+| V49 | Onboarding profiles |
+| V50 | Workflow versions |
+| V51 | Todo triggers table |
+| V52 | Fix attempts + last fix run ID on TODOs |
 
 ## Directory Structure
 

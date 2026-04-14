@@ -1,4 +1,4 @@
-> *Last updated: 28. März 2026, 19:45 Uhr — Workflow: MySuricates Docs aktualisieren | Run: 01102949-3825-4cd9-b4b9-8aa84917c4c2*
+> *Last updated: April 14, 2026 — Manual doc audit (11 missing hooks added)*
 
 # Frontend
 
@@ -8,7 +8,7 @@
 |---|---|---|
 | `/` | Dashboard | Statistics, charts, recent runs |
 | `/projects` | Projects | Project list, creation |
-| `/projects/:id` | ProjectDetail | Project details, container, workflows |
+| `/projects/:id` | ProjectDetail | Project details, containers, workflows |
 | `/wishes` | Wishes | Wish system, iterative fulfillment |
 | `/workflows` | Workflows | Workflow list, creation with templates |
 | `/workflows/:id` | WorkflowDetail | Block editor, skills, runs, memory |
@@ -27,7 +27,7 @@
 | `/insights` | Insights | Platform insights and analytics |
 | `/settings` | Settings | Language, theme, API key, Tailscale, staging, testing |
 
-All routes are defined in `src/App.tsx` and wrapped by a `<Layout>` component (sidebar + header).
+All routes are defined in `src/App.tsx` and wrapped by a `<Layout>` wrapper (sidebar + header).
 
 ### Simple Mode
 
@@ -40,14 +40,14 @@ All routes are defined in `src/App.tsx` and wrapped by a `<Layout>` component (s
 | `/workflows/:id` | `WorkflowDetail` | `SimpleWorkflowDetail` |
 | `/workflows/:id/run/:runId` | `WorkflowExecution` | `SimpleWorkflowExecution` |
 
-The switching is handled by route wrapper components (e.g. `DashboardRoute`, `WorkflowsRoute`) in `App.tsx`, which render the corresponding variant based on the `simpleMode` flag.
+The switching is done via route wrapper components (e.g., `DashboardRoute`, `WorkflowsRoute`) in `App.tsx`, which render the corresponding variant depending on the `simpleMode` flag.
 
 ## Pages
 
 ### Dashboard (`/`)
 
 - 4 stat cards: Active projects, workflows, runs today, success rate
-- 2 Recharts diagrams: Runs over time (AreaChart), success rate (AreaChart)
+- 2 Recharts charts: Runs history (AreaChart), success rate (AreaChart)
 - List of recent runs (clickable → execution page)
 - Top workflows by execution count
 
@@ -64,7 +64,7 @@ The switching is handled by route wrapper components (e.g. `DashboardRoute`, `Wo
 
 - 2-step creation: Template selection → form (project, name, description)
 - 44 built-in templates (from DB, via `WorkflowTemplateSeeder`) plus custom templates
-- Detail page: 2/3-column block editor (drag & drop), 1/3 sidebar (skills, runs, memory, info)
+- Detail page: 2/3-column block editor (drag & drop), 1/3-sidebar (skills, runs, memory, info)
 - Block editor with `@dnd-kit` for drag-and-drop sorting
 - Modals: Add block (type + JSON config via Monaco Editor), activate skill
 
@@ -105,28 +105,28 @@ The switching is handled by route wrapper components (e.g. `DashboardRoute`, `Wo
 
 - List of all TODOs with filters by status, priority, project, source, tag
 - Status workflow: OPEN → IN_PROGRESS → DONE / CANCELLED
-- Automatically recognizes AI-created TODOs (source: AI, sourceAgent: claude-code)
+- Automatically detects AI-created TODOs (source: AI, sourceAgent: claude-code)
 - Badge display in the sidebar for open TODOs
 
 ### ActivityLog (`/activity`)
 
 - Paginated log table with filters by level, category, workflow
-- Categories: WORKFLOW, SKILL, SYSTEM, SECURITY, and others
+- Categories: WORKFLOW, SKILL, SYSTEM, SECURITY, etc.
 
 ### Wishes (`/wishes`)
 
 - Enter natural-language wishes and have them fulfilled asynchronously
-- Iteration display, provide feedback, cancel or crystallize a wish
+- Iteration display, provide feedback, cancel or crystallize wish
 
 ### WorkflowFactory (`/factory`)
 
-- Generate a workflow from a topic category
-- Full pipeline: Generate → test instance → verify → promote
+- Generate workflow from topic category
+- Complete pipeline: Generate → test instance → verify → promote
 - Topic category selection
 
 ### DialogImport (`/dialogs`)
 
-- Scan Claude sessions and import them as workflows
+- Scan Claude sessions and import as workflows
 - Session selection, preview, import with project assignment
 
 ### Docs (`/docs`)
@@ -142,9 +142,9 @@ The switching is handled by route wrapper components (e.g. `DashboardRoute`, `Wo
 
 ### WorkflowDetail (`/workflows/:id`) — Extensions
 
-- **Memory tab:** Display, activate, delete, and re-extract workflow memory entries
+- **Memory tab:** Display, activate, delete, re-extract workflow memory entries
 - **Instructions tab:** Edit workflow-specific agent instructions in the Monaco editor
-- **Gate status:** Display the latest gate status in the run history
+- **Gate status:** Display of the last gate status in the run history
 
 ### Settings (`/settings`)
 
@@ -216,21 +216,21 @@ The theme is controlled via CSS custom properties (`src/index.css`, `src/theme/t
 | `--color-text` | `#f1f5f9` | Primary text |
 | `--color-text-secondary` | `#94a3b8` | Secondary text |
 | `--color-text-tertiary` | `#64748b` | Tertiary text |
-| `--color-accent` | `#06b6d4` | Accent color (cyan) |
+| `--color-accent` | `#06b6d4` | Accent color (Cyan) |
 | `--color-accent-hover` | `#22d3ee` | Accent hover |
 | `--color-accent-subtle` | `#083344` | Accent background |
-| `--color-success` | `#34d399` | Success (emerald) |
-| `--color-warning` | `#fbbf24` | Warning (amber) |
-| `--color-danger` | `#f87171` | Error (red) |
+| `--color-success` | `#34d399` | Success (Emerald) |
+| `--color-warning` | `#fbbf24` | Warning (Amber) |
+| `--color-danger` | `#f87171` | Error (Red) |
 | `--color-sidebar` | `#020617` | Sidebar background |
 
 **Light Theme:** Inverted variants with white background and dark text.
 
 ### Tailwind Configuration
 
-- **Dark Mode:** `class`-based (toggled via Zustand store)
+- **Dark Mode:** `class`-based (toggle via Zustand store)
 - **Fonts:**
-  - Sans: Plus Jakarta Sans (system-UI fallback)
+  - Sans: Plus Jakarta Sans (system UI fallback)
   - Mono: JetBrains Mono (Fira Code fallback)
 - **Custom Animations:** `fade-in`, `slide-in`, `slide-up`, `pulse-subtle`, `slide-in-right`
 
@@ -262,7 +262,7 @@ The theme is controlled via CSS custom properties (`src/index.css`, `src/theme/t
 All API data is managed via React Query:
 
 - **Caching:** Automatic with query keys
-- **Invalidation:** Related queries are invalidated after mutations
+- **Invalidation:** After mutations, associated queries are invalidated
 - **Optimistic Updates:** For drag-and-drop block sorting
 - **Auto-Refetch:** Health check every 30 seconds
 
@@ -381,8 +381,8 @@ All API data is managed via React Query:
 | Hook | Type | Description |
 |---|---|---|
 | `useStagingStatus()` | Query | Stable status + version |
-| `useStagingStart()` | Mutation | Start Stable |
-| `useStagingStop()` | Mutation | Stop Stable |
+| `useStagingStart()` | Mutation | Start stable |
+| `useStagingStop()` | Mutation | Stop stable |
 | `useStagingPromote()` | Mutation | Execute promote |
 | `useSyncPreview()` | Query | Sync preview |
 | `useSyncDefinitions()` | Mutation | Synchronize definitions |
@@ -504,29 +504,95 @@ useToast() → {
 }
 ```
 
+### `useAssistantWebSocket.ts`
+
+WebSocket connection for real-time status updates of the assistant (typing indicator, session updates).
+
+### `useIntegrations.ts`
+
+| Hook | Type | Description |
+|---|---|---|
+| `useIntegrations()` | Query | All providers with connection status |
+| `useConnectIntegration()` | Mutation | Establish OAuth connection |
+| `useDisconnectIntegration()` | Mutation | Disconnect OAuth connection |
+| `useTestIntegration()` | Mutation | Test provider connection |
+
+### `useWorkflowVersions.ts`
+
+| Hook | Type | Description |
+|---|---|---|
+| `useWorkflowVersions(id)` | Query | Version history of a workflow |
+| `useRestoreWorkflowVersion()` | Mutation | Restore version |
+
+### `useOnboardingProfiles.ts`
+
+| Hook | Type | Description |
+|---|---|---|
+| `useOnboardingProfiles()` | Query | All onboarding profiles |
+| `useUpdateOnboardingProfile()` | Mutation | Update profile |
+
+### `useCalendarAggregated.ts`
+
+Aggregates events from multiple sources (Google Calendar, Trello, Schedules, Runs) via the calendar adapter pattern.
+
+### `useCalendarColors.ts`
+
+Manages custom colors per calendar source (persisted in `localStorage`).
+
+### `useConversion.ts`
+
+| Hook | Type | Description |
+|---|---|---|
+| `useConversionSuggestions()` | Query | Suggestions for workflow conversions |
+| `useCreateConversion()` | Mutation | Convert agentic run to deterministic workflow |
+
+### `useLearning.ts`
+
+| Hook | Type | Description |
+|---|---|---|
+| `useLearningDashboard()` | Query | Learning dashboard data |
+| `useLearningStats()` | Query | Success rates and statistics |
+
+### `useReports.ts`
+
+| Hook | Type | Description |
+|---|---|---|
+| `useReports()` | Query | All generated reports |
+
+### `useTemplates.ts`
+
+| Hook | Type | Description |
+|---|---|---|
+| `useTemplates()` | Query | All workflow templates |
+| `useCreateFromTemplate()` | Mutation | Create workflow from template |
+
+### `useIsMobile.ts`
+
+Responsive hook, detects mobile breakpoint for adaptive UI adjustments.
+
 ## Internationalization (i18n)
 
 - **Languages:** German (`de`), English (`en`)
 - **Files:** `src/i18n/de.ts`, `src/i18n/en.ts`
 - **Hook:** `useT()` → returns the current translation object
 - **Store:** `useI18nStore()` → `locale`, `setLocale()`
-- **Toggle:** Button in the header
+- **Switching:** Button in the header
 
 ### Translation Structure
 
 ```
-common (24 keys) ─── General labels (Create, Delete, Search, ...)
-nav (7 keys) ─────── Navigation (Dashboard, Projects, ...)
-dashboard (8 keys) ─ Dashboard texts
-projects (11 keys) ─ Projects + nested types & statuses
-workflows (18 keys)  Workflows + block types & execution
-skills (10 keys) ─── Skills + categories
-schedules (7 keys) ─ Schedules
-webhooks (7 keys) ── Webhooks
-settings (16 keys) ─ Settings
-toast (26 keys) ──── Toast messages
-templates (13 keys)  Workflow templates
-charts (5 keys) ──── Chart labels
+common (24 Keys) ─── General labels (Create, Delete, Search, ...)
+nav (7 Keys) ─────── Navigation (Dashboard, Projects, ...)
+dashboard (8 Keys) ─ Dashboard texts
+projects (11 Keys) ─ Projects + nested types & status
+workflows (18 Keys)  Workflows + block types & execution
+skills (10 Keys) ─── Skills + categories
+schedules (7 Keys) ─ Schedules
+webhooks (7 Keys) ── Webhooks
+settings (16 Keys) ─ Settings
+toast (26 Keys) ──── Toast messages
+templates (13 Keys)  Workflow templates
+charts (5 Keys) ──── Chart labels
 ```
 
 ## PWA Configuration
@@ -557,7 +623,7 @@ class ApiClient {
 
 Errors are thrown as `ApiError` with `{ error, timestamp, fieldErrors? }`.
 
-The API key is read from the `settingsStore` and automatically attached to all requests.
+The API key is read from the `settingsStore` and automatically appended to all requests.
 
 ## Proxy Configuration (Vite)
 

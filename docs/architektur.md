@@ -70,7 +70,7 @@ SQLite (Datei: data/automation.db)
 
 ```
 com.automation
-├── controller/          26 REST-Controller
+├── controller/          30 REST-Controller
 ├── service/
 │   ├── project/         ProjectService, ContainerService, ProjectContextService, PathValidator
 │   ├── workflow/        WorkflowExecutor, WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService, GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService
@@ -93,6 +93,8 @@ com.automation
 │   ├── notification/    NotificationService
 │   ├── trigger/         CompletionTriggerService, TodoTriggerService, TodoFeedbackListener
 │   ├── health/          HealthAutoTodoService
+│   ├── integration/     IntegrationRegistry, IntegrationOAuthService, IntegrationEncryptionService, IntegrationBlockExecutor, 5 Provider
+│   ├── onboarding/      OnboardingProfileService, ProjectOnboardingService, OnboardingProfileSeeder
 │   ├── repair/          AutoRepairService
 │   ├── tray/            SystemTrayService
 │   ├── activitylog/     ActivityLogService, ActivityLogLifecycleListener
@@ -115,7 +117,7 @@ com.automation
 └── util/                JPA-Converter (JSON, BlockDefinitions)
 ```
 
-### Alle 26 REST-Controller
+### Alle 30 REST-Controller
 
 | Controller | Base-Path | Beschreibung |
 |---|---|---|
@@ -145,6 +147,9 @@ com.automation
 | `StagingController` | `/api/v1/staging` | Status, Start, Stop, Promote, Promote-Cancel, Sync-Preview, Sync-Definitions |
 | `TestingController` | `/api/v1/testing` | Status, Start, Stop, Reset, Sync-Preview, Sync-Definitions, Report-Result, Pull-Changes |
 | `SystemController` | `/api/v1/system` | Health, Auth-Status, Info, Settings, Execution-Config, AI-Providers, Backup, Backups, Remote-Access, Browse, Open-Path, Repair, Client-Errors |
+| `IntegrationController` | `/api/v1/integrations` | OAuth-Flow, Credentials, Actions, Provider-Liste |
+| `OnboardingProfileController` | `/api/v1/projects/{id}/onboarding` | Onboarding-Profile CRUD, Enable/Disable, Preview |
+| `ReportsController` | `/api/v1/reports` | Report-Generierung und -Abruf |
 | `DocsController` | `/api/v1/docs` | Markdown-Dokumentation lesen |
 
 ### Workflow-Ausführung
@@ -311,9 +316,10 @@ Benachrichtigungs-Konfigurationen für Workflow-Ereignisse:
 Kontext-sensitiver Chat-Assistent für die Plattform. Siehe auch: [assistant-system.md](assistant-system.md)
 
 - `AssistantService` — Chat-Logik, Kontext-Aufbereitung, Claude-CLI-Aufruf
-- `AssistantSessionService` — Session-Persistierung in DB (V41-Migration: `assistant_sessions`)
+- `AssistantSessionService` — Session-Persistierung in DB (V41-Migration: `assistant_sessions`, V58: `preview`-Spalte). Endpunkte: `GET /sessions` (Top 50), `GET /sessions/{id}` (Detail), `DELETE /sessions/{id}`
+- `AssistantContextBuilder` — injiziert letzte 5 Sessions (User-Nachricht + Antwort) und bis zu 8 aktive Workflow Memories in den System-Prompt — auf **allen** Seiten
 - `PageSuggestionService` — generiert und cached kontextsensitive UI-Vorschläge pro Seite (V42-Migration: `page_suggestions`)
-- `AssistantController` — `POST /api/v1/assistant/chat`
+- `AssistantController` — `POST /api/v1/assistant/chat`, `GET /sessions`, `GET /sessions/{id}`, `DELETE /sessions/{id}`
 - `PageSuggestionController` — `GET /api/v1/assistant/suggestions?page=...`, `POST /api/v1/assistant/suggestions/refresh?page=...`
 - Sessions werden nach jedem Chat-Aufruf persistiert; `AssistantSessionUpdatedEvent` triggert Page-Suggestion-Refresh
 - Standard-Modell: `claude-sonnet-4-6`
@@ -328,6 +334,7 @@ Workflows können über Runs hinweg Wissen akkumulieren:
 - `SummarizationSetupService` — Konfiguration und Setup der Summarization-Backends
 - `ConversationPreprocessor` — Vorverarbeitung von Konversationsdaten für Summarization
 - Aktive Memory-Einträge werden in nachfolgende Runs als Kontext injiziert
+- `AutoMemoryExtractionListener` — automatische Extraktion nach erfolgreichen Runs, konfigurierbar per Workflow-Metadata (`autoMemoryExtraction.enabled`, `autoMemoryExtraction.interval`)
 - `WorkflowMemory`-Entity (V16-Migration)
 
 ## Agent Instructions System

@@ -6,8 +6,8 @@ Eine Self-Hosted-Plattform zur Automatisierung von AI-gesteuerten Workflows. Pro
 
 | Komponente | Technologie |
 |---|---|
-| Backend | Spring Boot 3.2.2, Java 21 |
-| Frontend | React 18, TypeScript, Vite 5 |
+| Backend | Spring Boot 3.4, Java 21 |
+| Frontend | React 19, TypeScript, Vite 5 |
 | Datenbank | SQLite (WAL-Modus) + Flyway |
 | Container | Docker (Java Docker Client 3.3.4) |
 | Styling | Tailwind CSS 3.4, CSS-Variablen |
@@ -16,6 +16,7 @@ Eine Self-Hosted-Plattform zur Automatisierung von AI-gesteuerten Workflows. Pro
 | Sicherheit | API-Key-Auth, Rate Limiting |
 | i18n | Deutsch / Englisch |
 | PWA | Vite PWA Plugin |
+| Integrationen | Google Calendar, Gmail, Jira, Confluence, Trello |
 
 ## Quickstart
 
@@ -27,7 +28,7 @@ cd autotrigger
 # 2. Backend bauen und starten
 cd ai-automation-backend
 mvn clean package -DskipTests
-java -jar target/ai-automation-backend-0.1.0-SNAPSHOT.jar
+java -jar target/ai-automation-backend-*.jar
 
 # 3. Frontend installieren und starten (neues Terminal)
 cd ai-automation-frontend
@@ -61,3 +62,22 @@ docker compose up --build
 | [Frontend](docs/frontend.md) | Seiten, Komponenten, Hooks, Design-System |
 | [Deployment](docs/deployment.md) | Docker, Konfiguration, Umgebungsvariablen |
 | [Entwicklung](docs/entwicklung.md) | Lokales Setup, Build, Tests, Konventionen |
+| [Integrations](docs/integrations.md) | Plugin-System, OAuth, Provider-Referenz |
+| [Workflow-Guide](docs/WORKFLOW-GUIDE.md) | Block-Typen, Patterns, Timeouts |
+| [Assistant](docs/assistant-system.md) | Chat-Assistent, Sessions, Suggestions |
+| [Vision](VISION.md) | Produktvision und Roadmap |
+
+## Todo-Workflow-Verknuepfung
+
+Todos koennen optional mit einem Resolver-Workflow verknuepft werden. Die Verknuepfung ist bewusst nicht global und startet nichts automatisch.
+
+- `linkedWorkflowId` am Todo ist optional.
+- Ein verlinkter Workflow wird erst durch die manuelle Aktion `Loesen` gestartet.
+- Beim Start wechselt das Todo auf `IN_PROGRESS` und `resolutionState=RUNNING`.
+- Bei erfolgreichem Workflow-Run wird das Todo automatisch auf `DONE` gesetzt.
+- Bei einem fehlgeschlagenen Run springt das Todo auf den vorherigen Status zurueck und `resolutionState=FAILED`.
+
+Abgrenzung:
+- Das ist nicht dasselbe wie der bestehende `TodoTrigger`-Mechanismus.
+- `TodoTrigger` startet Workflows regelbasiert/automatisch.
+- Die Todo-Workflow-Verknuepfung ist aktuell ein manueller, optionaler Resolve-Flow pro Todo.

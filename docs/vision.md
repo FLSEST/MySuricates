@@ -1,4 +1,4 @@
-> *Zuletzt aktualisiert: 28. März 2026, 19:45 Uhr — Workflow: MySuricates Docs aktualisieren | Run: 01102949-3825-4cd9-b4b9-8aa84917c4c2*
+> *Zuletzt aktualisiert: 1. April 2026 — Vision-Check Workflow*
 
 # MySuricates — Vision
 
@@ -105,7 +105,7 @@ Workflows accumulate knowledge across runs:
 
 ---
 
-## Was schon gebaut ist (v0.6.1)
+## Was schon gebaut ist (v0.6.4)
 
 | Baustein | Status |
 |----------|--------|
@@ -116,10 +116,10 @@ Workflows accumulate knowledge across runs:
 | Workflow Factory (AI-generiert + Auto-Test) | Done |
 | Wishes (Intent → Decompose → Execute → Evaluate) | Done |
 | Decompose-Approval Gate | Done |
-| Pre-flight Verification + Auto-Fix | Done |
+| Pre-flight Verification + Auto-Fix + AutoRepair-Config | Done |
 | Learning-Feedback in Prompts | Done |
 | Cross-Project Workflow-Erkennung | Done |
-| 44 Built-in Templates (Dev + Büro + Alltag) | Done |
+| 53 Built-in Templates (Dev + Büro + Alltag) | Done |
 | 16 Built-in Skills (Code-Review, Test-Generator, OCR u.a.) | Done |
 | Staging (Dev + Stable + Test) | Done |
 | Multi-Provider (Claude + Codex) | Done |
@@ -127,6 +127,7 @@ Workflows accumulate knowledge across runs:
 | Gate Status System (Quality-Gates, AutoTodo-Integration) | Done |
 | Agent Instructions System (Base- und Per-Workflow-Instruktionen) | Done |
 | CompletionTrigger-System (automatische Aktionen nach Workflow-Abschluss) | Done |
+| TodoTrigger-System (Self-Improvement-Loop: TODO → Fix-Workflow → Verify → Close) | Done |
 | Notification-System (NotificationConfig) | Done |
 | Workflow Memory (Wissensextraktion und -akkumulation über Runs) | Done |
 | Template Verification (Qualitätsprüfung von Workflow-Templates) | Done |
@@ -135,6 +136,12 @@ Workflows accumulate knowledge across runs:
 | Session-zu-Workflow-Import (Claude-Sessions als Workflows) | Done |
 | Erweiterte Schedule-Steuerung (End-Conditions, Konflikt-Verhalten) | Done |
 | In-App Dokumentation (DocsController, kontextuelle Hilfe) | Done |
+| Onboarding-Profile (geführter Einstieg für neue Nutzer) | Done |
+| Workflow Pool & PoolBrowser (Template-Marktplatz-Browsing) | Done |
+| Workflow-Versionierung (Versionshistorie + Restore) | Done |
+| Simple Mode (vereinfachte UI für Einsteiger) | Done |
+| Insights-Page (Analyse-Dashboard) | Done |
+| Chain-Templates (vorgefertigte Ketten-Vorlagen) | Done |
 
 ---
 
@@ -144,13 +151,13 @@ Workflows accumulate knowledge across runs:
 
 - **Kosten-Schätzung vor Ausführung** — User sieht erwartete Token-Kosten bevor ein Wish läuft
 - **Modell-Auswahl pro Wish** — Automatische oder manuelle Wahl des passenden Modells
-- **Auto-Refine ohne User-Intervention** — Wish iteriert selbständig bis zur Zielqualität
-- **Iterations-Historie mit Delta-Tracking** — Nachvollziehbar, was sich zwischen Iterationen verändert hat
+- ~~**Auto-Refine ohne User-Intervention**~~ — Grundmechanismus vorhanden (maxIterations, iterationCount), autoRefine-Flag fehlt noch
+- ~~**Iterations-Historie mit Delta-Tracking**~~ — iterationHistory speichert Iterationen, Delta-Tracking/Diff-Ansicht fehlt noch
 
 ### Phase 3: Crystallize & Discovery
 
-- **Crystallize-Wizard** — Erfolgreiche Wishes in wiederverwendbare Templates umwandeln
-- **Template-Discovery & Suche** — Templates finden nach Problem, nicht nach Namen
+- ~~**Crystallize-Wizard**~~ — Done (`WishService.crystallize()` + Controller)
+- ~~**Template-Discovery & Suche**~~ — Done (WorkflowPoolService + PoolBrowser)
 - **Wish-Analytics Dashboard** — Erfolgsraten, Kosten, Trends visualisieren
 
 ### Langfrist: Ökosystem
@@ -191,6 +198,6 @@ Workflows accumulate knowledge across runs:
 ## Technical Stack
 
 - **Backend**: Spring Boot 3.4, Java 21, SQLite, Flyway
-- **Frontend**: React 18, TypeScript, TailwindCSS, TanStack Query, Zustand
+- **Frontend**: React 19, TypeScript, TailwindCSS, TanStack Query, Zustand
 - **Execution**: Docker containers (Python/Node/Go), Host Claude CLI, Host Codex CLI
 - **Deployment**: Dev (source) + Stable (Docker, port 9091) + Test (Docker, port 8090)
