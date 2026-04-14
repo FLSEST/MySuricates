@@ -130,6 +130,11 @@ export function Runs() {
       width: '80px',
     },
     {
+      key: 'result',
+      header: t.runs.result,
+      render: (r: WorkflowRun) => <RunResultText run={r} />,
+    },
+    {
       key: 'duration',
       header: t.runs.duration,
       render: (r: WorkflowRun) => (
@@ -265,6 +270,23 @@ export function Runs() {
         />
       )}
     </div>
+  );
+}
+
+function RunResultText({ run }: { run: WorkflowRun }) {
+  const lastStep = run.steps?.[run.steps.length - 1];
+  const isError = !!run.error?.message || !!lastStep?.error;
+  const text = run.error?.message || lastStep?.error || lastStep?.output || '-';
+
+  if (text === '-') return <span className="text-text-secondary">-</span>;
+
+  return (
+    <span
+      className={`text-xs block truncate max-w-[300px] ${isError ? 'text-red-500' : 'text-text-secondary'}`}
+      title={text}
+    >
+      {text}
+    </span>
   );
 }
 

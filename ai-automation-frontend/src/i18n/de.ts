@@ -995,6 +995,7 @@ export const de: TranslationKeys = {
     tabChains: 'Ketten',
     progress: 'Fortschritt',
     noChainRuns: 'Keine Ketten-Ausführungen gefunden.',
+    result: 'Ergebnis',
   },
   activityLog: {
     title: 'Aktivitätslog',

@@ -998,6 +998,7 @@ export const en = {
     tabChains: 'Chains',
     progress: 'Progress',
     noChainRuns: 'No chain runs found.',
+    result: 'Result',
   },
   activityLog: {
     title: 'Activity Log',
