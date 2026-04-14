@@ -1,4 +1,4 @@
-> *Last updated: 28. März 2026, 19:45 Uhr — Workflow: MySuricates Docs aktualisieren | Run: 01102949-3825-4cd9-b4b9-8aa84917c4c2*
+> *Last updated: April 14, 2026 — translated from German*
 
 # Assistant System
 
@@ -26,7 +26,7 @@ The Assistant system consists of three areas:
 
 - Persists chat histories in the `assistant_sessions` table (V41)
 - Method `appendMessages(sessionId, request, response)` — appends user and assistant messages
-- Sessions are managed per `sessionId`; the session ID comes from the frontend
+- Sessions are maintained per `sessionId`; the session ID comes from the frontend
 
 ### PageSuggestionService
 
@@ -92,9 +92,12 @@ Stores chat histories as a JSON array per session.
 |---|---|---|
 | `id` | TEXT PK | Session UUID |
 | `page` | TEXT | UI page (e.g. `"workflows"`) |
-| `messages` | TEXT | JSON array of chat messages |
-| `created_at` | TEXT | Creation timestamp |
-| `updated_at` | TEXT | Last update |
+| `entity_id` | TEXT | Optional entity reference (e.g. workflow ID) |
+| `preview` | TEXT | First user message (max 100 characters, V58) |
+| `messages` | TEXT | JSON array of chat messages (full length) |
+| `message_count` | INTEGER | Number of messages |
+| `started_at` | REAL | Creation timestamp |
+| `ended_at` | REAL | Last update |
 
 ### page_suggestions (V42)
 
@@ -114,16 +117,56 @@ Both controllers are registered under the base path `/api/v1/assistant`:
 | Controller | Endpoints | Description |
 |---|---|---|
 | `AssistantController` | `POST /chat` | Process chat request, persist session |
+| `AssistantController` | `GET /sessions` | Last 50 sessions with preview (without messages) |
+| `AssistantController` | `GET /sessions/{id}` | Single session with all messages |
+| `AssistantController` | `DELETE /sessions/{id}` | Delete session |
 | `PageSuggestionController` | `GET /suggestions`, `POST /suggestions/refresh` | Page-specific suggestions |
+
+## Tools (Server-Side Actions)
+
+The assistant can execute actions directly via `<tool type="...">JSON</tool>` tags. The tags are parsed by `AssistantToolExecutor` and executed server-side before the response is sent to the user.
+
+### Available Tools
+
+| Tool | Required Fields | Description |
+|------|-----------------|-------------|
+| `create_todo` | `title` | Create a todo (optional: description, priority, tags, projectId) |
+| `update_todo_status` | `id`, `status` | Change todo status (OPEN/IN_PROGRESS/DONE/BACKLOG) |
+| `create_workflow` | `projectId`, `name` | Create a workflow (optional: blocks, instructions, model, defaultContext) |
+| `update_workflow` | `workflowId` | Update workflow fields (only provided fields are changed) |
+| `delete_workflow` | `workflowId` | Soft-delete a workflow (user confirmation required per prompt) |
+| `start_workflow` | `workflowId` | Start a workflow (optional: context for input variables) |
+| `cancel_run` | `runId` | Cancel a running run (user confirmation required per prompt) |
+| `create_chain` | `name`, `entries` | Create a workflow chain |
+
+### JSON Sanitization
+
+`AssistantToolExecutor.sanitizeJson()` normalizes fullwidth Unicode characters (e.g. `，` → `,`) before JSON parsing, as Claude occasionally generates such characters.
+
+### Safety Rules
+
+Destructive tools (`delete_workflow`, `cancel_run`) require explicit user confirmation before execution according to the system prompt.
+
+## Fetch Mechanism (Dynamic Loading)
+
+The assistant can load additional data via `<fetch type="..." id="..."/>` tags. `AssistantFetchService` resolves these and returns the data as supplemental context.
+
+- **Max. 2 fetch rounds** per chat request (configured in `AssistantService`)
+- Truncation markers show size info: `[Output truncated: 8000 of 23456 characters]`
+- Available fetch types: `run_detail`, `step_output`, `workflow_detail`, `workflow_runs`, `wish_detail`, `docs`, `pool_workflows`, `pool_workflow`, `project_context`
 
 ## Context Injection
 
-`AssistantService` injects different platform data into the system prompt depending on `context.page`:
+`AssistantContextBuilder` injects different platform data into the system prompt depending on `context.page`:
 
 - **`workflows`** — List of current workflows for the project
 - **`runs`** — Status and logs of recent runs
 - **`todos`** — Open TODOs for the project
 - Other pages: general platform context
+
+Additionally on **all pages**:
+- **Last 5 sessions** — First user message (150 characters) + first assistant response (100 characters) per session
+- **Workflow Memory** — Up to 8 active memories (300 characters per memory)
 
 ## Model Selection
 
@@ -137,6 +180,8 @@ Both controllers are registered under the base path `/api/v1/assistant`:
 The assistant is implemented as a floating panel (`AssistantPanel.tsx`):
 - Global overlay above the layout, independent of the current page
 - Sends the `page` context from the current route
-- Displays Page Suggestions as quick actions (clickable — sent as a user message)
-- Persists `sessionId` in frontend state for continuous conversations
-- WebSocket integration for live streaming of the response (if implemented)
+- Displays Page Suggestions as quick actions (clickable → sent as user message)
+- Persists `sessionId` in the frontend state for coherent conversations
+- Conversation history is loaded from the backend (`GET /sessions`), merged with localStorage (localStorage takes precedence for the same ID)
+- When clicking on a backend-only session, the full history is loaded on-demand and hydrated into the state store
+- WebSocket integration for live-streaming of the response (if implemented)
