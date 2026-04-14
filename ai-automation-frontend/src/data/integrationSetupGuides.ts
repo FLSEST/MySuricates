@@ -15,6 +15,20 @@ export interface SetupGuide {
   credentialLabels?: CredentialLabels;
 }
 
+function backendBaseUrl(): string {
+  const explicit = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_API_BASE_URL?.trim();
+  if (explicit) {
+    return explicit.replace(/\/api\/v1\/?$/, '').replace(/\/$/, '');
+  }
+  if (window.location.port === '3000') {
+    const target = (import.meta as { env?: Record<string, string | undefined> }).env?.CYPRESS_TARGET === 'test'
+      ? '8090'
+      : '9090';
+    return `${window.location.protocol}//${window.location.hostname}:${target}`;
+  }
+  return window.location.origin;
+}
+
 export const SETUP_GUIDES: Record<string, SetupGuide> = {
   'google-calendar': {
     steps: [
@@ -107,7 +121,7 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
             'Add Authorized redirect URI:',
           ],
         },
-        code: `${window.location.port === '3000' ? window.location.origin.replace(':3000', ':9090') : window.location.origin}/api/v1/integrations/google-calendar/callback`,
+        code: `${backendBaseUrl()}/api/v1/integrations/google-calendar/callback`,
         link: {
           url: 'https://console.cloud.google.com/apis/credentials',
           label: { de: 'Credentials anlegen', en: 'Create Credentials' },
@@ -126,6 +140,117 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
           en: [
             'Copy Client ID and Client Secret from the previous step',
             'Enter them in the fields below and click "Save"',
+          ],
+        },
+      },
+    ],
+  },
+  'google-gmail': {
+    steps: [
+      {
+        title: {
+          de: 'Bestehendes Google Cloud Projekt nutzen',
+          en: 'Reuse existing Google Cloud project',
+        },
+        instructions: {
+          de: [
+            'Wenn Google Calendar bereits eingerichtet ist, nutze dasselbe Google Cloud Projekt und dieselben OAuth-Zugangsdaten',
+            'Falls noch kein Projekt existiert: Erstelle eines in der Google Cloud Console',
+            'Achte darauf, dass deine eigene Gmail-Adresse als Test User eingetragen ist',
+          ],
+          en: [
+            'If Google Calendar is already set up, reuse the same Google Cloud project and OAuth credentials',
+            'If no project exists yet, create one in Google Cloud Console',
+            'Make sure your own Gmail address is added as a test user',
+          ],
+        },
+        link: {
+          url: 'https://console.cloud.google.com/apis/credentials',
+          label: { de: 'Google Cloud Console', en: 'Google Cloud Console' },
+        },
+      },
+      {
+        title: {
+          de: 'Gmail API aktivieren',
+          en: 'Enable Gmail API',
+        },
+        instructions: {
+          de: [
+            'Im Seitenmenue: "APIs & Services" -> "Library"',
+            'Suche nach "Gmail API"',
+            'Klicke auf das Ergebnis -> "Enable"',
+          ],
+          en: [
+            'In the side menu: "APIs & Services" -> "Library"',
+            'Search for "Gmail API"',
+            'Click the result -> "Enable"',
+          ],
+        },
+        link: {
+          url: 'https://console.cloud.google.com/apis/library/gmail.googleapis.com',
+          label: { de: 'Gmail API aktivieren', en: 'Enable Gmail API' },
+        },
+      },
+      {
+        title: {
+          de: 'OAuth Consent Screen pruefen',
+          en: 'Review OAuth consent screen',
+        },
+        instructions: {
+          de: [
+            'Oeffne "APIs & Services" -> "OAuth consent screen"',
+            'Fuege den Scope ".../auth/gmail.readonly" hinzu',
+            'Falls die App noch im Testmodus ist: eigene Gmail-Adresse als Test User belassen oder ergaenzen',
+          ],
+          en: [
+            'Open "APIs & Services" -> "OAuth consent screen"',
+            'Add the scope ".../auth/gmail.readonly"',
+            'If the app is still in testing mode, keep or add your own Gmail address as a test user',
+          ],
+        },
+        link: {
+          url: 'https://console.cloud.google.com/apis/credentials/consent',
+          label: { de: 'Consent Screen', en: 'Consent Screen' },
+        },
+      },
+      {
+        title: {
+          de: 'Redirect URI ergaenzen oder pruefen',
+          en: 'Add or verify redirect URI',
+        },
+        instructions: {
+          de: [
+            'Oeffne "APIs & Services" -> "Credentials"',
+            'Bearbeite den bestehenden OAuth Client oder erstelle einen neuen vom Typ "Web application"',
+            'Diese Redirect URI muss hinterlegt sein:',
+          ],
+          en: [
+            'Open "APIs & Services" -> "Credentials"',
+            'Edit the existing OAuth client or create a new "Web application" client',
+            'This redirect URI must be configured:',
+          ],
+        },
+        code: `${backendBaseUrl()}/api/v1/integrations/google-gmail/callback`,
+        link: {
+          url: 'https://console.cloud.google.com/apis/credentials',
+          label: { de: 'Credentials oeffnen', en: 'Open credentials' },
+        },
+      },
+      {
+        title: {
+          de: 'Zugangsdaten eintragen und verbinden',
+          en: 'Enter credentials and connect',
+        },
+        instructions: {
+          de: [
+            'Trage dieselbe Client-ID und denselben Clientschluessel wie fuer Google Calendar ein',
+            'Klicke auf "Speichern" und danach auf "Verbinden"',
+            'Google fragt danach einmalig den Read-only-Zugriff auf Gmail an',
+          ],
+          en: [
+            'Enter the same client ID and client secret used for Google Calendar',
+            'Click "Save" and then "Connect"',
+            'Google will then ask once for read-only access to Gmail',
           ],
         },
       },

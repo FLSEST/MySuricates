@@ -17,6 +17,7 @@ Plugin-Framework für externe Dienste (Google Calendar, Trello, Jira, ...). Jede
 | Provider | Provider-ID | Paket | Actions |
 |----------|------------|-------|---------|
 | Google Calendar | `google-calendar` | `providers/google/` | list_events, get_event, create_event, update_event, delete_event, get_free_busy |
+| Gmail | `google-gmail` | `providers/google/` | list_messages, get_message |
 | Jira | `jira` | `providers/jira/` | list_projects, search_issues, get_issue, create_issue, update_issue, add_comment, get_transitions, transition_issue |
 | Confluence | `confluence` | `providers/confluence/` | list_spaces, list_pages, get_page, search |
 | Trello | `trello` | `providers/trello/` | list_boards, get_board_lists, get_list_cards, get_card, create_card, update_card, delete_card, add_comment, search |
