@@ -1159,6 +1159,120 @@ Delete a trigger.
 
 ---
 
+## Integrations (OAuth Providers)
+
+Plugin system for external services (Google Calendar, Gmail, Jira, Confluence, Trello). Each provider is auto-discovered and offers OAuth connection + actions.
+
+### `GET /api/v1/integrations`
+
+List all providers with connection status, actions, and account info.
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "providerId": "google-calendar",
+    "displayName": "Google Calendar",
+    "icon": "calendar",
+    "description": "...",
+    "status": "CONNECTED",
+    "configured": true,
+    "accountEmail": "user@gmail.com",
+    "accountName": "Max Mustermann",
+    "connectedAt": "2026-04-01T10:00:00Z",
+    "scopes": "https://www.googleapis.com/auth/calendar",
+    "optionalScopes": [],
+    "actions": [
+      { "name": "list_events", "description": "...", "inputSchema": {...}, "available": true }
+    ]
+  }
+]
+```
+
+### `GET /api/v1/integrations/{providerId}`
+
+Retrieve a single provider with details.
+
+### `GET /api/v1/integrations/{providerId}/connect`
+
+Generate OAuth authorization URL.
+
+**Query Parameters:** `scopes` (optional, list of additional OAuth scopes)
+
+**Response:** `200 OK`
+```json
+{ "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth?..." }
+```
+
+### `GET /api/v1/integrations/{providerId}/callback`
+
+OAuth callback (public, no API key required). Exchanges authorization code for tokens and closes the popup window via `postMessage`.
+
+### `POST /api/v1/integrations/{providerId}/credentials`
+
+Save client credentials (Client ID + Secret). Stored AES-256-GCM encrypted in the database.
+
+**Body:**
+```json
+{ "clientId": "...", "clientSecret": "..." }
+```
+
+### `DELETE /api/v1/integrations/{providerId}/connection`
+
+Disconnect OAuth connection. Deletes stored tokens.
+
+**Response:** `204 No Content`
+
+### `GET /api/v1/integrations/{providerId}/actions`
+
+List all available actions for the provider. `available` is `false` when required OAuth scopes are missing.
+
+### `POST /api/v1/integrations/{providerId}/actions/{action}`
+
+Execute an action. Body contains action-specific parameters.
+
+**Body (Example Google Calendar `create_event`):**
+```json
+{
+  "summary": "Meeting",
+  "startDateTime": "2026-04-15T10:00:00+02:00",
+  "endDateTime": "2026-04-15T11:00:00+02:00"
+}
+```
+
+---
+
+## Onboarding Profiles
+
+AI context templates for project onboarding. 5 built-in profiles (Developer, Research, Content, Ops, Base) + user-defined profiles.
+
+### `GET /api/v1/projects/{id}/onboarding/status`
+
+Check the onboarding status of a project (active profiles, generated file).
+
+### `POST /api/v1/projects/{id}/onboarding/enable`
+
+Enable onboarding for a project. Generates the onboarding file from the selected profiles.
+
+**Body:**
+```json
+{ "profileKeys": ["developer", "research"] }
+```
+
+### `GET /api/v1/projects/{id}/onboarding/preview`
+
+Preview the generated onboarding file.
+
+### `GET /api/v1/onboarding-profiles`
+
+List all onboarding profiles.
+
+### `PUT /api/v1/onboarding-profiles/{id}`
+
+Update profile content (automatically creates a history entry).
+
+---
+
 ## Todo Triggers (Self-Improvement Loop)
 
 Todo triggers automatically start fix workflows when TODOs are created. Closes the self-improvement loop: Audit → TODO → Fix → Verify → Close.
