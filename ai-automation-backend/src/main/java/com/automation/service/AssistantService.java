@@ -1,14 +1,17 @@
 package com.automation.service;
 
+import com.automation.config.HostClaudeConfig;
 import com.automation.dto.AssistantChatRequest;
 import com.automation.dto.AssistantChatResponse;
 import com.automation.dto.AssistantChatResponse.AssistantAction;
+import com.automation.exception.WorkflowExecutionException;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.assistant.AssistantChatBroadcaster;
 import com.automation.service.assistant.AssistantContextBuilder;
 import com.automation.service.assistant.AssistantFetchService;
 import com.automation.service.assistant.AssistantFetchService.FetchRequest;
 import com.automation.service.assistant.AssistantToolExecutor;
+import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -19,7 +22,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.sql.SQLTransientConnectionException;
 import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -37,7 +42,6 @@ import java.util.stream.Collectors;
 @Slf4j
 public class AssistantService {
 
-    private static final int TIMEOUT_SECONDS = 120;
     private static final String DEFAULT_THINKING_PHRASES =
             "{\"de\":[\"Denke nach…\",\"Analysiere…\",\"Überlege kurz…\",\"Einen Moment…\"," +
             "\"Bereite Antwort vor…\",\"Lade Kontext…\",\"Formuliere…\",\"Gleich fertig…\"]," +
@@ -45,11 +49,13 @@ public class AssistantService {
             "\"Preparing answer…\",\"Formulating…\",\"Almost there…\",\"Processing…\"]}";
 
     private final CommandExecutorService commandExecutorService;
+    private final AiProviderRegistry aiProviderRegistry;
     private final AssistantContextBuilder contextBuilder;
     private final AssistantFetchService fetchService;
     private final AssistantToolExecutor toolExecutor;
     private final AssistantChatBroadcaster broadcaster;
     private final AppSettingsRepository appSettingsRepository;
+    private final HostClaudeConfig hostClaudeConfig;
     private final ObjectMapper objectMapper;
 
     /** Cached model — loaded at startup, never read during a web request. */
@@ -98,6 +104,7 @@ public class AssistantService {
             String prompt = contextBuilder.buildPrompt(req.history(), req.message());
             String workingDir = contextBuilder.resolveWorkingDir(req.context());
             String model = cachedAssistantModel;
+            String resolvedProvider = aiProviderRegistry.resolve(req.provider()).getId();
 
             broadcaster.broadcastStatus(requestId, "THINKING", null, startNanos);
             var result = commandExecutorService.executeOnHost(
@@ -107,7 +114,7 @@ public class AssistantService {
                             .systemPrompt(systemPrompt)
                             .providerId(req.provider())
                             .model(model)
-                            .timeoutSeconds(TIMEOUT_SECONDS)
+                            .timeoutSeconds(hostClaudeConfig.getAssistantChatTimeoutSeconds())
                             .priority(true)
                             .build()
             );
@@ -136,7 +143,7 @@ public class AssistantService {
                                 .systemPrompt(systemPrompt)
                                 .providerId(req.provider())
                                 .model(model)
-                                .timeoutSeconds(TIMEOUT_SECONDS)
+                                .timeoutSeconds(hostClaudeConfig.getAssistantChatTimeoutSeconds())
                                 .priority(true)
                                 .build()
                 );
@@ -150,17 +157,61 @@ public class AssistantService {
 
             AssistantChatResponse parsed = parseResponse(finalOutput);
             broadcaster.broadcastStatus(requestId, "COMPLETED", null, startNanos);
-            return new AssistantChatResponse(parsed.message(), parsed.actions(), model);
+            return new AssistantChatResponse(parsed.message(), parsed.actions(), model, resolvedProvider);
 
         } catch (Exception e) {
             log.error("Assistant chat failed", e);
-            broadcaster.broadcastStatus(requestId, "ERROR", e.getMessage(), startNanos);
-            return new AssistantChatResponse(
-                    "Entschuldigung, ich konnte deine Anfrage gerade nicht verarbeiten. " +
-                    "Bitte versuche es erneut oder prüfe ob der KI-Provider konfiguriert ist.",
-                    List.of()
-            );
+            ErrorKind kind = classifyError(e);
+            broadcaster.broadcastStatus(requestId, "ERROR", kind.code(), startNanos);
+            return new AssistantChatResponse(kind.userMessage(), List.of());
         }
+    }
+
+    private record ErrorKind(String code, String userMessage) {}
+
+    private ErrorKind classifyError(Throwable e) {
+        Throwable root = unwrap(e);
+        String msg = root != null && root.getMessage() != null ? root.getMessage() : "";
+
+        if (root instanceof IOException && msg.contains("timed out")) {
+            int timeout = hostClaudeConfig.getAssistantChatTimeoutSeconds();
+            return new ErrorKind("TIMEOUT",
+                    "Die Antwort hat länger als " + timeout + " Sekunden gedauert. " +
+                    "Versuche es erneut oder formuliere die Frage kürzer. " +
+                    "Den Timeout kannst du in den Einstellungen erhöhen.");
+        }
+        if (root instanceof SQLTransientConnectionException
+                || msg.contains("Connection is not available")) {
+            return new ErrorKind("POOL_EXHAUSTED",
+                    "Das System ist gerade ausgelastet (Datenbank-Pool belegt). " +
+                    "Warte einen Moment und versuche es erneut.");
+        }
+        if (msg.toLowerCase().contains("provider") || msg.toLowerCase().contains("api key")) {
+            return new ErrorKind("PROVIDER_UNAVAILABLE",
+                    "Der KI-Provider ist nicht korrekt konfiguriert. " +
+                    "Prüfe die Einstellungen (API-Key, Modell).");
+        }
+        return new ErrorKind("UNKNOWN",
+                "Entschuldigung, ich konnte deine Anfrage gerade nicht verarbeiten. " +
+                "Bitte versuche es erneut oder prüfe ob der KI-Provider konfiguriert ist.");
+    }
+
+    private Throwable unwrap(Throwable e) {
+        Throwable current = e;
+        for (int i = 0; i < 10 && current != null; i++) {
+            if (current instanceof WorkflowExecutionException && current.getCause() != null) {
+                current = current.getCause();
+                continue;
+            }
+            if (current.getCause() != null && current.getCause() != current) {
+                Throwable cause = current.getCause();
+                if (cause instanceof IOException || cause instanceof SQLTransientConnectionException) {
+                    return cause;
+                }
+            }
+            return current;
+        }
+        return e;
     }
 
     // ── Response parsing ─────────────────────────────────────────────────────

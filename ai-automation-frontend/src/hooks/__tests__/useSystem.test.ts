@@ -66,7 +66,7 @@ describe('useUpdateExecutionConfig', () => {
   it('updates execution config via mutation', async () => {
     const { result } = renderHook(() => useUpdateExecutionConfig(), { wrapper: createWrapper() });
     await act(async () => {
-      result.current.mutate({ executionMaxConcurrent: 5, claudeMaxConcurrentCalls: 5, claudeReservedForInteractive: 1, claudeTimeoutSeconds: 300, claudeInterCallDelayMs: 0, chainWorkflowTimeoutMinutes: 30 });
+      result.current.mutate({ executionMaxConcurrent: 5, claudeMaxConcurrentCalls: 5, claudeReservedForInteractive: 1, claudeTimeoutSeconds: 300, claudeInterCallDelayMs: 0, chainWorkflowTimeoutMinutes: 30, rateLimitEnabled: 1, rateLimitRequestsPerMinute: 120, assistantChatTimeoutSeconds: 240 });
     });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
   });

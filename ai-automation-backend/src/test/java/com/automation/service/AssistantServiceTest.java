@@ -1,8 +1,12 @@
 package com.automation.service;
 
+import com.automation.config.HostClaudeConfig;
 import com.automation.dto.AssistantChatRequest;
 import com.automation.dto.AssistantChatResponse;
+import com.automation.exception.WorkflowExecutionException;
 import com.automation.repository.AppSettingsRepository;
+import com.automation.service.ai.AiProvider;
+import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.assistant.AssistantChatBroadcaster;
 import com.automation.service.assistant.AssistantContextBuilder;
 import com.automation.service.assistant.AssistantFetchService;
@@ -17,6 +21,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.io.IOException;
+import java.sql.SQLTransientConnectionException;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,12 +31,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AssistantServiceTest {
 
     @Mock private CommandExecutorService commandExecutorService;
+    @Mock private AiProviderRegistry aiProviderRegistry;
     @Mock private AssistantContextBuilder contextBuilder;
     @Mock private AssistantFetchService fetchService;
     @Mock private AssistantToolExecutor toolExecutor;
@@ -39,12 +47,20 @@ class AssistantServiceTest {
 
     private AssistantService service;
 
+    private HostClaudeConfig hostClaudeConfig;
+
     @BeforeEach
     void setUp() {
+        hostClaudeConfig = new HostClaudeConfig();
+        hostClaudeConfig.setAssistantChatTimeoutSeconds(240);
         service = new AssistantService(
-                commandExecutorService, contextBuilder, fetchService, toolExecutor,
-                broadcaster, appSettingsRepository, new ObjectMapper()
+                commandExecutorService, aiProviderRegistry, contextBuilder, fetchService, toolExecutor,
+                broadcaster, appSettingsRepository, hostClaudeConfig, new ObjectMapper()
         );
+        // Provider registry default — resolve to CLAUDE
+        AiProvider claudeProvider = mock(AiProvider.class);
+        lenient().when(claudeProvider.getId()).thenReturn("CLAUDE");
+        lenient().when(aiProviderRegistry.resolve(any())).thenReturn(claudeProvider);
         // Context builder defaults (lenient — not all tests call chat())
         lenient().when(contextBuilder.buildSystemPrompt(any(), any())).thenReturn("System prompt");
         lenient().when(contextBuilder.buildPrompt(any(), anyString())).thenAnswer(inv -> inv.getArgument(1));
@@ -178,6 +194,44 @@ class AssistantServiceTest {
 
         assertThat(result.message()).contains("Entschuldigung");
         assertThat(result.actions()).isEmpty();
+    }
+
+    @Test
+    void chat_timeoutException_returnsTimeoutSpecificMessage() {
+        when(commandExecutorService.executeOnHost(any(HostExecutionRequest.class)))
+                .thenThrow(new WorkflowExecutionException("Failed to execute command on host (project: /tmp)",
+                        new IOException("Host Claude action timed out after 240 seconds")));
+
+        var result = chat("Test");
+
+        assertThat(result.message())
+                .contains("240 Sekunden")
+                .contains("Einstellungen");
+    }
+
+    @Test
+    void chat_poolExhaustion_returnsPoolSpecificMessage() {
+        when(commandExecutorService.executeOnHost(any(HostExecutionRequest.class)))
+                .thenThrow(new WorkflowExecutionException("Failed to execute command on host",
+                        new SQLTransientConnectionException(
+                                "HikariPool-1 - Connection is not available, request timed out after 30000ms")));
+
+        var result = chat("Test");
+
+        assertThat(result.message())
+                .contains("ausgelastet");
+    }
+
+    @Test
+    void chat_timeoutRespectsConfiguredTimeout() {
+        hostClaudeConfig.setAssistantChatTimeoutSeconds(500);
+        when(commandExecutorService.executeOnHost(any(HostExecutionRequest.class)))
+                .thenThrow(new WorkflowExecutionException("x",
+                        new IOException("Host Claude action timed out after 500 seconds")));
+
+        var result = chat("Test");
+
+        assertThat(result.message()).contains("500 Sekunden");
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

@@ -190,6 +190,29 @@ class ExecutionSettingsServiceTest {
     }
 
     @Test
+    void validateAndApply_assistantChatTimeout_updatesConfig() {
+        service.validateAndApply("assistant-chat-timeout-seconds", "500");
+
+        verify(appSettingsRepository).set("assistant-chat-timeout-seconds", "500");
+        assertThat(hostClaudeConfig.getAssistantChatTimeoutSeconds()).isEqualTo(500);
+    }
+
+    @Test
+    void validateAndApply_assistantChatTimeout_camelCaseAlias() {
+        service.validateAndApply("assistantChatTimeoutSeconds", "300");
+
+        verify(appSettingsRepository).set("assistant-chat-timeout-seconds", "300");
+        assertThat(hostClaudeConfig.getAssistantChatTimeoutSeconds()).isEqualTo(300);
+    }
+
+    @Test
+    void validateAndApply_assistantChatTimeout_outOfBounds_throws() {
+        assertThatThrownBy(() -> service.validateAndApply("assistant-chat-timeout-seconds", "10"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must be between");
+    }
+
+    @Test
     void init_ignoresOutOfBoundsDbValue() {
         when(appSettingsRepository.get("execution-max-concurrent")).thenReturn(Optional.of("999"));
         when(appSettingsRepository.get("claude-max-concurrent-calls")).thenReturn(Optional.empty());

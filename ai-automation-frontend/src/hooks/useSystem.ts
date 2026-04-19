@@ -144,6 +144,7 @@ export interface ExecutionConfig {
   chainWorkflowTimeoutMinutes: number;
   rateLimitEnabled: number;
   rateLimitRequestsPerMinute: number;
+  assistantChatTimeoutSeconds: number;
   activeRuns: number;
 }
 

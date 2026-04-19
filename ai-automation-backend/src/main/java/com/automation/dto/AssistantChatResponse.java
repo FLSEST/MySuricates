@@ -9,19 +9,25 @@ public record AssistantChatResponse(
         List<AssistantAction> actions,
         String model,
         @JsonInclude(JsonInclude.Include.NON_NULL)
+        String provider,
+        @JsonInclude(JsonInclude.Include.NON_NULL)
         Long responseTimeMs
 ) {
     /** Backwards-compatible constructor — existing callsites use 2 args. */
     public AssistantChatResponse(String message, List<AssistantAction> actions) {
-        this(message, actions, null, null);
+        this(message, actions, null, null, null);
     }
 
     public AssistantChatResponse(String message, List<AssistantAction> actions, String model) {
-        this(message, actions, model, null);
+        this(message, actions, model, null, null);
+    }
+
+    public AssistantChatResponse(String message, List<AssistantAction> actions, String model, String provider) {
+        this(message, actions, model, provider, null);
     }
 
     public AssistantChatResponse withResponseTimeMs(long responseTimeMs) {
-        return new AssistantChatResponse(message, actions, model, responseTimeMs);
+        return new AssistantChatResponse(message, actions, model, provider, responseTimeMs);
     }
 
     /** An actionable suggestion the assistant is offering the user. */

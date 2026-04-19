@@ -714,6 +714,8 @@ export const de: TranslationKeys = {
     executionRateLimitEnabledHint: 'Anfrage-Ratenbegrenzung pro Client für die API aktivieren',
     executionRateLimitRpm: 'Ratenlimit (Anfragen/Min.)',
     executionRateLimitRpmHint: 'Maximale Anfragen pro Minute pro Client (10–10.000)',
+    executionAssistantChatTimeout: 'Assistent-Chat-Timeout (s)',
+    executionAssistantChatTimeoutHint: 'Maximale Wartezeit pro Assistent-CLI-Call, bevor abgebrochen wird (30–900 s). Default: 240.',
     executionSave: 'Einstellungen speichern',
     executionSaved: 'Ausführungs-Einstellungen gespeichert',
     executionSaveFailed: 'Ausführungs-Einstellungen konnten nicht gespeichert werden',

@@ -36,4 +36,12 @@ public class HostClaudeConfig {
      * Background calls (workflows, suggestions) are limited to maxConcurrentCalls - reservedForInteractive.
      */
     private int reservedForInteractive = 1;
+
+    /**
+     * Timeout in seconds for a single assistant chat CLI call.
+     * Applies per CLI call inside {@code AssistantService.chat()} — with fetch loops, the worst-case
+     * wait is this value multiplied by the number of fetch rounds. Kept separate from
+     * {@link #timeoutSeconds} so workflow/suggestion calls can have a different budget.
+     */
+    private int assistantChatTimeoutSeconds = 240;
 }

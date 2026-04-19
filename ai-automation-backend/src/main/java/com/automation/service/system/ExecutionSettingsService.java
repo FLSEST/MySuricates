@@ -20,27 +20,29 @@ import java.util.Map;
 @Slf4j
 public class ExecutionSettingsService {
 
-    private static final Map<String, long[]> BOUNDS = Map.of(
-            "execution-max-concurrent",          new long[]{1, 50},
-            "claude-max-concurrent-calls",       new long[]{1, 20},
-            "claude-reserved-for-interactive",   new long[]{0, 10},
-            "claude-timeout-seconds",            new long[]{30, 3600},
-            "claude-inter-call-delay-ms",        new long[]{0, 30000},
-            "chain-workflow-timeout-minutes",     new long[]{5, 1440},
-            "rate-limit-enabled",                new long[]{0, 1},
-            "rate-limit-requests-per-minute",    new long[]{10, 10000}
+    private static final Map<String, long[]> BOUNDS = Map.ofEntries(
+            Map.entry("execution-max-concurrent",          new long[]{1, 50}),
+            Map.entry("claude-max-concurrent-calls",       new long[]{1, 20}),
+            Map.entry("claude-reserved-for-interactive",   new long[]{0, 10}),
+            Map.entry("claude-timeout-seconds",            new long[]{30, 3600}),
+            Map.entry("claude-inter-call-delay-ms",        new long[]{0, 30000}),
+            Map.entry("chain-workflow-timeout-minutes",    new long[]{5, 1440}),
+            Map.entry("rate-limit-enabled",                new long[]{0, 1}),
+            Map.entry("rate-limit-requests-per-minute",    new long[]{10, 10000}),
+            Map.entry("assistant-chat-timeout-seconds",    new long[]{30, 900})
     );
 
     // Frontend sends camelCase keys, backend uses kebab-case internally
-    private static final Map<String, String> KEY_ALIASES = Map.of(
-            "executionMaxConcurrent",          "execution-max-concurrent",
-            "claudeMaxConcurrentCalls",        "claude-max-concurrent-calls",
-            "claudeReservedForInteractive",    "claude-reserved-for-interactive",
-            "claudeTimeoutSeconds",            "claude-timeout-seconds",
-            "claudeInterCallDelayMs",          "claude-inter-call-delay-ms",
-            "chainWorkflowTimeoutMinutes",     "chain-workflow-timeout-minutes",
-            "rateLimitEnabled",                "rate-limit-enabled",
-            "rateLimitRequestsPerMinute",      "rate-limit-requests-per-minute"
+    private static final Map<String, String> KEY_ALIASES = Map.ofEntries(
+            Map.entry("executionMaxConcurrent",          "execution-max-concurrent"),
+            Map.entry("claudeMaxConcurrentCalls",        "claude-max-concurrent-calls"),
+            Map.entry("claudeReservedForInteractive",    "claude-reserved-for-interactive"),
+            Map.entry("claudeTimeoutSeconds",            "claude-timeout-seconds"),
+            Map.entry("claudeInterCallDelayMs",          "claude-inter-call-delay-ms"),
+            Map.entry("chainWorkflowTimeoutMinutes",     "chain-workflow-timeout-minutes"),
+            Map.entry("rateLimitEnabled",                "rate-limit-enabled"),
+            Map.entry("rateLimitRequestsPerMinute",      "rate-limit-requests-per-minute"),
+            Map.entry("assistantChatTimeoutSeconds",     "assistant-chat-timeout-seconds")
     );
 
     private final AppSettingsRepository appSettingsRepository;
@@ -96,12 +98,14 @@ public class ExecutionSettingsService {
         applyIfPresent("chain-workflow-timeout-minutes", v -> chainConfig.setWorkflowTimeoutMinutes(Integer.parseInt(v)));
         applyIfPresent("rate-limit-enabled", v -> rateLimitConfig.setEnabled(Integer.parseInt(v) == 1));
         applyIfPresent("rate-limit-requests-per-minute", v -> rateLimitConfig.setRequestsPerMinute(Integer.parseInt(v)));
+        applyIfPresent("assistant-chat-timeout-seconds", v -> hostClaudeConfig.setAssistantChatTimeoutSeconds(Integer.parseInt(v)));
 
-        log.info("Execution settings initialized: maxConcurrent={}, maxCalls={}, timeout={}s, delay={}ms, chainTimeout={}min, rateLimit={}/{}rpm",
+        log.info("Execution settings initialized: maxConcurrent={}, maxCalls={}, timeout={}s, delay={}ms, chainTimeout={}min, rateLimit={}/{}rpm, assistantChatTimeout={}s",
                 executionSemaphore.getMaxPermits(), hostClaudeConfig.getMaxConcurrentCalls(),
                 hostClaudeConfig.getTimeoutSeconds(), hostClaudeConfig.getInterCallDelayMs(),
                 chainConfig.getWorkflowTimeoutMinutes(),
-                rateLimitConfig.isEnabled() ? "ON" : "OFF", rateLimitConfig.getRequestsPerMinute());
+                rateLimitConfig.isEnabled() ? "ON" : "OFF", rateLimitConfig.getRequestsPerMinute(),
+                hostClaudeConfig.getAssistantChatTimeoutSeconds());
     }
 
     public void updateAll(Map<String, String> settings) {
@@ -145,6 +149,7 @@ public class ExecutionSettingsService {
         result.put("chainWorkflowTimeoutMinutes", chainConfig.getWorkflowTimeoutMinutes());
         result.put("rateLimitEnabled", rateLimitConfig.isEnabled() ? 1 : 0);
         result.put("rateLimitRequestsPerMinute", rateLimitConfig.getRequestsPerMinute());
+        result.put("assistantChatTimeoutSeconds", hostClaudeConfig.getAssistantChatTimeoutSeconds());
         result.put("activeRuns", workflowExecutor.getActiveRunCount());
         return result;
     }
@@ -162,6 +167,7 @@ public class ExecutionSettingsService {
             case "chain-workflow-timeout-minutes" -> chainConfig.setWorkflowTimeoutMinutes(Integer.parseInt(value));
             case "rate-limit-enabled" -> rateLimitConfig.setEnabled(Integer.parseInt(value) == 1);
             case "rate-limit-requests-per-minute" -> rateLimitConfig.setRequestsPerMinute(Integer.parseInt(value));
+            case "assistant-chat-timeout-seconds" -> hostClaudeConfig.setAssistantChatTimeoutSeconds(Integer.parseInt(value));
         }
     }
 

@@ -25,6 +25,7 @@ interface FormState {
   chainWorkflowTimeoutMinutes: number;
   rateLimitEnabled: boolean;
   rateLimitRequestsPerMinute: number;
+  assistantChatTimeoutSeconds: number;
 }
 
 export function ExecutionSettingsCard() {
@@ -41,6 +42,7 @@ export function ExecutionSettingsCard() {
     chainWorkflowTimeoutMinutes: 180,
     rateLimitEnabled: true,
     rateLimitRequestsPerMinute: 120,
+    assistantChatTimeoutSeconds: 240,
   });
 
   useEffect(() => {
@@ -54,6 +56,7 @@ export function ExecutionSettingsCard() {
         chainWorkflowTimeoutMinutes: config.chainWorkflowTimeoutMinutes,
         rateLimitEnabled: config.rateLimitEnabled === 1,
         rateLimitRequestsPerMinute: config.rateLimitRequestsPerMinute,
+        assistantChatTimeoutSeconds: config.assistantChatTimeoutSeconds ?? 240,
       });
     }
   }, [config]);
@@ -66,7 +69,8 @@ export function ExecutionSettingsCard() {
     form.claudeInterCallDelayMs !== config.claudeInterCallDelayMs ||
     form.chainWorkflowTimeoutMinutes !== config.chainWorkflowTimeoutMinutes ||
     form.rateLimitEnabled !== (config.rateLimitEnabled === 1) ||
-    form.rateLimitRequestsPerMinute !== config.rateLimitRequestsPerMinute
+    form.rateLimitRequestsPerMinute !== config.rateLimitRequestsPerMinute ||
+    form.assistantChatTimeoutSeconds !== (config.assistantChatTimeoutSeconds ?? 240)
   );
 
   const fields: FieldConfig[] = [
@@ -77,6 +81,7 @@ export function ExecutionSettingsCard() {
     { key: 'delay', label: t.settings.executionInterCallDelay, hint: t.settings.executionInterCallDelayHint, min: 0, max: 30000, configKey: 'claudeInterCallDelayMs' },
     { key: 'chain', label: t.settings.executionChainTimeout, hint: t.settings.executionChainTimeoutHint, min: 5, max: 1440, configKey: 'chainWorkflowTimeoutMinutes' },
     { key: 'rateRpm', label: t.settings.executionRateLimitRpm, hint: t.settings.executionRateLimitRpmHint, min: 10, max: 10000, configKey: 'rateLimitRequestsPerMinute' },
+    { key: 'assistantTimeout', label: t.settings.executionAssistantChatTimeout, hint: t.settings.executionAssistantChatTimeoutHint, min: 30, max: 900, configKey: 'assistantChatTimeoutSeconds' },
   ];
 
   const handleSave = () => {
@@ -89,6 +94,7 @@ export function ExecutionSettingsCard() {
       chainWorkflowTimeoutMinutes: form.chainWorkflowTimeoutMinutes,
       rateLimitEnabled: form.rateLimitEnabled ? 1 : 0,
       rateLimitRequestsPerMinute: form.rateLimitRequestsPerMinute,
+      assistantChatTimeoutSeconds: form.assistantChatTimeoutSeconds,
     });
   };
 
