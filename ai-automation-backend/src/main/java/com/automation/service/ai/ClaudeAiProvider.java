@@ -51,7 +51,9 @@ public class ClaudeAiProvider implements AiProvider {
                 request.systemPrompt(),
                 request.workingDirectory(),
                 request.timeoutSeconds(),
-                request.priority()
+                request.priority(),
+                request.allowedTools(),
+                request.disallowedTools()
         );
         return new ActionResult(
                 result.text(),

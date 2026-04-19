@@ -42,6 +42,14 @@ import java.util.stream.Collectors;
 @Slf4j
 public class AssistantService {
 
+    /**
+     * Read-only tool whitelist for the assistant chat CLI. Edit, Write, MultiEdit, NotebookEdit,
+     * Bash, Task, TodoWrite and others are <b>not</b> in this list — the CLI will refuse to call
+     * them, so the model cannot mutate files or run shell commands from within the chat flow.
+     * File mutations must go through MySuricates workflow blocks instead.
+     */
+    private static final List<String> CHAT_ALLOWED_TOOLS = List.of("Read", "Grep", "Glob", "WebFetch");
+
     private static final String DEFAULT_THINKING_PHRASES =
             "{\"de\":[\"Denke nach…\",\"Analysiere…\",\"Überlege kurz…\",\"Einen Moment…\"," +
             "\"Bereite Antwort vor…\",\"Lade Kontext…\",\"Formuliere…\",\"Gleich fertig…\"]," +
@@ -116,6 +124,7 @@ public class AssistantService {
                             .model(model)
                             .timeoutSeconds(hostClaudeConfig.getAssistantChatTimeoutSeconds())
                             .priority(true)
+                            .allowedTools(CHAT_ALLOWED_TOOLS)
                             .build()
             );
 
@@ -145,6 +154,7 @@ public class AssistantService {
                                 .model(model)
                                 .timeoutSeconds(hostClaudeConfig.getAssistantChatTimeoutSeconds())
                                 .priority(true)
+                                .allowedTools(CHAT_ALLOWED_TOOLS)
                                 .build()
                 );
             }

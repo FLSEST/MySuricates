@@ -58,19 +58,35 @@ public interface AiProvider {
             String workingDirectory,
             Integer timeoutSeconds,
             boolean priority,
-            boolean readOnly
+            boolean readOnly,
+            List<String> allowedTools,
+            List<String> disallowedTools
     ) {
         public ActionRequest(String prompt, String model, String systemPrompt, String workingDirectory) {
-            this(prompt, model, systemPrompt, workingDirectory, null, false, true);
+            this(prompt, model, systemPrompt, workingDirectory, null, false, true, null, null);
         }
 
         public ActionRequest(String prompt, String model, String systemPrompt, String workingDirectory, Integer timeoutSeconds) {
-            this(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, false, true);
+            this(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, false, true, null, null);
         }
 
         /** Backward-compatible: 6-arg calls default to readOnly=true (analysis mode). */
         public ActionRequest(String prompt, String model, String systemPrompt, String workingDirectory, Integer timeoutSeconds, boolean priority) {
-            this(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, priority, true);
+            this(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, priority, true, null, null);
+        }
+
+        /** Backward-compatible 7-arg constructor for callers that previously set readOnly explicitly. */
+        public ActionRequest(String prompt, String model, String systemPrompt, String workingDirectory,
+                             Integer timeoutSeconds, boolean priority, boolean readOnly) {
+            this(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, priority, readOnly, null, null);
+        }
+
+        /** Chat-scoped constructor with explicit tool whitelist. */
+        public ActionRequest(String prompt, String model, String systemPrompt, String workingDirectory,
+                             Integer timeoutSeconds, boolean priority,
+                             List<String> allowedTools, List<String> disallowedTools) {
+            this(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, priority, true,
+                    allowedTools, disallowedTools);
         }
     }
 

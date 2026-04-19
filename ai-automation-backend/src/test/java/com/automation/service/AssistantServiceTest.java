@@ -30,8 +30,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -232,6 +234,23 @@ class AssistantServiceTest {
         var result = chat("Test");
 
         assertThat(result.message()).contains("500 Sekunden");
+    }
+
+    @Test
+    void chat_enforcesReadOnlyToolWhitelist() {
+        // Hard-gate: the chat CLI call must run with a strict tool whitelist. Edit/Write/Bash must
+        // not be reachable even if the model tries — the guarantee lives in the HostExecutionRequest.
+        stubClaude("ok");
+
+        chat("Hello");
+
+        verify(commandExecutorService).executeOnHost(argThat(req ->
+                req.allowedTools() != null
+                        && req.allowedTools().containsAll(List.of("Read", "Grep", "Glob", "WebFetch"))
+                        && !req.allowedTools().contains("Edit")
+                        && !req.allowedTools().contains("Write")
+                        && !req.allowedTools().contains("Bash")
+        ));
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

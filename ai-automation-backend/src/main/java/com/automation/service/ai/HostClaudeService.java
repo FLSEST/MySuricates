@@ -115,7 +115,20 @@ public class HostClaudeService {
     public ActionResult executeAction(String prompt, String model,
                                        String systemPrompt, String workingDirectory,
                                        Integer timeoutSeconds, boolean priority) throws IOException {
-        List<String> cmd = buildActionCommand(prompt, model, systemPrompt);
+        return executeAction(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, priority, null, null);
+    }
+
+    /**
+     * Action call with explicit tool restrictions. When {@code allowedTools} is non-empty,
+     * {@code --dangerously-skip-permissions} is suppressed and only the listed tools are available
+     * (via {@code --allowed-tools}). Used by the assistant chat flow to prevent ungated
+     * Edit/Write/Bash execution in the user's project directory.
+     */
+    public ActionResult executeAction(String prompt, String model,
+                                       String systemPrompt, String workingDirectory,
+                                       Integer timeoutSeconds, boolean priority,
+                                       List<String> allowedTools, List<String> disallowedTools) throws IOException {
+        List<String> cmd = buildActionCommand(prompt, model, systemPrompt, allowedTools, disallowedTools);
         var result = executeProcess(cmd, prompt, workingDirectory, timeoutSeconds, "Host Claude action", priority);
         return new ActionResult(result.text, result.exitCode, result.parsed);
     }
@@ -205,6 +218,11 @@ public class HostClaudeService {
      * Package-private for testability.
      */
     List<String> buildActionCommand(String prompt, String model, String systemPrompt) {
+        return buildActionCommand(prompt, model, systemPrompt, null, null);
+    }
+
+    List<String> buildActionCommand(String prompt, String model, String systemPrompt,
+                                    List<String> callAllowedTools, List<String> callDisallowedTools) {
         List<String> cmd = new ArrayList<>(List.of(
                 "claude", "-p",
                 "--output-format", "stream-json", "--verbose"
@@ -218,13 +236,34 @@ public class HostClaudeService {
             cmd.add("--append-system-prompt");
             cmd.add(systemPrompt);
         }
-        if (permissionsConfig.isSkipPermissions()) {
-            cmd.add("--dangerously-skip-permissions");
+
+        boolean hasCallWhitelist = callAllowedTools != null && !callAllowedTools.isEmpty();
+        if (hasCallWhitelist) {
+            // Per-call strict whitelist: drop skip-permissions, let the CLI enforce the list.
+            // Other tools (Edit, Write, Bash, …) are unavailable to the model.
+            // Emit one --allowed-tools flag per tool, mirroring the global CliPermissionsConfig
+            // pattern below — the CLI accepts both space-separated and repeated flag forms, the
+            // repeated form is less ambiguous and survives shell-quoting edge cases.
+            for (String tool : callAllowedTools) {
+                cmd.add("--allowed-tools");
+                cmd.add(tool);
+            }
+        } else {
+            if (permissionsConfig.isSkipPermissions()) {
+                cmd.add("--dangerously-skip-permissions");
+            }
+            for (String tool : permissionsConfig.getAllowedTools()) {
+                cmd.add("--allowedTools");
+                cmd.add(tool);
+            }
         }
-        for (String tool : permissionsConfig.getAllowedTools()) {
-            cmd.add("--allowedTools");
-            cmd.add(tool);
+        if (callDisallowedTools != null && !callDisallowedTools.isEmpty()) {
+            for (String tool : callDisallowedTools) {
+                cmd.add("--disallowed-tools");
+                cmd.add(tool);
+            }
         }
+
         if (config.getMaxTokens() != null) {
             cmd.add("--max-tokens");
             cmd.add(config.getMaxTokens().toString());

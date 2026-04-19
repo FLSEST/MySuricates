@@ -55,7 +55,8 @@ class ClaudeAiProviderTest {
     void executeAction_delegatesToHostService() throws IOException {
         var hostResult = new HostClaudeService.ActionResult("output", 0, null);
         when(hostClaudeService.executeAction(
-                eq("prompt"), eq("model"), eq("system"), eq("/path"), eq(300), eq(false)))
+                eq("prompt"), eq("model"), eq("system"), eq("/path"), eq(300), eq(false),
+                any(), any()))
                 .thenReturn(hostResult);
 
         var request = new AiProvider.ActionRequest("prompt", "model", "system", "/path", 300, false);

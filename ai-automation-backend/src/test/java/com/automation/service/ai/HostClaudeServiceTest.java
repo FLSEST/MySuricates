@@ -159,6 +159,46 @@ class HostClaudeServiceTest {
         assertThat(cmd).contains("--max-tokens", "4096");
     }
 
+    // --- Per-call tool whitelist (chat hard-gate) ---
+
+    @Test
+    void buildActionCommand_withCallWhitelist_dropsSkipPermissionsAndEmitsAllowedTools() {
+        // Even if the global config has skipPermissions=true (the default),
+        // a per-call whitelist must override it — the chat flow must never run with full privileges.
+        HostClaudeService service = createService(null, true, List.of("Bash"));
+        List<String> cmd = service.buildActionCommand("do work", null, null,
+                List.of("Read", "Grep", "Glob", "WebFetch"), null);
+
+        assertThat(cmd).doesNotContain("--dangerously-skip-permissions");
+        // Global-config tools should NOT leak through when a per-call whitelist is active.
+        assertThat(cmd).doesNotContain("--allowedTools");
+        assertThat(cmd).containsSubsequence("--allowed-tools", "Read");
+        assertThat(cmd).containsSubsequence("--allowed-tools", "Grep");
+        assertThat(cmd).containsSubsequence("--allowed-tools", "Glob");
+        assertThat(cmd).containsSubsequence("--allowed-tools", "WebFetch");
+    }
+
+    @Test
+    void buildActionCommand_withCallBlacklist_emitsDisallowedToolsFlag() {
+        HostClaudeService service = createService(null, true, List.of());
+        List<String> cmd = service.buildActionCommand("do work", null, null, null, List.of("Edit", "Write"));
+
+        assertThat(cmd).containsSubsequence("--disallowed-tools", "Edit");
+        assertThat(cmd).containsSubsequence("--disallowed-tools", "Write");
+    }
+
+    @Test
+    void buildActionCommand_noCallRestrictions_keepsGlobalBehavior() {
+        // When neither allowedTools nor disallowedTools is set per-call, behavior must match pre-change.
+        HostClaudeService service = createService(null, true, List.of("Bash"));
+        List<String> cmd = service.buildActionCommand("do work", null, null, null, null);
+
+        assertThat(cmd).contains("--dangerously-skip-permissions");
+        assertThat(cmd).containsSubsequence("--allowedTools", "Bash");
+        assertThat(cmd).doesNotContain("--allowed-tools");
+        assertThat(cmd).doesNotContain("--disallowed-tools");
+    }
+
     // --- timeout behavior ---
 
     @Test
