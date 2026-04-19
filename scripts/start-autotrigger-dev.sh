@@ -16,7 +16,7 @@ BACKEND_LOG="${STATE_DIR}/backend.log"
 FRONTEND_LOG="${STATE_DIR}/frontend.log"
 
 BACKEND_READY_URL="http://localhost:9090/api/v1/system/info"
-FRONTEND_READY_URL="http://localhost:3000"
+FRONTEND_READY_URL="https://localhost:3000"
 
 require_command() {
   local command_name="$1"
@@ -47,7 +47,7 @@ pid_is_running() {
 
 endpoint_is_ready() {
   local url="$1"
-  curl -fsS --max-time 2 "${url}" >/dev/null 2>&1
+  curl -fsSk --max-time 2 "${url}" >/dev/null 2>&1
 }
 
 wait_for_endpoint() {
@@ -127,7 +127,7 @@ fi
 
 echo
 echo "URLs:"
-echo "  Frontend: http://localhost:3000"
+echo "  Frontend: https://localhost:3000"
 echo "  Backend:  http://localhost:9090/api/v1"
 print_logs_hint
 
