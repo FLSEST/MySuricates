@@ -30,6 +30,26 @@ Audit-Workflow → AutoTodo → TODO (OPEN) → TodoTrigger → Fix-Workflow →
 - Loop-Prevention: max 3 Fix-Versuche, keine TODOs aus Fix-Runs, kein Doppel-Trigger bei laufendem Fix
 - CRUD: `GET/POST/DELETE /api/v1/todo-triggers`
 
+### Manuelle Todo-Workflow-Verknuepfung
+
+Zusätzlich zum automatischen `TodoTrigger` gibt es einen manuellen Resolve-Flow pro TODO:
+- Ein TODO kann optional `linkedWorkflowId` tragen.
+- Dieser Link allein startet noch nichts.
+- Der Workflow wird nur durch `POST /api/v1/todos/{id}/resolve` oder die UI-Aktion `Loesen` gestartet.
+- Beim Start: TODO `status=IN_PROGRESS`, `resolutionState=RUNNING`
+- Bei Erfolg: TODO `status=DONE`, `resolutionState=SUCCEEDED`
+- Bei Fehlschlag: TODO springt auf den vorherigen Status zurueck, `resolutionState=FAILED`
+
+Produktverhalten in der UI:
+- Im TODO-Edit-Dialog kann optional ein Workflow verlinkt werden.
+- In Liste und Kanban erscheint dann ein `Loesen`-Button.
+- Solange ein Resolve-Run laeuft, wird das TODO eng gepollt und der Button deaktiviert.
+- Die UI zeigt Workflow-Badge, letzten Fix-Run und den aktuellen `resolutionState`.
+
+Abgrenzung:
+- `TodoTrigger` = regelbasiert/automatisch
+- `linkedWorkflowId` + `Loesen` = manuell/pro TODO
+
 ### Modell-Empfehlungen
 
 | Use Case | Modell | Warum |

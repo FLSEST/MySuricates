@@ -31,10 +31,15 @@ Body: {
   "priority": "HIGH | MEDIUM | LOW",
   "tags": ["bug", "feature"],
   "projectId": "{{PROJECT_ID}}",
+  "linkedWorkflowId": "{{WORKFLOW_ID}}",
   "source": "AI",
   "sourceAgent": "claude-code"
 }
 ```
+
+Hinweise:
+- `linkedWorkflowId` ist optional. Ohne Link gibt es keinen Resolve-Workflow fuer das TODO.
+- Wird ein Link gesetzt, ist das rein deklarativ. Der Workflow startet dadurch noch nicht.
 
 ### TODOs abfragen
 
@@ -55,7 +60,33 @@ Query-Parameter:
 Status-Übersicht: `GET /api/v1/todos/count`
 Duplikat-Check: `GET /api/v1/todos/similar?projectId=<id>&title=<titel>`
 Status ändern: `PATCH /api/v1/todos/{id}/status` — Body: `{"status": "DONE"}`
-Aktualisieren: `PUT /api/v1/todos/{id}` — Body: `{ "title": "...", "priority": "HIGH", "tags": [...] }`
+Aktualisieren: `PUT /api/v1/todos/{id}` — Body: `{ "title": "...", "priority": "HIGH", "tags": [...], "linkedWorkflowId": "..." }`
+Resolver starten: `POST /api/v1/todos/{id}/resolve`
+
+### TODO-Resolve-Workflow
+
+```
+POST http://localhost:9090/api/v1/todos/{todoId}/resolve
+Headers: X-API-Key: $API_KEY
+Body: <leer>
+```
+
+Verhalten:
+- Der Endpunkt startet den in `linkedWorkflowId` hinterlegten Workflow.
+- Ohne `linkedWorkflowId` liefert der Endpunkt einen Fehler.
+- Bereits laufende Resolve-Runs fuer dasselbe TODO werden blockiert.
+- Das TODO wird beim Start auf `IN_PROGRESS` gesetzt.
+- Der gestartete Run wird in `lastFixRunId` gespeichert.
+
+Wichtige Response-Felder an TODOs:
+- `linkedWorkflowId` — optionaler Resolver-Workflow
+- `linkedWorkflowName` — aufgeloester Workflow-Name fuer die UI
+- `lastFixRunId` — letzter gestarteter Resolve-Run
+- `resolutionState` — `IDLE | RUNNING | FAILED | SUCCEEDED`
+
+Wichtig:
+- `POST /api/v1/todos/{id}/resolve` startet nur manuell auf Aufruf.
+- Weder `POST /api/v1/todos`, noch `PUT /api/v1/todos/{id}`, noch ein Statuswechsel triggern automatisch den Workflow.
 
 ### Workflow ausführen
 

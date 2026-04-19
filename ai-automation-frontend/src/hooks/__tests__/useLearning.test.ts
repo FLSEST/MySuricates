@@ -40,11 +40,11 @@ describe('useRateRun', () => {
   it('rates a run', async () => {
     server.use(
       http.post('/api/v1/learning/runs/:runId/rate', () =>
-        new HttpResponse(null, { status: 204 })),
+        new HttpResponse(null, { status: 200 })),
     );
     const { result } = renderHook(() => useRateRun(), { wrapper: createWrapper() });
     await act(async () => {
-      result.current.mutate({ runId: 'r1', rating: 5 });
+      result.current.mutate({ runId: 'r1', rating: 5, workflowId: 'w1' });
     });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
   });

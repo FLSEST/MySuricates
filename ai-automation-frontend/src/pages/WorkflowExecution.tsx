@@ -175,7 +175,7 @@ export function WorkflowExecution() {
   const activeHumanInput = pendingHumanInput ?? recoveredHumanInput;
 
   const handleRate = (rating: number) => {
-    rateRun.mutate({ runId: runId!, rating });
+    rateRun.mutate({ runId: runId!, rating, workflowId: id! });
   };
 
   const handleCreateFailedTodo = () => {

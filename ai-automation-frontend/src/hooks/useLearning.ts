@@ -27,8 +27,12 @@ export function usePlatformStats() {
 export function useRateRun() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ runId, rating }: { runId: string; rating: number }) =>
+    mutationFn: ({ runId, rating }: { runId: string; rating: number; workflowId: string }) =>
       api.post(`/learning/runs/${runId}/rate?rating=${rating}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['learning'] }),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ['learning'] });
+      qc.invalidateQueries({ queryKey: ['workflows', variables.workflowId, 'runs'] });
+      qc.invalidateQueries({ queryKey: ['runs'] });
+    },
   });
 }
