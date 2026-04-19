@@ -13,8 +13,12 @@ import com.automation.repository.WishRepository;
 import com.automation.repository.WorkflowMemoryRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.assistant.context.BlockTypesIndexSection;
+import com.automation.service.assistant.context.ChainsIndexSection;
+import com.automation.service.assistant.context.IntegrationsIndexSection;
 import com.automation.service.assistant.context.RunsContextSection;
 import com.automation.service.assistant.context.SchedulesContextSection;
+import com.automation.service.assistant.context.SkillsIndexSection;
 import com.automation.service.assistant.context.TodosContextSection;
 import com.automation.service.assistant.context.WishesContextSection;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -57,6 +61,10 @@ public class AssistantContextBuilder {
     private final TodosContextSection todosSection;
     private final WishesContextSection wishesSection;
     private final SchedulesContextSection schedulesSection;
+    private final SkillsIndexSection skillsSection;
+    private final IntegrationsIndexSection integrationsSection;
+    private final ChainsIndexSection chainsSection;
+    private final BlockTypesIndexSection blockTypesSection;
 
     // ── Page classification ───────────────────────────────────────────────────
 
@@ -94,6 +102,7 @@ public class AssistantContextBuilder {
         boolean compactSchedules = cat != PageCategory.SCHEDULES && cat != PageCategory.WORKFLOWS && cat != PageCategory.OVERVIEW;
         boolean compactProjects  = cat == PageCategory.RUNS || cat == PageCategory.SCHEDULES;
         boolean compactWorkflows = cat == PageCategory.RUNS || cat == PageCategory.SCHEDULES;
+        boolean compactRepertoire = cat != PageCategory.WORKFLOWS && cat != PageCategory.OVERVIEW;
 
         // Load workflows once — reused for appendWorkflows + appendWorkflowMemory
         List<Workflow> allWorkflows = safeLoadWorkflows();
@@ -106,6 +115,10 @@ public class AssistantContextBuilder {
         schedulesSection.append(sb, compactSchedules);
         appendProjects(sb, compactProjects, allWorkflows);
         appendWorkflows(sb, compactWorkflows, allWorkflows, ctx);
+        skillsSection.append(sb, compactRepertoire);
+        integrationsSection.append(sb, compactRepertoire);
+        chainsSection.append(sb, compactRepertoire);
+        blockTypesSection.append(sb, compactRepertoire);
         appendWorkflowMemory(sb, workflowById);
         appendRecentSessions(sb);
 
@@ -227,10 +240,17 @@ public class AssistantContextBuilder {
                 if (w.getDescription() != null && !w.getDescription().isBlank()) {
                     sb.append(" (").append(truncate(w.getDescription().trim(), 60)).append(")");
                 }
+                int inputCount = w.getDefaultContext() != null ? w.getDefaultContext().size() : 0;
+                if (inputCount > 0) {
+                    sb.append(" — ").append(inputCount).append(" Inputs");
+                }
                 sb.append("\n");
             });
             if (allWorkflows.size() > 25) {
-                sb.append("  … und ").append(allWorkflows.size() - 25).append(" weitere\n");
+                sb.append("  … und ").append(allWorkflows.size() - 25)
+                  .append(" weitere. Inputs eines Workflows via <fetch type=\"workflow-inputs\" id=\"<workflow-id>\"/>\n");
+            } else if (toShow.stream().anyMatch(w -> w.getDefaultContext() != null && !w.getDefaultContext().isEmpty())) {
+                sb.append("  Inputs eines Workflows via <fetch type=\"workflow-inputs\" id=\"<workflow-id>\"/>\n");
             }
             sb.append("\n");
         } catch (Exception e) {

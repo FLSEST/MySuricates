@@ -1,14 +1,21 @@
 package com.automation.service.assistant;
 
 import com.automation.entity.BlockDefinition;
+import com.automation.entity.IntegrationConnection;
 import com.automation.entity.RunStatus;
 import com.automation.entity.StepStatus;
 import com.automation.entity.WorkflowRun;
+import com.automation.repository.IntegrationConnectionRepository;
 import com.automation.repository.ProjectRepository;
+import com.automation.repository.SkillRepository;
 import com.automation.repository.WishRepository;
+import com.automation.repository.WorkflowChainRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.dto.response.PoolWorkflowEntry;
+import com.automation.service.integration.IntegrationAction;
+import com.automation.service.integration.IntegrationProvider;
+import com.automation.service.integration.IntegrationRegistry;
 import com.automation.service.pool.WorkflowPoolService;
 import com.automation.service.project.ProjectContextService;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +53,10 @@ public class AssistantFetchService {
     private final WorkflowRepository workflowRepository;
     private final ProjectRepository projectRepository;
     private final WishRepository wishRepository;
+    private final SkillRepository skillRepository;
+    private final IntegrationRegistry integrationRegistry;
+    private final IntegrationConnectionRepository integrationConnectionRepository;
+    private final WorkflowChainRepository workflowChainRepository;
     private final WorkflowPoolService workflowPoolService;
     private final ProjectContextService projectContextService;
     private final AssistantContextBuilder contextBuilder;
@@ -71,6 +82,8 @@ public class AssistantFetchService {
             case "wish_detail"      -> formatWishDetail(req.id());
             case "workflow_runs"    -> formatWorkflowRuns(req.id());
             case "workflow_detail"  -> formatWorkflowDetail(req.id());
+            case "workflow-full"    -> formatWorkflowFull(req.id());
+            case "workflow-inputs"  -> formatWorkflowInputs(req.id());
             case "step_output"      -> formatStepOutput(req.id());
             case "docs"             -> formatDocsSection(req.id());
             case "pool_workflows"   -> formatPoolWorkflows();
@@ -78,6 +91,10 @@ public class AssistantFetchService {
             case "project_context"  -> formatProjectContext(req.id());
             case "project_files"    -> formatProjectFiles(req.id());
             case "project_file"     -> formatProjectFile(req.id());
+            case "skill"            -> formatSkillDetail(req.id());
+            case "integration"      -> formatIntegrationDetail(req.id());
+            case "chain"            -> formatChainDetail(req.id());
+            case "block-spec"       -> formatBlockSpec(req.id());
             default -> "";
         };
     }
@@ -609,6 +626,279 @@ public class AssistantFetchService {
                     }
                 });
             }
+        }
+    }
+
+    // ── Skill / Integration / Chain / Block-Spec / Workflow-Full / Workflow-Inputs ──
+
+    private String formatSkillDetail(String skillId) {
+        try {
+            return skillRepository.findByIdWithCapabilities(skillId).map(s -> {
+                var sb = new StringBuilder();
+                sb.append("**Skill: ").append(s.getName()).append("** (id: ").append(s.getId()).append(")\n");
+                sb.append("Kategorie: ").append(s.getCategory()).append("\n");
+                if (s.getDescription() != null && !s.getDescription().isBlank()) {
+                    sb.append("Beschreibung: ").append(contextBuilder.truncate(s.getDescription().trim(), 200)).append("\n");
+                }
+                if (s.getAiContext() != null && !s.getAiContext().isBlank()) {
+                    sb.append("AI-Kontext: ").append(contextBuilder.truncate(s.getAiContext().trim(), 400)).append("\n");
+                }
+                var caps = s.getCapabilities();
+                if (caps != null && !caps.isEmpty()) {
+                    sb.append("\nCapabilities (").append(caps.size()).append("):\n");
+                    caps.forEach(c -> {
+                        sb.append("  - ").append(c.getName());
+                        if (c.getDescription() != null && !c.getDescription().isBlank()) {
+                            sb.append(" — ").append(contextBuilder.truncate(c.getDescription().trim(), 100));
+                        }
+                        sb.append("\n");
+                        if (c.getInputSchema() != null && !c.getInputSchema().isEmpty()) {
+                            sb.append("    inputSchema keys: ").append(c.getInputSchema().keySet()).append("\n");
+                        }
+                    });
+                }
+                return sb.toString();
+            }).orElse("Skill '" + skillId + "' nicht gefunden.\n");
+        } catch (Exception e) {
+            log.debug("Could not fetch skill detail for {}", skillId, e);
+            return "";
+        }
+    }
+
+    private String formatIntegrationDetail(String providerId) {
+        try {
+            if (!integrationRegistry.hasProvider(providerId)) {
+                return "Integration '" + providerId + "' nicht gefunden.\n";
+            }
+            IntegrationProvider p = integrationRegistry.getProvider(providerId);
+            IntegrationConnection.ConnectionStatus status = integrationConnectionRepository.findByProviderId(providerId)
+                    .map(IntegrationConnection::getStatus)
+                    .orElse(IntegrationConnection.ConnectionStatus.DISCONNECTED);
+            String accountInfo = integrationConnectionRepository.findByProviderId(providerId)
+                    .map(IntegrationConnection::getAccountInfo)
+                    .orElse(null);
+            var sb = new StringBuilder();
+            sb.append("**Integration: ").append(p.getDisplayName()).append("** (id: ").append(p.getProviderId()).append(")\n");
+            if (p.getDescription() != null && !p.getDescription().isBlank()) {
+                sb.append("Beschreibung: ").append(contextBuilder.truncate(p.getDescription().trim(), 200)).append("\n");
+            }
+            sb.append("Status: ").append(status);
+            if (accountInfo != null && !accountInfo.isBlank()) {
+                sb.append(" (").append(contextBuilder.truncate(accountInfo, 80)).append(")");
+            }
+            sb.append("\n");
+            sb.append("OAuth-Flow erforderlich: ").append(p.requiresOAuthFlow() ? "ja" : "nein (API-Key/Token)").append("\n");
+            List<IntegrationAction> actions = p.getAvailableActions();
+            if (actions != null && !actions.isEmpty()) {
+                sb.append("\nVerfügbare Actions (").append(actions.size()).append("):\n");
+                actions.forEach(a -> {
+                    sb.append("  - ").append(a.name());
+                    if (a.description() != null && !a.description().isBlank()) {
+                        sb.append(" — ").append(contextBuilder.truncate(a.description().trim(), 100));
+                    }
+                    sb.append("\n");
+                    if (a.inputSchema() != null && !a.inputSchema().isEmpty()) {
+                        sb.append("    inputSchema keys: ").append(a.inputSchema().keySet()).append("\n");
+                    }
+                    if (a.requiredScopes() != null && !a.requiredScopes().isEmpty()) {
+                        sb.append("    scopes: ").append(a.requiredScopes()).append("\n");
+                    }
+                });
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            log.debug("Could not fetch integration detail for {}", providerId, e);
+            return "";
+        }
+    }
+
+    private String formatChainDetail(String chainId) {
+        try {
+            return workflowChainRepository.findById(chainId).map(c -> {
+                var sb = new StringBuilder();
+                sb.append("**Chain: ").append(c.getName()).append("** (id: ").append(c.getId()).append(")\n");
+                if (c.getDescription() != null && !c.getDescription().isBlank()) {
+                    sb.append("Beschreibung: ").append(contextBuilder.truncate(c.getDescription().trim(), 200)).append("\n");
+                }
+                sb.append("Stop on failure: ").append(c.isStopOnFailure() ? "ja" : "nein").append("\n");
+                var entries = c.getEntries();
+                if (entries != null && !entries.isEmpty()) {
+                    sb.append("\nWorkflows in Chain (").append(entries.size()).append("):\n");
+                    for (int i = 0; i < entries.size(); i++) {
+                        var entry = entries.get(i);
+                        String wfName = workflowRepository.findById(entry.getWorkflowId())
+                                .map(w -> w.getName())
+                                .orElse(entry.getWorkflowId());
+                        sb.append("  ").append(i + 1).append(". ").append(wfName)
+                          .append(" (id: ").append(entry.getWorkflowId()).append(")");
+                        if (entry.getLabel() != null && !entry.getLabel().isBlank()) {
+                            sb.append(" [Label: ").append(entry.getLabel()).append("]");
+                        }
+                        sb.append("\n");
+                        if (entry.getInputContext() != null && !entry.getInputContext().isEmpty()) {
+                            sb.append("    inputs: ").append(entry.getInputContext().keySet()).append("\n");
+                        }
+                    }
+                }
+                return sb.toString();
+            }).orElse("Chain '" + chainId + "' nicht gefunden.\n");
+        } catch (Exception e) {
+            log.debug("Could not fetch chain detail for {}", chainId, e);
+            return "";
+        }
+    }
+
+    private static final Map<String, String> BLOCK_SPECS = Map.ofEntries(
+            Map.entry("simple", """
+                    **Block-Typ: simple** — Einfacher KI-Prompt, eine Antwort.
+                    Pflicht-Config: command (string) — Prompt-Text mit Template-Variablen ({{var}}).
+                    Optional: model (string), timeout_seconds (int), label (string).
+                    Beispiel-Config: { "command": "Analysiere {{input}} und gib JSON zurück" }
+                    """),
+            Map.entry("shell", """
+                    **Block-Typ: shell** — Shell-Kommando ausführen. KEIN API-/DB-Zugriff erlaubt.
+                    Pflicht-Config: command (string) — Bash-Kommando, Template-Variablen unterstützt.
+                    Optional: timeout_seconds (int), label (string).
+                    Beispiel-Config: { "command": "ls -la /tmp/{{run_id}}" }
+                    Hinweis: set -euo pipefail empfohlen, nutze actuator/health statt direkter DB.
+                    """),
+            Map.entry("agentic", """
+                    **Block-Typ: agentic** — Mehrstufiger Agent mit REASON+ACT-Phasen, langlaufend.
+                    Pflicht-Config: prompt (string), max_total_tokens (int) — kumulatives Budget.
+                    Optional: model, max_turns (int), timeout_seconds, label.
+                    Beispiel-Config: { "prompt": "Refaktoriere X bis Tests grün", "max_total_tokens": 50000 }
+                    Hinweis: REASON nutzt --system-prompt, ACT nutzt --append-system-prompt.
+                    """),
+            Map.entry("conditional", """
+                    **Block-Typ: conditional** — Verzweigung anhand Bedingung.
+                    Pflicht-Config: condition (string-Expression, JSONPath/Template).
+                    Pflicht-Sub-Blocks: true_blocks (list), false_blocks (list).
+                    Beispiel: { "condition": "{{score}} > 0.8", "true_blocks": [...], "false_blocks": [...] }
+                    """),
+            Map.entry("foreach", """
+                    **Block-Typ: foreach** — Iteration über Liste.
+                    Pflicht-Config: items (Template-Variable, die eine Liste auflöst).
+                    Pflicht-Sub-Blocks: blocks (list).
+                    Beispiel: { "items": "{{file_list}}", "blocks": [...] }
+                    Hinweis: Iterator-Variable im Sub-Block heisst {{item}}.
+                    """),
+            Map.entry("while", """
+                    **Block-Typ: while** — Schleife mit Abbruchbedingung und max_iterations.
+                    Pflicht-Config: condition (string), max_iterations (int).
+                    Pflicht-Sub-Blocks: blocks (list).
+                    Beispiel: { "condition": "{{retries}} < 3", "max_iterations": 10, "blocks": [...] }
+                    """),
+            Map.entry("switch", """
+                    **Block-Typ: switch** — Multi-Way-Verzweigung anhand Match-Wert.
+                    Pflicht-Config: value (string), cases (list von { "match": ..., "blocks": [...] }).
+                    Optional: default_blocks (list).
+                    """),
+            Map.entry("retry", """
+                    **Block-Typ: retry** — Wiederholt einen Sub-Block bei Fehler.
+                    Pflicht-Config: max_attempts (int), block (single block definition).
+                    Optional: backoff_ms (int), retry_on (list von Fehlertyp-Strings).
+                    """),
+            Map.entry("approval", """
+                    **Block-Typ: approval** — Pausiert bis User-Approval.
+                    Pflicht-Config: question (string).
+                    Optional: options (list von String-Antworten — z.B. ["Yes","No","Skip"]), timeout_seconds.
+                    Approve via POST /api/v1/executions/{id}/approve mit { "answer": "Yes" } (Feld: answer, NICHT approved).
+                    """),
+            Map.entry("sub-workflow", """
+                    **Block-Typ: sub-workflow** — Anderen Workflow als Block ausführen.
+                    Pflicht-Config: workflow_id (string).
+                    Optional: input_context (Map) — wird als context an den Sub-Workflow übergeben.
+                    """),
+            Map.entry("skill-capability", """
+                    **Block-Typ: skill-capability** — Capability eines Skills ausführen (deklarativ).
+                    Pflicht-Config: skill_id (string), capability_name (string).
+                    Optional: inputs (Map) — wird gegen capability.inputSchema validiert.
+                    """),
+            Map.entry("human-input", """
+                    **Block-Typ: human-input** — Wert vom User abfragen, pausiert bis Antwort.
+                    Pflicht-Config: prompt (string).
+                    Optional: input_type (text/number/boolean/json), default (any).
+                    """),
+            Map.entry("integration", """
+                    **Block-Typ: integration** — Aktion eines Integration-Providers.
+                    Pflicht-Config: provider_id (string), action (string).
+                    Optional: inputs (Map) — gegen action.inputSchema validiert.
+                    Beispiel: { "provider_id": "github", "action": "create_issue", "inputs": {...} }
+                    Lade verfügbare Provider via <fetch type="integration" id="<provider-id>"/>
+                    """),
+            Map.entry("document", """
+                    **Block-Typ: document** — OCR/Dokumenten-Verarbeitung (PDF, Bilder).
+                    Pflicht-Config: file_path (string oder Template-Variable).
+                    Optional: extract_mode (text/structured), language (Hint für OCR).
+                    """)
+    );
+
+    private String formatBlockSpec(String blockType) {
+        String spec = BLOCK_SPECS.get(blockType);
+        if (spec == null) {
+            return "Unbekannter Block-Typ '" + blockType + "'. Verfügbare: " + BLOCK_SPECS.keySet() + "\n";
+        }
+        return spec;
+    }
+
+    private String formatWorkflowFull(String workflowId) {
+        try {
+            return workflowRepository.findById(workflowId).map(wf -> {
+                var sb = new StringBuilder();
+                String projectName = wf.getProject() != null ? wf.getProject().getName() : "—";
+                sb.append("**Workflow (Vollständig): ").append(wf.getName()).append("** (").append(projectName).append(")\n");
+                sb.append("ID: ").append(wf.getId()).append("\n");
+                if (wf.getModel() != null && !wf.getModel().isBlank()) {
+                    sb.append("Modell: ").append(wf.getModel()).append("\n");
+                }
+                if (wf.getInstructions() != null && !wf.getInstructions().isBlank()) {
+                    sb.append("Instruktionen: ").append(contextBuilder.truncate(wf.getInstructions().trim(), 600)).append("\n");
+                }
+                if (wf.getDefaultContext() != null && !wf.getDefaultContext().isEmpty()) {
+                    sb.append("Default-Inputs: ").append(wf.getDefaultContext()).append("\n");
+                }
+                var blocks = wf.getBlocks();
+                if (blocks != null && !blocks.isEmpty()) {
+                    sb.append("\nBlöcke (").append(blocks.size()).append(", vollständige Config):\n");
+                    for (int i = 0; i < blocks.size(); i++) {
+                        BlockDefinition block = blocks.get(i);
+                        Map<String, Object> cfg = block.getConfig() != null ? block.getConfig() : Map.of();
+                        sb.append("  ").append(i + 1).append(". type: ").append(block.getType()).append("\n");
+                        cfg.forEach((k, v) -> {
+                            String valStr = v == null ? "null" : String.valueOf(v);
+                            sb.append("       ").append(k).append(": ")
+                              .append(contextBuilder.truncate(valStr, 300)).append("\n");
+                        });
+                    }
+                }
+                return sb.toString();
+            }).orElse("Workflow '" + workflowId + "' nicht gefunden.\n");
+        } catch (Exception e) {
+            log.debug("Could not fetch workflow-full for {}", workflowId, e);
+            return "";
+        }
+    }
+
+    private String formatWorkflowInputs(String workflowId) {
+        try {
+            return workflowRepository.findById(workflowId).map(wf -> {
+                var sb = new StringBuilder();
+                sb.append("**Inputs für Workflow: ").append(wf.getName()).append("** (id: ").append(wf.getId()).append(")\n");
+                Map<String, Object> ctx = wf.getDefaultContext();
+                if (ctx == null || ctx.isEmpty()) {
+                    sb.append("(keine default Inputs definiert)\n");
+                } else {
+                    ctx.forEach((k, v) -> {
+                        String valStr = v == null ? "null" : String.valueOf(v);
+                        sb.append("  - ").append(k).append(" = ")
+                          .append(contextBuilder.truncate(valStr, 100)).append("\n");
+                    });
+                }
+                return sb.toString();
+            }).orElse("Workflow '" + workflowId + "' nicht gefunden.\n");
+        } catch (Exception e) {
+            log.debug("Could not fetch workflow-inputs for {}", workflowId, e);
+            return "";
         }
     }
 }

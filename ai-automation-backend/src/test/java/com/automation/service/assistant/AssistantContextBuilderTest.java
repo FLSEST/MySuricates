@@ -3,10 +3,15 @@ package com.automation.service.assistant;
 import com.automation.dto.AssistantChatRequest;
 import com.automation.entity.*;
 import com.automation.repository.*;
+import com.automation.service.assistant.context.BlockTypesIndexSection;
+import com.automation.service.assistant.context.ChainsIndexSection;
+import com.automation.service.assistant.context.IntegrationsIndexSection;
 import com.automation.service.assistant.context.RunsContextSection;
 import com.automation.service.assistant.context.SchedulesContextSection;
+import com.automation.service.assistant.context.SkillsIndexSection;
 import com.automation.service.assistant.context.TodosContextSection;
 import com.automation.service.assistant.context.WishesContextSection;
+import com.automation.service.integration.IntegrationRegistry;
 import com.automation.service.system.SystemIdentityService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,6 +45,10 @@ class AssistantContextBuilderTest {
     @Mock private WorkflowMemoryRepository workflowMemoryRepository;
     @Mock private AssistantSessionRepository assistantSessionRepository;
     @Mock private SystemIdentityService systemIdentity;
+    @Mock private SkillRepository skillRepository;
+    @Mock private IntegrationRegistry integrationRegistry;
+    @Mock private IntegrationConnectionRepository integrationConnectionRepository;
+    @Mock private WorkflowChainRepository workflowChainRepository;
 
     private AssistantContextBuilder builder;
 
@@ -49,10 +58,15 @@ class AssistantContextBuilderTest {
         TodosContextSection todosSection = new TodosContextSection(todoRepository);
         WishesContextSection wishesSection = new WishesContextSection(wishRepository);
         SchedulesContextSection schedulesSection = new SchedulesContextSection(scheduledWorkflowRepository);
+        SkillsIndexSection skillsSection = new SkillsIndexSection(skillRepository);
+        IntegrationsIndexSection integrationsSection = new IntegrationsIndexSection(integrationRegistry, integrationConnectionRepository);
+        ChainsIndexSection chainsSection = new ChainsIndexSection(workflowChainRepository);
+        BlockTypesIndexSection blockTypesSection = new BlockTypesIndexSection();
         builder = new AssistantContextBuilder(workflowRunRepository, projectRepository,
                 wishRepository, workflowRepository, workflowMemoryRepository,
                 assistantSessionRepository, new ObjectMapper(),
-                runsSection, todosSection, wishesSection, schedulesSection);
+                runsSection, todosSection, wishesSection, schedulesSection,
+                skillsSection, integrationsSection, chainsSection, blockTypesSection);
     }
 
     @Test
