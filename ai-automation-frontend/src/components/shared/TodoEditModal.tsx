@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { ExternalLink } from 'lucide-react';
 import { Modal, Button, Input, Select, TagInput } from '../ui';
 import { useT } from '../../i18n';
-import type { Todo, TodoStatus, TodoPriority, UpdateTodoRequest, Project } from '../../types';
+import type { Todo, TodoStatus, TodoPriority, UpdateTodoRequest, Project, Workflow } from '../../types';
 
 const STATUSES: TodoStatus[] = ['OPEN', 'IN_PROGRESS', 'DONE', 'BACKLOG'];
 const PRIORITIES: TodoPriority[] = ['LOW', 'MEDIUM', 'HIGH'];
@@ -12,6 +12,7 @@ interface TodoEditModalProps {
   editForm: UpdateTodoRequest;
   editTagsList: string[];
   projects: Project[];
+  workflows: Workflow[];
   allTags: string[];
   isLoading: boolean;
   onClose: () => void;
@@ -25,6 +26,7 @@ export function TodoEditModal({
   editForm,
   editTagsList,
   projects,
+  workflows,
   allTags,
   isLoading,
   onClose,
@@ -136,6 +138,16 @@ export function TodoEditModal({
           ]}
         />
 
+        <Select
+          label={t.todos.linkedWorkflow}
+          value={editForm.linkedWorkflowId ?? ''}
+          onChange={(e) => onFormChange({ ...editForm, linkedWorkflowId: e.target.value })}
+          options={[
+            { value: '', label: t.todos.noLinkedWorkflow },
+            ...workflows.map((w) => ({ value: w.id, label: w.name })),
+          ]}
+        />
+
         {/* Tags */}
         <TagInput
           label={t.todos.tags}
@@ -180,6 +192,19 @@ export function TodoEditModal({
                 >
                   <ExternalLink className="w-2.5 h-2.5" />
                   Fix Run
+                </Link>
+              </div>
+            )}
+            {editTodo.linkedWorkflowId && (
+              <div className="flex items-center gap-2 text-xs text-text-tertiary">
+                <span>{t.todos.linkedWorkflow}:</span>
+                <Link
+                  to={`/workflows/${editTodo.linkedWorkflowId}`}
+                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-accent/10 text-accent font-medium hover:bg-accent/20 transition-colors"
+                  title={editTodo.linkedWorkflowName ?? t.common.workflow}
+                >
+                  <ExternalLink className="w-2.5 h-2.5" />
+                  {editTodo.linkedWorkflowName ?? t.common.workflow}
                 </Link>
               </div>
             )}

@@ -12,6 +12,7 @@ public record CreateTodoRequest(
         Todo.Priority priority,
         List<String> tags,
         String projectId,
+        String linkedWorkflowId,
         Todo.Source source,
         String sourceAgent,
         String sessionId,

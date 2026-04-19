@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
-import type { Todo, CreateTodoRequest, UpdateTodoRequest, TodoCountResponse, TodoStatus, PageResponse } from '../types';
+import type { Todo, CreateTodoRequest, UpdateTodoRequest, TodoCountResponse, TodoStatus, PageResponse, WorkflowRun } from '../types';
 
 export function useTodos(params?: Record<string, string>, page = 0, size = 50) {
   return useQuery({
@@ -16,7 +16,11 @@ export function useTodos(params?: Record<string, string>, page = 0, size = 50) {
       }
       return api.get<PageResponse<Todo>>(`/todos?${searchParams.toString()}`);
     },
-    refetchInterval: 60_000,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      const hasResolvingTodos = data?.content?.some((todo) => todo.status === 'IN_PROGRESS' && !!todo.lastFixRunId);
+      return hasResolvingTodos ? 5_000 : 60_000;
+    },
     staleTime: 60_000,
     placeholderData: keepPreviousData,
   });
@@ -27,6 +31,10 @@ export function useTodo(id: string) {
     queryKey: ['todos', id],
     queryFn: () => api.get<Todo>(`/todos/${id}`),
     enabled: !!id,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      return data?.status === 'IN_PROGRESS' && data.lastFixRunId ? 5_000 : false;
+    },
   });
 }
 
@@ -93,5 +101,21 @@ export function useDeleteTodo() {
       toast.success(t.toast.todoDeleted);
     },
     onError: (err) => toast.error(apiErrorMessage(err, t.toast.todoDeleteFailed)),
+  });
+}
+
+export function useResolveTodo() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
+  return useMutation({
+    mutationFn: (id: string) => api.post<WorkflowRun>(`/todos/${id}/resolve`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['todos'] });
+      qc.invalidateQueries({ queryKey: ['workflows'] });
+      qc.invalidateQueries({ queryKey: ['runs'] });
+      toast.success(t.toast.workflowExecuted);
+    },
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.workflowExecuteFailed)),
   });
 }

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { usePersistedState } from '../hooks/usePersistedState';
 import {
   CheckSquare, Plus, Search,
@@ -15,15 +16,17 @@ import { TodoProgressBar } from '../components/todo/TodoProgressBar';
 import { TodoKanbanView } from '../components/todo/TodoKanbanView';
 import { TodoListItem } from '../components/todo/TodoListView';
 import {
-  useTodos, useTodoCount, useCreateTodo, useUpdateTodo, useUpdateTodoStatus, useDeleteTodo,
+  useTodos, useTodoCount, useCreateTodo, useUpdateTodo, useUpdateTodoStatus, useDeleteTodo, useResolveTodo,
 } from '../hooks/useTodos';
 import { useProjects } from '../hooks/useProjects';
+import { useWorkflows } from '../hooks/useWorkflows';
 import { useT } from '../i18n';
 import type { Todo, TodoStatus, TodoPriority, TodoSource, CreateTodoRequest, UpdateTodoRequest } from '../types';
 
 /* ─── Main Todos Page ───────────────────────────────────── */
 export function Todos() {
   const t = useT();
+  const navigate = useNavigate();
   // Filter state (declared before useTodos so we can pass filters to the API)
   const [statusFilter, setStatusFilter] = usePersistedState<TodoStatus | 'ALL'>('todos-status-filter', 'ALL');
   const [sourceFilter, setSourceFilter] = usePersistedState<TodoSource | 'ALL'>('todos-source-filter', 'ALL');
@@ -65,10 +68,12 @@ export function Todos() {
   const todos = todosPage?.content;
   const { data: counts } = useTodoCount();
   const { data: projects } = useProjects();
+  const { data: workflows = [] } = useWorkflows();
   const createTodo = useCreateTodo();
   const updateTodo = useUpdateTodo();
   const updateStatus = useUpdateTodoStatus();
   const deleteTodo = useDeleteTodo();
+  const resolveTodo = useResolveTodo();
 
   // Quick-add state
   const [quickTitle, setQuickTitle] = useState('');
@@ -160,6 +165,7 @@ export function Todos() {
       status: todo.status,
       priority: todo.priority,
       projectId: todo.projectId ?? '',
+      linkedWorkflowId: todo.linkedWorkflowId ?? '',
       tags: todo.tags,
       dueDate: todo.dueDate ?? '',
     });
@@ -174,6 +180,14 @@ export function Todos() {
     };
     updateTodo.mutate({ id: editTodo.id, data }, {
       onSuccess: () => setEditTodo(null),
+    });
+  };
+
+  const handleResolve = (todo: Todo) => {
+    resolveTodo.mutate(todo.id, {
+      onSuccess: (run) => {
+        navigate(`/workflows/${run.workflowId}/run/${run.id}`);
+      },
     });
   };
 
@@ -411,6 +425,8 @@ export function Todos() {
             todos={filtered}
             onEdit={openEdit}
             onStatusChange={handleStatusChange}
+            onResolve={handleResolve}
+            resolveLoadingId={resolveTodo.variables ?? null}
             totalCounts={statusFilter === 'ALL' ? counts ?? undefined : undefined}
           />
           {todosPage && todosPage.totalElements > KANBAN_PAGE_SIZE && (
@@ -431,6 +447,8 @@ export function Todos() {
                   todo={todo}
                   onEdit={openEdit}
                   onStatusChange={handleStatusChange}
+                  onResolve={handleResolve}
+                  resolveLoading={resolveTodo.isPending && resolveTodo.variables === todo.id}
                   onDelete={(id) => deleteTodo.mutate(id)}
                 />
               ))}
@@ -457,6 +475,7 @@ export function Todos() {
         editForm={editForm}
         editTagsList={editTagsList}
         projects={projects ?? []}
+        workflows={workflows}
         allTags={allTags}
         isLoading={updateTodo.isPending}
         onClose={() => setEditTodo(null)}

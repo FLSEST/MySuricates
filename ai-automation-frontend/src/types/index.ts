@@ -884,6 +884,7 @@ export interface ExtractMemoryRequest {
 export type TodoStatus = 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'BACKLOG';
 export type TodoPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type TodoSource = 'USER' | 'AI' | 'WORKFLOW';
+export type TodoResolutionState = 'IDLE' | 'RUNNING' | 'FAILED' | 'SUCCEEDED';
 
 export interface Todo {
   id: string;
@@ -894,6 +895,8 @@ export interface Todo {
   tags: string[];
   projectId: string | null;
   projectName: string | null;
+  linkedWorkflowId: string | null;
+  linkedWorkflowName: string | null;
   source: TodoSource;
   sourceAgent: string | null;
   sessionId: string | null;
@@ -902,6 +905,7 @@ export interface Todo {
   referenceId: string | null;
   fixAttempts: number;
   lastFixRunId: string | null;
+  resolutionState: TodoResolutionState | null;
   dueDate: string | null;
   createdAt: string;
   updatedAt: string;
@@ -914,6 +918,7 @@ export interface CreateTodoRequest {
   priority?: TodoPriority;
   tags?: string[];
   projectId?: string;
+  linkedWorkflowId?: string;
   source?: TodoSource;
   sourceAgent?: string;
   sessionId?: string;
@@ -928,6 +933,7 @@ export interface UpdateTodoRequest {
   priority?: TodoPriority;
   tags?: string[];
   projectId?: string;
+  linkedWorkflowId?: string;
   dueDate?: string;
 }
 

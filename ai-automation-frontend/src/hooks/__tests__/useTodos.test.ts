@@ -3,7 +3,7 @@ import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type ReactNode, createElement } from 'react';
 import { server } from '../../test/server';
-import { useTodos, useTodoCount, useCreateTodo, useDeleteTodo } from '../useTodos';
+import { useTodos, useTodoCount, useCreateTodo, useDeleteTodo, useResolveTodo } from '../useTodos';
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
 afterEach(() => server.resetHandlers());
@@ -38,7 +38,7 @@ describe('useTodoCount', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(result.current.data).toEqual({ open: 3, inProgress: 1, done: 5 });
+    expect(result.current.data).toEqual({ open: 3, inProgress: 1, done: 5, backlog: 0 });
   });
 });
 
@@ -64,5 +64,18 @@ describe('useDeleteTodo', () => {
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  });
+});
+
+describe('useResolveTodo', () => {
+  it('starts a linked workflow run for a todo', async () => {
+    const { result } = renderHook(() => useResolveTodo(), { wrapper: createWrapper() });
+
+    await act(async () => {
+      result.current.mutate('t1');
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data!.workflowId).toBe('w1');
   });
 });

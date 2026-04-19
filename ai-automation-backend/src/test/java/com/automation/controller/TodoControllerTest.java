@@ -6,7 +6,9 @@ import com.automation.dto.request.UpdateTodoStatusRequest;
 import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.TodoCountResponse;
 import com.automation.dto.response.TodoResponse;
+import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.entity.Todo;
+import com.automation.mapper.WorkflowMapper;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.mapper.TodoMapper;
 import com.automation.service.system.ApiKeyService;
@@ -44,14 +46,15 @@ class TodoControllerTest {
     private ActivityLogService activityLogService;
 
     @MockBean private TodoMapper todoMapper;
+    @MockBean private WorkflowMapper workflowMapper;
     @MockBean private ApiKeyService apiKeyService;
     @MockBean private TodoSimilarityService todoSimilarityService;
     @MockBean private RateLimitConfig rateLimitConfig;
 
     private TodoResponse sampleResponse() {
         return new TodoResponse("t-1", "Fix bug", "desc", Todo.Status.OPEN, Todo.Priority.HIGH,
-                List.of("backend"), null, null, Todo.Source.AI, "claude", null, null, null, null,
-                0, null, null, Instant.now(), Instant.now());
+                List.of("backend"), null, null, null, null, Todo.Source.AI, "claude", null, null, null, null,
+                0, null, null, null, Instant.now(), Instant.now());
     }
 
     @Test
@@ -93,7 +96,7 @@ class TodoControllerTest {
         when(todoMapper.toResponse(todo)).thenReturn(sampleResponse());
 
         var request = new CreateTodoRequest("Fix bug", "desc", null, Todo.Priority.HIGH,
-                List.of("backend"), null, Todo.Source.AI, "claude", null, null, null, null, null);
+                List.of("backend"), null, null, Todo.Source.AI, "claude", null, null, null, null, null);
 
         mockMvc.perform(post("/api/v1/todos")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -120,6 +123,19 @@ class TodoControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(statusRequest)))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void resolveTodo_returnsRun() throws Exception {
+        var run = com.automation.entity.WorkflowRun.builder().id("run-1").build();
+        var response = new WorkflowRunResponse("run-1", "wf-1", "Resolver", null, null,
+                com.automation.entity.RunStatus.RUNNING, List.of(), Instant.now(), null, null, null, null, java.util.Map.of(), java.util.Map.of(), null);
+        when(todoService.resolve("t-1")).thenReturn(run);
+        when(workflowMapper.toRunResponse(run)).thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/todos/t-1/resolve"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("run-1"));
     }
 
     @Test

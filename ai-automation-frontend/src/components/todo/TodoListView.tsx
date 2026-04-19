@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Pencil, Trash2, Clock, RefreshCw, ExternalLink, CalendarClock } from 'lucide-react';
+import { Pencil, Trash2, Clock, RefreshCw, ExternalLink, CalendarClock, Wrench } from 'lucide-react';
 import { Badge } from '../ui';
 import { useT } from '../../i18n';
 import { StatusDots } from './StatusDots';
@@ -13,11 +13,13 @@ const MemoizedMarkdown = memo(function MemoizedMarkdown({ children }: { children
   return <ReactMarkdown remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown>;
 });
 
-export const TodoListItem = memo(function TodoListItem({ todo, onEdit, onStatusChange, onDelete }: {
+export const TodoListItem = memo(function TodoListItem({ todo, onEdit, onStatusChange, onDelete, onResolve, resolveLoading }: {
   todo: Todo;
   onEdit: (todo: Todo) => void;
   onStatusChange: (todo: Todo, status: TodoStatus) => void;
   onDelete: (id: string) => void;
+  onResolve: (todo: Todo) => void;
+  resolveLoading?: boolean;
 }) {
   const t = useT();
 
@@ -91,6 +93,32 @@ export const TodoListItem = memo(function TodoListItem({ todo, onEdit, onStatusC
               </Link>
             )}
 
+            {todo.linkedWorkflowId && (
+              <Link
+                to={`/workflows/${todo.linkedWorkflowId}`}
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-warning/10 text-warning font-medium hover:bg-warning/20 transition-colors"
+                title={todo.linkedWorkflowName ?? t.todos.linkedWorkflow}
+              >
+                <Wrench className="w-2.5 h-2.5" />
+                {todo.linkedWorkflowName ?? t.todos.linkedWorkflow}
+              </Link>
+            )}
+
+            {todo.resolutionState && todo.resolutionState !== 'IDLE' && (
+              <Badge
+                variant={
+                  todo.resolutionState === 'RUNNING'
+                    ? 'warning'
+                    : todo.resolutionState === 'FAILED'
+                      ? 'danger'
+                      : 'success'
+                }
+              >
+                {t.todos.resolutionStates[todo.resolutionState]}
+              </Badge>
+            )}
+
             {/* Tags */}
             {todo.tags.length > 0 && (
               <div className="hidden sm:flex items-center gap-1">
@@ -140,6 +168,17 @@ export const TodoListItem = memo(function TodoListItem({ todo, onEdit, onStatusC
 
       {/* Actions */}
       <div className="flex items-center gap-1 shrink-0 pt-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+        {todo.linkedWorkflowId && todo.status !== 'DONE' && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onResolve(todo); }}
+            disabled={resolveLoading || todo.resolutionState === 'RUNNING'}
+            className="p-1.5 rounded-lg text-warning hover:text-warning disabled:opacity-50 transition-colors"
+            aria-label={t.todos.resolve}
+            title={t.todos.resolve}
+          >
+            <Wrench className="w-3.5 h-3.5" />
+          </button>
+        )}
         <button
           onClick={(e) => { e.stopPropagation(); onEdit(todo); }}
           className="p-1.5 rounded-lg text-text-tertiary hover:text-accent transition-colors"

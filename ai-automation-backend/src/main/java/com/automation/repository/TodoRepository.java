@@ -72,4 +72,6 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
     Optional<Todo> findOpenByReferenceTypeAndId(
             @Param("refType") String referenceType,
             @Param("refId") String referenceId);
+
+    Optional<Todo> findByLastFixRunId(String lastFixRunId);
 }

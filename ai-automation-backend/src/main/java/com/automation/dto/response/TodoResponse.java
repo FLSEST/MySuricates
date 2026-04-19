@@ -14,6 +14,8 @@ public record TodoResponse(
         List<String> tags,
         String projectId,
         String projectName,
+        String linkedWorkflowId,
+        String linkedWorkflowName,
         Todo.Source source,
         String sourceAgent,
         String sessionId,
@@ -22,6 +24,7 @@ public record TodoResponse(
         String referenceId,
         int fixAttempts,
         String lastFixRunId,
+        Todo.ResolutionState resolutionState,
         Instant dueDate,
         Instant createdAt,
         Instant updatedAt

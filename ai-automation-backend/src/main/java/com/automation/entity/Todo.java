@@ -21,6 +21,7 @@ public class Todo {
     public enum Status { OPEN, IN_PROGRESS, DONE, BACKLOG }
     public enum Priority { LOW, MEDIUM, HIGH, CRITICAL }
     public enum Source { USER, AI, WORKFLOW }
+    public enum ResolutionState { IDLE, RUNNING, FAILED, SUCCEEDED }
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -47,6 +48,9 @@ public class Todo {
 
     @Column(name = "project_id")
     private String projectId;
+
+    @Column(name = "linked_workflow_id")
+    private String linkedWorkflowId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -80,6 +84,10 @@ public class Todo {
 
     @Column(name = "last_fix_run_id")
     private String lastFixRunId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "resolution_state")
+    private ResolutionState resolutionState;
 
     @CreatedDate
     @Column(updatable = false)

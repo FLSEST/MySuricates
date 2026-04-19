@@ -17,6 +17,7 @@ public interface TodoMapper {
 
     @Mapping(source = "tags", target = "tags", qualifiedByName = "jsonToList")
     @Mapping(target = "projectName", ignore = true)
+    @Mapping(target = "linkedWorkflowName", ignore = true)
     TodoResponse toResponse(Todo todo);
 
     @Named("jsonToList")

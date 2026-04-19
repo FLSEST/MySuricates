@@ -2,7 +2,8 @@ import { memo, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Clock, RefreshCw, ExternalLink, CalendarClock } from 'lucide-react';
+import { Clock, RefreshCw, ExternalLink, CalendarClock, Wrench } from 'lucide-react';
+import { Badge } from '../ui';
 import { useT } from '../../i18n';
 import { priorityColor, formatRelative } from './todoConstants';
 import type { Todo, TodoStatus, TodoCountResponse } from '../../types';
@@ -12,10 +13,12 @@ const MemoizedMarkdown = memo(function MemoizedMarkdown({ children }: { children
 });
 
 /* ─── Kanban Card ───────────────────────────────────────── */
-const KanbanCard = memo(function KanbanCard({ todo, onEdit, onStatusChange }: {
+const KanbanCard = memo(function KanbanCard({ todo, onEdit, onStatusChange, onResolve, resolveLoading }: {
   todo: Todo;
   onEdit: (todo: Todo) => void;
   onStatusChange: (todo: Todo, status: TodoStatus) => void;
+  onResolve: (todo: Todo) => void;
+  resolveLoading?: boolean;
 }) {
   const t = useT();
   return (
@@ -52,6 +55,30 @@ const KanbanCard = memo(function KanbanCard({ todo, onEdit, onStatusChange }: {
                 <ExternalLink className="w-2.5 h-2.5" />
                 Run
               </Link>
+            )}
+            {todo.linkedWorkflowId && (
+              <Link
+                to={`/workflows/${todo.linkedWorkflowId}`}
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-warning/10 text-warning font-medium hover:bg-warning/20 transition-colors"
+                title={todo.linkedWorkflowName ?? t.todos.linkedWorkflow}
+              >
+                <Wrench className="w-2.5 h-2.5" />
+                {todo.linkedWorkflowName ?? t.todos.linkedWorkflow}
+              </Link>
+            )}
+            {todo.resolutionState && todo.resolutionState !== 'IDLE' && (
+              <Badge
+                variant={
+                  todo.resolutionState === 'RUNNING'
+                    ? 'warning'
+                    : todo.resolutionState === 'FAILED'
+                      ? 'danger'
+                      : 'success'
+                }
+              >
+                {t.todos.resolutionStates[todo.resolutionState]}
+              </Badge>
             )}
             {todo.tags.slice(0, 3).map((tag) => (
               <span key={tag} className="px-1.5 py-0.5 rounded text-[10px] bg-surface-raised text-text-tertiary border border-border">
@@ -94,6 +121,15 @@ const KanbanCard = memo(function KanbanCard({ todo, onEdit, onStatusChange }: {
           </span>
         )}
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {todo.linkedWorkflowId && todo.status !== 'DONE' && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onResolve(todo); }}
+              disabled={resolveLoading || todo.resolutionState === 'RUNNING'}
+              className="px-1.5 py-0.5 rounded text-[10px] text-warning hover:bg-warning/10 disabled:opacity-50 transition-colors"
+            >
+              {t.todos.resolve}
+            </button>
+          )}
           {todo.status !== 'OPEN' && (
             <button
               onClick={(e) => { e.stopPropagation(); onStatusChange(todo, 'OPEN'); }}
@@ -133,10 +169,12 @@ const KanbanCard = memo(function KanbanCard({ todo, onEdit, onStatusChange }: {
 });
 
 /* ─── Kanban Board ──────────────────────────────────────── */
-export function TodoKanbanView({ todos, onEdit, onStatusChange, totalCounts }: {
+export function TodoKanbanView({ todos, onEdit, onStatusChange, onResolve, resolveLoadingId, totalCounts }: {
   todos: Todo[];
   onEdit: (todo: Todo) => void;
   onStatusChange: (todo: Todo, status: TodoStatus) => void;
+  onResolve: (todo: Todo) => void;
+  resolveLoadingId?: string | null;
   totalCounts?: TodoCountResponse;
 }) {
   const t = useT();
@@ -184,6 +222,8 @@ export function TodoKanbanView({ todos, onEdit, onStatusChange, totalCounts }: {
                   todo={todo}
                   onEdit={onEdit}
                   onStatusChange={onStatusChange}
+                  onResolve={onResolve}
+                  resolveLoading={resolveLoadingId === todo.id}
                 />
               ))
             )}

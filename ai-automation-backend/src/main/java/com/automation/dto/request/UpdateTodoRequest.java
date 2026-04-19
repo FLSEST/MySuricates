@@ -11,6 +11,7 @@ public record UpdateTodoRequest(
         Todo.Priority priority,
         List<String> tags,
         String projectId,
+        String linkedWorkflowId,
         String referenceType,
         String referenceId,
         String dueDate

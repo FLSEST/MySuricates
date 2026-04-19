@@ -5,11 +5,18 @@ import com.automation.dto.request.UpdateTodoRequest;
 import com.automation.dto.request.UpdateTodoStatusRequest;
 import com.automation.dto.response.TodoCountResponse;
 import com.automation.dto.response.TodoResponse;
+import com.automation.entity.RunStatus;
 import com.automation.entity.Todo;
+import com.automation.entity.Workflow;
+import com.automation.entity.WorkflowRun;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.TodoMapper;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.TodoRepository;
+import com.automation.repository.WorkflowRepository;
+import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.workflow.WorkflowExecutor;
+import com.automation.service.workflow.WorkflowService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -33,6 +40,18 @@ class TodoServiceTest {
 
     @Mock
     private ProjectRepository projectRepository;
+
+    @Mock
+    private WorkflowRepository workflowRepository;
+
+    @Mock
+    private WorkflowRunRepository workflowRunRepository;
+
+    @Mock
+    private WorkflowService workflowService;
+
+    @Mock
+    private WorkflowExecutor workflowExecutor;
 
     @Mock
     private TodoMapper todoMapper;
@@ -69,7 +88,7 @@ class TodoServiceTest {
     void create_withDefaults_setsStatusOpenPriorityMediumSourceUser() {
         CreateTodoRequest request = new CreateTodoRequest(
                 "Test Todo", "Description", null, null, null,
-                null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null);
 
         when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> {
             Todo t = inv.getArgument(0);
@@ -88,7 +107,7 @@ class TodoServiceTest {
     void create_withExplicitValues_usesProvidedValues() {
         CreateTodoRequest request = new CreateTodoRequest(
                 "Important", "Desc", Todo.Status.IN_PROGRESS, Todo.Priority.HIGH,
-                List.of("backend", "bug"), "proj-1", Todo.Source.AI, "claude-code",
+                List.of("backend", "bug"), "proj-1", null, Todo.Source.AI, "claude-code",
                 null, null, null, null, null);
 
         when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -115,7 +134,7 @@ class TodoServiceTest {
         when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UpdateTodoRequest request = new UpdateTodoRequest(
-                "New Title", null, null, Todo.Priority.HIGH, null, null, null, null, null);
+                "New Title", null, null, Todo.Priority.HIGH, null, null, null, null, null, null);
 
         Todo result = todoService.update("t-1", request);
 
@@ -134,7 +153,7 @@ class TodoServiceTest {
         when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UpdateTodoRequest request = new UpdateTodoRequest(
-                null, null, null, null, null, "", null, null, null);
+                null, null, null, null, null, "", null, null, null, null);
 
         Todo result = todoService.update("t-1", request);
 
@@ -153,6 +172,46 @@ class TodoServiceTest {
 
         assertThat(result.getStatus()).isEqualTo(Todo.Status.DONE);
         verify(todoRepository).save(todo);
+    }
+
+    @Test
+    void resolve_linkedWorkflow_setsTodoInProgressAndStartsRun() {
+        Todo todo = Todo.builder()
+                .id("t-1")
+                .title("Fix this")
+                .status(Todo.Status.OPEN)
+                .priority(Todo.Priority.MEDIUM)
+                .linkedWorkflowId("wf-1")
+                .source(Todo.Source.USER)
+                .build();
+        Workflow workflow = Workflow.builder().id("wf-1").name("Resolver").build();
+        WorkflowRun run = WorkflowRun.builder().id("run-1").status(RunStatus.RUNNING).build();
+
+        when(todoRepository.findById("t-1")).thenReturn(Optional.of(todo));
+        when(workflowService.findByIdEager("wf-1")).thenReturn(workflow);
+        when(workflowExecutor.execute(eq(workflow), anyMap(), isNull(), anyMap())).thenReturn(run);
+        when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        WorkflowRun result = todoService.resolve("t-1");
+
+        assertThat(result.getId()).isEqualTo("run-1");
+        assertThat(todo.getStatus()).isEqualTo(Todo.Status.IN_PROGRESS);
+        assertThat(todo.getLastFixRunId()).isEqualTo("run-1");
+        assertThat(todo.getResolutionState()).isEqualTo(Todo.ResolutionState.RUNNING);
+    }
+
+    @Test
+    void resolve_withoutLinkedWorkflow_throws() {
+        Todo todo = Todo.builder()
+                .id("t-1")
+                .title("Unlinked")
+                .status(Todo.Status.OPEN)
+                .build();
+        when(todoRepository.findById("t-1")).thenReturn(Optional.of(todo));
+
+        assertThatThrownBy(() -> todoService.resolve("t-1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("no linked workflow");
     }
 
     // --- delete ---

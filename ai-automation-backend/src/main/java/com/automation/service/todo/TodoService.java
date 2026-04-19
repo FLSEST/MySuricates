@@ -6,11 +6,17 @@ import com.automation.dto.request.UpdateTodoStatusRequest;
 import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.TodoCountResponse;
 import com.automation.dto.response.TodoResponse;
+import com.automation.entity.RunStatus;
 import com.automation.entity.Todo;
+import com.automation.entity.WorkflowRun;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.TodoMapper;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.TodoRepository;
+import com.automation.repository.WorkflowRepository;
+import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.workflow.WorkflowExecutor;
+import com.automation.service.workflow.WorkflowService;
 import jakarta.persistence.criteria.Predicate;
 import com.automation.event.TodoCreatedEvent;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +44,10 @@ public class TodoService {
 
     private final TodoRepository todoRepository;
     private final ProjectRepository projectRepository;
+    private final WorkflowRepository workflowRepository;
+    private final WorkflowRunRepository workflowRunRepository;
+    private final WorkflowService workflowService;
+    private final WorkflowExecutor workflowExecutor;
     private final TodoMapper todoMapper;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -60,13 +70,24 @@ public class TodoService {
                 .map(Todo::getProjectId)
                 .filter(pid -> pid != null && !pid.isBlank())
                 .collect(Collectors.toSet());
+        Set<String> linkedWorkflowIds = result.getContent().stream()
+                .map(Todo::getLinkedWorkflowId)
+                .filter(wid -> wid != null && !wid.isBlank())
+                .collect(Collectors.toSet());
         Map<String, String> projectNames = projectIds.isEmpty()
                 ? Map.of()
                 : projectRepository.findAllById(projectIds).stream()
                     .collect(Collectors.toMap(p -> p.getId(), p -> p.getName()));
+        Map<String, String> workflowNames = linkedWorkflowIds.isEmpty()
+                ? Map.of()
+                : workflowRepository.findAllById(linkedWorkflowIds).stream()
+                    .collect(Collectors.toMap(w -> w.getId(), w -> w.getName()));
 
         List<TodoResponse> content = result.getContent().stream()
-                .map(todo -> toResponseWithProjectName(todo, projectNames.get(todo.getProjectId())))
+                .map(todo -> toResponse(
+                        todo,
+                        todo.getProjectId() != null ? projectNames.get(todo.getProjectId()) : null,
+                        todo.getLinkedWorkflowId() != null ? workflowNames.get(todo.getLinkedWorkflowId()) : null))
                 .toList();
         return new PageResponse<>(content, result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
     }
@@ -91,12 +112,15 @@ public class TodoService {
                 .priority(request.priority() != null ? request.priority() : Todo.Priority.MEDIUM)
                 .tags(TodoMapper.listToJson(request.tags()))
                 .projectId(request.projectId())
+                .linkedWorkflowId(validateLinkedWorkflowId(request.linkedWorkflowId()))
                 .source(request.source() != null ? request.source() : Todo.Source.USER)
                 .sourceAgent(request.sourceAgent())
                 .sessionId(request.sessionId())
                 .workflowRunId(request.workflowRunId())
                 .referenceType(request.referenceType())
                 .referenceId(request.referenceId())
+                .resolutionState(request.linkedWorkflowId() != null && !request.linkedWorkflowId().isBlank()
+                        ? Todo.ResolutionState.IDLE : null)
                 .dueDate(request.dueDate() != null && !request.dueDate().isBlank() ? Instant.parse(request.dueDate()) : null)
                 .build();
 
@@ -118,6 +142,10 @@ public class TodoService {
         if (request.priority() != null) todo.setPriority(request.priority());
         if (request.tags() != null) todo.setTags(TodoMapper.listToJson(request.tags()));
         if (request.projectId() != null) todo.setProjectId(request.projectId().isBlank() ? null : request.projectId());
+        if (request.linkedWorkflowId() != null) {
+            todo.setLinkedWorkflowId(validateLinkedWorkflowId(request.linkedWorkflowId()));
+            todo.setResolutionState(todo.getLinkedWorkflowId() != null ? Todo.ResolutionState.IDLE : null);
+        }
         if (request.referenceType() != null) todo.setReferenceType(request.referenceType());
         if (request.referenceId() != null) todo.setReferenceId(request.referenceId());
         if (request.dueDate() != null) {
@@ -154,6 +182,36 @@ public class TodoService {
     }
 
     @Transactional
+    public WorkflowRun resolve(String id) {
+        Todo todo = findById(id);
+        if (todo.getLinkedWorkflowId() == null || todo.getLinkedWorkflowId().isBlank()) {
+            throw new IllegalArgumentException("Todo has no linked workflow");
+        }
+        if (todo.getStatus() == Todo.Status.DONE) {
+            throw new IllegalStateException("Done todo does not need resolution");
+        }
+        if (isFixRunStillRunning(todo)) {
+            throw new IllegalStateException("A resolution workflow is already running for this todo");
+        }
+
+        Todo.Status previousStatus = todo.getStatus();
+        var workflow = workflowService.findByIdEager(todo.getLinkedWorkflowId());
+        var runMetadata = new java.util.HashMap<String, Object>();
+        runMetadata.put("linkedTodoRun", true);
+        runMetadata.put("linkedTodoId", todo.getId());
+        runMetadata.put("linkedTodoPreviousStatus", previousStatus.name());
+        runMetadata.put("linkedTodoWorkflowId", workflow.getId());
+
+        WorkflowRun run = workflowExecutor.execute(workflow, buildResolveContext(todo), null, runMetadata);
+        todo.setStatus(Todo.Status.IN_PROGRESS);
+        todo.setLastFixRunId(run.getId());
+        todo.setResolutionState(Todo.ResolutionState.RUNNING);
+        todoRepository.save(todo);
+        log.info("Started resolution workflow {} for todo {} ({})", workflow.getName(), todo.getTitle(), todo.getId());
+        return run;
+    }
+
+    @Transactional
     public void delete(String id) {
         Todo todo = findById(id);
         todoRepository.delete(todo);
@@ -172,22 +230,67 @@ public class TodoService {
                     .map(p -> p.getName())
                     .orElse(null);
         }
-        return toResponseWithProjectName(todo, projectName);
+        String linkedWorkflowName = null;
+        if (todo.getLinkedWorkflowId() != null) {
+            linkedWorkflowName = workflowRepository.findById(todo.getLinkedWorkflowId())
+                    .map(w -> w.getName())
+                    .orElse(null);
+        }
+        return toResponse(todo, projectName, linkedWorkflowName);
     }
 
-    private TodoResponse toResponseWithProjectName(Todo todo, String projectName) {
+    private TodoResponse toResponse(Todo todo, String projectName, String linkedWorkflowName) {
         TodoResponse base = todoMapper.toResponse(todo);
         return new TodoResponse(
                 base.id(), base.title(), base.description(),
                 base.status(), base.priority(), base.tags(),
                 base.projectId(), projectName,
+                base.linkedWorkflowId(), linkedWorkflowName,
                 base.source(), base.sourceAgent(), base.sessionId(),
                 base.workflowRunId(),
                 base.referenceType(), base.referenceId(),
                 base.fixAttempts(), base.lastFixRunId(),
+                base.resolutionState(),
                 base.dueDate(),
                 base.createdAt(), base.updatedAt()
         );
+    }
+
+    private String validateLinkedWorkflowId(String linkedWorkflowId) {
+        if (linkedWorkflowId == null) {
+            return null;
+        }
+        String normalized = linkedWorkflowId.trim();
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        if (!workflowRepository.existsById(normalized)) {
+            throw new ResourceNotFoundException("Workflow", normalized);
+        }
+        return normalized;
+    }
+
+    private boolean isFixRunStillRunning(Todo todo) {
+        if (todo.getLastFixRunId() == null || todo.getLastFixRunId().isBlank()) {
+            return false;
+        }
+        return workflowRunRepository.findById(todo.getLastFixRunId())
+                .map(run -> run.getStatus() == RunStatus.RUNNING || run.getStatus() == RunStatus.PENDING)
+                .orElse(false);
+    }
+
+    private java.util.Map<String, Object> buildResolveContext(Todo todo) {
+        java.util.Map<String, Object> context = new java.util.HashMap<>();
+        context.put("todo_id", todo.getId());
+        context.put("todo_title", todo.getTitle());
+        context.put("todo_description", todo.getDescription() != null ? todo.getDescription() : "");
+        context.put("todo_tags", todo.getTags() != null ? todo.getTags() : "[]");
+        context.put("todo_priority", todo.getPriority().name());
+        context.put("todo_project_id", todo.getProjectId() != null ? todo.getProjectId() : "");
+        context.put("todo_source", todo.getSource() != null ? todo.getSource().name() : "");
+        context.put("todo_reference_type", todo.getReferenceType() != null ? todo.getReferenceType() : "");
+        context.put("todo_reference_id", todo.getReferenceId() != null ? todo.getReferenceId() : "");
+        return context;
     }
 
     private Specification<Todo> buildSpec(String projectId, List<String> status, String priority, String source, String tag, String q) {

@@ -7,6 +7,7 @@ import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.TodoCountResponse;
 import com.automation.dto.response.TodoResponse;
 import com.automation.mapper.TodoMapper;
+import com.automation.mapper.WorkflowMapper;
 import com.automation.service.todo.TodoService;
 import com.automation.service.todo.TodoSimilarityService;
 import jakarta.validation.Valid;
@@ -24,6 +25,7 @@ public class TodoController {
 
     private final TodoService todoService;
     private final TodoMapper todoMapper;
+    private final WorkflowMapper workflowMapper;
     private final TodoSimilarityService similarityService;
 
     @GetMapping
@@ -59,6 +61,11 @@ public class TodoController {
     public TodoResponse updateTodoStatus(@PathVariable String id,
                                          @Valid @RequestBody UpdateTodoStatusRequest request) {
         return todoService.updateStatusAndReturn(id, request);
+    }
+
+    @PostMapping("/{id}/resolve")
+    public com.automation.dto.response.WorkflowRunResponse resolveTodo(@PathVariable String id) {
+        return workflowMapper.toRunResponse(todoService.resolve(id));
     }
 
     @DeleteMapping("/{id}")

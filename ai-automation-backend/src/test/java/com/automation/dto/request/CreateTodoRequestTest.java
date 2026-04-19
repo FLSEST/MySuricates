@@ -27,6 +27,7 @@ class CreateTodoRequestTest {
                 Todo.Priority.HIGH,
                 tags,
                 "project-123",
+                "workflow-456",
                 Todo.Source.AI,
                 "claude-code",
                 "session-456",
@@ -42,6 +43,7 @@ class CreateTodoRequestTest {
         assertThat(request.priority()).isEqualTo(Todo.Priority.HIGH);
         assertThat(request.tags()).containsExactly("backend", "bug");
         assertThat(request.projectId()).isEqualTo("project-123");
+        assertThat(request.linkedWorkflowId()).isEqualTo("workflow-456");
         assertThat(request.source()).isEqualTo(Todo.Source.AI);
         assertThat(request.sourceAgent()).isEqualTo("claude-code");
         assertThat(request.sessionId()).isEqualTo("session-456");
@@ -54,7 +56,7 @@ class CreateTodoRequestTest {
     @Test
     void should_returnNullForOptionalFields_when_onlyTitleProvided() {
         var request = new CreateTodoRequest(
-                "Minimal todo", null, null, null, null, null, null, null, null, null, null, null, null
+                "Minimal todo", null, null, null, null, null, null, null, null, null, null, null, null, null
         );
 
         assertThat(request.title()).isEqualTo("Minimal todo");
@@ -63,6 +65,7 @@ class CreateTodoRequestTest {
         assertThat(request.priority()).isNull();
         assertThat(request.tags()).isNull();
         assertThat(request.projectId()).isNull();
+        assertThat(request.linkedWorkflowId()).isNull();
         assertThat(request.source()).isNull();
         assertThat(request.sourceAgent()).isNull();
         assertThat(request.sessionId()).isNull();
@@ -77,7 +80,7 @@ class CreateTodoRequestTest {
     @Test
     void should_passValidation_when_titleIsValid() {
         var request = new CreateTodoRequest(
-                "Valid title", null, null, null, null, null, null, null, null, null, null, null, null
+                "Valid title", null, null, null, null, null, null, null, null, null, null, null, null, null
         );
 
         Set<ConstraintViolation<CreateTodoRequest>> violations = validator.validate(request);
@@ -88,7 +91,7 @@ class CreateTodoRequestTest {
     @Test
     void should_failValidation_when_titleIsNull() {
         var request = new CreateTodoRequest(
-                null, null, null, null, null, null, null, null, null, null, null, null, null
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null
         );
 
         Set<ConstraintViolation<CreateTodoRequest>> violations = validator.validate(request);
@@ -100,7 +103,7 @@ class CreateTodoRequestTest {
     @Test
     void should_failValidation_when_titleIsEmpty() {
         var request = new CreateTodoRequest(
-                "", null, null, null, null, null, null, null, null, null, null, null, null
+                "", null, null, null, null, null, null, null, null, null, null, null, null, null
         );
 
         Set<ConstraintViolation<CreateTodoRequest>> violations = validator.validate(request);
@@ -112,7 +115,7 @@ class CreateTodoRequestTest {
     @Test
     void should_failValidation_when_titleIsBlank() {
         var request = new CreateTodoRequest(
-                "   ", null, null, null, null, null, null, null, null, null, null, null, null
+                "   ", null, null, null, null, null, null, null, null, null, null, null, null, null
         );
 
         Set<ConstraintViolation<CreateTodoRequest>> violations = validator.validate(request);
@@ -126,7 +129,7 @@ class CreateTodoRequestTest {
     @Test
     void should_passValidation_when_allOptionalFieldsAreNull() {
         var request = new CreateTodoRequest(
-                "Title only", null, null, null, null, null, null, null, null, null, null, null, null
+                "Title only", null, null, null, null, null, null, null, null, null, null, null, null, null
         );
 
         Set<ConstraintViolation<CreateTodoRequest>> violations = validator.validate(request);
@@ -145,6 +148,7 @@ class CreateTodoRequestTest {
                 Todo.Priority.MEDIUM,
                 List.of("feature"),
                 "proj-1",
+                "wf-1",
                 Todo.Source.USER,
                 "agent",
                 "sess",
@@ -164,8 +168,8 @@ class CreateTodoRequestTest {
     @Test
     void should_acceptAllStatusValues() {
         for (Todo.Status status : Todo.Status.values()) {
-            var request = new CreateTodoRequest(
-                    "Title", null, status, null, null, null, null, null, null, null, null, null, null
+        var request = new CreateTodoRequest(
+                    "Title", null, status, null, null, null, null, null, null, null, null, null, null, null
             );
             assertThat(request.status()).isEqualTo(status);
             assertThat(validator.validate(request)).isEmpty();
@@ -175,8 +179,8 @@ class CreateTodoRequestTest {
     @Test
     void should_acceptAllPriorityValues() {
         for (Todo.Priority priority : Todo.Priority.values()) {
-            var request = new CreateTodoRequest(
-                    "Title", null, null, priority, null, null, null, null, null, null, null, null, null
+        var request = new CreateTodoRequest(
+                    "Title", null, null, priority, null, null, null, null, null, null, null, null, null, null
             );
             assertThat(request.priority()).isEqualTo(priority);
             assertThat(validator.validate(request)).isEmpty();
@@ -186,8 +190,8 @@ class CreateTodoRequestTest {
     @Test
     void should_acceptAllSourceValues() {
         for (Todo.Source source : Todo.Source.values()) {
-            var request = new CreateTodoRequest(
-                    "Title", null, null, null, null, null, source, null, null, null, null, null, null
+        var request = new CreateTodoRequest(
+                    "Title", null, null, null, null, null, null, source, null, null, null, null, null, null
             );
             assertThat(request.source()).isEqualTo(source);
             assertThat(validator.validate(request)).isEmpty();
@@ -199,7 +203,7 @@ class CreateTodoRequestTest {
     @Test
     void should_returnEmptyList_when_tagsIsEmpty() {
         var request = new CreateTodoRequest(
-                "Title", null, null, null, List.of(), null, null, null, null, null, null, null, null
+                "Title", null, null, null, List.of(), null, null, null, null, null, null, null, null, null
         );
 
         assertThat(request.tags()).isEmpty();
@@ -209,7 +213,7 @@ class CreateTodoRequestTest {
     void should_returnMultipleTags_when_tagsHasMultipleEntries() {
         var tags = List.of("backend", "bug", "urgent");
         var request = new CreateTodoRequest(
-                "Title", null, null, null, tags, null, null, null, null, null, null, null, null
+                "Title", null, null, null, tags, null, null, null, null, null, null, null, null, null
         );
 
         assertThat(request.tags()).containsExactly("backend", "bug", "urgent");
@@ -222,11 +226,11 @@ class CreateTodoRequestTest {
         var tags = List.of("tag1");
         var a = new CreateTodoRequest(
                 "Title", "Desc", Todo.Status.OPEN, Todo.Priority.LOW, tags,
-                "proj", Todo.Source.WORKFLOW, "agent", "sess", "run", "type", "ref", "2026-01-01"
+                "proj", "wf-1", Todo.Source.WORKFLOW, "agent", "sess", "run", "type", "ref", "2026-01-01"
         );
         var b = new CreateTodoRequest(
                 "Title", "Desc", Todo.Status.OPEN, Todo.Priority.LOW, tags,
-                "proj", Todo.Source.WORKFLOW, "agent", "sess", "run", "type", "ref", "2026-01-01"
+                "proj", "wf-1", Todo.Source.WORKFLOW, "agent", "sess", "run", "type", "ref", "2026-01-01"
         );
 
         assertThat(a).isEqualTo(b);
@@ -236,10 +240,10 @@ class CreateTodoRequestTest {
     @Test
     void should_notBeEqual_when_titleDiffers() {
         var a = new CreateTodoRequest(
-                "Title A", null, null, null, null, null, null, null, null, null, null, null, null
+                "Title A", null, null, null, null, null, null, null, null, null, null, null, null, null
         );
         var b = new CreateTodoRequest(
-                "Title B", null, null, null, null, null, null, null, null, null, null, null, null
+                "Title B", null, null, null, null, null, null, null, null, null, null, null, null, null
         );
 
         assertThat(a).isNotEqualTo(b);
@@ -248,7 +252,7 @@ class CreateTodoRequestTest {
     @Test
     void should_notBeEqual_when_comparedToNull() {
         var request = new CreateTodoRequest(
-                "Title", null, null, null, null, null, null, null, null, null, null, null, null
+                "Title", null, null, null, null, null, null, null, null, null, null, null, null, null
         );
 
         assertThat(request).isNotEqualTo(null);
@@ -257,7 +261,7 @@ class CreateTodoRequestTest {
     @Test
     void should_notBeEqual_when_comparedToDifferentType() {
         var request = new CreateTodoRequest(
-                "Title", null, null, null, null, null, null, null, null, null, null, null, null
+                "Title", null, null, null, null, null, null, null, null, null, null, null, null, null
         );
 
         assertThat(request).isNotEqualTo("not a request");
@@ -268,7 +272,7 @@ class CreateTodoRequestTest {
     @Test
     void should_containTitle_inToString() {
         var request = new CreateTodoRequest(
-                "My Todo Title", null, null, null, null, null, null, null, null, null, null, null, null
+                "My Todo Title", null, null, null, null, null, null, null, null, null, null, null, null, null
         );
 
         assertThat(request.toString()).contains("title");
@@ -279,7 +283,7 @@ class CreateTodoRequestTest {
     void should_containAllFieldNames_inToString() {
         var request = new CreateTodoRequest(
                 "Title", "Desc", Todo.Status.DONE, Todo.Priority.CRITICAL, List.of("t"),
-                "proj", Todo.Source.AI, "agent", "sess", "run", "type", "ref", "2026-01-01"
+                "proj", "wf-1", Todo.Source.AI, "agent", "sess", "run", "type", "ref", "2026-01-01"
         );
 
         String str = request.toString();
@@ -289,6 +293,7 @@ class CreateTodoRequestTest {
         assertThat(str).contains("priority");
         assertThat(str).contains("tags");
         assertThat(str).contains("projectId");
+        assertThat(str).contains("linkedWorkflowId");
         assertThat(str).contains("source");
         assertThat(str).contains("sourceAgent");
         assertThat(str).contains("sessionId");
