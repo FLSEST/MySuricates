@@ -104,6 +104,20 @@ public class WorkflowMemoryService {
     }
 
     /**
+     * Extracts knowledge and automatically activates the result.
+     * Used by auto-memory extraction after successful runs.
+     */
+    @Transactional
+    public WorkflowMemory extractAndActivate(String workflowId, String provider) throws IOException {
+        WorkflowMemory memory = extractKnowledge(workflowId, null, provider);
+        memoryRepository.deactivateAllForWorkflow(workflowId);
+        memory.setActive(true);
+        memoryRepository.save(memory);
+        log.info("Auto-extracted and activated memory '{}' for workflow {}", memory.getTitle(), workflowId);
+        return memory;
+    }
+
+    /**
      * Activates a specific memory version and deactivates all others for the same workflow.
      */
     @Transactional

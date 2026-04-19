@@ -79,9 +79,15 @@ export interface PendingTodoItem {
   projectId?: string;
 }
 
+export interface AutoMemoryConfig {
+  enabled: boolean;
+  interval?: number;
+}
+
 export interface WorkflowMetadata {
   autoTodo?: AutoTodoConfig;
   autoRepair?: AutoRepairConfig;
+  autoMemoryExtraction?: AutoMemoryConfig;
   [key: string]: unknown;
 }
 

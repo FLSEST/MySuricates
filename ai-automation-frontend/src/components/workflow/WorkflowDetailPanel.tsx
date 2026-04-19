@@ -81,6 +81,8 @@ export function WorkflowDetailPanel({
   const autoTodoMode = workflow.metadata?.autoTodo?.mode ?? 'auto';
   const autoRepairEnabled = !!workflow.metadata?.autoRepair?.enabled;
   const autoRepairMode = workflow.metadata?.autoRepair?.mode ?? 'auto';
+  const autoMemoryEnabled = !!workflow.metadata?.autoMemoryExtraction?.enabled;
+  const autoMemoryInterval = workflow.metadata?.autoMemoryExtraction?.interval ?? 5;
 
   return (
     <div className="bg-surface border border-border rounded-xl p-6 space-y-6">
@@ -257,6 +259,50 @@ export function WorkflowDetailPanel({
             <option value="local">{t.workflows.autoRepairModeLocal}</option>
           </select>
           <p className="text-xs text-text-tertiary">{t.workflows.autoRepairModeHint}</p>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-surface-raised border border-border">
+        <div>
+          <span className="text-sm font-medium text-text">{t.workflows.autoMemory}</span>
+          <p className="text-xs text-text-tertiary">{t.workflows.autoMemoryDescription}</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={autoMemoryEnabled}
+          onClick={() =>
+            updateWorkflow.mutate({
+              id: workflow.id,
+              data: { metadata: { autoMemoryExtraction: { ...workflow.metadata?.autoMemoryExtraction, enabled: !autoMemoryEnabled } } },
+            })
+          }
+          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+            autoMemoryEnabled ? 'bg-accent' : 'bg-border'
+          }`}
+        >
+          <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${autoMemoryEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+        </button>
+      </div>
+
+      {autoMemoryEnabled && (
+        <div className="ml-4 pl-3 border-l-2 border-accent/20 space-y-2">
+          <span className="text-xs font-medium text-text-secondary">{t.workflows.autoMemoryInterval}</span>
+          <input
+            type="number"
+            min={1}
+            max={50}
+            value={autoMemoryInterval}
+            onChange={(e) => {
+              const val = Math.max(1, Math.min(50, Number(e.target.value) || 5));
+              updateWorkflow.mutate({
+                id: workflow.id,
+                data: { metadata: { autoMemoryExtraction: { ...workflow.metadata?.autoMemoryExtraction, interval: val } } },
+              });
+            }}
+            className="w-20 px-2 py-1 text-sm border border-border rounded-lg bg-surface text-text"
+          />
+          <p className="text-xs text-text-tertiary">{t.workflows.autoMemoryIntervalHint}</p>
         </div>
       )}
 

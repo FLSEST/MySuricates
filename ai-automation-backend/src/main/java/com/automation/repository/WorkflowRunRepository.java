@@ -71,6 +71,8 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
     @Query("SELECT DISTINCT wr.workflow.id FROM WorkflowRun wr WHERE wr.status = 'FAILED' AND wr.workflow IS NOT NULL")
     List<String> findDistinctWorkflowIdsWithFailedRuns();
 
+    long countByWorkflowIdAndStatusAndCompletedAtAfter(String workflowId, RunStatus status, Instant since);
+
     boolean existsByWorkflowIdAndStatus(String workflowId, RunStatus status);
 
     Optional<WorkflowRun> findTopByWorkflowIdAndStatusOrderByStartedAtDesc(String workflowId, RunStatus status);
