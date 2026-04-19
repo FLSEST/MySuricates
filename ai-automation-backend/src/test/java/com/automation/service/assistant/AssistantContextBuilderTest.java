@@ -287,7 +287,7 @@ class AssistantContextBuilderTest {
             when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
             when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of());
             when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
-            when(assistantSessionRepository.findTop3ByOrderByStartedAtDesc()).thenReturn(List.of());
+            when(assistantSessionRepository.findTop5ByOrderByStartedAtDesc()).thenReturn(List.of());
 
             String result = builder.buildSystemPrompt(null, "Du bist MySuricates.");
 
@@ -307,7 +307,7 @@ class AssistantContextBuilderTest {
             when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
             when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of());
             when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
-            when(assistantSessionRepository.findTop3ByOrderByStartedAtDesc()).thenReturn(List.of());
+            when(assistantSessionRepository.findTop5ByOrderByStartedAtDesc()).thenReturn(List.of());
 
             String result = builder.buildSystemPrompt(null, null);
 
@@ -324,7 +324,7 @@ class AssistantContextBuilderTest {
             when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
             when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of());
             when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
-            when(assistantSessionRepository.findTop3ByOrderByStartedAtDesc()).thenReturn(List.of());
+            when(assistantSessionRepository.findTop5ByOrderByStartedAtDesc()).thenReturn(List.of());
 
             Todo todo = Todo.builder().id("t1").title("Fix Bug").status(Todo.Status.OPEN)
                     .priority(Todo.Priority.HIGH).build();
@@ -348,6 +348,8 @@ class AssistantContextBuilderTest {
             when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
             when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of());
             when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
+
+            when(assistantSessionRepository.findTop5ByOrderByStartedAtDesc()).thenReturn(List.of());
 
             Todo todo = Todo.builder().id("t1").title("Fix Bug").status(Todo.Status.OPEN)
                     .priority(Todo.Priority.HIGH).build();
@@ -373,6 +375,7 @@ class AssistantContextBuilderTest {
             when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
             when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of());
             when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
+            when(assistantSessionRepository.findTop5ByOrderByStartedAtDesc()).thenReturn(List.of());
 
             StepResult step = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED)
                     .output("step output").build();
@@ -423,7 +426,7 @@ class AssistantContextBuilderTest {
                             [{"role":"assistant","content":"Hallo"},{"role":"user","content":"Wie ist der Status von Alpha?"}]
                             """)
                     .build();
-            when(assistantSessionRepository.findTop3ByOrderByStartedAtDesc()).thenReturn(List.of(session));
+            when(assistantSessionRepository.findTop5ByOrderByStartedAtDesc()).thenReturn(List.of(session));
 
             String result = builder.buildSystemPrompt(null, "Du bist MySuricates.");
 
@@ -435,7 +438,7 @@ class AssistantContextBuilderTest {
             assertThat(result).contains("## Gelerntes & Fallstricke");
             assertThat(result).contains("[Build Alpha]: Vor Shell-Ausfuehrung immer den Eingabe-Kontext validieren.");
             assertThat(result).contains("## Letzte Gespräche (Orientierung)");
-            assertThat(result).contains("User fragte: \"Wie ist der Status von Alpha?\"");
+            assertThat(result).contains("User: \"Wie ist der Status von Alpha?\"");
         }
 
         @Test
@@ -447,6 +450,7 @@ class AssistantContextBuilderTest {
             when(wishRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
             when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
             when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
+            when(assistantSessionRepository.findTop5ByOrderByStartedAtDesc()).thenReturn(List.of());
 
             Project alpha = Project.builder().id("p-alpha").name("Alpha").path("/work/alpha").build();
             Project beta = Project.builder().id("p-beta").name("Beta").path("/work/beta").build();
@@ -483,6 +487,7 @@ class AssistantContextBuilderTest {
             when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
             when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of());
             when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
+            when(assistantSessionRepository.findTop5ByOrderByStartedAtDesc()).thenReturn(List.of());
 
             Project alpha = Project.builder().id("p-alpha").name("Alpha").path("/work/alpha").build();
             Workflow alphaWorkflow = Workflow.builder().id("wf-alpha").name("Wish Workflow").project(alpha).build();

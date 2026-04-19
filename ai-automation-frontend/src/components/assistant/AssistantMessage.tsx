@@ -238,11 +238,14 @@ export function MessageBubble({ msg, onClose, onSend, onExecute, onRetry }: {
           </button>
         )}
 
-        {/* Timestamp + response time + status + copy */}
+        {/* Timestamp + response time + provider + status + copy */}
         <span className="text-[10px] text-text-tertiary ml-1 flex items-center gap-1">
           {time}
           {!isUser && respTime && (
             <>{time ? ' · ' : ''}{respTime}</>
+          )}
+          {!isUser && msg.provider && (
+            <>{(time || respTime) ? ' · ' : ''}{msg.provider === 'CODEX' ? 'Codex' : 'Claude'}</>
           )}
           {isUser && msg.status === 'sent' && <CheckCheck className="w-2.5 h-2.5 text-accent" />}
           {isUser && msg.status === 'error' && <XCircle className="w-2.5 h-2.5 text-danger" />}

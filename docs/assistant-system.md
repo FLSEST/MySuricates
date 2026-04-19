@@ -92,9 +92,12 @@ Speichert Chat-Verläufe als JSON-Array pro Session.
 |---|---|---|
 | `id` | TEXT PK | Session-UUID |
 | `page` | TEXT | UI-Seite (z.B. `"workflows"`) |
-| `messages` | TEXT | JSON-Array der Chat-Nachrichten |
-| `created_at` | TEXT | Erstellungszeitpunkt |
-| `updated_at` | TEXT | Letzter Update |
+| `entity_id` | TEXT | Optionale Entity-Referenz (z.B. Workflow-ID) |
+| `preview` | TEXT | Erste User-Nachricht (max 100 Zeichen, V58) |
+| `messages` | TEXT | JSON-Array der Chat-Nachrichten (volle Laenge) |
+| `message_count` | INTEGER | Anzahl der Nachrichten |
+| `started_at` | REAL | Erstellungszeitpunkt |
+| `ended_at` | REAL | Letzter Update |
 
 ### page_suggestions (V42)
 
@@ -114,6 +117,9 @@ Beide Controller sind unter dem Base-Path `/api/v1/assistant` registriert:
 | Controller | Endpunkte | Beschreibung |
 |---|---|---|
 | `AssistantController` | `POST /chat` | Chat-Anfrage verarbeiten, Session persistieren |
+| `AssistantController` | `GET /sessions` | Letzte 50 Sessions mit Preview (ohne Messages) |
+| `AssistantController` | `GET /sessions/{id}` | Einzelne Session mit allen Nachrichten |
+| `AssistantController` | `DELETE /sessions/{id}` | Session loeschen |
 | `PageSuggestionController` | `GET /suggestions`, `POST /suggestions/refresh` | Seitenspezifische Vorschläge |
 
 ## Tools (Server-seitige Aktionen)
@@ -151,12 +157,16 @@ Der Assistent kann über `<fetch type="..." id="..."/>`-Tags zusätzliche Daten 
 
 ## Kontext-Injektion
 
-`AssistantService` injiziert je nach `context.page` unterschiedliche Plattform-Daten in den System-Prompt:
+`AssistantContextBuilder` injiziert je nach `context.page` unterschiedliche Plattform-Daten in den System-Prompt:
 
 - **`workflows`** — Liste aktueller Workflows des Projekts
 - **`runs`** — Status und Logs der letzten Runs
 - **`todos`** — Offene TODOs des Projekts
 - Weitere Seiten: allgemeiner Plattform-Kontext
+
+Zusaetzlich auf **allen Seiten**:
+- **Letzte 5 Sessions** — Erste User-Nachricht (150 Zeichen) + erste Assistenten-Antwort (100 Zeichen) pro Session
+- **Workflow Memory** — Bis zu 8 aktive Memories (300 Zeichen pro Memory)
 
 ## Modell-Auswahl
 
@@ -171,5 +181,7 @@ Der Assistent ist als Floating-Panel (`AssistantPanel.tsx`) implementiert:
 - Globale Einblendung über dem Layout, unabhängig von der aktuellen Seite
 - Sendet den `page`-Kontext aus der aktuellen Route mit
 - Zeigt Page Suggestions als Schnell-Aktionen an (klickbar → werden als Nutzer-Nachricht gesendet)
-- Persistiert `sessionId` im Frontend-State für zusammenhängende Konversationen
+- Persistiert `sessionId` im Frontend-State fuer zusammenhaengende Konversationen
+- Gespraechsverlauf wird aus dem Backend geladen (`GET /sessions`), mit localStorage gemergt (localStorage hat Vorrang bei gleicher ID)
+- Beim Klick auf eine Backend-only Session wird der volle Verlauf on-demand nachgeladen und in den Zustand-Store hydriert
 - WebSocket-Integration für Live-Streaming der Antwort (sofern implementiert)

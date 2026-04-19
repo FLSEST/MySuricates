@@ -31,6 +31,7 @@ interface AssistantState {
   updateMessageStatus: (sessionId: string, msgId: string, status: ChatMessage['status']) => void;
   deleteSession: (id: string) => void;
   loadSession: (id: string) => void;
+  hydrateSession: (session: ChatSession) => void;
 }
 
 const MAX_SESSIONS = 20;
@@ -108,6 +109,15 @@ export const useAssistantStore = create<AssistantState>()(
 
       loadSession: (id) => {
         set({ activeSessionId: id, showHistory: false });
+      },
+
+      hydrateSession: (session) => {
+        set((s) => {
+          if (s.sessions.find((sess) => sess.id === session.id)) return {};
+          return {
+            sessions: [session, ...s.sessions].slice(0, MAX_SESSIONS),
+          };
+        });
       },
     }),
     {

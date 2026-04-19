@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { X, Send, Clock, Plus, Square } from 'lucide-react';
 import { useAssistantStore } from '../stores/assistantStore';
 import { useAssistantChat, type ChatMessage } from '../hooks/useAssistant';
@@ -32,6 +33,7 @@ export function AssistantPanel() {
   const { mutate: sendMessage, isPending } = useAssistantChat();
   const { mutate: executeWorkflow } = useExecuteWorkflow();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const abortRef = useRef<AbortController | null>(null);
   const queueRef = useRef<{ text: string; sessionId: string }[]>([]);
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
@@ -143,8 +145,11 @@ export function AssistantPanel() {
             content: res.message,
             actions: res.actions,
             responseTimeMs: res.responseTimeMs ?? undefined,
+            provider: res.provider ?? undefined,
+            model: res.model ?? undefined,
             timestamp: Date.now(),
           });
+          queryClient.invalidateQueries({ queryKey: ['assistant-sessions-api'] });
           processQueue();
         },
         onError: (err) => {

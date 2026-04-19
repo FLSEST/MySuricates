@@ -23,6 +23,9 @@ public class AssistantSession {
     @Column(name = "entity_id")
     private String entityId;
 
+    @Column
+    private String preview;
+
     @Column(columnDefinition = "text", nullable = false)
     @Builder.Default
     private String messages = "[]";

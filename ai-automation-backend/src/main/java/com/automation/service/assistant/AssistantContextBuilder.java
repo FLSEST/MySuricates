@@ -107,7 +107,7 @@ public class AssistantContextBuilder {
         appendProjects(sb, compactProjects, allWorkflows);
         appendWorkflows(sb, compactWorkflows, allWorkflows, ctx);
         appendWorkflowMemory(sb, workflowById);
-        if (cat == PageCategory.OVERVIEW) appendRecentSessions(sb);
+        appendRecentSessions(sb);
 
         // 3. Page-specific context (enriched with step outputs for run pages)
         if (ctx != null) appendPageContext(sb, ctx);
@@ -247,7 +247,7 @@ public class AssistantContextBuilder {
                 String wfName = workflowById.containsKey(m.getWorkflowId())
                         ? workflowById.get(m.getWorkflowId()).getName()
                         : m.getWorkflowId().substring(0, Math.min(8, m.getWorkflowId().length())) + "…";
-                sb.append("  - [").append(wfName).append("]: ").append(truncate(m.getContent(), 150)).append("\n");
+                sb.append("  - [").append(wfName).append("]: ").append(truncate(m.getContent(), 300)).append("\n");
             });
             sb.append("\n");
         } catch (Exception e) {
@@ -257,14 +257,18 @@ public class AssistantContextBuilder {
 
     private void appendRecentSessions(StringBuilder sb) {
         try {
-            List<AssistantSession> sessions = assistantSessionRepository.findTop3ByOrderByStartedAtDesc();
+            List<AssistantSession> sessions = assistantSessionRepository.findTop5ByOrderByStartedAtDesc();
             if (sessions.isEmpty()) return;
             sb.append("## Letzte Gespräche (Orientierung)\n");
             sessions.forEach(sess -> {
-                String firstUserMsg = extractFirstUserMessage(sess.getMessages());
-                if (firstUserMsg != null) {
+                String[] firstExchange = extractFirstExchange(sess.getMessages());
+                if (firstExchange != null) {
                     sb.append("  - [").append(fmt(sess.getStartedAt())).append("] ")
-                            .append("User fragte: \"").append(truncate(firstUserMsg, 80)).append("\"\n");
+                            .append("User: \"").append(truncate(firstExchange[0], 150)).append("\"");
+                    if (firstExchange[1] != null) {
+                        sb.append(" → Antwort: \"").append(truncate(firstExchange[1], 100)).append("\"");
+                    }
+                    sb.append("\n");
                 }
             });
             sb.append("\n");
@@ -273,16 +277,26 @@ public class AssistantContextBuilder {
         }
     }
 
-    private String extractFirstUserMessage(String messagesJson) {
+    /**
+     * Extracts the first user message and assistant response from a session's messages JSON.
+     * Returns [userMessage, assistantResponse] or null if no user message found.
+     */
+    private String[] extractFirstExchange(String messagesJson) {
         if (messagesJson == null || messagesJson.isBlank() || "[]".equals(messagesJson)) return null;
         try {
             List<Map<String, String>> messages = objectMapper.readValue(messagesJson, new TypeReference<>() {});
-            return messages.stream()
-                    .filter(m -> "user".equals(m.get("role")))
-                    .map(m -> m.get("content"))
-                    .filter(c -> c != null && !c.isBlank())
-                    .findFirst()
-                    .orElse(null);
+            String userMsg = null;
+            String assistantMsg = null;
+            for (Map<String, String> m : messages) {
+                if (userMsg == null && "user".equals(m.get("role"))) {
+                    userMsg = m.get("content");
+                } else if (userMsg != null && assistantMsg == null && "assistant".equals(m.get("role"))) {
+                    assistantMsg = m.get("content");
+                    break;
+                }
+            }
+            if (userMsg == null || userMsg.isBlank()) return null;
+            return new String[]{ userMsg, assistantMsg };
         } catch (Exception e) {
             return null;
         }

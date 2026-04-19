@@ -11,5 +11,9 @@ public interface AssistantSessionRepository extends JpaRepository<AssistantSessi
 
     List<AssistantSession> findTop3ByOrderByStartedAtDesc();
 
+    List<AssistantSession> findTop5ByOrderByStartedAtDesc();
+
     long countByPage(String page);
+
+    List<AssistantSession> findTop50ByOrderByStartedAtDesc();
 }

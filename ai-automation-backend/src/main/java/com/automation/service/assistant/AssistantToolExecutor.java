@@ -117,7 +117,7 @@ public class AssistantToolExecutor {
 
             var request = new CreateTodoRequest(
                     title, description, Todo.Status.OPEN, priority, tags,
-                    projectId, Todo.Source.AI, "assistant", null, null, null, null, null
+                    projectId, null, Todo.Source.AI, "assistant", null, null, null, null, null
             );
             Todo created = todoService.create(request);
             String tagStr = tags.isEmpty() ? "" : ", Tags: " + String.join(", ", tags);

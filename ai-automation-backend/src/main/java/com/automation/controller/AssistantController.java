@@ -2,6 +2,8 @@ package com.automation.controller;
 
 import com.automation.dto.AssistantChatRequest;
 import com.automation.dto.AssistantChatResponse;
+import com.automation.dto.response.AssistantSessionDetail;
+import com.automation.dto.response.AssistantSessionSummary;
 import com.automation.event.AssistantSessionUpdatedEvent;
 import com.automation.service.AssistantService;
 import com.automation.service.AssistantSessionService;
@@ -11,6 +13,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/assistant")
@@ -43,5 +47,20 @@ public class AssistantController {
         }
 
         return response;
+    }
+
+    @GetMapping("/sessions")
+    public List<AssistantSessionSummary> listSessions() {
+        return assistantSessionService.listRecentSessions();
+    }
+
+    @GetMapping("/sessions/{id}")
+    public AssistantSessionDetail getSession(@PathVariable String id) {
+        return assistantSessionService.getSession(id);
+    }
+
+    @DeleteMapping("/sessions/{id}")
+    public void deleteSession(@PathVariable String id) {
+        assistantSessionService.deleteSession(id);
     }
 }

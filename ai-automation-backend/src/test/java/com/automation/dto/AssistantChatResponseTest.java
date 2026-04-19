@@ -63,27 +63,43 @@ class AssistantChatResponseTest {
         assertThat(response.responseTimeMs()).isNull();
     }
 
-    // --- 4-arg (canonical) constructor ---
+    // --- 4-arg constructor (model + provider) ---
 
     @Test
-    void should_setAllFields_when_constructedWithFourArgs() {
+    void should_setModelAndProvider_when_constructedWithFourArgs() {
         var actions = List.of(new AssistantAction("start_wish", null, "wish text", "Start"));
-        var response = new AssistantChatResponse("Full", actions, "claude-sonnet-4-6", 1234L);
+        var response = new AssistantChatResponse("Full", actions, "claude-sonnet-4-6", "CLAUDE");
 
         assertThat(response.message()).isEqualTo("Full");
         assertThat(response.actions()).isEqualTo(actions);
         assertThat(response.model()).isEqualTo("claude-sonnet-4-6");
-        assertThat(response.responseTimeMs()).isEqualTo(1234L);
+        assertThat(response.provider()).isEqualTo("CLAUDE");
+        assertThat(response.responseTimeMs()).isNull();
     }
 
     @Test
     void should_acceptAllNulls_when_constructedWithFourArgs() {
-        var response = new AssistantChatResponse(null, null, null, null);
+        var response = new AssistantChatResponse(null, null, null, (String) null);
 
         assertThat(response.message()).isNull();
         assertThat(response.actions()).isNull();
         assertThat(response.model()).isNull();
+        assertThat(response.provider()).isNull();
         assertThat(response.responseTimeMs()).isNull();
+    }
+
+    // --- 5-arg (canonical) constructor ---
+
+    @Test
+    void should_setAllFields_when_constructedWithFiveArgs() {
+        var actions = List.of(new AssistantAction("start_wish", null, "wish text", "Start"));
+        var response = new AssistantChatResponse("Full", actions, "claude-sonnet-4-6", "CODEX", 1234L);
+
+        assertThat(response.message()).isEqualTo("Full");
+        assertThat(response.actions()).isEqualTo(actions);
+        assertThat(response.model()).isEqualTo("claude-sonnet-4-6");
+        assertThat(response.provider()).isEqualTo("CODEX");
+        assertThat(response.responseTimeMs()).isEqualTo(1234L);
     }
 
     // --- withResponseTimeMs ---
@@ -116,7 +132,7 @@ class AssistantChatResponseTest {
 
     @Test
     void should_overrideExistingResponseTime_when_withResponseTimeMsCalledAgain() {
-        var first = new AssistantChatResponse("msg", List.of(), "m", 100L);
+        var first = new AssistantChatResponse("msg", List.of(), "m", "CLAUDE", 100L);
         var second = first.withResponseTimeMs(200L);
 
         assertThat(first.responseTimeMs()).isEqualTo(100L);
@@ -178,8 +194,8 @@ class AssistantChatResponseTest {
     @Test
     void should_beEqual_when_sameFieldValues() {
         var actions = List.of(new AssistantAction("run_workflow", "w1", "WF", "Run"));
-        var a = new AssistantChatResponse("msg", actions, "model", 100L);
-        var b = new AssistantChatResponse("msg", actions, "model", 100L);
+        var a = new AssistantChatResponse("msg", actions, "model", "CLAUDE", 100L);
+        var b = new AssistantChatResponse("msg", actions, "model", "CLAUDE", 100L);
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -187,8 +203,8 @@ class AssistantChatResponseTest {
 
     @Test
     void should_notBeEqual_when_differentResponseTime() {
-        var a = new AssistantChatResponse("msg", List.of(), "model", 100L);
-        var b = new AssistantChatResponse("msg", List.of(), "model", 200L);
+        var a = new AssistantChatResponse("msg", List.of(), "model", "CLAUDE", 100L);
+        var b = new AssistantChatResponse("msg", List.of(), "model", "CLAUDE", 200L);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -224,7 +240,7 @@ class AssistantChatResponseTest {
 
     @Test
     void should_includeResponseTimeMs_when_present() throws Exception {
-        var response = new AssistantChatResponse("msg", List.of(), "model", 42L);
+        var response = new AssistantChatResponse("msg", List.of(), "model", "CLAUDE", 42L);
         var json = objectMapper.writeValueAsString(response);
 
         assertThat(json).contains("\"responseTimeMs\":42");
@@ -259,7 +275,7 @@ class AssistantChatResponseTest {
     void should_deserializeResponse_when_validJson() throws Exception {
         var original = new AssistantChatResponse("hello", List.of(
                 new AssistantAction("run_workflow", "w1", "WF", "Run")
-        ), "claude-sonnet-4-6", 123L);
+        ), "claude-sonnet-4-6", "CLAUDE", 123L);
 
         var json = objectMapper.writeValueAsString(original);
         var deserialized = objectMapper.readValue(json, AssistantChatResponse.class);

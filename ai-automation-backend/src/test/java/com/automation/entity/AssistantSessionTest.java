@@ -174,13 +174,14 @@ class AssistantSessionTest {
         String messages = "[{\"role\":\"user\",\"content\":\"test\"}]";
 
         AssistantSession session = new AssistantSession(
-                "session-id", "workflows", "entity-789",
+                "session-id", "workflows", "entity-789", "test preview",
                 messages, 3, started, ended
         );
 
         assertThat(session.getId()).isEqualTo("session-id");
         assertThat(session.getPage()).isEqualTo("workflows");
         assertThat(session.getEntityId()).isEqualTo("entity-789");
+        assertThat(session.getPreview()).isEqualTo("test preview");
         assertThat(session.getMessages()).isEqualTo(messages);
         assertThat(session.getMessageCount()).isEqualTo(3);
         assertThat(session.getStartedAt()).isEqualTo(started);
