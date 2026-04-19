@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
-import type { PoolWorkflowEntry } from '../types';
+import type { PoolWorkflowEntry, ExportToPoolRequest, ExportToPoolResponse } from '../types';
 
 export function usePoolWorkflows() {
   return useQuery({
@@ -23,5 +23,20 @@ export function useInstallPoolWorkflow() {
       toast.success(data.created ? t.toast.poolWorkflowInstalled : t.toast.poolWorkflowUpdated);
     },
     onError: (err) => toast.error(apiErrorMessage(err, t.toast.poolInstallFailed)),
+  });
+}
+
+export function usePoolExport() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
+  return useMutation({
+    mutationFn: ({ workflowId, request }: { workflowId: string; request?: ExportToPoolRequest }) =>
+      api.post<ExportToPoolResponse>(`/pool/export/${workflowId}`, request ?? {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pool'] });
+      toast.success(t.factory.exportedToPool);
+    },
+    onError: (err) => toast.error(apiErrorMessage(err, t.factory.exportFailed)),
   });
 }

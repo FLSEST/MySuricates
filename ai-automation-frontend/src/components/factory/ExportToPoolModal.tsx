@@ -1,0 +1,132 @@
+import { useState } from 'react';
+import { Package } from 'lucide-react';
+import { Modal } from '../ui/Modal';
+import { Button, Input, Select } from '../ui';
+import { Spinner } from '../ui';
+import { usePoolExport } from '../../hooks/usePool';
+import { useFactoryTopics } from '../../hooks/useWorkflowFactory';
+import { useT } from '../../i18n';
+
+interface ExportToPoolModalProps {
+  open: boolean;
+  onClose: () => void;
+  workflowId: string;
+  workflowName: string;
+  workflowDescription?: string | null;
+  onExported?: () => void;
+}
+
+export function ExportToPoolModal({
+  open, onClose, workflowId, workflowName, workflowDescription, onExported,
+}: ExportToPoolModalProps) {
+  const t = useT();
+  const exportMutation = usePoolExport();
+  const { data: topics } = useFactoryTopics();
+
+  const [nameEn, setNameEn] = useState(workflowName);
+  const [nameDe, setNameDe] = useState(workflowName);
+  const [descEn, setDescEn] = useState(workflowDescription ?? '');
+  const [descDe, setDescDe] = useState(workflowDescription ?? '');
+  const [category, setCategory] = useState('');
+  const [tagsInput, setTagsInput] = useState('');
+  const [author, setAuthor] = useState('MySuricates');
+
+  const handleExport = () => {
+    const tags = tagsInput.trim()
+      ? tagsInput.split(',').map(t => t.trim()).filter(Boolean)
+      : undefined;
+
+    exportMutation.mutate({
+      workflowId,
+      request: {
+        nameEn: nameEn || undefined,
+        nameDe: nameDe || undefined,
+        descriptionEn: descEn || undefined,
+        descriptionDe: descDe || undefined,
+        category: category || undefined,
+        tags,
+        author: author || undefined,
+      },
+    }, {
+      onSuccess: () => {
+        onExported?.();
+        onClose();
+      },
+    });
+  };
+
+  const categoryOptions = [
+    { value: '', label: '-' },
+    ...(topics?.map(t => ({ value: t.id, label: t.name })) ?? []),
+  ];
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={t.factory.exportTitle}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>{t.common.cancel}</Button>
+          <Button
+            variant="primary"
+            onClick={handleExport}
+            disabled={exportMutation.isPending || !nameEn.trim()}
+          >
+            {exportMutation.isPending ? <Spinner size="sm" /> : <Package className="w-4 h-4" />}
+            {t.factory.exportConfirm}
+          </Button>
+        </>
+      }
+    >
+      <p className="text-sm text-text-secondary mb-4">{t.factory.exportDesc}</p>
+      <div className="space-y-3">
+        <Input
+          label={t.factory.nameEn}
+          value={nameEn}
+          onChange={e => setNameEn(e.target.value)}
+        />
+        <Input
+          label={t.factory.nameDe}
+          value={nameDe}
+          onChange={e => setNameDe(e.target.value)}
+        />
+        <div>
+          <label className="block text-sm font-medium text-text-secondary mb-1">{t.factory.descEn}</label>
+          <textarea
+            className="input-base w-full text-sm"
+            rows={2}
+            value={descEn}
+            onChange={e => setDescEn(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-text-secondary mb-1">{t.factory.descDe}</label>
+          <textarea
+            className="input-base w-full text-sm"
+            rows={2}
+            value={descDe}
+            onChange={e => setDescDe(e.target.value)}
+          />
+        </div>
+        <Select
+          label={t.factory.categoryLabel}
+          options={categoryOptions}
+          value={category}
+          onChange={e => setCategory(e.target.value)}
+        />
+        <Input
+          label={t.factory.exportTags}
+          placeholder="tag1, tag2, tag3"
+          value={tagsInput}
+          onChange={e => setTagsInput(e.target.value)}
+        />
+        <Input
+          label={t.factory.exportAuthor}
+          value={author}
+          onChange={e => setAuthor(e.target.value)}
+        />
+      </div>
+    </Modal>
+  );
+}

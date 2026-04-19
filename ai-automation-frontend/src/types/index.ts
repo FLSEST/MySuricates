@@ -1103,7 +1103,7 @@ export interface WorkflowFactoryRequest {
 export interface WorkflowFactoryResult {
   workflowId: string | null;
   workflowName: string | null;
-  status: 'VERIFIED' | 'FAILED' | 'CREATED' | 'PROMOTED';
+  status: 'VERIFIED' | 'FAILED' | 'CREATED' | 'PROMOTED' | 'EXPORTED';
   testRunId: string | null;
   testStatus: 'PASSED' | 'FAILED' | null;
   testError: string | null;
@@ -1116,6 +1116,21 @@ export interface FactoryTopicCategory {
   id: string;
   name: string;
   description: string;
+}
+
+export interface ExportToPoolRequest {
+  nameEn?: string;
+  nameDe?: string;
+  descriptionEn?: string;
+  descriptionDe?: string;
+  category?: string;
+  tags?: string[];
+  author?: string;
+}
+
+export interface ExportToPoolResponse {
+  poolId: string;
+  filename: string;
 }
 
 // ── Chain Templates ──────────────────────────────────────

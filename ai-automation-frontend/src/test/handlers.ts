@@ -30,13 +30,16 @@ export const handlers = [
 
   // Todos
   http.get(`${BASE}/todos`, () =>
-    HttpResponse.json({ content: [{ id: 't1', title: 'Test Todo', description: null, status: 'OPEN', priority: 'MEDIUM', tags: [], projectId: null, projectName: null, source: 'USER', sourceAgent: null, workflowRunId: null, referenceType: null, referenceId: null, createdAt: '2025-01-01T00:00:00Z', updatedAt: '2025-01-01T00:00:00Z' }], page: 0, size: 50, totalElements: 1, totalPages: 1 }),
+    HttpResponse.json({ content: [{ id: 't1', title: 'Test Todo', description: null, status: 'OPEN', priority: 'MEDIUM', tags: [], projectId: null, projectName: null, linkedWorkflowId: 'w1', linkedWorkflowName: 'Test Workflow', source: 'USER', sourceAgent: null, workflowRunId: null, referenceType: null, referenceId: null, fixAttempts: 0, lastFixRunId: null, resolutionState: 'IDLE', dueDate: null, createdAt: '2025-01-01T00:00:00Z', updatedAt: '2025-01-01T00:00:00Z' }], page: 0, size: 50, totalElements: 1, totalPages: 1 }),
   ),
   http.get(`${BASE}/todos/count`, () =>
-    HttpResponse.json({ open: 3, inProgress: 1, done: 5 }),
+    HttpResponse.json({ open: 3, inProgress: 1, done: 5, backlog: 0 }),
   ),
   http.post(`${BASE}/todos`, () =>
-    HttpResponse.json({ id: 't2', title: 'New Todo', description: null, status: 'OPEN', priority: 'MEDIUM', tags: [], projectId: null, projectName: null, source: 'USER', sourceAgent: null, workflowRunId: null, referenceType: null, referenceId: null, createdAt: '2025-01-01T00:00:00Z', updatedAt: '2025-01-01T00:00:00Z' }),
+    HttpResponse.json({ id: 't2', title: 'New Todo', description: null, status: 'OPEN', priority: 'MEDIUM', tags: [], projectId: null, projectName: null, linkedWorkflowId: null, linkedWorkflowName: null, source: 'USER', sourceAgent: null, workflowRunId: null, referenceType: null, referenceId: null, fixAttempts: 0, lastFixRunId: null, resolutionState: null, dueDate: null, createdAt: '2025-01-01T00:00:00Z', updatedAt: '2025-01-01T00:00:00Z' }),
+  ),
+  http.post(`${BASE}/todos/:id/resolve`, ({ params }) =>
+    HttpResponse.json({ id: 'run-resolve-1', workflowId: 'w1', workflowName: 'Test Workflow', projectName: 'Test Project', projectPath: '/tmp/test', status: 'RUNNING', steps: [], startedAt: '2025-01-01T00:00:00Z', completedAt: null, durationMs: null, userRating: null, error: null, metadata: { linkedTodoId: params.id }, inputContext: {}, triggeredByScheduleId: null }),
   ),
   http.delete(`${BASE}/todos/:id`, () => new HttpResponse(null, { status: 204 })),
 
@@ -152,10 +155,10 @@ export const handlers = [
     HttpResponse.json({ providers: ['CLAUDE', 'CODEX'], default: 'CLAUDE' }),
   ),
   http.get(`${BASE}/system/execution-config`, () =>
-    HttpResponse.json({ executionMaxConcurrent: 5, claudeMaxConcurrentCalls: 5, claudeReservedForInteractive: 1, claudeTimeoutSeconds: 300, claudeInterCallDelayMs: 0, chainWorkflowTimeoutMinutes: 30, activeRuns: 0 }),
+    HttpResponse.json({ executionMaxConcurrent: 5, claudeMaxConcurrentCalls: 5, claudeReservedForInteractive: 1, claudeTimeoutSeconds: 300, claudeInterCallDelayMs: 0, chainWorkflowTimeoutMinutes: 30, assistantChatTimeoutSeconds: 240, activeRuns: 0 }),
   ),
   http.put(`${BASE}/system/execution-config`, () =>
-    HttpResponse.json({ executionMaxConcurrent: 5, claudeMaxConcurrentCalls: 5, claudeReservedForInteractive: 1, claudeTimeoutSeconds: 300, claudeInterCallDelayMs: 0, chainWorkflowTimeoutMinutes: 30, activeRuns: 0 }),
+    HttpResponse.json({ executionMaxConcurrent: 5, claudeMaxConcurrentCalls: 5, claudeReservedForInteractive: 1, claudeTimeoutSeconds: 300, claudeInterCallDelayMs: 0, chainWorkflowTimeoutMinutes: 30, assistantChatTimeoutSeconds: 240, activeRuns: 0 }),
   ),
   http.put(`${BASE}/system/settings/:key`, () =>
     HttpResponse.json({ key: 'test', value: 'val' }),

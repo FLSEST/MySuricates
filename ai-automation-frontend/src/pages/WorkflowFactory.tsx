@@ -1,14 +1,20 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Factory, Play, Sparkles, CheckCircle2, XCircle, Clock, ArrowUpRight, RotateCcw, Award } from 'lucide-react';
+import {
+  Factory, Sparkles, CheckCircle2, XCircle, Clock, ArrowUpRight,
+  RotateCcw, Award, Package, ChevronDown, ChevronRight, Play,
+} from 'lucide-react';
 import { Card, Button, Input, Select, Spinner, Badge, Toggle } from '../components/ui';
 import { useProjects } from '../hooks/useProjects';
-import { useFactoryTopics, useFactoryGenerate, useFactoryRun, useFactoryVerify, useFactoryPromote } from '../hooks/useWorkflowFactory';
+import {
+  useFactoryTopics, useFactoryGenerate, useFactoryRun, useFactoryVerify, useFactoryPromote,
+} from '../hooks/useWorkflowFactory';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { useTestingStatus } from '../hooks/useTesting';
 import { useT } from '../i18n';
 import { useToast } from '../hooks/useToast';
 import { formatDuration } from '../utils/formatTime';
+import { ExportToPoolModal } from '../components/factory/ExportToPoolModal';
 import type { WorkflowFactoryResult } from '../types';
 
 function StatusIcon({ status }: { status: string }) {
@@ -17,6 +23,7 @@ function StatusIcon({ status }: { status: string }) {
     case 'FAILED': return <XCircle className="w-5 h-5 text-red-500" />;
     case 'CREATED': return <Clock className="w-5 h-5 text-blue-500" />;
     case 'PROMOTED': return <Award className="w-5 h-5 text-amber-500" />;
+    case 'EXPORTED': return <Package className="w-5 h-5 text-violet-500" />;
     default: return <Spinner size="sm" />;
   }
 }
@@ -25,6 +32,7 @@ function ResultStatusBadge({ status }: { status: string }) {
   const variant = status === 'VERIFIED' ? 'success'
     : status === 'PROMOTED' ? 'warning'
     : status === 'FAILED' ? 'danger'
+    : status === 'EXPORTED' ? 'accent'
     : 'default';
   return <Badge variant={variant} dot>{status}</Badge>;
 }
@@ -52,6 +60,10 @@ export function WorkflowFactory() {
   const [autoFix, setAutoFix] = useState(false);
   const [maxRetries, setMaxRetries] = useState(2);
   const [results, setResults] = useState<WorkflowFactoryResult[]>([]);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [exportModal, setExportModal] = useState<{
+    workflowId: string; name: string; description?: string | null;
+  } | null>(null);
 
   const isTestHealthy = testingStatus?.healthy ?? false;
   const isRunning = generateMutation.isPending || runMutation.isPending;
@@ -66,7 +78,7 @@ export function WorkflowFactory() {
     }
   };
 
-  const handleGenerate = () => {
+  const handleCreate = () => {
     if (!topic.trim()) { toast.error(t.factory.topicRequired); return; }
     if (!projectId) { toast.error(t.factory.projectRequired); return; }
 
@@ -86,10 +98,10 @@ export function WorkflowFactory() {
     });
   };
 
-  const handleRun = () => {
+  const handleCreateAndTest = () => {
     if (!topic.trim()) { toast.error(t.factory.topicRequired); return; }
     if (!projectId) { toast.error(t.factory.projectRequired); return; }
-    if (!isTestHealthy) { toast.error('Test instance is not healthy'); return; }
+    if (!isTestHealthy) { toast.error(t.factory.testOffline); return; }
 
     runMutation.mutate({
       topic, description: description || undefined, category: category || undefined,
@@ -138,7 +150,13 @@ export function WorkflowFactory() {
     });
   };
 
-  // Workflows that were factory-generated (have factoryGenerated metadata)
+  const handleExported = (workflowId: string) => {
+    setResults(prev => prev.map(r =>
+      r.workflowId === workflowId ? { ...r, status: 'EXPORTED' } : r
+    ));
+  };
+
+  // Workflows that were factory-generated
   const factoryWorkflows = workflows?.filter(w =>
     (w.metadata as Record<string, unknown>)?.factoryGenerated === true
   ) ?? [];
@@ -156,61 +174,27 @@ export function WorkflowFactory() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <Factory className="w-7 h-7 text-accent" />
-            <h1 className="text-2xl font-bold text-text-primary">{t.factory.title}</h1>
-          </div>
-          <p className="text-sm text-text-secondary mt-1">{t.factory.subtitle}</p>
+      <div>
+        <div className="flex items-center gap-3">
+          <Factory className="w-7 h-7 text-accent" />
+          <h1 className="text-2xl font-bold text-text-primary">{t.factory.title}</h1>
         </div>
-        {!isTestHealthy && (
-          <Badge variant="warning">Test instance offline</Badge>
-        )}
+        <p className="text-sm text-text-secondary mt-1">{t.factory.subtitle}</p>
       </div>
 
-      {/* Generator Form */}
+      {/* Creation Form */}
       <Card className="p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-4">
+          {/* Row 1: Topic */}
           <Input
             label={t.factory.topicLabel}
             placeholder={t.factory.topicPlaceholder}
             value={topic}
             onChange={e => setTopic(e.target.value)}
           />
-          <Select
-            label={t.factory.categoryLabel}
-            options={categoryOptions}
-            value={category}
-            onChange={e => setCategory(e.target.value)}
-          />
-          <Select
-            label={t.factory.projectLabel}
-            options={projectOptions}
-            value={projectId}
-            onChange={e => setProjectId(e.target.value)}
-          />
-          <Select
-            label={t.factory.providerLabel}
-            options={[
-              { value: '', label: t.factory.providerDefault },
-              { value: 'CLAUDE', label: 'Claude' },
-              { value: 'CODEX', label: 'Codex' },
-            ]}
-            value={provider}
-            onChange={e => setProvider(e.target.value)}
-          />
-          <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-text-secondary">{t.factory.testInputsLabel}</label>
-            <textarea
-              className="input-base w-full font-mono text-sm"
-              rows={3}
-              placeholder={t.factory.testInputsPlaceholder}
-              value={testInputs}
-              onChange={e => setTestInputs(e.target.value)}
-            />
-          </div>
-          <div className="md:col-span-2">
+
+          {/* Row 2: Description */}
+          <div>
             <label className="block text-sm font-medium text-text-secondary mb-1.5">{t.factory.descriptionLabel}</label>
             <textarea
               className="input-base w-full"
@@ -220,53 +204,108 @@ export function WorkflowFactory() {
               onChange={e => setDescription(e.target.value)}
             />
           </div>
+
+          {/* Row 3: Project, Category, Provider */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Select
+              label={t.factory.projectLabel}
+              options={projectOptions}
+              value={projectId}
+              onChange={e => setProjectId(e.target.value)}
+            />
+            <Select
+              label={t.factory.categoryLabel}
+              options={categoryOptions}
+              value={category}
+              onChange={e => setCategory(e.target.value)}
+            />
+            <Select
+              label={t.factory.providerLabel}
+              options={[
+                { value: '', label: t.factory.providerDefault },
+                { value: 'CLAUDE', label: 'Claude' },
+                { value: 'CODEX', label: 'Codex' },
+              ]}
+              value={provider}
+              onChange={e => setProvider(e.target.value)}
+            />
+          </div>
         </div>
 
-        {/* Options */}
-        <div className="flex flex-wrap items-center gap-6 mt-4 pt-4 border-t border-border">
-          <Toggle
-            label={t.factory.autoPromote}
-            enabled={autoPromote}
-            onChange={setAutoPromote}
-          />
-          <Toggle
-            label={t.factory.autoFix}
-            enabled={autoFix}
-            onChange={setAutoFix}
-          />
-          {autoFix && (
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-text-secondary">{t.factory.maxRetries}</label>
-              <input
-                type="number"
-                min={1}
-                max={5}
-                value={maxRetries}
-                onChange={e => setMaxRetries(Number(e.target.value))}
-                className="input-base w-16 text-center"
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Actions */}
-        <div className="flex gap-3 mt-4">
+        {/* Primary Action */}
+        <div className="flex items-center gap-3 mt-5">
           <Button
-            onClick={handleGenerate}
+            onClick={handleCreate}
             disabled={isRunning || !topic.trim() || !projectId}
-            variant="secondary"
-          >
-            {generateMutation.isPending ? <Spinner size="sm" /> : <Sparkles className="w-4 h-4" />}
-            {generateMutation.isPending ? t.factory.generating : t.factory.generatePreview}
-          </Button>
-          <Button
-            onClick={handleRun}
-            disabled={isRunning || !topic.trim() || !projectId || !isTestHealthy}
             variant="primary"
           >
-            {runMutation.isPending ? <Spinner size="sm" /> : <Play className="w-4 h-4" />}
-            {runMutation.isPending ? t.factory.testing : t.factory.runPipeline}
+            {generateMutation.isPending ? <Spinner size="sm" /> : <Sparkles className="w-4 h-4" />}
+            {generateMutation.isPending ? t.factory.generating : t.factory.createWorkflow}
           </Button>
+        </div>
+
+        {/* Advanced Options */}
+        <div className="mt-4 pt-4 border-t border-border">
+          <button
+            className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+          >
+            {showAdvanced ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            {t.factory.advancedOptions}
+            {!isTestHealthy && (
+              <span className="ml-2"><Badge variant="warning">{t.factory.testOffline}</Badge></span>
+            )}
+          </button>
+
+          {showAdvanced && (
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">{t.factory.testInputsLabel}</label>
+                <textarea
+                  className="input-base w-full font-mono text-sm"
+                  rows={3}
+                  placeholder={t.factory.testInputsPlaceholder}
+                  value={testInputs}
+                  onChange={e => setTestInputs(e.target.value)}
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-6">
+                <Toggle
+                  label={t.factory.autoPromote}
+                  enabled={autoPromote}
+                  onChange={setAutoPromote}
+                />
+                <Toggle
+                  label={t.factory.autoFix}
+                  enabled={autoFix}
+                  onChange={setAutoFix}
+                />
+                {autoFix && (
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-text-secondary">{t.factory.maxRetries}</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={5}
+                      value={maxRetries}
+                      onChange={e => setMaxRetries(Number(e.target.value))}
+                      className="input-base w-16 text-center"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <Button
+                onClick={handleCreateAndTest}
+                disabled={isRunning || !topic.trim() || !projectId || !isTestHealthy}
+                variant="secondary"
+              >
+                {runMutation.isPending ? <Spinner size="sm" /> : <Play className="w-4 h-4" />}
+                {runMutation.isPending ? t.factory.testing : t.factory.createAndTest}
+              </Button>
+            </div>
+          )}
         </div>
       </Card>
 
@@ -303,6 +342,19 @@ export function WorkflowFactory() {
                   <span className="text-xs text-text-secondary">{formatDuration(r.durationMs)}</span>
                 )}
                 <div className="flex gap-1">
+                  {r.workflowId && (
+                    <Button
+                      size="sm" variant="ghost"
+                      onClick={() => setExportModal({
+                        workflowId: r.workflowId!,
+                        name: r.workflowName ?? '',
+                        description: null,
+                      })}
+                      title={t.factory.exportToPool}
+                    >
+                      <Package className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
                   {r.workflowId && r.status !== 'VERIFIED' && r.status !== 'PROMOTED' && isTestHealthy && (
                     <Button
                       size="sm" variant="ghost"
@@ -350,6 +402,17 @@ export function WorkflowFactory() {
                     </div>
                   </div>
                   <div className="flex gap-1">
+                    <Button
+                      size="sm" variant="ghost"
+                      onClick={() => setExportModal({
+                        workflowId: fw.id,
+                        name: fw.name,
+                        description: fw.description,
+                      })}
+                      title={t.factory.exportToPool}
+                    >
+                      <Package className="w-3.5 h-3.5" />
+                    </Button>
                     {isTestHealthy && (
                       <Button
                         size="sm" variant="ghost"
@@ -373,6 +436,18 @@ export function WorkflowFactory() {
           </div>
         )}
       </div>
+
+      {/* Export Modal */}
+      {exportModal && (
+        <ExportToPoolModal
+          open={!!exportModal}
+          onClose={() => setExportModal(null)}
+          workflowId={exportModal.workflowId}
+          workflowName={exportModal.name}
+          workflowDescription={exportModal.description}
+          onExported={() => handleExported(exportModal.workflowId)}
+        />
+      )}
     </div>
   );
 }

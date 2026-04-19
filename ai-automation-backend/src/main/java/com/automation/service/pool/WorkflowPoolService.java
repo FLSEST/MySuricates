@@ -2,8 +2,10 @@ package com.automation.service.pool;
 
 import com.automation.config.WorkflowPoolConfig;
 import com.automation.dto.request.CreateWorkflowRequest;
+import com.automation.dto.request.ExportToPoolRequest;
 import com.automation.dto.request.InstallPoolWorkflowRequest;
 import com.automation.dto.request.UpdateWorkflowRequest;
+import com.automation.dto.response.ExportToPoolResponse;
 import com.automation.dto.response.PoolWorkflowEntry;
 import com.automation.entity.BlockDefinition;
 import com.automation.entity.Workflow;
@@ -21,11 +23,8 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -133,6 +132,95 @@ public class WorkflowPoolService {
         Workflow workflow = workflowService.create(createRequest);
         log.info("Installed pool workflow '{}' as new workflow '{}' ({})", poolId, workflow.getName(), workflow.getId());
         return new InstallResult(workflow, true);
+    }
+
+    public ExportToPoolResponse exportToPool(String workflowId, ExportToPoolRequest request) throws IOException {
+        Workflow workflow = workflowService.findById(workflowId);
+        if (request == null) {
+            request = new ExportToPoolRequest(null, null, null, null, null, null, null);
+        }
+
+        String nameEn = request.nameEn() != null ? request.nameEn() : workflow.getName();
+        String nameDe = request.nameDe() != null ? request.nameDe() : workflow.getName();
+        String descEn = request.descriptionEn() != null ? request.descriptionEn() : workflow.getDescription();
+        String descDe = request.descriptionDe() != null ? request.descriptionDe() : workflow.getDescription();
+
+        // Resolve category from request, then metadata, then fallback
+        String category = request.category();
+        if (category == null && workflow.getMetadata() != null) {
+            Object factoryCat = workflow.getMetadata().get("factoryCategory");
+            if (factoryCat instanceof String s) category = s;
+        }
+        if (category == null) category = "CUSTOM";
+
+        List<String> tags = request.tags() != null ? request.tags() : List.of();
+        String author = request.author() != null ? request.author() : "MySuricates";
+
+        // Build pool JSON in canonical order
+        LinkedHashMap<String, Object> poolJson = new LinkedHashMap<>();
+        poolJson.put("name", Map.of("de", nameDe, "en", nameEn));
+        if (descEn != null || descDe != null) {
+            poolJson.put("description", Map.of(
+                    "de", descDe != null ? descDe : "",
+                    "en", descEn != null ? descEn : ""));
+        }
+        poolJson.put("icon", workflow.getIcon() != null ? workflow.getIcon() : "\uD83D\uDD27");
+        poolJson.put("category", category);
+        if (!tags.isEmpty()) {
+            poolJson.put("tags", tags);
+        }
+        poolJson.put("blocks", workflow.getBlocks());
+
+        if (workflow.getInstructions() != null && !workflow.getInstructions().isBlank()) {
+            poolJson.put("instructions", workflow.getInstructions());
+        }
+        if (workflow.getModel() != null) {
+            poolJson.put("model", workflow.getModel());
+        }
+        poolJson.put("version", workflow.getVersion() != null ? workflow.getVersion() : "1.0.0");
+        poolJson.put("author", author);
+
+        if (workflow.getDefaultContext() != null && !workflow.getDefaultContext().isEmpty()) {
+            poolJson.put("defaultContext", workflow.getDefaultContext());
+        }
+
+        // Filter out factory-internal metadata keys
+        if (workflow.getMetadata() != null && !workflow.getMetadata().isEmpty()) {
+            Map<String, Object> filtered = new LinkedHashMap<>(workflow.getMetadata());
+            Set.of("factoryGenerated", "factoryTopic", "factoryCategory").forEach(filtered::remove);
+            if (!filtered.isEmpty()) {
+                poolJson.put("metadata", filtered);
+            }
+        }
+
+        // Resolve filename with collision avoidance
+        Path poolDir = resolvePoolDirectory();
+        Files.createDirectories(poolDir);
+
+        String slug = slugify(nameEn);
+        String filename = slug + ".json";
+        Path target = poolDir.resolve(filename);
+        int suffix = 2;
+        while (Files.exists(target)) {
+            filename = slug + "-" + suffix + ".json";
+            target = poolDir.resolve(filename);
+            suffix++;
+        }
+
+        objectMapper.writerWithDefaultPrettyPrinter().writeValue(target.toFile(), poolJson);
+        String poolId = filename.replace(".json", "");
+        log.info("Exported workflow '{}' ({}) to pool: {}", workflow.getName(), workflowId, filename);
+        return new ExportToPoolResponse(poolId, filename);
+    }
+
+    private String slugify(String name) {
+        String slug = name.toLowerCase()
+                .replaceAll("[^a-z0-9]+", "-")
+                .replaceAll("^-|-$", "");
+        if (slug.isEmpty()) {
+            slug = "workflow-" + UUID.randomUUID().toString().substring(0, 8);
+        }
+        return slug;
     }
 
     private PoolWorkflowEntry parsePoolFile(Path file) throws IOException {
