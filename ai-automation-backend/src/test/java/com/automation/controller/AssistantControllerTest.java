@@ -55,6 +55,10 @@ class AssistantControllerTest {
     private ActivityLogService activityLogService;
     @MockBean
     private RateLimitConfig rateLimitConfig;
+    @MockBean
+    private com.automation.service.assistant.PendingToolRegistry pendingToolRegistry;
+    @MockBean
+    private com.automation.service.assistant.AssistantToolExecutor toolExecutor;
 
     @Test
     void chat_returnsAssistantResponse() throws Exception {
@@ -153,5 +157,64 @@ class AssistantControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"message\":\"Test\"}"))
                 .andExpect(status().isOk());
+    }
+
+    // ── Pending-tool gate ──────────────────────────────────────────────────────
+
+    @Test
+    void confirmPendingTool_consumesRegistryAndExecutes() throws Exception {
+        var tool = new com.automation.service.assistant.PendingTool(
+                "tool-1", "create_todo", "TODO anlegen: X", "{\"title\":\"X\"}",
+                java.time.Instant.now().plusSeconds(60));
+        when(pendingToolRegistry.take("tool-1")).thenReturn(java.util.Optional.of(tool));
+        when(toolExecutor.executeConfirmed(tool))
+                .thenReturn(new com.automation.service.assistant.ToolExecutionResult(
+                        "tool-1", "create_todo", true, "✓ Todo angelegt"));
+
+        mockMvc.perform(post("/api/v1/assistant/pending-tools/tool-1/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sessionId\":\"s1\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.toolId").value("tool-1"))
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("✓ Todo angelegt"));
+
+        verify(toolExecutor).executeConfirmed(tool);
+        verify(assistantSessionService).appendToolResult(
+                org.mockito.ArgumentMatchers.eq("s1"),
+                org.mockito.ArgumentMatchers.argThat(r -> r.success() && "tool-1".equals(r.toolId())));
+    }
+
+    @Test
+    void confirmPendingTool_alreadyConsumed_returns410() throws Exception {
+        when(pendingToolRegistry.take("gone")).thenReturn(java.util.Optional.empty());
+
+        mockMvc.perform(post("/api/v1/assistant/pending-tools/gone/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isGone());
+
+        verify(toolExecutor, org.mockito.Mockito.never()).executeConfirmed(any());
+    }
+
+    @Test
+    void rejectPendingTool_consumesWithoutExecuting() throws Exception {
+        var tool = new com.automation.service.assistant.PendingTool(
+                "tool-2", "delete_workflow", "Workflow löschen", "{\"workflowId\":\"wf-9\"}",
+                java.time.Instant.now().plusSeconds(60));
+        when(pendingToolRegistry.take("tool-2")).thenReturn(java.util.Optional.of(tool));
+
+        mockMvc.perform(post("/api/v1/assistant/pending-tools/tool-2/reject")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sessionId\":\"s2\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.toolId").value("tool-2"))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("✗ Abgelehnt"));
+
+        verify(toolExecutor, org.mockito.Mockito.never()).executeConfirmed(any());
+        verify(assistantSessionService).appendToolResult(
+                org.mockito.ArgumentMatchers.eq("s2"),
+                org.mockito.ArgumentMatchers.argThat(r -> !r.success() && "tool-2".equals(r.toolId())));
     }
 }

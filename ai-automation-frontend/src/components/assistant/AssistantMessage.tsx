@@ -2,11 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Play, Eye, Sparkles, ChevronDown, ChevronUp, RefreshCw, CheckCheck, XCircle, MessageCircle } from 'lucide-react';
+import { Play, Eye, Sparkles, ChevronDown, ChevronUp, RefreshCw, CheckCheck, XCircle, MessageCircle, Check, X, Loader2, ShieldAlert } from 'lucide-react';
 import { CopyButton } from '../shared/CopyButton';
 import { MeerkatIcon } from '../layout/Sidebar';
 import { formatAssistantTime, formatAssistantResponseTime } from '../assistantPanelUtils';
-import type { ChatMessage, AssistantAction } from '../../hooks/useAssistant';
+import { useT } from '../../i18n';
+import { apiErrorMessage } from '../../api/client';
+import type { ChatMessage, AssistantAction, PendingTool, ToolExecutionResult } from '../../hooks/useAssistant';
+import { useConfirmPendingTool, useRejectPendingTool } from '../../hooks/useAssistant';
 
 function ActionButton({ action, onClose, onSend, onExecute }: {
   action: AssistantAction;
@@ -72,6 +75,98 @@ function ActionButton({ action, onClose, onSend, onExecute }: {
   );
 }
 
+/**
+ * A tool proposal awaiting user confirmation. The backend only executes the tool after the
+ * user clicks "Bestätigen" — the assistant has no path to auto-trigger it regardless of the
+ * model's prompt compliance.
+ */
+function PendingToolCard({ tool, sessionId, existingResult }: {
+  tool: PendingTool;
+  sessionId?: string;
+  existingResult?: ToolExecutionResult;
+}) {
+  const t = useT();
+  const confirm = useConfirmPendingTool();
+  const reject = useRejectPendingTool();
+  const [localResult, setLocalResult] = useState<ToolExecutionResult | undefined>(existingResult);
+  const [error, setError] = useState<string | null>(null);
+  // Compute expiry once on mount — the pending-tool UI is short-lived; if the user stays on the
+  // card past its 30-min TTL the backend's 410 Gone will surface via error state instead.
+  const [expired] = useState<boolean>(() => {
+    const expiresMs = tool.expiresAt ? new Date(tool.expiresAt).getTime() : 0;
+    return expiresMs > 0 && expiresMs < Date.now();
+  });
+  const pending = confirm.isPending || reject.isPending;
+
+  if (localResult) {
+    return (
+      <div className={`flex items-start gap-1.5 text-xs rounded-lg px-2.5 py-1.5 border ${
+        localResult.success
+          ? 'bg-accent/10 border-accent/30 text-accent'
+          : 'bg-danger/10 border-danger/30 text-danger'
+      }`}>
+        {localResult.success ? <Check className="w-3.5 h-3.5 mt-0.5 shrink-0" /> : <X className="w-3.5 h-3.5 mt-0.5 shrink-0" />}
+        <span className="leading-snug">{localResult.message}</span>
+      </div>
+    );
+  }
+
+  const runConfirm = async () => {
+    setError(null);
+    try {
+      const result = await confirm.mutateAsync({ id: tool.id, sessionId });
+      setLocalResult(result);
+    } catch (e) {
+      setError(apiErrorMessage(e, t.assistant.pendingToolError));
+    }
+  };
+
+  const runReject = async () => {
+    setError(null);
+    try {
+      const result = await reject.mutateAsync({ id: tool.id, sessionId });
+      setLocalResult(result);
+    } catch (e) {
+      setError(apiErrorMessage(e, t.assistant.pendingToolError));
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5 text-xs rounded-lg px-2.5 py-1.5 border border-[var(--color-assistant-border)] bg-[var(--color-assistant-raised)]">
+      <div className="flex items-start gap-1.5">
+        <ShieldAlert className="w-3.5 h-3.5 mt-0.5 shrink-0 text-accent" />
+        <span className="leading-snug text-text">{tool.description}</span>
+      </div>
+      {expired ? (
+        <div className="text-text-tertiary italic">{t.assistant.pendingToolExpired}</div>
+      ) : (
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={runConfirm}
+            disabled={pending}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium
+                       bg-accent text-white hover:bg-accent-hover transition-colors disabled:opacity-60"
+          >
+            {confirm.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+            {confirm.isPending ? t.assistant.pendingToolExecuting : t.assistant.pendingToolConfirm}
+          </button>
+          <button
+            onClick={runReject}
+            disabled={pending}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium
+                       bg-transparent text-text-secondary border border-[var(--color-assistant-border)]
+                       hover:bg-[var(--color-assistant-hover)] transition-colors disabled:opacity-60"
+          >
+            <X className="w-3 h-3" />
+            {t.assistant.pendingToolReject}
+          </button>
+        </div>
+      )}
+      {error && <div className="text-danger text-[11px]">{error}</div>}
+    </div>
+  );
+}
+
 function MarkdownLink({ href, children, onNavigate }: {
   href?: string;
   children?: React.ReactNode;
@@ -97,8 +192,9 @@ function MarkdownLink({ href, children, onNavigate }: {
 
 const COLLAPSE_THRESHOLD = 300;
 
-export function MessageBubble({ msg, onClose, onSend, onExecute, onRetry }: {
+export function MessageBubble({ msg, sessionId, onClose, onSend, onExecute, onRetry }: {
   msg: ChatMessage;
+  sessionId?: string;
   onClose: () => void;
   onSend?: (text: string) => void;
   onExecute?: (workflowId: string) => void;
@@ -212,6 +308,18 @@ export function MessageBubble({ msg, onClose, onSend, onExecute, onRetry }: {
             </div>
           )}
         </div>
+
+        {/* Pending tool proposals — hard-gate: backend only executes after explicit confirm click */}
+        {!isUser && msg.pendingTools && msg.pendingTools.length > 0 && (
+          <div className="flex flex-col gap-1.5 mt-0.5 w-full">
+            {msg.pendingTools.map((tool) => {
+              const existingResult = msg.toolResults?.find((r) => r.toolId === tool.id);
+              return (
+                <PendingToolCard key={tool.id} tool={tool} sessionId={sessionId} existingResult={existingResult} />
+              );
+            })}
+          </div>
+        )}
 
         {/* Actions -- filter out run_workflow/show_workflow/show_run with missing id */}
         {msg.actions && msg.actions.length > 0 && (() => {

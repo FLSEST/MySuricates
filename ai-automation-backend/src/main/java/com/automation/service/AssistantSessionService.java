@@ -6,6 +6,8 @@ import com.automation.dto.response.AssistantSessionDetail;
 import com.automation.dto.response.AssistantSessionSummary;
 import com.automation.entity.AssistantSession;
 import com.automation.repository.AssistantSessionRepository;
+import com.automation.service.assistant.PendingTool;
+import com.automation.service.assistant.ToolExecutionResult;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -80,12 +82,66 @@ public class AssistantSessionService {
         if (res.model() != null) {
             assistantMsg.put("model", res.model());
         }
+        if (res.pendingTools() != null && !res.pendingTools().isEmpty()) {
+            List<Map<String, Object>> serialized = new ArrayList<>();
+            for (PendingTool t : res.pendingTools()) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("id", t.id());
+                m.put("type", t.type());
+                m.put("description", t.description());
+                m.put("expiresAt", t.expiresAt() != null ? t.expiresAt().toString() : null);
+                serialized.add(m);
+            }
+            assistantMsg.put("pendingTools", serialized);
+        }
         messages.add(assistantMsg);
 
         session.setMessages(serializeMessages(messages));
         session.setMessageCount(messages.size());
         session.setEndedAt(Instant.now());
 
+        sessionRepository.save(session);
+    }
+
+    /**
+     * Records the outcome of a confirmed/rejected pending tool. Appends to the most recent
+     * assistant message's {@code toolResults} array so the frontend can replace the pending
+     * card with a result line. Marks the corresponding pending-tool entry as resolved so
+     * history replay doesn't show it as still-pending.
+     */
+    @Transactional
+    public void appendToolResult(String sessionId, ToolExecutionResult result) {
+        if (sessionId == null || result == null) return;
+        AssistantSession session = sessionRepository.findById(sessionId).orElse(null);
+        if (session == null) return;
+
+        List<Map<String, Object>> messages = deserializeMessages(session.getMessages());
+        // Find the most recent assistant message that contains this tool in pendingTools
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            Map<String, Object> msg = messages.get(i);
+            if (!"assistant".equals(msg.get("role"))) continue;
+            Object pendingRaw = msg.get("pendingTools");
+            if (!(pendingRaw instanceof List<?> pendingList)) continue;
+            boolean hasMatch = pendingList.stream()
+                    .filter(e -> e instanceof Map)
+                    .map(e -> (Map<?, ?>) e)
+                    .anyMatch(m -> result.toolId().equals(m.get("id")));
+            if (!hasMatch) continue;
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> toolResults = (List<Map<String, Object>>) msg.computeIfAbsent(
+                    "toolResults", k -> new ArrayList<>());
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("toolId", result.toolId());
+            entry.put("type", result.type());
+            entry.put("success", result.success());
+            entry.put("message", result.message());
+            entry.put("timestamp", Instant.now().toEpochMilli());
+            toolResults.add(entry);
+            break;
+        }
+        session.setMessages(serializeMessages(messages));
+        session.setEndedAt(Instant.now());
         sessionRepository.save(session);
     }
 

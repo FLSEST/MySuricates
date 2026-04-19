@@ -29,22 +29,44 @@ class AssistantToolExecutorTest {
     @Mock private ChainService chainService;
 
     private AssistantToolExecutor executor;
+    private PendingToolRegistry registry;
 
     @BeforeEach
     void setUp() {
+        registry = new PendingToolRegistry();
         executor = new AssistantToolExecutor(todoService, workflowService,
-                workflowExecutor, chainService, new ObjectMapper());
+                workflowExecutor, chainService, new ObjectMapper(), registry);
+    }
+
+    /**
+     * Test helper: simulates the full extract → confirm flow. Takes the cleaned response
+     * (with {@code [Aktion wartet auf Bestätigung: …]} placeholders), confirms each pending
+     * tool, and substitutes the placeholder with the tool's result message — preserving the
+     * surrounding prose so existing tests can still assert on "Ich erstelle: …" etc.
+     */
+    private String runAllTools(String input) {
+        var extraction = executor.extractTools(input);
+        if (extraction.pendingTools().isEmpty()) {
+            return extraction.cleanedResponse();
+        }
+        String result = extraction.cleanedResponse();
+        for (PendingTool t : extraction.pendingTools()) {
+            String placeholder = "[Aktion wartet auf Bestätigung: " + t.description() + "]";
+            ToolExecutionResult r = executor.executeConfirmed(t);
+            result = result.replace(placeholder, r.message());
+        }
+        return result;
     }
 
     @Test
     void executeTools_noToolTags_returnsUnchanged() {
         String input = "Hier ist eine normale Antwort ohne Tools.";
-        assertThat(executor.executeTools(input)).isEqualTo(input);
+        assertThat(runAllTools(input)).isEqualTo(input);
     }
 
     @Test
     void executeTools_null_returnsNull() {
-        assertThat(executor.executeTools(null)).isNull();
+        assertThat(runAllTools(null)).isNull();
     }
 
     @Test
@@ -53,7 +75,7 @@ class AssistantToolExecutorTest {
         when(todoService.create(any())).thenReturn(created);
 
         String input = "<tool type=\"create_todo\">{\"title\": \"Test Todo\", \"priority\": \"HIGH\"}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("✓");
         assertThat(result).contains("Test Todo");
@@ -63,7 +85,7 @@ class AssistantToolExecutorTest {
     @Test
     void executeTools_createTodo_missingTitle_returnsError() {
         String input = "<tool type=\"create_todo\">{\"description\": \"no title\"}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("⚠");
         assertThat(result).contains("Titel fehlt");
@@ -73,7 +95,7 @@ class AssistantToolExecutorTest {
     @Test
     void executeTools_updateTodoStatus_success() {
         String input = "<tool type=\"update_todo_status\">{\"id\": \"12345678-abcd\", \"status\": \"DONE\"}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("✓");
         verify(todoService).updateStatus(eq("12345678-abcd"), any());
@@ -82,7 +104,7 @@ class AssistantToolExecutorTest {
     @Test
     void executeTools_updateTodoStatus_invalidStatus_returnsError() {
         String input = "<tool type=\"update_todo_status\">{\"id\": \"123\", \"status\": \"INVALID\"}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("⚠");
         assertThat(result).contains("Ungültiger Status");
@@ -94,7 +116,7 @@ class AssistantToolExecutorTest {
         when(workflowService.create(any())).thenReturn(created);
 
         String input = "<tool type=\"create_workflow\">{\"projectId\": \"p1\", \"name\": \"Test Workflow\"}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("✓");
         assertThat(result).contains("Test Workflow");
@@ -103,7 +125,7 @@ class AssistantToolExecutorTest {
     @Test
     void executeTools_createWorkflow_missingName_returnsError() {
         String input = "<tool type=\"create_workflow\">{\"projectId\": \"p1\"}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("⚠");
         assertThat(result).contains("Pflichtfeld");
@@ -117,7 +139,7 @@ class AssistantToolExecutorTest {
         when(workflowExecutor.execute(eq(wf), any())).thenReturn(run);
 
         String input = "<tool type=\"start_workflow\">{\"workflowId\": \"wf-1\"}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("✓");
         assertThat(result).contains("gestartet");
@@ -126,7 +148,7 @@ class AssistantToolExecutorTest {
     @Test
     void executeTools_cancelRun_success() {
         String input = "<tool type=\"cancel_run\">{\"runId\": \"run-12345678\"}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("✓");
         verify(workflowExecutor).cancelExecution("run-12345678");
@@ -138,7 +160,7 @@ class AssistantToolExecutorTest {
         when(workflowService.findById("wf-1")).thenReturn(wf);
 
         String input = "<tool type=\"delete_workflow\">{\"workflowId\": \"wf-1\"}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("✓");
         assertThat(result).contains("gelöscht");
@@ -151,7 +173,7 @@ class AssistantToolExecutorTest {
         when(chainService.create(any())).thenReturn(chain);
 
         String input = "<tool type=\"create_chain\">{\"name\": \"My Chain\", \"entries\": [{\"workflowId\": \"wf-1\"}]}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("✓");
         assertThat(result).contains("Chain erstellt");
@@ -164,7 +186,7 @@ class AssistantToolExecutorTest {
 
         // Use fullwidth characters: ＂title＂： ＂Unicode Test＂
         String input = "<tool type=\"create_todo\">{\u201ctitle\u201d: \u201cUnicode Test\u201d\uff0c \u201cpriority\u201d: \u201cHIGH\u201d}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("✓");
     }
@@ -172,7 +194,7 @@ class AssistantToolExecutorTest {
     @Test
     void executeTools_unknownToolType_returnsError() {
         String input = "<tool type=\"unknown_tool\">{}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("Unbekanntes Tool");
     }
@@ -184,7 +206,7 @@ class AssistantToolExecutorTest {
 
         String input = "Ich erstelle: <tool type=\"create_todo\">{\"title\": \"T1\"}</tool> und " +
                 "<tool type=\"cancel_run\">{\"runId\": \"run-99998888\"}</tool> fertig.";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("✓ Todo angelegt");
         assertThat(result).contains("✓ Run abgebrochen");
@@ -200,7 +222,7 @@ class AssistantToolExecutorTest {
         when(workflowService.update(eq("wf-1"), any())).thenReturn(updated);
 
         String input = "<tool type=\"update_workflow\">{\"workflowId\": \"wf-1\", \"name\": \"Updated WF\"}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("✓");
         assertThat(result).contains("aktualisiert");
@@ -210,7 +232,7 @@ class AssistantToolExecutorTest {
     @Test
     void executeTools_updateWorkflow_missingWorkflowId_returnsError() {
         String input = "<tool type=\"update_workflow\">{\"name\": \"New Name\"}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("⚠");
         assertThat(result).contains("workflowId");
@@ -219,7 +241,7 @@ class AssistantToolExecutorTest {
     @Test
     void executeTools_startWorkflow_missingWorkflowId_returnsError() {
         String input = "<tool type=\"start_workflow\">{\"context\": {}}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("⚠");
         assertThat(result).contains("workflowId");
@@ -228,7 +250,7 @@ class AssistantToolExecutorTest {
     @Test
     void executeTools_deleteWorkflow_missingWorkflowId_returnsError() {
         String input = "<tool type=\"delete_workflow\">{}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("⚠");
         assertThat(result).contains("workflowId");
@@ -237,7 +259,7 @@ class AssistantToolExecutorTest {
     @Test
     void executeTools_cancelRun_missingRunId_returnsError() {
         String input = "<tool type=\"cancel_run\">{}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("⚠");
         assertThat(result).contains("runId");
@@ -246,7 +268,7 @@ class AssistantToolExecutorTest {
     @Test
     void executeTools_createChain_missingName_returnsError() {
         String input = "<tool type=\"create_chain\">{\"entries\": [{\"workflowId\": \"wf-1\"}]}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("⚠");
         assertThat(result).contains("name");
@@ -255,7 +277,7 @@ class AssistantToolExecutorTest {
     @Test
     void executeTools_createChain_emptyEntries_returnsError() {
         String input = "<tool type=\"create_chain\">{\"name\": \"Chain\", \"entries\": []}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("⚠");
         assertThat(result).contains("entries");
@@ -267,7 +289,7 @@ class AssistantToolExecutorTest {
         when(todoService.create(any())).thenReturn(created);
 
         String input = "<tool type=\"create_todo\">{\"title\": \"Tagged Todo\", \"tags\": [\"backend\", \"bug\"]}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("✓");
         assertThat(result).contains("Tags: backend, bug");
@@ -279,7 +301,7 @@ class AssistantToolExecutorTest {
         when(todoService.create(any())).thenReturn(created);
 
         String input = "<tool type=\"create_todo\">{\"title\": \"Test\", \"priority\": \"BOGUS\"}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("✓");
         assertThat(result).contains("MEDIUM");
@@ -290,7 +312,7 @@ class AssistantToolExecutorTest {
         when(todoService.create(any())).thenThrow(new RuntimeException("DB error"));
 
         String input = "<tool type=\"create_todo\">{\"title\": \"Test\"}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("⚠");
         assertThat(result).contains("DB error");
@@ -304,7 +326,7 @@ class AssistantToolExecutorTest {
         when(workflowExecutor.execute(eq(wf), any())).thenReturn(run);
 
         String input = "<tool type=\"start_workflow\">{\"workflowId\": \"wf-1\", \"context\": {\"key\": \"val\"}}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("✓");
         verify(workflowExecutor).execute(eq(wf), argThat(ctx -> "val".equals(ctx.get("key"))));
@@ -313,7 +335,7 @@ class AssistantToolExecutorTest {
     @Test
     void executeTools_invalidJson_returnsError() {
         String input = "<tool type=\"create_todo\">{invalid json!!!}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("⚠");
     }
@@ -321,7 +343,7 @@ class AssistantToolExecutorTest {
     @Test
     void executeTools_updateTodoStatus_missingFields_returnsError() {
         String input = "<tool type=\"update_todo_status\">{}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("⚠");
         assertThat(result).contains("Pflichtfelder");
@@ -343,7 +365,7 @@ class AssistantToolExecutorTest {
                   "defaultContext": {"branch": "main"}
                 }</tool>
                 """;
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("✓ Workflow erstellt");
         verify(workflowService).create(argThat(req ->
@@ -373,7 +395,7 @@ class AssistantToolExecutorTest {
                   "defaultContext": {"env": "prod"}
                 }</tool>
                 """;
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("✓ Workflow aktualisiert");
         verify(workflowService).update(eq("wf-1"), argThat(req ->
@@ -406,7 +428,7 @@ class AssistantToolExecutorTest {
                   }]
                 }</tool>
                 """;
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("✓ Chain erstellt");
         verify(chainService).create(argThat(req ->
@@ -427,7 +449,7 @@ class AssistantToolExecutorTest {
         when(workflowService.findById("wf-1")).thenThrow(new RuntimeException("not allowed"));
 
         String input = "<tool type=\"delete_workflow\">{\"workflowId\": \"wf-1\"}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("⚠ Workflow konnte nicht gelöscht werden: not allowed");
     }
@@ -439,8 +461,74 @@ class AssistantToolExecutorTest {
         when(workflowExecutor.execute(eq(workflow), any())).thenThrow(new RuntimeException("queue offline"));
 
         String input = "<tool type=\"start_workflow\">{\"workflowId\": \"wf-1\"}</tool>";
-        String result = executor.executeTools(input);
+        String result = runAllTools(input);
 
         assertThat(result).contains("⚠ Workflow konnte nicht gestartet werden: queue offline");
+    }
+
+    // ── Hard-gate semantics: extractTools MUST NOT execute ────────────────────
+
+    @Test
+    void extractTools_createTodo_registersPending_doesNotExecute() {
+        String input = "<tool type=\"create_todo\">{\"title\": \"Gate me\", \"priority\": \"HIGH\"}</tool>";
+
+        var extraction = executor.extractTools(input);
+
+        // Tool is registered as pending, NOT executed
+        assertThat(extraction.pendingTools()).hasSize(1);
+        assertThat(extraction.pendingTools().get(0).type()).isEqualTo("create_todo");
+        assertThat(extraction.pendingTools().get(0).id()).isNotBlank();
+        assertThat(extraction.pendingTools().get(0).description())
+                .contains("TODO anlegen").contains("Gate me").contains("HIGH");
+        assertThat(extraction.cleanedResponse()).contains("Aktion wartet auf Bestätigung");
+
+        // Critically: no TodoService call happened
+        verify(todoService, never()).create(any());
+        // Registry holds the entry until take()
+        assertThat(registry.size()).isEqualTo(1);
+    }
+
+    @Test
+    void extractTools_multipleTools_allRegistered_noneExecuted() {
+        String input = "<tool type=\"create_todo\">{\"title\": \"A\"}</tool> "
+                + "<tool type=\"delete_workflow\">{\"workflowId\": \"wf-9\"}</tool>";
+
+        var extraction = executor.extractTools(input);
+
+        assertThat(extraction.pendingTools()).hasSize(2);
+        assertThat(extraction.pendingTools()).extracting(PendingTool::type)
+                .containsExactly("create_todo", "delete_workflow");
+        verifyNoInteractions(todoService, workflowService);
+        assertThat(registry.size()).isEqualTo(2);
+    }
+
+    @Test
+    void executeConfirmed_runsTheTool_andReturnsSuccessResult() {
+        Todo created = Todo.builder().id("abcdef12-xxx").title("Gate me").build();
+        when(todoService.create(any())).thenReturn(created);
+
+        PendingTool tool = registry.register("create_todo",
+                "TODO anlegen: \"Gate me\"",
+                "{\"title\":\"Gate me\",\"priority\":\"HIGH\"}");
+
+        ToolExecutionResult result = executor.executeConfirmed(tool);
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.message()).contains("✓").contains("Gate me");
+        assertThat(result.type()).isEqualTo("create_todo");
+        assertThat(result.toolId()).isEqualTo(tool.id());
+        verify(todoService).create(any());
+    }
+
+    @Test
+    void executeConfirmed_toolFailure_returnsFailureResult() {
+        when(todoService.create(any())).thenThrow(new RuntimeException("db full"));
+        PendingTool tool = registry.register("create_todo", "TODO anlegen: \"X\"",
+                "{\"title\":\"X\"}");
+
+        ToolExecutionResult result = executor.executeConfirmed(tool);
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.message()).contains("⚠").contains("db full");
     }
 }

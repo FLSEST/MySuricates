@@ -1,5 +1,6 @@
 package com.automation.dto;
 
+import com.automation.service.assistant.PendingTool;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.util.List;
@@ -11,23 +12,40 @@ public record AssistantChatResponse(
         @JsonInclude(JsonInclude.Include.NON_NULL)
         String provider,
         @JsonInclude(JsonInclude.Include.NON_NULL)
-        Long responseTimeMs
+        Long responseTimeMs,
+        /**
+         * Tool actions the assistant proposed in this turn. The frontend renders a confirmation
+         * card for each and calls {@code POST /api/v1/assistant/pending-tools/{id}/confirm|reject}.
+         * Empty/null if the turn contained no {@code <tool>} tags.
+         */
+        @JsonInclude(JsonInclude.Include.NON_EMPTY)
+        List<PendingTool> pendingTools
 ) {
     /** Backwards-compatible constructor — existing callsites use 2 args. */
     public AssistantChatResponse(String message, List<AssistantAction> actions) {
-        this(message, actions, null, null, null);
+        this(message, actions, null, null, null, null);
     }
 
     public AssistantChatResponse(String message, List<AssistantAction> actions, String model) {
-        this(message, actions, model, null, null);
+        this(message, actions, model, null, null, null);
     }
 
     public AssistantChatResponse(String message, List<AssistantAction> actions, String model, String provider) {
-        this(message, actions, model, provider, null);
+        this(message, actions, model, provider, null, null);
+    }
+
+    /** Backwards-compatible 5-arg (pre-pendingTools era). */
+    public AssistantChatResponse(String message, List<AssistantAction> actions, String model, String provider,
+                                 Long responseTimeMs) {
+        this(message, actions, model, provider, responseTimeMs, null);
+    }
+
+    public AssistantChatResponse withPendingTools(List<PendingTool> pendingTools) {
+        return new AssistantChatResponse(message, actions, model, provider, responseTimeMs, pendingTools);
     }
 
     public AssistantChatResponse withResponseTimeMs(long responseTimeMs) {
-        return new AssistantChatResponse(message, actions, model, provider, responseTimeMs);
+        return new AssistantChatResponse(message, actions, model, provider, responseTimeMs, pendingTools);
     }
 
     /** An actionable suggestion the assistant is offering the user. */

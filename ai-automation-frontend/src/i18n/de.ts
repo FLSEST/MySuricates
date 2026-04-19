@@ -1357,4 +1357,11 @@ export const de: TranslationKeys = {
     invalidJson: 'Ungültiges JSON',
     blockEdited: 'bearbeitet',
   },
+  assistant: {
+    pendingToolConfirm: 'Bestätigen',
+    pendingToolReject: 'Ablehnen',
+    pendingToolExecuting: 'Wird ausgeführt …',
+    pendingToolExpired: 'Vorschlag abgelaufen',
+    pendingToolError: 'Aktion konnte nicht ausgeführt werden',
+  },
 } as const;

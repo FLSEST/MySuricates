@@ -147,6 +147,7 @@ export function AssistantPanel() {
             responseTimeMs: res.responseTimeMs ?? undefined,
             provider: res.provider ?? undefined,
             model: res.model ?? undefined,
+            pendingTools: res.pendingTools,
             timestamp: Date.now(),
           });
           queryClient.invalidateQueries({ queryKey: ['assistant-sessions-api'] });
@@ -372,6 +373,7 @@ export function AssistantPanel() {
                 <MessageBubble
                   key={msg.id}
                   msg={msg}
+                  sessionId={activeSessionId ?? undefined}
                   onClose={() => setOpen(false)}
                   onSend={handleSendText}
                   onExecute={handleExecute}

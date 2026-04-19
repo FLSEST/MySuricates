@@ -1360,6 +1360,13 @@ export const en = {
     invalidJson: 'Invalid JSON',
     blockEdited: 'edited',
   },
+  assistant: {
+    pendingToolConfirm: 'Confirm',
+    pendingToolReject: 'Reject',
+    pendingToolExecuting: 'Executing …',
+    pendingToolExpired: 'Proposal expired',
+    pendingToolError: 'Failed to execute action',
+  },
 } as const;
 
 type DeepStringify<T> = {

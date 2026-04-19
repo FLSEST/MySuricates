@@ -69,8 +69,9 @@ class AssistantServiceTest {
         lenient().when(contextBuilder.resolveWorkingDir(any())).thenReturn("/tmp");
         // Fetch service defaults — no fetches
         lenient().when(fetchService.parseFetchRequests(any())).thenReturn(List.of());
-        // Tool executor — pass through (no tools)
-        lenient().when(toolExecutor.executeTools(any())).thenAnswer(inv -> inv.getArgument(0));
+        // Tool executor — no pending tools, pass cleaned response through unchanged
+        lenient().when(toolExecutor.extractTools(any()))
+                .thenAnswer(inv -> new AssistantToolExecutor.ExtractionResult(inv.getArgument(0), List.of()));
         // Fetch strip — pass through
         lenient().when(fetchService.stripFetchTags(any())).thenAnswer(inv -> inv.getArgument(0));
     }

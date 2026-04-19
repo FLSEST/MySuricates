@@ -9,9 +9,14 @@ import com.automation.service.AssistantService;
 import com.automation.service.AssistantSessionService;
 import com.automation.service.PageSuggestionService;
 import com.automation.service.assistant.AssistantChatBroadcaster;
+import com.automation.service.assistant.AssistantToolExecutor;
+import com.automation.service.assistant.PendingTool;
+import com.automation.service.assistant.PendingToolRegistry;
+import com.automation.service.assistant.ToolExecutionResult;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,6 +31,11 @@ public class AssistantController {
     private final PageSuggestionService pageSuggestionService;
     private final AssistantChatBroadcaster broadcaster;
     private final ApplicationEventPublisher eventPublisher;
+    private final PendingToolRegistry pendingToolRegistry;
+    private final AssistantToolExecutor toolExecutor;
+
+    /** Optional body for confirm/reject — carries sessionId so the result hits the right history. */
+    public record PendingToolAction(String sessionId) {}
 
     @PostMapping("/chat")
     public AssistantChatResponse chat(@Valid @RequestBody AssistantChatRequest request) {
@@ -62,5 +72,44 @@ public class AssistantController {
     @DeleteMapping("/sessions/{id}")
     public void deleteSession(@PathVariable String id) {
         assistantSessionService.deleteSession(id);
+    }
+
+    /**
+     * Executes a previously proposed tool after explicit user confirmation.
+     * Returns 410 Gone if the tool has already been consumed or expired — the frontend treats
+     * that as "already handled" and doesn't retry.
+     */
+    @PostMapping("/pending-tools/{id}/confirm")
+    public ResponseEntity<ToolExecutionResult> confirmPendingTool(
+            @PathVariable String id,
+            @RequestBody(required = false) PendingToolAction body) {
+        PendingTool tool = pendingToolRegistry.take(id).orElse(null);
+        if (tool == null) {
+            return ResponseEntity.status(410).build();
+        }
+        ToolExecutionResult result = toolExecutor.executeConfirmed(tool);
+        persistResult(body, result);
+        broadcaster.broadcastStatus(id, result.success() ? "TOOL_EXECUTED" : "TOOL_FAILED",
+                result.message(), System.nanoTime());
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/pending-tools/{id}/reject")
+    public ResponseEntity<ToolExecutionResult> rejectPendingTool(
+            @PathVariable String id,
+            @RequestBody(required = false) PendingToolAction body) {
+        PendingTool tool = pendingToolRegistry.take(id).orElse(null);
+        if (tool == null) {
+            return ResponseEntity.status(410).build();
+        }
+        ToolExecutionResult result = ToolExecutionResult.rejected(tool.id(), tool.type());
+        persistResult(body, result);
+        broadcaster.broadcastStatus(id, "TOOL_REJECTED", result.message(), System.nanoTime());
+        return ResponseEntity.ok(result);
+    }
+
+    private void persistResult(PendingToolAction body, ToolExecutionResult result) {
+        if (body == null || body.sessionId() == null) return;
+        assistantSessionService.appendToolResult(body.sessionId(), result);
     }
 }

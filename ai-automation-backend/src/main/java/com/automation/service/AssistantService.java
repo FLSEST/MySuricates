@@ -159,15 +159,17 @@ public class AssistantService {
                 );
             }
 
-            // Execute tools in final response
+            // Extract tool proposals (NOT executed — user must confirm via controller endpoint)
             broadcaster.broadcastStatus(requestId, "EXECUTING_TOOLS", null, startNanos);
-            String finalOutput = toolExecutor.executeTools(result.output());
+            var extraction = toolExecutor.extractTools(result.output());
+            String finalOutput = extraction.cleanedResponse();
             // Strip leftover <fetch> tags
             finalOutput = fetchService.stripFetchTags(finalOutput);
 
             AssistantChatResponse parsed = parseResponse(finalOutput);
             broadcaster.broadcastStatus(requestId, "COMPLETED", null, startNanos);
-            return new AssistantChatResponse(parsed.message(), parsed.actions(), model, resolvedProvider);
+            return new AssistantChatResponse(parsed.message(), parsed.actions(), model, resolvedProvider)
+                    .withPendingTools(extraction.pendingTools());
 
         } catch (Exception e) {
             log.error("Assistant chat failed", e);

@@ -32,12 +32,27 @@ export interface AssistantChatRequest {
   requestId?: string;
 }
 
+export interface PendingTool {
+  id: string;
+  type: string;
+  description: string;
+  expiresAt: string;
+}
+
+export interface ToolExecutionResult {
+  toolId: string;
+  type: string;
+  success: boolean;
+  message: string;
+}
+
 export interface AssistantChatResponse {
   message: string;
   actions: AssistantAction[];
   model?: string | null;
   provider?: string | null;
   responseTimeMs?: number | null;
+  pendingTools?: PendingTool[];
 }
 
 export interface ChatMessage {
@@ -51,12 +66,32 @@ export interface ChatMessage {
   timestamp?: number;
   isError?: boolean;
   status?: 'sending' | 'sent' | 'error';
+  pendingTools?: PendingTool[];
+  toolResults?: ToolExecutionResult[];
 }
 
 export function useAssistantChat() {
   return useMutation({
     mutationFn: ({ req, signal }: { req: AssistantChatRequest; signal?: AbortSignal }) =>
       api.post<AssistantChatResponse>('/assistant/chat', req, { signal }),
+  });
+}
+
+/**
+ * Confirms a previously-proposed tool action. The backend only executes the tool after this
+ * call fires — the assistant itself cannot bypass this gate regardless of model behavior.
+ */
+export function useConfirmPendingTool() {
+  return useMutation({
+    mutationFn: ({ id, sessionId }: { id: string; sessionId?: string }) =>
+      api.post<ToolExecutionResult>(`/assistant/pending-tools/${id}/confirm`, { sessionId }),
+  });
+}
+
+export function useRejectPendingTool() {
+  return useMutation({
+    mutationFn: ({ id, sessionId }: { id: string; sessionId?: string }) =>
+      api.post<ToolExecutionResult>(`/assistant/pending-tools/${id}/reject`, { sessionId }),
   });
 }
 

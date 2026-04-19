@@ -20,15 +20,23 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Executes tool calls embedded in the assistant's response.
- * Tools are encoded as <tool type="...">JSON</tool> tags.
- * Each tool call is replaced with a success/error message inline.
+ * Parses and executes tool calls embedded in the assistant's response.
+ * Tools are encoded as {@code <tool type="...">JSON</tool>} tags.
+ *
+ * <p><b>Hard-gate (2026-04-19)</b>: tool tags are <b>not</b> executed inline anymore.
+ * {@link #extractTools(String)} returns a list of {@link PendingTool}s that the
+ * {@link com.automation.controller.AssistantController} hands back to the frontend; execution
+ * only happens after the user clicks "Bestätigen" via
+ * {@code POST /api/v1/assistant/pending-tools/{id}/confirm}, which invokes
+ * {@link #executeConfirmed(PendingTool)}. This prevents the LLM from mutating platform state
+ * without explicit user approval, independent of prompt compliance.
  */
 @Component
 @RequiredArgsConstructor
@@ -43,37 +51,86 @@ public class AssistantToolExecutor {
     private final WorkflowExecutor workflowExecutor;
     private final ChainService chainService;
     private final ObjectMapper objectMapper;
+    private final PendingToolRegistry pendingToolRegistry;
 
-    private record ToolRequest(String type, String payload) {}
+    /**
+     * Result of {@link #extractTools(String)}: the cleaned response (with tool tags replaced
+     * by placeholder text) plus the list of pending tool proposals to surface to the user.
+     */
+    public record ExtractionResult(String cleanedResponse, List<PendingTool> pendingTools) {}
 
-    /** Replaces all <tool> tags in the response with their execution results. */
-    public String executeTools(String response) {
-        if (response == null) return response;
+    /**
+     * Extracts all {@code <tool>} tags from the assistant response, registers them as pending
+     * (to be confirmed by the user), and replaces them in the response text with a short
+     * "wartet auf Bestätigung" placeholder. No tool is executed at this point.
+     */
+    public ExtractionResult extractTools(String response) {
+        if (response == null) return new ExtractionResult(null, List.of());
         Matcher m = TOOL_PATTERN.matcher(response);
-        if (!m.find()) return response;
+        if (!m.find()) return new ExtractionResult(response, List.of());
 
+        List<PendingTool> pending = new ArrayList<>();
         StringBuffer sb = new StringBuffer();
         do {
-            String result = executeTool(new ToolRequest(m.group(1), m.group(2).trim()));
-            m.appendReplacement(sb, Matcher.quoteReplacement(result));
+            String type = m.group(1);
+            String payload = sanitizeJson(m.group(2).trim());
+            String description = describe(type, payload);
+            PendingTool tool = pendingToolRegistry.register(type, description, payload);
+            pending.add(tool);
+            m.appendReplacement(sb,
+                    Matcher.quoteReplacement("[Aktion wartet auf Bestätigung: " + description + "]"));
         } while (m.find());
         m.appendTail(sb);
-        return sb.toString();
+        return new ExtractionResult(sb.toString(), pending);
     }
 
-    private String executeTool(ToolRequest req) {
-        String payload = sanitizeJson(req.payload());
-        return switch (req.type()) {
+    /**
+     * Executes a tool that the user has just confirmed. Called from the controller after
+     * {@link PendingToolRegistry#take(String)} has returned the entry.
+     */
+    public ToolExecutionResult executeConfirmed(PendingTool tool) {
+        String payload = sanitizeJson(tool.payloadJson());
+        String rawResult = switch (tool.type()) {
             case "create_todo"        -> executeCreateTodo(payload);
             case "update_todo_status" -> executeUpdateTodoStatus(payload);
             case "create_workflow"    -> executeCreateWorkflow(payload);
-            case "update_workflow"   -> executeUpdateWorkflow(payload);
-            case "delete_workflow"   -> executeDeleteWorkflow(payload);
-            case "start_workflow"    -> executeStartWorkflow(payload);
-            case "cancel_run"        -> executeCancelRun(payload);
-            case "create_chain"      -> executeCreateChain(payload);
-            default -> "[Unbekanntes Tool: " + req.type() + "]";
+            case "update_workflow"    -> executeUpdateWorkflow(payload);
+            case "delete_workflow"    -> executeDeleteWorkflow(payload);
+            case "start_workflow"     -> executeStartWorkflow(payload);
+            case "cancel_run"         -> executeCancelRun(payload);
+            case "create_chain"       -> executeCreateChain(payload);
+            default -> "[Unbekanntes Tool: " + tool.type() + "]";
         };
+        boolean success = rawResult != null && rawResult.startsWith("✓");
+        return new ToolExecutionResult(tool.id(), tool.type(), success, rawResult);
+    }
+
+    /** Builds a short, user-facing description for a tool proposal. */
+    String describe(String type, String payloadJson) {
+        try {
+            Map<String, Object> params = objectMapper.readValue(payloadJson, new TypeReference<>() {});
+            return switch (type) {
+                case "create_todo" -> "TODO anlegen: \"" + params.getOrDefault("title", "?") + "\""
+                        + " (Priorität: " + params.getOrDefault("priority", "MEDIUM") + ")";
+                case "update_todo_status" -> "TODO-Status ändern → " + params.getOrDefault("status", "?");
+                case "create_workflow" -> "Workflow erstellen: \"" + params.getOrDefault("name", "?") + "\"";
+                case "update_workflow" -> "Workflow aktualisieren (ID: " + shorten(params.get("workflowId")) + ")";
+                case "delete_workflow" -> "Workflow LÖSCHEN (ID: " + shorten(params.get("workflowId")) + ")";
+                case "start_workflow" -> "Workflow starten (ID: " + shorten(params.get("workflowId")) + ")";
+                case "cancel_run" -> "Run abbrechen (ID: " + shorten(params.get("runId")) + ")";
+                case "create_chain" -> "Chain erstellen: \"" + params.getOrDefault("name", "?") + "\"";
+                default -> type;
+            };
+        } catch (Exception e) {
+            log.debug("describe failed for tool type={} — falling back to type label", type, e);
+            return type;
+        }
+    }
+
+    private static String shorten(Object id) {
+        if (id == null) return "?";
+        String s = id.toString();
+        return s.length() > 8 ? s.substring(0, 8) + "…" : s;
     }
 
     /**
