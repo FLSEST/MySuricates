@@ -24,6 +24,7 @@
         <docker-java.version>3.4.1</docker-java.version>
         <sqlite-jdbc.version>3.49.1.0</sqlite-jdbc.version>
         <sqlite-dialect.version>0.1.4</sqlite-dialect.version>
+        <tika.version>3.3.0</tika.version>
     </properties>
 
     <dependencies>
@@ -93,6 +94,33 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
+        </dependency>
+
+        <!-- Apache Tika — document text extraction (pure Java, no native deps) -->
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-core</artifactId>
+            <version>${tika.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-parser-pdf-module</artifactId>
+            <version>${tika.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-parser-microsoft-module</artifactId>
+            <version>${tika.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-parser-text-module</artifactId>
+            <version>${tika.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-parser-html-module</artifactId>
+            <version>${tika.version}</version>
         </dependency>
 
         <!-- Lombok -->

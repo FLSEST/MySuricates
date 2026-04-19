@@ -197,6 +197,7 @@ export const de: TranslationKeys = {
       'human-input': 'Benutzereingabe',
       switch: 'Verzweigung',
       integration: 'Integration',
+      document: 'Dokument (PDF/Text-Extraktion)',
     },
     instructions: 'Agent-Anweisungen',
     allProjects: 'Alle Projekte',

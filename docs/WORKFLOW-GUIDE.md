@@ -63,7 +63,7 @@ Zugriff in Block-Configs mit `{{ filepath }}` oder `{{ language }}`.
 
 ## 2. Block-Typ-Referenz
 
-MySuricates unterstuetzt 12 Block-Typen. Jeder Block hat einen `type` und eine `config`-Map.
+MySuricates unterstuetzt 13 Block-Typen. Jeder Block hat einen `type` und eine `config`-Map.
 
 ### Allgemeine Block-Eigenschaften
 
@@ -449,6 +449,49 @@ Ruft die Faehigkeit eines registrierten Skills auf.
 ```
 
 **Wann verwenden**: Spezialisierte Skills nutzen (OCR, Web-Suche, Analyse).
+
+---
+
+### `document` — Text aus Dokumenten extrahieren
+
+Liest eine Datei (PDF, DOCX, XLSX, PPTX, HTML, TXT, EPUB, RTF, …) und extrahiert den Plain-Text via Apache Tika. Pure Java, keine nativen Abhängigkeiten. Ausgabe ist der extrahierte Text als `previous_output` (und optional als benannte Variable). Kosten: 0 Tokens.
+
+| Config-Schluessel | Typ | Default | Beschreibung |
+|---|---|---|---|
+| `file_path` | string | **erforderlich** | Pfad zur Datei. Absolut oder relativ zum Projekt-Pfad. Unterstuetzt Templates (`{{ variable }}`). |
+| `variable_name` | string | null | Wenn gesetzt, wird der extrahierte Text zusätzlich in diese Kontext-Variable geschrieben. |
+| `fail_on_empty` | bool | `false` | Wenn true, FAILT der Block wenn der extrahierte Text leer/unter Schwelle ist. |
+| `min_characters` | int | `1` | Schwelle für `fail_on_empty`: weniger Zeichen gelten als leer. |
+
+```json
+{
+  "type": "document",
+  "config": {
+    "file_path": "{{ invoice_path }}",
+    "variable_name": "invoice_text",
+    "fail_on_empty": true,
+    "min_characters": 50
+  }
+}
+```
+
+**Unterstützte Formate (Auswahl)**: PDF (mit Text-Layer), DOCX/XLSX/PPTX, HTML/XML, TXT, EPUB, RTF, ODT.
+
+**Limits**:
+- Default max. 50 MB pro Datei (konfigurierbar via `automation.document.max-bytes`)
+- Default max. 5 Mio. Zeichen Output (konfigurierbar via `automation.document.max-characters`)
+- Pfad-Traversal (`../`) aus dem Projekt-Pfad wird blockiert
+- Gescannte PDFs ohne Text-Layer liefern leeren Output → OCR ist aktuell nicht Teil dieses Blocks (folgt in einer späteren Ausbaustufe)
+
+**Wann verwenden**: Rechnungs-/Vertragstext extrahieren, PDF-Reports zusammenfassen (Kombination mit `simple`-Block), Dokumenten-Klassifikation, Vorverarbeitung für LLM-Analyse ohne Vision-Token-Kosten.
+
+**Beispiel-Kombination mit `simple`**:
+```json
+[
+  { "type": "document", "config": { "file_path": "{{ pdf }}", "variable_name": "text" } },
+  { "type": "simple", "config": { "command": "Fasse zusammen:\n\n{{ text }}" } }
+]
+```
 
 ---
 
@@ -907,19 +950,41 @@ Token-Nutzung (Input + Output) wird ueber alle Iterationen getrackt. Wenn das Bu
 
 ### Workflow Memory
 
-Workflows koennen ueber Runs hinweg Wissen ansammeln. Memory wird **manuell extrahiert** — es passiert nicht automatisch nach einem Run.
+Workflows koennen ueber Runs hinweg Wissen ansammeln. Memory kann **manuell** oder **automatisch** extrahiert werden.
 
 #### Wie es funktioniert
 
-1. **Extrahieren** (manuell): Nach einem oder mehreren Runs, Extraktion ueber UI ("Memory"-Tab auf der Workflow-Detailseite) oder API ausloesen. Runs auswaehlen und Provider waehlen (Claude oder Codex). Der `ConversationPreprocessor` komprimiert die Step-Outputs um ~50-70% bevor sie an die KI gesendet werden, die einen strukturierten Wissenseintrag (Titel, Markdown-Inhalt, Tags) erstellt.
-2. **Aktivieren** (manuell): Extrahiertes Memory startet als `active=false`. Explizit aktivieren bevor es wirksam wird. Nur eine Version kann gleichzeitig aktiv sein.
+1. **Extrahieren** (manuell oder automatisch): Nach einem oder mehreren Runs, Extraktion ueber UI ("Memory"-Tab auf der Workflow-Detailseite) oder API ausloesen. Runs auswaehlen und Provider waehlen (Claude oder Codex). Der `ConversationPreprocessor` komprimiert die Step-Outputs um ~50-70% bevor sie an die KI gesendet werden, die einen strukturierten Wissenseintrag (Titel, Markdown-Inhalt, Tags) erstellt.
+2. **Aktivieren** (manuell oder automatisch): Bei manueller Extraktion startet Memory als `active=false`. Bei automatischer Extraktion wird es direkt aktiviert. Nur eine Version kann gleichzeitig aktiv sein.
 3. **Beim naechsten Run verwendet**: Vor jeder Workflow-Ausfuehrung wird das aktive Memory nach `.claude/rules/project-memory.md` im Projektverzeichnis geschrieben. Die Claude CLI greift auf diese Datei automatisch via Rules-System zu.
 4. **Versionierung**: Mehrere Memory-Versionen pro Workflow werden aufbewahrt. Aeltere Versionen koennen durch Aktivierung wiederhergestellt werden.
 5. **Bearbeiten**: Titel und Inhalt koennen in der UI (Monaco-Editor) manuell verfeinert werden.
 
+#### Automatische Extraktion (Auto-Memory)
+
+Konfigurierbar pro Workflow ueber `metadata.autoMemoryExtraction`:
+
+```json
+{
+  "metadata": {
+    "autoMemoryExtraction": {
+      "enabled": true,
+      "interval": 5
+    }
+  }
+}
+```
+
+- **`enabled`**: Automatische Extraktion ein/aus
+- **`interval`**: Nach wie vielen erfolgreichen Runs extrahiert wird (Default: 5)
+- Nur bei **COMPLETED**-Runs (nicht FAILED, CANCELLED etc.)
+- Zaehlt erfolgreiche Runs seit letzter Extraktion
+- Neues Memory wird automatisch aktiviert (ersetzt das bisherige aktive Memory)
+- Konfiguration auch ueber den Toggle "Auto-Memory" auf der Workflow-Detailseite
+
 #### Wann verwenden
 
-Memory extrahieren nachdem ein Workflow einen Run mit wertvollen Erkenntnissen produziert hat — Patterns, Fallstricke, Domain-Wissen — die zukuenftige Runs leiten sollen. Besonders nuetzlich fuer Agentic-Workflows die projektspezifische Konventionen ueber die Zeit lernen.
+Memory extrahieren nachdem ein Workflow einen Run mit wertvollen Erkenntnissen produziert hat — Patterns, Fallstricke, Domain-Wissen — die zukuenftige Runs leiten sollen. Besonders nuetzlich fuer Agentic-Workflows die projektspezifische Konventionen ueber die Zeit lernen. **Auto-Memory empfohlen** fuer Workflows die regelmaessig laufen und deren Erkenntnisse sich akkumulieren.
 
 #### API
 
