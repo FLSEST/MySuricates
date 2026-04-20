@@ -8,10 +8,11 @@ import com.automation.service.cli.HostExecutionRequest;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -34,7 +35,6 @@ import java.util.Set;
  * non-fatal — the workflow simply stays untagged until the next attempt.
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class WorkflowTaggingService {
 
@@ -67,6 +67,27 @@ public class WorkflowTaggingService {
     private final AppSettingsRepository appSettingsRepository;
     private final WorkflowRepository workflowRepository;
     private final ObjectMapper objectMapper;
+
+    /**
+     * Self-reference via {@code @Lazy} so {@code @Transactional} on
+     * {@link #loadAndBuildPrompt(String)} and {@link #persistTags(String, TagResult)}
+     * is actually applied when called from {@link #tagSingle(String)} — direct
+     * this.method() would bypass the Spring AOP proxy and silently skip the tx.
+     */
+    private final WorkflowTaggingService self;
+
+    public WorkflowTaggingService(
+            CommandExecutorService commandExecutorService,
+            AppSettingsRepository appSettingsRepository,
+            WorkflowRepository workflowRepository,
+            ObjectMapper objectMapper,
+            @Lazy @Autowired WorkflowTaggingService self) {
+        this.commandExecutorService = commandExecutorService;
+        this.appSettingsRepository = appSettingsRepository;
+        this.workflowRepository = workflowRepository;
+        this.objectMapper = objectMapper;
+        this.self = self;
+    }
 
     @Value("${automation.discovery.auto-tagging-enabled:true}")
     private boolean autoTaggingEnabled;
@@ -113,37 +134,64 @@ public class WorkflowTaggingService {
             log.debug("Auto-tagging disabled; skipping backfill.");
             return;
         }
-        List<Workflow> todo = workflowRepository.findUntagged();
-        if (todo.isEmpty()) return;
-        log.info("Auto-tagging backfill: {} workflows pending", todo.size());
+        List<String> ids = self.listUntaggedIds();
+        if (ids.isEmpty()) return;
+        log.info("Auto-tagging backfill: {} workflows pending", ids.size());
         int ok = 0, fail = 0;
-        for (Workflow w : todo) {
+        for (String id : ids) {
             try {
-                if (tagSingle(w.getId())) ok++;
+                if (tagSingle(id)) ok++;
                 else fail++;
             } catch (Exception e) {
                 fail++;
-                log.debug("Backfill tagging failed for {}", w.getId(), e);
+                log.debug("Backfill tagging failed for {}", id, e);
             }
         }
         log.info("Auto-tagging backfill done: ok={}, fail={}", ok, fail);
     }
 
     /**
-     * Attempts to tag one workflow by id. Skips if user-edited or disabled.
-     * Returns true on success, false otherwise. Runs in its own transaction so a
-     * failure doesn't poison the outer request.
+     * Orchestrates tagging for one workflow — splits read-only prompt building
+     * (inside a short transaction with eager skill loading), the CLI call
+     * (outside any transaction to not hog the single HikariCP connection), and
+     * a short write transaction. No {@code @Transactional} on this method itself.
      */
-    @Transactional
     public boolean tagSingle(String workflowId) {
         if (!autoTaggingEnabled) return false;
-        Workflow w = workflowRepository.findById(workflowId).orElse(null);
-        if (w == null) return false;
-        if (w.isTagsUserEdited()) return false;
-
-        TagResult result = callModel(w);
+        String prompt = self.loadAndBuildPrompt(workflowId);
+        if (prompt == null) return false;
+        TagResult result = callModel(workflowId, prompt);
         if (result == null) return false;
+        return self.persistTags(workflowId, result);
+    }
 
+    @Transactional(readOnly = true)
+    public List<String> listUntaggedIds() {
+        return workflowRepository.findUntagged().stream().map(Workflow::getId).toList();
+    }
+
+    /**
+     * Loads the workflow with its skills eagerly and renders the prompt while the
+     * JPA session is open. Returns null if workflow is missing or user-edited so
+     * the caller short-circuits without a CLI call.
+     */
+    @Transactional(readOnly = true)
+    public String loadAndBuildPrompt(String workflowId) {
+        Workflow w = workflowRepository.findByIdWithSkills(workflowId).orElse(null);
+        if (w == null) return null;
+        if (w.isTagsUserEdited()) return null;
+        return buildPrompt(w);
+    }
+
+    /**
+     * Persists the tagging result in a fresh short transaction. Re-checks
+     * {@code tagsUserEdited} so a user edit that arrived during the CLI call is
+     * respected. Returns true on success.
+     */
+    @Transactional
+    public boolean persistTags(String workflowId, TagResult result) {
+        Workflow w = workflowRepository.findById(workflowId).orElse(null);
+        if (w == null || w.isTagsUserEdited()) return false;
         w.setCategory(result.category);
         w.setTags(new ArrayList<>(result.tags));
         w.setTagsGeneratedAt(Instant.now());
@@ -153,8 +201,7 @@ public class WorkflowTaggingService {
 
     // ── CLI call ─────────────────────────────────────────────────────────────
 
-    private TagResult callModel(Workflow w) {
-        String prompt = buildPrompt(w);
+    private TagResult callModel(String workflowId, String prompt) {
         try {
             var result = commandExecutorService.executeOnHost(
                     HostExecutionRequest.builder()
@@ -167,12 +214,12 @@ public class WorkflowTaggingService {
                             .build()
             );
             if (result.exitCode() != 0) {
-                log.debug("Tagging CLI exited {} for workflow {}", result.exitCode(), w.getId());
+                log.debug("Tagging CLI exited {} for workflow {}", result.exitCode(), workflowId);
                 return null;
             }
             return parseAndValidate(result.output());
         } catch (Exception e) {
-            log.debug("Tagging CLI failed for workflow {}", w.getId(), e);
+            log.debug("Tagging CLI failed for workflow {}", workflowId, e);
             return null;
         }
     }
@@ -237,5 +284,5 @@ public class WorkflowTaggingService {
         return s == null ? "" : s;
     }
 
-    private record TagResult(String category, List<String> tags) {}
+    public record TagResult(String category, List<String> tags) {}
 }
