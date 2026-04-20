@@ -714,4 +714,38 @@ class AssistantFetchServiceTest {
                 .contains("- path = /tmp")
                 .contains("- limit = 10");
     }
+
+    @Test
+    void executeFetch_findWorkflow_matches_listsNameAndId() {
+        var project = com.automation.entity.Project.builder().id("p1").name("Proj").build();
+        var wf = Workflow.builder().id("wf-42").name("Markt-Radar Simap").project(project).build();
+        when(workflowRepository.findByNameContainingIgnoreCase("markt"))
+                .thenReturn(List.of(wf));
+
+        String result = service.executeFetch(new AssistantFetchService.FetchRequest("find_workflow", "markt"));
+
+        assertThat(result)
+                .contains("Workflow-Suche für 'markt'")
+                .contains("1 Treffer")
+                .contains("Markt-Radar Simap")
+                .contains("wf-42")
+                .contains("Proj");
+    }
+
+    @Test
+    void executeFetch_findWorkflow_noMatch_returnsNotFound() {
+        when(workflowRepository.findByNameContainingIgnoreCase("nope"))
+                .thenReturn(List.of());
+
+        String result = service.executeFetch(new AssistantFetchService.FetchRequest("find_workflow", "nope"));
+
+        assertThat(result).contains("Kein Workflow gefunden");
+    }
+
+    @Test
+    void executeFetch_findWorkflow_blankQuery_returnsHint() {
+        String result = service.executeFetch(new AssistantFetchService.FetchRequest("find_workflow", ""));
+
+        assertThat(result).contains("Suchbegriff fehlt");
+    }
 }

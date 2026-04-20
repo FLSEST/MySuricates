@@ -84,6 +84,7 @@ public class AssistantFetchService {
             case "workflow_detail"  -> formatWorkflowDetail(req.id());
             case "workflow-full"    -> formatWorkflowFull(req.id());
             case "workflow-inputs"  -> formatWorkflowInputs(req.id());
+            case "find_workflow"    -> formatFindWorkflow(req.id());
             case "step_output"      -> formatStepOutput(req.id());
             case "docs"             -> formatDocsSection(req.id());
             case "pool_workflows"   -> formatPoolWorkflows();
@@ -876,6 +877,36 @@ public class AssistantFetchService {
         } catch (Exception e) {
             log.debug("Could not fetch workflow-full for {}", workflowId, e);
             return "";
+        }
+    }
+
+    private String formatFindWorkflow(String query) {
+        if (query == null || query.isBlank()) {
+            return "Suchbegriff fehlt. Erwartet: <fetch type=\"find_workflow\" id=\"<name-oder-substring>\"/>\n";
+        }
+        try {
+            List<com.automation.entity.Workflow> matches = workflowRepository.findByNameContainingIgnoreCase(query.trim());
+            if (matches.isEmpty()) {
+                return "Kein Workflow gefunden, dessen Name '" + query + "' enthält.\n";
+            }
+            var sb = new StringBuilder();
+            sb.append("**Workflow-Suche für '").append(query).append("':** ")
+                    .append(matches.size()).append(" Treffer\n");
+            int limit = Math.min(matches.size(), 20);
+            for (int i = 0; i < limit; i++) {
+                var wf = matches.get(i);
+                String projectName = wf.getProject() != null ? wf.getProject().getName() : "—";
+                sb.append("  - **").append(wf.getName()).append("** (id: `").append(wf.getId()).append("`, Projekt: ")
+                        .append(projectName).append(")\n");
+            }
+            if (matches.size() > limit) {
+                sb.append("  … weitere ").append(matches.size() - limit).append(" Treffer (Suche verfeinern).\n");
+            }
+            sb.append("\nNutze `<fetch type=\"workflow_detail\" id=\"<id>\"/>` für Details.\n");
+            return sb.toString();
+        } catch (Exception e) {
+            log.debug("Could not search workflows for '{}'", query, e);
+            return "Workflow-Suche fehlgeschlagen.\n";
         }
     }
 

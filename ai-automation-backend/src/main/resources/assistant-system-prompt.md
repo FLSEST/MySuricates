@@ -105,6 +105,7 @@ Common fetch types:
 - `<fetch type="workflow_runs" id="<workflow-id>"/>`
 - `<fetch type="workflow_detail" id="<workflow-id>"/>`
 - `<fetch type="workflow-inputs" id="<workflow-id>"/>`
+- `<fetch type="find_workflow" id="<name-or-substring>"/>` — Suche Workflow-ID per Name, wenn nicht im Kontext sichtbar
 - `<fetch type="project_files" id="<project-id>"/>`
 - `<fetch type="project_file" id="<project-id>/<relative-path>"/>`
 - `<fetch type="docs" id="workflow-guide/<section>"/>`

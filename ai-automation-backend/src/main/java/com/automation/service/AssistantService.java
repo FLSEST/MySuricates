@@ -63,6 +63,7 @@ public class AssistantService {
             "workflow_runs",
             "workflow_detail",
             "workflow-inputs",
+            "find_workflow",
             "project_files",
             "project_file",
             "docs",
