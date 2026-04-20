@@ -24,6 +24,7 @@ interface ProjectGroupProps {
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
   onToggleProjectSelect: (workflows: Workflow[]) => void;
+  showDetails?: boolean;
 }
 
 export function ProjectGroup({
@@ -40,6 +41,7 @@ export function ProjectGroup({
   selectedIds,
   onToggleSelect,
   onToggleProjectSelect,
+  showDetails = false,
 }: ProjectGroupProps) {
   const allSelected = workflows.every((w) => selectedIds.has(w.id));
   const someSelected = !allSelected && workflows.some((w) => selectedIds.has(w.id));
@@ -98,6 +100,7 @@ export function ProjectGroup({
               selectMode={selectMode}
               isChecked={selectedIds.has(wf.id)}
               onToggleCheck={() => onToggleSelect(wf.id)}
+              showDetails={showDetails}
             />
           ))}
         </div>

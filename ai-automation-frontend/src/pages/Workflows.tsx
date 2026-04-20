@@ -33,6 +33,7 @@ import { useInstallPoolWorkflow } from '../hooks/usePool';
 
 const STORAGE_KEY = 'workflows-collapsed-projects';
 const SELECTED_KEY = 'workflows-selected-id';
+const SHOW_DETAILS_KEY = 'workflows-show-row-details';
 
 function loadCollapsed(): Set<string> {
   try {
@@ -80,6 +81,9 @@ export function Workflows() {
   const [search, setSearch] = useState('');
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(loadSelectedId);
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(loadCollapsed);
+  const [showDetails, setShowDetails] = useState<boolean>(() => {
+    try { return localStorage.getItem(SHOW_DETAILS_KEY) === '1'; } catch { return false; }
+  });
   const [createStep, setCreateStep] = useState<CreateStep>('closed');
   const [selectedTemplate, setSelectedTemplate] = useState<WorkflowTemplate | null>(null);
   const [form, setForm] = useState<CreateWorkflowRequest>({ projectId: '', name: '' });
@@ -105,15 +109,23 @@ export function Workflows() {
 
   useEffect(() => { saveCollapsed(collapsedProjects); }, [collapsedProjects]);
   useEffect(() => { saveSelectedId(selectedWorkflowId); }, [selectedWorkflowId]);
+  useEffect(() => {
+    try { localStorage.setItem(SHOW_DETAILS_KEY, showDetails ? '1' : '0'); } catch { /* ignore */ }
+  }, [showDetails]);
 
   const filtered = useMemo(
-    () =>
-      workflows?.filter(
-        (w) =>
-          !search ||
-          w.name.toLowerCase().includes(search.toLowerCase()) ||
-          w.projectName.toLowerCase().includes(search.toLowerCase()),
-      ) ?? [],
+    () => {
+      if (!search) return workflows ?? [];
+      const q = search.toLowerCase();
+      return (
+        workflows?.filter(
+          (w) =>
+            w.name.toLowerCase().includes(q) ||
+            w.projectName.toLowerCase().includes(q) ||
+            (w.description?.toLowerCase().includes(q) ?? false),
+        ) ?? []
+      );
+    },
     [workflows, search],
   );
 
@@ -403,6 +415,8 @@ export function Workflows() {
               filtered={filtered}
               onRequestDeleteSelected={requestDeleteSelected}
               onBulkToggleAutoTodo={handleBulkToggleAutoTodo}
+              showDetails={showDetails}
+              onToggleShowDetails={() => setShowDetails((v) => !v)}
             />
 
             <div className="flex-1 overflow-y-auto space-y-1 pr-1">
@@ -423,6 +437,7 @@ export function Workflows() {
                   selectedIds={selectedIds}
                   onToggleSelect={toggleWorkflowSelect}
                   onToggleProjectSelect={toggleProjectSelect}
+                  showDetails={showDetails}
                 />
               ))}
             </div>

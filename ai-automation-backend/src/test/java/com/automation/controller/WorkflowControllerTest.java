@@ -83,6 +83,8 @@ class WorkflowControllerTest {
     @MockBean
     private com.automation.mapper.WorkflowVersionMapper workflowVersionMapper;
     @MockBean
+    private com.automation.service.learning.WorkflowSimilarityService workflowSimilarityService;
+    @MockBean
     private RateLimitConfig rateLimitConfig;
 
     private Workflow testWorkflow;
@@ -319,5 +321,31 @@ class WorkflowControllerTest {
 
         mockMvc.perform(delete("/api/v1/workflows/wf-1/skills/skill-1"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void getSimilarWorkflows_returnsCappedList() throws Exception {
+        List<Map<String, Object>> matches = List.of(
+                Map.of("workflowId", "wf-2", "workflowName", "Sibling A", "similarity", 90L, "blockTypes", List.of("simple")),
+                Map.of("workflowId", "wf-3", "workflowName", "Sibling B", "similarity", 70L, "blockTypes", List.of("simple")),
+                Map.of("workflowId", "wf-4", "workflowName", "Sibling C", "similarity", 60L, "blockTypes", List.of("simple"))
+        );
+        when(workflowSimilarityService.getSimilarWorkflows("wf-1")).thenReturn(matches);
+
+        mockMvc.perform(get("/api/v1/workflows/wf-1/similar?limit=2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(2)))
+                .andExpect(jsonPath("$[0].workflowId").value("wf-2"))
+                .andExpect(jsonPath("$[1].workflowId").value("wf-3"));
+    }
+
+    @Test
+    void getSimilarWorkflows_defaultLimit_returnsOk() throws Exception {
+        when(workflowSimilarityService.getSimilarWorkflows("wf-1")).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/workflows/wf-1/similar"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(0)));
     }
 }

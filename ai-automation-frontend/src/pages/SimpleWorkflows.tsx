@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GitBranch, Play } from 'lucide-react';
+import { GitBranch, Play, Search } from 'lucide-react';
 import { Button, Spinner } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
@@ -38,11 +38,18 @@ export function SimpleWorkflows() {
     workflow: Workflow | null;
     variables: string[];
   }>({ open: false, workflow: null, variables: [] });
+  const [search, setSearch] = useState('');
 
-  const sorted = useMemo(
-    () => [...(workflows ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
-    [workflows],
-  );
+  const sorted = useMemo(() => {
+    const base = [...(workflows ?? [])].sort((a, b) => a.name.localeCompare(b.name));
+    if (!search) return base;
+    const q = search.toLowerCase();
+    return base.filter(
+      (w) =>
+        w.name.toLowerCase().includes(q) ||
+        (w.description?.toLowerCase().includes(q) ?? false),
+    );
+  }, [workflows, search]);
 
   const openCreate = () => {
     setCreateStep('template');
@@ -158,6 +165,19 @@ export function SimpleWorkflows() {
           {t.workflows.create}
         </Button>
       </div>
+
+      {(workflows?.length ?? 0) > 0 && (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary pointer-events-none" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t.workflows.searchPlaceholder}
+            className="w-full pl-9 pr-3 py-2 text-sm bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        </div>
+      )}
 
       {sorted.length === 0 ? (
         <EmptyState

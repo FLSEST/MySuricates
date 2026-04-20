@@ -80,6 +80,23 @@ export function useWorkflowRuns(workflowId: string, page = 0, size = 50) {
   });
 }
 
+export interface SimilarWorkflow {
+  workflowId: string;
+  workflowName: string;
+  similarity: number;
+  blockTypes: string[];
+}
+
+export function useSimilarWorkflows(workflowId: string, limit = 5) {
+  return useQuery({
+    queryKey: ['workflows', workflowId, 'similar', limit],
+    queryFn: () =>
+      api.get<SimilarWorkflow[]>(`/workflows/${workflowId}/similar?limit=${limit}`),
+    enabled: !!workflowId,
+    staleTime: 60_000,
+  });
+}
+
 export function useAllRuns(params?: { status?: string; workflowId?: string; projectId?: string; search?: string; page?: number; size?: number }) {
   return useQuery({
     queryKey: ['runs', params],

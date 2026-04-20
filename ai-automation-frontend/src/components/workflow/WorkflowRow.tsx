@@ -22,6 +22,7 @@ interface WorkflowRowProps {
   selectMode: boolean;
   isChecked: boolean;
   onToggleCheck: () => void;
+  showDetails?: boolean;
 }
 
 export function WorkflowRow({
@@ -34,6 +35,7 @@ export function WorkflowRow({
   selectMode,
   isChecked,
   onToggleCheck,
+  showDetails = false,
 }: WorkflowRowProps) {
   const handleClick = () => {
     if (selectMode) {
@@ -70,7 +72,14 @@ export function WorkflowRow({
       <span className="text-base shrink-0">
         <WorkflowIcon icon={workflow.icon} className="w-4 h-4" />
       </span>
-      <span className="text-sm truncate flex-1">{workflow.name}</span>
+      {showDetails && workflow.description ? (
+        <div className="flex-1 min-w-0">
+          <div className="text-sm truncate">{workflow.name}</div>
+          <div className="text-[11px] text-text-tertiary truncate">{workflow.description}</div>
+        </div>
+      ) : (
+        <span className="text-sm truncate flex-1">{workflow.name}</span>
+      )}
       {!selectMode && !!workflow.metadata?.autoTodo?.enabled && (
         <Bell className="w-3 h-3 text-accent/50 shrink-0" />
       )}

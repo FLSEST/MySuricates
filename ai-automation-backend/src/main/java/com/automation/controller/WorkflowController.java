@@ -19,6 +19,7 @@ import com.automation.mapper.WorkflowVersionMapper;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.project.ProjectService;
 import com.automation.entity.RunStatus;
+import com.automation.service.learning.WorkflowSimilarityService;
 import com.automation.service.repair.AutoRepairService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowOptimizationService;
@@ -51,6 +52,7 @@ public class WorkflowController {
     private final AutoRepairService autoRepairService;
     private final WorkflowVersionService workflowVersionService;
     private final WorkflowVersionMapper workflowVersionMapper;
+    private final WorkflowSimilarityService workflowSimilarityService;
     private final ObjectMapper objectMapper;
 
     @GetMapping
@@ -121,6 +123,15 @@ public class WorkflowController {
     public ResponseEntity<Map<String, Object>> optimizeWorkflow(@PathVariable String id) {
         Map<String, Object> suggestion = optimizationService.optimizeWorkflow(id);
         return ResponseEntity.ok(suggestion);
+    }
+
+    @GetMapping("/{id}/similar")
+    public List<Map<String, Object>> getSimilarWorkflows(
+            @PathVariable String id,
+            @RequestParam(defaultValue = "5") int limit) {
+        List<Map<String, Object>> all = workflowSimilarityService.getSimilarWorkflows(id);
+        int capped = Math.max(1, Math.min(limit, 20));
+        return all.size() > capped ? all.subList(0, capped) : all;
     }
 
     @PostMapping("/{id}/repair")

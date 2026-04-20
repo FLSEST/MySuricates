@@ -6,6 +6,8 @@ import {
   Trash2,
   Bell,
   BellOff,
+  AlignLeft,
+  AlignJustify,
 } from 'lucide-react';
 import { Button, Input } from '../ui';
 import type { Workflow } from '../../types';
@@ -23,6 +25,8 @@ interface WorkflowListToolbarProps {
   filtered: Workflow[];
   onRequestDeleteSelected: () => void;
   onBulkToggleAutoTodo: (enable: boolean) => void;
+  showDetails: boolean;
+  onToggleShowDetails: () => void;
 }
 
 export function WorkflowListToolbar({
@@ -37,6 +41,8 @@ export function WorkflowListToolbar({
   filtered,
   onRequestDeleteSelected,
   onBulkToggleAutoTodo,
+  showDetails,
+  onToggleShowDetails,
 }: WorkflowListToolbarProps) {
   return (
     <>
@@ -59,6 +65,17 @@ export function WorkflowListToolbar({
           title={selectMode ? t.workflows.exitSelectMode : t.workflows.selectMode}
         >
           {selectMode ? <X className="w-4 h-4" /> : <CheckSquare className="w-4 h-4" />}
+        </button>
+        <button
+          onClick={onToggleShowDetails}
+          className={`p-2 rounded-lg transition-colors shrink-0 ${
+            showDetails
+              ? 'bg-accent/10 text-accent'
+              : 'hover:bg-surface-raised text-text-tertiary hover:text-text'
+          }`}
+          title={showDetails ? t.workflows.hideDetails : t.workflows.showDetails}
+        >
+          {showDetails ? <AlignJustify className="w-4 h-4" /> : <AlignLeft className="w-4 h-4" />}
         </button>
         <button
           onClick={onToggleAll}

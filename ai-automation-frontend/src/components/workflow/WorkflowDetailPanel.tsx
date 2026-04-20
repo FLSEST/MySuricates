@@ -22,7 +22,7 @@ import { Button, Spinner } from '../ui';
 import { StatusBadge } from '../shared/StatusBadge';
 import { ExecutionBadges } from '../shared/ExecutionBadges';
 import { WorkflowIcon } from '../../utils/workflowIcon';
-import { useWorkflowRuns } from '../../hooks/useWorkflows';
+import { useWorkflowRuns, useSimilarWorkflows } from '../../hooks/useWorkflows';
 import { useUpdateWorkflow, exportWorkflow } from '../../hooks/useWorkflows';
 import { formatDuration, formatDateTime } from '../../utils/formatTime';
 import type { useNavigate } from 'react-router-dom';
@@ -76,6 +76,7 @@ export function WorkflowDetailPanel({
 }: WorkflowDetailPanelProps) {
   const { data: runsPage, isLoading: runsLoading } = useWorkflowRuns(workflow.id, 0, 5);
   const recentRuns = runsPage?.content ?? [];
+  const { data: similarWorkflows = [] } = useSimilarWorkflows(workflow.id, 5);
   const updateWorkflow = useUpdateWorkflow();
   const autoTodoEnabled = !!workflow.metadata?.autoTodo?.enabled;
   const autoTodoMode = workflow.metadata?.autoTodo?.mode ?? 'auto';
@@ -351,6 +352,29 @@ export function WorkflowDetailPanel({
               >
                 {name}
               </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {similarWorkflows.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-text mb-2">{t.workflows.similarWorkflows}</h3>
+          <div className="space-y-1.5">
+            {similarWorkflows.map((s) => (
+              <button
+                key={s.workflowId}
+                onClick={() => navigate(`/workflows/${s.workflowId}`)}
+                className="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-surface-raised transition-colors text-sm text-left"
+              >
+                <span className="truncate flex-1 text-text">{s.workflowName}</span>
+                <span
+                  className="text-text-tertiary text-xs tabular-nums shrink-0"
+                  title={t.workflows.similarityMatch.replace('{percent}', String(s.similarity))}
+                >
+                  {s.similarity}%
+                </span>
+              </button>
             ))}
           </div>
         </div>
