@@ -299,4 +299,56 @@ class CommandExecutorServiceTest {
 
         assertThat(result.getMetadata()).containsEntry("provider", "CODEX");
     }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void executeStepOnHost_storesAiSystemPromptAndAiRequestInMetadata() throws IOException {
+        when(aiProvider.executeAction(any())).thenReturn(new AiProvider.ActionResult("ok", 0, null));
+        when(aiProvider.getId()).thenReturn("CLAUDE");
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("simple")
+                .config(Map.of("command", "analyze something"))
+                .build();
+
+        StepResult result = commandExecutorService.executeStepOnHost(
+                HostExecutionRequest.builder()
+                        .projectPath("/project")
+                        .block(block)
+                        .model("claude-opus-4-6")
+                        .systemPrompt("You are a helpful assistant.\nBe precise.")
+                        .timeoutSeconds(300)
+                        .build());
+
+        assertThat(result.getMetadata())
+                .containsEntry("aiSystemPrompt", "You are a helpful assistant.\nBe precise.")
+                .containsKey("aiRequest");
+
+        Map<String, Object> aiRequest = (Map<String, Object>) result.getMetadata().get("aiRequest");
+        assertThat(aiRequest)
+                .containsEntry("provider", "CLAUDE")
+                .containsEntry("model", "claude-opus-4-6")
+                .containsEntry("timeoutSeconds", 300);
+        assertThat(aiRequest).doesNotContainKey("priority");
+    }
+
+    @Test
+    void executeStepOnHost_omitsAiSystemPromptWhenNull() throws IOException {
+        when(aiProvider.executeAction(any())).thenReturn(new AiProvider.ActionResult("ok", 0, null));
+        when(aiProvider.getId()).thenReturn("CLAUDE");
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("simple")
+                .config(Map.of("command", "task"))
+                .build();
+
+        StepResult result = commandExecutorService.executeStepOnHost(
+                HostExecutionRequest.builder()
+                        .projectPath("/project")
+                        .block(block)
+                        .build());
+
+        assertThat(result.getMetadata()).doesNotContainKey("aiSystemPrompt");
+        assertThat(result.getMetadata()).containsKey("aiRequest");
+    }
 }

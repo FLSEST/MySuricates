@@ -17,8 +17,23 @@ public record ClaudeJsonResponse(
         @JsonProperty("num_turns") Integer numTurns,
         Usage usage,
         @JsonProperty("modelUsage") Map<String, ModelUsage> modelUsage,
+        String assistantModel,
         List<ToolUseEvent> toolUses
 ) {
+    public ClaudeJsonResponse(
+            String result,
+            String sessionId,
+            Double totalCostUsd,
+            Long durationMs,
+            Long durationApiMs,
+            Integer numTurns,
+            Usage usage,
+            Map<String, ModelUsage> modelUsage,
+            List<ToolUseEvent> toolUses
+    ) {
+        this(result, sessionId, totalCostUsd, durationMs, durationApiMs, numTurns, usage, modelUsage, null, toolUses);
+    }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Usage(
             @JsonProperty("input_tokens") int inputTokens,
@@ -31,7 +46,13 @@ public record ClaudeJsonResponse(
     public record ToolUseEvent(String name, Map<String, Object> input) {}
 
     public String model() {
-        return modelUsage != null ? modelUsage.keySet().stream().findFirst().orElse(null) : null;
+        if (assistantModel != null && !assistantModel.isBlank()) {
+            return assistantModel;
+        }
+        if (modelUsage == null || modelUsage.isEmpty()) {
+            return null;
+        }
+        return modelUsage.size() == 1 ? modelUsage.keySet().iterator().next() : null;
     }
 
     public Map<String, Object> toMetadata() {

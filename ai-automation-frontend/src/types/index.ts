@@ -271,6 +271,7 @@ export interface StepResult {
   status: StepStatus;
   durationMs: number | null;
   error: string | null;
+  metadata?: Record<string, unknown>;
 }
 
 // ── Skill ────────────────────────────────────────────────

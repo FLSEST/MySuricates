@@ -324,6 +324,14 @@ export const de: TranslationKeys = {
       openFolder: 'Ordner öffnen',
       openPath: 'Pfad öffnen',
       openPathFailed: 'Pfad konnte nicht geöffnet werden',
+      stepInput: {
+        command: 'Befehl',
+        systemPrompt: 'System-Prompt',
+        showSystemPrompt: 'System-Prompt anzeigen',
+        hideSystemPrompt: 'System-Prompt einklappen',
+        request: 'Request-Parameter',
+        lineCount: '{count} Zeilen',
+      },
       terminal: {
         title: 'Terminal',
         connected: 'Verbunden',

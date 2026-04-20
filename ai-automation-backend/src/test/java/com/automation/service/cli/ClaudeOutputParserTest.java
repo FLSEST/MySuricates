@@ -26,6 +26,19 @@ class ClaudeOutputParserTest {
     }
 
     @Test
+    void parseStreamJson_prefersAssistantModel_whenModelUsageContainsMultipleModels() {
+        String ndjson = """
+                {"type":"assistant","message":{"model":"claude-sonnet-4-6","content":[{"type":"text","text":"OK"}]}}
+                {"type":"result","subtype":"success","result":"OK","session_id":"sess-123","total_cost_usd":0.055,"duration_ms":2304,"duration_api_ms":3505,"num_turns":1,"usage":{"input_tokens":3,"output_tokens":4},"modelUsage":{"claude-haiku-4-5-20251001":{"inputTokens":343,"outputTokens":11,"costUSD":0.00039},"claude-sonnet-4-6":{"inputTokens":3,"outputTokens":4,"costUSD":0.0546}}}
+                """;
+
+        ClaudeJsonResponse parsed = ClaudeOutputParser.parseStreamJson(ndjson);
+
+        assertThat(parsed.assistantModel()).isEqualTo("claude-sonnet-4-6");
+        assertThat(parsed.model()).isEqualTo("claude-sonnet-4-6");
+    }
+
+    @Test
     void parseStreamJson_extractsToolUseEvents() {
         String ndjson = """
                 {"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"src/main.ts"}},{"type":"tool_use","name":"Edit","input":{"file_path":"src/main.ts","old":"a","new":"b"}}]}}

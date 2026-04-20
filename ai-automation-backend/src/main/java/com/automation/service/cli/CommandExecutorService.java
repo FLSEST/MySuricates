@@ -182,10 +182,14 @@ public class CommandExecutorService {
 
             Map<String, Object> meta = new LinkedHashMap<>(
                     providerResult.metadata() != null ? providerResult.metadata().toMap() : Map.of());
-            if ((!meta.containsKey("model") || meta.get("model") == null) && request.model() != null) {
-                meta.put("model", request.model());
+            if (request.model() != null && !request.model().isBlank()) {
+                meta.put("requestedModel", request.model());
             }
             meta.put("provider", provider.getId());
+            if (request.systemPrompt() != null && !request.systemPrompt().isBlank()) {
+                meta.put("aiSystemPrompt", request.systemPrompt());
+            }
+            meta.put("aiRequest", buildAiRequestMetadata(request, provider.getId()));
             step.setMetadata(meta);
         } catch (Exception e) {
             log.error("Host step execution failed for project {}: {}", request.projectPath(), e.getMessage(), e);
@@ -277,6 +281,27 @@ public class CommandExecutorService {
 
     public String prependInstructions(String command, String prefix) {
         return "INSTRUCTIONS:\n" + prefix + "\n---\nTASK:\n" + command;
+    }
+
+    private Map<String, Object> buildAiRequestMetadata(HostExecutionRequest request, String providerId) {
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("provider", providerId);
+        if (request.model() != null && !request.model().isBlank()) {
+            params.put("model", request.model());
+        }
+        if (request.timeoutSeconds() != null) {
+            params.put("timeoutSeconds", request.timeoutSeconds());
+        }
+        if (request.priority()) {
+            params.put("priority", true);
+        }
+        if (request.allowedTools() != null && !request.allowedTools().isEmpty()) {
+            params.put("allowedTools", String.join(",", request.allowedTools()));
+        }
+        if (request.disallowedTools() != null && !request.disallowedTools().isEmpty()) {
+            params.put("disallowedTools", String.join(",", request.disallowedTools()));
+        }
+        return params;
     }
 
     private String extractCommand(BlockDefinition block) {

@@ -34,6 +34,21 @@ class AiResponseMetadataTest {
     }
 
     @Test
+    void fromClaudeResponse_prefersAssistantModel_whenModelUsageHasMultipleEntries() {
+        var usage = new ClaudeJsonResponse.Usage(1000, 500);
+        var modelUsage = Map.of(
+                "claude-haiku-4-5-20251001", new ClaudeJsonResponse.ModelUsage(343, 11, 0.00039),
+                "claude-sonnet-4-6", new ClaudeJsonResponse.ModelUsage(1000, 500, 0.05)
+        );
+        var parsed = new ClaudeJsonResponse(
+                "output text", "sess-123", 0.05, 2000L, 1500L, 3, usage, modelUsage, "claude-sonnet-4-6", List.of());
+
+        AiResponseMetadata meta = AiResponseMetadata.fromClaudeResponse(parsed);
+
+        assertThat(meta.model()).isEqualTo("claude-sonnet-4-6");
+    }
+
+    @Test
     void fromClaudeResponse_withNullReturnsEstimated() {
         AiResponseMetadata meta = AiResponseMetadata.fromClaudeResponse(null);
 

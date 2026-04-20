@@ -50,7 +50,36 @@ const BLOCK_TYPE_ICONS: Record<string, React.ReactNode> = {
   integration: <Plug className="w-3 h-3" />,
 };
 
+function stepMetadataSummary(step: StepResult) {
+  const metadata = step.metadata ?? {};
+  const provider = typeof metadata.provider === 'string' ? metadata.provider : null;
+  const model = typeof metadata.model === 'string' ? metadata.model : null;
+  const requestedModel = typeof metadata.requestedModel === 'string' ? metadata.requestedModel : null;
+  const aiSystemPrompt = typeof metadata.aiSystemPrompt === 'string' ? metadata.aiSystemPrompt : null;
+  const aiRequest = metadata.aiRequest && typeof metadata.aiRequest === 'object' && !Array.isArray(metadata.aiRequest)
+    ? (metadata.aiRequest as Record<string, unknown>)
+    : null;
+
+  return {
+    provider,
+    model,
+    requestedModel,
+    showRequestedModel: requestedModel != null && requestedModel !== model,
+    aiSystemPrompt,
+    aiRequest,
+  };
+}
+
 function StepCard({ step }: { step: StepResult }) {
+  const t = useT();
+  const [inputExpanded, setInputExpanded] = useState(false);
+  const [systemPromptExpanded, setSystemPromptExpanded] = useState(false);
+  const { provider, model, requestedModel, showRequestedModel, aiSystemPrompt, aiRequest } = stepMetadataSummary(step);
+  const systemPromptLineCount = aiSystemPrompt ? aiSystemPrompt.split('\n').length : 0;
+  const aiRequestEntries = aiRequest
+    ? Object.entries(aiRequest).filter(([, v]) => v !== null && v !== undefined && v !== '')
+    : [];
+
   return (
     <div className="flex gap-3 py-3">
       <div className="pt-0.5">
@@ -80,8 +109,85 @@ function StepCard({ step }: { step: StepResult }) {
             </span>
           )}
         </div>
-        {step.input && (
-          <p className="text-xs text-text-secondary font-mono mb-1 truncate">{step.input}</p>
+        {(provider || model || showRequestedModel) && (
+          <div className="flex flex-wrap gap-2 mb-2">
+            {provider && (
+              <span className="px-2 py-0.5 rounded-full bg-surface-raised text-[11px] font-mono text-text-tertiary">
+                provider={provider}
+              </span>
+            )}
+            {model && (
+              <span className="px-2 py-0.5 rounded-full bg-surface-raised text-[11px] font-mono text-text">
+                model={model}
+              </span>
+            )}
+            {showRequestedModel && (
+              <span className="px-2 py-0.5 rounded-full bg-warning/10 text-[11px] font-mono text-warning">
+                requested={requestedModel}
+              </span>
+            )}
+          </div>
+        )}
+        {step.input && !inputExpanded && (
+          <p
+            className="text-xs text-text-secondary font-mono mb-1 truncate cursor-pointer hover:text-text transition-colors"
+            onClick={() => setInputExpanded(true)}
+            title="Klicken zum Aufklappen"
+          >{step.input}</p>
+        )}
+        {step.input && inputExpanded && (
+          <div className="mb-2 space-y-2">
+            <div>
+              <button
+                type="button"
+                onClick={() => setInputExpanded(false)}
+                className="text-[11px] uppercase tracking-wide text-text-tertiary hover:text-text mb-1"
+                title="Klicken zum Einklappen"
+              >
+                {t.workflows.execution.stepInput.command}
+              </button>
+              <pre className="text-xs text-text-secondary font-mono bg-surface rounded-lg p-3 overflow-x-auto max-h-60 whitespace-pre-wrap break-all">{step.input}</pre>
+            </div>
+
+            {aiSystemPrompt && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setSystemPromptExpanded(e => !e)}
+                  className="text-[11px] uppercase tracking-wide text-text-tertiary hover:text-text mb-1 flex items-center gap-2"
+                >
+                  <span>{t.workflows.execution.stepInput.systemPrompt}</span>
+                  <span className="text-text-tertiary normal-case tracking-normal">
+                    ({t.workflows.execution.stepInput.lineCount.replace('{count}', String(systemPromptLineCount))})
+                  </span>
+                  <span className="text-text-tertiary normal-case tracking-normal">
+                    · {systemPromptExpanded
+                      ? t.workflows.execution.stepInput.hideSystemPrompt
+                      : t.workflows.execution.stepInput.showSystemPrompt}
+                  </span>
+                </button>
+                {systemPromptExpanded && (
+                  <pre className="text-xs text-text-secondary font-mono bg-surface rounded-lg p-3 overflow-auto max-h-80 whitespace-pre-wrap break-all">{aiSystemPrompt}</pre>
+                )}
+              </div>
+            )}
+
+            {aiRequestEntries.length > 0 && (
+              <div>
+                <div className="text-[11px] uppercase tracking-wide text-text-tertiary mb-1">
+                  {t.workflows.execution.stepInput.request}
+                </div>
+                <ul className="text-xs font-mono bg-surface rounded-lg p-3 space-y-0.5">
+                  {aiRequestEntries.map(([k, v]) => (
+                    <li key={k} className="flex gap-2">
+                      <span className="text-text-tertiary">{k}</span>
+                      <span className="text-text">{String(v)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         )}
         {step.output && (
           <pre className="text-xs text-text font-mono bg-surface rounded-lg p-3 overflow-x-auto max-h-40 whitespace-pre-wrap">

@@ -19,7 +19,23 @@ import { formatDuration } from '../utils/formatTime';
 import { api } from '../api/client';
 import type { StepResult, PendingHumanInput } from '../types';
 
+function stepMetadataSummary(step: StepResult) {
+  const metadata = step.metadata ?? {};
+  const provider = typeof metadata.provider === 'string' ? metadata.provider : null;
+  const model = typeof metadata.model === 'string' ? metadata.model : null;
+  const requestedModel = typeof metadata.requestedModel === 'string' ? metadata.requestedModel : null;
+
+  return {
+    provider,
+    model,
+    requestedModel,
+    showRequestedModel: requestedModel != null && requestedModel !== model,
+  };
+}
+
 function StepCard({ step }: { step: StepResult }) {
+  const { provider, model, requestedModel, showRequestedModel } = stepMetadataSummary(step);
+
   return (
     <div className="flex gap-3 py-3">
       <div className="pt-0.5">
@@ -46,6 +62,25 @@ function StepCard({ step }: { step: StepResult }) {
             </span>
           )}
         </div>
+        {(provider || model || showRequestedModel) && (
+          <div className="flex flex-wrap gap-2 mb-2">
+            {provider && (
+              <span className="px-2 py-0.5 rounded-full bg-surface-raised text-[11px] font-mono text-text-tertiary">
+                provider={provider}
+              </span>
+            )}
+            {model && (
+              <span className="px-2 py-0.5 rounded-full bg-surface-raised text-[11px] font-mono text-text">
+                model={model}
+              </span>
+            )}
+            {showRequestedModel && (
+              <span className="px-2 py-0.5 rounded-full bg-warning/10 text-[11px] font-mono text-warning">
+                requested={requestedModel}
+              </span>
+            )}
+          </div>
+        )}
         {step.output && (
           <pre className="text-xs text-text font-mono bg-surface rounded-lg p-3 overflow-x-auto max-h-48 whitespace-pre-wrap">
             <PathLinkedOutput text={step.output} />

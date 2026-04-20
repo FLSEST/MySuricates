@@ -322,6 +322,14 @@ export const en = {
       openFolder: 'Open folder',
       openPath: 'Open path',
       openPathFailed: 'Failed to open path',
+      stepInput: {
+        command: 'Command',
+        systemPrompt: 'System prompt',
+        showSystemPrompt: 'Show system prompt',
+        hideSystemPrompt: 'Hide system prompt',
+        request: 'Request parameters',
+        lineCount: '{count} lines',
+      },
       terminal: {
         title: 'Terminal',
         connected: 'Connected',

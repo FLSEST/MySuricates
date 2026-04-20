@@ -40,13 +40,23 @@ class ClaudeJsonResponseTest {
         }
 
         @Test
-        void should_returnFirstKey_when_modelUsageHasMultipleEntries() {
+        void should_returnAssistantModel_when_present() {
+            var modelUsage = new LinkedHashMap<String, ClaudeJsonResponse.ModelUsage>();
+            modelUsage.put("claude-opus-4-6", new ClaudeJsonResponse.ModelUsage(500, 1000, 0.50));
+            modelUsage.put("claude-sonnet-4-6", new ClaudeJsonResponse.ModelUsage(100, 200, 0.05));
+            var response = new ClaudeJsonResponse(
+                    "result", null, null, null, null, null, null, modelUsage, "claude-sonnet-4-6", null);
+            assertThat(response.model()).isEqualTo("claude-sonnet-4-6");
+        }
+
+        @Test
+        void should_returnNull_when_modelUsageHasMultipleEntriesAndNoAssistantModel() {
             var modelUsage = new LinkedHashMap<String, ClaudeJsonResponse.ModelUsage>();
             modelUsage.put("claude-opus-4-6", new ClaudeJsonResponse.ModelUsage(500, 1000, 0.50));
             modelUsage.put("claude-sonnet-4-6", new ClaudeJsonResponse.ModelUsage(100, 200, 0.05));
             var response = new ClaudeJsonResponse(
                     "result", null, null, null, null, null, null, modelUsage, null);
-            assertThat(response.model()).isEqualTo("claude-opus-4-6");
+            assertThat(response.model()).isNull();
         }
     }
 
@@ -137,6 +147,17 @@ class ClaudeJsonResponseTest {
                     "result", null, null, null, null, null, null, modelUsage, null);
 
             assertThat(response.toMetadata()).containsEntry("model", "claude-haiku-4-5");
+        }
+
+        @Test
+        void should_includeAssistantModel_when_modelUsageHasMultipleEntries() {
+            var modelUsage = new LinkedHashMap<String, ClaudeJsonResponse.ModelUsage>();
+            modelUsage.put("claude-haiku-4-5", new ClaudeJsonResponse.ModelUsage(50, 100, 0.01));
+            modelUsage.put("claude-sonnet-4-6", new ClaudeJsonResponse.ModelUsage(100, 200, 0.05));
+            var response = new ClaudeJsonResponse(
+                    "result", null, null, null, null, null, null, modelUsage, "claude-sonnet-4-6", null);
+
+            assertThat(response.toMetadata()).containsEntry("model", "claude-sonnet-4-6");
         }
 
         @Test

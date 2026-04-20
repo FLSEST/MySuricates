@@ -33,6 +33,7 @@ public class ClaudeOutputParser {
         String[] lines = rawOutput.split("\n");
         List<ClaudeJsonResponse.ToolUseEvent> toolUses = new ArrayList<>();
         ClaudeJsonResponse resultLine = null;
+        String assistantModel = null;
 
         for (String line : lines) {
             if (line.isBlank()) continue;
@@ -44,6 +45,10 @@ public class ClaudeOutputParser {
                 if ("result".equals(type)) {
                     resultLine = MAPPER.treeToValue(node, ClaudeJsonResponse.class);
                 } else if ("assistant".equals(type)) {
+                    String messageModel = node.path("message").path("model").asText("");
+                    if (!messageModel.isBlank()) {
+                        assistantModel = messageModel;
+                    }
                     JsonNode content = node.path("message").path("content");
                     if (content.isArray()) {
                         for (JsonNode item : content) {
@@ -91,6 +96,7 @@ public class ClaudeOutputParser {
                     resultLine.numTurns(),
                     resultLine.usage(),
                     resultLine.modelUsage(),
+                    assistantModel != null ? assistantModel : resultLine.assistantModel(),
                     toolUses.isEmpty() ? resultLine.toolUses() : toolUses
             );
         }
@@ -116,7 +122,7 @@ public class ClaudeOutputParser {
 
     private static ClaudeJsonResponse fallback(String rawText) {
         return new ClaudeJsonResponse(
-                rawText, null, null, null, null, null, null, null, null
+                rawText, null, null, null, null, null, null, null, null, null
         );
     }
 
