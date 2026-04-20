@@ -1,6 +1,11 @@
 package com.automation.service.assistant;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.time.Instant;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -46,5 +51,37 @@ class PendingToolRegistryTest {
         assertThat(registry.peek(tool.id())).hasValue(tool);
         assertThat(registry.size()).isEqualTo(1);
         assertThat(registry.take(tool.id())).hasValue(tool); // still takeable
+    }
+
+    @Test
+    void take_expiredTool_returnsEmptyAndRemoves() {
+        PendingToolRegistry registry = new PendingToolRegistry();
+        String id = UUID.randomUUID().toString();
+        PendingTool expired = new PendingTool(id, "create_todo", "old",
+                "{}", Instant.now().minusSeconds(60));
+        injectRaw(registry, id, expired);
+
+        // take() must filter the expired entry — the controller relies on this to return 410.
+        assertThat(registry.take(id)).isEmpty();
+        // Entry is also removed so cleanupExpired doesn't need to run for the controller path to work.
+        assertThat(registry.size()).isZero();
+    }
+
+    @Test
+    void peek_expiredTool_returnsEmpty() {
+        PendingToolRegistry registry = new PendingToolRegistry();
+        String id = UUID.randomUUID().toString();
+        PendingTool expired = new PendingTool(id, "create_todo", "old",
+                "{}", Instant.now().minusSeconds(60));
+        injectRaw(registry, id, expired);
+
+        assertThat(registry.peek(id)).isEmpty();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void injectRaw(PendingToolRegistry registry, String id, PendingTool tool) {
+        ConcurrentHashMap<String, PendingTool> pending =
+                (ConcurrentHashMap<String, PendingTool>) ReflectionTestUtils.getField(registry, "pending");
+        pending.put(id, tool);
     }
 }
