@@ -211,7 +211,7 @@ public class AssistantToolExecutor {
             Map<String, Object> params = objectMapper.readValue(json, new TypeReference<>() {});
             String projectId = (String) params.get("projectId");
             String name = (String) params.get("name");
-            if (projectId == null || name == null || name.isBlank())
+            if (projectId == null || projectId.isBlank() || name == null || name.isBlank())
                 return "⚠ create_workflow: projectId und name sind Pflichtfelder.";
 
             List<BlockDefinition> blocks = params.containsKey("blocks")

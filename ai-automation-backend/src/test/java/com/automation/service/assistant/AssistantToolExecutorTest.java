@@ -132,6 +132,24 @@ class AssistantToolExecutorTest {
     }
 
     @Test
+    void executeTools_createWorkflow_blankProjectId_returnsError() {
+        String input = "<tool type=\"create_workflow\">{\"projectId\": \"   \", \"name\": \"x\"}</tool>";
+        String result = runAllTools(input);
+
+        assertThat(result).contains("⚠");
+        assertThat(result).contains("Pflichtfeld");
+    }
+
+    @Test
+    void executeTools_createWorkflow_blankName_returnsError() {
+        String input = "<tool type=\"create_workflow\">{\"projectId\": \"p1\", \"name\": \"   \"}</tool>";
+        String result = runAllTools(input);
+
+        assertThat(result).contains("⚠");
+        assertThat(result).contains("Pflichtfeld");
+    }
+
+    @Test
     void executeTools_startWorkflow_success() {
         Workflow wf = Workflow.builder().id("wf-1").name("My WF").build();
         when(workflowService.findById("wf-1")).thenReturn(wf);
