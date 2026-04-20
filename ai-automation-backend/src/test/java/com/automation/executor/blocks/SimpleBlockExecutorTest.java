@@ -153,6 +153,41 @@ class SimpleBlockExecutorTest {
     }
 
     @Test
+    void execute_passesModelFromContext() {
+        context.setModel("claude-sonnet-4-6");
+        StepResult expected = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        ArgumentCaptor<HostExecutionRequest> captor = ArgumentCaptor.forClass(HostExecutionRequest.class);
+        when(commandExecutor.executeStepOnHost(captor.capture())).thenReturn(expected);
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("simple")
+                .config(new HashMap<>(Map.of("command", "test")))
+                .build();
+
+        executor.execute(block, context);
+
+        assertThat(captor.getValue().model()).isEqualTo("claude-sonnet-4-6");
+    }
+
+    @Test
+    void execute_noModel_passesNull() {
+        StepResult expected = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        ArgumentCaptor<HostExecutionRequest> captor = ArgumentCaptor.forClass(HostExecutionRequest.class);
+        when(commandExecutor.executeStepOnHost(captor.capture())).thenReturn(expected);
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("simple")
+                .config(new HashMap<>(Map.of("command", "test")))
+                .build();
+
+        executor.execute(block, context);
+
+        assertThat(captor.getValue().model()).isNull();
+    }
+
+    @Test
     void execute_passesInstructionPrefix() {
         context.setInstructionPrefix("You are a test agent");
         StepResult expected = StepResult.builder()
