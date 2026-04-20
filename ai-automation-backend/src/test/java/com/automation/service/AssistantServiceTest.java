@@ -74,6 +74,9 @@ class AssistantServiceTest {
                 .thenAnswer(inv -> new AssistantToolExecutor.ExtractionResult(inv.getArgument(0), List.of()));
         // Fetch strip — pass through
         lenient().when(fetchService.stripFetchTags(any())).thenAnswer(inv -> inv.getArgument(0));
+        // Seed settings as @PostConstruct would in prod — populates cachedBaseInstructions + cachedAssistantModel
+        lenient().when(appSettingsRepository.get(anyString())).thenReturn(Optional.of("claude-sonnet-4-6"));
+        service.seedSettings();
     }
 
     // ── Base instructions loading ────────────────────────────────────────────
