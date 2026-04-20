@@ -203,6 +203,28 @@ class AssistantServiceTest {
     }
 
     @Test
+    void chat_nonZeroExitCode_returnsErrorResponse() {
+        // CLI crashes with an API-key error — without exit-code check, the error text
+        // would bubble through as if it were a normal assistant reply.
+        stubClaude("API key invalid: ANTHROPIC_API_KEY not set or empty", 1);
+
+        var result = chat("Test");
+
+        assertThat(result.message()).doesNotContain("API key invalid");
+        assertThat(result.message()).contains("konfiguriert");
+        assertThat(result.actions()).isEmpty();
+    }
+
+    @Test
+    void chat_zeroExitCode_passesThrough() {
+        stubClaude("Normale Antwort", 0);
+
+        var result = chat("Test");
+
+        assertThat(result.message()).isEqualTo("Normale Antwort");
+    }
+
+    @Test
     void chat_timeoutException_returnsTimeoutSpecificMessage() {
         when(commandExecutorService.executeOnHost(any(HostExecutionRequest.class)))
                 .thenThrow(new WorkflowExecutionException("Failed to execute command on host (project: /tmp)",
@@ -260,8 +282,12 @@ class AssistantServiceTest {
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private void stubClaude(String responseText) {
+        stubClaude(responseText, 0);
+    }
+
+    private void stubClaude(String responseText, int exitCode) {
         when(commandExecutorService.executeOnHost(any(HostExecutionRequest.class)))
-                .thenReturn(new CliSession.EnrichedCommandResult(responseText, 0, null));
+                .thenReturn(new CliSession.EnrichedCommandResult(responseText, exitCode, null));
     }
 
     private AssistantChatResponse chat(String message) {

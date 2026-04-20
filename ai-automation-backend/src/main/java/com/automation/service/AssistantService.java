@@ -115,7 +115,7 @@ public class AssistantService {
             String resolvedProvider = aiProviderRegistry.resolve(req.provider()).getId();
 
             broadcaster.broadcastStatus(requestId, "THINKING", null, startNanos);
-            var result = commandExecutorService.executeOnHost(
+            var result = executeOrFail(
                     HostExecutionRequest.builder()
                             .projectPath(workingDir)
                             .command(prompt)
@@ -145,7 +145,7 @@ public class AssistantService {
                         + "\n\n---\nNachgeladene Details (Runde " + (fetchRound + 1) + "):\n" + supplemental
                         + "\n\n" + hint;
                 broadcaster.broadcastStatus(requestId, "THINKING", "Runde " + (fetchRound + 1), startNanos);
-                result = commandExecutorService.executeOnHost(
+                result = executeOrFail(
                         HostExecutionRequest.builder()
                                 .projectPath(workingDir)
                                 .command(enrichedPrompt)
@@ -177,6 +177,22 @@ public class AssistantService {
             broadcaster.broadcastStatus(requestId, "ERROR", kind.code(), startNanos);
             return new AssistantChatResponse(kind.userMessage(), List.of());
         }
+    }
+
+    /**
+     * Calls the CLI and fails fast on a non-zero exit code. Without this check, a crashed
+     * CLI process (bad API key, malformed config) would surface its error text as if it were
+     * a normal assistant reply.
+     */
+    private com.automation.service.cli.CliSession.EnrichedCommandResult executeOrFail(HostExecutionRequest request) {
+        var result = commandExecutorService.executeOnHost(request);
+        if (result.exitCode() != 0) {
+            String snippet = result.output() == null ? "" : result.output().strip();
+            if (snippet.length() > 200) snippet = snippet.substring(0, 200) + "…";
+            throw new WorkflowExecutionException(
+                    "Assistant CLI failed (exit " + result.exitCode() + "): " + snippet);
+        }
+        return result;
     }
 
     private record ErrorKind(String code, String userMessage) {}
