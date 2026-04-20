@@ -1431,5 +1431,13 @@ export const de: TranslationKeys = {
     noResults: 'Kein Workflow passt. Versuche andere Begriffe.',
     runHint: 'Jetzt starten',
     openHint: 'Details öffnen',
+    triggerLabel: 'Suchen oder starten…',
+    pinned: 'Angeheftet',
+    recent: 'Zuletzt verwendet',
+    pinHint: 'Anheften',
+    unpinHint: 'Nicht mehr anheften',
+    collectVariablesHeader: 'Eingaben für Workflow',
+    collectStart: 'Starten',
+    collectCancel: 'Zurück',
   },
 } as const;

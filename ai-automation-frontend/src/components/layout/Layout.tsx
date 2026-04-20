@@ -1,10 +1,11 @@
-import { Suspense } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { SecurityBanner } from './SecurityBanner';
 import { ApiKeyGuard } from './ApiKeyGuard';
 import { AssistantPanel } from '../AssistantPanel';
+import { CommandPalette } from '../palette/CommandPalette';
 import { Spinner } from '../ui';
 import { useSidebarStore } from '../../stores/sidebarStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
@@ -14,6 +15,23 @@ export function Layout() {
   const mobileOpen = useSidebarStore((s) => s.mobileOpen);
   const setMobileOpen = useSidebarStore((s) => s.setMobileOpen);
   const isMobile = useIsMobile();
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    const keyHandler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    };
+    const openHandler = () => setPaletteOpen(true);
+    window.addEventListener('keydown', keyHandler);
+    window.addEventListener('mysuri:openPalette', openHandler as EventListener);
+    return () => {
+      window.removeEventListener('keydown', keyHandler);
+      window.removeEventListener('mysuri:openPalette', openHandler as EventListener);
+    };
+  }, []);
 
   return (
     <ApiKeyGuard>
@@ -42,6 +60,7 @@ export function Layout() {
         </div>
       </div>
       <AssistantPanel />
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </ApiKeyGuard>
   );
 }

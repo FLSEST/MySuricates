@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Moon, Sun, Globe, Menu, Sparkles } from 'lucide-react';
+import { Moon, Sun, Globe, Menu, Sparkles, Search } from 'lucide-react';
 import { useThemeStore } from '../../stores/themeStore';
 import { useI18nStore, type Locale } from '../../i18n';
 import { useT } from '../../i18n';
@@ -8,6 +8,40 @@ import { useSidebarStore } from '../../stores/sidebarStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useAssistantStore } from '../../stores/assistantStore';
 import { useAssistantSuggestions } from '../../hooks/useAssistant';
+
+function isMac(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || '');
+}
+
+function PaletteTrigger({ compact, label }: { compact: boolean; label: string }) {
+  const hint = isMac() ? '⌘K' : 'Ctrl+K';
+  const onClick = () => window.dispatchEvent(new CustomEvent('mysuri:openPalette'));
+  if (compact) {
+    return (
+      <button
+        onClick={onClick}
+        className="p-2 rounded-lg text-text-secondary hover:text-accent hover:bg-accent/10 transition-colors"
+        title={`${label} (${hint})`}
+        aria-label={label}
+      >
+        <Search className="w-4 h-4" />
+      </button>
+    );
+  }
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-2 h-8 px-3 rounded-lg border border-border bg-surface-raised/40
+                 text-text-tertiary hover:text-text hover:border-accent/40 transition-colors text-sm min-w-[180px]"
+      aria-label={label}
+    >
+      <Search className="w-3.5 h-3.5 shrink-0" />
+      <span className="flex-1 text-left truncate">{label}</span>
+      <span className="text-[10px] font-medium border border-border rounded-sm px-1 py-0.5 shrink-0">{hint}</span>
+    </button>
+  );
+}
 
 function SuggestionButton() {
   const location = useLocation();
@@ -89,6 +123,9 @@ export function Header() {
       )}
 
       <div className="flex items-center gap-2">
+        {/* Command Palette trigger */}
+        <PaletteTrigger compact={isMobile} label={t.commandPalette.triggerLabel} />
+
         {/* Suggestions button */}
         <SuggestionButton />
 

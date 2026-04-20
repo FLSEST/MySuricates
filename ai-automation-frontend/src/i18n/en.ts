@@ -1434,6 +1434,14 @@ export const en = {
     noResults: 'No workflow matches. Try different terms.',
     runHint: 'Run now',
     openHint: 'Open details',
+    triggerLabel: 'Search or run…',
+    pinned: 'Pinned',
+    recent: 'Recent',
+    pinHint: 'Pin',
+    unpinHint: 'Unpin',
+    collectVariablesHeader: 'Inputs for workflow',
+    collectStart: 'Run',
+    collectCancel: 'Back',
   },
 } as const;
 
