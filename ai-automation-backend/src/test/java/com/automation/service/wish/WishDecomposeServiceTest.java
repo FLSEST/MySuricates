@@ -107,6 +107,28 @@ class WishDecomposeServiceTest {
         }
 
         @Test
+        void autoRefine_skipsDecomposeApproval_andSetsExecuting() throws Exception {
+            Wish wish = createWish("w-1");
+            wish.setAutoRefine(true);
+            String json = """
+                    {"analysis":"test","strategy":"simple","workflows":[
+                      {"name":"My WF","description":"desc","blocks":[
+                        {"type":"shell","config":{"command":"echo hello"}}
+                      ]}
+                    ],"needsClarification":false}""";
+            when(aiProvider.reason(any())).thenReturn(new AiProvider.ReasoningResult(json, null));
+            Workflow created = Workflow.builder().id("wf-1").name("My WF").build();
+            when(workflowService.create(any())).thenReturn(created);
+            lenient().when(workflowFactoryService.verifyAndFix(anyString(), anyInt()))
+                    .thenReturn(new WorkflowFactoryService.FactoryTestResult("OK", null, null));
+
+            service.decompose(wish);
+
+            assertThat(wish.getStatus()).isEqualTo(WishStatus.EXECUTING);
+            assertThat(wish.getIterationCount()).isEqualTo(1);
+        }
+
+        @Test
         void clarificationNeeded_setsAwaitingClarification() throws Exception {
             Wish wish = createWish("w-1");
             String json = """

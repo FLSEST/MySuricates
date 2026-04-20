@@ -1194,6 +1194,11 @@ export const de: TranslationKeys = {
         issues: 'Bewertungs-Issues',
       },
     },
+    autoRefine: {
+      label: 'Auto-Refine',
+      description: 'Ohne manuelle Bestätigung — iteriert autonom bis zum zufriedenstellenden Ergebnis oder max. Iterationen.',
+      enabled: 'Auto-Refine aktiv',
+    },
     showAnalytics: 'Analyse anzeigen',
     hideAnalytics: 'Analyse ausblenden',
     totalWishes: 'Gesamt',

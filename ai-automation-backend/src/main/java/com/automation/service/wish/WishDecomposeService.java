@@ -178,7 +178,11 @@ public class WishDecomposeService {
         }
 
         wish.setIterationCount(wish.getIterationCount() + 1);
-        WishStatusHelper.updateStatus(wishRepository, messagingTemplate, wish, WishStatus.AWAITING_DECOMPOSE_APPROVAL);
+        WishStatus nextStatus = wish.isAutoRefine() ? WishStatus.EXECUTING : WishStatus.AWAITING_DECOMPOSE_APPROVAL;
+        if (wish.isAutoRefine()) {
+            log.info("Wish {}: Auto-approving decomposition (autoRefine) — proceeding to execute", wish.getId());
+        }
+        WishStatusHelper.updateStatus(wishRepository, messagingTemplate, wish, nextStatus);
     }
 
     @SuppressWarnings("unchecked")

@@ -26,5 +26,6 @@ public record WishResponse(
         List<Map<String, Object>> iterationHistory,
         Map<String, Object> metadata,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        boolean autoRefine
 ) {}

@@ -81,6 +81,10 @@ public class WishService {
     }
 
     public Wish create(String text, String projectId, Integer maxIterations, List<String> referenceWorkflowIds) {
+        return create(text, projectId, maxIterations, referenceWorkflowIds, null);
+    }
+
+    public Wish create(String text, String projectId, Integer maxIterations, List<String> referenceWorkflowIds, Boolean autoRefine) {
         if (projectId == null || projectId.isBlank()) {
             throw new IllegalArgumentException("projectId is required for wish creation");
         }
@@ -93,6 +97,7 @@ public class WishService {
                 .projectId(projectId)
                 .maxIterations(maxIterations != null ? maxIterations : 5)
                 .referenceWorkflowIds(referenceWorkflowIds != null ? referenceWorkflowIds : List.of())
+                .autoRefine(Boolean.TRUE.equals(autoRefine))
                 .build();
 
         return wishRepository.save(wish);
@@ -380,8 +385,13 @@ public class WishService {
             meta.put("pendingEvaluation", evaluation);
             wish.setMetadata(meta);
             wish.setResultSummary(summary);
-            WishStatusHelper.updateStatus(wishRepository, messagingTemplate, wish, WishStatus.AWAITING_APPROVAL);
-            log.info("Wish {}: Awaiting user approval — {}", wish.getId(), WishStringUtil.truncate(summary, 100));
+            if (wish.isAutoRefine()) {
+                WishStatusHelper.updateStatus(wishRepository, messagingTemplate, wish, WishStatus.COMPLETED);
+                log.info("Wish {}: Auto-accepted (autoRefine) — {}", wish.getId(), WishStringUtil.truncate(summary, 100));
+            } else {
+                WishStatusHelper.updateStatus(wishRepository, messagingTemplate, wish, WishStatus.AWAITING_APPROVAL);
+                log.info("Wish {}: Awaiting user approval — {}", wish.getId(), WishStringUtil.truncate(summary, 100));
+            }
             return;
         } else if (shouldRetry && wish.getIterationCount() < wish.getMaxIterations()) {
             wish.setStatus(WishStatus.REFINING);

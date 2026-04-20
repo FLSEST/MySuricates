@@ -47,6 +47,14 @@ export function WishDetail({ wishId, onCancel, onDelete }: {
               {wish.projectName && (
                 <p className="text-sm text-text-tertiary mt-1">{t.wishes.project}: {wish.projectName}</p>
               )}
+              {wish.autoRefine && (
+                <div className="mt-1.5">
+                  <Badge variant="accent">
+                    <RefreshCw className="w-3 h-3 mr-1 inline" />
+                    {t.wishes.autoRefine.enabled}
+                  </Badge>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2 ml-4">
               {!isTerminal(wish.status) && !isPaused(wish.status) && (

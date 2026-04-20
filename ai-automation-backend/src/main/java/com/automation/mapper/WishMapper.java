@@ -71,7 +71,8 @@ public class WishMapper {
                 wish.getIterationHistory(),
                 wish.getMetadata(),
                 wish.getCreatedAt(),
-                wish.getUpdatedAt()
+                wish.getUpdatedAt(),
+                wish.isAutoRefine()
         );
     }
 

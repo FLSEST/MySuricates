@@ -5,7 +5,7 @@ import { useT } from '../../i18n';
 import type { Project, Workflow } from '../../types';
 
 interface WishFormProps {
-  onSubmit: (data: { text: string; projectId?: string; referenceWorkflowIds?: string[] }) => void;
+  onSubmit: (data: { text: string; projectId?: string; referenceWorkflowIds?: string[]; autoRefine?: boolean }) => void;
   isPending: boolean;
   projects: Project[] | undefined;
   allWorkflows: Workflow[] | undefined;
@@ -18,6 +18,7 @@ export function WishForm({ onSubmit, isPending, projects, allWorkflows }: WishFo
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [selectedWorkflowIds, setSelectedWorkflowIds] = useState<string[]>([]);
   const [workflowSearch, setWorkflowSearch] = useState('');
+  const [autoRefine, setAutoRefine] = useState(false);
 
   const workflowsByProject = useMemo(() => {
     if (!allWorkflows) return new Map<string, typeof allWorkflows>();
@@ -43,9 +44,11 @@ export function WishForm({ onSubmit, isPending, projects, allWorkflows }: WishFo
       text: wishText,
       projectId: projectId || undefined,
       referenceWorkflowIds: selectedWorkflowIds.length > 0 ? selectedWorkflowIds : undefined,
+      autoRefine: autoRefine || undefined,
     });
     setWishText('');
     setSelectedWorkflowIds([]);
+    setAutoRefine(false);
     setShowAdvanced(false);
   };
 
@@ -88,9 +91,22 @@ export function WishForm({ onSubmit, isPending, projects, allWorkflows }: WishFo
           </Button>
         </div>
 
-        {/* Advanced: Reference Workflow Selector */}
+        {/* Advanced: Reference Workflow Selector + Auto-Refine */}
         {showAdvanced && (
-          <div className="space-y-2 pt-1">
+          <div className="space-y-3 pt-1">
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoRefine}
+                onChange={(e) => setAutoRefine(e.target.checked)}
+                className="mt-0.5 rounded border-border text-accent focus:ring-accent"
+              />
+              <span className="flex flex-col">
+                <span className="text-xs font-medium text-text-secondary">{t.wishes.autoRefine.label}</span>
+                <span className="text-[11px] text-text-tertiary">{t.wishes.autoRefine.description}</span>
+              </span>
+            </label>
+
             <div>
               <label className="text-xs font-medium text-text-secondary">{t.wishes.referenceWorkflows}</label>
               <p className="text-xs text-text-tertiary">{t.wishes.referenceWorkflowsHint}</p>

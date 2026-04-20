@@ -21,7 +21,7 @@ class WishResponseTest {
                 WishStatus.EXECUTING,
                 "proj-42",
                 "My Project",
-                Map.of("steps", List.of("build", "deploy")),
+                Map.<String, Object>of("steps", List.of("build", "deploy")),
                 List.of("wf-1", "wf-2"),
                 List.of("Build Workflow", "Deploy Workflow"),
                 List.of("ref-1"),
@@ -32,11 +32,10 @@ class WishResponseTest {
                 "run-99",
                 "Deployed successfully",
                 null,
-                List.of(Map.of("iteration", 1, "status", "done")),
-                Map.of("source", "ui"),
+                List.<Map<String, Object>>of(Map.of("iteration", 1, "status", "done")),
+                Map.<String, Object>of("source", "ui"),
                 NOW,
-                LATER
-        );
+                LATER, false);
     }
 
     // --- Constructor & accessors ---
@@ -73,8 +72,7 @@ class WishResponseTest {
                 "wish-2", "text", WishStatus.RECEIVED, null, null,
                 Map.of(), List.of(), List.of(), List.of(), List.of(),
                 null, 0, 10, null, null, null,
-                List.of(), Map.of(), NOW, NOW
-        );
+                List.of(), Map.of(), NOW, NOW, false);
 
         assertThat(response.decomposition()).isEmpty();
         assertThat(response.generatedWorkflowIds()).isEmpty();
@@ -91,8 +89,7 @@ class WishResponseTest {
                 null, null, null, null, null,
                 null, null, null, null, null,
                 null, 0, 0, null, null, null,
-                null, null, null, null
-        );
+                null, null, null, null, false);
 
         assertThat(response.id()).isNull();
         assertThat(response.originalText()).isNull();
@@ -120,8 +117,7 @@ class WishResponseTest {
                 "wish-err", "broken wish", WishStatus.FAILED, null, null,
                 null, List.of(), List.of(), List.of(), List.of(),
                 null, 1, 3, null, null, "Something went wrong",
-                List.of(), null, NOW, LATER
-        );
+                List.of(), null, NOW, LATER, false);
 
         assertThat(response.status()).isEqualTo(WishStatus.FAILED);
         assertThat(response.error()).isEqualTo("Something went wrong");
@@ -139,8 +135,7 @@ class WishResponseTest {
                 "wish-iter", "iterative wish", WishStatus.COMPLETED, null, null,
                 null, List.of("wf-1"), List.of("WF"), List.of(), List.of(),
                 null, 2, 5, null, "Done", null,
-                history, null, NOW, LATER
-        );
+                history, null, NOW, LATER, false);
 
         assertThat(response.iterationCount()).isEqualTo(2);
         assertThat(response.maxIterations()).isEqualTo(5);
@@ -160,8 +155,8 @@ class WishResponseTest {
 
     @Test
     void should_beEqual_when_bothAllNulls() {
-        var a = new WishResponse(null, null, null, null, null, null, null, null, null, null, null, 0, 0, null, null, null, null, null, null, null);
-        var b = new WishResponse(null, null, null, null, null, null, null, null, null, null, null, 0, 0, null, null, null, null, null, null, null);
+        var a = new WishResponse(null, null, null, null, null, null, null, null, null, null, null, 0, 0, null, null, null, null, null, null, null, false);
+        var b = new WishResponse(null, null, null, null, null, null, null, null, null, null, null, 0, 0, null, null, null, null, null, null, null, false);
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -172,13 +167,12 @@ class WishResponseTest {
         var a = createFullResponse();
         var b = new WishResponse(
                 "wish-other", "Deploy my app", WishStatus.EXECUTING, "proj-42", "My Project",
-                Map.of("steps", List.of("build", "deploy")),
+                Map.<String, Object>of("steps", List.of("build", "deploy")),
                 List.of("wf-1", "wf-2"), List.of("Build Workflow", "Deploy Workflow"),
                 List.of("ref-1"), List.of("Reference Workflow"),
                 "chain-1", 3, 5, "run-99", "Deployed successfully", null,
-                List.of(Map.of("iteration", 1, "status", "done")),
-                Map.of("source", "ui"), NOW, LATER
-        );
+                List.<Map<String, Object>>of(Map.of("iteration", 1, "status", "done")),
+                Map.<String, Object>of("source", "ui"), NOW, LATER, false);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -188,13 +182,12 @@ class WishResponseTest {
         var a = createFullResponse();
         var b = new WishResponse(
                 "wish-1", "Deploy my app", WishStatus.COMPLETED, "proj-42", "My Project",
-                Map.of("steps", List.of("build", "deploy")),
+                Map.<String, Object>of("steps", List.of("build", "deploy")),
                 List.of("wf-1", "wf-2"), List.of("Build Workflow", "Deploy Workflow"),
                 List.of("ref-1"), List.of("Reference Workflow"),
                 "chain-1", 3, 5, "run-99", "Deployed successfully", null,
-                List.of(Map.of("iteration", 1, "status", "done")),
-                Map.of("source", "ui"), NOW, LATER
-        );
+                List.<Map<String, Object>>of(Map.of("iteration", 1, "status", "done")),
+                Map.<String, Object>of("source", "ui"), NOW, LATER, false);
 
         assertThat(a).isNotEqualTo(b);
     }

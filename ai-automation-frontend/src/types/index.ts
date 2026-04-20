@@ -1078,6 +1078,7 @@ export interface Wish {
   metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
+  autoRefine: boolean;
 }
 
 export interface CreateWishRequest {
@@ -1085,6 +1086,7 @@ export interface CreateWishRequest {
   projectId?: string;
   maxIterations?: number;
   referenceWorkflowIds?: string[];
+  autoRefine?: boolean;
 }
 
 // ── Workflow Factory ─────────────────────────────────────

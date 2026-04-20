@@ -25,7 +25,7 @@ public class WishController {
 
     @PostMapping
     public ResponseEntity<WishResponse> createWish(@Valid @RequestBody CreateWishRequest request) {
-        Wish wish = wishService.create(request.text(), request.projectId(), request.maxIterations(), request.referenceWorkflowIds());
+        Wish wish = wishService.create(request.text(), request.projectId(), request.maxIterations(), request.referenceWorkflowIds(), request.autoRefine());
         wishService.fulfillAsync(wish.getId());
         return ResponseEntity.status(HttpStatus.CREATED).body(wishMapper.toResponse(wish));
     }

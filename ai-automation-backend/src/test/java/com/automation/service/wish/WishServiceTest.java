@@ -146,6 +146,36 @@ class WishServiceTest {
 
             assertThat(result.getProjectId()).isEqualTo("p-1");
         }
+
+        @Test
+        void create_defaultsAutoRefineToFalse_whenNotProvided() {
+            when(projectRepository.findById("proj-1")).thenReturn(Optional.of(new Project()));
+            when(wishRepository.save(any(Wish.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            Wish result = wishService.create("Test", "proj-1", null, null);
+
+            assertThat(result.isAutoRefine()).isFalse();
+        }
+
+        @Test
+        void create_defaultsAutoRefineToFalse_whenNullExplicitly() {
+            when(projectRepository.findById("proj-1")).thenReturn(Optional.of(new Project()));
+            when(wishRepository.save(any(Wish.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            Wish result = wishService.create("Test", "proj-1", null, null, null);
+
+            assertThat(result.isAutoRefine()).isFalse();
+        }
+
+        @Test
+        void create_setsAutoRefineTrue_whenRequested() {
+            when(projectRepository.findById("proj-1")).thenReturn(Optional.of(new Project()));
+            when(wishRepository.save(any(Wish.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            Wish result = wishService.create("Test", "proj-1", null, null, Boolean.TRUE);
+
+            assertThat(result.isAutoRefine()).isTrue();
+        }
     }
 
     // --- Delete ---

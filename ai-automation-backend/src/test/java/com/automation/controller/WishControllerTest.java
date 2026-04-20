@@ -47,13 +47,13 @@ class WishControllerTest {
         return new WishResponse("w-1", "Build a dashboard", WishStatus.DECOMPOSING,
                 "proj-1", "Project", null, List.of(), List.of(), List.of(), List.of(),
                 null, 0, 3, null, null, null, List.of(), Map.of(),
-                Instant.now(), Instant.now());
+                Instant.now(), Instant.now(), false);
     }
 
     @Test
     void createWish_validRequest_returns201() throws Exception {
         var wish = Wish.builder().id("w-1").build();
-        when(wishService.create(any(), any(), any(), any())).thenReturn(wish);
+        when(wishService.create(any(), any(), any(), any(), any())).thenReturn(wish);
         when(wishMapper.toResponse(wish)).thenReturn(sampleResponse());
 
         mockMvc.perform(post("/api/v1/wishes")

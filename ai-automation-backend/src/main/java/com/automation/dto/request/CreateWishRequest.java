@@ -8,5 +8,6 @@ public record CreateWishRequest(
         @NotBlank String text,
         @NotBlank String projectId,
         Integer maxIterations,
-        List<String> referenceWorkflowIds
+        List<String> referenceWorkflowIds,
+        Boolean autoRefine
 ) {}

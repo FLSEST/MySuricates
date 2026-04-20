@@ -66,6 +66,10 @@ public class Wish {
     @Builder.Default
     private int maxIterations = 5;
 
+    @Column(name = "auto_refine", nullable = false)
+    @Builder.Default
+    private boolean autoRefine = false;
+
     @Column(name = "current_run_id")
     private String currentRunId;
 

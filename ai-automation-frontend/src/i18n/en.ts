@@ -1197,6 +1197,11 @@ export const en = {
         issues: 'Evaluation issues',
       },
     },
+    autoRefine: {
+      label: 'Auto-refine',
+      description: 'Skip manual approval — iterate autonomously until satisfied or max iterations reached.',
+      enabled: 'Auto-refine on',
+    },
     showAnalytics: 'Show analytics',
     hideAnalytics: 'Hide analytics',
     totalWishes: 'Total',
