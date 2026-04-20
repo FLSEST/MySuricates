@@ -9,6 +9,7 @@ import {
 import { Card, CardHeader, Button, Spinner, Badge, Input } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { GateStatusBadge } from '../components/shared/GateStatusBadge';
+import { GateStatusBanner } from '../components/shared/GateStatusBanner';
 import { ErrorState } from '../components/shared/ErrorState';
 import { LogViewer } from '../components/shared/LogViewer';
 import { ApprovalDialog } from '../components/shared/ApprovalDialog';
@@ -430,6 +431,8 @@ export function WorkflowExecution() {
           </div>
         )}
       </div>
+
+      <GateStatusBanner run={run} />
 
       {/* Duration + rating */}
       <div className="flex items-center gap-6 text-sm">

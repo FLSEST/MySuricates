@@ -328,6 +328,12 @@ export const en = {
       openFolder: 'Open folder',
       openPath: 'Open path',
       openPathFailed: 'Failed to open path',
+      gateBanner: {
+        green: 'Quality gate passed',
+        yellow: 'Quality gate findings',
+        red: 'Quality gate failed',
+        categoryLabel: 'Category',
+      },
       stepInput: {
         command: 'Command',
         systemPrompt: 'System prompt',

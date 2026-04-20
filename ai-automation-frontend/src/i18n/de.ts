@@ -330,6 +330,12 @@ export const de: TranslationKeys = {
       openFolder: 'Ordner öffnen',
       openPath: 'Pfad öffnen',
       openPathFailed: 'Pfad konnte nicht geöffnet werden',
+      gateBanner: {
+        green: 'Qualitäts-Gate bestanden',
+        yellow: 'Qualitäts-Gate meldet Findings',
+        red: 'Qualitäts-Gate fehlgeschlagen',
+        categoryLabel: 'Kategorie',
+      },
       stepInput: {
         command: 'Befehl',
         systemPrompt: 'System-Prompt',
