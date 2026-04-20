@@ -521,6 +521,19 @@ class AssistantToolExecutorTest {
     }
 
     @Test
+    void extractTools_disallowedMutatingTool_isStrippedAndNotRegistered() {
+        String input = "Ich schlage ein TODO vor. <tool type=\"create_todo\">{\"title\":\"A\"}</tool>";
+
+        var extraction = executor.extractTools(input, type -> false);
+
+        assertThat(extraction.pendingTools()).isEmpty();
+        assertThat(extraction.cleanedResponse()).contains("Ich schlage ein TODO vor.");
+        assertThat(extraction.cleanedResponse()).doesNotContain("Bestätigung");
+        assertThat(registry.size()).isZero();
+        verifyNoInteractions(todoService, workflowService, workflowExecutor, chainService);
+    }
+
+    @Test
     void executeConfirmed_runsTheTool_andReturnsSuccessResult() {
         Todo created = Todo.builder().id("abcdef12-xxx").title("Gate me").build();
         when(todoService.create(any())).thenReturn(created);

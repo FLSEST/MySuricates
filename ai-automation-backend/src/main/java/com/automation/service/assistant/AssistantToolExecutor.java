@@ -23,6 +23,8 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -45,6 +47,16 @@ public class AssistantToolExecutor {
 
     private static final Pattern TOOL_PATTERN =
             Pattern.compile("<tool type=\"([^\"]+)\">(.*?)</tool>", Pattern.DOTALL);
+    private static final Set<String> MUTATING_TOOL_TYPES = Set.of(
+            "create_todo",
+            "update_todo_status",
+            "create_workflow",
+            "update_workflow",
+            "delete_workflow",
+            "start_workflow",
+            "cancel_run",
+            "create_chain"
+    );
 
     private final TodoService todoService;
     private final WorkflowService workflowService;
@@ -65,6 +77,14 @@ public class AssistantToolExecutor {
      * "wartet auf Bestätigung" placeholder. No tool is executed at this point.
      */
     public ExtractionResult extractTools(String response) {
+        return extractTools(response, type -> true);
+    }
+
+    /**
+     * Variant of {@link #extractTools(String)} that allows the caller to suppress specific tool
+     * types. Suppressed tags are stripped from the response and never registered as pending.
+     */
+    public ExtractionResult extractTools(String response, Predicate<String> allowToolType) {
         if (response == null) return new ExtractionResult(null, List.of());
         Matcher m = TOOL_PATTERN.matcher(response);
         if (!m.find()) return new ExtractionResult(response, List.of());
@@ -73,6 +93,10 @@ public class AssistantToolExecutor {
         StringBuffer sb = new StringBuffer();
         do {
             String type = m.group(1);
+            if (!allowToolType.test(type)) {
+                m.appendReplacement(sb, "");
+                continue;
+            }
             String payload = sanitizeJson(m.group(2).trim());
             String description = describe(type, payload);
             PendingTool tool = pendingToolRegistry.register(type, description, payload);
@@ -82,6 +106,10 @@ public class AssistantToolExecutor {
         } while (m.find());
         m.appendTail(sb);
         return new ExtractionResult(sb.toString(), pending);
+    }
+
+    public boolean isMutatingToolType(String type) {
+        return MUTATING_TOOL_TYPES.contains(type);
     }
 
     /**

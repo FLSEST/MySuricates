@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.sql.SQLTransientConnectionException;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -34,6 +35,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -71,8 +73,9 @@ class AssistantServiceTest {
         // Fetch service defaults — no fetches
         lenient().when(fetchService.parseFetchRequests(any())).thenReturn(List.of());
         // Tool executor — no pending tools, pass cleaned response through unchanged
-        lenient().when(toolExecutor.extractTools(any()))
+        lenient().when(toolExecutor.extractTools(any(), org.mockito.ArgumentMatchers.<Predicate<String>>any()))
                 .thenAnswer(inv -> new AssistantToolExecutor.ExtractionResult(inv.getArgument(0), List.of()));
+        lenient().when(toolExecutor.isMutatingToolType(anyString())).thenReturn(true);
         // Fetch strip — pass through
         lenient().when(fetchService.stripFetchTags(any())).thenAnswer(inv -> inv.getArgument(0));
         // Seed settings as @PostConstruct would in prod — populates cachedBaseInstructions + cachedAssistantModel
@@ -112,7 +115,7 @@ class AssistantServiceTest {
                 Ja, ich starte den Workflow für dich.
                 <actions>[{"type":"run_workflow","id":"wf-42","name":"Daily Report","label":"Jetzt starten"}]</actions>""");
 
-        var result = chat("Starte Daily Report");
+        var result = chat("Starte den Workflow Daily Report");
 
         assertThat(result.message()).isEqualTo("Ja, ich starte den Workflow für dich.");
         assertThat(result.actions()).hasSize(1);
@@ -129,7 +132,7 @@ class AssistantServiceTest {
                 Du hast zwei Optionen:
                 <actions>[{"type":"run_workflow","id":"wf-1","name":"Workflow A","label":"A starten"},{"type":"show_workflow","id":"wf-2","name":"Workflow B","label":"B anzeigen"}]</actions>""");
 
-        var result = chat("Was kann ich tun?");
+        var result = chat("Starte den Workflow A");
 
         assertThat(result.actions()).hasSize(2);
         assertThat(result.actions().get(0).type()).isEqualTo("run_workflow");
@@ -274,8 +277,11 @@ class AssistantServiceTest {
         var fetchReq = new AssistantFetchService.FetchRequest("run_detail", "r1");
         when(fetchService.parseFetchRequests("<fetch type=\"run_detail\" id=\"r1\"/>Was ist mit dem Run?"))
                 .thenReturn(List.of(fetchReq));
-        when(fetchService.parseFetchRequests("Der Run r1 ist fertig.")).thenReturn(List.of());
         when(fetchService.executeFetch(fetchReq)).thenReturn("run r1: COMPLETED");
+        when(fetchService.stripFetchTags("<fetch type=\"run_detail\" id=\"r1\"/>Was ist mit dem Run?"))
+                .thenReturn("");
+        when(fetchService.stripFetchTags("Der Run r1 ist fertig."))
+                .thenReturn("Der Run r1 ist fertig.");
 
         var result = chat("Was ist mit dem Run?");
 
@@ -290,43 +296,46 @@ class AssistantServiceTest {
     }
 
     @Test
-    void chat_secondFetchRoundHitsLimitHint() {
-        stubClaudeSequence(
-                "<fetch type=\"run_detail\" id=\"r1\"/>",
-                "<fetch type=\"run_detail\" id=\"r2\"/>",
-                "Finale Antwort."
-        );
-        var f1 = new AssistantFetchService.FetchRequest("run_detail", "r1");
-        var f2 = new AssistantFetchService.FetchRequest("run_detail", "r2");
-        when(fetchService.parseFetchRequests("<fetch type=\"run_detail\" id=\"r1\"/>")).thenReturn(List.of(f1));
-        when(fetchService.parseFetchRequests("<fetch type=\"run_detail\" id=\"r2\"/>")).thenReturn(List.of(f2));
-        // After 2 rounds, the loop exits without parsing "Finale Antwort." again
-        when(fetchService.executeFetch(f1)).thenReturn("detail r1");
-        when(fetchService.executeFetch(f2)).thenReturn("detail r2");
+    void chat_responseWithTextAndFetchDoesNotAutoFetch() {
+        stubClaude("Kurzantwort. <fetch type=\"run_detail\" id=\"r1\"/>");
+        when(fetchService.stripFetchTags("Kurzantwort. <fetch type=\"run_detail\" id=\"r1\"/>"))
+                .thenReturn("Kurzantwort.");
 
-        var result = chat("Query");
+        var result = chat("Was ist mit dem Run?");
 
-        assertThat(result.message()).isEqualTo("Finale Antwort.");
-        // Round-1 CLI call must include the limit hint ("Keine weiteren Fetches möglich.")
-        verify(commandExecutorService).executeOnHost(argThat(req ->
-                req.command() != null
-                        && req.command().contains("detail r2")
-                        && req.command().contains("Runde 2")
-                        && req.command().contains("Keine weiteren Fetches möglich")
-        ));
+        assertThat(result.message()).isEqualTo("Kurzantwort.");
+        verify(commandExecutorService, org.mockito.Mockito.times(1))
+                .executeOnHost(any(HostExecutionRequest.class));
+        verify(fetchService, never()).executeFetch(any());
+    }
+
+    @Test
+    void chat_disallowedFetchTypeDoesNotAutoFetch() {
+        stubClaude("<fetch type=\"project_context\" id=\"p1\"/>");
+        var fetchReq = new AssistantFetchService.FetchRequest("project_context", "p1");
+        when(fetchService.parseFetchRequests("<fetch type=\"project_context\" id=\"p1\"/>"))
+                .thenReturn(List.of(fetchReq));
+        when(fetchService.stripFetchTags("<fetch type=\"project_context\" id=\"p1\"/>"))
+                .thenReturn("");
+
+        var result = chat("Analysiere das Projekt");
+
+        assertThat(result.message()).isEqualTo("(Keine Antwort erhalten)");
+        verify(commandExecutorService, org.mockito.Mockito.times(1))
+                .executeOnHost(any(HostExecutionRequest.class));
+        verify(fetchService, never()).executeFetch(any());
     }
 
     @Test
     void chat_blankSupplementalBreaksLoop() {
         // Fetches are returned, but executeFetch yields only blanks → supplemental.isBlank() → break.
         stubClaude("<fetch type=\"unknown\" id=\"x\"/>Antwort trotzdem.");
-        var fetchReq = new AssistantFetchService.FetchRequest("unknown", "x");
-        when(fetchService.parseFetchRequests(any())).thenReturn(List.of(fetchReq));
-        when(fetchService.executeFetch(fetchReq)).thenReturn("   ");
+        when(fetchService.stripFetchTags("<fetch type=\"unknown\" id=\"x\"/>Antwort trotzdem."))
+                .thenReturn("Antwort trotzdem.");
 
         var result = chat("Q");
 
-        assertThat(result.message()).isEqualTo("<fetch type=\"unknown\" id=\"x\"/>Antwort trotzdem.");
+        assertThat(result.message()).isEqualTo("Antwort trotzdem.");
         // Exactly one CLI call — no enriched second round after blank supplemental break
         verify(commandExecutorService, org.mockito.Mockito.times(1))
                 .executeOnHost(any(HostExecutionRequest.class));
@@ -361,6 +370,66 @@ class AssistantServiceTest {
                         && !req.allowedTools().contains("Write")
                         && !req.allowedTools().contains("Bash")
         ));
+    }
+
+    @Test
+    void chat_stripsMutatingToolProposalWithoutExplicitIntent() {
+        when(toolExecutor.extractTools(any(), argThat((Predicate<String> predicate) -> !predicate.test("create_todo"))))
+                .thenReturn(new AssistantToolExecutor.ExtractionResult("Analyse ohne Karte.", List.of()));
+        when(fetchService.stripFetchTags("Analyse ohne Karte.")).thenReturn("Analyse ohne Karte.");
+        stubClaude("Ich schlage vor, ein TODO anzulegen. <tool type=\"create_todo\">{\"title\":\"x\"}</tool>");
+
+        var result = chat("Das waere eher ein Feature.");
+
+        assertThat(result.message()).isEqualTo("Analyse ohne Karte.");
+        assertThat(result.pendingTools()).isNullOrEmpty();
+        verify(toolExecutor).extractTools(any(), argThat((Predicate<String> predicate) -> !predicate.test("create_todo")));
+    }
+
+    @Test
+    void chat_keepsMutatingToolProposalForExplicitIntent() {
+        var pending = List.of(new com.automation.service.assistant.PendingTool(
+                "p1", "create_todo", "TODO anlegen", "{}", java.time.Instant.now().plusSeconds(60)));
+        when(toolExecutor.extractTools(any(), argThat((Predicate<String> predicate) -> predicate.test("create_todo"))))
+                .thenReturn(new AssistantToolExecutor.ExtractionResult("Ich schlage das vor.", pending));
+        when(fetchService.stripFetchTags("Ich schlage das vor.")).thenReturn("Ich schlage das vor.");
+        stubClaude("<tool type=\"create_todo\">{\"title\":\"x\"}</tool>");
+
+        var result = chat("Bitte lege ein TODO an.");
+
+        assertThat(result.message()).isEqualTo("Ich schlage das vor.");
+        assertThat(result.pendingTools()).hasSize(1);
+        verify(toolExecutor).extractTools(any(), argThat((Predicate<String> predicate) -> predicate.test("create_todo")));
+    }
+
+    @Test
+    void chat_filtersRunWorkflowActionWithoutExplicitIntent() {
+        stubClaude("""
+                Ich kann das starten.
+                <actions>[{"type":"run_workflow","id":"wf-42","name":"Daily Report","label":"Jetzt starten"}]</actions>""");
+
+        var result = chat("Was waere sinnvoll?");
+
+        assertThat(result.actions()).isEmpty();
+    }
+
+    @Test
+    void chat_keepsRunWorkflowActionForExplicitIntent() {
+        stubClaude("""
+                Ich kann das starten.
+                <actions>[{"type":"run_workflow","id":"wf-42","name":"Daily Report","label":"Jetzt starten"}]</actions>""");
+
+        var result = service.chat(new AssistantChatRequest(
+                "Bitte starte ihn nochmal.",
+                List.of(),
+                new AssistantChatRequest.PageContext("workflow", "wf-42", null, "wf-42", null, "/workflows/wf-42"),
+                null,
+                null,
+                null
+        ));
+
+        assertThat(result.actions()).hasSize(1);
+        assertThat(result.actions().getFirst().type()).isEqualTo("run_workflow");
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

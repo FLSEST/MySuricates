@@ -85,6 +85,13 @@ public class AssistantContextBuilder {
     // ── System prompt ────────────────────────────────────────────────────────
 
     public String buildSystemPrompt(AssistantChatRequest.PageContext ctx, String baseInstructions) {
+        String page = ctx != null ? ctx.page() : null;
+        PageCategory cat = classifyPage(page);
+
+        if (cat == PageCategory.RUNS && resolveRunId(ctx) != null) {
+            return buildRunFocusedSystemPrompt(ctx, baseInstructions);
+        }
+
         var sb = new StringBuilder(4000);
 
         // 1. Base instructions from resource file
@@ -92,39 +99,86 @@ public class AssistantContextBuilder {
             sb.append(baseInstructions).append("\n\n");
         }
 
-        // 2. Dynamic platform context
-        String page = ctx != null ? ctx.page() : null;
-        PageCategory cat = classifyPage(page);
+        // 2. Dynamic platform context (default: lean, only page-relevant sections)
+        boolean includeRunsSection = cat == PageCategory.OVERVIEW;
+        boolean includeTodosSection = cat == PageCategory.TASKS || cat == PageCategory.OVERVIEW;
+        boolean includeWishesSection = cat == PageCategory.WISHES || cat == PageCategory.OVERVIEW;
+        boolean includeSchedulesSection = cat == PageCategory.SCHEDULES || cat == PageCategory.OVERVIEW;
+        boolean includeProjects = cat == PageCategory.WORKFLOWS || cat == PageCategory.TASKS || cat == PageCategory.OVERVIEW;
+        boolean compactProjects = cat == PageCategory.TASKS;
+        boolean includeWorkflows = cat == PageCategory.WORKFLOWS || cat == PageCategory.TASKS || cat == PageCategory.OVERVIEW;
+        boolean compactWorkflows = cat == PageCategory.TASKS;
+        boolean includeRepertoire = cat == PageCategory.WORKFLOWS || cat == PageCategory.OVERVIEW;
+        boolean compactRepertoire = cat != PageCategory.OVERVIEW;
+        boolean includeMemoryAndSessions = cat == PageCategory.OVERVIEW;
 
-        boolean compactRuns      = cat == PageCategory.TASKS || cat == PageCategory.WISHES || cat == PageCategory.SCHEDULES;
-        boolean compactTodos     = cat != PageCategory.TASKS     && cat != PageCategory.OVERVIEW;
-        boolean compactWishes    = cat != PageCategory.WISHES    && cat != PageCategory.OVERVIEW;
-        boolean compactSchedules = cat != PageCategory.SCHEDULES && cat != PageCategory.WORKFLOWS && cat != PageCategory.OVERVIEW;
-        boolean compactProjects  = cat == PageCategory.RUNS || cat == PageCategory.SCHEDULES;
-        boolean compactWorkflows = cat == PageCategory.RUNS || cat == PageCategory.SCHEDULES;
-        boolean compactRepertoire = cat != PageCategory.WORKFLOWS && cat != PageCategory.OVERVIEW;
-
-        // Load workflows once — reused for appendWorkflows + appendWorkflowMemory
-        List<Workflow> allWorkflows = safeLoadWorkflows();
+        List<Workflow> allWorkflows = includeProjects || includeWorkflows || includeMemoryAndSessions
+                ? safeLoadWorkflows()
+                : List.of();
         Map<String, Workflow> workflowById = allWorkflows.stream()
                 .collect(Collectors.toMap(Workflow::getId, Function.identity(), (a, b) -> a));
 
-        runsSection.append(sb, compactRuns);
-        todosSection.append(sb, compactTodos);
-        wishesSection.append(sb, compactWishes);
-        schedulesSection.append(sb, compactSchedules);
-        appendProjects(sb, compactProjects, allWorkflows);
-        appendWorkflows(sb, compactWorkflows, allWorkflows, ctx);
-        skillsSection.append(sb, compactRepertoire);
-        integrationsSection.append(sb, compactRepertoire);
-        chainsSection.append(sb, compactRepertoire);
-        blockTypesSection.append(sb, compactRepertoire);
-        appendWorkflowMemory(sb, workflowById);
-        appendRecentSessions(sb);
+        if (includeRunsSection) {
+            runsSection.append(sb, false);
+        }
+        if (includeTodosSection) {
+            todosSection.append(sb, cat != PageCategory.OVERVIEW);
+        }
+        if (includeWishesSection) {
+            wishesSection.append(sb, cat != PageCategory.OVERVIEW);
+        }
+        if (includeSchedulesSection) {
+            schedulesSection.append(sb, cat != PageCategory.OVERVIEW);
+        }
+        if (includeProjects) {
+            appendProjects(sb, compactProjects, allWorkflows);
+        }
+        if (includeWorkflows) {
+            appendWorkflows(sb, compactWorkflows, allWorkflows, ctx);
+        }
+        if (includeRepertoire) {
+            skillsSection.append(sb, compactRepertoire);
+            integrationsSection.append(sb, compactRepertoire);
+            chainsSection.append(sb, compactRepertoire);
+            blockTypesSection.append(sb, compactRepertoire);
+        }
+        if (includeMemoryAndSessions) {
+            appendWorkflowMemory(sb, workflowById);
+            appendRecentSessions(sb);
+        }
 
         // 3. Page-specific context (enriched with step outputs for run pages)
         if (ctx != null) appendPageContext(sb, ctx);
 
+        return sb.toString();
+    }
+
+    private String buildRunFocusedSystemPrompt(AssistantChatRequest.PageContext ctx, String baseInstructions) {
+        var sb = new StringBuilder(2000);
+        if (baseInstructions != null && !baseInstructions.isBlank()) {
+            sb.append(baseInstructions).append("\n\n");
+        }
+
+        sb.append("## Aktueller Kontext des Users\n");
+        if (ctx.page() != null) sb.append("Seite: /").append(ctx.page()).append("\n");
+        if (ctx.pathname() != null) sb.append("Pfad: ").append(ctx.pathname()).append("\n");
+        if (ctx.workflowId() != null) sb.append("Workflow-ID: ").append(ctx.workflowId()).append("\n");
+        if (ctx.runId() != null) sb.append("Run-ID: ").append(ctx.runId()).append("\n");
+        if (ctx.entityId() != null) sb.append("Angezeigtes Element: ID ").append(ctx.entityId()).append("\n");
+
+        String runId = resolveRunId(ctx);
+        if (runId != null) {
+            try {
+                workflowRunRepository.findByIdWithSteps(runId).ifPresent(run -> {
+                    sb.append("### Aktuell angezeigter Run\n");
+                    appendRunSummary(sb, run);
+                });
+            } catch (Exception ignored) {}
+        }
+
+        String workflowId = resolveWorkflowId(ctx);
+        appendWorkflowContext(sb, workflowId, false);
+        sb.append("\n");
         return sb.toString();
     }
 
@@ -365,58 +419,13 @@ public class AssistantContextBuilder {
             try {
                 workflowRunRepository.findByIdWithSteps(runId).ifPresent(run -> {
                     sb.append("### Aktuell angezeigter Run\n");
-                    sb.append("Workflow: ").append(runLabel(run)).append("\n");
-                    sb.append("Status: ").append(run.getStatus());
-                    if (run.getDurationMs() != null) {
-                        sb.append(" (").append(run.getDurationMs() / 1000).append("s)");
-                    }
-                    sb.append("\n");
-                    String runErr = extractError(run);
-                    if (runErr != null) sb.append("Run-Fehler: ").append(truncate(runErr, 200)).append("\n");
-                    List<StepResult> steps = run.getSteps();
-                    if (!steps.isEmpty()) {
-                        sb.append("Schritte (").append(steps.size()).append("):\n");
-                        int firstFailedIdx = -1;
-                        for (int i = 0; i < steps.size(); i++) {
-                            if (steps.get(i).getStatus() == StepStatus.FAILED) { firstFailedIdx = i; break; }
-                        }
-                        int perStepBudget = firstFailedIdx == -1 && !steps.isEmpty()
-                                ? Math.min(1500, 8000 / steps.size())
-                                : 0;
-                        for (int i = 0; i < steps.size(); i++) {
-                            StepResult s = steps.get(i);
-                            sb.append("  ").append(s.getStepIndex() + 1).append(". ")
-                                    .append(s.getStatus());
-                            boolean isFailed = s.getStatus() == StepStatus.FAILED;
-                            boolean isBeforeFailed = firstFailedIdx > 0 && i == firstFailedIdx - 1;
-                            if (isFailed && s.getOutput() != null) {
-                                sb.append(":\n    ").append(truncate(s.getOutput(), 3000));
-                            } else if (isBeforeFailed && s.getOutput() != null) {
-                                sb.append(" (vorheriger Step — Kontext für Fehleranalyse):\n    ")
-                                        .append(truncate(s.getOutput(), 1500));
-                            } else if (firstFailedIdx == -1 && s.getOutput() != null && perStepBudget > 0) {
-                                sb.append(" Output:\n    ").append(truncate(s.getOutput(), perStepBudget));
-                            }
-                            sb.append("\n");
-                        }
-                    }
+                    appendRunSummary(sb, run);
                 });
             } catch (Exception ignored) {}
         }
 
         String workflowId = resolveWorkflowId(ctx);
-        if (workflowId != null) {
-            try {
-                workflowRepository.findByIdWithSkills(workflowId).ifPresent(workflow -> {
-                    sb.append("Aktiver Workflow: ").append(workflow.getName())
-                            .append(" (ID: ").append(workflow.getId()).append(")\n");
-                    if (workflow.getProject() != null) {
-                        sb.append("Workflow-Projekt: ").append(workflow.getProject().getName())
-                                .append(" (ID: ").append(workflow.getProject().getId()).append(")\n");
-                    }
-                });
-            } catch (Exception ignored) {}
-        }
+        appendWorkflowContext(sb, workflowId, true);
 
         if ("wishes".equals(ctx.page()) && ctx.entityId() != null) {
             try {
@@ -449,6 +458,69 @@ public class AssistantContextBuilder {
             } catch (Exception ignored) {}
         }
         sb.append("\n");
+    }
+
+    private void appendRunSummary(StringBuilder sb, WorkflowRun run) {
+        sb.append("Workflow: ").append(runLabel(run)).append("\n");
+        if (run.getWorkflow() != null) {
+            sb.append("Workflow-ID: ").append(run.getWorkflow().getId()).append("\n");
+            if (run.getWorkflow().getProject() != null) {
+                sb.append("Workflow-Projekt: ").append(run.getWorkflow().getProject().getName())
+                        .append(" (ID: ").append(run.getWorkflow().getProject().getId()).append(")\n");
+            }
+        }
+        sb.append("Status: ").append(run.getStatus());
+        if (run.getDurationMs() != null) {
+            sb.append(" (").append(run.getDurationMs() / 1000).append("s)");
+        }
+        sb.append("\n");
+        String runErr = extractError(run);
+        if (runErr != null) {
+            sb.append("Run-Fehler: ").append(truncate(runErr, 200)).append("\n");
+        }
+
+        List<StepResult> steps = run.getSteps();
+        if (!steps.isEmpty()) {
+            sb.append("Schritte: ").append(steps.size());
+            String counts = summarizeStepStatuses(steps);
+            if (!counts.isBlank()) {
+                sb.append(" (").append(counts).append(")");
+            }
+            sb.append("\n");
+            steps.stream()
+                    .filter(step -> step.getStatus() == StepStatus.FAILED)
+                    .findFirst()
+                    .ifPresent(step -> sb.append("Erster fehlgeschlagener Schritt: ")
+                            .append(step.getStepIndex() + 1).append("\n"));
+        }
+    }
+
+    private String summarizeStepStatuses(List<StepResult> steps) {
+        if (steps == null || steps.isEmpty()) return "";
+        return java.util.Arrays.stream(StepStatus.values())
+                .map(status -> Map.entry(status, steps.stream().filter(step -> step.getStatus() == status).count()))
+                .filter(entry -> entry.getValue() > 0)
+                .map(entry -> entry.getKey() + "=" + entry.getValue())
+                .collect(Collectors.joining(", "));
+    }
+
+    private void appendWorkflowContext(StringBuilder sb, String workflowId, boolean includeProjectFiles) {
+        if (workflowId == null) return;
+        try {
+            workflowRepository.findByIdWithSkills(workflowId).ifPresent(workflow -> {
+                sb.append("Aktiver Workflow: ").append(workflow.getName())
+                        .append(" (ID: ").append(workflow.getId()).append(")\n");
+                if (workflow.getProject() != null) {
+                    sb.append("Workflow-Projekt: ").append(workflow.getProject().getName())
+                            .append(" (ID: ").append(workflow.getProject().getId()).append(")\n");
+                    if (includeProjectFiles) {
+                        sb.append("Aktives Projekt: ").append(workflow.getProject().getName())
+                                .append(" (ID: ").append(workflow.getProject().getId()).append(")\n");
+                        appendProjectFileListing(sb, workflow.getProject().getPath(), workflow.getProject().getId());
+                    }
+                }
+            });
+        } catch (Exception ignored) {}
     }
 
     // ── Project file listing ──────────────────────────────────────────────

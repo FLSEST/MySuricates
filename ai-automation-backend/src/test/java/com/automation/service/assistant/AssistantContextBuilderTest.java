@@ -353,44 +353,21 @@ class AssistantContextBuilderTest {
 
         @Test
         void runsPage_compactTodos() {
-            when(systemIdentity.getVersion()).thenReturn("1.0.0");
-            when(workflowRepository.findAllWithActiveProject()).thenReturn(List.of());
-            // RUNS page → full mode for runs: uses findByStatus + findTop10
-            when(workflowRunRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of());
-            when(workflowRunRepository.findTop10ByOrderByStartedAtDesc()).thenReturn(List.of());
-            when(wishRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
-            when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
-            when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of());
-            when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
+            WorkflowRun run = WorkflowRun.builder().id("run-1").status(RunStatus.RUNNING)
+                    .steps(new ArrayList<>()).build();
+            when(workflowRunRepository.findByIdWithSteps("run-1")).thenReturn(Optional.of(run));
 
-            when(assistantSessionRepository.findTop5ByOrderByStartedAtDesc()).thenReturn(List.of());
-
-            Todo todo = Todo.builder().id("t1").title("Fix Bug").status(Todo.Status.OPEN)
-                    .priority(Todo.Priority.HIGH).build();
-            when(todoRepository.findAll()).thenReturn(List.of(todo));
-
-            var ctx = new AssistantChatRequest.PageContext("runs", null, null);
+            var ctx = new AssistantChatRequest.PageContext("runs", "run-1", null);
             String result = builder.buildSystemPrompt(ctx, "");
 
-            // Compact: shows count, not individual todo titles
-            assertThat(result).contains("Todos:");
-            assertThat(result).contains("1 offen");
+            assertThat(result).contains("Aktuell angezeigter Run");
+            assertThat(result).contains("Status: RUNNING");
+            assertThat(result).doesNotContain("Todos:");
+            assertThat(result).doesNotContain("Fix Bug");
         }
 
         @Test
         void pageContext_run_showsRunDetails() {
-            when(systemIdentity.getVersion()).thenReturn("1.0.0");
-            when(workflowRepository.findAllWithActiveProject()).thenReturn(List.of());
-            // RUNS page → full mode for runs
-            when(workflowRunRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of());
-            when(workflowRunRepository.findTop10ByOrderByStartedAtDesc()).thenReturn(List.of());
-            when(todoRepository.findAll()).thenReturn(List.of());
-            when(wishRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
-            when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
-            when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of());
-            when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
-            when(assistantSessionRepository.findTop5ByOrderByStartedAtDesc()).thenReturn(List.of());
-
             StepResult step = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED)
                     .output("step output").build();
             WorkflowRun run = WorkflowRun.builder().id("run-1").status(RunStatus.COMPLETED)
@@ -405,6 +382,8 @@ class AssistantContextBuilderTest {
             assertThat(result).contains("Pfad: /workflows/wf-1/run/run-1");
             assertThat(result).contains("Workflow-ID: wf-1");
             assertThat(result).contains("Run-ID: run-1");
+            assertThat(result).contains("Schritte: 1 (COMPLETED=1)");
+            assertThat(result).doesNotContain("step output");
             verify(workflowRunRepository).findByIdWithSteps("run-1");
         }
 
@@ -457,15 +436,6 @@ class AssistantContextBuilderTest {
 
         @Test
         void workflowsPage_prioritizesFocusedProjectAndShowsActiveProject() {
-            when(systemIdentity.getVersion()).thenReturn("1.0.0");
-            when(workflowRunRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of());
-            when(workflowRunRepository.findTop10ByOrderByStartedAtDesc()).thenReturn(List.of());
-            when(todoRepository.findAll()).thenReturn(List.of());
-            when(wishRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
-            when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
-            when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
-            when(assistantSessionRepository.findTop5ByOrderByStartedAtDesc()).thenReturn(List.of());
-
             Project alpha = Project.builder().id("p-alpha").name("Alpha").path("/work/alpha").build();
             Project beta = Project.builder().id("p-beta").name("Beta").path("/work/beta").build();
             when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of(alpha, beta));
@@ -494,19 +464,6 @@ class AssistantContextBuilderTest {
 
         @Test
         void wishesPage_showsWishDetailsAndFullWishContext() {
-            when(systemIdentity.getVersion()).thenReturn("1.0.0");
-            when(workflowRunRepository.countByStatus(RunStatus.RUNNING)).thenReturn(0L);
-            when(workflowRunRepository.findTop10ByOrderByStartedAtDesc()).thenReturn(List.of());
-            when(todoRepository.findAll()).thenReturn(List.of());
-            when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
-            when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of());
-            when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
-            when(assistantSessionRepository.findTop5ByOrderByStartedAtDesc()).thenReturn(List.of());
-
-            Project alpha = Project.builder().id("p-alpha").name("Alpha").path("/work/alpha").build();
-            Workflow alphaWorkflow = Workflow.builder().id("wf-alpha").name("Wish Workflow").project(alpha).build();
-            when(workflowRepository.findAllWithActiveProject()).thenReturn(List.of(alphaWorkflow));
-
             Wish activeWish = Wish.builder()
                     .id("wish-1")
                     .originalText("Baue einen Deploy-Workflow")
@@ -520,10 +477,7 @@ class AssistantContextBuilderTest {
             var ctx = new AssistantChatRequest.PageContext("wishes", "wish-1", null);
             String result = builder.buildSystemPrompt(ctx, "");
 
-            assertThat(result).contains("**Aktive Wishes (1):**");
-            assertThat(result).contains("[EXECUTING] Baue einen Deploy-Workflow");
-            assertThat(result).contains("**Meine Workflows (1):**");
-            assertThat(result).contains("[Wish Workflow] Alpha (projekt: p-alpha)");
+            assertThat(result).contains("**Wishes:** 1 aktiv, 0 fehlgeschlagen");
             assertThat(result).contains("Wish-Details: [EXECUTING] Baue einen Deploy-Workflow, Iterationen: 2/5");
         }
     }

@@ -27,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.sql.SQLTransientConnectionException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -49,6 +50,28 @@ public class AssistantService {
      * File mutations must go through MySuricates workflow blocks instead.
      */
     private static final List<String> CHAT_ALLOWED_TOOLS = List.of("Read", "Grep", "Glob", "WebFetch");
+    private static final Set<String> AUTO_FETCH_TYPES = Set.of(
+            "run_detail",
+            "step_output",
+            "wish_detail",
+            "workflow_runs",
+            "workflow_detail",
+            "workflow-inputs",
+            "project_files",
+            "project_file",
+            "docs",
+            "skill",
+            "integration",
+            "chain",
+            "block-spec"
+    );
+    private static final Set<String> MUTATING_ACTION_TYPES = Set.of("run_workflow");
+    private static final Pattern EXPLICIT_MUTATION_VERB =
+            Pattern.compile("(?iu)\\b(?:leg(?:e|en|st)?|erstell(?:e|en|st)?|schreib(?:e|en|st)?|mach(?:e|en|st)?|start(?:e|en|est)?|ausf(?:u|ü)hr(?:e|en|st)?|aktualisier(?:e|en|st)?|(?:ver)?änder(?:e|n|st)?|l(?:o|ö)sch(?:e|en|st)?|entfern(?:e|en|st)?|stopp(?:e|en)?|brich(?:\\s+\\w+){0,2}\\s+ab|markier(?:e|en|st)?)\\b");
+    private static final Pattern EXPLICIT_MUTATION_TARGET =
+            Pattern.compile("(?iu)\\b(?:todo|aufgabe|workflow|chain|run|ausf(?:u|ü)hrung|wish|wunsch|status)\\b");
+    private static final Pattern CONTEXTUAL_RUN_VERB =
+            Pattern.compile("(?iu)\\b(?:start(?:e|en|est)?|ausf(?:u|ü)hr(?:e|en|st)?|erneut(?:\\s+ausf(?:u|ü)hren)?|nochmal(?:\\s+ausf(?:u|ü)hren)?|nochmals(?:\\s+ausf(?:u|ü)hren)?|wiederholen|retry|rerun|abbrechen|stopp(?:e|en)?)\\b");
 
     private static final String DEFAULT_THINKING_PHRASES =
             "{\"de\":[\"Denke nach…\",\"Analysiere…\",\"Überlege kurz…\",\"Einen Moment…\"," +
@@ -113,6 +136,7 @@ public class AssistantService {
             String workingDir = contextBuilder.resolveWorkingDir(req.context());
             String model = cachedAssistantModel;
             String resolvedProvider = aiProviderRegistry.resolve(req.provider()).getId();
+            boolean allowMutatingProposals = hasExplicitMutationIntent(req);
 
             broadcaster.broadcastStatus(requestId, "THINKING", null, startNanos);
             var result = executeOrFail(
@@ -128,22 +152,28 @@ public class AssistantService {
                             .build()
             );
 
-            // Dynamic fetch loop (max 2 rounds)
-            for (int fetchRound = 0; fetchRound < 2; fetchRound++) {
-                List<FetchRequest> fetches = fetchService.parseFetchRequests(result.output());
+            // Demand-driven auto-fetch: at most one follow-up call, only for a single safe fetch
+            for (int fetchRound = 0; fetchRound < 1; fetchRound++) {
+                String rawOutput = result.output();
+                String nonFetchText = fetchService.stripFetchTags(rawOutput);
+                boolean fetchOnlyResponse = nonFetchText == null || nonFetchText.isBlank();
+                if (!fetchOnlyResponse) break;
+
+                List<FetchRequest> fetches = fetchService.parseFetchRequests(rawOutput).stream()
+                        .filter(this::isAutoFetchAllowed)
+                        .limit(1)
+                        .toList();
                 if (fetches.isEmpty()) break;
+
                 broadcaster.broadcastStatus(requestId, "FETCHING_DATA", "Runde " + (fetchRound + 1), startNanos);
                 String supplemental = fetches.stream()
                         .map(fetchService::executeFetch)
                         .filter(s -> !s.isBlank())
                         .collect(Collectors.joining("\n"));
                 if (supplemental.isBlank()) break;
-                String hint = fetchRound == 0
-                        ? "[Bitte beantworte die ursprüngliche Frage jetzt mit diesen Details.]"
-                        : "[Bitte beantworte die Frage JETZT mit den verfügbaren Daten. Keine weiteren Fetches möglich.]";
                 String enrichedPrompt = prompt
                         + "\n\n---\nNachgeladene Details (Runde " + (fetchRound + 1) + "):\n" + supplemental
-                        + "\n\n" + hint;
+                        + "\n\n[Bitte beantworte die ursprüngliche Frage jetzt mit diesen Details.]";
                 broadcaster.broadcastStatus(requestId, "THINKING", "Runde " + (fetchRound + 1), startNanos);
                 result = executeOrFail(
                         HostExecutionRequest.builder()
@@ -161,14 +191,18 @@ public class AssistantService {
 
             // Extract tool proposals (NOT executed — user must confirm via controller endpoint)
             broadcaster.broadcastStatus(requestId, "EXECUTING_TOOLS", null, startNanos);
-            var extraction = toolExecutor.extractTools(result.output());
+            var extraction = toolExecutor.extractTools(
+                    result.output(),
+                    type -> allowMutatingProposals || !toolExecutor.isMutatingToolType(type)
+            );
             String finalOutput = extraction.cleanedResponse();
             // Strip leftover <fetch> tags
             finalOutput = fetchService.stripFetchTags(finalOutput);
 
             AssistantChatResponse parsed = parseResponse(finalOutput);
+            List<AssistantAction> filteredActions = filterActions(parsed.actions(), allowMutatingProposals);
             broadcaster.broadcastStatus(requestId, "COMPLETED", null, startNanos);
-            return new AssistantChatResponse(parsed.message(), parsed.actions(), model, resolvedProvider)
+            return new AssistantChatResponse(parsed.message(), filteredActions, model, resolvedProvider)
                     .withPendingTools(extraction.pendingTools());
 
         } catch (Exception e) {
@@ -240,6 +274,43 @@ public class AssistantService {
             return current;
         }
         return e;
+    }
+
+    private boolean isAutoFetchAllowed(FetchRequest req) {
+        return req != null && AUTO_FETCH_TYPES.contains(req.type());
+    }
+
+    private List<AssistantAction> filterActions(List<AssistantAction> actions, boolean allowMutatingProposals) {
+        if (actions == null || actions.isEmpty()) {
+            return List.of();
+        }
+        return actions.stream()
+                .filter(action -> action != null)
+                .filter(action -> allowMutatingProposals || !isMutatingActionType(action.type()))
+                .toList();
+    }
+
+    private boolean isMutatingActionType(String type) {
+        return type != null && MUTATING_ACTION_TYPES.contains(type);
+    }
+
+    private boolean hasExplicitMutationIntent(AssistantChatRequest req) {
+        String message = req != null ? req.message() : null;
+        if (message == null || message.isBlank()) {
+            return false;
+        }
+        if (EXPLICIT_MUTATION_VERB.matcher(message).find()
+                && EXPLICIT_MUTATION_TARGET.matcher(message).find()) {
+            return true;
+        }
+
+        String page = req.context() != null ? req.context().page() : null;
+        if (page == null) {
+            return false;
+        }
+        boolean contextualRunPage = "run".equals(page) || "runs".equals(page)
+                || "workflow".equals(page) || "workflows".equals(page);
+        return contextualRunPage && CONTEXTUAL_RUN_VERB.matcher(message).find();
     }
 
     // ── Response parsing ─────────────────────────────────────────────────────

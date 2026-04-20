@@ -14,6 +14,31 @@ Anleitung für OpenAI Codex CLI, um eigenständig Workflows und Chains über die
 DEV_KEY=$(python3 -c "import sqlite3; conn = sqlite3.connect('ai-automation-backend/data/automation.db'); c = conn.cursor(); c.execute(\"SELECT value FROM app_settings WHERE key = 'api-key'\"); print(c.fetchone()[0]); conn.close()")
 ```
 
+## TODO-First Arbeitsweise
+
+- Bei Aufgaben mit Code-, UI-, Config- oder Commit-Bezug zuerst ein MySuricates-TODO ueber die REST API anlegen oder ein vorhandenes TODO als Arbeitsanker referenzieren.
+- Danach die Umsetzung explizit an dieser TODO-ID ausrichten und den Status mindestens auf `IN_PROGRESS` setzen.
+- Vor einer Fertigmeldung oder vor einem Commit immer die zugehoerige TODO-ID nennen.
+- Kein "fertig", "umgesetzt" oder "committed" behaupten, wenn noch kein TODO existiert oder die Arbeit nicht diesem TODO zugeordnet ist.
+- Commits werden anschliessend gemeinsam und bewusst gemacht, nicht stillschweigend.
+
+### TODO anlegen
+
+```bash
+curl -s -X POST http://localhost:9090/api/v1/todos \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $DEV_KEY" \
+  -d '{
+    "title": "Kurzbeschreibung der Arbeit",
+    "description": "Worum es konkret geht",
+    "status": "IN_PROGRESS",
+    "priority": "HIGH",
+    "projectId": "<project-uuid>",
+    "source": "AI",
+    "sourceAgent": "Codex CLI"
+  }'
+```
+
 ## Cypress E2E gegen Dev oder Test
 
 Die Cypress-Tests koennen jetzt gegen **Dev** (`9090`) oder **Test** (`8090`) laufen. Wichtig ist, dass **Frontend-Proxy und Cypress immer dasselbe Ziel verwenden**.
