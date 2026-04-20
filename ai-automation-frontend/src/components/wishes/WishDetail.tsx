@@ -7,6 +7,7 @@ import { useWish, useRespondToWish, useCrystallizeWish } from '../../hooks/useWi
 import { useExecutionWebSocket } from '../../hooks/useWebSocket';
 import { useT } from '../../i18n';
 import { formatRelativeTime } from '../../utils/formatTime';
+import { computeIterationDiff, type FieldDiff, type IterationEntry } from '../../utils/iterationDiff';
 import type { Wish, WishStatus } from '../../types';
 
 export function WishDetail({ wishId, onCancel, onDelete }: {
@@ -220,6 +221,11 @@ export function WishDetail({ wishId, onCancel, onDelete }: {
                   const evaluation = entry.evaluation as Record<string, unknown> | undefined;
                   const runId = entry.runId as string | undefined;
                   const workflowIds = entry.workflowIds as string[] | undefined;
+                  const prevEntry = idx > 0 ? (wish.iterationHistory[idx - 1] as IterationEntry) : null;
+                  const diffs = computeIterationDiff(prevEntry, entry as IterationEntry);
+                  const prevIterationNumber = prevEntry
+                    ? ((prevEntry.iteration as number | undefined) ?? idx)
+                    : undefined;
 
                   return (
                     <div key={idx} className="rounded-lg border border-border bg-surface-raised p-3 space-y-2">
@@ -288,6 +294,13 @@ export function WishDetail({ wishId, onCancel, onDelete }: {
                             </ul>
                           )}
                         </div>
+                      )}
+
+                      {prevEntry && (
+                        <IterationDiffSection
+                          diffs={diffs}
+                          prevIteration={prevIterationNumber ?? idx}
+                        />
                       )}
                     </div>
                   );
@@ -533,6 +546,57 @@ function ExecutionLogsPanel({ runId }: { runId: string }) {
         <LogViewer logs={logs} maxHeight="400px" />
       </div>
     </Card>
+  );
+}
+
+/* -- Iteration Diff Section ----------------------------------------- */
+
+function IterationDiffSection({ diffs, prevIteration }: { diffs: FieldDiff[]; prevIteration: number }) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const labels = t.wishes.iterationDiff;
+
+  if (diffs.length === 0) return null;
+
+  const toggleLabel = (open ? labels.toggleHide : labels.toggleShow).replace('{prev}', String(prevIteration));
+
+  return (
+    <div className="pt-2 border-t border-border/60">
+      <button
+        type="button"
+        className="flex items-center gap-1.5 text-xs text-accent hover:underline"
+        onClick={() => setOpen(v => !v)}
+      >
+        {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+        <span>{toggleLabel} ({diffs.length})</span>
+      </button>
+      {open && (
+        <div className="mt-2 space-y-2">
+          {diffs.map((diff, i) => (
+            <div key={`${diff.group}-${diff.key}-${i}`} className="rounded border border-border/60 bg-surface-base p-2 space-y-1">
+              <div className="flex items-center gap-2 text-xs">
+                <Badge variant={diff.kind === 'added' ? 'success' : 'warning'}>
+                  {diff.kind === 'added' ? labels.added : labels.changed}
+                </Badge>
+                <span className="text-text-secondary font-medium">
+                  {labels.fields[diff.key]}
+                </span>
+              </div>
+              {diff.kind === 'changed' && diff.before && (
+                <div className="text-xs">
+                  <div className="text-text-tertiary uppercase tracking-wide">{labels.before}</div>
+                  <pre className="whitespace-pre-wrap break-words text-danger/80 line-through">{diff.before}</pre>
+                </div>
+              )}
+              <div className="text-xs">
+                <div className="text-text-tertiary uppercase tracking-wide">{labels.after}</div>
+                <pre className="whitespace-pre-wrap break-words text-success">{diff.after}</pre>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
