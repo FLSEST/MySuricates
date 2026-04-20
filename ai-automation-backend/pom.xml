@@ -187,6 +187,32 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
+
+            <!--
+                Resolve byte-buddy-agent jar path into a property so Surefire can
+                pre-attach it via -javaagent. Required by Mockito inline-mock-maker
+                to silence the self-attach deprecation warning under JDK 21+.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>resolve-test-agent-paths</id>
+                        <goals>
+                            <goal>properties</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>-javaagent:${net.bytebuddy:byte-buddy-agent:jar}</argLine>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 </project>
