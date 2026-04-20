@@ -81,7 +81,6 @@ public class CommandExecutorService {
 
     public StepResult executeStep(String containerId, String cliType, BlockDefinition block, int stepIndex,
                                    String instructionPrefix, String model) {
-        String command = extractCommand(block);
         return executeStepInternal(containerId, cliType, block, stepIndex, model, instructionPrefix);
     }
 
