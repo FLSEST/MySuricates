@@ -136,7 +136,7 @@ class SecurityConfigIntegrationTest {
     void headers_cspHeaderIsSet() throws Exception {
         mockMvc.perform(get("/api/v1/system/health"))
                 .andExpect(header().string("Content-Security-Policy",
-                        "default-src 'self'; script-src 'self'; connect-src 'self' ws://localhost:* wss://localhost:* ws://100.*:* wss://100.*:*; style-src 'self' 'unsafe-inline'; img-src 'self' data:"));
+                        "default-src 'self'; script-src 'self'; connect-src 'self' ws: wss:; style-src 'self' 'unsafe-inline'; img-src 'self' data:"));
     }
 
     @Test
