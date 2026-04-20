@@ -14,7 +14,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.junit.jupiter.api.io.TempDir;
+
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
@@ -350,5 +354,67 @@ class CommandExecutorServiceTest {
 
         assertThat(result.getMetadata()).doesNotContainKey("aiSystemPrompt");
         assertThat(result.getMetadata()).containsKey("aiRequest");
+    }
+
+    // === writeSkillContextToProject (skill-context file on host project) ===
+
+    @Test
+    void writeSkillContextToProject_writesAggregatedContent(@TempDir Path tempDir) throws IOException {
+        Skill skill1 = Skill.builder().id("s1").name("Lint").aiContext("Run eslint").build();
+        Skill skill2 = Skill.builder().id("s2").name("Test").aiContext("Run pytest").build();
+
+        commandExecutorService.writeSkillContextToProject(tempDir.toString(), List.of(skill1, skill2));
+
+        Path contextFile = tempDir.resolve(".claude/rules/skills-context.md");
+        assertThat(contextFile).exists();
+        String content = Files.readString(contextFile);
+        assertThat(content).contains("=== Skill: Lint ===", "Run eslint");
+        assertThat(content).contains("=== Skill: Test ===", "Run pytest");
+    }
+
+    @Test
+    void writeSkillContextToProject_nullSkills_deletesExistingFile(@TempDir Path tempDir) throws IOException {
+        Path contextFile = tempDir.resolve(".claude/rules/skills-context.md");
+        Files.createDirectories(contextFile.getParent());
+        Files.writeString(contextFile, "stale content");
+
+        commandExecutorService.writeSkillContextToProject(tempDir.toString(), null);
+
+        assertThat(contextFile).doesNotExist();
+    }
+
+    @Test
+    void writeSkillContextToProject_emptySkillsList_deletesExistingFile(@TempDir Path tempDir) throws IOException {
+        Path contextFile = tempDir.resolve(".claude/rules/skills-context.md");
+        Files.createDirectories(contextFile.getParent());
+        Files.writeString(contextFile, "stale content");
+
+        commandExecutorService.writeSkillContextToProject(tempDir.toString(), List.of());
+
+        assertThat(contextFile).doesNotExist();
+    }
+
+    @Test
+    void writeSkillContextToProject_blankProjectPath_isNoop(@TempDir Path tempDir) {
+        Skill skill = Skill.builder().id("s1").name("Lint").aiContext("Run eslint").build();
+
+        // Must not throw, must not create anything in the temp dir
+        commandExecutorService.writeSkillContextToProject("", List.of(skill));
+        commandExecutorService.writeSkillContextToProject(null, List.of(skill));
+
+        assertThat(tempDir.resolve(".claude/rules/skills-context.md")).doesNotExist();
+    }
+
+    @Test
+    void writeSkillContextToProject_skillsWithBlankContext_deletesFile(@TempDir Path tempDir) throws IOException {
+        // buildSkillContext filters out blank aiContext → aggregated result is empty → delete path
+        Path contextFile = tempDir.resolve(".claude/rules/skills-context.md");
+        Files.createDirectories(contextFile.getParent());
+        Files.writeString(contextFile, "old content");
+        Skill blank = Skill.builder().id("s1").name("Empty").aiContext("  ").build();
+
+        commandExecutorService.writeSkillContextToProject(tempDir.toString(), List.of(blank));
+
+        assertThat(contextFile).doesNotExist();
     }
 }
