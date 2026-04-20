@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.AdditionalMatchers.not;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -44,12 +45,16 @@ class InstanceSyncHelperTest {
     private static final String TARGET = "http://localhost:9091/api/v1";
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         syncHelper = spy(new InstanceSyncHelper(
                 appSettingsRepository, projectRepository, workflowRepository,
                 skillRepository, apiKeyService, objectMapper, dataSource));
 
         lenient().when(appSettingsRepository.get(anyString())).thenReturn(Optional.empty());
+
+        // Default: pre-sync backup succeeds (stubbed globally so existing tests are unaffected).
+        lenient().doReturn(objectMapper.readTree("{\"filename\":\"test-backup.db\",\"sizeBytes\":1024}"))
+                .when(syncHelper).httpPost(contains("/system/backup"), any());
     }
 
     // --- Sync preview ---
@@ -289,7 +294,7 @@ class InstanceSyncHelperTest {
         when(workflowRepository.findAllReadOnly()).thenReturn(List.of());
         when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
 
-        // httpGet returns null (target unreachable) — with guard, httpPost is never called
+        // httpGet returns null (target unreachable) — with guard, no non-backup httpPost is called
         doReturn(null).when(syncHelper).httpGet(anyString());
 
         SyncResult result = syncHelper.syncDefinitionsTo(TARGET);
@@ -297,7 +302,8 @@ class InstanceSyncHelperTest {
         // Should not crash, errors are collected for each entity type
         assertThat(result.errors()).isNotEmpty();
         assertThat(result.projectsSynced()).isEqualTo(0);
-        verify(syncHelper, never()).httpPost(anyString(), any());
+        // Pre-sync backup POST is expected (best-effort rollback point) — but no sync POSTs
+        verify(syncHelper, never()).httpPost(not(contains("/system/backup")), any());
     }
 
     @Test
@@ -314,12 +320,12 @@ class InstanceSyncHelperTest {
 
         SyncResult result = syncHelper.syncDefinitionsTo(TARGET);
 
-        // Nothing should be synced — no POST calls at all
+        // Nothing should be synced — no sync POST calls (backup POST is expected)
         assertThat(result.projectsSynced()).isEqualTo(0);
         assertThat(result.workflowsSynced()).isEqualTo(0);
         assertThat(result.skillsSynced()).isEqualTo(0);
         assertThat(result.errors()).hasSize(3);
-        verify(syncHelper, never()).httpPost(anyString(), any());
+        verify(syncHelper, never()).httpPost(not(contains("/system/backup")), any());
     }
 
     // --- API key override ---
@@ -433,5 +439,64 @@ class InstanceSyncHelperTest {
         // wf3 is skipped: selectedProjectIds filter rejects it because wf3.project == null
         assertThat(result.workflowsSynced()).isEqualTo(0);
         verify(syncHelper, never()).httpPost(eq(TARGET + "/workflows/import"), any());
+    }
+
+    // --- Pre-sync backup ---
+
+    @Test
+    void sync_triggersPreSyncBackupOnTarget() throws Exception {
+        when(projectRepository.findAll()).thenReturn(List.of());
+        when(workflowRepository.findAllReadOnly()).thenReturn(List.of());
+        when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
+
+        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(anyString());
+
+        SyncResult result = syncHelper.syncDefinitionsTo(TARGET);
+
+        // Backup is called with the pre-sync-definitions reason
+        verify(syncHelper).httpPost(eq(TARGET + "/system/backup?reason=pre-sync-definitions"), any());
+        assertThat(result.preSyncBackup()).isEqualTo("test-backup.db");
+        assertThat(result.errors()).isEmpty();
+    }
+
+    @Test
+    void sync_preSyncBackupFailure_doesNotBlockSync() throws Exception {
+        Project proj = Project.builder().id("p1").name("NewProj").path("/new").type(ProjectType.CODE).build();
+        when(projectRepository.findAll()).thenReturn(List.of(proj));
+        when(workflowRepository.findAllReadOnly()).thenReturn(List.of());
+        when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
+
+        // Override the global backup stub to simulate backup failure
+        doThrow(new RuntimeException("backup-target-down"))
+                .when(syncHelper).httpPost(contains("/system/backup"), any());
+
+        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/projects");
+        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/workflows");
+        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/skills");
+        doReturn(objectMapper.readTree("{\"id\":\"tp1\"}")).when(syncHelper).httpPost(eq(TARGET + "/projects"), any());
+
+        SyncResult result = syncHelper.syncDefinitionsTo(TARGET);
+
+        // Sync still happens despite backup failure
+        assertThat(result.projectsSynced()).isEqualTo(1);
+        assertThat(result.preSyncBackup()).isNull();
+        // Warning is recorded in errors
+        assertThat(result.errors()).anyMatch(e -> e.contains("Pre-sync backup failed"));
+    }
+
+    @Test
+    void sync_preSyncBackupReturnsNull_recordsWarning() throws Exception {
+        when(projectRepository.findAll()).thenReturn(List.of());
+        when(workflowRepository.findAllReadOnly()).thenReturn(List.of());
+        when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
+
+        // Backup call returns null (e.g., target rejected the request silently)
+        doReturn(null).when(syncHelper).httpPost(contains("/system/backup"), any());
+        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(anyString());
+
+        SyncResult result = syncHelper.syncDefinitionsTo(TARGET);
+
+        assertThat(result.preSyncBackup()).isNull();
+        assertThat(result.errors()).anyMatch(e -> e.contains("Pre-sync backup failed"));
     }
 }

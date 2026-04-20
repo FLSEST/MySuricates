@@ -633,6 +633,7 @@ export const en = {
     stagingSyncConfirm: 'Existing workflows on Stable will be updated. Continue?',
     stagingSyncResult: '{workflows} workflows, {projects} projects, {skills} skills synced ({skipped} skipped)',
     stagingSyncErrors: '{count} errors during sync',
+    syncPreBackupHint: 'Rollback point: {filename} — restore via Settings → Backups if needed.',
     stagingOpenUi: 'Open Stable UI',
     stagingLastSnapshot: 'Last Snapshot',
     stagingNoSnapshot: 'No snapshot yet',

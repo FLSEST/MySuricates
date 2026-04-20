@@ -176,6 +176,9 @@ public class InstanceSyncHelper {
         int skipped = 0;
         List<String> errors = new ArrayList<>();
 
+        // Pre-sync backup on target (rollback point) — don't block sync on failure.
+        String preSyncBackup = createPreSyncBackup(targetBaseUrl, errors);
+
         Map<String, String> projectIdMapping = new HashMap<>();
 
         // Determine which items to sync
@@ -397,7 +400,37 @@ public class InstanceSyncHelper {
         log.info("Definition sync complete: {} projects, {} workflows, {} skills synced, {} skipped, {} errors",
                 projectsSynced, workflowsSynced, skillsSynced, skipped, errors.size());
 
-        return new SyncResult(projectsSynced, workflowsSynced, skillsSynced, skipped, errors);
+        return new SyncResult(projectsSynced, workflowsSynced, skillsSynced, skipped, errors, preSyncBackup);
+    }
+
+    /**
+     * Triggers a database backup on the sync target so the user has a rollback point.
+     * Failures are recorded in {@code errors} but do not block the sync — a broken
+     * backup endpoint shouldn't prevent the actual work.
+     *
+     * @return the backup filename reported by the target, or {@code null} if the backup failed
+     */
+    private String createPreSyncBackup(String targetBaseUrl, List<String> errors) {
+        try {
+            JsonNode result = httpPost(
+                    targetBaseUrl + "/system/backup?reason=pre-sync-definitions",
+                    null
+            );
+            if (result == null) {
+                errors.add("Pre-sync backup failed: target returned no response — sync continued without rollback point");
+                log.warn("Pre-sync backup on {} returned null", targetBaseUrl);
+                return null;
+            }
+            String filename = result.path("filename").asText(null);
+            if (filename != null) {
+                log.info("Pre-sync backup created on target: {}", filename);
+            }
+            return filename;
+        } catch (Exception e) {
+            errors.add("Pre-sync backup failed: " + e.getMessage() + " — sync continued without rollback point");
+            log.warn("Pre-sync backup failed on {}, continuing anyway", targetBaseUrl, e);
+            return null;
+        }
     }
 
     // ── Workflow diff ────────────────────────────────────────

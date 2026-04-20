@@ -184,6 +184,20 @@ public class SystemController {
                 .body(resource);
     }
 
+    public record BackupMetadata(String filename, long sizeBytes, Instant createdAt) {}
+
+    @PostMapping("/backup")
+    public ResponseEntity<BackupMetadata> createBackup(
+            @RequestParam(required = false) String reason) throws IOException {
+        Path backupPath = databaseBackupService.createBackup(reason);
+        databaseBackupService.rotateBackups();
+        return ResponseEntity.ok(new BackupMetadata(
+                backupPath.getFileName().toString(),
+                Files.size(backupPath),
+                Instant.now()
+        ));
+    }
+
     @GetMapping("/backups")
     public List<DatabaseBackupService.BackupInfo> listBackups() throws IOException {
         return databaseBackupService.listBackups();

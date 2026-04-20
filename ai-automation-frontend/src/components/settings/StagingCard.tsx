@@ -241,6 +241,11 @@ export function StagingCard({ staging, devVersion, onStart, onStop, onPromote, o
                       .replace('{skills}', String(syncResult.skillsSynced))
                       .replace('{skipped}', String(syncResult.skipped))}
                   </p>
+                  {syncResult.preSyncBackup && (
+                    <p className="text-xs text-text-tertiary">
+                      {t.settings.syncPreBackupHint.replace('{filename}', syncResult.preSyncBackup)}
+                    </p>
+                  )}
                   {syncResult.errors.length > 0 && (
                     <div className="text-xs text-danger">
                       <p>{t.settings.stagingSyncErrors.replace('{count}', String(syncResult.errors.length))}</p>

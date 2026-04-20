@@ -210,6 +210,11 @@ export function TestingCard({ testing, devVersion, onStart, onStop, onReset, onS
                   .replace('{skills}', String(syncResult.skillsSynced))
                   .replace('{skipped}', String(syncResult.skipped))}
               </p>
+              {syncResult.preSyncBackup && (
+                <p className="text-xs text-text-tertiary">
+                  {t.settings.syncPreBackupHint.replace('{filename}', syncResult.preSyncBackup)}
+                </p>
+              )}
               {syncResult.errors.length > 0 && (
                 <div className="text-xs text-danger">
                   <p>{t.settings.testingSyncErrors.replace('{count}', String(syncResult.errors.length))}</p>

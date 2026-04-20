@@ -184,6 +184,33 @@ class DatabaseBackupServiceTest {
     }
 
     @Test
+    void createBackupWithReason_logsReasonToActivityLog() throws IOException {
+        Path backup = service.createBackup("pre-sync-definitions");
+
+        assertThat(backup).exists();
+        verify(activityLogService).info(
+                any(),
+                contains("pre-sync-definitions"),
+                eq("DatabaseBackupService"));
+    }
+
+    @Test
+    void createBackupWithReason_nullReason_skipsActivityLog() throws IOException {
+        Path backup = service.createBackup((String) null);
+
+        assertThat(backup).exists();
+        verifyNoInteractions(activityLogService);
+    }
+
+    @Test
+    void createBackupWithReason_blankReason_skipsActivityLog() throws IOException {
+        Path backup = service.createBackup("  ");
+
+        assertThat(backup).exists();
+        verifyNoInteractions(activityLogService);
+    }
+
+    @Test
     void scheduledBackup_whenEnabled_createsBackupAndLogs() throws IOException {
         service.scheduledBackup();
 

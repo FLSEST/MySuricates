@@ -97,6 +97,23 @@ public class DatabaseBackupService {
     }
 
     /**
+     * Creates a backup and logs the given reason to the activity log.
+     * Used for pre-sync / pre-seed rollback points so operators can identify
+     * why a backup was created when browsing the backup list.
+     */
+    public Path createBackup(String reason) throws IOException {
+        Path backup = createBackup();
+        if (reason != null && !reason.isBlank()) {
+            activityLogService.info(
+                    LogCategory.SYSTEM,
+                    "Backup created: " + backup.getFileName() + " (reason: " + reason + ")",
+                    "DatabaseBackupService"
+            );
+        }
+        return backup;
+    }
+
+    /**
      * Deletes oldest backups exceeding the retain count.
      */
     public int rotateBackups() throws IOException {

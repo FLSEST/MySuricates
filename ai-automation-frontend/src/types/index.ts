@@ -638,6 +638,7 @@ export interface SyncResult {
   skillsSynced: number;
   skipped: number;
   errors: string[];
+  preSyncBackup: string | null;
 }
 
 // ── Sync Preview / Selective Sync ─────────────────────────

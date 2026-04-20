@@ -155,10 +155,26 @@ cmd_db_seed() {
         volume_path=$(docker volume inspect "$volume_name" --format '{{.Mountpoint}}')
     fi
 
-    # Stop container if running
+    # Stop container if running — ensures SQLite file is in a consistent state before backup.
     if docker ps --filter "name=$CONTAINER_NAME" --format '{{.ID}}' | grep -q .; then
         warn "Stopping container before DB seed..."
         cmd_stop
+    fi
+
+    # Pre-seed rollback point: copy current stable DB to host-backup dir before overwrite.
+    local backup_dir="${HOME}/.autotrigger/backups/stable"
+    mkdir -p "$backup_dir"
+    local timestamp
+    timestamp=$(date +%Y-%m-%d_%H-%M-%S)
+    local backup_file="$backup_dir/mysuricates-backup-${timestamp}-pre-seed.db"
+    if [ -f "$volume_path/automation.db" ]; then
+        log "Creating pre-seed backup: $(basename "$backup_file")"
+        cp "$volume_path/automation.db" "$backup_file"
+        [ -f "$volume_path/automation.db-wal" ] && cp "$volume_path/automation.db-wal" "${backup_file}-wal"
+        [ -f "$volume_path/automation.db-shm" ] && cp "$volume_path/automation.db-shm" "${backup_file}-shm"
+        log "Pre-seed backup saved. Rollback: docker run --rm -v $volume_name:/data -v $backup_file:/src/db:ro alpine cp /src/db /data/automation.db"
+    else
+        warn "No existing DB in stable volume — nothing to back up."
     fi
 
     log "Copying dev DB to stable volume..."

@@ -699,6 +699,7 @@ export const de: TranslationKeys = {
     stagingSyncConfirm: 'Bestehende Workflows auf Stable werden aktualisiert. Fortfahren?',
     stagingSyncResult: '{workflows} Workflows, {projects} Projekte, {skills} Skills synchronisiert ({skipped} übersprungen)',
     stagingSyncErrors: '{count} Fehler beim Synchronisieren',
+    syncPreBackupHint: 'Rollback-Punkt: {filename} — bei Bedarf über Einstellungen → Backups wiederherstellen.',
     stagingOpenUi: 'Stable UI öffnen',
     stagingLastSnapshot: 'Letzter Snapshot',
     stagingNoSnapshot: 'Noch kein Snapshot',

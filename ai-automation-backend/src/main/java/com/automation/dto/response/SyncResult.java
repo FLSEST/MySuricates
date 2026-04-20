@@ -7,5 +7,10 @@ public record SyncResult(
         int workflowsSynced,
         int skillsSynced,
         int skipped,
-        List<String> errors
-) {}
+        List<String> errors,
+        String preSyncBackup
+) {
+    public SyncResult(int projectsSynced, int workflowsSynced, int skillsSynced, int skipped, List<String> errors) {
+        this(projectsSynced, workflowsSynced, skillsSynced, skipped, errors, null);
+    }
+}

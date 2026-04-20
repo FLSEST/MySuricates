@@ -307,6 +307,21 @@ Die Test-Instanz ist ein dedizierter Docker-Container für automatisierte Workfl
 
 **Nicht synciert** (auf Stable/Test erhalten): workflow_runs, step_results, scheduled_workflows, webhook_triggers, activity_log, todos, built-in Skills/Templates. Archivierte Projekte und soft-deleted Workflows werden automatisch ausgeschlossen.
 
+### Rollback nach Sync
+
+Vor jedem Definition-Sync ruft das Backend automatisch `POST /api/v1/system/backup?reason=pre-sync-definitions` auf dem **Ziel** auf. Der zurückgegebene Dateiname wird im `SyncResult.preSyncBackup` mitgeliefert und im Frontend-Toast angezeigt. Der Backup-Erfolg blockiert den Sync nicht — scheitert das Backup, läuft der Sync trotzdem durch, die Warnung landet in `SyncResult.errors`.
+
+Zusätzlich legt `./scripts/staging.sh db-seed` ein File-Backup an (`~/.autotrigger/backups/stable/mysuricates-backup-<timestamp>-pre-seed.db`), bevor die Stable-DB mit der Dev-DB überschrieben wird.
+
+**Rollback-Pfade:**
+
+| Quelle des Snapshots | Speicherort | Restore-Weg |
+|---|---|---|
+| Pre-Sync (Definition-Sync) | Ziel-Backup-Verzeichnis (`~/.autotrigger/backups/<env>/`) | UI auf dem Ziel: Settings → Backups → Download; manuell zurückspielen. |
+| Pre-Seed (`staging.sh db-seed`) | `~/.autotrigger/backups/stable/…-pre-seed.db` | `docker compose -f ai-automation-backend/docker-compose.stable.yml down && docker run --rm -v ai-automation-backend_stable-data:/data -v <backup>:/src/db:ro alpine cp /src/db /data/automation.db && ./scripts/staging.sh start` |
+
+Pre-Sync-Backups zählen zur regulären Retention (`automation.backup.retain-count`, Default 30) und werden ggf. durch jüngere Backups verdrängt.
+
 ### Versionsanzeige
 
 In Settings → Stable wird ein Versionsvergleich angezeigt:
