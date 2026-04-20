@@ -158,6 +158,30 @@ class RunsContextSectionTest {
         }
 
         @Test
+        void runLabel_softDeletedWorkflow_usesSnapshot() {
+            WorkflowRun run = buildRun("run-1", RunStatus.COMPLETED);
+            run.setWorkflowName("Deploy");
+            // workflow association resolved to null (e.g. soft-deleted via @SQLRestriction)
+
+            assertThat(section.runLabel(run)).isEqualTo("Deploy [gelöscht]");
+        }
+
+        @Test
+        void runLabel_snapshotPreferredOverLazyLoad() {
+            WorkflowRun run = buildRun("run-1", RunStatus.COMPLETED);
+            run.setWorkflowName("SnapshotName");
+            Workflow wf = new Workflow();
+            wf.setName("LiveName");
+            Project p = new Project();
+            p.setName("Proj");
+            wf.setProject(p);
+            run.setWorkflow(wf);
+
+            // snapshot wins over lazy-loaded workflow name, project still appended
+            assertThat(section.runLabel(run)).isEqualTo("SnapshotName (Proj)");
+        }
+
+        @Test
         void fmt_null_returnsDash() {
             assertThat(section.fmt(null)).isEqualTo("—");
         }

@@ -60,6 +60,23 @@ class WorkflowMapperTest extends WorkflowMapper {
 
             assertThat(safeWorkflowName(run)).isEqualTo("(deleted)");
         }
+
+        @Test
+        void snapshotName_preferredOverLiveWorkflow() {
+            Workflow wf = Workflow.builder().id("wf-1").name("Renamed").build();
+            WorkflowRun run = WorkflowRun.builder()
+                    .id("r-1").workflow(wf).workflowName("OriginalName").build();
+
+            assertThat(safeWorkflowName(run)).isEqualTo("OriginalName");
+        }
+
+        @Test
+        void snapshotName_usedWhenWorkflowSoftDeleted() {
+            WorkflowRun run = WorkflowRun.builder()
+                    .id("r-1").workflowName("DeletedButRemembered").build();
+
+            assertThat(safeWorkflowName(run)).isEqualTo("DeletedButRemembered");
+        }
     }
 
     @Nested

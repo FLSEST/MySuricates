@@ -88,14 +88,23 @@ public class RunsContextSection implements AssistantContextSection {
     }
 
     public String runLabel(WorkflowRun run) {
+        String snapshotName = run.getWorkflowName();
+        String wfName = snapshotName != null && !snapshotName.isBlank() ? snapshotName : null;
+        String proj = "";
         try {
-            String wfName = run.getWorkflow() != null ? run.getWorkflow().getName() : "Unbekannt";
-            String proj = run.getWorkflow() != null && run.getWorkflow().getProject() != null
-                    ? " (" + run.getWorkflow().getProject().getName() + ")" : "";
-            return wfName + proj;
+            if (run.getWorkflow() != null) {
+                if (wfName == null) wfName = run.getWorkflow().getName();
+                if (run.getWorkflow().getProject() != null) {
+                    proj = " (" + run.getWorkflow().getProject().getName() + ")";
+                }
+            } else if (wfName != null) {
+                proj = " [gelöscht]";
+            }
         } catch (Exception e) {
-            return "(gelöschter Workflow)";
+            // Lazy-load failure (OSIV disabled and no active session): fall back to snapshot.
+            if (wfName != null) proj = " [gelöscht]";
         }
+        return wfName != null ? wfName + proj : "Unbekannt";
     }
 
     public String fmt(Instant instant) {

@@ -49,6 +49,10 @@ public abstract class WorkflowMapper {
     }
 
     protected String safeWorkflowName(WorkflowRun run) {
+        // Prefer the snapshot captured at run creation — stable even when the
+        // workflow is soft-deleted or the association cannot be lazy-loaded.
+        String snapshot = run.getWorkflowName();
+        if (snapshot != null && !snapshot.isBlank()) return snapshot;
         try {
             return run.getWorkflow() != null ? run.getWorkflow().getName() : "(deleted)";
         } catch (Exception e) {

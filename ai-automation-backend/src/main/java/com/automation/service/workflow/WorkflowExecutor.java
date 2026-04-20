@@ -85,6 +85,7 @@ public class WorkflowExecutor {
                                String triggeredByScheduleId, Map<String, Object> initialRunMetadata) {
         WorkflowRun run = WorkflowRun.builder()
                 .workflow(workflow)
+                .workflowName(workflow.getName())
                 .status(RunStatus.RUNNING)
                 .startedAt(Instant.now())
                 .triggeredByScheduleId(triggeredByScheduleId)

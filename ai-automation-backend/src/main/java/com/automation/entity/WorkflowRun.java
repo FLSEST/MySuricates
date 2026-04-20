@@ -27,6 +27,14 @@ public class WorkflowRun {
     @JoinColumn(name = "workflow_id", nullable = false)
     private Workflow workflow;
 
+    /**
+     * Name snapshot taken at run creation. Stable even when the workflow is
+     * soft-deleted (hidden by @SQLRestriction) or when the run is read outside
+     * a JPA session (OSIV disabled → lazy workflow load would throw).
+     */
+    @Column(name = "workflow_name")
+    private String workflowName;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
