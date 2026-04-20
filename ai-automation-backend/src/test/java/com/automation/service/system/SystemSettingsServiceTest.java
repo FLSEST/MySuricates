@@ -5,6 +5,7 @@ import com.automation.repository.AppSettingsRepository;
 import com.automation.service.AssistantService;
 import com.automation.service.PageSuggestionService;
 import com.automation.service.ai.AiProviderRegistry;
+import com.automation.service.assistant.AssistantActionSuggestionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,6 +27,7 @@ class SystemSettingsServiceTest {
     @Mock private AiProviderRegistry aiProviderRegistry;
     @Mock private AssistantService assistantService;
     @Mock private PageSuggestionService pageSuggestionService;
+    @Mock private AssistantActionSuggestionService actionSuggestionService;
     @Spy private BackupConfig backupConfig = new BackupConfig();
 
     private SystemSettingsService service;
@@ -37,6 +39,7 @@ class SystemSettingsServiceTest {
         // Inject @Lazy @Autowired fields via reflection
         setField(service, "assistantService", assistantService);
         setField(service, "pageSuggestionService", pageSuggestionService);
+        setField(service, "actionSuggestionService", actionSuggestionService);
     }
 
     private void setField(Object target, String fieldName, Object value) throws Exception {
@@ -133,7 +136,19 @@ class SystemSettingsServiceTest {
 
         verify(appSettingsRepository).set("suggestions-model", "claude-haiku-4-5");
         verify(pageSuggestionService).refreshCachedModel();
+        verify(actionSuggestionService).refreshCache();
         verifyNoInteractions(assistantService);
+        verifyNoInteractions(aiProviderRegistry);
+    }
+
+    @Test
+    void setSetting_suggestionsEnabled_refreshesActionSuggestionCache() {
+        service.setSetting("suggestions-enabled", "false");
+
+        verify(appSettingsRepository).set("suggestions-enabled", "false");
+        verify(actionSuggestionService).refreshCache();
+        verifyNoInteractions(assistantService);
+        verifyNoInteractions(pageSuggestionService);
         verifyNoInteractions(aiProviderRegistry);
     }
 
@@ -154,6 +169,7 @@ class SystemSettingsServiceTest {
         verify(appSettingsRepository).set("auto-repair-default", "true");
         verifyNoInteractions(assistantService);
         verifyNoInteractions(pageSuggestionService);
+        verifyNoInteractions(actionSuggestionService);
         verifyNoInteractions(aiProviderRegistry);
     }
 
@@ -165,7 +181,7 @@ class SystemSettingsServiceTest {
                 "auto-todo-default", "auto-repair-default", "auto-repair-mode",
                 "auto-repair-max-retries", "auto-repair-timeout-seconds",
                 "default-ai-provider", "assistant-thinking-phrases",
-                "assistant-model", "suggestions-model"
+                "assistant-model", "suggestions-model", "suggestions-enabled"
         };
 
         for (String key : expectedKeys) {

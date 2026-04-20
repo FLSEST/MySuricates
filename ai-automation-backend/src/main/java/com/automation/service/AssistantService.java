@@ -6,6 +6,7 @@ import com.automation.dto.AssistantChatResponse;
 import com.automation.dto.AssistantChatResponse.AssistantAction;
 import com.automation.exception.WorkflowExecutionException;
 import com.automation.repository.AppSettingsRepository;
+import com.automation.service.assistant.AssistantActionSuggestionService;
 import com.automation.service.assistant.AssistantChatBroadcaster;
 import com.automation.service.assistant.AssistantContextBuilder;
 import com.automation.service.assistant.AssistantFetchService;
@@ -25,9 +26,14 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLTransientConnectionException;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -88,6 +94,7 @@ public class AssistantService {
     private final AppSettingsRepository appSettingsRepository;
     private final HostClaudeConfig hostClaudeConfig;
     private final ObjectMapper objectMapper;
+    private final AssistantActionSuggestionService actionSuggestionService;
 
     /** Cached model — loaded at startup, never read during a web request. */
     private volatile String cachedAssistantModel = null;
@@ -152,7 +159,9 @@ public class AssistantService {
                             .build()
             );
 
-            // Demand-driven auto-fetch: at most one follow-up call, only for a single safe fetch
+            // Demand-driven auto-fetch: at most one follow-up call, only for a single safe fetch.
+            // Skip the follow-up if the first response already contains text outside the <fetch>
+            // tags — otherwise a fully-formed answer (including any <actions>) gets overwritten.
             for (int fetchRound = 0; fetchRound < 1; fetchRound++) {
                 String rawOutput = result.output();
                 String nonFetchText = fetchService.stripFetchTags(rawOutput);
@@ -200,7 +209,13 @@ public class AssistantService {
             finalOutput = fetchService.stripFetchTags(finalOutput);
 
             AssistantChatResponse parsed = parseResponse(finalOutput);
-            List<AssistantAction> filteredActions = filterActions(parsed.actions(), allowMutatingProposals);
+
+            // Second call: generate action-button suggestions via the dedicated suggestions-model.
+            // Decoupled from the main answer so the primary model stays focused on text quality.
+            List<AssistantAction> suggestedActions = fetchSuggestedActions(req, systemPrompt, parsed.message());
+
+            List<AssistantAction> mergedActions = mergeActions(parsed.actions(), suggestedActions);
+            List<AssistantAction> filteredActions = filterActions(mergedActions, allowMutatingProposals);
             broadcaster.broadcastStatus(requestId, "COMPLETED", null, startNanos);
             return new AssistantChatResponse(parsed.message(), filteredActions, model, resolvedProvider)
                     .withPendingTools(extraction.pendingTools());
@@ -278,6 +293,56 @@ public class AssistantService {
 
     private boolean isAutoFetchAllowed(FetchRequest req) {
         return req != null && AUTO_FETCH_TYPES.contains(req.type());
+    }
+
+    /**
+     * Runs the action-suggestion CLI call with a short timeout; failure or timeout returns an
+     * empty list so the chat still delivers its text response. Skipped entirely when suggestions
+     * are disabled in settings — saves a CLI slot per chat turn.
+     */
+    private List<AssistantAction> fetchSuggestedActions(AssistantChatRequest req, String pageContext, String answer) {
+        if (actionSuggestionService == null || !actionSuggestionService.isEnabled()) {
+            return List.of();
+        }
+        try {
+            return CompletableFuture
+                    .supplyAsync(() -> actionSuggestionService.suggest(req, answer, pageContext))
+                    .completeOnTimeout(List.of(), 35, TimeUnit.SECONDS)
+                    .join();
+        } catch (Exception e) {
+            log.debug("Action-suggestion call failed; returning empty actions", e);
+            return List.of();
+        }
+    }
+
+    /**
+     * Merges inline actions (legacy path — main model may still emit {@code <actions>} tags) with
+     * suggestion-model actions. Deduplicated by (type, id) — inline wins on conflict.
+     */
+    private List<AssistantAction> mergeActions(List<AssistantAction> inline, List<AssistantAction> suggested) {
+        if ((inline == null || inline.isEmpty()) && (suggested == null || suggested.isEmpty())) {
+            return List.of();
+        }
+        Map<String, AssistantAction> byKey = new LinkedHashMap<>();
+        if (inline != null) {
+            for (AssistantAction a : inline) {
+                if (a != null && a.type() != null) {
+                    byKey.put(dedupeKey(a), a);
+                }
+            }
+        }
+        if (suggested != null) {
+            for (AssistantAction a : suggested) {
+                if (a != null && a.type() != null) {
+                    byKey.putIfAbsent(dedupeKey(a), a);
+                }
+            }
+        }
+        return new ArrayList<>(byKey.values());
+    }
+
+    private String dedupeKey(AssistantAction a) {
+        return a.type() + "|" + (a.id() == null ? "" : a.id());
     }
 
     private List<AssistantAction> filterActions(List<AssistantAction> actions, boolean allowMutatingProposals) {

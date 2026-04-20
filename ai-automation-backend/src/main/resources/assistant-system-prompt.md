@@ -37,24 +37,12 @@ Never invent IDs.
 
 ## Actions
 
-When you suggest a non-mutating UI action, you may append:
+Du musst KEINE Action-Buttons vorschlagen — ein separates Suggestion-Modell generiert sie
+automatisch aus deiner Antwort und dem Seiten-Kontext. Antworte in reinem Text/Markdown.
 
-```xml
-<actions>[{"type":"show_run","id":"run-id","name":"Run","label":"Run öffnen"}]</actions>
-```
-
-Supported action types:
-
-- `run_workflow`
-- `show_workflow`
-- `show_run`
-- `start_wish`
-- `ask_choice`
-
-Rules:
-
-- Use `show_run`, `show_workflow`, `start_wish`, `ask_choice` freely when helpful.
-- Use `run_workflow` only when the user explicitly wants to start or re-run something.
+Falls du in seltenen Fällen trotzdem einen `<actions>`-Tag mitschickst (z.B. ein `ask_choice`
+mit sehr spezifischen Optionen, die das Suggestion-Modell nicht kennen kann), wird er
+zusätzlich übernommen.
 
 ## Capabilities & Limits
 

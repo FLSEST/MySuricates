@@ -5,6 +5,7 @@ import com.automation.repository.AppSettingsRepository;
 import com.automation.service.AssistantService;
 import com.automation.service.PageSuggestionService;
 import com.automation.service.ai.AiProviderRegistry;
+import com.automation.service.assistant.AssistantActionSuggestionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
@@ -20,7 +21,8 @@ public class SystemSettingsService {
     private static final Set<String> ALLOWED_SETTINGS = Set.of(
             "auto-todo-default", "auto-repair-default", "auto-repair-mode",
             "auto-repair-max-retries", "auto-repair-timeout-seconds",
-            "default-ai-provider", "assistant-thinking-phrases", "assistant-model", "suggestions-model",
+            "default-ai-provider", "assistant-thinking-phrases", "assistant-model",
+            "suggestions-model", "suggestions-enabled",
             "backup-retain-count"
     );
 
@@ -35,6 +37,10 @@ public class SystemSettingsService {
     @Autowired
     @Lazy
     private PageSuggestionService pageSuggestionService;
+
+    @Autowired
+    @Lazy
+    private AssistantActionSuggestionService actionSuggestionService;
 
     public SystemSettingsService(AppSettingsRepository appSettingsRepository, AiProviderRegistry aiProviderRegistry, BackupConfig backupConfig) {
         this.appSettingsRepository = appSettingsRepository;
@@ -74,6 +80,10 @@ public class SystemSettingsService {
         }
         if ("suggestions-model".equals(key)) {
             pageSuggestionService.refreshCachedModel();
+            actionSuggestionService.refreshCache();
+        }
+        if ("suggestions-enabled".equals(key)) {
+            actionSuggestionService.refreshCache();
         }
         if ("default-ai-provider".equals(key)) {
             aiProviderRegistry.refreshDefaultProviderCache();

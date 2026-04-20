@@ -7,6 +7,7 @@ import com.automation.exception.WorkflowExecutionException;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.ai.AiProvider;
 import com.automation.service.ai.AiProviderRegistry;
+import com.automation.service.assistant.AssistantActionSuggestionService;
 import com.automation.service.assistant.AssistantChatBroadcaster;
 import com.automation.service.assistant.AssistantContextBuilder;
 import com.automation.service.assistant.AssistantFetchService;
@@ -49,6 +50,7 @@ class AssistantServiceTest {
     @Mock private AssistantToolExecutor toolExecutor;
     @Mock private AssistantChatBroadcaster broadcaster;
     @Mock private AppSettingsRepository appSettingsRepository;
+    @Mock private AssistantActionSuggestionService actionSuggestionService;
 
     private AssistantService service;
 
@@ -60,8 +62,11 @@ class AssistantServiceTest {
         hostClaudeConfig.setAssistantChatTimeoutSeconds(240);
         service = new AssistantService(
                 commandExecutorService, aiProviderRegistry, contextBuilder, fetchService, toolExecutor,
-                broadcaster, appSettingsRepository, hostClaudeConfig, new ObjectMapper()
+                broadcaster, appSettingsRepository, hostClaudeConfig, new ObjectMapper(), actionSuggestionService
         );
+        // Action-suggestion service defaults — disabled unless explicitly stubbed per test
+        lenient().when(actionSuggestionService.isEnabled()).thenReturn(false);
+        lenient().when(actionSuggestionService.suggest(any(), anyString(), any())).thenReturn(List.of());
         // Provider registry default — resolve to CLAUDE
         AiProvider claudeProvider = mock(AiProvider.class);
         lenient().when(claudeProvider.getId()).thenReturn("CLAUDE");
@@ -430,6 +435,89 @@ class AssistantServiceTest {
 
         assertThat(result.actions()).hasSize(1);
         assertThat(result.actions().getFirst().type()).isEqualTo("run_workflow");
+    }
+
+    // ── Action suggestions (suggestions-model decoupling) ───────────────────
+
+    @Test
+    void chat_mergesSuggestedActionsIntoResponse() {
+        stubClaude("Hier ist der Status.");
+        when(fetchService.stripFetchTags("Hier ist der Status.")).thenReturn("Hier ist der Status.");
+        var suggested = new AssistantChatResponse.AssistantAction(
+                "show_run", "r-9", "Letzter Run", "Run öffnen");
+        when(actionSuggestionService.isEnabled()).thenReturn(true);
+        when(actionSuggestionService.suggest(any(), eq("Hier ist der Status."), any()))
+                .thenReturn(List.of(suggested));
+
+        var result = chat("Wie lief der letzte Run?");
+
+        assertThat(result.actions()).hasSize(1);
+        assertThat(result.actions().getFirst().type()).isEqualTo("show_run");
+        assertThat(result.actions().getFirst().id()).isEqualTo("r-9");
+    }
+
+    @Test
+    void chat_skipsActionSuggestionsWhenDisabled() {
+        stubClaude("Antwort.");
+        when(fetchService.stripFetchTags("Antwort.")).thenReturn("Antwort.");
+        when(actionSuggestionService.isEnabled()).thenReturn(false);
+
+        var result = chat("Frage");
+
+        assertThat(result.actions()).isEmpty();
+        verify(actionSuggestionService, never()).suggest(any(), anyString(), any());
+    }
+
+    @Test
+    void chat_inlineActionsWinOverSuggestedOnConflict() {
+        // Main model emitted its own <actions> for wf-1; suggestion model proposes wf-1 too + wf-2.
+        // Inline entry wins; wf-2 is added on top.
+        stubClaude("""
+                Text.
+                <actions>[{"type":"show_workflow","id":"wf-1","name":"Inline","label":"Inline öffnen"}]</actions>""");
+        when(fetchService.stripFetchTags(any())).thenAnswer(inv -> inv.getArgument(0));
+        var suggestedConflict = new AssistantChatResponse.AssistantAction(
+                "show_workflow", "wf-1", "Suggested", "Suggested öffnen");
+        var suggestedNew = new AssistantChatResponse.AssistantAction(
+                "show_workflow", "wf-2", "Extra", "Extra öffnen");
+        when(actionSuggestionService.isEnabled()).thenReturn(true);
+        when(actionSuggestionService.suggest(any(), any(), any()))
+                .thenReturn(List.of(suggestedConflict, suggestedNew));
+
+        var result = chat("Welche Workflows gibt es?");
+
+        assertThat(result.actions()).hasSize(2);
+        assertThat(result.actions().get(0).id()).isEqualTo("wf-1");
+        assertThat(result.actions().get(0).name()).isEqualTo("Inline");
+        assertThat(result.actions().get(1).id()).isEqualTo("wf-2");
+    }
+
+    @Test
+    void chat_actionSuggestionFailureStillReturnsTextAnswer() {
+        stubClaude("Antwort trotzdem.");
+        when(fetchService.stripFetchTags("Antwort trotzdem.")).thenReturn("Antwort trotzdem.");
+        when(actionSuggestionService.isEnabled()).thenReturn(true);
+        when(actionSuggestionService.suggest(any(), any(), any()))
+                .thenThrow(new RuntimeException("CLI boom"));
+
+        var result = chat("Frage");
+
+        assertThat(result.message()).isEqualTo("Antwort trotzdem.");
+        assertThat(result.actions()).isEmpty();
+    }
+
+    @Test
+    void chat_suggestedRunWorkflowFilteredWithoutExplicitIntent() {
+        stubClaude("Hier sind die Optionen.");
+        when(fetchService.stripFetchTags(any())).thenAnswer(inv -> inv.getArgument(0));
+        var runAction = new AssistantChatResponse.AssistantAction(
+                "run_workflow", "wf-42", "Daily Report", "Jetzt starten");
+        when(actionSuggestionService.isEnabled()).thenReturn(true);
+        when(actionSuggestionService.suggest(any(), any(), any())).thenReturn(List.of(runAction));
+
+        var result = chat("Welche Workflows gibt es?");
+
+        assertThat(result.actions()).isEmpty();
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
