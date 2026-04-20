@@ -6,6 +6,8 @@ import com.automation.service.AssistantService;
 import com.automation.service.PageSuggestionService;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.assistant.AssistantActionSuggestionService;
+import com.automation.service.search.SemanticWorkflowSearchService;
+import com.automation.service.workflow.WorkflowTaggingService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
@@ -41,6 +43,14 @@ public class SystemSettingsService {
     @Autowired
     @Lazy
     private AssistantActionSuggestionService actionSuggestionService;
+
+    @Autowired
+    @Lazy
+    private WorkflowTaggingService workflowTaggingService;
+
+    @Autowired
+    @Lazy
+    private SemanticWorkflowSearchService semanticSearchService;
 
     public SystemSettingsService(AppSettingsRepository appSettingsRepository, AiProviderRegistry aiProviderRegistry, BackupConfig backupConfig) {
         this.appSettingsRepository = appSettingsRepository;
@@ -81,6 +91,8 @@ public class SystemSettingsService {
         if ("suggestions-model".equals(key)) {
             pageSuggestionService.refreshCachedModel();
             actionSuggestionService.refreshCache();
+            workflowTaggingService.refreshCache();
+            semanticSearchService.refreshCache();
         }
         if ("suggestions-enabled".equals(key)) {
             actionSuggestionService.refreshCache();

@@ -115,6 +115,10 @@ export interface Workflow {
   createdAt: string;
   updatedAt: string;
   stableSyncedAt?: string | null;
+  tags?: string[];
+  category?: string | null;
+  tagsGeneratedAt?: string | null;
+  tagsUserEdited?: boolean;
 }
 
 export interface CreateWorkflowRequest {
@@ -189,6 +193,8 @@ export interface UpdateWorkflowRequest {
   provider?: string;
   metadata?: Record<string, unknown>;
   defaultContext?: Record<string, string>;
+  tags?: string[];
+  category?: string;
 }
 
 export type BlockType = 'simple' | 'shell' | 'retry' | 'foreach' | 'while' | 'conditional' | 'switch' | 'skill-capability' | 'approval' | 'agentic' | 'sub-workflow' | 'human-input' | 'document';

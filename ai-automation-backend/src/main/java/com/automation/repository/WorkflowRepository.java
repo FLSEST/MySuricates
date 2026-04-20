@@ -54,6 +54,12 @@ public interface WorkflowRepository extends JpaRepository<Workflow, String> {
     List<Workflow> findWithEmptyBlockTypes();
 
     /**
+     * Workflows that have never been auto-tagged — used for one-shot backfill at startup.
+     */
+    @Query("SELECT w FROM Workflow w WHERE w.tagsGeneratedAt IS NULL AND w.tagsUserEdited = false")
+    List<Workflow> findUntagged();
+
+    /**
      * Loads all workflows in Hibernate read-only mode — prevents dirty-checking and flushes.
      * Used by InstanceSyncHelper to avoid Hibernate overwriting stable_synced_at via dirty-check flush.
      */

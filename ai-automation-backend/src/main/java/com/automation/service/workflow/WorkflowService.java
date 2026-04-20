@@ -15,6 +15,7 @@ import com.automation.repository.WorkflowRepository;
 import com.automation.service.activitylog.ActivityLogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +35,7 @@ public class WorkflowService {
     private final SkillRepository skillRepository;
     private final ActivityLogService activityLogService;
     private final WorkflowVersionService workflowVersionService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
     public List<Workflow> findAll() {
@@ -99,6 +101,7 @@ public class WorkflowService {
         Workflow saved = workflowRepository.save(workflow);
         log.info("Created workflow: {} ({})", saved.getName(), saved.getId());
         activityLogService.info(LogCategory.SYSTEM, "Workflow created: " + saved.getName(), "WorkflowService", saved.getId(), saved.getId());
+        eventPublisher.publishEvent(new WorkflowContentChangedEvent(saved.getId()));
         return saved;
     }
 
@@ -140,10 +143,27 @@ public class WorkflowService {
         if (request.defaultContext() != null) {
             workflow.setDefaultContext(new HashMap<>(request.defaultContext()));
         }
+        if (request.tags() != null) {
+            // User-provided tags lock the workflow from auto-regeneration.
+            workflow.setTags(new ArrayList<>(request.tags()));
+            workflow.setTagsUserEdited(true);
+            workflow.setTagsGeneratedAt(java.time.Instant.now());
+        }
+        if (request.category() != null) {
+            workflow.setCategory(request.category());
+            workflow.setTagsUserEdited(true);
+        }
+
+        boolean contentChanged = request.name() != null
+                || request.description() != null
+                || request.blocks() != null;
 
         Workflow saved = workflowRepository.save(workflow);
         log.info("Updated workflow: {} ({})", saved.getName(), saved.getId());
         activityLogService.info(LogCategory.SYSTEM, "Workflow updated: " + saved.getName(), "WorkflowService", saved.getId(), saved.getId());
+        if (contentChanged) {
+            eventPublisher.publishEvent(new WorkflowContentChangedEvent(saved.getId()));
+        }
         return saved;
     }
 

@@ -24,6 +24,7 @@ import { ExecutionBadges } from '../shared/ExecutionBadges';
 import { WorkflowIcon } from '../../utils/workflowIcon';
 import { useWorkflowRuns, useSimilarWorkflows } from '../../hooks/useWorkflows';
 import { useUpdateWorkflow, exportWorkflow } from '../../hooks/useWorkflows';
+import { TagEditor } from './TagEditor';
 import { formatDuration, formatDateTime } from '../../utils/formatTime';
 import type { useNavigate } from 'react-router-dom';
 import type { Workflow } from '../../types';
@@ -356,6 +357,20 @@ export function WorkflowDetailPanel({
           </div>
         </div>
       )}
+
+      <TagEditor
+        t={t}
+        tags={workflow.tags ?? []}
+        category={workflow.category ?? null}
+        userEdited={!!workflow.tagsUserEdited}
+        disabled={updateWorkflow.isPending}
+        onSave={(next) =>
+          updateWorkflow.mutate({
+            id: workflow.id,
+            data: { tags: next.tags, category: next.category ?? undefined },
+          })
+        }
+      />
 
       {similarWorkflows.length > 0 && (
         <div>

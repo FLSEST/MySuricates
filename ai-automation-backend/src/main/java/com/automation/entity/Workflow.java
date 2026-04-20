@@ -2,6 +2,7 @@ package com.automation.entity;
 
 import com.automation.util.BlockDefinitionListConverter;
 import com.automation.util.JsonMapConverter;
+import com.automation.util.StringListConverter;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.SQLRestriction;
@@ -85,6 +86,21 @@ public class Workflow {
     @Column(name = "block_types")
     @Builder.Default
     private String blockTypes = "";
+
+    @Convert(converter = StringListConverter.class)
+    @Column(columnDefinition = "text")
+    @Builder.Default
+    private List<String> tags = new ArrayList<>();
+
+    @Column(length = 32)
+    private String category;
+
+    @Column(name = "tags_generated_at")
+    private Instant tagsGeneratedAt;
+
+    @Column(name = "tags_user_edited", nullable = false)
+    @Builder.Default
+    private boolean tagsUserEdited = false;
 
     @Builder.Default
     private String testStatus = "UNTESTED";

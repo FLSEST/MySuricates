@@ -10,6 +10,7 @@ import { WorkflowListToolbar } from '../components/workflow/WorkflowListToolbar'
 import { WorkflowCreateFlow, type CreateStep } from '../components/workflow/WorkflowCreateFlow';
 import { WorkflowImportModal } from '../components/workflow/WorkflowImportModal';
 import { ProjectGroup } from '../components/workflow/ProjectGroup';
+import { DiscoveryView } from '../components/workflow/DiscoveryView';
 import { WorkflowDetailPanel } from '../components/workflow/WorkflowDetailPanel';
 import {
   useWorkflows,
@@ -34,6 +35,9 @@ import { useInstallPoolWorkflow } from '../hooks/usePool';
 const STORAGE_KEY = 'workflows-collapsed-projects';
 const SELECTED_KEY = 'workflows-selected-id';
 const SHOW_DETAILS_KEY = 'workflows-show-row-details';
+const VIEW_MODE_KEY = 'workflows-view-mode';
+
+type ViewMode = 'classic' | 'discovery';
 
 function loadCollapsed(): Set<string> {
   try {
@@ -84,6 +88,12 @@ export function Workflows() {
   const [showDetails, setShowDetails] = useState<boolean>(() => {
     try { return localStorage.getItem(SHOW_DETAILS_KEY) === '1'; } catch { return false; }
   });
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    try {
+      const v = localStorage.getItem(VIEW_MODE_KEY);
+      return v === 'discovery' ? 'discovery' : 'classic';
+    } catch { return 'classic'; }
+  });
   const [createStep, setCreateStep] = useState<CreateStep>('closed');
   const [selectedTemplate, setSelectedTemplate] = useState<WorkflowTemplate | null>(null);
   const [form, setForm] = useState<CreateWorkflowRequest>({ projectId: '', name: '' });
@@ -112,6 +122,9 @@ export function Workflows() {
   useEffect(() => {
     try { localStorage.setItem(SHOW_DETAILS_KEY, showDetails ? '1' : '0'); } catch { /* ignore */ }
   }, [showDetails]);
+  useEffect(() => {
+    try { localStorage.setItem(VIEW_MODE_KEY, viewMode); } catch { /* ignore */ }
+  }, [viewMode]);
 
   const filtered = useMemo(
     () => {
@@ -419,8 +432,43 @@ export function Workflows() {
               onToggleShowDetails={() => setShowDetails((v) => !v)}
             />
 
+            <div className="flex items-center gap-1 mb-2 text-xs" role="tablist">
+              <button
+                role="tab"
+                aria-selected={viewMode === 'classic'}
+                onClick={() => setViewMode('classic')}
+                className={`px-2.5 py-1 rounded-md transition-colors ${
+                  viewMode === 'classic'
+                    ? 'bg-surface-raised text-text border border-border'
+                    : 'text-text-tertiary hover:text-text'
+                }`}
+              >
+                {t.workflows.viewModeClassic}
+              </button>
+              <button
+                role="tab"
+                aria-selected={viewMode === 'discovery'}
+                onClick={() => setViewMode('discovery')}
+                className={`px-2.5 py-1 rounded-md transition-colors ${
+                  viewMode === 'discovery'
+                    ? 'bg-surface-raised text-text border border-border'
+                    : 'text-text-tertiary hover:text-text'
+                }`}
+              >
+                {t.workflows.viewModeDiscovery}
+              </button>
+            </div>
+
             <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-              {groupedByProject.map((group) => (
+              {viewMode === 'discovery' && !selectMode ? (
+                <DiscoveryView
+                  t={t}
+                  workflows={filtered}
+                  search={search}
+                  onExecute={handleExecute}
+                  navigate={navigate}
+                />
+              ) : groupedByProject.map((group) => (
                 <ProjectGroup
                   key={group.projectId}
                   projectId={group.projectId}

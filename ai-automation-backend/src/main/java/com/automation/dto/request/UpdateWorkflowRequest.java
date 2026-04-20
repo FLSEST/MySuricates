@@ -16,13 +16,24 @@ public record UpdateWorkflowRequest(
         Map<String, Object> metadata,
         Map<String, Object> defaultContext,
         String changeSource,
-        String changeMessage
+        String changeMessage,
+        List<String> tags,
+        String category
 ) {
     public UpdateWorkflowRequest(String name, String description, String icon,
                                   List<BlockDefinition> blocks, String instructions,
                                   String model, String provider,
                                   Map<String, Object> metadata, Map<String, Object> defaultContext) {
         this(name, description, icon, blocks, instructions, model, provider,
-                metadata, defaultContext, null, null);
+                metadata, defaultContext, null, null, null, null);
+    }
+
+    public UpdateWorkflowRequest(String name, String description, String icon,
+                                  List<BlockDefinition> blocks, String instructions,
+                                  String model, String provider,
+                                  Map<String, Object> metadata, Map<String, Object> defaultContext,
+                                  String changeSource, String changeMessage) {
+        this(name, description, icon, blocks, instructions, model, provider,
+                metadata, defaultContext, changeSource, changeMessage, null, null);
     }
 }

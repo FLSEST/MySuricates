@@ -3,6 +3,7 @@ import { createBrowserRouter, RouterProvider, useParams, Navigate } from 'react-
 import { Layout } from './components/layout/Layout';
 import { RouteErrorFallback } from './components/shared/RouteErrorFallback';
 import { ToastContainer } from './components/ui/ToastContainer';
+import { CommandPalette } from './components/palette/CommandPalette';
 import { useSettingsStore } from './stores/settingsStore';
 import { api } from './api/client';
 
@@ -109,9 +110,24 @@ const router = createBrowserRouter([
 ]);
 
 export function App() {
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Cmd/Ctrl+K toggles palette; never hijack input with modifier-less shortcuts.
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
   return (
     <>
       <RouterProvider router={router} />
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <ToastContainer />
     </>
   );

@@ -66,6 +66,9 @@ app:
   build-timestamp: @maven.build.timestamp@
 
 automation:
+  discovery:
+    auto-tagging-enabled: ${AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED:true}
+    semantic-enabled: ${AUTOMATION_DISCOVERY_SEMANTIC_ENABLED:true}
   cli:
     host-home: ${AUTOMATION_HOST_HOME:}    # Default: System.getProperty("user.home")
     host-uid: ${AUTOMATION_HOST_UID:}      # Default: detected via 'id -u'
