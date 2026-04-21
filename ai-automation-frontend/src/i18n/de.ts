@@ -1442,6 +1442,7 @@ export const de: TranslationKeys = {
     rerunHint: 'Erneut mit denselben Eingaben starten',
     filterChipStatus: 'Status',
     filterChipRemove: 'Filter entfernen',
+    askAssistant: 'Frag den Assistenten',
     contexts: {
       workflow: {
         triggerLabel: 'Workflow suchen oder starten…',

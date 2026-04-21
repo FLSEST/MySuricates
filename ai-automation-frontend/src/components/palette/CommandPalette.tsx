@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Search, Play, ExternalLink, Star, ArrowLeft, RotateCw, X } from 'lucide-react';
+import { Search, Play, ExternalLink, Star, ArrowLeft, RotateCw, X, Sparkles } from 'lucide-react';
 import { useExecuteWorkflow } from '../../hooks/useWorkflows';
 import { usePaletteHistory } from '../../hooks/usePaletteHistory';
+import { useAssistantStore } from '../../stores/assistantStore';
 import { useT } from '../../i18n';
 import { WorkflowIcon } from '../../utils/workflowIcon';
 import type { Workflow } from '../../types';
@@ -68,6 +69,8 @@ function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onC
 
   const executeWorkflow = useExecuteWorkflow();
   const { recents, pins, pushRecent, togglePin, isPinned } = usePaletteHistory(context.id);
+  const setAssistantInput = useAssistantStore((s) => s.setPendingInput);
+  const setAssistantOpen = useAssistantStore((s) => s.setOpen);
 
   const debouncedQuery = useDebounced(query, 250);
 
@@ -82,9 +85,13 @@ function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onC
   );
 
   const isEmptyQuery = query.trim().length === 0;
+  // Assistant escape-hatch row appears at the bottom once the query has substance;
+  // threshold matches Fuse's minMatchCharLength so we don't offer it for stray keystrokes.
+  const hasAssistantRow = query.trim().length >= 2;
+  const assistantIdx = hasAssistantRow ? results.length : -1;
   const totalItems = isEmptyQuery
     ? pinnedItems.length + recentItems.length
-    : results.length;
+    : results.length + (hasAssistantRow ? 1 : 0);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -120,6 +127,14 @@ function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onC
 
   const runAltAction = (item: PaletteItem) => {
     context.altAction?.run(item, deps);
+  };
+
+  const askAssistant = () => {
+    const text = query.trim();
+    if (!text) return;
+    setAssistantInput(text);
+    setAssistantOpen(true);
+    onClose();
   };
 
   const enterItem = (item: PaletteItem) => {
@@ -171,6 +186,10 @@ function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onC
         setSelectedIdx((i) => Math.max(0, i - 1));
       } else if (e.key === 'Enter') {
         e.preventDefault();
+        if (!isEmptyQuery && selectedIdx === assistantIdx) {
+          askAssistant();
+          return;
+        }
         const item = itemAt(selectedIdx);
         if (item) {
           if (e.metaKey || e.ctrlKey) openItemInNewTab(item);
@@ -240,8 +259,8 @@ function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onC
             </div>
 
             <div className="max-h-[60vh] overflow-y-auto">
-              {totalItems === 0 && !isEmptyQuery && !loading && (
-                <div className="px-4 py-6 text-center text-sm text-text-tertiary">
+              {!isEmptyQuery && results.length === 0 && !loading && (
+                <div className="px-4 py-4 text-center text-sm text-text-tertiary">
                   {context.labels.empty}
                 </div>
               )}
@@ -304,6 +323,17 @@ function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onC
                     />
                   ))}
                 </div>
+              )}
+
+              {!isEmptyQuery && hasAssistantRow && (
+                <AssistantRow
+                  query={query.trim()}
+                  selected={selectedIdx === assistantIdx}
+                  onHover={() => setSelectedIdx(assistantIdx)}
+                  onClick={askAssistant}
+                  label={t.commandPalette.askAssistant}
+                  borderTop={results.length > 0}
+                />
               )}
 
               {isEmptyQuery && pinnedItems.length === 0 && recentItems.length === 0 && (
@@ -443,6 +473,39 @@ function PaletteRow({ item, selected, pinned, onHover, onRun, onOpen, onTogglePi
       >
         <Play className="w-3.5 h-3.5" />
       </button>
+    </div>
+  );
+}
+
+interface AssistantRowProps {
+  query: string;
+  selected: boolean;
+  onHover: () => void;
+  onClick: () => void;
+  label: string;
+  borderTop: boolean;
+}
+
+function AssistantRow({ query, selected, onHover, onClick, label, borderTop }: AssistantRowProps) {
+  return (
+    <div
+      onMouseEnter={onHover}
+      onClick={onClick}
+      className={`flex items-center gap-3 px-4 py-2 cursor-pointer ${
+        borderTop ? 'border-t border-border' : ''
+      } ${selected ? 'bg-accent/10' : 'hover:bg-surface-raised'}`}
+    >
+      <span className="shrink-0 text-accent">
+        <Sparkles className="w-4 h-4" />
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm text-text truncate">
+          {label}: <span className="text-text-tertiary">»{query}«</span>
+        </div>
+      </div>
+      <span className="text-[10px] text-text-tertiary border border-border px-1.5 py-0.5 rounded-sm shrink-0">
+        ⏎
+      </span>
     </div>
   );
 }

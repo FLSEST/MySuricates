@@ -1445,6 +1445,7 @@ export const en = {
     rerunHint: 'Re-run with the same inputs',
     filterChipStatus: 'Status',
     filterChipRemove: 'Remove filter',
+    askAssistant: 'Ask the assistant',
     contexts: {
       workflow: {
         triggerLabel: 'Search or run workflow…',
