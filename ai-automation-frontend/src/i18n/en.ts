@@ -1442,6 +1442,23 @@ export const en = {
     collectVariablesHeader: 'Inputs for workflow',
     collectStart: 'Run',
     collectCancel: 'Back',
+    contexts: {
+      workflow: {
+        triggerLabel: 'Search or run workflow…',
+        placeholder: 'Search or run workflow…',
+        empty: 'No workflow matches. Try different terms.',
+      },
+      run: {
+        triggerLabel: 'Search runs…',
+        placeholder: 'Search runs (workflow name or status)…',
+        empty: 'No run matches. Try different terms.',
+      },
+      project: {
+        triggerLabel: 'Open project…',
+        placeholder: 'Search projects (name or subtitle)…',
+        empty: 'No project matches. Try different terms.',
+      },
+    },
   },
 } as const;
 

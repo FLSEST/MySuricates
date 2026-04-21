@@ -1439,5 +1439,22 @@ export const de: TranslationKeys = {
     collectVariablesHeader: 'Eingaben für Workflow',
     collectStart: 'Starten',
     collectCancel: 'Zurück',
+    contexts: {
+      workflow: {
+        triggerLabel: 'Workflow suchen oder starten…',
+        placeholder: 'Workflow suchen oder starten…',
+        empty: 'Kein Workflow passt. Versuche andere Begriffe.',
+      },
+      run: {
+        triggerLabel: 'Run suchen…',
+        placeholder: 'Run suchen (Workflow-Name oder Status)…',
+        empty: 'Kein Run passt. Versuche andere Begriffe.',
+      },
+      project: {
+        triggerLabel: 'Projekt öffnen…',
+        placeholder: 'Projekt suchen (Name oder Untertitel)…',
+        empty: 'Kein Projekt passt. Versuche andere Begriffe.',
+      },
+    },
   },
 } as const;

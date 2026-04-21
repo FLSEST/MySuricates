@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 
-const RECENTS_KEY = 'workflows-recents';
-const PINS_KEY = 'workflows-pins';
 const MAX_RECENTS = 10;
 const MAX_PINS = 8;
+const EVENT_NAME = 'workflows:history-changed';
+
+function recentsKey(contextId: string): string {
+  return contextId === 'workflow' ? 'workflows-recents' : `palette-recents-${contextId}`;
+}
+
+function pinsKey(contextId: string): string {
+  return contextId === 'workflow' ? 'workflows-pins' : `palette-pins-${contextId}`;
+}
 
 function loadList(key: string): string[] {
   try {
@@ -25,53 +32,56 @@ function saveList(key: string, list: string[]) {
 }
 
 /**
- * LocalStorage-backed recent + pinned workflow IDs for the Command Palette.
- * Recents: FIFO, deduped, capped at MAX_RECENTS. Pushed when a workflow runs.
- * Pins: user-toggled via palette star icon, capped at MAX_PINS.
- * The `workflows:history-changed` event lets other palette instances (unlikely but cheap)
- * stay in sync within the same tab.
+ * LocalStorage-backed recent + pinned IDs for the Command Palette, scoped per context.
+ * Keys: {contextId}-recents / {contextId}-pins. The 'workflow' context keeps the legacy
+ * keys `workflows-recents` / `workflows-pins` so users don't lose existing pins.
+ * Persistence happens in useEffect to survive Strict Mode's double-invoked reducer.
  */
-export function usePaletteHistory() {
-  const [recents, setRecents] = useState<string[]>(() => loadList(RECENTS_KEY));
-  const [pins, setPins] = useState<string[]>(() => loadList(PINS_KEY));
+export function usePaletteHistory(contextId: string) {
+  const rKey = recentsKey(contextId);
+  const pKey = pinsKey(contextId);
 
-  // Sync across palette instances in the same tab. Guard against echoing our own writes.
+  const [recents, setRecents] = useState<string[]>(() => loadList(rKey));
+  const [pins, setPins] = useState<string[]>(() => loadList(pKey));
+
+  // When context changes, swap the lists (initial mount covers this via useState init;
+  // a later context change will re-mount via React key, so this is defensive only).
+  useEffect(() => {
+    setRecents(loadList(rKey));
+    setPins(loadList(pKey));
+  }, [rKey, pKey]);
+
   useEffect(() => {
     const handler = () => {
-      const freshRecents = loadList(RECENTS_KEY);
-      const freshPins = loadList(PINS_KEY);
+      const freshRecents = loadList(rKey);
+      const freshPins = loadList(pKey);
       setRecents((prev) => (sameList(prev, freshRecents) ? prev : freshRecents));
       setPins((prev) => (sameList(prev, freshPins) ? prev : freshPins));
     };
-    window.addEventListener('workflows:history-changed', handler);
-    return () => window.removeEventListener('workflows:history-changed', handler);
-  }, []);
-
-  // Persist + broadcast as an effect so Strict Mode's double-invoked reducer
-  // does not toggle LocalStorage back to the initial state.
-  useEffect(() => {
-    saveList(RECENTS_KEY, recents);
-    window.dispatchEvent(new CustomEvent('workflows:history-changed'));
-  }, [recents]);
+    window.addEventListener(EVENT_NAME, handler);
+    return () => window.removeEventListener(EVENT_NAME, handler);
+  }, [rKey, pKey]);
 
   useEffect(() => {
-    saveList(PINS_KEY, pins);
-    window.dispatchEvent(new CustomEvent('workflows:history-changed'));
-  }, [pins]);
+    saveList(rKey, recents);
+    window.dispatchEvent(new CustomEvent(EVENT_NAME));
+  }, [recents, rKey]);
+
+  useEffect(() => {
+    saveList(pKey, pins);
+    window.dispatchEvent(new CustomEvent(EVENT_NAME));
+  }, [pins, pKey]);
 
   const pushRecent = useCallback((id: string) => {
     setRecents((prev) => {
-      if (prev[0] === id) return prev; // already on top
-      const next = [id, ...prev.filter((x) => x !== id)].slice(0, MAX_RECENTS);
-      return next;
+      if (prev[0] === id) return prev;
+      return [id, ...prev.filter((x) => x !== id)].slice(0, MAX_RECENTS);
     });
   }, []);
 
   const togglePin = useCallback((id: string) => {
     setPins((prev) =>
-      prev.includes(id)
-        ? prev.filter((x) => x !== id)
-        : [id, ...prev].slice(0, MAX_PINS),
+      prev.includes(id) ? prev.filter((x) => x !== id) : [id, ...prev].slice(0, MAX_PINS),
     );
   }, []);
 

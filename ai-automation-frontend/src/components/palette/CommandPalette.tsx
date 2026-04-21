@@ -1,21 +1,16 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { Search, Play, ExternalLink, Sparkles, Star, ArrowLeft } from 'lucide-react';
-import { api } from '../../api/client';
-import { useWorkflows, useExecuteWorkflow } from '../../hooks/useWorkflows';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Search, Play, ExternalLink, Star, ArrowLeft } from 'lucide-react';
+import { useExecuteWorkflow } from '../../hooks/useWorkflows';
 import { usePaletteHistory } from '../../hooks/usePaletteHistory';
-import { extractWorkflowVariables } from '../../utils/extractWorkflowVariables';
 import { useT } from '../../i18n';
 import { WorkflowIcon } from '../../utils/workflowIcon';
 import type { Workflow } from '../../types';
-
-interface SemanticHit {
-  workflowId: string;
-  workflowName: string;
-  reason: string;
-  score: number;
-}
+import { resolveContextId } from './resolveContext';
+import { useWorkflowContext } from './contexts/workflowContext';
+import { useRunContext } from './contexts/runContext';
+import { useProjectContext } from './contexts/projectContext';
+import type { PaletteContextHandle, PaletteItem, BadgeTone } from './contexts/types';
 
 interface CollectingState {
   workflow: Workflow;
@@ -23,122 +18,109 @@ interface CollectingState {
   values: Record<string, string>;
 }
 
-function rankLocal(workflows: Workflow[], q: string): Workflow[] {
-  const query = q.toLowerCase().trim();
-  if (!query) return [];
-  const scored = workflows
-    .map((w) => {
-      let score = 0;
-      const name = w.name.toLowerCase();
-      const desc = (w.description ?? '').toLowerCase();
-      const cat = (w.category ?? '').toLowerCase();
-      const tags = (w.tags ?? []).join(' ').toLowerCase();
-      if (name === query) score += 10;
-      if (name.startsWith(query)) score += 5;
-      if (name.includes(query)) score += 3;
-      if (desc.includes(query)) score += 1.5;
-      if (tags.includes(query)) score += 2;
-      if (cat.includes(query)) score += 1;
-      return { w, score };
-    })
-    .filter((s) => s.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 10);
-  return scored.map((s) => s.w);
-}
-
 interface CommandPaletteProps {
   open: boolean;
   onClose: () => void;
 }
 
+/**
+ * Outer wrapper: resolves the current context by route and remounts PaletteBody
+ * on context change via `key`. Remounting guarantees a stable hook order
+ * inside the inner body.
+ */
 export function CommandPalette({ open, onClose }: CommandPaletteProps) {
+  const location = useLocation();
+  const contextId = resolveContextId(location.pathname);
+  if (!open) return null;
+  return <PaletteBody key={contextId} contextId={contextId} onClose={onClose} />;
+}
+
+function PaletteBody({ contextId, onClose }: { contextId: ReturnType<typeof resolveContextId>; onClose: () => void }) {
+  // Exactly one context hook per variant — satisfies react-hooks/rules-of-hooks.
+  if (contextId === 'run') return <RunBody onClose={onClose} />;
+  if (contextId === 'project') return <ProjectBody onClose={onClose} />;
+  return <WorkflowBody onClose={onClose} />;
+}
+
+function WorkflowBody({ onClose }: { onClose: () => void }) {
+  const context = useWorkflowContext();
+  return <InnerPalette context={context} onClose={onClose} />;
+}
+
+function RunBody({ onClose }: { onClose: () => void }) {
+  const context = useRunContext();
+  return <InnerPalette context={context} onClose={onClose} />;
+}
+
+function ProjectBody({ onClose }: { onClose: () => void }) {
+  const context = useProjectContext();
+  return <InnerPalette context={context} onClose={onClose} />;
+}
+
+function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onClose: () => void }) {
   const t = useT();
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [collecting, setCollecting] = useState<CollectingState | null>(null);
-  const { data: workflows = [] } = useWorkflows();
+
   const executeWorkflow = useExecuteWorkflow();
-  const { recents, pins, pushRecent, togglePin, isPinned } = usePaletteHistory();
+  const { recents, pins, pushRecent, togglePin, isPinned } = usePaletteHistory(context.id);
 
   const debouncedQuery = useDebounced(query, 250);
 
-  const semantic = useQuery({
-    queryKey: ['search', 'semantic', debouncedQuery],
-    queryFn: async () =>
-      api.post<SemanticHit[]>('/search/workflows/semantic', {
-        query: debouncedQuery,
-        limit: 5,
-      }),
-    enabled: open && debouncedQuery.trim().length >= 3,
-    staleTime: 60_000,
-  });
-
-  const localMatches = useMemo(() => rankLocal(workflows, query), [workflows, query]);
-
-  const combined = useMemo(() => {
-    const localIds = new Set(localMatches.map((w) => w.id));
-    const semanticOnly = (semantic.data ?? []).filter((h) => !localIds.has(h.workflowId));
-    return { local: localMatches, semantic: semanticOnly };
-  }, [localMatches, semantic.data]);
-
-  const pinnedWorkflows = useMemo(
-    () => pins.map((id) => workflows.find((w) => w.id === id)).filter((w): w is Workflow => !!w),
-    [pins, workflows],
+  const { items: results, loading } = context.useResults(debouncedQuery);
+  const pinnedItems = context.useByIds(pins);
+  const recentItems = context.useByIds(
+    recents.filter((id) => !pins.includes(id)).slice(0, 5),
   );
-  const recentWorkflows = useMemo(() => {
-    const pinSet = new Set(pins);
-    return recents
-      .filter((id) => !pinSet.has(id))
-      .map((id) => workflows.find((w) => w.id === id))
-      .filter((w): w is Workflow => !!w)
-      .slice(0, 5);
-  }, [recents, pins, workflows]);
 
   const isEmptyQuery = query.trim().length === 0;
   const totalItems = isEmptyQuery
-    ? pinnedWorkflows.length + recentWorkflows.length
-    : combined.local.length + combined.semantic.length;
+    ? pinnedItems.length + recentItems.length
+    : results.length;
 
   useEffect(() => {
-    if (!open) return;
     inputRef.current?.focus();
-    setSelectedIdx(0);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) {
-      setQuery('');
-      setCollecting(null);
-    }
-  }, [open]);
+  }, []);
 
   useEffect(() => {
     setSelectedIdx(0);
   }, [query]);
 
-  const itemAt = (idx: number): Workflow | null => {
+  const itemAt = (idx: number): PaletteItem | null => {
     if (isEmptyQuery) {
-      if (idx < pinnedWorkflows.length) return pinnedWorkflows[idx] ?? null;
-      return recentWorkflows[idx - pinnedWorkflows.length] ?? null;
+      if (idx < pinnedItems.length) return pinnedItems[idx] ?? null;
+      return recentItems[idx - pinnedItems.length] ?? null;
     }
-    if (idx < combined.local.length) return combined.local[idx] ?? null;
-    const hit = combined.semantic[idx - combined.local.length];
-    if (!hit) return null;
-    return workflows.find((w) => w.id === hit.workflowId) ?? null;
+    return results[idx] ?? null;
   };
 
-  const openDetail = (id: string) => {
-    onClose();
-    navigate(`/workflows/${id}`);
+  const deps = { navigate, onClose };
+
+  const openItem = (item: PaletteItem) => {
+    if (context.onOpen) context.onOpen(item, deps);
+    else context.onEnter(item, deps);
   };
 
-  const startWithContext = (w: Workflow, context: Record<string, string>) => {
+  const enterItem = (item: PaletteItem) => {
+    pushRecent(item.id);
+    if (context.onBeforeEnter) {
+      const intercepted = context.onBeforeEnter(item, deps, (w, variables, values) => {
+        setCollecting({ workflow: w as Workflow, variables, values });
+      });
+      if (intercepted) return;
+    }
+    context.onEnter(item, deps);
+  };
+
+  const submitCollected = () => {
+    if (!collecting) return;
+    const w = collecting.workflow;
     pushRecent(w.id);
     executeWorkflow.mutate(
-      { id: w.id, context },
+      { id: w.id, context: collecting.values },
       {
         onSuccess: (run) => {
           setCollecting(null);
@@ -149,27 +131,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     );
   };
 
-  const runWorkflow = (w: Workflow) => {
-    const variables = extractWorkflowVariables(w.blocks);
-    if (variables.length === 0) {
-      startWithContext(w, {});
-      return;
-    }
-    const defaults: Record<string, string> = {};
-    const ctx = w.defaultContext ?? {};
-    for (const v of variables) {
-      defaults[v] = typeof ctx[v] === 'string' ? (ctx[v] as string) : '';
-    }
-    setCollecting({ workflow: w, variables, values: defaults });
-  };
-
-  const submitCollected = () => {
-    if (!collecting) return;
-    startWithContext(collecting.workflow, collecting.values);
-  };
-
   useEffect(() => {
-    if (!open) return;
     const handleKey = (e: KeyboardEvent) => {
       if (collecting) {
         if (e.key === 'Escape') {
@@ -193,16 +155,15 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
         e.preventDefault();
         const item = itemAt(selectedIdx);
         if (item) {
-          if (e.shiftKey) openDetail(item.id);
-          else runWorkflow(item);
+          if (e.shiftKey) openItem(item);
+          else enterItem(item);
         }
       }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [open, selectedIdx, totalItems, combined, collecting, isEmptyQuery, pinnedWorkflows, recentWorkflows]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (!open) return null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIdx, totalItems, results, pinnedItems, recentItems, collecting, isEmptyQuery]);
 
   return (
     <div
@@ -231,7 +192,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder={t.commandPalette.placeholder}
+                placeholder={context.labels.placeholder}
                 className="flex-1 bg-transparent text-sm text-text placeholder:text-text-tertiary focus:outline-none"
               />
               <span className="text-[10px] text-text-tertiary border border-border px-1.5 py-0.5 rounded-sm">
@@ -240,47 +201,44 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
             </div>
 
             <div className="max-h-[60vh] overflow-y-auto">
-              {totalItems === 0 && !isEmptyQuery && (
+              {totalItems === 0 && !isEmptyQuery && !loading && (
                 <div className="px-4 py-6 text-center text-sm text-text-tertiary">
-                  {t.commandPalette.noResults}
+                  {context.labels.empty}
                 </div>
               )}
 
-              {isEmptyQuery && pinnedWorkflows.length > 0 && (
-                <Section
-                  title={t.commandPalette.pinned}
-                  icon={<Star className="w-3 h-3 fill-current" />}
-                >
-                  {pinnedWorkflows.map((w, idx) => (
+              {isEmptyQuery && pinnedItems.length > 0 && (
+                <Section title={t.commandPalette.pinned} icon={<Star className="w-3 h-3 fill-current" />}>
+                  {pinnedItems.map((item, idx) => (
                     <PaletteRow
-                      key={w.id}
-                      workflow={w}
+                      key={item.id}
+                      item={item}
                       selected={selectedIdx === idx}
                       pinned
                       onHover={() => setSelectedIdx(idx)}
-                      onRun={() => runWorkflow(w)}
-                      onOpen={() => openDetail(w.id)}
-                      onTogglePin={() => togglePin(w.id)}
+                      onRun={() => enterItem(item)}
+                      onOpen={() => openItem(item)}
+                      onTogglePin={() => togglePin(item.id)}
                       t={t}
                     />
                   ))}
                 </Section>
               )}
 
-              {isEmptyQuery && recentWorkflows.length > 0 && (
-                <Section title={t.commandPalette.recent} borderTop={pinnedWorkflows.length > 0}>
-                  {recentWorkflows.map((w, i) => {
-                    const absIdx = pinnedWorkflows.length + i;
+              {isEmptyQuery && recentItems.length > 0 && (
+                <Section title={t.commandPalette.recent} borderTop={pinnedItems.length > 0}>
+                  {recentItems.map((item, i) => {
+                    const absIdx = pinnedItems.length + i;
                     return (
                       <PaletteRow
-                        key={w.id}
-                        workflow={w}
+                        key={item.id}
+                        item={item}
                         selected={selectedIdx === absIdx}
                         pinned={false}
                         onHover={() => setSelectedIdx(absIdx)}
-                        onRun={() => runWorkflow(w)}
-                        onOpen={() => openDetail(w.id)}
-                        onTogglePin={() => togglePin(w.id)}
+                        onRun={() => enterItem(item)}
+                        onOpen={() => openItem(item)}
+                        onTogglePin={() => togglePin(item.id)}
                         t={t}
                       />
                     );
@@ -288,53 +246,25 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                 </Section>
               )}
 
-              {!isEmptyQuery && combined.local.length > 0 && (
-                <Section title={t.commandPalette.workflows}>
-                  {combined.local.map((w, idx) => (
+              {!isEmptyQuery && results.length > 0 && (
+                <div className="py-1">
+                  {results.map((item, idx) => (
                     <PaletteRow
-                      key={w.id}
-                      workflow={w}
+                      key={item.id}
+                      item={item}
                       selected={selectedIdx === idx}
-                      pinned={isPinned(w.id)}
+                      pinned={isPinned(item.id)}
                       onHover={() => setSelectedIdx(idx)}
-                      onRun={() => runWorkflow(w)}
-                      onOpen={() => openDetail(w.id)}
-                      onTogglePin={() => togglePin(w.id)}
+                      onRun={() => enterItem(item)}
+                      onOpen={() => openItem(item)}
+                      onTogglePin={() => togglePin(item.id)}
                       t={t}
                     />
                   ))}
-                </Section>
+                </div>
               )}
 
-              {!isEmptyQuery && combined.semantic.length > 0 && (
-                <Section
-                  title={t.commandPalette.byMeaning}
-                  icon={<Sparkles className="w-3 h-3" />}
-                  borderTop={combined.local.length > 0}
-                >
-                  {combined.semantic.map((hit, i) => {
-                    const w = workflows.find((x) => x.id === hit.workflowId);
-                    if (!w) return null;
-                    const absIdx = combined.local.length + i;
-                    return (
-                      <PaletteRow
-                        key={hit.workflowId}
-                        workflow={w}
-                        reason={hit.reason}
-                        selected={selectedIdx === absIdx}
-                        pinned={isPinned(w.id)}
-                        onHover={() => setSelectedIdx(absIdx)}
-                        onRun={() => runWorkflow(w)}
-                        onOpen={() => openDetail(w.id)}
-                        onTogglePin={() => togglePin(w.id)}
-                        t={t}
-                      />
-                    );
-                  })}
-                </Section>
-              )}
-
-              {isEmptyQuery && pinnedWorkflows.length === 0 && recentWorkflows.length === 0 && (
+              {isEmptyQuery && pinnedItems.length === 0 && recentItems.length === 0 && (
                 <div className="px-4 py-6 text-center text-xs text-text-tertiary">
                   {t.commandPalette.hint}
                 </div>
@@ -366,9 +296,16 @@ function Section({ title, icon, borderTop, children }: SectionProps) {
   );
 }
 
+const TONE_CLASSES: Record<BadgeTone, string> = {
+  success: 'bg-success/10 text-success',
+  danger: 'bg-danger/10 text-danger',
+  warn: 'bg-warning/10 text-warning',
+  info: 'bg-accent/10 text-accent',
+  neutral: 'bg-surface-raised text-text-tertiary',
+};
+
 interface PaletteRowProps {
-  workflow: Workflow;
-  reason?: string;
+  item: PaletteItem;
   selected: boolean;
   pinned: boolean;
   onHover: () => void;
@@ -378,7 +315,7 @@ interface PaletteRowProps {
   t: ReturnType<typeof useT>;
 }
 
-function PaletteRow({ workflow, reason, selected, pinned, onHover, onRun, onOpen, onTogglePin, t }: PaletteRowProps) {
+function PaletteRow({ item, selected, pinned, onHover, onRun, onOpen, onTogglePin, t }: PaletteRowProps) {
   return (
     <div
       onMouseEnter={onHover}
@@ -388,14 +325,19 @@ function PaletteRow({ workflow, reason, selected, pinned, onHover, onRun, onOpen
       }`}
     >
       <span className="shrink-0">
-        <WorkflowIcon icon={workflow.icon} className="w-4 h-4" />
+        <WorkflowIcon icon={item.icon ?? null} className="w-4 h-4" />
       </span>
       <div className="flex-1 min-w-0">
-        <div className="text-sm text-text truncate">{workflow.name}</div>
-        {(reason ?? workflow.description) && (
-          <div className="text-xs text-text-tertiary truncate">{reason ?? workflow.description}</div>
+        <div className="text-sm text-text truncate">{item.title}</div>
+        {item.subtitle && (
+          <div className="text-xs text-text-tertiary truncate">{item.subtitle}</div>
         )}
       </div>
+      {item.badge && (
+        <span className={`text-[10px] px-1.5 py-0.5 rounded-sm shrink-0 ${TONE_CLASSES[item.badge.tone]}`}>
+          {item.badge.label}
+        </span>
+      )}
       <button
         onClick={(e) => { e.stopPropagation(); onTogglePin(); }}
         className={`p-1 rounded-sm transition-colors ${

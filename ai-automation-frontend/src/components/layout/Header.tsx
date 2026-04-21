@@ -8,6 +8,7 @@ import { useSidebarStore } from '../../stores/sidebarStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useAssistantStore } from '../../stores/assistantStore';
 import { useAssistantSuggestions } from '../../hooks/useAssistant';
+import { resolveContextId } from '../palette/resolveContext';
 
 function isMac(): boolean {
   if (typeof navigator === 'undefined') return false;
@@ -108,6 +109,9 @@ export function Header() {
   const { locale, setLocale } = useI18nStore();
   const setMobileOpen = useSidebarStore((s) => s.setMobileOpen);
   const isMobile = useIsMobile();
+  const location = useLocation();
+  const contextId = resolveContextId(location.pathname);
+  const triggerLabel = t.commandPalette.contexts[contextId].triggerLabel;
 
   return (
     <header className={`h-14 border-b border-border flex items-center px-6 gap-2 ${isMobile ? 'justify-between' : 'justify-end'}`}>
@@ -124,7 +128,7 @@ export function Header() {
 
       <div className="flex items-center gap-2">
         {/* Command Palette trigger */}
-        <PaletteTrigger compact={isMobile} label={t.commandPalette.triggerLabel} />
+        <PaletteTrigger compact={isMobile} label={triggerLabel} />
 
         {/* Suggestions button */}
         <SuggestionButton />
