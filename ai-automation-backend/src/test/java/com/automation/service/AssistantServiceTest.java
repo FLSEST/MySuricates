@@ -332,6 +332,113 @@ class AssistantServiceTest {
     }
 
     @Test
+    void chat_multiRoundFetchChainsUpToThreeRoundsAndAccumulatesDetails() {
+        // Round 0: model wants run_detail. Round 1: still fetch-only, wants step_output.
+        // Round 2: finally produces a text answer. We should see three CLI calls total
+        // (initial + 2 follow-ups) and the third call must contain both supplemental blocks.
+        stubClaudeSequence(
+                "<fetch type=\"run_detail\" id=\"r1\"/>",
+                "<fetch type=\"step_output\" id=\"r1/0\"/>",
+                "Der Run r1 ist fertig — Step 0 hat 1.2GB geschrieben."
+        );
+        var firstFetch = new AssistantFetchService.FetchRequest("run_detail", "r1");
+        var secondFetch = new AssistantFetchService.FetchRequest("step_output", "r1/0");
+        when(fetchService.parseFetchRequests("<fetch type=\"run_detail\" id=\"r1\"/>"))
+                .thenReturn(List.of(firstFetch));
+        when(fetchService.parseFetchRequests("<fetch type=\"step_output\" id=\"r1/0\"/>"))
+                .thenReturn(List.of(secondFetch));
+        when(fetchService.executeFetch(firstFetch)).thenReturn("run r1: COMPLETED");
+        when(fetchService.executeFetch(secondFetch)).thenReturn("step 0: 1.2GB output");
+        when(fetchService.stripFetchTags("<fetch type=\"run_detail\" id=\"r1\"/>"))
+                .thenReturn("");
+        when(fetchService.stripFetchTags("<fetch type=\"step_output\" id=\"r1/0\"/>"))
+                .thenReturn("");
+        when(fetchService.stripFetchTags("Der Run r1 ist fertig — Step 0 hat 1.2GB geschrieben."))
+                .thenReturn("Der Run r1 ist fertig — Step 0 hat 1.2GB geschrieben.");
+
+        var result = chat("Was ist mit dem Run?");
+
+        assertThat(result.message()).isEqualTo("Der Run r1 ist fertig — Step 0 hat 1.2GB geschrieben.");
+        // Third call receives both supplemental blocks and the round-2 hint
+        verify(commandExecutorService).executeOnHost(argThat(req ->
+                req.command() != null
+                        && req.command().contains("run r1: COMPLETED")
+                        && req.command().contains("step 0: 1.2GB output")
+                        && req.command().contains("Runde 2")
+        ));
+    }
+
+    @Test
+    void chat_duplicateFetchAcrossRoundsIsSkippedAndBreaksLoop() {
+        // Model repeats the same fetch in round 1 — the duplicate filter drops it, leaving
+        // no fetches → loop breaks. No second enrichment is sent.
+        stubClaudeSequence(
+                "<fetch type=\"run_detail\" id=\"r1\"/>",
+                "<fetch type=\"run_detail\" id=\"r1\"/>"
+        );
+        var fetchReq = new AssistantFetchService.FetchRequest("run_detail", "r1");
+        when(fetchService.parseFetchRequests("<fetch type=\"run_detail\" id=\"r1\"/>"))
+                .thenReturn(List.of(fetchReq));
+        when(fetchService.executeFetch(fetchReq)).thenReturn("run r1: COMPLETED");
+        when(fetchService.stripFetchTags("<fetch type=\"run_detail\" id=\"r1\"/>"))
+                .thenReturn("");
+
+        var result = chat("Was ist mit dem Run?");
+
+        // Only one fetch is executed, not two
+        verify(fetchService, org.mockito.Mockito.times(1)).executeFetch(fetchReq);
+        // Response is empty text after 2 rounds (initial + 1 follow-up) → fetch-exhaustion fallback
+        assertThat(result.message()).contains("Daten-Abfragen").contains("konkreter");
+    }
+
+    @Test
+    void chat_exhaustedFetchRoundsProducesFallbackMessage() {
+        // Model keeps emitting different fetches but never delivers a text answer.
+        // After MAX_FETCH_ROUNDS the user should see a concrete fallback, not "(Keine Antwort erhalten)".
+        stubClaudeSequence(
+                "<fetch type=\"run_detail\" id=\"r1\"/>",
+                "<fetch type=\"run_detail\" id=\"r2\"/>",
+                "<fetch type=\"run_detail\" id=\"r3\"/>",
+                "<fetch type=\"run_detail\" id=\"r4\"/>"
+        );
+        when(fetchService.parseFetchRequests(any()))
+                .thenAnswer(inv -> {
+                    String raw = inv.getArgument(0);
+                    if (raw.contains("r1")) return List.of(new AssistantFetchService.FetchRequest("run_detail", "r1"));
+                    if (raw.contains("r2")) return List.of(new AssistantFetchService.FetchRequest("run_detail", "r2"));
+                    if (raw.contains("r3")) return List.of(new AssistantFetchService.FetchRequest("run_detail", "r3"));
+                    if (raw.contains("r4")) return List.of(new AssistantFetchService.FetchRequest("run_detail", "r4"));
+                    return List.of();
+                });
+        when(fetchService.executeFetch(any())).thenReturn("run data");
+        when(fetchService.stripFetchTags(any())).thenAnswer(inv -> {
+            String s = inv.getArgument(0);
+            return s.startsWith("<fetch") ? "" : s;
+        });
+
+        var result = chat("Analysiere die letzten Runs");
+
+        assertThat(result.message())
+                .contains("Daten-Abfragen")
+                .contains("konkreter");
+    }
+
+    @Test
+    void chat_jsonParseErrorClassifiesAsToolCallMalformed() {
+        // Full-width Unicode comma in tool JSON — previously misreported as "provider nicht konfiguriert".
+        when(commandExecutorService.executeOnHost(any(HostExecutionRequest.class)))
+                .thenThrow(new WorkflowExecutionException("tool parse failed",
+                        new com.fasterxml.jackson.core.JsonParseException(
+                                null, "Unexpected character ('，' (code 65292)): was expecting comma")));
+
+        var result = chat("Erstelle einen Workflow");
+
+        assertThat(result.message())
+                .contains("JSON-Fehler")
+                .doesNotContain("konfiguriert");
+    }
+
+    @Test
     void chat_blankSupplementalBreaksLoop() {
         // Fetches are returned, but executeFetch yields only blanks → supplemental.isBlank() → break.
         stubClaude("<fetch type=\"unknown\" id=\"x\"/>Antwort trotzdem.");

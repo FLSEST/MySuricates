@@ -15,6 +15,7 @@ import com.automation.service.assistant.AssistantToolExecutor;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
@@ -28,6 +29,7 @@ import java.nio.charset.StandardCharsets;
 import java.sql.SQLTransientConnectionException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +58,10 @@ public class AssistantService {
      * File mutations must go through MySuricates workflow blocks instead.
      */
     private static final List<String> CHAT_ALLOWED_TOOLS = List.of("Read", "Grep", "Glob", "WebFetch");
+    /** Maximum number of fetch→answer follow-up calls. Each round ≈ one CLI round-trip. */
+    private static final int MAX_FETCH_ROUNDS = 3;
+    /** Maximum number of distinct fetches per round. Dedup across rounds runs before this limit. */
+    private static final int MAX_FETCHES_PER_ROUND = 3;
     private static final Set<String> AUTO_FETCH_TYPES = Set.of(
             "run_detail",
             "step_output",
@@ -160,10 +166,16 @@ public class AssistantService {
                             .build()
             );
 
-            // Demand-driven auto-fetch: at most one follow-up call, only for a single safe fetch.
-            // Skip the follow-up if the first response already contains text outside the <fetch>
-            // tags — otherwise a fully-formed answer (including any <actions>) gets overwritten.
-            for (int fetchRound = 0; fetchRound < 1; fetchRound++) {
+            // Demand-driven auto-fetch: up to MAX_FETCH_ROUNDS follow-up calls, each with up to
+            // MAX_FETCHES_PER_ROUND distinct fetches. Skip enrichment if the response already
+            // contains text outside <fetch> tags — that's a fully-formed answer.
+            // Duplicates across rounds are filtered so the model can't loop on the same fetch.
+            // If after all rounds we still only see <fetch> tags, emit a targeted fallback
+            // message instead of "(Keine Antwort erhalten)".
+            Set<String> seenFetches = new HashSet<>();
+            String accumulatedSupplemental = "";
+            boolean fetchLoopEntered = false;
+            for (int fetchRound = 0; fetchRound < MAX_FETCH_ROUNDS; fetchRound++) {
                 String rawOutput = result.output();
                 String nonFetchText = fetchService.stripFetchTags(rawOutput);
                 boolean fetchOnlyResponse = nonFetchText == null || nonFetchText.isBlank();
@@ -171,19 +183,31 @@ public class AssistantService {
 
                 List<FetchRequest> fetches = fetchService.parseFetchRequests(rawOutput).stream()
                         .filter(this::isAutoFetchAllowed)
-                        .limit(1)
+                        .filter(f -> seenFetches.add(fetchKey(f)))
+                        .limit(MAX_FETCHES_PER_ROUND)
                         .toList();
                 if (fetches.isEmpty()) break;
+                fetchLoopEntered = true;
 
                 broadcaster.broadcastStatus(requestId, "FETCHING_DATA", "Runde " + (fetchRound + 1), startNanos);
                 String supplemental = fetches.stream()
                         .map(fetchService::executeFetch)
                         .filter(s -> !s.isBlank())
                         .collect(Collectors.joining("\n"));
+                log.debug("Assistant fetch round {} — {} fetch(es): {}",
+                        fetchRound + 1, fetches.size(),
+                        fetches.stream().map(this::fetchKey).toList());
                 if (supplemental.isBlank()) break;
+
+                accumulatedSupplemental = accumulatedSupplemental.isBlank()
+                        ? supplemental
+                        : accumulatedSupplemental + "\n\n" + supplemental;
                 String enrichedPrompt = prompt
-                        + "\n\n---\nNachgeladene Details (Runde " + (fetchRound + 1) + "):\n" + supplemental
-                        + "\n\n[Bitte beantworte die ursprüngliche Frage jetzt mit diesen Details.]";
+                        + "\n\n---\nNachgeladene Details (Runde " + (fetchRound + 1) + "):\n"
+                        + accumulatedSupplemental
+                        + "\n\n[Bitte beantworte die ursprüngliche Frage jetzt mit diesen Details. "
+                        + "Wenn wirklich noch etwas Entscheidendes fehlt, benenne es in 1 Satz und mach dann "
+                        + "höchstens einen weiteren konkreten <fetch>.]";
                 broadcaster.broadcastStatus(requestId, "THINKING", "Runde " + (fetchRound + 1), startNanos);
                 result = executeOrFail(
                         HostExecutionRequest.builder()
@@ -208,6 +232,16 @@ public class AssistantService {
             String finalOutput = extraction.cleanedResponse();
             // Strip leftover <fetch> tags
             finalOutput = fetchService.stripFetchTags(finalOutput);
+
+            // Fetch-exhaustion fallback: the model entered the fetch loop but never produced any
+            // text outside the <fetch> tags — covers both "hit MAX_FETCH_ROUNDS" and "broke out
+            // because the model repeated the same fetch". Give the user a concrete error instead
+            // of the silent "(Keine Antwort erhalten)" that the session log shows most often.
+            if ((finalOutput == null || finalOutput.isBlank()) && fetchLoopEntered) {
+                finalOutput = "Ich konnte die Frage mit bis zu " + MAX_FETCH_ROUNDS
+                        + " Daten-Abfragen nicht vollständig auflösen. "
+                        + "Bitte formuliere die Frage konkreter oder gib die relevante ID direkt an.";
+            }
 
             AssistantChatResponse parsed = parseResponse(finalOutput);
 
@@ -264,14 +298,34 @@ public class AssistantService {
                     "Das System ist gerade ausgelastet (Datenbank-Pool belegt). " +
                     "Warte einen Moment und versuche es erneut.");
         }
-        if (msg.toLowerCase().contains("provider") || msg.toLowerCase().contains("api key")) {
+        // JSON parse failures from tool-call extraction (e.g. Unicode full-width comma in the
+        // model's tool-JSON). Previously these surfaced as "Provider nicht konfiguriert",
+        // which sent users on a wild goose chase.
+        if (root instanceof JsonProcessingException
+                || msg.contains("Unexpected close marker")
+                || msg.contains("was expecting comma")
+                || msg.contains("Unexpected character")) {
+            return new ErrorKind("TOOL_CALL_MALFORMED",
+                    "Meine Tool-Eingabe war nicht valide (JSON-Fehler). " +
+                    "Formuliere die Anfrage einfacher oder ohne Sonderzeichen und versuche es erneut.");
+        }
+        if (msg.toLowerCase().contains("api key")) {
             return new ErrorKind("PROVIDER_UNAVAILABLE",
                     "Der KI-Provider ist nicht korrekt konfiguriert. " +
                     "Prüfe die Einstellungen (API-Key, Modell).");
         }
+        if (msg.contains("Assistant CLI failed (exit ")) {
+            // Surface the CLI exit code so debugging doesn't require digging through logs.
+            int excerptStart = msg.indexOf("(exit ");
+            int excerptEnd = Math.min(msg.length(), excerptStart + 60);
+            String excerpt = excerptStart >= 0 ? msg.substring(excerptStart, excerptEnd) : "";
+            return new ErrorKind("CLI_NON_ZERO_EXIT",
+                    "Der KI-Prozess endete mit einem Fehler " + excerpt + ". " +
+                    "Prüfe die API-Konfiguration; Details stehen im Server-Log.");
+        }
         return new ErrorKind("UNKNOWN",
                 "Entschuldigung, ich konnte deine Anfrage gerade nicht verarbeiten. " +
-                "Bitte versuche es erneut oder prüfe ob der KI-Provider konfiguriert ist.");
+                "Details stehen im Server-Log — bitte versuche es erneut.");
     }
 
     private Throwable unwrap(Throwable e) {
@@ -294,6 +348,10 @@ public class AssistantService {
 
     private boolean isAutoFetchAllowed(FetchRequest req) {
         return req != null && AUTO_FETCH_TYPES.contains(req.type());
+    }
+
+    private String fetchKey(FetchRequest req) {
+        return (req.type() == null ? "" : req.type()) + "|" + (req.id() == null ? "" : req.id());
     }
 
     /**
