@@ -27,5 +27,6 @@ public interface SkillMapper {
     @Mapping(target = "capabilities", ignore = true)
     @Mapping(target = "workflows", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
     Skill toEntity(CreateSkillRequest request);
 }
