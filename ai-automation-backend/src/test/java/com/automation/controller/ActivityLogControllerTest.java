@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -35,10 +35,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ActivityLogControllerTest {
 
     @Autowired private MockMvc mockMvc;
-    @MockBean private ActivityLogService activityLogService;
-    @MockBean private ActivityLogMapper activityLogMapper;
-    @MockBean private ApiKeyService apiKeyService;
-    @MockBean private RateLimitConfig rateLimitConfig;
+    @MockitoBean private ActivityLogService activityLogService;
+    @MockitoBean private ActivityLogMapper activityLogMapper;
+    @MockitoBean private ApiKeyService apiKeyService;
+    @MockitoBean private RateLimitConfig rateLimitConfig;
 
     @Test
     void getLogs_returnsPagedResults() throws Exception {

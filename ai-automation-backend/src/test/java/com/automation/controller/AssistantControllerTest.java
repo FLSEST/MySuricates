@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -39,25 +39,25 @@ class AssistantControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockBean
+    @MockitoBean
     private AssistantService assistantService;
-    @MockBean
+    @MockitoBean
     private AssistantSessionService assistantSessionService;
-    @MockBean
+    @MockitoBean
     private PageSuggestionService pageSuggestionService;
-    @MockBean
+    @MockitoBean
     private com.automation.service.assistant.AssistantChatBroadcaster broadcaster;
-    @MockBean
+    @MockitoBean
     private ApplicationEventPublisher eventPublisher;
-    @MockBean
+    @MockitoBean
     private ApiKeyService apiKeyService;
-    @MockBean
+    @MockitoBean
     private ActivityLogService activityLogService;
-    @MockBean
+    @MockitoBean
     private RateLimitConfig rateLimitConfig;
-    @MockBean
+    @MockitoBean
     private com.automation.service.assistant.PendingToolRegistry pendingToolRegistry;
-    @MockBean
+    @MockitoBean
     private com.automation.service.assistant.AssistantToolExecutor toolExecutor;
 
     @Test

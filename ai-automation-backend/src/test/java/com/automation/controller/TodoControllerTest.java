@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -41,15 +41,15 @@ class TodoControllerTest {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
-    @MockBean private TodoService todoService;
-    @MockBean
+    @MockitoBean private TodoService todoService;
+    @MockitoBean
     private ActivityLogService activityLogService;
 
-    @MockBean private TodoMapper todoMapper;
-    @MockBean private WorkflowMapper workflowMapper;
-    @MockBean private ApiKeyService apiKeyService;
-    @MockBean private TodoSimilarityService todoSimilarityService;
-    @MockBean private RateLimitConfig rateLimitConfig;
+    @MockitoBean private TodoMapper todoMapper;
+    @MockitoBean private WorkflowMapper workflowMapper;
+    @MockitoBean private ApiKeyService apiKeyService;
+    @MockitoBean private TodoSimilarityService todoSimilarityService;
+    @MockitoBean private RateLimitConfig rateLimitConfig;
 
     private TodoResponse sampleResponse() {
         return new TodoResponse("t-1", "Fix bug", "desc", Todo.Status.OPEN, Todo.Priority.HIGH,

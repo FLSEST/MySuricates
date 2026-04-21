@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -48,30 +48,30 @@ class ProjectControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockBean
+    @MockitoBean
     private ProjectService projectService;
-    @MockBean
+    @MockitoBean
     private ActivityLogService activityLogService;
 
 
-    @MockBean
+    @MockitoBean
     private WorkflowService workflowService;
 
-    @MockBean
+    @MockitoBean
     private ProjectContextService projectContextService;
 
-    @MockBean
+    @MockitoBean
     private ProjectOnboardingService projectOnboardingService;
 
-    @MockBean
+    @MockitoBean
     private ProjectMapper projectMapper;
 
-    @MockBean
+    @MockitoBean
     private WorkflowMapper workflowMapper;
 
-    @MockBean
+    @MockitoBean
     private ApiKeyService apiKeyService;
-    @MockBean
+    @MockitoBean
     private RateLimitConfig rateLimitConfig;
 
     private Project testProject;

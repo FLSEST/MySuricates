@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -47,26 +47,26 @@ class ExecutionControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private WorkflowExecutor workflowExecutor;
-    @MockBean
+    @MockitoBean
     private ActivityLogService activityLogService;
-    @MockBean
+    @MockitoBean
     private AutoTodoService autoTodoService;
-    @MockBean
+    @MockitoBean
     private WorkflowService workflowService;
-    @MockBean
+    @MockitoBean
     private WorkflowRunRepository workflowRunRepository;
 
-    @MockBean
+    @MockitoBean
     private ExecutionQueryService executionQueryService;
 
-    @MockBean
+    @MockitoBean
     private WorkflowMapper workflowMapper;
 
-    @MockBean
+    @MockitoBean
     private ApiKeyService apiKeyService;
-    @MockBean
+    @MockitoBean
     private RateLimitConfig rateLimitConfig;
 
     @Test

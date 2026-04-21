@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * {@code @Transactional(readOnly = true)} is accidentally removed from controller
  * methods that map entities to DTOs via MapStruct.
  *
- * <p>Unit tests with {@code @MockBean} do not catch these issues because the mapper
+ * <p>Unit tests with {@code @MockitoBean} do not catch these issues because the mapper
  * is mocked and never accesses real lazy associations.</p>
  */
 @SpringBootTest

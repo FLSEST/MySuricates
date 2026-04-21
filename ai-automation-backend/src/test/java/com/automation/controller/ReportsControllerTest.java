@@ -11,7 +11,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -29,10 +29,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ReportsControllerTest {
 
     @Autowired private MockMvc mockMvc;
-    @MockBean private ReportsConfig reportsConfig;
-    @MockBean private ApiKeyService apiKeyService;
-    @MockBean private ActivityLogService activityLogService;
-    @MockBean private RateLimitConfig rateLimitConfig;
+    @MockitoBean private ReportsConfig reportsConfig;
+    @MockitoBean private ApiKeyService apiKeyService;
+    @MockitoBean private ActivityLogService activityLogService;
+    @MockitoBean private RateLimitConfig rateLimitConfig;
 
     @TempDir
     Path tempDir;

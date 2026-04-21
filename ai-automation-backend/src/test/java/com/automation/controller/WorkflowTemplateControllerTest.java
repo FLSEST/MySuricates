@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -35,14 +35,14 @@ class WorkflowTemplateControllerTest {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
-    @MockBean private WorkflowTemplateService templateService;
-    @MockBean
+    @MockitoBean private WorkflowTemplateService templateService;
+    @MockitoBean
     private ActivityLogService activityLogService;
 
-    @MockBean private WorkflowTemplateMapper templateMapper;
-    @MockBean private TemplateVerificationService verificationService;
-    @MockBean private ApiKeyService apiKeyService;
-    @MockBean private RateLimitConfig rateLimitConfig;
+    @MockitoBean private WorkflowTemplateMapper templateMapper;
+    @MockitoBean private TemplateVerificationService verificationService;
+    @MockitoBean private ApiKeyService apiKeyService;
+    @MockitoBean private RateLimitConfig rateLimitConfig;
 
     private WorkflowTemplateResponse sampleResponse() {
         return new WorkflowTemplateResponse("t-1", Map.of("en", "Test"), Map.of("en", "Desc"),

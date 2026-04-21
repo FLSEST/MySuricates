@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -42,15 +42,15 @@ class ChainControllerTest {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
-    @MockBean private ChainService chainService;
-    @MockBean
+    @MockitoBean private ChainService chainService;
+    @MockitoBean
     private ActivityLogService activityLogService;
 
-    @MockBean private ChainExecutor chainExecutor;
-    @MockBean private ChainMapper chainMapper;
-    @MockBean private ChainRunRepository chainRunRepository;
-    @MockBean private ApiKeyService apiKeyService;
-    @MockBean private RateLimitConfig rateLimitConfig;
+    @MockitoBean private ChainExecutor chainExecutor;
+    @MockitoBean private ChainMapper chainMapper;
+    @MockitoBean private ChainRunRepository chainRunRepository;
+    @MockitoBean private ApiKeyService apiKeyService;
+    @MockitoBean private RateLimitConfig rateLimitConfig;
 
     private ChainResponse sampleChain() {
         return new ChainResponse("c-1", "My Chain", "desc", null, List.of(),

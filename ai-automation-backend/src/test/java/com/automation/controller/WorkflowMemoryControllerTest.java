@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -36,13 +36,13 @@ class WorkflowMemoryControllerTest {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
-    @MockBean private WorkflowMemoryService memoryService;
-    @MockBean
+    @MockitoBean private WorkflowMemoryService memoryService;
+    @MockitoBean
     private ActivityLogService activityLogService;
 
-    @MockBean private WorkflowMemoryMapper memoryMapper;
-    @MockBean private ApiKeyService apiKeyService;
-    @MockBean private RateLimitConfig rateLimitConfig;
+    @MockitoBean private WorkflowMemoryMapper memoryMapper;
+    @MockitoBean private ApiKeyService apiKeyService;
+    @MockitoBean private RateLimitConfig rateLimitConfig;
 
     private WorkflowMemoryResponse sampleResponse() {
         return new WorkflowMemoryResponse("m-1", "w-1", "Lesson learned", "Content",

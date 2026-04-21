@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -35,11 +35,11 @@ class CompletionTriggerControllerTest {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
-    @MockBean private CompletionTriggerService service;
-    @MockBean private CompletionTriggerMapper mapper;
-    @MockBean private ApiKeyService apiKeyService;
-    @MockBean private ActivityLogService activityLogService;
-    @MockBean private RateLimitConfig rateLimitConfig;
+    @MockitoBean private CompletionTriggerService service;
+    @MockitoBean private CompletionTriggerMapper mapper;
+    @MockitoBean private ApiKeyService apiKeyService;
+    @MockitoBean private ActivityLogService activityLogService;
+    @MockitoBean private RateLimitConfig rateLimitConfig;
 
     private static final Instant NOW = Instant.parse("2026-03-28T12:00:00Z");
 
