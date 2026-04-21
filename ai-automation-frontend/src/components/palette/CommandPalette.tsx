@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Search, Play, ExternalLink, Star, ArrowLeft } from 'lucide-react';
+import { Search, Play, ExternalLink, Star, ArrowLeft, RotateCw, X } from 'lucide-react';
 import { useExecuteWorkflow } from '../../hooks/useWorkflows';
 import { usePaletteHistory } from '../../hooks/usePaletteHistory';
 import { useT } from '../../i18n';
@@ -10,7 +10,8 @@ import { resolveContextId } from './resolveContext';
 import { useWorkflowContext } from './contexts/workflowContext';
 import { useRunContext } from './contexts/runContext';
 import { useProjectContext } from './contexts/projectContext';
-import type { PaletteContextHandle, PaletteItem, BadgeTone } from './contexts/types';
+import type { PaletteContextHandle, PaletteItem, BadgeTone, PaletteMatch, HighlightKey } from './contexts/types';
+import { parsePaletteQuery } from './queryParser';
 
 interface CollectingState {
   workflow: Workflow;
@@ -70,6 +71,10 @@ function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onC
 
   const debouncedQuery = useDebounced(query, 250);
 
+  // For run context we parse the query to show the status filter chip. Other contexts
+  // ignore slash-tokens; the parser returns null status and the chip is hidden.
+  const parsed = useMemo(() => parsePaletteQuery(query), [query]);
+
   const { items: results, loading } = context.useResults(debouncedQuery);
   const pinnedItems = context.useByIds(pins);
   const recentItems = context.useByIds(
@@ -102,6 +107,19 @@ function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onC
   const openItem = (item: PaletteItem) => {
     if (context.onOpen) context.onOpen(item, deps);
     else context.onEnter(item, deps);
+  };
+
+  const openItemInNewTab = (item: PaletteItem) => {
+    const path = context.getPath?.(item);
+    if (path) {
+      window.open(path, '_blank', 'noopener');
+    } else {
+      openItem(item);
+    }
+  };
+
+  const runAltAction = (item: PaletteItem) => {
+    context.altAction?.run(item, deps);
   };
 
   const enterItem = (item: PaletteItem) => {
@@ -155,9 +173,19 @@ function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onC
         e.preventDefault();
         const item = itemAt(selectedIdx);
         if (item) {
-          if (e.shiftKey) openItem(item);
+          if (e.metaKey || e.ctrlKey) openItemInNewTab(item);
+          else if (e.shiftKey) openItem(item);
           else enterItem(item);
         }
+      } else if (
+        context.altAction &&
+        e.altKey &&
+        e.key.toLowerCase() === context.altAction.shortcut
+      ) {
+        // Alt+<shortcut> fires even when the search input is focused. For runContext: Alt+R = Re-Run.
+        e.preventDefault();
+        const item = itemAt(selectedIdx);
+        if (item) runAltAction(item);
       }
     };
     window.addEventListener('keydown', handleKey);
@@ -187,6 +215,17 @@ function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onC
           <>
             <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
               <Search className="w-4 h-4 text-text-tertiary shrink-0" />
+              {context.id === 'run' && parsed.status && (
+                <button
+                  type="button"
+                  onClick={() => setQuery(parsed.query)}
+                  className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-sm bg-accent/15 text-accent shrink-0"
+                  title={t.commandPalette.filterChipRemove}
+                >
+                  {t.commandPalette.filterChipStatus}: {parsed.status.toLowerCase()}
+                  <X className="w-3 h-3" />
+                </button>
+              )}
               <input
                 ref={inputRef}
                 type="text"
@@ -220,6 +259,7 @@ function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onC
                       onOpen={() => openItem(item)}
                       onTogglePin={() => togglePin(item.id)}
                       t={t}
+                      altAction={context.altAction ? { label: context.altAction.label, shortcut: context.altAction.shortcut, run: () => runAltAction(item) } : undefined}
                     />
                   ))}
                 </Section>
@@ -240,6 +280,7 @@ function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onC
                         onOpen={() => openItem(item)}
                         onTogglePin={() => togglePin(item.id)}
                         t={t}
+                      altAction={context.altAction ? { label: context.altAction.label, shortcut: context.altAction.shortcut, run: () => runAltAction(item) } : undefined}
                       />
                     );
                   })}
@@ -259,6 +300,7 @@ function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onC
                       onOpen={() => openItem(item)}
                       onTogglePin={() => togglePin(item.id)}
                       t={t}
+                      altAction={context.altAction ? { label: context.altAction.label, shortcut: context.altAction.shortcut, run: () => runAltAction(item) } : undefined}
                     />
                   ))}
                 </div>
@@ -312,10 +354,35 @@ interface PaletteRowProps {
   onRun: () => void;
   onOpen: () => void;
   onTogglePin: () => void;
+  altAction?: {
+    label: string;
+    shortcut: string;
+    run: () => void;
+  };
   t: ReturnType<typeof useT>;
 }
 
-function PaletteRow({ item, selected, pinned, onHover, onRun, onOpen, onTogglePin, t }: PaletteRowProps) {
+function renderHighlighted(text: string, matches: PaletteMatch[] | undefined, key: HighlightKey): React.ReactNode {
+  if (!text) return text;
+  const ranges = matches?.filter((m) => m.key === key).flatMap((m) => m.indices) ?? [];
+  if (ranges.length === 0) return text;
+  const sorted = [...ranges].sort((a, b) => a[0] - b[0]);
+  const out: React.ReactNode[] = [];
+  let cursor = 0;
+  sorted.forEach(([start, end], i) => {
+    if (start > cursor) out.push(text.slice(cursor, start));
+    out.push(
+      <span key={`h${i}`} className="font-semibold text-accent">
+        {text.slice(start, end + 1)}
+      </span>,
+    );
+    cursor = end + 1;
+  });
+  if (cursor < text.length) out.push(text.slice(cursor));
+  return out;
+}
+
+function PaletteRow({ item, selected, pinned, onHover, onRun, onOpen, onTogglePin, altAction, t }: PaletteRowProps) {
   return (
     <div
       onMouseEnter={onHover}
@@ -328,9 +395,11 @@ function PaletteRow({ item, selected, pinned, onHover, onRun, onOpen, onTogglePi
         <WorkflowIcon icon={item.icon ?? null} className="w-4 h-4" />
       </span>
       <div className="flex-1 min-w-0">
-        <div className="text-sm text-text truncate">{item.title}</div>
+        <div className="text-sm text-text truncate">{renderHighlighted(item.title, item.matches, 'title')}</div>
         {item.subtitle && (
-          <div className="text-xs text-text-tertiary truncate">{item.subtitle}</div>
+          <div className="text-xs text-text-tertiary truncate">
+            {renderHighlighted(item.subtitle, item.matches, 'subtitle')}
+          </div>
         )}
       </div>
       {item.badge && (
@@ -348,6 +417,16 @@ function PaletteRow({ item, selected, pinned, onHover, onRun, onOpen, onTogglePi
       >
         <Star className={`w-3.5 h-3.5 ${pinned ? 'fill-current' : ''}`} />
       </button>
+      {altAction && (
+        <button
+          onClick={(e) => { e.stopPropagation(); altAction.run(); }}
+          className="p-1 rounded-sm hover:bg-warning/20 text-warning"
+          title={`${altAction.label} (Alt+${altAction.shortcut.toUpperCase()})`}
+          aria-label={altAction.label}
+        >
+          <RotateCw className="w-3.5 h-3.5" />
+        </button>
+      )}
       <button
         onClick={(e) => { e.stopPropagation(); onOpen(); }}
         className="p-1 rounded-sm hover:bg-surface text-text-tertiary hover:text-text"

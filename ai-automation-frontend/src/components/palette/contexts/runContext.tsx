@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
-import { useAllRuns } from '../../../hooks/useWorkflows';
+import { useAllRuns, useRetryExecution } from '../../../hooks/useWorkflows';
 import { useT } from '../../../i18n';
 import { runStatusBadge } from '../../../utils/statusBadge';
 import type { WorkflowRun } from '../../../types';
+import { parsePaletteQuery } from '../queryParser';
 import type { PaletteContextHandle, PaletteItem } from './types';
 
 function toItem(run: WorkflowRun): PaletteItem {
@@ -17,11 +18,13 @@ function toItem(run: WorkflowRun): PaletteItem {
 
 export function useRunContext(): PaletteContextHandle {
   const t = useT();
+  const retry = useRetryExecution();
 
   const useResults = (query: string) => {
-    const q = query.trim();
+    const parsed = parsePaletteQuery(query);
     const { data, isLoading } = useAllRuns({
-      search: q || undefined,
+      search: parsed.query || undefined,
+      status: parsed.status ?? undefined,
       size: 20,
       page: 0,
     });
@@ -29,8 +32,8 @@ export function useRunContext(): PaletteContextHandle {
     return { items, loading: isLoading };
   };
 
-  // Pins/Recents for runs are intentionally empty in MVP — runs are mostly one-off;
-  // individual run rehydration would require a separate fetch-by-id hook.
+  // Pins/Recents for runs intentionally return empty in MVP; rehydrating a run by id
+  // would require a separate fetch-by-id hook that doesn't exist today.
   const useByIds = (): PaletteItem[] => [];
 
   return {
@@ -46,6 +49,28 @@ export function useRunContext(): PaletteContextHandle {
       const run = item.raw as WorkflowRun;
       onClose();
       navigate(`/workflows/${run.workflowId}/run/${run.id}`);
+    },
+    getPath: (item) => {
+      const run = item.raw as WorkflowRun;
+      return `/workflows/${run.workflowId}/run/${run.id}`;
+    },
+    altAction: {
+      icon: 'rotate-cw',
+      label: t.commandPalette.rerunHint,
+      shortcut: 'r',
+      run: (item, { navigate, onClose }) => {
+        const run = item.raw as WorkflowRun;
+        retry.mutate(run.id, {
+          onSuccess: (newRun) => {
+            onClose();
+            if (newRun?.id && newRun?.workflowId) {
+              navigate(`/workflows/${newRun.workflowId}/run/${newRun.id}`);
+            } else {
+              navigate(`/workflows/${run.workflowId}/run/${run.id}`);
+            }
+          },
+        });
+      },
     },
   };
 }

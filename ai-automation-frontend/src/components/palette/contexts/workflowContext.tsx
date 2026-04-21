@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import Fuse, { type FuseResultMatch } from 'fuse.js';
 import { api } from '../../../api/client';
 import { useWorkflows, useExecuteWorkflow } from '../../../hooks/useWorkflows';
 import { extractWorkflowVariables } from '../../../utils/extractWorkflowVariables';
 import { useT } from '../../../i18n';
 import type { Workflow } from '../../../types';
-import type { PaletteContextHandle, PaletteItem, ActionDeps } from './types';
+import type { PaletteContextHandle, PaletteItem, PaletteMatch, HighlightKey } from './types';
 
 interface SemanticHit {
   workflowId: string;
@@ -14,36 +15,47 @@ interface SemanticHit {
   score: number;
 }
 
-function rankLocal(workflows: Workflow[], q: string): Workflow[] {
-  const query = q.toLowerCase().trim();
-  if (!query) return [];
-  return workflows
-    .map((w) => {
-      let score = 0;
-      const name = w.name.toLowerCase();
-      const desc = (w.description ?? '').toLowerCase();
-      const cat = (w.category ?? '').toLowerCase();
-      const tags = (w.tags ?? []).join(' ').toLowerCase();
-      if (name === query) score += 10;
-      if (name.startsWith(query)) score += 5;
-      if (name.includes(query)) score += 3;
-      if (desc.includes(query)) score += 1.5;
-      if (tags.includes(query)) score += 2;
-      if (cat.includes(query)) score += 1;
-      return { w, score };
-    })
-    .filter((s) => s.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 10)
-    .map((s) => s.w);
+interface WorkflowWithSearchable extends Workflow {
+  _tagsJoined: string;
 }
 
-function toItem(w: Workflow, subtitleOverride?: string): PaletteItem {
+const FUSE_OPTIONS = {
+  includeMatches: true,
+  ignoreLocation: true,
+  threshold: 0.35,
+  minMatchCharLength: 2,
+  keys: [
+    { name: 'name', weight: 3 },
+    { name: 'description', weight: 1.5 },
+    { name: '_tagsJoined', weight: 2 },
+    { name: 'category', weight: 1 },
+  ],
+};
+
+function mapFuseMatches(matches: readonly FuseResultMatch[] | undefined): PaletteMatch[] {
+  if (!matches) return [];
+  const out: PaletteMatch[] = [];
+  for (const m of matches) {
+    let key: HighlightKey | null = null;
+    if (m.key === 'name') key = 'title';
+    else if (m.key === 'description') key = 'subtitle';
+    // tags and category don't map to title/subtitle; skip visual highlighting for those
+    if (!key || !m.indices?.length) continue;
+    out.push({
+      key,
+      indices: m.indices.map(([a, b]) => [a, b] as [number, number]),
+    });
+  }
+  return out;
+}
+
+function toItem(w: Workflow, subtitleOverride?: string, matches?: PaletteMatch[]): PaletteItem {
   return {
     id: w.id,
     title: w.name,
     subtitle: subtitleOverride ?? w.description ?? undefined,
     icon: w.icon,
+    matches,
     raw: w,
   };
 }
@@ -53,9 +65,15 @@ export function useWorkflowContext(): PaletteContextHandle {
   const { data: workflows = [] } = useWorkflows();
   const executeWorkflow = useExecuteWorkflow();
 
+  const searchable: WorkflowWithSearchable[] = useMemo(
+    () => workflows.map((w) => ({ ...w, _tagsJoined: (w.tags ?? []).join(' ') })),
+    [workflows],
+  );
+  const fuse = useMemo(() => new Fuse(searchable, FUSE_OPTIONS), [searchable]);
+
   const useResults = (query: string) => {
     const q = query.trim();
-    const localMatches = useMemo(() => rankLocal(workflows, q), [q]); // eslint-disable-line react-hooks/exhaustive-deps
+    const localMatches = useMemo(() => (q ? fuse.search(q).slice(0, 10) : []), [q]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const semantic = useQuery({
       queryKey: ['search', 'semantic', q],
@@ -66,7 +84,8 @@ export function useWorkflowContext(): PaletteContextHandle {
     });
 
     const items = useMemo(() => {
-      const localIds = new Set(localMatches.map((w) => w.id));
+      const localIds = new Set(localMatches.map((r) => r.item.id));
+      const localItems = localMatches.map((r) => toItem(r.item, undefined, mapFuseMatches(r.matches)));
       const semanticItems = (semantic.data ?? [])
         .filter((h) => !localIds.has(h.workflowId))
         .map((h) => {
@@ -74,22 +93,15 @@ export function useWorkflowContext(): PaletteContextHandle {
           return w ? toItem(w, h.reason) : null;
         })
         .filter((i): i is PaletteItem => i !== null);
-      return [...localMatches.map((w) => toItem(w)), ...semanticItems];
+      return [...localItems, ...semanticItems];
     }, [localMatches, semantic.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
     return { items, loading: semantic.isLoading };
   };
 
   const useByIds = (ids: string[]): PaletteItem[] => {
-    const set = new Set(ids);
     const byId = new Map(workflows.map((w) => [w.id, w]));
-    return ids.map((id) => byId.get(id)).filter((w): w is Workflow => !!w && set.has(w.id)).map((w) => toItem(w));
-  };
-
-  const onEnter = (item: PaletteItem, deps: ActionDeps) => {
-    // handled by onBeforeEnter (variable collection), see CommandPalette wiring.
-    void item;
-    void deps;
+    return ids.map((id) => byId.get(id)).filter((w): w is Workflow => !!w).map((w) => toItem(w));
   };
 
   return {
@@ -101,11 +113,12 @@ export function useWorkflowContext(): PaletteContextHandle {
     },
     useResults,
     useByIds,
-    onEnter,
+    onEnter: () => { /* handled via onBeforeEnter */ },
     onOpen: (item, { navigate, onClose }) => {
       onClose();
       navigate(`/workflows/${item.id}`);
     },
+    getPath: (item) => `/workflows/${item.id}`,
     onBeforeEnter: (item, deps, showCollector) => {
       const w = item.raw as Workflow;
       const variables = extractWorkflowVariables(w.blocks);
@@ -116,7 +129,7 @@ export function useWorkflowContext(): PaletteContextHandle {
           defaults[v] = typeof ctx[v] === 'string' ? (ctx[v] as string) : '';
         }
         showCollector(w, variables, defaults);
-        return true; // intercept
+        return true;
       }
       executeWorkflow.mutate(
         { id: w.id },

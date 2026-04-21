@@ -228,7 +228,7 @@ export function useRetryExecution() {
   const toast = useToast();
   const t = useT();
   return useMutation({
-    mutationFn: (runId: string) => api.post(`/executions/${runId}/retry`),
+    mutationFn: (runId: string) => api.post<WorkflowRun>(`/executions/${runId}/retry`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['runs'] });
       qc.invalidateQueries({ queryKey: ['workflows'] });

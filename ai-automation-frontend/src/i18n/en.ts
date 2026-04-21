@@ -1442,6 +1442,9 @@ export const en = {
     collectVariablesHeader: 'Inputs for workflow',
     collectStart: 'Run',
     collectCancel: 'Back',
+    rerunHint: 'Re-run with the same inputs',
+    filterChipStatus: 'Status',
+    filterChipRemove: 'Remove filter',
     contexts: {
       workflow: {
         triggerLabel: 'Search or run workflow…',

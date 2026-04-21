@@ -1439,6 +1439,9 @@ export const de: TranslationKeys = {
     collectVariablesHeader: 'Eingaben für Workflow',
     collectStart: 'Starten',
     collectCancel: 'Zurück',
+    rerunHint: 'Erneut mit denselben Eingaben starten',
+    filterChipStatus: 'Status',
+    filterChipRemove: 'Filter entfernen',
     contexts: {
       workflow: {
         triggerLabel: 'Workflow suchen oder starten…',
