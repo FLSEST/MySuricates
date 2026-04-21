@@ -28,6 +28,7 @@ logs/
 *.log
 
 ### Maven ###
-.mvn/
+.mvn/*
+!.mvn/jvm.config
 mvnw
 mvnw.cmd
