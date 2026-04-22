@@ -26,6 +26,7 @@ services:
       - ${HOME}/.local/bin:${HOME}/.local/bin:ro
       - ${HOME}/.claude:${HOME}/.claude
       - ${HOME}/Entwicklung:${HOME}/Entwicklung
+      - ${HOME}/dokumente:${HOME}/dokumente
       - ${HOME}/.autotrigger/backups/stable:/host-backups/stable
     restart: unless-stopped
 
