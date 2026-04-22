@@ -40,6 +40,9 @@ class CommandExecutorServiceTest {
     private ShellCommandService shellCommandService;
 
     @Mock
+    private ContainerShellService containerShellService;
+
+    @Mock
     private AiProviderRegistry aiProviderRegistry;
 
     @Mock
@@ -49,7 +52,7 @@ class CommandExecutorServiceTest {
 
     @BeforeEach
     void setUp() throws IOException {
-        commandExecutorService = new CommandExecutorService(sessionManager, shellCommandService, aiProviderRegistry);
+        commandExecutorService = new CommandExecutorService(sessionManager, shellCommandService, containerShellService, aiProviderRegistry);
         lenient().when(sessionManager.getOrCreateSession(anyString(), anyString())).thenReturn(cliSession);
         lenient().when(aiProviderRegistry.resolve(any())).thenReturn(aiProvider);
     }
@@ -416,5 +419,71 @@ class CommandExecutorServiceTest {
         commandExecutorService.writeSkillContextToProject(tempDir.toString(), List.of(blank));
 
         assertThat(contextFile).doesNotExist();
+    }
+
+    @Test
+    void executeStepAsShell_withoutContainerImage_runsOnHostShell() {
+        when(shellCommandService.execute(eq("echo hi"), eq("/proj"), eq(30)))
+                .thenReturn(new ShellCommandService.ShellResult("hi", 0, 5L));
+        BlockDefinition block = BlockDefinition.builder().type("shell")
+                .config(Map.of("command", "echo hi")).build();
+
+        StepResult result = commandExecutorService.executeStepAsShell("/proj", block, 0, 30);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getOutput()).isEqualTo("hi");
+        assertThat(result.getMetadata()).containsEntry("executionMode", "shell");
+        verify(containerShellService, never()).execute(any(), any(), anyInt(), any(), anyBoolean(), any());
+    }
+
+    @Test
+    void executeStepAsShell_withContainerImage_delegatesToContainerShellService() {
+        when(containerShellService.execute(
+                eq("mvn -v"), eq("/proj"), eq(120),
+                eq("automation-agent-java:latest"), eq(false),
+                eq(List.of("/host:/container:rw"))))
+                .thenReturn(new ShellCommandService.ShellResult("Maven 3.6.3", 0, 800L));
+        BlockDefinition block = BlockDefinition.builder().type("shell")
+                .config(Map.of(
+                        "command", "mvn -v",
+                        "container_image", "automation-agent-java:latest",
+                        "mounts", List.of("/host:/container:rw")
+                )).build();
+
+        StepResult result = commandExecutorService.executeStepAsShell("/proj", block, 0, 120);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getOutput()).isEqualTo("Maven 3.6.3");
+        assertThat(result.getMetadata()).containsEntry("executionMode", "container:automation-agent-java:latest");
+        verify(shellCommandService, never()).execute(any(), any(), anyInt());
+    }
+
+    @Test
+    void buildResolvedShellBlock_preservesContainerImage_andResolvesMountTemplates() {
+        var context = com.automation.executor.ExecutionContext.builder().build();
+        context.setVariable("home_dir", "/home/testuser");
+        Map<String, Object> originalConfig = Map.of(
+                "command", "irrelevant",
+                "container_image", "automation-agent-java:latest",
+                "mount_docker_socket", Boolean.FALSE,
+                "mounts", List.of(
+                        "{{ home_dir }}/dokumente:{{ home_dir }}/dokumente:rw",
+                        "/etc/timezone:/etc/timezone:ro"
+                )
+        );
+
+        BlockDefinition resolved = CommandExecutorService.buildResolvedShellBlock(
+                originalConfig, "mvn clean compile", context);
+
+        assertThat(resolved.getType()).isEqualTo("shell");
+        assertThat(resolved.getConfig()).containsEntry("command", "mvn clean compile");
+        assertThat(resolved.getConfig()).containsEntry("container_image", "automation-agent-java:latest");
+        assertThat(resolved.getConfig()).containsEntry("mount_docker_socket", Boolean.FALSE);
+        @SuppressWarnings("unchecked")
+        List<String> mounts = (List<String>) resolved.getConfig().get("mounts");
+        assertThat(mounts).containsExactly(
+                "/home/testuser/dokumente:/home/testuser/dokumente:rw",
+                "/etc/timezone:/etc/timezone:ro"
+        );
     }
 }

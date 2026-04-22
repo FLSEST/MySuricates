@@ -1,0 +1,21 @@
+FROM eclipse-temurin:21-jdk-jammy
+
+# Create generic agent user - UID is overridden at runtime via --user
+RUN useradd -m -u 1000 agent
+
+# Base tools + Maven
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      maven git curl jq bash python3 ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+# Prepare home directories (m2 cache writable by any runtime UID)
+RUN mkdir -p /home/agent/.m2 /home/agent/.cache /home/agent/.config && \
+    chown -R agent:agent /home/agent && \
+    chmod -R a+rwX /home/agent
+
+ENV HOME="/home/agent"
+
+USER agent
+WORKDIR /workspace
+
+CMD ["tail", "-f", "/dev/null"]

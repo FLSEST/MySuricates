@@ -215,6 +215,10 @@ public class WorkflowExecutor {
             context.setVariable("model", model != null ? model : "");
             context.setVariable("provider", provider != null ? provider : "");
             context.setVariable("started_at", java.time.Instant.now().toString());
+            // Host/user metadata so workflow configs can stay user-agnostic
+            // (e.g. "mounts": ["{{ home_dir }}/dokumente:{{ home_dir }}/dokumente:rw"])
+            context.setVariable("home_dir", System.getProperty("user.home", ""));
+            context.setVariable("user", System.getProperty("user.name", ""));
 
             // Inject workflow version info for delta-based quality workflows
             int versionCount = workflowVersionService.getVersionCount(workflowId);

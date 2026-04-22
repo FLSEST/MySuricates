@@ -192,10 +192,7 @@ public class SwitchBlockExecutor implements BlockExecutor {
         if (isShell) {
             return commandExecutor.executeStepAsShell(
                     context.getProjectPath(),
-                    BlockDefinition.builder()
-                            .type("shell")
-                            .config(Map.of("command", command))
-                            .build(),
+                    CommandExecutorService.buildResolvedShellBlock(nestedConfig, command, context),
                     context.nextStepIndex(),
                     shellTimeout
             );

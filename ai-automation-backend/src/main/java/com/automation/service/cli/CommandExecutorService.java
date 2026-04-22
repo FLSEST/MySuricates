@@ -27,6 +27,7 @@ public class CommandExecutorService {
 
     private final CliSessionManager sessionManager;
     private final ShellCommandService shellCommandService;
+    private final ContainerShellService containerShellService;
     private final AiProviderRegistry aiProviderRegistry;
 
     public CliSession.CommandResult executeCommand(String containerId, String cliType, String command) {
@@ -262,15 +263,77 @@ public class CommandExecutorService {
         step.setInput(command);
         step.setStatus(StepStatus.RUNNING);
 
-        ShellResult result = shellCommandService.execute(command, projectPath, timeoutSeconds);
+        Map<String, Object> config = block.getConfig();
+        String containerImage = config.get("container_image") instanceof String s ? s : null;
+
+        ShellResult result;
+        String executionMode;
+        if (containerImage != null && !containerImage.isBlank()) {
+            boolean mountDockerSocket = Boolean.TRUE.equals(config.get("mount_docker_socket"));
+            List<String> extraMounts = extractResolvedMounts(config.get("mounts"));
+            result = containerShellService.execute(command, projectPath, timeoutSeconds,
+                    containerImage, mountDockerSocket, extraMounts);
+            executionMode = "container:" + containerImage;
+        } else {
+            result = shellCommandService.execute(command, projectPath, timeoutSeconds);
+            executionMode = "shell";
+        }
+
         step.setOutput(result.output());
         step.setStatus(result.exitCode() == 0 ? StepStatus.COMPLETED : StepStatus.FAILED);
-        step.setMetadata(Map.of("exitCode", result.exitCode(), "executionMode", "shell"));
+        step.setMetadata(Map.of("exitCode", result.exitCode(), "executionMode", executionMode));
 
         step.setCompletedAt(Instant.now());
         step.setDurationMs(result.durationMs());
 
         return step;
+    }
+
+    /**
+     * Expects callers to have already resolved templates in mount strings via
+     * context.resolveTemplate(). This method just does type-coercion and blank-filtering.
+     */
+    private static List<String> extractResolvedMounts(Object raw) {
+        if (!(raw instanceof List<?> list) || list.isEmpty()) return List.of();
+        List<String> out = new java.util.ArrayList<>(list.size());
+        for (Object e : list) {
+            if (e == null) continue;
+            String s = e.toString();
+            if (!s.isBlank()) out.add(s);
+        }
+        return out;
+    }
+
+    /**
+     * Builds a fresh shell BlockDefinition from an originating block's config, preserving
+     * container_image / mount_docker_socket and template-resolving the `mounts` list against
+     * the given context. Used by wrapper blocks (retry, foreach, while, switch) so that the
+     * inner shell execution keeps container settings instead of silently falling back to host.
+     */
+    public static BlockDefinition buildResolvedShellBlock(
+            Map<String, Object> originalConfig, String resolvedCommand,
+            com.automation.executor.ExecutionContext context) {
+        Map<String, Object> cfg = new java.util.LinkedHashMap<>();
+        cfg.put("command", resolvedCommand);
+        Object ci = originalConfig.get("container_image");
+        if (ci instanceof String s && !s.isBlank()) {
+            cfg.put("container_image", s);
+        }
+        Object mds = originalConfig.get("mount_docker_socket");
+        if (mds != null) {
+            cfg.put("mount_docker_socket", mds);
+        }
+        Object rawMounts = originalConfig.get("mounts");
+        if (rawMounts instanceof List<?> list && !list.isEmpty()) {
+            List<String> resolved = new java.util.ArrayList<>(list.size());
+            for (Object e : list) {
+                if (e == null) continue;
+                String m = e.toString();
+                if (!m.isBlank()) resolved.add(context.resolveTemplate(m));
+            }
+            if (!resolved.isEmpty()) cfg.put("mounts", resolved);
+        }
+        return BlockDefinition.builder().type("shell").config(cfg).build();
     }
 
     public CliSession.CommandResult executeShellCommandOnHost(String projectPath, String command, int timeoutSeconds) {

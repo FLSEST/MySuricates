@@ -79,10 +79,7 @@ public class WhileBlockExecutor implements BlockExecutor {
             if (isShell) {
                 stepResult = commandExecutor.executeStepAsShell(
                         context.getProjectPath(),
-                        BlockDefinition.builder()
-                                .type("shell")
-                                .config(Map.of("command", resolvedCommand))
-                                .build(),
+                        CommandExecutorService.buildResolvedShellBlock(config, resolvedCommand, context),
                         context.nextStepIndex(),
                         shellTimeout
                 );

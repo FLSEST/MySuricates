@@ -67,10 +67,10 @@ class ContainerShellServiceTest {
         // Use reflection to call private method
         try {
             var method = ContainerShellService.class.getDeclaredMethod(
-                    "buildDockerCommand", String.class, String.class, String.class, boolean.class);
+                    "buildDockerCommand", String.class, String.class, String.class, boolean.class, List.class);
             method.setAccessible(true);
             @SuppressWarnings("unchecked")
-            List<String> cmd = (List<String>) method.invoke(service, "echo hi", "/my/project", "img:latest", false);
+            List<String> cmd = (List<String>) method.invoke(service, "echo hi", "/my/project", "img:latest", false, List.of());
 
             assertThat(cmd).contains("docker", "run", "--rm");
             assertThat(cmd).contains("--user", "1000");
@@ -91,10 +91,10 @@ class ContainerShellServiceTest {
 
         try {
             var method = ContainerShellService.class.getDeclaredMethod(
-                    "buildDockerCommand", String.class, String.class, String.class, boolean.class);
+                    "buildDockerCommand", String.class, String.class, String.class, boolean.class, List.class);
             method.setAccessible(true);
             @SuppressWarnings("unchecked")
-            List<String> cmd = (List<String>) method.invoke(service, "cmd", "/tmp", "img:latest", true);
+            List<String> cmd = (List<String>) method.invoke(service, "cmd", "/tmp", "img:latest", true, List.of());
 
             assertThat(cmd).contains("/var/run/docker.sock:/var/run/docker.sock");
         } catch (Exception e) {
@@ -108,13 +108,56 @@ class ContainerShellServiceTest {
 
         try {
             var method = ContainerShellService.class.getDeclaredMethod(
-                    "buildDockerCommand", String.class, String.class, String.class, boolean.class);
+                    "buildDockerCommand", String.class, String.class, String.class, boolean.class, List.class);
             method.setAccessible(true);
             @SuppressWarnings("unchecked")
-            List<String> cmd = (List<String>) method.invoke(service, "cmd", null, "img:latest", false);
+            List<String> cmd = (List<String>) method.invoke(service, "cmd", null, "img:latest", false, List.of());
 
             // Should not contain a project volume mount
             assertThat(cmd.stream().filter(s -> s.contains(":/workspace")).count()).isEqualTo(0);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Test
+    void buildDockerCommand_withExtraMounts_addsAllBindMounts() {
+        when(hostProcessUtils.getHostUid()).thenReturn("1000");
+        try {
+            var method = ContainerShellService.class.getDeclaredMethod(
+                    "buildDockerCommand", String.class, String.class, String.class, boolean.class, List.class);
+            method.setAccessible(true);
+            List<String> extras = List.of(
+                    "/home/flo/dokumente:/home/flo/dokumente:rw",
+                    "/etc/timezone:/etc/timezone:ro"
+            );
+            @SuppressWarnings("unchecked")
+            List<String> cmd = (List<String>) method.invoke(service, "cmd", "/p", "img:latest", false, extras);
+
+            assertThat(cmd).contains("/home/flo/dokumente:/home/flo/dokumente:rw");
+            assertThat(cmd).contains("/etc/timezone:/etc/timezone:ro");
+            // Extra mounts are separate -v flags, so there are 3 total (project + 2 extras)
+            assertThat(cmd.stream().filter("-v"::equals).count()).isEqualTo(3);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Test
+    void buildDockerCommand_emptyOrNullMounts_addsNothing() {
+        when(hostProcessUtils.getHostUid()).thenReturn("1000");
+        try {
+            var method = ContainerShellService.class.getDeclaredMethod(
+                    "buildDockerCommand", String.class, String.class, String.class, boolean.class, List.class);
+            method.setAccessible(true);
+
+            @SuppressWarnings("unchecked")
+            List<String> cmdEmpty = (List<String>) method.invoke(service, "cmd", "/p", "img:latest", false, List.of());
+            assertThat(cmdEmpty.stream().filter("-v"::equals).count()).isEqualTo(1); // only project mount
+
+            @SuppressWarnings("unchecked")
+            List<String> cmdNull = (List<String>) method.invoke(service, "cmd", "/p", "img:latest", false, null);
+            assertThat(cmdNull.stream().filter("-v"::equals).count()).isEqualTo(1);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

@@ -60,10 +60,7 @@ public class RetryBlockExecutor implements BlockExecutor {
             if (isShell) {
                 lastResult = commandExecutor.executeStepAsShell(
                         context.getProjectPath(),
-                        BlockDefinition.builder()
-                                .type("shell")
-                                .config(Map.of("command", command))
-                                .build(),
+                        CommandExecutorService.buildResolvedShellBlock(config, command, context),
                         context.nextStepIndex(),
                         shellTimeout
                 );

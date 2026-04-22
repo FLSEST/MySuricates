@@ -42,6 +42,18 @@ public class ContainerShellService {
      */
     public ShellResult execute(String command, String projectPath, int timeoutSeconds,
                                String containerImage, boolean mountDockerSocket) {
+        return execute(command, projectPath, timeoutSeconds, containerImage, mountDockerSocket, List.of());
+    }
+
+    /**
+     * Execute a command inside an ephemeral container with additional bind-mounts.
+     *
+     * @param extraMounts  Extra bind-mounts in docker-volume syntax "host:container[:ro|rw]".
+     *                     Template variables must already be resolved by the caller.
+     */
+    public ShellResult execute(String command, String projectPath, int timeoutSeconds,
+                               String containerImage, boolean mountDockerSocket,
+                               List<String> extraMounts) {
         long start = System.currentTimeMillis();
 
         boolean effectiveMount = mountDockerSocket && allowDockerSocketMount;
@@ -57,7 +69,7 @@ public class ContainerShellService {
                     "ContainerShellService", null);
         }
 
-        List<String> dockerCmd = buildDockerCommand(command, projectPath, containerImage, effectiveMount);
+        List<String> dockerCmd = buildDockerCommand(command, projectPath, containerImage, effectiveMount, extraMounts);
 
         log.debug("Container shell execute (image: {}, workDir: {}, timeout: {}s): {}",
                 containerImage, projectPath, timeoutSeconds,
@@ -111,7 +123,8 @@ public class ContainerShellService {
     }
 
     private List<String> buildDockerCommand(String command, String projectPath,
-                                            String containerImage, boolean mountDockerSocket) {
+                                            String containerImage, boolean mountDockerSocket,
+                                            List<String> extraMounts) {
         List<String> cmd = new ArrayList<>();
         cmd.add("docker");
         cmd.add("run");
@@ -134,6 +147,15 @@ public class ContainerShellService {
         if (mountDockerSocket) {
             cmd.add("-v");
             cmd.add("/var/run/docker.sock:/var/run/docker.sock");
+        }
+
+        // Extra bind-mounts from block config (already template-resolved by caller)
+        if (extraMounts != null) {
+            for (String mount : extraMounts) {
+                if (mount == null || mount.isBlank()) continue;
+                cmd.add("-v");
+                cmd.add(mount);
+            }
         }
 
         // Security hardening

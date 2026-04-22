@@ -10,7 +10,18 @@ RUN apt-get update && \
       curl git gosu \
       python3 jq \
       nodejs npm \
-      wget unzip && \
+      wget unzip ca-certificates gnupg && \
+    rm -rf /var/lib/apt/lists/*
+
+# Docker CE CLI so the backend can spawn ephemeral per-block containers via
+# ContainerShellService (container_image in shell/retry/foreach/while/switch blocks).
+# The docker daemon lives on the host; we just need the client binary + socket mount.
+RUN install -m 0755 -d /etc/apt/keyrings && \
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc && \
+    chmod a+r /etc/apt/keyrings/docker.asc && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu jammy stable" \
+      > /etc/apt/sources.list.d/docker.list && \
+    apt-get update && apt-get install -y --no-install-recommends docker-ce-cli && \
     rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -g ${HOST_GID} ${HOST_USER} && \

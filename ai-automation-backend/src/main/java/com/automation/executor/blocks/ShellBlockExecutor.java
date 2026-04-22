@@ -13,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import static com.automation.config.ExecutionDefaults.SHELL_TIMEOUT_SECONDS;
@@ -46,13 +48,14 @@ public class ShellBlockExecutor implements BlockExecutor {
 
         String containerImage = config.get("container_image") instanceof String s ? s : null;
         boolean mountDockerSocket = Boolean.TRUE.equals(config.get("mount_docker_socket"));
+        List<String> extraMounts = resolveMounts(config.get("mounts"), context);
 
         ShellResult result;
         String executionMode;
 
         if (containerImage != null && !containerImage.isBlank()) {
             result = containerShellService.execute(command, context.getProjectPath(), timeout,
-                    containerImage, mountDockerSocket);
+                    containerImage, mountDockerSocket, extraMounts);
             executionMode = "container:" + containerImage;
         } else {
             result = shellService.execute(command, context.getProjectPath(), timeout, proc -> {
@@ -81,6 +84,25 @@ public class ShellBlockExecutor implements BlockExecutor {
     @Override
     public boolean supports(String blockType) {
         return "shell".equals(blockType);
+    }
+
+    /**
+     * Reads the optional `mounts` config (List of strings in docker-volume syntax
+     * `host:container[:ro|rw]`) and resolves template variables like {{ home_dir }}
+     * against the current execution context.
+     */
+    static List<String> resolveMounts(Object raw, ExecutionContext context) {
+        if (!(raw instanceof List<?> list) || list.isEmpty()) {
+            return List.of();
+        }
+        List<String> resolved = new ArrayList<>(list.size());
+        for (Object entry : list) {
+            if (entry == null) continue;
+            String s = entry.toString();
+            if (s.isBlank()) continue;
+            resolved.add(context.resolveTemplate(s));
+        }
+        return resolved;
     }
 
     private String buildRecoveryHint(int exitCode, String command) {
