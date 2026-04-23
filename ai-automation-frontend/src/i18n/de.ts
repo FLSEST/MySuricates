@@ -1443,6 +1443,7 @@ export const de: TranslationKeys = {
     filterChipStatus: 'Status',
     filterChipRemove: 'Filter entfernen',
     askAssistant: 'Frag den Assistenten',
+    switchContextHint: 'Tab wechselt',
     contexts: {
       workflow: {
         triggerLabel: 'Workflow suchen oder starten…',

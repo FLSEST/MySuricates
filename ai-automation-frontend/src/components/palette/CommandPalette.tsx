@@ -11,8 +11,10 @@ import { resolveContextId } from './resolveContext';
 import { useWorkflowContext } from './contexts/workflowContext';
 import { useRunContext } from './contexts/runContext';
 import { useProjectContext } from './contexts/projectContext';
-import type { PaletteContextHandle, PaletteItem, BadgeTone, PaletteMatch, HighlightKey } from './contexts/types';
+import type { PaletteContextHandle, PaletteContextId, PaletteItem, BadgeTone, PaletteMatch, HighlightKey } from './contexts/types';
 import { parsePaletteQuery } from './queryParser';
+
+const CONTEXT_ORDER: PaletteContextId[] = ['workflow', 'run', 'project'];
 
 interface CollectingState {
   workflow: Workflow;
@@ -32,38 +34,83 @@ interface CommandPaletteProps {
  */
 export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const location = useLocation();
-  const contextId = resolveContextId(location.pathname);
+  const routeContextId = resolveContextId(location.pathname);
+  const [contextId, setContextId] = useState<PaletteContextId>(routeContextId);
+  const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    if (open) setContextId(routeContextId);
+    // Only reset to route context when the palette opens; Tab-switch must survive re-renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const cycleContext = (direction: 1 | -1) => {
+    setContextId((c) => {
+      const idx = CONTEXT_ORDER.indexOf(c);
+      const next = (idx + direction + CONTEXT_ORDER.length) % CONTEXT_ORDER.length;
+      return CONTEXT_ORDER[next] ?? c;
+    });
+  };
+
   if (!open) return null;
-  return <PaletteBody key={contextId} contextId={contextId} onClose={onClose} />;
+  return (
+    <PaletteBody
+      key={contextId}
+      contextId={contextId}
+      onClose={onClose}
+      query={query}
+      setQuery={setQuery}
+      cycleContext={cycleContext}
+    />
+  );
 }
 
-function PaletteBody({ contextId, onClose }: { contextId: ReturnType<typeof resolveContextId>; onClose: () => void }) {
+interface PaletteBodyProps {
+  contextId: PaletteContextId;
+  onClose: () => void;
+  query: string;
+  setQuery: (q: string) => void;
+  cycleContext: (direction: 1 | -1) => void;
+}
+
+function PaletteBody({ contextId, onClose, query, setQuery, cycleContext }: PaletteBodyProps) {
   // Exactly one context hook per variant — satisfies react-hooks/rules-of-hooks.
-  if (contextId === 'run') return <RunBody onClose={onClose} />;
-  if (contextId === 'project') return <ProjectBody onClose={onClose} />;
-  return <WorkflowBody onClose={onClose} />;
+  if (contextId === 'run') return <RunBody onClose={onClose} query={query} setQuery={setQuery} contextId={contextId} cycleContext={cycleContext} />;
+  if (contextId === 'project') return <ProjectBody onClose={onClose} query={query} setQuery={setQuery} contextId={contextId} cycleContext={cycleContext} />;
+  return <WorkflowBody onClose={onClose} query={query} setQuery={setQuery} contextId={contextId} cycleContext={cycleContext} />;
 }
 
-function WorkflowBody({ onClose }: { onClose: () => void }) {
+interface BodyProps {
+  onClose: () => void;
+  query: string;
+  setQuery: (q: string) => void;
+  contextId: PaletteContextId;
+  cycleContext: (direction: 1 | -1) => void;
+}
+
+function WorkflowBody(props: BodyProps) {
   const context = useWorkflowContext();
-  return <InnerPalette context={context} onClose={onClose} />;
+  return <InnerPalette context={context} {...props} />;
 }
 
-function RunBody({ onClose }: { onClose: () => void }) {
+function RunBody(props: BodyProps) {
   const context = useRunContext();
-  return <InnerPalette context={context} onClose={onClose} />;
+  return <InnerPalette context={context} {...props} />;
 }
 
-function ProjectBody({ onClose }: { onClose: () => void }) {
+function ProjectBody(props: BodyProps) {
   const context = useProjectContext();
-  return <InnerPalette context={context} onClose={onClose} />;
+  return <InnerPalette context={context} {...props} />;
 }
 
-function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onClose: () => void }) {
+interface InnerPaletteProps extends BodyProps {
+  context: PaletteContextHandle;
+}
+
+function InnerPalette({ context, onClose, query, setQuery, contextId, cycleContext }: InnerPaletteProps) {
   const t = useT();
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [query, setQuery] = useState('');
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [collecting, setCollecting] = useState<CollectingState | null>(null);
 
@@ -178,6 +225,36 @@ function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onC
         onClose();
         return;
       }
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        cycleContext(e.shiftKey ? -1 : 1);
+        return;
+      }
+      if (e.altKey && /^[1-9]$/.test(e.key)) {
+        // Alt+N jumps directly to result row N (1-indexed). Works for result rows and
+        // the trailing assistant row; pinned/recent sections are skipped.
+        e.preventDefault();
+        const n = parseInt(e.key, 10) - 1;
+        if (isEmptyQuery) {
+          const item = itemAt(n);
+          if (item) {
+            setSelectedIdx(n);
+            enterItem(item);
+          }
+          return;
+        }
+        if (n === assistantIdx) {
+          setSelectedIdx(n);
+          askAssistant();
+          return;
+        }
+        const item = itemAt(n);
+        if (item) {
+          setSelectedIdx(n);
+          enterItem(item);
+        }
+        return;
+      }
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setSelectedIdx((i) => Math.min(i + 1, Math.max(0, totalItems - 1)));
@@ -232,6 +309,29 @@ function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onC
           />
         ) : (
           <>
+            <div className="flex items-center gap-1 px-2 py-1.5 border-b border-border">
+              {CONTEXT_ORDER.map((cid) => (
+                <button
+                  key={cid}
+                  type="button"
+                  onClick={() => {
+                    const diff = (CONTEXT_ORDER.indexOf(cid) - CONTEXT_ORDER.indexOf(contextId) + CONTEXT_ORDER.length) % CONTEXT_ORDER.length;
+                    if (diff === 0) return;
+                    for (let i = 0; i < diff; i += 1) cycleContext(1);
+                  }}
+                  className={`px-2 py-1 text-[11px] rounded-md transition-colors ${
+                    cid === contextId
+                      ? 'bg-accent/15 text-accent font-medium'
+                      : 'text-text-tertiary hover:text-text hover:bg-surface-raised'
+                  }`}
+                >
+                  {t.commandPalette.contexts[cid].triggerLabel.replace(/…$/, '').replace(/\.\.\.$/, '')}
+                </button>
+              ))}
+              <span className="ml-auto text-[10px] text-text-tertiary border border-border px-1.5 py-0.5 rounded-sm">
+                {t.commandPalette.switchContextHint}
+              </span>
+            </div>
             <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
               <Search className="w-4 h-4 text-text-tertiary shrink-0" />
               {context.id === 'run' && parsed.status && (
@@ -277,6 +377,7 @@ function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onC
                       onRun={() => enterItem(item)}
                       onOpen={() => openItem(item)}
                       onTogglePin={() => togglePin(item.id)}
+                      numberHint={idx < 9 ? idx + 1 : undefined}
                       t={t}
                       altAction={context.altAction ? { label: context.altAction.label, shortcut: context.altAction.shortcut, run: () => runAltAction(item) } : undefined}
                     />
@@ -298,6 +399,7 @@ function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onC
                         onRun={() => enterItem(item)}
                         onOpen={() => openItem(item)}
                         onTogglePin={() => togglePin(item.id)}
+                        numberHint={absIdx < 9 ? absIdx + 1 : undefined}
                         t={t}
                       altAction={context.altAction ? { label: context.altAction.label, shortcut: context.altAction.shortcut, run: () => runAltAction(item) } : undefined}
                       />
@@ -318,6 +420,7 @@ function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onC
                       onRun={() => enterItem(item)}
                       onOpen={() => openItem(item)}
                       onTogglePin={() => togglePin(item.id)}
+                      numberHint={idx < 9 ? idx + 1 : undefined}
                       t={t}
                       altAction={context.altAction ? { label: context.altAction.label, shortcut: context.altAction.shortcut, run: () => runAltAction(item) } : undefined}
                     />
@@ -333,6 +436,7 @@ function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onC
                   onClick={askAssistant}
                   label={t.commandPalette.askAssistant}
                   borderTop={results.length > 0}
+                  numberHint={assistantIdx < 9 ? assistantIdx + 1 : undefined}
                 />
               )}
 
@@ -389,6 +493,7 @@ interface PaletteRowProps {
     shortcut: string;
     run: () => void;
   };
+  numberHint?: number;
   t: ReturnType<typeof useT>;
 }
 
@@ -412,7 +517,7 @@ function renderHighlighted(text: string, matches: PaletteMatch[] | undefined, ke
   return out;
 }
 
-function PaletteRow({ item, selected, pinned, onHover, onRun, onOpen, onTogglePin, altAction, t }: PaletteRowProps) {
+function PaletteRow({ item, selected, pinned, onHover, onRun, onOpen, onTogglePin, altAction, numberHint, t }: PaletteRowProps) {
   return (
     <div
       onMouseEnter={onHover}
@@ -421,6 +526,11 @@ function PaletteRow({ item, selected, pinned, onHover, onRun, onOpen, onTogglePi
         selected ? 'bg-accent/10' : 'hover:bg-surface-raised'
       }`}
     >
+      {numberHint !== undefined && (
+        <span className="shrink-0 text-[9px] text-text-tertiary font-mono w-4 text-right">
+          ⌥{numberHint}
+        </span>
+      )}
       <span className="shrink-0">
         <WorkflowIcon icon={item.icon ?? null} className="w-4 h-4" />
       </span>
@@ -484,9 +594,10 @@ interface AssistantRowProps {
   onClick: () => void;
   label: string;
   borderTop: boolean;
+  numberHint?: number;
 }
 
-function AssistantRow({ query, selected, onHover, onClick, label, borderTop }: AssistantRowProps) {
+function AssistantRow({ query, selected, onHover, onClick, label, borderTop, numberHint }: AssistantRowProps) {
   return (
     <div
       onMouseEnter={onHover}
@@ -495,6 +606,11 @@ function AssistantRow({ query, selected, onHover, onClick, label, borderTop }: A
         borderTop ? 'border-t border-border' : ''
       } ${selected ? 'bg-accent/10' : 'hover:bg-surface-raised'}`}
     >
+      {numberHint !== undefined && (
+        <span className="shrink-0 text-[9px] text-text-tertiary font-mono w-4 text-right">
+          ⌥{numberHint}
+        </span>
+      )}
       <span className="shrink-0 text-accent">
         <Sparkles className="w-4 h-4" />
       </span>

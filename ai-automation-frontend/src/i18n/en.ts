@@ -1446,6 +1446,7 @@ export const en = {
     filterChipStatus: 'Status',
     filterChipRemove: 'Remove filter',
     askAssistant: 'Ask the assistant',
+    switchContextHint: 'Tab to switch',
     contexts: {
       workflow: {
         triggerLabel: 'Search or run workflow…',
