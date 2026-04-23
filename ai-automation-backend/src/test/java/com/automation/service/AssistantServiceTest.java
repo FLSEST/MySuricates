@@ -301,14 +301,62 @@ class AssistantServiceTest {
     }
 
     @Test
-    void chat_responseWithTextAndFetchDoesNotAutoFetch() {
-        stubClaude("Kurzantwort. <fetch type=\"run_detail\" id=\"r1\"/>");
-        when(fetchService.stripFetchTags("Kurzantwort. <fetch type=\"run_detail\" id=\"r1\"/>"))
-                .thenReturn("Kurzantwort.");
+    void chat_responseWithSubstantiveTextAndFetchDoesNotAutoFetch() {
+        // Long text (>= 200 chars) next to a fetch tag is treated as a complete answer — no
+        // second round, even though the model also emitted a speculative fetch.
+        String longAnswer = "Der Run ist abgeschlossen und hat alle fünf Schritte erfolgreich durchlaufen. "
+                + "Die Ausgabe enthält keine Fehler, und das Gate-Status-Feld steht auf grün. "
+                + "Der Workflow kann jetzt wie geplant weitergeführt werden.";
+        String raw = longAnswer + " <fetch type=\"run_detail\" id=\"r1\"/>";
+        stubClaude(raw);
+        when(fetchService.stripFetchTags(raw)).thenReturn(longAnswer);
 
         var result = chat("Was ist mit dem Run?");
 
-        assertThat(result.message()).isEqualTo("Kurzantwort.");
+        assertThat(result.message()).isEqualTo(longAnswer);
+        verify(commandExecutorService, org.mockito.Mockito.times(1))
+                .executeOnHost(any(HostExecutionRequest.class));
+        verify(fetchService, never()).executeFetch(any());
+    }
+
+    @Test
+    void chat_announcementTextWithFetchStillAutoFetches() {
+        // The observed regression: model emits "Ich schaue mir den Run an." + <fetch>. Old logic
+        // saw non-blank text and treated it as the final answer — user got just the announcement.
+        // New logic detects announcement-style filler and still runs the fetch loop.
+        stubClaudeSequence(
+                "Ich schaue mir die Details des Runs an. <fetch type=\"run_detail\" id=\"r1\"/>",
+                "Der Run r1 ist FAILED — Step 0 mit Exit 137 (OOM)."
+        );
+        var fetchReq = new AssistantFetchService.FetchRequest("run_detail", "r1");
+        when(fetchService.parseFetchRequests("Ich schaue mir die Details des Runs an. <fetch type=\"run_detail\" id=\"r1\"/>"))
+                .thenReturn(List.of(fetchReq));
+        when(fetchService.executeFetch(fetchReq)).thenReturn("run r1: FAILED, step 0 OOM");
+        when(fetchService.stripFetchTags("Ich schaue mir die Details des Runs an. <fetch type=\"run_detail\" id=\"r1\"/>"))
+                .thenReturn("Ich schaue mir die Details des Runs an.");
+        when(fetchService.stripFetchTags("Der Run r1 ist FAILED — Step 0 mit Exit 137 (OOM)."))
+                .thenReturn("Der Run r1 ist FAILED — Step 0 mit Exit 137 (OOM).");
+
+        var result = chat("Was ist mit dem Run?");
+
+        assertThat(result.message()).isEqualTo("Der Run r1 ist FAILED — Step 0 mit Exit 137 (OOM).");
+        verify(fetchService).executeFetch(fetchReq);
+    }
+
+    @Test
+    void chat_responseWithActionsAndFetchDoesNotAutoFetch() {
+        // An <actions> block means the model already produced a complete structured answer —
+        // honor it even if the visible text is short.
+        String raw = "Ja. <actions>[{\"type\":\"show_run\",\"id\":\"r-9\",\"name\":\"Last Run\",\"label\":\"Öffnen\"}]</actions> <fetch type=\"run_detail\" id=\"r2\"/>";
+        stubClaude(raw);
+        when(fetchService.stripFetchTags(any())).thenAnswer(inv -> {
+            String s = inv.getArgument(0);
+            return s == null ? null : s.replaceAll("<fetch[^>]*/>", "").trim();
+        });
+
+        var result = chat("Run?");
+
+        assertThat(result.actions()).hasSize(1);
         verify(commandExecutorService, org.mockito.Mockito.times(1))
                 .executeOnHost(any(HostExecutionRequest.class));
         verify(fetchService, never()).executeFetch(any());

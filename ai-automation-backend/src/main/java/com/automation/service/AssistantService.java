@@ -167,8 +167,12 @@ public class AssistantService {
             );
 
             // Demand-driven auto-fetch: up to MAX_FETCH_ROUNDS follow-up calls, each with up to
-            // MAX_FETCHES_PER_ROUND distinct fetches. Skip enrichment if the response already
-            // contains text outside <fetch> tags — that's a fully-formed answer.
+            // MAX_FETCHES_PER_ROUND distinct fetches. We continue the loop whenever the model
+            // emits an auto-fetchable tag AND the surrounding text is not a substantive answer
+            // (short announcements like "Ich schaue mir an…" count as no-answer, because they
+            // are stripped together with the fetch tag in the old logic and otherwise leave
+            // the user with just the announcement). An `<actions>` block marks a substantive
+            // answer even if the text is short.
             // Duplicates across rounds are filtered so the model can't loop on the same fetch.
             // If after all rounds we still only see <fetch> tags, emit a targeted fallback
             // message instead of "(Keine Antwort erhalten)".
@@ -178,8 +182,7 @@ public class AssistantService {
             for (int fetchRound = 0; fetchRound < MAX_FETCH_ROUNDS; fetchRound++) {
                 String rawOutput = result.output();
                 String nonFetchText = fetchService.stripFetchTags(rawOutput);
-                boolean fetchOnlyResponse = nonFetchText == null || nonFetchText.isBlank();
-                if (!fetchOnlyResponse) break;
+                if (hasSubstantiveAnswer(rawOutput, nonFetchText)) break;
 
                 List<FetchRequest> fetches = fetchService.parseFetchRequests(rawOutput).stream()
                         .filter(this::isAutoFetchAllowed)
@@ -352,6 +355,39 @@ public class AssistantService {
 
     private String fetchKey(FetchRequest req) {
         return (req.type() == null ? "" : req.type()) + "|" + (req.id() == null ? "" : req.id());
+    }
+
+    /** Threshold at which text outside {@code <fetch>} tags counts as a real answer, not a filler
+     *  announcement. 200 chars is comfortably longer than typical "Ich schaue mir X an…" stalls
+     *  but short enough that a one-sentence factual answer still counts. */
+    private static final int ANSWER_TEXT_MIN_CHARS = 200;
+
+    /** Regex for common announcement openings — catches the stall responses that cost users a
+     *  round-trip without delivering content. Anchored at start, case-insensitive. */
+    private static final Pattern ANNOUNCEMENT_PATTERN = Pattern.compile(
+            "(?is)^\\s*(ich\\s+(schau|hole|lade|pr(ü|u)f|prufe|analysier|check|verifizier)|lade\\s+|einen\\s+moment|moment\\b|kurz\\s+nachladen|sekunde).{0,200}",
+            Pattern.CASE_INSENSITIVE);
+
+    /**
+     * A response counts as a "substantive answer" (→ stop the fetch loop) when the non-fetch
+     * text is long enough to be a real answer OR carries an {@code <actions>} block. Short
+     * announcement-style filler ("Ich schaue mir den Run an…") is explicitly NOT substantive,
+     * even though it's non-blank — otherwise a stripped {@code <fetch>} would leave the user
+     * with nothing but the announcement.
+     */
+    private boolean hasSubstantiveAnswer(String rawOutput, String nonFetchText) {
+        if (nonFetchText == null || nonFetchText.isBlank()) {
+            return false;
+        }
+        if (rawOutput != null && rawOutput.contains("<actions>")) {
+            return true;
+        }
+        String trimmed = nonFetchText.trim();
+        if (trimmed.length() >= ANSWER_TEXT_MIN_CHARS) {
+            return true;
+        }
+        // Short text — treat as announcement filler and continue the fetch loop.
+        return !ANNOUNCEMENT_PATTERN.matcher(trimmed).find() && trimmed.length() >= 40;
     }
 
     /**
