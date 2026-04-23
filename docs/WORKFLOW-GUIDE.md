@@ -522,7 +522,8 @@ Folgende Variablen werden vom `WorkflowExecutor` automatisch bei jedem Run geset
 | `{{ project_path }}` | Projektpfad |
 | `{{ model }}` | Konfiguriertes Modell (oder leer) |
 | `{{ provider }}` | Konfigurierter AI-Provider (oder leer) |
-| `{{ started_at }}` | Startzeitpunkt des Runs (ISO-8601) |
+| `{{ started_at }}` | Startzeitpunkt des Runs (ISO-8601, z.B. `2026-04-22T21:30:45.123Z`) |
+| `{{ run_timestamp }}` | Pfadsicherer Timestamp (UTC, Format `yyyyMMdd-HHmmss`, z.B. `20260422-213045`) — ideal für Output-Verzeichnisse pro Run |
 
 ### Kontext-Variablen
 

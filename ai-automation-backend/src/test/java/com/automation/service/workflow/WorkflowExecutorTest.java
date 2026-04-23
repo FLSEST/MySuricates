@@ -289,6 +289,25 @@ class WorkflowExecutorTest {
     }
 
     @Test
+    void execute_seedsRunTimestamp_inPathSafeFormat() {
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        ArgumentCaptor<ExecutionContext> ctxCaptor = ArgumentCaptor.forClass(ExecutionContext.class);
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), ctxCaptor.capture()))
+                .thenReturn(step);
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        ExecutionContext ctx = ctxCaptor.getValue();
+        Object ts = ctx.getVariable("run_timestamp");
+        assertThat(ts).isNotNull();
+        // yyyyMMdd-HHmmss — no ':' so it's safe as a filename / directory name
+        assertThat(String.valueOf(ts)).matches("\\d{8}-\\d{6}");
+        assertThat(ctx.resolveTemplate("reports/{{ run_timestamp }}/summary.md"))
+                .matches("reports/\\d{8}-\\d{6}/summary\\.md");
+    }
+
+    @Test
     void execute_writesSkillContextToProject() {
         Skill skill = Skill.builder()
                 .id("skill-1").name("Reviewer").category(SkillCategory.CODE)

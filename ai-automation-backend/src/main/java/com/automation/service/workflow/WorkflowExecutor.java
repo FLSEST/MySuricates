@@ -66,7 +66,8 @@ public class WorkflowExecutor {
 
     private static final java.util.Set<String> SYSTEM_VAR_KEYS = java.util.Set.of(
             "workflow_run_id", "workflow_id", "workflow_name", "project_path",
-            "model", "provider", "started_at", "previous_report", "open_todos",
+            "model", "provider", "started_at", "run_timestamp",
+            "previous_report", "open_todos",
             "workflow_version", "workflow_changed_since_last_run"
     );
 
@@ -214,7 +215,15 @@ public class WorkflowExecutor {
             context.setVariable("project_path", project.getPath() != null ? project.getPath() : "");
             context.setVariable("model", model != null ? model : "");
             context.setVariable("provider", provider != null ? provider : "");
-            context.setVariable("started_at", java.time.Instant.now().toString());
+            java.time.Instant startedAt = java.time.Instant.now();
+            context.setVariable("started_at", startedAt.toString());
+            // Path-safe timestamp for output-directory naming (no ':' or timezone).
+            // Format: yyyyMMdd-HHmmss in UTC. Use together with {{ workflow_run_id }}
+            // to version workflow outputs per run (see TODO 2738fda0).
+            context.setVariable("run_timestamp", java.time.format.DateTimeFormatter
+                    .ofPattern("yyyyMMdd-HHmmss")
+                    .withZone(java.time.ZoneOffset.UTC)
+                    .format(startedAt));
             // Host/user metadata so workflow configs can stay user-agnostic
             // (e.g. "mounts": ["{{ home_dir }}/dokumente:{{ home_dir }}/dokumente:rw"])
             context.setVariable("home_dir", System.getProperty("user.home", ""));
