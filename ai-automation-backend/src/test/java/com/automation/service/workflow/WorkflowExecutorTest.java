@@ -268,6 +268,27 @@ class WorkflowExecutorTest {
     }
 
     @Test
+    void execute_seedsSystemVariables_includingProjectPath() {
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        ArgumentCaptor<ExecutionContext> ctxCaptor = ArgumentCaptor.forClass(ExecutionContext.class);
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), ctxCaptor.capture()))
+                .thenReturn(step);
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        ExecutionContext ctx = ctxCaptor.getValue();
+        assertThat(ctx.getVariable("project_path")).isEqualTo("/workspace/test");
+        assertThat(ctx.getProjectPath()).isEqualTo("/workspace/test");
+        assertThat(ctx.getVariable("workflow_id")).isEqualTo("wf-1");
+        assertThat(ctx.getVariable("workflow_name")).isEqualTo("Test Workflow");
+        assertThat(ctx.getVariable("workflow_run_id")).isEqualTo("run-1");
+        assertThat(ctx.getVariable("started_at")).isNotNull();
+        assertThat(ctx.getVariable("home_dir")).isNotNull();
+        assertThat(ctx.resolveTemplate("cd {{ project_path }}")).isEqualTo("cd /workspace/test");
+    }
+
+    @Test
     void execute_writesSkillContextToProject() {
         Skill skill = Skill.builder()
                 .id("skill-1").name("Reviewer").category(SkillCategory.CODE)
