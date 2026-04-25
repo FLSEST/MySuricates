@@ -886,4 +886,254 @@ class WorkflowExecutorTest {
     void isRunActive_inactiveRun_returnsFalse() {
         assertThat(workflowExecutor.isRunActive("non-existent-run")).isFalse();
     }
+
+    // -------------------------------------------------------------------------
+    // Error-path tests (TODO 0bd95702): block exceptions, interrupts, sub-workflow
+    // failure propagation, failRun branches, defensive try/catch blocks.
+    // -------------------------------------------------------------------------
+
+    /** Helper: re-build the executor with a custom BlockExecutor list and semaphore. */
+    private WorkflowExecutor buildExecutor(List<BlockExecutor> executors, DynamicSemaphore semaphore) {
+        return new WorkflowExecutor(
+                executors,
+                containerService,
+                commandExecutorService,
+                runRepository,
+                stepResultRepository,
+                containerRepository,
+                skillRepository,
+                broadcaster,
+                virtualThreadExecutor,
+                semaphore,
+                agentInstructionsService,
+                activityLogService,
+                workflowMemoryService,
+                projectContextService,
+                eventPublisher,
+                templateVerificationService,
+                systemIdentity,
+                todoRepository,
+                workflowVersionService,
+                new WorkflowExecutionRegistry()
+        );
+    }
+
+    // --- Group A: Block exception paths (WorkflowExecutor.java:472–480) ------
+
+    @Test
+    void execute_blockThrowsWorkflowExecutionException_savesFailedWithMessage() {
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenThrow(new WorkflowExecutionException("custom block failure"));
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(saved.getError().get("message")).isEqualTo("custom block failure");
+        verify(eventPublisher).publishEvent(any(WorkflowRunCompletedEvent.class));
+    }
+
+    @Test
+    void execute_blockThrowsExceptionWithNullMessage_fallsBackToClassName() {
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenThrow(new RuntimeException());
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(saved.getError().get("message")).isEqualTo("java.lang.RuntimeException");
+    }
+
+    @Test
+    void execute_secondBlockThrows_firstBlockStillSavedAsCompleted() {
+        StepResult ok = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(ok)
+                .thenThrow(new RuntimeException("second block crashed"));
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        WorkflowRun savedRun = captureLastSavedRun();
+        assertThat(savedRun.getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(savedRun.getError().get("message")).isEqualTo("second block crashed");
+
+        // First block's StepResult must have been persisted before the crash
+        ArgumentCaptor<StepResult> stepCaptor = ArgumentCaptor.forClass(StepResult.class);
+        verify(stepResultRepository, atLeastOnce()).save(stepCaptor.capture());
+        boolean firstBlockCompleted = stepCaptor.getAllValues().stream()
+                .anyMatch(s -> s.getStatus() == StepStatus.COMPLETED);
+        assertThat(firstBlockCompleted).isTrue();
+    }
+
+    @Test
+    void execute_blockThrows_eventPublishedAndBroadcastFinalStatus() {
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenThrow(new RuntimeException("boom"));
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        // Both broadcaster and eventPublisher must fire from the finally block
+        verify(broadcaster).broadcastRunStatus("run-1", RunStatus.FAILED);
+        ArgumentCaptor<WorkflowRunCompletedEvent> evt = ArgumentCaptor.forClass(WorkflowRunCompletedEvent.class);
+        verify(eventPublisher).publishEvent(evt.capture());
+        assertThat(evt.getValue().getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(evt.getValue().getError()).isNotNull();
+    }
+
+    // --- Group B: Semaphore / Interrupt (WorkflowExecutor.java:468–471) ------
+
+    @Test
+    void execute_interruptedDuringSemaphoreAcquire_callsFailRun() throws InterruptedException {
+        DynamicSemaphore mockSemaphore = mock(DynamicSemaphore.class);
+        doThrow(new InterruptedException("simulated")).when(mockSemaphore).acquire();
+        WorkflowExecutor executor = buildExecutor(List.of(simpleBlockExecutor), mockSemaphore);
+
+        executor.execute(testWorkflow, null);
+
+        ArgumentCaptor<WorkflowRun> captor = ArgumentCaptor.forClass(WorkflowRun.class);
+        verify(runRepository, atLeastOnce()).save(captor.capture());
+        boolean savedAsFailedDueToInterrupt = captor.getAllValues().stream()
+                .anyMatch(r -> r.getStatus() == RunStatus.FAILED
+                        && r.getError() != null
+                        && "Interrupted while waiting for execution slot".equals(r.getError().get("message")));
+        assertThat(savedAsFailedDueToInterrupt).isTrue();
+
+        // Interrupt status must be re-set on the calling thread
+        assertThat(Thread.interrupted()).isTrue();
+
+        // Block executor must never have run
+        verify(simpleBlockExecutor, never()).execute(any(), any());
+    }
+
+    @Test
+    void execute_finallyAlwaysReleasesSemaphore_evenAfterException() {
+        DynamicSemaphore singleSlot = new DynamicSemaphore(1);
+        WorkflowExecutor executor = buildExecutor(List.of(simpleBlockExecutor), singleSlot);
+
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenThrow(new RuntimeException("first run boom"))
+                .thenReturn(StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build());
+
+        executor.execute(testWorkflow, null);
+        // If the semaphore wasn't released, this second execute() would block forever
+        // (synchronous virtualThreadExecutor + acquire() in same thread).
+        executor.execute(testWorkflow, null);
+
+        // Verify both attempts ran the block executor (1× thrown, then 2 successful blocks)
+        verify(simpleBlockExecutor, atLeast(2)).execute(any(), any());
+        // 1 permit available again at the end
+        assertThat(singleSlot.availablePermits()).isEqualTo(1);
+    }
+
+    // --- Group C: Registry cleanup (WorkflowExecutor.java:485) ---------------
+
+    @Test
+    void execute_blockThrows_registryUnregistersRun() {
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenThrow(new RuntimeException("crash"));
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        assertThat(workflowExecutor.isRunActive("run-1")).isFalse();
+        assertThat(workflowExecutor.getActiveRunCount()).isZero();
+    }
+
+    // --- Group D: Sub-workflow failure propagation ---------------------------
+
+    @Test
+    void execute_subWorkflowBlockReturnsFailed_parentRunFails() {
+        BlockExecutor subWorkflowExecutor = mock(BlockExecutor.class);
+        lenient().when(subWorkflowExecutor.supports("sub-workflow")).thenReturn(true);
+        lenient().when(simpleBlockExecutor.supports("sub-workflow")).thenReturn(false);
+        when(subWorkflowExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(StepResult.builder()
+                        .stepIndex(0).status(StepStatus.FAILED)
+                        .output("Sub-workflow run-X failed: timeout")
+                        .build());
+
+        WorkflowExecutor executor = buildExecutor(
+                List.of(simpleBlockExecutor, subWorkflowExecutor),
+                new DynamicSemaphore(10));
+
+        testWorkflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder().type("sub-workflow")
+                        .config(new HashMap<>(Map.of("workflow_id", "child-wf"))).build()
+        )));
+
+        executor.execute(testWorkflow, null);
+
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(saved.getError()).isNotNull();
+        assertThat(String.valueOf(saved.getError().get("message"))).contains("Sub-workflow run-X failed");
+    }
+
+    @Test
+    void execute_subWorkflowBlockThrows_parentRunFails() {
+        BlockExecutor subWorkflowExecutor = mock(BlockExecutor.class);
+        lenient().when(subWorkflowExecutor.supports("sub-workflow")).thenReturn(true);
+        lenient().when(simpleBlockExecutor.supports("sub-workflow")).thenReturn(false);
+        when(subWorkflowExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenThrow(new WorkflowExecutionException("Sub-workflow timed out after 30 minutes"));
+
+        WorkflowExecutor executor = buildExecutor(
+                List.of(simpleBlockExecutor, subWorkflowExecutor),
+                new DynamicSemaphore(10));
+
+        testWorkflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder().type("sub-workflow")
+                        .config(new HashMap<>(Map.of("workflow_id", "child-wf"))).build()
+        )));
+
+        executor.execute(testWorkflow, null);
+
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(saved.getError().get("message")).isEqualTo("Sub-workflow timed out after 30 minutes");
+    }
+
+    // --- Group E: failRun path (WorkflowExecutor.java:516–518, 527–542) ------
+
+    @Test
+    void execute_runNotInRepository_callsFailRunInFinally() {
+        // First findById (line 190) returns empty → orElseThrow → caught.
+        // Second findById (inside failRun line 529) returns a RUNNING run that gets force-failed.
+        when(runRepository.findById("run-1"))
+                .thenReturn(Optional.empty())
+                .thenAnswer(inv -> Optional.of(WorkflowRun.builder()
+                        .id("run-1").workflow(testWorkflow).status(RunStatus.RUNNING)
+                        .startedAt(Instant.now()).build()));
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        ArgumentCaptor<WorkflowRun> captor = ArgumentCaptor.forClass(WorkflowRun.class);
+        verify(runRepository, atLeastOnce()).save(captor.capture());
+        boolean savedAsFailedDbLoad = captor.getAllValues().stream()
+                .anyMatch(r -> r.getStatus() == RunStatus.FAILED
+                        && r.getError() != null
+                        && "Failed to load workflow run from database".equals(r.getError().get("message")));
+        assertThat(savedAsFailedDbLoad).isTrue();
+        verify(broadcaster, atLeastOnce()).broadcastRunStatus("run-1", RunStatus.FAILED);
+    }
+
+    // --- Group F: Defensive paths --------------------------------------------
+
+    @Test
+    void execute_eventPublisherThrows_runStillSavedAndBroadcast() {
+        StepResult ok = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(ok);
+        doThrow(new RuntimeException("subscriber crashed"))
+                .when(eventPublisher).publishEvent(any(WorkflowRunCompletedEvent.class));
+
+        // Should not throw — the publish is wrapped in try/catch (Z. 506–515)
+        workflowExecutor.execute(testWorkflow, null);
+
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
+        verify(broadcaster).broadcastRunStatus("run-1", RunStatus.COMPLETED);
+    }
 }
