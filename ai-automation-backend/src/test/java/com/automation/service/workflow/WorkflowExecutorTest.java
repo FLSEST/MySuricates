@@ -28,6 +28,7 @@ import java.util.concurrent.ExecutorService;
 import com.automation.concurrency.DynamicSemaphore;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
@@ -840,5 +841,49 @@ class WorkflowExecutorTest {
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getMetadata()).containsEntry("system", "MySuricates");
         assertThat(saved.getMetadata()).containsEntry("systemVersion", "0.2.3");
+    }
+
+    @Test
+    void cancelExecution_duringExecution_marksRunCancelled() {
+        // Arrange: cancel run mid-flight (after block 0, before block 1)
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenAnswer(inv -> {
+                    workflowExecutor.cancelExecution("run-1");
+                    return step;
+                });
+
+        // Act
+        workflowExecutor.execute(testWorkflow, null);
+
+        // Assert: only first block ran, run was saved with CANCELLED
+        verify(simpleBlockExecutor, times(1)).execute(any(BlockDefinition.class), any(ExecutionContext.class));
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.CANCELLED);
+    }
+
+    @Test
+    void cancelExecution_ghostRun_updatesPersistedStatusToCancelled() {
+        // Run exists in DB but no active execution context in the registry
+        // (simulates a stale RUNNING row after backend crash/restart).
+        // findById("run-1") is already mocked in setUp to return a RUNNING run.
+
+        workflowExecutor.cancelExecution("run-1");
+
+        ArgumentCaptor<WorkflowRun> captor = ArgumentCaptor.forClass(WorkflowRun.class);
+        verify(runRepository, atLeastOnce()).save(captor.capture());
+        WorkflowRun saved = captor.getValue();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.CANCELLED);
+    }
+
+    @Test
+    void getActiveRunCount_noExecution_returnsZero() {
+        assertThat(workflowExecutor.getActiveRunCount()).isZero();
+    }
+
+    @Test
+    void isRunActive_inactiveRun_returnsFalse() {
+        assertThat(workflowExecutor.isRunActive("non-existent-run")).isFalse();
     }
 }
