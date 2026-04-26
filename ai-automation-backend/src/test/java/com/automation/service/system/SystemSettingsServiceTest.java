@@ -6,6 +6,8 @@ import com.automation.service.AssistantService;
 import com.automation.service.PageSuggestionService;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.assistant.AssistantActionSuggestionService;
+import com.automation.service.search.SemanticWorkflowSearchService;
+import com.automation.service.workflow.WorkflowTaggingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,6 +30,8 @@ class SystemSettingsServiceTest {
     @Mock private AssistantService assistantService;
     @Mock private PageSuggestionService pageSuggestionService;
     @Mock private AssistantActionSuggestionService actionSuggestionService;
+    @Mock private WorkflowTaggingService workflowTaggingService;
+    @Mock private SemanticWorkflowSearchService semanticSearchService;
     @Spy private BackupConfig backupConfig = new BackupConfig();
 
     private SystemSettingsService service;
@@ -40,6 +44,8 @@ class SystemSettingsServiceTest {
         setField(service, "assistantService", assistantService);
         setField(service, "pageSuggestionService", pageSuggestionService);
         setField(service, "actionSuggestionService", actionSuggestionService);
+        setField(service, "workflowTaggingService", workflowTaggingService);
+        setField(service, "semanticSearchService", semanticSearchService);
     }
 
     private void setField(Object target, String fieldName, Object value) throws Exception {
