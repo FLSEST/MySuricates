@@ -6,6 +6,7 @@ import com.automation.config.HostClaudeConfig;
 import com.automation.config.RateLimitConfig;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.ai.HostClaudeService;
+import com.automation.service.cli.ContainerShellService;
 import com.automation.service.workflow.WorkflowExecutor;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -29,7 +30,8 @@ public class ExecutionSettingsService {
             Map.entry("chain-workflow-timeout-minutes",    new long[]{5, 1440}),
             Map.entry("rate-limit-enabled",                new long[]{0, 1}),
             Map.entry("rate-limit-requests-per-minute",    new long[]{10, 10000}),
-            Map.entry("assistant-chat-timeout-seconds",    new long[]{30, 900})
+            Map.entry("assistant-chat-timeout-seconds",    new long[]{30, 900}),
+            Map.entry("allow-extra-mounts",                new long[]{0, 1})
     );
 
     // Frontend sends camelCase keys, backend uses kebab-case internally
@@ -42,7 +44,8 @@ public class ExecutionSettingsService {
             Map.entry("chainWorkflowTimeoutMinutes",     "chain-workflow-timeout-minutes"),
             Map.entry("rateLimitEnabled",                "rate-limit-enabled"),
             Map.entry("rateLimitRequestsPerMinute",      "rate-limit-requests-per-minute"),
-            Map.entry("assistantChatTimeoutSeconds",     "assistant-chat-timeout-seconds")
+            Map.entry("assistantChatTimeoutSeconds",     "assistant-chat-timeout-seconds"),
+            Map.entry("allowExtraMounts",                "allow-extra-mounts")
     );
 
     private final AppSettingsRepository appSettingsRepository;
@@ -52,6 +55,7 @@ public class ExecutionSettingsService {
     private final ChainConfig chainConfig;
     private final RateLimitConfig rateLimitConfig;
     private final WorkflowExecutor workflowExecutor;
+    private final ContainerShellService containerShellService;
 
     // Defaults from YAML/env (captured at startup)
     private int defaultMaxConcurrent;
@@ -67,7 +71,8 @@ public class ExecutionSettingsService {
             HostClaudeConfig hostClaudeConfig,
             ChainConfig chainConfig,
             RateLimitConfig rateLimitConfig,
-            @Lazy WorkflowExecutor workflowExecutor) {
+            @Lazy WorkflowExecutor workflowExecutor,
+            ContainerShellService containerShellService) {
         this.appSettingsRepository = appSettingsRepository;
         this.executionSemaphore = executionSemaphore;
         this.hostClaudeService = hostClaudeService;
@@ -75,6 +80,7 @@ public class ExecutionSettingsService {
         this.chainConfig = chainConfig;
         this.rateLimitConfig = rateLimitConfig;
         this.workflowExecutor = workflowExecutor;
+        this.containerShellService = containerShellService;
     }
 
     @PostConstruct
@@ -99,6 +105,7 @@ public class ExecutionSettingsService {
         applyIfPresent("rate-limit-enabled", v -> rateLimitConfig.setEnabled(Integer.parseInt(v) == 1));
         applyIfPresent("rate-limit-requests-per-minute", v -> rateLimitConfig.setRequestsPerMinute(Integer.parseInt(v)));
         applyIfPresent("assistant-chat-timeout-seconds", v -> hostClaudeConfig.setAssistantChatTimeoutSeconds(Integer.parseInt(v)));
+        applyIfPresent("allow-extra-mounts", v -> containerShellService.setAllowExtraMounts(Integer.parseInt(v) == 1));
 
         log.info("Execution settings initialized: maxConcurrent={}, maxCalls={}, timeout={}s, delay={}ms, chainTimeout={}min, rateLimit={}/{}rpm, assistantChatTimeout={}s",
                 executionSemaphore.getMaxPermits(), hostClaudeConfig.getMaxConcurrentCalls(),
@@ -150,6 +157,7 @@ public class ExecutionSettingsService {
         result.put("rateLimitEnabled", rateLimitConfig.isEnabled() ? 1 : 0);
         result.put("rateLimitRequestsPerMinute", rateLimitConfig.getRequestsPerMinute());
         result.put("assistantChatTimeoutSeconds", hostClaudeConfig.getAssistantChatTimeoutSeconds());
+        result.put("allowExtraMounts", containerShellService.isAllowExtraMounts() ? 1 : 0);
         result.put("activeRuns", workflowExecutor.getActiveRunCount());
         return result;
     }
@@ -168,6 +176,7 @@ public class ExecutionSettingsService {
             case "rate-limit-enabled" -> rateLimitConfig.setEnabled(Integer.parseInt(value) == 1);
             case "rate-limit-requests-per-minute" -> rateLimitConfig.setRequestsPerMinute(Integer.parseInt(value));
             case "assistant-chat-timeout-seconds" -> hostClaudeConfig.setAssistantChatTimeoutSeconds(Integer.parseInt(value));
+            case "allow-extra-mounts" -> containerShellService.setAllowExtraMounts(Integer.parseInt(value) == 1);
         }
     }
 

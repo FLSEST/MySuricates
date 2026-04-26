@@ -101,6 +101,7 @@ automation:
   execution:
     max-concurrent: ${AUTOMATION_MAX_CONCURRENT_RUNS:10}
     allow-docker-socket-mount: ${AUTOMATION_ALLOW_DOCKER_SOCKET_MOUNT:false}
+    allow-extra-mounts: ${AUTOMATION_ALLOW_EXTRA_MOUNTS:false}
   summarization:
     base-dir: ${AUTOMATION_SUMMARIZATION_DIR:${user.home}/.autotrigger/summarization}
     timeout-seconds: ${AUTOMATION_SUMMARIZATION_TIMEOUT:120}

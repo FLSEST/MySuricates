@@ -6,6 +6,7 @@ import com.automation.config.HostClaudeConfig;
 import com.automation.config.RateLimitConfig;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.ai.HostClaudeService;
+import com.automation.service.cli.ContainerShellService;
 import com.automation.service.workflow.WorkflowExecutor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,7 @@ class ExecutionSettingsServiceTest {
     @Mock private AppSettingsRepository appSettingsRepository;
     @Mock private HostClaudeService hostClaudeService;
     @Mock private WorkflowExecutor workflowExecutor;
+    @Mock private ContainerShellService containerShellService;
 
     private DynamicSemaphore executionSemaphore;
     private HostClaudeConfig hostClaudeConfig;
@@ -43,7 +45,7 @@ class ExecutionSettingsServiceTest {
         service = new ExecutionSettingsService(
                 appSettingsRepository, executionSemaphore,
                 hostClaudeService, hostClaudeConfig, chainConfig,
-                rateLimitConfig, workflowExecutor
+                rateLimitConfig, workflowExecutor, containerShellService
         );
     }
 
@@ -162,9 +164,33 @@ class ExecutionSettingsServiceTest {
                 "claudeTimeoutSeconds", "claudeInterCallDelayMs",
                 "chainWorkflowTimeoutMinutes",
                 "rateLimitEnabled", "rateLimitRequestsPerMinute",
+                "allowExtraMounts",
                 "activeRuns"
         );
         assertThat(settings.get("activeRuns")).isEqualTo(3);
+    }
+
+    @Test
+    void validateAndApply_allowExtraMounts_setsContainerShellService() {
+        service.validateAndApply("allow-extra-mounts", "1");
+
+        verify(appSettingsRepository).set("allow-extra-mounts", "1");
+        verify(containerShellService).setAllowExtraMounts(true);
+    }
+
+    @Test
+    void validateAndApply_allowExtraMounts_alias_works() {
+        service.validateAndApply("allowExtraMounts", "0");
+
+        verify(appSettingsRepository).set("allow-extra-mounts", "0");
+        verify(containerShellService).setAllowExtraMounts(false);
+    }
+
+    @Test
+    void validateAndApply_allowExtraMounts_outOfBounds_throws() {
+        assertThatThrownBy(() -> service.validateAndApply("allow-extra-mounts", "2"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must be between");
     }
 
     @Test

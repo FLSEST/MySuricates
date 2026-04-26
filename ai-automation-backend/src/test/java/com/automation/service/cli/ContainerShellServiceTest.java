@@ -27,6 +27,7 @@ class ContainerShellServiceTest {
     void setUp() {
         service = new ContainerShellService(hostProcessUtils, activityLogService);
         ReflectionTestUtils.setField(service, "allowDockerSocketMount", false);
+        ReflectionTestUtils.setField(service, "allowExtraMounts", false);
     }
 
     @Test
@@ -141,6 +142,122 @@ class ContainerShellServiceTest {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Test
+    void filterExtraMounts_disallowedByDefault_dropsAll() {
+        service.setAllowExtraMounts(false);
+
+        List<String> safe = service.filterExtraMounts(
+                List.of("/home/flo/data:/data:rw", "/tmp/cache:/cache"),
+                "img:latest");
+
+        assertThat(safe).isEmpty();
+        verify(activityLogService, times(2))
+                .warn(any(), contains("Extra mount denied (allow-extra-mounts=false)"), anyString(), isNull());
+    }
+
+    @Test
+    void filterExtraMounts_allowedAndSafe_keepsAndLogsActivation() {
+        service.setAllowExtraMounts(true);
+
+        List<String> safe = service.filterExtraMounts(
+                List.of("/home/flo/data:/workspace/data:rw"),
+                "img:latest");
+
+        assertThat(safe).containsExactly("/home/flo/data:/workspace/data:rw");
+        verify(activityLogService).warn(any(), contains("Extra mount activated"), anyString(), isNull());
+    }
+
+    @Test
+    void filterExtraMounts_dockerSocketTarget_isRejectedEvenWhenAllowed() {
+        service.setAllowExtraMounts(true);
+
+        List<String> safe = service.filterExtraMounts(
+                List.of("/var/run/docker.sock:/var/run/docker.sock"),
+                "img:latest");
+
+        assertThat(safe).isEmpty();
+        verify(activityLogService).warn(any(),
+                contains("forbidden path /var/run/docker.sock"), anyString(), isNull());
+    }
+
+    @Test
+    void filterExtraMounts_etcSubpath_isRejectedAsForbidden() {
+        service.setAllowExtraMounts(true);
+
+        List<String> safe = service.filterExtraMounts(
+                List.of("/etc/passwd:/data/passwd:ro"),
+                "img:latest");
+
+        assertThat(safe).isEmpty();
+        verify(activityLogService).warn(any(),
+                contains("forbidden path /etc"), anyString(), isNull());
+    }
+
+    @Test
+    void filterExtraMounts_rootMount_isRejected() {
+        service.setAllowExtraMounts(true);
+
+        List<String> safe = service.filterExtraMounts(
+                List.of("/:/host:ro"),
+                "img:latest");
+
+        assertThat(safe).isEmpty();
+    }
+
+    @Test
+    void filterExtraMounts_containerSideForbidden_isRejected() {
+        service.setAllowExtraMounts(true);
+
+        // host side is harmless, but container mount target is /etc
+        List<String> safe = service.filterExtraMounts(
+                List.of("/home/flo/data:/etc/myconf"),
+                "img:latest");
+
+        assertThat(safe).isEmpty();
+    }
+
+    @Test
+    void filterExtraMounts_partiallyForbidden_keepsValidOnly() {
+        service.setAllowExtraMounts(true);
+
+        List<String> safe = service.filterExtraMounts(
+                List.of(
+                        "/home/flo/data:/data:rw",
+                        "/etc:/host-etc:ro",
+                        "/tmp/cache:/cache"
+                ),
+                "img:latest");
+
+        assertThat(safe).containsExactlyInAnyOrder(
+                "/home/flo/data:/data:rw",
+                "/tmp/cache:/cache");
+    }
+
+    @Test
+    void filterExtraMounts_blankOrNullEntries_skippedSilently() {
+        service.setAllowExtraMounts(true);
+
+        java.util.ArrayList<String> input = new java.util.ArrayList<>();
+        input.add(null);
+        input.add("");
+        input.add("   ");
+        input.add("/home/flo/data:/data:rw");
+
+        List<String> safe = service.filterExtraMounts(input, "img:latest");
+
+        assertThat(safe).containsExactly("/home/flo/data:/data:rw");
+    }
+
+    @Test
+    void findForbiddenSegment_exactMatchAndChildPaths_areForbidden() {
+        assertThat(ContainerShellService.findForbiddenSegment("/etc:/host:ro")).isEqualTo("/etc");
+        assertThat(ContainerShellService.findForbiddenSegment("/etc/foo:/data:ro")).isEqualTo("/etc");
+        assertThat(ContainerShellService.findForbiddenSegment("/root:/data:ro")).isEqualTo("/root");
+        assertThat(ContainerShellService.findForbiddenSegment("/var/run/docker.sock:/sock:ro")).isEqualTo("/var/run/docker.sock");
+        assertThat(ContainerShellService.findForbiddenSegment("/home/flo:/data:ro")).isNull();
+        assertThat(ContainerShellService.findForbiddenSegment("/etcetera:/data:ro")).isNull(); // not a child of /etc
     }
 
     @Test

@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -25,11 +26,38 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class ContainerShellService {
 
+    /**
+     * Mount paths that are always rejected (regardless of allow-extra-mounts).
+     * Matched against both host- and container-side of each bind-mount: a segment
+     * is rejected if it equals one of these or starts with "<path>/" — so e.g.
+     * "/etc/passwd" is rejected because it's a child of "/etc".
+     */
+    static final Set<String> FORBIDDEN_MOUNT_PATHS = Set.of(
+            "/var/run/docker.sock",
+            "/",
+            "/etc",
+            "/root",
+            "/proc",
+            "/sys"
+    );
+
     private final HostProcessUtils hostProcessUtils;
     private final ActivityLogService activityLogService;
 
     @Value("${automation.execution.allow-docker-socket-mount:false}")
     private boolean allowDockerSocketMount;
+
+    @Value("${automation.execution.allow-extra-mounts:false}")
+    private volatile boolean allowExtraMounts;
+
+    /** Runtime-mutable setter used by ExecutionSettingsService for live config updates. */
+    public void setAllowExtraMounts(boolean allow) {
+        this.allowExtraMounts = allow;
+    }
+
+    public boolean isAllowExtraMounts() {
+        return allowExtraMounts;
+    }
 
     /**
      * Execute a command inside an ephemeral container.
@@ -69,7 +97,9 @@ public class ContainerShellService {
                     "ContainerShellService", null);
         }
 
-        List<String> dockerCmd = buildDockerCommand(command, projectPath, containerImage, effectiveMount, extraMounts);
+        List<String> safeExtraMounts = filterExtraMounts(extraMounts, containerImage);
+
+        List<String> dockerCmd = buildDockerCommand(command, projectPath, containerImage, effectiveMount, safeExtraMounts);
 
         log.debug("Container shell execute (image: {}, workDir: {}, timeout: {}s): {}",
                 containerImage, projectPath, timeoutSeconds,
@@ -122,6 +152,74 @@ public class ContainerShellService {
         }
     }
 
+    /**
+     * Validates extra bind-mounts against the global allow-extra-mounts policy
+     * and the forbidden-targets blacklist. Rejected entries are dropped from the
+     * docker command and logged to the SECURITY ActivityLog.
+     */
+    List<String> filterExtraMounts(List<String> extraMounts, String containerImage) {
+        if (extraMounts == null || extraMounts.isEmpty()) {
+            return List.of();
+        }
+        List<String> safe = new ArrayList<>(extraMounts.size());
+        for (String mount : extraMounts) {
+            if (mount == null || mount.isBlank()) continue;
+
+            if (!allowExtraMounts) {
+                log.warn("Extra mount '{}' denied: allow-extra-mounts=false (image: {})", mount, containerImage);
+                activityLogService.warn(LogCategory.SECURITY,
+                        "Extra mount denied (allow-extra-mounts=false): " + mount + " (image: " + containerImage + ")",
+                        "ContainerShellService", null);
+                continue;
+            }
+
+            String forbidden = findForbiddenSegment(mount);
+            if (forbidden != null) {
+                log.warn("Extra mount '{}' rejected: matches forbidden path '{}' (image: {})", mount, forbidden, containerImage);
+                activityLogService.warn(LogCategory.SECURITY,
+                        "Extra mount rejected (forbidden path " + forbidden + "): " + mount + " (image: " + containerImage + ")",
+                        "ContainerShellService", null);
+                continue;
+            }
+
+            activityLogService.warn(LogCategory.SECURITY,
+                    "Extra mount activated: " + mount + " (image: " + containerImage + ")",
+                    "ContainerShellService", null);
+            safe.add(mount);
+        }
+        return safe;
+    }
+
+    /**
+     * Returns the forbidden path that matches either side of the bind-mount, or
+     * null if the mount is acceptable. A path is considered "matched" when a
+     * mount segment equals it or is a child of it (e.g. "/etc/foo" matches "/etc").
+     */
+    static String findForbiddenSegment(String mount) {
+        // Docker bind-mount syntax: "host:container[:options]"
+        String[] parts = mount.split(":", 3);
+        if (parts.length < 2) return null;
+        String host = parts[0].trim();
+        String container = parts[1].trim();
+
+        for (String forbidden : FORBIDDEN_MOUNT_PATHS) {
+            if (matchesForbidden(host, forbidden) || matchesForbidden(container, forbidden)) {
+                return forbidden;
+            }
+        }
+        return null;
+    }
+
+    private static boolean matchesForbidden(String path, String forbidden) {
+        if (path == null || path.isBlank()) return false;
+        String normalized = path.endsWith("/") && !path.equals("/")
+                ? path.substring(0, path.length() - 1)
+                : path;
+        if (normalized.equals(forbidden)) return true;
+        if (forbidden.equals("/")) return false; // every path starts with "/" — only exact match counts
+        return normalized.startsWith(forbidden + "/");
+    }
+
     private List<String> buildDockerCommand(String command, String projectPath,
                                             String containerImage, boolean mountDockerSocket,
                                             List<String> extraMounts) {
@@ -149,10 +247,9 @@ public class ContainerShellService {
             cmd.add("/var/run/docker.sock:/var/run/docker.sock");
         }
 
-        // Extra bind-mounts from block config (already template-resolved by caller)
+        // Extra bind-mounts (already validated by filterExtraMounts)
         if (extraMounts != null) {
             for (String mount : extraMounts) {
-                if (mount == null || mount.isBlank()) continue;
                 cmd.add("-v");
                 cmd.add(mount);
             }
