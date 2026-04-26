@@ -66,7 +66,8 @@ class AssistantServiceTest {
         );
         // Action-suggestion service defaults — disabled unless explicitly stubbed per test
         lenient().when(actionSuggestionService.isEnabled()).thenReturn(false);
-        lenient().when(actionSuggestionService.suggest(any(), anyString(), any())).thenReturn(List.of());
+        lenient().when(actionSuggestionService.suggest(any(), anyString(), any()))
+                .thenReturn(AssistantActionSuggestionService.SuggestionResult.empty());
         // Provider registry default — resolve to CLAUDE
         AiProvider claudeProvider = mock(AiProvider.class);
         lenient().when(claudeProvider.getId()).thenReturn("CLAUDE");
@@ -602,7 +603,8 @@ class AssistantServiceTest {
                 "show_run", "r-9", "Letzter Run", "Run öffnen");
         when(actionSuggestionService.isEnabled()).thenReturn(true);
         when(actionSuggestionService.suggest(any(), eq("Hier ist der Status."), any()))
-                .thenReturn(List.of(suggested));
+                .thenReturn(new AssistantActionSuggestionService.SuggestionResult(
+                        List.of(suggested), List.of()));
 
         var result = chat("Wie lief der letzte Run?");
 
@@ -637,7 +639,8 @@ class AssistantServiceTest {
                 "show_workflow", "wf-2", "Extra", "Extra öffnen");
         when(actionSuggestionService.isEnabled()).thenReturn(true);
         when(actionSuggestionService.suggest(any(), any(), any()))
-                .thenReturn(List.of(suggestedConflict, suggestedNew));
+                .thenReturn(new AssistantActionSuggestionService.SuggestionResult(
+                        List.of(suggestedConflict, suggestedNew), List.of()));
 
         var result = chat("Welche Workflows gibt es?");
 
@@ -668,7 +671,9 @@ class AssistantServiceTest {
         var runAction = new AssistantChatResponse.AssistantAction(
                 "run_workflow", "wf-42", "Daily Report", "Jetzt starten");
         when(actionSuggestionService.isEnabled()).thenReturn(true);
-        when(actionSuggestionService.suggest(any(), any(), any())).thenReturn(List.of(runAction));
+        when(actionSuggestionService.suggest(any(), any(), any()))
+                .thenReturn(new AssistantActionSuggestionService.SuggestionResult(
+                        List.of(runAction), List.of()));
 
         var result = chat("Welche Workflows gibt es?");
 

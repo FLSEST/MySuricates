@@ -4,6 +4,7 @@ import com.automation.service.assistant.PendingTool;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.util.List;
+import java.util.Map;
 
 public record AssistantChatResponse(
         String message,
@@ -50,9 +51,14 @@ public record AssistantChatResponse(
 
     /** An actionable suggestion the assistant is offering the user. */
     public record AssistantAction(
-            /** run_workflow | show_workflow | start_wish | show_run | ask_choice */
+            /**
+             * Navigational: run_workflow | show_workflow | start_wish | show_run | ask_choice.
+             * Mutating proposal (server-converted to PendingTool, not surfaced to frontend as
+             * an action button): propose_create_todo | propose_cancel_run |
+             * propose_rerun_workflow | propose_update_todo_status.
+             */
             String type,
-            /** Entity ID (workflowId, runId). Null for start_wish and ask_choice. */
+            /** Entity ID (workflowId, runId, todoId). Null for start_wish and ask_choice. */
             String id,
             /** Human-readable name of the entity. For start_wish: pre-filled wish text. */
             String name,
@@ -60,11 +66,23 @@ public record AssistantChatResponse(
             String label,
             /** Only for ask_choice: list of options rendered as individual clickable buttons. */
             @JsonInclude(JsonInclude.Include.NON_NULL)
-            List<String> options
+            List<String> options,
+            /**
+             * Extra payload for mutating proposals (priority/tags for create_todo,
+             * status for update_todo_status, etc.). Consumed server-side when the action is
+             * converted to a PendingTool — never reaches the frontend.
+             */
+            @JsonInclude(JsonInclude.Include.NON_NULL)
+            Map<String, Object> payload
     ) {
         /** Backwards-compatible constructor for existing 4-field callsites. */
         public AssistantAction(String type, String id, String name, String label) {
-            this(type, id, name, label, null);
+            this(type, id, name, label, null, null);
+        }
+
+        /** Constructor for ask_choice actions (with options, no payload). */
+        public AssistantAction(String type, String id, String name, String label, List<String> options) {
+            this(type, id, name, label, options, null);
         }
     }
 }

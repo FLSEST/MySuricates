@@ -250,13 +250,19 @@ public class AssistantService {
 
             // Second call: generate action-button suggestions via the dedicated suggestions-model.
             // Decoupled from the main answer so the primary model stays focused on text quality.
-            List<AssistantAction> suggestedActions = fetchSuggestedActions(req, systemPrompt, parsed.message());
+            // The suggestion service may also return mutating-proposal pending-tools (already
+            // registered in the PendingToolRegistry) which we merge with whatever the main model
+            // emitted via <tool> tags.
+            AssistantActionSuggestionService.SuggestionResult suggestion =
+                    fetchSuggestedActions(req, systemPrompt, parsed.message());
 
-            List<AssistantAction> mergedActions = mergeActions(parsed.actions(), suggestedActions);
+            List<AssistantAction> mergedActions = mergeActions(parsed.actions(), suggestion.actions());
             List<AssistantAction> filteredActions = filterActions(mergedActions, allowMutatingProposals);
+            List<com.automation.service.assistant.PendingTool> mergedPendingTools =
+                    mergePendingTools(extraction.pendingTools(), suggestion.pendingTools());
             broadcaster.broadcastStatus(requestId, "COMPLETED", null, startNanos);
             return new AssistantChatResponse(parsed.message(), filteredActions, model, resolvedProvider)
-                    .withPendingTools(extraction.pendingTools());
+                    .withPendingTools(mergedPendingTools);
 
         } catch (Exception e) {
             log.error("Assistant chat failed", e);
@@ -392,22 +398,43 @@ public class AssistantService {
 
     /**
      * Runs the action-suggestion CLI call with a short timeout; failure or timeout returns an
-     * empty list so the chat still delivers its text response. Skipped entirely when suggestions
-     * are disabled in settings — saves a CLI slot per chat turn.
+     * empty result so the chat still delivers its text response. Skipped entirely when
+     * suggestions are disabled in settings — saves a CLI slot per chat turn.
      */
-    private List<AssistantAction> fetchSuggestedActions(AssistantChatRequest req, String pageContext, String answer) {
+    private AssistantActionSuggestionService.SuggestionResult fetchSuggestedActions(
+            AssistantChatRequest req, String pageContext, String answer) {
         if (actionSuggestionService == null || !actionSuggestionService.isEnabled()) {
-            return List.of();
+            return AssistantActionSuggestionService.SuggestionResult.empty();
         }
         try {
             return CompletableFuture
                     .supplyAsync(() -> actionSuggestionService.suggest(req, answer, pageContext))
-                    .completeOnTimeout(List.of(), 35, TimeUnit.SECONDS)
+                    .completeOnTimeout(AssistantActionSuggestionService.SuggestionResult.empty(),
+                            35, TimeUnit.SECONDS)
                     .join();
         } catch (Exception e) {
             log.debug("Action-suggestion call failed; returning empty actions", e);
+            return AssistantActionSuggestionService.SuggestionResult.empty();
+        }
+    }
+
+    /**
+     * Merges pending-tools from two sources: tools the main model emitted via {@code <tool>}
+     * tags (extraction.pendingTools()) and tools the suggestion model proposed via
+     * {@code propose_*} actions (suggestion.pendingTools()). Both lists may be empty. Inline
+     * tools are listed first; suggestion-model tools follow. No de-duplication — a duplicate
+     * is unlikely (different code paths trigger them) and the user can reject either.
+     */
+    private List<com.automation.service.assistant.PendingTool> mergePendingTools(
+            List<com.automation.service.assistant.PendingTool> inline,
+            List<com.automation.service.assistant.PendingTool> suggested) {
+        if ((inline == null || inline.isEmpty()) && (suggested == null || suggested.isEmpty())) {
             return List.of();
         }
+        List<com.automation.service.assistant.PendingTool> merged = new ArrayList<>();
+        if (inline != null) merged.addAll(inline);
+        if (suggested != null) merged.addAll(suggested);
+        return merged;
     }
 
     /**
