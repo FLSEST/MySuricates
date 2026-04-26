@@ -4,8 +4,8 @@
     "en": "Suno Batch Song Generation"
   },
   "description": {
-    "de": "Erstellt Songs auf Suno aus vorhandenen Lyrics-Dateien via Chromium CDP-Session",
-    "en": "Creates songs on Suno from existing lyrics files via Chromium CDP session"
+    "de": "Erstellt Songs auf Suno aus vorhandenen Lyrics-Dateien via Chromium CDP-Session. Erwartet eine laufende Chromium-Instanz mit Remote-Debugging auf Port 9222 und ein vorbereitetes Suno-Login.",
+    "en": "Creates songs on Suno from existing lyrics files via Chromium CDP session. Requires Chromium with remote-debugging on port 9222 and a logged-in Suno session."
   },
   "icon": "🎵",
   "category": "CONTENT",
@@ -14,15 +14,15 @@
     {
       "type": "shell",
       "config": {
-        "command": "echo '=== Suno Batch Pre-Check ===' && echo '' && echo '--- CDP Connection ---' && if curl -s --max-time 5 http://localhost:9222/json/version > /dev/null 2>&1; then echo 'CDP on port 9222: OK'; else echo 'CDP on port 9222: NOT REACHABLE'; echo 'Start Chromium with: chromium --remote-debugging-port=9222'; exit 1; fi && echo '' && echo '--- Lyrics Files ---' && LYRICS_DIR='{{ base_dir }}/{{ lang_pair }}/{{ collection }}' && LYRICS_COUNT=$(find \"$LYRICS_DIR\" -name '*.txt' 2>/dev/null | wc -l) && echo \"Directory: $LYRICS_DIR\" && echo \"Lyrics files found: $LYRICS_COUNT\" && if [ \"$LYRICS_COUNT\" -eq 0 ]; then echo 'ERROR: No lyrics files found'; exit 1; fi && echo '' && echo '--- Existing Downloads ---' && AUDIO_COUNT=$(find \"$LYRICS_DIR\" -name '*.mp3' -o -name '*.wav' 2>/dev/null | wc -l) && echo \"Audio files already present: $AUDIO_COUNT\" && echo \"Remaining to generate: $((LYRICS_COUNT - AUDIO_COUNT))\"",
-        "label": "Pre-Check: CDP & Lyrics",
+        "command": "set -uo pipefail\necho '=== Suno Batch Pre-Check ==='\necho ''\nBASE_DIR=$(eval echo '{{ base_dir }}')\nSCRIPT_PATH=\"$BASE_DIR/{{ batch_script }}\"\nLYRICS_DIR=\"$BASE_DIR/{{ lang_pair }}/{{ collection }}\"\n\necho '--- CDP Connection ---'\nif curl -s --max-time 5 http://localhost:9222/json/version > /dev/null 2>&1; then\n  echo 'CDP auf Port 9222: OK'\nelse\n  echo 'FEHLER: CDP auf Port 9222 nicht erreichbar.'\n  echo 'Starte Chromium mit:'\n  echo '  chromium --remote-debugging-port=9222 --user-data-dir=/tmp/suno-profile'\n  exit 1\nfi\necho ''\n\necho '--- Batch-Script ---'\nif [ ! -f \"$SCRIPT_PATH\" ]; then\n  echo \"FEHLER: Batch-Script fehlt: $SCRIPT_PATH\"\n  echo \"Setze defaultContext.batch_script korrekt oder lege das Script ab.\"\n  exit 1\nfi\nif [ ! -x \"$SCRIPT_PATH\" ]; then\n  echo \"WARN: Script ist nicht ausfuehrbar — chmod +x $SCRIPT_PATH\"\nfi\necho \"Script: $SCRIPT_PATH (OK)\"\necho ''\n\necho '--- Lyrics Files ---'\nLYRICS_COUNT=$(find \"$LYRICS_DIR\" -maxdepth 1 -name '*.txt' 2>/dev/null | wc -l)\necho \"Verzeichnis: $LYRICS_DIR\"\necho \"Lyrics-Dateien gefunden: $LYRICS_COUNT\"\nif [ \"$LYRICS_COUNT\" -eq 0 ]; then\n  echo 'FEHLER: Keine Lyrics-Dateien gefunden'\n  exit 1\nfi\necho ''\n\necho '--- Bereits generierte Audios ---'\nAUDIO_COUNT=$(find \"$LYRICS_DIR\" -maxdepth 1 \\( -name '*.mp3' -o -name '*.wav' \\) 2>/dev/null | wc -l)\necho \"Audio-Dateien vorhanden: $AUDIO_COUNT\"\necho \"Verbleibend: $((LYRICS_COUNT - AUDIO_COUNT))\"",
+        "label": "Pre-Check: CDP, Script & Lyrics",
         "timeout_seconds": 30
       }
     },
     {
       "type": "shell",
       "config": {
-        "command": "cd {{ base_dir }} && bash scripts/suno_batch_pipx.sh --session-mode cdp --continue-on-error --skip-existing --delay {{ delay }} --delay-jitter {{ delay_jitter }} --song-timeout {{ song_timeout }} --max-downloads {{ max_downloads }} '{{ lang_pair }}/{{ collection }}/*.txt'",
+        "command": "set -uo pipefail\nBASE_DIR=$(eval echo '{{ base_dir }}')\ncd \"$BASE_DIR\" || { echo \"base_dir nicht erreichbar: $BASE_DIR\"; exit 1; }\nbash '{{ batch_script }}' --session-mode cdp --continue-on-error --skip-existing --delay {{ delay }} --delay-jitter {{ delay_jitter }} --song-timeout {{ song_timeout }} --max-downloads {{ max_downloads }} '{{ lang_pair }}/{{ collection }}/*.txt'",
         "label": "Suno Batch Generation",
         "timeout_seconds": 10800,
         "on_failure": "continue"
@@ -31,7 +31,7 @@
     {
       "type": "shell",
       "config": {
-        "command": "echo '=== Suno Batch Results ===' && echo '' && LYRICS_DIR='{{ base_dir }}/{{ lang_pair }}/{{ collection }}' && LYRICS_COUNT=$(find \"$LYRICS_DIR\" -name '*.txt' 2>/dev/null | wc -l) && AUDIO_COUNT=$(find \"$LYRICS_DIR\" -name '*.mp3' -o -name '*.wav' 2>/dev/null | wc -l) && echo \"Total lyrics files: $LYRICS_COUNT\" && echo \"Total audio files:  $AUDIO_COUNT\" && echo \"Success rate: $AUDIO_COUNT / $LYRICS_COUNT\" && echo '' && echo '--- Missing Songs ---' && for txt in \"$LYRICS_DIR\"/*.txt; do base=$(basename \"$txt\" .txt); if [ ! -f \"$LYRICS_DIR/$base.mp3\" ] && [ ! -f \"$LYRICS_DIR/$base.wav\" ]; then echo \"  MISSING: $base\"; fi; done && echo '' && echo 'Done.'",
+        "command": "set -uo pipefail\necho '=== Suno Batch Results ==='\necho ''\nBASE_DIR=$(eval echo '{{ base_dir }}')\nLYRICS_DIR=\"$BASE_DIR/{{ lang_pair }}/{{ collection }}\"\nLYRICS_COUNT=$(find \"$LYRICS_DIR\" -maxdepth 1 -name '*.txt' 2>/dev/null | wc -l)\nAUDIO_COUNT=$(find \"$LYRICS_DIR\" -maxdepth 1 \\( -name '*.mp3' -o -name '*.wav' \\) 2>/dev/null | wc -l)\necho \"Total lyrics files: $LYRICS_COUNT\"\necho \"Total audio files:  $AUDIO_COUNT\"\necho \"Success rate: $AUDIO_COUNT / $LYRICS_COUNT\"\necho ''\necho '--- Missing Songs ---'\nfor txt in \"$LYRICS_DIR\"/*.txt; do\n  [ -f \"$txt\" ] || continue\n  base=$(basename \"$txt\" .txt)\n  if [ ! -f \"$LYRICS_DIR/$base.mp3\" ] && [ ! -f \"$LYRICS_DIR/$base.wav\" ]; then\n    echo \"  MISSING: $base\"\n  fi\ndone\necho ''\necho 'Done.'",
         "label": "Result Summary",
         "timeout_seconds": 60
       }
@@ -39,10 +39,11 @@
   ],
   "instructions": null,
   "model": null,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "MySuricates",
   "defaultContext": {
-    "base_dir": "/home/flo/Entwicklung/Musik",
+    "base_dir": "~/Entwicklung/Musik",
+    "batch_script": "scripts/suno_batch_pipx.sh",
     "lang_pair": "de-es",
     "collection": "alltag",
     "delay": "5",
