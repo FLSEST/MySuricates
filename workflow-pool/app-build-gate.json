@@ -15,11 +15,14 @@
       "type": "shell",
       "config": {
         "label": "Flutter App analysieren und testen",
-        "command": "cd /home/flo/Entwicklung/IdeaProjects/treasure_hunt_app\n\necho '=== Flutter Analyze ==='\nflutter analyze --no-pub 2>&1\nANALYZE_EXIT=$?\n\necho ''\necho '=== Flutter Test ==='\nflutter test 2>&1\nTEST_EXIT=$?\n\necho ''\necho '--- Build Gate Summary ---'\necho \"Analyze exit code: $ANALYZE_EXIT\"\necho \"Test exit code: $TEST_EXIT\"\n\nif [ $TEST_EXIT -ne 0 ]; then\n  echo \"gate_status: RED\"\n  echo \"gate_category: app-build\"\n  echo \"gate_description: Flutter-Tests fehlgeschlagen — Release blockiert\"\n  exit 1\nelif [ $ANALYZE_EXIT -ne 0 ]; then\n  echo \"gate_status: YELLOW\"\n  echo \"gate_category: app-build\"\n  echo \"gate_description: Flutter analyze hat Warnungen — Tests bestanden\"\nelse\n  echo \"gate_status: GREEN\"\n  echo \"gate_category: app-build\"\n  echo \"gate_description: App-Tests bestanden, keine Analyze-Fehler\"\nfi",
+        "command": "set -uo pipefail\ncommand -v flutter >/dev/null 2>&1 || { echo 'flutter not found in PATH'; echo 'gate_status: RED'; echo 'gate_category: app-build'; echo 'gate_description: Flutter CLI fehlt — Build kann nicht ausgeführt werden'; exit 1; }\ncd '{{ project_path }}' || { echo 'project_path not accessible: {{ project_path }}'; echo 'gate_status: RED'; echo 'gate_category: app-build'; exit 1; }\n\necho '=== Flutter Analyze ==='\nflutter analyze --no-pub 2>&1\nANALYZE_EXIT=$?\n\necho ''\necho '=== Flutter Test ==='\nflutter test 2>&1\nTEST_EXIT=$?\n\necho ''\necho '--- Build Gate Summary ---'\necho \"Analyze exit code: $ANALYZE_EXIT\"\necho \"Test exit code: $TEST_EXIT\"\n\nif [ $TEST_EXIT -ne 0 ]; then\n  echo \"gate_status: RED\"\n  echo \"gate_category: app-build\"\n  echo \"gate_description: Flutter-Tests fehlgeschlagen — Release blockiert\"\n  exit 1\nelif [ $ANALYZE_EXIT -ne 0 ]; then\n  echo \"gate_status: YELLOW\"\n  echo \"gate_category: app-build\"\n  echo \"gate_description: Flutter analyze hat Warnungen — Tests bestanden\"\nelse\n  echo \"gate_status: GREEN\"\n  echo \"gate_category: app-build\"\n  echo \"gate_description: App-Tests bestanden, keine Analyze-Fehler\"\nfi",
         "timeout_seconds": 300
       }
     }
   ],
-  "version": "1.0.0",
-  "author": "MySuricates"
+  "version": "1.1.0",
+  "author": "MySuricates",
+  "defaultContext": {
+    "project_path": "/home/flo/Entwicklung/IdeaProjects/treasure_hunt_app"
+  }
 }

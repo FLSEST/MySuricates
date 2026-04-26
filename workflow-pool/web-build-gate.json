@@ -15,11 +15,14 @@
       "type": "shell",
       "config": {
         "label": "Website lint und build",
-        "command": "cd /home/flo/Entwicklung/IdeaProjects/treasure_hunt_web\n\necho '=== npm run lint ==='\nnpm run lint 2>&1\nLINT_EXIT=$?\n\necho ''\necho '=== npm run build ==='\nnpm run build 2>&1\nBUILD_EXIT=$?\n\necho ''\necho '--- Web Build Gate Summary ---'\necho \"Lint exit code: $LINT_EXIT\"\necho \"Build exit code: $BUILD_EXIT\"\n\nif [ $BUILD_EXIT -ne 0 ]; then\n  echo \"gate_status: RED\"\n  echo \"gate_category: web-build\"\n  echo \"gate_description: Next.js Build fehlgeschlagen — Release blockiert\"\n  exit 1\nelif [ $LINT_EXIT -ne 0 ]; then\n  echo \"gate_status: YELLOW\"\n  echo \"gate_category: web-build\"\n  echo \"gate_description: Lint-Warnungen vorhanden — Build erfolgreich\"\nelse\n  echo \"gate_status: GREEN\"\n  echo \"gate_category: web-build\"\n  echo \"gate_description: Website Build erfolgreich, kein Lint-Fehler\"\nfi",
+        "command": "set -uo pipefail\ncommand -v npm >/dev/null 2>&1 || { echo 'npm not found in PATH'; echo 'gate_status: RED'; echo 'gate_category: web-build'; echo 'gate_description: npm CLI fehlt — Build kann nicht ausgeführt werden'; exit 1; }\ncd '{{ project_path }}' || { echo 'project_path not accessible: {{ project_path }}'; echo 'gate_status: RED'; echo 'gate_category: web-build'; exit 1; }\n\necho '=== npm run lint ==='\nnpm run lint 2>&1\nLINT_EXIT=$?\n\necho ''\necho '=== npm run build ==='\nnpm run build 2>&1\nBUILD_EXIT=$?\n\necho ''\necho '--- Web Build Gate Summary ---'\necho \"Lint exit code: $LINT_EXIT\"\necho \"Build exit code: $BUILD_EXIT\"\n\nif [ $BUILD_EXIT -ne 0 ]; then\n  echo \"gate_status: RED\"\n  echo \"gate_category: web-build\"\n  echo \"gate_description: Next.js Build fehlgeschlagen — Release blockiert\"\n  exit 1\nelif [ $LINT_EXIT -ne 0 ]; then\n  echo \"gate_status: YELLOW\"\n  echo \"gate_category: web-build\"\n  echo \"gate_description: Lint-Warnungen vorhanden — Build erfolgreich\"\nelse\n  echo \"gate_status: GREEN\"\n  echo \"gate_category: web-build\"\n  echo \"gate_description: Website Build erfolgreich, kein Lint-Fehler\"\nfi",
         "timeout_seconds": 300
       }
     }
   ],
-  "version": "1.0.0",
-  "author": "MySuricates"
+  "version": "1.1.0",
+  "author": "MySuricates",
+  "defaultContext": {
+    "project_path": "/home/flo/Entwicklung/IdeaProjects/treasure_hunt_web"
+  }
 }

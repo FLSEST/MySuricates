@@ -15,11 +15,14 @@
       "type": "shell",
       "config": {
         "label": "Playwright Tests ausführen",
-        "command": "cd /home/flo/Entwicklung/LernApp\n\necho '=== LernApp Playwright Tests ==='\ndate\necho ''\n\nOUTPUT=$(npm test 2>&1)\nEXIT_CODE=$?\n\necho \"$OUTPUT\"\n\n# Extract pass/fail counts from Playwright output\nPASSED=$(echo \"$OUTPUT\" | grep -oE '[0-9]+ passed' | grep -oE '[0-9]+' | tail -1 || echo '?')\nFAILED=$(echo \"$OUTPUT\" | grep -oE '[0-9]+ failed' | grep -oE '[0-9]+' | tail -1 || echo '0')\n\necho ''\necho '--- Zusammenfassung ---'\necho \"Bestanden: $PASSED\"\necho \"Fehlgeschlagen: $FAILED\"\necho \"Exit-Code: $EXIT_CODE\"\n\nif [ \"$EXIT_CODE\" -ne 0 ] || [ \"$FAILED\" != '0' ] && [ \"$FAILED\" != '?' ]; then\n  # Extract failed test names for the gate description\n  FAIL_NAMES=$(echo \"$OUTPUT\" | grep -E '^\\s+[0-9]+\\)' | head -5 | sed 's/^[[:space:]]*//' | tr '\\n' '; ')\n  echo ''\n  echo \"gate_status: RED\"\n  echo \"gate_category: lernapp-tests\"\n  echo \"gate_description: $FAILED fehlgeschlagene Tests: $FAIL_NAMES\"\nelse\n  echo ''\n  echo \"gate_status: GREEN\"\n  echo \"gate_category: lernapp-tests\"\n  echo \"gate_description: Alle $PASSED LernApp-Tests bestanden\"\nfi",
+        "command": "set -uo pipefail\ncommand -v npm >/dev/null 2>&1 || { echo 'npm not found in PATH'; echo 'gate_status: RED'; echo 'gate_category: lernapp-tests'; echo 'gate_description: npm CLI fehlt — Tests können nicht ausgeführt werden'; exit 1; }\ncd '{{ project_path }}' || { echo 'project_path not accessible: {{ project_path }}'; echo 'gate_status: RED'; echo 'gate_category: lernapp-tests'; exit 1; }\n\necho '=== LernApp Playwright Tests ==='\ndate\necho ''\n\nOUTPUT=$(npm test 2>&1)\nEXIT_CODE=$?\n\necho \"$OUTPUT\"\n\n# Extract pass/fail counts from Playwright output\nPASSED=$(echo \"$OUTPUT\" | grep -oE '[0-9]+ passed' | grep -oE '[0-9]+' | tail -1 || echo '?')\nFAILED=$(echo \"$OUTPUT\" | grep -oE '[0-9]+ failed' | grep -oE '[0-9]+' | tail -1 || echo '0')\n\necho ''\necho '--- Zusammenfassung ---'\necho \"Bestanden: $PASSED\"\necho \"Fehlgeschlagen: $FAILED\"\necho \"Exit-Code: $EXIT_CODE\"\n\nif [ \"$EXIT_CODE\" -ne 0 ] || [ \"$FAILED\" != '0' ] && [ \"$FAILED\" != '?' ]; then\n  # Extract failed test names for the gate description\n  FAIL_NAMES=$(echo \"$OUTPUT\" | grep -E '^\\s+[0-9]+\\)' | head -5 | sed 's/^[[:space:]]*//' | tr '\\n' '; ')\n  echo ''\n  echo \"gate_status: RED\"\n  echo \"gate_category: lernapp-tests\"\n  echo \"gate_description: $FAILED fehlgeschlagene Tests: $FAIL_NAMES\"\nelse\n  echo ''\n  echo \"gate_status: GREEN\"\n  echo \"gate_category: lernapp-tests\"\n  echo \"gate_description: Alle $PASSED LernApp-Tests bestanden\"\nfi",
         "timeout_seconds": 180
       }
     }
   ],
-  "version": "1.0.0",
-  "author": "MySuricates"
+  "version": "1.1.0",
+  "author": "MySuricates",
+  "defaultContext": {
+    "project_path": "/home/flo/Entwicklung/LernApp"
+  }
 }
