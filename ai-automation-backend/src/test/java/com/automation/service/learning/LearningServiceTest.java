@@ -431,6 +431,73 @@ class LearningServiceTest {
             assertThat(dashboard.failedRuns()).isEqualTo(1L);
             assertThat(dashboard.successRate()).isCloseTo(0.667, within(0.01));
         }
+
+        @Test
+        void getDashboard_integrationProvider_isExcludedFromAiProviderStats() {
+            LearningService learningService = new LearningService(
+                    runRepository, workflowRepository, workflowMapper,
+                    statsService, similarityService, agenticService, insightsService);
+
+            // Run 1: integration step (Trello) followed by an AI step (Claude)
+            StepResult trelloStep = StepResult.builder()
+                    .stepIndex(0).status(StepStatus.COMPLETED).durationMs(800L)
+                    .startedAt(Instant.now())
+                    .metadata(Map.of(
+                            "provider", "trello",
+                            "executionMode", "integration",
+                            "blockType", "integration"
+                    ))
+                    .build();
+            StepResult claudeStep = StepResult.builder()
+                    .stepIndex(1).status(StepStatus.COMPLETED).durationMs(2000L)
+                    .startedAt(Instant.now())
+                    .metadata(Map.of(
+                            "provider", "CLAUDE",
+                            "model", "claude-sonnet-4-6",
+                            "blockType", "simple"
+                    ))
+                    .build();
+            WorkflowRun mixedRun = WorkflowRun.builder()
+                    .status(RunStatus.COMPLETED)
+                    .startedAt(Instant.now())
+                    .steps(new ArrayList<>(List.of(trelloStep, claudeStep)))
+                    .build();
+
+            // Run 2: integration-only run (Jira) — must NOT contribute a "jira" provider entry
+            StepResult jiraStep = StepResult.builder()
+                    .stepIndex(0).status(StepStatus.COMPLETED).durationMs(500L)
+                    .startedAt(Instant.now())
+                    .metadata(Map.of(
+                            "provider", "jira",
+                            "executionMode", "integration",
+                            "blockType", "integration"
+                    ))
+                    .build();
+            WorkflowRun integrationOnlyRun = WorkflowRun.builder()
+                    .status(RunStatus.COMPLETED)
+                    .startedAt(Instant.now())
+                    .steps(new ArrayList<>(List.of(jiraStep)))
+                    .build();
+
+            when(workflowRepository.count()).thenReturn(1L);
+            when(runRepository.count()).thenReturn(2L);
+            when(runRepository.countByStatus(RunStatus.COMPLETED)).thenReturn(2L);
+            when(runRepository.countByStatus(RunStatus.COMPLETED_WITH_ERRORS)).thenReturn(0L);
+            when(runRepository.countByStatus(RunStatus.FAILED)).thenReturn(0L);
+            when(runRepository.countByStartedAtAfter(any(Instant.class))).thenReturn(0L);
+            when(runRepository.findByStartedAtAfterOrderByStartedAtDesc(any(Instant.class)))
+                    .thenReturn(List.of(mixedRun, integrationOnlyRun));
+            when(runRepository.findTopWorkflows()).thenReturn(List.of());
+            when(runRepository.findTop10ByOrderByStartedAtDesc()).thenReturn(List.of());
+
+            DashboardResponse dashboard = learningService.getDashboard(30, null);
+
+            // Only CLAUDE should appear — trello/jira are integration connectors, not AI providers
+            assertThat(dashboard.providerStats())
+                    .extracting(DashboardResponse.ProviderStats::provider)
+                    .containsExactly("CLAUDE")
+                    .doesNotContain("trello", "jira", "google-calendar");
+        }
     }
 
     // --- AgenticLearningService ---

@@ -239,7 +239,13 @@ public class LearningService {
                 runCost += stepCost;
                 runTokens += stepTokens;
 
-                if (runProvider == null && meta.get("provider") instanceof String p) runProvider = p;
+                // Only AI providers count for providerStats — integration block metadata
+                // also stores a `provider` (trello/jira/google-calendar/...) but those are
+                // connectors, not AI providers, so we skip them here.
+                if (runProvider == null && meta.get("provider") instanceof String p
+                        && !"integration".equals(extractString(meta, "executionMode"))) {
+                    runProvider = p;
+                }
 
                 if (meta.get("model") instanceof String m && !m.isBlank()) {
                     String nm = normalizeModelId(m);
