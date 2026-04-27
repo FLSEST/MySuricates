@@ -191,7 +191,10 @@ public class ConnectionPoolWatchdogService {
         sb.append("  Thread \"").append(t.getName())
                 .append("\" id=").append(t.getId())
                 .append(" state=").append(t.getState());
-        int limit = Math.min(stack.length, 25);
+        // Show enough frames that the com.automation caller is visible. With
+        // Hibernate/Spring Data JPA, the caller frame is often 30-50 deep
+        // below all the SQM/AST plumbing.
+        int limit = Math.min(stack.length, 80);
         for (int i = 0; i < limit; i++) {
             sb.append("\n    at ").append(stack[i]);
         }
