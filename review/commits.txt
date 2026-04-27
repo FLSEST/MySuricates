@@ -1,0 +1,5 @@
+b57d303 fix(assistant): auto-fetch on announcement text, not just blank responses
+75f5899 feat(workflow): add {{ run_timestamp }} path-safe timestamp variable (TODO 2738fda0)
+20644ad feat(palette): phase 5.2 — Tab context switch & Alt+1–9 row shortcuts
+b635131 test(workflow): lock in {{ project_path }} + system variable seeding (TODO b5a46bb5)
+a5c912c feat(execution): per-block container_image with mount support + system variables

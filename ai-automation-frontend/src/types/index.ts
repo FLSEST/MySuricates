@@ -700,6 +700,13 @@ export interface ProviderStats {
   successRate: number;
 }
 
+export interface IntegrationStats {
+  provider: string;
+  runCount: number;
+  totalTokens: number;
+  successRate: number;
+}
+
 export interface ModelStats {
   model: string;
   stepCount: number;
@@ -729,6 +736,7 @@ export interface DashboardData {
   recentRuns: WorkflowRun[];
   timeSeries?: TimeSeriesPoint[];
   providerStats?: ProviderStats[];
+  integrationStats?: IntegrationStats[];
   modelStats?: ModelStats[];
   gateStatusSummary?: GateStatusEntry[];
   failureReasons?: FailureReasonEntry[];

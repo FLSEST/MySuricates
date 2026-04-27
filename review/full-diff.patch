@@ -1,0 +1,1054 @@
+diff --git a/ai-automation-backend/docker/Dockerfile.agent-java b/ai-automation-backend/docker/Dockerfile.agent-java
+new file mode 100644
+index 0000000..1b89d06
+--- /dev/null
++++ b/ai-automation-backend/docker/Dockerfile.agent-java
+@@ -0,0 +1,21 @@
++FROM eclipse-temurin:21-jdk-jammy
++
++# Create generic agent user - UID is overridden at runtime via --user
++RUN useradd -m -u 1000 agent
++
++# Base tools + Maven
++RUN apt-get update && apt-get install -y --no-install-recommends \
++      maven git curl jq bash python3 ca-certificates && \
++    rm -rf /var/lib/apt/lists/*
++
++# Prepare home directories (m2 cache writable by any runtime UID)
++RUN mkdir -p /home/agent/.m2 /home/agent/.cache /home/agent/.config && \
++    chown -R agent:agent /home/agent && \
++    chmod -R a+rwX /home/agent
++
++ENV HOME="/home/agent"
++
++USER agent
++WORKDIR /workspace
++
++CMD ["tail", "-f", "/dev/null"]
+diff --git a/ai-automation-backend/docker/Dockerfile.stable b/ai-automation-backend/docker/Dockerfile.stable
+index 1d5b5ca..d66cbb5 100644
+--- a/ai-automation-backend/docker/Dockerfile.stable
++++ b/ai-automation-backend/docker/Dockerfile.stable
+@@ -10,7 +10,18 @@ RUN apt-get update && \
+       curl git gosu \
+       python3 jq \
+       nodejs npm \
+-      wget unzip && \
++      wget unzip ca-certificates gnupg && \
++    rm -rf /var/lib/apt/lists/*
++
++# Docker CE CLI so the backend can spawn ephemeral per-block containers via
++# ContainerShellService (container_image in shell/retry/foreach/while/switch blocks).
++# The docker daemon lives on the host; we just need the client binary + socket mount.
++RUN install -m 0755 -d /etc/apt/keyrings && \
++    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc && \
++    chmod a+r /etc/apt/keyrings/docker.asc && \
++    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu jammy stable" \
++      > /etc/apt/sources.list.d/docker.list && \
++    apt-get update && apt-get install -y --no-install-recommends docker-ce-cli && \
+     rm -rf /var/lib/apt/lists/*
+ 
+ RUN groupadd -g ${HOST_GID} ${HOST_USER} && \
+diff --git a/ai-automation-backend/src/main/java/com/automation/executor/blocks/ForEachBlockExecutor.java b/ai-automation-backend/src/main/java/com/automation/executor/blocks/ForEachBlockExecutor.java
+index 4199d97..a691df4 100644
+--- a/ai-automation-backend/src/main/java/com/automation/executor/blocks/ForEachBlockExecutor.java
++++ b/ai-automation-backend/src/main/java/com/automation/executor/blocks/ForEachBlockExecutor.java
+@@ -90,10 +90,7 @@ public class ForEachBlockExecutor implements BlockExecutor {
+             if (isShell) {
+                 itemResult = commandExecutor.executeStepAsShell(
+                         context.getProjectPath(),
+-                        BlockDefinition.builder()
+-                                .type("shell")
+-                                .config(Map.of("command", resolvedCommand))
+-                                .build(),
++                        CommandExecutorService.buildResolvedShellBlock(config, resolvedCommand, context),
+                         context.nextStepIndex(),
+                         shellTimeout
+                 );
+diff --git a/ai-automation-backend/src/main/java/com/automation/executor/blocks/RetryBlockExecutor.java b/ai-automation-backend/src/main/java/com/automation/executor/blocks/RetryBlockExecutor.java
+index 082cc31..d9a9dee 100644
+--- a/ai-automation-backend/src/main/java/com/automation/executor/blocks/RetryBlockExecutor.java
++++ b/ai-automation-backend/src/main/java/com/automation/executor/blocks/RetryBlockExecutor.java
+@@ -60,10 +60,7 @@ public class RetryBlockExecutor implements BlockExecutor {
+             if (isShell) {
+                 lastResult = commandExecutor.executeStepAsShell(
+                         context.getProjectPath(),
+-                        BlockDefinition.builder()
+-                                .type("shell")
+-                                .config(Map.of("command", command))
+-                                .build(),
++                        CommandExecutorService.buildResolvedShellBlock(config, command, context),
+                         context.nextStepIndex(),
+                         shellTimeout
+                 );
+diff --git a/ai-automation-backend/src/main/java/com/automation/executor/blocks/ShellBlockExecutor.java b/ai-automation-backend/src/main/java/com/automation/executor/blocks/ShellBlockExecutor.java
+index 367eb6a..1ee0eae 100644
+--- a/ai-automation-backend/src/main/java/com/automation/executor/blocks/ShellBlockExecutor.java
++++ b/ai-automation-backend/src/main/java/com/automation/executor/blocks/ShellBlockExecutor.java
+@@ -13,6 +13,8 @@ import lombok.RequiredArgsConstructor;
+ import org.springframework.stereotype.Component;
+ 
+ import java.time.Instant;
++import java.util.ArrayList;
++import java.util.List;
+ import java.util.Map;
+ 
+ import static com.automation.config.ExecutionDefaults.SHELL_TIMEOUT_SECONDS;
+@@ -46,13 +48,14 @@ public class ShellBlockExecutor implements BlockExecutor {
+ 
+         String containerImage = config.get("container_image") instanceof String s ? s : null;
+         boolean mountDockerSocket = Boolean.TRUE.equals(config.get("mount_docker_socket"));
++        List<String> extraMounts = resolveMounts(config.get("mounts"), context);
+ 
+         ShellResult result;
+         String executionMode;
+ 
+         if (containerImage != null && !containerImage.isBlank()) {
+             result = containerShellService.execute(command, context.getProjectPath(), timeout,
+-                    containerImage, mountDockerSocket);
++                    containerImage, mountDockerSocket, extraMounts);
+             executionMode = "container:" + containerImage;
+         } else {
+             result = shellService.execute(command, context.getProjectPath(), timeout, proc -> {
+@@ -83,6 +86,25 @@ public class ShellBlockExecutor implements BlockExecutor {
+         return "shell".equals(blockType);
+     }
+ 
++    /**
++     * Reads the optional `mounts` config (List of strings in docker-volume syntax
++     * `host:container[:ro|rw]`) and resolves template variables like {{ home_dir }}
++     * against the current execution context.
++     */
++    static List<String> resolveMounts(Object raw, ExecutionContext context) {
++        if (!(raw instanceof List<?> list) || list.isEmpty()) {
++            return List.of();
++        }
++        List<String> resolved = new ArrayList<>(list.size());
++        for (Object entry : list) {
++            if (entry == null) continue;
++            String s = entry.toString();
++            if (s.isBlank()) continue;
++            resolved.add(context.resolveTemplate(s));
++        }
++        return resolved;
++    }
++
+     private String buildRecoveryHint(int exitCode, String command) {
+         String firstToken = command.trim().split("\\s+")[0];
+         return switch (exitCode) {
+diff --git a/ai-automation-backend/src/main/java/com/automation/executor/blocks/SwitchBlockExecutor.java b/ai-automation-backend/src/main/java/com/automation/executor/blocks/SwitchBlockExecutor.java
+index 73f231b..f45d553 100644
+--- a/ai-automation-backend/src/main/java/com/automation/executor/blocks/SwitchBlockExecutor.java
++++ b/ai-automation-backend/src/main/java/com/automation/executor/blocks/SwitchBlockExecutor.java
+@@ -192,10 +192,7 @@ public class SwitchBlockExecutor implements BlockExecutor {
+         if (isShell) {
+             return commandExecutor.executeStepAsShell(
+                     context.getProjectPath(),
+-                    BlockDefinition.builder()
+-                            .type("shell")
+-                            .config(Map.of("command", command))
+-                            .build(),
++                    CommandExecutorService.buildResolvedShellBlock(nestedConfig, command, context),
+                     context.nextStepIndex(),
+                     shellTimeout
+             );
+diff --git a/ai-automation-backend/src/main/java/com/automation/executor/blocks/WhileBlockExecutor.java b/ai-automation-backend/src/main/java/com/automation/executor/blocks/WhileBlockExecutor.java
+index 061e468..0bbb798 100644
+--- a/ai-automation-backend/src/main/java/com/automation/executor/blocks/WhileBlockExecutor.java
++++ b/ai-automation-backend/src/main/java/com/automation/executor/blocks/WhileBlockExecutor.java
+@@ -79,10 +79,7 @@ public class WhileBlockExecutor implements BlockExecutor {
+             if (isShell) {
+                 stepResult = commandExecutor.executeStepAsShell(
+                         context.getProjectPath(),
+-                        BlockDefinition.builder()
+-                                .type("shell")
+-                                .config(Map.of("command", resolvedCommand))
+-                                .build(),
++                        CommandExecutorService.buildResolvedShellBlock(config, resolvedCommand, context),
+                         context.nextStepIndex(),
+                         shellTimeout
+                 );
+diff --git a/ai-automation-backend/src/main/java/com/automation/service/AssistantService.java b/ai-automation-backend/src/main/java/com/automation/service/AssistantService.java
+index 873eff1..357587b 100644
+--- a/ai-automation-backend/src/main/java/com/automation/service/AssistantService.java
++++ b/ai-automation-backend/src/main/java/com/automation/service/AssistantService.java
+@@ -167,8 +167,12 @@ public class AssistantService {
+             );
+ 
+             // Demand-driven auto-fetch: up to MAX_FETCH_ROUNDS follow-up calls, each with up to
+-            // MAX_FETCHES_PER_ROUND distinct fetches. Skip enrichment if the response already
+-            // contains text outside <fetch> tags — that's a fully-formed answer.
++            // MAX_FETCHES_PER_ROUND distinct fetches. We continue the loop whenever the model
++            // emits an auto-fetchable tag AND the surrounding text is not a substantive answer
++            // (short announcements like "Ich schaue mir an…" count as no-answer, because they
++            // are stripped together with the fetch tag in the old logic and otherwise leave
++            // the user with just the announcement). An `<actions>` block marks a substantive
++            // answer even if the text is short.
+             // Duplicates across rounds are filtered so the model can't loop on the same fetch.
+             // If after all rounds we still only see <fetch> tags, emit a targeted fallback
+             // message instead of "(Keine Antwort erhalten)".
+@@ -178,8 +182,7 @@ public class AssistantService {
+             for (int fetchRound = 0; fetchRound < MAX_FETCH_ROUNDS; fetchRound++) {
+                 String rawOutput = result.output();
+                 String nonFetchText = fetchService.stripFetchTags(rawOutput);
+-                boolean fetchOnlyResponse = nonFetchText == null || nonFetchText.isBlank();
+-                if (!fetchOnlyResponse) break;
++                if (hasSubstantiveAnswer(rawOutput, nonFetchText)) break;
+ 
+                 List<FetchRequest> fetches = fetchService.parseFetchRequests(rawOutput).stream()
+                         .filter(this::isAutoFetchAllowed)
+@@ -354,6 +357,39 @@ public class AssistantService {
+         return (req.type() == null ? "" : req.type()) + "|" + (req.id() == null ? "" : req.id());
+     }
+ 
++    /** Threshold at which text outside {@code <fetch>} tags counts as a real answer, not a filler
++     *  announcement. 200 chars is comfortably longer than typical "Ich schaue mir X an…" stalls
++     *  but short enough that a one-sentence factual answer still counts. */
++    private static final int ANSWER_TEXT_MIN_CHARS = 200;
++
++    /** Regex for common announcement openings — catches the stall responses that cost users a
++     *  round-trip without delivering content. Anchored at start, case-insensitive. */
++    private static final Pattern ANNOUNCEMENT_PATTERN = Pattern.compile(
++            "(?is)^\\s*(ich\\s+(schau|hole|lade|pr(ü|u)f|prufe|analysier|check|verifizier)|lade\\s+|einen\\s+moment|moment\\b|kurz\\s+nachladen|sekunde).{0,200}",
++            Pattern.CASE_INSENSITIVE);
++
++    /**
++     * A response counts as a "substantive answer" (→ stop the fetch loop) when the non-fetch
++     * text is long enough to be a real answer OR carries an {@code <actions>} block. Short
++     * announcement-style filler ("Ich schaue mir den Run an…") is explicitly NOT substantive,
++     * even though it's non-blank — otherwise a stripped {@code <fetch>} would leave the user
++     * with nothing but the announcement.
++     */
++    private boolean hasSubstantiveAnswer(String rawOutput, String nonFetchText) {
++        if (nonFetchText == null || nonFetchText.isBlank()) {
++            return false;
++        }
++        if (rawOutput != null && rawOutput.contains("<actions>")) {
++            return true;
++        }
++        String trimmed = nonFetchText.trim();
++        if (trimmed.length() >= ANSWER_TEXT_MIN_CHARS) {
++            return true;
++        }
++        // Short text — treat as announcement filler and continue the fetch loop.
++        return !ANNOUNCEMENT_PATTERN.matcher(trimmed).find() && trimmed.length() >= 40;
++    }
++
+     /**
+      * Runs the action-suggestion CLI call with a short timeout; failure or timeout returns an
+      * empty list so the chat still delivers its text response. Skipped entirely when suggestions
+diff --git a/ai-automation-backend/src/main/java/com/automation/service/cli/CommandExecutorService.java b/ai-automation-backend/src/main/java/com/automation/service/cli/CommandExecutorService.java
+index 69e4b2b..b9a3326 100644
+--- a/ai-automation-backend/src/main/java/com/automation/service/cli/CommandExecutorService.java
++++ b/ai-automation-backend/src/main/java/com/automation/service/cli/CommandExecutorService.java
+@@ -27,6 +27,7 @@ public class CommandExecutorService {
+ 
+     private final CliSessionManager sessionManager;
+     private final ShellCommandService shellCommandService;
++    private final ContainerShellService containerShellService;
+     private final AiProviderRegistry aiProviderRegistry;
+ 
+     public CliSession.CommandResult executeCommand(String containerId, String cliType, String command) {
+@@ -262,10 +263,25 @@ public class CommandExecutorService {
+         step.setInput(command);
+         step.setStatus(StepStatus.RUNNING);
+ 
+-        ShellResult result = shellCommandService.execute(command, projectPath, timeoutSeconds);
++        Map<String, Object> config = block.getConfig();
++        String containerImage = config.get("container_image") instanceof String s ? s : null;
++
++        ShellResult result;
++        String executionMode;
++        if (containerImage != null && !containerImage.isBlank()) {
++            boolean mountDockerSocket = Boolean.TRUE.equals(config.get("mount_docker_socket"));
++            List<String> extraMounts = extractResolvedMounts(config.get("mounts"));
++            result = containerShellService.execute(command, projectPath, timeoutSeconds,
++                    containerImage, mountDockerSocket, extraMounts);
++            executionMode = "container:" + containerImage;
++        } else {
++            result = shellCommandService.execute(command, projectPath, timeoutSeconds);
++            executionMode = "shell";
++        }
++
+         step.setOutput(result.output());
+         step.setStatus(result.exitCode() == 0 ? StepStatus.COMPLETED : StepStatus.FAILED);
+-        step.setMetadata(Map.of("exitCode", result.exitCode(), "executionMode", "shell"));
++        step.setMetadata(Map.of("exitCode", result.exitCode(), "executionMode", executionMode));
+ 
+         step.setCompletedAt(Instant.now());
+         step.setDurationMs(result.durationMs());
+@@ -273,6 +289,53 @@ public class CommandExecutorService {
+         return step;
+     }
+ 
++    /**
++     * Expects callers to have already resolved templates in mount strings via
++     * context.resolveTemplate(). This method just does type-coercion and blank-filtering.
++     */
++    private static List<String> extractResolvedMounts(Object raw) {
++        if (!(raw instanceof List<?> list) || list.isEmpty()) return List.of();
++        List<String> out = new java.util.ArrayList<>(list.size());
++        for (Object e : list) {
++            if (e == null) continue;
++            String s = e.toString();
++            if (!s.isBlank()) out.add(s);
++        }
++        return out;
++    }
++
++    /**
++     * Builds a fresh shell BlockDefinition from an originating block's config, preserving
++     * container_image / mount_docker_socket and template-resolving the `mounts` list against
++     * the given context. Used by wrapper blocks (retry, foreach, while, switch) so that the
++     * inner shell execution keeps container settings instead of silently falling back to host.
++     */
++    public static BlockDefinition buildResolvedShellBlock(
++            Map<String, Object> originalConfig, String resolvedCommand,
++            com.automation.executor.ExecutionContext context) {
++        Map<String, Object> cfg = new java.util.LinkedHashMap<>();
++        cfg.put("command", resolvedCommand);
++        Object ci = originalConfig.get("container_image");
++        if (ci instanceof String s && !s.isBlank()) {
++            cfg.put("container_image", s);
++        }
++        Object mds = originalConfig.get("mount_docker_socket");
++        if (mds != null) {
++            cfg.put("mount_docker_socket", mds);
++        }
++        Object rawMounts = originalConfig.get("mounts");
++        if (rawMounts instanceof List<?> list && !list.isEmpty()) {
++            List<String> resolved = new java.util.ArrayList<>(list.size());
++            for (Object e : list) {
++                if (e == null) continue;
++                String m = e.toString();
++                if (!m.isBlank()) resolved.add(context.resolveTemplate(m));
++            }
++            if (!resolved.isEmpty()) cfg.put("mounts", resolved);
++        }
++        return BlockDefinition.builder().type("shell").config(cfg).build();
++    }
++
+     public CliSession.CommandResult executeShellCommandOnHost(String projectPath, String command, int timeoutSeconds) {
+         ShellResult result = shellCommandService.execute(command, projectPath, timeoutSeconds);
+         return new CliSession.CommandResult(result.output(), result.exitCode());
+diff --git a/ai-automation-backend/src/main/java/com/automation/service/cli/ContainerShellService.java b/ai-automation-backend/src/main/java/com/automation/service/cli/ContainerShellService.java
+index f54d020..de1f127 100644
+--- a/ai-automation-backend/src/main/java/com/automation/service/cli/ContainerShellService.java
++++ b/ai-automation-backend/src/main/java/com/automation/service/cli/ContainerShellService.java
+@@ -42,6 +42,18 @@ public class ContainerShellService {
+      */
+     public ShellResult execute(String command, String projectPath, int timeoutSeconds,
+                                String containerImage, boolean mountDockerSocket) {
++        return execute(command, projectPath, timeoutSeconds, containerImage, mountDockerSocket, List.of());
++    }
++
++    /**
++     * Execute a command inside an ephemeral container with additional bind-mounts.
++     *
++     * @param extraMounts  Extra bind-mounts in docker-volume syntax "host:container[:ro|rw]".
++     *                     Template variables must already be resolved by the caller.
++     */
++    public ShellResult execute(String command, String projectPath, int timeoutSeconds,
++                               String containerImage, boolean mountDockerSocket,
++                               List<String> extraMounts) {
+         long start = System.currentTimeMillis();
+ 
+         boolean effectiveMount = mountDockerSocket && allowDockerSocketMount;
+@@ -57,7 +69,7 @@ public class ContainerShellService {
+                     "ContainerShellService", null);
+         }
+ 
+-        List<String> dockerCmd = buildDockerCommand(command, projectPath, containerImage, effectiveMount);
++        List<String> dockerCmd = buildDockerCommand(command, projectPath, containerImage, effectiveMount, extraMounts);
+ 
+         log.debug("Container shell execute (image: {}, workDir: {}, timeout: {}s): {}",
+                 containerImage, projectPath, timeoutSeconds,
+@@ -111,7 +123,8 @@ public class ContainerShellService {
+     }
+ 
+     private List<String> buildDockerCommand(String command, String projectPath,
+-                                            String containerImage, boolean mountDockerSocket) {
++                                            String containerImage, boolean mountDockerSocket,
++                                            List<String> extraMounts) {
+         List<String> cmd = new ArrayList<>();
+         cmd.add("docker");
+         cmd.add("run");
+@@ -136,6 +149,15 @@ public class ContainerShellService {
+             cmd.add("/var/run/docker.sock:/var/run/docker.sock");
+         }
+ 
++        // Extra bind-mounts from block config (already template-resolved by caller)
++        if (extraMounts != null) {
++            for (String mount : extraMounts) {
++                if (mount == null || mount.isBlank()) continue;
++                cmd.add("-v");
++                cmd.add(mount);
++            }
++        }
++
+         // Security hardening
+         cmd.add("--cap-drop");
+         cmd.add("ALL");
+diff --git a/ai-automation-backend/src/main/java/com/automation/service/workflow/WorkflowExecutor.java b/ai-automation-backend/src/main/java/com/automation/service/workflow/WorkflowExecutor.java
+index 700bc1d..d5b508e 100644
+--- a/ai-automation-backend/src/main/java/com/automation/service/workflow/WorkflowExecutor.java
++++ b/ai-automation-backend/src/main/java/com/automation/service/workflow/WorkflowExecutor.java
+@@ -66,7 +66,8 @@ public class WorkflowExecutor {
+ 
+     private static final java.util.Set<String> SYSTEM_VAR_KEYS = java.util.Set.of(
+             "workflow_run_id", "workflow_id", "workflow_name", "project_path",
+-            "model", "provider", "started_at", "previous_report", "open_todos",
++            "model", "provider", "started_at", "run_timestamp",
++            "previous_report", "open_todos",
+             "workflow_version", "workflow_changed_since_last_run"
+     );
+ 
+@@ -214,7 +215,19 @@ public class WorkflowExecutor {
+             context.setVariable("project_path", project.getPath() != null ? project.getPath() : "");
+             context.setVariable("model", model != null ? model : "");
+             context.setVariable("provider", provider != null ? provider : "");
+-            context.setVariable("started_at", java.time.Instant.now().toString());
++            java.time.Instant startedAt = java.time.Instant.now();
++            context.setVariable("started_at", startedAt.toString());
++            // Path-safe timestamp for output-directory naming (no ':' or timezone).
++            // Format: yyyyMMdd-HHmmss in UTC. Use together with {{ workflow_run_id }}
++            // to version workflow outputs per run (see TODO 2738fda0).
++            context.setVariable("run_timestamp", java.time.format.DateTimeFormatter
++                    .ofPattern("yyyyMMdd-HHmmss")
++                    .withZone(java.time.ZoneOffset.UTC)
++                    .format(startedAt));
++            // Host/user metadata so workflow configs can stay user-agnostic
++            // (e.g. "mounts": ["{{ home_dir }}/dokumente:{{ home_dir }}/dokumente:rw"])
++            context.setVariable("home_dir", System.getProperty("user.home", ""));
++            context.setVariable("user", System.getProperty("user.name", ""));
+ 
+             // Inject workflow version info for delta-based quality workflows
+             int versionCount = workflowVersionService.getVersionCount(workflowId);
+diff --git a/ai-automation-backend/src/main/resources/assistant-system-prompt.md b/ai-automation-backend/src/main/resources/assistant-system-prompt.md
+index 5c18102..f970740 100644
+--- a/ai-automation-backend/src/main/resources/assistant-system-prompt.md
++++ b/ai-automation-backend/src/main/resources/assistant-system-prompt.md
+@@ -18,8 +18,8 @@ Always answer in German.
+ - Answer from the available context first whenever possible.
+ - Fetch only if one concrete missing detail blocks a reliable answer.
+ - Never ask the user for IDs or paths that already exist in context.
+-- Do not narrate loading. Either answer directly or emit a `<fetch .../>` tag.
+-- **Never answer with only a `<fetch>` tag and nothing else.** If you emit a fetch, also write one sentence that names what you're looking for — so the user sees intent, not silence. After the follow-up round comes back with data, **write the actual answer** — never a second stall like "Ich lade noch…".
++- Do not narrate loading. Either answer directly, **or** emit a `<fetch .../>` tag **alone** (no surrounding text like "Ich schaue mir an…" or "Einen Moment…"). The platform runs one follow-up round automatically and you can answer properly then.
++- When the follow-up round returns data with `Nachgeladene Details`, **write the actual answer now** — never a second stall like "Ich hole die Details". If the data is still not enough, emit **one more** concrete `<fetch>` alone.
+ 
+ ### Run Pages
+ 
+diff --git a/ai-automation-backend/src/test/java/com/automation/service/AssistantServiceTest.java b/ai-automation-backend/src/test/java/com/automation/service/AssistantServiceTest.java
+index 82f8cbc..f3db224 100644
+--- a/ai-automation-backend/src/test/java/com/automation/service/AssistantServiceTest.java
++++ b/ai-automation-backend/src/test/java/com/automation/service/AssistantServiceTest.java
+@@ -301,14 +301,62 @@ class AssistantServiceTest {
+     }
+ 
+     @Test
+-    void chat_responseWithTextAndFetchDoesNotAutoFetch() {
+-        stubClaude("Kurzantwort. <fetch type=\"run_detail\" id=\"r1\"/>");
+-        when(fetchService.stripFetchTags("Kurzantwort. <fetch type=\"run_detail\" id=\"r1\"/>"))
+-                .thenReturn("Kurzantwort.");
++    void chat_responseWithSubstantiveTextAndFetchDoesNotAutoFetch() {
++        // Long text (>= 200 chars) next to a fetch tag is treated as a complete answer — no
++        // second round, even though the model also emitted a speculative fetch.
++        String longAnswer = "Der Run ist abgeschlossen und hat alle fünf Schritte erfolgreich durchlaufen. "
++                + "Die Ausgabe enthält keine Fehler, und das Gate-Status-Feld steht auf grün. "
++                + "Der Workflow kann jetzt wie geplant weitergeführt werden.";
++        String raw = longAnswer + " <fetch type=\"run_detail\" id=\"r1\"/>";
++        stubClaude(raw);
++        when(fetchService.stripFetchTags(raw)).thenReturn(longAnswer);
+ 
+         var result = chat("Was ist mit dem Run?");
+ 
+-        assertThat(result.message()).isEqualTo("Kurzantwort.");
++        assertThat(result.message()).isEqualTo(longAnswer);
++        verify(commandExecutorService, org.mockito.Mockito.times(1))
++                .executeOnHost(any(HostExecutionRequest.class));
++        verify(fetchService, never()).executeFetch(any());
++    }
++
++    @Test
++    void chat_announcementTextWithFetchStillAutoFetches() {
++        // The observed regression: model emits "Ich schaue mir den Run an." + <fetch>. Old logic
++        // saw non-blank text and treated it as the final answer — user got just the announcement.
++        // New logic detects announcement-style filler and still runs the fetch loop.
++        stubClaudeSequence(
++                "Ich schaue mir die Details des Runs an. <fetch type=\"run_detail\" id=\"r1\"/>",
++                "Der Run r1 ist FAILED — Step 0 mit Exit 137 (OOM)."
++        );
++        var fetchReq = new AssistantFetchService.FetchRequest("run_detail", "r1");
++        when(fetchService.parseFetchRequests("Ich schaue mir die Details des Runs an. <fetch type=\"run_detail\" id=\"r1\"/>"))
++                .thenReturn(List.of(fetchReq));
++        when(fetchService.executeFetch(fetchReq)).thenReturn("run r1: FAILED, step 0 OOM");
++        when(fetchService.stripFetchTags("Ich schaue mir die Details des Runs an. <fetch type=\"run_detail\" id=\"r1\"/>"))
++                .thenReturn("Ich schaue mir die Details des Runs an.");
++        when(fetchService.stripFetchTags("Der Run r1 ist FAILED — Step 0 mit Exit 137 (OOM)."))
++                .thenReturn("Der Run r1 ist FAILED — Step 0 mit Exit 137 (OOM).");
++
++        var result = chat("Was ist mit dem Run?");
++
++        assertThat(result.message()).isEqualTo("Der Run r1 ist FAILED — Step 0 mit Exit 137 (OOM).");
++        verify(fetchService).executeFetch(fetchReq);
++    }
++
++    @Test
++    void chat_responseWithActionsAndFetchDoesNotAutoFetch() {
++        // An <actions> block means the model already produced a complete structured answer —
++        // honor it even if the visible text is short.
++        String raw = "Ja. <actions>[{\"type\":\"show_run\",\"id\":\"r-9\",\"name\":\"Last Run\",\"label\":\"Öffnen\"}]</actions> <fetch type=\"run_detail\" id=\"r2\"/>";
++        stubClaude(raw);
++        when(fetchService.stripFetchTags(any())).thenAnswer(inv -> {
++            String s = inv.getArgument(0);
++            return s == null ? null : s.replaceAll("<fetch[^>]*/>", "").trim();
++        });
++
++        var result = chat("Run?");
++
++        assertThat(result.actions()).hasSize(1);
+         verify(commandExecutorService, org.mockito.Mockito.times(1))
+                 .executeOnHost(any(HostExecutionRequest.class));
+         verify(fetchService, never()).executeFetch(any());
+diff --git a/ai-automation-backend/src/test/java/com/automation/service/cli/CommandExecutorServiceTest.java b/ai-automation-backend/src/test/java/com/automation/service/cli/CommandExecutorServiceTest.java
+index dd7463d..8ab618c 100644
+--- a/ai-automation-backend/src/test/java/com/automation/service/cli/CommandExecutorServiceTest.java
++++ b/ai-automation-backend/src/test/java/com/automation/service/cli/CommandExecutorServiceTest.java
+@@ -39,6 +39,9 @@ class CommandExecutorServiceTest {
+     @Mock
+     private ShellCommandService shellCommandService;
+ 
++    @Mock
++    private ContainerShellService containerShellService;
++
+     @Mock
+     private AiProviderRegistry aiProviderRegistry;
+ 
+@@ -49,7 +52,7 @@ class CommandExecutorServiceTest {
+ 
+     @BeforeEach
+     void setUp() throws IOException {
+-        commandExecutorService = new CommandExecutorService(sessionManager, shellCommandService, aiProviderRegistry);
++        commandExecutorService = new CommandExecutorService(sessionManager, shellCommandService, containerShellService, aiProviderRegistry);
+         lenient().when(sessionManager.getOrCreateSession(anyString(), anyString())).thenReturn(cliSession);
+         lenient().when(aiProviderRegistry.resolve(any())).thenReturn(aiProvider);
+     }
+@@ -417,4 +420,70 @@ class CommandExecutorServiceTest {
+ 
+         assertThat(contextFile).doesNotExist();
+     }
++
++    @Test
++    void executeStepAsShell_withoutContainerImage_runsOnHostShell() {
++        when(shellCommandService.execute(eq("echo hi"), eq("/proj"), eq(30)))
++                .thenReturn(new ShellCommandService.ShellResult("hi", 0, 5L));
++        BlockDefinition block = BlockDefinition.builder().type("shell")
++                .config(Map.of("command", "echo hi")).build();
++
++        StepResult result = commandExecutorService.executeStepAsShell("/proj", block, 0, 30);
++
++        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
++        assertThat(result.getOutput()).isEqualTo("hi");
++        assertThat(result.getMetadata()).containsEntry("executionMode", "shell");
++        verify(containerShellService, never()).execute(any(), any(), anyInt(), any(), anyBoolean(), any());
++    }
++
++    @Test
++    void executeStepAsShell_withContainerImage_delegatesToContainerShellService() {
++        when(containerShellService.execute(
++                eq("mvn -v"), eq("/proj"), eq(120),
++                eq("automation-agent-java:latest"), eq(false),
++                eq(List.of("/host:/container:rw"))))
++                .thenReturn(new ShellCommandService.ShellResult("Maven 3.6.3", 0, 800L));
++        BlockDefinition block = BlockDefinition.builder().type("shell")
++                .config(Map.of(
++                        "command", "mvn -v",
++                        "container_image", "automation-agent-java:latest",
++                        "mounts", List.of("/host:/container:rw")
++                )).build();
++
++        StepResult result = commandExecutorService.executeStepAsShell("/proj", block, 0, 120);
++
++        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
++        assertThat(result.getOutput()).isEqualTo("Maven 3.6.3");
++        assertThat(result.getMetadata()).containsEntry("executionMode", "container:automation-agent-java:latest");
++        verify(shellCommandService, never()).execute(any(), any(), anyInt());
++    }
++
++    @Test
++    void buildResolvedShellBlock_preservesContainerImage_andResolvesMountTemplates() {
++        var context = com.automation.executor.ExecutionContext.builder().build();
++        context.setVariable("home_dir", "/home/testuser");
++        Map<String, Object> originalConfig = Map.of(
++                "command", "irrelevant",
++                "container_image", "automation-agent-java:latest",
++                "mount_docker_socket", Boolean.FALSE,
++                "mounts", List.of(
++                        "{{ home_dir }}/dokumente:{{ home_dir }}/dokumente:rw",
++                        "/etc/timezone:/etc/timezone:ro"
++                )
++        );
++
++        BlockDefinition resolved = CommandExecutorService.buildResolvedShellBlock(
++                originalConfig, "mvn clean compile", context);
++
++        assertThat(resolved.getType()).isEqualTo("shell");
++        assertThat(resolved.getConfig()).containsEntry("command", "mvn clean compile");
++        assertThat(resolved.getConfig()).containsEntry("container_image", "automation-agent-java:latest");
++        assertThat(resolved.getConfig()).containsEntry("mount_docker_socket", Boolean.FALSE);
++        @SuppressWarnings("unchecked")
++        List<String> mounts = (List<String>) resolved.getConfig().get("mounts");
++        assertThat(mounts).containsExactly(
++                "/home/testuser/dokumente:/home/testuser/dokumente:rw",
++                "/etc/timezone:/etc/timezone:ro"
++        );
++    }
+ }
+diff --git a/ai-automation-backend/src/test/java/com/automation/service/cli/ContainerShellServiceTest.java b/ai-automation-backend/src/test/java/com/automation/service/cli/ContainerShellServiceTest.java
+index 548646a..4c5e918 100644
+--- a/ai-automation-backend/src/test/java/com/automation/service/cli/ContainerShellServiceTest.java
++++ b/ai-automation-backend/src/test/java/com/automation/service/cli/ContainerShellServiceTest.java
+@@ -67,10 +67,10 @@ class ContainerShellServiceTest {
+         // Use reflection to call private method
+         try {
+             var method = ContainerShellService.class.getDeclaredMethod(
+-                    "buildDockerCommand", String.class, String.class, String.class, boolean.class);
++                    "buildDockerCommand", String.class, String.class, String.class, boolean.class, List.class);
+             method.setAccessible(true);
+             @SuppressWarnings("unchecked")
+-            List<String> cmd = (List<String>) method.invoke(service, "echo hi", "/my/project", "img:latest", false);
++            List<String> cmd = (List<String>) method.invoke(service, "echo hi", "/my/project", "img:latest", false, List.of());
+ 
+             assertThat(cmd).contains("docker", "run", "--rm");
+             assertThat(cmd).contains("--user", "1000");
+@@ -91,10 +91,10 @@ class ContainerShellServiceTest {
+ 
+         try {
+             var method = ContainerShellService.class.getDeclaredMethod(
+-                    "buildDockerCommand", String.class, String.class, String.class, boolean.class);
++                    "buildDockerCommand", String.class, String.class, String.class, boolean.class, List.class);
+             method.setAccessible(true);
+             @SuppressWarnings("unchecked")
+-            List<String> cmd = (List<String>) method.invoke(service, "cmd", "/tmp", "img:latest", true);
++            List<String> cmd = (List<String>) method.invoke(service, "cmd", "/tmp", "img:latest", true, List.of());
+ 
+             assertThat(cmd).contains("/var/run/docker.sock:/var/run/docker.sock");
+         } catch (Exception e) {
+@@ -108,10 +108,10 @@ class ContainerShellServiceTest {
+ 
+         try {
+             var method = ContainerShellService.class.getDeclaredMethod(
+-                    "buildDockerCommand", String.class, String.class, String.class, boolean.class);
++                    "buildDockerCommand", String.class, String.class, String.class, boolean.class, List.class);
+             method.setAccessible(true);
+             @SuppressWarnings("unchecked")
+-            List<String> cmd = (List<String>) method.invoke(service, "cmd", null, "img:latest", false);
++            List<String> cmd = (List<String>) method.invoke(service, "cmd", null, "img:latest", false, List.of());
+ 
+             // Should not contain a project volume mount
+             assertThat(cmd.stream().filter(s -> s.contains(":/workspace")).count()).isEqualTo(0);
+@@ -119,4 +119,47 @@ class ContainerShellServiceTest {
+             throw new RuntimeException(e);
+         }
+     }
++
++    @Test
++    void buildDockerCommand_withExtraMounts_addsAllBindMounts() {
++        when(hostProcessUtils.getHostUid()).thenReturn("1000");
++        try {
++            var method = ContainerShellService.class.getDeclaredMethod(
++                    "buildDockerCommand", String.class, String.class, String.class, boolean.class, List.class);
++            method.setAccessible(true);
++            List<String> extras = List.of(
++                    "/home/flo/dokumente:/home/flo/dokumente:rw",
++                    "/etc/timezone:/etc/timezone:ro"
++            );
++            @SuppressWarnings("unchecked")
++            List<String> cmd = (List<String>) method.invoke(service, "cmd", "/p", "img:latest", false, extras);
++
++            assertThat(cmd).contains("/home/flo/dokumente:/home/flo/dokumente:rw");
++            assertThat(cmd).contains("/etc/timezone:/etc/timezone:ro");
++            // Extra mounts are separate -v flags, so there are 3 total (project + 2 extras)
++            assertThat(cmd.stream().filter("-v"::equals).count()).isEqualTo(3);
++        } catch (Exception e) {
++            throw new RuntimeException(e);
++        }
++    }
++
++    @Test
++    void buildDockerCommand_emptyOrNullMounts_addsNothing() {
++        when(hostProcessUtils.getHostUid()).thenReturn("1000");
++        try {
++            var method = ContainerShellService.class.getDeclaredMethod(
++                    "buildDockerCommand", String.class, String.class, String.class, boolean.class, List.class);
++            method.setAccessible(true);
++
++            @SuppressWarnings("unchecked")
++            List<String> cmdEmpty = (List<String>) method.invoke(service, "cmd", "/p", "img:latest", false, List.of());
++            assertThat(cmdEmpty.stream().filter("-v"::equals).count()).isEqualTo(1); // only project mount
++
++            @SuppressWarnings("unchecked")
++            List<String> cmdNull = (List<String>) method.invoke(service, "cmd", "/p", "img:latest", false, null);
++            assertThat(cmdNull.stream().filter("-v"::equals).count()).isEqualTo(1);
++        } catch (Exception e) {
++            throw new RuntimeException(e);
++        }
++    }
+ }
+diff --git a/ai-automation-backend/src/test/java/com/automation/service/workflow/WorkflowExecutorTest.java b/ai-automation-backend/src/test/java/com/automation/service/workflow/WorkflowExecutorTest.java
+index c22cf30..5875771 100644
+--- a/ai-automation-backend/src/test/java/com/automation/service/workflow/WorkflowExecutorTest.java
++++ b/ai-automation-backend/src/test/java/com/automation/service/workflow/WorkflowExecutorTest.java
+@@ -267,6 +267,46 @@ class WorkflowExecutorTest {
+         verify(simpleBlockExecutor, times(2)).execute(any(), any());
+     }
+ 
++    @Test
++    void execute_seedsSystemVariables_includingProjectPath() {
++        StepResult step = StepResult.builder()
++                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
++        ArgumentCaptor<ExecutionContext> ctxCaptor = ArgumentCaptor.forClass(ExecutionContext.class);
++        when(simpleBlockExecutor.execute(any(BlockDefinition.class), ctxCaptor.capture()))
++                .thenReturn(step);
++
++        workflowExecutor.execute(testWorkflow, null);
++
++        ExecutionContext ctx = ctxCaptor.getValue();
++        assertThat(ctx.getVariable("project_path")).isEqualTo("/workspace/test");
++        assertThat(ctx.getProjectPath()).isEqualTo("/workspace/test");
++        assertThat(ctx.getVariable("workflow_id")).isEqualTo("wf-1");
++        assertThat(ctx.getVariable("workflow_name")).isEqualTo("Test Workflow");
++        assertThat(ctx.getVariable("workflow_run_id")).isEqualTo("run-1");
++        assertThat(ctx.getVariable("started_at")).isNotNull();
++        assertThat(ctx.getVariable("home_dir")).isNotNull();
++        assertThat(ctx.resolveTemplate("cd {{ project_path }}")).isEqualTo("cd /workspace/test");
++    }
++
++    @Test
++    void execute_seedsRunTimestamp_inPathSafeFormat() {
++        StepResult step = StepResult.builder()
++                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
++        ArgumentCaptor<ExecutionContext> ctxCaptor = ArgumentCaptor.forClass(ExecutionContext.class);
++        when(simpleBlockExecutor.execute(any(BlockDefinition.class), ctxCaptor.capture()))
++                .thenReturn(step);
++
++        workflowExecutor.execute(testWorkflow, null);
++
++        ExecutionContext ctx = ctxCaptor.getValue();
++        Object ts = ctx.getVariable("run_timestamp");
++        assertThat(ts).isNotNull();
++        // yyyyMMdd-HHmmss — no ':' so it's safe as a filename / directory name
++        assertThat(String.valueOf(ts)).matches("\\d{8}-\\d{6}");
++        assertThat(ctx.resolveTemplate("reports/{{ run_timestamp }}/summary.md"))
++                .matches("reports/\\d{8}-\\d{6}/summary\\.md");
++    }
++
+     @Test
+     void execute_writesSkillContextToProject() {
+         Skill skill = Skill.builder()
+diff --git a/ai-automation-frontend/src/components/palette/CommandPalette.tsx b/ai-automation-frontend/src/components/palette/CommandPalette.tsx
+index 9863016..7aa7abd 100644
+--- a/ai-automation-frontend/src/components/palette/CommandPalette.tsx
++++ b/ai-automation-frontend/src/components/palette/CommandPalette.tsx
+@@ -11,9 +11,11 @@ import { resolveContextId } from './resolveContext';
+ import { useWorkflowContext } from './contexts/workflowContext';
+ import { useRunContext } from './contexts/runContext';
+ import { useProjectContext } from './contexts/projectContext';
+-import type { PaletteContextHandle, PaletteItem, BadgeTone, PaletteMatch, HighlightKey } from './contexts/types';
++import type { PaletteContextHandle, PaletteContextId, PaletteItem, BadgeTone, PaletteMatch, HighlightKey } from './contexts/types';
+ import { parsePaletteQuery } from './queryParser';
+ 
++const CONTEXT_ORDER: PaletteContextId[] = ['workflow', 'run', 'project'];
++
+ interface CollectingState {
+   workflow: Workflow;
+   variables: string[];
+@@ -32,38 +34,83 @@ interface CommandPaletteProps {
+  */
+ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
+   const location = useLocation();
+-  const contextId = resolveContextId(location.pathname);
++  const routeContextId = resolveContextId(location.pathname);
++  const [contextId, setContextId] = useState<PaletteContextId>(routeContextId);
++  const [query, setQuery] = useState('');
++
++  useEffect(() => {
++    if (open) setContextId(routeContextId);
++    // Only reset to route context when the palette opens; Tab-switch must survive re-renders.
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [open]);
++
++  const cycleContext = (direction: 1 | -1) => {
++    setContextId((c) => {
++      const idx = CONTEXT_ORDER.indexOf(c);
++      const next = (idx + direction + CONTEXT_ORDER.length) % CONTEXT_ORDER.length;
++      return CONTEXT_ORDER[next] ?? c;
++    });
++  };
++
+   if (!open) return null;
+-  return <PaletteBody key={contextId} contextId={contextId} onClose={onClose} />;
++  return (
++    <PaletteBody
++      key={contextId}
++      contextId={contextId}
++      onClose={onClose}
++      query={query}
++      setQuery={setQuery}
++      cycleContext={cycleContext}
++    />
++  );
++}
++
++interface PaletteBodyProps {
++  contextId: PaletteContextId;
++  onClose: () => void;
++  query: string;
++  setQuery: (q: string) => void;
++  cycleContext: (direction: 1 | -1) => void;
+ }
+ 
+-function PaletteBody({ contextId, onClose }: { contextId: ReturnType<typeof resolveContextId>; onClose: () => void }) {
++function PaletteBody({ contextId, onClose, query, setQuery, cycleContext }: PaletteBodyProps) {
+   // Exactly one context hook per variant — satisfies react-hooks/rules-of-hooks.
+-  if (contextId === 'run') return <RunBody onClose={onClose} />;
+-  if (contextId === 'project') return <ProjectBody onClose={onClose} />;
+-  return <WorkflowBody onClose={onClose} />;
++  if (contextId === 'run') return <RunBody onClose={onClose} query={query} setQuery={setQuery} contextId={contextId} cycleContext={cycleContext} />;
++  if (contextId === 'project') return <ProjectBody onClose={onClose} query={query} setQuery={setQuery} contextId={contextId} cycleContext={cycleContext} />;
++  return <WorkflowBody onClose={onClose} query={query} setQuery={setQuery} contextId={contextId} cycleContext={cycleContext} />;
++}
++
++interface BodyProps {
++  onClose: () => void;
++  query: string;
++  setQuery: (q: string) => void;
++  contextId: PaletteContextId;
++  cycleContext: (direction: 1 | -1) => void;
+ }
+ 
+-function WorkflowBody({ onClose }: { onClose: () => void }) {
++function WorkflowBody(props: BodyProps) {
+   const context = useWorkflowContext();
+-  return <InnerPalette context={context} onClose={onClose} />;
++  return <InnerPalette context={context} {...props} />;
+ }
+ 
+-function RunBody({ onClose }: { onClose: () => void }) {
++function RunBody(props: BodyProps) {
+   const context = useRunContext();
+-  return <InnerPalette context={context} onClose={onClose} />;
++  return <InnerPalette context={context} {...props} />;
+ }
+ 
+-function ProjectBody({ onClose }: { onClose: () => void }) {
++function ProjectBody(props: BodyProps) {
+   const context = useProjectContext();
+-  return <InnerPalette context={context} onClose={onClose} />;
++  return <InnerPalette context={context} {...props} />;
+ }
+ 
+-function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onClose: () => void }) {
++interface InnerPaletteProps extends BodyProps {
++  context: PaletteContextHandle;
++}
++
++function InnerPalette({ context, onClose, query, setQuery, contextId, cycleContext }: InnerPaletteProps) {
+   const t = useT();
+   const navigate = useNavigate();
+   const inputRef = useRef<HTMLInputElement>(null);
+-  const [query, setQuery] = useState('');
+   const [selectedIdx, setSelectedIdx] = useState(0);
+   const [collecting, setCollecting] = useState<CollectingState | null>(null);
+ 
+@@ -178,6 +225,36 @@ function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onC
+         onClose();
+         return;
+       }
++      if (e.key === 'Tab') {
++        e.preventDefault();
++        cycleContext(e.shiftKey ? -1 : 1);
++        return;
++      }
++      if (e.altKey && /^[1-9]$/.test(e.key)) {
++        // Alt+N jumps directly to result row N (1-indexed). Works for result rows and
++        // the trailing assistant row; pinned/recent sections are skipped.
++        e.preventDefault();
++        const n = parseInt(e.key, 10) - 1;
++        if (isEmptyQuery) {
++          const item = itemAt(n);
++          if (item) {
++            setSelectedIdx(n);
++            enterItem(item);
++          }
++          return;
++        }
++        if (n === assistantIdx) {
++          setSelectedIdx(n);
++          askAssistant();
++          return;
++        }
++        const item = itemAt(n);
++        if (item) {
++          setSelectedIdx(n);
++          enterItem(item);
++        }
++        return;
++      }
+       if (e.key === 'ArrowDown') {
+         e.preventDefault();
+         setSelectedIdx((i) => Math.min(i + 1, Math.max(0, totalItems - 1)));
+@@ -232,6 +309,29 @@ function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onC
+           />
+         ) : (
+           <>
++            <div className="flex items-center gap-1 px-2 py-1.5 border-b border-border">
++              {CONTEXT_ORDER.map((cid) => (
++                <button
++                  key={cid}
++                  type="button"
++                  onClick={() => {
++                    const diff = (CONTEXT_ORDER.indexOf(cid) - CONTEXT_ORDER.indexOf(contextId) + CONTEXT_ORDER.length) % CONTEXT_ORDER.length;
++                    if (diff === 0) return;
++                    for (let i = 0; i < diff; i += 1) cycleContext(1);
++                  }}
++                  className={`px-2 py-1 text-[11px] rounded-md transition-colors ${
++                    cid === contextId
++                      ? 'bg-accent/15 text-accent font-medium'
++                      : 'text-text-tertiary hover:text-text hover:bg-surface-raised'
++                  }`}
++                >
++                  {t.commandPalette.contexts[cid].triggerLabel.replace(/…$/, '').replace(/\.\.\.$/, '')}
++                </button>
++              ))}
++              <span className="ml-auto text-[10px] text-text-tertiary border border-border px-1.5 py-0.5 rounded-sm">
++                {t.commandPalette.switchContextHint}
++              </span>
++            </div>
+             <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+               <Search className="w-4 h-4 text-text-tertiary shrink-0" />
+               {context.id === 'run' && parsed.status && (
+@@ -277,6 +377,7 @@ function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onC
+                       onRun={() => enterItem(item)}
+                       onOpen={() => openItem(item)}
+                       onTogglePin={() => togglePin(item.id)}
++                      numberHint={idx < 9 ? idx + 1 : undefined}
+                       t={t}
+                       altAction={context.altAction ? { label: context.altAction.label, shortcut: context.altAction.shortcut, run: () => runAltAction(item) } : undefined}
+                     />
+@@ -298,6 +399,7 @@ function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onC
+                         onRun={() => enterItem(item)}
+                         onOpen={() => openItem(item)}
+                         onTogglePin={() => togglePin(item.id)}
++                        numberHint={absIdx < 9 ? absIdx + 1 : undefined}
+                         t={t}
+                       altAction={context.altAction ? { label: context.altAction.label, shortcut: context.altAction.shortcut, run: () => runAltAction(item) } : undefined}
+                       />
+@@ -318,6 +420,7 @@ function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onC
+                       onRun={() => enterItem(item)}
+                       onOpen={() => openItem(item)}
+                       onTogglePin={() => togglePin(item.id)}
++                      numberHint={idx < 9 ? idx + 1 : undefined}
+                       t={t}
+                       altAction={context.altAction ? { label: context.altAction.label, shortcut: context.altAction.shortcut, run: () => runAltAction(item) } : undefined}
+                     />
+@@ -333,6 +436,7 @@ function InnerPalette({ context, onClose }: { context: PaletteContextHandle; onC
+                   onClick={askAssistant}
+                   label={t.commandPalette.askAssistant}
+                   borderTop={results.length > 0}
++                  numberHint={assistantIdx < 9 ? assistantIdx + 1 : undefined}
+                 />
+               )}
+ 
+@@ -389,6 +493,7 @@ interface PaletteRowProps {
+     shortcut: string;
+     run: () => void;
+   };
++  numberHint?: number;
+   t: ReturnType<typeof useT>;
+ }
+ 
+@@ -412,7 +517,7 @@ function renderHighlighted(text: string, matches: PaletteMatch[] | undefined, ke
+   return out;
+ }
+ 
+-function PaletteRow({ item, selected, pinned, onHover, onRun, onOpen, onTogglePin, altAction, t }: PaletteRowProps) {
++function PaletteRow({ item, selected, pinned, onHover, onRun, onOpen, onTogglePin, altAction, numberHint, t }: PaletteRowProps) {
+   return (
+     <div
+       onMouseEnter={onHover}
+@@ -421,6 +526,11 @@ function PaletteRow({ item, selected, pinned, onHover, onRun, onOpen, onTogglePi
+         selected ? 'bg-accent/10' : 'hover:bg-surface-raised'
+       }`}
+     >
++      {numberHint !== undefined && (
++        <span className="shrink-0 text-[9px] text-text-tertiary font-mono w-4 text-right">
++          ⌥{numberHint}
++        </span>
++      )}
+       <span className="shrink-0">
+         <WorkflowIcon icon={item.icon ?? null} className="w-4 h-4" />
+       </span>
+@@ -484,9 +594,10 @@ interface AssistantRowProps {
+   onClick: () => void;
+   label: string;
+   borderTop: boolean;
++  numberHint?: number;
+ }
+ 
+-function AssistantRow({ query, selected, onHover, onClick, label, borderTop }: AssistantRowProps) {
++function AssistantRow({ query, selected, onHover, onClick, label, borderTop, numberHint }: AssistantRowProps) {
+   return (
+     <div
+       onMouseEnter={onHover}
+@@ -495,6 +606,11 @@ function AssistantRow({ query, selected, onHover, onClick, label, borderTop }: A
+         borderTop ? 'border-t border-border' : ''
+       } ${selected ? 'bg-accent/10' : 'hover:bg-surface-raised'}`}
+     >
++      {numberHint !== undefined && (
++        <span className="shrink-0 text-[9px] text-text-tertiary font-mono w-4 text-right">
++          ⌥{numberHint}
++        </span>
++      )}
+       <span className="shrink-0 text-accent">
+         <Sparkles className="w-4 h-4" />
+       </span>
+diff --git a/ai-automation-frontend/src/i18n/de.ts b/ai-automation-frontend/src/i18n/de.ts
+index 0c7fa3e..ddf151a 100644
+--- a/ai-automation-frontend/src/i18n/de.ts
++++ b/ai-automation-frontend/src/i18n/de.ts
+@@ -1443,6 +1443,7 @@ export const de: TranslationKeys = {
+     filterChipStatus: 'Status',
+     filterChipRemove: 'Filter entfernen',
+     askAssistant: 'Frag den Assistenten',
++    switchContextHint: 'Tab wechselt',
+     contexts: {
+       workflow: {
+         triggerLabel: 'Workflow suchen oder starten…',
+diff --git a/ai-automation-frontend/src/i18n/en.ts b/ai-automation-frontend/src/i18n/en.ts
+index c48b15f..7d00394 100644
+--- a/ai-automation-frontend/src/i18n/en.ts
++++ b/ai-automation-frontend/src/i18n/en.ts
+@@ -1446,6 +1446,7 @@ export const en = {
+     filterChipStatus: 'Status',
+     filterChipRemove: 'Remove filter',
+     askAssistant: 'Ask the assistant',
++    switchContextHint: 'Tab to switch',
+     contexts: {
+       workflow: {
+         triggerLabel: 'Search or run workflow…',
+diff --git a/docs/WORKFLOW-GUIDE.md b/docs/WORKFLOW-GUIDE.md
+index ee2e8d8..0048fd0 100644
+--- a/docs/WORKFLOW-GUIDE.md
++++ b/docs/WORKFLOW-GUIDE.md
+@@ -522,7 +522,8 @@ Folgende Variablen werden vom `WorkflowExecutor` automatisch bei jedem Run geset
+ | `{{ project_path }}` | Projektpfad |
+ | `{{ model }}` | Konfiguriertes Modell (oder leer) |
+ | `{{ provider }}` | Konfigurierter AI-Provider (oder leer) |
+-| `{{ started_at }}` | Startzeitpunkt des Runs (ISO-8601) |
++| `{{ started_at }}` | Startzeitpunkt des Runs (ISO-8601, z.B. `2026-04-22T21:30:45.123Z`) |
++| `{{ run_timestamp }}` | Pfadsicherer Timestamp (UTC, Format `yyyyMMdd-HHmmss`, z.B. `20260422-213045`) — ideal für Output-Verzeichnisse pro Run |
+ 
+ ### Kontext-Variablen
+ 

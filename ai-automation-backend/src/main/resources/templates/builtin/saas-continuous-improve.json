@@ -1,0 +1,39 @@
+{
+  "id" : "saas-continuous-improve",
+  "icon" : "🌀",
+  "name" : {
+    "en" : "SaaS — Continuous Improve",
+    "de" : "SaaS — Kontinuierliche Verbesserung"
+  },
+  "description" : {
+    "en" : "Periodic sweep: open TODOs in saas-factory project, dependency updates, container cleanup",
+    "de" : "Regelmäßiger Sweep: offene SaaS-Factory-TODOs, Dependency-Updates, Container-Cleanup"
+  },
+  "category" : "AUTOMATION",
+  "sortOrder" : 62,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Wird per Schedule (wöchentlich) ausgeführt. Räumt alte Container auf, listet offene TODOs, triggert Auto-Fix für test-failed-TODOs falls noch nicht gefixt.",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "timeout_seconds" : 300,
+      "command" : "set -euo pipefail\nFACTORY=\"${FACTORY_ROOT:-/home/flo/Entwicklung/IdeaProjects/saas-factory}\"\necho '=== Cleanup alter Container/Images (>14 Tage) ==='\n\"$FACTORY/tools/factory\" cleanup --older-than 14 || true"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "timeout_seconds" : 60,
+      "command" : "set -euo pipefail\nDB='/home/flo/Entwicklung/tools/autotrigger/ai-automation-backend/data/automation.db'\nKEY=$(python3 -c \"import sqlite3; c=sqlite3.connect('$DB'); print(c.execute(\\\"SELECT value FROM app_settings WHERE key='api-key'\\\").fetchone()[0])\")\necho '=== Offene SaaS-Factory-TODOs ==='\ncurl -s 'http://localhost:9090/api/v1/todos?status=OPEN&projectId=685061f8-5eb6-4f9e-9bf7-2b1549325eee&size=100' -H \"X-API-Key: $KEY\" | python3 -c 'import sys,json;d=json.load(sys.stdin);content=d.get(\"content\",d) if isinstance(d,dict) else d;print(f\"OPEN_COUNT={len(content)}\");[print(f\"- [{t[\\\"priority\\\"]}] {t[\\\"id\\\"][:8]} {t[\\\"title\\\"]}\") for t in content[:20]]'"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "timeout_seconds" : 180,
+      "command" : "Du hast den Output von Block 1 (cleanup) und Block 2 (offene TODOs).\n\nBlock 1: {{ step_0_output }}\n\nBlock 2: {{ previous_output }}\n\nAUFGABE: Erstelle einen kurzen Wochenreport (max 15 Zeilen Markdown):\n\n## SaaS-Factory Wochenreport ({{ run_timestamp }})\n\n- Container/Images aufgeräumt: <Anzahl, falls vorhanden>\n- Offene TODOs: <Zahl>\n- Top-Prioritäten: <bis zu 3 HIGH/CRITICAL TODOs>\n- Auffälligkeiten: <z. B. wenn ein TODO älter als 7 Tage ist>\n\nAm Ende: 'NEXT_ACTIONS:' Liste mit 1-3 konkreten Schritten für die Pipeline."
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

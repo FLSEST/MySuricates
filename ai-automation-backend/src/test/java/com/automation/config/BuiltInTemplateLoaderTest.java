@@ -59,7 +59,8 @@ class BuiltInTemplateLoaderTest {
         Set<String> validTypes = Set.of(
                 "simple", "shell", "retry", "conditional", "foreach",
                 "while", "switch", "agentic", "approval",
-                "sub-workflow", "skill-capability", "human-input");
+                "sub-workflow", "skill-capability", "human-input",
+                "document", "integration");
 
         for (WorkflowTemplate t : templates) {
             for (BlockDefinition block : t.getBlocks()) {

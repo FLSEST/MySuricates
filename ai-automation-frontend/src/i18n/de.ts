@@ -1294,6 +1294,7 @@ export const de: TranslationKeys = {
     runs: 'Ausführungen',
     rate: 'Rate',
     providerStats: 'KI-Anbieter (30T)',
+    integrationStats: 'Integrationen (30T)',
     modelStats: 'Genutzte Modelle (30T)',
     tokens: 'Token',
   },

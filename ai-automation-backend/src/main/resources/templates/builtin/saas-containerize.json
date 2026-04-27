@@ -1,0 +1,42 @@
+{
+  "id" : "saas-containerize",
+  "icon" : "📦",
+  "name" : {
+    "en" : "SaaS — Containerize",
+    "de" : "SaaS — Containerisieren"
+  },
+  "description" : {
+    "en" : "Builds the Docker image, starts compose stack, runs smoke test, and waits for user approval before continuing",
+    "de" : "Baut das Docker-Image, startet den Compose-Stack, macht einen Smoke-Test und wartet auf User-Approval"
+  },
+  "category" : "DEPLOY",
+  "sortOrder" : 59,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Containerisierung ist deterministisch — keine LLM-Schritte. Nutzt factory-CLI. Approval am Ende, weil der User sich die laufende App anschauen soll.",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "timeout_seconds" : 1800,
+      "command" : "set -euo pipefail\nFACTORY=\"${FACTORY_ROOT:-/home/flo/Entwicklung/IdeaProjects/saas-factory}\"\nSLUG=\"{{ slug }}\"\nTARGET=\"$FACTORY/$SLUG\"\n\"$FACTORY/tools/factory\" build-container \"$TARGET\" --smoke"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "approval",
+    "config" : {
+      "options" : [ "Yes", "No", "Restart" ],
+      "timeout_minutes" : 60,
+      "variable_name" : "containerize_decision",
+      "question" : "## Container läuft\n\n{{ previous_output }}\n\nDie App läuft jetzt lokal. Schau sie dir im Browser an — der Port steht im JSON oben.\n\n**Yes** = Pipeline beenden, App ist OK\n**No** = Pipeline beenden, App ist NICHT OK (öffnet TODO für Manual Review)\n**Restart** = Container stoppen und neu bauen (z. B. nach Code-Edits)"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "timeout_seconds" : 60,
+      "on_failure" : "continue",
+      "command" : "set -euo pipefail\nFACTORY=\"${FACTORY_ROOT:-/home/flo/Entwicklung/IdeaProjects/saas-factory}\"\nDECISION=\"{{ containerize_decision }}\"\nSLUG=\"{{ slug }}\"\nif [ \"$DECISION\" = 'No' ]; then\n  \"$FACTORY/tools/factory\" create-todo \"Manual Review nötig: $SLUG nach Containerize abgelehnt\" --tag manual-review --tag \"$SLUG\" --priority HIGH --workflow-run '{{ workflow_run_id }}' --reference-type 'containerize_rejected' --reference-id \"$SLUG\" >&2 || true\nfi\necho \"Decision: $DECISION\""
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

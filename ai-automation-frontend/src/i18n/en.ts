@@ -1297,6 +1297,7 @@ export const en = {
     runs: 'Runs',
     rate: 'Rate',
     providerStats: 'AI Provider (30d)',
+    integrationStats: 'Integrations (30d)',
     modelStats: 'Models Used (30d)',
     tokens: 'Tokens',
   },

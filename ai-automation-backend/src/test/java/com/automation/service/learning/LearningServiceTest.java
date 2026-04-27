@@ -497,6 +497,64 @@ class LearningServiceTest {
                     .extracting(DashboardResponse.ProviderStats::provider)
                     .containsExactly("CLAUDE")
                     .doesNotContain("trello", "jira", "google-calendar");
+
+            // Integrations should appear in their own bucket (per-step aggregation)
+            assertThat(dashboard.integrationStats())
+                    .extracting(DashboardResponse.IntegrationStats::provider)
+                    .containsExactlyInAnyOrder("trello", "jira");
+            DashboardResponse.IntegrationStats trello = dashboard.integrationStats().stream()
+                    .filter(s -> "trello".equals(s.provider())).findFirst().orElseThrow();
+            assertThat(trello.runCount()).isEqualTo(1L);
+            assertThat(trello.successRate()).isEqualTo(1.0);
+        }
+
+        @Test
+        void getDashboard_failedIntegrationStep_countsTowardIntegrationStats() {
+            LearningService learningService = new LearningService(
+                    runRepository, workflowRepository, workflowMapper,
+                    statsService, similarityService, agenticService, insightsService);
+
+            // Failed integration step still has executionMode=integration (set in catch branch)
+            StepResult failedTrello = StepResult.builder()
+                    .stepIndex(0).status(StepStatus.FAILED).durationMs(300L)
+                    .startedAt(Instant.now())
+                    .metadata(Map.of(
+                            "provider", "trello",
+                            "action", "createCard",
+                            "executionMode", "integration",
+                            "error", "API rate limit"
+                    ))
+                    .build();
+            WorkflowRun failedRun = WorkflowRun.builder()
+                    .status(RunStatus.FAILED)
+                    .startedAt(Instant.now())
+                    .steps(new ArrayList<>(List.of(failedTrello)))
+                    .build();
+
+            when(workflowRepository.count()).thenReturn(1L);
+            when(runRepository.count()).thenReturn(1L);
+            when(runRepository.countByStatus(RunStatus.COMPLETED)).thenReturn(0L);
+            when(runRepository.countByStatus(RunStatus.COMPLETED_WITH_ERRORS)).thenReturn(0L);
+            when(runRepository.countByStatus(RunStatus.FAILED)).thenReturn(1L);
+            when(runRepository.countByStartedAtAfter(any(Instant.class))).thenReturn(0L);
+            when(runRepository.findByStartedAtAfterOrderByStartedAtDesc(any(Instant.class)))
+                    .thenReturn(List.of(failedRun));
+            when(runRepository.findTopWorkflows()).thenReturn(List.of());
+            when(runRepository.findTop10ByOrderByStartedAtDesc()).thenReturn(List.of());
+
+            DashboardResponse dashboard = learningService.getDashboard(30, null);
+
+            // Trello must NOT leak into providerStats even on failure
+            assertThat(dashboard.providerStats())
+                    .extracting(DashboardResponse.ProviderStats::provider)
+                    .doesNotContain("trello");
+
+            // Failure shows up in integrationStats with successRate=0
+            assertThat(dashboard.integrationStats()).hasSize(1);
+            DashboardResponse.IntegrationStats trello = dashboard.integrationStats().get(0);
+            assertThat(trello.provider()).isEqualTo("trello");
+            assertThat(trello.runCount()).isEqualTo(1L);
+            assertThat(trello.successRate()).isEqualTo(0.0);
         }
     }
 

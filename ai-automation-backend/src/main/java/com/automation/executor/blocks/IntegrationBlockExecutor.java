@@ -80,6 +80,7 @@ public class IntegrationBlockExecutor implements BlockExecutor {
             step.setMetadata(Map.of(
                     "provider", providerId,
                     "action", action,
+                    "executionMode", "integration",
                     "error", e.getMessage()
             ));
             return step;

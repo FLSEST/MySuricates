@@ -18,6 +18,7 @@ public record DashboardResponse(
         List<WorkflowRunResponse> recentRuns,
         List<TimeSeriesPoint> timeSeries,
         List<ProviderStats> providerStats,
+        List<IntegrationStats> integrationStats,
         List<ModelStats> modelStats,
         List<GateStatusEntry> gateStatusSummary,
         List<FailureReasonEntry> failureReasons,
@@ -46,6 +47,13 @@ public record DashboardResponse(
             long runCount,
             long totalTokens,
             double totalCostUsd,
+            double successRate
+    ) {}
+
+    public record IntegrationStats(
+            String provider,
+            long runCount,
+            long totalTokens,
             double successRate
     ) {}
 

@@ -1,0 +1,54 @@
+{
+  "id" : "saas-auto-fix",
+  "icon" : "🩹",
+  "name" : {
+    "en" : "SaaS — Auto-Fix",
+    "de" : "SaaS — Auto-Fix"
+  },
+  "description" : {
+    "en" : "Triggered by TodoTrigger when tests/lint/build fail. Diagnoses, attempts a fix, re-tests.",
+    "de" : "Wird vom TodoTrigger gefeuert, wenn Tests/Lint/Build fehlschlagen. Diagnostiziert, versucht Fix, testet erneut."
+  },
+  "category" : "CODE",
+  "sortOrder" : 60,
+  "version" : "1.0.0",
+  "model" : "claude-sonnet-4-6",
+  "instructions" : "Wird automatisch von TodoTrigger ausgeführt. Hard rules: max 3 Versuche pro Issue (Trigger steuert das), nie Tests deaktivieren, nie Symptome maskieren. Bei Unsicherheit Fix abbrechen — TodoTrigger eskaliert dann auf manuelle Review.",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "timeout_seconds" : 60,
+      "command" : "set -euo pipefail\necho 'TODO_TITLE={{ todo_title }}'\necho 'TODO_DESCRIPTION={{ todo_description }}'\necho 'TODO_TAGS={{ todo_tags }}'\necho 'PROJECT={{ project_path }}'"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "timeout_seconds" : 300,
+      "command" : "Du erhältst einen Fehler-Kontext aus einem TODO, das vom TodoTrigger gefeuert wurde.\n\nKONTEXT:\n{{ previous_output }}\n\nAUFGABE — Diagnose:\n1. Welche Art von Fehler? (test-failed | lint-failed | build-failed | type-failed | missing-feature | doc-stale | dependency-vuln)\n2. Welcher konkrete Fehler? (parse aus tags + description; ggf. .factory-test-*.log im Projekt lesen)\n3. Mögliche Ursachen (1-3)\n4. Fix-Strategie (in 1-2 Sätzen)\n\nGib die Diagnose als JSON aus:\n{\n  \"error_type\": \"...\",\n  \"specific_error\": \"...\",\n  \"likely_causes\": [\"...\", \"...\"],\n  \"fix_strategy\": \"...\",\n  \"confidence\": \"high|medium|low\"\n}\n\nWenn confidence=low: Diagnose beenden mit \"fix_strategy\": \"ABORT — manuelle Review nötig\"."
+    },
+    "requiredCapabilities" : [ ],
+    "skillIds" : [ "builtin-feature-implementer" ]
+  }, {
+    "type" : "agentic",
+    "config" : {
+      "max_iterations" : 8,
+      "max_total_tokens" : 150000,
+      "iteration_timeout_seconds" : 300,
+      "total_timeout_seconds" : 1800,
+      "max_repeated_actions" : 3,
+      "require_approval" : false,
+      "success_criteria" : "factory test im Projekt-Verzeichnis gibt JSON mit ok=true zurück.",
+      "goal" : "Behebe den Fehler basierend auf der Diagnose.\n\nDIAGNOSE (JSON):\n{{ previous_output }}\n\nPROJEKT-PFAD: {{ project_path }}\n\nWENN fix_strategy = 'ABORT' → Schreibe 'AUTO_FIX_ABORTED — manuelle Review nötig' und stoppe.\n\nSONST:\n1. Implementiere die Fix-Strategie (möglichst chirurgisch — nur die problematische Stelle anfassen)\n2. Re-run factory test im Projekt\n3. Iteriere bis ok=true ODER iteration-Budget erschöpft\n4. Wenn weiterhin rot: Schreibe 'AUTO_FIX_FAILED' — TodoTrigger erhöht fixAttempts und eskaliert eventuell\n\nNiemals Tests deaktivieren, .skip() setzen oder Asserts entfernen. Niemals Symptome maskieren."
+    },
+    "requiredCapabilities" : [ ],
+    "skillIds" : [ "builtin-feature-implementer", "builtin-code-review" ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "timeout_seconds" : 60,
+      "command" : "set -euo pipefail\nRESULT='{{ previous_output }}'\nif echo \"$RESULT\" | grep -qE 'AUTO_FIX_ABORTED|AUTO_FIX_FAILED'; then\n  echo 'GATE_RED'\nelse\n  echo 'GATE_GREEN'\nfi"
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

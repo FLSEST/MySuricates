@@ -1,0 +1,49 @@
+{
+  "id" : "saas-spec-to-buildplan",
+  "icon" : "🏛️",
+  "name" : {
+    "en" : "SaaS — Spec to Build-Plan",
+    "de" : "SaaS — Spec zu Build-Plan"
+  },
+  "description" : {
+    "en" : "Reads spec.md, validates frontmatter against schema, drives Spec-Architect to research stack and decompose features, then waits for user approval",
+    "de" : "Liest spec.md, validiert Frontmatter, lässt den Spec-Architect Stack recherchieren und Features zerlegen, wartet dann auf User-Approval"
+  },
+  "category" : "BUSINESS",
+  "sortOrder" : 54,
+  "version" : "1.0.0",
+  "model" : "claude-opus-4-6",
+  "instructions" : "Du bist die erste Stufe der SaaS-Factory-Pipeline. Aus einer spec.md erzeugst du einen strukturierten Build-Plan inklusive Stack-Empfehlung. Sei explizit über Annahmen, formuliere offene Fragen statt schweigend zu raten. Pflicht: respektiere constraints.must_avoid hart.",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "timeout_seconds" : 60,
+      "command" : "set -euo pipefail\nSPEC=\"{{ spec_path }}\"\nFACTORY=\"${FACTORY_ROOT:-/home/flo/Entwicklung/IdeaProjects/saas-factory}\"\nif [ -z \"$SPEC\" ] || [ \"$SPEC\" = '{{ spec_path }}' ]; then\n  echo 'ERROR: spec_path Kontextvariable fehlt' >&2; exit 2\nfi\n# absolutize, falls relativ\ncase \"$SPEC\" in /*) ;; *) SPEC=\"$FACTORY/$SPEC\" ;; esac\n\"$FACTORY/tools/factory\" validate-spec \"$SPEC\""
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "document",
+    "config" : {
+      "file_path" : "{{ spec_path }}",
+      "max_chars" : 100000
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "timeout_seconds" : 600,
+      "command" : "Du erhältst die geparste Frontmatter-Validation als JSON von Block 1 und den vollständigen spec.md-Text von Block 2.\n\nVALIDATION-RESULT (Block 1, JSON):\n{{ step_1_output }}\n\nSPEC-INHALT (Block 2):\n{{ previous_output }}\n\nVERFÜGBARE RECIPES (im saas-factory Projekt unter recipes/):\n- nextjs-prisma-postgres (Next.js 15 + Prisma + Postgres + Tailwind, App-Router)\n\nAUFGABE — Erstelle einen JSON-Build-Plan mit folgender Struktur:\n```json\n{\n  \"stack\": {\n    \"framework\": \"...\",\n    \"db\": \"...\",\n    \"auth\": \"...\",\n    \"recipe\": \"recipe-name oder null\",\n    \"cli_fallback\": \"command oder null\"\n  },\n  \"stack_reasoning\": \"1-2 Sätze warum dieser Stack zur Spec passt\",\n  \"feature_order\": [\"feature-id-1\", \"feature-id-2\", ...],\n  \"per_feature\": {\n    \"feature-id-1\": {\n      \"snippet_hint\": \"snippets/<stack>/<feature>/ oder null\",\n      \"complexity\": \"S|M|L\",\n      \"risks\": [\"risk-1\", \"risk-2\"]\n    }\n  },\n  \"open_questions\": [\"Frage 1\", \"Frage 2\"]\n}\n```\n\nWICHTIG:\n- Berücksichtige nur Phase-1-Features (must_have=true UND phase=1 oder default).\n- Wenn die Spec einen stack_hint hat, respektiere ihn — nur überschreiben, wenn er in Konflikt mit must_avoid steht.\n- Bei mehrdeutigen Anforderungen → open_questions, NICHT raten."
+    },
+    "requiredCapabilities" : [ ],
+    "skillIds" : [ "builtin-spec-architect" ]
+  }, {
+    "type" : "approval",
+    "config" : {
+      "options" : [ "Yes", "Edit", "Abort" ],
+      "timeout_minutes" : 60,
+      "variable_name" : "buildplan_decision",
+      "question" : "## Build-Plan Review\n\n{{ previous_output }}\n\n**Yes** = Plan akzeptieren, weiter zu Scaffold\n**Edit** = Plan ändern (gib im Folge-Run einen modifizierten Plan als Kontext mit)\n**Abort** = Pipeline abbrechen"
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

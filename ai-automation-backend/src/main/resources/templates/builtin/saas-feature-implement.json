@@ -1,0 +1,58 @@
+{
+  "id" : "saas-feature-implement",
+  "icon" : "🛠️",
+  "name" : {
+    "en" : "SaaS — Implement One Feature",
+    "de" : "SaaS — Feature implementieren"
+  },
+  "description" : {
+    "en" : "Implements a single feature in a generated SaaS app: snippet-apply, agentic code-gen, factory test, optional auto-fix, code-review",
+    "de" : "Implementiert ein einzelnes Feature: snippet-apply, agentic Code-Gen, factory test, optional Auto-Fix, Code-Review"
+  },
+  "category" : "CODE",
+  "sortOrder" : 56,
+  "version" : "1.0.0",
+  "model" : "claude-sonnet-4-6",
+  "instructions" : "Implementiert genau EIN Feature im Ziel-Projekt. Hard rule: claim NIE Erfolg ohne grünen factory test. Tests fixen statt verstecken. Niemals Bibliotheken erfinden — wenn etwas fehlt, package.json erweitern.",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "timeout_seconds" : 60,
+      "on_failure" : "continue",
+      "command" : "set -euo pipefail\nFACTORY=\"${FACTORY_ROOT:-/home/flo/Entwicklung/IdeaProjects/saas-factory}\"\nSLUG=\"{{ slug }}\"\nFEATURE_ID=\"{{ feature_id }}\"\nSTACK=\"{{ stack }}\"\nTARGET=\"$FACTORY/$SLUG\"\n\"$FACTORY/tools/factory\" snippet-apply --feature \"$FEATURE_ID\" --stack \"$STACK\" --target \"$TARGET\" 2>&1 || echo 'Kein Snippet vorhanden — agentic generiert from scratch'"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "agentic",
+    "config" : {
+      "max_iterations" : 15,
+      "max_total_tokens" : 300000,
+      "iteration_timeout_seconds" : 600,
+      "total_timeout_seconds" : 3600,
+      "max_repeated_actions" : 3,
+      "require_approval" : false,
+      "success_criteria" : "factory test im Projekt-Verzeichnis gibt JSON mit ok=true zurück (lint/typecheck/unit alle passed).",
+      "goal" : "Implementiere das Feature {{ feature_id }} im Projekt {{ slug }}.\n\nKONTEXT:\n- Projekt-Pfad: ${FACTORY_ROOT:-/home/flo/Entwicklung/IdeaProjects/saas-factory}/{{ slug }}\n- Feature-Beschreibung: {{ feature_desc }}\n- Stack: {{ stack }}\n- Snippet-Resultat (Block 1 oben): {{ previous_output }}\n\nAUFGABE:\n1. Wenn das Snippet bereits Files kopiert hat, fülle Lücken (TODO-Marker, fehlende Imports, business logic).\n2. Sonst: Generiere alle Files für das Feature von Grund auf, im Stack-spezifischen Idiom (Next.js App-Router → src/app/, server actions in src/lib/, Prisma-Schema-Erweiterungen in prisma/schema.prisma).\n3. Schreibe mindestens einen Unit-Test (Vitest/Jest/pytest je nach Stack).\n4. Wenn Prisma-Schema geändert wird: NUR Schema-Datei anpassen — Migration läuft danach via `factory migrate`.\n5. README.md kurz aktualisieren (1-2 Sätze für das neue Feature).\n6. Iteriere via factory test (im Projekt-Verzeichnis ausführen) bis ok=true.\n\nABSOLUTE PFADE verwenden — jede ACTION ist ein eigener Agent ohne Kontext der vorherigen.\nKeine inkrementellen Refactors außerhalb des Features.\nKeine Secrets hartcoden — .env.example pflegen.",
+      "instructions_addendum" : "Wenn factory test fehlschlägt: lies log_tail im JSON-Report, fixe gezielt, re-run. Nie Tests deaktivieren oder skippen."
+    },
+    "requiredCapabilities" : [ ],
+    "skillIds" : [ "builtin-feature-implementer" ]
+  }, {
+    "type" : "shell",
+    "config" : {
+      "timeout_seconds" : 600,
+      "on_failure" : "continue",
+      "command" : "set -euo pipefail\nFACTORY=\"${FACTORY_ROOT:-/home/flo/Entwicklung/IdeaProjects/saas-factory}\"\nSLUG=\"{{ slug }}\"\nTARGET=\"$FACTORY/$SLUG\"\nRESULT=$(\"$FACTORY/tools/factory\" test \"$TARGET\")\necho \"$RESULT\"\nOK=$(echo \"$RESULT\" | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d[\"ok\"])')\nif [ \"$OK\" != \"True\" ] && [ \"$OK\" != \"true\" ]; then\n  echo 'TEST_FAILED'\n  \"$FACTORY/tools/factory\" create-todo \"feature {{ feature_id }} in {{ slug }} — tests failed\" --tag test-failed --tag {{ slug }} --tag {{ feature_id }} --priority HIGH --workflow-run \"{{ workflow_run_id }}\" --reference-type 'feature_test_failure' --reference-id '{{ feature_id }}' >&2 || true\nelse\n  echo 'TEST_OK'\nfi"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "simple",
+    "config" : {
+      "timeout_seconds" : 300,
+      "on_failure" : "continue",
+      "command" : "Du bist Code-Reviewer. Reviewe die Änderungen für Feature {{ feature_id }} im Projekt {{ slug }}.\n\nProjekt-Pfad: ${FACTORY_ROOT:-/home/flo/Entwicklung/IdeaProjects/saas-factory}/{{ slug }}\n\nAUFGABE:\n1. Schaue dir den letzten Commit an (`cd $PROJEKT && git log -1 --stat && git show HEAD`)\n2. Bewerte: Bugs, Security-Issues, Performance, Maintainability\n3. Gib NUR Findings mit Severity HIGH oder CRITICAL aus — keine Stilmeckerei\n4. Falls alles OK ist: 'CODE_REVIEW: PASSED — keine Findings'\n5. Falls Findings: Liste mit File:Line + Beschreibung + Fix-Vorschlag"
+    },
+    "requiredCapabilities" : [ ],
+    "skillIds" : [ "builtin-code-review" ]
+  } ]
+}

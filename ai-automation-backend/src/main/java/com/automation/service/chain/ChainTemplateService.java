@@ -96,6 +96,34 @@ public class ChainTemplateService {
                             new BuiltInChainTemplate.Entry("sprint-retrospective",
                                     Map.of("de", "Sprint-Retrospektive durchführen", "en", "Run sprint retrospective"))
                     )
+            ),
+            new BuiltInChainTemplate(
+                    "saas-spec-to-container",
+                    Map.of("de", "SaaS-Factory: Spec → Container",
+                            "en", "SaaS-Factory: Spec → Container"),
+                    Map.of("de", "End-to-End-Pipeline der SaaS-Factory: aus einer spec.md entsteht eine lokal laufende Container-App inklusive Marketing-Page",
+                            "en", "End-to-end SaaS-Factory pipeline: produces a locally running container app with marketing page from a spec.md"),
+                    "🏭",
+                    List.of(
+                            new BuiltInChainTemplate.Entry("saas-spec-to-buildplan",
+                                    Map.of("de", "Spec validieren + Build-Plan erstellen",
+                                            "en", "Validate spec + build plan")),
+                            new BuiltInChainTemplate.Entry("saas-scaffold",
+                                    Map.of("de", "App-Skelett scaffolden",
+                                            "en", "Scaffold app skeleton")),
+                            new BuiltInChainTemplate.Entry("saas-feature-loop",
+                                    Map.of("de", "Features iterativ implementieren",
+                                            "en", "Iterate features")),
+                            new BuiltInChainTemplate.Entry("saas-marketing-site",
+                                    Map.of("de", "Marketing-Page generieren",
+                                            "en", "Generate marketing page")),
+                            new BuiltInChainTemplate.Entry("saas-doc-update",
+                                    Map.of("de", "README + CHANGELOG aktualisieren",
+                                            "en", "Update README + CHANGELOG")),
+                            new BuiltInChainTemplate.Entry("saas-containerize",
+                                    Map.of("de", "Container bauen + Approval",
+                                            "en", "Build container + approval"))
+                    )
             )
     );
 

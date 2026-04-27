@@ -1,0 +1,45 @@
+{
+  "id" : "saas-feature-loop",
+  "icon" : "🔁",
+  "name" : {
+    "en" : "SaaS — Feature Loop",
+    "de" : "SaaS — Feature-Schleife"
+  },
+  "description" : {
+    "en" : "Iterates over the feature_order from the build-plan and invokes saas-feature-implement for each",
+    "de" : "Iteriert über feature_order aus dem Build-Plan und ruft für jedes Feature saas-feature-implement auf"
+  },
+  "category" : "TRANSFORM",
+  "sortOrder" : 57,
+  "version" : "1.0.0",
+  "model" : null,
+  "instructions" : "Iteriert die geplanten Features in Reihenfolge ab. Bricht ab, wenn ein Feature 3x in Folge fehlschlägt — TodoTrigger nimmt dann manuelle Auflösung an.",
+  "blocks" : [ {
+    "type" : "shell",
+    "config" : {
+      "timeout_seconds" : 30,
+      "command" : "set -euo pipefail\necho '{{ feature_order_json }}' | python3 -c 'import json,sys; data=json.loads(sys.stdin.read()); [print(json.dumps(f)) for f in data]'"
+    },
+    "requiredCapabilities" : [ ]
+  }, {
+    "type" : "foreach",
+    "config" : {
+      "items_command" : "echo '{{ step_0_output }}' | python3 -c 'import sys; [print(line.strip()) for line in sys.stdin if line.strip()]'",
+      "variable_name" : "current_feature",
+      "blocks" : [ {
+        "type" : "sub-workflow",
+        "config" : {
+          "workflow_id_lookup" : "saas-feature-implement",
+          "context" : {
+            "slug" : "{{ slug }}",
+            "stack" : "{{ stack }}",
+            "feature_id" : "{{ current_feature.id }}",
+            "feature_desc" : "{{ current_feature.desc }}"
+          }
+        },
+        "requiredCapabilities" : [ ]
+      } ]
+    },
+    "requiredCapabilities" : [ ]
+  } ]
+}

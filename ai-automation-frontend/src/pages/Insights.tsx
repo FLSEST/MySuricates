@@ -9,6 +9,7 @@ import { ErrorState } from '../components/shared/ErrorState';
 import { RunsChart } from '../components/dashboard/RunsChart';
 import { SuccessRateChart } from '../components/dashboard/SuccessRateChart';
 import { ProviderStatsCard } from '../components/dashboard/ProviderStatsCard';
+import { IntegrationStatsCard } from '../components/dashboard/IntegrationStatsCard';
 import { ModelStatsCard } from '../components/dashboard/ModelStatsCard';
 import { TimeRangeSelector } from '../components/insights/TimeRangeSelector';
 import { CostOverTimeChart } from '../components/insights/CostOverTimeChart';
@@ -161,9 +162,10 @@ export function Insights() {
       {stats && (
         <>
           <SectionHeader icon={<Cpu className="w-4 h-4" />} title={t.insights.modelsAndTokens} />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             <ModelStatsCard data={stats.modelStats} />
             <ProviderStatsCard data={stats.providerStats} />
+            <IntegrationStatsCard data={stats.integrationStats} />
             <TokenBreakdownChart input={stats.totalInputTokens ?? 0} output={stats.totalOutputTokens ?? 0} />
           </div>
         </>

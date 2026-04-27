@@ -162,6 +162,11 @@ public class LearningService {
         Map<String, long[]> providerTokens = new LinkedHashMap<>();
         Map<String, double[]> providerCost = new LinkedHashMap<>();
 
+        // Integration aggregation (per step, not per run — a single run can use multiple integrations)
+        Map<String, long[]> integrationStepCount = new LinkedHashMap<>();
+        Map<String, long[]> integrationSuccessCount = new LinkedHashMap<>();
+        Map<String, long[]> integrationTokens = new LinkedHashMap<>();
+
         // Model aggregation
         Map<String, long[]> modelStepCount = new LinkedHashMap<>();
         Map<String, long[]> modelTokens = new LinkedHashMap<>();
@@ -239,12 +244,25 @@ public class LearningService {
                 runCost += stepCost;
                 runTokens += stepTokens;
 
+                String execMode = extractString(meta, "executionMode");
+                boolean isIntegrationStep = "integration".equals(execMode);
+
                 // Only AI providers count for providerStats — integration block metadata
                 // also stores a `provider` (trello/jira/google-calendar/...) but those are
                 // connectors, not AI providers, so we skip them here.
-                if (runProvider == null && meta.get("provider") instanceof String p
-                        && !"integration".equals(extractString(meta, "executionMode"))) {
+                if (runProvider == null && meta.get("provider") instanceof String p && !isIntegrationStep) {
                     runProvider = p;
+                }
+
+                // Integration stats: per-step aggregation by integration ID (trello, jira,
+                // google-calendar, gmail, ...). Tokens/cost are typically zero for these.
+                if (isIntegrationStep && meta.get("provider") instanceof String integrationId
+                        && !integrationId.isBlank()) {
+                    integrationStepCount.computeIfAbsent(integrationId, k -> new long[1])[0]++;
+                    if (step.getStatus() == StepStatus.COMPLETED) {
+                        integrationSuccessCount.computeIfAbsent(integrationId, k -> new long[1])[0]++;
+                    }
+                    integrationTokens.computeIfAbsent(integrationId, k -> new long[1])[0] += stepTokens;
                 }
 
                 if (meta.get("model") instanceof String m && !m.isBlank()) {
@@ -322,6 +340,17 @@ public class LearningService {
                 .sorted(Comparator.comparingLong(DashboardResponse.ProviderStats::runCount).reversed())
                 .toList();
 
+        List<DashboardResponse.IntegrationStats> integrationStats = integrationStepCount.entrySet().stream()
+                .map(e -> {
+                    String p = e.getKey();
+                    long runs = e.getValue()[0];
+                    long successes = integrationSuccessCount.getOrDefault(p, new long[]{0})[0];
+                    long tokens = integrationTokens.getOrDefault(p, new long[]{0})[0];
+                    return new DashboardResponse.IntegrationStats(p, runs, tokens, runs > 0 ? (double) successes / runs : 0.0);
+                })
+                .sorted(Comparator.comparingLong(DashboardResponse.IntegrationStats::runCount).reversed())
+                .toList();
+
         List<DashboardResponse.ModelStats> modelStats = modelStepCount.entrySet().stream()
                 .map(e -> {
                     String m = e.getKey();
@@ -384,6 +413,7 @@ public class LearningService {
                 recentRuns,
                 timeSeries,
                 providerStats,
+                integrationStats,
                 modelStats,
                 gateStatusSummary,
                 failureReasons,

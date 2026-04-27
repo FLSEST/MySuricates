@@ -1,0 +1,41 @@
+ ai-automation-backend/docker/Dockerfile.agent-java |  21 +++
+ ai-automation-backend/docker/Dockerfile.stable     |  13 +-
+ .../executor/blocks/ForEachBlockExecutor.java      |   5 +-
+ .../executor/blocks/RetryBlockExecutor.java        |   5 +-
+ .../executor/blocks/ShellBlockExecutor.java        |  24 +++-
+ .../executor/blocks/SwitchBlockExecutor.java       |   5 +-
+ .../executor/blocks/WhileBlockExecutor.java        |   5 +-
+ .../com/automation/service/AssistantService.java   |  44 +++++-
+ .../service/cli/CommandExecutorService.java        |  67 ++++++++-
+ .../service/cli/ContainerShellService.java         |  26 +++-
+ .../service/workflow/WorkflowExecutor.java         |  17 ++-
+ .../src/main/resources/assistant-system-prompt.md  |   4 +-
+ .../automation/service/AssistantServiceTest.java   |  58 +++++++-
+ .../service/cli/CommandExecutorServiceTest.java    |  71 +++++++++-
+ .../service/cli/ContainerShellServiceTest.java     |  55 +++++++-
+ .../service/workflow/WorkflowExecutorTest.java     |  40 ++++++
+ .../src/components/palette/CommandPalette.tsx      | 150 ++++++++++++++++++---
+ ai-automation-frontend/src/i18n/de.ts              |   1 +
+ ai-automation-frontend/src/i18n/en.ts              |   1 +
+ docs/WORKFLOW-GUIDE.md                             |   3 +-
+ 20 files changed, 555 insertions(+), 60 deletions(-)
+A	ai-automation-backend/docker/Dockerfile.agent-java
+M	ai-automation-backend/docker/Dockerfile.stable
+M	ai-automation-backend/src/main/java/com/automation/executor/blocks/ForEachBlockExecutor.java
+M	ai-automation-backend/src/main/java/com/automation/executor/blocks/RetryBlockExecutor.java
+M	ai-automation-backend/src/main/java/com/automation/executor/blocks/ShellBlockExecutor.java
+M	ai-automation-backend/src/main/java/com/automation/executor/blocks/SwitchBlockExecutor.java
+M	ai-automation-backend/src/main/java/com/automation/executor/blocks/WhileBlockExecutor.java
+M	ai-automation-backend/src/main/java/com/automation/service/AssistantService.java
+M	ai-automation-backend/src/main/java/com/automation/service/cli/CommandExecutorService.java
+M	ai-automation-backend/src/main/java/com/automation/service/cli/ContainerShellService.java
+M	ai-automation-backend/src/main/java/com/automation/service/workflow/WorkflowExecutor.java
+M	ai-automation-backend/src/main/resources/assistant-system-prompt.md
+M	ai-automation-backend/src/test/java/com/automation/service/AssistantServiceTest.java
+M	ai-automation-backend/src/test/java/com/automation/service/cli/CommandExecutorServiceTest.java
+M	ai-automation-backend/src/test/java/com/automation/service/cli/ContainerShellServiceTest.java
+M	ai-automation-backend/src/test/java/com/automation/service/workflow/WorkflowExecutorTest.java
+M	ai-automation-frontend/src/components/palette/CommandPalette.tsx
+M	ai-automation-frontend/src/i18n/de.ts
+M	ai-automation-frontend/src/i18n/en.ts
+M	docs/WORKFLOW-GUIDE.md

@@ -41,6 +41,10 @@ class DashboardResponseTest {
         return new DashboardResponse.BlockTypeUsageEntry("simple", 500L, 3L, 0.006);
     }
 
+    private static DashboardResponse.IntegrationStats sampleIntegrationStats() {
+        return new DashboardResponse.IntegrationStats("trello", 12L, 0L, 1.0);
+    }
+
     private static DashboardResponse.TriggerDistribution sampleTriggerDistribution() {
         return new DashboardResponse.TriggerDistribution(10L, 20L, 5L, 3L, 2L);
     }
@@ -62,6 +66,7 @@ class DashboardResponseTest {
                 List.of(),   // recentRuns - empty list to avoid WorkflowRunResponse construction
                 List.of(sampleTimeSeriesPoint()),
                 List.of(sampleProviderStats()),
+                List.of(sampleIntegrationStats()),
                 List.of(sampleModelStats()),
                 List.of(sampleGateStatusEntry()),
                 List.of(sampleFailureReasonEntry()),
@@ -99,6 +104,7 @@ class DashboardResponseTest {
             assertThat(response.recentRuns()).isEmpty();
             assertThat(response.timeSeries()).hasSize(1).containsExactly(sampleTimeSeriesPoint());
             assertThat(response.providerStats()).hasSize(1).containsExactly(sampleProviderStats());
+            assertThat(response.integrationStats()).hasSize(1).containsExactly(sampleIntegrationStats());
             assertThat(response.modelStats()).hasSize(1).containsExactly(sampleModelStats());
             assertThat(response.gateStatusSummary()).hasSize(1).containsExactly(sampleGateStatusEntry());
             assertThat(response.failureReasons()).hasSize(1).containsExactly(sampleFailureReasonEntry());
@@ -111,12 +117,13 @@ class DashboardResponseTest {
         void should_allow_null_collection_and_object_fields() {
             DashboardResponse response = new DashboardResponse(
                     0L, 0L, 0L, 0L, 0L, 0.0, 0.0, 0.0, 0L, 0L, 0L,
-                    null, null, null, null, null, null, null, null, null, null);
+                    null, null, null, null, null, null, null, null, null, null, null);
 
             assertThat(response.topWorkflows()).isNull();
             assertThat(response.recentRuns()).isNull();
             assertThat(response.timeSeries()).isNull();
             assertThat(response.providerStats()).isNull();
+            assertThat(response.integrationStats()).isNull();
             assertThat(response.modelStats()).isNull();
             assertThat(response.gateStatusSummary()).isNull();
             assertThat(response.failureReasons()).isNull();
