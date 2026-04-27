@@ -3,9 +3,10 @@ FROM eclipse-temurin:21-jdk-jammy
 # Create generic agent user - UID is overridden at runtime via --user
 RUN useradd -m -u 1000 agent
 
-# Base tools + Maven
+# Base tools + Maven + LibreOffice (headless DOCX -> PDF conversion)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      maven git curl jq bash python3 ca-certificates && \
+      maven git curl jq bash python3 ca-certificates \
+      libreoffice-writer libreoffice-core fonts-liberation fonts-dejavu && \
     rm -rf /var/lib/apt/lists/*
 
 # Prepare home directories (m2 cache writable by any runtime UID)
