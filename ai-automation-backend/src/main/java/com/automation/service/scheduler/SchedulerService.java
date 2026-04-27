@@ -26,6 +26,7 @@ import com.automation.dto.request.UpdateScheduleRequest;
 import com.automation.dto.response.UpcomingScheduleResponse;
 import com.automation.repository.AppSettingsRepository;
 
+import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
@@ -50,6 +51,7 @@ public class SchedulerService {
     private final ScheduledWorkflowExecutor scheduledExecutor;
     private final ActivityLogService activityLogService;
     private final AppSettingsRepository appSettingsRepository;
+    private final Clock clock;
 
     private static final String MAINTENANCE_MODE_KEY = "scheduler.maintenance-mode";
 
@@ -157,7 +159,7 @@ public class SchedulerService {
             if (delayExpression == null || delayExpression.isBlank()) {
                 throw new IllegalArgumentException("delayExpression is required for DELAYED schedules (e.g. '2h', '30m', '1d')");
             }
-            Instant runAt = Instant.now().plus(parseDelay(delayExpression));
+            Instant runAt = Instant.now(clock).plus(parseDelay(delayExpression));
             builder.cronExpression("");
             builder.scheduledAt(runAt);
             builder.nextRunAt(runAt);
@@ -253,20 +255,20 @@ public class SchedulerService {
 
     @Transactional(readOnly = true)
     public UpcomingScheduleResponse getRemainingToday() {
-        Instant endOfDay = LocalDate.now().plusDays(1)
+        Instant endOfDay = LocalDate.now(clock).plusDays(1)
                 .atStartOfDay(ZoneId.systemDefault()).toInstant();
         return getUpcomingRuns(endOfDay);
     }
 
     @Transactional(readOnly = true)
     public UpcomingScheduleResponse getRemainingThisWeek() {
-        LocalDate nextMonday = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY));
+        LocalDate nextMonday = LocalDate.now(clock).with(TemporalAdjusters.next(DayOfWeek.MONDAY));
         Instant endOfWeek = nextMonday.atStartOfDay(ZoneId.systemDefault()).toInstant();
         return getUpcomingRuns(endOfWeek);
     }
 
     private UpcomingScheduleResponse getUpcomingRuns(Instant until) {
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         List<ScheduledWorkflow> enabled = scheduledRepository.findByEnabledTrue();
         List<UpcomingScheduleResponse.UpcomingRun> upcoming = new ArrayList<>();
 
@@ -289,7 +291,7 @@ public class SchedulerService {
 
             if (sw.getScheduleType() == ScheduleType.CRON) {
                 CronExpression cron = CronExpression.parse(sw.getCronExpression());
-                LocalDateTime next = cron.next(LocalDateTime.now());
+                LocalDateTime next = cron.next(LocalDateTime.now(clock));
                 while (next != null) {
                     Instant nextInstant = next.atZone(ZoneId.systemDefault()).toInstant();
                     if (nextInstant.isAfter(until)) break;
@@ -319,7 +321,7 @@ public class SchedulerService {
         }
         CronExpression cron = CronExpression.parse(cronExpression);
         List<Instant> result = new ArrayList<>();
-        LocalDateTime next = cron.next(LocalDateTime.now());
+        LocalDateTime next = cron.next(LocalDateTime.now(clock));
         while (next != null && result.size() < count) {
             result.add(next.atZone(ZoneId.systemDefault()).toInstant());
             next = cron.next(next);
@@ -344,7 +346,7 @@ public class SchedulerService {
             return;
         }
 
-        List<ScheduledWorkflow> dueSchedules = scheduledRepository.findDueSchedules(Instant.now());
+        List<ScheduledWorkflow> dueSchedules = scheduledRepository.findDueSchedules(Instant.now(clock));
 
         for (ScheduledWorkflow scheduled : dueSchedules) {
             try {
@@ -382,7 +384,7 @@ public class SchedulerService {
 
     private Instant calculateNextRun(String cronExpression) {
         CronExpression cron = CronExpression.parse(cronExpression);
-        LocalDateTime next = cron.next(LocalDateTime.now());
+        LocalDateTime next = cron.next(LocalDateTime.now(clock));
         if (next == null) return null;
         return next.atZone(ZoneId.systemDefault()).toInstant();
     }

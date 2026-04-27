@@ -15,9 +15,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +50,12 @@ class SchedulerServiceTest {
 
     @Mock
     private AppSettingsRepository appSettingsRepository;
+
+    // Fixed at noon UTC so getRemainingToday/Week behave deterministically regardless of wall-clock time.
+    private static final Instant FIXED_NOW = Instant.parse("2026-04-26T12:00:00Z");
+
+    @Spy
+    private Clock clock = Clock.fixed(FIXED_NOW, ZoneId.of("UTC"));
 
     @InjectMocks
     private SchedulerService schedulerService;
@@ -323,7 +332,7 @@ class SchedulerServiceTest {
 
     @Test
     void getRemainingToday_onceSchedule_futureToday_included() {
-        Instant inOneHour = Instant.now().plus(1, ChronoUnit.HOURS);
+        Instant inOneHour = FIXED_NOW.plus(1, ChronoUnit.HOURS);
         ScheduledWorkflow onceSchedule = ScheduledWorkflow.builder()
                 .id("sched-once-today")
                 .workflow(testWorkflow)
@@ -343,7 +352,7 @@ class SchedulerServiceTest {
 
     @Test
     void getRemainingToday_onceSchedule_pastTime_excluded() {
-        Instant oneHourAgo = Instant.now().minus(1, ChronoUnit.HOURS);
+        Instant oneHourAgo = FIXED_NOW.minus(1, ChronoUnit.HOURS);
         ScheduledWorkflow pastSchedule = ScheduledWorkflow.builder()
                 .id("sched-past")
                 .workflow(testWorkflow)
@@ -395,7 +404,7 @@ class SchedulerServiceTest {
 
     @Test
     void getRemainingThisWeek_onceSchedule_withinWeek_included() {
-        Instant inTwoDays = Instant.now().plus(2, ChronoUnit.DAYS);
+        Instant inTwoDays = FIXED_NOW.plus(2, ChronoUnit.DAYS);
         ScheduledWorkflow onceSchedule = ScheduledWorkflow.builder()
                 .id("sched-once-week")
                 .workflow(testWorkflow)

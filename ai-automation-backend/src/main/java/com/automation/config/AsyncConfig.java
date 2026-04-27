@@ -7,6 +7,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 
 import com.automation.concurrency.DynamicSemaphore;
 
+import java.time.Clock;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -25,5 +26,10 @@ public class AsyncConfig {
     @Bean
     public DynamicSemaphore executionSemaphore() {
         return new DynamicSemaphore(maxConcurrent);
+    }
+
+    @Bean
+    public Clock systemClock() {
+        return Clock.systemDefaultZone();
     }
 }
