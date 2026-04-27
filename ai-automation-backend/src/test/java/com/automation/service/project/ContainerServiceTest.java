@@ -16,6 +16,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -47,6 +49,12 @@ class ContainerServiceTest {
     @Mock
     private HostProcessUtils hostProcessUtils;
 
+    @Mock
+    private PlatformTransactionManager transactionManager;
+
+    @Mock
+    private TransactionStatus transactionStatus;
+
     private ContainerService service;
 
     private Project testProject;
@@ -54,12 +62,18 @@ class ContainerServiceTest {
     @BeforeEach
     void setUp() {
         lenient().when(hostProcessUtils.getHostUid()).thenReturn("1000");
+        // TransactionTemplate.execute() asks the manager for a status, runs the
+        // callback, then commits — returning a mock status lets the callback
+        // run unchanged and turns commit/rollback into no-ops, which is what
+        // the unit test wants.
+        lenient().when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
         service = new ContainerService(
                 dockerClient,
                 containerRepository,
                 workflowExecutor,
                 activityLogService,
                 hostProcessUtils,
+                transactionManager,
                 100_000L,           // cpuQuota
                 4_294_967_296L,     // memoryLimit (4GB)
                 100L,               // pidsLimit
@@ -167,7 +181,7 @@ class ContainerServiceTest {
         Container result = service.createAndStartContainer(testProject);
 
         assertThat(result.getDockerContainerId()).isEqualTo("docker-new");
-        verify(containerRepository).delete(stale);
+        verify(containerRepository).deleteById("c1");
     }
 
     @Test
@@ -190,6 +204,7 @@ class ContainerServiceTest {
                 .status(ContainerStatus.RUNNING)
                 .build();
         when(containerRepository.findByProjectId("project-1")).thenReturn(Optional.of(container));
+        when(containerRepository.findById("c1")).thenReturn(Optional.of(container));
         stubDockerRemoveCommands();
         when(containerRepository.save(any(Container.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -263,6 +278,7 @@ class ContainerServiceTest {
                 .startedAt(Instant.now().minus(120, ChronoUnit.MINUTES))
                 .build();
         when(containerRepository.findByStatus(ContainerStatus.RUNNING)).thenReturn(List.of(idle));
+        when(containerRepository.findById("c1")).thenReturn(Optional.of(idle));
         when(workflowExecutor.getActiveContainerIds()).thenReturn(Set.of());
         stubDockerRemoveCommands();
         when(containerRepository.save(any(Container.class))).thenAnswer(inv -> inv.getArgument(0));
