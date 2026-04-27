@@ -15,7 +15,7 @@ class BuiltInSkillsTest {
     @Test
     void getAll_returnsAllSkills() {
         List<Skill> skills = BuiltInSkills.getAll();
-        assertThat(skills).hasSize(16);
+        assertThat(skills).hasSize(19);
     }
 
     @Test
