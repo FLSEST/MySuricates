@@ -5,6 +5,7 @@ import com.automation.service.activitylog.ActivityLogService;
 import com.zaxxer.hikari.HikariDataSource;
 import com.zaxxer.hikari.HikariPoolMXBean;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -13,6 +14,7 @@ import javax.sql.DataSource;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Monitors the HikariCP connection pool for exhaustion (stuck connections).
@@ -31,6 +33,9 @@ public class ConnectionPoolWatchdogService {
     private final ActivityLogService activityLogService;
     private final SimpMessagingTemplate messagingTemplate;
     private final HikariDataSource hikariDataSource;
+
+    @Value("${automation.watchdog.dump-stacks-on-exhaustion:true}")
+    private boolean dumpStacksOnExhaustion;
 
     private volatile Instant exhaustionDetectedAt;
     private volatile boolean alerted;
@@ -64,6 +69,9 @@ public class ConnectionPoolWatchdogService {
                 exhaustionDetectedAt = Instant.now();
                 log.warn("Pool exhaustion detected: active={}, waiting={}, idle={}, total={}",
                         active, waiting, idle, total);
+                if (dumpStacksOnExhaustion) {
+                    dumpRelevantThreadStacks();
+                }
             }
 
             Duration elapsed = Duration.between(exhaustionDetectedAt, Instant.now());
@@ -147,6 +155,50 @@ public class ConnectionPoolWatchdogService {
         } catch (Exception e) {
             log.debug("WebSocket broadcast failed: {}", e.getMessage());
         }
+    }
+
+    private void dumpRelevantThreadStacks() {
+        try {
+            String dump = Thread.getAllStackTraces().entrySet().stream()
+                    .filter(e -> isInteresting(e.getValue()))
+                    .map(e -> formatThreadStack(e.getKey(), e.getValue()))
+                    .collect(Collectors.joining("\n"));
+            if (dump.isBlank()) {
+                log.warn("Pool exhaustion thread-dump: no threads matched filter (com.automation/hibernate/sqlite/hikari).");
+            } else {
+                log.warn("Pool exhaustion thread-dump (filtered):\n{}", dump);
+            }
+        } catch (Exception e) {
+            log.debug("Thread-dump failed: {}", e.getMessage());
+        }
+    }
+
+    private static boolean isInteresting(StackTraceElement[] stack) {
+        for (StackTraceElement el : stack) {
+            String cn = el.getClassName();
+            if (cn.startsWith("com.automation.")
+                    || cn.startsWith("org.hibernate.")
+                    || cn.startsWith("org.sqlite.")
+                    || cn.startsWith("com.zaxxer.hikari.")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String formatThreadStack(Thread t, StackTraceElement[] stack) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("  Thread \"").append(t.getName())
+                .append("\" id=").append(t.getId())
+                .append(" state=").append(t.getState());
+        int limit = Math.min(stack.length, 25);
+        for (int i = 0; i < limit; i++) {
+            sb.append("\n    at ").append(stack[i]);
+        }
+        if (stack.length > limit) {
+            sb.append("\n    ... ").append(stack.length - limit).append(" more");
+        }
+        return sb.toString();
     }
 
     private static HikariDataSource unwrapHikariDataSource(DataSource dataSource) {
