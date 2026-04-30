@@ -5,12 +5,15 @@ import com.automation.dto.response.SyncPreview;
 import com.automation.dto.response.SyncPreviewItem;
 import com.automation.dto.response.SyncResult;
 import com.automation.dto.response.WorkflowDiff;
+import com.automation.entity.ChainEntry;
 import com.automation.entity.Project;
 import com.automation.entity.Skill;
 import com.automation.entity.Workflow;
+import com.automation.entity.WorkflowChain;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.SkillRepository;
+import com.automation.repository.WorkflowChainRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.service.system.ApiKeyService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -40,6 +43,7 @@ public class InstanceSyncHelper {
     private final ProjectRepository projectRepository;
     private final WorkflowRepository workflowRepository;
     private final SkillRepository skillRepository;
+    private final WorkflowChainRepository chainRepository;
     private final ApiKeyService apiKeyService;
     private final ObjectMapper objectMapper;
     private final DataSource dataSource;
@@ -62,7 +66,8 @@ public class InstanceSyncHelper {
     private record TargetMaps(
             Map<String, JsonNode> projectsByNamePath,
             Map<String, JsonNode> workflowsByNameProject,
-            Set<String> skillNames
+            Set<String> skillNames,
+            Map<String, JsonNode> chainsByName
     ) {}
 
     private TargetMaps buildTargetMaps(String targetBaseUrl) {
@@ -92,7 +97,15 @@ public class InstanceSyncHelper {
             }
         }
 
-        return new TargetMaps(projectsByNamePath, workflowsByNameProject, skillNames);
+        Map<String, JsonNode> chainsByName = new HashMap<>();
+        JsonNode targetChains = httpGet(targetBaseUrl + "/chains");
+        if (targetChains != null && targetChains.isArray()) {
+            for (JsonNode sc : targetChains) {
+                chainsByName.put(sc.path("name").asText(), sc);
+            }
+        }
+
+        return new TargetMaps(projectsByNamePath, workflowsByNameProject, skillNames, chainsByName);
     }
 
     // ── Sync preview ────────────────────────────────────────
@@ -136,7 +149,13 @@ public class InstanceSyncHelper {
             skills.add(new SyncPreviewItem(skill.getId(), skill.getName(), null, action));
         }
 
-        return new SyncPreview(projects, workflows, skills);
+        List<SyncPreviewItem> chains = new ArrayList<>();
+        for (WorkflowChain chain : chainRepository.findAll()) {
+            String action = target.chainsByName().containsKey(chain.getName()) ? "UPDATE" : "NEW";
+            chains.add(new SyncPreviewItem(chain.getId(), chain.getName(), null, action));
+        }
+
+        return new SyncPreview(projects, workflows, skills, chains);
     }
 
     // ── Sync all (backwards compatible) ─────────────────────
@@ -173,6 +192,7 @@ public class InstanceSyncHelper {
         int projectsSynced = 0;
         int workflowsSynced = 0;
         int skillsSynced = 0;
+        int chainsSynced = 0;
         int skipped = 0;
         List<String> errors = new ArrayList<>();
 
@@ -180,6 +200,7 @@ public class InstanceSyncHelper {
         String preSyncBackup = createPreSyncBackup(targetBaseUrl, errors);
 
         Map<String, String> projectIdMapping = new HashMap<>();
+        Map<String, String> workflowIdMapping = new HashMap<>();
 
         // Determine which items to sync
         Set<String> selectedProjectIds = request != null && request.projectIds() != null
@@ -188,6 +209,8 @@ public class InstanceSyncHelper {
                 ? new HashSet<>(request.workflowIds()) : null;
         Set<String> selectedSkillIds = request != null && request.skillIds() != null
                 ? new HashSet<>(request.skillIds()) : null;
+        Set<String> selectedChainIds = request != null && request.chainIds() != null
+                ? new HashSet<>(request.chainIds()) : null;
 
         // If workflows are selected, ensure their projects are included
         if (selectedWorkflowIds != null && selectedProjectIds != null) {
@@ -287,6 +310,7 @@ public class InstanceSyncHelper {
                 JsonNode existingWorkflow = targetWorkflowsByNameProject.get(wKey);
                 if (existingWorkflow != null) {
                     String targetWorkflowId = existingWorkflow.path("id").asText();
+                    workflowIdMapping.put(workflow.getId(), targetWorkflowId);
                     Map<String, Object> updateBody = new LinkedHashMap<>();
                     updateBody.put("name", workflow.getName());
                     updateBody.put("description", workflow.getDescription());
@@ -310,7 +334,10 @@ public class InstanceSyncHelper {
                     importBody.put("blocks", workflow.getBlocks());
                     if (workflow.getInstructions() != null) importBody.put("instructions", workflow.getInstructions());
                     if (workflow.getModel() != null) importBody.put("model", workflow.getModel());
-                    httpPost(targetBaseUrl + "/workflows/import", importBody);
+                    JsonNode created = httpPost(targetBaseUrl + "/workflows/import", importBody);
+                    if (created != null && !created.path("id").isMissingNode()) {
+                        workflowIdMapping.put(workflow.getId(), created.path("id").asText());
+                    }
                     workflowsSynced++;
                     markStableSynced(workflow.getId());
                     log.info("Created workflow on target: {}", workflow.getName());
@@ -363,7 +390,90 @@ public class InstanceSyncHelper {
             }
         }
 
-        // 4. Sync auto-todo-default setting
+        // 4. Sync chains
+        // Ensure workflow-id mapping covers all target workflows (chains may reference workflows
+        // that weren't part of this sync but already exist on the target).
+        if (targetWorkflows != null && targetWorkflows.isArray()) {
+            for (Workflow workflow : devWorkflows) {
+                if (workflowIdMapping.containsKey(workflow.getId())) continue;
+                String projectName = workflow.getProject() != null ? workflow.getProject().getName() : "";
+                String wKey = workflow.getName() + "|" + projectName;
+                JsonNode match = targetWorkflowsByNameProject.get(wKey);
+                if (match != null && !match.path("id").isMissingNode()) {
+                    workflowIdMapping.put(workflow.getId(), match.path("id").asText());
+                }
+            }
+        }
+
+        List<WorkflowChain> devChains = chainRepository.findAll();
+        JsonNode targetChains = httpGet(targetBaseUrl + "/chains");
+        Map<String, JsonNode> targetChainsByName = new HashMap<>();
+        if (targetChains != null && targetChains.isArray()) {
+            for (JsonNode tc : targetChains) {
+                targetChainsByName.put(tc.path("name").asText(), tc);
+            }
+        } else if (targetChains == null) {
+            errors.add("Could not fetch chains from target — skipping chain sync");
+        }
+
+        for (WorkflowChain chain : devChains) {
+            if (targetChains == null) break;
+            if (selectedChainIds != null && !selectedChainIds.contains(chain.getId())) {
+                continue;
+            }
+
+            try {
+                List<Map<String, Object>> entriesBody = new ArrayList<>();
+                boolean missingMapping = false;
+                for (ChainEntry entry : chain.getEntries()) {
+                    String targetWorkflowId = workflowIdMapping.get(entry.getWorkflowId());
+                    if (targetWorkflowId == null) {
+                        errors.add("Chain '" + chain.getName() + "': workflow '" + entry.getWorkflowId()
+                                + "' has no target mapping (workflow not on target)");
+                        missingMapping = true;
+                        break;
+                    }
+                    Map<String, Object> entryBody = new LinkedHashMap<>();
+                    entryBody.put("workflowId", targetWorkflowId);
+                    if (entry.getLabel() != null) entryBody.put("label", entry.getLabel());
+                    entryBody.put("sortOrder", entry.getSortOrder());
+                    entryBody.put("stopOnFailure", entry.isStopOnFailure());
+                    if (entry.getInputContext() != null && !entry.getInputContext().isEmpty()) {
+                        entryBody.put("inputContext", entry.getInputContext());
+                    }
+                    entriesBody.add(entryBody);
+                }
+                if (missingMapping) continue;
+                if (entriesBody.isEmpty()) {
+                    errors.add("Chain '" + chain.getName() + "': no entries — skipped");
+                    continue;
+                }
+
+                Map<String, Object> chainBody = new LinkedHashMap<>();
+                chainBody.put("name", chain.getName());
+                if (chain.getDescription() != null) chainBody.put("description", chain.getDescription());
+                if (chain.getIcon() != null) chainBody.put("icon", chain.getIcon());
+                chainBody.put("entries", entriesBody);
+                chainBody.put("stopOnFailure", chain.isStopOnFailure());
+
+                JsonNode existingChain = targetChainsByName.get(chain.getName());
+                if (existingChain != null) {
+                    String targetChainId = existingChain.path("id").asText();
+                    httpPut(targetBaseUrl + "/chains/" + targetChainId, chainBody);
+                    chainsSynced++;
+                    log.info("Updated chain on target: {}", chain.getName());
+                } else {
+                    httpPost(targetBaseUrl + "/chains", chainBody);
+                    chainsSynced++;
+                    log.info("Created chain on target: {}", chain.getName());
+                }
+            } catch (Exception e) {
+                errors.add("Chain '" + chain.getName() + "': " + e.getMessage());
+                log.warn("Failed to sync chain '{}': {}", chain.getName(), e.getMessage());
+            }
+        }
+
+        // 5. Sync auto-todo-default setting
         try {
             appSettingsRepository.get("auto-todo-default").ifPresent(value -> {
                 try {
@@ -397,10 +507,10 @@ public class InstanceSyncHelper {
             log.warn("Failed to read auto-repair-default: {}", e.getMessage());
         }
 
-        log.info("Definition sync complete: {} projects, {} workflows, {} skills synced, {} skipped, {} errors",
-                projectsSynced, workflowsSynced, skillsSynced, skipped, errors.size());
+        log.info("Definition sync complete: {} projects, {} workflows, {} skills, {} chains synced, {} skipped, {} errors",
+                projectsSynced, workflowsSynced, skillsSynced, chainsSynced, skipped, errors.size());
 
-        return new SyncResult(projectsSynced, workflowsSynced, skillsSynced, skipped, errors, preSyncBackup);
+        return new SyncResult(projectsSynced, workflowsSynced, skillsSynced, chainsSynced, skipped, errors, preSyncBackup);
     }
 
     /**

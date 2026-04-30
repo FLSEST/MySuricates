@@ -725,6 +725,7 @@ export const de: TranslationKeys = {
     syncProjects: 'Projekte',
     syncWorkflows: 'Workflows',
     syncSkills: 'Custom Skills',
+    syncChains: 'Chains',
     syncActionNew: 'Neu',
     syncActionUpdate: 'Update',
     syncActionSkip: 'Identisch',

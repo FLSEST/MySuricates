@@ -659,6 +659,7 @@ export const en = {
     syncProjects: 'Projects',
     syncWorkflows: 'Workflows',
     syncSkills: 'Custom Skills',
+    syncChains: 'Chains',
     syncActionNew: 'New',
     syncActionUpdate: 'Update',
     syncActionSkip: 'Identical',

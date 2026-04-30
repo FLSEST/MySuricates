@@ -644,6 +644,7 @@ export interface SyncResult {
   projectsSynced: number;
   workflowsSynced: number;
   skillsSynced: number;
+  chainsSynced?: number;
   skipped: number;
   errors: string[];
   preSyncBackup: string | null;
@@ -655,6 +656,7 @@ export interface SyncPreview {
   projects: SyncPreviewItem[];
   workflows: SyncPreviewItem[];
   skills: SyncPreviewItem[];
+  chains?: SyncPreviewItem[];
 }
 
 export interface WorkflowDiff {
@@ -677,6 +679,7 @@ export interface SyncDefinitionsRequest {
   projectIds?: string[];
   workflowIds?: string[];
   skillIds?: string[];
+  chainIds?: string[];
 }
 
 // ── Testing ───────────────────────────────────────────────

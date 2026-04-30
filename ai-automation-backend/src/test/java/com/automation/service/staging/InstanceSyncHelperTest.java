@@ -7,6 +7,7 @@ import com.automation.entity.*;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.SkillRepository;
+import com.automation.repository.WorkflowChainRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.service.system.ApiKeyService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -36,6 +37,7 @@ class InstanceSyncHelperTest {
     @Mock private ProjectRepository projectRepository;
     @Mock private WorkflowRepository workflowRepository;
     @Mock private SkillRepository skillRepository;
+    @Mock private WorkflowChainRepository chainRepository;
     @Mock private ApiKeyService apiKeyService;
     @Mock private javax.sql.DataSource dataSource;
 
@@ -48,7 +50,8 @@ class InstanceSyncHelperTest {
     void setUp() throws Exception {
         syncHelper = spy(new InstanceSyncHelper(
                 appSettingsRepository, projectRepository, workflowRepository,
-                skillRepository, apiKeyService, objectMapper, dataSource));
+                skillRepository, chainRepository, apiKeyService, objectMapper, dataSource));
+        lenient().when(chainRepository.findAll()).thenReturn(List.of());
 
         lenient().when(appSettingsRepository.get(anyString())).thenReturn(Optional.empty());
 
@@ -324,7 +327,8 @@ class InstanceSyncHelperTest {
         assertThat(result.projectsSynced()).isEqualTo(0);
         assertThat(result.workflowsSynced()).isEqualTo(0);
         assertThat(result.skillsSynced()).isEqualTo(0);
-        assertThat(result.errors()).hasSize(3);
+        assertThat(result.chainsSynced()).isEqualTo(0);
+        assertThat(result.errors()).hasSize(4);
         verify(syncHelper, never()).httpPost(not(contains("/system/backup")), any());
     }
 

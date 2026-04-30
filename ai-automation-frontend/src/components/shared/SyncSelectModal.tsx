@@ -38,6 +38,9 @@ export function SyncSelectModal({ open, onClose, preview, previewLoading, onSync
     for (const s of preview.skills) {
       if (s.action !== 'SKIP') initial.add(`skill:${s.id}`);
     }
+    for (const c of preview.chains ?? []) {
+      if (c.action !== 'SKIP') initial.add(`chain:${c.id}`);
+    }
     setSelected(initial);
     setInitialized(true);
   }
@@ -56,6 +59,7 @@ export function SyncSelectModal({ open, onClose, preview, previewLoading, onSync
       ...preview.projects.map(p => `project:${p.id}`),
       ...preview.workflows.map(w => `workflow:${w.id}`),
       ...preview.skills.map(s => `skill:${s.id}`),
+      ...(preview.chains ?? []).map(c => `chain:${c.id}`),
     ];
   }, [preview]);
 
@@ -109,7 +113,12 @@ export function SyncSelectModal({ open, onClose, preview, previewLoading, onSync
 
   const hasChanges = useMemo(() => {
     if (!preview) return false;
-    return [...preview.projects, ...preview.workflows, ...preview.skills].some(i => i.action !== 'SKIP');
+    return [
+      ...preview.projects,
+      ...preview.workflows,
+      ...preview.skills,
+      ...(preview.chains ?? []),
+    ].some(i => i.action !== 'SKIP');
   }, [preview]);
 
   const handleSync = async () => {
@@ -122,11 +131,15 @@ export function SyncSelectModal({ open, onClose, preview, previewLoading, onSync
     const skillIds = preview?.skills
       .filter(s => selected.has(`skill:${s.id}`))
       .map(s => s.id);
+    const chainIds = (preview?.chains ?? [])
+      .filter(c => selected.has(`chain:${c.id}`))
+      .map(c => c.id);
 
     await onSync({
       projectIds: projectIds?.length ? projectIds : undefined,
       workflowIds: workflowIds?.length ? workflowIds : undefined,
       skillIds: skillIds?.length ? skillIds : undefined,
+      chainIds: chainIds?.length ? chainIds : undefined,
     });
     handleClose();
   };
@@ -244,6 +257,29 @@ export function SyncSelectModal({ open, onClose, preview, previewLoading, onSync
                   onToggle={() => toggle(`skill:${s.id}`)}
                   actionLabel={actionLabel(s.action)}
                   actionStyle={ACTION_STYLES[s.action] ?? ''}
+                  t={t}
+                />
+              ))}
+            </Section>
+          )}
+
+          {/* Chains */}
+          {(preview.chains ?? []).length > 0 && (
+            <Section
+              label={t.settings.syncChains}
+              count={sectionCount(preview.chains ?? [], 'chain')}
+              total={(preview.chains ?? []).length}
+              collapsed={!!collapsed['chains']}
+              onToggle={() => toggleSection('chains')}
+            >
+              {(preview.chains ?? []).map(c => (
+                <ItemRow
+                  key={c.id}
+                  item={c}
+                  checked={selected.has(`chain:${c.id}`)}
+                  onToggle={() => toggle(`chain:${c.id}`)}
+                  actionLabel={actionLabel(c.action)}
+                  actionStyle={ACTION_STYLES[c.action] ?? ''}
                   t={t}
                 />
               ))}
