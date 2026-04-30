@@ -6,6 +6,8 @@ import com.automation.entity.StepStatus;
 import com.automation.executor.ApprovalRequest;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -25,6 +27,7 @@ import java.util.concurrent.TimeoutException;
 public class HumanInputBlockExecutor implements BlockExecutor {
 
     private final SimpMessagingTemplate messagingTemplate;
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     @Override
     public boolean supports(String blockType) {
@@ -56,6 +59,11 @@ public class HumanInputBlockExecutor implements BlockExecutor {
                 ? Boolean.TRUE.equals(config.get("use_default_on_timeout"))
                 : true;
 
+        List<Map<String, Object>> fields = config.get("fields") instanceof List
+                ? (List<Map<String, Object>>) config.get("fields")
+                : null;
+        boolean multiField = fields != null && !fields.isEmpty();
+
         String blockId = "human-input-" + stepIndex;
         ApprovalRequest request = ApprovalRequest.builder()
                 .blockId(blockId)
@@ -68,6 +76,7 @@ public class HumanInputBlockExecutor implements BlockExecutor {
                 .variableName(variableName)
                 .required(required)
                 .validationPattern(validationPattern)
+                .fields(fields)
                 .build();
 
         CompletableFuture<String> future = context.requestApproval(request);
@@ -85,6 +94,9 @@ public class HumanInputBlockExecutor implements BlockExecutor {
             payload.put("validationPattern", validationPattern);
             payload.put("variableName", variableName);
             payload.put("stepIndex", stepIndex);
+            if (multiField) {
+                payload.put("fields", fields);
+            }
 
             messagingTemplate.convertAndSend(
                     "/topic/executions/" + context.getWorkflowRunId() + "/logs",
@@ -126,10 +138,32 @@ public class HumanInputBlockExecutor implements BlockExecutor {
             log.warn("Failed to broadcast human input resolution: {}", e.getMessage());
         }
 
-        // Store answer as context variable
-        context.setVariable(variableName, answer);
+        // Multi-field: parse JSON answer and store each entry as a separate variable.
+        // Single-field: store the raw answer under variableName (legacy behavior).
+        String storedOutput;
+        if (multiField) {
+            Map<String, String> parsed;
+            try {
+                parsed = JSON.readValue(answer == null ? "{}" : answer, new TypeReference<>() {});
+            } catch (Exception e) {
+                log.warn("Multi-field human input could not be parsed as JSON, raw answer kept under {}: {}",
+                        variableName, e.getMessage());
+                context.setVariable(variableName, answer);
+                return buildResult(stepIndex, start, prompt, answer, StepStatus.COMPLETED);
+            }
+            for (Map<String, Object> field : fields) {
+                Object varNameObj = field.get("variable_name");
+                if (!(varNameObj instanceof String varName) || varName.isBlank()) continue;
+                String value = parsed.getOrDefault(varName, "");
+                context.setVariable(varName, value);
+            }
+            storedOutput = answer == null ? "" : answer;
+        } else {
+            context.setVariable(variableName, answer);
+            storedOutput = answer;
+        }
 
-        return buildResult(stepIndex, start, prompt, answer, StepStatus.COMPLETED);
+        return buildResult(stepIndex, start, prompt, storedOutput, StepStatus.COMPLETED);
     }
 
     private StepResult buildResult(int stepIndex, Instant start, String input, String output, StepStatus status) {

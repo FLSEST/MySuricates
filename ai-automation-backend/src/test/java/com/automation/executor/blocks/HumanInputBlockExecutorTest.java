@@ -199,6 +199,97 @@ class HumanInputBlockExecutorTest {
         assertThat(result.getOutput()).contains("cancelled");
     }
 
+    // --- Multi-field tests ---
+
+    @Test
+    void execute_multiField_storesEachFieldAsContextVariable() {
+        var config = new HashMap<String, Object>();
+        config.put("prompt", "Bitte mehrere Werte:");
+        config.put("fields", List.of(
+                Map.of("variable_name", "first", "input_type", "text"),
+                Map.of("variable_name", "second", "input_type", "text")
+        ));
+
+        var block = BlockDefinition.builder().type("human-input").config(config).build();
+        String json = "{\"first\":\"A\",\"second\":\"B\"}";
+        var context = buildContextWithPrecompletedApproval(json);
+
+        var result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getOutput()).isEqualTo(json);
+        assertThat(context.getVariable("first")).isEqualTo("A");
+        assertThat(context.getVariable("second")).isEqualTo("B");
+    }
+
+    @Test
+    void execute_multiField_missingValueDefaultsToEmpty() {
+        var config = new HashMap<String, Object>();
+        config.put("prompt", "Bitte:");
+        config.put("fields", List.of(
+                Map.of("variable_name", "name"),
+                Map.of("variable_name", "age")
+        ));
+
+        var block = BlockDefinition.builder().type("human-input").config(config).build();
+        var context = buildContextWithPrecompletedApproval("{\"name\":\"Flo\"}");
+
+        executor.execute(block, context);
+
+        assertThat(context.getVariable("name")).isEqualTo("Flo");
+        assertThat(context.getVariable("age")).isEqualTo("");
+    }
+
+    @Test
+    void execute_multiField_invalidJson_fallsBackToSingleVariable() {
+        var config = new HashMap<String, Object>();
+        config.put("prompt", "Bitte:");
+        config.put("variable_name", "fallback");
+        config.put("fields", List.of(Map.of("variable_name", "x")));
+
+        var block = BlockDefinition.builder().type("human-input").config(config).build();
+        var context = buildContextWithPrecompletedApproval("not-json");
+
+        var result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(context.getVariable("fallback")).isEqualTo("not-json");
+    }
+
+    @Test
+    void execute_multiField_broadcastIncludesFields() {
+        var config = new HashMap<String, Object>();
+        config.put("prompt", "Bitte:");
+        config.put("fields", List.of(Map.of("variable_name", "x", "input_type", "text")));
+
+        var block = BlockDefinition.builder().type("human-input").config(config).build();
+        var context = buildContextWithPrecompletedApproval("{\"x\":\"y\"}");
+
+        executor.execute(block, context);
+
+        ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(messagingTemplate, atLeastOnce()).convertAndSend(any(String.class), payloadCaptor.capture());
+        var firstPayload = payloadCaptor.getAllValues().get(0);
+        assertThat(firstPayload).containsEntry("type", "human_input_required");
+        assertThat(firstPayload).containsKey("fields");
+    }
+
+    @Test
+    void execute_singleField_legacyBehavior_unchanged() {
+        var config = new HashMap<String, Object>();
+        config.put("prompt", "Name?");
+        config.put("variable_name", "name");
+
+        var block = BlockDefinition.builder().type("human-input").config(config).build();
+        var context = buildContextWithPrecompletedApproval("Flo");
+
+        var result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(context.getVariable("name")).isEqualTo("Flo");
+        assertThat(result.getOutput()).isEqualTo("Flo");
+    }
+
     // --- Helpers ---
 
     private ExecutionContext buildContext() {

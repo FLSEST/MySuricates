@@ -1057,16 +1057,31 @@ export interface ChainRunEntry {
 
 // ── Human Input ─────────────────────────────────────────
 
+export type HumanInputFieldType = 'text' | 'number' | 'textarea' | 'select' | 'checkbox' | 'date';
+
+export interface HumanInputField {
+  variable_name: string;
+  label?: string;
+  input_type?: HumanInputFieldType;
+  required?: boolean;
+  default_value?: string;
+  options?: string[];
+  placeholder?: string;
+  description?: string;
+  validation_pattern?: string;
+}
+
 export interface PendingHumanInput {
   blockId: string;
   prompt: string;
-  inputType: 'text' | 'number' | 'textarea' | 'select';
+  inputType: HumanInputFieldType;
   options: string[];
   defaultValue: string;
   required: boolean;
   validationPattern: string | null;
   variableName: string;
   stepIndex: number;
+  fields?: HumanInputField[];
 }
 
 // ── Wishes ───────────────────────────────────────────────
