@@ -102,6 +102,12 @@ public class IntegrationController {
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping("/{providerId}/credentials")
+    public ResponseEntity<Void> deleteCredentials(@PathVariable String providerId) {
+        oAuthService.deleteCredentials(providerId);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{providerId}/actions")
     public List<IntegrationActionResponse> getActions(@PathVariable String providerId) {
         IntegrationProvider provider = registry.getProvider(providerId);

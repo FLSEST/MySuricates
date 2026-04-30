@@ -195,14 +195,43 @@ public class IntegrationOAuthService {
     }
 
     /**
-     * Disconnect a provider: revoke token and delete connection.
+     * Disconnect a provider: revoke the active token and clear all token-related fields.
+     * App credentials (clientId / clientSecret) are kept so a reconnect doesn't require
+     * re-entering them. Use {@link #deleteCredentials} for full removal of the row.
      */
     @Transactional
     public void disconnect(String providerId) {
         connectionRepository.findByProviderId(providerId).ifPresent(connection -> {
             IntegrationProvider provider = registry.getProvider(providerId);
             // Only revoke tokens for OAuth providers (non-OAuth tokens like Trello API keys can't be revoked server-side)
-            if (provider.requiresOAuthFlow()) {
+            if (provider.requiresOAuthFlow() && connection.getAccessTokenEncrypted() != null) {
+                try {
+                    String accessToken = encryptionService.decrypt(connection.getAccessTokenEncrypted());
+                    revokeToken(accessToken);
+                } catch (Exception e) {
+                    log.warn("Failed to revoke token for {}: {}", providerId, e.getMessage());
+                }
+            }
+            connection.setAccessTokenEncrypted(null);
+            connection.setRefreshTokenEncrypted(null);
+            connection.setTokenExpiry(null);
+            connection.setScopes(null);
+            connection.setAccountInfo(null);
+            connection.setStatus(ConnectionStatus.DISCONNECTED);
+            connectionRepository.save(connection);
+        });
+        log.info("Disconnected integration (kept credentials): {}", providerId);
+    }
+
+    /**
+     * Delete the connection row entirely, including any stored app credentials.
+     * Requires the user to re-enter clientId/clientSecret on reconnect.
+     */
+    @Transactional
+    public void deleteCredentials(String providerId) {
+        connectionRepository.findByProviderId(providerId).ifPresent(connection -> {
+            IntegrationProvider provider = registry.getProvider(providerId);
+            if (provider.requiresOAuthFlow() && connection.getAccessTokenEncrypted() != null) {
                 try {
                     String accessToken = encryptionService.decrypt(connection.getAccessTokenEncrypted());
                     revokeToken(accessToken);
@@ -212,7 +241,7 @@ public class IntegrationOAuthService {
             }
             connectionRepository.delete(connection);
         });
-        log.info("Disconnected integration: {}", providerId);
+        log.info("Deleted integration credentials: {}", providerId);
     }
 
     /**

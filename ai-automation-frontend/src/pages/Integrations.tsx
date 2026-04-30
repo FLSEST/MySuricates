@@ -10,6 +10,7 @@ import {
   useIntegrations,
   useConnectIntegration,
   useDisconnectIntegration,
+  useDeleteCredentials,
   useTestIntegrationAction,
   useSaveCredentials,
 } from '../hooks/useIntegrations';
@@ -209,10 +210,12 @@ export function Integrations() {
   const { data: providers, isLoading, error, refetch } = useIntegrations();
   const connect = useConnectIntegration();
   const disconnect = useDisconnectIntegration();
+  const deleteCredentials = useDeleteCredentials();
   const testAction = useTestIntegrationAction();
 
   const [selected, setSelected] = useState<IntegrationProviderInfo | null>(null);
   const [showDisconnect, setShowDisconnect] = useState<string | null>(null);
+  const [showDeleteCredentials, setShowDeleteCredentials] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
   const [testingAction, setTestingAction] = useState<string | null>(null);
   const [selectedScopes, setSelectedScopes] = useState<Record<string, boolean>>({});
@@ -245,6 +248,12 @@ export function Integrations() {
       ?.filter(s => selectedScopes[s.scope])
       .map(s => s.scope) ?? [];
     connect.mutate({ providerId, scopes: scopes.length > 0 ? scopes : undefined });
+  };
+
+  const handleDeleteCredentials = (providerId: string) => {
+    deleteCredentials.mutate(providerId, {
+      onSuccess: () => setShowDeleteCredentials(null),
+    });
   };
 
   const handleDisconnect = (providerId: string) => {
@@ -439,16 +448,49 @@ export function Integrations() {
         title={t.integrations.disconnectConfirm}
       >
         <p className="text-text-secondary mb-4">{t.integrations.disconnectWarning}</p>
+        <div className="flex justify-between gap-2">
+          <Button
+            variant="ghost"
+            onClick={() => {
+              const provider = showDisconnect;
+              setShowDisconnect(null);
+              setShowDeleteCredentials(provider);
+            }}
+          >
+            {t.integrations.deleteCredentials}
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => setShowDisconnect(null)}>
+              {t.common.cancel}
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => showDisconnect && handleDisconnect(showDisconnect)}
+              loading={disconnect.isPending}
+            >
+              {t.integrations.disconnect}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete Credentials Confirmation */}
+      <Modal
+        open={!!showDeleteCredentials}
+        onClose={() => setShowDeleteCredentials(null)}
+        title={t.integrations.deleteCredentialsConfirm}
+      >
+        <p className="text-text-secondary mb-4">{t.integrations.deleteCredentialsWarning}</p>
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => setShowDisconnect(null)}>
+          <Button variant="ghost" onClick={() => setShowDeleteCredentials(null)}>
             {t.common.cancel}
           </Button>
           <Button
             variant="danger"
-            onClick={() => showDisconnect && handleDisconnect(showDisconnect)}
-            loading={disconnect.isPending}
+            onClick={() => showDeleteCredentials && handleDeleteCredentials(showDeleteCredentials)}
+            loading={deleteCredentials.isPending}
           >
-            {t.integrations.disconnect}
+            {t.integrations.deleteCredentials}
           </Button>
         </div>
       </Modal>

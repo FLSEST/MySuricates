@@ -80,6 +80,22 @@ export function useDisconnectIntegration() {
   });
 }
 
+export function useDeleteCredentials() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
+
+  return useMutation({
+    mutationFn: (providerId: string) =>
+      api.delete(`/integrations/${providerId}/credentials`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['integrations'] });
+      toast.success(t.toast.credentialsDeleted);
+    },
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.credentialsDeleteFailed)),
+  });
+}
+
 export function useSaveCredentials() {
   const qc = useQueryClient();
   const toast = useToast();

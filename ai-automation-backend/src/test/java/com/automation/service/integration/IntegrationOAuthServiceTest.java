@@ -335,12 +335,15 @@ class IntegrationOAuthServiceTest {
     }
 
     @Test
-    void disconnect_forNonOAuthProviderDeletesConnectionWithoutRevocation() {
+    void disconnect_forNonOAuthProviderClearsTokensWithoutRevocation() {
         IntegrationOAuthService service = new IntegrationOAuthService(
                 connectionRepository, encryptionService, registry, objectMapper);
         IntegrationConnection connection = IntegrationConnection.builder()
                 .providerId("trello")
                 .status(ConnectionStatus.CONNECTED)
+                .accessTokenEncrypted("enc-access")
+                .clientIdEncrypted("enc-client-id")
+                .clientSecretEncrypted("enc-client-secret")
                 .build();
 
         when(connectionRepository.findByProviderId("trello")).thenReturn(Optional.of(connection));
@@ -349,20 +352,25 @@ class IntegrationOAuthServiceTest {
 
         service.disconnect("trello");
 
-        verify(connectionRepository).delete(connection);
+        verify(connectionRepository, never()).delete(any());
+        verify(connectionRepository).save(connection);
+        assertThat(connection.getAccessTokenEncrypted()).isNull();
+        assertThat(connection.getStatus()).isEqualTo(ConnectionStatus.DISCONNECTED);
+        assertThat(connection.getClientIdEncrypted()).isEqualTo("enc-client-id");
+        assertThat(connection.getClientSecretEncrypted()).isEqualTo("enc-client-secret");
     }
 
     @Test
     void disconnect_completesEvenWhenRevocationFails() {
-        // revokeToken() uses a hardcoded Google URL — local HttpServer cannot intercept it.
-        // Simulates the revocation failure path: decrypt throws, the try-catch in disconnect
-        // absorbs the exception, and connectionRepository.delete() is still called.
         IntegrationOAuthService service = new IntegrationOAuthService(
                 connectionRepository, encryptionService, registry, objectMapper);
         IntegrationConnection connection = IntegrationConnection.builder()
                 .providerId("google-calendar")
                 .status(ConnectionStatus.CONNECTED)
                 .accessTokenEncrypted("enc-access")
+                .refreshTokenEncrypted("enc-refresh")
+                .clientIdEncrypted("enc-client-id")
+                .clientSecretEncrypted("enc-client-secret")
                 .build();
 
         when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.of(connection));
@@ -371,6 +379,43 @@ class IntegrationOAuthServiceTest {
         when(encryptionService.decrypt("enc-access")).thenThrow(new RuntimeException("decryption failed"));
 
         service.disconnect("google-calendar");
+
+        verify(connectionRepository, never()).delete(any());
+        verify(connectionRepository).save(connection);
+        assertThat(connection.getAccessTokenEncrypted()).isNull();
+        assertThat(connection.getRefreshTokenEncrypted()).isNull();
+        assertThat(connection.getClientIdEncrypted()).isEqualTo("enc-client-id");
+        assertThat(connection.getClientSecretEncrypted()).isEqualTo("enc-client-secret");
+    }
+
+    @Test
+    void disconnect_noConnection_isNoop() {
+        IntegrationOAuthService service = new IntegrationOAuthService(
+                connectionRepository, encryptionService, registry, objectMapper);
+        when(connectionRepository.findByProviderId("trello")).thenReturn(Optional.empty());
+
+        service.disconnect("trello");
+
+        verify(connectionRepository, never()).save(any());
+        verify(connectionRepository, never()).delete(any());
+    }
+
+    @Test
+    void deleteCredentials_removesEntireRow() {
+        IntegrationOAuthService service = new IntegrationOAuthService(
+                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationConnection connection = IntegrationConnection.builder()
+                .providerId("trello")
+                .status(ConnectionStatus.CONNECTED)
+                .clientIdEncrypted("enc-client-id")
+                .clientSecretEncrypted("enc-client-secret")
+                .build();
+
+        when(connectionRepository.findByProviderId("trello")).thenReturn(Optional.of(connection));
+        when(registry.getProvider("trello")).thenReturn(provider);
+        when(provider.requiresOAuthFlow()).thenReturn(false);
+
+        service.deleteCredentials("trello");
 
         verify(connectionRepository).delete(connection);
     }
