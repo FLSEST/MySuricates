@@ -128,7 +128,8 @@ class WorkflowExecutorTest {
                 systemIdentity,
                 todoRepository,
                 workflowVersionService,
-                new WorkflowExecutionRegistry()
+                new WorkflowExecutionRegistry(),
+                new BlockOutputValidator()
         );
 
         testProject = Project.builder()
@@ -914,7 +915,8 @@ class WorkflowExecutorTest {
                 systemIdentity,
                 todoRepository,
                 workflowVersionService,
-                new WorkflowExecutionRegistry()
+                new WorkflowExecutionRegistry(),
+                new BlockOutputValidator()
         );
     }
 

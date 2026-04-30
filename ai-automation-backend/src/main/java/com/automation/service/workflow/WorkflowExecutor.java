@@ -63,6 +63,7 @@ public class WorkflowExecutor {
     private final com.automation.repository.TodoRepository todoRepository;
     private final WorkflowVersionService workflowVersionService;
     private final WorkflowExecutionRegistry executionRegistry;
+    private final BlockOutputValidator blockOutputValidator;
 
     private static final java.util.Set<String> SYSTEM_VAR_KEYS = java.util.Set.of(
             "workflow_run_id", "workflow_id", "workflow_name", "project_path",
@@ -344,8 +345,38 @@ public class WorkflowExecutor {
                 stepResultRepository.save(step);
                 broadcaster.broadcastStepResult(run.getId(), step);
 
-                // Execute the block — nextStepIndex() returns the pre-allocated index
+                // Execute the block — with optional output validation + retry
                 StepResult result = executor.execute(block, context);
+                int validationAttempts = 0;
+                int maxValidationAttempts = blockOutputValidator.maxRetries(block);
+                while (result.getStatus() == StepStatus.COMPLETED && validationAttempts < maxValidationAttempts) {
+                    var validation = blockOutputValidator.validate(block, result.getOutput());
+                    if (validation.passed()) break;
+                    if (!blockOutputValidator.shouldRetry(block)) {
+                        log.warn("Block {} output validation failed without retry: {}", step.getStepIndex(), validation.reason());
+                        result.setStatus(StepStatus.FAILED);
+                        String existing = result.getOutput() == null ? "" : result.getOutput();
+                        result.setOutput(existing + "\n[VALIDATION] " + validation.reason());
+                        break;
+                    }
+                    validationAttempts++;
+                    log.info("Block {} output validation failed (attempt {}/{}): {}",
+                            step.getStepIndex(), validationAttempts, maxValidationAttempts, validation.reason());
+                    activityLogService.warn(LogCategory.EXECUTION,
+                            "Block " + step.getStepIndex() + " validation failed (attempt " + validationAttempts + "/" + maxValidationAttempts + "): " + validation.reason(),
+                            "WorkflowExecutor", run.getId());
+                    result = executor.execute(block, context);
+                }
+                if (result.getStatus() == StepStatus.COMPLETED) {
+                    var finalCheck = blockOutputValidator.validate(block, result.getOutput());
+                    if (!finalCheck.passed()) {
+                        log.warn("Block {} output validation failed after {} retries: {}",
+                                step.getStepIndex(), validationAttempts, finalCheck.reason());
+                        result.setStatus(StepStatus.FAILED);
+                        String existing = result.getOutput() == null ? "" : result.getOutput();
+                        result.setOutput(existing + "\n[VALIDATION] failed after " + validationAttempts + " retries: " + finalCheck.reason());
+                    }
+                }
 
                 // Update the persisted step with the actual results
                 step.setInput(result.getInput());
