@@ -102,6 +102,11 @@ automation:
     max-concurrent: ${AUTOMATION_MAX_CONCURRENT_RUNS:10}
     allow-docker-socket-mount: ${AUTOMATION_ALLOW_DOCKER_SOCKET_MOUNT:false}
     allow-extra-mounts: ${AUTOMATION_ALLOW_EXTRA_MOUNTS:false}
+    # Comma-separated list of host-path prefixes that container bind-mounts are restricted to.
+    # When empty (default), only allow-extra-mounts + FORBIDDEN_MOUNT_PATHS apply (legacy behavior).
+    # When set, the host side of every extra mount must start with one of these prefixes.
+    # Supports leading "~" (= $HOME). Example: "~/Entwicklung,~/dokumente"
+    allowed-mount-prefixes: ${AUTOMATION_ALLOWED_MOUNT_PREFIXES:}
   summarization:
     base-dir: ${AUTOMATION_SUMMARIZATION_DIR:${user.home}/.autotrigger/summarization}
     timeout-seconds: ${AUTOMATION_SUMMARIZATION_TIMEOUT:120}

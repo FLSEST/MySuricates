@@ -236,6 +236,84 @@ class ContainerShellServiceTest {
     }
 
     @Test
+    void filterExtraMounts_emptyAllowlist_keepsAllNonForbidden() {
+        service.setAllowExtraMounts(true);
+        service.setAllowedMountPrefixes(List.of());
+
+        List<String> safe = service.filterExtraMounts(
+                List.of("/home/flo/data:/data:rw", "/opt/anything:/data2:rw"),
+                "img:latest");
+
+        assertThat(safe).hasSize(2);
+    }
+
+    @Test
+    void filterExtraMounts_allowlistConfigured_rejectsHostPathsOutsidePrefix() {
+        service.setAllowExtraMounts(true);
+        service.setAllowedMountPrefixes(List.of("/home/flo/dokumente", "/home/flo/Entwicklung"));
+
+        List<String> safe = service.filterExtraMounts(
+                List.of(
+                        "/home/flo/dokumente/cv:/data:rw",
+                        "/home/flo/Entwicklung/foo:/work:rw",
+                        "/opt/secret:/data2:rw",
+                        "/home/flo/.ssh:/mnt:ro"),
+                "img:latest");
+
+        assertThat(safe).containsExactly(
+                "/home/flo/dokumente/cv:/data:rw",
+                "/home/flo/Entwicklung/foo:/work:rw");
+        verify(activityLogService, times(2)).warn(any(),
+                contains("not under allowed-mount-prefixes"), anyString(), isNull());
+    }
+
+    @Test
+    void filterExtraMounts_allowlistRejectsForbiddenPathsFirst() {
+        service.setAllowExtraMounts(true);
+        service.setAllowedMountPrefixes(List.of("/home/flo"));
+
+        // /etc is forbidden, must be rejected with "forbidden path" log,
+        // not "not under allowed-mount-prefixes".
+        List<String> safe = service.filterExtraMounts(
+                List.of("/etc/passwd:/data:ro"),
+                "img:latest");
+
+        assertThat(safe).isEmpty();
+        verify(activityLogService).warn(any(),
+                contains("forbidden path /etc"), anyString(), isNull());
+    }
+
+    @Test
+    void filterExtraMounts_allowlistAcceptsExactPrefixMatch() {
+        service.setAllowExtraMounts(true);
+        service.setAllowedMountPrefixes(List.of("/home/flo/dokumente"));
+
+        List<String> safe = service.filterExtraMounts(
+                List.of("/home/flo/dokumente:/dok:rw"),
+                "img:latest");
+
+        assertThat(safe).containsExactly("/home/flo/dokumente:/dok:rw");
+    }
+
+    @Test
+    void initAllowedMountPrefixes_expandsHomeAndTrims() {
+        ReflectionTestUtils.setField(service, "allowedMountPrefixesRaw", " ~/dokumente , ~/Entwicklung/ ,");
+        service.initAllowedMountPrefixes();
+
+        String home = System.getProperty("user.home");
+        assertThat(service.getAllowedMountPrefixes())
+                .containsExactly(home + "/dokumente", home + "/Entwicklung");
+    }
+
+    @Test
+    void initAllowedMountPrefixes_blankRawDisablesAllowlist() {
+        ReflectionTestUtils.setField(service, "allowedMountPrefixesRaw", "");
+        service.initAllowedMountPrefixes();
+
+        assertThat(service.getAllowedMountPrefixes()).isEmpty();
+    }
+
+    @Test
     void filterExtraMounts_blankOrNullEntries_skippedSilently() {
         service.setAllowExtraMounts(true);
 

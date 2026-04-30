@@ -50,6 +50,11 @@ public class ContainerShellService {
     @Value("${automation.execution.allow-extra-mounts:false}")
     private volatile boolean allowExtraMounts;
 
+    @Value("${automation.execution.allowed-mount-prefixes:}")
+    private String allowedMountPrefixesRaw;
+
+    private volatile List<String> allowedMountPrefixes = List.of();
+
     /** Runtime-mutable setter used by ExecutionSettingsService for live config updates. */
     public void setAllowExtraMounts(boolean allow) {
         this.allowExtraMounts = allow;
@@ -57,6 +62,38 @@ public class ContainerShellService {
 
     public boolean isAllowExtraMounts() {
         return allowExtraMounts;
+    }
+
+    /** Replaces the in-memory allowlist. Setter is used by tests; production loads from YAML at startup. */
+    void setAllowedMountPrefixes(List<String> prefixes) {
+        this.allowedMountPrefixes = prefixes == null ? List.of() : List.copyOf(prefixes);
+    }
+
+    public List<String> getAllowedMountPrefixes() {
+        return allowedMountPrefixes;
+    }
+
+    @jakarta.annotation.PostConstruct
+    void initAllowedMountPrefixes() {
+        if (allowedMountPrefixesRaw == null || allowedMountPrefixesRaw.isBlank()) {
+            this.allowedMountPrefixes = List.of();
+            return;
+        }
+        String home = System.getProperty("user.home", "");
+        List<String> prefixes = new ArrayList<>();
+        for (String raw : allowedMountPrefixesRaw.split(",")) {
+            String trimmed = raw.trim();
+            if (trimmed.isEmpty()) continue;
+            String expanded = trimmed.startsWith("~") ? home + trimmed.substring(1) : trimmed;
+            String normalized = expanded.endsWith("/") && !expanded.equals("/")
+                    ? expanded.substring(0, expanded.length() - 1)
+                    : expanded;
+            prefixes.add(normalized);
+        }
+        this.allowedMountPrefixes = List.copyOf(prefixes);
+        if (!prefixes.isEmpty()) {
+            log.info("Container mount allowlist active: {}", prefixes);
+        }
     }
 
     /**
@@ -182,12 +219,43 @@ public class ContainerShellService {
                 continue;
             }
 
+            if (!isAllowedByPrefix(mount)) {
+                log.warn("Extra mount '{}' rejected: host path not under allowed-mount-prefixes (image: {})", mount, containerImage);
+                activityLogService.warn(LogCategory.SECURITY,
+                        "Extra mount rejected (not under allowed-mount-prefixes): " + mount + " (image: " + containerImage + ")",
+                        "ContainerShellService", null);
+                continue;
+            }
+
             activityLogService.warn(LogCategory.SECURITY,
                     "Extra mount activated: " + mount + " (image: " + containerImage + ")",
                     "ContainerShellService", null);
             safe.add(mount);
         }
         return safe;
+    }
+
+    /**
+     * Returns true if no allowlist is configured (legacy behavior) or if the host
+     * side of the bind-mount starts with one of the configured prefixes.
+     */
+    boolean isAllowedByPrefix(String mount) {
+        List<String> prefixes = allowedMountPrefixes;
+        if (prefixes == null || prefixes.isEmpty()) {
+            return true;
+        }
+        String[] parts = mount.split(":", 3);
+        if (parts.length < 2) return false;
+        String host = parts[0].trim();
+        String normalized = host.endsWith("/") && !host.equals("/")
+                ? host.substring(0, host.length() - 1)
+                : host;
+        for (String prefix : prefixes) {
+            if (normalized.equals(prefix) || normalized.startsWith(prefix + "/")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
