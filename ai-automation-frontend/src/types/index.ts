@@ -208,6 +208,7 @@ export type BlockType = 'simple' | 'shell' | 'retry' | 'foreach' | 'while' | 'co
 
 export interface BlockDefinition {
   type: BlockType;
+  name?: string;
   config: Record<string, unknown>;
   requiredCapabilities?: string[];
   skillIds?: string[];

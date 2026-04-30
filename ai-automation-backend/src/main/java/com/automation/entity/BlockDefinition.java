@@ -16,6 +16,13 @@ public class BlockDefinition {
 
     private String type;
 
+    /**
+     * Optional human-readable name used to reference this block's output from later
+     * blocks via {@code {{ block.<name>.output }}}. Allowed characters: letters,
+     * digits, underscore, hyphen — no dots or whitespace.
+     */
+    private String name;
+
     @Builder.Default
     private Map<String, Object> config = new HashMap<>();
 

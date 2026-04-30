@@ -37,6 +37,10 @@ public class ExecutionContext {
     @Builder.Default
     private final Map<String, Object> variables = new HashMap<>();
 
+    /** Named block outputs keyed by block name. Resolved via {{ block.<name>.output }}. */
+    @Builder.Default
+    private final Map<String, String> blockOutputs = new ConcurrentHashMap<>();
+
     @Builder.Default
     private final AtomicInteger stepCounter = new AtomicInteger(0);
 
@@ -91,12 +95,28 @@ public class ExecutionContext {
         return variables.get(name);
     }
 
+    /** Stores a block's output under its declared name for {{ block.<name>.output }} resolution. */
+    public void setBlockOutput(String blockName, String output) {
+        if (blockName == null || blockName.isBlank()) return;
+        blockOutputs.put(blockName, output == null ? "" : output);
+    }
+
+    public String getBlockOutput(String blockName) {
+        return blockOutputs.get(blockName);
+    }
+
     public String resolveTemplate(String template) {
         if (template == null) return null;
 
         String resolved = template;
         resolved = resolved.replace("{{ previous_output }}", previousOutput != null ? previousOutput : "");
         resolved = resolved.replace("{{previous_output}}", previousOutput != null ? previousOutput : "");
+
+        for (Map.Entry<String, String> entry : blockOutputs.entrySet()) {
+            String value = entry.getValue() == null ? "" : entry.getValue();
+            resolved = resolved.replace("{{ block." + entry.getKey() + ".output }}", value);
+            resolved = resolved.replace("{{block." + entry.getKey() + ".output}}", value);
+        }
 
         for (Map.Entry<String, Object> entry : variables.entrySet()) {
             resolved = resolved.replace("{{ " + entry.getKey() + " }}", String.valueOf(entry.getValue()));
@@ -118,6 +138,12 @@ public class ExecutionContext {
         String safePreviousOutput = shellEscape(previousOutput != null ? previousOutput : "");
         resolved = resolved.replace("{{ previous_output }}", safePreviousOutput);
         resolved = resolved.replace("{{previous_output}}", safePreviousOutput);
+
+        for (Map.Entry<String, String> entry : blockOutputs.entrySet()) {
+            String safeValue = shellEscape(entry.getValue() == null ? "" : entry.getValue());
+            resolved = resolved.replace("{{ block." + entry.getKey() + ".output }}", safeValue);
+            resolved = resolved.replace("{{block." + entry.getKey() + ".output}}", safeValue);
+        }
 
         for (Map.Entry<String, Object> entry : variables.entrySet()) {
             String safeValue = shellEscape(String.valueOf(entry.getValue()));

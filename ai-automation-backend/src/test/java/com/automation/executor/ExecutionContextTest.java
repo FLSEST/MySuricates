@@ -240,4 +240,63 @@ class ExecutionContextTest {
     void shellEscape_multipleSingleQuotes() {
         assertThat(ExecutionContext.shellEscape("a'b'c")).isEqualTo("'a'\\''b'\\''c'");
     }
+
+    // --- Named block outputs: {{ block.<name>.output }} ---
+
+    @Test
+    void resolveTemplate_blockOutput_byName() {
+        context.setBlockOutput("extract", "JSON-payload");
+
+        String result = context.resolveTemplate("Use {{ block.extract.output }} now");
+
+        assertThat(result).isEqualTo("Use JSON-payload now");
+    }
+
+    @Test
+    void resolveTemplate_blockOutput_withoutSpaces() {
+        context.setBlockOutput("step1", "value");
+
+        String result = context.resolveTemplate("X={{block.step1.output}}");
+
+        assertThat(result).isEqualTo("X=value");
+    }
+
+    @Test
+    void resolveTemplate_blockOutput_unknownName_leavesPlaceholder() {
+        String result = context.resolveTemplate("{{ block.missing.output }}");
+        assertThat(result).isEqualTo("{{ block.missing.output }}");
+    }
+
+    @Test
+    void resolveTemplate_blockOutput_multipleBlocks() {
+        context.setBlockOutput("first", "A");
+        context.setBlockOutput("second", "B");
+
+        String result = context.resolveTemplate("a={{ block.first.output }} b={{ block.second.output }}");
+
+        assertThat(result).isEqualTo("a=A b=B");
+    }
+
+    @Test
+    void resolveTemplateShellSafe_blockOutput_isEscaped() {
+        context.setBlockOutput("danger", "x'y");
+
+        String result = context.resolveTemplateShellSafe("echo {{ block.danger.output }}");
+
+        assertThat(result).isEqualTo("echo 'x'\\''y'");
+    }
+
+    @Test
+    void setBlockOutput_blankName_isIgnored() {
+        context.setBlockOutput("", "value");
+        context.setBlockOutput(null, "value");
+        assertThat(context.getBlockOutput("")).isNull();
+    }
+
+    @Test
+    void setBlockOutput_nullValue_storedAsEmpty() {
+        context.setBlockOutput("foo", null);
+        String result = context.resolveTemplate("[{{ block.foo.output }}]");
+        assertThat(result).isEqualTo("[]");
+    }
 }
