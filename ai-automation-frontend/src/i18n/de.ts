@@ -311,11 +311,12 @@ export const de: TranslationKeys = {
     importCollectionHint: 'Ohne Projektzuordnung wird der Workflow zur „Sammlung" hinzugefügt.',
     activateSkill: 'Skill aktivieren',
     executeWithVariables: 'Mit Variablen ausführen',
-    variablesDescription: 'Dieser Workflow benötigt Eingabewerte. Bitte füllen Sie alle Variablen aus.',
+    variablesDescription: 'Dieser Workflow benötigt Eingabewerte. Pflichtfelder ausfüllen; optionale Felder können leer bleiben.',
     enterValue: 'Wert eingeben für',
     defaultValues: 'Standardwerte',
     defaultValuesHint: 'Vorausgefüllte Werte für Variablen bei der Ausführung.',
     defaultValueSet: 'Standardwert gesetzt',
+    optional: 'optional',
     execution: {
       title: 'Workflow-Ausführung',
       running: 'Läuft...',

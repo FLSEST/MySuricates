@@ -18,6 +18,7 @@ import { WorkflowDetailModals } from '../components/workflow/WorkflowDetailModal
 import { CompletionTriggerSection } from '../components/workflow/CompletionTriggerSection';
 import { useT } from '../i18n';
 import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
+import { readContextSchema } from '../utils/contextSchema';
 import type { BlockDefinition, BlockType, OptimizeResult, UpdateWorkflowRequest } from '../types';
 
 export function WorkflowDetail() {
@@ -379,6 +380,9 @@ export function WorkflowDetail() {
         setShowExecuteDialog={setShowExecuteDialog}
         workflowVariables={workflowVariables}
         defaultValues={workflow.defaultContext}
+        optionalVariables={readContextSchema(workflow).optional}
+        variableDescriptions={readContextSchema(workflow).descriptions}
+        variablePlaceholders={readContextSchema(workflow).placeholders}
         onExecuteWithContext={handleExecuteWithContext}
         executeLoading={executeWorkflow.isPending}
         showEditInstructions={showEditInstructions}

@@ -23,6 +23,7 @@ import {
 import { useSettingsStore } from '../stores/settingsStore';
 import { useProjects } from '../hooks/useProjects';
 import { useT } from '../i18n';
+import { readContextSchema } from '../utils/contextSchema';
 import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
 import type { CreateWorkflowRequest, Workflow, WorkflowExportData, WorkflowTemplate, PoolWorkflowEntry } from '../types';
 import { useI18nStore } from '../i18n';
@@ -102,6 +103,10 @@ export function Workflows() {
     workflow: Workflow | null;
     variables: string[];
   }>({ open: false, workflow: null, variables: [] });
+  const executeDialogSchema = useMemo(
+    () => readContextSchema(executeDialog.workflow),
+    [executeDialog.workflow],
+  );
 
   const [showImport, setShowImport] = useState(false);
   const [importData, setImportData] = useState<WorkflowExportData | null>(null);
@@ -552,6 +557,9 @@ export function Workflows() {
         onExecute={handleExecuteWithContext}
         variables={executeDialog.variables}
         defaultValues={executeDialog.workflow?.defaultContext}
+        optionalVariables={executeDialogSchema.optional}
+        descriptions={executeDialogSchema.descriptions}
+        placeholders={executeDialogSchema.placeholders}
         loading={executeWorkflow.isPending}
       />
 

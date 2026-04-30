@@ -84,10 +84,17 @@ export interface AutoMemoryConfig {
   interval?: number;
 }
 
+export interface ContextVariableSpec {
+  required?: boolean;
+  description?: string;
+  placeholder?: string;
+}
+
 export interface WorkflowMetadata {
   autoTodo?: AutoTodoConfig;
   autoRepair?: AutoRepairConfig;
   autoMemoryExtraction?: AutoMemoryConfig;
+  contextSchema?: Record<string, ContextVariableSpec>;
   [key: string]: unknown;
 }
 

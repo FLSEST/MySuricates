@@ -13,6 +13,7 @@ import { useT } from '../i18n';
 import { useI18nStore } from '../i18n';
 import { formatDuration, formatRelativeTime } from '../utils/formatTime';
 import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
+import { readContextSchema } from '../utils/contextSchema';
 import type { WorkflowChain, CreateChainRequest, UpdateChainRequest, ChainEntryRequest, ChainTemplate } from '../types';
 
 function StatusBadge({ status }: { status: string }) {
@@ -57,9 +58,19 @@ export function Chains() {
 
   // Collect all template variables and defaults across chain workflows
   const getChainVariables = useCallback((chain: WorkflowChain) => {
-    if (!workflows) return { variables: [] as string[], defaults: {} as Record<string, string> };
+    if (!workflows) return {
+      variables: [] as string[],
+      defaults: {} as Record<string, string>,
+      optional: [] as string[],
+      descriptions: {} as Record<string, string>,
+      placeholders: {} as Record<string, string>,
+    };
     const allVars = new Set<string>();
     const defaults: Record<string, string> = {};
+    const requiredVars = new Set<string>();
+    const optionalVars = new Set<string>();
+    const descriptions: Record<string, string> = {};
+    const placeholders: Record<string, string> = {};
     for (const entry of chain.entries) {
       const wf = workflows.find(w => w.id === entry.workflowId);
       if (!wf) continue;
@@ -71,8 +82,25 @@ export function Chains() {
           if (!(k in defaults)) defaults[k] = v;
         }
       }
+      const schema = readContextSchema(wf);
+      for (const v of schema.optional) optionalVars.add(v);
+      for (const [k, v] of Object.entries(schema.descriptions)) {
+        if (!(k in descriptions)) descriptions[k] = v;
+      }
+      for (const [k, v] of Object.entries(schema.placeholders)) {
+        if (!(k in placeholders)) placeholders[k] = v;
+      }
+      // A variable that is required in any workflow within the chain is required overall.
+      const schemaMeta = wf.metadata?.contextSchema as Record<string, { required?: boolean }> | undefined;
+      if (schemaMeta) {
+        for (const [k, spec] of Object.entries(schemaMeta)) {
+          if (spec?.required !== false) requiredVars.add(k);
+        }
+      }
     }
-    return { variables: Array.from(allVars), defaults };
+    // Drop variables from optional set if any chain workflow marks them required.
+    const optional = Array.from(optionalVars).filter(v => !requiredVars.has(v));
+    return { variables: Array.from(allVars), defaults, optional, descriptions, placeholders };
   }, [workflows]);
 
   const handleExecute = useCallback((chain: WorkflowChain) => {
@@ -236,7 +264,7 @@ export function Chains() {
 
       {/* Execute with variables dialog */}
       {executeTarget && (() => {
-        const { variables, defaults } = getChainVariables(executeTarget);
+        const { variables, defaults, optional, descriptions, placeholders } = getChainVariables(executeTarget);
         return (
           <ExecuteDialog
             open={true}
@@ -244,6 +272,9 @@ export function Chains() {
             onExecute={handleExecuteWithContext}
             variables={variables}
             defaultValues={defaults}
+            optionalVariables={optional}
+            descriptions={descriptions}
+            placeholders={placeholders}
             loading={executeChain.isPending}
           />
         );

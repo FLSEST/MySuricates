@@ -309,11 +309,12 @@ export const en = {
     importCollectionHint: 'Without project selection, the workflow is added to the "Sammlung" collection.',
     activateSkill: 'Activate Skill',
     executeWithVariables: 'Execute with Variables',
-    variablesDescription: 'This workflow requires input values. Please fill in all variables below.',
+    variablesDescription: 'This workflow requires input values. Required fields must be filled; optional fields can stay empty.',
     enterValue: 'Enter value for',
     defaultValues: 'Default Values',
     defaultValuesHint: 'Pre-filled values for variables when executing.',
     defaultValueSet: 'Default value set',
+    optional: 'optional',
     execution: {
       title: 'Workflow Execution',
       running: 'Running...',

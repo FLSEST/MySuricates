@@ -10,6 +10,7 @@ import {
 } from '../hooks/useWorkflows';
 import { useT, useI18nStore } from '../i18n';
 import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
+import { readContextSchema } from '../utils/contextSchema';
 import { formatDuration, formatRelativeTime } from '../utils/formatTime';
 
 export function SimpleWorkflowDetail() {
@@ -160,6 +161,9 @@ export function SimpleWorkflowDetail() {
         onExecute={handleExecuteWithContext}
         variables={workflowVariables}
         defaultValues={workflow.defaultContext}
+        optionalVariables={readContextSchema(workflow).optional}
+        descriptions={readContextSchema(workflow).descriptions}
+        placeholders={readContextSchema(workflow).placeholders}
         loading={executeWorkflow.isPending}
       />
     </div>

@@ -8,16 +8,30 @@ interface ExecuteDialogProps {
   onExecute: (context: Record<string, string>) => void;
   variables: string[];
   defaultValues?: Record<string, string>;
+  optionalVariables?: string[];
+  descriptions?: Record<string, string>;
+  placeholders?: Record<string, string>;
   loading?: boolean;
 }
 
-export function ExecuteDialog({ open, onClose, onExecute, variables, defaultValues, loading }: ExecuteDialogProps) {
+export function ExecuteDialog({
+  open,
+  onClose,
+  onExecute,
+  variables,
+  defaultValues,
+  optionalVariables,
+  descriptions,
+  placeholders,
+  loading,
+}: ExecuteDialogProps) {
   const t = useT();
+  const optionalSet = new Set(optionalVariables ?? []);
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(variables.map((v) => [v, defaultValues?.[v] ?? '']))
   );
 
-  const allFilled = variables.every((v) => values[v]?.trim());
+  const allFilled = variables.every((v) => optionalSet.has(v) || values[v]?.trim());
 
   const handleExecute = () => {
     onExecute(values);
@@ -49,17 +63,30 @@ export function ExecuteDialog({ open, onClose, onExecute, variables, defaultValu
     >
       <div className="space-y-4">
         <p className="text-sm text-text-secondary">{t.workflows.variablesDescription}</p>
-        {variables.map((variable) => (
-          <Input
-            key={variable}
-            label={variable}
-            value={values[variable] ?? ''}
-            onChange={(e) => setValues({ ...values, [variable]: e.target.value })}
-            placeholder={defaultValues?.[variable]
+        {variables.map((variable) => {
+          const isOptional = optionalSet.has(variable);
+          const label = isOptional ? `${variable} (${t.workflows.optional})` : variable;
+          const description = descriptions?.[variable];
+          const customPlaceholder = placeholders?.[variable];
+          const placeholder = customPlaceholder
+            ? customPlaceholder
+            : defaultValues?.[variable]
               ? `${t.workflows.defaultValueSet}: ${defaultValues[variable]}`
-              : `${t.workflows.enterValue} ${variable}`}
-          />
-        ))}
+              : `${t.workflows.enterValue} ${variable}`;
+          return (
+            <div key={variable} className="space-y-1">
+              <Input
+                label={label}
+                value={values[variable] ?? ''}
+                onChange={(e) => setValues({ ...values, [variable]: e.target.value })}
+                placeholder={placeholder}
+              />
+              {description && (
+                <p className="text-xs text-text-tertiary">{description}</p>
+              )}
+            </div>
+          );
+        })}
       </div>
     </Modal>
   );

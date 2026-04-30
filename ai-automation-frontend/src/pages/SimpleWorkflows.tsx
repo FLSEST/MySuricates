@@ -15,6 +15,7 @@ import { useSettingsStore } from '../stores/settingsStore';
 import { useProjects } from '../hooks/useProjects';
 import { useT, useI18nStore } from '../i18n';
 import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
+import { readContextSchema } from '../utils/contextSchema';
 import { resolveTemplateName } from '../utils/templateUtils';
 import type { CreateWorkflowRequest, Workflow, WorkflowTemplate, PoolWorkflowEntry } from '../types';
 import { useInstallPoolWorkflow } from '../hooks/usePool';
@@ -227,6 +228,9 @@ export function SimpleWorkflows() {
         onExecute={handleExecuteWithContext}
         variables={executeDialog.variables}
         defaultValues={executeDialog.workflow?.defaultContext}
+        optionalVariables={readContextSchema(executeDialog.workflow).optional}
+        descriptions={readContextSchema(executeDialog.workflow).descriptions}
+        placeholders={readContextSchema(executeDialog.workflow).placeholders}
         loading={executeWorkflow.isPending}
       />
 

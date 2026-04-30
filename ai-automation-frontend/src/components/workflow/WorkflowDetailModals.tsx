@@ -70,6 +70,9 @@ interface WorkflowDetailModalsProps {
   setShowExecuteDialog: (v: boolean) => void;
   workflowVariables: string[];
   defaultValues: Record<string, string> | undefined;
+  optionalVariables?: string[];
+  variableDescriptions?: Record<string, string>;
+  variablePlaceholders?: Record<string, string>;
   onExecuteWithContext: (context: Record<string, string>) => void;
   executeLoading: boolean;
 
@@ -136,6 +139,9 @@ export function WorkflowDetailModals({
   setShowExecuteDialog,
   workflowVariables,
   defaultValues,
+  optionalVariables,
+  variableDescriptions,
+  variablePlaceholders,
   onExecuteWithContext,
   executeLoading,
 
@@ -451,6 +457,9 @@ export function WorkflowDetailModals({
         onExecute={onExecuteWithContext}
         variables={workflowVariables}
         defaultValues={defaultValues}
+        optionalVariables={optionalVariables}
+        descriptions={variableDescriptions}
+        placeholders={variablePlaceholders}
         loading={executeLoading}
       />
 
