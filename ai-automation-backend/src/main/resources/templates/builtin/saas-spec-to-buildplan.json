@@ -14,11 +14,14 @@
   "version" : "1.0.0",
   "model" : "claude-opus-4-6",
   "instructions" : "Du bist die erste Stufe der SaaS-Factory-Pipeline. Aus einer spec.md erzeugst du einen strukturierten Build-Plan inklusive Stack-Empfehlung. Sei explizit über Annahmen, formuliere offene Fragen statt schweigend zu raten. Pflicht: respektiere constraints.must_avoid hart.",
+  "defaultContext" : {
+    "spec_path" : ""
+  },
   "blocks" : [ {
     "type" : "shell",
     "config" : {
       "timeout_seconds" : 60,
-      "command" : "set -euo pipefail\nSPEC=\"{{ spec_path }}\"\nFACTORY=\"${FACTORY_ROOT:-/home/flo/Entwicklung/IdeaProjects/saas-factory}\"\nif [ -z \"$SPEC\" ] || [ \"$SPEC\" = '{{ spec_path }}' ]; then\n  echo 'ERROR: spec_path Kontextvariable fehlt' >&2; exit 2\nfi\n# absolutize, falls relativ\ncase \"$SPEC\" in /*) ;; *) SPEC=\"$FACTORY/$SPEC\" ;; esac\n\"$FACTORY/tools/factory\" validate-spec \"$SPEC\""
+      "command" : "set -euo pipefail\nSPEC=\"{{ spec_path }}\"\nFACTORY=\"${FACTORY_ROOT:-/home/flo/Entwicklung/IdeaProjects/saas-factory}\"\nif [ -z \"$SPEC\" ]; then\n  echo 'ERROR: spec_path Kontextvariable fehlt' >&2; exit 2\nfi\ncase \"$SPEC\" in /*) ;; *) SPEC=\"$FACTORY/$SPEC\" ;; esac\n\"$FACTORY/tools/factory\" validate-spec \"$SPEC\""
     },
     "requiredCapabilities" : [ ]
   }, {
