@@ -66,6 +66,7 @@ const ChainExecution = lazy(() => import('./pages/ChainExecution').then(m => ({ 
 const Wishes = lazy(() => import('./pages/Wishes').then(m => ({ default: m.Wishes })));
 const Todos = lazy(() => import('./pages/Todos').then(m => ({ default: m.Todos })));
 const ActivityLog = lazy(() => import('./pages/ActivityLog').then(m => ({ default: m.ActivityLog })));
+const DeadLetterQueue = lazy(() => import('./pages/DeadLetterQueue').then(m => ({ default: m.DeadLetterQueue })));
 const WorkflowFactory = lazy(() => import('./pages/WorkflowFactory').then(m => ({ default: m.WorkflowFactory })));
 const Docs = lazy(() => import('./pages/Docs').then(m => ({ default: m.Docs })));
 const Reports = lazy(() => import('./pages/Reports').then(m => ({ default: m.Reports })));
@@ -99,6 +100,7 @@ const router = createBrowserRouter([
       { path: 'integrations', element: <Integrations /> },
       { path: 'todos', element: <Todos /> },
       { path: 'activity', element: <ActivityLog /> },
+      { path: 'dlq', element: <DeadLetterQueue /> },
       { path: 'docs', element: <Docs /> },
       { path: 'reports', element: <Reports /> },
       { path: 'insights', element: <Insights /> },

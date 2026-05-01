@@ -63,6 +63,9 @@ class WorkflowExecutorTest {
     private WorkflowVersionService workflowVersionService;
 
     @Mock
+    private com.automation.service.dlq.DeadLetterService deadLetterService;
+
+    @Mock
     private ExecutionBroadcaster broadcaster;
 
     @Mock
@@ -129,7 +132,8 @@ class WorkflowExecutorTest {
                 todoRepository,
                 workflowVersionService,
                 new WorkflowExecutionRegistry(),
-                new BlockOutputValidator()
+                new BlockOutputValidator(),
+                deadLetterService
         );
 
         testProject = Project.builder()
@@ -916,7 +920,8 @@ class WorkflowExecutorTest {
                 todoRepository,
                 workflowVersionService,
                 new WorkflowExecutionRegistry(),
-                new BlockOutputValidator()
+                new BlockOutputValidator(),
+                deadLetterService
         );
     }
 

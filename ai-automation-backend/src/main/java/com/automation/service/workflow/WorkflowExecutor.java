@@ -64,6 +64,7 @@ public class WorkflowExecutor {
     private final WorkflowVersionService workflowVersionService;
     private final WorkflowExecutionRegistry executionRegistry;
     private final BlockOutputValidator blockOutputValidator;
+    private final com.automation.service.dlq.DeadLetterService deadLetterService;
 
     private static final java.util.Set<String> SYSTEM_VAR_KEYS = java.util.Set.of(
             "workflow_run_id", "workflow_id", "workflow_name", "project_path",
@@ -497,6 +498,11 @@ public class WorkflowExecutor {
                 activityLogService.error(LogCategory.EXECUTION,
                         "Workflow execution failed: " + runId,
                         "WorkflowExecutor", runId, workflowId);
+                try {
+                    deadLetterService.recordFailure(run);
+                } catch (Exception dlqError) {
+                    log.warn("Failed to record DLQ entry for run {}: {}", runId, dlqError.getMessage());
+                }
             }
 
         } catch (InterruptedException e) {
