@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -400,6 +401,85 @@ class SchedulerServiceTest {
         // Weekly count should be >= daily count
         UpcomingScheduleResponse todayResult = schedulerService.getRemainingToday();
         assertThat(result.count()).isGreaterThanOrEqualTo(todayResult.count());
+    }
+
+    @Test
+    void getRemainingThisWeek_cronSchedule_respectsMaxRunsAndRunCount() {
+        ScheduledWorkflow limited = ScheduledWorkflow.builder()
+                .id("sched-limited")
+                .workflow(testWorkflow)
+                .cronExpression("0 */7 * * * *")
+                .scheduleType(ScheduleType.CRON)
+                .enabled(true)
+                .maxRuns(35)
+                .runCount(1)
+                .build();
+
+        when(scheduledRepository.findByEnabledTrue()).thenReturn(List.of(limited));
+
+        UpcomingScheduleResponse result = schedulerService.getRemainingThisWeek();
+
+        assertThat(result.count()).isEqualTo(34);
+        assertThat(result.schedules()).hasSize(34);
+    }
+
+    @Test
+    void getRemainingThisWeek_cronSchedule_excludesExhaustedMaxRuns() {
+        ScheduledWorkflow exhausted = ScheduledWorkflow.builder()
+                .id("sched-exhausted")
+                .workflow(testWorkflow)
+                .cronExpression("0 */7 * * * *")
+                .scheduleType(ScheduleType.CRON)
+                .enabled(true)
+                .maxRuns(35)
+                .runCount(35)
+                .build();
+
+        when(scheduledRepository.findByEnabledTrue()).thenReturn(List.of(exhausted));
+
+        UpcomingScheduleResponse result = schedulerService.getRemainingThisWeek();
+
+        assertThat(result.count()).isZero();
+        assertThat(result.schedules()).isEmpty();
+    }
+
+    @Test
+    void getRemainingThisWeek_cronSchedule_excludesWeekBoundary() {
+        ScheduledWorkflow boundary = ScheduledWorkflow.builder()
+                .id("sched-boundary")
+                .workflow(testWorkflow)
+                .cronExpression("0 0 0 * * MON")
+                .scheduleType(ScheduleType.CRON)
+                .enabled(true)
+                .build();
+
+        when(scheduledRepository.findByEnabledTrue()).thenReturn(List.of(boundary));
+
+        UpcomingScheduleResponse result = schedulerService.getRemainingThisWeek();
+
+        assertThat(result.count()).isZero();
+        assertThat(result.schedules()).isEmpty();
+    }
+
+    @Test
+    void getRemainingThisWeek_cronSchedule_respectsEndDate() {
+        Instant endDate = LocalDateTime.now(clock).plusMinutes(20)
+                .atZone(ZoneId.systemDefault()).toInstant();
+        ScheduledWorkflow ending = ScheduledWorkflow.builder()
+                .id("sched-ending")
+                .workflow(testWorkflow)
+                .cronExpression("0 */5 * * * *")
+                .scheduleType(ScheduleType.CRON)
+                .enabled(true)
+                .endDate(endDate)
+                .build();
+
+        when(scheduledRepository.findByEnabledTrue()).thenReturn(List.of(ending));
+
+        UpcomingScheduleResponse result = schedulerService.getRemainingThisWeek();
+
+        assertThat(result.count()).isEqualTo(3);
+        assertThat(result.schedules()).allMatch(run -> run.scheduledAt().isBefore(endDate));
     }
 
     @Test

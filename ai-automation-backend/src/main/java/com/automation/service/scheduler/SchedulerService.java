@@ -290,14 +290,21 @@ public class SchedulerService {
             }
 
             if (sw.getScheduleType() == ScheduleType.CRON) {
+                int remainingRuns = getRemainingRunLimit(sw);
+                if (remainingRuns == 0) {
+                    continue;
+                }
+                Instant effectiveUntil = getEffectiveUntil(until, sw.getEndDate());
                 CronExpression cron = CronExpression.parse(sw.getCronExpression());
                 LocalDateTime next = cron.next(LocalDateTime.now(clock));
-                while (next != null) {
+                int addedForSchedule = 0;
+                while (next != null && addedForSchedule < remainingRuns) {
                     Instant nextInstant = next.atZone(ZoneId.systemDefault()).toInstant();
-                    if (nextInstant.isAfter(until)) break;
+                    if (!nextInstant.isBefore(effectiveUntil)) break;
                     upcoming.add(new UpcomingScheduleResponse.UpcomingRun(
                             sw.getId(), workflowName, projectName,
                             chainId, chainName, targetType, nextInstant));
+                    addedForSchedule++;
                     next = cron.next(next);
                 }
             } else if (sw.getScheduleType() == ScheduleType.ONCE
@@ -313,6 +320,20 @@ public class SchedulerService {
         }
 
         return new UpcomingScheduleResponse(upcoming.size(), upcoming);
+    }
+
+    private int getRemainingRunLimit(ScheduledWorkflow sw) {
+        if (sw.getMaxRuns() <= 0) {
+            return Integer.MAX_VALUE;
+        }
+        return Math.max(0, sw.getMaxRuns() - sw.getRunCount());
+    }
+
+    private Instant getEffectiveUntil(Instant until, Instant endDate) {
+        if (endDate == null || endDate.isAfter(until)) {
+            return until;
+        }
+        return endDate;
     }
 
     public List<Instant> getNextRuns(String cronExpression, int count) {
