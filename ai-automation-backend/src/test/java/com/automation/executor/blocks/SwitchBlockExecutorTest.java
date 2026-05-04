@@ -477,4 +477,208 @@ class SwitchBlockExecutorTest {
         verify(commandExecutor).executeStepOnHost(
                 argThat(req -> req.providerId() == null));
     }
+
+    @Test
+    void should_executeFirstCase_when_multipleCasesMatch() {
+        context.setVariable("flag", "a");
+
+        StepResult firstResult = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("first branch ran").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(firstResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "${flag}");
+        config.put("cases", List.of(
+                Map.of("value", "a", "blocks", List.of(
+                        Map.of("type", "simple", "config", Map.of("command", "first command"))
+                )),
+                Map.of("value", "a", "blocks", List.of(
+                        Map.of("type", "simple", "config", Map.of("command", "second command"))
+                ))
+        ));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("switch")
+                .config(config)
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getOutput()).isEqualTo("first branch ran");
+        assertThat(result.getMetadata()).containsEntry("matchedCase", "a");
+        verify(commandExecutor, times(1)).executeStepOnHost(any(HostExecutionRequest.class));
+    }
+
+    @Test
+    void should_executeLastCase_when_onlyLastMatches() {
+        context.setVariable("phase", "third");
+
+        StepResult lastResult = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("third branch ran").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(lastResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "${phase}");
+        config.put("cases", List.of(
+                Map.of("value", "first", "blocks", List.of(
+                        Map.of("type", "simple", "config", Map.of("command", "run first"))
+                )),
+                Map.of("value", "second", "blocks", List.of(
+                        Map.of("type", "simple", "config", Map.of("command", "run second"))
+                )),
+                Map.of("value", "third", "blocks", List.of(
+                        Map.of("type", "simple", "config", Map.of("command", "run third"))
+                ))
+        ));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("switch")
+                .config(config)
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getOutput()).isEqualTo("third branch ran");
+        assertThat(result.getMetadata()).containsEntry("matchedCase", "third");
+        verify(commandExecutor, times(1)).executeStepOnHost(any(HostExecutionRequest.class));
+    }
+
+    @Test
+    void should_returnSuccess_when_noDefaultAndNoMatch() {
+        context.setVariable("state", "irrelevant");
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "${state}");
+        config.put("cases", List.of(
+                Map.of("value", "alpha", "blocks", List.of(
+                        Map.of("type", "simple", "config", Map.of("command", "alpha cmd"))
+                )),
+                Map.of("value", "beta", "blocks", List.of(
+                        Map.of("type", "simple", "config", Map.of("command", "beta cmd"))
+                ))
+        ));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("switch")
+                .config(config)
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata()).containsEntry("matchedCase", "none");
+        verify(commandExecutor, never()).executeStepOnHost(any(HostExecutionRequest.class));
+        verify(commandExecutor, never()).executeStepAsShell(any(), any(), anyInt(), anyInt());
+    }
+
+    @Test
+    void should_notThrowNpe_when_expressionResolvesToNull() {
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", null);
+        config.put("cases", List.of(
+                Map.of("value", "some-value", "blocks", List.of(
+                        Map.of("type", "simple", "config", Map.of("command", "run"))
+                ))
+        ));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("switch")
+                .config(config)
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata()).containsEntry("matchedCase", "none");
+        verify(commandExecutor, never()).executeStepOnHost(any(HostExecutionRequest.class));
+    }
+
+    @Test
+    void should_notThrowNpe_when_casesIsNull() {
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "some-value");
+        config.put("cases", null);
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("switch")
+                .config(config)
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata()).containsEntry("matchedCase", "none");
+        verify(commandExecutor, never()).executeStepOnHost(any(HostExecutionRequest.class));
+    }
+
+    @Test
+    void should_notThrowNpe_when_caseValueIsNull() {
+        context.setVariable("state", "actual");
+
+        Map<String, Object> nullValueCase = new HashMap<>();
+        nullValueCase.put("value", null);
+        nullValueCase.put("blocks", List.of(
+                Map.of("type", "simple", "config", Map.of("command", "should not run"))
+        ));
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "${state}");
+        config.put("cases", List.of(nullValueCase));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("switch")
+                .config(config)
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata()).containsEntry("matchedCase", "none");
+        verify(commandExecutor, never()).executeStepOnHost(any(HostExecutionRequest.class));
+    }
+
+    @Test
+    void should_isolateContextBetweenBranches_when_differentCasesMatchInSequentialRuns() {
+        StepResult branchAResult = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("branch-A-output").build();
+        StepResult branchBResult = StepResult.builder()
+                .stepIndex(2).status(StepStatus.COMPLETED).output("branch-B-output").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(branchAResult)
+                .thenReturn(branchBResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "${branch}");
+        config.put("cases", List.of(
+                Map.of("value", "A", "blocks", List.of(
+                        Map.of("type", "simple", "config", Map.of("command", "do A"))
+                )),
+                Map.of("value", "B", "blocks", List.of(
+                        Map.of("type", "simple", "config", Map.of("command", "do B"))
+                ))
+        ));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("switch")
+                .config(config)
+                .build();
+
+        context.setVariable("branch", "A");
+        StepResult firstResult = executor.execute(block, context);
+
+        context.setVariable("branch", "B");
+        StepResult secondResult = executor.execute(block, context);
+
+        assertThat(firstResult.getMetadata()).containsEntry("matchedCase", "A");
+        assertThat(firstResult.getOutput()).isEqualTo("branch-A-output");
+        assertThat(firstResult.getOutput()).doesNotContain("branch-B-output");
+
+        assertThat(secondResult.getMetadata()).containsEntry("matchedCase", "B");
+        assertThat(secondResult.getOutput()).isEqualTo("branch-B-output");
+        assertThat(secondResult.getOutput()).doesNotContain("branch-A-output");
+    }
 }
