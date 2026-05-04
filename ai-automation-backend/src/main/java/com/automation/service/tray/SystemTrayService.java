@@ -74,7 +74,7 @@ public class SystemTrayService {
 
     @EventListener(ApplicationReadyEvent.class)
     public void initialize() {
-        if (!SystemTray.isSupported()) {
+        if (!isSystemTraySupported()) {
             log.warn("SystemTray is not supported on this platform — tray icon disabled");
             return;
         }
@@ -99,6 +99,15 @@ public class SystemTrayService {
             log.info("System tray icon initialized");
         } catch (Exception e) {
             log.warn("Failed to initialize system tray icon: {}", e.getMessage());
+        }
+    }
+
+    private boolean isSystemTraySupported() {
+        try {
+            return SystemTray.isSupported();
+        } catch (AWTError e) {
+            log.warn("SystemTray support check failed: {}", e.getMessage());
+            return false;
         }
     }
 

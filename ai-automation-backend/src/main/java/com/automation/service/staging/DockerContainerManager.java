@@ -26,13 +26,21 @@ public class DockerContainerManager {
      * Returns {@code true} if a Docker container matching {@code containerName} is currently running.
      */
     public boolean isRunning(String containerName) {
+        if (containerName == null || containerName.isBlank()) {
+            return false;
+        }
+
         try {
             ProcessBuilder pb = new ProcessBuilder("docker", "ps", "--filter",
                     "name=" + containerName, "--format", "{{.Status}}");
             pb.redirectErrorStream(true);
             Process p = pb.start();
             String output = new String(p.getInputStream().readAllBytes()).trim();
-            p.waitFor();
+            int exitCode = p.waitFor();
+            if (exitCode != 0) {
+                log.debug("Container status check failed for '{}' (exit {}): {}", containerName, exitCode, output);
+                return false;
+            }
             return !output.isEmpty();
         } catch (Exception e) {
             log.debug("Container status check failed for '{}': {}", containerName, e.getMessage());
