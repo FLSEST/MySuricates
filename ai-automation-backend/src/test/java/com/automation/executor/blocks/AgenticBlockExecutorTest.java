@@ -19,6 +19,7 @@ import com.automation.service.system.SystemIdentityService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -698,5 +699,85 @@ class AgenticBlockExecutorTest {
 
         // Should still complete despite broadcast failures
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+    }
+
+    @Test
+    void execute_perBlockTimeout_propagatedToReasonAndAct() throws Exception {
+        Map<String, Object> config = new HashMap<>();
+        config.put("goal", "Timeout propagation test");
+        config.put("success_criteria", "Timeout forwarded");
+        config.put("max_iterations", 10);
+        config.put("iteration_timeout_seconds", 300);
+        config.put("require_approval", false);
+        config.put("timeout_seconds", 600);
+        BlockDefinition block = BlockDefinition.builder().type("agentic").config(config).build();
+
+        when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), eq(600)))
+                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Do it\nSUMMARY: Step"))
+                .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
+        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), eq(600), eq(false), isNull(), isNull()))
+                .thenReturn(new HostClaudeService.ActionResult("done", 0, null));
+        when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
+
+        StepResult result = executor.execute(block, buildContext());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        verify(hostClaude, atLeast(1)).reasonStructured(anyString(), anyString(), isNull(), isNull(), eq(600));
+        verify(hostClaude).executeAction(anyString(), isNull(), isNull(), eq("/test/project"), eq(600), eq(false), isNull(), isNull());
+    }
+
+    @Test
+    void execute_reasonAndActPhases_useDistinctSystemPromptArguments() throws Exception {
+        when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Do it\nSUMMARY: Step"))
+                .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
+        when(hostClaude.executeAction(anyString(), eq("claude-opus-4-6"), eq("WORKFLOW_INSTR_X"), eq("/test/project"), isNull(), eq(false), isNull(), isNull()))
+                .thenReturn(new HostClaudeService.ActionResult("done", 0, null));
+        when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
+
+        ExecutionContext context = buildContext();
+        context.setModel("claude-opus-4-6");
+        context.setInstructionPrefix("WORKFLOW_INSTR_X");
+
+        executor.execute(buildBlock("Phase-args goal"), context);
+
+        ArgumentCaptor<String> reasonSysPrompt = ArgumentCaptor.forClass(String.class);
+        verify(hostClaude, atLeast(1)).reasonStructured(anyString(), reasonSysPrompt.capture(), isNull(), isNull(), isNull());
+        ArgumentCaptor<String> actSysPrompt = ArgumentCaptor.forClass(String.class);
+        verify(hostClaude).executeAction(anyString(), eq("claude-opus-4-6"), actSysPrompt.capture(), eq("/test/project"), isNull(), eq(false), isNull(), isNull());
+
+        // REASON gets the full agentic system prompt (contains goal + structured format)
+        assertThat(reasonSysPrompt.getValue()).contains("Phase-args goal");
+        assertThat(reasonSysPrompt.getValue()).contains("Your Goal");
+        assertThat(reasonSysPrompt.getValue()).contains("GOAL_STATUS:");
+        // ACT gets only the raw workflow instruction prefix
+        assertThat(actSysPrompt.getValue()).isEqualTo("WORKFLOW_INSTR_X");
+        assertThat(actSysPrompt.getValue()).doesNotContain("Your Goal");
+    }
+
+    @Test
+    void execute_providerExecuteActionThrowsClaudeNotInstalled_marksFailure() throws Exception {
+        Map<String, Object> config = new HashMap<>();
+        config.put("goal", "Binary missing test");
+        config.put("success_criteria", "Claude binary found");
+        config.put("max_iterations", 1);
+        config.put("iteration_timeout_seconds", 300);
+        config.put("require_approval", false);
+        config.put("max_repeated_actions", 10);
+        BlockDefinition block = BlockDefinition.builder().type("agentic").config(config).build();
+
+        when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Do something\nSUMMARY: Step"));
+        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull()))
+                .thenThrow(new RuntimeException("claude binary not found in PATH"));
+        when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
+
+        StepResult result = executor.execute(block, buildContext());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getOutput()).contains("claude binary not found in PATH");
     }
 }
