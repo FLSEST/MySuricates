@@ -15,6 +15,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -434,5 +435,43 @@ class ForEachBlockExecutorTest {
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         verify(commandExecutor, times(2)).executeStepOnHost(any(HostExecutionRequest.class));
+    }
+
+    @Test
+    void execute_eachIteration_seesIsolatedItemVariable() {
+        // Kontext-Isolation: Jede Iteration darf nur ihr eigenes Item sehen,
+        // niemals das aus der vorherigen Iteration. (item N != item N-1)
+        ArrayList<String> capturedItems = new ArrayList<>();
+
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenAnswer(inv -> {
+                    Object current = context.getVariable("item");
+                    capturedItems.add(String.valueOf(current));
+                    return StepResult.builder()
+                            .stepIndex(0)
+                            .status(StepStatus.COMPLETED)
+                            .output("ok")
+                            .build();
+                });
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("items_source", "list");
+        config.put("items", List.of("alpha", "beta", "gamma"));
+        config.put("variable_name", "item");
+        config.put("command", "echo {{ item }}");
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("foreach")
+                .config(config)
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(capturedItems).containsExactly("alpha", "beta", "gamma");
+        // item N != item N-1 — jede Iteration ueberschreibt die Variable sauber
+        assertThat(capturedItems.get(1)).isNotEqualTo(capturedItems.get(0));
+        assertThat(capturedItems.get(2)).isNotEqualTo(capturedItems.get(1));
+        verify(commandExecutor, times(3)).executeStepOnHost(any(HostExecutionRequest.class));
     }
 }
