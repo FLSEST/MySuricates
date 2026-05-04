@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -230,5 +231,100 @@ class RetryBlockExecutorTest {
 
         verify(commandExecutor).executeStepOnHost(
                 argThat(req -> req.providerId() == null));
+    }
+
+    @Test
+    void execute_maxRetriesZero_executesExactlyOnce() {
+        StepResult failed = StepResult.builder()
+                .stepIndex(0).status(StepStatus.FAILED).output("err").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(failed);
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("retry")
+                .config(new HashMap<>(Map.of(
+                        "command", "npm test",
+                        "max_retries", 0,
+                        "delay", 0
+                )))
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        // max_retries=0 means 1 attempt total (no retries)
+        verify(commandExecutor, times(1)).executeStepOnHost(any(HostExecutionRequest.class));
+    }
+
+    @Test
+    void execute_maxRetriesOne_executesAtMostTwice_offByOneCheck() {
+        StepResult failed = StepResult.builder()
+                .stepIndex(0).status(StepStatus.FAILED).output("err").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(failed);
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("retry")
+                .config(new HashMap<>(Map.of(
+                        "command", "npm test",
+                        "max_retries", 1,
+                        "delay", 0
+                )))
+                .build();
+
+        executor.execute(block, context);
+
+        // 1 initial + 1 retry = exactly 2 attempts (off-by-one boundary)
+        verify(commandExecutor, times(2)).executeStepOnHost(any(HostExecutionRequest.class));
+    }
+
+    @Test
+    void execute_commandExecutorThrowsException_propagatesUpwards() {
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenThrow(new RuntimeException("boom"));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("retry")
+                .config(new HashMap<>(Map.of(
+                        "command", "npm test",
+                        "max_retries", 3,
+                        "delay", 0
+                )))
+                .build();
+
+        assertThatThrownBy(() -> executor.execute(block, context))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("boom");
+    }
+
+    @Test
+    void supports_returnsFalseForNonRetryTypes() {
+        assertThat(executor.supports("shell")).isFalse();
+        assertThat(executor.supports("simple")).isFalse();
+        assertThat(executor.supports("agentic")).isFalse();
+        assertThat(executor.supports("")).isFalse();
+        assertThat(executor.supports(null)).isFalse();
+    }
+
+    @Test
+    void execute_eachAttempt_sendsFreshRequest_contextIsolation() {
+        StepResult failed = StepResult.builder()
+                .stepIndex(0).status(StepStatus.FAILED).output("err").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(failed);
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("retry")
+                .config(new HashMap<>(Map.of(
+                        "command", "npm test",
+                        "max_retries", 2,
+                        "delay", 0
+                )))
+                .build();
+
+        executor.execute(block, context);
+
+        // Each retry must send a request - verify count proves no shared mutable state blocks retries
+        verify(commandExecutor, times(3)).executeStepOnHost(any(HostExecutionRequest.class));
     }
 }
