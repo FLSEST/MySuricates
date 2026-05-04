@@ -12,6 +12,9 @@ import org.springframework.stereotype.Service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -237,7 +240,10 @@ public class ContainerShellService {
 
     /**
      * Returns true if no allowlist is configured (legacy behavior) or if the host
-     * side of the bind-mount starts with one of the configured prefixes.
+     * side of the bind-mount, after normalization (resolving "." and ".."
+     * segments), is contained under one of the configured prefixes. Without the
+     * normalization step, a mount like "/allowed/../../etc:/data" would pass a
+     * naive prefix check while Docker would actually mount /etc.
      */
     boolean isAllowedByPrefix(String mount) {
         List<String> prefixes = allowedMountPrefixes;
@@ -247,12 +253,20 @@ public class ContainerShellService {
         String[] parts = mount.split(":", 3);
         if (parts.length < 2) return false;
         String host = parts[0].trim();
-        String normalized = host.endsWith("/") && !host.equals("/")
-                ? host.substring(0, host.length() - 1)
-                : host;
+        Path hostPath;
+        try {
+            hostPath = Paths.get(host).toAbsolutePath().normalize();
+        } catch (InvalidPathException e) {
+            return false;
+        }
         for (String prefix : prefixes) {
-            if (normalized.equals(prefix) || normalized.startsWith(prefix + "/")) {
-                return true;
+            try {
+                Path prefixPath = Paths.get(prefix).toAbsolutePath().normalize();
+                if (hostPath.equals(prefixPath) || hostPath.startsWith(prefixPath)) {
+                    return true;
+                }
+            } catch (InvalidPathException ignored) {
+                // skip malformed prefix entries
             }
         }
         return false;

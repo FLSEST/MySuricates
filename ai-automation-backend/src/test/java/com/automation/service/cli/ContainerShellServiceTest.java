@@ -284,6 +284,39 @@ class ContainerShellServiceTest {
     }
 
     @Test
+    void filterExtraMounts_allowlistRejectsPathTraversalBypass() {
+        // String prefix check would let "/home/flo/dokumente/../../etc:/data" pass
+        // because the string starts with "/home/flo/dokumente". After path
+        // normalization the host path becomes "/etc" → must be rejected as
+        // forbidden, not slip through.
+        service.setAllowExtraMounts(true);
+        service.setAllowedMountPrefixes(List.of("/home/flo/dokumente"));
+
+        List<String> safe = service.filterExtraMounts(
+                List.of(
+                        "/home/flo/dokumente/../../etc:/data:rw",
+                        "/home/flo/dokumente/./../.ssh:/mnt:ro",
+                        "/home/flo/dokumente/cv:/data:rw"),
+                "img:latest");
+
+        assertThat(safe).containsExactly("/home/flo/dokumente/cv:/data:rw");
+    }
+
+    @Test
+    void isAllowedByPrefix_normalizesDotDotSequences() {
+        service.setAllowedMountPrefixes(List.of("/home/flo/dokumente"));
+
+        // Naive string-prefix check would accept these — must be rejected after
+        // normalization because they resolve outside the prefix.
+        assertThat(service.isAllowedByPrefix("/home/flo/dokumente/../etc:/data:rw")).isFalse();
+        assertThat(service.isAllowedByPrefix("/home/flo/dokumente/../../root:/data:rw")).isFalse();
+
+        // Valid paths still pass.
+        assertThat(service.isAllowedByPrefix("/home/flo/dokumente/cv:/data:rw")).isTrue();
+        assertThat(service.isAllowedByPrefix("/home/flo/dokumente/sub/./file:/data:rw")).isTrue();
+    }
+
+    @Test
     void filterExtraMounts_allowlistAcceptsExactPrefixMatch() {
         service.setAllowExtraMounts(true);
         service.setAllowedMountPrefixes(List.of("/home/flo/dokumente"));
