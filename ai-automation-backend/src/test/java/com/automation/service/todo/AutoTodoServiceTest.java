@@ -3,6 +3,8 @@ package com.automation.service.todo;
 import com.automation.entity.GateStatus;
 import com.automation.entity.RunStatus;
 import com.automation.entity.Todo;
+import com.automation.entity.Workflow;
+import com.automation.entity.WorkflowRun;
 import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.repository.StepResultRepository;
@@ -569,6 +571,76 @@ class AutoTodoServiceTest {
                     && t.getDescription().contains("Test Workflow")
                     && t.getDescription().contains("run-1"));
         }
+    }
+
+    @Test
+    void todoTriggerRun_loopPrevention_skipsProcessing() {
+        Map<String, Object> runMeta = new HashMap<>();
+        runMeta.put("todoTriggerRun", true);
+        WorkflowRunCompletedEvent event = new WorkflowRunCompletedEvent(
+                this, "run-loop", "wf-1", "Test Workflow", "proj-1", "/workspace/test",
+                RunStatus.FAILED, runMeta, AUTO_TODO_ENABLED_META, Map.of());
+
+        autoTodoService.onWorkflowRunCompleted(event);
+
+        verify(todoRepository, never()).save(any());
+        verify(gateStatusResolver, never()).resolve(any());
+    }
+
+    @Test
+    void approvalMode_redGate_storesPendingTodosInsteadOfCreating() {
+        Map<String, Object> approvalMeta = Map.of("autoTodo", Map.of("enabled", true, "mode", "approval"));
+        WorkflowRunCompletedEvent event = new WorkflowRunCompletedEvent(
+                this, "run-app", "wf-1", "Test Workflow", "proj-1", "/workspace/test",
+                RunStatus.FAILED, Map.of(), approvalMeta, Map.of());
+        when(gateStatusResolver.resolve(any())).thenReturn(new GateResult(GateStatus.RED, "lint-failure", "3 ESLint errors"));
+
+        WorkflowRun run = new WorkflowRun();
+        run.setId("run-app");
+        Map<String, Object> runMetadata = new HashMap<>();
+        run.setMetadata(runMetadata);
+        when(workflowRunRepository.findById("run-app")).thenReturn(Optional.of(run));
+        when(workflowRunRepository.save(any(WorkflowRun.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        autoTodoService.onWorkflowRunCompleted(event);
+
+        assertThat(runMetadata).containsKey("pending_todos");
+        verify(todoRepository, never()).save(any());
+    }
+
+    @Test
+    void approvePendingTodos_approved_createsTodosFromPendingMap() {
+        Workflow workflow = new Workflow();
+        workflow.setId("wf-1");
+        WorkflowRun run = new WorkflowRun();
+        run.setId("run-app");
+        run.setWorkflow(workflow);
+        Map<String, Object> meta = new HashMap<>();
+        Map<String, Object> pending = new HashMap<>();
+        pending.put("title", "Approved Test Todo");
+        pending.put("priority", "HIGH");
+        pending.put("description", "from pending");
+        pending.put("projectId", "proj-1");
+        pending.put("category", "general");
+        pending.put("tags", "[]");
+        meta.put("pending_todos", List.of(pending));
+        run.setMetadata(meta);
+
+        when(workflowRunRepository.findById("run-app")).thenReturn(Optional.of(run));
+        when(todoRepository.findOpenByCompositeKey(any(), any(), any(), any())).thenReturn(Optional.empty());
+        when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> {
+            Todo t = inv.getArgument(0);
+            t.setId("todo-new");
+            return t;
+        });
+        when(workflowRunRepository.save(any(WorkflowRun.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        autoTodoService.approvePendingTodos("run-app", true);
+
+        ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+        verify(todoRepository, atLeastOnce()).save(captor.capture());
+        assertThat(captor.getValue().getTitle()).isEqualTo("Approved Test Todo");
+        assertThat(meta).doesNotContainKey("pending_todos");
     }
 
     private WorkflowRunCompletedEvent createEvent(RunStatus status,
