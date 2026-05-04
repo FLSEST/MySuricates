@@ -18,7 +18,7 @@
     "type" : "shell",
     "config" : {
       "timeout_seconds" : 30,
-      "command" : "set -euo pipefail\nFACTORY=\"${FACTORY_ROOT:-/home/flo/Entwicklung/IdeaProjects/saas-factory}\"\nSLUG=\"{{ slug }}\"\nSTACK_HINT=\"{{ stack_hint }}\"\nSPEC_TYPE=\"{{ spec_type }}\"\n[ -z \"$SLUG\" ] || [ \"$SLUG\" = '{{ slug }}' ] && { echo 'ERROR: slug fehlt' >&2; exit 2; }\nRECIPE=$(\"$FACTORY/tools/factory\" pick-recipe ${STACK_HINT:+--stack \"$STACK_HINT\"} ${SPEC_TYPE:+--type \"$SPEC_TYPE\"})\nPORT=$(\"$FACTORY/tools/factory\" port --reserve --app \"$SLUG\")\necho \"RECIPE=$RECIPE\"\necho \"PORT=$PORT\"\necho \"TARGET=$FACTORY/$SLUG\"\necho \"SLUG=$SLUG\""
+      "command" : "set -euo pipefail\nFACTORY=\"${FACTORY_ROOT:-/home/flo/Entwicklung/IdeaProjects/saas-factory}\"\nSLUG=\"{{ slug }}\"\nSTACK_HINT=\"{{ stack_hint }}\"\nSPEC_TYPE=\"{{ spec_type }}\"\nif [ -z \"$SLUG\" ]; then\n  echo 'ERROR: slug fehlt' >&2; exit 2\nfi\nRECIPE=$(\"$FACTORY/tools/factory\" pick-recipe ${STACK_HINT:+--stack \"$STACK_HINT\"} ${SPEC_TYPE:+--type \"$SPEC_TYPE\"})\nPORT=$(\"$FACTORY/tools/factory\" port --reserve --app \"$SLUG\")\necho \"RECIPE=$RECIPE\"\necho \"PORT=$PORT\"\necho \"TARGET=$FACTORY/$SLUG\"\necho \"SLUG=$SLUG\""
     },
     "requiredCapabilities" : [ ]
   }, {
