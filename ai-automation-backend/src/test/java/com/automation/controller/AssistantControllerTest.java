@@ -20,11 +20,16 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Instant;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -216,5 +221,120 @@ class AssistantControllerTest {
         verify(assistantSessionService).appendToolResult(
                 org.mockito.ArgumentMatchers.eq("s2"),
                 org.mockito.ArgumentMatchers.argThat(r -> !r.success() && "tool-2".equals(r.toolId())));
+    }
+
+    // ── Session management ─────────────────────────────────────────────────────
+
+    @Test
+    void listSessions_returnsListFromService() throws Exception {
+        var summary = new com.automation.dto.response.AssistantSessionSummary(
+                "s1", "Hallo", "dashboard", 2, Instant.now());
+        when(assistantSessionService.listRecentSessions()).thenReturn(List.of(summary));
+
+        mockMvc.perform(get("/api/v1/assistant/sessions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    void listSessions_emptyList_returnsEmptyArray() throws Exception {
+        when(assistantSessionService.listRecentSessions()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/assistant/sessions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void getSession_returnsDetail() throws Exception {
+        var detail = new com.automation.dto.response.AssistantSessionDetail(
+                "abc", "Test-Preview", "dashboard", null, List.of(), 0, Instant.now(), null);
+        when(assistantSessionService.getSession("abc")).thenReturn(detail);
+
+        mockMvc.perform(get("/api/v1/assistant/sessions/abc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("abc"));
+
+        verify(assistantSessionService).getSession("abc");
+    }
+
+    @Test
+    void deleteSession_callsServiceAndReturns200() throws Exception {
+        mockMvc.perform(delete("/api/v1/assistant/sessions/abc"))
+                .andExpect(status().isOk());
+
+        verify(assistantSessionService).deleteSession("abc");
+    }
+
+    // ── Chat session persistence ───────────────────────────────────────────────
+
+    @Test
+    void chat_persistsSessionWhenSessionIdProvided() throws Exception {
+        when(assistantService.chat(any())).thenReturn(new AssistantChatResponse("OK", List.of()));
+
+        // AssistantChatRequest(message, history, context, provider, sessionId, requestId)
+        var request = new AssistantChatRequest("Hello", List.of(), null, null, "sess-1", null);
+
+        mockMvc.perform(post("/api/v1/assistant/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+        verify(assistantSessionService).appendMessages(eq("sess-1"), any(), any());
+    }
+
+    @Test
+    void chat_doesNotPersistWhenSessionIdNull() throws Exception {
+        when(assistantService.chat(any())).thenReturn(new AssistantChatResponse("OK", List.of()));
+
+        var request = new AssistantChatRequest("Hello", List.of(), null, null, null, null);
+
+        mockMvc.perform(post("/api/v1/assistant/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+        verify(assistantSessionService, never()).appendMessages(any(), any(), any());
+    }
+
+    @Test
+    void chat_cancelsRunningSuggestions() throws Exception {
+        when(assistantService.chat(any())).thenReturn(new AssistantChatResponse("OK", List.of()));
+
+        var request = new AssistantChatRequest("Hello", List.of(), null, null, null, null);
+
+        mockMvc.perform(post("/api/v1/assistant/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+        verify(pageSuggestionService).cancelRunning();
+    }
+
+    // ── Reject 410 ────────────────────────────────────────────────────────────
+
+    @Test
+    void rejectPendingTool_alreadyConsumed_returns410() throws Exception {
+        when(pendingToolRegistry.take("xyz")).thenReturn(java.util.Optional.empty());
+
+        mockMvc.perform(post("/api/v1/assistant/pending-tools/xyz/reject")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isGone());
+
+        verify(toolExecutor, never()).executeConfirmed(any());
+    }
+
+    // ── Error propagation ─────────────────────────────────────────────────────
+
+    @Test
+    void getSession_serviceThrows_propagatesError() throws Exception {
+        when(assistantSessionService.getSession("bad-id"))
+                .thenThrow(new RuntimeException("Session not found"));
+
+        mockMvc.perform(get("/api/v1/assistant/sessions/bad-id"))
+                .andExpect(status().is5xxServerError());
     }
 }
