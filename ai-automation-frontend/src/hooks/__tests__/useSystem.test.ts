@@ -1,36 +1,95 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { http, HttpResponse } from 'msw';
 import { type ReactNode, createElement } from 'react';
 import { server } from '../../test/server';
-import { useSystemHealth, useSystemInfo, useAiProviders, useBackupList, useExecutionConfig, useUpdateExecutionConfig, useUpdateSystemSetting } from '../useSystem';
+import {
+  useSystemHealth,
+  useSystemInfo,
+  useAiProviders,
+  useBackupList,
+  useExecutionConfig,
+  useUpdateExecutionConfig,
+  useUpdateSystemSetting,
+  useRemoteAccessStatus,
+  useEnableRemoteAccess,
+  useDisableRemoteAccess,
+  usePiCatalog,
+  useAssistantModelSetting,
+  useAutoRepairModeSetting,
+  useSuggestionsModelSetting,
+  useAssistantThinkingPhrases,
+  useRepairAllFailed,
+  useBrowseDirectory,
+} from '../useSystem';
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
+const apiBase = '/api/v1';
+
+const mocks = vi.hoisted(() => ({
+  toastSuccess: vi.fn(),
+  toastError: vi.fn(),
+}));
+
+vi.mock('../useToast', () => ({
+  useToast: () => ({ success: mocks.toastSuccess, error: mocks.toastError }),
+}));
+
+vi.mock('../../i18n', () => ({
+  useT: () => ({
+    toast: {
+      repairAllStarted: '{count} workflows queued for repair',
+      repairFailed: 'Failed to start repair',
+    },
+    settings: {
+      executionSaved: 'Execution settings saved',
+      executionSaveFailed: 'Failed to save execution settings',
+    },
+  }),
+  useI18nStore: (selector: (s: { locale: string }) => unknown) =>
+    selector({ locale: 'de' }),
+}));
 
 function createWrapper() {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-  return ({ children }: { children: ReactNode }) =>
-    createElement(QueryClientProvider, { client: qc }, children);
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { retry: false },
+    },
+  });
+  const Wrapper = ({ children }: { children: ReactNode }) =>
+    createElement(QueryClientProvider, { client }, children);
+  return { Wrapper, client };
 }
+
+beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+afterEach(() => {
+  server.resetHandlers();
+  vi.clearAllMocks();
+});
+afterAll(() => server.close());
+
+// ────── Existing tests ──────
 
 describe('useSystemHealth', () => {
   it('fetches system health', async () => {
-    const { result } = renderHook(() => useSystemHealth(), { wrapper: createWrapper() });
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useSystemHealth(), { wrapper: Wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data!.status).toBe('UP');
   });
 
   it('returns loading state initially', () => {
-    const { result } = renderHook(() => useSystemHealth(), { wrapper: createWrapper() });
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useSystemHealth(), { wrapper: Wrapper });
     expect(result.current.isLoading).toBe(true);
   });
 });
 
 describe('useSystemInfo', () => {
   it('fetches system info', async () => {
-    const { result } = renderHook(() => useSystemInfo(), { wrapper: createWrapper() });
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useSystemInfo(), { wrapper: Wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data!.version).toBe('0.5.0');
   });
@@ -38,7 +97,8 @@ describe('useSystemInfo', () => {
 
 describe('useAiProviders', () => {
   it('fetches AI providers', async () => {
-    const { result } = renderHook(() => useAiProviders(), { wrapper: createWrapper() });
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useAiProviders(), { wrapper: Wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data!.providers).toContain('CLAUDE');
     expect(result.current.data!.default).toBe('CLAUDE');
@@ -47,7 +107,8 @@ describe('useAiProviders', () => {
 
 describe('useBackupList', () => {
   it('fetches backup list', async () => {
-    const { result } = renderHook(() => useBackupList(), { wrapper: createWrapper() });
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useBackupList(), { wrapper: Wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toHaveLength(1);
     expect(result.current.data![0].name).toBe('backup1');
@@ -56,7 +117,8 @@ describe('useBackupList', () => {
 
 describe('useExecutionConfig', () => {
   it('fetches execution config', async () => {
-    const { result } = renderHook(() => useExecutionConfig(), { wrapper: createWrapper() });
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useExecutionConfig(), { wrapper: Wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data!.claudeMaxConcurrentCalls).toBe(5);
   });
@@ -64,20 +126,304 @@ describe('useExecutionConfig', () => {
 
 describe('useUpdateExecutionConfig', () => {
   it('updates execution config via mutation', async () => {
-    const { result } = renderHook(() => useUpdateExecutionConfig(), { wrapper: createWrapper() });
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useUpdateExecutionConfig(), { wrapper: Wrapper });
     await act(async () => {
       result.current.mutate({ executionMaxConcurrent: 5, claudeMaxConcurrentCalls: 5, claudeReservedForInteractive: 1, claudeTimeoutSeconds: 300, claudeInterCallDelayMs: 0, chainWorkflowTimeoutMinutes: 30, rateLimitEnabled: 1, rateLimitRequestsPerMinute: 120, assistantChatTimeoutSeconds: 240 });
     });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
   });
+
+  it('shows error toast when update fails', async () => {
+    server.use(
+      http.put(`${apiBase}/system/execution-config`, () =>
+        HttpResponse.json({ error: 'server error' }, { status: 500 }),
+      ),
+    );
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useUpdateExecutionConfig(), { wrapper: Wrapper });
+    await expect(
+      act(async () => {
+        await result.current.mutateAsync({ executionMaxConcurrent: 5, claudeMaxConcurrentCalls: 5, claudeReservedForInteractive: 1, claudeTimeoutSeconds: 300, claudeInterCallDelayMs: 0, chainWorkflowTimeoutMinutes: 30, rateLimitEnabled: 1, rateLimitRequestsPerMinute: 120, assistantChatTimeoutSeconds: 240 });
+      }),
+    ).rejects.toBeDefined();
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalled());
+  });
 });
 
 describe('useUpdateSystemSetting', () => {
   it('updates a system setting via mutation', async () => {
-    const { result } = renderHook(() => useUpdateSystemSetting(), { wrapper: createWrapper() });
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useUpdateSystemSetting(), { wrapper: Wrapper });
     await act(async () => {
       result.current.mutate({ key: 'test', value: 'val' });
     });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  });
+});
+
+// ────── New tests ──────
+
+describe('useRemoteAccessStatus', () => {
+  it('fetches remote access status', async () => {
+    server.use(
+      http.get(`${apiBase}/system/remote-access/status`, () =>
+        HttpResponse.json({ enabled: true, port: 9090 }),
+      ),
+    );
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useRemoteAccessStatus(), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data!.enabled).toBe(true);
+  });
+});
+
+describe('useEnableRemoteAccess', () => {
+  it('calls enable endpoint and invalidates remote-access queries', async () => {
+    server.use(
+      http.post(`${apiBase}/system/remote-access/enable`, () =>
+        HttpResponse.json({ enabled: true, port: 9090 }),
+      ),
+    );
+    const { Wrapper, client } = createWrapper();
+    const invalidateSpy = vi.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(() => useEnableRemoteAccess(), { wrapper: Wrapper });
+    await act(async () => {
+      await result.current.mutateAsync();
+    });
+    expect(result.current.isSuccess).toBe(true);
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ['system', 'remote-access'] }),
+    );
+  });
+});
+
+describe('useDisableRemoteAccess', () => {
+  it('calls disable endpoint and invalidates remote-access queries', async () => {
+    server.use(
+      http.post(`${apiBase}/system/remote-access/disable`, () =>
+        HttpResponse.json({ enabled: false }),
+      ),
+    );
+    const { Wrapper, client } = createWrapper();
+    const invalidateSpy = vi.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(() => useDisableRemoteAccess(), { wrapper: Wrapper });
+    await act(async () => {
+      await result.current.mutateAsync();
+    });
+    expect(result.current.isSuccess).toBe(true);
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ['system', 'remote-access'] }),
+    );
+  });
+});
+
+describe('usePiCatalog', () => {
+  it('fetches PI catalog with all fields', async () => {
+    const catalogData = {
+      installed: true,
+      authenticatedProviders: ['anthropic'],
+      customProviders: [],
+      defaultProvider: 'anthropic',
+      defaultModel: 'claude-sonnet-4-6',
+    };
+    server.use(
+      http.get(`${apiBase}/system/ai-providers/PI/catalog`, () =>
+        HttpResponse.json(catalogData),
+      ),
+    );
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => usePiCatalog(), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data!.installed).toBe(true);
+    expect(result.current.data!.authenticatedProviders).toEqual(['anthropic']);
+    expect(result.current.data!.customProviders).toEqual([]);
+    expect(result.current.data!.defaultProvider).toBe('anthropic');
+    expect(result.current.data!.defaultModel).toBe('claude-sonnet-4-6');
+  });
+
+  it('exposes error when request fails', async () => {
+    server.use(
+      http.get(`${apiBase}/system/ai-providers/PI/catalog`, () =>
+        HttpResponse.json({ error: 'catalog unavailable' }, { status: 500 }),
+      ),
+    );
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => usePiCatalog(), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+});
+
+describe('useAssistantModelSetting', () => {
+  it('returns model value from settings', async () => {
+    server.use(
+      http.get(`${apiBase}/system/settings/assistant-model`, () =>
+        HttpResponse.json({ value: 'claude-sonnet-4-6' }),
+      ),
+    );
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useAssistantModelSetting(), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toBe('claude-sonnet-4-6');
+  });
+
+  it('returns empty string when value is null', async () => {
+    server.use(
+      http.get(`${apiBase}/system/settings/assistant-model`, () =>
+        HttpResponse.json({ value: null }),
+      ),
+    );
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useAssistantModelSetting(), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toBe('');
+  });
+});
+
+describe('useAutoRepairModeSetting', () => {
+  it('returns setting value from server', async () => {
+    server.use(
+      http.get(`${apiBase}/system/settings/auto-repair-mode`, () =>
+        HttpResponse.json({ value: 'manual' }),
+      ),
+    );
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useAutoRepairModeSetting(), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toBe('manual');
+  });
+
+  it('returns auto as default when value is empty string', async () => {
+    server.use(
+      http.get(`${apiBase}/system/settings/auto-repair-mode`, () =>
+        HttpResponse.json({ value: '' }),
+      ),
+    );
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useAutoRepairModeSetting(), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toBe('auto');
+  });
+});
+
+describe('useSuggestionsModelSetting', () => {
+  it('returns model value from settings', async () => {
+    server.use(
+      http.get(`${apiBase}/system/settings/suggestions-model`, () =>
+        HttpResponse.json({ value: 'claude-haiku-4-5' }),
+      ),
+    );
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useSuggestionsModelSetting(), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toBe('claude-haiku-4-5');
+  });
+
+  it('returns empty string when value is null', async () => {
+    server.use(
+      http.get(`${apiBase}/system/settings/suggestions-model`, () =>
+        HttpResponse.json({ value: null }),
+      ),
+    );
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useSuggestionsModelSetting(), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toBe('');
+  });
+});
+
+describe('useAssistantThinkingPhrases', () => {
+  it('parses plain JSON array format', async () => {
+    server.use(
+      http.get(`${apiBase}/system/settings/assistant-thinking-phrases`, () =>
+        HttpResponse.json({ value: '["A","B"]' }),
+      ),
+    );
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useAssistantThinkingPhrases(), { wrapper: Wrapper });
+    // placeholderData makes isSuccess true immediately — wait until real data arrives
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+      expect(result.current.isPlaceholderData).toBe(false);
+    });
+    expect(result.current.data).toEqual(['A', 'B']);
+  });
+
+  it('resolves correct locale from keyed map', async () => {
+    server.use(
+      http.get(`${apiBase}/system/settings/assistant-thinking-phrases`, () =>
+        HttpResponse.json({ value: '{"de":["X"],"en":["Y"]}' }),
+      ),
+    );
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useAssistantThinkingPhrases(), { wrapper: Wrapper });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+      expect(result.current.isPlaceholderData).toBe(false);
+    });
+    expect(result.current.data).toEqual(['X']);
+  });
+
+  it('returns placeholderData before fetch resolves', () => {
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useAssistantThinkingPhrases(), { wrapper: Wrapper });
+    expect(result.current.data).toBeDefined();
+    expect(Array.isArray(result.current.data)).toBe(true);
+  });
+});
+
+describe('useRepairAllFailed', () => {
+  it('shows success toast with queued count', async () => {
+    server.use(
+      http.post(`${apiBase}/system/repair-failed`, () =>
+        HttpResponse.json({ queued: 3 }),
+      ),
+    );
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useRepairAllFailed(), { wrapper: Wrapper });
+    await act(async () => {
+      await result.current.mutateAsync(false);
+    });
+    expect(mocks.toastSuccess).toHaveBeenCalledWith(expect.stringContaining('3'));
+  });
+
+  it('shows error toast when repair fails', async () => {
+    server.use(
+      http.post(`${apiBase}/system/repair-failed`, () =>
+        HttpResponse.json({ error: 'server error' }, { status: 500 }),
+      ),
+    );
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useRepairAllFailed(), { wrapper: Wrapper });
+    await expect(
+      act(async () => {
+        await result.current.mutateAsync(false);
+      }),
+    ).rejects.toBeDefined();
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalled());
+  });
+});
+
+describe('useBrowseDirectory', () => {
+  it('does not fetch when path is null', () => {
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useBrowseDirectory(null), { wrapper: Wrapper });
+    expect(result.current.fetchStatus).toBe('idle');
+    expect(result.current.data).toBeUndefined();
+  });
+
+  it('fetches directory entries for a given path', async () => {
+    server.use(
+      http.get(`${apiBase}/system/browse`, ({ request }) => {
+        const url = new URL(request.url);
+        expect(url.searchParams.get('path')).toBe('/tmp');
+        return HttpResponse.json({ path: '/tmp', entries: [{ name: 'foo', type: 'DIRECTORY' }] });
+      }),
+    );
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useBrowseDirectory('/tmp'), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data!.entries).toHaveLength(1);
+    expect(result.current.data!.entries[0].name).toBe('foo');
   });
 });
