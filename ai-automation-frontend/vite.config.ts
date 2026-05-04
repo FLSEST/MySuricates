@@ -78,5 +78,19 @@ export default defineConfig(() => {
         },
       },
     },
+    build: {
+      chunkSizeWarningLimit: 600,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            react: ['react', 'react-dom', 'react-router-dom'],
+            query: ['@tanstack/react-query'],
+            ws: ['@stomp/stompjs', 'sockjs-client'],
+            markdown: ['react-markdown', 'remark-gfm'],
+            dnd: ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
+          },
+        },
+      },
+    },
   };
 });
