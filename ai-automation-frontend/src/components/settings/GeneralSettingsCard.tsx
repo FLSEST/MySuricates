@@ -14,6 +14,19 @@ function modelOptionsForProvider(provider: string): { value: string; label: stri
         { value: 'o3', label: 'o3' },
         { value: 'o4-mini', label: 'o4-mini' },
       ];
+    case 'PI':
+      // pi routes via "<backend>/<model>" — these are useful presets across the major backends.
+      // Users can type any other backend/model combo into the workflow.model field directly.
+      return [
+        { value: '', label: 'Standard (pi-Default-Backend)' },
+        { value: 'anthropic/claude-sonnet-4-6', label: 'Anthropic · Sonnet 4.6' },
+        { value: 'anthropic/claude-opus-4-6', label: 'Anthropic · Opus 4.6' },
+        { value: 'openai/gpt-4o', label: 'OpenAI · GPT-4o' },
+        { value: 'openai/o3', label: 'OpenAI · o3' },
+        { value: 'google/gemini-2.0-flash', label: 'Google · Gemini 2.0 Flash' },
+        { value: 'xai/grok-2', label: 'xAI · Grok 2' },
+        { value: 'groq/llama-3.3-70b-versatile', label: 'Groq · Llama 3.3 70B' },
+      ];
     default:
       return [
         { value: '', label: 'Standard (Provider-Standard)' },
@@ -103,7 +116,7 @@ export function GeneralSettingsCard() {
             }}
             options={(aiProviders?.providers || []).map((p: string) => ({
               value: p,
-              label: p === 'CLAUDE' ? 'Claude CLI' : p === 'CODEX' ? 'Codex CLI' : p,
+              label: p === 'CLAUDE' ? 'Claude CLI' : p === 'CODEX' ? 'Codex CLI' : p === 'PI' ? 'pi (Mario Zechner)' : p,
             }))}
           />
         </div>

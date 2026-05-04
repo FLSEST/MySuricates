@@ -257,6 +257,7 @@ export function WorkflowMemoryPanel({ workflowId, runs }: Props) {
               options={[
                 { value: 'CLAUDE', label: 'Claude' },
                 { value: 'CODEX', label: 'Codex (OpenAI)' },
+                { value: 'PI', label: 'pi (Mario Zechner)' },
               ]}
             />
           </div>

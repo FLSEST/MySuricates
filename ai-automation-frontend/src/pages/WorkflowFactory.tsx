@@ -225,6 +225,7 @@ export function WorkflowFactory() {
                 { value: '', label: t.factory.providerDefault },
                 { value: 'CLAUDE', label: 'Claude' },
                 { value: 'CODEX', label: 'Codex' },
+                { value: 'PI', label: 'pi (Mario Zechner)' },
               ]}
               value={provider}
               onChange={e => setProvider(e.target.value)}

@@ -120,7 +120,7 @@ export function WorkflowDetailSidebar({
             { value: '', label: t.workflows.providerDefault },
             ...(aiProviders?.providers ?? []).map((p) => ({
               value: p,
-              label: p === 'CLAUDE' ? 'Claude CLI' : p === 'CODEX' ? 'Codex CLI' : p,
+              label: p === 'CLAUDE' ? 'Claude CLI' : p === 'CODEX' ? 'Codex CLI' : p === 'PI' ? 'pi (Mario Zechner)' : p,
             })),
           ]}
         />

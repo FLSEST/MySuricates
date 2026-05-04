@@ -94,6 +94,13 @@ automation:
     inter-call-delay-ms: ${AUTOMATION_HOST_CLAUDE_INTER_CALL_DELAY_MS:0}
     max-concurrent-calls: ${AUTOMATION_HOST_CLAUDE_MAX_CONCURRENT_CALLS:5}
     reserved-for-interactive: ${AUTOMATION_HOST_CLAUDE_RESERVED_INTERACTIVE:1}
+  host-pi:
+    timeout-seconds: ${AUTOMATION_HOST_PI_TIMEOUT:300}
+    inter-call-delay-ms: ${AUTOMATION_HOST_PI_INTER_CALL_DELAY_MS:0}
+    max-concurrent-calls: ${AUTOMATION_HOST_PI_MAX_CONCURRENT_CALLS:5}
+    reserved-for-interactive: ${AUTOMATION_HOST_PI_RESERVED_INTERACTIVE:1}
+    default-backend-provider: ${AUTOMATION_HOST_PI_BACKEND:anthropic}
+    default-thinking-level: ${AUTOMATION_HOST_PI_THINKING:medium}
   todo-trigger:
     poll-interval-ms: ${AUTOMATION_TODO_TRIGGER_POLL_MS:300000}
   chain:

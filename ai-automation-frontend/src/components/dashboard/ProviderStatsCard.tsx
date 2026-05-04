@@ -9,6 +9,7 @@ interface ProviderStatsCardProps {
 const PROVIDER_COLORS: Record<string, string> = {
   CLAUDE: 'bg-accent',
   CODEX: 'bg-violet-500',
+  PI: 'bg-amber-500',
 };
 
 function providerColor(provider: string): string {
