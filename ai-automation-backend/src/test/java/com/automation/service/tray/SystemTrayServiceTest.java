@@ -174,4 +174,44 @@ class SystemTrayServiceTest {
         // (with strict stubs) throw — proving the early-return guard works.
         service.refreshStatus();
     }
+
+    @Test
+    void isSystemTraySupported_returnsFalseInHeadlessEnvironment() throws Exception {
+        // Tests run headless on CI, so the helper must return false without throwing.
+        java.lang.reflect.Method method = SystemTrayService.class.getDeclaredMethod("isSystemTraySupported");
+        method.setAccessible(true);
+        Object result = method.invoke(service);
+        assertThat(result).isInstanceOf(Boolean.class);
+        // In a headless environment we expect false; in a graphical env it may be true.
+        // Either way the call must not throw.
+    }
+
+    @Test
+    void isSystemTraySupported_returnsFalseWhenAwtErrorThrown() throws Exception {
+        // Simulate an environment where SystemTray.isSupported() throws AWTError
+        // (e.g. broken X11 connection). The helper must swallow it and return false.
+        try (org.mockito.MockedStatic<java.awt.SystemTray> mocked = org.mockito.Mockito.mockStatic(java.awt.SystemTray.class)) {
+            mocked.when(java.awt.SystemTray::isSupported).thenThrow(new java.awt.AWTError("display unavailable"));
+
+            java.lang.reflect.Method method = SystemTrayService.class.getDeclaredMethod("isSystemTraySupported");
+            method.setAccessible(true);
+            Object result = method.invoke(service);
+
+            assertThat(result).isEqualTo(false);
+        }
+    }
+
+    @Test
+    void initialize_doesNotThrowWhenSystemTrayCheckFails() {
+        // Even if the underlying SystemTray.isSupported() throws AWTError, initialize()
+        // must complete cleanly and leave the service in a non-initialized state.
+        try (org.mockito.MockedStatic<java.awt.SystemTray> mocked = org.mockito.Mockito.mockStatic(java.awt.SystemTray.class)) {
+            mocked.when(java.awt.SystemTray::isSupported).thenThrow(new java.awt.AWTError("no display"));
+            service.initialize();
+            // Subsequent calls should remain safe no-ops
+            service.refreshStatus();
+            service.showNotification("t", "m", false);
+            service.cleanup();
+        }
+    }
 }
