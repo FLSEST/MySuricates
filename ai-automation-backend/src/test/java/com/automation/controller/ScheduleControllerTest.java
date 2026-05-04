@@ -1,7 +1,9 @@
 package com.automation.controller;
 
 import com.automation.config.RateLimitConfig;
+import com.automation.dto.request.UpdateScheduleRequest;
 import com.automation.dto.response.ScheduledWorkflowResponse;
+import com.automation.dto.response.UpcomingScheduleResponse;
 import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.ScheduledWorkflow.ScheduleType;
 import com.automation.entity.Workflow;
@@ -10,6 +12,7 @@ import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.ChainMapper;
 import com.automation.mapper.ScheduleMapper;
 import com.automation.mapper.WorkflowMapper;
+import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.scheduler.SchedulerService;
 import com.automation.service.system.ApiKeyService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -31,7 +34,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-import com.automation.service.activitylog.ActivityLogService;
 
 @WebMvcTest(ScheduleController.class)
 @Import(GlobalExceptionHandler.class)
@@ -251,5 +253,146 @@ class ScheduleControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(schedulerService).delete("sched-1");
+    }
+
+    @Test
+    void getRemainingToday_returnsCountAndSchedules() throws Exception {
+        var run = new UpcomingScheduleResponse.UpcomingRun(
+                "sched-1", "Test Workflow", null, null, null, "WORKFLOW",
+                Instant.parse("2026-02-16T10:00:00Z"));
+        when(schedulerService.getRemainingToday()).thenReturn(new UpcomingScheduleResponse(1, List.of(run)));
+
+        mockMvc.perform(get("/api/v1/schedules/remaining-today"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1))
+                .andExpect(jsonPath("$.schedules[0].scheduleId").value("sched-1"))
+                .andExpect(jsonPath("$.schedules[0].workflowName").value("Test Workflow"));
+    }
+
+    @Test
+    void getRemainingThisWeek_returnsCountAndSchedules() throws Exception {
+        when(schedulerService.getRemainingThisWeek()).thenReturn(new UpcomingScheduleResponse(0, List.of()));
+
+        mockMvc.perform(get("/api/v1/schedules/remaining-this-week"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(0))
+                .andExpect(jsonPath("$.schedules").isArray());
+    }
+
+    @Test
+    void getScheduleRuns_returnsBothWorkflowAndChainRuns() throws Exception {
+        when(schedulerService.findWorkflowRunsByScheduleId("sched-1")).thenReturn(List.of());
+        when(schedulerService.findChainRunsByScheduleId("sched-1")).thenReturn(List.of());
+        when(workflowMapper.toRunResponseList(any())).thenReturn(List.of());
+        when(chainMapper.toRunResponseList(any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/schedules/sched-1/runs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.workflowRuns").isArray())
+                .andExpect(jsonPath("$.chainRuns").isArray());
+    }
+
+    @Test
+    void getByChain_returnsOk() throws Exception {
+        when(schedulerService.findByChainId("chain-1")).thenReturn(List.of(testScheduled));
+        when(scheduleMapper.toResponseList(any())).thenReturn(List.of(testResponse));
+
+        mockMvc.perform(get("/api/v1/schedules/chain/chain-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value("sched-1"));
+    }
+
+    @Test
+    void previewCron_validExpression_returnsNextRuns() throws Exception {
+        Instant next = Instant.parse("2026-02-16T01:00:00Z");
+        when(schedulerService.getNextRuns("0 0 * * * *", 5)).thenReturn(List.of(next));
+
+        mockMvc.perform(post("/api/v1/schedules/preview")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cronExpression\": \"0 0 * * * *\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.runs").isArray())
+                .andExpect(jsonPath("$.runs[0]").exists());
+    }
+
+    @Test
+    void previewCron_invalidExpression_returns400WithError() throws Exception {
+        when(schedulerService.getNextRuns("not-valid", 5))
+                .thenThrow(new IllegalArgumentException("Invalid cron expression: not-valid"));
+
+        mockMvc.perform(post("/api/v1/schedules/preview")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cronExpression\": \"not-valid\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").exists());
+    }
+
+    @Test
+    void previewCron_missingExpression_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/schedules/preview")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("cronExpression is required"));
+    }
+
+    @Test
+    void updateSchedule_returnsOk() throws Exception {
+        when(schedulerService.update(any(), any(UpdateScheduleRequest.class))).thenReturn(testScheduled);
+        when(scheduleMapper.toResponse(testScheduled)).thenReturn(testResponse);
+
+        mockMvc.perform(put("/api/v1/schedules/sched-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cronExpression\": \"0 0 12 * * *\", \"description\": \"Updated\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("sched-1"));
+    }
+
+    @Test
+    void updateSchedule_nonExistent_returns404() throws Exception {
+        when(schedulerService.update(any(), any(UpdateScheduleRequest.class)))
+                .thenThrow(new ResourceNotFoundException("ScheduledWorkflow", "unknown"));
+
+        mockMvc.perform(put("/api/v1/schedules/unknown")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cronExpression\": \"0 0 12 * * *\"}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getCalendarData_returnsUpcomingAndPastRuns() throws Exception {
+        when(schedulerService.findSchedulesInRange(any(), any())).thenReturn(List.of(testScheduled));
+        when(schedulerService.findWorkflowRunsBetween(any(), any())).thenReturn(List.of());
+        when(scheduleMapper.toResponseList(any())).thenReturn(List.of(testResponse));
+        when(workflowMapper.toRunResponseList(any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/schedules/calendar")
+                        .param("from", "2026-02-16T00:00:00Z")
+                        .param("to", "2026-02-23T00:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.upcoming").isArray())
+                .andExpect(jsonPath("$.pastRuns").isArray());
+    }
+
+    @Test
+    void getMaintenanceMode_returnsEnabledFalse() throws Exception {
+        when(schedulerService.isMaintenanceMode()).thenReturn(false);
+
+        mockMvc.perform(get("/api/v1/schedules/maintenance"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(false));
+    }
+
+    @Test
+    void setMaintenanceMode_enablesAndReturnsEnabled() throws Exception {
+        doNothing().when(schedulerService).setMaintenanceMode(true);
+
+        mockMvc.perform(post("/api/v1/schedules/maintenance")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\": true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(true));
+
+        verify(schedulerService).setMaintenanceMode(true);
     }
 }
