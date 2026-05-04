@@ -1143,4 +1143,138 @@ class WorkflowExecutorTest {
         assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
         verify(broadcaster).broadcastRunStatus("run-1", RunStatus.COMPLETED);
     }
+
+    // --- Group G: Block-type dispatching (shell/agentic/foreach/conditional) ---
+
+    @Test
+    void execute_shellBlock_dispatchesToShellExecutor() {
+        BlockExecutor shellExec = mock(BlockExecutor.class);
+        lenient().when(shellExec.supports("shell")).thenReturn(true);
+        when(shellExec.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(StepResult.builder()
+                        .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build());
+
+        testWorkflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder().type("shell")
+                        .config(new HashMap<>(Map.of("command", "echo hi"))).build()
+        )));
+
+        WorkflowExecutor exec = buildExecutor(List.of(shellExec), new DynamicSemaphore(10));
+        exec.execute(testWorkflow, null);
+
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
+        verify(shellExec, atLeastOnce()).execute(any(BlockDefinition.class), any(ExecutionContext.class));
+    }
+
+    @Test
+    void execute_agenticBlock_dispatchesToAgenticExecutor() {
+        BlockExecutor agenticExec = mock(BlockExecutor.class);
+        lenient().when(agenticExec.supports("agentic")).thenReturn(true);
+        when(agenticExec.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(StepResult.builder()
+                        .stepIndex(0).status(StepStatus.COMPLETED).output("agentic done").build());
+
+        testWorkflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder().type("agentic")
+                        .config(new HashMap<>(Map.of("prompt", "do something"))).build()
+        )));
+
+        WorkflowExecutor exec = buildExecutor(List.of(agenticExec), new DynamicSemaphore(10));
+        exec.execute(testWorkflow, null);
+
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
+        verify(agenticExec, atLeastOnce()).execute(any(BlockDefinition.class), any(ExecutionContext.class));
+    }
+
+    @Test
+    void execute_foreachBlock_dispatchesToForeachExecutor() {
+        BlockExecutor foreachExec = mock(BlockExecutor.class);
+        lenient().when(foreachExec.supports("foreach")).thenReturn(true);
+        when(foreachExec.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(StepResult.builder()
+                        .stepIndex(0).status(StepStatus.COMPLETED).output("foreach done").build());
+
+        testWorkflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder().type("foreach")
+                        .config(new HashMap<>(Map.of("items", List.of("a", "b")))).build()
+        )));
+
+        WorkflowExecutor exec = buildExecutor(List.of(foreachExec), new DynamicSemaphore(10));
+        exec.execute(testWorkflow, null);
+
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
+        verify(foreachExec, atLeastOnce()).execute(any(BlockDefinition.class), any(ExecutionContext.class));
+    }
+
+    @Test
+    void execute_conditionalBlock_dispatchesToConditionalExecutor() {
+        BlockExecutor conditionalExec = mock(BlockExecutor.class);
+        lenient().when(conditionalExec.supports("conditional")).thenReturn(true);
+        when(conditionalExec.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(StepResult.builder()
+                        .stepIndex(0).status(StepStatus.COMPLETED).output("condition met").build());
+
+        testWorkflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder().type("conditional")
+                        .config(new HashMap<>(Map.of("condition", "true"))).build()
+        )));
+
+        WorkflowExecutor exec = buildExecutor(List.of(conditionalExec), new DynamicSemaphore(10));
+        exec.execute(testWorkflow, null);
+
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
+        verify(conditionalExec, atLeastOnce()).execute(any(BlockDefinition.class), any(ExecutionContext.class));
+    }
+
+    @Test
+    void execute_unknownBlockType_runFails() {
+        testWorkflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder().type("nonexistent-type")
+                        .config(new HashMap<>()).build()
+        )));
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
+    }
+
+    @Test
+    void execute_blockExecutorThrowsRuntimeException_runFails() {
+        BlockExecutor flaky = mock(BlockExecutor.class);
+        lenient().when(flaky.supports("simple")).thenReturn(true);
+        when(flaky.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenThrow(new RuntimeException("Timeout after 30s"));
+
+        WorkflowExecutor exec = buildExecutor(List.of(flaky), new DynamicSemaphore(10));
+        exec.execute(testWorkflow, null);
+
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(saved.getError()).isNotNull();
+    }
+
+    @Test
+    void execute_foreachBlockReturnsFailure_parentRunFails() {
+        BlockExecutor foreachExec = mock(BlockExecutor.class);
+        lenient().when(foreachExec.supports("foreach")).thenReturn(true);
+        when(foreachExec.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(StepResult.builder()
+                        .stepIndex(0).status(StepStatus.FAILED).output("iteration 2 failed").build());
+
+        testWorkflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder().type("foreach")
+                        .config(new HashMap<>(Map.of("items", List.of("a", "b")))).build()
+        )));
+
+        WorkflowExecutor exec = buildExecutor(List.of(foreachExec), new DynamicSemaphore(10));
+        exec.execute(testWorkflow, null);
+
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
+    }
 }
