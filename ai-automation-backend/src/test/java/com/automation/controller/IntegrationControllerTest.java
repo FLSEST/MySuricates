@@ -25,8 +25,10 @@ import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -146,6 +148,64 @@ class IntegrationControllerTest {
                 .andExpect(jsonPath("$.providerId").value("google-calendar"));
 
         verify(oAuthService).saveCredentials("google-calendar", "client-1", "secret-1");
+    }
+
+    @Test
+    void handleCallback_returnsError_whenStateInvalid() throws Exception {
+        when(oAuthService.handleCallback(eq("code-x"), eq("bad-state"), any()))
+                .thenThrow(new IllegalArgumentException("Invalid or expired OAuth state"));
+
+        mockMvc.perform(get("/api/v1/integrations/google-calendar/callback")
+                        .param("code", "code-x")
+                        .param("state", "bad-state"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"));
+    }
+
+    @Test
+    void disconnect_returnsNoContent_whenProviderConnected() throws Exception {
+        mockMvc.perform(delete("/api/v1/integrations/google-calendar/connection"))
+                .andExpect(status().isNoContent());
+
+        verify(oAuthService).disconnect("google-calendar");
+    }
+
+    @Test
+    void testAction_returns400_whenProviderUnknown() throws Exception {
+        when(registry.getProvider("unknown"))
+                .thenThrow(new IllegalArgumentException("Unknown integration provider: unknown"));
+
+        mockMvc.perform(post("/api/v1/integrations/unknown/actions/list_events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"));
+    }
+
+    @Test
+    void testAction_returns409_whenCredentialsMissing() throws Exception {
+        IntegrationProvider provider = provider("google-calendar");
+        when(registry.getProvider("google-calendar")).thenReturn(provider);
+        when(oAuthService.getValidAccessToken("google-calendar"))
+                .thenThrow(new IllegalStateException("No connection for provider: google-calendar"));
+
+        mockMvc.perform(post("/api/v1/integrations/google-calendar/actions/list_events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("STATE_CONFLICT"));
+    }
+
+    @Test
+    void getActions_returnsAvailableActions_forProvider() throws Exception {
+        IntegrationProvider provider = provider("google-calendar");
+        when(registry.getProvider("google-calendar")).thenReturn(provider);
+        when(oAuthService.getConnection("google-calendar")).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/v1/integrations/google-calendar/actions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name").value("list_events"))
+                .andExpect(jsonPath("$[0].description").value("List events"));
     }
 
     private IntegrationProvider provider(String providerId) {
