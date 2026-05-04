@@ -6,7 +6,7 @@ import { GateStatusBadge } from '../shared/GateStatusBadge';
 import { Pagination } from '../shared/Pagination';
 import { WorkflowMemoryPanel } from './WorkflowMemoryPanel';
 import { useUpdateWorkflow, useWorkflowRuns } from '../../hooks/useWorkflows';
-import { useAiProviders } from '../../hooks/useSystem';
+import { useAiProviders, usePiCatalog } from '../../hooks/useSystem';
 import { useT } from '../../i18n';
 import { formatDuration } from '../../utils/formatTime';
 import { modelOptionsForProvider, isFreeTextModelProvider } from '../../utils/aiProviderModels';
@@ -34,8 +34,29 @@ export function WorkflowDetailSidebar({
   const t = useT();
   const updateWorkflow = useUpdateWorkflow();
   const { data: aiProviders } = useAiProviders();
+  const isPi = isFreeTextModelProvider(workflow.provider);
+  const { data: piCatalog } = usePiCatalog();
   const [runPage, setRunPage] = useState(0);
   const { data: runs } = useWorkflowRuns(workflow.id, runPage, RUN_PAGE_SIZE);
+
+  // For PI: filter the static preset list down to backends the user actually has
+  // configured locally (auth.json or custom models.json). Avoids offering options
+  // that would fail at runtime with "No API key found for …".
+  const piPresets = isPi
+    ? (() => {
+        const allowed = new Set<string>([
+          ...(piCatalog?.authenticatedProviders ?? []),
+          ...(piCatalog?.customProviders ?? []),
+        ]);
+        const all = modelOptionsForProvider('PI').filter((opt) => opt.value !== '');
+        return allowed.size > 0
+          ? all.filter((opt) => {
+              const backend = opt.value.split('/')[0] ?? '';
+              return allowed.has(backend);
+            })
+          : all;
+      })()
+    : [];
 
   return (
     <div className="space-y-4">
@@ -111,7 +132,7 @@ export function WorkflowDetailSidebar({
 
       <Card>
         <CardHeader title={t.workflows.model} />
-        {isFreeTextModelProvider(workflow.provider) ? (
+        {isPi ? (
           <>
             <Input
               list="pi-model-suggestions"
@@ -122,12 +143,34 @@ export function WorkflowDetailSidebar({
               placeholder="<backend>/<model-id>  z.B. anthropic/claude-sonnet-4-6"
             />
             <datalist id="pi-model-suggestions">
-              {modelOptionsForProvider('PI')
-                .filter((opt) => opt.value !== '')
-                .map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
+              {piPresets.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
             </datalist>
+            {piCatalog && piCatalog.installed && (
+              <div className="text-xs text-text-tertiary mt-2 space-y-1">
+                {piCatalog.authenticatedProviders.length > 0 && (
+                  <p>
+                    Authentifiziert: <span className="font-mono">{piCatalog.authenticatedProviders.join(', ')}</span>
+                  </p>
+                )}
+                {piCatalog.customProviders.length > 0 && (
+                  <p>
+                    Custom (~/.pi/agent/models.json): <span className="font-mono">{piCatalog.customProviders.join(', ')}</span>
+                  </p>
+                )}
+                {piCatalog.defaultProvider && (
+                  <p>
+                    pi-Default: <span className="font-mono">{piCatalog.defaultProvider}{piCatalog.defaultModel ? `/${piCatalog.defaultModel}` : ''}</span> (wird genutzt wenn das Feld leer bleibt)
+                  </p>
+                )}
+              </div>
+            )}
+            {piCatalog && !piCatalog.installed && (
+              <p className="text-xs text-warning mt-2">
+                pi nicht gefunden in ~/.pi/agent — bitte einmalig <code className="font-mono">pi /login</code> ausführen.
+              </p>
+            )}
           </>
         ) : (
           <Select

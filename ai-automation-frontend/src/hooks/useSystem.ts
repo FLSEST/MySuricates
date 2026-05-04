@@ -56,6 +56,22 @@ export function useAiProviders() {
   });
 }
 
+export interface PiCatalog {
+  installed: boolean;
+  authenticatedProviders: string[];
+  customProviders: string[];
+  defaultProvider: string | null;
+  defaultModel: string | null;
+}
+
+export function usePiCatalog() {
+  return useQuery({
+    queryKey: ['system', 'ai-providers', 'PI', 'catalog'],
+    queryFn: () => api.get<PiCatalog>('/system/ai-providers/PI/catalog'),
+    staleTime: 60_000, // pi config rarely changes mid-session
+  });
+}
+
 export function useUpdateSystemSetting() {
   return useMutation({
     mutationFn: ({ key, value }: { key: string; value: string }) =>

@@ -37,6 +37,7 @@ public class SystemController {
     private final DataSource dataSource;
     private final SystemIdentityService systemIdentity;
     private final AiProviderRegistry aiProviderRegistry;
+    private final com.automation.service.ai.PiCatalogService piCatalogService;
     private final ExecutionSettingsService executionSettingsService;
     private final SystemSettingsService systemSettingsService;
     private final FileBrowserService fileBrowserService;
@@ -131,6 +132,16 @@ public class SystemController {
                 "providers", aiProviderRegistry.getAvailableProviderIds(),
                 "default", aiProviderRegistry.getDefaultProviderId()
         );
+    }
+
+    /**
+     * Returns the pi runtime catalog read from {@code ~/.pi/agent}: which backend
+     * providers are authenticated, which are custom-defined in models.json, and
+     * what pi's own default-provider/-model is set to.
+     */
+    @GetMapping("/ai-providers/PI/catalog")
+    public com.automation.service.ai.PiCatalogService.PiCatalog piCatalog() {
+        return piCatalogService.getCatalog();
     }
 
     @PostMapping("/repair-failed")

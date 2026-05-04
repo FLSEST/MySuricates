@@ -33,4 +33,10 @@ public class HostPiConfig {
      * Valid values: off, minimal, low, medium, high, xhigh.
      */
     private String defaultThinkingLevel = "medium";
+
+    /**
+     * Directory containing pi's runtime config (auth.json, settings.json, models.json).
+     * Default mirrors pi's own convention: $HOME/.pi/agent.
+     */
+    private String configDir = System.getProperty("user.home") + "/.pi/agent";
 }

@@ -45,5 +45,5 @@ export function modelOptionsForProvider(provider: string | null | undefined): Mo
  * so the model field renders as free-text input with a datalist of suggestions.
  */
 export function isFreeTextModelProvider(provider: string | null | undefined): boolean {
-  return (provider || '').toUpperCase() === 'PI';
+  return ((provider ?? '') as string).toUpperCase() === 'PI';
 }

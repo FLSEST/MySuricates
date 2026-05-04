@@ -68,6 +68,9 @@ class SystemControllerTest {
     private com.automation.service.ai.AiProviderRegistry aiProviderRegistry;
 
     @MockitoBean
+    private com.automation.service.ai.PiCatalogService piCatalogService;
+
+    @MockitoBean
     private ExecutionSettingsService executionSettingsService;
 
     @MockitoBean
