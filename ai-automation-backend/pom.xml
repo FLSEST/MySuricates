@@ -213,6 +213,41 @@
                     <argLine>-javaagent:${net.bytebuddy:byte-buddy-agent:jar}</argLine>
                 </configuration>
             </plugin>
+
+            <!--
+                Wirft die Integration-Test-DB unter /tmp vor jedem Test-Lauf weg.
+                Hintergrund: application-integration.yml nutzt eine file-basierte SQLite-DB,
+                die zwischen Läufen persistiert (gewollt, damit Flyway eine eigene Connection
+                aufbauen kann). Wird ein Test-Lauf gewaltsam beendet (kill -9, OOM, Reboot),
+                bleibt die WAL/Pages inkonsistent zurück und der nächste Bootstrap scheitert
+                mit SQLITE_CORRUPT. Phase process-test-resources läuft vor test/integration-test.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-clean-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>clean-integration-test-db</id>
+                        <phase>process-test-resources</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                        <configuration>
+                            <excludeDefaultDirectories>true</excludeDefaultDirectories>
+                            <filesets>
+                                <fileset>
+                                    <directory>/tmp</directory>
+                                    <includes>
+                                        <include>autotrigger-integrationtest.db</include>
+                                        <include>autotrigger-integrationtest.db-shm</include>
+                                        <include>autotrigger-integrationtest.db-wal</include>
+                                    </includes>
+                                </fileset>
+                            </filesets>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>
