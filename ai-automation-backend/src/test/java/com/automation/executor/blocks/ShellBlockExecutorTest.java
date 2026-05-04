@@ -5,22 +5,32 @@ import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.exception.WorkflowExecutionException;
 import com.automation.executor.ExecutionContext;
+import com.automation.service.cli.ContainerShellService;
 import com.automation.service.cli.ShellCommandService;
 import com.automation.service.cli.ShellCommandService.ShellResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,6 +38,9 @@ class ShellBlockExecutorTest {
 
     @Mock
     private ShellCommandService shellService;
+
+    @Mock
+    private ContainerShellService containerShellService;
 
     @InjectMocks
     private ShellBlockExecutor executor;
@@ -188,5 +201,126 @@ class ShellBlockExecutorTest {
         StepResult result = executor.execute(block, context);
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+    }
+
+    @Test
+    void execute_containerImageProvided_routesToContainerShellService() {
+        when(containerShellService.execute(eq("echo hi"), eq("/test/project"), eq(300),
+                eq("python:3.12"), eq(false), eq(List.of())))
+                .thenReturn(new ShellResult("hi", 0, 20));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("shell")
+                .config(new HashMap<>(Map.of("command", "echo hi", "container_image", "python:3.12")))
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata()).containsEntry("executionMode", "container:python:3.12");
+        verify(shellService, never()).execute(any(), any(), anyInt(), any());
+    }
+
+    @Test
+    void execute_containerImageBlank_fallsBackToShell() {
+        when(shellService.execute(eq("echo hi"), eq("/test/project"), eq(300), any()))
+                .thenReturn(new ShellResult("hi", 0, 10));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("shell")
+                .config(new HashMap<>(Map.of("command", "echo hi", "container_image", "  ")))
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata()).containsEntry("executionMode", "shell");
+        verify(containerShellService, never()).execute(any(), any(), anyInt(), any(), anyBoolean(), any());
+    }
+
+    @Test
+    void execute_mountDockerSocket_propagatedToContainerService() {
+        when(containerShellService.execute(eq("docker ps"), eq("/test/project"), eq(300),
+                eq("automation-agent-devops:latest"), eq(true), eq(List.of())))
+                .thenReturn(new ShellResult("containers", 0, 30));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("shell")
+                .config(new HashMap<>(Map.of(
+                        "command", "docker ps",
+                        "container_image", "automation-agent-devops:latest",
+                        "mount_docker_socket", true
+                )))
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        verify(containerShellService).execute(any(), any(), anyInt(), any(), eq(true), any());
+    }
+
+    @Test
+    void execute_mountsList_resolvedAndPassedToContainer() {
+        context.setVariable("home", "/home/flo");
+        List<String> expectedMounts = List.of("/home/flo/data:/data:ro", "/tmp:/tmp");
+
+        when(containerShellService.execute(eq("ls /data"), eq("/test/project"), eq(300),
+                eq("python:3.12"), eq(false), eq(expectedMounts)))
+                .thenReturn(new ShellResult("files", 0, 15));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("shell")
+                .config(new HashMap<>(Map.of(
+                        "command", "ls /data",
+                        "container_image", "python:3.12",
+                        "mounts", List.of("{{ home }}/data:/data:ro", "/tmp:/tmp")
+                )))
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        verify(containerShellService).execute(any(), any(), anyInt(), any(), anyBoolean(), eq(expectedMounts));
+    }
+
+    @Test
+    void execute_nonZeroExit_outputContainsRecoveryHint() {
+        when(shellService.execute(eq("bad-cmd"), eq("/test/project"), eq(300), any()))
+                .thenReturn(new ShellResult("error msg", 1, 10));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("shell")
+                .config(new HashMap<>(Map.of("command", "bad-cmd")))
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getOutput()).contains("[RECOVERY]");
+    }
+
+    @Test
+    void execute_registersAndClearsProcessForShellPath() {
+        when(shellService.execute(any(), any(), anyInt(), any()))
+                .thenReturn(new ShellResult("out", 0, 10));
+
+        ExecutionContext contextSpy = spy(context);
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("shell")
+                .config(new HashMap<>(Map.of("command", "echo test")))
+                .build();
+
+        executor.execute(block, contextSpy);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Consumer<Process>> consumerCaptor = ArgumentCaptor.forClass(Consumer.class);
+        verify(shellService).execute(any(), any(), anyInt(), consumerCaptor.capture());
+
+        Process mockProcess = mock(Process.class);
+        consumerCaptor.getValue().accept(mockProcess);
+
+        verify(contextSpy).registerProcess(mockProcess);
+        verify(contextSpy).clearProcess();
     }
 }
