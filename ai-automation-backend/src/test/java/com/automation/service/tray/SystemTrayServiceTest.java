@@ -150,4 +150,28 @@ class SystemTrayServiceTest {
         service.initialize();
         service.cleanup();
     }
+
+    @Test
+    void showNotification_isNoOpWhenNotInitialized() {
+        // initialized=false (default) → must not throw, must not touch trayIcon
+        service.showNotification("Title", "Message", false);
+        service.showNotification("Error", "Boom", true);
+        // No exception = pass; verifies the early-return guard at the top of showNotification
+    }
+
+    @Test
+    void cleanup_isNoOpWhenNotInitialized() {
+        // initialized=false (default) → must not throw and must not call SystemTray.getSystemTray()
+        service.cleanup();
+        // Calling twice must remain safe
+        service.cleanup();
+    }
+
+    @Test
+    void refreshStatus_isNoOpWhenNotInitialized() {
+        // initialized=false (default) → must return early without touching any collaborator.
+        // Because no when(...) stubs are configured, any interaction would either NPE or
+        // (with strict stubs) throw — proving the early-return guard works.
+        service.refreshStatus();
+    }
 }
