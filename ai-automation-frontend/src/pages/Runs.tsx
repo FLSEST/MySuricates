@@ -335,17 +335,6 @@ function WorkflowsTab({
   page,
   setPage,
 }: any) {
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Spinner text={t.common.loading} />
-      </div>
-    );
-  }
-  if (error) {
-    return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
-  }
-
   return (
     <>
       {/* Filters */}
@@ -396,7 +385,13 @@ function WorkflowsTab({
       </div>
 
       {/* Table */}
-      {!filteredRuns.length ? (
+      {isLoading ? (
+        <div className="flex items-center justify-center h-64">
+          <Spinner text={t.common.loading} />
+        </div>
+      ) : error ? (
+        <ErrorState message={(error as Error).message} onRetry={() => refetch()} />
+      ) : !filteredRuns.length ? (
         <EmptyState
           icon={<History className="w-8 h-8 text-text-tertiary" />}
           title={t.runs.title}
@@ -441,17 +436,6 @@ function ChainsTab({
   chainPage,
   setChainPage,
 }: any) {
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Spinner text={t.common.loading} />
-      </div>
-    );
-  }
-  if (error) {
-    return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
-  }
-
   return (
     <>
       {/* Filters */}
@@ -480,7 +464,13 @@ function ChainsTab({
       </div>
 
       {/* Table */}
-      {!filteredChainRuns.length ? (
+      {isLoading ? (
+        <div className="flex items-center justify-center h-64">
+          <Spinner text={t.common.loading} />
+        </div>
+      ) : error ? (
+        <ErrorState message={(error as Error).message} onRetry={() => refetch()} />
+      ) : !filteredChainRuns.length ? (
         <EmptyState
           icon={<Link2 className="w-8 h-8 text-text-tertiary" />}
           title={t.nav.chains}
