@@ -33,6 +33,11 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import com.automation.dto.request.UpdateChainRequest;
+import com.automation.dto.response.PageResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import com.automation.service.activitylog.ActivityLogService;
 
 @WebMvcTest(ChainController.class)
@@ -148,5 +153,85 @@ class ChainControllerTest {
         mockMvc.perform(post("/api/v1/chains/runs/r-1/cancel"))
                 .andExpect(status().isOk());
         verify(chainExecutor).cancel("r-1");
+    }
+
+    @Test
+    void updateChain_returnsUpdatedChain() throws Exception {
+        UpdateChainRequest req = new UpdateChainRequest("Renamed", "new desc", null, List.of(), false);
+        var entity = WorkflowChain.builder().id("c-1").build();
+        when(chainService.update(eq("c-1"), any(UpdateChainRequest.class))).thenReturn(entity);
+        when(chainMapper.toResponse(entity)).thenReturn(sampleChain());
+
+        mockMvc.perform(put("/api/v1/chains/c-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("c-1"));
+
+        verify(chainService).update(eq("c-1"), any(UpdateChainRequest.class));
+    }
+
+    @Test
+    void updateChain_returns404_whenChainMissing() throws Exception {
+        UpdateChainRequest req = new UpdateChainRequest("X", null, null, List.of(), null);
+        when(chainService.update(eq("missing"), any(UpdateChainRequest.class)))
+                .thenThrow(new java.util.NoSuchElementException("Chain not found"));
+
+        mockMvc.perform(put("/api/v1/chains/missing")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getChain_returns404_whenChainMissing() throws Exception {
+        when(chainService.findById("missing")).thenThrow(new java.util.NoSuchElementException("not found"));
+
+        mockMvc.perform(get("/api/v1/chains/missing"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void executeChain_returns404_whenChainMissing() throws Exception {
+        when(chainService.findById("missing")).thenThrow(new java.util.NoSuchElementException("not found"));
+
+        mockMvc.perform(post("/api/v1/chains/missing/execute")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getRun_returns404_whenRunMissing() throws Exception {
+        when(chainRunRepository.findById("missing")).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/v1/chains/c-1/runs/missing"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void listAllRuns_returnsPagedResponse() throws Exception {
+        ChainRun run = mock(ChainRun.class);
+        Page<ChainRun> page = new PageImpl<>(List.of(run), Pageable.ofSize(50), 1);
+        when(chainRunRepository.findFiltered(eq(null), eq(null), any(Pageable.class))).thenReturn(page);
+        when(chainMapper.toRunResponseList(any())).thenReturn(List.of(sampleRun()));
+
+        mockMvc.perform(get("/api/v1/chains/runs?page=0&size=50"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value("r-1"))
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
+    void listAllRuns_filtersByStatusAndSearch() throws Exception {
+        Page<ChainRun> page = new PageImpl<>(List.of(), Pageable.ofSize(20), 0);
+        when(chainRunRepository.findFiltered(eq(RunStatus.COMPLETED), eq("foo"), any(Pageable.class))).thenReturn(page);
+        when(chainMapper.toRunResponseList(any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/chains/runs?page=0&size=20&status=completed&search=foo"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+
+        verify(chainRunRepository).findFiltered(eq(RunStatus.COMPLETED), eq("foo"), any(Pageable.class));
     }
 }
