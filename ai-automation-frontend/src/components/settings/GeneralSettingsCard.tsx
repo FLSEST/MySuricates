@@ -4,38 +4,8 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useI18nStore, type Locale } from '../../i18n';
 import { useT } from '../../i18n';
 import { useUpdateSystemSetting, useAiProviders, useAssistantModelSetting, useSuggestionsModelSetting, useAutoRepairModeSetting } from '../../hooks/useSystem';
+import { modelOptionsForProvider } from '../../utils/aiProviderModels';
 import { Globe, Bot, Sparkles } from 'lucide-react';
-
-function modelOptionsForProvider(provider: string): { value: string; label: string }[] {
-  switch (provider) {
-    case 'CODEX':
-      return [
-        { value: '', label: 'Standard' },
-        { value: 'o3', label: 'o3' },
-        { value: 'o4-mini', label: 'o4-mini' },
-      ];
-    case 'PI':
-      // pi routes via "<backend>/<model>" — these are useful presets across the major backends.
-      // Users can type any other backend/model combo into the workflow.model field directly.
-      return [
-        { value: '', label: 'Standard (pi-Default-Backend)' },
-        { value: 'anthropic/claude-sonnet-4-6', label: 'Anthropic · Sonnet 4.6' },
-        { value: 'anthropic/claude-opus-4-6', label: 'Anthropic · Opus 4.6' },
-        { value: 'openai/gpt-4o', label: 'OpenAI · GPT-4o' },
-        { value: 'openai/o3', label: 'OpenAI · o3' },
-        { value: 'google/gemini-2.0-flash', label: 'Google · Gemini 2.0 Flash' },
-        { value: 'xai/grok-2', label: 'xAI · Grok 2' },
-        { value: 'groq/llama-3.3-70b-versatile', label: 'Groq · Llama 3.3 70B' },
-      ];
-    default:
-      return [
-        { value: '', label: 'Standard (Provider-Standard)' },
-        { value: 'claude-haiku-4-5-20251001', label: 'Haiku (schnell)' },
-        { value: 'claude-sonnet-4-6', label: 'Sonnet (präzise)' },
-        { value: 'claude-opus-4-6', label: 'Opus (komplex)' },
-      ];
-  }
-}
 
 export function GeneralSettingsCard() {
   const t = useT();

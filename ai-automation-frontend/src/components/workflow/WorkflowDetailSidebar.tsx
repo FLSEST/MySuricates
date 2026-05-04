@@ -9,14 +9,8 @@ import { useUpdateWorkflow, useWorkflowRuns } from '../../hooks/useWorkflows';
 import { useAiProviders } from '../../hooks/useSystem';
 import { useT } from '../../i18n';
 import { formatDuration } from '../../utils/formatTime';
+import { modelOptionsForProvider, isFreeTextModelProvider } from '../../utils/aiProviderModels';
 import type { Workflow, WorkflowRun } from '../../types';
-
-const MODEL_OPTIONS = [
-  { value: '', label: '' },
-  { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (fast)' },
-  { value: 'claude-opus-4-6', label: 'Claude Opus 4.6 (powerful)' },
-  { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 (fastest)' },
-];
 
 interface WorkflowDetailSidebarProps {
   workflow: Workflow;
@@ -92,29 +86,14 @@ export function WorkflowDetailSidebar({
       <WorkflowMemoryPanel workflowId={workflow.id} runs={runs?.content} />
 
       <Card>
-        <CardHeader title={t.workflows.model} />
-        <Select
-          value={workflow.model || ''}
-          onChange={(e) => {
-            updateWorkflow.mutate({ id: workflow.id, data: { model: e.target.value } });
-          }}
-          options={MODEL_OPTIONS.map((opt) => ({
-            value: opt.value,
-            label: opt.value === '' ? t.workflows.modelDefault : opt.label,
-          }))}
-        />
-        <p className="text-xs text-text-tertiary mt-2 flex items-center gap-1.5">
-          <Bot className="w-3.5 h-3.5" />
-          {t.workflows.modelHint}
-        </p>
-      </Card>
-
-      <Card>
         <CardHeader title={t.workflows.provider} />
         <Select
           value={workflow.provider || ''}
           onChange={(e) => {
-            updateWorkflow.mutate({ id: workflow.id, data: { provider: e.target.value || undefined } });
+            const newProvider = e.target.value || undefined;
+            // Reset model when switching providers — values like "anthropic/claude-…" are
+            // pi-only and break Claude/Codex routing if left around.
+            updateWorkflow.mutate({ id: workflow.id, data: { provider: newProvider, model: '' } });
           }}
           options={[
             { value: '', label: t.workflows.providerDefault },
@@ -127,6 +106,44 @@ export function WorkflowDetailSidebar({
         <p className="text-xs text-text-tertiary mt-2 flex items-center gap-1.5">
           <Bot className="w-3.5 h-3.5" />
           {t.workflows.providerHint}
+        </p>
+      </Card>
+
+      <Card>
+        <CardHeader title={t.workflows.model} />
+        {isFreeTextModelProvider(workflow.provider) ? (
+          <>
+            <Input
+              list="pi-model-suggestions"
+              value={workflow.model || ''}
+              onChange={(e) => {
+                updateWorkflow.mutate({ id: workflow.id, data: { model: e.target.value } });
+              }}
+              placeholder="<backend>/<model-id>  z.B. anthropic/claude-sonnet-4-6"
+            />
+            <datalist id="pi-model-suggestions">
+              {modelOptionsForProvider('PI')
+                .filter((opt) => opt.value !== '')
+                .map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+            </datalist>
+          </>
+        ) : (
+          <Select
+            value={workflow.model || ''}
+            onChange={(e) => {
+              updateWorkflow.mutate({ id: workflow.id, data: { model: e.target.value } });
+            }}
+            options={modelOptionsForProvider(workflow.provider || aiProviders?.default).map((opt) => ({
+              value: opt.value,
+              label: opt.value === '' ? t.workflows.modelDefault : opt.label,
+            }))}
+          />
+        )}
+        <p className="text-xs text-text-tertiary mt-2 flex items-center gap-1.5">
+          <Bot className="w-3.5 h-3.5" />
+          {t.workflows.modelHint}
         </p>
       </Card>
 
