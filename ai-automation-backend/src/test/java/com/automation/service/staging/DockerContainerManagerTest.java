@@ -103,4 +103,19 @@ class DockerContainerManagerTest {
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("exit 42");
     }
+
+    @Test
+    void isRunning_nullName_returnsFalse() {
+        assertThat(manager.isRunning(null)).isFalse();
+    }
+
+    @Test
+    void isRunning_emptyName_returnsFalse() {
+        assertThat(manager.isRunning("")).isFalse();
+    }
+
+    @Test
+    void isRunning_blankName_returnsFalse() {
+        assertThat(manager.isRunning("   ")).isFalse();
+    }
 }
