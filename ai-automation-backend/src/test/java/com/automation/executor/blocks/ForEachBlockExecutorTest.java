@@ -290,4 +290,149 @@ class ForEachBlockExecutorTest {
         verify(commandExecutor).executeStepOnHost(
                 argThat(req -> req.providerId() == null));
     }
+
+    @Test
+    void execute_broadcastsStartedAndCompletedEventsPerItem() {
+        StepResult stepResult = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("done").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(stepResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("items_source", "list");
+        config.put("items", List.of("x", "y"));
+        config.put("command", "handle {{ item }}");
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("foreach")
+                .config(config)
+                .build();
+
+        executor.execute(block, context);
+
+        verify(broadcaster, times(2)).broadcastLogMessage(eq("run-1"), eq("foreach_item_started"), any());
+        verify(broadcaster, times(2)).broadcastLogMessage(eq("run-1"), eq("foreach_item_completed"), any());
+    }
+
+    @Test
+    void execute_outputCombinesItemResults() {
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenAnswer(inv -> {
+                    HostExecutionRequest req = inv.getArgument(0);
+                    String cmd = (String) req.block().getConfig().get("command");
+                    return StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("processed " + cmd).build();
+                });
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("items_source", "list");
+        config.put("items", List.of("alpha", "beta"));
+        config.put("variable_name", "item");
+        config.put("command", "{{ item }}");
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("foreach")
+                .config(config)
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getOutput()).contains("[alpha]:");
+        assertThat(result.getOutput()).contains("[beta]:");
+    }
+
+    @Test
+    void execute_customTimeout_passedToShellMode() {
+        StepResult stepResult = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(commandExecutor.executeStepAsShell(any(), any(), anyInt(), eq(60)))
+                .thenReturn(stepResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("items_source", "list");
+        config.put("items", List.of("a"));
+        config.put("command", "echo {{ item }}");
+        config.put("execution_mode", "shell");
+        config.put("timeout_seconds", 60);
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("foreach")
+                .config(config)
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        verify(commandExecutor).executeStepAsShell(any(), any(), anyInt(), eq(60));
+    }
+
+    @Test
+    void execute_customClaudeTimeout_passedToHostRequest() {
+        StepResult stepResult = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(commandExecutor.executeStepOnHost(argThat(req -> Integer.valueOf(120).equals(req.timeoutSeconds()))))
+                .thenReturn(stepResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("items_source", "list");
+        config.put("items", List.of("a"));
+        config.put("command", "process {{ item }}");
+        config.put("timeout_seconds", 120);
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("foreach")
+                .config(config)
+                .build();
+
+        executor.execute(block, context);
+
+        verify(commandExecutor).executeStepOnHost(argThat(req -> Integer.valueOf(120).equals(req.timeoutSeconds())));
+    }
+
+    @Test
+    void execute_itemsCommand_templateVariablesResolved() {
+        context.setVariable("branch", "main");
+        when(commandExecutor.executeShellCommandOnHost("/test/project", "git diff main --name-only", 300))
+                .thenReturn(new CliSession.CommandResult("changed.js", 0));
+        StepResult stepResult = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(stepResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("items_source", "command");
+        config.put("items_command", "git diff {{ branch }} --name-only");
+        config.put("command", "lint {{ item }}");
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("foreach")
+                .config(config)
+                .build();
+
+        executor.execute(block, context);
+
+        verify(commandExecutor).executeShellCommandOnHost("/test/project", "git diff main --name-only", 300);
+    }
+
+    @Test
+    void execute_noItemsSource_defaultsToList() {
+        StepResult stepResult = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(stepResult);
+
+        Map<String, Object> config = new HashMap<>();
+        // items_source omitted — should default to "list"
+        config.put("items", List.of("one", "two"));
+        config.put("command", "handle {{ item }}");
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("foreach")
+                .config(config)
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        verify(commandExecutor, times(2)).executeStepOnHost(any(HostExecutionRequest.class));
+    }
 }
