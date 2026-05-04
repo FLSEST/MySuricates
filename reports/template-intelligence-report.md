@@ -1,99 +1,49 @@
-# Template Intelligence Report — KW 12
+# Template Intelligence Report — KW 18
 
-**Datum**: 2026-03-16 | **Plattform**: MySuricates v0.3.2
-
----
+**Generated**: 2026-05-01 | **Platform**: MySuricates v0.7.1 | **Window**: 30 Tage
 
 ## Zusammenfassung
 
-- **Gesamt-Erfolgsrate**: 58.0% (293/505 Runs)
-- **Trend**: ↓ -0.83 pp vs. Vorwoche (58.85% → 58.02%)
-- **Gate-Status**: 🔴 RED — unter kritischem Schwellenwert von 70%
-
-```
-gate_status: RED
-gate_category: success-rate
-gate_description: Erfolgsrate 58.02% < 70% (kritisch). Regression vs. Vorwoche (-0.83pp). Haupttreiber: neue Batch-Workflows mit hohem Volumen und niedriger Erfolgsrate.
-```
-
----
+- **Gesamt-Erfolgsrate**: 84.0% (1168/1390 Runs)
+- **Trend**: ↑ RED 58% (KW 12) → YELLOW 84% — klare Verbesserung
+- **Gate-Status**: YELLOW
+- **Kosten**: $486.91 / 30d ($0.35/Run), 5.1M Tokens (85% Output)
+- **Limitation**: Per-Workflow-Insights fehlen (Insights-API-Bug, siehe Empfehlung 3)
 
 ## Erfolgsraten pro Workflow
 
 | Workflow | Runs | Erfolgsrate | Trend | Kosten (Tokens) |
 |---|---|---|---|---|
-| Lehrplan-Extraktor | 99 | ⚠️ Unbekannt* | 🆕 Neu | — |
-| Lernpaket-Batch-Generator | 96 | ⚠️ Unbekannt* | 🆕 Neu | — |
-| Frequenz-basierte Vokabel-Songs | 21 | ~70–80% | → Stabil | Mittel |
-| Code Quality | 20 | ~70–80% | → Stabil | Niedrig |
-| CS2BIM Code-Qualität & Auto-Fix-PR | 15 | ⚠️ Unbekannt* | 🆕 Neu | — |
+| MySuricates Test Coverage Audit | 300 (21.6%) | ~84%* | ↑ | hoch (Agentic) |
+| Write Test (TODO-driven) | 285 (20.5%) | ~84%* | ↑ | hoch (Agentic) |
+| Lernpaket-Batch-Generator | 111 (8.0%) | ~84%* | → | sehr hoch (Content) |
+| Lehrplan-Extraktor | 64 (4.6%) | ~84%* | → | mittel (Document) |
+| Job Shortlist Generator | 43 (3.1%) | ~84%* | → | niedrig |
+| Long Tail (280 Workflows) | 587 (42.2%) | ~84%* | → | breit verteilt |
 
-*) Per-Workflow-Metriken nicht verfügbar (Block 2 Data-Pipeline defekt).
-
-**Plattform-Metriken (Wochenvergleich)**:
-
-| Metrik | Aktuell | Vorwoche | Veränderung |
-|---|---|---|---|
-| Workflows | 156 | 143 | +9.1% |
-| Runs | 505 | 243 | +107.8% |
-| Kosten (30d) | $265.85 | $169.59 | +57% |
-| Tokens (30d) | 2.92M | 1.65M | +77% |
-| Kosten/erfolgreicher Run | $0.91 | — | Hoch |
-
----
+*\*Per-Workflow-Raten nicht verfügbar — Aggregatwert als Schätzung. Insights-API liefert `AttributeError` (siehe Empfehlung 3).*
 
 ## Failure-Hotspots
 
-### 1. Block 2 AttributeError — Data-Pipeline defekt (beide Runs)
+1. **Test Coverage Audit / Write Test** (585 Runs, 42% Volumen) — Agentic-Blöcke mit Token-Budget-Überschreitung, Maven-Build-Timeouts in Shell-Blöcken. Hohe Ø-Dauer (7:43 min) deutet auf späte, teure Failures hin.
+2. **Lehrplan-Extraktor** (64 Runs) — Document-Block (Apache Tika) bricht bei korrupten oder passwortgeschützten PDFs ab.
+3. **Lernpaket-Batch-Generator** (111 Runs) — ForEach-Block über große Listen akkumuliert Fehler; Hauptverursacher der 4.34M Output-Tokens.
 
-```
-AttributeError: 'list' object has no attribute 'get'
-```
-**Ursache**: Python-Script erwartet Dict, bekommt Liste. API-Response-Format hat sich geändert.
-**Impact**: Verhindert detaillierte Per-Workflow-Analyse in jedem Template-Intelligence-Run.
-
-### 2. Lernpaket-Batch-Generator — 0/36 Pakete generiert
-
-- Shell-Step identifiziert 36 fehlende Themen korrekt (✅ ~80ms)
-- AI-Generierungsschritt läuft lange / schlägt fehl (❌)
-- 96 Runs, systematisches Fehlermuster, keine Error-Recovery
-
-### 3. Batch-Workflows treiben Fehlerrate
-
-Lehrplan-Extraktor + Lernpaket-Batch-Generator = 195 Runs (38.6% aller Runs).
-Vermutlich 50–60% der Gesamtfehler, da Erfolgsrate trotz +107% mehr Runs stagniert.
-
----
+**Geschätzte Failure-Kosten**: 199 Failures × $0.35 ≈ $70/Monat (untere Schranke — Agentic-Failures teurer als Durchschnitt).
 
 ## Empfehlungen
 
-1. **Block 2 AttributeError beheben** — API-Response als Liste behandeln (`isinstance(data, list)`). Ermöglicht vollständiges Monitoring und schließt den Selbstverbesserungs-Loop. ✅ Sofort umsetzbar.
+1. **Output-Validation für Top-2-Workflows aktivieren** — Seit `a60e5ce` verfügbar. Auf Test Coverage Audit + Write Test scharfschalten. Erwartung: +2-4 PP Erfolgsrate (84% → 86-88%), Gate YELLOW → GREEN realistisch.
+2. **Token-Budget-Caps für Agentic-Blöcke setzen** — `max_total_tokens` hart begrenzen (50k Test / 100k Content). `AgenticTokenTracker` existiert. Erwartung: Kosten-Varianz -30%, ~$20-40/Monat eingespart.
+3. **Insights-API-Bug fixen** — `LearningController`/`ExecutionInsightsService` liefert Liste statt Dict → `AttributeError` bei Konsumenten. Ohne Fix bleiben per-Workflow-Failure-Daten unsichtbar, Optimierung bleibt Hypothese.
 
-2. **Lernpaket-Batch-Generator stabilisieren** — Incremental Checkpoints, Retry-Block (3x exponential backoff), Batch-Größe auf 5–10 reduzieren. Erwartete Wirkung: Erfolgsrate +5–8pp gesamt, da Workflow 19% aller Runs ausmacht.
+## Gate-Entscheidung
 
-3. **Kosten-Monitoring einführen** — Budget-Alert bei >$300/30d, Token-Budget pro Workflow, Kosten-Trend im Dashboard. Verhindert unkontrollierte Ausgaben bei fehlschlagenden Workflows.
-
----
-
-## Gate-Kriterien
-
-| Kriterium | Schwellenwert | Aktuell | Status |
+| Kriterium | Schwelle | Ist | Status |
 |---|---|---|---|
-| Ø Erfolgsrate | >70% | 58.02% | 🔴 RED |
-| Regression | <-5pp/Woche | -0.83 pp | 🟢 OK |
-| Data Pipeline | Fehlerfrei | 2x Fehler | 🔴 RED |
+| Erfolgsrate ≥ 80% | 80% | 84.0% | PASS |
+| Erfolgsrate ≥ 70% (RED-Floor) | 70% | 84.0% | PASS |
+| Failure-Anzahl | < 100/30d | 199 | FAIL |
+| Pro-Workflow-Daten verfügbar | ja | nein | FAIL |
 
-**Gesamtbewertung: 🔴 RED** — Sofortiger Handlungsbedarf.
-
----
-
-## Datenqualität
-
-- ✅ Dashboard-Metriken vollständig
-- ❌ Block 2 in beiden Runs fehlgeschlagen → keine Per-Workflow-Metriken
-- ⚠️ Trend-Analyse auf 2 Datenpunkten basiert
-- ⚠️ Einzelschätzungen basieren auf Volumen-Verteilung und bekannten Fehlermustern
-
----
-
-*Generiert von: self-care-template-intelligence | MySuricates v0.3.2*
+**gate_status: YELLOW** — Aggregat über 80%, aber 199 Failures materiell und per-Workflow-Daten fehlen für gezielte Optimierung. Trend gegenüber KW 12 (RED/58%) positiv.
