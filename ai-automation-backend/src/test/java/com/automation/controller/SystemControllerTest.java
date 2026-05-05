@@ -282,4 +282,54 @@ class SystemControllerTest {
 
         verify(integrationSnippetService).render("/home/user/project");
     }
+
+    @Test
+    void getExecutionConfig_returnsCurrentSettings() throws Exception {
+        when(executionSettingsService.getCurrentSettings())
+                .thenReturn(java.util.Map.of("claude-max-concurrent-calls", 5, "claude-reserved-for-interactive", 1));
+
+        mockMvc.perform(get("/api/v1/system/execution-config"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.['claude-max-concurrent-calls']").value(5))
+                .andExpect(jsonPath("$.['claude-reserved-for-interactive']").value(1));
+    }
+
+    @Test
+    void updateExecutionConfig_validSettings_returns200WithUpdated() throws Exception {
+        java.util.Map<String, Object> updated = java.util.Map.of("claude-max-concurrent-calls", 7);
+        when(executionSettingsService.getCurrentSettings()).thenReturn(updated);
+
+        mockMvc.perform(put("/api/v1/system/execution-config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"claude-max-concurrent-calls\":\"7\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.['claude-max-concurrent-calls']").value(7));
+
+        verify(executionSettingsService).updateAll(java.util.Map.of("claude-max-concurrent-calls", "7"));
+    }
+
+    @Test
+    void updateExecutionConfig_invalidSettings_returns400WithError() throws Exception {
+        doThrow(new IllegalArgumentException("Invalid value for claude-max-concurrent-calls: must be 1-20"))
+                .when(executionSettingsService).updateAll(any());
+
+        mockMvc.perform(put("/api/v1/system/execution-config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"claude-max-concurrent-calls\":\"999\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Invalid value for claude-max-concurrent-calls: must be 1-20"));
+    }
+
+    @Test
+    void aiProviders_returnsProviderList() throws Exception {
+        when(aiProviderRegistry.getAvailableProviderIds())
+                .thenReturn(java.util.List.of("CLAUDE", "CODEX"));
+        when(aiProviderRegistry.getDefaultProviderId())
+                .thenReturn("CLAUDE");
+
+        mockMvc.perform(get("/api/v1/system/ai-providers"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.providers").isArray())
+                .andExpect(jsonPath("$.providers.length()").value(2));
+    }
 }
