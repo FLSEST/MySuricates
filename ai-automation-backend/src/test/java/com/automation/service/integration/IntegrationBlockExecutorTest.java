@@ -135,6 +135,115 @@ class IntegrationBlockExecutorTest {
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
     }
 
+    @Test
+    void failsWhenProviderNotFoundInRegistry() {
+        BlockDefinition block = new BlockDefinition();
+        block.setType("integration");
+        block.setConfig(Map.of(
+                "provider", "unknown-provider",
+                "action", "some_action"
+        ));
+
+        when(registry.getProvider("unknown-provider"))
+                .thenThrow(new IllegalArgumentException("Unknown integration provider: unknown-provider"));
+
+        StepResult result = executor.execute(block, createContext());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getOutput()).contains("Unknown integration provider");
+        assertThat(result.getMetadata()).containsEntry("provider", "unknown-provider");
+        assertThat(result.getMetadata()).containsEntry("action", "some_action");
+        assertThat(result.getMetadata()).containsKey("error");
+    }
+
+    @Test
+    void failsWhenAccessTokenInvalid() {
+        BlockDefinition block = new BlockDefinition();
+        block.setType("integration");
+        block.setConfig(Map.of(
+                "provider", "google-calendar",
+                "action", "list_events"
+        ));
+
+        when(registry.getProvider("google-calendar")).thenReturn(provider);
+        when(oAuthService.getValidAccessToken("google-calendar"))
+                .thenThrow(new IllegalStateException("No valid access token for provider: google-calendar"));
+
+        StepResult result = executor.execute(block, createContext());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getOutput()).contains("No valid access token");
+        assertThat(result.getMetadata()).containsEntry("executionMode", "integration");
+    }
+
+    @Test
+    void executesWithoutParamsWhenParamsMissing() {
+        BlockDefinition block = new BlockDefinition();
+        block.setType("integration");
+        block.setConfig(Map.of(
+                "provider", "google-calendar",
+                "action", "list_events"
+        ));
+
+        when(registry.getProvider("google-calendar")).thenReturn(provider);
+        when(oAuthService.getValidAccessToken("google-calendar")).thenReturn("mock-token");
+        when(provider.executeAction(eq("list_events"), any(), eq("mock-token")))
+                .thenReturn(Map.of("items", List.of()));
+
+        StepResult result = executor.execute(block, createContext());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getDurationMs()).isGreaterThanOrEqualTo(0L);
+        assertThat(result.getStartedAt()).isNotNull();
+        assertThat(result.getCompletedAt()).isNotNull();
+    }
+
+    @Test
+    void successResultContainsCorrectMetadata() {
+        BlockDefinition block = new BlockDefinition();
+        block.setType("integration");
+        block.setConfig(Map.of(
+                "provider", "google-calendar",
+                "action", "create_event",
+                "params", Map.of("title", "Test")
+        ));
+
+        when(registry.getProvider("google-calendar")).thenReturn(provider);
+        when(oAuthService.getValidAccessToken("google-calendar")).thenReturn("mock-token");
+        when(provider.executeAction(eq("create_event"), any(), eq("mock-token")))
+                .thenReturn(Map.of("id", "event-123"));
+
+        StepResult result = executor.execute(block, createContext());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata())
+                .containsEntry("provider", "google-calendar")
+                .containsEntry("action", "create_event")
+                .containsEntry("executionMode", "integration");
+        assertThat(result.getInput()).contains("google-calendar").contains("create_event");
+    }
+
+    @Test
+    void failsWhenProviderActionThrowsRuntimeException() {
+        BlockDefinition block = new BlockDefinition();
+        block.setType("integration");
+        block.setConfig(Map.of(
+                "provider", "google-calendar",
+                "action", "list_events"
+        ));
+
+        when(registry.getProvider("google-calendar")).thenReturn(provider);
+        when(oAuthService.getValidAccessToken("google-calendar")).thenReturn("mock-token");
+        when(provider.executeAction(eq("list_events"), any(), eq("mock-token")))
+                .thenThrow(new RuntimeException("Network timeout after 30s"));
+
+        StepResult result = executor.execute(block, createContext());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getOutput()).contains("Network timeout");
+        assertThat(result.getMetadata()).containsEntry("error", "Network timeout after 30s");
+    }
+
     private ExecutionContext createContext() {
         return ExecutionContext.builder()
                 .workflowRunId("test-run-1")
