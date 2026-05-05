@@ -236,4 +236,80 @@ class ScheduledWorkflowExecutorTest {
         verify(scheduledRepository).save(argThat(sw ->
                 ((ScheduledWorkflow) sw).getLastRunAt() != null));
     }
+
+    @Test
+    void should_disableSchedule_when_cronMaxRunsReached() {
+        ScheduledWorkflow schedule = ScheduledWorkflow.builder()
+                .id("sched-cron-max")
+                .scheduleType(ScheduleType.CRON)
+                .targetType(TargetType.WORKFLOW)
+                .workflow(testWorkflow)
+                .cronExpression("0 0 * * * *")
+                .runCount(4)
+                .maxRuns(5)
+                .enabled(true)
+                .build();
+        when(scheduledRepository.findById("sched-cron-max")).thenReturn(Optional.of(schedule));
+
+        executor.updateScheduleAfterRun("sched-cron-max", ScheduleType.CRON, "0 0 * * * *");
+
+        assertThat(schedule.getRunCount()).isEqualTo(5);
+        assertThat(schedule.isEnabled()).isFalse();
+        assertThat(schedule.getNextRunAt()).isNull();
+        assertThat(schedule.getLastRunAt()).isNotNull();
+        verify(scheduledRepository).save(schedule);
+    }
+
+    @Test
+    void should_disableSchedule_when_cronEndDateExceeded() {
+        ScheduledWorkflow schedule = ScheduledWorkflow.builder()
+                .id("sched-cron-end")
+                .scheduleType(ScheduleType.CRON)
+                .targetType(TargetType.WORKFLOW)
+                .workflow(testWorkflow)
+                .cronExpression("0 0 * * * *")
+                .runCount(2)
+                .maxRuns(0)
+                .endDate(Instant.now().minusSeconds(3600))
+                .enabled(true)
+                .build();
+        when(scheduledRepository.findById("sched-cron-end")).thenReturn(Optional.of(schedule));
+
+        executor.updateScheduleAfterRun("sched-cron-end", ScheduleType.CRON, "0 0 * * * *");
+
+        assertThat(schedule.getRunCount()).isEqualTo(3);
+        assertThat(schedule.isEnabled()).isFalse();
+        assertThat(schedule.getNextRunAt()).isNull();
+        assertThat(schedule.getLastRunAt()).isNotNull();
+        verify(scheduledRepository).save(schedule);
+    }
+
+    @Test
+    void should_disableSchedule_when_delayedScheduleExecuted() {
+        ScheduledWorkflow schedule = ScheduledWorkflow.builder()
+                .id("sched-delayed")
+                .scheduleType(ScheduleType.DELAYED)
+                .targetType(TargetType.WORKFLOW)
+                .workflow(testWorkflow)
+                .enabled(true)
+                .build();
+        when(scheduledRepository.findById("sched-delayed")).thenReturn(Optional.of(schedule));
+
+        executor.updateScheduleAfterRun("sched-delayed", ScheduleType.DELAYED, null);
+
+        assertThat(schedule.isEnabled()).isFalse();
+        assertThat(schedule.getNextRunAt()).isNull();
+        assertThat(schedule.getLastRunAt()).isNotNull();
+        verify(scheduledRepository).save(schedule);
+    }
+
+    @Test
+    void should_doNothing_when_updateScheduleAfterRun_scheduleNotFound() {
+        when(scheduledRepository.findById("missing")).thenReturn(Optional.empty());
+
+        executor.updateScheduleAfterRun("missing", ScheduleType.CRON, "0 0 * * * *");
+
+        verify(scheduledRepository, never()).save(any());
+    }
+
 }
