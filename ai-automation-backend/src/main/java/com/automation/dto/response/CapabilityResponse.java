@@ -8,5 +8,6 @@ public record CapabilityResponse(
         String description,
         Map<String, Object> inputSchema,
         Map<String, Object> outputSchema,
-        boolean async
+        boolean async,
+        boolean writes
 ) {}

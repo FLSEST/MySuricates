@@ -91,7 +91,7 @@ class SkillImportExportServiceTest {
     void importSkill_validRequest_createsAndRegistersSkill() {
         var capReq = new ImportSkillRequest.ImportCapabilityRequest(
                 "ocr", "Extract text", "com.Handler",
-                Map.of("image", "string"), Map.of("text", "string"), false
+                Map.of("image", "string"), Map.of("text", "string"), false, false
         );
         var request = new ImportSkillRequest(
                 "Imported Skill", "An imported skill", "icon",
@@ -139,7 +139,7 @@ class SkillImportExportServiceTest {
     @Test
     void importSkill_nullSchemas_defaultsToEmptyMaps() {
         var capReq = new ImportSkillRequest.ImportCapabilityRequest(
-                "test", "desc", "handler", null, null, true
+                "test", "desc", "handler", null, null, true, false
         );
         var request = new ImportSkillRequest(
                 "Skill", "desc", null, SkillCategory.CODE,

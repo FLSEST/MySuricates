@@ -315,6 +315,12 @@ export interface Capability {
   inputSchema: Record<string, unknown>;
   outputSchema: Record<string, unknown>;
   async: boolean;
+  /**
+   * If true, this capability writes to the project filesystem. Workflow blocks must set
+   * `allow_writes: true` in the skill-capability block config to enable execution; otherwise
+   * the backend fails the block fast.
+   */
+  writes: boolean;
 }
 
 // ── Schedule ─────────────────────────────────────────────

@@ -17,7 +17,7 @@ class ExportSkillResponseTest {
     void should_setAllFields_when_constructed() {
         var capability = new ExportCapabilityResponse(
                 "cap-1", "Cap description", "com.Handler",
-                Map.of("input", "string"), Map.of("output", "string"), true
+                Map.of("input", "string"), Map.of("output", "string"), true, false
         );
         var response = new ExportSkillResponse(
                 "skill-name", "skill-desc", "icon-1", SkillCategory.CODE,
@@ -80,7 +80,7 @@ class ExportSkillResponseTest {
     @Test
     void should_beEqual_when_sameFieldValues() {
         var cap = new ExportCapabilityResponse(
-                "cap", "desc", "handler", Map.of(), Map.of(), false
+                "cap", "desc", "handler", Map.of(), Map.of(), false, false
         );
         var a = new ExportSkillResponse(
                 "skill", "desc", "icon", SkillCategory.CONTENT,
@@ -158,7 +158,7 @@ class ExportSkillResponseTest {
     void should_setAllCapabilityFields_when_constructed() {
         var cap = new ExportCapabilityResponse(
                 "cap-name", "cap-desc", "com.Handler",
-                Map.of("in", "type"), Map.of("out", "type"), true
+                Map.of("in", "type"), Map.of("out", "type"), true, false
         );
 
         assertThat(cap.name()).isEqualTo("cap-name");
@@ -172,7 +172,7 @@ class ExportSkillResponseTest {
     @Test
     void should_returnFalseAsync_when_constructedWithFalse() {
         var cap = new ExportCapabilityResponse(
-                "cap", "desc", "handler", Map.of(), Map.of(), false
+                "cap", "desc", "handler", Map.of(), Map.of(), false, false
         );
 
         assertThat(cap.async()).isFalse();
@@ -180,7 +180,7 @@ class ExportSkillResponseTest {
 
     @Test
     void should_acceptNullCapabilityFields_when_constructed() {
-        var cap = new ExportCapabilityResponse(null, null, null, null, null, false);
+        var cap = new ExportCapabilityResponse(null, null, null, null, null, false, false);
 
         assertThat(cap.name()).isNull();
         assertThat(cap.description()).isNull();
@@ -193,7 +193,7 @@ class ExportSkillResponseTest {
     @Test
     void should_acceptEmptySchemas_when_capabilityConstructed() {
         var cap = new ExportCapabilityResponse(
-                "cap", "desc", "handler", Map.of(), Map.of(), true
+                "cap", "desc", "handler", Map.of(), Map.of(), true, false
         );
 
         assertThat(cap.inputSchema()).isEmpty();
@@ -204,8 +204,8 @@ class ExportSkillResponseTest {
 
     @Test
     void should_capabilityBeEqual_when_sameFieldValues() {
-        var a = new ExportCapabilityResponse("cap", "desc", "handler", Map.of("k", "v"), Map.of(), true);
-        var b = new ExportCapabilityResponse("cap", "desc", "handler", Map.of("k", "v"), Map.of(), true);
+        var a = new ExportCapabilityResponse("cap", "desc", "handler", Map.of("k", "v"), Map.of(), true, false);
+        var b = new ExportCapabilityResponse("cap", "desc", "handler", Map.of("k", "v"), Map.of(), true, false);
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -213,24 +213,24 @@ class ExportSkillResponseTest {
 
     @Test
     void should_capabilityNotBeEqual_when_differentName() {
-        var a = new ExportCapabilityResponse("a", "desc", "handler", Map.of(), Map.of(), false);
-        var b = new ExportCapabilityResponse("b", "desc", "handler", Map.of(), Map.of(), false);
+        var a = new ExportCapabilityResponse("a", "desc", "handler", Map.of(), Map.of(), false, false);
+        var b = new ExportCapabilityResponse("b", "desc", "handler", Map.of(), Map.of(), false, false);
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_capabilityNotBeEqual_when_differentAsync() {
-        var a = new ExportCapabilityResponse("cap", "desc", "handler", Map.of(), Map.of(), true);
-        var b = new ExportCapabilityResponse("cap", "desc", "handler", Map.of(), Map.of(), false);
+        var a = new ExportCapabilityResponse("cap", "desc", "handler", Map.of(), Map.of(), true, false);
+        var b = new ExportCapabilityResponse("cap", "desc", "handler", Map.of(), Map.of(), false, false);
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_capabilityNotBeEqual_when_differentHandlerClass() {
-        var a = new ExportCapabilityResponse("cap", "desc", "handler1", Map.of(), Map.of(), false);
-        var b = new ExportCapabilityResponse("cap", "desc", "handler2", Map.of(), Map.of(), false);
+        var a = new ExportCapabilityResponse("cap", "desc", "handler1", Map.of(), Map.of(), false, false);
+        var b = new ExportCapabilityResponse("cap", "desc", "handler2", Map.of(), Map.of(), false, false);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -241,7 +241,7 @@ class ExportSkillResponseTest {
     void should_containCapabilityFieldValues_when_toStringCalled() {
         var cap = new ExportCapabilityResponse(
                 "my-cap", "my-cap-desc", "com.MyHandler",
-                Map.of("in", "val"), Map.of("out", "val"), true
+                Map.of("in", "val"), Map.of("out", "val"), true, false
         );
         var str = cap.toString();
 

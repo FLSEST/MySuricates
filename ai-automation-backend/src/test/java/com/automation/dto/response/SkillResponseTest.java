@@ -16,7 +16,7 @@ class SkillResponseTest {
     void should_expose_all_fields_when_constructed_with_full_values() {
         Instant createdAt = Instant.parse("2026-01-10T12:00:00Z");
         CapabilityResponse capability = new CapabilityResponse(
-            "cap-1", "Summarize", "Summarizes text", Map.of(), Map.of(), false
+            "cap-1", "Summarize", "Summarizes text", Map.of(), Map.of(), false, false
         );
         Map<String, Object> schema = Map.of("maxTokens", 1024);
 

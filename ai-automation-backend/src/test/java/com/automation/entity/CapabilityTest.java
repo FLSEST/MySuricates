@@ -187,7 +187,7 @@ class CapabilityTest {
 
         Capability capability = new Capability(
                 "cap-id", skill, "search", "Searches data",
-                "com.example.SearchHandler", inputSchema, outputSchema, true
+                "com.example.SearchHandler", inputSchema, outputSchema, true, false
         );
 
         assertThat(capability.getId()).isEqualTo("cap-id");

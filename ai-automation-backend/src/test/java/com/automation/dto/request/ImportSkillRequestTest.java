@@ -22,7 +22,7 @@ class ImportSkillRequestTest {
     void should_returnAllFields_when_constructedWithValidData() {
         var capabilities = List.of(new ImportSkillRequest.ImportCapabilityRequest(
                 "cap-name", "cap-desc", "com.example.Handler",
-                Map.of("in", "schema"), Map.of("out", "schema"), true));
+                Map.of("in", "schema"), Map.of("out", "schema"), true, false));
         var request = new ImportSkillRequest(
                 "My Skill", "A description", "icon.svg", SkillCategory.CODE,
                 "AI context", Map.of("key", "value"), "1.0.0", capabilities);
@@ -132,7 +132,7 @@ class ImportSkillRequestTest {
     void should_returnAllCapabilityFields_when_constructed() {
         var cap = new ImportSkillRequest.ImportCapabilityRequest(
                 "cap-name", "cap-desc", "com.example.Handler",
-                Map.of("inKey", 1), Map.of("outKey", 2), true);
+                Map.of("inKey", 1), Map.of("outKey", 2), true, false);
 
         assertThat(cap.name()).isEqualTo("cap-name");
         assertThat(cap.description()).isEqualTo("cap-desc");
@@ -145,7 +145,7 @@ class ImportSkillRequestTest {
     @Test
     void should_returnFalse_when_asyncIsNotSet() {
         var cap = new ImportSkillRequest.ImportCapabilityRequest(
-                "cap-name", null, null, null, null, false);
+                "cap-name", null, null, null, null, false, false);
 
         assertThat(cap.async()).isFalse();
     }
@@ -155,7 +155,7 @@ class ImportSkillRequestTest {
     @Test
     void should_passCapabilityValidation_when_nameIsPresent() {
         var cap = new ImportSkillRequest.ImportCapabilityRequest(
-                "cap-name", null, null, null, null, false);
+                "cap-name", null, null, null, null, false, false);
 
         Set<ConstraintViolation<ImportSkillRequest.ImportCapabilityRequest>> violations = validator.validate(cap);
 
@@ -165,7 +165,7 @@ class ImportSkillRequestTest {
     @Test
     void should_failCapabilityValidation_when_nameIsNull() {
         var cap = new ImportSkillRequest.ImportCapabilityRequest(
-                null, "desc", null, null, null, false);
+                null, "desc", null, null, null, false, false);
 
         Set<ConstraintViolation<ImportSkillRequest.ImportCapabilityRequest>> violations = validator.validate(cap);
 
@@ -176,7 +176,7 @@ class ImportSkillRequestTest {
     @Test
     void should_failCapabilityValidation_when_nameIsBlank() {
         var cap = new ImportSkillRequest.ImportCapabilityRequest(
-                "   ", "desc", null, null, null, false);
+                "   ", "desc", null, null, null, false, false);
 
         Set<ConstraintViolation<ImportSkillRequest.ImportCapabilityRequest>> violations = validator.validate(cap);
 
@@ -188,8 +188,8 @@ class ImportSkillRequestTest {
 
     @Test
     void should_beEqual_when_capabilityFieldsMatch() {
-        var a = new ImportSkillRequest.ImportCapabilityRequest("name", "desc", null, null, null, true);
-        var b = new ImportSkillRequest.ImportCapabilityRequest("name", "desc", null, null, null, true);
+        var a = new ImportSkillRequest.ImportCapabilityRequest("name", "desc", null, null, null, true, false);
+        var b = new ImportSkillRequest.ImportCapabilityRequest("name", "desc", null, null, null, true, false);
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -197,8 +197,8 @@ class ImportSkillRequestTest {
 
     @Test
     void should_notBeEqual_when_capabilityNamesDiffer() {
-        var a = new ImportSkillRequest.ImportCapabilityRequest("name-a", null, null, null, null, false);
-        var b = new ImportSkillRequest.ImportCapabilityRequest("name-b", null, null, null, null, false);
+        var a = new ImportSkillRequest.ImportCapabilityRequest("name-a", null, null, null, null, false, false);
+        var b = new ImportSkillRequest.ImportCapabilityRequest("name-b", null, null, null, null, false, false);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -206,7 +206,7 @@ class ImportSkillRequestTest {
     @Test
     void should_containCapabilityFieldsInToString() {
         var cap = new ImportSkillRequest.ImportCapabilityRequest(
-                "cap-name", null, null, null, null, false);
+                "cap-name", null, null, null, null, false, false);
 
         assertThat(cap.toString()).contains("name");
         assertThat(cap.toString()).contains("cap-name");

@@ -23,6 +23,7 @@ public record ImportSkillRequest(
             String handlerClass,
             Map<String, Object> inputSchema,
             Map<String, Object> outputSchema,
-            boolean async
+            boolean async,
+            boolean writes
     ) {}
 }

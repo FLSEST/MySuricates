@@ -436,6 +436,7 @@ Ruft die Faehigkeit eines registrierten Skills auf.
 | `input` | string | `""` | Eingabedaten (optional, Default: leerer String) |
 | `params` | map | `{}` | Zusaetzliche Parameter |
 | `timeout_seconds` | int | null | Claude-CLI-Timeout |
+| `allow_writes` | bool | `false` | Erlaubt der Capability Schreibzugriff aufs Repo. Erforderlich fuer `writes:true`-Capabilities (test-generator, feature-implementer). Ohne `allow_writes` laeuft der Block read-only (Tool-Whitelist Read/Grep/Glob/WebFetch/WebSearch/Task/TodoWrite). |
 
 ```json
 {
@@ -449,6 +450,8 @@ Ruft die Faehigkeit eines registrierten Skills auf.
 ```
 
 **Wann verwenden**: Spezialisierte Skills nutzen (OCR, Web-Suche, Analyse).
+
+**Sicherheit**: Capabilities deklarieren ueber `Capability.writes`, ob sie Dateien schreiben. Built-in `writes:true`: `builtin-test-generator/*`, `builtin-feature-implementer/*`. Ein Block, der eine `writes:true`-Capability aufruft ohne `"allow_writes": true`, faellt sofort fehl mit klarer Meldung. Fuer alle anderen Faelle wird der Host-CLI mit einer Read-Only-Tool-Whitelist gestartet (Defense-in-Depth).
 
 ---
 

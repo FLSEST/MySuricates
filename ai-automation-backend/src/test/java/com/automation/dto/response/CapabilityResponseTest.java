@@ -15,7 +15,7 @@ class CapabilityResponseTest {
     void should_setAllFields_when_constructed() {
         Map<String, Object> inputSchema = Map.of("type", "object", "required", true);
         Map<String, Object> outputSchema = Map.of("type", "string");
-        var response = new CapabilityResponse("cap-1", "doSomething", "Does something", inputSchema, outputSchema, true);
+        var response = new CapabilityResponse("cap-1", "doSomething", "Does something", inputSchema, outputSchema, true, false);
 
         assertThat(response.id()).isEqualTo("cap-1");
         assertThat(response.name()).isEqualTo("doSomething");
@@ -27,14 +27,14 @@ class CapabilityResponseTest {
 
     @Test
     void should_returnFalseAsync_when_constructedWithFalse() {
-        var response = new CapabilityResponse("cap-2", "sync-action", "Sync", Map.of(), Map.of(), false);
+        var response = new CapabilityResponse("cap-2", "sync-action", "Sync", Map.of(), Map.of(), false, false);
 
         assertThat(response.async()).isFalse();
     }
 
     @Test
     void should_acceptNullId_when_constructed() {
-        var response = new CapabilityResponse(null, "name", "desc", Map.of(), Map.of(), false);
+        var response = new CapabilityResponse(null, "name", "desc", Map.of(), Map.of(), false, false);
 
         assertThat(response.id()).isNull();
         assertThat(response.name()).isEqualTo("name");
@@ -42,7 +42,7 @@ class CapabilityResponseTest {
 
     @Test
     void should_acceptNullName_when_constructed() {
-        var response = new CapabilityResponse("cap-1", null, "desc", Map.of(), Map.of(), false);
+        var response = new CapabilityResponse("cap-1", null, "desc", Map.of(), Map.of(), false, false);
 
         assertThat(response.name()).isNull();
         assertThat(response.description()).isEqualTo("desc");
@@ -50,28 +50,28 @@ class CapabilityResponseTest {
 
     @Test
     void should_acceptNullDescription_when_constructed() {
-        var response = new CapabilityResponse("cap-1", "name", null, Map.of(), Map.of(), false);
+        var response = new CapabilityResponse("cap-1", "name", null, Map.of(), Map.of(), false, false);
 
         assertThat(response.description()).isNull();
     }
 
     @Test
     void should_acceptNullInputSchema_when_constructed() {
-        var response = new CapabilityResponse("cap-1", "name", "desc", null, Map.of(), false);
+        var response = new CapabilityResponse("cap-1", "name", "desc", null, Map.of(), false, false);
 
         assertThat(response.inputSchema()).isNull();
     }
 
     @Test
     void should_acceptNullOutputSchema_when_constructed() {
-        var response = new CapabilityResponse("cap-1", "name", "desc", Map.of(), null, false);
+        var response = new CapabilityResponse("cap-1", "name", "desc", Map.of(), null, false, false);
 
         assertThat(response.outputSchema()).isNull();
     }
 
     @Test
     void should_acceptAllNulls_when_constructed() {
-        var response = new CapabilityResponse(null, null, null, null, null, false);
+        var response = new CapabilityResponse(null, null, null, null, null, false, false);
 
         assertThat(response.id()).isNull();
         assertThat(response.name()).isNull();
@@ -83,14 +83,14 @@ class CapabilityResponseTest {
 
     @Test
     void should_acceptEmptyInputSchema_when_constructed() {
-        var response = new CapabilityResponse("cap-1", "name", "desc", Collections.emptyMap(), Map.of("x", "y"), false);
+        var response = new CapabilityResponse("cap-1", "name", "desc", Collections.emptyMap(), Map.of("x", "y"), false, false);
 
         assertThat(response.inputSchema()).isEmpty();
     }
 
     @Test
     void should_acceptEmptyOutputSchema_when_constructed() {
-        var response = new CapabilityResponse("cap-1", "name", "desc", Map.of("x", "y"), Collections.emptyMap(), false);
+        var response = new CapabilityResponse("cap-1", "name", "desc", Map.of("x", "y"), Collections.emptyMap(), false, false);
 
         assertThat(response.outputSchema()).isEmpty();
     }
@@ -105,7 +105,7 @@ class CapabilityResponseTest {
                 "type", "object",
                 "properties", Map.of("result", Map.of("type", "array"))
         );
-        var response = new CapabilityResponse("cap-1", "search", "Search", inputSchema, outputSchema, true);
+        var response = new CapabilityResponse("cap-1", "search", "Search", inputSchema, outputSchema, true, false);
 
         assertThat(response.inputSchema()).containsKey("type");
         assertThat(response.inputSchema()).containsKey("properties");
@@ -120,8 +120,8 @@ class CapabilityResponseTest {
     void should_beEqual_when_sameFieldValues() {
         Map<String, Object> input = Map.of("type", "string");
         Map<String, Object> output = Map.of("type", "number");
-        var a = new CapabilityResponse("cap-1", "name", "desc", input, output, true);
-        var b = new CapabilityResponse("cap-1", "name", "desc", input, output, true);
+        var a = new CapabilityResponse("cap-1", "name", "desc", input, output, true, false);
+        var b = new CapabilityResponse("cap-1", "name", "desc", input, output, true, false);
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -130,8 +130,8 @@ class CapabilityResponseTest {
     @Test
     void should_notBeEqual_when_differentId() {
         var schema = Map.<String, Object>of("type", "string");
-        var a = new CapabilityResponse("cap-1", "name", "desc", schema, schema, false);
-        var b = new CapabilityResponse("cap-2", "name", "desc", schema, schema, false);
+        var a = new CapabilityResponse("cap-1", "name", "desc", schema, schema, false, false);
+        var b = new CapabilityResponse("cap-2", "name", "desc", schema, schema, false, false);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -139,8 +139,8 @@ class CapabilityResponseTest {
     @Test
     void should_notBeEqual_when_differentName() {
         var schema = Map.<String, Object>of("type", "string");
-        var a = new CapabilityResponse("cap-1", "nameA", "desc", schema, schema, false);
-        var b = new CapabilityResponse("cap-1", "nameB", "desc", schema, schema, false);
+        var a = new CapabilityResponse("cap-1", "nameA", "desc", schema, schema, false, false);
+        var b = new CapabilityResponse("cap-1", "nameB", "desc", schema, schema, false, false);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -148,8 +148,8 @@ class CapabilityResponseTest {
     @Test
     void should_notBeEqual_when_differentDescription() {
         var schema = Map.<String, Object>of("type", "string");
-        var a = new CapabilityResponse("cap-1", "name", "desc-a", schema, schema, false);
-        var b = new CapabilityResponse("cap-1", "name", "desc-b", schema, schema, false);
+        var a = new CapabilityResponse("cap-1", "name", "desc-a", schema, schema, false, false);
+        var b = new CapabilityResponse("cap-1", "name", "desc-b", schema, schema, false, false);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -157,8 +157,8 @@ class CapabilityResponseTest {
     @Test
     void should_notBeEqual_when_differentInputSchema() {
         var output = Map.<String, Object>of("type", "string");
-        var a = new CapabilityResponse("cap-1", "name", "desc", Map.of("type", "string"), output, false);
-        var b = new CapabilityResponse("cap-1", "name", "desc", Map.of("type", "number"), output, false);
+        var a = new CapabilityResponse("cap-1", "name", "desc", Map.of("type", "string"), output, false, false);
+        var b = new CapabilityResponse("cap-1", "name", "desc", Map.of("type", "number"), output, false, false);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -166,8 +166,8 @@ class CapabilityResponseTest {
     @Test
     void should_notBeEqual_when_differentOutputSchema() {
         var input = Map.<String, Object>of("type", "string");
-        var a = new CapabilityResponse("cap-1", "name", "desc", input, Map.of("type", "string"), false);
-        var b = new CapabilityResponse("cap-1", "name", "desc", input, Map.of("type", "number"), false);
+        var a = new CapabilityResponse("cap-1", "name", "desc", input, Map.of("type", "string"), false, false);
+        var b = new CapabilityResponse("cap-1", "name", "desc", input, Map.of("type", "number"), false, false);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -175,16 +175,16 @@ class CapabilityResponseTest {
     @Test
     void should_notBeEqual_when_differentAsync() {
         var schema = Map.<String, Object>of("type", "string");
-        var a = new CapabilityResponse("cap-1", "name", "desc", schema, schema, true);
-        var b = new CapabilityResponse("cap-1", "name", "desc", schema, schema, false);
+        var a = new CapabilityResponse("cap-1", "name", "desc", schema, schema, true, false);
+        var b = new CapabilityResponse("cap-1", "name", "desc", schema, schema, false, false);
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_beEqual_when_bothAllNull() {
-        var a = new CapabilityResponse(null, null, null, null, null, false);
-        var b = new CapabilityResponse(null, null, null, null, null, false);
+        var a = new CapabilityResponse(null, null, null, null, null, false, false);
+        var b = new CapabilityResponse(null, null, null, null, null, false, false);
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -194,7 +194,7 @@ class CapabilityResponseTest {
 
     @Test
     void should_containFieldValues_when_toStringCalled() {
-        var response = new CapabilityResponse("cap-1", "doSearch", "Searches things", Map.of("type", "object"), Map.of("result", "array"), true);
+        var response = new CapabilityResponse("cap-1", "doSearch", "Searches things", Map.of("type", "object"), Map.of("result", "array"), true, false);
         var str = response.toString();
 
         assertThat(str).contains("cap-1");
@@ -208,7 +208,7 @@ class CapabilityResponseTest {
 
     @Test
     void should_handleNullsInToString_when_fieldsAreNull() {
-        var response = new CapabilityResponse(null, null, null, null, null, false);
+        var response = new CapabilityResponse(null, null, null, null, null, false, false);
         var str = response.toString();
 
         assertThat(str).contains("null");

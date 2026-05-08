@@ -44,4 +44,13 @@ public class Capability {
 
     @Builder.Default
     private boolean async = false;
+
+    /**
+     * Whether this capability is allowed to write to the project filesystem
+     * (e.g. test-generator, feature-implementer). When true, the workflow block
+     * must explicitly opt in via {@code allow_writes: true} in its config; otherwise
+     * the block fails fast and the host-CLI is invoked with a read-only tool whitelist.
+     */
+    @Builder.Default
+    private boolean writes = false;
 }

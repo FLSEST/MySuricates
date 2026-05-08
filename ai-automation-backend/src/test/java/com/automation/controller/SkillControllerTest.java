@@ -117,7 +117,7 @@ class SkillControllerTest {
         Capability cap = Capability.builder()
                 .id("cap-1").name("ocr").description("Extract text").build();
         CapabilityResponse capResponse = new CapabilityResponse(
-                "cap-1", "ocr", "Extract text", Map.of(), Map.of(), false
+                "cap-1", "ocr", "Extract text", Map.of(), Map.of(), false, false
         );
 
         when(skillService.findCapabilities("skill-1")).thenReturn(List.of(cap));

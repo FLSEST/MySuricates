@@ -65,11 +65,11 @@ public final class BuiltInSkills {
 
                 Output well-structured, runnable test code with clear test names describing the expected behavior.""",
                 List.of(
-                        cap("generate_unit_tests", "Generate unit tests for the provided code",
+                        capWrites("generate_unit_tests", "Generate unit tests for the provided code",
                                 null,
                                 Map.of("type", "object", "properties", Map.of("code", Map.of("type", "string"), "framework", Map.of("type", "string"))),
                                 Map.of("type", "object", "properties", Map.of("tests", Map.of("type", "string")))),
-                        cap("generate_integration_tests", "Generate integration tests for component interactions",
+                        capWrites("generate_integration_tests", "Generate integration tests for component interactions",
                                 null,
                                 Map.of("type", "object", "properties", Map.of("components", Map.of("type", "array"))),
                                 Map.of("type", "object", "properties", Map.of("tests", Map.of("type", "string"))))
@@ -522,7 +522,7 @@ public final class BuiltInSkills {
                 - Use absolute paths when touching files outside the current working directory.
                 - Stay within the scope of the requested feature — no incidental refactors.""",
                 List.of(
-                        cap("implement_feature", "Implement a single feature in the target project",
+                        capWrites("implement_feature", "Implement a single feature in the target project",
                                 null,
                                 Map.of("type", "object", "properties", Map.of(
                                         "feature", Map.of("type", "object"),
@@ -531,14 +531,14 @@ public final class BuiltInSkills {
                                 Map.of("type", "object", "properties", Map.of(
                                         "files_changed", Map.of("type", "array"),
                                         "summary", Map.of("type", "string")))),
-                        cap("write_tests", "Write unit/integration tests for an implemented feature",
+                        capWrites("write_tests", "Write unit/integration tests for an implemented feature",
                                 null,
                                 Map.of("type", "object", "properties", Map.of(
                                         "feature", Map.of("type", "object"),
                                         "stack", Map.of("type", "object"))),
                                 Map.of("type", "object", "properties", Map.of(
                                         "test_files", Map.of("type", "array")))),
-                        cap("apply_routes_glue", "Wire a feature into the app's router/navigation/layout",
+                        capWrites("apply_routes_glue", "Wire a feature into the app's router/navigation/layout",
                                 null,
                                 Map.of("type", "object", "properties", Map.of(
                                         "feature_id", Map.of("type", "string"),
@@ -632,5 +632,17 @@ public final class BuiltInSkills {
                 .outputSchema(outputSchema)
                 .async(async)
                 .build();
+    }
+
+    /**
+     * Capability variant that writes to the project filesystem. Workflows referencing
+     * such a capability must explicitly opt in via {@code allow_writes: true} in the
+     * skill-capability block config; otherwise the block fails fast.
+     */
+    private static Capability capWrites(String name, String description, String handlerClass,
+                                         Map<String, Object> inputSchema, Map<String, Object> outputSchema) {
+        Capability c = cap(name, description, handlerClass, inputSchema, outputSchema, false);
+        c.setWrites(true);
+        return c;
     }
 }

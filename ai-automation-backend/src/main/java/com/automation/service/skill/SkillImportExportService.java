@@ -35,7 +35,8 @@ public class SkillImportExportService {
                         c.getHandlerClass(),
                         c.getInputSchema(),
                         c.getOutputSchema(),
-                        c.isAsync()
+                        c.isAsync(),
+                        c.isWrites()
                 ))
                 .toList();
 
@@ -75,6 +76,7 @@ public class SkillImportExportService {
                         .inputSchema(capReq.inputSchema() != null ? capReq.inputSchema() : new HashMap<>())
                         .outputSchema(capReq.outputSchema() != null ? capReq.outputSchema() : new HashMap<>())
                         .async(capReq.async())
+                        .writes(capReq.writes())
                         .build();
                 skill.getCapabilities().add(capability);
             }
