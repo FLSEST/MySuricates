@@ -197,7 +197,7 @@ class ExecutionControllerTest {
     }
 
     @Test
-    void approveExecution_validAnswer_returnsOk() throws Exception {
+    void approveExecution_answerYes_returnsOk() throws Exception {
         mockMvc.perform(post("/api/v1/executions/run-1/approve")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -209,6 +209,30 @@ class ExecutionControllerTest {
     }
 
     @Test
+    void approveExecution_answerNo_returnsOk() throws Exception {
+        mockMvc.perform(post("/api/v1/executions/run-1/approve")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"answer": "No"}
+                                """))
+                .andExpect(status().isOk());
+
+        verify(workflowExecutor).resolveApproval("run-1", "No");
+    }
+
+    @Test
+    void approveExecution_customStringAnswer_returnsOk() throws Exception {
+        mockMvc.perform(post("/api/v1/executions/run-1/approve")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"answer": "Deploy to staging instead"}
+                                """))
+                .andExpect(status().isOk());
+
+        verify(workflowExecutor).resolveApproval("run-1", "Deploy to staging instead");
+    }
+
+    @Test
     void approveExecution_blankAnswer_returns400() throws Exception {
         mockMvc.perform(post("/api/v1/executions/run-1/approve")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -216,6 +240,48 @@ class ExecutionControllerTest {
                                 {"answer": ""}
                                 """))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void approveExecution_nullAnswer_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/executions/run-1/approve")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"answer": null}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void approveExecution_missingBody_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/executions/run-1/approve")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void approveExecution_unknownExecution_returns404() throws Exception {
+        org.mockito.Mockito.doThrow(new ResourceNotFoundException("Execution", "unknown"))
+                .when(workflowExecutor).resolveApproval("unknown", "Yes");
+
+        mockMvc.perform(post("/api/v1/executions/unknown/approve")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"answer": "Yes"}
+                                """))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void approveExecution_delegatesCorrectIdAndAnswer() throws Exception {
+        mockMvc.perform(post("/api/v1/executions/exec-42/approve")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"answer": "Approved"}
+                                """))
+                .andExpect(status().isOk());
+
+        verify(workflowExecutor).resolveApproval("exec-42", "Approved");
     }
 
     @Test
