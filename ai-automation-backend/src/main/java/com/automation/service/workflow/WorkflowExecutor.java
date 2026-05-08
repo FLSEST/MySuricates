@@ -423,11 +423,15 @@ public class WorkflowExecutor {
                 }
             }
 
-            // Parse gate_status markers from ALL blocks — highest severity wins
+            // Parse gate_status markers from ALL blocks — highest severity wins.
             // GateStatus ordinal: GREEN(0) < YELLOW(1) < RED(2)
             GateStatus highestGate = null;
             String gateCategory = null;
             String gateDescription = null;
+            // Aggregate every parsed gate so trend tooling (e.g. public-readiness chains) can
+            // diff runs without re-parsing step outputs.
+            List<Map<String, Object>> gateItems = new ArrayList<>();
+            Map<String, Integer> gateCountsByStatus = new HashMap<>();
             for (StepResult step : run.getSteps()) {
                 if (step.getOutput() != null) {
                     var parsedGate = GateStatusOutputParser.parse(step.getOutput());
@@ -438,6 +442,13 @@ public class WorkflowExecutor {
                             gateCategory = gate.category();
                             gateDescription = gate.description();
                         }
+                        Map<String, Object> item = new HashMap<>();
+                        item.put("status", gate.status().name());
+                        if (gate.category() != null) item.put("category", gate.category());
+                        if (gate.description() != null) item.put("description", gate.description());
+                        item.put("step_index", step.getStepIndex());
+                        gateItems.add(item);
+                        gateCountsByStatus.merge(gate.status().name(), 1, Integer::sum);
                     }
                 }
             }
@@ -445,6 +456,14 @@ public class WorkflowExecutor {
                 context.setRunMetadata("gate_status", highestGate.name());
                 if (gateCategory != null) context.setRunMetadata("gate_category", gateCategory);
                 if (gateDescription != null) context.setRunMetadata("gate_description", gateDescription);
+
+                // gate_summary aggregates ALL parsed gates so a follow-up run can be diffed
+                // against a previous one without re-walking step outputs.
+                Map<String, Object> gateSummary = new HashMap<>();
+                gateSummary.put("highest", highestGate.name());
+                gateSummary.put("counts_by_status", gateCountsByStatus);
+                gateSummary.put("items", gateItems);
+                context.setRunMetadata("gate_summary", gateSummary);
             }
 
             // Parse todo_item markers from ALL blocks — collect granular TODO items

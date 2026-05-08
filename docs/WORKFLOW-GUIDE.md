@@ -731,6 +731,29 @@ fi
 
 Wenn mehrere Bloecke Gates emittieren, gewinnt der hoechste Schweregrad (RED > YELLOW > GREEN).
 
+**`run.metadata.gate_summary`** aggregiert zusaetzlich alle geparsten Gates des Runs:
+
+```json
+{
+  "gate_summary": {
+    "highest": "YELLOW",
+    "counts_by_status": {"GREEN": 3, "YELLOW": 2},
+    "items": [
+      {"step_index": 0, "status": "GREEN", "category": "public-inventory"},
+      {"step_index": 2, "status": "YELLOW", "category": "lint"}
+    ]
+  }
+}
+```
+
+Damit lassen sich zwei Runs ohne Re-Parsing diffen (z. B. fuer Public-Readiness-Trends):
+
+```bash
+curl -s -H "X-API-Key: $KEY" "$BASE/executions/$RUN1" | jq '.metadata.gate_summary' > a.json
+curl -s -H "X-API-Key: $KEY" "$BASE/executions/$RUN2" | jq '.metadata.gate_summary' > b.json
+diff <(jq -S . a.json) <(jq -S . b.json)
+```
+
 ---
 
 ## 5. Timeout-Konfiguration

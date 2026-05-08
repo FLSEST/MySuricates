@@ -813,6 +813,39 @@ class WorkflowExecutorTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void execute_aggregatesGateSummaryAcrossSteps() {
+        // Two-block workflow with mixed gates -> gate_summary aggregates both items + counts.
+        testWorkflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder().type("simple").config(new HashMap<>(Map.of("command", "first"))).build(),
+                BlockDefinition.builder().type("simple").config(new HashMap<>(Map.of("command", "second"))).build()
+        )));
+        StepResult greenStep = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED)
+                .output("gate_status: GREEN\ngate_category: tests")
+                .build();
+        StepResult yellowStep = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED)
+                .output("gate_status: YELLOW\ngate_category: lint\ngate_description: 2 warnings")
+                .build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(greenStep, yellowStep);
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        WorkflowRun saved = captureLastSavedRun();
+        Map<String, Object> summary = (Map<String, Object>) saved.getMetadata().get("gate_summary");
+        assertThat(summary).isNotNull();
+        assertThat(summary).containsEntry("highest", "YELLOW");
+        Map<String, Integer> counts = (Map<String, Integer>) summary.get("counts_by_status");
+        assertThat(counts).containsEntry("GREEN", 1).containsEntry("YELLOW", 1);
+        List<Map<String, Object>> items = (List<Map<String, Object>>) summary.get("items");
+        assertThat(items).hasSize(2);
+        assertThat(items).anyMatch(i -> "GREEN".equals(i.get("status")) && "tests".equals(i.get("category")));
+        assertThat(items).anyMatch(i -> "YELLOW".equals(i.get("status")) && "lint".equals(i.get("category")));
+    }
+
+    @Test
     void execute_redGateStatus_stillSetsCompleted() {
         // RED gate doesn't change RunStatus — AutoTodoService handles it via event
         StepResult step = StepResult.builder()
