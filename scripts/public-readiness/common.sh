@@ -9,5 +9,40 @@ redact() {
     -e 's#(https?://)[^/@[:space:]]+:[^/@[:space:]]+@#\1[REDACTED]@#g'
 }
 section() { printf '\n## %s\n' "$1"; }
+inventory_section() { printf '\n## %s [deterministic]\n' "$1"; }
+tool_section() {
+  local name="$1"
+  local tool="${2:-}"
+  printf '\n## %s [non-deterministic, tool-dependent]\n' "$name"
+  if [ -n "$tool" ]; then
+    if command -v "$tool" >/dev/null 2>&1; then
+      local version
+      version=$("$tool" --version 2>/dev/null | head -n 1 | redact || echo "unknown")
+      printf 'tool: %s\ntool_available: yes\ntool_version: %s\n' "$tool" "$version"
+    else
+      printf 'tool: %s\ntool_available: no\n' "$tool"
+    fi
+  fi
+}
+
+# Portable grep replacement. Workflow-block shells often lack ripgrep, so we
+# wrap GNU grep with sensible exclusions used across the public-readiness scripts.
+# No -n by default: callers add -n / -h / -c / -i / -o themselves.
+# Usage: pgrep [extra grep flags] PATTERN PATH...
+pgrep() {
+  grep -rE --binary-files=without-match -I \
+    --exclude-dir=node_modules --exclude-dir=target --exclude-dir=dist \
+    --exclude-dir=build --exclude-dir=data --exclude-dir=.git \
+    --exclude-dir=.output --exclude-dir=.tmp --exclude-dir=screenshots \
+    --exclude-dir=.playwright-mcp --exclude-dir=.idea --exclude-dir=.vscode \
+    --exclude='*.png' --exclude='*.jpg' --exclude='*.gif' --exclude='*.webp' \
+    --exclude='*.lock' --exclude='*.min.js' --exclude='*.map' \
+    "$@" 2>/dev/null
+}
+# Total match count across files. Returns "0" on no match.
+pgrep_count_total() {
+  pgrep "$@" | wc -l | tr -d ' '
+}
+
 run_limited() { "$@" 2>&1 | redact | head -n "$MAX_LINES"; return ${PIPESTATUS[0]}; }
 cd_root() { cd "$ROOT" || exit 2; }

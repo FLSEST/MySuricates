@@ -17,3 +17,7 @@ section "Test file count"
 find . -type f \( -name '*test*' -o -name '*spec*' \) ! -path '*/node_modules/*' ! -path '*/dist/*' ! -path '*/build/*' ! -path '*/target/*' ! -path '*/data/*' ! -path '*/.git/*' | wc -l
 section "Existing image/screenshot candidates (filenames only)"
 find . -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.webp' -o -iname '*.gif' \) ! -path '*/node_modules/*' ! -path '*/data/*' ! -path '*/.git/*' | sed 's#^./##' | head -120 | redact
+section "Gate status"
+echo "gate_status: GREEN"
+echo "gate_category: public-inventory"
+echo "gate_description: Safe inventory completed; review evidence before publication."
