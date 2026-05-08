@@ -37,3 +37,12 @@ ai-automation-backend/stable-frontend/
 /output/
 /todo-sdk/
 /templatetesting/
+
+# Public-readiness generated artefacts
+.tmp/
+docs/public/generated/
+screenshots/raw/
+
+# Python bytecode
+__pycache__/
+*.pyc
