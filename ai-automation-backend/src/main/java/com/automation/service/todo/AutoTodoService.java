@@ -258,8 +258,7 @@ public class AutoTodoService {
         if (itemDescription != null && !itemDescription.isBlank()) {
             sb.append(itemDescription);
         }
-        sb.append("\n\n---\n*Workflow: ").append(event.getWorkflowName())
-                .append(" | Run: `").append(event.getRunId()).append("`*");
+        sb.append("\n\n---\n").append(buildSourceFooter(event));
         return sb.toString();
     }
 
@@ -506,9 +505,23 @@ public class AutoTodoService {
             sb.append(gate.description());
         }
 
-        sb.append("\n\n---\n*Workflow: ").append(event.getWorkflowName())
-                .append(" | Run: `").append(event.getRunId()).append("`*");
+        sb.append("\n\n---\n").append(buildSourceFooter(event));
         return sb.toString();
+    }
+
+    /**
+     * Builds a markdown footer that links the auto-todo back to its source run/workflow.
+     * Uses relative URLs so the same TODO renders correctly on every instance (Dev/Stable/Test).
+     */
+    private String buildSourceFooter(WorkflowRunCompletedEvent event) {
+        String wfId = event.getWorkflowId();
+        String runId = event.getRunId();
+        String name = event.getWorkflowName();
+        if (wfId != null && runId != null) {
+            return "*Source: [" + name + "](/workflows/" + wfId + ")"
+                    + " · [Run →](/workflows/" + wfId + "/run/" + runId + ")*";
+        }
+        return "*Workflow: " + name + " | Run: `" + runId + "`*";
     }
 
     /**

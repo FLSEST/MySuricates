@@ -571,6 +571,40 @@ class AutoTodoServiceTest {
                     && t.getDescription().contains("Test Workflow")
                     && t.getDescription().contains("run-1"));
         }
+
+        @Test
+        void buildGranularDescription_footerContainsClickableRunAndWorkflowLinks() {
+            Map<String, Object> todoItem = Map.of(
+                    "title", "Test item",
+                    "priority", "LOW",
+                    "tags", List.of(),
+                    "description", "Item description");
+
+            Map<String, Object> runMeta = new HashMap<>();
+            runMeta.put("todo_items", List.of(todoItem));
+
+            WorkflowRunCompletedEvent event = createEvent(RunStatus.COMPLETED, runMeta, AUTO_TODO_ENABLED_META);
+            when(gateStatusResolver.resolve(event))
+                    .thenReturn(new GateResult(GateStatus.GREEN, "ok", null));
+            when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
+                    .thenReturn(Optional.empty());
+            when(similarityService.findSimilar(anyString(), anyString(), any()))
+                    .thenReturn(List.of());
+            when(todoRepository.findByProjectIdAndSourceAndReferenceTypeAndReferenceIdAndStatusNot(
+                    anyString(), any(), anyString(), anyString(), any()))
+                    .thenReturn(List.of());
+            when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            autoTodoService.onWorkflowRunCompleted(event);
+
+            ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+            verify(todoRepository, atLeastOnce()).save(captor.capture());
+            // Workflow link uses workflowId; Run link uses workflowId/run/runId. Relative URLs work
+            // on every instance (Dev :3000, Stable :9091, Test :8090).
+            assertThat(captor.getAllValues()).anyMatch(t ->
+                    t.getDescription().contains("[Test Workflow](/workflows/wf-1)")
+                    && t.getDescription().contains("[Run →](/workflows/wf-1/run/run-1)"));
+        }
     }
 
     @Test
