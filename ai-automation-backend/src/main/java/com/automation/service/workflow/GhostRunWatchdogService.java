@@ -8,6 +8,7 @@ import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.activitylog.ActivityLogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -25,7 +26,8 @@ import java.util.Map;
 @Slf4j
 public class GhostRunWatchdogService {
 
-    private static final long STALE_THRESHOLD_MINUTES = 10;
+    @Value("${automation.execution.ghost-watchdog-stale-minutes:30}")
+    private long staleThresholdMinutes;
 
     private final WorkflowRunRepository runRepository;
     private final WorkflowExecutor workflowExecutor;
@@ -41,7 +43,7 @@ public class GhostRunWatchdogService {
             return;
         }
 
-        Instant staleThreshold = Instant.now().minus(STALE_THRESHOLD_MINUTES, ChronoUnit.MINUTES);
+        Instant staleThreshold = Instant.now().minus(staleThresholdMinutes, ChronoUnit.MINUTES);
         int ghostCount = 0;
 
         for (WorkflowRun run : runningRuns) {

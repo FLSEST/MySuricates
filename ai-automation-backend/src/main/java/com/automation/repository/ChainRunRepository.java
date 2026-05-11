@@ -26,6 +26,8 @@ public interface ChainRunRepository extends JpaRepository<ChainRun, String> {
 
     boolean existsByChainIdAndStatus(String chainId, RunStatus status);
 
+    List<ChainRun> findByStatus(RunStatus status);
+
     List<ChainRun> findByTriggeredByScheduleIdOrderByStartedAtDesc(String scheduleId);
 
     @Query("SELECT cr FROM ChainRun cr LEFT JOIN cr.chain c " +

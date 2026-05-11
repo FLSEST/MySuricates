@@ -12,6 +12,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -36,6 +37,7 @@ class GhostRunWatchdogServiceTest {
     void setUp() {
         service = new GhostRunWatchdogService(runRepository, workflowExecutor,
                 executionSemaphore, broadcaster, activityLogService);
+        ReflectionTestUtils.setField(service, "staleThresholdMinutes", 10L);
     }
 
     private void stubPermitsBalanced() {

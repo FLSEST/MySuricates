@@ -114,6 +114,9 @@ automation:
     # When set, the host side of every extra mount must start with one of these prefixes.
     # Supports leading "~" (= $HOME). Example: "~/Entwicklung,~/dokumente"
     allowed-mount-prefixes: ${AUTOMATION_ALLOWED_MOUNT_PREFIXES:}
+    # Ghost-Run-Watchdog: maximal tolerierte Zeit zwischen save(RUNNING) und register().
+    # Muss laenger sein als der laengste legitime Semaphore-Wait + Container-Init.
+    ghost-watchdog-stale-minutes: ${AUTOMATION_GHOST_WATCHDOG_STALE:30}
   summarization:
     base-dir: ${AUTOMATION_SUMMARIZATION_DIR:${user.home}/.autotrigger/summarization}
     timeout-seconds: ${AUTOMATION_SUMMARIZATION_TIMEOUT:120}

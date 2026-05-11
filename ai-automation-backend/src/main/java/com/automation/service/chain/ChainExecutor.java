@@ -11,7 +11,9 @@ import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
@@ -92,6 +94,28 @@ public class ChainExecutor {
         if (flag != null) {
             flag.set(true);
         }
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void cleanupZombieChainRuns() {
+        List<ChainRun> zombies = new ArrayList<>();
+        zombies.addAll(chainRunRepository.findByStatus(RunStatus.RUNNING));
+        zombies.addAll(chainRunRepository.findByStatus(RunStatus.PAUSED));
+        if (zombies.isEmpty()) {
+            return;
+        }
+        log.warn("Found {} chain-run(s) stuck in RUNNING/PAUSED — marking as INTERRUPTED", zombies.size());
+        for (ChainRun zombie : zombies) {
+            zombie.setStatus(RunStatus.INTERRUPTED);
+            zombie.setCompletedAt(Instant.now());
+            if (zombie.getStartedAt() != null) {
+                zombie.setDurationMs(zombie.getCompletedAt().toEpochMilli() - zombie.getStartedAt().toEpochMilli());
+            }
+            chainRunRepository.save(zombie);
+        }
+        activityLogService.warn(LogCategory.EXECUTION,
+                "Startup cleanup: marked " + zombies.size() + " chain-run(s) as INTERRUPTED",
+                "ChainExecutor");
     }
 
     private void executeEntries(String runId, WorkflowChain chain, Map<String, Object> inputContext) {
