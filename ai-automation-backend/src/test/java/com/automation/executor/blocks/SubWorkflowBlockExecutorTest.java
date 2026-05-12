@@ -3,6 +3,7 @@ package com.automation.executor.blocks;
 import com.automation.entity.*;
 import com.automation.exception.WorkflowExecutionException;
 import com.automation.executor.ExecutionContext;
+import com.automation.repository.StepResultRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
@@ -34,13 +35,16 @@ class SubWorkflowBlockExecutorTest {
     @Mock
     private WorkflowRunRepository runRepository;
 
+    @Mock
+    private StepResultRepository stepResultRepository;
+
     private SubWorkflowBlockExecutor executor;
 
     private ExecutionContext context;
 
     @BeforeEach
     void setUp() {
-        executor = new SubWorkflowBlockExecutor(workflowService, workflowExecutor, runRepository);
+        executor = new SubWorkflowBlockExecutor(workflowService, workflowExecutor, runRepository, stepResultRepository);
         context = ExecutionContext.builder()
                 .containerId("container-1")
                 .workflowRunId("run-1")
@@ -124,6 +128,8 @@ class SubWorkflowBlockExecutorTest {
 
         when(workflowExecutor.execute(eq(subWorkflow), any(Map.class))).thenReturn(subRun);
         when(runRepository.findById("sub-run-1")).thenReturn(Optional.of(subRun));
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("sub-run-1"))
+                .thenReturn(List.of(subStep));
 
         BlockDefinition block = BlockDefinition.builder()
                 .type("sub-workflow")

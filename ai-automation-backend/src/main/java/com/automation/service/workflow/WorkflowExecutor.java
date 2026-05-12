@@ -208,6 +208,8 @@ public class WorkflowExecutor {
             inputContext.forEach(context::setVariable);
             if (resumePreviousOutput != null) {
                 context.setPreviousOutput(resumePreviousOutput);
+            } else if (inputContext.get("previous_output") != null) {
+                context.setPreviousOutput(String.valueOf(inputContext.get("previous_output")));
             }
 
             // Inject workflow & run metadata as template variables

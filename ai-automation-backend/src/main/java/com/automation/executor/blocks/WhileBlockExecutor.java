@@ -114,7 +114,7 @@ public class WhileBlockExecutor implements BlockExecutor {
         }
 
         aggregateResult.setOutput(outputs.toString().trim());
-        if (aggregateResult.getStatus() == null) {
+        if (aggregateResult.getStatus() == null || aggregateResult.getStatus() == StepStatus.PENDING) {
             aggregateResult.setStatus(StepStatus.COMPLETED);
         }
         aggregateResult.setCompletedAt(Instant.now());

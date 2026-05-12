@@ -4,6 +4,7 @@ import com.automation.entity.*;
 import com.automation.exception.WorkflowExecutionException;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
+import com.automation.repository.StepResultRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
@@ -25,13 +26,16 @@ public class SubWorkflowBlockExecutor implements BlockExecutor {
     private final WorkflowService workflowService;
     private final WorkflowExecutor workflowExecutor;
     private final WorkflowRunRepository runRepository;
+    private final StepResultRepository stepResultRepository;
 
     public SubWorkflowBlockExecutor(WorkflowService workflowService,
                                     @Lazy WorkflowExecutor workflowExecutor,
-                                    WorkflowRunRepository runRepository) {
+                                    WorkflowRunRepository runRepository,
+                                    StepResultRepository stepResultRepository) {
         this.workflowService = workflowService;
         this.workflowExecutor = workflowExecutor;
         this.runRepository = runRepository;
+        this.stepResultRepository = stepResultRepository;
     }
 
     @Override
@@ -147,18 +151,17 @@ public class SubWorkflowBlockExecutor implements BlockExecutor {
     }
 
     private String buildOutput(WorkflowRun run) {
+        List<StepResult> steps = stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc(run.getId());
         StringBuilder sb = new StringBuilder();
         sb.append("Sub-workflow completed with status: ").append(run.getStatus()).append("\n");
-        if (run.getSteps() != null) {
-            for (StepResult step : run.getSteps()) {
-                sb.append("[Step ").append(step.getStepIndex()).append("] ")
-                        .append(step.getStatus())
-                        .append(": ").append(truncate(step.getOutput(), 500)).append("\n");
-            }
+        for (StepResult step : steps) {
+            sb.append("[Step ").append(step.getStepIndex()).append("] ")
+                    .append(step.getStatus())
+                    .append(": ").append(truncate(step.getOutput(), 500)).append("\n");
         }
         // Return last step output as main output
-        if (run.getSteps() != null && !run.getSteps().isEmpty()) {
-            StepResult lastStep = run.getSteps().get(run.getSteps().size() - 1);
+        if (!steps.isEmpty()) {
+            StepResult lastStep = steps.get(steps.size() - 1);
             if (lastStep.getOutput() != null) {
                 return lastStep.getOutput();
             }

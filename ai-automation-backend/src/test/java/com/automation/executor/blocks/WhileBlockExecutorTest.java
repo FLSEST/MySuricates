@@ -77,8 +77,7 @@ class WhileBlockExecutorTest {
 
         StepResult result = executor.execute(block, context);
 
-        // StepResult defaults to PENDING; the null-check in source never triggers
-        assertThat(result.getStatus()).isEqualTo(StepStatus.PENDING);
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         assertThat(result.getOutput()).contains("[iteration 1]");
         verify(commandExecutor, times(1)).executeStepAsShell(eq("/tmp/project"), any(), anyInt(), eq(60));
     }
@@ -102,7 +101,7 @@ class WhileBlockExecutorTest {
 
         StepResult result = executor.execute(block, context);
 
-        assertThat(result.getStatus()).isEqualTo(StepStatus.PENDING);
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         assertThat(result.getOutput()).contains("[iteration 1]");
         assertThat(result.getOutput()).contains("[iteration 3]");
         verify(commandExecutor, times(3)).executeStepAsShell(eq("/tmp/project"), any(), anyInt(), eq(60));
@@ -145,7 +144,7 @@ class WhileBlockExecutorTest {
 
         StepResult result = executor.execute(block, context);
 
-        assertThat(result.getStatus()).isEqualTo(StepStatus.PENDING);
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         assertThat(result.getOutput()).isEmpty();
         verifyNoInteractions(commandExecutor);
     }
@@ -173,7 +172,7 @@ class WhileBlockExecutorTest {
 
         StepResult result = executor.execute(block, context);
 
-        assertThat(result.getStatus()).isEqualTo(StepStatus.PENDING);
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         assertThat(result.getOutput()).contains("[iteration 1]");
         verify(commandExecutor, times(1)).executeStepOnHost(any(HostExecutionRequest.class));
     }
