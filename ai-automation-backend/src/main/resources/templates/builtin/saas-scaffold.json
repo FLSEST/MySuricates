@@ -18,14 +18,14 @@
     "type" : "shell",
     "config" : {
       "timeout_seconds" : 30,
-      "command" : "set -euo pipefail\nFACTORY=\"${FACTORY_ROOT:-/home/flo/Entwicklung/IdeaProjects/saas-factory}\"\nSLUG=\"{{ slug }}\"\nSTACK_HINT=\"{{ stack_hint }}\"\nSPEC_TYPE=\"{{ spec_type }}\"\nif [ -z \"$SLUG\" ]; then\n  echo 'ERROR: slug fehlt' >&2; exit 2\nfi\nRECIPE=$(\"$FACTORY/tools/factory\" pick-recipe ${STACK_HINT:+--stack \"$STACK_HINT\"} ${SPEC_TYPE:+--type \"$SPEC_TYPE\"})\nPORT=$(\"$FACTORY/tools/factory\" port --reserve --app \"$SLUG\")\necho \"RECIPE=$RECIPE\"\necho \"PORT=$PORT\"\necho \"TARGET=$FACTORY/$SLUG\"\necho \"SLUG=$SLUG\""
+      "command" : "set -euo pipefail\nFACTORY=\"${FACTORY_ROOT:-./saas-factory}\"\nSLUG=\"{{ slug }}\"\nSTACK_HINT=\"{{ stack_hint }}\"\nSPEC_TYPE=\"{{ spec_type }}\"\nif [ -z \"$SLUG\" ]; then\n  echo 'ERROR: slug fehlt' >&2; exit 2\nfi\nRECIPE=$(\"$FACTORY/tools/factory\" pick-recipe ${STACK_HINT:+--stack \"$STACK_HINT\"} ${SPEC_TYPE:+--type \"$SPEC_TYPE\"})\nPORT=$(\"$FACTORY/tools/factory\" port --reserve --app \"$SLUG\")\necho \"RECIPE=$RECIPE\"\necho \"PORT=$PORT\"\necho \"TARGET=$FACTORY/$SLUG\"\necho \"SLUG=$SLUG\""
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "shell",
     "config" : {
       "timeout_seconds" : 600,
-      "command" : "set -euo pipefail\nFACTORY=\"${FACTORY_ROOT:-/home/flo/Entwicklung/IdeaProjects/saas-factory}\"\nSLUG=\"{{ slug }}\"\nPREVIOUS='{{ previous_output }}'\nRECIPE=$(echo \"$PREVIOUS\" | grep '^RECIPE=' | head -1 | cut -d= -f2-)\nPORT=$(echo \"$PREVIOUS\" | grep '^PORT=' | head -1 | cut -d= -f2-)\nTARGET=\"$FACTORY/$SLUG\"\necho \"Scaffolding $SLUG → $TARGET (recipe=$RECIPE port=$PORT)\"\n\"$FACTORY/tools/factory\" scaffold --recipe \"$RECIPE\" --target \"$TARGET\" --name \"$SLUG\" --port \"$PORT\""
+      "command" : "set -euo pipefail\nFACTORY=\"${FACTORY_ROOT:-./saas-factory}\"\nSLUG=\"{{ slug }}\"\nPREVIOUS='{{ previous_output }}'\nRECIPE=$(echo \"$PREVIOUS\" | grep '^RECIPE=' | head -1 | cut -d= -f2-)\nPORT=$(echo \"$PREVIOUS\" | grep '^PORT=' | head -1 | cut -d= -f2-)\nTARGET=\"$FACTORY/$SLUG\"\necho \"Scaffolding $SLUG → $TARGET (recipe=$RECIPE port=$PORT)\"\n\"$FACTORY/tools/factory\" scaffold --recipe \"$RECIPE\" --target \"$TARGET\" --name \"$SLUG\" --port \"$PORT\""
     },
     "requiredCapabilities" : [ ]
   }, {
@@ -33,7 +33,7 @@
     "config" : {
       "timeout_seconds" : 900,
       "on_failure" : "continue",
-      "command" : "set -euo pipefail\nFACTORY=\"${FACTORY_ROOT:-/home/flo/Entwicklung/IdeaProjects/saas-factory}\"\nSLUG=\"{{ slug }}\"\nTARGET=\"$FACTORY/$SLUG\"\ncd \"$TARGET\"\nif [ -f docker-compose.yml ]; then\n  docker compose build 2>&1 | tail -50\n  docker compose up -d 2>&1 | tail -20\n  sleep 10\nfi\n\"$FACTORY/tools/factory\" smoke \"$TARGET\" --timeout 60 || echo 'Smoke-Test fehlgeschlagen (non-fatal beim leeren Skelett)'"
+      "command" : "set -euo pipefail\nFACTORY=\"${FACTORY_ROOT:-./saas-factory}\"\nSLUG=\"{{ slug }}\"\nTARGET=\"$FACTORY/$SLUG\"\ncd \"$TARGET\"\nif [ -f docker-compose.yml ]; then\n  docker compose build 2>&1 | tail -50\n  docker compose up -d 2>&1 | tail -20\n  sleep 10\nfi\n\"$FACTORY/tools/factory\" smoke \"$TARGET\" --timeout 60 || echo 'Smoke-Test fehlgeschlagen (non-fatal beim leeren Skelett)'"
     },
     "requiredCapabilities" : [ ]
   } ]

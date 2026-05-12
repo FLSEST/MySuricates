@@ -18,14 +18,14 @@
     "type" : "shell",
     "config" : {
       "timeout_seconds" : 300,
-      "command" : "set -euo pipefail\nFACTORY=\"${FACTORY_ROOT:-/home/flo/Entwicklung/IdeaProjects/saas-factory}\"\necho '=== Cleanup alter Container/Images (>14 Tage) ==='\n\"$FACTORY/tools/factory\" cleanup --older-than 14 || true"
+      "command" : "set -euo pipefail\nFACTORY=\"${FACTORY_ROOT:-./saas-factory}\"\necho '=== Cleanup alter Container/Images (>14 Tage) ==='\n\"$FACTORY/tools/factory\" cleanup --older-than 14 || true"
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "shell",
     "config" : {
       "timeout_seconds" : 60,
-      "command" : "set -euo pipefail\nDB='/home/flo/Entwicklung/tools/autotrigger/ai-automation-backend/data/automation.db'\nKEY=$(python3 -c \"import sqlite3; c=sqlite3.connect('$DB'); print(c.execute(\\\"SELECT value FROM app_settings WHERE key='api-key'\\\").fetchone()[0])\")\necho '=== Offene SaaS-Factory-TODOs ==='\ncurl -s 'http://localhost:9090/api/v1/todos?status=OPEN&projectId=685061f8-5eb6-4f9e-9bf7-2b1549325eee&size=100' -H \"X-API-Key: $KEY\" | python3 -c 'import sys,json;d=json.load(sys.stdin);content=d.get(\"content\",d) if isinstance(d,dict) else d;print(f\"OPEN_COUNT={len(content)}\");[print(f\"- [{t[\\\"priority\\\"]}] {t[\\\"id\\\"][:8]} {t[\\\"title\\\"]}\") for t in content[:20]]'"
+      "command" : "set -euo pipefail\necho '=== Offene SaaS-Factory-TODOs ==='\ncat <<'TODOS'\n{{ open_todos }}\nTODOS"
     },
     "requiredCapabilities" : [ ]
   }, {

@@ -18,7 +18,7 @@
     "type" : "shell",
     "config" : {
       "timeout_seconds" : 1800,
-      "command" : "set -euo pipefail\nFACTORY=\"${FACTORY_ROOT:-/home/flo/Entwicklung/IdeaProjects/saas-factory}\"\nSLUG=\"{{ slug }}\"\nTARGET=\"$FACTORY/$SLUG\"\n\"$FACTORY/tools/factory\" build-container \"$TARGET\" --smoke"
+      "command" : "set -euo pipefail\nFACTORY=\"${FACTORY_ROOT:-./saas-factory}\"\nSLUG=\"{{ slug }}\"\nTARGET=\"$FACTORY/$SLUG\"\n\"$FACTORY/tools/factory\" build-container \"$TARGET\" --smoke"
     },
     "requiredCapabilities" : [ ]
   }, {
@@ -35,7 +35,7 @@
     "config" : {
       "timeout_seconds" : 60,
       "on_failure" : "continue",
-      "command" : "set -euo pipefail\nFACTORY=\"${FACTORY_ROOT:-/home/flo/Entwicklung/IdeaProjects/saas-factory}\"\nDECISION=\"{{ containerize_decision }}\"\nSLUG=\"{{ slug }}\"\nif [ \"$DECISION\" = 'No' ]; then\n  \"$FACTORY/tools/factory\" create-todo \"Manual Review nötig: $SLUG nach Containerize abgelehnt\" --tag manual-review --tag \"$SLUG\" --priority HIGH --workflow-run '{{ workflow_run_id }}' --reference-type 'containerize_rejected' --reference-id \"$SLUG\" >&2 || true\nfi\necho \"Decision: $DECISION\""
+      "command" : "set -euo pipefail\nFACTORY=\"${FACTORY_ROOT:-./saas-factory}\"\nDECISION=\"{{ containerize_decision }}\"\nSLUG=\"{{ slug }}\"\nif [ \"$DECISION\" = 'No' ]; then\n  \"$FACTORY/tools/factory\" create-todo \"Manual Review nötig: $SLUG nach Containerize abgelehnt\" --tag manual-review --tag \"$SLUG\" --priority HIGH --workflow-run '{{ workflow_run_id }}' --reference-type 'containerize_rejected' --reference-id \"$SLUG\" >&2 || true\nfi\necho \"Decision: $DECISION\""
     },
     "requiredCapabilities" : [ ]
   } ]
