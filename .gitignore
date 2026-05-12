@@ -7,8 +7,9 @@ certs/
 # Playwright MCP
 .playwright-mcp/
 
-# Scheduler runtime lock
-.claude/scheduled_tasks.lock
+# Claude Code runtime (settings, rules, scheduled tasks, plans)
+.claude/
+docs/superpowers/
 
 # Frontend build artifacts
 ai-automation-frontend/node_modules/
@@ -38,10 +39,18 @@ ai-automation-backend/stable-frontend/
 /todo-sdk/
 /templatetesting/
 
-# Public-readiness generated artefacts
+# Public-readiness generated artefacts and internal reports
 .tmp/
+.output/
+reports/
+review/
 docs/public/generated/
 screenshots/raw/
+
+# Debug snapshots (host hardware/identity)
+diagnose-report.md
+diagnose-raw-output.txt
+*.txt.bak
 
 # Python bytecode
 __pycache__/
