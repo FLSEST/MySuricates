@@ -174,7 +174,8 @@ class ActivityLogTest {
                         ActivityLog.LogCategory.SCHEDULE,
                         ActivityLog.LogCategory.WEBHOOK,
                         ActivityLog.LogCategory.SECURITY,
-                        ActivityLog.LogCategory.CONTAINER
+                        ActivityLog.LogCategory.CONTAINER,
+                        ActivityLog.LogCategory.PLUGIN
                 );
     }
 
@@ -186,6 +187,7 @@ class ActivityLogTest {
         assertThat(ActivityLog.LogCategory.valueOf("WEBHOOK")).isEqualTo(ActivityLog.LogCategory.WEBHOOK);
         assertThat(ActivityLog.LogCategory.valueOf("SECURITY")).isEqualTo(ActivityLog.LogCategory.SECURITY);
         assertThat(ActivityLog.LogCategory.valueOf("CONTAINER")).isEqualTo(ActivityLog.LogCategory.CONTAINER);
+        assertThat(ActivityLog.LogCategory.valueOf("PLUGIN")).isEqualTo(ActivityLog.LogCategory.PLUGIN);
     }
 
     @Test

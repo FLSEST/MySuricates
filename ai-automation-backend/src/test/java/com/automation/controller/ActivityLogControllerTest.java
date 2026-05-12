@@ -16,6 +16,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.automation.entity.ActivityLog;
@@ -25,8 +26,9 @@ import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(ActivityLogController.class)
@@ -126,5 +128,54 @@ class ActivityLogControllerTest {
                 .andExpect(jsonPath("$.size").value(25))
                 .andExpect(jsonPath("$.totalElements").value(51))
                 .andExpect(jsonPath("$.totalPages").value(3));
+    }
+
+    @Test
+    void createPluginLog_writesPluginCategoryAndReturnsCreated() throws Exception {
+        var entry = ActivityLog.builder()
+                .id("log-1")
+                .timestamp(Instant.now())
+                .level(LogLevel.WARN)
+                .category(LogCategory.PLUGIN)
+                .message("Skill failed")
+                .source("mysuricates")
+                .referenceId("run-workflow")
+                .workflowId("wf-1")
+                .metadata(Map.of("durationMs", 1200))
+                .build();
+        var response = new ActivityLogResponse("log-1", entry.getTimestamp(), "WARN", "PLUGIN",
+                "Skill failed", "mysuricates", "run-workflow", "wf-1", entry.getMetadata(), Instant.now());
+
+        when(activityLogService.log(eq(LogLevel.WARN), eq(LogCategory.PLUGIN), eq("Skill failed"),
+                eq("mysuricates"), eq("run-workflow"), eq(Map.of("durationMs", 1200)), eq("wf-1")))
+                .thenReturn(entry);
+        when(activityLogMapper.toResponse(entry)).thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/activity-log")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "level": "WARN",
+                                  "message": "Skill failed",
+                                  "source": "mysuricates",
+                                  "referenceId": "run-workflow",
+                                  "workflowId": "wf-1",
+                                  "metadata": { "durationMs": 1200 }
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value("log-1"))
+                .andExpect(jsonPath("$.category").value("PLUGIN"));
+
+        verify(activityLogService).log(LogLevel.WARN, LogCategory.PLUGIN, "Skill failed",
+                "mysuricates", "run-workflow", Map.of("durationMs", 1200), "wf-1");
+    }
+
+    @Test
+    void createPluginLog_blankMessage_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/activity-log")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"  \"}"))
+                .andExpect(status().isBadRequest());
     }
 }

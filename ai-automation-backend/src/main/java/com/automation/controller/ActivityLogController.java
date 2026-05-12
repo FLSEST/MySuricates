@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.dto.request.CreateActivityLogRequest;
 import com.automation.dto.response.ActivityLogResponse;
 import com.automation.dto.response.PageResponse;
 import com.automation.entity.ActivityLog.LogCategory;
@@ -7,6 +8,8 @@ import com.automation.entity.ActivityLog.LogLevel;
 import com.automation.mapper.ActivityLogMapper;
 import com.automation.service.activitylog.ActivityLogService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -38,5 +41,25 @@ public class ActivityLogController {
                 result.getTotalElements(),
                 result.getTotalPages()
         );
+    }
+
+    @PostMapping
+    public ResponseEntity<ActivityLogResponse> createPluginLog(@RequestBody CreateActivityLogRequest request) {
+        if (request.message() == null || request.message().isBlank()) {
+            throw new IllegalArgumentException("message must not be blank");
+        }
+
+        LogLevel level = request.level() != null ? request.level() : LogLevel.INFO;
+        var entry = activityLogService.log(
+                level,
+                LogCategory.PLUGIN,
+                request.message().trim(),
+                request.source() != null && !request.source().isBlank() ? request.source().trim() : "plugin",
+                request.referenceId(),
+                request.metadata(),
+                request.workflowId()
+        );
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(activityLogMapper.toResponse(entry));
     }
 }

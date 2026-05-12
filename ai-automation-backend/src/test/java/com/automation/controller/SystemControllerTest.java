@@ -22,6 +22,7 @@ import java.sql.Statement;
 
 import java.util.Optional;
 
+import static org.hamcrest.Matchers.hasItem;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -331,5 +332,19 @@ class SystemControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.providers").isArray())
                 .andExpect(jsonPath("$.providers.length()").value(2));
+    }
+
+    @Test
+    void capabilities_returnsRoutesAndBlockTypes() throws Exception {
+        when(systemIdentity.getVersion()).thenReturn("0.7.2-SNAPSHOT");
+        when(systemIdentity.getBuildType()).thenReturn("SNAPSHOT");
+
+        mockMvc.perform(get("/api/v1/system/capabilities"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.apiVersion").value("v1"))
+                .andExpect(jsonPath("$.appVersion").value("0.7.2-SNAPSHOT"))
+                .andExpect(jsonPath("$.routes[*].path", hasItem("/api/v1/system/capabilities")))
+                .andExpect(jsonPath("$.blockTypes[*].type", hasItem("shell")))
+                .andExpect(jsonPath("$.generatedAt").exists());
     }
 }

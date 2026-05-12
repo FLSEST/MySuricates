@@ -25,7 +25,7 @@ public class ActivityLog {
     }
 
     public enum LogCategory {
-        SYSTEM, EXECUTION, SCHEDULE, WEBHOOK, SECURITY, CONTAINER
+        SYSTEM, EXECUTION, SCHEDULE, WEBHOOK, SECURITY, CONTAINER, PLUGIN
     }
 
     @Id

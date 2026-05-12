@@ -1,7 +1,9 @@
 package com.automation.controller;
 
 import com.automation.dto.response.RemoteAccessResponse;
+import com.automation.dto.response.SystemCapabilitiesResponse;
 import com.automation.service.ai.AiProviderRegistry;
+import com.automation.service.assistant.context.BlockTypesIndexSection;
 import com.automation.service.repair.AutoRepairService;
 import com.automation.service.system.*;
 import com.github.dockerjava.api.DockerClient;
@@ -14,6 +16,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 import javax.sql.DataSource;
 import java.io.*;
@@ -42,6 +47,7 @@ public class SystemController {
     private final SystemSettingsService systemSettingsService;
     private final FileBrowserService fileBrowserService;
     private final IntegrationSnippetService integrationSnippetService;
+    private final RequestMappingHandlerMapping requestMappingHandlerMapping;
 
     @Value("${automation.security.enabled:true}")
     private boolean securityEnabled;
@@ -132,6 +138,70 @@ public class SystemController {
                 "providers", aiProviderRegistry.getAvailableProviderIds(),
                 "default", aiProviderRegistry.getDefaultProviderId()
         );
+    }
+
+    @GetMapping("/capabilities")
+    public SystemCapabilitiesResponse capabilities() {
+        List<SystemCapabilitiesResponse.RouteCapabilityResponse> routes = requestMappingHandlerMapping
+                .getHandlerMethods()
+                .entrySet()
+                .stream()
+                .flatMap(entry -> routeCapabilities(entry.getKey(), entry.getValue()).stream())
+                .sorted(Comparator.comparing(SystemCapabilitiesResponse.RouteCapabilityResponse::path)
+                        .thenComparing(r -> String.join(",", r.methods())))
+                .toList();
+
+        List<SystemCapabilitiesResponse.BlockTypeCapabilityResponse> blockTypes = BlockTypesIndexSection.BLOCK_TYPES
+                .stream()
+                .map(e -> new SystemCapabilitiesResponse.BlockTypeCapabilityResponse(e.type(), e.summary()))
+                .toList();
+
+        return new SystemCapabilitiesResponse(
+                "v1",
+                systemIdentity.getVersion(),
+                systemIdentity.getBuildType(),
+                environment,
+                routes,
+                blockTypes,
+                Instant.now()
+        );
+    }
+
+    private List<SystemCapabilitiesResponse.RouteCapabilityResponse> routeCapabilities(
+            RequestMappingInfo info,
+            HandlerMethod handlerMethod) {
+        List<String> paths = routePaths(info);
+        if (paths.isEmpty()) {
+            return List.of();
+        }
+
+        List<String> methods = info.getMethodsCondition().getMethods().stream()
+                .map(Enum::name)
+                .sorted()
+                .toList();
+        if (methods.isEmpty()) {
+            methods = List.of("ANY");
+        }
+
+        List<String> finalMethods = methods;
+        return paths.stream()
+                .filter(path -> path.startsWith("/api/"))
+                .map(path -> new SystemCapabilitiesResponse.RouteCapabilityResponse(
+                        path,
+                        finalMethods,
+                        handlerMethod.getBeanType().getSimpleName(),
+                        handlerMethod.getMethod().getName()))
+                .toList();
+    }
+
+    private List<String> routePaths(RequestMappingInfo info) {
+        if (info.getPathPatternsCondition() != null) {
+            return info.getPathPatternsCondition().getPatternValues().stream().sorted().toList();
+        }
+        if (info.getPatternsCondition() != null) {
+            return info.getPatternsCondition().getPatterns().stream().sorted().toList();
+        }
+        return List.of();
     }
 
     /**
