@@ -1,4 +1,4 @@
-FROM node:21-slim
+FROM node:22-slim
 
 # Create generic agent user - UID is overridden at runtime via --user
 RUN userdel -r node 2>/dev/null; useradd -m -u 1000 agent
