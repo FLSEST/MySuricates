@@ -120,7 +120,7 @@ Response: 201 Created
     }
   ],
   "defaultContext": {
-    "base_dir": "/home/flo/projects/example"
+    "base_dir": "/your/project/path"
   },
   "model": "claude-sonnet-4-6",
   "instructions": "Optionale workflow-spezifische Instruktionen"
