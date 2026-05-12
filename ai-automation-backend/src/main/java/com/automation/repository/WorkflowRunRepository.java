@@ -43,6 +43,27 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
 
     List<WorkflowRun> findByStartedAtAfterOrderByStartedAtDesc(Instant since);
 
+    /**
+     * Dashboard-Window mit eager-geladenem workflow, project und steps.
+     * Eliminiert N+1 lazy loads beim Aggregieren in {@code LearningService.getDashboard}.
+     * Mit pool-size=1 würden N+1-Queries die einzige SQLite-Connection >60s halten und
+     * den HikariCP-Leak-Watchdog auslösen.
+     */
+    @Query("SELECT DISTINCT wr FROM WorkflowRun wr "
+         + "LEFT JOIN FETCH wr.workflow w "
+         + "LEFT JOIN FETCH w.project "
+         + "LEFT JOIN FETCH wr.steps "
+         + "WHERE wr.startedAt > :since "
+         + "ORDER BY wr.startedAt DESC")
+    List<WorkflowRun> findDashboardWindow(@Param("since") Instant since);
+
+    /** Top-10-Recent-Runs mit eager-geladenem workflow für das Dashboard-Recent-Runs-Panel. */
+    @Query("SELECT wr FROM WorkflowRun wr "
+         + "LEFT JOIN FETCH wr.workflow "
+         + "ORDER BY wr.startedAt DESC "
+         + "LIMIT 10")
+    List<WorkflowRun> findTop10WithWorkflowByOrderByStartedAtDesc();
+
     @Query("SELECT wr.workflow.id, wr.workflow.name, COUNT(wr) " +
            "FROM WorkflowRun wr " +
            "WHERE wr.workflow IS NOT NULL " +

@@ -418,9 +418,9 @@ class LearningServiceTest {
             when(runRepository.countByStatus(RunStatus.COMPLETED_WITH_ERRORS)).thenReturn(0L);
             when(runRepository.countByStatus(RunStatus.FAILED)).thenReturn(1L);
             when(runRepository.countByStartedAtAfter(any(Instant.class))).thenReturn(0L);
-            when(runRepository.findByStartedAtAfterOrderByStartedAtDesc(any(Instant.class))).thenReturn(List.of());
+            when(runRepository.findDashboardWindow(any(Instant.class))).thenReturn(List.of());
             when(runRepository.findTopWorkflows()).thenReturn(List.of());
-            when(runRepository.findTop10ByOrderByStartedAtDesc()).thenReturn(List.of());
+            when(runRepository.findTop10WithWorkflowByOrderByStartedAtDesc()).thenReturn(List.of());
 
             DashboardResponse dashboard = learningService.getDashboard(30, null);
 
@@ -485,10 +485,10 @@ class LearningServiceTest {
             when(runRepository.countByStatus(RunStatus.COMPLETED_WITH_ERRORS)).thenReturn(0L);
             when(runRepository.countByStatus(RunStatus.FAILED)).thenReturn(0L);
             when(runRepository.countByStartedAtAfter(any(Instant.class))).thenReturn(0L);
-            when(runRepository.findByStartedAtAfterOrderByStartedAtDesc(any(Instant.class)))
+            when(runRepository.findDashboardWindow(any(Instant.class)))
                     .thenReturn(List.of(mixedRun, integrationOnlyRun));
             when(runRepository.findTopWorkflows()).thenReturn(List.of());
-            when(runRepository.findTop10ByOrderByStartedAtDesc()).thenReturn(List.of());
+            when(runRepository.findTop10WithWorkflowByOrderByStartedAtDesc()).thenReturn(List.of());
 
             DashboardResponse dashboard = learningService.getDashboard(30, null);
 
@@ -537,10 +537,10 @@ class LearningServiceTest {
             when(runRepository.countByStatus(RunStatus.COMPLETED_WITH_ERRORS)).thenReturn(0L);
             when(runRepository.countByStatus(RunStatus.FAILED)).thenReturn(1L);
             when(runRepository.countByStartedAtAfter(any(Instant.class))).thenReturn(0L);
-            when(runRepository.findByStartedAtAfterOrderByStartedAtDesc(any(Instant.class)))
+            when(runRepository.findDashboardWindow(any(Instant.class)))
                     .thenReturn(List.of(failedRun));
             when(runRepository.findTopWorkflows()).thenReturn(List.of());
-            when(runRepository.findTop10ByOrderByStartedAtDesc()).thenReturn(List.of());
+            when(runRepository.findTop10WithWorkflowByOrderByStartedAtDesc()).thenReturn(List.of());
 
             DashboardResponse dashboard = learningService.getDashboard(30, null);
 

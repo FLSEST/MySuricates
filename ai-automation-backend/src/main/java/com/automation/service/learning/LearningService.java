@@ -98,12 +98,10 @@ public class LearningService {
         }
     }
 
-    @Transactional(readOnly = true)
     public DashboardResponse getDashboard() {
         return getDashboard(30, null);
     }
 
-    @Transactional(readOnly = true)
     public DashboardResponse getDashboard(int days, String projectId) {
         long totalWorkflows = workflowRepository.count();
         long totalRuns = runRepository.count();
@@ -117,7 +115,7 @@ public class LearningService {
 
         Instant windowStart = LocalDate.now().minusDays(days)
                 .atStartOfDay(ZoneId.systemDefault()).toInstant();
-        List<WorkflowRun> recentWindow = runRepository.findByStartedAtAfterOrderByStartedAtDesc(windowStart);
+        List<WorkflowRun> recentWindow = runRepository.findDashboardWindow(windowStart);
 
         // Apply optional project filter
         if (projectId != null && !projectId.isBlank()) {
@@ -141,7 +139,7 @@ public class LearningService {
                         (String) row[0], (String) row[1], (Long) row[2]))
                 .toList();
 
-        List<WorkflowRunResponse> recentRuns = runRepository.findTop10ByOrderByStartedAtDesc().stream()
+        List<WorkflowRunResponse> recentRuns = runRepository.findTop10WithWorkflowByOrderByStartedAtDesc().stream()
                 .filter(r -> safeGetWorkflow(r) != null)
                 .map(workflowMapper::toRunResponse)
                 .toList();
