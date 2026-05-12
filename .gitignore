@@ -52,6 +52,9 @@ diagnose-report.md
 diagnose-raw-output.txt
 *.txt.bak
 
+# Personal seed scripts (use seed-workflows.example.sh as template)
+scripts/seed-workflows.sh
+
 # Python bytecode
 __pycache__/
 *.pyc
