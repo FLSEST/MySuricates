@@ -38,6 +38,7 @@ public class ContainerService {
     private final WorkflowExecutor workflowExecutor;
     private final ActivityLogService activityLogService;
     private final HostProcessUtils hostProcessUtils;
+    private final PathValidator pathValidator;
     private final TransactionTemplate transactionTemplate;
     private final TransactionTemplate readOnlyTransactionTemplate;
     private static final String CONTAINER_HOME = "/home/agent";
@@ -61,6 +62,7 @@ public class ContainerService {
             @Lazy WorkflowExecutor workflowExecutor,
             ActivityLogService activityLogService,
             HostProcessUtils hostProcessUtils,
+            PathValidator pathValidator,
             PlatformTransactionManager transactionManager,
             @Value("${docker.container.cpu-quota}") long cpuQuota,
             @Value("${docker.container.memory-limit}") long memoryLimit,
@@ -72,6 +74,7 @@ public class ContainerService {
         this.workflowExecutor = workflowExecutor;
         this.activityLogService = activityLogService;
         this.hostProcessUtils = hostProcessUtils;
+        this.pathValidator = pathValidator;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.readOnlyTransactionTemplate = new TransactionTemplate(transactionManager);
         this.readOnlyTransactionTemplate.setReadOnly(true);
@@ -101,6 +104,12 @@ public class ContainerService {
     }
 
     private Container doCreateAndStart(Project project) {
+        // Defense in depth: revalidate the project path right before the host bind
+        // mount. Project-create already validated, but a DB tamper, migration or
+        // skipped validator at update time must not let a sensitive host path
+        // (`/etc`, `~/.ssh`, ...) reach Bind.parse below.
+        pathValidator.validateForContainerMount(project.getPath());
+
         // Step 1 (short Tx, read-only): look up the existing Container row for this project.
         Container existing = readOnlyTransactionTemplate.execute(status ->
                 containerRepository.findByProjectId(project.getId()).orElse(null));

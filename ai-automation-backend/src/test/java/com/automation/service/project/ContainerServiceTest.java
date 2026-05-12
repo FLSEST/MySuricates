@@ -50,6 +50,9 @@ class ContainerServiceTest {
     private HostProcessUtils hostProcessUtils;
 
     @Mock
+    private PathValidator pathValidator;
+
+    @Mock
     private PlatformTransactionManager transactionManager;
 
     @Mock
@@ -73,6 +76,7 @@ class ContainerServiceTest {
                 workflowExecutor,
                 activityLogService,
                 hostProcessUtils,
+                pathValidator,
                 transactionManager,
                 100_000L,           // cpuQuota
                 4_294_967_296L,     // memoryLimit (4GB)
