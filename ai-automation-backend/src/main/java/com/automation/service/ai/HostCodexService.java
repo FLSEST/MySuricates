@@ -1,8 +1,10 @@
 package com.automation.service.ai;
 
 import com.automation.config.SummarizationConfig;
-import lombok.RequiredArgsConstructor;
+import com.automation.service.system.ApiKeyService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -22,11 +24,30 @@ import java.util.concurrent.TimeoutException;
  * Analogous to HostClaudeService but for the codex CLI.
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class HostCodexService {
 
     private final SummarizationConfig config;
+    /**
+     * Lazily resolved so unit tests that construct this service without a Spring
+     * context can keep using the 1-arg constructor. The env var is only injected
+     * when the provider is available (production code path via Spring DI).
+     */
+    private final ObjectProvider<ApiKeyService> apiKeyServiceProvider;
+
+    @Autowired
+    public HostCodexService(SummarizationConfig config,
+                            ObjectProvider<ApiKeyService> apiKeyServiceProvider) {
+        this.config = config;
+        this.apiKeyServiceProvider = apiKeyServiceProvider;
+    }
+
+    /**
+     * Convenience constructor for unit tests that don't wire an {@link ApiKeyService}.
+     */
+    public HostCodexService(SummarizationConfig config) {
+        this(config, null);
+    }
 
     /**
      * Executes a one-shot codex prompt and returns the text result.
@@ -56,6 +77,11 @@ public class HostCodexService {
 
             ProcessBuilder pb = new ProcessBuilder(cmd);
             pb.redirectErrorStream(true);
+            // Inject the platform API key as an env var so workflows can call the
+            // backend REST API (curl -H "X-API-Key: $AUTOMATION_API_KEY ...") without
+            // leaking the key into the LLM prompt — and therefore not into the
+            // persisted StepResult.output (see H1 finding).
+            injectApiKeyEnv(pb);
             if (workingDirectory != null) {
                 pb.directory(workingDirectory.toFile());
             }
@@ -164,5 +190,19 @@ public class HostCodexService {
     private String truncate(String s, int maxLen) {
         if (s == null) return "";
         return s.length() > maxLen ? s.substring(0, maxLen) + "..." : s;
+    }
+
+    /**
+     * Sets {@code AUTOMATION_API_KEY} on the spawned process's environment when
+     * an {@link ApiKeyService} is wired (production). Tests that construct the
+     * service via the 1-arg constructor get a no-op.
+     */
+    void injectApiKeyEnv(ProcessBuilder pb) {
+        if (apiKeyServiceProvider == null) return;
+        ApiKeyService svc = apiKeyServiceProvider.getIfAvailable();
+        if (svc == null) return;
+        String key = svc.getEffectiveApiKey();
+        if (key == null || key.isBlank()) return;
+        pb.environment().put("AUTOMATION_API_KEY", key);
     }
 }

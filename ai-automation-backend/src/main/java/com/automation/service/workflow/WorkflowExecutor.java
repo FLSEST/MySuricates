@@ -19,7 +19,6 @@ import com.automation.service.todo.GateStatusOutputParser;
 import com.automation.service.todo.TodoOutputParser;
 import com.automation.service.project.ContainerService;
 import com.automation.service.project.ProjectContextService;
-import com.automation.service.system.ApiKeyService;
 import com.automation.service.system.SystemIdentityService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -61,7 +60,6 @@ public class WorkflowExecutor {
     private final ApplicationEventPublisher eventPublisher;
     private final TemplateVerificationService templateVerificationService;
     private final SystemIdentityService systemIdentity;
-    private final ApiKeyService apiKeyService;
     private final com.automation.repository.TodoRepository todoRepository;
     private final WorkflowVersionService workflowVersionService;
     private final WorkflowExecutionRegistry executionRegistry;
@@ -71,7 +69,7 @@ public class WorkflowExecutor {
     private static final java.util.Set<String> SYSTEM_VAR_KEYS = java.util.Set.of(
             "workflow_run_id", "workflow_id", "workflow_name", "project_path",
             "model", "provider", "started_at", "run_timestamp",
-            "previous_report", "open_todos", "api_key",
+            "previous_report", "open_todos",
             "workflow_version", "workflow_changed_since_last_run"
     );
 
@@ -878,19 +876,21 @@ public class WorkflowExecutor {
     /**
      * Injects platform data into the execution context so workflows don't need
      * direct DB or API access. Available as {{ variable_name }} in block templates.
+     *
+     * <p>The platform API key is intentionally <b>not</b> injected as a template
+     * variable. Doing so would resolve the literal key into block prompts, then
+     * into LLM output, and finally persist it in {@link com.automation.entity.StepResult#getOutput()}
+     * (SQLite, backups, UI). Instead, the key is set as the {@code AUTOMATION_API_KEY}
+     * environment variable on the CLI process spawned by
+     * {@link com.automation.service.ai.HostClaudeService} and
+     * {@link com.automation.service.ai.HostCodexService}. Templates that need it
+     * use {@code curl -H "X-API-Key: $AUTOMATION_API_KEY"} from the agent's Bash
+     * tool — the resolved value never enters the prompt or persisted output.
      */
     private void injectPlatformData(ExecutionContext context, String workflowId, String projectId) {
         try {
             context.setVariable("previous_report", loadPreviousReport(workflowId));
             context.setVariable("open_todos", loadOpenTodos(projectId));
-            // Templates may need the API key to call the platform's own REST API.
-            // Injecting it here removes the need for templates to read the SQLite
-            // app_settings table directly (Hibernate-cache bypass, pool-lock risk).
-            // Native todo-* block types remain the long-term goal — see follow-up TODO.
-            String apiKey = apiKeyService.getEffectiveApiKey();
-            if (apiKey != null && !apiKey.isBlank()) {
-                context.setVariable("api_key", apiKey);
-            }
         } catch (Exception e) {
             log.warn("Failed to inject platform data: {}", e.getMessage());
         }

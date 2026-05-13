@@ -2,13 +2,18 @@ package com.automation.service.ai;
 
 import com.automation.config.CliPermissionsConfig;
 import com.automation.config.HostClaudeConfig;
+import com.automation.service.system.ApiKeyService;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.io.IOException;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class HostClaudeServiceTest {
 
@@ -411,5 +416,89 @@ class HostClaudeServiceTest {
         assertThat(result).contains("Hello");
         assertThat(result).contains("[ASSISTANT]");
         assertThat(result).contains("Hi there");
+    }
+
+    // --- API-key env var injection (H1 fix) ---
+
+    /**
+     * Helper to build a service with a mocked {@link ApiKeyService}.
+     * Wrapping in an {@link ObjectProvider} mirrors the production wiring.
+     */
+    @SuppressWarnings("unchecked")
+    private HostClaudeService createServiceWithApiKey(String apiKey) {
+        HostClaudeConfig config = new HostClaudeConfig();
+        config.setTimeoutSeconds(300);
+        CliPermissionsConfig perms = new CliPermissionsConfig();
+        perms.setSkipPermissions(false);
+        perms.setAllowedTools(List.of());
+
+        ApiKeyService keyService = mock(ApiKeyService.class);
+        when(keyService.getEffectiveApiKey()).thenReturn(apiKey);
+        ObjectProvider<ApiKeyService> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(keyService);
+
+        return new HostClaudeService(config, perms, provider);
+    }
+
+    @Test
+    void injectApiKeyEnv_setsAutomationApiKey_whenServiceWired() {
+        HostClaudeService service = createServiceWithApiKey("my-secret-key");
+        ProcessBuilder pb = new ProcessBuilder("true");
+
+        service.injectApiKeyEnv(pb);
+
+        assertThat(pb.environment()).containsEntry("AUTOMATION_API_KEY", "my-secret-key");
+    }
+
+    @Test
+    void injectApiKeyEnv_isNoOp_whenServiceProviderIsNull() {
+        // 2-arg ctor: provider is null (test/legacy code path).
+        HostClaudeService service = createService(null, false, List.of());
+        ProcessBuilder pb = new ProcessBuilder("true");
+
+        service.injectApiKeyEnv(pb);
+
+        assertThat(pb.environment()).doesNotContainKey("AUTOMATION_API_KEY");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void injectApiKeyEnv_isNoOp_whenApiKeyServiceUnavailable() {
+        // Spring DI present, but the ApiKeyService bean is not (e.g. early startup).
+        HostClaudeConfig config = new HostClaudeConfig();
+        config.setTimeoutSeconds(300);
+        CliPermissionsConfig perms = new CliPermissionsConfig();
+        perms.setSkipPermissions(false);
+        perms.setAllowedTools(List.of());
+        ObjectProvider<ApiKeyService> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(null);
+        HostClaudeService service = new HostClaudeService(config, perms, provider);
+        ProcessBuilder pb = new ProcessBuilder("true");
+
+        service.injectApiKeyEnv(pb);
+
+        assertThat(pb.environment()).doesNotContainKey("AUTOMATION_API_KEY");
+    }
+
+    @Test
+    void injectApiKeyEnv_isNoOp_whenApiKeyIsBlank() {
+        // Security disabled or not yet generated → empty key, do not set env var
+        // to avoid masking a legitimate "no key" state with "AUTOMATION_API_KEY=".
+        HostClaudeService service = createServiceWithApiKey("  ");
+        ProcessBuilder pb = new ProcessBuilder("true");
+
+        service.injectApiKeyEnv(pb);
+
+        assertThat(pb.environment()).doesNotContainKey("AUTOMATION_API_KEY");
+    }
+
+    @Test
+    void injectApiKeyEnv_isNoOp_whenApiKeyIsNull() {
+        HostClaudeService service = createServiceWithApiKey(null);
+        ProcessBuilder pb = new ProcessBuilder("true");
+
+        service.injectApiKeyEnv(pb);
+
+        assertThat(pb.environment()).doesNotContainKey("AUTOMATION_API_KEY");
     }
 }

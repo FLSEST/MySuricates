@@ -4,7 +4,10 @@ import com.automation.config.CliPermissionsConfig;
 import com.automation.config.HostClaudeConfig;
 import com.automation.service.cli.ClaudeJsonResponse;
 import com.automation.service.cli.ClaudeOutputParser;
+import com.automation.service.system.ApiKeyService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -37,16 +40,34 @@ public class HostClaudeService {
     private final DynamicSemaphore callSemaphore;
     private final DynamicSemaphore backgroundSemaphore;
     private final AtomicLong lastCallTimestamp = new AtomicLong(0);
+    /**
+     * Lazily resolved so unit tests that construct this service without a Spring
+     * context can keep using the 2-arg constructor. The env var is only injected
+     * when the provider is available (production code path via Spring DI).
+     */
+    private final ObjectProvider<ApiKeyService> apiKeyServiceProvider;
 
-    public HostClaudeService(HostClaudeConfig config, CliPermissionsConfig permissionsConfig) {
+    @Autowired
+    public HostClaudeService(HostClaudeConfig config, CliPermissionsConfig permissionsConfig,
+                             ObjectProvider<ApiKeyService> apiKeyServiceProvider) {
         this.config = config;
         this.permissionsConfig = permissionsConfig;
+        this.apiKeyServiceProvider = apiKeyServiceProvider;
         int total = config.getMaxConcurrentCalls();
         int reserved = config.getReservedForInteractive();
         this.callSemaphore = new DynamicSemaphore(total);
         this.backgroundSemaphore = new DynamicSemaphore(Math.max(1, total - reserved));
         log.info("Claude CLI throttle: maxConcurrent={}, reservedForInteractive={}, backgroundLimit={}, interCallDelay={}ms",
                 total, reserved, total - reserved, config.getInterCallDelayMs());
+    }
+
+    /**
+     * Convenience constructor for unit tests that don't wire an {@link ApiKeyService}.
+     * Production code path uses Spring DI with the 3-arg constructor above so the
+     * AUTOMATION_API_KEY env var is injected into every spawned CLI process.
+     */
+    public HostClaudeService(HostClaudeConfig config, CliPermissionsConfig permissionsConfig) {
+        this(config, permissionsConfig, null);
     }
 
     public void updateMaxConcurrentCalls(int newMax) {
@@ -151,6 +172,11 @@ public class HostClaudeService {
             pb.redirectErrorStream(true);
             pb.environment().remove("CLAUDE_CODE");
             pb.environment().remove("CLAUDECODE");
+            // Inject the platform API key as an env var so workflows can call the
+            // backend REST API (curl -H "X-API-Key: $AUTOMATION_API_KEY ...") without
+            // leaking the key into the LLM prompt — and therefore not into the
+            // persisted StepResult.output (see H1 finding).
+            injectApiKeyEnv(pb);
             if (workingDirectory != null && !workingDirectory.isBlank()) {
                 pb.directory(new File(workingDirectory));
             }
@@ -386,5 +412,19 @@ public class HostClaudeService {
     private String truncate(String s, int maxLen) {
         if (s == null) return "";
         return s.length() > maxLen ? s.substring(0, maxLen) + "..." : s;
+    }
+
+    /**
+     * Sets {@code AUTOMATION_API_KEY} on the spawned process's environment when
+     * an {@link ApiKeyService} is wired (production). Tests that construct the
+     * service via the 2-arg constructor get a no-op.
+     */
+    void injectApiKeyEnv(ProcessBuilder pb) {
+        if (apiKeyServiceProvider == null) return;
+        ApiKeyService svc = apiKeyServiceProvider.getIfAvailable();
+        if (svc == null) return;
+        String key = svc.getEffectiveApiKey();
+        if (key == null || key.isBlank()) return;
+        pb.environment().put("AUTOMATION_API_KEY", key);
     }
 }

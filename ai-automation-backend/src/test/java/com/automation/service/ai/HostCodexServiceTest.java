@@ -1,13 +1,17 @@
 package com.automation.service.ai;
 
 import com.automation.config.SummarizationConfig;
+import com.automation.service.system.ApiKeyService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.nio.file.Path;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class HostCodexServiceTest {
 
@@ -94,5 +98,53 @@ class HostCodexServiceTest {
 
         assertThat(cmd).contains("codex", "exec");
         assertThat(cmd).contains("-o");
+    }
+
+    // --- API-key env var injection (H1 fix) ---
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void injectApiKeyEnv_setsAutomationApiKey_whenServiceWired() {
+        SummarizationConfig config = new SummarizationConfig();
+        config.setTimeoutSeconds(120);
+        ApiKeyService keyService = mock(ApiKeyService.class);
+        when(keyService.getEffectiveApiKey()).thenReturn("codex-key");
+        ObjectProvider<ApiKeyService> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(keyService);
+
+        HostCodexService svc = new HostCodexService(config, provider);
+        ProcessBuilder pb = new ProcessBuilder("true");
+
+        svc.injectApiKeyEnv(pb);
+
+        assertThat(pb.environment()).containsEntry("AUTOMATION_API_KEY", "codex-key");
+    }
+
+    @Test
+    void injectApiKeyEnv_isNoOp_whenServiceProviderIsNull() {
+        // 1-arg ctor: provider is null (test/legacy code path).
+        ProcessBuilder pb = new ProcessBuilder("true");
+
+        service.injectApiKeyEnv(pb);
+
+        assertThat(pb.environment()).doesNotContainKey("AUTOMATION_API_KEY");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void injectApiKeyEnv_isNoOp_whenApiKeyIsBlank() {
+        SummarizationConfig config = new SummarizationConfig();
+        config.setTimeoutSeconds(120);
+        ApiKeyService keyService = mock(ApiKeyService.class);
+        when(keyService.getEffectiveApiKey()).thenReturn("");
+        ObjectProvider<ApiKeyService> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(keyService);
+
+        HostCodexService svc = new HostCodexService(config, provider);
+        ProcessBuilder pb = new ProcessBuilder("true");
+
+        svc.injectApiKeyEnv(pb);
+
+        assertThat(pb.environment()).doesNotContainKey("AUTOMATION_API_KEY");
     }
 }

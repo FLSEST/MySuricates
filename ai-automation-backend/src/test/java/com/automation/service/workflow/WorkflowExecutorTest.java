@@ -95,9 +95,6 @@ class WorkflowExecutorTest {
     @Mock
     private SystemIdentityService systemIdentity;
 
-    @Mock
-    private com.automation.service.system.ApiKeyService apiKeyService;
-
     private WorkflowExecutor workflowExecutor;
 
     private Workflow testWorkflow;
@@ -132,7 +129,6 @@ class WorkflowExecutorTest {
                 eventPublisher,
                 templateVerificationService,
                 systemIdentity,
-                apiKeyService,
                 todoRepository,
                 workflowVersionService,
                 new WorkflowExecutionRegistry(),
@@ -296,6 +292,33 @@ class WorkflowExecutorTest {
         assertThat(ctx.getVariable("started_at")).isNotNull();
         assertThat(ctx.getVariable("home_dir")).isNotNull();
         assertThat(ctx.resolveTemplate("cd {{ project_path }}")).isEqualTo("cd /workspace/test");
+    }
+
+    /**
+     * Regression test for H1: the platform API key MUST NOT be exposed as a
+     * {@code {{ api_key }}} template variable. Doing so would resolve the literal
+     * key into block prompts, then into LLM output, and finally persist it in
+     * {@code StepResult.output}. The key is now delivered via the
+     * {@code AUTOMATION_API_KEY} env var on the spawned CLI process instead.
+     */
+    @Test
+    void execute_doesNotInjectApiKeyAsTemplateVariable() {
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        ArgumentCaptor<ExecutionContext> ctxCaptor = ArgumentCaptor.forClass(ExecutionContext.class);
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), ctxCaptor.capture()))
+                .thenReturn(step);
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        ExecutionContext ctx = ctxCaptor.getValue();
+        assertThat(ctx.getVariable("api_key"))
+                .as("api_key must never be a template variable — it would leak into persisted StepResult.output")
+                .isNull();
+        // Templates referencing {{ api_key }} resolve to the literal placeholder
+        // (no substitution), making the leak vector inert.
+        assertThat(ctx.resolveTemplate("X-API-Key: {{ api_key }}"))
+                .isEqualTo("X-API-Key: {{ api_key }}");
     }
 
     @Test
@@ -954,7 +977,6 @@ class WorkflowExecutorTest {
                 eventPublisher,
                 templateVerificationService,
                 systemIdentity,
-                apiKeyService,
                 todoRepository,
                 workflowVersionService,
                 new WorkflowExecutionRegistry(),
