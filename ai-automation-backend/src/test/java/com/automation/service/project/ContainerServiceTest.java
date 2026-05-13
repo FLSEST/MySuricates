@@ -292,4 +292,46 @@ class ContainerServiceTest {
         assertThat(idle.getStatus()).isEqualTo(ContainerStatus.STOPPED);
         verify(containerRepository).save(idle);
     }
+
+    // --- Defense-in-depth: PathValidator must be invoked for both project path and hostHome (H2 + M3) ---
+
+    @Test
+    void createAndStart_callsValidateForContainerMount_forProjectPath() {
+        when(containerRepository.findByProjectId("project-1")).thenReturn(Optional.empty());
+        stubDockerRemoveCommands();
+        stubDockerCreateAndStart("docker-123");
+        when(containerRepository.save(any(Container.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.createAndStartContainer(testProject);
+
+        // Regression guard: if a future refactor removes the line in ContainerService.doCreateAndStart,
+        // this verify fails. Direct evidence of defense-in-depth.
+        verify(pathValidator).validateForContainerMount("/test/project");
+    }
+
+    @Test
+    void createAndStart_callsValidateForContainerMount_forHostHome() {
+        when(containerRepository.findByProjectId("project-1")).thenReturn(Optional.empty());
+        stubDockerRemoveCommands();
+        stubDockerCreateAndStart("docker-123");
+        when(containerRepository.save(any(Container.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.createAndStartContainer(testProject);
+
+        verify(pathValidator).validateForContainerMount("/home/test");
+    }
+
+    @Test
+    void createAndStart_invalidProjectPath_doesNotCallDocker() {
+        doThrow(new IllegalArgumentException("Path points to a restricted system directory: /etc"))
+                .when(pathValidator).validateForContainerMount("/test/project");
+
+        assertThatThrownBy(() -> service.createAndStartContainer(testProject))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("restricted system directory");
+
+        verify(dockerClient, never()).createContainerCmd(anyString());
+        verify(dockerClient, never()).startContainerCmd(anyString());
+        verify(containerRepository, never()).save(any(Container.class));
+    }
 }

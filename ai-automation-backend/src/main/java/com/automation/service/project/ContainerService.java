@@ -110,6 +110,13 @@ public class ContainerService {
         // (`/etc`, `~/.ssh`, ...) reach Bind.parse below.
         pathValidator.validateForContainerMount(project.getPath());
 
+        // Same check on hostHome: protects against AUTOMATION_CLI_HOST_HOME being
+        // set to /etc or ~/.ssh in misconfigured environments. hostHome is a
+        // server-side property, not user input, so this is a misconfiguration
+        // guard rather than an attack mitigation — but it fails fast with a
+        // clear message instead of mounting secrets into the container.
+        pathValidator.validateForContainerMount(hostHome);
+
         // Step 1 (short Tx, read-only): look up the existing Container row for this project.
         Container existing = readOnlyTransactionTemplate.execute(status ->
                 containerRepository.findByProjectId(project.getId()).orElse(null));
