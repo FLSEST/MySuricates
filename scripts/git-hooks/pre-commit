@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+#
+# Pre-commit Hygiene-Check
+#
+# Blockiert Commits, die NEU einführen:
+#   1. Dateien in ignorierten Pfaden (review/, reports/, .output/, ...)
+#   2. Verbotene Patterns (/home/flo, test-e2e-key, interne UUID)
+#
+# Prüft NUR staged changes (`git diff --cached`) — nicht den ganzen Tree.
+# Bestehende Violations in unverändterten Files blockieren nichts.
+# Vollständiger Tree-Check läuft in CI via scripts/ci/public-hygiene.sh.
+#
+# Bypass: git commit --no-verify
+#
+set -euo pipefail
+
+FAIL=0
+COUNT=0
+
+forbidden_paths=(review .output reports portfolio dashboard presentation ebook prototype output todo-sdk)
+
+patterns=(
+  "/home/flo|absolute developer path"
+  "test-e2e-key|hardcoded test API key string"
+  "ebf4f50c-20c2-4c35-a84a-a0b350124523|internal project UUID"
+)
+
+report() {
+  echo "  ✗ $1" >&2
+  FAIL=1
+  COUNT=$((COUNT + 1))
+}
+
+# ---------------------------------------------------------------------------
+# Check 1 — neu hinzugefügte Dateien in ignorierten Pfaden
+# ---------------------------------------------------------------------------
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  for d in "${forbidden_paths[@]}"; do
+    case "$f" in
+      "$d"/*)
+        report "$f → file in ignored path '$d/' (unstage: git restore --staged '$f')"
+        break
+        ;;
+    esac
+  done
+done < <(git diff --cached --name-only --diff-filter=A 2>/dev/null)
+
+# ---------------------------------------------------------------------------
+# Check 2 — verbotene Patterns in HINZUGEFÜGTEN Zeilen
+# ---------------------------------------------------------------------------
+# Parst `git diff --cached`: trackt current file via "+++ b/..." Header,
+# prüft jede mit "+" beginnende Zeile (außer "+++") gegen Patterns.
+current_file=""
+while IFS= read -r line; do
+  if [[ "$line" == "+++ b/"* ]]; then
+    current_file="${line#+++ b/}"
+    continue
+  fi
+  if [[ "$line" == "+++"* ]]; then
+    continue
+  fi
+  # Self-exclude: hook + CI script enthalten die Patterns legitim als Strings
+  case "$current_file" in
+    scripts/git-hooks/*|scripts/ci/public-hygiene.sh)
+      continue
+      ;;
+  esac
+  if [[ "$line" == +* ]]; then
+    content="${line:1}"
+    for entry in "${patterns[@]}"; do
+      pat="${entry%%|*}"
+      desc="${entry##*|}"
+      if [[ "$content" == *"$pat"* ]]; then
+        report "$current_file → added line contains '$pat' ($desc)"
+      fi
+    done
+  fi
+done < <(git diff --cached --no-color -U0 --diff-filter=AM 2>/dev/null)
+
+if [ "$FAIL" -ne 0 ]; then
+  echo "" >&2
+  echo "Pre-commit Hygiene-Check FAILED — $COUNT violation(s) in staged changes." >&2
+  echo "Fix or bypass with: git commit --no-verify" >&2
+  exit 1
+fi
+
+exit 0
