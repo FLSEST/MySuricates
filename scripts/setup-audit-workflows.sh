@@ -7,7 +7,12 @@ set -euo pipefail
 
 BASE_URL="${AUTOPILOT_URL:-http://localhost:9090}/api/v1"
 API_KEY="${AUTOPILOT_API_KEY:-}"
-PROJECT_ID="ebf4f50c-20c2-4c35-a84a-a0b350124523"  # AutoPilot project
+PROJECT_ID="${AUTOPILOT_PROJECT_ID:-${1:-}}"
+if [[ -z "$PROJECT_ID" ]]; then
+  echo "Usage: AUTOPILOT_PROJECT_ID=<uuid> $0   or   $0 <uuid>" >&2
+  echo "       AUTOPILOT_PROJECT_ID is the target project UUID for the audit workflows." >&2
+  exit 2
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

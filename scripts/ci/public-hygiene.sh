@@ -69,6 +69,7 @@ check_forbidden_patterns() {
     done < <(
       git grep -nI -F -- "$pat" \
         ':!scripts/ci/public-hygiene.sh' \
+        ':!scripts/git-hooks/*' \
         2>/dev/null || true
     )
   done

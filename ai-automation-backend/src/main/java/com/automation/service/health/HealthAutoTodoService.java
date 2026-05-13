@@ -7,6 +7,7 @@ import com.automation.service.staging.StagingService;
 import com.automation.service.staging.TestingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -18,12 +19,14 @@ import java.util.Optional;
 public class HealthAutoTodoService {
 
     private static final String REFERENCE_TYPE = "health_check";
-    private static final String AUTOPILOT_PROJECT_ID = "ebf4f50c-20c2-4c35-a84a-a0b350124523";
 
     private final StagingService stagingService;
     private final TestingService testingService;
     private final TodoRepository todoRepository;
     private final ProjectRepository projectRepository;
+
+    @Value("${automation.autopilot.project-id:}")
+    private String autopilotProjectId;
 
     private volatile boolean previousStableHealthy = true;
     private volatile boolean previousTestHealthy = true;
@@ -40,7 +43,8 @@ public class HealthAutoTodoService {
                 // Transition healthy → unhealthy: create todo if none open
                 Optional<Todo> existing = todoRepository.findOpenByReferenceTypeAndId(REFERENCE_TYPE, refId);
                 if (existing.isEmpty()) {
-                    String projectId = projectRepository.existsById(AUTOPILOT_PROJECT_ID) ? AUTOPILOT_PROJECT_ID : null;
+                    String projectId = (autopilotProjectId != null && !autopilotProjectId.isBlank()
+                            && projectRepository.existsById(autopilotProjectId)) ? autopilotProjectId : null;
                     Todo todo = Todo.builder()
                             .title("[Health] " + label + "-Instanz nicht erreichbar")
                             .description("Die " + label + "-Instanz ist nicht mehr erreichbar. "
