@@ -175,7 +175,7 @@ The Dev API key is auto-detected from `ai-automation-backend/data/automation.db`
 ```bash
 # Example: start the test instance with a fixed API key
 cd ai-automation-backend
-AUTOMATION_API_KEY=test-e2e-key docker compose -f docker-compose.test.yml up -d
+AUTOMATION_API_KEY=<test-api-key> docker compose -f docker-compose.test.yml up -d
 
 # Optional: sync current definitions from Dev to Test
 curl -s -X POST http://localhost:9090/api/v1/testing/sync-definitions \
@@ -186,10 +186,10 @@ curl -s -X POST http://localhost:9090/api/v1/testing/sync-definitions \
 cd ../ai-automation-frontend
 
 # Frontend proxy to Test (:8090)
-CYPRESS_TARGET=test CYPRESS_TEST_API_KEY=test-e2e-key npm run dev:e2e:test
+CYPRESS_TARGET=test CYPRESS_TEST_API_KEY=<test-api-key> npm run dev:e2e:test
 
 # Cypress against the same test instance
-CYPRESS_TARGET=test CYPRESS_TEST_API_KEY=test-e2e-key npm run test:e2e:test
+CYPRESS_TARGET=test CYPRESS_TEST_API_KEY=<test-api-key> npm run test:e2e:test
 ```
 
 You can also override the target URLs directly:

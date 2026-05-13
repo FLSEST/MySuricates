@@ -27,7 +27,7 @@ let templates: TemplateResponse[];
 
 test.beforeAll(async () => {
   // 1. Create test workspace
-  execSync('bash /home/flo/Entwicklung/tools/autotrigger/scripts/create-test-workspace.sh', {
+  execSync(`bash ${resolve(__dir, '../../../scripts/create-test-workspace.sh')}`, {
     timeout: 15000,
   });
 

@@ -175,7 +175,7 @@ Der Dev-API-Key wird automatisch aus `ai-automation-backend/data/automation.db` 
 ```bash
 # Beispiel: Test-Instanz mit festem API-Key starten
 cd ai-automation-backend
-AUTOMATION_API_KEY=test-e2e-key docker compose -f docker-compose.test.yml up -d
+AUTOMATION_API_KEY=<test-api-key> docker compose -f docker-compose.test.yml up -d
 
 # Optional: aktuelle Definitionen von Dev nach Test synchronisieren
 curl -s -X POST http://localhost:9090/api/v1/testing/sync-definitions \
@@ -186,10 +186,10 @@ curl -s -X POST http://localhost:9090/api/v1/testing/sync-definitions \
 cd ../ai-automation-frontend
 
 # Frontend mit Proxy auf Test (:8090)
-CYPRESS_TARGET=test CYPRESS_TEST_API_KEY=test-e2e-key npm run dev:e2e:test
+CYPRESS_TARGET=test CYPRESS_TEST_API_KEY=<test-api-key> npm run dev:e2e:test
 
 # Cypress gegen dieselbe Test-Instanz
-CYPRESS_TARGET=test CYPRESS_TEST_API_KEY=test-e2e-key npm run test:e2e:test
+CYPRESS_TARGET=test CYPRESS_TEST_API_KEY=<test-api-key> npm run test:e2e:test
 ```
 
 Optional koennen die Ziele auch direkt ueberschrieben werden:

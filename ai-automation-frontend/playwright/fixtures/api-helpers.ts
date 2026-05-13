@@ -298,7 +298,9 @@ export function resetWorkspace(workspacePath: string): void {
     });
   } catch {
     // If git reset fails, re-run workspace script
-    execSync('bash /home/flo/Entwicklung/tools/autotrigger/scripts/create-test-workspace.sh', {
+    const __dir = dirname(fileURLToPath(import.meta.url));
+    const workspaceScript = resolve(__dir, '../../../scripts/create-test-workspace.sh');
+    execSync(`bash ${workspaceScript}`, {
       timeout: 15000,
     });
   }
