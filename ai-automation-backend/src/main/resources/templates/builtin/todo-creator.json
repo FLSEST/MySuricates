@@ -1,45 +1,49 @@
 {
-  "id" : "todo-creator",
-  "icon" : "✅",
-  "name" : {
-    "en" : "TODO Creator",
-    "de" : "TODO-Creator"
+  "id": "todo-creator",
+  "icon": "✅",
+  "name": {
+    "en": "TODO Creator",
+    "de": "TODO-Creator"
   },
-  "description" : {
-    "en" : "Decompose task description into atomic TODOs and create via API",
-    "de" : "Aufgabenbeschreibung in atomare TODOs zerlegen und via API anlegen"
+  "description": {
+    "en": "Decompose task description into atomic TODOs and create via API",
+    "de": "Aufgabenbeschreibung in atomare TODOs zerlegen und via API anlegen"
   },
-  "category" : "TRANSFORM",
-  "sortOrder" : 43,
-  "version" : "1.0.0",
-  "model" : null,
-  "instructions" : "Zerlege Aufgabenbeschreibungen in atomare TODOs und lege sie automatisch via API an. Variablen: task_description (Aufgabe), project_context (Kontext), project_id (Ziel-Projekt-ID).",
-  "blocks" : [ {
-    "type" : "simple",
-    "config" : {
-      "timeout_seconds" : 600,
-      "command" : "Analysiere die folgende Aufgabe und zerlege sie in atomare, umsetzbare Teilschritte.\n\n## Aufgabe\n{{ task_description }}\n\n## Projektkontext\n{{ project_context }}\n\nErstelle fuer jeden Teilschritt:\n- **title**: Kurzer Titel im Imperativ (z.B. 'API-Endpunkt fuer User-Export implementieren')\n- **description**: Markdown mit Kontext, Akzeptanzkriterien, technischen Hinweisen\n- **priority**: HIGH (blockierend/kritisch), MEDIUM (bald noetig), LOW (nice-to-have)\n- **tags**: Passende Tags aus: backend, frontend, architektur, security, performance, ux, ui, feature, bug, testing, documentation\n\nRegeln:\n- Jedes TODO muss in sich abgeschlossen und unabhaengig umsetzbar sein\n- Abhaengigkeiten zwischen TODOs in der Description erwaehnen\n- Realistische Priorisierung — nicht alles ist HIGH\n- Maximal 10 TODOs pro Aufgabe\n\nAntworte als JSON-Array:\n```json\n[{\"title\": \"...\", \"description\": \"...\", \"priority\": \"HIGH|MEDIUM|LOW\", \"tags\": [\"...\"]}]\n```"
+  "category": "TRANSFORM",
+  "sortOrder": 43,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": "Zerlege Aufgabenbeschreibungen in atomare TODOs und lege sie automatisch via API an. Variablen: task_description (Aufgabe), project_context (Kontext), project_id (Ziel-Projekt-ID).",
+  "blocks": [
+    {
+      "type": "simple",
+      "config": {
+        "timeout_seconds": 600,
+        "command": "Analysiere die folgende Aufgabe und zerlege sie in atomare, umsetzbare Teilschritte.\n\n## Aufgabe\n{{ task_description }}\n\n## Projektkontext\n{{ project_context }}\n\nErstelle fuer jeden Teilschritt:\n- **title**: Kurzer Titel im Imperativ (z.B. 'API-Endpunkt fuer User-Export implementieren')\n- **description**: Markdown mit Kontext, Akzeptanzkriterien, technischen Hinweisen\n- **priority**: HIGH (blockierend/kritisch), MEDIUM (bald noetig), LOW (nice-to-have)\n- **tags**: Passende Tags aus: backend, frontend, architektur, security, performance, ux, ui, feature, bug, testing, documentation\n\nRegeln:\n- Jedes TODO muss in sich abgeschlossen und unabhaengig umsetzbar sein\n- Abhaengigkeiten zwischen TODOs in der Description erwaehnen\n- Realistische Priorisierung — nicht alles ist HIGH\n- Maximal 10 TODOs pro Aufgabe\n\nAntworte als JSON-Array:\n```json\n[{\"title\": \"...\", \"description\": \"...\", \"priority\": \"HIGH|MEDIUM|LOW\", \"tags\": [\"...\"]}]\n```"
+      },
+      "requiredCapabilities": []
     },
-    "requiredCapabilities" : [ ]
-  }, {
-    "type" : "agentic",
-    "config" : {
-      "max_iterations" : 10,
-      "max_total_tokens" : 150000,
-      "iteration_timeout_seconds" : 120,
-      "goal" : "Erstelle TODOs via REST API basierend auf der Analyse aus {{ previous_output }}.\n\nVORGEHEN:\n1. API-Key aus der SQLite-Datenbank lesen:\n   python3 -c \"import sqlite3; conn = sqlite3.connect('ai-automation-backend/data/automation.db'); c = conn.cursor(); c.execute(\\\"SELECT value FROM app_settings WHERE key = 'api-key'\\\"); print(c.fetchone()[0]); conn.close()\"\n\n2. Fuer jedes TODO aus der Analyse einen API-Call ausfuehren:\n   curl -X POST http://localhost:9090/api/v1/todos \\\n     -H 'Content-Type: application/json' \\\n     -H 'X-API-Key: <KEY>' \\\n     -d '{\"title\": \"...\", \"description\": \"...\", \"priority\": \"...\", \"tags\": [...], \"projectId\": \"{{ project_id }}\", \"source\": \"AI\", \"sourceAgent\": \"todo-creator\"}'\n\n3. Ergebnis jedes API-Calls pruefen (HTTP 200/201 = Erfolg)\n\nWICHTIG: Absolute Pfade fuer die SQLite-DB verwenden. Jeden API-Call einzeln ausfuehren und Ergebnis pruefen.",
-      "max_repeated_actions" : 3,
-      "success_criteria" : "Alle TODOs aus der Analyse wurden erfolgreich via API angelegt.",
-      "total_timeout_seconds" : 900,
-      "require_approval" : false
+    {
+      "type": "agentic",
+      "config": {
+        "max_iterations": 10,
+        "max_total_tokens": 150000,
+        "iteration_timeout_seconds": 120,
+        "goal": "Erstelle TODOs via REST API basierend auf der Analyse aus {{ previous_output }}.\n\nKONTEXT vom WorkflowExecutor:\n- {{ api_key }} — Backend API-Key (verwende diesen im X-API-Key Header)\n- {{ open_todos }} — alle offenen TODOs des Projekts (optional, falls Duplikat-Check gewünscht)\n\nVORGEHEN:\n1. Fuer jedes TODO aus der Analyse einen API-Call ausfuehren:\n   curl -X POST http://localhost:9090/api/v1/todos \\\n     -H 'Content-Type: application/json' \\\n     -H 'X-API-Key: {{ api_key }}' \\\n     -d '{\"title\": \"...\", \"description\": \"...\", \"priority\": \"...\", \"tags\": [...], \"projectId\": \"{{ project_id }}\", \"source\": \"AI\", \"sourceAgent\": \"todo-creator\"}'\n\n2. Ergebnis jedes API-Calls pruefen (HTTP 200/201 = Erfolg).\n\nHINWEIS Anti-Pattern: REST-Self-Call (POST /api/v1/todos) ist noch nicht ideal — ein nativer todo-create Block-Typ ersetzt das in einem Folge-Refactor.",
+        "max_repeated_actions": 3,
+        "success_criteria": "Alle TODOs aus der Analyse wurden erfolgreich via API angelegt.",
+        "total_timeout_seconds": 900,
+        "require_approval": false
+      },
+      "requiredCapabilities": []
     },
-    "requiredCapabilities" : [ ]
-  }, {
-    "type" : "simple",
-    "config" : {
-      "timeout_seconds" : 300,
-      "command" : "Erstelle eine Zusammenfassung der angelegten TODOs basierend auf {{ previous_output }}.\n\nFormat:\n## TODO-Creator Ergebnis\n\n**Anzahl angelegte TODOs:** X\n\n| # | Titel | Prioritaet | Tags |\n|---|-------|-----------|------|\n| 1 | ... | HIGH/MEDIUM/LOW | ... |\n\nFasse kurz zusammen, welche Bereiche abgedeckt sind und ob Abhaengigkeiten beachtet werden muessen."
-    },
-    "requiredCapabilities" : [ ]
-  } ]
+    {
+      "type": "simple",
+      "config": {
+        "timeout_seconds": 300,
+        "command": "Erstelle eine Zusammenfassung der angelegten TODOs basierend auf {{ previous_output }}.\n\nFormat:\n## TODO-Creator Ergebnis\n\n**Anzahl angelegte TODOs:** X\n\n| # | Titel | Prioritaet | Tags |\n|---|-------|-----------|------|\n| 1 | ... | HIGH/MEDIUM/LOW | ... |\n\nFasse kurz zusammen, welche Bereiche abgedeckt sind und ob Abhaengigkeiten beachtet werden muessen."
+      },
+      "requiredCapabilities": []
+    }
+  ]
 }

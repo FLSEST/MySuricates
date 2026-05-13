@@ -1,52 +1,57 @@
 {
-  "id" : "codebase-health-scorecard",
-  "icon" : "\uD83C\uDFE5",
-  "name" : {
-    "en" : "Codebase Health Scorecard",
-    "de" : "Codebase-Gesundheits-Scorecard"
+  "id": "codebase-health-scorecard",
+  "icon": "🏥",
+  "name": {
+    "en": "Codebase Health Scorecard",
+    "de": "Codebase-Gesundheits-Scorecard"
   },
-  "description" : {
-    "en" : "Holistic assessment: tests, complexity, error handling, security, tech debt, architecture",
-    "de" : "Ganzheitliche Bewertung: Tests, Komplexität, Fehlerbehandlung, Security, Tech Debt, Architektur"
+  "description": {
+    "en": "Holistic assessment: tests, complexity, error handling, security, tech debt, architecture",
+    "de": "Ganzheitliche Bewertung: Tests, Komplexität, Fehlerbehandlung, Security, Tech Debt, Architektur"
   },
-  "category" : "CODE",
-  "sortOrder" : 39,
-  "version" : "1.1.0",
-  "model" : "claude-sonnet-4-6",
-  "instructions" : "Ganzheitliche Codebase-Bewertung in 6 Dimensionen: Testabdeckung, Komplexitaet, Fehlerbehandlung, Security, Tech Debt, Architektur.",
-  "blocks" : [ {
-    "type" : "shell",
-    "config" : {
-      "on_failure" : "continue",
-      "command" : "set -euo pipefail\necho '=== File Counts by Type ==='\nfind . -type f \\( -name '*.java' -o -name '*.kt' -o -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \\) -not -path '*/node_modules/*' -not -path '*/build/*' -not -path '*/target/*' -not -path '*/dist/*' -not -path '*/.git/*' | sed 's/.*\\.//' | sort | uniq -c | sort -rn\necho ''\necho '=== Test Files ==='\nfind . -type f \\( -name '*Test.java' -o -name '*Spec.java' -o -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' -o -name '*.test.js' -o -name '*_test.go' \\) -not -path '*/node_modules/*' -not -path '*/target/*' 2>/dev/null | wc -l\necho ''\necho '=== Source vs Test Ratio ==='\nSRC=$(find . -type f \\( -name '*.java' -o -name '*.ts' -o -name '*.tsx' \\) -not -name '*Test*' -not -name '*test*' -not -name '*spec*' -not -path '*/node_modules/*' -not -path '*/target/*' -not -path '*/dist/*' 2>/dev/null | wc -l)\nTEST=$(find . -type f \\( -name '*Test.java' -o -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' \\) -not -path '*/node_modules/*' -not -path '*/target/*' 2>/dev/null | wc -l)\necho \"Source files: $SRC, Test files: $TEST, Ratio: 1:$(python3 -c \"print(round($TEST/$SRC,2) if $SRC>0 else 0)\" 2>/dev/null || echo '?')\"\necho ''\necho '=== Large Files (>300 lines) ==='\nfind . -type f \\( -name '*.java' -o -name '*.ts' -o -name '*.tsx' \\) -not -path '*/node_modules/*' -not -path '*/target/*' -not -path '*/dist/*' 2>/dev/null | while read f; do\n  lines=$(wc -l < \"$f\")\n  if [ \"$lines\" -gt 300 ]; then echo \"$lines $f\"; fi\ndone | sort -rn | head -20\necho ''\necho '=== TODOs/FIXMEs ==='\ngrep -rn 'TODO\\|FIXME\\|HACK\\|XXX\\|WORKAROUND' --include='*.java' --include='*.ts' --include='*.tsx' --include='*.kt' . 2>/dev/null | grep -v node_modules | grep -v target | wc -l\necho ''\necho '=== Empty Catch Blocks ==='\ngrep -rn 'catch.*{' --include='*.java' --include='*.kt' -A1 . 2>/dev/null | grep -B1 '^ *}' | grep 'catch' | grep -v target | wc -l\necho ''\necho '=== Hardcoded Strings (potential secrets) ==='\ngrep -rn 'password.*=.*\"\\|secret.*=.*\"\\|api.key.*=.*\"\\|token.*=.*\"' --include='*.java' --include='*.ts' --include='*.kt' --include='*.yml' --include='*.yaml' -i . 2>/dev/null | grep -v node_modules | grep -v target | grep -v test | grep -v '.md' | head -15\necho ''\necho '=== Deprecated Annotations ==='\ngrep -rn '@Deprecated\\|@deprecated\\|@SuppressWarnings' --include='*.java' --include='*.kt' . 2>/dev/null | grep -v target | wc -l"
+  "category": "CODE",
+  "sortOrder": 39,
+  "version": "1.1.0",
+  "model": "claude-sonnet-4-6",
+  "instructions": "Ganzheitliche Codebase-Bewertung in 6 Dimensionen: Testabdeckung, Komplexitaet, Fehlerbehandlung, Security, Tech Debt, Architektur.",
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "on_failure": "continue",
+        "command": "set -euo pipefail\necho '=== File Counts by Type ==='\nfind . -type f \\( -name '*.java' -o -name '*.kt' -o -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \\) -not -path '*/node_modules/*' -not -path '*/build/*' -not -path '*/target/*' -not -path '*/dist/*' -not -path '*/.git/*' | sed 's/.*\\.//' | sort | uniq -c | sort -rn\necho ''\necho '=== Test Files ==='\nfind . -type f \\( -name '*Test.java' -o -name '*Spec.java' -o -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' -o -name '*.test.js' -o -name '*_test.go' \\) -not -path '*/node_modules/*' -not -path '*/target/*' 2>/dev/null | wc -l\necho ''\necho '=== Source vs Test Ratio ==='\nSRC=$(find . -type f \\( -name '*.java' -o -name '*.ts' -o -name '*.tsx' \\) -not -name '*Test*' -not -name '*test*' -not -name '*spec*' -not -path '*/node_modules/*' -not -path '*/target/*' -not -path '*/dist/*' 2>/dev/null | wc -l)\nTEST=$(find . -type f \\( -name '*Test.java' -o -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' \\) -not -path '*/node_modules/*' -not -path '*/target/*' 2>/dev/null | wc -l)\necho \"Source files: $SRC, Test files: $TEST, Ratio: 1:$(python3 -c \"print(round($TEST/$SRC,2) if $SRC>0 else 0)\" 2>/dev/null || echo '?')\"\necho ''\necho '=== Large Files (>300 lines) ==='\nfind . -type f \\( -name '*.java' -o -name '*.ts' -o -name '*.tsx' \\) -not -path '*/node_modules/*' -not -path '*/target/*' -not -path '*/dist/*' 2>/dev/null | while read f; do\n  lines=$(wc -l < \"$f\")\n  if [ \"$lines\" -gt 300 ]; then echo \"$lines $f\"; fi\ndone | sort -rn | head -20\necho ''\necho '=== TODOs/FIXMEs ==='\ngrep -rn 'TODO\\|FIXME\\|HACK\\|XXX\\|WORKAROUND' --include='*.java' --include='*.ts' --include='*.tsx' --include='*.kt' . 2>/dev/null | grep -v node_modules | grep -v target | wc -l\necho ''\necho '=== Empty Catch Blocks ==='\ngrep -rn 'catch.*{' --include='*.java' --include='*.kt' -A1 . 2>/dev/null | grep -B1 '^ *}' | grep 'catch' | grep -v target | wc -l\necho ''\necho '=== Hardcoded Strings (potential secrets) ==='\ngrep -rn 'password.*=.*\"\\|secret.*=.*\"\\|api.key.*=.*\"\\|token.*=.*\"' --include='*.java' --include='*.ts' --include='*.kt' --include='*.yml' --include='*.yaml' -i . 2>/dev/null | grep -v node_modules | grep -v target | grep -v test | grep -v '.md' | head -15\necho ''\necho '=== Deprecated Annotations ==='\ngrep -rn '@Deprecated\\|@deprecated\\|@SuppressWarnings' --include='*.java' --include='*.kt' . 2>/dev/null | grep -v target | wc -l"
+      },
+      "requiredCapabilities": []
     },
-    "requiredCapabilities" : [ ]
-  }, {
-    "type" : "simple",
-    "config" : {
-      "timeout_seconds" : 600,
-      "command" : "Bewerte die Codebase-Gesundheit anhand der Metriken:\n\n{{ previous_output }}\n\nBewerte jede Dimension auf einer Skala von 1-10 mit konkreten Belegen:\n\n1. **Testabdeckung** (Gewicht 20%): Test/Source-Ratio, Verteilung der Test-Typen, untestete Bereiche\n2. **Code-Komplexitaet** (Gewicht 15%): Grosse Dateien, God Classes, Verschachtelungstiefe\n3. **Fehlerbehandlung** (Gewicht 15%): Leere Catch-Bloecke, konsistentes Error-Handling, Logging\n4. **Security-Hygiene** (Gewicht 20%): Hardcoded Secrets, Input-Validierung, Dependency-Alter\n5. **Tech Debt** (Gewicht 15%): TODOs/FIXMEs, Deprecated-Nutzung, Workarounds, auskommentierter Code\n6. **Architektur-Klarheit** (Gewicht 15%): Schichtentrennung, Benennungskonsistenz, Package-Struktur\n\nFuer jede Dimension: Score, 2-3 konkrete Belege aus den Daten, groesster Verbesserungshebel."
+    {
+      "type": "simple",
+      "config": {
+        "timeout_seconds": 600,
+        "command": "Bewerte die Codebase-Gesundheit anhand der Metriken:\n\n{{ previous_output }}\n\nBewerte jede Dimension auf einer Skala von 1-10 mit konkreten Belegen:\n\n1. **Testabdeckung** (Gewicht 20%): Test/Source-Ratio, Verteilung der Test-Typen, untestete Bereiche\n2. **Code-Komplexitaet** (Gewicht 15%): Grosse Dateien, God Classes, Verschachtelungstiefe\n3. **Fehlerbehandlung** (Gewicht 15%): Leere Catch-Bloecke, konsistentes Error-Handling, Logging\n4. **Security-Hygiene** (Gewicht 20%): Hardcoded Secrets, Input-Validierung, Dependency-Alter\n5. **Tech Debt** (Gewicht 15%): TODOs/FIXMEs, Deprecated-Nutzung, Workarounds, auskommentierter Code\n6. **Architektur-Klarheit** (Gewicht 15%): Schichtentrennung, Benennungskonsistenz, Package-Struktur\n\nFuer jede Dimension: Score, 2-3 konkrete Belege aus den Daten, groesster Verbesserungshebel."
+      },
+      "requiredCapabilities": []
     },
-    "requiredCapabilities" : [ ]
-  }, {
-    "type" : "simple",
-    "config" : {
-      "timeout_seconds" : 600,
-      "command" : "Erstelle die finale Scorecard:\n\n{{ previous_output }}\n\n## Format:\n\n### Health Scorecard\n| Dimension | Score | Gewicht | Gewichtet | Trend-Indikator |\n|-----------|-------|---------|-----------|----------------|\n| ... | X/10 | XX% | X.X | (geschaetzt) |\n| **Gesamt** | | | **X.X/10** | |\n\n### Top-3 Staerken\nWas die Codebase gut macht.\n\n### Top-3 Risiken\nWo der groesste Handlungsbedarf besteht.\n\n### Improvement Roadmap\n| Prioritaet | Massnahme | Betroffene Dimension | Erwarteter Impact | Aufwand |\n\nMaximal 8-10 Massnahmen, nach Impact/Aufwand-Verhaeltnis sortiert."
+    {
+      "type": "simple",
+      "config": {
+        "timeout_seconds": 600,
+        "command": "Erstelle die finale Scorecard:\n\n{{ previous_output }}\n\n## Format:\n\n### Health Scorecard\n| Dimension | Score | Gewicht | Gewichtet | Trend-Indikator |\n|-----------|-------|---------|-----------|----------------|\n| ... | X/10 | XX% | X.X | (geschaetzt) |\n| **Gesamt** | | | **X.X/10** | |\n\n### Top-3 Staerken\nWas die Codebase gut macht.\n\n### Top-3 Risiken\nWo der groesste Handlungsbedarf besteht.\n\n### Improvement Roadmap\n| Prioritaet | Massnahme | Betroffene Dimension | Erwarteter Impact | Aufwand |\n\nMaximal 8-10 Massnahmen, nach Impact/Aufwand-Verhaeltnis sortiert."
+      },
+      "requiredCapabilities": []
     },
-    "requiredCapabilities" : [ ]
-  }, {
-    "type" : "agentic",
-    "config" : {
-      "max_iterations" : 10,
-      "max_total_tokens" : 150000,
-      "iteration_timeout_seconds" : 120,
-      "goal" : "Erstelle oder aktualisiere TODOs basierend auf den Audit-Findings aus {{ previous_output }}.\n\nVORGEHEN:\n1. API-Key aus der SQLite-Datenbank lesen:\n   python3 -c \"import sqlite3; conn = sqlite3.connect('ai-automation-backend/data/automation.db'); c = conn.cursor(); c.execute(\\\"SELECT value FROM app_settings WHERE key = 'api-key'\\\"); print(c.fetchone()[0]); conn.close()\"\n\n2. Bestehende TODOs mit Tag 'audit:codebase-health' laden:\n   curl -s -H 'X-API-Key: <KEY>' http://localhost:9090/api/v1/todos?tag=audit:codebase-health\n\n3. Fuer jeden HIGH oder CRITICAL Finding aus dem Audit-Report:\n   a) Pruefen ob bereits ein offenes TODO mit gleichem Titel-Prefix existiert\n   b) Falls ja: TODO-Beschreibung aktualisieren (PATCH /api/v1/todos/<id>)\n   c) Falls nein: Neues TODO anlegen (POST /api/v1/todos) mit:\n      - title: \"Codebase Health: <kurze Beschreibung des Findings>\"\n      - description: Markdown mit Details, betroffene Dateien, Empfehlung\n      - priority: Mapping CRITICAL→HIGH, HIGH→MEDIUM\n      - tags: [\"audit:codebase-health\", \"backend\" oder \"frontend\"]\n      - projectId: \"ebf4f50c-20c2-4c35-a84a-a0b350124523\"\n      - source: \"AI\"\n      - sourceAgent: \"audit-workflow\"\n\n4. Bestehende TODOs mit Tag 'audit:codebase-health' die NICHT mehr in den Findings auftauchen:\n   → Status auf DONE setzen (PATCH /api/v1/todos/<id>/status mit {\"status\": \"DONE\"})\n\nWICHTIG: Nur HIGH und CRITICAL Findings als TODOs anlegen. MEDIUM und LOW ignorieren.\nWICHTIG: Jede curl-Aktion muss den API-Key im Header X-API-Key mitgeben.\nWICHTIG: Absolute Pfade verwenden fuer die SQLite-DB.",
-      "max_repeated_actions" : 3,
-      "success_criteria" : "Alle HIGH/CRITICAL Findings sind als TODOs angelegt oder aktualisiert. Geloeste Issues sind auf DONE gesetzt.",
-      "total_timeout_seconds" : 900,
-      "require_approval" : false
-    },
-    "requiredCapabilities" : [ ]
-  } ]
+    {
+      "type": "agentic",
+      "config": {
+        "max_iterations": 10,
+        "max_total_tokens": 150000,
+        "iteration_timeout_seconds": 120,
+        "goal": "Erstelle oder aktualisiere TODOs basierend auf den Audit-Findings aus {{ previous_output }}.\n\nKONTEXT vom WorkflowExecutor:\n- {{ api_key }} — Backend API-Key (verwende diesen im X-API-Key Header)\n- {{ open_todos }} — alle offenen TODOs des Projekts im Format\n  `- <id> [PRIORITY] [tag1,tag2,...] Title` (eine Zeile pro TODO)\n\nVORGEHEN:\n1. Filtere {{ open_todos }} nach Tag 'audit:codebase-health' — die so gefilterten Zeilen sind die \"bestehenden Audit-TODOs\", die du updaten oder schliessen kannst.\n\n2. Fuer jeden HIGH oder CRITICAL Finding aus dem Audit-Report:\n   a) Pruefen ob bereits ein offenes TODO mit gleichem Titel-Prefix existiert\n   b) Falls ja: TODO-Beschreibung aktualisieren (PATCH /api/v1/todos/<id>)\n   c) Falls nein: Neues TODO anlegen (POST /api/v1/todos) mit:\n      - title: \"Codebase Health: <kurze Beschreibung des Findings>\"\n      - description: Markdown mit Details, betroffene Dateien, Empfehlung\n      - priority: Mapping CRITICAL→HIGH, HIGH→MEDIUM\n      - tags: [\"audit:codebase-health\", \"backend\" oder \"frontend\"]\n      - projectId: \"ebf4f50c-20c2-4c35-a84a-a0b350124523\"\n      - source: \"AI\"\n      - sourceAgent: \"audit-workflow\"\n\n3. Bestehende TODOs mit Tag 'audit:codebase-health' die NICHT mehr in den Findings auftauchen:\n   → Status auf DONE setzen (PATCH /api/v1/todos/<id>/status mit {\"status\": \"DONE\"})\n\nHINWEIS Anti-Pattern: Schritte 2+3 nutzen REST-Self-Calls (POST/PATCH /api/v1/todos). Das ist noch nicht ideal — ein nativer todo-create/update/close Block-Typ ersetzt das in einem Folge-Refactor. Bis dahin: alle curl-Aufrufe mit `-H \"X-API-Key: {{ api_key }}\"` (Wert wird vom WorkflowExecutor injiziert).\n\nWICHTIG: Nur HIGH und CRITICAL Findings als TODOs anlegen. MEDIUM und LOW ignorieren.",
+        "max_repeated_actions": 3,
+        "success_criteria": "Alle HIGH/CRITICAL Findings sind als TODOs angelegt oder aktualisiert. Geloeste Issues sind auf DONE gesetzt.",
+        "total_timeout_seconds": 900,
+        "require_approval": false
+      },
+      "requiredCapabilities": []
+    }
+  ]
 }

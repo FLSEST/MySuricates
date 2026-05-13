@@ -19,6 +19,7 @@ import com.automation.service.todo.GateStatusOutputParser;
 import com.automation.service.todo.TodoOutputParser;
 import com.automation.service.project.ContainerService;
 import com.automation.service.project.ProjectContextService;
+import com.automation.service.system.ApiKeyService;
 import com.automation.service.system.SystemIdentityService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,6 +61,7 @@ public class WorkflowExecutor {
     private final ApplicationEventPublisher eventPublisher;
     private final TemplateVerificationService templateVerificationService;
     private final SystemIdentityService systemIdentity;
+    private final ApiKeyService apiKeyService;
     private final com.automation.repository.TodoRepository todoRepository;
     private final WorkflowVersionService workflowVersionService;
     private final WorkflowExecutionRegistry executionRegistry;
@@ -69,7 +71,7 @@ public class WorkflowExecutor {
     private static final java.util.Set<String> SYSTEM_VAR_KEYS = java.util.Set.of(
             "workflow_run_id", "workflow_id", "workflow_name", "project_path",
             "model", "provider", "started_at", "run_timestamp",
-            "previous_report", "open_todos",
+            "previous_report", "open_todos", "api_key",
             "workflow_version", "workflow_changed_since_last_run"
     );
 
@@ -881,6 +883,14 @@ public class WorkflowExecutor {
         try {
             context.setVariable("previous_report", loadPreviousReport(workflowId));
             context.setVariable("open_todos", loadOpenTodos(projectId));
+            // Templates may need the API key to call the platform's own REST API.
+            // Injecting it here removes the need for templates to read the SQLite
+            // app_settings table directly (Hibernate-cache bypass, pool-lock risk).
+            // Native todo-* block types remain the long-term goal — see follow-up TODO.
+            String apiKey = apiKeyService.getEffectiveApiKey();
+            if (apiKey != null && !apiKey.isBlank()) {
+                context.setVariable("api_key", apiKey);
+            }
         } catch (Exception e) {
             log.warn("Failed to inject platform data: {}", e.getMessage());
         }
@@ -930,7 +940,13 @@ public class WorkflowExecutor {
             if (todos.isEmpty()) return "(keine offenen TODOs)";
             StringBuilder sb = new StringBuilder();
             for (com.automation.entity.Todo t : todos) {
-                sb.append("- [").append(t.getPriority()).append("] ").append(t.getTitle()).append("\n");
+                String id = t.getId() != null ? t.getId() : "";
+                String tags = t.getTags() != null ? t.getTags().trim() : "";
+                sb.append("- ").append(id).append(" [").append(t.getPriority()).append("]");
+                if (!tags.isEmpty()) {
+                    sb.append(" [").append(tags).append("]");
+                }
+                sb.append(" ").append(t.getTitle()).append("\n");
             }
             return sb.toString();
         } catch (Exception e) {

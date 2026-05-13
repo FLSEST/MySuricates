@@ -95,6 +95,9 @@ class WorkflowExecutorTest {
     @Mock
     private SystemIdentityService systemIdentity;
 
+    @Mock
+    private com.automation.service.system.ApiKeyService apiKeyService;
+
     private WorkflowExecutor workflowExecutor;
 
     private Workflow testWorkflow;
@@ -129,6 +132,7 @@ class WorkflowExecutorTest {
                 eventPublisher,
                 templateVerificationService,
                 systemIdentity,
+                apiKeyService,
                 todoRepository,
                 workflowVersionService,
                 new WorkflowExecutionRegistry(),
@@ -950,6 +954,7 @@ class WorkflowExecutorTest {
                 eventPublisher,
                 templateVerificationService,
                 systemIdentity,
+                apiKeyService,
                 todoRepository,
                 workflowVersionService,
                 new WorkflowExecutionRegistry(),

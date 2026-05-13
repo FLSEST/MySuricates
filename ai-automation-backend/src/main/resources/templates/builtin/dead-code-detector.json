@@ -1,52 +1,57 @@
 {
-  "id" : "dead-code-detector",
-  "icon" : "\uD83D\uDC80",
-  "name" : {
-    "en" : "Dead Code Detector",
-    "de" : "Dead-Code-Detektor"
+  "id": "dead-code-detector",
+  "icon": "💀",
+  "name": {
+    "en": "Dead Code Detector",
+    "de": "Dead-Code-Detektor"
   },
-  "description" : {
-    "en" : "Find unused code: orphan exports, dead files, unused dependencies",
-    "de" : "Ungenutzten Code finden: verwaiste Exports, tote Dateien, ungenutzte Dependencies"
+  "description": {
+    "en": "Find unused code: orphan exports, dead files, unused dependencies",
+    "de": "Ungenutzten Code finden: verwaiste Exports, tote Dateien, ungenutzte Dependencies"
   },
-  "category" : "CODE",
-  "sortOrder" : 37,
-  "version" : "1.1.0",
-  "model" : "claude-sonnet-4-6",
-  "instructions" : "Findet ungenutzten Code: verwaiste Exports, tote Dateien, ungenutzte Dependencies, tote Code-Pfade.",
-  "blocks" : [ {
-    "type" : "shell",
-    "config" : {
-      "on_failure" : "continue",
-      "command" : "set -euo pipefail\necho '=== Source File Inventory ==='\nfind . -type f \\( -name '*.java' -o -name '*.kt' -o -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \\) -not -path '*/node_modules/*' -not -path '*/build/*' -not -path '*/target/*' -not -path '*/dist/*' -not -path '*/.git/*' | sort > /tmp/all_source_files.txt\nwc -l < /tmp/all_source_files.txt\necho ''\necho '=== Exports (JS/TS) ==='\ngrep -rn 'export \\(default \\|const \\|function \\|class \\|interface \\|type \\|enum \\)' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' . 2>/dev/null | grep -v node_modules | grep -v dist | grep -v build | head -100\necho ''\necho '=== Public Classes/Methods (Java/Kotlin) ==='\ngrep -rn '^public class \\|^public interface \\|^public enum ' --include='*.java' --include='*.kt' . 2>/dev/null | grep -v target | grep -v build | head -80\necho ''\necho '=== Import Statements ==='\ngrep -rn '^import ' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.java' --include='*.kt' . 2>/dev/null | grep -v node_modules | grep -v target | grep -v build | grep -v dist | head -200\necho ''\necho '=== Package Dependencies ==='\nfor f in $(find . -name package.json -not -path '*/node_modules/*' -maxdepth 3 2>/dev/null); do\n  echo \"--- $f ---\"\n  python3 -c \"import json; d=json.load(open('$f')); deps=list(d.get('dependencies',{}).keys())+list(d.get('devDependencies',{}).keys()); print('\\n'.join(deps))\" 2>/dev/null || true\ndone\necho ''\nfor f in $(find . -name pom.xml -maxdepth 3 2>/dev/null); do\n  echo \"--- $f ---\"\n  grep -A2 '<artifactId>' \"$f\" | grep -v '<groupId>\\|--' | sed 's/.*<artifactId>\\(.*\\)<\\/artifactId>.*/\\1/' | head -30\ndone"
+  "category": "CODE",
+  "sortOrder": 37,
+  "version": "1.1.0",
+  "model": "claude-sonnet-4-6",
+  "instructions": "Findet ungenutzten Code: verwaiste Exports, tote Dateien, ungenutzte Dependencies, tote Code-Pfade.",
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "on_failure": "continue",
+        "command": "set -euo pipefail\necho '=== Source File Inventory ==='\nfind . -type f \\( -name '*.java' -o -name '*.kt' -o -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \\) -not -path '*/node_modules/*' -not -path '*/build/*' -not -path '*/target/*' -not -path '*/dist/*' -not -path '*/.git/*' | sort > /tmp/all_source_files.txt\nwc -l < /tmp/all_source_files.txt\necho ''\necho '=== Exports (JS/TS) ==='\ngrep -rn 'export \\(default \\|const \\|function \\|class \\|interface \\|type \\|enum \\)' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' . 2>/dev/null | grep -v node_modules | grep -v dist | grep -v build | head -100\necho ''\necho '=== Public Classes/Methods (Java/Kotlin) ==='\ngrep -rn '^public class \\|^public interface \\|^public enum ' --include='*.java' --include='*.kt' . 2>/dev/null | grep -v target | grep -v build | head -80\necho ''\necho '=== Import Statements ==='\ngrep -rn '^import ' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.java' --include='*.kt' . 2>/dev/null | grep -v node_modules | grep -v target | grep -v build | grep -v dist | head -200\necho ''\necho '=== Package Dependencies ==='\nfor f in $(find . -name package.json -not -path '*/node_modules/*' -maxdepth 3 2>/dev/null); do\n  echo \"--- $f ---\"\n  python3 -c \"import json; d=json.load(open('$f')); deps=list(d.get('dependencies',{}).keys())+list(d.get('devDependencies',{}).keys()); print('\\n'.join(deps))\" 2>/dev/null || true\ndone\necho ''\nfor f in $(find . -name pom.xml -maxdepth 3 2>/dev/null); do\n  echo \"--- $f ---\"\n  grep -A2 '<artifactId>' \"$f\" | grep -v '<groupId>\\|--' | sed 's/.*<artifactId>\\(.*\\)<\\/artifactId>.*/\\1/' | head -30\ndone"
+      },
+      "requiredCapabilities": []
     },
-    "requiredCapabilities" : [ ]
-  }, {
-    "type" : "simple",
-    "config" : {
-      "timeout_seconds" : 600,
-      "command" : "Analysiere die gesammelten Code-Daten auf ungenutzten Code:\n\n{{ previous_output }}\n\nSuche systematisch nach:\n1. **Verwaiste Exports**: Exportierte Symbole (Funktionen, Klassen, Interfaces, Typen), die nirgends importiert werden\n2. **Tote Dateien**: Source-Dateien, die von keiner anderen Datei referenziert werden (weder importiert noch als Route/Config eingebunden)\n3. **Ungenutzte Dependencies**: Pakete in package.json/pom.xml, die nirgends im Code importiert werden\n4. **Tote Code-Pfade**: Methoden/Funktionen innerhalb von Dateien, die nur definiert aber nie aufgerufen werden\n5. **Auskommentierter Code**: Groessere Bloecke von auskommentiertem Code, der entfernt werden sollte\n\nFuer jeden Fund: Datei, Symbol/Paket, Evidenz warum es ungenutzt ist. Markiere Confidence (HIGH/MEDIUM/LOW) — nur HIGH melden wenn sicher ungenutzt."
+    {
+      "type": "simple",
+      "config": {
+        "timeout_seconds": 600,
+        "command": "Analysiere die gesammelten Code-Daten auf ungenutzten Code:\n\n{{ previous_output }}\n\nSuche systematisch nach:\n1. **Verwaiste Exports**: Exportierte Symbole (Funktionen, Klassen, Interfaces, Typen), die nirgends importiert werden\n2. **Tote Dateien**: Source-Dateien, die von keiner anderen Datei referenziert werden (weder importiert noch als Route/Config eingebunden)\n3. **Ungenutzte Dependencies**: Pakete in package.json/pom.xml, die nirgends im Code importiert werden\n4. **Tote Code-Pfade**: Methoden/Funktionen innerhalb von Dateien, die nur definiert aber nie aufgerufen werden\n5. **Auskommentierter Code**: Groessere Bloecke von auskommentiertem Code, der entfernt werden sollte\n\nFuer jeden Fund: Datei, Symbol/Paket, Evidenz warum es ungenutzt ist. Markiere Confidence (HIGH/MEDIUM/LOW) — nur HIGH melden wenn sicher ungenutzt."
+      },
+      "requiredCapabilities": []
     },
-    "requiredCapabilities" : [ ]
-  }, {
-    "type" : "simple",
-    "config" : {
-      "timeout_seconds" : 600,
-      "command" : "Erstelle einen Impact-Report und Cleanup-Plan:\n\n{{ previous_output }}\n\n## Format:\n\n### Summary\n- Geschaetzte Menge an Dead Code (Dateien, LOC)\n- Betroffene Module/Packages\n\n### Findings nach Kategorie\n| # | Kategorie | Datei/Symbol | Confidence | Impact (LOC) | Aktion |\n\n### Cleanup-Aktionsplan\n1. **Safe Deletes** (HIGH confidence): Sofort entfernbar\n2. **Review Required** (MEDIUM confidence): Manuell pruefen\n3. **Dependency Cleanup**: Pakete zum Entfernen\n\nNur HIGH-confidence Findings in den Safe-Delete-Bereich."
+    {
+      "type": "simple",
+      "config": {
+        "timeout_seconds": 600,
+        "command": "Erstelle einen Impact-Report und Cleanup-Plan:\n\n{{ previous_output }}\n\n## Format:\n\n### Summary\n- Geschaetzte Menge an Dead Code (Dateien, LOC)\n- Betroffene Module/Packages\n\n### Findings nach Kategorie\n| # | Kategorie | Datei/Symbol | Confidence | Impact (LOC) | Aktion |\n\n### Cleanup-Aktionsplan\n1. **Safe Deletes** (HIGH confidence): Sofort entfernbar\n2. **Review Required** (MEDIUM confidence): Manuell pruefen\n3. **Dependency Cleanup**: Pakete zum Entfernen\n\nNur HIGH-confidence Findings in den Safe-Delete-Bereich."
+      },
+      "requiredCapabilities": []
     },
-    "requiredCapabilities" : [ ]
-  }, {
-    "type" : "agentic",
-    "config" : {
-      "max_iterations" : 10,
-      "max_total_tokens" : 150000,
-      "iteration_timeout_seconds" : 120,
-      "goal" : "Erstelle oder aktualisiere TODOs basierend auf den Audit-Findings aus {{ previous_output }}.\n\nVORGEHEN:\n1. API-Key aus der SQLite-Datenbank lesen:\n   python3 -c \"import sqlite3; conn = sqlite3.connect('ai-automation-backend/data/automation.db'); c = conn.cursor(); c.execute(\\\"SELECT value FROM app_settings WHERE key = 'api-key'\\\"); print(c.fetchone()[0]); conn.close()\"\n\n2. Bestehende TODOs mit Tag 'audit:dead-code' laden:\n   curl -s -H 'X-API-Key: <KEY>' http://localhost:9090/api/v1/todos?tag=audit:dead-code\n\n3. Fuer jeden HIGH oder CRITICAL Finding aus dem Audit-Report:\n   a) Pruefen ob bereits ein offenes TODO mit gleichem Titel-Prefix existiert\n   b) Falls ja: TODO-Beschreibung aktualisieren (PATCH /api/v1/todos/<id>)\n   c) Falls nein: Neues TODO anlegen (POST /api/v1/todos) mit:\n      - title: \"Dead Code: <kurze Beschreibung des Findings>\"\n      - description: Markdown mit Details, betroffene Dateien, Empfehlung\n      - priority: Mapping CRITICAL→HIGH, HIGH→MEDIUM\n      - tags: [\"audit:dead-code\", \"backend\" oder \"frontend\"]\n      - projectId: \"ebf4f50c-20c2-4c35-a84a-a0b350124523\"\n      - source: \"AI\"\n      - sourceAgent: \"audit-workflow\"\n\n4. Bestehende TODOs mit Tag 'audit:dead-code' die NICHT mehr in den Findings auftauchen:\n   → Status auf DONE setzen (PATCH /api/v1/todos/<id>/status mit {\"status\": \"DONE\"})\n\nWICHTIG: Nur HIGH und CRITICAL Findings als TODOs anlegen. MEDIUM und LOW ignorieren.\nWICHTIG: Jede curl-Aktion muss den API-Key im Header X-API-Key mitgeben.\nWICHTIG: Absolute Pfade verwenden fuer die SQLite-DB.",
-      "max_repeated_actions" : 3,
-      "success_criteria" : "Alle HIGH/CRITICAL Findings sind als TODOs angelegt oder aktualisiert. Geloeste Issues sind auf DONE gesetzt.",
-      "total_timeout_seconds" : 900,
-      "require_approval" : false
-    },
-    "requiredCapabilities" : [ ]
-  } ]
+    {
+      "type": "agentic",
+      "config": {
+        "max_iterations": 10,
+        "max_total_tokens": 150000,
+        "iteration_timeout_seconds": 120,
+        "goal": "Erstelle oder aktualisiere TODOs basierend auf den Audit-Findings aus {{ previous_output }}.\n\nKONTEXT vom WorkflowExecutor:\n- {{ api_key }} — Backend API-Key (verwende diesen im X-API-Key Header)\n- {{ open_todos }} — alle offenen TODOs des Projekts im Format\n  `- <id> [PRIORITY] [tag1,tag2,...] Title` (eine Zeile pro TODO)\n\nVORGEHEN:\n1. Filtere {{ open_todos }} nach Tag 'audit:dead-code' — die so gefilterten Zeilen sind die \"bestehenden Audit-TODOs\", die du updaten oder schliessen kannst.\n\n2. Fuer jeden HIGH oder CRITICAL Finding aus dem Audit-Report:\n   a) Pruefen ob bereits ein offenes TODO mit gleichem Titel-Prefix existiert\n   b) Falls ja: TODO-Beschreibung aktualisieren (PATCH /api/v1/todos/<id>)\n   c) Falls nein: Neues TODO anlegen (POST /api/v1/todos) mit:\n      - title: \"Dead Code: <kurze Beschreibung des Findings>\"\n      - description: Markdown mit Details, betroffene Dateien, Empfehlung\n      - priority: Mapping CRITICAL→HIGH, HIGH→MEDIUM\n      - tags: [\"audit:dead-code\", \"backend\" oder \"frontend\"]\n      - projectId: \"ebf4f50c-20c2-4c35-a84a-a0b350124523\"\n      - source: \"AI\"\n      - sourceAgent: \"audit-workflow\"\n\n3. Bestehende TODOs mit Tag 'audit:dead-code' die NICHT mehr in den Findings auftauchen:\n   → Status auf DONE setzen (PATCH /api/v1/todos/<id>/status mit {\"status\": \"DONE\"})\n\nHINWEIS Anti-Pattern: Schritte 2+3 nutzen REST-Self-Calls (POST/PATCH /api/v1/todos). Das ist noch nicht ideal — ein nativer todo-create/update/close Block-Typ ersetzt das in einem Folge-Refactor. Bis dahin: alle curl-Aufrufe mit `-H \"X-API-Key: {{ api_key }}\"` (Wert wird vom WorkflowExecutor injiziert).\n\nWICHTIG: Nur HIGH und CRITICAL Findings als TODOs anlegen. MEDIUM und LOW ignorieren.",
+        "max_repeated_actions": 3,
+        "success_criteria": "Alle HIGH/CRITICAL Findings sind als TODOs angelegt oder aktualisiert. Geloeste Issues sind auf DONE gesetzt.",
+        "total_timeout_seconds": 900,
+        "require_approval": false
+      },
+      "requiredCapabilities": []
+    }
+  ]
 }
