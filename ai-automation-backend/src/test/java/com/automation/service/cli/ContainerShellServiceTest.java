@@ -129,13 +129,13 @@ class ContainerShellServiceTest {
                     "buildDockerCommand", String.class, String.class, String.class, boolean.class, List.class);
             method.setAccessible(true);
             List<String> extras = List.of(
-                    "/home/flo/dokumente:/home/flo/dokumente:rw",
+                    "/test/user/dokumente:/test/user/dokumente:rw",
                     "/etc/timezone:/etc/timezone:ro"
             );
             @SuppressWarnings("unchecked")
             List<String> cmd = (List<String>) method.invoke(service, "cmd", "/p", "img:latest", false, extras);
 
-            assertThat(cmd).contains("/home/flo/dokumente:/home/flo/dokumente:rw");
+            assertThat(cmd).contains("/test/user/dokumente:/test/user/dokumente:rw");
             assertThat(cmd).contains("/etc/timezone:/etc/timezone:ro");
             // Extra mounts are separate -v flags, so there are 3 total (project + 2 extras)
             assertThat(cmd.stream().filter("-v"::equals).count()).isEqualTo(3);
@@ -149,7 +149,7 @@ class ContainerShellServiceTest {
         service.setAllowExtraMounts(false);
 
         List<String> safe = service.filterExtraMounts(
-                List.of("/home/flo/data:/data:rw", "/tmp/cache:/cache"),
+                List.of("/test/user/data:/data:rw", "/tmp/cache:/cache"),
                 "img:latest");
 
         assertThat(safe).isEmpty();
@@ -162,10 +162,10 @@ class ContainerShellServiceTest {
         service.setAllowExtraMounts(true);
 
         List<String> safe = service.filterExtraMounts(
-                List.of("/home/flo/data:/workspace/data:rw"),
+                List.of("/test/user/data:/workspace/data:rw"),
                 "img:latest");
 
-        assertThat(safe).containsExactly("/home/flo/data:/workspace/data:rw");
+        assertThat(safe).containsExactly("/test/user/data:/workspace/data:rw");
         verify(activityLogService).warn(any(), contains("Extra mount activated"), anyString(), isNull());
     }
 
@@ -212,7 +212,7 @@ class ContainerShellServiceTest {
 
         // host side is harmless, but container mount target is /etc
         List<String> safe = service.filterExtraMounts(
-                List.of("/home/flo/data:/etc/myconf"),
+                List.of("/test/user/data:/etc/myconf"),
                 "img:latest");
 
         assertThat(safe).isEmpty();
@@ -224,14 +224,14 @@ class ContainerShellServiceTest {
 
         List<String> safe = service.filterExtraMounts(
                 List.of(
-                        "/home/flo/data:/data:rw",
+                        "/test/user/data:/data:rw",
                         "/etc:/host-etc:ro",
                         "/tmp/cache:/cache"
                 ),
                 "img:latest");
 
         assertThat(safe).containsExactlyInAnyOrder(
-                "/home/flo/data:/data:rw",
+                "/test/user/data:/data:rw",
                 "/tmp/cache:/cache");
     }
 
@@ -241,7 +241,7 @@ class ContainerShellServiceTest {
         service.setAllowedMountPrefixes(List.of());
 
         List<String> safe = service.filterExtraMounts(
-                List.of("/home/flo/data:/data:rw", "/opt/anything:/data2:rw"),
+                List.of("/test/user/data:/data:rw", "/opt/anything:/data2:rw"),
                 "img:latest");
 
         assertThat(safe).hasSize(2);
@@ -250,19 +250,19 @@ class ContainerShellServiceTest {
     @Test
     void filterExtraMounts_allowlistConfigured_rejectsHostPathsOutsidePrefix() {
         service.setAllowExtraMounts(true);
-        service.setAllowedMountPrefixes(List.of("/home/flo/dokumente", "/home/flo/Entwicklung"));
+        service.setAllowedMountPrefixes(List.of("/test/user/dokumente", "/test/user/Entwicklung"));
 
         List<String> safe = service.filterExtraMounts(
                 List.of(
-                        "/home/flo/dokumente/cv:/data:rw",
-                        "/home/flo/Entwicklung/foo:/work:rw",
+                        "/test/user/dokumente/cv:/data:rw",
+                        "/test/user/Entwicklung/foo:/work:rw",
                         "/opt/secret:/data2:rw",
-                        "/home/flo/.ssh:/mnt:ro"),
+                        "/test/user/.ssh:/mnt:ro"),
                 "img:latest");
 
         assertThat(safe).containsExactly(
-                "/home/flo/dokumente/cv:/data:rw",
-                "/home/flo/Entwicklung/foo:/work:rw");
+                "/test/user/dokumente/cv:/data:rw",
+                "/test/user/Entwicklung/foo:/work:rw");
         verify(activityLogService, times(2)).warn(any(),
                 contains("not under allowed-mount-prefixes"), anyString(), isNull());
     }
@@ -270,7 +270,7 @@ class ContainerShellServiceTest {
     @Test
     void filterExtraMounts_allowlistRejectsForbiddenPathsFirst() {
         service.setAllowExtraMounts(true);
-        service.setAllowedMountPrefixes(List.of("/home/flo"));
+        service.setAllowedMountPrefixes(List.of("/test/user"));
 
         // /etc is forbidden, must be rejected with "forbidden path" log,
         // not "not under allowed-mount-prefixes".
@@ -285,47 +285,47 @@ class ContainerShellServiceTest {
 
     @Test
     void filterExtraMounts_allowlistRejectsPathTraversalBypass() {
-        // String prefix check would let "/home/flo/dokumente/../../etc:/data" pass
-        // because the string starts with "/home/flo/dokumente". After path
+        // String prefix check would let "/test/user/dokumente/../../etc:/data" pass
+        // because the string starts with "/test/user/dokumente". After path
         // normalization the host path becomes "/etc" → must be rejected as
         // forbidden, not slip through.
         service.setAllowExtraMounts(true);
-        service.setAllowedMountPrefixes(List.of("/home/flo/dokumente"));
+        service.setAllowedMountPrefixes(List.of("/test/user/dokumente"));
 
         List<String> safe = service.filterExtraMounts(
                 List.of(
-                        "/home/flo/dokumente/../../etc:/data:rw",
-                        "/home/flo/dokumente/./../.ssh:/mnt:ro",
-                        "/home/flo/dokumente/cv:/data:rw"),
+                        "/test/user/dokumente/../../etc:/data:rw",
+                        "/test/user/dokumente/./../.ssh:/mnt:ro",
+                        "/test/user/dokumente/cv:/data:rw"),
                 "img:latest");
 
-        assertThat(safe).containsExactly("/home/flo/dokumente/cv:/data:rw");
+        assertThat(safe).containsExactly("/test/user/dokumente/cv:/data:rw");
     }
 
     @Test
     void isAllowedByPrefix_normalizesDotDotSequences() {
-        service.setAllowedMountPrefixes(List.of("/home/flo/dokumente"));
+        service.setAllowedMountPrefixes(List.of("/test/user/dokumente"));
 
         // Naive string-prefix check would accept these — must be rejected after
         // normalization because they resolve outside the prefix.
-        assertThat(service.isAllowedByPrefix("/home/flo/dokumente/../etc:/data:rw")).isFalse();
-        assertThat(service.isAllowedByPrefix("/home/flo/dokumente/../../root:/data:rw")).isFalse();
+        assertThat(service.isAllowedByPrefix("/test/user/dokumente/../etc:/data:rw")).isFalse();
+        assertThat(service.isAllowedByPrefix("/test/user/dokumente/../../root:/data:rw")).isFalse();
 
         // Valid paths still pass.
-        assertThat(service.isAllowedByPrefix("/home/flo/dokumente/cv:/data:rw")).isTrue();
-        assertThat(service.isAllowedByPrefix("/home/flo/dokumente/sub/./file:/data:rw")).isTrue();
+        assertThat(service.isAllowedByPrefix("/test/user/dokumente/cv:/data:rw")).isTrue();
+        assertThat(service.isAllowedByPrefix("/test/user/dokumente/sub/./file:/data:rw")).isTrue();
     }
 
     @Test
     void filterExtraMounts_allowlistAcceptsExactPrefixMatch() {
         service.setAllowExtraMounts(true);
-        service.setAllowedMountPrefixes(List.of("/home/flo/dokumente"));
+        service.setAllowedMountPrefixes(List.of("/test/user/dokumente"));
 
         List<String> safe = service.filterExtraMounts(
-                List.of("/home/flo/dokumente:/dok:rw"),
+                List.of("/test/user/dokumente:/dok:rw"),
                 "img:latest");
 
-        assertThat(safe).containsExactly("/home/flo/dokumente:/dok:rw");
+        assertThat(safe).containsExactly("/test/user/dokumente:/dok:rw");
     }
 
     @Test
@@ -354,11 +354,11 @@ class ContainerShellServiceTest {
         input.add(null);
         input.add("");
         input.add("   ");
-        input.add("/home/flo/data:/data:rw");
+        input.add("/test/user/data:/data:rw");
 
         List<String> safe = service.filterExtraMounts(input, "img:latest");
 
-        assertThat(safe).containsExactly("/home/flo/data:/data:rw");
+        assertThat(safe).containsExactly("/test/user/data:/data:rw");
     }
 
     @Test
@@ -367,7 +367,7 @@ class ContainerShellServiceTest {
         assertThat(ContainerShellService.findForbiddenSegment("/etc/foo:/data:ro")).isEqualTo("/etc");
         assertThat(ContainerShellService.findForbiddenSegment("/root:/data:ro")).isEqualTo("/root");
         assertThat(ContainerShellService.findForbiddenSegment("/var/run/docker.sock:/sock:ro")).isEqualTo("/var/run/docker.sock");
-        assertThat(ContainerShellService.findForbiddenSegment("/home/flo:/data:ro")).isNull();
+        assertThat(ContainerShellService.findForbiddenSegment("/test/user:/data:ro")).isNull();
         assertThat(ContainerShellService.findForbiddenSegment("/etcetera:/data:ro")).isNull(); // not a child of /etc
     }
 

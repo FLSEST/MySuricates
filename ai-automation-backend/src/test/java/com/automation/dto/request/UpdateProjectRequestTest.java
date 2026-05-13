@@ -81,14 +81,14 @@ class UpdateProjectRequestTest {
         var config = Map.<String, Object>of("env", "prod", "debug", false);
         var request = new UpdateProjectRequest(
                 "MySuricates", "AI Automation", "Workflow platform",
-                ProjectType.CODE, "/home/flo/project", config, "Spring Boot backend"
+                ProjectType.CODE, "/test/user/project", config, "Spring Boot backend"
         );
 
         assertThat(request.name()).isEqualTo("MySuricates");
         assertThat(request.subtitle()).isEqualTo("AI Automation");
         assertThat(request.description()).isEqualTo("Workflow platform");
         assertThat(request.type()).isEqualTo(ProjectType.CODE);
-        assertThat(request.path()).isEqualTo("/home/flo/project");
+        assertThat(request.path()).isEqualTo("/test/user/project");
         assertThat(request.config()).containsExactlyInAnyOrderEntriesOf(config);
         assertThat(request.aiContext()).isEqualTo("Spring Boot backend");
     }

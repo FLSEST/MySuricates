@@ -261,8 +261,8 @@ class ShellBlockExecutorTest {
 
     @Test
     void execute_mountsList_resolvedAndPassedToContainer() {
-        context.setVariable("home", "/home/flo");
-        List<String> expectedMounts = List.of("/home/flo/data:/data:ro", "/tmp:/tmp");
+        context.setVariable("home", "/test/user");
+        List<String> expectedMounts = List.of("/test/user/data:/data:ro", "/tmp:/tmp");
 
         when(containerShellService.execute(eq("ls /data"), eq("/test/project"), eq(300),
                 eq("python:3.12"), eq(false), eq(expectedMounts)))
