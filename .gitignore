@@ -40,10 +40,11 @@ ai-automation-backend/stable-frontend/
 /templatetesting/
 
 # Public-readiness generated artefacts and internal reports
+# root-anchored so a future ai-automation-backend/reports submodule isn't ignored
 .tmp/
-.output/
-reports/
-review/
+/.output/
+/reports/
+/review/
 docs/public/generated/
 screenshots/raw/
 

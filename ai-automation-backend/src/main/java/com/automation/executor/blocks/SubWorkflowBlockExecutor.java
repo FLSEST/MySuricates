@@ -136,7 +136,8 @@ public class SubWorkflowBlockExecutor implements BlockExecutor {
     private WorkflowRun waitForCompletion(String runId) {
         Instant deadline = Instant.now().plus(MAX_WAIT);
         while (Instant.now().isBefore(deadline)) {
-            WorkflowRun run = runRepository.findById(runId).orElseThrow();
+            WorkflowRun run = runRepository.findById(runId).orElseThrow(() ->
+                    new WorkflowExecutionException("Sub-workflow run " + runId + " disappeared while waiting"));
             if (run.getStatus() != RunStatus.RUNNING && run.getStatus() != RunStatus.PENDING) {
                 return run;
             }
