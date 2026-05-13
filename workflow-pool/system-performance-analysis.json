@@ -15,7 +15,7 @@
   "author": "MySuricates",
   "defaultContext": {
     "backend_url": "http://localhost:9090",
-    "project_id": "ebf4f50c-20c2-4c35-a84a-a0b350124523",
+    "project_id": "{{ project_id }}",
     "log_file": "ai-automation-backend/data/logs/mysuricates.log",
     "db_file": "ai-automation-backend/data/automation.db"
   },

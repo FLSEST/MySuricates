@@ -21,7 +21,7 @@
   "version": "1.2.0",
   "author": "MySuricates",
   "defaultContext": {
-    "project_path": "/home/flo/Entwicklung/tools/autotrigger"
+    "project_path": "{{ project_path }}"
   },
   "blocks": [
     {
