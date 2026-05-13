@@ -302,6 +302,74 @@ class WorkflowExecutorTest {
      * {@code AUTOMATION_API_KEY} env var on the spawned CLI process instead.
      */
     @Test
+    void execute_injectsOpenTodosWithIdAndTags() {
+        com.automation.entity.Todo todo = com.automation.entity.Todo.builder()
+                .id("abc12345-1111-2222-3333-444455556666")
+                .title("Fix endpoint X")
+                .status(com.automation.entity.Todo.Status.OPEN)
+                .priority(com.automation.entity.Todo.Priority.HIGH)
+                .tags("audit:api-consistency,backend")
+                .build();
+        when(todoRepository.findByProjectIdAndStatusIn(eq("proj-1"), any()))
+                .thenReturn(List.of(todo));
+
+        ArgumentCaptor<ExecutionContext> ctxCaptor = ArgumentCaptor.forClass(ExecutionContext.class);
+        StepResult step = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), ctxCaptor.capture()))
+                .thenReturn(step);
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        String openTodos = (String) ctxCaptor.getValue().getVariable("open_todos");
+        assertThat(openTodos)
+                .as("open_todos must contain id, priority, tags, title for filter-by-tag use cases")
+                .contains("abc12345-1111-2222-3333-444455556666")
+                .contains("[HIGH]")
+                .contains("[audit:api-consistency,backend]")
+                .contains("Fix endpoint X");
+    }
+
+    @Test
+    void execute_openTodosWithoutTags_omitsTagBracket() {
+        com.automation.entity.Todo todo = com.automation.entity.Todo.builder()
+                .id("def-id")
+                .title("Plain TODO")
+                .status(com.automation.entity.Todo.Status.OPEN)
+                .priority(com.automation.entity.Todo.Priority.MEDIUM)
+                .tags(null)
+                .build();
+        when(todoRepository.findByProjectIdAndStatusIn(eq("proj-1"), any()))
+                .thenReturn(List.of(todo));
+
+        ArgumentCaptor<ExecutionContext> ctxCaptor = ArgumentCaptor.forClass(ExecutionContext.class);
+        StepResult step = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), ctxCaptor.capture()))
+                .thenReturn(step);
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        String openTodos = (String) ctxCaptor.getValue().getVariable("open_todos");
+        // No tag-bracket when tags are null: "- def-id [MEDIUM] Plain TODO"
+        assertThat(openTodos).contains("- def-id [MEDIUM] Plain TODO");
+    }
+
+    @Test
+    void execute_noOpenTodos_injectsPlaceholder() {
+        when(todoRepository.findByProjectIdAndStatusIn(eq("proj-1"), any()))
+                .thenReturn(List.of());
+
+        ArgumentCaptor<ExecutionContext> ctxCaptor = ArgumentCaptor.forClass(ExecutionContext.class);
+        StepResult step = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), ctxCaptor.capture()))
+                .thenReturn(step);
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        assertThat(ctxCaptor.getValue().getVariable("open_todos"))
+                .isEqualTo("(keine offenen TODOs)");
+    }
+
+    @Test
     void execute_doesNotInjectApiKeyAsTemplateVariable() {
         StepResult step = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
