@@ -202,4 +202,78 @@ class PathValidatorTest {
         assertThatCode(() -> validator.validateForContainerMount(tempDir.toString()))
                 .doesNotThrowAnyException();
     }
+
+    // --- New blocklist entries (L1) ---
+
+    @Test
+    void validate_restrictedPath_bin_throwsException() {
+        assertThatThrownBy(() -> validator.validate("/bin"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("restricted system directory");
+    }
+
+    @Test
+    void validate_restrictedPath_sbin_throwsException() {
+        assertThatThrownBy(() -> validator.validate("/sbin"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("restricted system directory");
+    }
+
+    @Test
+    void validate_restrictedPath_lib_throwsException() {
+        assertThatThrownBy(() -> validator.validate("/lib"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("restricted system directory");
+    }
+
+    @Test
+    void validate_restrictedPath_opt_throwsException() {
+        assertThatThrownBy(() -> validator.validate("/opt/anything"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("restricted system directory");
+    }
+
+    // --- Symlink resolution (M2) ---
+
+    @Test
+    void validateForContainerMount_symlinkToRestrictedDir_isRejected(@TempDir Path tempDir) throws Exception {
+        // A symlink in the workspace points at /etc — must be blocked even
+        // though the symlink path itself starts under tempDir.
+        Path link = tempDir.resolve("project");
+        java.nio.file.Files.createSymbolicLink(link, java.nio.file.Path.of("/etc"));
+
+        assertThatThrownBy(() -> validator.validateForContainerMount(link.toString()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("restricted system directory");
+    }
+
+    @Test
+    void validateForContainerMount_symlinkToOwnSshDir_isRejected(@TempDir Path tempDir) throws Exception {
+        // We cannot create /home/<other>/.ssh in a test, but the resolved path
+        // can be the *current* user's home — which still triggers the sensitive
+        // subpath check after symlink resolution.
+        Path realSsh = java.nio.file.Path.of(System.getProperty("user.home"), ".ssh");
+        if (!java.nio.file.Files.exists(realSsh)) {
+            // Skip if .ssh does not exist on the test host
+            return;
+        }
+        Path link = tempDir.resolve("project");
+        java.nio.file.Files.createSymbolicLink(link, realSsh);
+
+        assertThatThrownBy(() -> validator.validateForContainerMount(link.toString()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("sensitive home subpath");
+    }
+
+    @Test
+    void validateForContainerMount_symlinkToLegitDir_passes(@TempDir Path tempDir) throws Exception {
+        // Symlink that points to a real directory not in the blocklist.
+        Path target = tempDir.resolve("real-target");
+        java.nio.file.Files.createDirectory(target);
+        Path link = tempDir.resolve("project");
+        java.nio.file.Files.createSymbolicLink(link, target);
+
+        assertThatCode(() -> validator.validateForContainerMount(link.toString()))
+                .doesNotThrowAnyException();
+    }
 }

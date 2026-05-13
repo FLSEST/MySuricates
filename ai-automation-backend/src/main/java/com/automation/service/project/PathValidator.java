@@ -4,7 +4,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
@@ -33,7 +35,8 @@ public class PathValidator {
     private static final List<String> SYSTEM_DIRECTORIES = List.of(
             "/etc", "/proc", "/sys", "/dev",
             "/var/run", "/var/lib", "/var/log", "/var/cache",
-            "/usr", "/boot", "/root", "/run", "/lost+found"
+            "/usr", "/boot", "/root", "/run", "/lost+found",
+            "/bin", "/sbin", "/lib", "/lib64", "/opt", "/mnt", "/media"
     );
 
     /**
@@ -56,23 +59,7 @@ public class PathValidator {
      */
     public void validate(String path) {
         Path normalized = normalize(path);
-        String normalizedStr = normalized.toString();
-
-        if (workspaceRoot != null && !workspaceRoot.isBlank()) {
-            Path root = Path.of(workspaceRoot).normalize().toAbsolutePath();
-            if (!normalized.startsWith(root)) {
-                throw new IllegalArgumentException("Path must be under workspace root: " + root);
-            }
-        } else {
-            if (normalizedStr.equals("/")) {
-                throw new IllegalArgumentException("Path points to a restricted system directory: " + path);
-            }
-            for (String restricted : SYSTEM_DIRECTORIES) {
-                if (normalizedStr.equals(restricted) || normalizedStr.startsWith(restricted + "/")) {
-                    throw new IllegalArgumentException("Path points to a restricted system directory: " + path);
-                }
-            }
-        }
+        enforceBlocklistOrWorkspaceRoot(normalized.toString(), path);
 
         if (!Files.isDirectory(normalized)) {
             throw new IllegalArgumentException("Path must be an existing directory: " + path);
@@ -80,11 +67,14 @@ public class PathValidator {
     }
 
     /**
-     * Defense-in-depth check for container mounts. The sensitive-subpath check
-     * runs before the {@link #validate} filesystem check so callers (and tests)
-     * see the security reason, not a "path does not exist" message, when an
-     * attacker points the project path at a sensitive location that happens to
-     * not exist on the current host.
+     * Defense-in-depth check for container mounts. Runs four layers:
+     * <ol>
+     *   <li>String-level: is the path a sensitive home subpath (~/.ssh, …)?</li>
+     *   <li>{@link #validate}: blocklist/workspace check on the normalized path + existence.</li>
+     *   <li>Symlink resolution: {@code Path.toRealPath()} dereferences any symlinks.</li>
+     *   <li>Re-check blocklist + sensitive-subpath on the resolved real path —
+     *       blocks attacks like {@code /home/user/project → /etc}.</li>
+     * </ol>
      */
     public void validateForContainerMount(String path) {
         if (isSensitiveHomeSubpath(path)) {
@@ -92,6 +82,44 @@ public class PathValidator {
                     "Path points to a sensitive home subpath and cannot be mounted: " + path);
         }
         validate(path);
+
+        try {
+            String realPath = Path.of(path).toRealPath().toString();
+            enforceBlocklistOrWorkspaceRoot(realPath, path);
+            if (isSensitiveHomeSubpath(realPath)) {
+                throw new IllegalArgumentException(
+                        "Path resolves through symlinks to a sensitive home subpath: " + path);
+            }
+        } catch (NoSuchFileException e) {
+            // validate() above already proved existence — treat as defensive fall-through.
+            throw new IllegalArgumentException("Path disappeared between validation and resolve: " + path, e);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Cannot resolve container-mount path: " + path, e);
+        }
+    }
+
+    /**
+     * Applies workspace-root allowlist (when configured) or the system-directory
+     * blocklist. Throws {@link IllegalArgumentException} on rejection.
+     * {@code reportedPath} appears in error messages so users see what they
+     * passed in, even when checking a symlink-resolved path internally.
+     */
+    private void enforceBlocklistOrWorkspaceRoot(String pathToCheck, String reportedPath) {
+        if (workspaceRoot != null && !workspaceRoot.isBlank()) {
+            Path root = Path.of(workspaceRoot).normalize().toAbsolutePath();
+            if (!Path.of(pathToCheck).startsWith(root)) {
+                throw new IllegalArgumentException("Path must be under workspace root: " + root);
+            }
+            return;
+        }
+        if (pathToCheck.equals("/")) {
+            throw new IllegalArgumentException("Path points to a restricted system directory: " + reportedPath);
+        }
+        for (String restricted : SYSTEM_DIRECTORIES) {
+            if (pathToCheck.equals(restricted) || pathToCheck.startsWith(restricted + "/")) {
+                throw new IllegalArgumentException("Path points to a restricted system directory: " + reportedPath);
+            }
+        }
     }
 
     /**
