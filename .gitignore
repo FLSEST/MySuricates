@@ -77,3 +77,6 @@ __pycache__/
 /workflow-pool/lernapp-generator.json
 /workflow-pool/lernapp-test-monitor.json
 /workflow-pool/lernpaket-batch-generator.json
+/workflow-pool/schulbuch-themen-generator.json
+/workflow-pool/uebungs-generator.json
+/workflow-pool/web-build-gate.json
