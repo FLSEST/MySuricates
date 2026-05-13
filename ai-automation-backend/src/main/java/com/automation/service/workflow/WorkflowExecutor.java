@@ -67,7 +67,7 @@ public class WorkflowExecutor {
     private final com.automation.service.dlq.DeadLetterService deadLetterService;
 
     private static final java.util.Set<String> SYSTEM_VAR_KEYS = java.util.Set.of(
-            "workflow_run_id", "workflow_id", "workflow_name", "project_path",
+            "workflow_run_id", "workflow_id", "workflow_name", "project_id", "project_path",
             "model", "provider", "started_at", "run_timestamp",
             "previous_report", "open_todos",
             "workflow_version", "workflow_changed_since_last_run"
@@ -216,6 +216,7 @@ public class WorkflowExecutor {
             context.setVariable("workflow_run_id", runId);
             context.setVariable("workflow_id", workflowId);
             context.setVariable("workflow_name", workflowName != null ? workflowName : "");
+            context.setVariable("project_id", project.getId() != null ? project.getId() : "");
             context.setVariable("project_path", project.getPath() != null ? project.getPath() : "");
             context.setVariable("model", model != null ? model : "");
             context.setVariable("provider", provider != null ? provider : "");
