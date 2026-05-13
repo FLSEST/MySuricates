@@ -59,3 +59,21 @@ scripts/seed-workflows.sh
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Private workflow templates (project-specific, not generic platform demos)
+/workflow-pool/app-build-gate.json
+/workflow-pool/backend-build-gate.json
+/workflow-pool/bahnhof-hunt-sync-deploy.json
+/workflow-pool/bilingual-narrative-song.json
+/workflow-pool/grammatik-uebungs-generator.json
+/workflow-pool/hunt-data-quality-gate.json
+/workflow-pool/job-shortlist-generator.json
+/workflow-pool/job-shortlist-template.html
+/workflow-pool/kreuzwort-generator.json
+/workflow-pool/lehrplan-extraktor.json
+/workflow-pool/lehrplan-extraktor-bw.json
+/workflow-pool/lehrplan-extraktor-niedersachsen.json
+/workflow-pool/lehrplan-extraktor-nrw.json
+/workflow-pool/lernapp-generator.json
+/workflow-pool/lernapp-test-monitor.json
+/workflow-pool/lernpaket-batch-generator.json
