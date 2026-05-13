@@ -25,10 +25,10 @@ NEVER: Reine Informationsfragen oder triviale Antworten ohne Code-Änderung
 ✅ RICHTIG: User fragt nach Änderung → TODO anlegen → IN_PROGRESS → Datei editieren → DONE → Docs aktualisieren → committen
 ```
 
-### API-Key auslesen
+### API-Key bereitstellen
 
 ```bash
-python3 -c "import sqlite3; conn = sqlite3.connect('ai-automation-backend/data/automation.db'); c = conn.cursor(); c.execute(\"SELECT value FROM app_settings WHERE key = 'api-key'\"); print(c.fetchone()[0]); conn.close()"
+export DEV_KEY="<dev-api-key>"
 ```
 
 ### TODO-Felder
@@ -42,7 +42,7 @@ curl -X POST http://localhost:9090/api/v1/todos \
     "description": "Markdown mit Kontext und Umsetzungsschritten",
     "priority": "HIGH | MEDIUM | LOW",
     "tags": ["bereich", "typ"],
-    "projectId": "ebf4f50c-20c2-4c35-a84a-a0b350124523",
+    "projectId": "<project-uuid>",
     "source": "AI",
     "sourceAgent": "claude-code",
     "sessionId": "$SHELL_SESSION_ID"
@@ -51,7 +51,7 @@ curl -X POST http://localhost:9090/api/v1/todos \
 
 ### Konventionen
 
-- **Projekt**: `AutoPilot` (ID: `ebf4f50c-20c2-4c35-a84a-a0b350124523`) für MySuricates-eigene TODOs
+- **Projekt**: `AutoPilot` (ID: `<project-uuid>`) für MySuricates-eigene TODOs
 - **Source**: `AI` mit `sourceAgent: "claude-code"`, `sessionId: "$SHELL_SESSION_ID"`
 - **Sprache**: Deutsch für Titel
 - **Priority**: `HIGH` = blockierend, `MEDIUM` = bald, `LOW` = nice-to-have
@@ -63,7 +63,7 @@ Das `sessionId`-Feld im TODO enthält die Shell-Session-ID (`$SHELL_SESSION_ID`)
 
 **Session-ID auslesen:**
 ```bash
-ls -t ~/.claude/projects/-home-flo-Entwicklung-tools-autotrigger/*.jsonl | head -1 | xargs basename -s .jsonl
+ls -t ~/.claude/projects/<project-slug>/*.jsonl | head -1 | xargs basename -s .jsonl
 ```
 
 **Format in der Description:**

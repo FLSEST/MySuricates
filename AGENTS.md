@@ -8,10 +8,11 @@ Anleitung für OpenAI Codex CLI, um eigenständig Workflows und Chains über die
 - **Test-Instanz** läuft auf `localhost:8090` (via `POST /api/v1/testing/start`)
 - **API-Keys** für Dev und Test sind separate Datenbanken
 
-### API-Key auslesen (Dev)
+### API-Key bereitstellen
 
 ```bash
-DEV_KEY=$(python3 -c "import sqlite3; conn = sqlite3.connect('ai-automation-backend/data/automation.db'); c = conn.cursor(); c.execute(\"SELECT value FROM app_settings WHERE key = 'api-key'\"); print(c.fetchone()[0]); conn.close()")
+export DEV_KEY="<dev-api-key>"
+export TEST_KEY="<test-api-key>"
 ```
 
 ## TODO-First Arbeitsweise
@@ -60,14 +61,14 @@ npm run dev
 npm run test:e2e
 ```
 
-Der Dev-API-Key wird in `cypress.config.ts` automatisch aus `ai-automation-backend/data/automation.db` gelesen, falls vorhanden.
+Der Dev-API-Key wird fuer Cypress aus der lokalen Testkonfiguration bereitgestellt; alternativ kann `CYPRESS_API_KEY` gesetzt werden.
 
 ### Test-Target
 
 ```bash
-# Test-Instanz mit bekanntem API-Key starten
+# Test-Instanz mit bekanntem privaten API-Key starten
 cd ai-automation-backend
-AUTOMATION_API_KEY=test-e2e-key docker compose -f docker-compose.test.yml up -d
+AUTOMATION_API_KEY=<test-api-key> docker compose -f docker-compose.test.yml up -d
 
 # Optional: Definitionen von Dev nach Test synchronisieren
 curl -s -X POST http://localhost:9090/api/v1/testing/sync-definitions \
@@ -77,8 +78,8 @@ curl -s -X POST http://localhost:9090/api/v1/testing/sync-definitions \
 
 # Frontend und Cypress beide auf Test schalten
 cd ../ai-automation-frontend
-CYPRESS_TARGET=test CYPRESS_TEST_API_KEY=test-e2e-key npm run dev:e2e:test
-CYPRESS_TARGET=test CYPRESS_TEST_API_KEY=test-e2e-key npm run test:e2e:test
+CYPRESS_TARGET=test CYPRESS_TEST_API_KEY=<test-api-key> npm run dev:e2e:test
+CYPRESS_TARGET=test CYPRESS_TEST_API_KEY=<test-api-key> npm run test:e2e:test
 ```
 
 Hinweise:
@@ -358,8 +359,9 @@ Hinweise:
 ## Kompletter Beispiel-Flow
 
 ```bash
-# 1. API-Key auslesen
-DEV_KEY=$(python3 -c "import sqlite3; conn = sqlite3.connect('ai-automation-backend/data/automation.db'); c = conn.cursor(); c.execute(\"SELECT value FROM app_settings WHERE key = 'api-key'\"); print(c.fetchone()[0]); conn.close()")
+# 1. Private API-Keys bereitstellen
+export DEV_KEY="<dev-api-key>"
+export TEST_KEY="<test-api-key>"
 
 # 2. Test-Status prüfen
 curl -s -H "X-API-Key: $DEV_KEY" http://localhost:9090/api/v1/testing/status
