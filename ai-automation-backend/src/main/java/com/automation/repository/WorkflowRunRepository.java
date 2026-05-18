@@ -62,17 +62,6 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
          + "ORDER BY wr.startedAt DESC")
     List<WorkflowRun> findDashboardWindow(@Param("since") Instant since);
 
-    /**
-     * Top-10-Recent-Runs mit eager-geladenem workflow für das Dashboard-Recent-Runs-Panel.
-     * Inner JOIN FETCH: Runs soft-gelöschter Workflows werden ausgeschlossen (vgl.
-     * {@link #findDashboardWindow}) — liefert so bis zu 10 Runs mit lebendem Workflow.
-     */
-    @Query("SELECT wr FROM WorkflowRun wr "
-         + "JOIN FETCH wr.workflow "
-         + "ORDER BY wr.startedAt DESC "
-         + "LIMIT 10")
-    List<WorkflowRun> findTop10WithWorkflowByOrderByStartedAtDesc();
-
     @Query("SELECT wr.workflow.id, wr.workflow.name, COUNT(wr) " +
            "FROM WorkflowRun wr " +
            "WHERE wr.workflow IS NOT NULL " +

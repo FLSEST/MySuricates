@@ -139,8 +139,13 @@ public class LearningService {
                         (String) row[0], (String) row[1], (Long) row[2]))
                 .toList();
 
-        List<WorkflowRunResponse> recentRuns = runRepository.findTop10WithWorkflowByOrderByStartedAtDesc().stream()
-                .filter(r -> safeGetWorkflow(r) != null)
+        // recentRuns is derived from recentWindow (already startedAt-DESC ordered, with
+        // workflow + project + steps eager-fetched). A separate query is avoided: fetching
+        // the steps collection alongside a LIMIT would force Hibernate to apply the limit
+        // in memory, and getDashboard runs without a transaction (OSIV disabled) so any
+        // lazy access would throw.
+        List<WorkflowRunResponse> recentRuns = recentWindow.stream()
+                .limit(10)
                 .map(workflowMapper::toRunResponse)
                 .toList();
 

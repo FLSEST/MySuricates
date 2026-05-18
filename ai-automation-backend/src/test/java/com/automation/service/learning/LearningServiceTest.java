@@ -420,7 +420,6 @@ class LearningServiceTest {
             when(runRepository.countByStartedAtAfter(any(Instant.class))).thenReturn(0L);
             when(runRepository.findDashboardWindow(any(Instant.class))).thenReturn(List.of());
             when(runRepository.findTopWorkflows()).thenReturn(List.of());
-            when(runRepository.findTop10WithWorkflowByOrderByStartedAtDesc()).thenReturn(List.of());
 
             DashboardResponse dashboard = learningService.getDashboard(30, null);
 
@@ -488,7 +487,6 @@ class LearningServiceTest {
             when(runRepository.findDashboardWindow(any(Instant.class)))
                     .thenReturn(List.of(mixedRun, integrationOnlyRun));
             when(runRepository.findTopWorkflows()).thenReturn(List.of());
-            when(runRepository.findTop10WithWorkflowByOrderByStartedAtDesc()).thenReturn(List.of());
 
             DashboardResponse dashboard = learningService.getDashboard(30, null);
 
@@ -540,7 +538,6 @@ class LearningServiceTest {
             when(runRepository.findDashboardWindow(any(Instant.class)))
                     .thenReturn(List.of(failedRun));
             when(runRepository.findTopWorkflows()).thenReturn(List.of());
-            when(runRepository.findTop10WithWorkflowByOrderByStartedAtDesc()).thenReturn(List.of());
 
             DashboardResponse dashboard = learningService.getDashboard(30, null);
 

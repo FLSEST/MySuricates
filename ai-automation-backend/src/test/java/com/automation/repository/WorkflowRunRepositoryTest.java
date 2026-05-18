@@ -399,26 +399,6 @@ class WorkflowRunRepositoryTest {
                 assertThat(r.getWorkflow().getId()).isEqualTo(workflowA.getId()));
     }
 
-    /**
-     * Regression: the dashboard recent-runs query must skip runs of soft-deleted
-     * workflows rather than throwing FetchNotFoundException.
-     */
-    @Test
-    void should_exclude_runs_of_soft_deleted_workflow_from_top10_with_workflow() {
-        run(workflowA, RunStatus.COMPLETED, Instant.now().minusSeconds(20));
-        run(workflowB, RunStatus.COMPLETED, Instant.now().minusSeconds(10));
-
-        workflowB.setDeletedAt(Instant.now());
-        workflowRepository.flush();
-        entityManager.clear();
-
-        List<WorkflowRun> top = runRepository.findTop10WithWorkflowByOrderByStartedAtDesc();
-
-        assertThat(top).isNotEmpty();
-        assertThat(top).allSatisfy(r ->
-                assertThat(r.getWorkflow().getId()).isEqualTo(workflowA.getId()));
-    }
-
     @Test
     void should_find_by_id_with_steps() {
         WorkflowRun saved = run(workflowA, RunStatus.COMPLETED, Instant.now());
