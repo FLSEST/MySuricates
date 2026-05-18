@@ -6,6 +6,7 @@ import com.automation.entity.ProjectType;
 import com.automation.entity.RunStatus;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +36,9 @@ class WorkflowRunRepositoryTest {
 
     @Autowired
     private ProjectRepository projectRepository;
+
+    @Autowired
+    private EntityManager entityManager;
 
     private Workflow workflowA;
     private Workflow workflowB;
@@ -370,6 +374,49 @@ class WorkflowRunRepositoryTest {
         assertThat(result).isNotEmpty();
         // Triggers no LazyInitializationException because of JOIN FETCH
         assertThat(result.get(0).getWorkflow().getName()).isNotNull();
+    }
+
+    /**
+     * Regression: a WorkflowRun whose workflow was soft-deleted ({@code deleted_at} set,
+     * hidden by {@code @SQLRestriction}) must not break the dashboard window query.
+     * The inner JOIN FETCH excludes such runs instead of throwing FetchNotFoundException.
+     */
+    @Test
+    void should_exclude_runs_of_soft_deleted_workflow_from_dashboard_window() {
+        Instant now = Instant.now();
+        run(workflowA, RunStatus.COMPLETED, now.minusSeconds(20));
+        run(workflowB, RunStatus.COMPLETED, now.minusSeconds(10));
+
+        workflowB.setDeletedAt(Instant.now());
+        workflowRepository.flush();
+        entityManager.clear();
+
+        Instant since = now.minus(1, ChronoUnit.DAYS);
+        List<WorkflowRun> window = runRepository.findDashboardWindow(since);
+
+        assertThat(window).isNotEmpty();
+        assertThat(window).allSatisfy(r ->
+                assertThat(r.getWorkflow().getId()).isEqualTo(workflowA.getId()));
+    }
+
+    /**
+     * Regression: the dashboard recent-runs query must skip runs of soft-deleted
+     * workflows rather than throwing FetchNotFoundException.
+     */
+    @Test
+    void should_exclude_runs_of_soft_deleted_workflow_from_top10_with_workflow() {
+        run(workflowA, RunStatus.COMPLETED, Instant.now().minusSeconds(20));
+        run(workflowB, RunStatus.COMPLETED, Instant.now().minusSeconds(10));
+
+        workflowB.setDeletedAt(Instant.now());
+        workflowRepository.flush();
+        entityManager.clear();
+
+        List<WorkflowRun> top = runRepository.findTop10WithWorkflowByOrderByStartedAtDesc();
+
+        assertThat(top).isNotEmpty();
+        assertThat(top).allSatisfy(r ->
+                assertThat(r.getWorkflow().getId()).isEqualTo(workflowA.getId()));
     }
 
     @Test

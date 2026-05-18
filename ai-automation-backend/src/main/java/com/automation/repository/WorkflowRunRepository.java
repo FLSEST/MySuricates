@@ -48,18 +48,27 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
      * Eliminiert N+1 lazy loads beim Aggregieren in {@code LearningService.getDashboard}.
      * Mit pool-size=1 würden N+1-Queries die einzige SQLite-Connection >60s halten und
      * den HikariCP-Leak-Watchdog auslösen.
+     *
+     * <p>Inner JOIN FETCH auf {@code workflow}: Runs soft-gelöschter Workflows
+     * ({@code @SQLRestriction("deleted_at IS NULL")}) werden bewusst ausgeschlossen.
+     * Ein LEFT JOIN FETCH würde hier {@code FetchNotFoundException} werfen, weil der
+     * nicht-nullable FK gesetzt ist, die Zeile aber durch die Restriction unsichtbar.
      */
     @Query("SELECT DISTINCT wr FROM WorkflowRun wr "
-         + "LEFT JOIN FETCH wr.workflow w "
+         + "JOIN FETCH wr.workflow w "
          + "LEFT JOIN FETCH w.project "
          + "LEFT JOIN FETCH wr.steps "
          + "WHERE wr.startedAt > :since "
          + "ORDER BY wr.startedAt DESC")
     List<WorkflowRun> findDashboardWindow(@Param("since") Instant since);
 
-    /** Top-10-Recent-Runs mit eager-geladenem workflow für das Dashboard-Recent-Runs-Panel. */
+    /**
+     * Top-10-Recent-Runs mit eager-geladenem workflow für das Dashboard-Recent-Runs-Panel.
+     * Inner JOIN FETCH: Runs soft-gelöschter Workflows werden ausgeschlossen (vgl.
+     * {@link #findDashboardWindow}) — liefert so bis zu 10 Runs mit lebendem Workflow.
+     */
     @Query("SELECT wr FROM WorkflowRun wr "
-         + "LEFT JOIN FETCH wr.workflow "
+         + "JOIN FETCH wr.workflow "
          + "ORDER BY wr.startedAt DESC "
          + "LIMIT 10")
     List<WorkflowRun> findTop10WithWorkflowByOrderByStartedAtDesc();
