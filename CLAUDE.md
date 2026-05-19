@@ -270,9 +270,16 @@ Drei Umgebungen parallel:
 - **Test**: `localhost:8090` (Docker container, dedicated test instance)
 
 ```bash
-./scripts/staging.sh promote     # stop → snapshot → start (Einzeiler)
+./scripts/staging.sh promote      # Stable: stop → snapshot → start (Einzeiler)
 ./scripts/staging.sh start|stop|status|log|snapshot|db-seed|clean
+./scripts/staging.sh test-promote # Test:  stop → test-snapshot → test-start (Einzeiler)
+./scripts/staging.sh test-start|test-stop|test-status|test-log|test-reset|test-clean
 ```
+
+**Wichtig:** `test-start` baut das Test-Image NICHT neu — es startet nur das vorhandene.
+Nach Code-Änderungen immer `test-promote` (oder `test-snapshot`) verwenden, sonst läuft
+der Test-Container mit einem veralteten Backend-JAR (aktuelles Frontend + altes Backend
+→ neue Endpoints liefern 404 → UI hängt auf „loading").
 
 Vollständige Dokumentation (Auto-Start, Definition-Sync, Key-Files): [docs/deployment.md](docs/deployment.md)
 

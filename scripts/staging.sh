@@ -36,14 +36,10 @@ wait_healthy() {
     return 1
 }
 
-cmd_snapshot() {
-    log "Building snapshot from current code..."
-
-    # Tag current commit
-    local tag="stable-$(date +%Y%m%d-%H%M%S)"
-    cd "$PROJECT_ROOT"
-    git tag "$tag" 2>/dev/null && log "Tagged: $tag" || warn "Git tag failed (dirty tree?), continuing..."
-
+# Build backend JAR + frontend and copy the frontend into stable-frontend/.
+# Shared by the stable snapshot and the test snapshot — both the stable and
+# the test container COPY target/*.jar at image build and mount ./stable-frontend.
+build_artifacts() {
     # Build backend JAR
     log "Building backend JAR..."
     cd "$BACKEND_DIR"
@@ -60,6 +56,17 @@ cmd_snapshot() {
     rm -rf "$STABLE_FRONTEND_DIR"
     cp -r "$FRONTEND_DIR/dist" "$STABLE_FRONTEND_DIR"
     log "Frontend copied to $STABLE_FRONTEND_DIR"
+}
+
+cmd_snapshot() {
+    log "Building snapshot from current code..."
+
+    # Tag current commit
+    local tag="stable-$(date +%Y%m%d-%H%M%S)"
+    cd "$PROJECT_ROOT"
+    git tag "$tag" 2>/dev/null && log "Tagged: $tag" || warn "Git tag failed (dirty tree?), continuing..."
+
+    build_artifacts
 
     # Build Docker image
     log "Building Docker image..."
@@ -300,6 +307,31 @@ cmd_test_clean() {
     log "Cleaned: test container, volume, and image removed."
 }
 
+cmd_test_snapshot() {
+    log "Building test snapshot from current code..."
+
+    build_artifacts
+
+    # Rebuild the test Docker image so it picks up the fresh JAR. Without this,
+    # `test-start` reuses the existing image and the test backend goes stale —
+    # an outdated backend + current frontend means new endpoints 404 and the UI
+    # hangs on "loading".
+    log "Building test Docker image..."
+    cd "$BACKEND_DIR"
+    docker compose -f "$TEST_COMPOSE_FILE" build
+    log "Test Docker image built."
+
+    log "Test snapshot complete."
+}
+
+cmd_test_promote() {
+    log "Promoting current code to test..."
+    cmd_test_stop 2>/dev/null || true
+    cmd_test_snapshot
+    cmd_test_start
+    log "Test promotion complete!"
+}
+
 usage() {
     echo "Usage: $(basename "$0") <command>"
     echo ""
@@ -314,12 +346,14 @@ usage() {
     echo "  promote      Stop → snapshot → start (one-liner upgrade)"
     echo ""
     echo "Test commands:"
-    echo "  test-start   Start the test environment container"
-    echo "  test-stop    Stop the test environment container"
-    echo "  test-status  Show test container status and health"
-    echo "  test-reset   Reset test DB (delete volume + restart)"
-    echo "  test-log     Tail test container logs"
-    echo "  test-clean   Remove test container, volume, and image"
+    echo "  test-snapshot  Build JAR + Frontend, rebuild the test Docker image"
+    echo "  test-promote   Stop → test-snapshot → test-start (one-liner upgrade)"
+    echo "  test-start     Start the test environment container (no rebuild)"
+    echo "  test-stop      Stop the test environment container"
+    echo "  test-status    Show test container status and health"
+    echo "  test-reset     Reset test DB (delete volume + restart)"
+    echo "  test-log       Tail test container logs"
+    echo "  test-clean     Remove test container, volume, and image"
 }
 
 case "${1:-}" in
@@ -331,6 +365,8 @@ case "${1:-}" in
     db-seed)      cmd_db_seed ;;
     clean)        cmd_clean ;;
     promote)      cmd_promote ;;
+    test-snapshot) cmd_test_snapshot ;;
+    test-promote) cmd_test_promote ;;
     test-start)   cmd_test_start ;;
     test-stop)    cmd_test_stop ;;
     test-status)  cmd_test_status ;;
