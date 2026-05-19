@@ -22,8 +22,9 @@ services:
       - test-data:/app/data
       - ./stable-frontend:/app/frontend:ro
       - ./src/main/resources/application-test.yml:/app/config/application-test.yml:ro
+      - ./docker/entrypoint.sh:/app/entrypoint.sh:ro
       - /var/run/docker.sock:/var/run/docker.sock
-      - ${HOME}/.claude.json:${HOME}/.claude.json:ro
+      - ${HOME}/.claude.json:/seed/.claude.json:ro
       - ${HOME}/.local/share/claude:${HOME}/.local/share/claude:ro
       - ${HOME}/.local/bin:${HOME}/.local/bin:ro
       - ${HOME}/.claude:${HOME}/.claude
