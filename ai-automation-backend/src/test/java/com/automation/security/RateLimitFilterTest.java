@@ -130,6 +130,23 @@ class RateLimitFilterTest {
     }
 
     @Test
+    void staticAssets_bypassRateLimit() {
+        rateLimitConfig.setEnabled(true);
+        // Static frontend bundle chunks must never count against the API bucket —
+        // a single workflow-detail page mount lazy-loads dozens of chunks (Monaco,
+        // Workbox, route chunks) and would otherwise exhaust the limit and 429
+        // legitimate <script> loads, breaking Monaco initialisation.
+        for (String path : List.of("/", "/index.html", "/assets/index-abc.js",
+                "/assets/index-abc.css", "/sw.js", "/workbox-1234.js",
+                "/manifest.webmanifest", "/ws/info", "/actuator/health")) {
+            when(request.getRequestURI()).thenReturn(path);
+            assertThat(filter.shouldNotFilter(request))
+                    .as("path %s should bypass rate limit", path)
+                    .isTrue();
+        }
+    }
+
+    @Test
     void rateLimitEnabled_concurrentRequests_exactlyLimitPass() throws Exception {
         rateLimitConfig.setEnabled(true);
         rateLimitConfig.setRequestsPerMinute(10);

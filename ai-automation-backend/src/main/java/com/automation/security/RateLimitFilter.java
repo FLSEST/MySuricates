@@ -35,7 +35,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        if (path.startsWith("/ws") || path.startsWith("/actuator")) {
+        // Only API endpoints are rate-limited. Static frontend assets (/assets/*,
+        // /sw.js, Monaco/Workbox chunks, index.html), WebSocket (/ws) and actuator
+        // are exempt — they were previously counted against the bucket and a single
+        // workflow-detail mount could exhaust 120 RPM, 429'ing lazy script chunks
+        // and breaking Monaco initialisation.
+        if (!path.startsWith("/api/")) {
             return true;
         }
         // Internal sync traffic (InstanceSyncHelper) bypasses rate limiting

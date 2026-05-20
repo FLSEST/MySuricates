@@ -43,8 +43,19 @@ public class SecurityConfig {
                         .anyRequest().permitAll()
                 )
                 .headers(headers -> headers
+                        // cdn.jsdelivr.net is whitelisted so the bundled `@monaco-editor/react`
+                        // loader can pull Monaco's runtime (loader.js, editor.main.js, codicon
+                        // font, language workers). worker-src allows Monaco's Blob-URL workers.
+                        // Without these, the workflow-detail JSON block editor never initialises
+                        // and the browser console shows "Monaco initialization: error".
                         .contentSecurityPolicy(csp -> csp.policyDirectives(
-                                "default-src 'self'; script-src 'self'; connect-src 'self' ws: wss:; style-src 'self' 'unsafe-inline'; img-src 'self' data:"))
+                                "default-src 'self'; " +
+                                "script-src 'self' https://cdn.jsdelivr.net; " +
+                                "worker-src 'self' blob:; " +
+                                "connect-src 'self' ws: wss: https://cdn.jsdelivr.net; " +
+                                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
+                                "font-src 'self' data: https://cdn.jsdelivr.net; " +
+                                "img-src 'self' data:"))
                         .frameOptions(fo -> fo.deny()))
                 .addFilterBefore(apiKeyAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
