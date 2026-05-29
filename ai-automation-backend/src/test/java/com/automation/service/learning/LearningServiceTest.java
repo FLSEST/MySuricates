@@ -438,44 +438,16 @@ class LearningServiceTest {
                     statsService, similarityService, agenticService, insightsService);
 
             // Run 1: integration step (Trello) followed by an AI step (Claude)
-            StepResult trelloStep = StepResult.builder()
-                    .stepIndex(0).status(StepStatus.COMPLETED).durationMs(800L)
-                    .startedAt(Instant.now())
-                    .metadata(Map.of(
-                            "provider", "trello",
-                            "executionMode", "integration",
-                            "blockType", "integration"
-                    ))
-                    .build();
-            StepResult claudeStep = StepResult.builder()
-                    .stepIndex(1).status(StepStatus.COMPLETED).durationMs(2000L)
-                    .startedAt(Instant.now())
-                    .metadata(Map.of(
-                            "provider", "CLAUDE",
-                            "model", "claude-sonnet-4-6",
-                            "blockType", "simple"
-                    ))
-                    .build();
+            // Run 2: integration-only run (Jira) — must NOT contribute a "jira" provider entry
             WorkflowRun mixedRun = WorkflowRun.builder()
+                    .id("run-mixed")
                     .status(RunStatus.COMPLETED)
                     .startedAt(Instant.now())
-                    .steps(new ArrayList<>(List.of(trelloStep, claudeStep)))
-                    .build();
-
-            // Run 2: integration-only run (Jira) — must NOT contribute a "jira" provider entry
-            StepResult jiraStep = StepResult.builder()
-                    .stepIndex(0).status(StepStatus.COMPLETED).durationMs(500L)
-                    .startedAt(Instant.now())
-                    .metadata(Map.of(
-                            "provider", "jira",
-                            "executionMode", "integration",
-                            "blockType", "integration"
-                    ))
                     .build();
             WorkflowRun integrationOnlyRun = WorkflowRun.builder()
+                    .id("run-int")
                     .status(RunStatus.COMPLETED)
                     .startedAt(Instant.now())
-                    .steps(new ArrayList<>(List.of(jiraStep)))
                     .build();
 
             when(workflowRepository.count()).thenReturn(1L);
@@ -486,6 +458,15 @@ class LearningServiceTest {
             when(runRepository.countByStartedAtAfter(any(Instant.class))).thenReturn(0L);
             when(runRepository.findDashboardWindow(any(Instant.class)))
                     .thenReturn(List.of(mixedRun, integrationOnlyRun));
+            // Steps now come from a lightweight projection (runId, status, metadata), ordered by stepIndex.
+            when(runRepository.findStepMetadataForDashboard(any(Instant.class))).thenReturn(objectArrayList(
+                    new Object[]{"run-mixed", StepStatus.COMPLETED,
+                            Map.of("provider", "trello", "executionMode", "integration", "blockType", "integration")},
+                    new Object[]{"run-mixed", StepStatus.COMPLETED,
+                            Map.of("provider", "CLAUDE", "model", "claude-sonnet-4-6", "blockType", "simple")},
+                    new Object[]{"run-int", StepStatus.COMPLETED,
+                            Map.of("provider", "jira", "executionMode", "integration", "blockType", "integration")}
+            ));
             when(runRepository.findTopWorkflows()).thenReturn(List.of());
 
             DashboardResponse dashboard = learningService.getDashboard(30, null);
@@ -512,21 +493,10 @@ class LearningServiceTest {
                     runRepository, workflowRepository, workflowMapper,
                     statsService, similarityService, agenticService, insightsService);
 
-            // Failed integration step still has executionMode=integration (set in catch branch)
-            StepResult failedTrello = StepResult.builder()
-                    .stepIndex(0).status(StepStatus.FAILED).durationMs(300L)
-                    .startedAt(Instant.now())
-                    .metadata(Map.of(
-                            "provider", "trello",
-                            "action", "createCard",
-                            "executionMode", "integration",
-                            "error", "API rate limit"
-                    ))
-                    .build();
             WorkflowRun failedRun = WorkflowRun.builder()
+                    .id("run-failed")
                     .status(RunStatus.FAILED)
                     .startedAt(Instant.now())
-                    .steps(new ArrayList<>(List.of(failedTrello)))
                     .build();
 
             when(workflowRepository.count()).thenReturn(1L);
@@ -537,6 +507,12 @@ class LearningServiceTest {
             when(runRepository.countByStartedAtAfter(any(Instant.class))).thenReturn(0L);
             when(runRepository.findDashboardWindow(any(Instant.class)))
                     .thenReturn(List.of(failedRun));
+            // Failed integration step still carries executionMode=integration (set in the catch branch).
+            when(runRepository.findStepMetadataForDashboard(any(Instant.class))).thenReturn(objectArrayList(
+                    new Object[]{"run-failed", StepStatus.FAILED,
+                            Map.of("provider", "trello", "action", "createCard",
+                                    "executionMode", "integration", "error", "API rate limit")}
+            ));
             when(runRepository.findTopWorkflows()).thenReturn(List.of());
 
             DashboardResponse dashboard = learningService.getDashboard(30, null);

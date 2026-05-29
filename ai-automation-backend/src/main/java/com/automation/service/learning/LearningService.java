@@ -139,15 +139,39 @@ public class LearningService {
                         (String) row[0], (String) row[1], (Long) row[2]))
                 .toList();
 
-        // recentRuns is derived from recentWindow (already startedAt-DESC ordered, with
-        // workflow + project + steps eager-fetched). A separate query is avoided: fetching
-        // the steps collection alongside a LIMIT would force Hibernate to apply the limit
-        // in memory, and getDashboard runs without a transaction (OSIV disabled) so any
-        // lazy access would throw.
-        List<WorkflowRunResponse> recentRuns = recentWindow.stream()
+        // recentRuns: the "recent runs" widget needs the full steps (incl. input/output) for at
+        // most 10 runs. findDashboardWindow no longer fetches steps (that would drag every step's
+        // large TEXT columns across the whole window), so fetch them for just these 10 runs.
+        // Eager workflow+project+steps because getDashboard runs without a transaction (OSIV off).
+        List<String> recentIds = recentWindow.stream()
                 .limit(10)
-                .map(workflowMapper::toRunResponse)
+                .map(WorkflowRun::getId)
                 .toList();
+        List<WorkflowRunResponse> recentRuns;
+        if (recentIds.isEmpty()) {
+            recentRuns = List.of();
+        } else {
+            Map<String, WorkflowRun> recentById = runRepository.findByIdInWithStepsAndWorkflow(recentIds).stream()
+                    .collect(Collectors.toMap(WorkflowRun::getId, r -> r, (a, b) -> a));
+            recentRuns = recentIds.stream()
+                    .map(recentById::get)
+                    .filter(Objects::nonNull)
+                    .map(workflowMapper::toRunResponse)
+                    .toList();
+        }
+
+        // Per-step aggregation source: a lightweight projection (status + metadata only), NOT the
+        // full StepResult entities — avoids loading the large input/output/context_delta TEXT
+        // columns for every step in the window (getDashboard never reads them). Keyed by run id;
+        // ordered by stepIndex so the "first non-integration step wins" provider logic stays stable.
+        Map<String, List<StepAgg>> stepsByRun = new HashMap<>();
+        for (Object[] row : runRepository.findStepMetadataForDashboard(windowStart)) {
+            String stepRunId = (String) row[0];
+            StepStatus stepStatus = (StepStatus) row[1];
+            @SuppressWarnings("unchecked")
+            Map<String, Object> stepMeta = (Map<String, Object>) row[2];
+            stepsByRun.computeIfAbsent(stepRunId, k -> new ArrayList<>()).add(new StepAgg(stepStatus, stepMeta));
+        }
 
         // --- Per-run aggregation pass ---
         double totalCostUsd = 0.0;
@@ -232,9 +256,9 @@ public class LearningService {
             workflowRunCountMap.computeIfAbsent(wfId, k -> new long[1])[0]++;
             workflowNameMap.putIfAbsent(wfId, wfName);
 
-            for (StepResult step : run.getSteps()) {
-                if (step.getMetadata() == null) continue;
-                Map<String, Object> meta = step.getMetadata();
+            for (StepAgg step : stepsByRun.getOrDefault(run.getId(), List.of())) {
+                if (step.metadata() == null) continue;
+                Map<String, Object> meta = step.metadata();
 
                 double stepCost = extractDouble(meta, "costUsd");
                 long stepInput = extractLong(meta, "inputTokens");
@@ -262,7 +286,7 @@ public class LearningService {
                 if (isIntegrationStep && meta.get("provider") instanceof String integrationId
                         && !integrationId.isBlank()) {
                     integrationStepCount.computeIfAbsent(integrationId, k -> new long[1])[0]++;
-                    if (step.getStatus() == StepStatus.COMPLETED) {
+                    if (step.status() == StepStatus.COMPLETED) {
                         integrationSuccessCount.computeIfAbsent(integrationId, k -> new long[1])[0]++;
                     }
                     integrationTokens.computeIfAbsent(integrationId, k -> new long[1])[0] += stepTokens;
@@ -279,7 +303,7 @@ public class LearningService {
                 String blockType = extractString(meta, "blockType");
                 if (blockType != null && !blockType.isBlank()) {
                     blockTypeStepCount.computeIfAbsent(blockType, k -> new long[1])[0]++;
-                    if (step.getStatus() == StepStatus.FAILED) {
+                    if (step.status() == StepStatus.FAILED) {
                         blockTypeFailedCount.computeIfAbsent(blockType, k -> new long[1])[0]++;
                     }
                 }
@@ -425,4 +449,8 @@ public class LearningService {
                 triggerDistribution
         );
     }
+
+    /** Lightweight per-step aggregation row sourced from {@code findStepMetadataForDashboard}
+     *  (status + metadata only) instead of the full StepResult entity. */
+    private record StepAgg(StepStatus status, Map<String, Object> metadata) {}
 }

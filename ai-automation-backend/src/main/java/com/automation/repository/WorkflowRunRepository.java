@@ -44,23 +44,47 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
     List<WorkflowRun> findByStartedAtAfterOrderByStartedAtDesc(Instant since);
 
     /**
-     * Dashboard-Window mit eager-geladenem workflow, project und steps.
-     * Eliminiert N+1 lazy loads beim Aggregieren in {@code LearningService.getDashboard}.
-     * Mit pool-size=1 würden N+1-Queries die einzige SQLite-Connection >60s halten und
-     * den HikariCP-Leak-Watchdog auslösen.
+     * Dashboard-Window mit eager-geladenem workflow + project (NICHT steps).
+     * <p>Steps werden bewusst NICHT mehr mitgefetcht: ein {@code LEFT JOIN FETCH wr.steps}
+     * lädt jede StepResult-Zeile inkl. der großen TEXT-Spalten input/output/context_delta
+     * (volle CLI-Outputs) als kartesisches Produkt — bei pool-size=1 hält das die einzige
+     * SQLite-Connection mehrere Sekunden und blockiert alles andere. Die Aggregation in
+     * {@code LearningService.getDashboard} braucht pro Step nur status + metadata; die liefert
+     * {@link #findStepMetadataForDashboard(Instant)} als schlanke Projektion.
      *
      * <p>Inner JOIN FETCH auf {@code workflow}: Runs soft-gelöschter Workflows
      * ({@code @SQLRestriction("deleted_at IS NULL")}) werden bewusst ausgeschlossen.
      * Ein LEFT JOIN FETCH würde hier {@code FetchNotFoundException} werfen, weil der
      * nicht-nullable FK gesetzt ist, die Zeile aber durch die Restriction unsichtbar.
      */
+    @Query("SELECT wr FROM WorkflowRun wr "
+         + "JOIN FETCH wr.workflow w "
+         + "LEFT JOIN FETCH w.project "
+         + "WHERE wr.startedAt > :since "
+         + "ORDER BY wr.startedAt DESC")
+    List<WorkflowRun> findDashboardWindow(@Param("since") Instant since);
+
+    /**
+     * Schlanke Per-Step-Projektion für die Dashboard-Aggregation: nur (runId, status, metadata),
+     * NICHT die großen input/output/context_delta-TEXT-Spalten. Sortiert nach Run + stepIndex,
+     * damit die Provider-Erkennung (erster Nicht-Integration-Step gewinnt) deterministisch bleibt.
+     */
+    @Query("SELECT sr.workflowRun.id, sr.status, sr.metadata FROM StepResult sr "
+         + "WHERE sr.workflowRun.startedAt > :since "
+         + "ORDER BY sr.workflowRun.id, sr.stepIndex")
+    List<Object[]> findStepMetadataForDashboard(@Param("since") Instant since);
+
+    /**
+     * Lädt vollständige Runs (inkl. steps + workflow + project) für die wenigen "recentRuns"
+     * des Dashboards. Nur für ≤10 IDs gedacht — hier sind die großen TEXT-Spalten gewollt
+     * (das Frontend zeigt sie). Eager-Fetch, weil getDashboard ohne Transaktion läuft (OSIV aus).
+     */
     @Query("SELECT DISTINCT wr FROM WorkflowRun wr "
          + "JOIN FETCH wr.workflow w "
          + "LEFT JOIN FETCH w.project "
          + "LEFT JOIN FETCH wr.steps "
-         + "WHERE wr.startedAt > :since "
-         + "ORDER BY wr.startedAt DESC")
-    List<WorkflowRun> findDashboardWindow(@Param("since") Instant since);
+         + "WHERE wr.id IN :ids")
+    List<WorkflowRun> findByIdInWithStepsAndWorkflow(@Param("ids") List<String> ids);
 
     @Query("SELECT wr.workflow.id, wr.workflow.name, COUNT(wr) " +
            "FROM WorkflowRun wr " +

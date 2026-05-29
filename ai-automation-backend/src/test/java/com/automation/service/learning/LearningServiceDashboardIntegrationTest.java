@@ -21,6 +21,7 @@ import org.springframework.test.context.ActiveProfiles;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -137,5 +138,61 @@ class LearningServiceDashboardIntegrationTest {
         // The run of the soft-deleted workflow is excluded.
         assertThat(dashboard.recentRuns())
                 .noneSatisfy(r -> assertThat(r.workflowId()).isEqualTo(deletedWorkflow.getId()));
+    }
+
+    /**
+     * Proves the {@code findStepMetadataForDashboard} projection deserializes the
+     * {@code @Convert(JsonMapConverter)} metadata Map against real SQLite, and that
+     * cost/token/provider aggregation works <b>without</b> loading the heavy step
+     * input/output TEXT columns.
+     */
+    @Test
+    void getDashboard_aggregatesCostTokensProviderFromStepMetadata_viaProjection() {
+        long nano = System.nanoTime();
+        Project project = projectRepository.save(Project.builder()
+                .name("dash-cost-" + nano)
+                .description("Dashboard cost IT")
+                .type(ProjectType.CODE)
+                .path("/tmp/dash-cost-" + nano)
+                .status(ProjectStatus.STOPPED)
+                .build());
+        Workflow workflow = workflowRepository.save(Workflow.builder()
+                .name("cost-wf-" + nano)
+                .description("Cost workflow")
+                .project(project)
+                .build());
+
+        Instant now = Instant.now();
+        WorkflowRun run = WorkflowRun.builder()
+                .workflow(workflow)
+                .workflowName(workflow.getName())
+                .status(RunStatus.COMPLETED)
+                .startedAt(now.minusSeconds(45))
+                .build();
+        run.addStep(StepResult.builder()
+                .stepIndex(0)
+                .status(StepStatus.COMPLETED)
+                .startedAt(now.minusSeconds(45))
+                .durationMs(1200L)
+                // Large blobs the dashboard must NOT need to load:
+                .input("x".repeat(5000))
+                .output("y".repeat(5000))
+                .metadata(Map.of(
+                        "provider", "CLAUDE",
+                        "model", "claude-sonnet-4-6",
+                        "blockType", "simple",
+                        "costUsd", 0.25,
+                        "inputTokens", 1000,
+                        "outputTokens", 500))
+                .build());
+        createdRunIds.add(runRepository.save(run).getId());
+
+        DashboardResponse dashboard = learningService.getDashboard(30, null);
+
+        assertThat(dashboard.totalCostUsd30d()).isGreaterThanOrEqualTo(0.25);
+        assertThat(dashboard.totalTokens30d()).isGreaterThanOrEqualTo(1500L);
+        assertThat(dashboard.providerStats())
+                .extracting(DashboardResponse.ProviderStats::provider)
+                .contains("CLAUDE");
     }
 }

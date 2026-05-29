@@ -3,6 +3,7 @@ package com.automation.entity;
 import com.automation.util.JsonMapConverter;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -42,6 +43,7 @@ public class WorkflowRun {
 
     @OneToMany(mappedBy = "workflowRun", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("stepIndex ASC")
+    @BatchSize(size = 30)  // Batch lazy loads of steps across runs (e.g. the executions list maps 50 runs) → IN-queries instead of N+1.
     @Builder.Default
     private List<StepResult> steps = new ArrayList<>();
 
