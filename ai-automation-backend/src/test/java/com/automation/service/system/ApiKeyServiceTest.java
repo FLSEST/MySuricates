@@ -1,13 +1,16 @@
 package com.automation.service.system;
 
 import com.automation.repository.AppSettingsRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.nio.file.Path;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -22,12 +25,23 @@ class ApiKeyServiceTest {
     private AppSettingsRepository settingsRepo;
 
     private ApiKeyService service;
+    private String originalUserHome;
+
+    @TempDir
+    private Path tempHome;
 
     @BeforeEach
     void setUp() {
+        originalUserHome = System.getProperty("user.home");
+        System.setProperty("user.home", tempHome.toString());
         service = new ApiKeyService(settingsRepo);
         ReflectionTestUtils.setField(service, "configuredApiKey", "");
         ReflectionTestUtils.setField(service, "securityEnabled", true);
+    }
+
+    @AfterEach
+    void tearDown() {
+        System.setProperty("user.home", originalUserHome);
     }
 
     @Test
