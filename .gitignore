@@ -48,9 +48,6 @@ ai-automation-backend/stable-frontend/
 docs/public/generated/
 screenshots/raw/
 
-# Debug snapshots (host hardware/identity)
-diagnose-report.md
-diagnose-raw-output.txt
 *.txt.bak
 
 # Personal seed scripts (use seed-workflows.example.sh as template)
