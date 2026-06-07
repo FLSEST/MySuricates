@@ -25,6 +25,15 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
 
     long countByWorkflowId(String workflowId);
 
+    /**
+     * Run-Counts aller Workflows in EINER GROUP-BY-Query (statt {@code countByWorkflowId} pro
+     * Workflow). Für die /workflows-Liste — vermeidet N+1 (~285 Einzel-Counts). Nutzt
+     * {@code idx_workflow_runs_workflow_id} (V10). Workflows ohne Runs fehlen im Ergebnis
+     * (→ Mapper nutzt {@code getOrDefault(id, 0L)}).
+     */
+    @Query("SELECT wr.workflow.id, COUNT(wr) FROM WorkflowRun wr WHERE wr.workflow IS NOT NULL GROUP BY wr.workflow.id")
+    List<Object[]> countRunsGroupedByWorkflow();
+
     long countByStatus(RunStatus status);
 
     long countByStartedAtAfter(Instant since);

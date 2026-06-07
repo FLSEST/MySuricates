@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -128,6 +129,22 @@ class WorkflowRunRepositoryTest {
         long count = runRepository.countByWorkflowId(workflowA.getId());
 
         assertThat(count).isEqualTo(2);
+    }
+
+    @Test
+    void countRunsGroupedByWorkflow_matchesPerWorkflowCounts() {
+        run(workflowA, RunStatus.COMPLETED, Instant.now());
+        run(workflowA, RunStatus.FAILED, Instant.now());
+        run(workflowB, RunStatus.COMPLETED, Instant.now());
+
+        Map<String, Long> grouped = runRepository.countRunsGroupedByWorkflow().stream()
+                .collect(java.util.stream.Collectors.toMap(r -> (String) r[0], r -> (Long) r[1]));
+
+        assertThat(grouped.get(workflowA.getId())).isEqualTo(2L);
+        assertThat(grouped.get(workflowB.getId())).isEqualTo(1L);
+        // Same value as the per-workflow count it replaces in the /workflows list:
+        assertThat(grouped.get(workflowA.getId()))
+                .isEqualTo(runRepository.countByWorkflowId(workflowA.getId()));
     }
 
     @Test

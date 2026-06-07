@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -23,6 +24,8 @@ class WorkflowMapperTest extends WorkflowMapper {
     @Override public WorkflowRunResponse toRunResponse(WorkflowRun run) { return null; }
     @Override public List<WorkflowRunResponse> toRunResponseList(List<WorkflowRun> runs) { return null; }
     @Override public StepResultResponse toStepResponse(StepResult step) { return null; }
+    @Override public WorkflowResponse toResponse(Workflow workflow, Map<String, Long> runCounts) { return null; }
+    @Override public List<WorkflowResponse> toResponseList(List<Workflow> workflows, Map<String, Long> runCounts) { return null; }
 
     @Nested
     class SafeWorkflowId {

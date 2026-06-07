@@ -57,7 +57,7 @@ public class WorkflowController {
 
     @GetMapping
     public List<WorkflowResponse> listWorkflows() {
-        return workflowMapper.toResponseList(workflowService.findAll());
+        return workflowMapper.toResponseListWithRunCounts(workflowService.findAll());
     }
 
     @PostMapping

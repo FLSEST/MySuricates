@@ -16,6 +16,13 @@ public interface ChainRunRepository extends JpaRepository<ChainRun, String> {
 
     long countByChainId(String chainId);
 
+    /**
+     * Run-Counts aller Chains in EINER GROUP-BY-Query (statt {@code countByChainId} pro Chain).
+     * Für die /chains-Liste — vermeidet N+1. Nutzt {@code idx_chain_runs_chain_id} (V21).
+     */
+    @Query("SELECT cr.chain.id, COUNT(cr) FROM ChainRun cr WHERE cr.chain IS NOT NULL GROUP BY cr.chain.id")
+    List<Object[]> countRunsGroupedByChain();
+
     long countByStatus(RunStatus status);
 
     List<ChainRun> findByChainIdOrderByStartedAtDesc(String chainId);

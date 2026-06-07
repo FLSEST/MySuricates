@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
@@ -52,6 +52,7 @@ export function useWorkflows() {
       const raw = await api.get<WorkflowApiResponse[]>('/workflows');
       return raw.map(mapWorkflow);
     },
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -116,6 +117,7 @@ export function useAllRuns(params?: { status?: string; workflowId?: string; proj
       const hasActiveRuns = data.content.some((run) => !TERMINAL_RUN_STATUSES.has(run.status));
       return hasActiveRuns ? 5_000 : 30_000;
     },
+    placeholderData: keepPreviousData,
   });
 }
 

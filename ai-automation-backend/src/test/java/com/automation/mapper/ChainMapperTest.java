@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -137,11 +138,44 @@ class ChainMapperTest {
     void toResponseList_mapsMultiple() {
         WorkflowChain c1 = WorkflowChain.builder().id("c1").name("A").entries(List.of()).build();
         WorkflowChain c2 = WorkflowChain.builder().id("c2").name("B").entries(List.of()).build();
-        when(chainRunRepository.countByChainId("c1")).thenReturn(0L);
-        when(chainRunRepository.countByChainId("c2")).thenReturn(0L);
 
         List<ChainResponse> responses = mapper.toResponseList(List.of(c1, c2));
 
         assertThat(responses).hasSize(2);
+    }
+
+    @Test
+    void toResponseList_usesGroupedRunCounts() {
+        WorkflowChain c1 = WorkflowChain.builder().id("c1").name("A").entries(List.of()).build();
+        WorkflowChain c2 = WorkflowChain.builder().id("c2").name("B").entries(List.of()).build();
+        // Batch path: one grouped query instead of countByChainId per chain.
+        when(chainRunRepository.countRunsGroupedByChain()).thenReturn(List.of(
+                new Object[]{"c1", 3L}, new Object[]{"c2", 7L}));
+
+        List<ChainResponse> responses = mapper.toResponseList(List.of(c1, c2));
+
+        assertThat(responses).hasSize(2);
+        assertThat(responses.get(0).runCount()).isEqualTo(3L);
+        assertThat(responses.get(1).runCount()).isEqualTo(7L);
+    }
+
+    @Test
+    void toResponseList_batchResolvesEntryWorkflowNames() {
+        Project project = new Project();
+        project.setName("MyProject");
+        Workflow wf = Workflow.builder().id("wf-1").name("WF A").project(project).build();
+        // Batch path: one findAllById instead of findById per entry.
+        when(workflowRepository.findAllById(anySet())).thenReturn(List.of(wf));
+
+        ChainEntry entry = new ChainEntry();
+        entry.setWorkflowId("wf-1");
+        entry.setSortOrder(0);
+        WorkflowChain chain = WorkflowChain.builder()
+                .id("ch-1").name("Chain").entries(List.of(entry)).build();
+
+        List<ChainResponse> responses = mapper.toResponseList(List.of(chain));
+
+        assertThat(responses.get(0).entries().get(0).workflowName()).isEqualTo("WF A");
+        assertThat(responses.get(0).entries().get(0).projectName()).isEqualTo("MyProject");
     }
 }

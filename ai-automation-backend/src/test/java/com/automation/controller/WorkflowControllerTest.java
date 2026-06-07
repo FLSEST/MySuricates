@@ -113,7 +113,7 @@ class WorkflowControllerTest {
     @Test
     void listWorkflows_returnsOk() throws Exception {
         when(workflowService.findAll()).thenReturn(List.of(testWorkflow));
-        when(workflowMapper.toResponseList(any())).thenReturn(List.of(testResponse));
+        when(workflowMapper.toResponseListWithRunCounts(any())).thenReturn(List.of(testResponse));
 
         mockMvc.perform(get("/api/v1/workflows"))
                 .andExpect(status().isOk())

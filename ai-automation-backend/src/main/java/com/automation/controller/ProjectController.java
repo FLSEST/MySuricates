@@ -82,7 +82,7 @@ public class ProjectController {
 
     @GetMapping("/{id}/workflows")
     public List<WorkflowResponse> getProjectWorkflows(@PathVariable String id) {
-        return workflowMapper.toResponseList(workflowService.findByProjectId(id));
+        return workflowMapper.toResponseListWithRunCounts(workflowService.findByProjectId(id));
     }
 
     @PostMapping("/{id}/generate-context")

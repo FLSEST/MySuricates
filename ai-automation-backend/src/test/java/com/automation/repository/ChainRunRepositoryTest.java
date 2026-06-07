@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -61,6 +62,22 @@ class ChainRunRepositoryTest {
         long count = repository.countByChainId("no-such-chain");
 
         assertThat(count).isZero();
+    }
+
+    @Test
+    void countRunsGroupedByChain_matchesPerChainCounts() {
+        WorkflowChain chain = saveChain("Grouped Chain");
+        WorkflowChain other = saveChain("Grouped Other");
+        repository.save(run(chain, RunStatus.COMPLETED));
+        repository.save(run(chain, RunStatus.FAILED));
+        repository.save(run(other, RunStatus.COMPLETED));
+
+        Map<String, Long> grouped = repository.countRunsGroupedByChain().stream()
+                .collect(java.util.stream.Collectors.toMap(r -> (String) r[0], r -> (Long) r[1]));
+
+        assertThat(grouped.get(chain.getId())).isEqualTo(2L);
+        assertThat(grouped.get(other.getId())).isEqualTo(1L);
+        assertThat(grouped.get(chain.getId())).isEqualTo(repository.countByChainId(chain.getId()));
     }
 
     // --- countByStatus ---

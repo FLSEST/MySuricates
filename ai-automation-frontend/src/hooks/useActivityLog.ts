@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { api } from '../api/client';
 import type { ActivityLogPage } from '../types';
 
@@ -20,5 +20,6 @@ export function useActivityLog(
     queryKey: ['activity-log', page, size, level, category, workflowId],
     queryFn: () => api.get<ActivityLogPage>(`/activity-log?${params.toString()}`),
     refetchInterval: 10_000,
+    placeholderData: keepPreviousData,
   });
 }

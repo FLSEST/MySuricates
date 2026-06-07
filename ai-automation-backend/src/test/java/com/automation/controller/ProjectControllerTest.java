@@ -275,7 +275,7 @@ class ProjectControllerTest {
     @Test
     void getProjectWorkflows_returnsOk() throws Exception {
         when(workflowService.findByProjectId("proj-1")).thenReturn(List.of());
-        when(workflowMapper.toResponseList(any())).thenReturn(List.of());
+        when(workflowMapper.toResponseListWithRunCounts(any())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/v1/projects/proj-1/workflows"))
                 .andExpect(status().isOk())

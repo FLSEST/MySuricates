@@ -9,6 +9,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Component
 public class ChainMapper {
@@ -41,8 +43,67 @@ public class ChainMapper {
         );
     }
 
+    /**
+     * Batch-Variante: holt die Run-Counts in EINER GROUP-BY-Query und alle referenzierten
+     * Workflows in EINEM {@code findAllById} (statt {@code countByChainId} pro Chain und
+     * {@code findById} pro Chain-Eintrag — vermeidet ~200–300 Einzelqueries / N+1).
+     */
     public List<ChainResponse> toResponseList(List<WorkflowChain> chains) {
-        return chains.stream().map(this::toResponse).toList();
+        Map<String, Long> runCounts = chainRunRepository.countRunsGroupedByChain().stream()
+                .collect(Collectors.toMap(row -> (String) row[0], row -> (Long) row[1]));
+
+        Set<String> workflowIds = chains.stream()
+                .flatMap(c -> c.getEntries().stream())
+                .map(ChainEntry::getWorkflowId)
+                .collect(Collectors.toSet());
+        Map<String, Workflow> workflows = workflowIds.isEmpty()
+                ? Map.of()
+                : workflowRepository.findAllById(workflowIds).stream()
+                        .collect(Collectors.toMap(Workflow::getId, w -> w));
+
+        return chains.stream().map(c -> toResponse(c, runCounts, workflows)).toList();
+    }
+
+    private ChainResponse toResponse(WorkflowChain chain, Map<String, Long> runCounts,
+                                     Map<String, Workflow> workflows) {
+        List<ChainResponse.ChainEntryResponse> entryResponses = chain.getEntries().stream()
+                .map(e -> toEntryResponse(e, workflows))
+                .toList();
+
+        return new ChainResponse(
+                chain.getId(),
+                chain.getName(),
+                chain.getDescription(),
+                chain.getIcon(),
+                entryResponses,
+                chain.isStopOnFailure(),
+                runCounts.getOrDefault(chain.getId(), 0L),
+                chain.getMetadata(),
+                chain.getCreatedAt(),
+                chain.getUpdatedAt()
+        );
+    }
+
+    private ChainResponse.ChainEntryResponse toEntryResponse(ChainEntry entry, Map<String, Workflow> workflows) {
+        String workflowName = null;
+        String projectName = null;
+        Workflow workflow = workflows.get(entry.getWorkflowId());
+        if (workflow != null) {
+            workflowName = workflow.getName();
+            if (workflow.getProject() != null) {
+                projectName = workflow.getProject().getName();
+            }
+        }
+
+        return new ChainResponse.ChainEntryResponse(
+                entry.getWorkflowId(),
+                workflowName,
+                projectName,
+                entry.getLabel(),
+                entry.getSortOrder(),
+                entry.isStopOnFailure(),
+                entry.getInputContext()
+        );
     }
 
     private ChainResponse.ChainEntryResponse toEntryResponse(ChainEntry entry) {
