@@ -9,7 +9,7 @@ spring:
       maximum-pool-size: 1  # SQLite supports only one writer at a time — pool=1 serializes via Hikari queue instead of SQLite locks (avoids SQLITE_BUSY under concurrent workflow runs)
       minimum-idle: 1
       connection-timeout: 120000  # 120s (default: 30s) — safety net for pool-size=1 contention during concurrent workflow runs
-      leak-detection-threshold: 2000  # 2s — Hikari minimum. Logs WARNING with stack trace when a connection is held this long. Lowered from 60s while diagnosing the residual pool exhaustion (TODO fa741274) — at 10s, brief but recurring 1-2s holds were missed; at 2s every meaningful hold gets a stack.
+      leak-detection-threshold: 60000  # 60s — logs a WARNING + stack trace when a connection is held this long. (Was temporarily 2s while diagnosing the residual pool exhaustion fa741274; root cause — getDashboard fetching step TEXT blobs — fixed in 65fd5eee, so the 2s diagnostic magnifier is no longer needed.)
       connection-test-query: SELECT 1
       connection-init-sql: "PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 30000; PRAGMA auto_vacuum = INCREMENTAL;"
 
