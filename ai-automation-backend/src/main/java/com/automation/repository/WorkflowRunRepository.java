@@ -123,6 +123,26 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
     @Query("SELECT DISTINCT wr.workflow.id FROM WorkflowRun wr WHERE wr.status = 'FAILED' AND wr.workflow IS NOT NULL")
     List<String> findDistinctWorkflowIdsWithFailedRuns();
 
+    /**
+     * Workflows whose MOST RECENT run is a failure — the "currently broken" set for the
+     * Workflow-Debug page (one row per workflow, deduplicated). The correlated subquery picks
+     * each workflow's latest run by {@code startedAt}; the outer {@code WHERE} keeps only those
+     * whose latest run is in {@code :statuses} (FAILED / COMPLETED_WITH_ERRORS).
+     *
+     * <p>Modeled on {@link #findDashboardWindow}: {@code JOIN FETCH} workflow + project but
+     * NOT steps — pool-size=1 means we must never load {@code StepResult} TEXT blobs in an
+     * aggregation. The inner {@code JOIN FETCH} on workflow also excludes soft-deleted
+     * workflows ({@code @SQLRestriction("deleted_at IS NULL")}), so a deleted workflow never
+     * shows up as "broken".
+     */
+    @Query("SELECT wr FROM WorkflowRun wr "
+         + "JOIN FETCH wr.workflow w "
+         + "LEFT JOIN FETCH w.project "
+         + "WHERE wr.status IN :statuses "
+         + "AND wr.startedAt = (SELECT MAX(wr2.startedAt) FROM WorkflowRun wr2 WHERE wr2.workflow.id = wr.workflow.id) "
+         + "ORDER BY wr.startedAt DESC")
+    List<WorkflowRun> findBrokenWorkflows(@Param("statuses") List<RunStatus> statuses);
+
     long countByWorkflowIdAndStatusAndCompletedAtAfter(String workflowId, RunStatus status, Instant since);
 
     boolean existsByWorkflowIdAndStatus(String workflowId, RunStatus status);

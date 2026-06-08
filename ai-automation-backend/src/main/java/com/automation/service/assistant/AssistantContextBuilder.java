@@ -15,6 +15,7 @@ import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.assistant.context.BlockTypesIndexSection;
 import com.automation.service.assistant.context.ChainsIndexSection;
+import com.automation.service.assistant.context.FailedWorkflowsContextSection;
 import com.automation.service.assistant.context.IntegrationsIndexSection;
 import com.automation.service.assistant.context.RunsContextSection;
 import com.automation.service.assistant.context.SchedulesContextSection;
@@ -65,10 +66,11 @@ public class AssistantContextBuilder {
     private final IntegrationsIndexSection integrationsSection;
     private final ChainsIndexSection chainsSection;
     private final BlockTypesIndexSection blockTypesSection;
+    private final FailedWorkflowsContextSection failedWorkflowsSection;
 
     // ── Page classification ───────────────────────────────────────────────────
 
-    public enum PageCategory { RUNS, WORKFLOWS, TASKS, WISHES, SCHEDULES, OVERVIEW }
+    public enum PageCategory { RUNS, WORKFLOWS, TASKS, WISHES, SCHEDULES, DEBUG, OVERVIEW }
 
     public PageCategory classifyPage(String page) {
         if (page == null) return PageCategory.OVERVIEW;
@@ -78,6 +80,7 @@ public class AssistantContextBuilder {
             case "todos", "project", "projects"    -> PageCategory.TASKS;
             case "wishes", "factory"               -> PageCategory.WISHES;
             case "schedules"                       -> PageCategory.SCHEDULES;
+            case "debug"                           -> PageCategory.DEBUG;
             default                                -> PageCategory.OVERVIEW;
         };
     }
@@ -101,6 +104,7 @@ public class AssistantContextBuilder {
 
         // 2. Dynamic platform context (default: lean, only page-relevant sections)
         boolean includeRunsSection = cat == PageCategory.OVERVIEW;
+        boolean includeFailedWorkflowsSection = cat == PageCategory.DEBUG;
         boolean includeTodosSection = cat == PageCategory.TASKS || cat == PageCategory.OVERVIEW;
         boolean includeWishesSection = cat == PageCategory.WISHES || cat == PageCategory.OVERVIEW;
         boolean includeSchedulesSection = cat == PageCategory.SCHEDULES || cat == PageCategory.OVERVIEW;
@@ -120,6 +124,9 @@ public class AssistantContextBuilder {
 
         if (includeRunsSection) {
             runsSection.append(sb, false);
+        }
+        if (includeFailedWorkflowsSection) {
+            failedWorkflowsSection.append(sb, false);
         }
         if (includeTodosSection) {
             todosSection.append(sb, cat != PageCategory.OVERVIEW);

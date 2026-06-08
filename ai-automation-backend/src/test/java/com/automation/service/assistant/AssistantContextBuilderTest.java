@@ -1,16 +1,19 @@
 package com.automation.service.assistant;
 
 import com.automation.dto.AssistantChatRequest;
+import com.automation.dto.response.BrokenWorkflowResponse;
 import com.automation.entity.*;
 import com.automation.repository.*;
 import com.automation.service.assistant.context.BlockTypesIndexSection;
 import com.automation.service.assistant.context.ChainsIndexSection;
+import com.automation.service.assistant.context.FailedWorkflowsContextSection;
 import com.automation.service.assistant.context.IntegrationsIndexSection;
 import com.automation.service.assistant.context.RunsContextSection;
 import com.automation.service.assistant.context.SchedulesContextSection;
 import com.automation.service.assistant.context.SkillsIndexSection;
 import com.automation.service.assistant.context.TodosContextSection;
 import com.automation.service.assistant.context.WishesContextSection;
+import com.automation.service.execution.WorkflowDebugService;
 import com.automation.service.integration.IntegrationRegistry;
 import com.automation.service.system.SystemIdentityService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -49,6 +52,7 @@ class AssistantContextBuilderTest {
     @Mock private IntegrationRegistry integrationRegistry;
     @Mock private IntegrationConnectionRepository integrationConnectionRepository;
     @Mock private WorkflowChainRepository workflowChainRepository;
+    @Mock private WorkflowDebugService workflowDebugService;
 
     private AssistantContextBuilder builder;
 
@@ -62,11 +66,13 @@ class AssistantContextBuilderTest {
         IntegrationsIndexSection integrationsSection = new IntegrationsIndexSection(integrationRegistry, integrationConnectionRepository);
         ChainsIndexSection chainsSection = new ChainsIndexSection(workflowChainRepository);
         BlockTypesIndexSection blockTypesSection = new BlockTypesIndexSection();
+        FailedWorkflowsContextSection failedWorkflowsSection = new FailedWorkflowsContextSection(workflowDebugService);
         builder = new AssistantContextBuilder(workflowRunRepository, projectRepository,
                 wishRepository, workflowRepository, workflowMemoryRepository,
                 assistantSessionRepository, new ObjectMapper(),
                 runsSection, todosSection, wishesSection, schedulesSection,
-                skillsSection, integrationsSection, chainsSection, blockTypesSection);
+                skillsSection, integrationsSection, chainsSection, blockTypesSection,
+                failedWorkflowsSection);
     }
 
     @Test
@@ -104,6 +110,11 @@ class AssistantContextBuilderTest {
         assertThat(builder.classifyPage("settings")).isEqualTo(AssistantContextBuilder.PageCategory.OVERVIEW);
         assertThat(builder.classifyPage("dashboard")).isEqualTo(AssistantContextBuilder.PageCategory.OVERVIEW);
         assertThat(builder.classifyPage(null)).isEqualTo(AssistantContextBuilder.PageCategory.OVERVIEW);
+    }
+
+    @Test
+    void classifyPage_debug_returnsDebug() {
+        assertThat(builder.classifyPage("debug")).isEqualTo(AssistantContextBuilder.PageCategory.DEBUG);
     }
 
     @Test
@@ -479,6 +490,24 @@ class AssistantContextBuilderTest {
 
             assertThat(result).contains("**Wishes:** 1 aktiv, 0 fehlgeschlagen");
             assertThat(result).contains("Wish-Details: [EXECUTING] Baue einen Deploy-Workflow, Iterationen: 2/5");
+        }
+
+        @Test
+        void debugPage_includesBrokenWorkflowsSection() {
+            when(workflowDebugService.getBrokenWorkflows()).thenReturn(List.of(
+                    new BrokenWorkflowResponse("wf1", "Build Alpha", "Alpha", "run1", RunStatus.FAILED,
+                            "boom", 2, "shell", Instant.parse("2026-06-01T10:00:00Z"),
+                            Instant.parse("2026-06-01T10:01:00Z"), 60000L, null)));
+
+            var ctx = new AssistantChatRequest.PageContext("debug", null, null, null, null, "/debug");
+            String result = builder.buildSystemPrompt(ctx, "");
+
+            assertThat(result).contains("Kaputte Workflows (letzter Lauf fehlgeschlagen)");
+            assertThat(result).contains("Build Alpha");
+            assertThat(result).contains("Schritt 3 (shell)");
+            assertThat(result).contains("boom");
+            assertThat(result).contains("run1");
+            assertThat(result).contains("run_detail");
         }
     }
 }

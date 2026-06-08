@@ -425,4 +425,50 @@ class WorkflowRunRepositoryTest {
         assertThat(result).isPresent();
         assertThat(result.get().getId()).isEqualTo(saved.getId());
     }
+
+    private static final List<RunStatus> BROKEN =
+            List.of(RunStatus.FAILED, RunStatus.COMPLETED_WITH_ERRORS);
+
+    @Test
+    void findBrokenWorkflows_returnsOnlyWorkflowsWhoseLatestRunFailed() {
+        Instant now = Instant.now();
+        // workflowA: an older COMPLETED run, but the LATEST run FAILED → broken
+        run(workflowA, RunStatus.COMPLETED, now.minusSeconds(60));
+        WorkflowRun latestA = run(workflowA, RunStatus.FAILED, now.minusSeconds(10));
+        // workflowB: failed earlier, but the LATEST run COMPLETED → healthy, must NOT appear
+        run(workflowB, RunStatus.FAILED, now.minusSeconds(60));
+        run(workflowB, RunStatus.COMPLETED, now.minusSeconds(10));
+
+        List<WorkflowRun> broken = runRepository.findBrokenWorkflows(BROKEN);
+
+        List<String> workflowIds = broken.stream().map(r -> r.getWorkflow().getId()).toList();
+        assertThat(workflowIds).contains(workflowA.getId());
+        assertThat(workflowIds).doesNotContain(workflowB.getId());
+        WorkflowRun aRun = broken.stream()
+                .filter(r -> r.getWorkflow().getId().equals(workflowA.getId()))
+                .findFirst().orElseThrow();
+        assertThat(aRun.getId()).isEqualTo(latestA.getId());
+        assertThat(aRun.getStatus()).isEqualTo(RunStatus.FAILED);
+    }
+
+    @Test
+    void findBrokenWorkflows_includesCompletedWithErrors() {
+        run(workflowA, RunStatus.COMPLETED_WITH_ERRORS, Instant.now());
+
+        List<WorkflowRun> broken = runRepository.findBrokenWorkflows(BROKEN);
+
+        assertThat(broken.stream().map(r -> r.getWorkflow().getId())).contains(workflowA.getId());
+    }
+
+    @Test
+    void findBrokenWorkflows_excludesWorkflowWhoseLatestRunIsStillRunning() {
+        Instant now = Instant.now();
+        // Failed earlier, then re-run and currently RUNNING → not "broken" anymore.
+        run(workflowA, RunStatus.FAILED, now.minusSeconds(30));
+        run(workflowA, RunStatus.RUNNING, now);
+
+        List<WorkflowRun> broken = runRepository.findBrokenWorkflows(BROKEN);
+
+        assertThat(broken.stream().map(r -> r.getWorkflow().getId())).doesNotContain(workflowA.getId());
+    }
 }
