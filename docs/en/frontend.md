@@ -1,3 +1,5 @@
+<!-- last-sync: 2026-04-14 from: docs/frontend.md -->
+
 > *Last updated: April 14, 2026 — Manual doc audit (11 missing hooks added)*
 
 # Frontend

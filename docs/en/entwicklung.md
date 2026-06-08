@@ -1,3 +1,5 @@
+<!-- last-sync: 2026-05-13 from: docs/entwicklung.md -->
+
 > *Last updated: [auto-generated]*
 
 # Development

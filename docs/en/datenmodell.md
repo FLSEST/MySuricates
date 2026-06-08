@@ -1,3 +1,7 @@
+<!-- last-sync: 2026-04-14 from: docs/datenmodell.md -->
+
+> ⚠️ **This translation may be outdated.** The German source (`docs/datenmodell.md`) was updated on 2026-06-08, after this translation was last synced (2026-04-14). Until it is re-translated, the German version is authoritative.
+
 > *Last updated: April 14, 2026 — Manual documentation audit (V53-V59, integration_connections, onboarding_profiles, workflow_versions)*
 
 # Data Model

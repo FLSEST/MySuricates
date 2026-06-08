@@ -1,3 +1,5 @@
+<!-- last-sync: 2026-05-12 from: docs/deployment.md -->
+
 > *Last updated: [auto-generated]*
 
 # Deployment

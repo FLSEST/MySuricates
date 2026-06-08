@@ -1,3 +1,5 @@
+<!-- last-sync: 2026-05-12 from: docs/workflow-memory-architecture.md -->
+
 > *Last updated: [auto-generated]*
 
 # Workflow Memory — Architecture & Data Flow

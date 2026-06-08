@@ -1,3 +1,5 @@
+<!-- last-sync: 2026-05-12 from: docs/api-referenz.md -->
+
 > *Last updated: [auto-generated]*
 
 # API Reference

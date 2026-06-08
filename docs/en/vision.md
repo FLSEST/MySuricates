@@ -1,3 +1,5 @@
+<!-- last-sync: 2026-04-14 from: docs/vision.md -->
+
 > *Last updated: April 14, 2026 — Translated from German*
 
 # MySuricates — Vision

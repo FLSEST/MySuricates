@@ -1,3 +1,7 @@
+<!-- last-sync: 2026-04-14 from: docs/WORKFLOW-GUIDE.md -->
+
+> ⚠️ **This translation may be outdated.** The German source (`docs/WORKFLOW-GUIDE.md`) was updated on 2026-05-12, after this translation was last synced (2026-04-14). Until it is re-translated, the German version is authoritative.
+
 > *Last updated: April 14, 2026 — Translation updated*
 
 # Workflow Building Guide

@@ -1,3 +1,5 @@
+<!-- last-sync: 2026-05-12 from: docs/analysis.md -->
+
 > *Last updated: [auto-generated]*
 
 # Documentation Gap Analysis — All Six Docs
