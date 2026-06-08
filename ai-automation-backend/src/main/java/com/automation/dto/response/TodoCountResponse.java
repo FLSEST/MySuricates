@@ -4,5 +4,6 @@ public record TodoCountResponse(
         long open,
         long inProgress,
         long done,
-        long backlog
+        long backlog,
+        long archived
 ) {}

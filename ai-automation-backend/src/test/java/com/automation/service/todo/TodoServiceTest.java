@@ -30,6 +30,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -238,7 +239,7 @@ class TodoServiceTest {
 
     @Test
     void count_returnsCounts() {
-        when(todoRepository.countGroupedByStatus()).thenReturn(new TodoCountResponse(5L, 3L, 12L, 2L));
+        when(todoRepository.countGroupedByStatus()).thenReturn(new TodoCountResponse(5L, 3L, 12L, 2L, 0L));
 
         TodoCountResponse counts = todoService.count();
 
@@ -246,5 +247,26 @@ class TodoServiceTest {
         assertThat(counts.inProgress()).isEqualTo(3L);
         assertThat(counts.done()).isEqualTo(12L);
         assertThat(counts.backlog()).isEqualTo(2L);
+        assertThat(counts.archived()).isZero();
+    }
+
+    // --- bulkUpdateStatus ---
+
+    @Test
+    void bulkUpdateStatus_delegatesToRepository_andReturnsCount() {
+        List<String> ids = List.of("a", "b", "c");
+        when(todoRepository.bulkSetStatus(eq(ids), eq(Todo.Status.ARCHIVED), any())).thenReturn(3);
+
+        int updated = todoService.bulkUpdateStatus(ids, Todo.Status.ARCHIVED);
+
+        assertThat(updated).isEqualTo(3);
+        verify(todoRepository).bulkSetStatus(eq(ids), eq(Todo.Status.ARCHIVED), any());
+    }
+
+    @Test
+    void bulkUpdateStatus_emptyIds_isNoOp() {
+        assertThat(todoService.bulkUpdateStatus(List.of(), Todo.Status.ARCHIVED)).isZero();
+        assertThat(todoService.bulkUpdateStatus(null, Todo.Status.ARCHIVED)).isZero();
+        verify(todoRepository, never()).bulkSetStatus(any(), any(), any());
     }
 }

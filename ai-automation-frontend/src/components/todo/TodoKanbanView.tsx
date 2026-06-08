@@ -187,12 +187,12 @@ export function TodoKanbanView({ todos, onEdit, onStatusChange, onResolve, resol
   ];
 
   const totalCountMap: Record<TodoStatus, number | undefined> = totalCounts
-    ? { OPEN: totalCounts.open, IN_PROGRESS: totalCounts.inProgress, DONE: totalCounts.done, BACKLOG: totalCounts.backlog }
-    : { OPEN: undefined, IN_PROGRESS: undefined, DONE: undefined, BACKLOG: undefined };
+    ? { OPEN: totalCounts.open, IN_PROGRESS: totalCounts.inProgress, DONE: totalCounts.done, BACKLOG: totalCounts.backlog, ARCHIVED: totalCounts.archived }
+    : { OPEN: undefined, IN_PROGRESS: undefined, DONE: undefined, BACKLOG: undefined, ARCHIVED: undefined };
 
   const grouped = useMemo(() => {
-    const map: Record<TodoStatus, Todo[]> = { OPEN: [], IN_PROGRESS: [], DONE: [], BACKLOG: [] };
-    todos.forEach((todo) => map[todo.status].push(todo));
+    const map: Record<TodoStatus, Todo[]> = { OPEN: [], IN_PROGRESS: [], DONE: [], BACKLOG: [], ARCHIVED: [] };
+    todos.forEach((todo) => map[todo.status]?.push(todo));
     return map;
   }, [todos]);
 

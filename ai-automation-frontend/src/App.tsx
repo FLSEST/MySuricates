@@ -65,8 +65,10 @@ const Chains = lazy(() => import('./pages/Chains').then(m => ({ default: m.Chain
 const ChainExecution = lazy(() => import('./pages/ChainExecution').then(m => ({ default: m.ChainExecution })));
 const Wishes = lazy(() => import('./pages/Wishes').then(m => ({ default: m.Wishes })));
 const Todos = lazy(() => import('./pages/Todos').then(m => ({ default: m.Todos })));
+const ProjectCockpit = lazy(() => import('./pages/ProjectCockpit').then(m => ({ default: m.ProjectCockpit })));
 const ActivityLog = lazy(() => import('./pages/ActivityLog').then(m => ({ default: m.ActivityLog })));
 const DeadLetterQueue = lazy(() => import('./pages/DeadLetterQueue').then(m => ({ default: m.DeadLetterQueue })));
+const WorkflowDebug = lazy(() => import('./pages/WorkflowDebug').then(m => ({ default: m.WorkflowDebug })));
 const WorkflowFactory = lazy(() => import('./pages/WorkflowFactory').then(m => ({ default: m.WorkflowFactory })));
 const Docs = lazy(() => import('./pages/Docs').then(m => ({ default: m.Docs })));
 const Reports = lazy(() => import('./pages/Reports').then(m => ({ default: m.Reports })));
@@ -98,9 +100,11 @@ const router = createBrowserRouter([
       { path: 'calendar', element: <CalendarPage /> },
       { path: 'webhooks', element: <Webhooks /> },
       { path: 'integrations', element: <Integrations /> },
+      { path: 'cockpit', element: <ProjectCockpit /> },
       { path: 'todos', element: <Todos /> },
       { path: 'activity', element: <ActivityLog /> },
       { path: 'dlq', element: <DeadLetterQueue /> },
+      { path: 'debug', element: <WorkflowDebug /> },
       { path: 'docs', element: <Docs /> },
       { path: 'reports', element: <Reports /> },
       { path: 'insights', element: <Insights /> },

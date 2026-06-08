@@ -223,6 +223,20 @@ public class TodoService {
         return todoRepository.countGroupedByStatus();
     }
 
+    /**
+     * Bulk status change (e.g. archive a project's stale todos in one click).
+     * Uses a single bulk UPDATE — no entities loaded, short transaction, safe under pool-size=1.
+     */
+    @Transactional
+    public int bulkUpdateStatus(List<String> ids, Todo.Status status) {
+        if (ids == null || ids.isEmpty()) {
+            return 0;
+        }
+        int updated = todoRepository.bulkSetStatus(ids, status, Instant.now());
+        log.info("Bulk updated {} todo(s) → {}", updated, status);
+        return updated;
+    }
+
     private TodoResponse toResponseWithProject(Todo todo) {
         String projectName = null;
         if (todo.getProjectId() != null) {
@@ -309,6 +323,9 @@ public class TodoService {
                 } else {
                     predicates.add(root.get("status").in(enums));
                 }
+            } else {
+                // ARCHIVED is "out of sight": hidden from the default list unless explicitly requested.
+                predicates.add(cb.notEqual(root.get("status"), Todo.Status.ARCHIVED));
             }
             if (priority != null && !priority.isBlank()) {
                 predicates.add(cb.equal(root.get("priority"), Todo.Priority.valueOf(priority)));

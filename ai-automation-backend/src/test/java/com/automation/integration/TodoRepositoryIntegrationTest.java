@@ -1,5 +1,8 @@
 package com.automation.integration;
 
+import com.automation.dto.projection.NeedsYouRow;
+import com.automation.dto.projection.ProjectCount;
+import com.automation.dto.projection.ProjectStatusCounts;
 import com.automation.dto.response.TodoCountResponse;
 import com.automation.entity.*;
 import com.automation.repository.ProjectRepository;
@@ -12,6 +15,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 
@@ -438,5 +443,147 @@ class TodoRepositoryIntegrationTest {
         Optional<Todo> result = todoRepository.findOpenByReferenceTypeAndId("health-check", "hc-006");
         assertThat(result).isPresent();
         assertThat(result.get().getId()).isEqualTo(todo.getId());
+    }
+
+    // --- countGroupedByStatus: ARCHIVED bucket ---
+
+    @Test
+    void countGroupedByStatus_countsArchived() {
+        createTodo("Archived 1", Todo.Status.ARCHIVED, Todo.Priority.LOW, Todo.Source.WORKFLOW);
+        createTodo("Archived 2", Todo.Status.ARCHIVED, Todo.Priority.LOW, Todo.Source.AI);
+        createTodo("Open", Todo.Status.OPEN, Todo.Priority.MEDIUM, Todo.Source.USER);
+
+        TodoCountResponse counts = todoRepository.countGroupedByStatus();
+        assertThat(counts.archived()).isEqualTo(2);
+        assertThat(counts.open()).isEqualTo(1);
+    }
+
+    // --- aggregateByProject (cockpit) ---
+
+    @Test
+    void aggregateByProject_returnsStatusAndActiveSourceCounts() {
+        createTodoWithProject("Open User", Todo.Status.OPEN, Todo.Source.USER, null, null);
+        createTodoWithProject("Open AI", Todo.Status.OPEN, Todo.Source.AI, null, null);
+        createTodoWithProject("Backlog WF", Todo.Status.BACKLOG, Todo.Source.WORKFLOW, null, null);
+        createTodoWithProject("Done AI", Todo.Status.DONE, Todo.Source.AI, null, null);
+        createTodoWithProject("Archived AI", Todo.Status.ARCHIVED, Todo.Source.AI, null, null);
+
+        ProjectStatusCounts row = todoRepository.aggregateByProject().stream()
+                .filter(c -> testProject.getId().equals(c.projectId()))
+                .findFirst().orElseThrow();
+
+        assertThat(row.open()).isEqualTo(2);
+        assertThat(row.backlog()).isEqualTo(1);
+        assertThat(row.done()).isEqualTo(1);
+        assertThat(row.archived()).isEqualTo(1);
+        assertThat(row.userActive()).isEqualTo(1);       // only the OPEN USER
+        assertThat(row.machineActive()).isEqualTo(2);     // OPEN AI + BACKLOG WF (active only, not DONE/ARCHIVED)
+    }
+
+    // --- staleCountByProject (cockpit) ---
+
+    private Todo createAutoTodoWithProject(String title, Todo.Status status, Todo.Source source) {
+        return todoRepository.save(Todo.builder()
+                .title(title).status(status).priority(Todo.Priority.MEDIUM).source(source)
+                .projectId(testProject.getId()).tags("auto:workflow,backend").build());
+    }
+
+    @Test
+    void staleCountByProject_countsActiveAutoWorkflowMachineTodos() {
+        createAutoTodoWithProject("Open AI auto", Todo.Status.OPEN, Todo.Source.AI);
+        createAutoTodoWithProject("Backlog WF auto", Todo.Status.BACKLOG, Todo.Source.WORKFLOW);
+        // excluded: USER source
+        todoRepository.save(Todo.builder().title("User auto").status(Todo.Status.OPEN)
+                .priority(Todo.Priority.MEDIUM).source(Todo.Source.USER)
+                .projectId(testProject.getId()).tags("auto:workflow").build());
+        // excluded: no auto:workflow tag
+        createTodoWithProject("Open AI untagged", Todo.Status.OPEN, Todo.Source.AI, null, null);
+        // excluded: DONE
+        createAutoTodoWithProject("Done AI auto", Todo.Status.DONE, Todo.Source.AI);
+
+        // future cutoff → updatedAt < cutoff holds for all, so we test the status/source/tag filter
+        Instant future = Instant.now().plus(1, ChronoUnit.DAYS);
+        ProjectCount row = todoRepository.staleCountByProject(future).stream()
+                .filter(c -> testProject.getId().equals(c.projectId()))
+                .findFirst().orElseThrow();
+
+        assertThat(row.cnt()).isEqualTo(2);
+    }
+
+    @Test
+    void findStaleAutoTodoIdsForProject_scopesToProject() {
+        Todo inProject = createAutoTodoWithProject("In project", Todo.Status.OPEN, Todo.Source.AI);
+        Project other = createProject("other-stale");
+        todoRepository.save(Todo.builder().title("Other project").status(Todo.Status.OPEN)
+                .priority(Todo.Priority.MEDIUM).source(Todo.Source.AI)
+                .projectId(other.getId()).tags("auto:workflow").build());
+
+        Instant future = Instant.now().plus(1, ChronoUnit.DAYS);
+        List<String> ids = todoRepository.findStaleAutoTodoIdsForProject(
+                testProject.getId(), future, PageRequest.of(0, 100));
+
+        assertThat(ids).containsExactly(inProject.getId());
+    }
+
+    // --- findNeedsYou (cockpit "Braucht dich") ---
+
+    @Test
+    void findNeedsYou_returnsUserCriticalOrOverdue_excludesRoutine() {
+        Instant now = Instant.now();
+        todoRepository.save(Todo.builder().title("User").status(Todo.Status.OPEN)
+                .priority(Todo.Priority.MEDIUM).source(Todo.Source.USER).build());
+        todoRepository.save(Todo.builder().title("Critical").status(Todo.Status.OPEN)
+                .priority(Todo.Priority.CRITICAL).source(Todo.Source.AI).build());
+        todoRepository.save(Todo.builder().title("Overdue").status(Todo.Status.OPEN)
+                .priority(Todo.Priority.MEDIUM).source(Todo.Source.AI)
+                .dueDate(now.minus(2, ChronoUnit.DAYS)).build());
+        // routine machine todo: not USER, not CRITICAL, no due date → excluded
+        todoRepository.save(Todo.builder().title("Routine").status(Todo.Status.OPEN)
+                .priority(Todo.Priority.MEDIUM).source(Todo.Source.AI).build());
+
+        List<NeedsYouRow> rows = todoRepository.findNeedsYou(now, PageRequest.of(0, 50));
+
+        assertThat(rows).extracting(NeedsYouRow::title)
+                .containsExactlyInAnyOrder("User", "Critical", "Overdue");
+        // CRITICAL ranks first
+        assertThat(rows.get(0).title()).isEqualTo("Critical");
+    }
+
+    // --- findStaleAutoTodoIds (hygiene) ---
+
+    @Test
+    void findStaleAutoTodoIds_onlyAutoWorkflowTaggedActiveMachineTodos() {
+        Todo a = todoRepository.save(Todo.builder().title("Auto open").status(Todo.Status.OPEN)
+                .priority(Todo.Priority.HIGH).source(Todo.Source.AI).tags("auto:workflow,backend").build());
+        Todo b = todoRepository.save(Todo.builder().title("Auto backlog").status(Todo.Status.BACKLOG)
+                .priority(Todo.Priority.LOW).source(Todo.Source.WORKFLOW).tags("auto:workflow").build());
+        // excluded: no auto:workflow tag
+        todoRepository.save(Todo.builder().title("Manual").status(Todo.Status.OPEN)
+                .priority(Todo.Priority.MEDIUM).source(Todo.Source.AI).tags("manual").build());
+        // excluded: DONE
+        todoRepository.save(Todo.builder().title("Auto done").status(Todo.Status.DONE)
+                .priority(Todo.Priority.LOW).source(Todo.Source.AI).tags("auto:workflow").build());
+
+        Instant future = Instant.now().plus(1, ChronoUnit.DAYS);
+        List<String> ids = todoRepository.findStaleAutoTodoIds(future, PageRequest.of(0, 100));
+
+        assertThat(ids).containsExactlyInAnyOrder(a.getId(), b.getId());
+    }
+
+    // --- bulkSetStatus (hygiene + cockpit bulk action) ---
+
+    @Test
+    void bulkSetStatus_updatesAllGivenTodos() {
+        Todo a = createTodo("A", Todo.Status.OPEN, Todo.Priority.MEDIUM, Todo.Source.AI);
+        Todo b = createTodo("B", Todo.Status.BACKLOG, Todo.Priority.LOW, Todo.Source.WORKFLOW);
+        Todo untouched = createTodo("C", Todo.Status.OPEN, Todo.Priority.HIGH, Todo.Source.USER);
+
+        int updated = todoRepository.bulkSetStatus(
+                List.of(a.getId(), b.getId()), Todo.Status.ARCHIVED, Instant.now());
+
+        assertThat(updated).isEqualTo(2);
+        assertThat(todoRepository.findById(a.getId()).orElseThrow().getStatus()).isEqualTo(Todo.Status.ARCHIVED);
+        assertThat(todoRepository.findById(b.getId()).orElseThrow().getStatus()).isEqualTo(Todo.Status.ARCHIVED);
+        assertThat(todoRepository.findById(untouched.getId()).orElseThrow().getStatus()).isEqualTo(Todo.Status.OPEN);
     }
 }

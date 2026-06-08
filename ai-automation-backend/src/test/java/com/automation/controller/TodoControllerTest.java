@@ -42,6 +42,8 @@ class TodoControllerTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @MockitoBean private TodoService todoService;
+    @MockitoBean private com.automation.service.todo.TodoOverviewService todoOverviewService;
+    @MockitoBean private com.automation.service.todo.TodoHygieneService todoHygieneService;
     @MockitoBean
     private ActivityLogService activityLogService;
 
@@ -147,12 +149,58 @@ class TodoControllerTest {
 
     @Test
     void countTodos_returnsCounts() throws Exception {
-        when(todoService.count()).thenReturn(new TodoCountResponse(5, 2, 10, 3));
+        when(todoService.count()).thenReturn(new TodoCountResponse(5, 2, 10, 3, 0));
 
         mockMvc.perform(get("/api/v1/todos/count"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.open").value(5))
                 .andExpect(jsonPath("$.done").value(10));
+    }
+
+    @Test
+    void overview_returnsPayload() throws Exception {
+        var rollup = new com.automation.dto.response.ProjectRollup(
+                "p-1", "AutoPilot", 5, 1, 10, 2, 3, 4, 1, 5, 2);
+        when(todoOverviewService.getOverview()).thenReturn(
+                new com.automation.dto.response.TodoOverviewResponse(List.of(rollup), List.of(), Instant.now(), 30));
+
+        mockMvc.perform(get("/api/v1/todos/overview"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.staleThresholdDays").value(30))
+                .andExpect(jsonPath("$.projects[0].projectName").value("AutoPilot"))
+                .andExpect(jsonPath("$.projects[0].staleCount").value(4));
+    }
+
+    @Test
+    void bulkUpdateStatus_returnsUpdatedCount() throws Exception {
+        when(todoService.bulkUpdateStatus(anyList(), eq(Todo.Status.ARCHIVED))).thenReturn(3);
+
+        var body = objectMapper.writeValueAsString(new com.automation.dto.request.BulkUpdateTodoStatusRequest(
+                List.of("a", "b", "c"), Todo.Status.ARCHIVED));
+
+        mockMvc.perform(post("/api/v1/todos/bulk-status")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.updated").value(3));
+    }
+
+    @Test
+    void bulkUpdateStatus_emptyIds_returnsBadRequest() throws Exception {
+        var body = objectMapper.writeValueAsString(new com.automation.dto.request.BulkUpdateTodoStatusRequest(
+                List.of(), Todo.Status.ARCHIVED));
+
+        mockMvc.perform(post("/api/v1/todos/bulk-status")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void archiveStale_withProjectId_returnsArchivedCount() throws Exception {
+        when(todoHygieneService.archiveStaleNow("p-1")).thenReturn(7);
+
+        mockMvc.perform(post("/api/v1/todos/archive-stale").param("projectId", "p-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.archived").value(7));
     }
 
     @Test

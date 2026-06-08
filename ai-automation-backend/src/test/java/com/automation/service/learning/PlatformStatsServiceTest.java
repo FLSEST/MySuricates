@@ -230,7 +230,7 @@ class PlatformStatsServiceTest {
     void getPlatformStats_todoStats() {
         stubAllEmpty();
         when(todoRepository.countGroupedByStatus()).thenReturn(
-                new TodoCountResponse(5, 3, 10, 2));
+                new TodoCountResponse(5, 3, 10, 2, 0));
         when(todoRepository.countBySource(Todo.Source.USER)).thenReturn(8L);
         when(todoRepository.countBySource(Todo.Source.AI)).thenReturn(7L);
         when(todoRepository.countBySource(Todo.Source.WORKFLOW)).thenReturn(5L);
@@ -386,7 +386,7 @@ class PlatformStatsServiceTest {
         when(todoTriggerRepository.findByEnabledTrue()).thenReturn(List.of());
         when(completionTriggerRepository.countByEnabledTrue()).thenReturn(0L);
         when(memoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
-        when(todoRepository.countGroupedByStatus()).thenReturn(new TodoCountResponse(0, 0, 0, 0));
+        when(todoRepository.countGroupedByStatus()).thenReturn(new TodoCountResponse(0, 0, 0, 0, 0));
         when(todoRepository.countBySource(Todo.Source.USER)).thenReturn(0L);
         when(todoRepository.countBySource(Todo.Source.AI)).thenReturn(0L);
         when(todoRepository.countBySource(Todo.Source.WORKFLOW)).thenReturn(0L);

@@ -383,10 +383,15 @@ class AssistantFetchServiceTest {
     }
 
     @Test
-    void executeFetch_docsWorkflowGuide_whenUnavailable_returnsHelpfulMessage() {
+    void executeFetch_docsWorkflowGuide_loadsFromClasspathAndReturnsToc() {
+        // The maven-resources-plugin (sync-docs-from-source) bundles docs/ onto the classpath,
+        // so the assistant can actually load the workflow guide at runtime. A bare doc id
+        // (no section) returns the table of contents.
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("docs", "workflow-guide"));
 
-        assertThat(result).contains("Dokumentation 'workflow-guide' nicht verfügbar.");
+        assertThat(result).contains("Dokumentation: workflow-guide");
+        assertThat(result).contains("Inhaltsübersicht");
+        assertThat(result).doesNotContain("nicht verfügbar");
     }
 
     @Test

@@ -4,6 +4,7 @@ import com.automation.concurrency.DynamicSemaphore;
 import com.automation.config.ChainConfig;
 import com.automation.config.HostClaudeConfig;
 import com.automation.config.RateLimitConfig;
+import com.automation.config.TodoHygieneConfig;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.ai.HostClaudeService;
 import com.automation.service.cli.ContainerShellService;
@@ -31,7 +32,10 @@ public class ExecutionSettingsService {
             Map.entry("rate-limit-enabled",                new long[]{0, 1}),
             Map.entry("rate-limit-requests-per-minute",    new long[]{10, 10000}),
             Map.entry("assistant-chat-timeout-seconds",    new long[]{30, 900}),
-            Map.entry("allow-extra-mounts",                new long[]{0, 1})
+            Map.entry("allow-extra-mounts",                new long[]{0, 1}),
+            Map.entry("todo-hygiene-enabled",              new long[]{0, 1}),
+            Map.entry("todo-stale-days",                   new long[]{7, 365}),
+            Map.entry("todo-hygiene-max-per-run",          new long[]{10, 2000})
     );
 
     // Frontend sends camelCase keys, backend uses kebab-case internally
@@ -45,7 +49,10 @@ public class ExecutionSettingsService {
             Map.entry("rateLimitEnabled",                "rate-limit-enabled"),
             Map.entry("rateLimitRequestsPerMinute",      "rate-limit-requests-per-minute"),
             Map.entry("assistantChatTimeoutSeconds",     "assistant-chat-timeout-seconds"),
-            Map.entry("allowExtraMounts",                "allow-extra-mounts")
+            Map.entry("allowExtraMounts",                "allow-extra-mounts"),
+            Map.entry("todoHygieneEnabled",              "todo-hygiene-enabled"),
+            Map.entry("todoStaleDays",                   "todo-stale-days"),
+            Map.entry("todoHygieneMaxPerRun",            "todo-hygiene-max-per-run")
     );
 
     private final AppSettingsRepository appSettingsRepository;
@@ -56,6 +63,7 @@ public class ExecutionSettingsService {
     private final RateLimitConfig rateLimitConfig;
     private final WorkflowExecutor workflowExecutor;
     private final ContainerShellService containerShellService;
+    private final TodoHygieneConfig todoHygieneConfig;
 
     // Defaults from YAML/env (captured at startup)
     private int defaultMaxConcurrent;
@@ -72,7 +80,8 @@ public class ExecutionSettingsService {
             ChainConfig chainConfig,
             RateLimitConfig rateLimitConfig,
             @Lazy WorkflowExecutor workflowExecutor,
-            ContainerShellService containerShellService) {
+            ContainerShellService containerShellService,
+            TodoHygieneConfig todoHygieneConfig) {
         this.appSettingsRepository = appSettingsRepository;
         this.executionSemaphore = executionSemaphore;
         this.hostClaudeService = hostClaudeService;
@@ -81,6 +90,7 @@ public class ExecutionSettingsService {
         this.rateLimitConfig = rateLimitConfig;
         this.workflowExecutor = workflowExecutor;
         this.containerShellService = containerShellService;
+        this.todoHygieneConfig = todoHygieneConfig;
     }
 
     @PostConstruct
@@ -106,6 +116,9 @@ public class ExecutionSettingsService {
         applyIfPresent("rate-limit-requests-per-minute", v -> rateLimitConfig.setRequestsPerMinute(Integer.parseInt(v)));
         applyIfPresent("assistant-chat-timeout-seconds", v -> hostClaudeConfig.setAssistantChatTimeoutSeconds(Integer.parseInt(v)));
         applyIfPresent("allow-extra-mounts", v -> containerShellService.setAllowExtraMounts(Integer.parseInt(v) == 1));
+        applyIfPresent("todo-hygiene-enabled", v -> todoHygieneConfig.setEnabled(Integer.parseInt(v) == 1));
+        applyIfPresent("todo-stale-days", v -> todoHygieneConfig.setStaleDays(Integer.parseInt(v)));
+        applyIfPresent("todo-hygiene-max-per-run", v -> todoHygieneConfig.setMaxPerRun(Integer.parseInt(v)));
 
         log.info("Execution settings initialized: maxConcurrent={}, maxCalls={}, timeout={}s, delay={}ms, chainTimeout={}min, rateLimit={}/{}rpm, assistantChatTimeout={}s",
                 executionSemaphore.getMaxPermits(), hostClaudeConfig.getMaxConcurrentCalls(),
@@ -158,6 +171,9 @@ public class ExecutionSettingsService {
         result.put("rateLimitRequestsPerMinute", rateLimitConfig.getRequestsPerMinute());
         result.put("assistantChatTimeoutSeconds", hostClaudeConfig.getAssistantChatTimeoutSeconds());
         result.put("allowExtraMounts", containerShellService.isAllowExtraMounts() ? 1 : 0);
+        result.put("todoHygieneEnabled", todoHygieneConfig.isEnabled() ? 1 : 0);
+        result.put("todoStaleDays", todoHygieneConfig.getStaleDays());
+        result.put("todoHygieneMaxPerRun", todoHygieneConfig.getMaxPerRun());
         result.put("activeRuns", workflowExecutor.getActiveRunCount());
         return result;
     }
@@ -177,6 +193,9 @@ public class ExecutionSettingsService {
             case "rate-limit-requests-per-minute" -> rateLimitConfig.setRequestsPerMinute(Integer.parseInt(value));
             case "assistant-chat-timeout-seconds" -> hostClaudeConfig.setAssistantChatTimeoutSeconds(Integer.parseInt(value));
             case "allow-extra-mounts" -> containerShellService.setAllowExtraMounts(Integer.parseInt(value) == 1);
+            case "todo-hygiene-enabled" -> todoHygieneConfig.setEnabled(Integer.parseInt(value) == 1);
+            case "todo-stale-days" -> todoHygieneConfig.setStaleDays(Integer.parseInt(value));
+            case "todo-hygiene-max-per-run" -> todoHygieneConfig.setMaxPerRun(Integer.parseInt(value));
         }
     }
 

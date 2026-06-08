@@ -288,6 +288,25 @@ export interface StepResult {
   metadata?: Record<string, unknown>;
 }
 
+/**
+ * A workflow whose most recent run failed — one entry per workflow, for the /debug page.
+ * Lean: the error overview (message/step/blockType) comes from the run's error map; no steps.
+ */
+export interface BrokenWorkflow {
+  workflowId: string | null;
+  workflowName: string | null;
+  projectName: string | null;
+  runId: string;
+  status: RunStatus;
+  errorMessage: string | null;
+  failedStepIndex: number | null;
+  failedBlockType: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  durationMs: number | null;
+  triggeredByScheduleId: string | null;
+}
+
 // ── Skill ────────────────────────────────────────────────
 
 export type SkillCategory = 'DOCUMENT' | 'CODE' | 'DATA' | 'CONTENT' | 'RESEARCH' | 'BUSINESS';
@@ -920,7 +939,7 @@ export interface ExtractMemoryRequest {
 
 // ── Todo ────────────────────────────────────────────────
 
-export type TodoStatus = 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'BACKLOG';
+export type TodoStatus = 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'BACKLOG' | 'ARCHIVED';
 export type TodoPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type TodoSource = 'USER' | 'AI' | 'WORKFLOW';
 export type TodoResolutionState = 'IDLE' | 'RUNNING' | 'FAILED' | 'SUCCEEDED';
@@ -981,6 +1000,43 @@ export interface TodoCountResponse {
   inProgress: number;
   done: number;
   backlog: number;
+  archived: number;
+}
+
+// ── Todo Cockpit (cross-project overview) ───────────────
+export interface NeedsYouItem {
+  id: string;
+  title: string;
+  projectId: string | null;
+  projectName: string | null;
+  priority: TodoPriority;
+  dueDate: string | null;
+  source: TodoSource;
+  createdAt: string;
+  updatedAt: string;
+  ageDays: number;
+  overdue: boolean;
+}
+
+export interface ProjectRollup {
+  projectId: string | null;
+  projectName: string | null;
+  open: number;
+  inProgress: number;
+  done: number;
+  backlog: number;
+  archived: number;
+  staleCount: number;
+  userActive: number;
+  machineActive: number;
+  needsYouCount: number;
+}
+
+export interface TodoOverviewResponse {
+  projects: ProjectRollup[];
+  needsYou: NeedsYouItem[];
+  generatedAt: string;
+  staleThresholdDays: number;
 }
 
 // ── Workflow Chain ──────────────────────────────────────

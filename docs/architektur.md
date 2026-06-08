@@ -136,7 +136,7 @@ com.automation
 | `ConversionController` | `/api/v1/conversions` | Suggest, Create-Workflow aus Run |
 | `DialogController` | `/api/v1/dialog` | Sessions, Projekte, Claude-Session-Analyse, Workflow-Erstellung |
 | `LearningController` | `/api/v1/learning` | Dashboard, Stats, Step-Analytics, Suggestions, Similar, Agentic-History, Agentic-Analytics, Tool-Patterns, Execution-Insights, Run-Insights, Rate |
-| `TodoController` | `/api/v1/todos` | CRUD, Status-Patch, Count |
+| `TodoController` | `/api/v1/todos` | CRUD, Status-Patch, Count, Overview (Cockpit), Bulk-Status, Archive-Stale |
 | `ActivityLogController` | `/api/v1/activity-log` | Liste |
 | `AssistantController` | `/api/v1/assistant` | Chat (`POST /chat`) |
 | `PageSuggestionController` | `/api/v1/assistant` | Suggestions per Page (Get/Refresh) |
@@ -303,6 +303,15 @@ Audit-Workflow → AutoTodoService → TODO (OPEN)
 - API: List, Get, Create, Enable/Disable, Delete
 - **Loop-Prevention**: 3 Schichten — Metadata-Flag (`todoTriggerRun`), Max-Attempts-Zähler (`todo.fixAttempts`), Running-Check (`todo.lastFixRunId`)
 - **Context-Variablen** für Fix-Workflow: `todo_id`, `todo_title`, `todo_description`, `todo_tags`, `todo_priority`, `todo_project_id`, `todo_trigger_id`
+
+## Projekt-Cockpit & TODO-Hygiene
+
+Da TODOs zu ~96 % maschinell erzeugt und über viele Projekte verstreut sind, gibt es eine projektübergreifende Übersicht plus einen Aufräum-Mechanismus.
+
+- **Cockpit** (`GET /api/v1/todos/overview`, `TodoOverviewService`): liefert pro Projekt einen Rollup (Status-Counts, `staleCount`, `userActive` vs. `machineActive`, `needsYouCount`) plus eine globale „Braucht dich"-Liste (USER-Source ∨ CRITICAL ∨ überfällig). Alles aus schlanken GROUP-BY-Projektionen (keine TEXT-Blobs → pool-size=1-safe), Frontend-Seite `ProjectCockpit.tsx` (Route `/cockpit`).
+- **ARCHIVED-Status**: Ablage neben BACKLOG für „aus den Augen". Aus der Default-Liste ausgeblendet (`TodoService.buildSpec` schließt ARCHIVED aus, wenn kein Status-Filter gesetzt ist), erreichbar über den Archiv-Tab / Edit-Modal.
+- **Hygiene** (`TodoHygieneService`): `archiveStaleNow(projectId)` verschiebt verstaubte Auto-Todos (OPEN/BACKLOG, Source AI/WORKFLOW, Tag `auto:workflow`, `updatedAt` älter als Schwelle) nach ARCHIVED — per Bulk-UPDATE in kurzer Transaktion. Cockpit-Knopf „Verstaubtes archivieren" (`POST /todos/archive-stale?projectId=`) ist der primäre, human-in-the-loop Weg. Der `@Scheduled`-Job (täglich 03:30) ruft denselben Pfad, ist aber per Default **AUS** (`todo-hygiene-enabled`). Schwellen runtime-konfigurierbar via `ExecutionSettingsService`: `todo-hygiene-enabled` [0,1], `todo-stale-days` [7,365], `todo-hygiene-max-per-run` [10,2000].
+- **Bulk-Status** (`POST /todos/bulk-status`): generischer Bulk-UPDATE für viele TODO-IDs auf einen Status.
 
 ## Notification System (V40)
 
@@ -525,7 +534,7 @@ Alle JPA-Entities und Enums im `com.automation.entity`-Package:
 | `SkillCategory` | DOCUMENT, CODE, DATA, CONTENT, RESEARCH, BUSINESS, PRODUCTIVITY |
 | `StepStatus` | PENDING, RUNNING, COMPLETED, FAILED, SKIPPED, WAITING_APPROVAL |
 | `WishStatus` | RECEIVED, DECOMPOSING, AWAITING_DECOMPOSE_APPROVAL, EXECUTING, EVALUATING, REFINING, AWAITING_CLARIFICATION, AWAITING_APPROVAL, COMPLETED, FAILED, CANCELLED |
-| `Todo.Status` | OPEN, IN_PROGRESS, DONE, BACKLOG |
+| `Todo.Status` | OPEN, IN_PROGRESS, DONE, BACKLOG, ARCHIVED (ARCHIVED = „aus den Augen" — aus der Default-Liste ausgeblendet, eigener Archiv-Tab; Ziel der Hygiene/Bulk-Archivierung) |
 | `Todo.Priority` | LOW, MEDIUM, HIGH |
 | `Todo.Source` | USER, AI, WORKFLOW |
 | `ActivityLog.LogLevel` | DEBUG, INFO, WARN, ERROR |

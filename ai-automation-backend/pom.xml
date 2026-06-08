@@ -215,6 +215,43 @@
             </plugin>
 
             <!--
+                Single-source the docs the assistant reads at runtime.
+                Source of truth: repo-root docs/. These four files are copied into
+                src/main/resources/docs (git-ignored) during generate-resources, then the
+                default process-resources step bundles them onto the classpath
+                (AssistantFetchService loads them via ClassPathResource("docs/...")).
+                Prevents silent drift between docs/ and the former resources/ duplicate.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>sync-docs-from-source</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.basedir}/src/main/resources/docs</outputDirectory>
+                            <overwrite>true</overwrite>
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}/../docs</directory>
+                                    <includes>
+                                        <include>architektur.md</include>
+                                        <include>WORKFLOW-GUIDE.md</include>
+                                        <include>assistant-system.md</include>
+                                        <include>vision.md</include>
+                                    </includes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!--
                 Wirft die Integration-Test-DB unter /tmp vor jedem Test-Lauf weg.
                 Hintergrund: application-integration.yml nutzt eine file-basierte SQLite-DB,
                 die zwischen Läufen persistiert (gewollt, damit Flyway eine eigene Connection

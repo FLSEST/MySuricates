@@ -90,6 +90,36 @@ export function useUpdateTodoStatus() {
   });
 }
 
+export function useBulkUpdateTodoStatus() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
+  return useMutation({
+    mutationFn: ({ ids, status }: { ids: string[]; status: TodoStatus }) =>
+      api.post<{ updated: number }>('/todos/bulk-status', { ids, status }),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['todos'] });
+      toast.success(t.toast.todosArchived.replace('{n}', String(res.updated)));
+    },
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.todoUpdateFailed)),
+  });
+}
+
+export function useArchiveStale() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
+  return useMutation({
+    mutationFn: (projectId?: string) =>
+      api.post<{ archived: number }>(`/todos/archive-stale${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['todos'] });
+      toast.success(t.toast.todosArchived.replace('{n}', String(res.archived)));
+    },
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.todoUpdateFailed)),
+  });
+}
+
 export function useDeleteTodo() {
   const qc = useQueryClient();
   const toast = useToast();

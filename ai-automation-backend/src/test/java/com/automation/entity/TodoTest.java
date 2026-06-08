@@ -240,7 +240,7 @@ class TodoTest {
         void should_containAllStatusValues_when_valuesCalled() {
             assertThat(Todo.Status.values())
                     .containsExactly(Todo.Status.OPEN, Todo.Status.IN_PROGRESS,
-                            Todo.Status.DONE, Todo.Status.BACKLOG);
+                            Todo.Status.DONE, Todo.Status.BACKLOG, Todo.Status.ARCHIVED);
         }
 
         @Test
@@ -249,6 +249,7 @@ class TodoTest {
             assertThat(Todo.Status.valueOf("IN_PROGRESS")).isEqualTo(Todo.Status.IN_PROGRESS);
             assertThat(Todo.Status.valueOf("DONE")).isEqualTo(Todo.Status.DONE);
             assertThat(Todo.Status.valueOf("BACKLOG")).isEqualTo(Todo.Status.BACKLOG);
+            assertThat(Todo.Status.valueOf("ARCHIVED")).isEqualTo(Todo.Status.ARCHIVED);
         }
 
         @Test

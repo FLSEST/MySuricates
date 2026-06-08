@@ -1,0 +1,166 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Bug, RotateCcw, Stethoscope, ArrowRight, Clock, CalendarClock } from 'lucide-react';
+import { Button, Modal, Spinner } from '../components/ui';
+import { StatusBadge } from '../components/shared/StatusBadge';
+import { EmptyState } from '../components/shared/EmptyState';
+import { ErrorState } from '../components/shared/ErrorState';
+import { useBrokenWorkflows } from '../hooks/useWorkflowDebug';
+import { useRetryExecution } from '../hooks/useWorkflows';
+import { useAssistantStore } from '../stores/assistantStore';
+import { useT, useI18nStore } from '../i18n';
+import { formatRelativeTime, formatDuration } from '../utils/formatTime';
+import type { BrokenWorkflow } from '../types';
+
+export function WorkflowDebug() {
+  const t = useT();
+  const { data, isLoading, error, refetch } = useBrokenWorkflows();
+  const [restartTarget, setRestartTarget] = useState<BrokenWorkflow | null>(null);
+  const retry = useRetryExecution();
+
+  const broken = data ?? [];
+
+  const handleRestart = () => {
+    if (!restartTarget) return;
+    retry.mutate(restartTarget.runId, { onSuccess: () => setRestartTarget(null) });
+  };
+
+  return (
+    <div className="space-y-4 p-6">
+      <header>
+        <h1 className="text-2xl font-bold text-text flex items-center gap-2">
+          <Bug className="w-6 h-6 text-danger" />
+          {t.workflowDebug.title}
+        </h1>
+        <p className="text-sm text-text-secondary mt-1">{t.workflowDebug.subtitle}</p>
+      </header>
+
+      {isLoading ? (
+        <div className="flex justify-center py-12"><Spinner /></div>
+      ) : error ? (
+        <ErrorState message={t.workflowDebug.loadError} onRetry={() => refetch()} />
+      ) : broken.length === 0 ? (
+        <EmptyState
+          icon={<Bug className="w-10 h-10 text-success" />}
+          title={t.workflowDebug.empty}
+        />
+      ) : (
+        <>
+          <p className="text-sm text-text-tertiary">
+            {broken.length} {t.workflowDebug.failingCount}
+          </p>
+          <div className="space-y-2">
+            {broken.map((wf) => (
+              <BrokenRow key={wf.runId} wf={wf} onRestart={() => setRestartTarget(wf)} />
+            ))}
+          </div>
+        </>
+      )}
+
+      <Modal
+        open={!!restartTarget}
+        onClose={() => setRestartTarget(null)}
+        title={t.workflowDebug.restartConfirm}
+      >
+        <p className="text-text-secondary mb-4">{t.workflowDebug.restartConfirmHint}</p>
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setRestartTarget(null)}>{t.common.cancel}</Button>
+          <Button onClick={handleRestart} loading={retry.isPending}>{t.workflowDebug.restart}</Button>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+function BrokenRow({ wf, onRestart }: { wf: BrokenWorkflow; onRestart: () => void }) {
+  const t = useT();
+  const locale = useI18nStore((s) => s.locale);
+  const setPendingInput = useAssistantStore((s) => s.setPendingInput);
+  const setAssistantOpen = useAssistantStore((s) => s.setOpen);
+
+  const handleDiagnose = () => {
+    const prompt = t.workflowDebug.diagnosePrompt
+      .replace('{name}', wf.workflowName ?? '—')
+      .replace('{runId}', wf.runId);
+    setPendingInput(prompt);
+    setAssistantOpen(true);
+  };
+
+  return (
+    <div className="bg-surface-raised border border-border rounded-lg p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            {wf.workflowId ? (
+              <Link
+                to={`/workflows/${wf.workflowId}`}
+                className="font-medium text-text hover:text-accent truncate"
+              >
+                {wf.workflowName ?? wf.workflowId}
+              </Link>
+            ) : (
+              <span className="font-medium text-text truncate">{wf.workflowName ?? '—'}</span>
+            )}
+            <StatusBadge status={wf.status} />
+            {wf.projectName && <span className="text-xs text-text-tertiary">{wf.projectName}</span>}
+            {wf.triggeredByScheduleId && (
+              <span className="inline-flex items-center gap-1 text-xs text-text-tertiary">
+                <CalendarClock className="w-3 h-3" />
+                {t.workflowDebug.scheduled}
+              </span>
+            )}
+          </div>
+
+          <p className="text-sm text-danger mt-1.5 line-clamp-2 font-mono">
+            {wf.errorMessage ?? t.workflowDebug.noError}
+          </p>
+
+          <div className="flex items-center gap-3 mt-2 text-xs text-text-tertiary flex-wrap">
+            {wf.failedStepIndex != null && (
+              <span>
+                {t.workflowDebug.failedStep} {wf.failedStepIndex + 1}
+                {wf.failedBlockType ? ` (${wf.failedBlockType})` : ''}
+              </span>
+            )}
+            <span className="inline-flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {t.workflowDebug.failedAt}: {formatRelativeTime(wf.completedAt ?? wf.startedAt, locale)}
+            </span>
+            {wf.durationMs != null && (
+              <span>{t.workflowDebug.duration}: {formatDuration(wf.durationMs)}</span>
+            )}
+            {wf.workflowId && (
+              <Link
+                to={`/workflows/${wf.workflowId}/run/${wf.runId}`}
+                className="text-accent hover:underline inline-flex items-center gap-0.5"
+              >
+                {t.workflowDebug.openRun} <ArrowRight className="w-3 h-3" />
+              </Link>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Stethoscope className="w-4 h-4" />}
+            onClick={handleDiagnose}
+            title={t.workflowDebug.diagnoseTitle}
+          >
+            {t.workflowDebug.diagnose}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<RotateCcw className="w-4 h-4" />}
+            onClick={onRestart}
+            title={t.workflowDebug.restart}
+          >
+            {t.workflowDebug.restart}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

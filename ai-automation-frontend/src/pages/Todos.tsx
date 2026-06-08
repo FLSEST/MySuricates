@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { usePersistedState } from '../hooks/usePersistedState';
 import {
   CheckSquare, Plus, Search,
@@ -31,6 +31,14 @@ export function Todos() {
   const [statusFilter, setStatusFilter] = usePersistedState<TodoStatus | 'ALL'>('todos-status-filter', 'ALL');
   const [sourceFilter, setSourceFilter] = usePersistedState<TodoSource | 'ALL'>('todos-source-filter', 'ALL');
   const [projectFilter, setProjectFilter] = usePersistedState('todos-project-filter', '');
+
+  // Deep-link from the cockpit: ?projectId=… focuses that project (additive — persisted filter wins when absent)
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    const pid = searchParams.get('projectId');
+    if (pid) setProjectFilter(pid);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   const [search, setSearch] = usePersistedState('todos-search', '');
   const [debouncedSearch, setDebouncedSearch] = useState(search);
   const [tagFilter, setTagFilter] = usePersistedState('todos-tag-filter', '');
@@ -316,6 +324,18 @@ export function Todos() {
               {t.todos.statuses[s]}
             </button>
           ))}
+          {/* Archive tab — separated; ARCHIVED is hidden from the default views */}
+          <span className="w-px h-4 bg-border mx-1" aria-hidden />
+          <button
+            onClick={() => setStatusFilter('ARCHIVED')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              statusFilter === 'ARCHIVED'
+                ? 'bg-accent text-text-inverse'
+                : 'text-text-tertiary hover:text-text hover:bg-surface-raised'
+            }`}
+          >
+            {t.todos.statuses.ARCHIVED}
+          </button>
         </div>
 
         {/* Source filter */}

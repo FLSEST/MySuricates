@@ -18,7 +18,7 @@ import java.time.Instant;
 @Builder
 public class Todo {
 
-    public enum Status { OPEN, IN_PROGRESS, DONE, BACKLOG }
+    public enum Status { OPEN, IN_PROGRESS, DONE, BACKLOG, ARCHIVED }
     public enum Priority { LOW, MEDIUM, HIGH, CRITICAL }
     public enum Source { USER, AI, WORKFLOW }
     public enum ResolutionState { IDLE, RUNNING, FAILED, SUCCEEDED }

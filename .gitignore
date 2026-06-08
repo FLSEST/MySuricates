@@ -29,6 +29,9 @@ ai-automation-frontend/test-results/
 # Stable environment build artifacts
 ai-automation-backend/stable-frontend/
 
+# Build-synced docs (generated from docs/ by maven-resources-plugin at generate-resources)
+ai-automation-backend/src/main/resources/docs/
+
 # Generated session artifacts (anchored to repo root)
 /portfolio/
 /dashboard/

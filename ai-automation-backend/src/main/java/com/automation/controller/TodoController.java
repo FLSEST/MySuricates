@@ -1,13 +1,17 @@
 package com.automation.controller;
 
+import com.automation.dto.request.BulkUpdateTodoStatusRequest;
 import com.automation.dto.request.CreateTodoRequest;
 import com.automation.dto.request.UpdateTodoRequest;
 import com.automation.dto.request.UpdateTodoStatusRequest;
 import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.TodoCountResponse;
+import com.automation.dto.response.TodoOverviewResponse;
 import com.automation.dto.response.TodoResponse;
 import com.automation.mapper.TodoMapper;
 import com.automation.mapper.WorkflowMapper;
+import com.automation.service.todo.TodoHygieneService;
+import com.automation.service.todo.TodoOverviewService;
 import com.automation.service.todo.TodoService;
 import com.automation.service.todo.TodoSimilarityService;
 import jakarta.validation.Valid;
@@ -17,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/todos")
@@ -24,6 +29,8 @@ import java.util.List;
 public class TodoController {
 
     private final TodoService todoService;
+    private final TodoOverviewService todoOverviewService;
+    private final TodoHygieneService todoHygieneService;
     private final TodoMapper todoMapper;
     private final WorkflowMapper workflowMapper;
     private final TodoSimilarityService similarityService;
@@ -77,6 +84,29 @@ public class TodoController {
     @GetMapping("/count")
     public TodoCountResponse countTodos() {
         return todoService.count();
+    }
+
+    /** Cross-project cockpit overview: per-project rollups + a global "Braucht dich" lane. */
+    @GetMapping("/overview")
+    public TodoOverviewResponse overview() {
+        return todoOverviewService.getOverview();
+    }
+
+    /** Bulk status change (e.g. archive selected todos). Returns {@code {"updated": n}}. */
+    @PostMapping("/bulk-status")
+    public ResponseEntity<Map<String, Integer>> bulkUpdateStatus(@Valid @RequestBody BulkUpdateTodoStatusRequest request) {
+        int updated = todoService.bulkUpdateStatus(request.ids(), request.status());
+        return ResponseEntity.ok(Map.of("updated", updated));
+    }
+
+    /**
+     * Archive stale auto-todos now (cockpit "Verstaubtes archivieren"). Optional {@code projectId}
+     * scopes it to one project; omit to archive across all. Returns {@code {"archived": n}}.
+     */
+    @PostMapping("/archive-stale")
+    public ResponseEntity<Map<String, Integer>> archiveStale(@RequestParam(required = false) String projectId) {
+        int archived = todoHygieneService.archiveStaleNow(projectId);
+        return ResponseEntity.ok(Map.of("archived", archived));
     }
 
     /**

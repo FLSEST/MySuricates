@@ -4,6 +4,7 @@ import com.automation.concurrency.DynamicSemaphore;
 import com.automation.config.ChainConfig;
 import com.automation.config.HostClaudeConfig;
 import com.automation.config.RateLimitConfig;
+import com.automation.config.TodoHygieneConfig;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.ai.HostClaudeService;
 import com.automation.service.cli.ContainerShellService;
@@ -33,6 +34,7 @@ class ExecutionSettingsServiceTest {
     private HostClaudeConfig hostClaudeConfig;
     private ChainConfig chainConfig;
     private RateLimitConfig rateLimitConfig;
+    private TodoHygieneConfig todoHygieneConfig;
     private ExecutionSettingsService service;
 
     @BeforeEach
@@ -41,11 +43,13 @@ class ExecutionSettingsServiceTest {
         hostClaudeConfig = new HostClaudeConfig();
         chainConfig = new ChainConfig();
         rateLimitConfig = new RateLimitConfig();
+        todoHygieneConfig = new TodoHygieneConfig();
 
         service = new ExecutionSettingsService(
                 appSettingsRepository, executionSemaphore,
                 hostClaudeService, hostClaudeConfig, chainConfig,
-                rateLimitConfig, workflowExecutor, containerShellService
+                rateLimitConfig, workflowExecutor, containerShellService,
+                todoHygieneConfig
         );
     }
 
@@ -236,6 +240,37 @@ class ExecutionSettingsServiceTest {
         assertThatThrownBy(() -> service.validateAndApply("assistant-chat-timeout-seconds", "10"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("must be between");
+    }
+
+    @Test
+    void validateAndApply_todoHygieneEnabled_updatesConfig() {
+        service.validateAndApply("todo-hygiene-enabled", "1");
+
+        verify(appSettingsRepository).set("todo-hygiene-enabled", "1");
+        assertThat(todoHygieneConfig.isEnabled()).isTrue();
+    }
+
+    @Test
+    void validateAndApply_todoStaleDays_camelCaseAlias_updatesConfig() {
+        service.validateAndApply("todoStaleDays", "45");
+
+        verify(appSettingsRepository).set("todo-stale-days", "45");
+        assertThat(todoHygieneConfig.getStaleDays()).isEqualTo(45);
+    }
+
+    @Test
+    void validateAndApply_todoStaleDays_belowMin_throws() {
+        assertThatThrownBy(() -> service.validateAndApply("todo-stale-days", "3"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must be between");
+    }
+
+    @Test
+    void validateAndApply_todoHygieneMaxPerRun_updatesConfig() {
+        service.validateAndApply("todo-hygiene-max-per-run", "500");
+
+        verify(appSettingsRepository).set("todo-hygiene-max-per-run", "500");
+        assertThat(todoHygieneConfig.getMaxPerRun()).isEqualTo(500);
     }
 
     @Test

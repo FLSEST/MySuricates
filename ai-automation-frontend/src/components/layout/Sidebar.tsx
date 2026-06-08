@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, GitBranch, History, Zap, Sparkles, Factory,
   Calendar, CalendarDays, Webhook, Plug, ScrollText, CheckSquare, Settings, ChevronLeft, ChevronRight, Link2, BookOpen, BookMarked, BarChart2,
-  Pencil, Check, RotateCcw, Plus, MessageCircle, ClipboardList,
+  Pencil, Check, RotateCcw, Plus, MessageCircle, ClipboardList, LayoutGrid, Bug,
 } from 'lucide-react';
 import {
   DndContext,
@@ -110,11 +110,13 @@ const navItems = [
   { to: '/dialogs', icon: MessageCircle, labelKey: 'dialogs' as const },
   { to: '/chains', icon: Link2, labelKey: 'chains' as const },
   { to: '/runs', icon: History, labelKey: 'runs' as const },
+  { to: '/debug', icon: Bug, labelKey: 'debug' as const },
   { to: '/skills', icon: Zap, labelKey: 'skills' as const },
   { to: '/schedules', icon: Calendar, labelKey: 'schedules' as const },
   { to: '/calendar', icon: CalendarDays, labelKey: 'calendar' as const },
   { to: '/webhooks', icon: Webhook, labelKey: 'webhooks' as const },
   { to: '/integrations', icon: Plug, labelKey: 'integrations' as const },
+  { to: '/cockpit', icon: LayoutGrid, labelKey: 'cockpit' as const },
   { to: '/todos', icon: CheckSquare, labelKey: 'todos' as const },
   { to: '/activity', icon: ScrollText, labelKey: 'activityLog' as const },
   { to: '/insights', icon: BarChart2, labelKey: 'insights' as const },

@@ -4,7 +4,7 @@ import { Modal, Button, Input, Select, TagInput } from '../ui';
 import { useT } from '../../i18n';
 import type { Todo, TodoStatus, TodoPriority, UpdateTodoRequest, Project, Workflow } from '../../types';
 
-const STATUSES: TodoStatus[] = ['OPEN', 'IN_PROGRESS', 'DONE', 'BACKLOG'];
+const STATUSES: TodoStatus[] = ['OPEN', 'IN_PROGRESS', 'DONE', 'BACKLOG', 'ARCHIVED'];
 const PRIORITIES: TodoPriority[] = ['LOW', 'MEDIUM', 'HIGH'];
 
 interface TodoEditModalProps {
