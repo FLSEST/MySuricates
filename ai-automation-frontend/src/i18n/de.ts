@@ -1153,6 +1153,8 @@ export const de: TranslationKeys = {
     openProject: 'Projekt öffnen',
     noOpenTodos: 'Keine offenen Todos',
     moreTodos: '+{n} weitere',
+    expandTodos: 'Todos aufklappen',
+    collapseTodos: 'Todos einklappen',
   },
   todos: {
     title: 'Todos',

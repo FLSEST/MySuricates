@@ -153,31 +153,19 @@ function ProjectCard({
 
   return (
     <Card className="flex flex-col gap-3 hover:border-border-strong transition-colors">
-      {/* Title row — expandable projects toggle; "Ohne Projekt" navigates */}
+      {/* Title row — click navigates to the project's Todos */}
       <div className="flex items-center justify-between gap-2">
         <button
-          onClick={expandable ? () => setExpanded((v) => !v) : onOpen}
-          className="flex items-center gap-1.5 min-w-0 text-left group flex-1"
-          aria-expanded={expandable ? expanded : undefined}
+          onClick={onOpen}
+          className="flex items-center gap-1 min-w-0 text-left group flex-1"
+          title={t.cockpit.openProject}
         >
-          {expandable && (
-            <ChevronRight className={`w-4 h-4 shrink-0 text-text-tertiary transition-transform ${expanded ? 'rotate-90' : ''}`} />
-          )}
           <h3 className="font-semibold text-text truncate group-hover:text-accent transition-colors">
             {rollup.projectName ?? t.cockpit.noProject}
           </h3>
+          <ArrowUpRight className="w-3.5 h-3.5 shrink-0 text-text-tertiary group-hover:text-accent transition-colors" />
         </button>
         <span className="shrink-0 text-xs text-text-tertiary">{active} {t.cockpit.active}</span>
-        {expandable && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onOpen(); }}
-            className="shrink-0 p-1 rounded-md text-text-tertiary hover:text-accent hover:bg-surface-raised transition-colors"
-            title={t.cockpit.openProject}
-            aria-label={t.cockpit.openProject}
-          >
-            <ArrowUpRight className="w-4 h-4" />
-          </button>
-        )}
       </div>
 
       {/* Progress bar */}
@@ -201,9 +189,19 @@ function ProjectCard({
         )}
       </div>
 
-      {/* Expanded: lazily-loaded open + in-progress todos */}
-      {expandable && expanded && (
-        <ProjectTodoList projectId={rollup.projectId!} onOpen={onOpen} t={t} />
+      {/* Explicit, labeled toggle (not a bare chevron, not in the title) → lazily-loaded open + in-progress todos */}
+      {expandable && (
+        <div>
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            aria-expanded={expanded}
+            className="flex items-center gap-1.5 text-xs font-medium text-accent hover:underline"
+          >
+            <ChevronRight className={`w-3.5 h-3.5 transition-transform ${expanded ? 'rotate-90' : ''}`} />
+            {expanded ? t.cockpit.collapseTodos : t.cockpit.expandTodos}
+          </button>
+          {expanded && <ProjectTodoList projectId={rollup.projectId!} onOpen={onOpen} t={t} />}
+        </div>
       )}
 
       {/* Stale badge + archive action */}

@@ -1156,6 +1156,8 @@ export const en = {
     openProject: 'Open project',
     noOpenTodos: 'No open todos',
     moreTodos: '+{n} more',
+    expandTodos: 'Expand todos',
+    collapseTodos: 'Collapse todos',
   },
   todos: {
     title: 'Todos',
