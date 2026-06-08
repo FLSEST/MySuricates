@@ -47,6 +47,23 @@ export function useTodoCount() {
   });
 }
 
+/** Lazily fetch a project's active todos (OPEN + IN_PROGRESS) — used by the cockpit's expandable cards. */
+export function useProjectActiveTodos(projectId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['todos', 'project-active', projectId],
+    queryFn: () => {
+      const sp = new URLSearchParams();
+      sp.set('projectId', projectId);
+      sp.append('status', 'OPEN');
+      sp.append('status', 'IN_PROGRESS');
+      sp.set('size', '12');
+      return api.get<PageResponse<Todo>>(`/todos?${sp.toString()}`);
+    },
+    enabled: enabled && !!projectId,
+    staleTime: 30_000,
+  });
+}
+
 export function useCreateTodo() {
   const qc = useQueryClient();
   const toast = useToast();

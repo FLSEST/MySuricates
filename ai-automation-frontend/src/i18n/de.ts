@@ -71,7 +71,7 @@ export const de: TranslationKeys = {
     insights: 'Insights',
     dialogs: 'Session2Workflow',
     onboardingProfiles: 'Onboarding-Profile',
-    debug: 'Debug',
+    debug: 'Workflow-Debug',
   },
   dashboard: {
     title: 'Dashboard',
@@ -1150,6 +1150,9 @@ export const de: TranslationKeys = {
     archiveStale: 'Verstaubtes archivieren',
     staleHint: 'Auto-Todos ohne Aktivität seit {days} Tagen',
     overdue: 'überfällig',
+    openProject: 'Projekt öffnen',
+    noOpenTodos: 'Keine offenen Todos',
+    moreTodos: '+{n} weitere',
   },
   todos: {
     title: 'Todos',

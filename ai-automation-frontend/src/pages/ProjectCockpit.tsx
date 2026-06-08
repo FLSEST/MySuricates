@@ -1,14 +1,15 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutGrid, FolderKanban, Archive, AlertTriangle, ChevronRight, Clock } from 'lucide-react';
+import { LayoutGrid, FolderKanban, Archive, AlertTriangle, ChevronRight, Clock, ArrowUpRight } from 'lucide-react';
 import { Card, Button, Spinner } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
 import { TodoProgressBar } from '../components/todo/TodoProgressBar';
 import { priorityColor, sourceIcon, formatRelative } from '../components/todo/todoConstants';
 import { useTodoOverview } from '../hooks/useTodoOverview';
-import { useArchiveStale } from '../hooks/useTodos';
+import { useArchiveStale, useProjectActiveTodos } from '../hooks/useTodos';
 import { useT } from '../i18n';
-import type { NeedsYouItem, ProjectRollup } from '../types';
+import type { NeedsYouItem, ProjectRollup, Todo } from '../types';
 
 export function ProjectCockpit() {
   const t = useT();
@@ -147,15 +148,37 @@ function ProjectCard({
   t: ReturnType<typeof useT>;
 }) {
   const active = rollup.open + rollup.inProgress + rollup.backlog;
+  const expandable = rollup.projectId != null;
+  const [expanded, setExpanded] = useState(false);
+
   return (
     <Card className="flex flex-col gap-3 hover:border-border-strong transition-colors">
-      {/* Title row (click → project) */}
-      <button onClick={onOpen} className="flex items-center justify-between text-left group">
-        <h3 className="font-semibold text-text truncate group-hover:text-accent transition-colors">
-          {rollup.projectName ?? t.cockpit.noProject}
-        </h3>
-        <span className="shrink-0 ml-2 text-xs text-text-tertiary">{active} {t.cockpit.active}</span>
-      </button>
+      {/* Title row — expandable projects toggle; "Ohne Projekt" navigates */}
+      <div className="flex items-center justify-between gap-2">
+        <button
+          onClick={expandable ? () => setExpanded((v) => !v) : onOpen}
+          className="flex items-center gap-1.5 min-w-0 text-left group flex-1"
+          aria-expanded={expandable ? expanded : undefined}
+        >
+          {expandable && (
+            <ChevronRight className={`w-4 h-4 shrink-0 text-text-tertiary transition-transform ${expanded ? 'rotate-90' : ''}`} />
+          )}
+          <h3 className="font-semibold text-text truncate group-hover:text-accent transition-colors">
+            {rollup.projectName ?? t.cockpit.noProject}
+          </h3>
+        </button>
+        <span className="shrink-0 text-xs text-text-tertiary">{active} {t.cockpit.active}</span>
+        {expandable && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onOpen(); }}
+            className="shrink-0 p-1 rounded-md text-text-tertiary hover:text-accent hover:bg-surface-raised transition-colors"
+            title={t.cockpit.openProject}
+            aria-label={t.cockpit.openProject}
+          >
+            <ArrowUpRight className="w-4 h-4" />
+          </button>
+        )}
+      </div>
 
       {/* Progress bar */}
       <TodoProgressBar open={rollup.open} inProgress={rollup.inProgress} done={rollup.done} backlog={rollup.backlog} />
@@ -178,6 +201,11 @@ function ProjectCard({
         )}
       </div>
 
+      {/* Expanded: lazily-loaded open + in-progress todos */}
+      {expandable && expanded && (
+        <ProjectTodoList projectId={rollup.projectId!} onOpen={onOpen} t={t} />
+      )}
+
       {/* Stale badge + archive action */}
       {rollup.staleCount > 0 && (
         <div className="flex items-center justify-between pt-2 border-t border-border">
@@ -196,5 +224,53 @@ function ProjectCard({
         </div>
       )}
     </Card>
+  );
+}
+
+/* ─── Expanded project todo list (lazy) ─────────────────── */
+function ProjectTodoList({ projectId, onOpen, t }: { projectId: string; onOpen: () => void; t: ReturnType<typeof useT> }) {
+  const { data, isLoading } = useProjectActiveTodos(projectId, true);
+  const todos = data?.content ?? [];
+  const total = data?.totalElements ?? 0;
+  const more = total - todos.length;
+
+  return (
+    <div className="pt-2 border-t border-border">
+      {isLoading ? (
+        <div className="py-3 flex justify-center"><Spinner size="sm" /></div>
+      ) : todos.length === 0 ? (
+        <p className="py-2 text-xs text-text-tertiary text-center">{t.cockpit.noOpenTodos}</p>
+      ) : (
+        <div className="-mx-1">
+          {todos.map((todo) => (
+            <TodoMiniRow key={todo.id} todo={todo} onClick={onOpen} t={t} />
+          ))}
+          <button
+            onClick={onOpen}
+            className="w-full mt-1 px-1 py-1.5 text-left text-xs text-accent hover:underline"
+          >
+            {more > 0 ? `${t.cockpit.moreTodos.replace('{n}', String(more))} · ${t.cockpit.openProject}` : `${t.cockpit.openProject} →`}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Compact read-only todo row ────────────────────────── */
+function TodoMiniRow({ todo, onClick, t }: { todo: Todo; onClick: () => void; t: ReturnType<typeof useT> }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-2 px-1 py-1.5 text-left rounded-md hover:bg-surface-raised transition-colors"
+    >
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${priorityColor[todo.priority]}`} title={t.todos.priorities[todo.priority]} />
+      <span className="text-text-tertiary shrink-0">{sourceIcon(todo.source)}</span>
+      <span className="flex-1 min-w-0 truncate text-xs text-text">{todo.title}</span>
+      {todo.status === 'IN_PROGRESS' && (
+        <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-warning/15 text-warning">{t.todos.statuses.IN_PROGRESS}</span>
+      )}
+      <span className="shrink-0 text-[11px] text-text-tertiary">{formatRelative(todo.updatedAt)}</span>
+    </button>
   );
 }

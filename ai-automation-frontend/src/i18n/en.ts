@@ -69,7 +69,7 @@ export const en = {
     insights: 'Insights',
     dialogs: 'Session2Workflow',
     onboardingProfiles: 'Onboarding Profiles',
-    debug: 'Debug',
+    debug: 'Workflow Debug',
   },
   dashboard: {
     title: 'Dashboard',
@@ -1153,6 +1153,9 @@ export const en = {
     archiveStale: 'Archive stale',
     staleHint: 'Auto-todos with no activity for {days} days',
     overdue: 'overdue',
+    openProject: 'Open project',
+    noOpenTodos: 'No open todos',
+    moreTodos: '+{n} more',
   },
   todos: {
     title: 'Todos',
