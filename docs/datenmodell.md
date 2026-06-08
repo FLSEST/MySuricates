@@ -422,6 +422,7 @@ erDiagram
 | `input_schema` | TEXT | | JSON-Schema für Eingabe |
 | `output_schema` | TEXT | | JSON-Schema für Ausgabe |
 | `async` | INTEGER | NOT NULL, DEFAULT 0 | Asynchrone Ausführung |
+| `writes` | INTEGER | NOT NULL, DEFAULT 0 | Capability verändert Dateien/State (V64). Block-Config muss `allow_writes: true` setzen; hält BuiltInSkills.capWrites(...) synchron |
 
 ### `workflows`
 
@@ -441,6 +442,10 @@ erDiagram
 | `test_status` | TEXT | DEFAULT 'UNTESTED' | Teststatus: UNTESTED, PASSED, FAILED (V25) |
 | `last_tested_at` | TEXT | | Letzter Testzeitpunkt (V25) |
 | `block_types` | TEXT | DEFAULT '' | Denormalisierte Block-Typen, kommagetrennt (V26) |
+| `tags` | TEXT | | JSON-Array als Text — Tags für Intent-basierte Discovery (V61) |
+| `category` | VARCHAR(32) | | Geschlossene Taxonomie: Productivity, Dev, Content, Analysis, Ops, Data, Integration, Other (V61) |
+| `tags_generated_at` | TIMESTAMP | | Wann der Tagging-Service zuletzt Tags schrieb (V61) |
+| `tags_user_edited` | BOOLEAN | NOT NULL, DEFAULT 0 | Sperrt Tags gegen Auto-Regenerierung, sobald vom User editiert (V61) |
 | `version` | TEXT | DEFAULT '1.0.0' | Versionsnummer |
 | `metadata` | TEXT | | JSON: Zusätzliche Metadaten |
 | `deleted_at` | TEXT | | Soft-Delete-Zeitpunkt (V32). `@SQLRestriction("deleted_at IS NULL")` |
@@ -465,6 +470,7 @@ M:N-Beziehung zwischen Workflows und Skills.
 |---|---|---|---|
 | `id` | TEXT | PK | UUID |
 | `workflow_id` | TEXT | FK → workflows, NOT NULL | Zugehöriger Workflow |
+| `workflow_name` | TEXT | | Snapshot des Workflow-Namens bei Run-Erstellung (V60). Bleibt stabil bei Soft-Delete und vermeidet Lazy-Load (OSIV deaktiviert) |
 | `status` | TEXT | NOT NULL, DEFAULT 'PENDING' | Enum: RunStatus |
 | `input_context` | TEXT | | JSON: Eingabe-Kontext beim Start (V20) |
 | `started_at` | TEXT | | Startzeitpunkt |
@@ -702,6 +708,7 @@ TODOs werden von `AutoTodoService` automatisch bei RED/YELLOW Gate-Status erstel
 | `reference_workflow_ids` | TEXT | | JSON-Array von Referenz-Workflows für den Wunsch (V29) |
 | `iteration_count` | INTEGER | NOT NULL, DEFAULT 0 | Aktuelle Iterations-Zahl |
 | `max_iterations` | INTEGER | NOT NULL, DEFAULT 5 | Maximale Iterations-Zahl |
+| `auto_refine` | BOOLEAN | NOT NULL, DEFAULT FALSE | Autonomer Iterations-Modus (V62): überspringt `AWAITING_DECOMPOSE_APPROVAL` + `AWAITING_APPROVAL`, läuft bis satisfied, FAILED oder `max_iterations` |
 | `current_run_id` | TEXT | | Aktuell laufender Run |
 | `result_summary` | TEXT | | Zusammenfassung des Ergebnisses |
 | `iteration_history` | TEXT | | JSON: Verlauf aller Iterationen (V33) |
@@ -865,6 +872,24 @@ Versionierungshistorie für Onboarding-Profile (V49).
 | `created_at` | TEXT | | Erstellzeitpunkt |
 
 UNIQUE-Constraint auf (`workflow_id`, `version_number`). Speichert vollständige Workflow-Snapshots für Versionshistorie und Restore (V50).
+
+### `dead_letter_entries`
+
+| Spalte | Typ | Constraints | Beschreibung |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `workflow_run_id` | TEXT | | Fehlgeschlagener Run (kein FK-Constraint — Eintrag überlebt Run-Löschung) |
+| `workflow_id` | TEXT | | Zugehöriger Workflow |
+| `workflow_name` | TEXT | | Snapshot des Workflow-Namens |
+| `error_message` | TEXT | | Fehlermeldung des letzten Versuchs |
+| `failed_step_index` | INTEGER | | Index des fehlgeschlagenen Schritts |
+| `retry_count` | INTEGER | NOT NULL, DEFAULT 0 | Anzahl der Wiederholungsversuche |
+| `last_failure_at` | TEXT | NOT NULL | Zeitpunkt des letzten Fehlschlags |
+| `status` | TEXT | NOT NULL, DEFAULT 'OPEN' | Bearbeitungsstatus, z.B. `OPEN` |
+| `created_at` | TEXT | NOT NULL | Erstellzeitpunkt |
+| `updated_at` | TEXT | | Aktualisierungszeitpunkt |
+
+**Indizes:** `idx_dlq_status`, `idx_dlq_created_at` (DESC). Dead-Letter-Queue für wiederholt fehlgeschlagene Workflow-Runs (V63).
 
 ### `app_settings`
 
@@ -1139,6 +1164,11 @@ Blöcke werden als JSON-Array in der `blocks`-Spalte der `workflows`-Tabelle ges
 | V57 | `V57__add_due_date_to_todos.sql` | `due_date` in todos |
 | V58 | `V58__add_assistant_session_preview.sql` | `preview` in assistant_sessions |
 | V59 | `V59__add_linked_workflow_to_todos.sql` | `linked_workflow_id`, `resolution_state` in todos |
+| V60 | `V60__add_workflow_name_to_runs.sql` | `workflow_name`-Snapshot in workflow_runs (+ Backfill bestehender Runs) |
+| V61 | `V61__add_workflow_tags_and_category.sql` | `tags`, `category`, `tags_generated_at`, `tags_user_edited` in workflows |
+| V62 | `V62__add_auto_refine_to_wishes.sql` | `auto_refine` in wishes |
+| V63 | `V63__create_dead_letter_entries.sql` | dead_letter_entries-Tabelle + Indizes (Dead-Letter-Queue) |
+| V64 | `V64__add_writes_to_capabilities.sql` | `writes` in capabilities (+ Backfill write-fähiger Built-in-Capabilities) |
 
 ## SQLite-Besonderheiten
 
