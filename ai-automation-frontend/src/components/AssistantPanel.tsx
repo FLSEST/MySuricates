@@ -19,6 +19,7 @@ export function AssistantPanel() {
     open, toggle, setOpen,
     sessions, activeSessionId, showHistory, panelWidth, panelHeight,
     pendingInput, setPendingInput,
+    pendingContext, setPendingContext,
     startNewSession, appendMessage,
     setShowHistory, setPanelWidth, setPanelHeight,
   } = useAssistantStore();
@@ -39,7 +40,7 @@ export function AssistantPanel() {
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
   const { currentPhase } = useAssistantWebSocket(activeRequestId, activeSessionId);
 
-  const ctx = parsePageContext(location.pathname);
+  const ctx = pendingContext ?? parsePageContext(location.pathname);
 
   // Resize drag state
   const [isResizing, setIsResizing] = useState(false);
@@ -69,6 +70,16 @@ export function AssistantPanel() {
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open, pendingInput, setPendingInput]);
+
+  // Auto-grow the input to fit its content (typing, paste, or a programmatic prefill like the
+  // Diagnose button) up to a max height, then scroll. The textarea's onInput handler only fires
+  // on real keystrokes/paste, not on programmatic value changes — this effect covers those.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
+  }, [input]);
 
   // ESC to close
   useEffect(() => {
@@ -176,6 +187,8 @@ export function AssistantPanel() {
         },
       }
     );
+    // Per-message context (e.g. a Diagnose run) applies once, then we revert to the URL context.
+    if (pendingContext) setPendingContext(null);
   };
 
   const processQueue = () => {
@@ -421,12 +434,12 @@ export function AssistantPanel() {
                   placeholder="Nachricht eingeben… (Enter zum Senden)"
                   rows={1}
                   className="flex-1 resize-none bg-transparent text-sm text-text placeholder-text-tertiary
-                             outline-none min-h-[24px] max-h-[120px] leading-6 py-0"
+                             outline-none min-h-[24px] max-h-[240px] leading-6 py-0 overflow-y-auto"
                   style={{ height: 'auto' }}
                   onInput={(e) => {
                     const el = e.currentTarget;
                     el.style.height = 'auto';
-                    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+                    el.style.height = Math.min(el.scrollHeight, 240) + 'px';
                   }}
                 />
                 <button

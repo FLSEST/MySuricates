@@ -77,11 +77,34 @@ function BrokenRow({ wf, onRestart }: { wf: BrokenWorkflow; onRestart: () => voi
   const locale = useI18nStore((s) => s.locale);
   const setPendingInput = useAssistantStore((s) => s.setPendingInput);
   const setAssistantOpen = useAssistantStore((s) => s.setOpen);
+  const startNewSession = useAssistantStore((s) => s.startNewSession);
+  const setShowHistory = useAssistantStore((s) => s.setShowHistory);
+  const setPendingContext = useAssistantStore((s) => s.setPendingContext);
 
   const handleDiagnose = () => {
+    const stepLabel = wf.failedStepIndex != null
+      ? `${wf.failedStepIndex + 1}${wf.failedBlockType ? ` (${wf.failedBlockType})` : ''}`
+      : '—';
+    const errorText = wf.errorMessage
+      ? (wf.errorMessage.length > 600 ? `${wf.errorMessage.slice(0, 600)}…` : wf.errorMessage)
+      : t.workflowDebug.noError;
     const prompt = t.workflowDebug.diagnosePrompt
-      .replace('{name}', wf.workflowName ?? '—')
-      .replace('{runId}', wf.runId);
+      .replace('{name}', () => wf.workflowName ?? '—')
+      .replace('{status}', () => wf.status)
+      .replace('{step}', () => stepLabel)
+      .replace('{error}', () => errorText)
+      .replace('{runId}', () => wf.runId);
+    // Hand the assistant the specific run as STRUCTURED context (not just prompt text) so the
+    // backend auto-loads its status/error/steps — and open it in its own fresh chat.
+    setPendingContext({
+      page: 'run',
+      entityId: wf.runId,
+      runId: wf.runId,
+      workflowId: wf.workflowId ?? undefined,
+      pathname: wf.workflowId ? `/workflows/${wf.workflowId}/run/${wf.runId}` : '/debug',
+    });
+    startNewSession();
+    setShowHistory(false);
     setPendingInput(prompt);
     setAssistantOpen(true);
   };

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ChatMessage } from '../hooks/useAssistant';
+import type { ChatMessage, AssistantPageContext } from '../hooks/useAssistant';
 import { generateId } from '../utils/uuid';
 
 export interface ChatSession {
@@ -18,6 +18,7 @@ interface AssistantState {
   panelWidth: number;
   panelHeight: number;
   pendingInput: string | null;
+  pendingContext: AssistantPageContext | null;
 
   toggle: () => void;
   setOpen: (open: boolean) => void;
@@ -25,6 +26,7 @@ interface AssistantState {
   setPanelWidth: (w: number) => void;
   setPanelHeight: (h: number) => void;
   setPendingInput: (text: string | null) => void;
+  setPendingContext: (ctx: AssistantPageContext | null) => void;
 
   startNewSession: () => string;
   appendMessage: (sessionId: string, msg: ChatMessage) => void;
@@ -46,6 +48,7 @@ export const useAssistantStore = create<AssistantState>()(
       panelWidth: 420,
       panelHeight: 600,
       pendingInput: null,
+      pendingContext: null,
 
       toggle: () => set((s) => ({ open: !s.open })),
       setOpen: (open) => set({ open }),
@@ -53,6 +56,7 @@ export const useAssistantStore = create<AssistantState>()(
       setPanelWidth: (panelWidth) => set({ panelWidth }),
       setPanelHeight: (panelHeight) => set({ panelHeight }),
       setPendingInput: (pendingInput) => set({ pendingInput }),
+      setPendingContext: (pendingContext) => set({ pendingContext }),
 
       startNewSession: () => {
         const id = generateId();

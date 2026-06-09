@@ -1136,7 +1136,7 @@ export const en = {
     restartConfirmHint: 'A fresh run of the workflow with the original input context will be triggered.',
     diagnose: 'Diagnose',
     diagnoseTitle: 'Ask the assistant why this run failed',
-    diagnosePrompt: 'Why did the last run of workflow "{name}" (run {runId}) fail? Please analyse the error and suggest a fix.',
+    diagnosePrompt: 'Workflow "{name}" failed on its last run.\n- Status: {status}\n- Failed step: {step}\n- Error: {error}\n- Run ID: {runId}\n\nPlease analyse the root cause and suggest a concrete fix.',
   },
   cockpit: {
     title: 'Cockpit',
