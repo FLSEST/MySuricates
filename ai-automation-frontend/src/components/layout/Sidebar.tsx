@@ -139,10 +139,18 @@ export function Sidebar() {
   );
 
   // Build label-enriched nav items once (needed for edit mode display)
-  const navItemsWithLabels = navItems.map((item) => ({
-    ...item,
-    label: t.nav[item.labelKey],
-  }));
+  const SIMPLE_LABEL_KEYS: Record<string, 'simpleHome' | 'myWorkflows' | 'results'> = {
+    '/': 'simpleHome',
+    '/workflows': 'myWorkflows',
+    '/runs': 'results',
+  };
+  const navItemsWithLabels = navItems.map((item) => {
+    const simpleKey = simpleMode ? SIMPLE_LABEL_KEYS[item.to] : undefined;
+    return {
+      ...item,
+      label: simpleKey ? t.nav[simpleKey] : t.nav[item.labelKey],
+    };
+  });
 
   // Compute ordered nav items (respecting custom order, minus hidden)
   const orderedNavItems = (() => {
