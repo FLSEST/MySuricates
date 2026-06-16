@@ -37,6 +37,11 @@ function WorkflowExecutionRoute() {
   return simpleMode ? <SimpleWorkflowExecution /> : <WorkflowExecution />;
 }
 
+function RunsRoute() {
+  const { simpleMode } = useSettingsStore();
+  return simpleMode ? <SimpleRuns /> : <Runs />;
+}
+
 /** Redirects /runs/:runId to /workflows/:workflowId/run/:runId */
 function RunRedirect() {
   const { runId } = useParams<{ runId: string }>();
@@ -55,6 +60,7 @@ function RunRedirect() {
   return null;
 }
 const Runs = lazy(() => import('./pages/Runs').then(m => ({ default: m.Runs })));
+const SimpleRuns = lazy(() => import('./pages/SimpleRuns').then(m => ({ default: m.SimpleRuns })));
 const Skills = lazy(() => import('./pages/Skills').then(m => ({ default: m.Skills })));
 const Schedules = lazy(() => import('./pages/Schedules').then(m => ({ default: m.Schedules })));
 const CalendarPage = lazy(() => import('./pages/Calendar').then(m => ({ default: m.Calendar })));
@@ -93,7 +99,7 @@ const router = createBrowserRouter([
       { path: 'dialogs', element: <DialogImport /> },
       { path: 'chains', element: <Chains /> },
       { path: 'chains/:id/run/:runId', element: <ChainExecution /> },
-      { path: 'runs', element: <Runs /> },
+      { path: 'runs', element: <RunsRoute /> },
       { path: 'runs/:runId', element: <RunRedirect /> },
       { path: 'skills', element: <Skills /> },
       { path: 'schedules', element: <Schedules /> },
