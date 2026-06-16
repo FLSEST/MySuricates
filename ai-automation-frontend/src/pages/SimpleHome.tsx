@@ -15,12 +15,8 @@ import { ErrorState } from '../components/shared/ErrorState';
 import { SimpleOnboarding } from '../components/simple/SimpleOnboarding';
 import { SimpleOverview } from '../components/simple/SimpleOverview';
 import { FeatureTile } from '../components/simple/FeatureTile';
+import { StatusDot } from '../components/simple/kit';
 import type { Workflow } from '../types';
-
-const STATUS_DOT: Record<string, string> = {
-  COMPLETED: '#34d399', COMPLETED_WITH_ERRORS: '#34d399',
-  FAILED: '#fb7185', RUNNING: '#38bdf8', PAUSED: '#fbbf24',
-};
 
 export function SimpleHome() {
   const t = useT();
@@ -166,9 +162,7 @@ export function SimpleHome() {
                 >
                   <span className="text-lg leading-none">{w.icon || '⚡'}</span>
                   <span className="text-[13px] font-medium text-text whitespace-nowrap">{w.name}</span>
-                  {status && (
-                    <span className="w-[7px] h-[7px] rounded-full shrink-0" style={{ background: STATUS_DOT[status] ?? '#5b6678' }} />
-                  )}
+                  <StatusDot status={status} />
                   <Play className="w-3 h-3 text-text-tertiary group-hover:text-accent transition-colors" />
                 </button>
               );

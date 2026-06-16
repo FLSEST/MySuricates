@@ -13,14 +13,24 @@ export interface NavTileConfig {
   color: string;
 }
 
+/** Shared accent hue per area — single source for tiles and Simple sub-pages. */
+export const AREA_COLORS: Record<NavTileId, string> = {
+  workflows: '#818cf8',
+  results: '#34d399',
+  projects: '#fbbf24',
+  schedules: '#a78bfa',
+  todos: '#fb7185',
+  activity: '#38bdf8',
+};
+
 /** Curated everyday areas reachable from the Simple home — NOT all 21 routes. */
 export const NAV_TILES: NavTileConfig[] = [
-  { id: 'workflows', to: '/workflows', icon: GitBranch, color: '#818cf8' },
-  { id: 'results', to: '/runs', icon: History, color: '#34d399' },
-  { id: 'projects', to: '/projects', icon: FolderKanban, color: '#fbbf24' },
-  { id: 'schedules', to: '/schedules', icon: Calendar, color: '#a78bfa' },
-  { id: 'todos', to: '/todos', icon: CheckSquare, color: '#fb7185' },
-  { id: 'activity', to: '/activity', icon: ScrollText, color: '#38bdf8' },
+  { id: 'workflows', to: '/workflows', icon: GitBranch, color: AREA_COLORS.workflows },
+  { id: 'results', to: '/runs', icon: History, color: AREA_COLORS.results },
+  { id: 'projects', to: '/projects', icon: FolderKanban, color: AREA_COLORS.projects },
+  { id: 'schedules', to: '/schedules', icon: Calendar, color: AREA_COLORS.schedules },
+  { id: 'todos', to: '/todos', icon: CheckSquare, color: AREA_COLORS.todos },
+  { id: 'activity', to: '/activity', icon: ScrollText, color: AREA_COLORS.activity },
 ];
 
 export interface HomeTiles {
