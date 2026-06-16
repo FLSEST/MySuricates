@@ -5,6 +5,7 @@ const STATUS_DOT: Record<string, string> = {
   COMPLETED: '#34d399', COMPLETED_WITH_ERRORS: '#34d399',
   FAILED: '#fb7185', RUNNING: '#38bdf8', PAUSED: '#fbbf24',
   PENDING: '#5b6678', CANCELLED: '#5b6678', INTERRUPTED: '#fbbf24',
+  STOPPED: '#5b6678', STARTING: '#fbbf24', ERROR: '#fb7185',
 };
 
 /** Canonical Simple-page container: width + vertical rhythm + fade-in. */

@@ -127,6 +127,33 @@ export const de: TranslationKeys = {
       empty: 'Noch keine Läufe',
       emptyHint: 'Starte einen Workflow unter „Meine Workflows".',
     },
+    projects: {
+      title: 'Projekte',
+      subtitle: 'Deine Projekte',
+      empty: 'Noch keine Projekte',
+      emptyHint: 'Lege eines im Pro-Modus an.',
+      workflowsLabel: 'Workflows',
+    },
+    schedules: {
+      title: 'Geplant',
+      subtitle: 'Was automatisch läuft',
+      empty: 'Keine Zeitpläne',
+      emptyHint: 'Richte einen im Pro-Modus ein.',
+      nextRun: 'Nächster Lauf',
+    },
+    todos: {
+      title: 'Aufgaben',
+      subtitle: 'Deine offenen Aufgaben',
+      empty: 'Keine offenen Aufgaben',
+      emptyHint: 'Stark — nichts zu tun.',
+      markDone: 'Erledigt',
+    },
+    activity: {
+      title: 'Aktivität',
+      subtitle: 'Was zuletzt passiert ist',
+      empty: 'Noch keine Aktivität',
+      emptyHint: '',
+    },
     onboarding: {
       title: 'Du bist im Simple-Modus',
       body: 'Beschreibe, was du tun willst, und führe deine Workflows aus. Über die Seitenleiste kommst du jederzeit in den Pro-Modus zum Bauen und Konfigurieren.',

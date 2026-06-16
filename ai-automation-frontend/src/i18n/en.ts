@@ -125,6 +125,33 @@ export const en = {
       empty: 'No runs yet',
       emptyHint: 'Start a workflow from "My Workflows".',
     },
+    projects: {
+      title: 'Projects',
+      subtitle: 'Your projects',
+      empty: 'No projects yet',
+      emptyHint: 'Create one in Pro mode.',
+      workflowsLabel: 'workflows',
+    },
+    schedules: {
+      title: 'Scheduled',
+      subtitle: 'What runs automatically',
+      empty: 'No schedules',
+      emptyHint: 'Set one up in Pro mode.',
+      nextRun: 'Next run',
+    },
+    todos: {
+      title: 'Tasks',
+      subtitle: 'Your open tasks',
+      empty: 'No open tasks',
+      emptyHint: 'Nice — nothing on your plate.',
+      markDone: 'Mark done',
+    },
+    activity: {
+      title: 'Activity',
+      subtitle: 'What happened recently',
+      empty: 'No activity yet',
+      emptyHint: '',
+    },
     onboarding: {
       title: "You're in Simple Mode",
       body: 'Describe what you want and run your workflows. Switch to Pro anytime via the sidebar to build and configure.',

@@ -42,6 +42,26 @@ function RunsRoute() {
   return simpleMode ? <SimpleRuns /> : <Runs />;
 }
 
+function ProjectsRoute() {
+  const { simpleMode } = useSettingsStore();
+  return simpleMode ? <SimpleProjects /> : <Projects />;
+}
+
+function SchedulesRoute() {
+  const { simpleMode } = useSettingsStore();
+  return simpleMode ? <SimpleSchedules /> : <Schedules />;
+}
+
+function TodosRoute() {
+  const { simpleMode } = useSettingsStore();
+  return simpleMode ? <SimpleTodos /> : <Todos />;
+}
+
+function ActivityRoute() {
+  const { simpleMode } = useSettingsStore();
+  return simpleMode ? <SimpleActivity /> : <ActivityLog />;
+}
+
 /** Redirects /runs/:runId to /workflows/:workflowId/run/:runId */
 function RunRedirect() {
   const { runId } = useParams<{ runId: string }>();
@@ -61,6 +81,10 @@ function RunRedirect() {
 }
 const Runs = lazy(() => import('./pages/Runs').then(m => ({ default: m.Runs })));
 const SimpleRuns = lazy(() => import('./pages/SimpleRuns').then(m => ({ default: m.SimpleRuns })));
+const SimpleProjects = lazy(() => import('./pages/SimpleProjects').then(m => ({ default: m.SimpleProjects })));
+const SimpleSchedules = lazy(() => import('./pages/SimpleSchedules').then(m => ({ default: m.SimpleSchedules })));
+const SimpleTodos = lazy(() => import('./pages/SimpleTodos').then(m => ({ default: m.SimpleTodos })));
+const SimpleActivity = lazy(() => import('./pages/SimpleActivity').then(m => ({ default: m.SimpleActivity })));
 const Skills = lazy(() => import('./pages/Skills').then(m => ({ default: m.Skills })));
 const Schedules = lazy(() => import('./pages/Schedules').then(m => ({ default: m.Schedules })));
 const CalendarPage = lazy(() => import('./pages/Calendar').then(m => ({ default: m.Calendar })));
@@ -89,7 +113,7 @@ const router = createBrowserRouter([
     errorElement: <RouteErrorFallback />,
     children: [
       { index: true, element: <DashboardRoute /> },
-      { path: 'projects', element: <Projects /> },
+      { path: 'projects', element: <ProjectsRoute /> },
       { path: 'projects/:id', element: <ProjectDetail /> },
       { path: 'wishes', element: <Wishes /> },
       { path: 'workflows', element: <WorkflowsRoute /> },
@@ -102,13 +126,13 @@ const router = createBrowserRouter([
       { path: 'runs', element: <RunsRoute /> },
       { path: 'runs/:runId', element: <RunRedirect /> },
       { path: 'skills', element: <Skills /> },
-      { path: 'schedules', element: <Schedules /> },
+      { path: 'schedules', element: <SchedulesRoute /> },
       { path: 'calendar', element: <CalendarPage /> },
       { path: 'webhooks', element: <Webhooks /> },
       { path: 'integrations', element: <Integrations /> },
       { path: 'cockpit', element: <ProjectCockpit /> },
-      { path: 'todos', element: <Todos /> },
-      { path: 'activity', element: <ActivityLog /> },
+      { path: 'todos', element: <TodosRoute /> },
+      { path: 'activity', element: <ActivityRoute /> },
       { path: 'dlq', element: <DeadLetterQueue /> },
       { path: 'debug', element: <WorkflowDebug /> },
       { path: 'docs', element: <Docs /> },
