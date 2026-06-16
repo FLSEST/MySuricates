@@ -1,21 +1,26 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Search } from 'lucide-react';
+import { Play, Search, Sparkles, ArrowUp } from 'lucide-react';
 import { useT } from '../i18n';
 import { useWorkflows, useExecuteWorkflow } from '../hooks/useWorkflows';
 import { useSettingsStore } from '../stores/settingsStore';
+import { useAssistantStore } from '../stores/assistantStore';
 import { useLatestRunStatuses } from '../hooks/useLatestRunStatuses';
-import { matchWorkflows } from '../utils/matchWorkflows';
 import { buildHomeTiles, greetingKey } from '../utils/homeTiles';
 import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
 import { readContextSchema } from '../utils/contextSchema';
 import { ExecuteDialog } from '../components/workflow/ExecuteDialog';
-import { Spinner, Button } from '../components/ui';
+import { Spinner } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
 import { SimpleOnboarding } from '../components/simple/SimpleOnboarding';
 import { SimpleOverview } from '../components/simple/SimpleOverview';
 import { FeatureTile } from '../components/simple/FeatureTile';
 import type { Workflow } from '../types';
+
+const STATUS_DOT: Record<string, string> = {
+  COMPLETED: '#34d399', COMPLETED_WITH_ERRORS: '#34d399',
+  FAILED: '#fb7185', RUNNING: '#38bdf8', PAUSED: '#fbbf24',
+};
 
 export function SimpleHome() {
   const t = useT();
@@ -24,18 +29,28 @@ export function SimpleHome() {
   const { data: workflows, isLoading, error, refetch } = useWorkflows();
   const executeWorkflow = useExecuteWorkflow();
   const latestStatus = useLatestRunStatuses();
+  const setPendingInput = useAssistantStore((s) => s.setPendingInput);
+  const setAssistantOpen = useAssistantStore((s) => s.setOpen);
 
-  const [intent, setIntent] = useState('');
+  const [assistantInput, setAssistantInput] = useState('');
   const [executeDialog, setExecuteDialog] = useState<{ open: boolean; workflow: Workflow | null; variables: string[] }>(
     { open: false, workflow: null, variables: [] },
   );
 
-  const matches = useMemo(() => matchWorkflows(intent, workflows ?? []).slice(0, 5), [intent, workflows]);
   const { navTiles, runTiles } = useMemo(
     () => buildHomeTiles(workflows ?? [], pinnedWorkflowIds, 4),
     [workflows, pinnedWorkflowIds],
   );
   const greeting = t.simple.home[greetingKey(new Date())];
+
+  const submitAssistant = () => {
+    const text = assistantInput.trim();
+    setPendingInput(text || null);
+    setAssistantOpen(true);
+    setAssistantInput('');
+  };
+
+  const openSearch = () => window.dispatchEvent(new CustomEvent('mysuri:openPalette'));
 
   const handleExecute = (workflow: Workflow) => {
     const variables = extractWorkflowVariables(workflow.blocks);
@@ -71,61 +86,63 @@ export function SimpleHome() {
     <div className="animate-fade-in max-w-4xl mx-auto space-y-6">
       <SimpleOnboarding />
 
-      <div>
-        <p className="text-sm text-text-secondary mb-1">{greeting}</p>
-        <h1 className="text-2xl font-bold text-text">{t.simple.home.question}</h1>
+      {/* Greeting + quick search */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm text-text-secondary mb-1">{greeting}</p>
+          <h1 className="text-[28px] font-bold text-text tracking-tight leading-none">{t.simple.home.question}</h1>
+        </div>
+        <button
+          onClick={openSearch}
+          className="flex items-center gap-2 bg-surface border border-border rounded-xl px-3 py-2 text-sm text-text-secondary hover:border-accent/40 hover:text-text transition-colors whitespace-nowrap shrink-0"
+        >
+          <Search className="w-4 h-4" />
+          <span className="hidden sm:inline">{t.simple.home.searchButton}</span>
+          <kbd className="text-[10px] bg-surface-raised rounded px-1.5 py-0.5 text-text-tertiary">⌘K</kbd>
+        </button>
       </div>
 
-      {/* Slim search (secondary) */}
-      <div>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary pointer-events-none" />
-          <input
-            type="search"
-            value={intent}
-            onChange={(e) => setIntent(e.target.value)}
-            placeholder={t.simple.home.searchHint}
-            className="w-full pl-9 pr-3 py-2.5 text-sm bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent"
-          />
-        </div>
-        {intent.trim() && matches.length > 0 && (
-          <div className="space-y-2 mt-2">
-            {matches.map((m) => (
-              <div
-                key={m.workflow.id}
-                className="flex items-center justify-between px-4 py-2.5 rounded-lg bg-surface border border-border hover:border-accent/40 transition-colors cursor-pointer"
-                onClick={() => navigate(`/workflows/${m.workflow.id}`)}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="text-lg">{m.workflow.icon || '⚡'}</span>
-                  <p className="text-sm font-medium text-text truncate">{m.workflow.name}</p>
-                </div>
-                <Button size="sm" variant="secondary" icon={<Play className="w-3.5 h-3.5" />}
-                  onClick={(e) => { e.stopPropagation(); handleExecute(m.workflow); }} loading={executeWorkflow.isPending}>
-                  {t.workflows.execute}
-                </Button>
-              </div>
-            ))}
+      {/* Assistant — the hero input */}
+      <form
+        onSubmit={(e) => { e.preventDefault(); submitAssistant(); }}
+        className="relative rounded-2xl p-[1.5px] shadow-[0_18px_50px_-30px_rgba(129,140,248,0.7)]"
+        style={{ background: 'linear-gradient(120deg, rgba(129,140,248,.55), rgba(56,189,248,.30) 40%, rgba(167,139,250,.45))' }}
+      >
+        <div className="flex items-center gap-3 bg-surface-raised rounded-[14px] px-4 py-3">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: 'linear-gradient(135deg, rgba(129,140,248,.25), rgba(56,189,248,.18))' }}
+          >
+            <Sparkles className="w-[18px] h-[18px]" style={{ color: '#aab4ff' }} />
           </div>
-        )}
-        {intent.trim() && matches.length === 0 && (
-          <button className="text-sm text-accent hover:underline mt-2" onClick={() => navigate('/workflows')}>
-            {t.simple.home.noMatchTitle}
+          <input
+            value={assistantInput}
+            onChange={(e) => setAssistantInput(e.target.value)}
+            placeholder={t.simple.home.assistantPlaceholder}
+            className="flex-1 min-w-0 bg-transparent text-sm text-text placeholder:text-text-tertiary focus:outline-none"
+          />
+          <button
+            type="submit"
+            aria-label={t.simple.home.assistantLabel}
+            className="w-8 h-8 rounded-lg bg-accent text-white flex items-center justify-center shrink-0 hover:opacity-90 transition-opacity"
+          >
+            <ArrowUp className="w-4 h-4" />
           </button>
-        )}
-      </div>
+        </div>
+      </form>
 
       {/* "How's it looking?" overview */}
       <SimpleOverview />
 
-      {/* Feature tiles — reach the right place */}
+      {/* Areas — reach the right place */}
       <div>
-        <p className="text-xs text-text-tertiary mb-2 uppercase tracking-wide">{t.simple.home.exploreTitle}</p>
+        <p className="text-[11px] tracking-widest uppercase text-text-tertiary font-semibold mb-3">{t.simple.home.exploreTitle}</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {navTiles.map((tile) => (
             <FeatureTile
               key={tile.id}
               icon={tile.icon}
+              color={tile.color}
               title={t.simple.home.tiles[tile.id].title}
               description={t.simple.home.tiles[tile.id].desc}
               onClick={() => navigate(tile.to)}
@@ -134,21 +151,35 @@ export function SimpleHome() {
         </div>
       </div>
 
-      {/* Quick run — top workflows */}
+      {/* Quick run — compact chips */}
       {runTiles.length > 0 && (
         <div>
-          <p className="text-xs text-text-tertiary mb-2 uppercase tracking-wide">{t.simple.home.runTilesTitle}</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {runTiles.map((w) => (
-              <FeatureTile
-                key={w.id}
-                emoji={w.icon || '⚡'}
-                title={w.name}
-                description={w.description || undefined}
-                status={latestStatus.get(w.id)}
-                onClick={() => handleExecute(w)}
-              />
-            ))}
+          <p className="text-[11px] tracking-widest uppercase text-text-tertiary font-semibold mb-3">{t.simple.home.runTilesTitle}</p>
+          <div className="flex flex-wrap gap-2">
+            {runTiles.map((w) => {
+              const status = latestStatus.get(w.id);
+              return (
+                <button
+                  key={w.id}
+                  onClick={() => handleExecute(w)}
+                  className="group flex items-center gap-2.5 rounded-xl border border-border bg-surface px-3 py-2 hover:border-accent/40 hover:bg-surface-raised transition-colors"
+                >
+                  <span className="text-lg leading-none">{w.icon || '⚡'}</span>
+                  <span className="text-[13px] font-medium text-text whitespace-nowrap">{w.name}</span>
+                  {status && (
+                    <span className="w-[7px] h-[7px] rounded-full shrink-0" style={{ background: STATUS_DOT[status] ?? '#5b6678' }} />
+                  )}
+                  <Play className="w-3 h-3 text-text-tertiary group-hover:text-accent transition-colors" />
+                </button>
+              );
+            })}
+            <button
+              onClick={() => navigate('/workflows')}
+              aria-label={t.simple.home.more}
+              className="flex items-center justify-center rounded-xl border border-dashed border-border bg-surface px-4 py-2 text-sm tracking-widest text-text-tertiary hover:text-text hover:border-accent/40 transition-colors"
+            >
+              ···
+            </button>
           </div>
         </div>
       )}

@@ -9,16 +9,18 @@ export interface NavTileConfig {
   id: NavTileId;
   to: string;
   icon: LucideIcon;
+  /** Accent hue for this tile (works on light + dark). */
+  color: string;
 }
 
 /** Curated everyday areas reachable from the Simple home — NOT all 21 routes. */
 export const NAV_TILES: NavTileConfig[] = [
-  { id: 'workflows', to: '/workflows', icon: GitBranch },
-  { id: 'results', to: '/runs', icon: History },
-  { id: 'projects', to: '/projects', icon: FolderKanban },
-  { id: 'schedules', to: '/schedules', icon: Calendar },
-  { id: 'todos', to: '/todos', icon: CheckSquare },
-  { id: 'activity', to: '/activity', icon: ScrollText },
+  { id: 'workflows', to: '/workflows', icon: GitBranch, color: '#818cf8' },
+  { id: 'results', to: '/runs', icon: History, color: '#34d399' },
+  { id: 'projects', to: '/projects', icon: FolderKanban, color: '#fbbf24' },
+  { id: 'schedules', to: '/schedules', icon: Calendar, color: '#a78bfa' },
+  { id: 'todos', to: '/todos', icon: CheckSquare, color: '#fb7185' },
+  { id: 'activity', to: '/activity', icon: ScrollText, color: '#38bdf8' },
 ];
 
 export interface HomeTiles {

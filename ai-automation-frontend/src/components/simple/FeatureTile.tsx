@@ -1,38 +1,42 @@
 import type { LucideIcon } from 'lucide-react';
-import { Card } from '../ui';
-import { StatusBadge } from '../shared/StatusBadge';
-import type { RunStatus } from '../../types';
+import type { CSSProperties } from 'react';
 
 interface FeatureTileProps {
-  /** Nav tiles pass a lucide icon; run tiles pass an emoji (workflow.icon). */
-  icon?: LucideIcon;
-  emoji?: string;
+  icon: LucideIcon;
   title: string;
   description?: string;
-  /** Last-run status for run tiles. */
-  status?: RunStatus;
+  /** Accent hue (works on light + dark). */
+  color: string;
   onClick: () => void;
 }
 
-export function FeatureTile({ icon: Icon, emoji, title, description, status, onClick }: FeatureTileProps) {
+/** Color-accented launcher card for a Simple-mode area. Theme-token base + per-tile hue. */
+export function FeatureTile({ icon: Icon, title, description, color, onClick }: FeatureTileProps) {
   return (
-    <Card onClick={onClick} className="cursor-pointer hover:border-accent/40 transition-colors">
-      <div className="flex items-start gap-3">
-        <div className="p-2 rounded-lg bg-accent/10 shrink-0">
-          {Icon ? (
-            <Icon className="w-5 h-5 text-accent" />
-          ) : (
-            <span className="text-xl leading-none">{emoji || '⚡'}</span>
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 min-w-0">
-            <p className="text-sm font-medium text-text truncate">{title}</p>
-            {status && <StatusBadge status={status} />}
-          </div>
-          {description && <p className="text-xs text-text-tertiary mt-0.5 truncate">{description}</p>}
-        </div>
+    <button
+      onClick={onClick}
+      style={{ '--tc': color } as CSSProperties}
+      className="group relative overflow-hidden text-left rounded-2xl p-[18px] bg-surface border border-border transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--tc)] hover:shadow-[0_14px_34px_-18px_var(--tc)] focus:outline-none focus-visible:border-[var(--tc)]"
+    >
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.12]"
+        style={{ background: `radial-gradient(220px 120px at 85% -20%, ${color}, transparent 70%)` }}
+      />
+      <div
+        className="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
+        style={{ background: `color-mix(in srgb, ${color} 16%, transparent)`, color }}
+      >
+        <Icon className="w-5 h-5" />
       </div>
-    </Card>
+      <h3 className="text-[15px] font-semibold text-text mb-0.5 tracking-tight">{title}</h3>
+      {description && <p className="text-xs text-text-secondary leading-snug">{description}</p>}
+      <span
+        className="absolute top-[18px] right-[18px] opacity-0 group-hover:opacity-90 group-hover:translate-x-0.5 transition"
+        style={{ color }}
+        aria-hidden
+      >
+        →
+      </span>
+    </button>
   );
 }

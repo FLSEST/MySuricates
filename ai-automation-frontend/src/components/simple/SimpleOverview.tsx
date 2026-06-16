@@ -4,24 +4,24 @@ import { useT } from '../../i18n';
 import { useAllRuns } from '../../hooks/useWorkflows';
 import { useRemainingToday } from '../../hooks/useSchedules';
 import { useTodoCount } from '../../hooks/useTodos';
-import { Badge } from '../ui';
 
 const TERMINAL_OK = new Set(['COMPLETED', 'COMPLETED_WITH_ERRORS']);
 
-interface ChipProps {
+interface PillProps {
+  color: string;
+  value: number;
   label: string;
   onClick: () => void;
-  children: React.ReactNode;
 }
 
-function Chip({ label, onClick, children }: ChipProps) {
+function Pill({ color, value, label, onClick }: PillProps) {
   return (
     <button
       onClick={onClick}
-      className="flex items-center justify-between gap-2 rounded-xl border border-border bg-surface px-4 py-3 text-left hover:border-accent/40 transition-colors"
+      className="flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-text-secondary hover:border-accent/40 transition-colors"
     >
-      <span className="text-xs text-text-tertiary truncate">{label}</span>
-      <span className="flex items-center gap-1 shrink-0">{children}</span>
+      <span className="w-[7px] h-[7px] rounded-full shrink-0" style={{ background: color }} />
+      <span><b className="text-text font-semibold">{value}</b> {label}</span>
     </button>
   );
 }
@@ -45,17 +45,11 @@ export function SimpleOverview() {
   }, [runsPage]);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-      <Chip label={t.simple.home.todayPrefix} onClick={() => navigate('/runs')}>
-        <Badge variant="success" dot>{today.green}</Badge>
-        <Badge variant="danger" dot>{today.failed}</Badge>
-      </Chip>
-      <Chip label={t.simple.home.plannedToday} onClick={() => navigate('/schedules')}>
-        <Badge variant="accent">{remaining?.count ?? 0}</Badge>
-      </Chip>
-      <Chip label={t.simple.home.openTodos} onClick={() => navigate('/todos')}>
-        <Badge variant="warning">{todoCount?.open ?? 0}</Badge>
-      </Chip>
+    <div className="flex flex-wrap gap-2">
+      <Pill color="#34d399" value={today.green} label={t.simple.home.ranLabel} onClick={() => navigate('/runs')} />
+      <Pill color="#fb7185" value={today.failed} label={t.simple.home.failedLabel} onClick={() => navigate('/runs')} />
+      <Pill color="#a78bfa" value={remaining?.count ?? 0} label={t.simple.home.scheduledLabel} onClick={() => navigate('/schedules')} />
+      <Pill color="#fbbf24" value={todoCount?.open ?? 0} label={t.simple.home.tasksLabel} onClick={() => navigate('/todos')} />
     </div>
   );
 }
