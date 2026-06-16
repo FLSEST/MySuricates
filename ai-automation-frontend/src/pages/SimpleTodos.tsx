@@ -2,20 +2,20 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Sparkles, Loader2 } from 'lucide-react';
 import { useT } from '../i18n';
-import { useTodos, useCreateTodo, useUpdateTodoStatus, useResolveTodo } from '../hooks/useTodos';
-import { Spinner, Button, Modal } from '../components/ui';
+import { useTodos, useCreateTodo, useUpdateTodoStatus, useUpdateTodo, useDeleteTodo, useResolveTodo } from '../hooks/useTodos';
+import { Spinner, Button, Modal, Input, Select } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
 import { EmptyState } from '../components/shared/EmptyState';
 import { SimplePage, SimplePageHeader, SectionLabel, SimpleRow } from '../components/simple/kit';
 import { StatusDots } from '../components/todo/StatusDots';
 import { AREA_COLORS } from '../utils/homeTiles';
-import { formatDateTime } from '../utils/formatTime';
-import type { Todo } from '../types';
+import type { Todo, TodoPriority } from '../types';
 
 const PRIORITY_COLOR: Record<string, string> = {
   CRITICAL: '#fb7185', HIGH: '#fbbf24', MEDIUM: '#38bdf8', LOW: '#5b6678',
 };
 const PRIO_RANK: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+const PRIORITIES: TodoPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
 function linkTarget(todo: Todo): string | null {
   if (todo.linkedWorkflowId && todo.workflowRunId) return `/workflows/${todo.linkedWorkflowId}/run/${todo.workflowRunId}`;
@@ -30,10 +30,13 @@ export function SimpleTodos() {
   const inProgQ = useTodos({ status: 'IN_PROGRESS' }, 0, 50);
   const createTodo = useCreateTodo();
   const updateStatus = useUpdateTodoStatus();
+  const updateTodo = useUpdateTodo();
+  const deleteTodo = useDeleteTodo();
   const resolve = useResolveTodo();
 
   const [newTitle, setNewTitle] = useState('');
   const [selected, setSelected] = useState<Todo | null>(null);
+  const [draft, setDraft] = useState({ title: '', description: '', priority: 'MEDIUM' as TodoPriority, dueDate: '' });
 
   const isLoading = openQ.isLoading || inProgQ.isLoading;
   const error = openQ.error || inProgQ.error;
@@ -62,7 +65,39 @@ export function SimpleTodos() {
     createTodo.mutate({ title }, { onSuccess: () => setNewTitle('') });
   };
 
-  const markDone = (id: string) => updateStatus.mutate({ id, status: 'DONE' });
+  const openDetail = (td: Todo) => {
+    setSelected(td);
+    setDraft({
+      title: td.title,
+      description: td.description ?? '',
+      priority: td.priority,
+      dueDate: td.dueDate ? td.dueDate.slice(0, 10) : '',
+    });
+  };
+
+  const saveEdit = () => {
+    if (!selected) return;
+    updateTodo.mutate(
+      {
+        id: selected.id,
+        data: {
+          title: draft.title.trim() || selected.title,
+          description: draft.description,
+          priority: draft.priority,
+          dueDate: draft.dueDate ? new Date(draft.dueDate + 'T23:59:59').toISOString() : undefined,
+        },
+      },
+      { onSuccess: () => setSelected(null) },
+    );
+  };
+
+  const removeTodo = () => {
+    if (!selected) return;
+    if (window.confirm(t.common.deleteConfirm)) {
+      deleteTodo.mutate(selected.id, { onSuccess: () => setSelected(null) });
+    }
+  };
+
   const doResolve = (id: string) =>
     resolve.mutate(id, { onSuccess: (run) => navigate(`/workflows/${run.workflowId}/run/${run.id}`) });
 
@@ -79,7 +114,7 @@ export function SimpleTodos() {
         <StatusDots current={td.status} onChange={(s) => updateStatus.mutate({ id: td.id, status: s })} />
         <span className="w-1 h-5 rounded-full shrink-0" style={{ background: PRIORITY_COLOR[td.priority] ?? '#5b6678' }} />
         <button
-          onClick={() => setSelected(td)}
+          onClick={() => openDetail(td)}
           className="text-sm font-medium text-text truncate text-left min-w-0 flex-1 hover:text-accent transition-colors"
         >
           {td.title}
@@ -147,12 +182,13 @@ export function SimpleTodos() {
       <Modal
         open={!!selected}
         onClose={() => setSelected(null)}
-        title={selected?.title ?? ''}
+        title={t.simple.todos.editTitle}
         footer={
           selected ? (
             <>
+              <Button variant="ghost" onClick={removeTodo} loading={deleteTodo.isPending}>{t.common.delete}</Button>
               {target && (
-                <Button variant="ghost" onClick={() => { navigate(target); setSelected(null); }}>
+                <Button variant="secondary" onClick={() => { navigate(target); setSelected(null); }}>
                   {t.simple.todos.openLinked}
                 </Button>
               )}
@@ -165,27 +201,37 @@ export function SimpleTodos() {
                   {t.simple.todos.resolve}
                 </Button>
               )}
-              <Button onClick={() => { markDone(selected.id); setSelected(null); }}>
-                {t.simple.todos.markDone}
-              </Button>
+              <Button onClick={saveEdit} loading={updateTodo.isPending}>{t.common.save}</Button>
             </>
           ) : undefined
         }
       >
-        {selected && (
-          <div className="space-y-3">
-            {selected.description ? (
-              <p className="text-sm text-text-secondary whitespace-pre-wrap">{selected.description}</p>
-            ) : (
-              <p className="text-sm text-text-tertiary italic">{t.simple.todos.noDescription}</p>
-            )}
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-tertiary">
-              <span>{t.simple.todos.priority}: {selected.priority}</span>
-              {selected.projectName && <span>{selected.projectName}</span>}
-              {selected.dueDate && <span>{t.simple.todos.due}: {formatDateTime(selected.dueDate)}</span>}
-            </div>
+        <div className="space-y-4">
+          <Input label={t.simple.todos.titleLabel} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-1">{t.common.description}</label>
+            <textarea
+              value={draft.description}
+              onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+              rows={3}
+              className="w-full text-sm bg-surface border border-border rounded-lg px-3 py-2 text-text placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent"
+            />
           </div>
-        )}
+          <div className="grid grid-cols-2 gap-3">
+            <Select
+              label={t.simple.todos.priority}
+              value={draft.priority}
+              onChange={(e) => setDraft({ ...draft, priority: e.target.value as TodoPriority })}
+              options={PRIORITIES.map((p) => ({ value: p, label: p }))}
+            />
+            <Input
+              type="date"
+              label={t.simple.todos.due}
+              value={draft.dueDate}
+              onChange={(e) => setDraft({ ...draft, dueDate: e.target.value })}
+            />
+          </div>
+        </div>
       </Modal>
     </SimplePage>
   );

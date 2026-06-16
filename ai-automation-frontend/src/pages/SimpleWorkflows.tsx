@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GitBranch, Play, Search, Pin } from 'lucide-react';
+import { GitBranch, Play, Search, Pin, Trash2 } from 'lucide-react';
 import { Button, Spinner } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
@@ -11,6 +11,7 @@ import {
   useWorkflows,
   useCreateWorkflow,
   useExecuteWorkflow,
+  useDeleteWorkflow,
 } from '../hooks/useWorkflows';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useProjects } from '../hooks/useProjects';
@@ -34,6 +35,7 @@ export function SimpleWorkflows() {
   const createWorkflow = useCreateWorkflow();
   const installPoolWorkflow = useInstallPoolWorkflow();
   const executeWorkflow = useExecuteWorkflow();
+  const deleteWorkflow = useDeleteWorkflow();
 
   const [createStep, setCreateStep] = useState<CreateStep>('closed');
   const [selectedTemplate, setSelectedTemplate] = useState<WorkflowTemplate | null>(null);
@@ -229,6 +231,13 @@ export function SimpleWorkflows() {
                   onClick={() => togglePinnedWorkflow(workflow.id)}
                 >
                   <Pin className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  aria-label={t.common.delete}
+                  className="text-text-tertiary hover:text-danger transition-colors"
+                  onClick={() => { if (window.confirm(t.common.deleteConfirm)) deleteWorkflow.mutate(workflow.id); }}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
                 <Button
                   size="sm"
