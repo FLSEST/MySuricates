@@ -4,7 +4,7 @@ import { GitBranch, Play, Search, Pin } from 'lucide-react';
 import { Button, Spinner } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
-import { StatusBadge } from '../components/shared/StatusBadge';
+import { SimpleRow, StatusDot } from '../components/simple/kit';
 import { ExecuteDialog } from '../components/workflow/ExecuteDialog';
 import { WorkflowCreateFlow, type CreateStep } from '../components/workflow/WorkflowCreateFlow';
 import {
@@ -19,6 +19,7 @@ import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
 import { readContextSchema } from '../utils/contextSchema';
 import { resolveTemplateName } from '../utils/templateUtils';
 import { curateWorkflows } from '../utils/curateWorkflows';
+import { AREA_COLORS } from '../utils/homeTiles';
 import { useLatestRunStatuses } from '../hooks/useLatestRunStatuses';
 import type { CreateWorkflowRequest, Workflow, WorkflowTemplate, PoolWorkflowEntry } from '../types';
 import { useInstallPoolWorkflow } from '../hooks/usePool';
@@ -172,9 +173,9 @@ export function SimpleWorkflows() {
   }
 
   return (
-    <div className="space-y-4 animate-fade-in max-w-2xl">
+    <div className="animate-fade-in max-w-4xl mx-auto space-y-6">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold text-text">{t.workflows.title}</h1>
+        <h1 className="text-[28px] font-bold text-text tracking-tight leading-none">{t.workflows.title}</h1>
         <Button icon={<GitBranch className="w-4 h-4" />} onClick={openCreate}>
           {t.workflows.create}
         </Button>
@@ -207,12 +208,11 @@ export function SimpleWorkflows() {
       ) : (
         <div className="space-y-2">
           {visible.map((workflow) => (
-            <div
-              key={workflow.id}
-              className="flex items-center justify-between px-4 py-3 rounded-lg bg-surface border border-border hover:border-accent/40 transition-colors cursor-pointer"
-              onClick={() => navigate(`/workflows/${workflow.id}`)}
-            >
-              <div className="flex items-center gap-3 min-w-0">
+            <SimpleRow key={workflow.id} color={AREA_COLORS.workflows}>
+              <button
+                className="flex items-center gap-3 min-w-0 text-left"
+                onClick={() => navigate(`/workflows/${workflow.id}`)}
+              >
                 <span className="text-lg">{workflow.icon || '⚡'}</span>
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-text truncate">{workflow.name}</p>
@@ -220,13 +220,13 @@ export function SimpleWorkflows() {
                     <p className="text-xs text-text-tertiary truncate">{workflow.description}</p>
                   )}
                 </div>
-              </div>
+              </button>
               <div className="flex items-center gap-2 shrink-0">
-                {latestStatus.get(workflow.id) && <StatusBadge status={latestStatus.get(workflow.id)!} />}
+                <StatusDot status={latestStatus.get(workflow.id)} />
                 <button
                   aria-label="pin"
                   className={pinnedWorkflowIds.includes(workflow.id) ? 'text-accent' : 'text-text-tertiary hover:text-text'}
-                  onClick={(e) => { e.stopPropagation(); togglePinnedWorkflow(workflow.id); }}
+                  onClick={() => togglePinnedWorkflow(workflow.id)}
                 >
                   <Pin className="w-3.5 h-3.5" />
                 </button>
@@ -234,13 +234,13 @@ export function SimpleWorkflows() {
                   size="sm"
                   variant="secondary"
                   icon={<Play className="w-3.5 h-3.5" />}
-                  onClick={(e) => { e.stopPropagation(); handleExecute(workflow); }}
+                  onClick={() => handleExecute(workflow)}
                   loading={executeWorkflow.isPending}
                 >
                   {t.workflows.execute}
                 </Button>
               </div>
-            </div>
+            </SimpleRow>
           ))}
           {!search && rest.length > 0 && (
             <button

@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { RotateCcw } from 'lucide-react';
 import { useT } from '../i18n';
 import { useAllRuns, useExecuteWorkflow } from '../hooks/useWorkflows';
-import { StatusBadge } from '../components/shared/StatusBadge';
-import { Spinner, Button, Card } from '../components/ui';
+import { Spinner, Button } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
 import { EmptyState } from '../components/shared/EmptyState';
+import { SimplePage, SimplePageHeader, SimpleRow, StatusDot } from '../components/simple/kit';
+import { AREA_COLORS } from '../utils/homeTiles';
 import { formatDateTime, formatDuration } from '../utils/formatTime';
 import type { WorkflowRun } from '../types';
 
@@ -35,11 +36,8 @@ export function SimpleRuns() {
   }
 
   return (
-    <div className="animate-fade-in max-w-3xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-text">{t.simple.runs.title}</h1>
-        <p className="text-sm text-text-secondary mt-1">{t.simple.runs.subtitle}</p>
-      </div>
+    <SimplePage>
+      <SimplePageHeader title={t.simple.runs.title} subtitle={t.simple.runs.subtitle} />
 
       {ordered.length === 0 ? (
         <EmptyState title={t.simple.runs.empty} description={t.simple.runs.emptyHint} />
@@ -48,43 +46,41 @@ export function SimpleRuns() {
           {ordered.map((run: WorkflowRun) => {
             const isFailed = run.status === 'FAILED';
             return (
-              <Card key={run.id}>
-                <div className="flex items-center justify-between gap-3">
-                  <div
-                    className="flex items-center gap-3 min-w-0 cursor-pointer"
-                    onClick={() => navigate(`/workflows/${run.workflowId}/run/${run.id}`)}
-                  >
-                    <StatusBadge status={run.status} />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-text truncate">{run.workflowName}</p>
-                      <p className="text-xs text-text-tertiary truncate">
-                        {run.startedAt ? formatDateTime(run.startedAt) : '-'} · {formatDuration(run.durationMs)}
-                        {isFailed && run.error?.message ? ` · ${run.error.message}` : ''}
-                      </p>
-                    </div>
+              <SimpleRow key={run.id} color={AREA_COLORS.results}>
+                <button
+                  className="flex items-center gap-3 min-w-0 text-left"
+                  onClick={() => navigate(`/workflows/${run.workflowId}/run/${run.id}`)}
+                >
+                  <StatusDot status={run.status} />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-text truncate">{run.workflowName}</p>
+                    <p className="text-xs text-text-tertiary truncate">
+                      {run.startedAt ? formatDateTime(run.startedAt) : '-'} · {formatDuration(run.durationMs)}
+                      {isFailed && run.error?.message ? ` · ${run.error.message}` : ''}
+                    </p>
                   </div>
-                  {isFailed && (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      icon={<RotateCcw className="w-3.5 h-3.5" />}
-                      loading={executeWorkflow.isPending}
-                      onClick={() =>
-                        executeWorkflow.mutate(
-                          { id: run.workflowId },
-                          { onSuccess: (r) => navigate(`/workflows/${run.workflowId}/run/${r.id}`) },
-                        )
-                      }
-                    >
-                      {t.simple.runs.retry}
-                    </Button>
-                  )}
-                </div>
-              </Card>
+                </button>
+                {isFailed && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    icon={<RotateCcw className="w-3.5 h-3.5" />}
+                    loading={executeWorkflow.isPending}
+                    onClick={() =>
+                      executeWorkflow.mutate(
+                        { id: run.workflowId },
+                        { onSuccess: (r) => navigate(`/workflows/${run.workflowId}/run/${r.id}`) },
+                      )
+                    }
+                  >
+                    {t.simple.runs.retry}
+                  </Button>
+                )}
+              </SimpleRow>
             );
           })}
         </div>
       )}
-    </div>
+    </SimplePage>
   );
 }

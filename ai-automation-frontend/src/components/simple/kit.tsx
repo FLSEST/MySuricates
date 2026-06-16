@@ -66,6 +66,20 @@ export function SimpleCard({
   );
 }
 
+/** Compact list row with a color hover-accent. Content (clickable area, trailing action) is the caller's. */
+export function SimpleRow({
+  color, children, className = '',
+}: { color?: string; children: ReactNode; className?: string }) {
+  return (
+    <div
+      style={color ? ({ '--tc': color } as CSSProperties) : undefined}
+      className={`flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-surface border border-border transition-colors ${color ? 'hover:border-[var(--tc)]' : 'hover:border-accent/40'} ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
 /** 7×7 status dot. Renders nothing without a status. */
 export function StatusDot({ status }: { status?: string }) {
   if (!status) return null;
