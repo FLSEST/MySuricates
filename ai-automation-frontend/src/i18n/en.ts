@@ -110,6 +110,10 @@ export const en = {
         schedules: { title: 'Scheduled', desc: 'What runs automatically' },
         todos: { title: 'Tasks', desc: 'To-dos from your workflows' },
         activity: { title: 'Activity', desc: 'What happened recently' },
+        factory: { title: 'Factory', desc: 'Create a workflow from a description' },
+        integrations: { title: 'Integrations', desc: 'Connect services (Gmail, Calendar…)' },
+        reports: { title: 'Reports', desc: 'Read generated reports' },
+        wishes: { title: 'Wishes', desc: 'Submit an idea or feature' },
       },
     },
     workflows: {

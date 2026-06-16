@@ -1,9 +1,11 @@
-import { GitBranch, History, FolderKanban, Calendar, CheckSquare, ScrollText } from 'lucide-react';
+import { GitBranch, History, FolderKanban, Calendar, CheckSquare, ScrollText, Factory, Plug, FileText, Lightbulb } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Workflow } from '../types';
 import { curateWorkflows } from './curateWorkflows';
 
-export type NavTileId = 'workflows' | 'results' | 'projects' | 'schedules' | 'todos' | 'activity';
+export type NavTileId =
+  | 'workflows' | 'results' | 'projects' | 'schedules' | 'todos' | 'activity'
+  | 'factory' | 'integrations' | 'reports' | 'wishes';
 
 export interface NavTileConfig {
   id: NavTileId;
@@ -21,6 +23,10 @@ export const AREA_COLORS: Record<NavTileId, string> = {
   schedules: '#a78bfa',
   todos: '#fb7185',
   activity: '#38bdf8',
+  factory: '#f472b6',
+  integrations: '#2dd4bf',
+  reports: '#fb923c',
+  wishes: '#a3e635',
 };
 
 /** Curated everyday areas reachable from the Simple home — NOT all 21 routes. */
@@ -31,6 +37,10 @@ export const NAV_TILES: NavTileConfig[] = [
   { id: 'schedules', to: '/schedules', icon: Calendar, color: AREA_COLORS.schedules },
   { id: 'todos', to: '/todos', icon: CheckSquare, color: AREA_COLORS.todos },
   { id: 'activity', to: '/activity', icon: ScrollText, color: AREA_COLORS.activity },
+  { id: 'factory', to: '/factory', icon: Factory, color: AREA_COLORS.factory },
+  { id: 'integrations', to: '/integrations', icon: Plug, color: AREA_COLORS.integrations },
+  { id: 'reports', to: '/reports', icon: FileText, color: AREA_COLORS.reports },
+  { id: 'wishes', to: '/wishes', icon: Lightbulb, color: AREA_COLORS.wishes },
 ];
 
 export interface HomeTiles {

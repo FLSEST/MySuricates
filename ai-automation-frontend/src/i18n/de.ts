@@ -112,6 +112,10 @@ export const de: TranslationKeys = {
         schedules: { title: 'Geplant', desc: 'Was automatisch läuft' },
         todos: { title: 'Aufgaben', desc: 'To-dos aus deinen Workflows' },
         activity: { title: 'Aktivität', desc: 'Was zuletzt passiert ist' },
+        factory: { title: 'Factory', desc: 'Workflow aus einer Beschreibung erstellen' },
+        integrations: { title: 'Integrationen', desc: 'Dienste verbinden (Gmail, Kalender…)' },
+        reports: { title: 'Berichte', desc: 'Generierte Berichte lesen' },
+        wishes: { title: 'Wünsche', desc: 'Idee oder Feature einreichen' },
       },
     },
     workflows: {

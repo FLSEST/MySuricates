@@ -12,13 +12,15 @@ function wf(id: string, runCount: number): Workflow {
 }
 
 describe('buildHomeTiles', () => {
-  it('returns the 6 nav tiles in fixed order', () => {
+  it('returns the nav tiles in fixed order', () => {
     const { navTiles } = buildHomeTiles([], [], 4);
     expect(navTiles.map((t) => t.id)).toEqual([
       'workflows', 'results', 'projects', 'schedules', 'todos', 'activity',
+      'factory', 'integrations', 'reports', 'wishes',
     ]);
     expect(navTiles.map((t) => t.to)).toEqual([
       '/workflows', '/runs', '/projects', '/schedules', '/todos', '/activity',
+      '/factory', '/integrations', '/reports', '/wishes',
     ]);
   });
 
@@ -31,7 +33,7 @@ describe('buildHomeTiles', () => {
   it('no workflows → empty run tiles but nav tiles intact', () => {
     const { navTiles, runTiles } = buildHomeTiles([], [], 4);
     expect(runTiles).toEqual([]);
-    expect(navTiles.length).toBe(6);
+    expect(navTiles.length).toBe(10);
   });
 
   it('surfaces pinned workflows among run tiles', () => {
