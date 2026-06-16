@@ -14,6 +14,8 @@ interface SettingsState {
   suggestionsEnabled: boolean;
   sidebarItemOrder: string[];
   sidebarHiddenItems: string[];
+  pinnedWorkflowIds: string[];
+  simpleOnboardingSeen: boolean;
   setApiKey: (key: string) => void;
   setSimpleMode: (enabled: boolean) => void;
   setAdvancedMode: (enabled: boolean) => void;
@@ -26,6 +28,8 @@ interface SettingsState {
   setSuggestionsEnabled: (enabled: boolean) => void;
   setSidebarItemOrder: (order: string[]) => void;
   setSidebarHiddenItems: (hidden: string[]) => void;
+  togglePinnedWorkflow: (id: string) => void;
+  setSimpleOnboardingSeen: (seen: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -43,6 +47,8 @@ export const useSettingsStore = create<SettingsState>()(
       suggestionsEnabled: true,
       sidebarItemOrder: [],
       sidebarHiddenItems: [],
+      pinnedWorkflowIds: [],
+      simpleOnboardingSeen: false,
       setApiKey: (apiKey) => set({ apiKey }),
       setSimpleMode: (simpleMode) => set({ simpleMode }),
       setAdvancedMode: (advancedMode) => set({ advancedMode }),
@@ -55,6 +61,13 @@ export const useSettingsStore = create<SettingsState>()(
       setSuggestionsEnabled: (suggestionsEnabled) => set({ suggestionsEnabled }),
       setSidebarItemOrder: (sidebarItemOrder) => set({ sidebarItemOrder }),
       setSidebarHiddenItems: (sidebarHiddenItems) => set({ sidebarHiddenItems }),
+      togglePinnedWorkflow: (id) =>
+        set((state) => ({
+          pinnedWorkflowIds: state.pinnedWorkflowIds.includes(id)
+            ? state.pinnedWorkflowIds.filter((x) => x !== id)
+            : [...state.pinnedWorkflowIds, id],
+        })),
+      setSimpleOnboardingSeen: (simpleOnboardingSeen) => set({ simpleOnboardingSeen }),
     }),
     { name: 'app-settings' }
   )
