@@ -149,6 +149,13 @@ export const en = {
       noDescription: 'No description.',
       priority: 'Priority',
       due: 'Due',
+      quickAddPlaceholder: 'Add a task…',
+      add: 'Add',
+      needsYou: 'Needs you',
+      allTasks: 'Tasks',
+      resolve: 'Let AI do it',
+      resolving: 'Running…',
+      overdue: 'overdue',
     },
     activity: {
       title: 'Activity',

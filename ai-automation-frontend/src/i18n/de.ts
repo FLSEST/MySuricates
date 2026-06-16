@@ -151,6 +151,13 @@ export const de: TranslationKeys = {
       noDescription: 'Keine Beschreibung.',
       priority: 'Priorität',
       due: 'Fällig',
+      quickAddPlaceholder: 'Aufgabe hinzufügen…',
+      add: 'Hinzufügen',
+      needsYou: 'Braucht dich',
+      allTasks: 'Aufgaben',
+      resolve: 'Erledigen lassen',
+      resolving: 'läuft…',
+      overdue: 'überfällig',
     },
     activity: {
       title: 'Aktivität',
