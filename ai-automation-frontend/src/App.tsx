@@ -7,7 +7,7 @@ import { useSettingsStore } from './stores/settingsStore';
 import { api } from './api/client';
 
 const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
-const SimpleDashboard = lazy(() => import('./pages/SimpleDashboard').then(m => ({ default: m.SimpleDashboard })));
+const SimpleHome = lazy(() => import('./pages/SimpleHome').then(m => ({ default: m.SimpleHome })));
 const Projects = lazy(() => import('./pages/Projects').then(m => ({ default: m.Projects })));
 const ProjectDetail = lazy(() => import('./pages/ProjectDetail').then(m => ({ default: m.ProjectDetail })));
 const Workflows = lazy(() => import('./pages/Workflows').then(m => ({ default: m.Workflows })));
@@ -19,7 +19,7 @@ const SimpleWorkflowExecution = lazy(() => import('./pages/SimpleWorkflowExecuti
 
 function DashboardRoute() {
   const { simpleMode } = useSettingsStore();
-  return simpleMode ? <SimpleDashboard /> : <Dashboard />;
+  return simpleMode ? <SimpleHome /> : <Dashboard />;
 }
 
 function WorkflowsRoute() {
