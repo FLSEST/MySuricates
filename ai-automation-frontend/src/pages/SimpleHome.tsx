@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Search, Sparkles, ArrowUp } from 'lucide-react';
+import { Play, Sparkles, ArrowUp } from 'lucide-react';
 import { useT } from '../i18n';
 import { useWorkflows, useExecuteWorkflow } from '../hooks/useWorkflows';
 import { useSettingsStore } from '../stores/settingsStore';
@@ -46,8 +46,6 @@ export function SimpleHome() {
     setAssistantInput('');
   };
 
-  const openSearch = () => window.dispatchEvent(new CustomEvent('mysuri:openPalette'));
-
   const handleExecute = (workflow: Workflow) => {
     const variables = extractWorkflowVariables(workflow.blocks);
     if (variables.length > 0) {
@@ -82,20 +80,10 @@ export function SimpleHome() {
     <div className="animate-fade-in max-w-4xl mx-auto space-y-6">
       <SimpleOnboarding />
 
-      {/* Greeting + quick search */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm text-text-secondary mb-1">{greeting}</p>
-          <h1 className="text-[28px] font-bold text-text tracking-tight leading-none">{t.simple.home.question}</h1>
-        </div>
-        <button
-          onClick={openSearch}
-          className="flex items-center gap-2 bg-surface border border-border rounded-xl px-3 py-2 text-sm text-text-secondary hover:border-accent/40 hover:text-text transition-colors whitespace-nowrap shrink-0"
-        >
-          <Search className="w-4 h-4" />
-          <span className="hidden sm:inline">{t.simple.home.searchButton}</span>
-          <kbd className="text-[10px] bg-surface-raised rounded px-1.5 py-0.5 text-text-tertiary">⌘K</kbd>
-        </button>
+      {/* Greeting */}
+      <div>
+        <p className="text-sm text-text-secondary mb-1">{greeting}</p>
+        <h1 className="text-[28px] font-bold text-text tracking-tight leading-none">{t.simple.home.question}</h1>
       </div>
 
       {/* Assistant — the hero input */}
