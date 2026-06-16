@@ -28,7 +28,7 @@ import { useT } from '../../i18n';
 import { HealthIndicator } from './HealthIndicator';
 import { SortableNavItem } from './SortableNavItem';
 
-const SIMPLE_MODE_ROUTES = new Set(['/', '/workflows', '/runs']);
+const SIMPLE_MODE_ROUTES = new Set(['/', '/workflows', '/runs', '/projects', '/schedules', '/todos', '/activity']);
 
 export function MeerkatIcon({ className, size = 24 }: { className?: string; size?: number }) {
   const bg = 'var(--color-sidebar, #1a1614)';
