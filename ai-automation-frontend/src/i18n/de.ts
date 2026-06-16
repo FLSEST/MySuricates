@@ -147,6 +147,10 @@ export const de: TranslationKeys = {
       empty: 'Keine offenen Aufgaben',
       emptyHint: 'Stark — nichts zu tun.',
       markDone: 'Erledigt',
+      openLinked: 'Workflow öffnen',
+      noDescription: 'Keine Beschreibung.',
+      priority: 'Priorität',
+      due: 'Fällig',
     },
     activity: {
       title: 'Aktivität',

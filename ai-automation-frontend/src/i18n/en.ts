@@ -145,6 +145,10 @@ export const en = {
       empty: 'No open tasks',
       emptyHint: 'Nice — nothing on your plate.',
       markDone: 'Mark done',
+      openLinked: 'Open workflow',
+      noDescription: 'No description.',
+      priority: 'Priority',
+      due: 'Due',
     },
     activity: {
       title: 'Activity',
