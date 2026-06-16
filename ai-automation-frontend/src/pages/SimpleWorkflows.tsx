@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GitBranch, Play, Search } from 'lucide-react';
+import { GitBranch, Play, Search, Pin } from 'lucide-react';
 import { Button, Spinner } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
+import { StatusBadge } from '../components/shared/StatusBadge';
 import { ExecuteDialog } from '../components/workflow/ExecuteDialog';
 import { WorkflowCreateFlow, type CreateStep } from '../components/workflow/WorkflowCreateFlow';
 import {
@@ -17,6 +18,8 @@ import { useT, useI18nStore } from '../i18n';
 import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
 import { readContextSchema } from '../utils/contextSchema';
 import { resolveTemplateName } from '../utils/templateUtils';
+import { curateWorkflows } from '../utils/curateWorkflows';
+import { useLatestRunStatuses } from '../hooks/useLatestRunStatuses';
 import type { CreateWorkflowRequest, Workflow, WorkflowTemplate, PoolWorkflowEntry } from '../types';
 import { useInstallPoolWorkflow } from '../hooks/usePool';
 
@@ -40,9 +43,12 @@ export function SimpleWorkflows() {
     variables: string[];
   }>({ open: false, workflow: null, variables: [] });
   const [search, setSearch] = useState('');
+  const [showAll, setShowAll] = useState(false);
+  const { pinnedWorkflowIds, togglePinnedWorkflow } = useSettingsStore();
+  const latestStatus = useLatestRunStatuses();
 
-  const sorted = useMemo(() => {
-    const base = [...(workflows ?? [])].sort((a, b) => a.name.localeCompare(b.name));
+  const filtered = useMemo(() => {
+    const base = [...(workflows ?? [])];
     if (!search) return base;
     const q = search.toLowerCase();
     return base.filter(
@@ -51,6 +57,13 @@ export function SimpleWorkflows() {
         (w.description?.toLowerCase().includes(q) ?? false),
     );
   }, [workflows, search]);
+
+  const { curated, rest } = useMemo(
+    () => curateWorkflows(filtered, pinnedWorkflowIds, 6),
+    [filtered, pinnedWorkflowIds],
+  );
+
+  const visible = search ? [...curated, ...rest] : showAll ? [...curated, ...rest] : curated;
 
   const openCreate = () => {
     setCreateStep('template');
@@ -180,7 +193,7 @@ export function SimpleWorkflows() {
         </div>
       )}
 
-      {sorted.length === 0 ? (
+      {visible.length === 0 ? (
         <EmptyState
           icon={<GitBranch className="w-8 h-8 text-text-tertiary" />}
           title={t.workflows.title}
@@ -193,7 +206,7 @@ export function SimpleWorkflows() {
         />
       ) : (
         <div className="space-y-2">
-          {sorted.map((workflow) => (
+          {visible.map((workflow) => (
             <div
               key={workflow.id}
               className="flex items-center justify-between px-4 py-3 rounded-lg bg-surface border border-border hover:border-accent/40 transition-colors cursor-pointer"
@@ -208,17 +221,35 @@ export function SimpleWorkflows() {
                   )}
                 </div>
               </div>
-              <Button
-                size="sm"
-                variant="secondary"
-                icon={<Play className="w-3.5 h-3.5" />}
-                onClick={(e) => { e.stopPropagation(); handleExecute(workflow); }}
-                loading={executeWorkflow.isPending}
-              >
-                {t.workflows.execute}
-              </Button>
+              <div className="flex items-center gap-2 shrink-0">
+                {latestStatus.get(workflow.id) && <StatusBadge status={latestStatus.get(workflow.id)!} />}
+                <button
+                  aria-label="pin"
+                  className={pinnedWorkflowIds.includes(workflow.id) ? 'text-accent' : 'text-text-tertiary hover:text-text'}
+                  onClick={(e) => { e.stopPropagation(); togglePinnedWorkflow(workflow.id); }}
+                >
+                  <Pin className="w-3.5 h-3.5" />
+                </button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={<Play className="w-3.5 h-3.5" />}
+                  onClick={(e) => { e.stopPropagation(); handleExecute(workflow); }}
+                  loading={executeWorkflow.isPending}
+                >
+                  {t.workflows.execute}
+                </Button>
+              </div>
             </div>
           ))}
+          {!search && rest.length > 0 && (
+            <button
+              className="text-sm text-accent hover:underline mt-1"
+              onClick={() => setShowAll((v) => !v)}
+            >
+              {showAll ? t.simple.workflows.showLess : `${t.simple.workflows.showAll} (${rest.length})`}
+            </button>
+          )}
         </div>
       )}
 
