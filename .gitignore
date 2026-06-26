@@ -4,12 +4,21 @@
 # TLS certificates (dev)
 certs/
 
+# Environment files (local config/secrets)
+.env
+.env.*
+!.env.example
+ai-automation-frontend/.env
+ai-automation-frontend/.env.*
+!ai-automation-frontend/.env.example
+
 # Playwright MCP
 .playwright-mcp/
 
 # Claude Code runtime (settings, rules, scheduled tasks, plans)
 .claude/
 docs/superpowers/
+.superpowers/
 
 # Frontend build artifacts
 ai-automation-frontend/node_modules/
