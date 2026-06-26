@@ -141,6 +141,25 @@ print_logs_hint() {
   echo "  Frontend: ${FRONTEND_LOG}"
 }
 
+# Zeigt den API-Key, den der neue User im Browser-Login eingeben muss.
+# Drei Fälle: Security aus / eigener Key via Env / auto-generierter Key (Datei).
+print_api_key() {
+  local key_file="${HOME}/.autotrigger/api-key"
+  echo
+  if [[ "${AUTOMATION_SECURITY_ENABLED:-true}" == "false" ]]; then
+    echo "API-Key: nicht nötig (AUTOMATION_SECURITY_ENABLED=false)"
+  elif [[ -n "${AUTOMATION_API_KEY:-}" ]]; then
+    echo "API-Key (eigener, via AUTOMATION_API_KEY):"
+    echo "  ${AUTOMATION_API_KEY}"
+  elif [[ -f "${key_file}" ]]; then
+    echo "API-Key (beim ersten Öffnen im Browser-Login einfügen):"
+    echo "  $(cat "${key_file}")"
+    echo "  Quelle: ${key_file}"
+  else
+    echo "API-Key: noch nicht gefunden — siehe Backend-Log (${BACKEND_LOG})"
+  fi
+}
+
 if [[ "${MVN_CMD}" == "mvn" ]]; then
   require_command mvn   # kein Wrapper vorhanden -> System-Maven nötig
 fi
@@ -168,6 +187,9 @@ echo
 echo "URLs:"
 echo "  Frontend: $(resolved_frontend_url)"
 echo "  Backend:  http://localhost:9090/api/v1"
+if [[ "${backend_ok}" -eq 1 ]]; then
+  print_api_key
+fi
 print_logs_hint
 
 if [[ "${backend_ok}" -eq 1 && "${frontend_ok}" -eq 1 ]]; then

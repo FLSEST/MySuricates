@@ -80,14 +80,18 @@ Logs liegen unter `~/.local/state/autotrigger-dev/{backend,frontend}.log`.
 
 ## 4. API-Key eintragen
 
-Beim ersten Backend-Start wird ein API-Key erzeugt und geschrieben nach:
+Beim ersten Backend-Start wird automatisch ein API-Key erzeugt. **`start-autotrigger-dev.sh` zeigt
+ihn direkt nach dem Start im Terminal an** — einfach kopieren. Er liegt außerdem in der Datei
+`~/.autotrigger/api-key` (und im Backend-Log):
 
 ```bash
 cat ~/.autotrigger/api-key
 ```
 
-(Er steht auch im Backend-Log.) Diesen Key im Frontend unter **Einstellungen** eintragen — er wird
-für alle API-Aufrufe als Header `X-API-Key` verwendet.
+Beim **ersten Öffnen** von `localhost:3000` erscheint automatisch ein **Login-Screen** mit einem
+Eingabefeld (er zeigt den Key nicht an — du fügst ihn dort ein). Danach ist der Key im Browser
+gespeichert; du wirst nicht erneut gefragt. Er wird für alle API-Aufrufe als Header `X-API-Key`
+verwendet.
 
 Eigenen Key vorgeben statt generieren lassen:
 

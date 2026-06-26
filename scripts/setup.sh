@@ -311,8 +311,18 @@ fi
 head2 "${C_GRN}Setup abgeschlossen${C_RST}"
 echo "  Starten:   ${C_BLD}./scripts/start-autotrigger-dev.sh${C_RST}"
 echo "  Frontend:  http://localhost:3000   (Backend-API: http://localhost:9090/api/v1)"
-echo "  API-Key:   wird beim ersten Backend-Start erzeugt und nach ${C_BLD}~/.autotrigger/api-key${C_RST} geschrieben"
-echo "             (auch im Backend-Log; im UI unter Einstellungen eintragen)"
+KEY_FILE="$HOME/.autotrigger/api-key"
+if [ "${AUTOMATION_SECURITY_ENABLED:-true}" = "false" ]; then
+  echo "  API-Key:   nicht nötig (AUTOMATION_SECURITY_ENABLED=false)"
+elif [ -n "${AUTOMATION_API_KEY:-}" ]; then
+  echo "  API-Key:   eigener via ${C_BLD}AUTOMATION_API_KEY${C_RST} gesetzt"
+elif [ -f "$KEY_FILE" ]; then
+  echo "  API-Key:   ${C_BLD}$(cat "$KEY_FILE")${C_RST}"
+  echo "             (aus ${KEY_FILE} — beim ersten Öffnen ins Browser-Login einfügen)"
+else
+  echo "  API-Key:   wird beim ersten Backend-Start erzeugt → ${C_BLD}~/.autotrigger/api-key${C_RST}"
+  echo "             (erscheint dann automatisch beim Start; auch im Backend-Log)"
+fi
 echo "  HTTPS:     optional via ${C_BLD}./scripts/generate-dev-cert.sh${C_RST} (selbst-signiert → Browser-Warnung)"
 echo "  Anleitung: ${C_BLD}docs/GETTING-STARTED.md${C_RST}"
 
