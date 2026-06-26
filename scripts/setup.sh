@@ -163,9 +163,18 @@ else
   need_build java "Java (JDK 21+) fehlt"
 fi
 
-# --- Maven 3.6.3+ (Spring-Boot-3.4-Minimum; 3.9+ empfohlen) ---
-# -B + ANSI-Strip: Maven 3.8+ färbt die Versionsausgabe ein.
-if have mvn; then
+# --- Maven: Wrapper (mvnw) bevorzugt, sonst System-Maven 3.6.3+ ---
+# Mit Wrapper ist System-Maven NICHT erforderlich (mvnw lädt Maven selbst, nur Java + curl nötig).
+# -B + ANSI-Strip beim Parsen: Maven 3.8+ färbt die Versionsausgabe ein.
+if [ -x "$BACKEND_DIR/mvnw" ]; then
+  MVN_CMD="$BACKEND_DIR/mvnw"
+  ok "Maven-Wrapper (mvnw) vorhanden — lädt Maven selbst, System-Maven optional"
+  if have mvn; then
+    MVN_VER="$(mvn -B -version 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | awk '/Apache Maven/{print $3; exit}')"
+    [ -n "$MVN_VER" ] && ok "System-Maven ${MVN_VER} (zusätzlich vorhanden)"
+  fi
+elif have mvn; then
+  MVN_CMD="mvn"
   MVN_VER="$(mvn -B -version 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | awk '/Apache Maven/{print $3; exit}')"
   if [ -n "$MVN_VER" ] && version_ge "$MVN_VER" "3.6.3"; then
     if version_ge "$MVN_VER" "3.9"; then ok "Maven ${MVN_VER}"; else ok "Maven ${MVN_VER} (3.9+ empfohlen)"; fi
@@ -173,7 +182,8 @@ if have mvn; then
     need_build maven "Maven ${MVN_VER:-?} gefunden, benötigt wird 3.6.3+"
   fi
 else
-  need_build maven "Maven (3.6.3+, 3.9+ empfohlen) fehlt"
+  MVN_CMD="mvn"
+  need_build maven "Maven (3.6.3+, 3.9+ empfohlen) fehlt — oder den Wrapper ai-automation-backend/mvnw nutzen"
 fi
 
 # --- Node 20+ ---
@@ -287,8 +297,8 @@ else
   exit 1
 fi
 
-echo "  Backend vorkompilieren (mvn test-compile) ..."
-if ( cd "$BACKEND_DIR" && mvn -q -DskipTests test-compile ); then
+echo "  Backend vorkompilieren (${MVN_CMD##*/} test-compile) ..."
+if ( cd "$BACKEND_DIR" && "$MVN_CMD" -q -DskipTests test-compile ); then
   ok "Backend kompiliert"
 else
   fail "Backend-Kompilierung fehlgeschlagen — siehe Ausgabe oben"

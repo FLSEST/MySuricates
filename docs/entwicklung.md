@@ -7,8 +7,8 @@
 | Tool | Version | Prüfung |
 |---|---|---|
 | Java (JDK) | 21+ | `java --version` |
-| Maven | 3.9+ | `mvn --version` |
-| Node.js | 20+ | `node --version` |
+| Maven | optional (Wrapper `mvnw` dabei) | `./mvnw --version` |
+| Node.js | 20+ (`.nvmrc`) | `node --version` |
 | npm | 10+ | `npm --version` |
 | Docker | 24+ (optional) | `docker --version` |
 

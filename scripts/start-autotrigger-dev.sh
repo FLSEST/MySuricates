@@ -10,6 +10,13 @@ mkdir -p "${STATE_DIR}"
 BACKEND_DIR="${REPO_ROOT}/ai-automation-backend"
 FRONTEND_DIR="${REPO_ROOT}/ai-automation-frontend"
 
+# Maven-Wrapper bevorzugen (lädt Maven selbst), sonst System-Maven.
+if [[ -x "${BACKEND_DIR}/mvnw" ]]; then
+  MVN_CMD="${BACKEND_DIR}/mvnw"
+else
+  MVN_CMD="mvn"
+fi
+
 BACKEND_PID_FILE="${STATE_DIR}/backend.pid"
 FRONTEND_PID_FILE="${STATE_DIR}/frontend.pid"
 BACKEND_LOG="${STATE_DIR}/backend.log"
@@ -107,7 +114,7 @@ start_backend() {
   echo "Starte Backend ..."
   (
     cd "${BACKEND_DIR}"
-    nohup mvn spring-boot:run > "${BACKEND_LOG}" 2>&1 &
+    nohup "${MVN_CMD}" spring-boot:run > "${BACKEND_LOG}" 2>&1 &
     echo "$!" > "${BACKEND_PID_FILE}"
   )
 }
@@ -134,7 +141,9 @@ print_logs_hint() {
   echo "  Frontend: ${FRONTEND_LOG}"
 }
 
-require_command mvn
+if [[ "${MVN_CMD}" == "mvn" ]]; then
+  require_command mvn   # kein Wrapper vorhanden -> System-Maven nötig
+fi
 require_command npm
 require_command curl
 

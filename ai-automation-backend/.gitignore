@@ -28,7 +28,7 @@ logs/
 *.log
 
 ### Maven ###
+# Maven-Wrapper (mvnw) bewusst eingecheckt — lädt Maven selbst, kein System-Maven nötig.
 .mvn/*
 !.mvn/jvm.config
-mvnw
-mvnw.cmd
+!.mvn/wrapper

@@ -15,12 +15,16 @@ und wird nur für Container-Execution-Workflow-Blöcke gebraucht.
 | Tool | Version | Pflicht? | Wofür |
 |---|---|---|---|
 | Java (JDK) | 21+ | ✅ | Backend bauen/starten |
-| Maven | 3.6.3+ (3.9+ empfohlen) | ✅ | Backend-Build |
-| Node.js | 20+ | ✅ | Frontend |
+| Maven | — | ⬜ optional | Wrapper `ai-automation-backend/mvnw` ist dabei und lädt Maven 3.9.9 selbst (nur Java + curl nötig) |
+| Node.js | 20+ | ✅ | Frontend (Version in `ai-automation-frontend/.nvmrc` → `nvm use`) |
 | npm | 10+ | ✅ | Frontend-Deps |
 | git, curl | aktuell | ✅ | Basis |
 | **Claude-Account + `claude` CLI** | aktuell | ✅ für KI | AI-Workflows laufen über `claude` auf dem Host |
 | Docker | 24+ | ⬜ optional | nur Container-Execution-Blöcke |
+
+> **System-Maven nicht nötig:** Der Maven-Wrapper (`mvnw`) lädt beim ersten Build automatisch die
+> passende Maven-Version herunter. `scripts/setup.sh` und der Start nutzen ihn automatisch.
+> Node-Nutzer mit `nvm` bekommen mit `nvm use` (im Frontend-Ordner) die richtige Node-Version.
 
 Die Person braucht einen **eigenen Claude-Account** und meldet sich mit `claude login` selbst an.
 
