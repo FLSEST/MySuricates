@@ -106,6 +106,10 @@ class IntegrationControllerTest {
 
     @Test
     void saveCredentials_withMissingSecretReturnsBadRequest() throws Exception {
+        IntegrationProvider provider = provider("google-calendar");
+        when(provider.requiresCredentials()).thenReturn(true);
+        when(registry.getProvider("google-calendar")).thenReturn(provider);
+
         mockMvc.perform(post("/api/v1/integrations/google-calendar/credentials")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -113,6 +117,24 @@ class IntegrationControllerTest {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"));
+    }
+
+    @Test
+    void saveCredentials_allowsEmpty_whenProviderDoesNotRequireCredentials() throws Exception {
+        IntegrationProvider provider = provider("taskwarrior");
+        when(provider.requiresCredentials()).thenReturn(false);
+        when(registry.getProvider("taskwarrior")).thenReturn(provider);
+        when(oAuthService.getConnection("taskwarrior")).thenReturn(Optional.empty());
+        when(oAuthService.isProviderConfigured("taskwarrior")).thenReturn(true);
+
+        mockMvc.perform(post("/api/v1/integrations/taskwarrior/credentials")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"clientId":"","clientSecret":""}
+                                """))
+                .andExpect(status().isOk());
+
+        verify(oAuthService).saveCredentials("taskwarrior", "", "");
     }
 
     @Test
