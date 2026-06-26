@@ -107,6 +107,8 @@ automation:
     default-thinking-level: ${AUTOMATION_HOST_PI_THINKING:medium}
   todo-trigger:
     poll-interval-ms: ${AUTOMATION_TODO_TRIGGER_POLL_MS:300000}
+  scheduler:
+    skip-until: ${AUTOMATION_SCHEDULER_SKIP_UNTIL:}
   chain:
     workflow-timeout-minutes: ${AUTOMATION_CHAIN_WORKFLOW_TIMEOUT:180}
   execution:

@@ -1,6 +1,8 @@
 package com.automation.service.scheduler;
 
+import com.automation.config.SchedulerConfig;
 import com.automation.entity.ActivityLog.LogCategory;
+import com.automation.entity.ActivityLog.LogLevel;
 import com.automation.entity.ChainRun;
 import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.ScheduledWorkflow.ScheduleType;
@@ -33,10 +35,13 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -51,9 +56,13 @@ public class SchedulerService {
     private final ScheduledWorkflowExecutor scheduledExecutor;
     private final ActivityLogService activityLogService;
     private final AppSettingsRepository appSettingsRepository;
+    private final SchedulerConfig schedulerConfig;
     private final Clock clock;
 
     private static final String MAINTENANCE_MODE_KEY = "scheduler.maintenance-mode";
+
+    /** Last unparseable skip-until value we already warned about, to avoid logging every 60s tick. */
+    private volatile String lastInvalidSkipUntil = null;
 
     @Transactional(readOnly = true)
     public List<ScheduledWorkflow> findAll() {
@@ -367,7 +376,18 @@ public class SchedulerService {
             return;
         }
 
-        List<ScheduledWorkflow> dueSchedules = scheduledRepository.findDueSchedules(Instant.now(clock));
+        Optional<Instant> skipUntil = parseSkipUntil();
+
+        Instant now = Instant.now(clock);
+        List<ScheduledWorkflow> dueSchedules = scheduledRepository.findDueSchedules(now);
+
+        if (skipUntil.isPresent() && now.isBefore(skipUntil.get())) {
+            Instant until = skipUntil.get();
+            for (ScheduledWorkflow scheduled : dueSchedules) {
+                skipScheduleUntil(scheduled, until);
+            }
+            return;
+        }
 
         for (ScheduledWorkflow scheduled : dueSchedules) {
             try {
@@ -379,6 +399,72 @@ public class SchedulerService {
                         "SchedulerService", scheduled.getId());
             }
         }
+    }
+
+    private Optional<Instant> parseSkipUntil() {
+        String raw = schedulerConfig.getSkipUntil();
+        if (raw == null || raw.isBlank()) {
+            lastInvalidSkipUntil = null;
+            return Optional.empty();
+        }
+
+        try {
+            Optional<Instant> parsed = Optional.of(Instant.parse(raw.trim()));
+            lastInvalidSkipUntil = null;
+            return parsed;
+        } catch (DateTimeParseException e) {
+            // Fail open: a misconfigured (unparseable) skip-until must NOT halt the whole scheduler.
+            // Treat it as "no skip" so schedules keep running, and warn once per distinct bad value
+            // (this runs every 60s — logging every tick would spam the log and the ActivityLog/DB).
+            if (!raw.equals(lastInvalidSkipUntil)) {
+                lastInvalidSkipUntil = raw;
+                log.error("Invalid automation.scheduler.skip-until value '{}'; ignoring it and running schedules normally", raw);
+                activityLogService.warn(LogCategory.SCHEDULE,
+                        "Invalid scheduler skip-until value (ignored): " + raw,
+                        "SchedulerService");
+            }
+            return Optional.empty();
+        }
+    }
+
+    private void skipScheduleUntil(ScheduledWorkflow scheduled, Instant until) {
+        Instant previousNextRunAt = scheduled.getNextRunAt();
+
+        if (scheduled.getScheduleType() == ScheduleType.CRON) {
+            CronExpression cron = CronExpression.parse(scheduled.getCronExpression());
+            LocalDateTime cursor = LocalDateTime.ofInstant(until, ZoneId.systemDefault()).minusNanos(1);
+            LocalDateTime next = cron.next(cursor);
+            scheduled.setNextRunAt(next != null ? next.atZone(ZoneId.systemDefault()).toInstant() : null);
+        } else if (scheduled.getScheduleType() == ScheduleType.ONCE
+                || scheduled.getScheduleType() == ScheduleType.DELAYED) {
+            // Intentional: a one-off schedule that falls inside the skip window is permanently
+            // disabled (not deferred). Its single firing is dropped — unlike CRON, which resumes
+            // at the next occurrence after the window.
+            scheduled.setEnabled(false);
+            scheduled.setNextRunAt(null);
+        }
+
+        scheduledRepository.save(scheduled);
+        log.info("Schedule {} skipped until {}", scheduled.getId(), until);
+
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("reason", "scheduler-skip-until");
+        metadata.put("skipUntil", until.toString());
+        if (previousNextRunAt != null) {
+            metadata.put("previousNextRunAt", previousNextRunAt.toString());
+        }
+        if (scheduled.getNextRunAt() != null) {
+            metadata.put("nextRunAt", scheduled.getNextRunAt().toString());
+        }
+
+        activityLogService.log(
+                LogLevel.INFO,
+                LogCategory.SCHEDULE,
+                "Schedule skipped: " + scheduled.getTargetName(),
+                "SchedulerService",
+                scheduled.getId(),
+                metadata
+        );
     }
 
     private TargetType parseTargetType(String targetType) {

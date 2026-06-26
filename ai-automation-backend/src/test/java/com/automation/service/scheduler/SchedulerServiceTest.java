@@ -1,6 +1,9 @@
 package com.automation.service.scheduler;
 
+import com.automation.config.SchedulerConfig;
 import com.automation.dto.response.UpcomingScheduleResponse;
+import com.automation.entity.ActivityLog.LogCategory;
+import com.automation.entity.ActivityLog.LogLevel;
 import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.ScheduledWorkflow.ScheduleType;
 import com.automation.entity.Workflow;
@@ -13,6 +16,7 @@ import com.automation.service.activitylog.ActivityLogService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -51,6 +55,9 @@ class SchedulerServiceTest {
 
     @Mock
     private AppSettingsRepository appSettingsRepository;
+
+    @Mock
+    private SchedulerConfig schedulerConfig;
 
     // Fixed at noon UTC so getRemainingToday/Week behave deterministically regardless of wall-clock time.
     private static final Instant FIXED_NOW = Instant.parse("2026-04-26T12:00:00Z");
@@ -309,6 +316,164 @@ class SchedulerServiceTest {
 
         verify(scheduledExecutor).executeSingleSchedule("s1");
         verify(scheduledExecutor).executeSingleSchedule("s2");
+    }
+
+    @Test
+    void checkAndExecuteScheduled_skipUntilFuture_skipsCronAndLogsActivity() {
+        Instant dueAt = FIXED_NOW.minusSeconds(60);
+        Instant skipUntil = FIXED_NOW.plus(3, ChronoUnit.HOURS);
+        testScheduled.setNextRunAt(dueAt);
+
+        when(schedulerConfig.getSkipUntil()).thenReturn(skipUntil.toString());
+        when(scheduledRepository.findDueSchedules(FIXED_NOW)).thenReturn(List.of(testScheduled));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        schedulerService.checkAndExecuteScheduled();
+
+        verify(scheduledExecutor, never()).executeSingleSchedule(any());
+        assertThat(testScheduled.isEnabled()).isTrue();
+        assertThat(testScheduled.getNextRunAt()).isNotNull().isAfterOrEqualTo(skipUntil);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> metadataCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(activityLogService).log(
+                eq(LogLevel.INFO),
+                eq(LogCategory.SCHEDULE),
+                eq("Schedule skipped: Test Workflow"),
+                eq("SchedulerService"),
+                eq("sched-1"),
+                metadataCaptor.capture()
+        );
+        assertThat(metadataCaptor.getValue())
+                .containsEntry("reason", "scheduler-skip-until")
+                .containsEntry("skipUntil", skipUntil.toString())
+                .containsEntry("previousNextRunAt", dueAt.toString());
+    }
+
+    @Test
+    void checkAndExecuteScheduled_skipUntilFuture_skipsAllDueSchedules() {
+        Instant dueAt = FIXED_NOW.minusSeconds(60);
+        Instant skipUntil = FIXED_NOW.plus(1, ChronoUnit.HOURS);
+        ScheduledWorkflow sched1 = ScheduledWorkflow.builder()
+                .id("s1").workflow(testWorkflow).cronExpression("0 0 * * * *")
+                .scheduleType(ScheduleType.CRON).enabled(true).nextRunAt(dueAt).build();
+        ScheduledWorkflow sched2 = ScheduledWorkflow.builder()
+                .id("s2").workflow(testWorkflow).cronExpression("0 30 * * * *")
+                .scheduleType(ScheduleType.CRON).enabled(true).nextRunAt(dueAt).build();
+
+        when(schedulerConfig.getSkipUntil()).thenReturn(skipUntil.toString());
+        when(scheduledRepository.findDueSchedules(FIXED_NOW)).thenReturn(List.of(sched1, sched2));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        schedulerService.checkAndExecuteScheduled();
+
+        verify(scheduledExecutor, never()).executeSingleSchedule(any());
+        verify(scheduledRepository, times(2)).save(any(ScheduledWorkflow.class));
+        verify(activityLogService, times(2)).log(
+                eq(LogLevel.INFO),
+                eq(LogCategory.SCHEDULE),
+                startsWith("Schedule skipped:"),
+                eq("SchedulerService"),
+                any(),
+                any()
+        );
+    }
+
+    @Test
+    void checkAndExecuteScheduled_skipUntilExpired_executesDueSchedule() {
+        testScheduled.setNextRunAt(FIXED_NOW.minusSeconds(60));
+
+        when(schedulerConfig.getSkipUntil()).thenReturn(FIXED_NOW.minusSeconds(1).toString());
+        when(scheduledRepository.findDueSchedules(FIXED_NOW)).thenReturn(List.of(testScheduled));
+
+        schedulerService.checkAndExecuteScheduled();
+
+        verify(scheduledExecutor).executeSingleSchedule("sched-1");
+        verify(scheduledRepository, never()).save(any());
+        verify(activityLogService, never()).log(
+                eq(LogLevel.INFO),
+                eq(LogCategory.SCHEDULE),
+                startsWith("Schedule skipped:"),
+                any(),
+                any(),
+                any()
+        );
+    }
+
+    @Test
+    void checkAndExecuteScheduled_maintenanceMode_doesNotApplySkipUntil() {
+        when(appSettingsRepository.get("scheduler.maintenance-mode")).thenReturn(Optional.of("true"));
+
+        schedulerService.checkAndExecuteScheduled();
+
+        verify(schedulerConfig, never()).getSkipUntil();
+        verify(scheduledRepository, never()).findDueSchedules(any());
+        verify(scheduledExecutor, never()).executeSingleSchedule(any());
+    }
+
+    @Test
+    void checkAndExecuteScheduled_skipUntilFuture_disablesOnceSchedule() {
+        Instant dueAt = FIXED_NOW.minusSeconds(60);
+        Instant skipUntil = FIXED_NOW.plus(1, ChronoUnit.HOURS);
+        ScheduledWorkflow onceSchedule = ScheduledWorkflow.builder()
+                .id("sched-once")
+                .workflow(testWorkflow)
+                .cronExpression("")
+                .scheduleType(ScheduleType.ONCE)
+                .scheduledAt(dueAt)
+                .enabled(true)
+                .nextRunAt(dueAt)
+                .build();
+
+        when(schedulerConfig.getSkipUntil()).thenReturn(skipUntil.toString());
+        when(scheduledRepository.findDueSchedules(FIXED_NOW)).thenReturn(List.of(onceSchedule));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        schedulerService.checkAndExecuteScheduled();
+
+        verify(scheduledExecutor, never()).executeSingleSchedule(any());
+        assertThat(onceSchedule.isEnabled()).isFalse();
+        assertThat(onceSchedule.getNextRunAt()).isNull();
+        verify(activityLogService).log(
+                eq(LogLevel.INFO),
+                eq(LogCategory.SCHEDULE),
+                eq("Schedule skipped: Test Workflow"),
+                eq("SchedulerService"),
+                eq("sched-once"),
+                any()
+        );
+    }
+
+    @Test
+    void checkAndExecuteScheduled_invalidSkipUntil_runsSchedulesNormallyAndWarnsOnce() {
+        testScheduled.setNextRunAt(FIXED_NOW.minusSeconds(60));
+
+        // Unparseable value: must be treated as "no skip" (fail open), not halt the scheduler.
+        when(schedulerConfig.getSkipUntil()).thenReturn("not-a-timestamp");
+        when(scheduledRepository.findDueSchedules(FIXED_NOW)).thenReturn(List.of(testScheduled));
+
+        // Two ticks with the same bad value.
+        schedulerService.checkAndExecuteScheduled();
+        schedulerService.checkAndExecuteScheduled();
+
+        // Fail open: due schedules ran normally on both ticks, nothing was skipped/saved.
+        verify(scheduledExecutor, times(2)).executeSingleSchedule("sched-1");
+        verify(scheduledRepository, never()).save(any());
+
+        // Dedup: warned exactly once for the same invalid value, no per-tick spam.
+        verify(activityLogService, times(1)).warn(
+                eq(LogCategory.SCHEDULE),
+                contains("Invalid scheduler skip-until value"),
+                eq("SchedulerService")
+        );
+        verify(activityLogService, never()).log(
+                eq(LogLevel.INFO),
+                eq(LogCategory.SCHEDULE),
+                startsWith("Schedule skipped:"),
+                any(),
+                any(),
+                any()
+        );
     }
 
     @Test
