@@ -12,6 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.file.Files;
@@ -36,7 +37,12 @@ class ControllerIntegrationTest {
     @Autowired private ObjectMapper objectMapper;
     @Autowired private ProjectRepository projectRepository;
 
+    // NOT_SUPPORTED suspends the class-level @Transactional for this method: /system/health does its
+    // own dataSource.getConnection() (SELECT 1). With pool-size=1, a held test transaction would starve
+    // that second acquisition (→ DB DOWN after the 120s connection-timeout). Running without a tx mirrors
+    // prod, where this endpoint has no ambient transaction. See CLAUDE.md → "HikariCP pool-size = 1".
     @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void healthEndpoint_returnsUp() throws Exception {
         mockMvc.perform(get("/api/v1/system/health"))
                 .andExpect(status().isOk())

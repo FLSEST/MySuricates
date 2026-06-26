@@ -3,7 +3,11 @@ spring:
     url: jdbc:sqlite:/tmp/autotrigger-integrationtest.db?journal_mode=WAL&busy_timeout=10000
     driver-class-name: org.sqlite.JDBC
     hikari:
-      maximum-pool-size: 3
+      # SQLite supports only one writer — integration tests MUST mirror prod (pool-size=1).
+      # pool>1 + WAL on the shared file DB caused intermittent SQLITE_CORRUPT at context startup,
+      # and pool>1 also MASKS pool-size=1 deadlocks (tests pass while prod would starve).
+      # See CLAUDE.md → "HikariCP pool-size = 1". Do NOT raise without switching off SQLite.
+      maximum-pool-size: 1
       minimum-idle: 1
       connection-test-query: SELECT 1
       connection-init-sql: "PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 30000;"
