@@ -4,6 +4,7 @@ import com.automation.concurrency.DynamicSemaphore;
 import com.automation.config.ChainConfig;
 import com.automation.config.HostClaudeConfig;
 import com.automation.config.RateLimitConfig;
+import com.automation.config.TaskCommandConfig;
 import com.automation.config.TodoHygieneConfig;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.ai.HostClaudeService;
@@ -35,6 +36,7 @@ class ExecutionSettingsServiceTest {
     private ChainConfig chainConfig;
     private RateLimitConfig rateLimitConfig;
     private TodoHygieneConfig todoHygieneConfig;
+    private TaskCommandConfig taskCommandConfig;
     private ExecutionSettingsService service;
 
     @BeforeEach
@@ -44,12 +46,13 @@ class ExecutionSettingsServiceTest {
         chainConfig = new ChainConfig();
         rateLimitConfig = new RateLimitConfig();
         todoHygieneConfig = new TodoHygieneConfig();
+        taskCommandConfig = new TaskCommandConfig();
 
         service = new ExecutionSettingsService(
                 appSettingsRepository, executionSemaphore,
                 hostClaudeService, hostClaudeConfig, chainConfig,
                 rateLimitConfig, workflowExecutor, containerShellService,
-                todoHygieneConfig
+                todoHygieneConfig, taskCommandConfig
         );
     }
 
@@ -238,6 +241,29 @@ class ExecutionSettingsServiceTest {
     @Test
     void validateAndApply_assistantChatTimeout_outOfBounds_throws() {
         assertThatThrownBy(() -> service.validateAndApply("assistant-chat-timeout-seconds", "10"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must be between");
+    }
+
+    @Test
+    void validateAndApply_taskCommandTimeout_updatesConfig() {
+        service.validateAndApply("task-command-timeout-seconds", "120");
+
+        verify(appSettingsRepository).set("task-command-timeout-seconds", "120");
+        assertThat(taskCommandConfig.getTimeoutSeconds()).isEqualTo(120);
+    }
+
+    @Test
+    void validateAndApply_taskCommandTimeout_camelCaseAlias() {
+        service.validateAndApply("taskCommandTimeoutSeconds", "90");
+
+        verify(appSettingsRepository).set("task-command-timeout-seconds", "90");
+        assertThat(taskCommandConfig.getTimeoutSeconds()).isEqualTo(90);
+    }
+
+    @Test
+    void validateAndApply_taskCommandTimeout_outOfBounds_throws() {
+        assertThatThrownBy(() -> service.validateAndApply("task-command-timeout-seconds", "5"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("must be between");
     }

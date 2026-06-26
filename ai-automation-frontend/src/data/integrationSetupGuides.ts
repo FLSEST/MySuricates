@@ -256,6 +256,108 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
       },
     ],
   },
+  'taskwarrior': {
+    credentialLabels: {
+      clientIdPlaceholder: { de: 'TASKDATA-Pfad (optional)', en: 'TASKDATA path (optional)' },
+      clientSecretPlaceholder: { de: 'TASKRC-Pfad (optional)', en: 'TASKRC path (optional)' },
+    },
+    steps: [
+      {
+        title: {
+          de: 'Taskwarrior installieren',
+          en: 'Install Taskwarrior',
+        },
+        instructions: {
+          de: [
+            'Taskwarrior muss auf dem Host laufen, auf dem das MySuricates-Backend läuft',
+            'Debian/Ubuntu: "sudo apt install taskwarrior" · macOS: "brew install task"',
+            'Andere Systeme: siehe Download-Seite (Link unten)',
+          ],
+          en: [
+            'Taskwarrior must run on the host where the MySuricates backend runs',
+            'Debian/Ubuntu: "sudo apt install taskwarrior" · macOS: "brew install task"',
+            'Other systems: see the download page (link below)',
+          ],
+        },
+        link: {
+          url: 'https://taskwarrior.org/download/',
+          label: { de: 'Taskwarrior Download', en: 'Taskwarrior Download' },
+        },
+        code: 'sudo apt install taskwarrior',
+      },
+      {
+        title: {
+          de: 'Installation prüfen',
+          en: 'Verify the installation',
+        },
+        instructions: {
+          de: [
+            'Führe "task --version" aus — erwartet wird Version 3.x oder neuer',
+            'Beim ersten Aufruf legt Taskwarrior automatisch ~/.taskrc und ~/.task an',
+          ],
+          en: [
+            'Run "task --version" — version 3.x or newer is expected',
+            'On first run Taskwarrior creates ~/.taskrc and ~/.task automatically',
+          ],
+        },
+        code: 'task --version',
+      },
+      {
+        title: {
+          de: 'Datenverzeichnis (optional)',
+          en: 'Data directory (optional)',
+        },
+        instructions: {
+          de: [
+            'Standard: ~/.task (Daten) und ~/.taskrc (Konfiguration) — Felder unten leer lassen',
+            'Nur wenn deine Tasks woanders liegen: TASKDATA- bzw. TASKRC-Pfad unten eintragen',
+          ],
+          en: [
+            'Default: ~/.task (data) and ~/.taskrc (config) — leave the fields below empty',
+            'Only if your tasks live elsewhere: enter the TASKDATA / TASKRC path below',
+          ],
+        },
+      },
+      {
+        title: {
+          de: 'Geräteübergreifender Sync (optional)',
+          en: 'Cross-device sync (optional)',
+        },
+        instructions: {
+          de: [
+            'Taskwarrior ist standardmäßig rein lokal',
+            'Für mehrere Geräte: einen Sync-Server in ~/.taskrc konfigurieren und "task sync" nutzen',
+            'Die Integration bietet dafür die Aktion "sync_task"',
+          ],
+          en: [
+            'Taskwarrior is purely local by default',
+            'For multiple devices: configure a sync server in ~/.taskrc and use "task sync"',
+            'The integration exposes the "sync_task" action for this',
+          ],
+        },
+        link: {
+          url: 'https://taskwarrior.org/docs/sync/',
+          label: { de: 'Taskwarrior Sync-Doku', en: 'Taskwarrior Sync docs' },
+        },
+      },
+      {
+        title: {
+          de: 'Verbinden',
+          en: 'Connect',
+        },
+        instructions: {
+          de: [
+            'Pfade optional eintragen (oder leer lassen für die Standardwerte)',
+            '"Zugangsdaten speichern" klicken — der Status wird grün, sobald "task" erreichbar ist',
+          ],
+          en: [
+            'Enter the paths optionally (or leave empty for the defaults)',
+            'Click "Save credentials" — the status turns green once "task" is reachable',
+          ],
+        },
+      },
+    ],
+  },
   'trello': {
     credentialLabels: {
       clientIdPlaceholder: { de: 'API-Schlüssel', en: 'API Key' },

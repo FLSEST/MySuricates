@@ -105,6 +105,8 @@ automation:
     reserved-for-interactive: ${AUTOMATION_HOST_PI_RESERVED_INTERACTIVE:1}
     default-backend-provider: ${AUTOMATION_HOST_PI_BACKEND:anthropic}
     default-thinking-level: ${AUTOMATION_HOST_PI_THINKING:medium}
+  task-command:
+    timeout-seconds: ${AUTOMATION_TASK_COMMAND_TIMEOUT:60}    # Timeout für einen `task`-CLI-Aufruf (Taskwarrior-Integration)
   todo-trigger:
     poll-interval-ms: ${AUTOMATION_TODO_TRIGGER_POLL_MS:300000}
   scheduler:

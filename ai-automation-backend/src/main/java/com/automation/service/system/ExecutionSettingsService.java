@@ -4,6 +4,7 @@ import com.automation.concurrency.DynamicSemaphore;
 import com.automation.config.ChainConfig;
 import com.automation.config.HostClaudeConfig;
 import com.automation.config.RateLimitConfig;
+import com.automation.config.TaskCommandConfig;
 import com.automation.config.TodoHygieneConfig;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.ai.HostClaudeService;
@@ -32,6 +33,7 @@ public class ExecutionSettingsService {
             Map.entry("rate-limit-enabled",                new long[]{0, 1}),
             Map.entry("rate-limit-requests-per-minute",    new long[]{10, 10000}),
             Map.entry("assistant-chat-timeout-seconds",    new long[]{30, 900}),
+            Map.entry("task-command-timeout-seconds",      new long[]{10, 3600}),
             Map.entry("allow-extra-mounts",                new long[]{0, 1}),
             Map.entry("todo-hygiene-enabled",              new long[]{0, 1}),
             Map.entry("todo-stale-days",                   new long[]{7, 365}),
@@ -49,6 +51,7 @@ public class ExecutionSettingsService {
             Map.entry("rateLimitEnabled",                "rate-limit-enabled"),
             Map.entry("rateLimitRequestsPerMinute",      "rate-limit-requests-per-minute"),
             Map.entry("assistantChatTimeoutSeconds",     "assistant-chat-timeout-seconds"),
+            Map.entry("taskCommandTimeoutSeconds",       "task-command-timeout-seconds"),
             Map.entry("allowExtraMounts",                "allow-extra-mounts"),
             Map.entry("todoHygieneEnabled",              "todo-hygiene-enabled"),
             Map.entry("todoStaleDays",                   "todo-stale-days"),
@@ -64,6 +67,7 @@ public class ExecutionSettingsService {
     private final WorkflowExecutor workflowExecutor;
     private final ContainerShellService containerShellService;
     private final TodoHygieneConfig todoHygieneConfig;
+    private final TaskCommandConfig taskCommandConfig;
 
     // Defaults from YAML/env (captured at startup)
     private int defaultMaxConcurrent;
@@ -81,7 +85,8 @@ public class ExecutionSettingsService {
             RateLimitConfig rateLimitConfig,
             @Lazy WorkflowExecutor workflowExecutor,
             ContainerShellService containerShellService,
-            TodoHygieneConfig todoHygieneConfig) {
+            TodoHygieneConfig todoHygieneConfig,
+            TaskCommandConfig taskCommandConfig) {
         this.appSettingsRepository = appSettingsRepository;
         this.executionSemaphore = executionSemaphore;
         this.hostClaudeService = hostClaudeService;
@@ -91,6 +96,7 @@ public class ExecutionSettingsService {
         this.workflowExecutor = workflowExecutor;
         this.containerShellService = containerShellService;
         this.todoHygieneConfig = todoHygieneConfig;
+        this.taskCommandConfig = taskCommandConfig;
     }
 
     @PostConstruct
@@ -115,6 +121,7 @@ public class ExecutionSettingsService {
         applyIfPresent("rate-limit-enabled", v -> rateLimitConfig.setEnabled(Integer.parseInt(v) == 1));
         applyIfPresent("rate-limit-requests-per-minute", v -> rateLimitConfig.setRequestsPerMinute(Integer.parseInt(v)));
         applyIfPresent("assistant-chat-timeout-seconds", v -> hostClaudeConfig.setAssistantChatTimeoutSeconds(Integer.parseInt(v)));
+        applyIfPresent("task-command-timeout-seconds", v -> taskCommandConfig.setTimeoutSeconds(Integer.parseInt(v)));
         applyIfPresent("allow-extra-mounts", v -> containerShellService.setAllowExtraMounts(Integer.parseInt(v) == 1));
         applyIfPresent("todo-hygiene-enabled", v -> todoHygieneConfig.setEnabled(Integer.parseInt(v) == 1));
         applyIfPresent("todo-stale-days", v -> todoHygieneConfig.setStaleDays(Integer.parseInt(v)));
@@ -170,6 +177,7 @@ public class ExecutionSettingsService {
         result.put("rateLimitEnabled", rateLimitConfig.isEnabled() ? 1 : 0);
         result.put("rateLimitRequestsPerMinute", rateLimitConfig.getRequestsPerMinute());
         result.put("assistantChatTimeoutSeconds", hostClaudeConfig.getAssistantChatTimeoutSeconds());
+        result.put("taskCommandTimeoutSeconds", taskCommandConfig.getTimeoutSeconds());
         result.put("allowExtraMounts", containerShellService.isAllowExtraMounts() ? 1 : 0);
         result.put("todoHygieneEnabled", todoHygieneConfig.isEnabled() ? 1 : 0);
         result.put("todoStaleDays", todoHygieneConfig.getStaleDays());
@@ -192,6 +200,7 @@ public class ExecutionSettingsService {
             case "rate-limit-enabled" -> rateLimitConfig.setEnabled(Integer.parseInt(value) == 1);
             case "rate-limit-requests-per-minute" -> rateLimitConfig.setRequestsPerMinute(Integer.parseInt(value));
             case "assistant-chat-timeout-seconds" -> hostClaudeConfig.setAssistantChatTimeoutSeconds(Integer.parseInt(value));
+            case "task-command-timeout-seconds" -> taskCommandConfig.setTimeoutSeconds(Integer.parseInt(value));
             case "allow-extra-mounts" -> containerShellService.setAllowExtraMounts(Integer.parseInt(value) == 1);
             case "todo-hygiene-enabled" -> todoHygieneConfig.setEnabled(Integer.parseInt(value) == 1);
             case "todo-stale-days" -> todoHygieneConfig.setStaleDays(Integer.parseInt(value));

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Plug, Calendar, KanbanSquare, TicketCheck, Mail, ExternalLink, Trash2, Play, CheckCircle2, XCircle,
-  AlertTriangle, ChevronRight, Copy, Settings2,
+  AlertTriangle, ChevronRight, Copy, Settings2, ListTodo,
 } from 'lucide-react';
 import { Card, Button, Badge, Spinner, Modal, Input } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
@@ -25,6 +25,7 @@ const ICON_MAP: Record<string, typeof Calendar> = {
   KanbanSquare,
   TicketCheck,
   Mail,
+  ListTodo,
 };
 
 function ProviderIcon({ icon }: { icon: string }) {

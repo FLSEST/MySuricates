@@ -18,6 +18,7 @@
 
 import { googleCalendarAdapter } from './googleCalendarAdapter';
 import { trelloAdapter } from './trelloAdapter';
+import { taskwarriorAdapter } from './taskwarriorAdapter';
 import { schedulesAdapter } from './schedulesAdapter';
 import { runsAdapter } from './runsAdapter';
 import type { CalendarSourceAdapter } from './types';
@@ -25,6 +26,7 @@ import type { CalendarSourceAdapter } from './types';
 export const CALENDAR_ADAPTERS: CalendarSourceAdapter[] = [
   googleCalendarAdapter,
   trelloAdapter,
+  taskwarriorAdapter,
   schedulesAdapter,
   runsAdapter,
 ];
