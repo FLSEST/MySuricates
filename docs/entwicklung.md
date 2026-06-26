@@ -10,9 +10,11 @@
 | Maven | 3.9+ | `mvn --version` |
 | Node.js | 20+ | `node --version` |
 | npm | 10+ | `npm --version` |
-| Docker | 24+ | `docker --version` |
+| Docker | 24+ (optional) | `docker --version` |
 
-Docker muss laufen, da das Backend über den Docker Socket Container erstellt und verwaltet.
+Docker wird nur für Container-Execution-Workflow-Blöcke benötigt — das Backend bootet auch ohne
+laufenden Docker-Daemon (der Docker-Client wird lazy aufgebaut). Für die Erstinstallation auf einem
+neuen Rechner siehe **[GETTING-STARTED.md](GETTING-STARTED.md)** (inkl. `scripts/setup.sh`).
 
 ## Lokales Setup
 

@@ -20,6 +20,9 @@ Eine Self-Hosted-Plattform zur Automatisierung von AI-gesteuerten Workflows. Pro
 
 ## Quickstart
 
+> Neuer Rechner (Linux), evtl. ohne Java/Node/Docker? → **[docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)**
+> führt Schritt für Schritt durch das Setup. Kurzform: `git clone … && cd autotrigger && ./scripts/setup.sh`.
+
 ```bash
 # 1. Repository klonen
 git clone <repository-url>
@@ -56,6 +59,7 @@ docker compose up --build
 
 | Dokument | Inhalt |
 |---|---|
+| [Getting Started](docs/GETTING-STARTED.md) | Erstinstallation auf einem neuen Linux-Rechner (Bootstrap-Skript, Prereqs, KI-Setup) |
 | [Architektur](docs/architektur.md) | Systemübersicht, Schichten, Datenfluss, Sicherheit |
 | [API-Referenz](docs/api-referenz.md) | Alle REST-Endpunkte mit Request/Response |
 | [Datenmodell](docs/datenmodell.md) | Entities, DB-Schema, Migrationen |

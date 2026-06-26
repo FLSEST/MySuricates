@@ -16,7 +16,10 @@ BACKEND_LOG="${STATE_DIR}/backend.log"
 FRONTEND_LOG="${STATE_DIR}/frontend.log"
 
 BACKEND_READY_URL="http://localhost:9090/api/v1/system/info"
-FRONTEND_READY_URL="https://localhost:3000"
+# Vite serves HTTPS only when certs/dev.crt exists, otherwise plain HTTP.
+# Probe both schemes so a fresh clone (no certs -> HTTP) is detected correctly.
+FRONTEND_HTTPS_URL="https://localhost:3000"
+FRONTEND_HTTP_URL="http://localhost:3000"
 
 require_command() {
   local command_name="$1"
@@ -67,6 +70,33 @@ wait_for_endpoint() {
   return 1
 }
 
+frontend_is_ready() {
+  endpoint_is_ready "${FRONTEND_HTTPS_URL}" || endpoint_is_ready "${FRONTEND_HTTP_URL}"
+}
+
+resolved_frontend_url() {
+  if endpoint_is_ready "${FRONTEND_HTTPS_URL}"; then
+    echo "${FRONTEND_HTTPS_URL}"
+  else
+    echo "${FRONTEND_HTTP_URL}"
+  fi
+}
+
+wait_for_frontend() {
+  local attempts="$1"
+
+  for ((i = 1; i <= attempts; i += 1)); do
+    if frontend_is_ready; then
+      echo "Frontend ist erreichbar: $(resolved_frontend_url)"
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "Frontend wurde nicht rechtzeitig erreichbar: ${FRONTEND_HTTP_URL} / ${FRONTEND_HTTPS_URL}" >&2
+  return 1
+}
+
 start_backend() {
   if pid_is_running "${BACKEND_PID_FILE}" || endpoint_is_ready "${BACKEND_READY_URL}"; then
     echo "Backend laeuft bereits auf http://localhost:9090"
@@ -83,8 +113,8 @@ start_backend() {
 }
 
 start_frontend() {
-  if pid_is_running "${FRONTEND_PID_FILE}" || endpoint_is_ready "${FRONTEND_READY_URL}"; then
-    echo "Frontend laeuft bereits auf http://localhost:3000"
+  if pid_is_running "${FRONTEND_PID_FILE}" || frontend_is_ready; then
+    echo "Frontend laeuft bereits auf $(resolved_frontend_url)"
     return 0
   fi
 
@@ -121,13 +151,13 @@ if wait_for_endpoint "Backend" "${BACKEND_READY_URL}" 90; then
   backend_ok=1
 fi
 
-if wait_for_endpoint "Frontend" "${FRONTEND_READY_URL}" 90; then
+if wait_for_frontend 90; then
   frontend_ok=1
 fi
 
 echo
 echo "URLs:"
-echo "  Frontend: https://localhost:3000"
+echo "  Frontend: $(resolved_frontend_url)"
 echo "  Backend:  http://localhost:9090/api/v1"
 print_logs_hint
 
