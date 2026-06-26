@@ -81,8 +81,14 @@ Logs liegen unter `~/.local/state/autotrigger-dev/{backend,frontend}.log`.
 ## 4. API-Key eintragen
 
 Beim ersten Backend-Start wird automatisch ein API-Key erzeugt. **`start-autotrigger-dev.sh` zeigt
-ihn direkt nach dem Start im Terminal an** — einfach kopieren. Er liegt außerdem in der Datei
-`~/.autotrigger/api-key` (und im Backend-Log):
+ihn nach dem Start im Terminal an** — standardmäßig **maskiert** (nur die letzten 4 Zeichen), damit
+er nicht versehentlich in Terminal-Scrollback/Logs/Screen-Sharing landet. Voll anzeigen mit dem Flag:
+
+```bash
+./scripts/start-autotrigger-dev.sh --show-key    # oder: ./scripts/setup.sh --show-key --start
+```
+
+Der Key liegt immer im Klartext in der Datei `~/.autotrigger/api-key` (und im Backend-Log):
 
 ```bash
 cat ~/.autotrigger/api-key

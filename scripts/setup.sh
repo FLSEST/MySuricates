@@ -13,6 +13,7 @@
 #   ./scripts/setup.sh                # nur prüfen + vorbereiten
 #   ./scripts/setup.sh --install      # fehlende Tools per Paketmanager installieren (apt: voll, sonst Hinweise)
 #   ./scripts/setup.sh --start        # nach erfolgreichem Setup direkt starten
+#   ./scripts/setup.sh --show-key     # API-Key voll anzeigen (Default: maskiert)
 #   ./scripts/setup.sh --install --start
 #   ./scripts/setup.sh --help
 #
@@ -26,10 +27,12 @@ FRONTEND_DIR="${REPO_ROOT}/ai-automation-frontend"
 
 DO_INSTALL=0
 DO_START=0
+SHOW_KEY=0
 for arg in "$@"; do
   case "$arg" in
     --install) DO_INSTALL=1 ;;
     --start)   DO_START=1 ;;
+    --show-key) SHOW_KEY=1 ;;
     -h|--help)
       sed -n '2,18p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0
@@ -317,7 +320,12 @@ if [ "${AUTOMATION_SECURITY_ENABLED:-true}" = "false" ]; then
 elif [ -n "${AUTOMATION_API_KEY:-}" ]; then
   echo "  API-Key:   eigener via ${C_BLD}AUTOMATION_API_KEY${C_RST} gesetzt"
 elif [ -f "$KEY_FILE" ]; then
-  echo "  API-Key:   ${C_BLD}$(cat "$KEY_FILE")${C_RST}"
+  k="$(cat "$KEY_FILE")"
+  if [ "$SHOW_KEY" -eq 1 ]; then
+    echo "  API-Key:   ${C_BLD}${k}${C_RST}"
+  else
+    echo "  API-Key:   …${k: -4}   (maskiert — voll mit ${C_BLD}--show-key${C_RST})"
+  fi
   echo "             (aus ${KEY_FILE} — beim ersten Öffnen ins Browser-Login einfügen)"
 else
   echo "  API-Key:   wird beim ersten Backend-Start erzeugt → ${C_BLD}~/.autotrigger/api-key${C_RST}"
@@ -339,5 +347,9 @@ fi
 
 if [ "$DO_START" -eq 1 ]; then
   head2 "Starte Dev-Umgebung ..."
-  exec bash "${SCRIPT_DIR}/start-autotrigger-dev.sh"
+  if [ "$SHOW_KEY" -eq 1 ]; then
+    exec bash "${SCRIPT_DIR}/start-autotrigger-dev.sh" --show-key
+  else
+    exec bash "${SCRIPT_DIR}/start-autotrigger-dev.sh"
+  fi
 fi

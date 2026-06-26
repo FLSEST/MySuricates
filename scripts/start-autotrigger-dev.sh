@@ -4,6 +4,15 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
+# --show-key: API-Key voll anzeigen (Default: maskiert, nur letzte 4 Zeichen).
+SHOW_KEY=0
+for arg in "$@"; do
+  case "$arg" in
+    --show-key) SHOW_KEY=1 ;;
+    *) ;; # andere Argumente ignorieren
+  esac
+done
+
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/autotrigger-dev"
 mkdir -p "${STATE_DIR}"
 
@@ -143,21 +152,30 @@ print_logs_hint() {
 
 # Zeigt den API-Key, den der neue User im Browser-Login eingeben muss.
 # Drei Fälle: Security aus / eigener Key via Env / auto-generierter Key (Datei).
+# Default maskiert (nur letzte 4 Zeichen) — mit --show-key voll. Sicher für CI/Screen-Sharing.
 print_api_key() {
   local key_file="${HOME}/.autotrigger/api-key"
+  local key="" src=""
   echo
   if [[ "${AUTOMATION_SECURITY_ENABLED:-true}" == "false" ]]; then
     echo "API-Key: nicht nötig (AUTOMATION_SECURITY_ENABLED=false)"
+    return 0
   elif [[ -n "${AUTOMATION_API_KEY:-}" ]]; then
+    key="${AUTOMATION_API_KEY}"; src="AUTOMATION_API_KEY (env)"
     echo "API-Key (eigener, via AUTOMATION_API_KEY):"
-    echo "  ${AUTOMATION_API_KEY}"
   elif [[ -f "${key_file}" ]]; then
+    key="$(cat "${key_file}")"; src="${key_file}"
     echo "API-Key (beim ersten Öffnen im Browser-Login einfügen):"
-    echo "  $(cat "${key_file}")"
-    echo "  Quelle: ${key_file}"
   else
     echo "API-Key: noch nicht gefunden — siehe Backend-Log (${BACKEND_LOG})"
+    return 0
   fi
+  if [[ "${SHOW_KEY}" -eq 1 ]]; then
+    echo "  ${key}"
+  else
+    echo "  …${key: -4}   (maskiert — voll anzeigen mit: --show-key)"
+  fi
+  echo "  Quelle: ${src}"
 }
 
 if [[ "${MVN_CMD}" == "mvn" ]]; then
