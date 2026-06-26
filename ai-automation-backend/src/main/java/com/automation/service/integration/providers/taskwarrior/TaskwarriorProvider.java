@@ -80,6 +80,12 @@ public class TaskwarriorProvider implements IntegrationProvider {
     }
 
     @Override
+    public boolean requiresCredentials() {
+        // TASKDATA/TASKRC are optional — empty connects against the host's default ~/.task / ~/.taskrc.
+        return false;
+    }
+
+    @Override
     public OAuthConfig getOAuthConfig() {
         // URLs/scopes are unused for non-OAuth providers; the env-var slots map to the
         // optional TASKDATA / TASKRC paths the user can supply when connecting.
@@ -96,9 +102,10 @@ public class TaskwarriorProvider implements IntegrationProvider {
         // combinedToken = "TASKDATA|TASKRC" (either side may be empty -> host defaults).
         Map<String, String> env = envFrom(combinedToken);
         try {
-            TaskResult version = taskCommandService.run(List.of("--version"), env, 10);
+            // `_version` is the script-friendly variant — `--version` breaks under rc.verbose=nothing on TW 2.x.
+            TaskResult version = taskCommandService.run(List.of("_version"), env, 10);
             if (!version.isSuccess()) {
-                throw new IllegalStateException("`task --version` exited " + version.exitCode());
+                throw new IllegalStateException("`task _version` exited " + version.exitCode());
             }
             String versionStr = version.output() != null ? version.output().trim() : "";
 

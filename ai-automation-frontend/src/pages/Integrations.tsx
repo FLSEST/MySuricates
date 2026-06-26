@@ -66,9 +66,10 @@ function ProviderStatusBadge({ provider }: { provider: IntegrationProviderInfo }
   );
 }
 
-function SetupGuidePanel({ providerId, displayName, onRefresh }: {
+function SetupGuidePanel({ providerId, displayName, requiresCredentials = true, onRefresh }: {
   providerId: string;
   displayName: string;
+  requiresCredentials?: boolean;
   onRefresh: () => void;
 }) {
   const lang = useI18nStore.getState().locale;
@@ -195,7 +196,7 @@ function SetupGuidePanel({ providerId, displayName, onRefresh }: {
             variant="primary"
             onClick={handleSaveCredentials}
             loading={saveCredentials.isPending}
-            disabled={!clientId.trim() || !clientSecret.trim()}
+            disabled={requiresCredentials && (!clientId.trim() || !clientSecret.trim())}
           >
             <CheckCircle2 className="w-3 h-3 mr-1" />
             {t.integrations.saveCredentials}
@@ -394,6 +395,7 @@ export function Integrations() {
           key={selected.providerId}
           providerId={selected.providerId}
           displayName={selected.displayName}
+          requiresCredentials={selected.requiresCredentials !== false}
           onRefresh={() => refetch()}
         />
       )}

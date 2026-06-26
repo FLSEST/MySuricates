@@ -87,13 +87,17 @@ public class IntegrationController {
     public IntegrationProviderResponse saveCredentials(
             @PathVariable String providerId,
             @RequestBody Map<String, String> body) {
-        String clientId = body.get("clientId");
-        String clientSecret = body.get("clientSecret");
-        if (clientId == null || clientSecret == null || clientId.isBlank() || clientSecret.isBlank()) {
+        IntegrationProvider provider = registry.getProvider(providerId);
+        String clientId = body.getOrDefault("clientId", "");
+        String clientSecret = body.getOrDefault("clientSecret", "");
+        if (clientId == null) clientId = "";
+        if (clientSecret == null) clientSecret = "";
+        // Providers with optional credentials (e.g. local CLI tools) may be connected with empty values.
+        if (provider.requiresCredentials() && (clientId.isBlank() || clientSecret.isBlank())) {
             throw new IllegalArgumentException("clientId and clientSecret are required");
         }
         oAuthService.saveCredentials(providerId, clientId, clientSecret);
-        return toProviderResponse(registry.getProvider(providerId));
+        return toProviderResponse(provider);
     }
 
     @DeleteMapping("/{providerId}/connection")
@@ -167,6 +171,7 @@ public class IntegrationController {
                 provider.getDescription(),
                 status,
                 oAuthService.isProviderConfigured(provider.getProviderId()),
+                provider.requiresCredentials(),
                 accountEmail,
                 accountName,
                 connection != null ? connection.getCreatedAt() : null,

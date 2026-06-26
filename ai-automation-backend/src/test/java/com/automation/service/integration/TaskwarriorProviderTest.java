@@ -299,7 +299,7 @@ class TaskwarriorProviderTest {
 
     @Test
     void fetchAccountInfoReturnsVersionJson() throws Exception {
-        when(taskCommandService.run(eq(List.of("--version")), anyMap(), any()))
+        when(taskCommandService.run(eq(List.of("_version")), anyMap(), any()))
                 .thenReturn(new TaskResult("3.1.0", 0));
         when(taskCommandService.run(eq(List.of("status:pending", "count")), anyMap(), any()))
                 .thenReturn(new TaskResult("12", 0));
@@ -321,7 +321,7 @@ class TaskwarriorProviderTest {
 
     @Test
     void fetchAccountInfoPassesTaskdataEnv() {
-        when(taskCommandService.run(eq(List.of("--version")), anyMap(), any()))
+        when(taskCommandService.run(eq(List.of("_version")), anyMap(), any()))
                 .thenReturn(new TaskResult("3.1.0", 0));
         when(taskCommandService.run(eq(List.of("status:pending", "count")), anyMap(), any()))
                 .thenReturn(new TaskResult("0", 0));
@@ -330,7 +330,7 @@ class TaskwarriorProviderTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, String>> envCaptor = ArgumentCaptor.forClass(Map.class);
-        verify(taskCommandService, atLeastOnce()).run(eq(List.of("--version")), envCaptor.capture(), any());
+        verify(taskCommandService, atLeastOnce()).run(eq(List.of("_version")), envCaptor.capture(), any());
         assertThat(envCaptor.getValue())
                 .containsEntry("TASKDATA", "/data/tasks")
                 .containsEntry("TASKRC", "/data/.taskrc");

@@ -10,6 +10,7 @@ public record IntegrationProviderResponse(
         String description,
         String status,
         boolean configured,
+        boolean requiresCredentials,
         String accountEmail,
         String accountName,
         Instant connectedSince,

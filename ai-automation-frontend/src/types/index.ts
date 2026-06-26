@@ -460,6 +460,8 @@ export interface IntegrationProviderInfo {
   description: string;
   status: 'CONNECTED' | 'DISCONNECTED' | 'EXPIRED';
   configured: boolean;
+  /** Whether connecting requires non-empty credentials. Local providers (e.g. Taskwarrior) may be false. */
+  requiresCredentials?: boolean;
   accountEmail: string | null;
   accountName: string | null;
   connectedSince: string | null;

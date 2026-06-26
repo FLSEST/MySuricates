@@ -39,4 +39,12 @@ public interface IntegrationProvider {
     default boolean requiresOAuthFlow() {
         return true;
     }
+
+    /**
+     * Whether connecting requires non-empty clientId/clientSecret. Local providers (e.g. a CLI tool
+     * with optional config paths) may return false so the user can connect without entering credentials.
+     */
+    default boolean requiresCredentials() {
+        return true;
+    }
 }

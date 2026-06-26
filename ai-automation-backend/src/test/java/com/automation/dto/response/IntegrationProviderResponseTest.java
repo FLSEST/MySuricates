@@ -25,6 +25,7 @@ class IntegrationProviderResponseTest {
             "Calendar integration",
             "CONNECTED",
             true,
+            true,
             "user@example.com",
             "John Doe",
             connectedSince,
@@ -39,6 +40,7 @@ class IntegrationProviderResponseTest {
         assertThat(response.description()).isEqualTo("Calendar integration");
         assertThat(response.status()).isEqualTo("CONNECTED");
         assertThat(response.configured()).isTrue();
+        assertThat(response.requiresCredentials()).isTrue();
         assertThat(response.accountEmail()).isEqualTo("user@example.com");
         assertThat(response.accountName()).isEqualTo("John Doe");
         assertThat(response.connectedSince()).isEqualTo(connectedSince);
@@ -56,6 +58,7 @@ class IntegrationProviderResponseTest {
             null,
             "DISCONNECTED",
             false,
+            true,
             null,
             null,
             null,
@@ -79,6 +82,16 @@ class IntegrationProviderResponseTest {
     }
 
     @Test
+    void should_expose_requiresCredentials_false_for_local_providers() {
+        IntegrationProviderResponse response = new IntegrationProviderResponse(
+            "taskwarrior", "Taskwarrior", "ListTodo", "Local tasks",
+            "DISCONNECTED", false, false, null, null, null, null, List.of(), List.of()
+        );
+
+        assertThat(response.requiresCredentials()).isFalse();
+    }
+
+    @Test
     void should_handle_empty_lists_when_no_scopes_or_actions() {
         IntegrationProviderResponse response = new IntegrationProviderResponse(
             "trello",
@@ -86,6 +99,7 @@ class IntegrationProviderResponseTest {
             "trello-icon",
             "Trello integration",
             "CONNECTED",
+            true,
             true,
             "user@example.com",
             "Jane",
@@ -106,11 +120,11 @@ class IntegrationProviderResponseTest {
     void should_be_equal_when_all_fields_match() {
         Instant ts = Instant.parse("2026-02-01T08:00:00Z");
         IntegrationProviderResponse a = new IntegrationProviderResponse(
-            "id", "name", "icon", "desc", "OK", true,
+            "id", "name", "icon", "desc", "OK", true, true,
             "e@x", "n", ts, "s", List.of(), List.of()
         );
         IntegrationProviderResponse b = new IntegrationProviderResponse(
-            "id", "name", "icon", "desc", "OK", true,
+            "id", "name", "icon", "desc", "OK", true, true,
             "e@x", "n", ts, "s", List.of(), List.of()
         );
 
@@ -121,10 +135,10 @@ class IntegrationProviderResponseTest {
     @Test
     void should_not_be_equal_when_provider_id_differs() {
         IntegrationProviderResponse a = new IntegrationProviderResponse(
-            "id-a", "name", null, null, "OK", true, null, null, null, null, null, null
+            "id-a", "name", null, null, "OK", true, true, null, null, null, null, null, null
         );
         IntegrationProviderResponse b = new IntegrationProviderResponse(
-            "id-b", "name", null, null, "OK", true, null, null, null, null, null, null
+            "id-b", "name", null, null, "OK", true, true, null, null, null, null, null, null
         );
 
         assertThat(a).isNotEqualTo(b);
@@ -133,10 +147,10 @@ class IntegrationProviderResponseTest {
     @Test
     void should_not_be_equal_when_configured_differs() {
         IntegrationProviderResponse a = new IntegrationProviderResponse(
-            "id", "name", null, null, "OK", true, null, null, null, null, null, null
+            "id", "name", null, null, "OK", true, true, null, null, null, null, null, null
         );
         IntegrationProviderResponse b = new IntegrationProviderResponse(
-            "id", "name", null, null, "OK", false, null, null, null, null, null, null
+            "id", "name", null, null, "OK", false, true, null, null, null, null, null, null
         );
 
         assertThat(a).isNotEqualTo(b);
@@ -147,7 +161,7 @@ class IntegrationProviderResponseTest {
     @Test
     void should_include_field_names_in_toString() {
         IntegrationProviderResponse response = new IntegrationProviderResponse(
-            "github", "GitHub", null, null, "CONNECTED", true,
+            "github", "GitHub", null, null, "CONNECTED", true, true,
             "u@x", "U", null, null, null, null
         );
 
