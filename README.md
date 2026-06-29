@@ -1,49 +1,51 @@
+[Deutsch](README.de.md) | **English**
+
 # AI Automation Platform
 
-Eine Self-Hosted-Plattform zur Automatisierung von AI-gesteuerten Workflows. Projekte werden in isolierten Docker-Containern ausgeführt und über ein React-Frontend verwaltet.
+A self-hosted platform for automating AI-driven workflows. Projects run in isolated Docker containers and are managed through a React frontend.
 
-## Tech-Stack
+## Tech Stack
 
-| Komponente | Technologie |
+| Component | Technology |
 |---|---|
 | Backend | Spring Boot 3.4, Java 21 |
 | Frontend | React 19, TypeScript, Vite 5 |
-| Datenbank | SQLite (WAL-Modus) + Flyway |
+| Database | SQLite (WAL mode) + Flyway |
 | Container | Docker (Java Docker Client 3.3.4) |
-| Styling | Tailwind CSS 3.4, CSS-Variablen |
+| Styling | Tailwind CSS 3.4, CSS variables |
 | State | Zustand 4.4 + TanStack Query 5 |
-| WebSocket | STOMP über SockJS |
-| Sicherheit | API-Key-Auth, Rate Limiting |
-| i18n | Deutsch / Englisch |
+| WebSocket | STOMP over SockJS |
+| Security | API key auth, rate limiting |
+| i18n | German / English |
 | PWA | Vite PWA Plugin |
-| Integrationen | Google Calendar, Gmail, Jira, Confluence, Trello |
+| Integrations | Google Calendar, Gmail, Jira, Confluence, Trello |
 
 ## Quickstart
 
-> Neuer Rechner (Linux), evtl. ohne Java/Node/Docker? → **[docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)**
-> führt Schritt für Schritt durch das Setup. Kurzform: `git clone … && cd autotrigger && ./scripts/setup.sh`.
+> New machine (Linux), possibly without Java/Node/Docker? → **[docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)**
+> walks you through the setup step by step. Short version: `git clone … && cd autotrigger && ./scripts/setup.sh`.
 
 ```bash
-# 1. Repository klonen
+# 1. Clone the repository
 git clone <repository-url>
 cd autotrigger
 
-# 2. Backend bauen und starten
+# 2. Build and start the backend
 cd ai-automation-backend
 mvn clean package -DskipTests
 java -jar target/ai-automation-backend-*.jar
 
-# 3. Frontend installieren und starten (neues Terminal)
+# 3. Install and start the frontend (new terminal)
 cd ai-automation-frontend
 npm install
 npm run dev
 
-# 4. Öffnen
+# 4. Open
 # Frontend: http://localhost:3000
 # Backend API: http://localhost:9090/api/v1
 ```
 
-Alternativ mit Docker:
+Alternatively with Docker:
 
 ```bash
 cd ai-automation-backend
@@ -52,36 +54,40 @@ docker compose up --build
 # → http://localhost:9090
 ```
 
-<!-- Screenshot-Platzhalter -->
+<!-- Screenshot placeholder -->
 <!-- ![Dashboard](docs/screenshots/dashboard.png) -->
 
-## Dokumentation
+## Documentation
 
-| Dokument | Inhalt |
+| Document | Content |
 |---|---|
-| [Getting Started](docs/GETTING-STARTED.md) | Erstinstallation auf einem neuen Linux-Rechner (Bootstrap-Skript, Prereqs, KI-Setup) |
-| [Architektur](docs/architektur.md) | Systemübersicht, Schichten, Datenfluss, Sicherheit |
-| [API-Referenz](docs/api-referenz.md) | Alle REST-Endpunkte mit Request/Response |
-| [Datenmodell](docs/datenmodell.md) | Entities, DB-Schema, Migrationen |
-| [Frontend](docs/frontend.md) | Seiten, Komponenten, Hooks, Design-System |
-| [Deployment](docs/deployment.md) | Docker, Konfiguration, Umgebungsvariablen |
-| [Entwicklung](docs/entwicklung.md) | Lokales Setup, Build, Tests, Konventionen |
-| [Integrations](docs/integrations.md) | Plugin-System, OAuth, Provider-Referenz |
-| [Workflow-Guide](docs/WORKFLOW-GUIDE.md) | Block-Typen, Patterns, Timeouts |
-| [Assistant](docs/assistant-system.md) | Chat-Assistent, Sessions, Suggestions |
-| [Vision](VISION.md) | Produktvision und Roadmap |
+| [Getting Started](docs/GETTING-STARTED.md) | First-time installation on a new Linux machine (bootstrap script, prereqs, AI setup) |
+| [Architecture](docs/architektur.md) | System overview, layers, data flow, security |
+| [API Reference](docs/api-referenz.md) | All REST endpoints with request/response |
+| [Data Model](docs/datenmodell.md) | Entities, DB schema, migrations |
+| [Frontend](docs/frontend.md) | Pages, components, hooks, design system |
+| [Deployment](docs/deployment.md) | Docker, configuration, environment variables |
+| [Development](docs/entwicklung.md) | Local setup, build, tests, conventions |
+| [Integrations](docs/integrations.md) | Plugin system, OAuth, provider reference |
+| [Workflow Guide](docs/WORKFLOW-GUIDE.md) | Block types, patterns, timeouts |
+| [Assistant](docs/assistant-system.md) | Chat assistant, sessions, suggestions |
+| [Vision](VISION.md) | Product vision and roadmap |
 
-## Todo-Workflow-Verknuepfung
+## Todo Workflow Linking
 
-Todos koennen optional mit einem Resolver-Workflow verknuepft werden. Die Verknuepfung ist bewusst nicht global und startet nichts automatisch.
+Todos can optionally be linked to a resolver workflow. The link is deliberately not global and does not start anything automatically.
 
-- `linkedWorkflowId` am Todo ist optional.
-- Ein verlinkter Workflow wird erst durch die manuelle Aktion `Loesen` gestartet.
-- Beim Start wechselt das Todo auf `IN_PROGRESS` und `resolutionState=RUNNING`.
-- Bei erfolgreichem Workflow-Run wird das Todo automatisch auf `DONE` gesetzt.
-- Bei einem fehlgeschlagenen Run springt das Todo auf den vorherigen Status zurueck und `resolutionState=FAILED`.
+- `linkedWorkflowId` on the todo is optional.
+- A linked workflow is only started by the manual `Resolve` action.
+- On start, the todo switches to `IN_PROGRESS` and `resolutionState=RUNNING`.
+- On a successful workflow run, the todo is automatically set to `DONE`.
+- On a failed run, the todo reverts to its previous status and `resolutionState=FAILED`.
 
-Abgrenzung:
-- Das ist nicht dasselbe wie der bestehende `TodoTrigger`-Mechanismus.
-- `TodoTrigger` startet Workflows regelbasiert/automatisch.
-- Die Todo-Workflow-Verknuepfung ist aktuell ein manueller, optionaler Resolve-Flow pro Todo.
+Distinction:
+- This is not the same as the existing `TodoTrigger` mechanism.
+- `TodoTrigger` starts workflows rule-based/automatically.
+- The todo workflow link is currently a manual, optional resolve flow per todo.
+
+---
+
+> 🌍 This English README.md is generated from [README.de.md](README.de.md) by the "README DE↔EN Sync" workflow. For content changes, edit the German source and re-run the workflow rather than editing this file by hand.
