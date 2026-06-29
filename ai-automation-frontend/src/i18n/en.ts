@@ -648,6 +648,20 @@ export const en = {
     configMissing: 'Environment variables not set yet',
     enterCredentials: 'Enter credentials',
     saveCredentials: 'Save credentials',
+    providers: {
+      github: {
+        displayName: 'GitHub',
+        description: 'Sync GitHub issues: list, create, update and comment',
+        actions: {
+          list_repos: 'List accessible repositories',
+          list_issues: 'List issues of a repository',
+          get_issue: 'Fetch a single issue',
+          create_issue: 'Create a new issue',
+          update_issue: 'Update an issue (incl. open/close)',
+          add_comment: 'Add a comment to an issue',
+        },
+      },
+    },
   },
   calendar: {
     title: 'Calendar',

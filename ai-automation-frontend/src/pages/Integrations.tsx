@@ -210,6 +210,16 @@ function SetupGuidePanel({ providerId, displayName, requiresCredentials = true, 
 export function Integrations() {
   const t = useT();
   const { data: providers, isLoading, error, refetch } = useIntegrations();
+  // Localized provider copy (DE/EN) with fallback to the backend-provided text.
+  const providerCopy = (t.integrations as unknown as {
+    providers?: Record<string, { displayName?: string; description?: string; actions?: Record<string, string> }>;
+  }).providers;
+  const localizedName = (p: { providerId: string; displayName: string }) =>
+    providerCopy?.[p.providerId]?.displayName ?? p.displayName;
+  const localizedDesc = (p: { providerId: string; description: string }) =>
+    providerCopy?.[p.providerId]?.description ?? p.description;
+  const localizedActionDesc = (providerId: string, a: { name: string; description: string }) =>
+    providerCopy?.[providerId]?.actions?.[a.name] ?? a.description;
   const connect = useConnectIntegration();
   const disconnect = useDisconnectIntegration();
   const deleteCredentials = useDeleteCredentials();
@@ -313,10 +323,10 @@ export function Integrations() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <h3 className="font-semibold text-text">{provider.displayName}</h3>
+                  <h3 className="font-semibold text-text">{localizedName(provider)}</h3>
                   <ProviderStatusBadge provider={provider} />
                 </div>
-                <p className="text-sm text-text-secondary mb-3">{provider.description}</p>
+                <p className="text-sm text-text-secondary mb-3">{localizedDesc(provider)}</p>
 
                 {provider.status === 'CONNECTED' && provider.accountEmail && (
                   <p className="text-xs text-text-tertiary mb-3">
@@ -394,7 +404,7 @@ export function Integrations() {
         <SetupGuidePanel
           key={selected.providerId}
           providerId={selected.providerId}
-          displayName={selected.displayName}
+          displayName={localizedName(selected)}
           requiresCredentials={selected.requiresCredentials !== false}
           onRefresh={() => refetch()}
         />
@@ -405,14 +415,14 @@ export function Integrations() {
         <Card>
           <div className="p-4">
             <h3 className="font-semibold text-text mb-4">
-              {t.integrations.availableActions} — {selected.displayName}
+              {t.integrations.availableActions} — {localizedName(selected)}
             </h3>
             <div className="space-y-3">
               {selected.actions.map((action) => (
                 <div key={action.name} className={`flex items-center justify-between p-3 rounded-lg bg-surface-secondary ${!action.available ? 'opacity-50' : ''}`}>
                   <div>
                     <p className={`font-medium text-sm ${action.available ? 'text-text' : 'text-text-tertiary'}`}>{action.name}</p>
-                    <p className="text-xs text-text-secondary">{action.description}</p>
+                    <p className="text-xs text-text-secondary">{localizedActionDesc(selected.providerId, action)}</p>
                     {!action.available && (
                       <p className="text-xs text-amber-500 mt-1">{t.integrations.scopeMissing}</p>
                     )}

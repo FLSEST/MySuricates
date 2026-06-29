@@ -502,6 +502,59 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
     ],
   },
 
+  'github': {
+    credentialLabels: {
+      clientIdPlaceholder: { de: 'GitHub-Benutzername (optional)', en: 'GitHub username (optional)' },
+      clientSecretPlaceholder: { de: 'Personal Access Token (PAT)', en: 'Personal Access Token (PAT)' },
+    },
+    steps: [
+      {
+        title: {
+          de: 'Personal Access Token erstellen',
+          en: 'Create a Personal Access Token',
+        },
+        instructions: {
+          de: [
+            'Öffne die GitHub Token-Einstellungen (Link unten)',
+            'Empfohlen: "Fine-grained token" → wähle das/die Repository/s aus',
+            'Repository-Berechtigungen: "Issues" auf "Read and write" setzen',
+            '(Alternativ: klassischer Token mit Scope "repo")',
+            'Token erzeugen und sofort kopieren — er wird nur einmal angezeigt',
+          ],
+          en: [
+            'Open the GitHub token settings (link below)',
+            'Recommended: "Fine-grained token" → select the repository/repositories',
+            'Repository permissions: set "Issues" to "Read and write"',
+            '(Alternatively: classic token with the "repo" scope)',
+            'Generate the token and copy it immediately — it is shown only once',
+          ],
+        },
+        link: {
+          url: 'https://github.com/settings/tokens',
+          label: { de: 'GitHub Token-Einstellungen', en: 'GitHub token settings' },
+        },
+      },
+      {
+        title: {
+          de: 'Zugangsdaten eintragen',
+          en: 'Enter credentials',
+        },
+        instructions: {
+          de: [
+            'GitHub-Benutzername in das erste Feld (optional, nur zur Anzeige)',
+            'Personal Access Token in das zweite Feld',
+            '"Zugangsdaten speichern" klicken — der Status wird grün, sobald der Token gültig ist',
+          ],
+          en: [
+            'GitHub username in the first field (optional, for display only)',
+            'Personal Access Token in the second field',
+            'Click "Save credentials" — the status turns green once the token is valid',
+          ],
+        },
+      },
+    ],
+  },
+
   'confluence': {
     steps: [
       {

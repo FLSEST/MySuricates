@@ -650,6 +650,20 @@ export const de: TranslationKeys = {
     configMissing: 'Umgebungsvariablen noch nicht gesetzt',
     enterCredentials: 'Zugangsdaten eintragen',
     saveCredentials: 'Zugangsdaten speichern',
+    providers: {
+      github: {
+        displayName: 'GitHub',
+        description: 'GitHub-Issues synchronisieren: auflisten, erstellen, aktualisieren und kommentieren',
+        actions: {
+          list_repos: 'Zugängliche Repositories auflisten',
+          list_issues: 'Issues eines Repositories auflisten',
+          get_issue: 'Ein einzelnes Issue abrufen',
+          create_issue: 'Ein neues Issue erstellen',
+          update_issue: 'Ein Issue aktualisieren (inkl. öffnen/schliessen)',
+          add_comment: 'Einen Kommentar zu einem Issue hinzufügen',
+        },
+      },
+    },
   },
   calendar: {
     title: 'Kalender',
