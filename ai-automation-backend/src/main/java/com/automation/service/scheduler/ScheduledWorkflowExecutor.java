@@ -17,6 +17,7 @@ import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -32,6 +33,7 @@ public class ScheduledWorkflowExecutor {
     private final WorkflowExecutor workflowExecutor;
     private final ChainExecutor chainExecutor;
     private final ActivityLogService activityLogService;
+    private final Clock clock;
 
     /**
      * Execute a scheduled workflow/chain.
@@ -52,7 +54,7 @@ public class ScheduledWorkflowExecutor {
 
         if (scheduled == null || !scheduled.isEnabled()
                 || scheduled.getNextRunAt() == null
-                || scheduled.getNextRunAt().isAfter(Instant.now())) {
+                || scheduled.getNextRunAt().isAfter(Instant.now(clock))) {
             return;
         }
 
@@ -109,7 +111,7 @@ public class ScheduledWorkflowExecutor {
         ScheduledWorkflow scheduled = scheduledRepository.findById(scheduleId).orElse(null);
         if (scheduled == null) return;
 
-        scheduled.setLastRunAt(Instant.now());
+        scheduled.setLastRunAt(Instant.now(clock));
 
         if (scheduleType == ScheduleType.ONCE || scheduleType == ScheduleType.DELAYED) {
             scheduled.setNextRunAt(null);
@@ -122,7 +124,7 @@ public class ScheduledWorkflowExecutor {
             boolean maxRunsReached = scheduled.getMaxRuns() > 0
                     && scheduled.getRunCount() >= scheduled.getMaxRuns();
             boolean endDateReached = scheduled.getEndDate() != null
-                    && Instant.now().isAfter(scheduled.getEndDate());
+                    && Instant.now(clock).isAfter(scheduled.getEndDate());
 
             if (maxRunsReached || endDateReached) {
                 scheduled.setNextRunAt(null);
@@ -141,7 +143,7 @@ public class ScheduledWorkflowExecutor {
 
     private Instant calculateNextRun(String cronExpression) {
         CronExpression cron = CronExpression.parse(cronExpression);
-        LocalDateTime next = cron.next(LocalDateTime.now());
+        LocalDateTime next = cron.next(LocalDateTime.now(clock));
         if (next == null) return null;
         return next.atZone(ZoneId.systemDefault()).toInstant();
     }

@@ -15,5 +15,6 @@ public record CreateScheduleRequest(
         String delayExpression,
         Instant endDate,
         Integer maxRuns,
-        String conflictBehavior
+        String conflictBehavior,
+        Boolean catchUpOnResume
 ) {}

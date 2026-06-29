@@ -9,5 +9,6 @@ public record UpdateScheduleRequest(
         Map<String, Object> inputContext,
         Instant scheduledAt,
         Instant endDate,
-        Integer maxRuns
+        Integer maxRuns,
+        Boolean catchUpOnResume
 ) {}

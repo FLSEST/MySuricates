@@ -601,6 +601,8 @@ export const en = {
     conflictBehavior: 'When already running',
     conflictBehaviorSkip: 'Skip (default)',
     conflictBehaviorOverlap: 'Start anyway (overlap)',
+    catchUpOnResume: 'Catch up missed runs after standby',
+    catchUpOnResumeHint: 'Default: off. If the machine was asleep, overdue runs are skipped instead of all firing at once on resume.',
     limitExecutions: 'Limit executions',
     endDate: 'End date',
     maxRuns: 'Maximum runs',

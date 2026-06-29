@@ -199,6 +199,7 @@ export function Schedules() {
       endDate: schedule.endDate ?? null,
       maxRuns: schedule.maxRuns ?? undefined,
       conflictBehavior: schedule.conflictBehavior ?? 'SKIP',
+      catchUpOnResume: schedule.catchUpOnResume ?? false,
     });
     const hasEndConditions = !!(schedule.endDate || (schedule.maxRuns && schedule.maxRuns > 0));
     setShowEndConditions(hasEndConditions);
@@ -215,6 +216,7 @@ export function Schedules() {
       }
       data.description = form.description;
       data.inputContext = form.inputContext;
+      data.catchUpOnResume = form.catchUpOnResume ?? false;
       if (editingSchedule.scheduleType === 'CRON' && showEndConditions) {
         data.endDate = form.endDate ?? null;
         data.maxRuns = form.maxRuns ?? null;
@@ -232,6 +234,7 @@ export function Schedules() {
         endDate: form.scheduleType === 'CRON' && showEndConditions ? (form.endDate ?? null) : null,
         maxRuns: form.scheduleType === 'CRON' && showEndConditions ? (form.maxRuns ?? null) : null,
         conflictBehavior: form.conflictBehavior ?? 'SKIP',
+        catchUpOnResume: form.catchUpOnResume ?? false,
       };
       if (form.targetType === 'CHAIN') {
         payload.chainId = form.chainId;

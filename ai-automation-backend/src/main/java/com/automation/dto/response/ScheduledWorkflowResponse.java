@@ -27,5 +27,6 @@ public record ScheduledWorkflowResponse(
         Instant endDate,
         int maxRuns,
         int runCount,
-        String conflictBehavior
+        String conflictBehavior,
+        boolean catchUpOnResume
 ) {}

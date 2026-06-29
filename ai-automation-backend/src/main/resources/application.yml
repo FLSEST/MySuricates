@@ -111,6 +111,10 @@ automation:
     poll-interval-ms: ${AUTOMATION_TODO_TRIGGER_POLL_MS:300000}
   scheduler:
     skip-until: ${AUTOMATION_SCHEDULER_SKIP_UNTIL:}
+    # Gap between two scheduler ticks (minutes) interpreted as a system resume after suspend/freeze.
+    # On such a tick the due-schedule backlog is handled by each schedule's catch-up policy instead
+    # of firing all at once. 0 disables resume detection.
+    resume-grace-minutes: ${AUTOMATION_SCHEDULER_RESUME_GRACE:5}
   chain:
     workflow-timeout-minutes: ${AUTOMATION_CHAIN_WORKFLOW_TIMEOUT:180}
   execution:

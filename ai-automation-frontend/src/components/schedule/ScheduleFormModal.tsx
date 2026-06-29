@@ -309,6 +309,19 @@ export function ScheduleFormModal({
           ]}
         />
 
+        <label className="flex items-start gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={form.catchUpOnResume ?? false}
+            onChange={(e) => onFormChange({ ...form, catchUpOnResume: e.target.checked })}
+          />
+          <span className="text-sm text-text">
+            {t.schedules.catchUpOnResume}
+            <span className="block text-xs text-text-tertiary">{t.schedules.catchUpOnResumeHint}</span>
+          </span>
+        </label>
+
         {/* Variables accordion */}
         <div className="border border-border rounded-lg overflow-hidden">
           <button

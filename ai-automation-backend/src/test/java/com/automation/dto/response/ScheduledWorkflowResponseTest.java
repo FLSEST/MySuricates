@@ -27,7 +27,7 @@ class ScheduledWorkflowResponseTest {
                 "0 0 * * *", "CRON", NOW,
                 "PT1H", true, "Daily deploy",
                 ctx, LATER, END, NOW,
-                RunStatus.COMPLETED, END, 10, 3, "SKIP");
+                RunStatus.COMPLETED, END, 10, 3, "SKIP", false);
 
         assertThat(response.id()).isEqualTo("sched-1");
         assertThat(response.workflowId()).isEqualTo("wf-1");
@@ -61,7 +61,7 @@ class ScheduledWorkflowResponseTest {
                 "0 0 * * *", "CRON", NOW,
                 null, false, null,
                 null, null, null, NOW,
-                null, null, 0, 0, null);
+                null, null, 0, 0, null, false);
 
         assertThat(response.enabled()).isFalse();
     }
@@ -74,7 +74,7 @@ class ScheduledWorkflowResponseTest {
                 null, null, null,
                 null, false, null,
                 null, null, null, null,
-                null, null, 0, 0, null);
+                null, null, 0, 0, null, false);
 
         assertThat(response.id()).isNull();
         assertThat(response.workflowId()).isNull();
@@ -108,7 +108,7 @@ class ScheduledWorkflowResponseTest {
                 "0 0 * * *", "CRON", NOW,
                 null, true, "desc",
                 Map.of(), null, null, NOW,
-                null, null, 0, 0, null);
+                null, null, 0, 0, null, false);
 
         assertThat(response.inputContext()).isEmpty();
     }
@@ -121,7 +121,7 @@ class ScheduledWorkflowResponseTest {
                 null, null, null,
                 null, true, null,
                 null, null, null, null,
-                RunStatus.RUNNING, null, 0, 0, null);
+                RunStatus.RUNNING, null, 0, 0, null, false);
 
         assertThat(response.lastRunStatus()).isEqualTo(RunStatus.RUNNING);
     }
@@ -139,14 +139,14 @@ class ScheduledWorkflowResponseTest {
                 "0 0 * * *", "CRON", NOW,
                 "PT1H", true, "desc",
                 ctx, LATER, END, NOW,
-                RunStatus.COMPLETED, END, 10, 3, "SKIP");
+                RunStatus.COMPLETED, END, 10, 3, "SKIP", false);
         var b = new ScheduledWorkflowResponse(
                 "sched-1", "wf-1", "WF", "Proj",
                 "chain-1", "Chain", "WORKFLOW",
                 "0 0 * * *", "CRON", NOW,
                 "PT1H", true, "desc",
                 ctx, LATER, END, NOW,
-                RunStatus.COMPLETED, END, 10, 3, "SKIP");
+                RunStatus.COMPLETED, END, 10, 3, "SKIP", false);
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -158,12 +158,12 @@ class ScheduledWorkflowResponseTest {
                 "sched-1", "wf-1", "WF", "Proj",
                 null, null, null, null, null, null,
                 null, false, null, null, null, null, null,
-                null, null, 0, 0, null);
+                null, null, 0, 0, null, false);
         var b = new ScheduledWorkflowResponse(
                 "sched-2", "wf-1", "WF", "Proj",
                 null, null, null, null, null, null,
                 null, false, null, null, null, null, null,
-                null, null, 0, 0, null);
+                null, null, 0, 0, null, false);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -174,12 +174,12 @@ class ScheduledWorkflowResponseTest {
                 "sched-1", "wf-1", "WF", "Proj",
                 null, null, null, null, null, null,
                 null, false, null, null, null, null, null,
-                null, null, 0, 0, null);
+                null, null, 0, 0, null, false);
         var b = new ScheduledWorkflowResponse(
                 "sched-1", "wf-2", "WF", "Proj",
                 null, null, null, null, null, null,
                 null, false, null, null, null, null, null,
-                null, null, 0, 0, null);
+                null, null, 0, 0, null, false);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -190,12 +190,12 @@ class ScheduledWorkflowResponseTest {
                 "sched-1", "wf-1", "WF", "Proj",
                 null, null, null, null, null, null,
                 null, true, null, null, null, null, null,
-                null, null, 0, 0, null);
+                null, null, 0, 0, null, false);
         var b = new ScheduledWorkflowResponse(
                 "sched-1", "wf-1", "WF", "Proj",
                 null, null, null, null, null, null,
                 null, false, null, null, null, null, null,
-                null, null, 0, 0, null);
+                null, null, 0, 0, null, false);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -206,12 +206,12 @@ class ScheduledWorkflowResponseTest {
                 "sched-1", "wf-1", "WF", "Proj",
                 null, null, null, null, null, null,
                 null, false, null, null, null, null, null,
-                null, null, 10, 0, null);
+                null, null, 10, 0, null, false);
         var b = new ScheduledWorkflowResponse(
                 "sched-1", "wf-1", "WF", "Proj",
                 null, null, null, null, null, null,
                 null, false, null, null, null, null, null,
-                null, null, 20, 0, null);
+                null, null, 20, 0, null, false);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -222,12 +222,12 @@ class ScheduledWorkflowResponseTest {
                 "sched-1", "wf-1", "WF", "Proj",
                 null, null, null, null, null, null,
                 null, false, null, null, null, null, null,
-                null, null, 0, 1, null);
+                null, null, 0, 1, null, false);
         var b = new ScheduledWorkflowResponse(
                 "sched-1", "wf-1", "WF", "Proj",
                 null, null, null, null, null, null,
                 null, false, null, null, null, null, null,
-                null, null, 0, 2, null);
+                null, null, 0, 2, null, false);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -238,12 +238,12 @@ class ScheduledWorkflowResponseTest {
                 "sched-1", "wf-1", "WF", "Proj",
                 null, null, null, null, null, null,
                 null, false, null, null, null, null, null,
-                RunStatus.COMPLETED, null, 0, 0, null);
+                RunStatus.COMPLETED, null, 0, 0, null, false);
         var b = new ScheduledWorkflowResponse(
                 "sched-1", "wf-1", "WF", "Proj",
                 null, null, null, null, null, null,
                 null, false, null, null, null, null, null,
-                RunStatus.RUNNING, null, 0, 0, null);
+                RunStatus.RUNNING, null, 0, 0, null, false);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -254,12 +254,12 @@ class ScheduledWorkflowResponseTest {
                 null, null, null, null,
                 null, null, null, null, null, null,
                 null, false, null, null, null, null, null,
-                null, null, 0, 0, null);
+                null, null, 0, 0, null, false);
         var b = new ScheduledWorkflowResponse(
                 null, null, null, null,
                 null, null, null, null, null, null,
                 null, false, null, null, null, null, null,
-                null, null, 0, 0, null);
+                null, null, 0, 0, null, false);
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -277,7 +277,7 @@ class ScheduledWorkflowResponseTest {
                 "0 0 3 * *", "CRON", NOW,
                 "PT2H", true, "Nightly build schedule",
                 Map.of("branch", "main"), LATER, END, NOW,
-                RunStatus.COMPLETED, END, 100, 42, "QUEUE");
+                RunStatus.COMPLETED, END, 100, 42, "QUEUE", false);
         var str = response.toString();
 
         assertThat(str).contains("sched-42");
@@ -296,7 +296,7 @@ class ScheduledWorkflowResponseTest {
                 null, null, null, null,
                 null, null, null, null, null, null,
                 null, false, null, null, null, null, null,
-                null, null, 0, 0, null);
+                null, null, 0, 0, null, false);
         var str = response.toString();
 
         assertThat(str).contains("null");

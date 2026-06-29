@@ -368,6 +368,7 @@ export interface ScheduledWorkflow {
   maxRuns?: number;
   runCount?: number;
   conflictBehavior?: 'SKIP' | 'OVERLAP';
+  catchUpOnResume?: boolean;
 }
 
 export interface CreateScheduleRequest {
@@ -383,6 +384,7 @@ export interface CreateScheduleRequest {
   endDate?: string | null;
   maxRuns?: number | null;
   conflictBehavior?: 'SKIP' | 'OVERLAP';
+  catchUpOnResume?: boolean;
 }
 
 export interface UpdateScheduleRequest {
@@ -392,6 +394,7 @@ export interface UpdateScheduleRequest {
   scheduledAt?: string;
   endDate?: string | null;
   maxRuns?: number | null;
+  catchUpOnResume?: boolean;
 }
 
 export interface CalendarEvent {

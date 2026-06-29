@@ -603,6 +603,8 @@ export const de: TranslationKeys = {
     conflictBehavior: 'Bei laufender Ausführung',
     conflictBehaviorSkip: 'Überspringen (Standard)',
     conflictBehaviorOverlap: 'Trotzdem starten (Überlappung)',
+    catchUpOnResume: 'Verpasste Läufe nach Standby nachholen',
+    catchUpOnResumeHint: 'Standard: aus. War der Rechner im Ruhezustand, werden überfällige Läufe übersprungen statt beim Aufwachen alle auf einmal zu starten.',
     limitExecutions: 'Ausführungen begrenzen',
     endDate: 'Enddatum',
     maxRuns: 'Maximale Ausführungen',

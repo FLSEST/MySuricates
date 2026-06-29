@@ -31,7 +31,7 @@ class CreateScheduleRequestTest {
                 END_DATE,
                 10,
                 "SKIP"
-        );
+        , null);
 
         assertThat(request.workflowId()).isEqualTo("wf-1");
         assertThat(request.chainId()).isEqualTo("chain-1");
@@ -51,7 +51,7 @@ class CreateScheduleRequestTest {
     void should_acceptNullOptionalFields_when_constructedWithNulls() {
         var request = new CreateScheduleRequest(
                 null, null, null, null, null, null, null, null, null, null, null, null
-        );
+        , null);
 
         assertThat(request.workflowId()).isNull();
         assertThat(request.chainId()).isNull();
@@ -72,7 +72,7 @@ class CreateScheduleRequestTest {
         var request = new CreateScheduleRequest(
                 "wf-2", null, "WORKFLOW", "* * * * *", null,
                 Map.of(), "CRON", null, null, null, null, null
-        );
+        , null);
 
         assertThat(request.inputContext()).isNotNull();
         assertThat(request.inputContext()).isEmpty();
@@ -83,7 +83,7 @@ class CreateScheduleRequestTest {
         var request = new CreateScheduleRequest(
                 null, "chain-42", "CHAIN", "0 12 * * *", "Lunch chain",
                 null, "CRON", null, null, null, 5, "RUN_ANYWAY"
-        );
+        , null);
 
         assertThat(request.chainId()).isEqualTo("chain-42");
         assertThat(request.targetType()).isEqualTo("CHAIN");
@@ -95,7 +95,7 @@ class CreateScheduleRequestTest {
         var request = new CreateScheduleRequest(
                 "wf-3", null, "WORKFLOW", null, "One-time run",
                 null, "ONE_TIME", SCHEDULED_AT, null, null, 1, "SKIP"
-        );
+        , null);
 
         assertThat(request.scheduleType()).isEqualTo("ONE_TIME");
         assertThat(request.scheduledAt()).isEqualTo(SCHEDULED_AT);
@@ -109,9 +109,9 @@ class CreateScheduleRequestTest {
     void should_beEqual_when_bothHaveSameValues() {
         Map<String, Object> ctx = Map.of("k", "v");
         var a = new CreateScheduleRequest("wf-1", "ch-1", "WORKFLOW", "0 0 * * *", "desc",
-                ctx, "CRON", SCHEDULED_AT, "PT1H", END_DATE, 10, "SKIP");
+                ctx, "CRON", SCHEDULED_AT, "PT1H", END_DATE, 10, "SKIP", null);
         var b = new CreateScheduleRequest("wf-1", "ch-1", "WORKFLOW", "0 0 * * *", "desc",
-                ctx, "CRON", SCHEDULED_AT, "PT1H", END_DATE, 10, "SKIP");
+                ctx, "CRON", SCHEDULED_AT, "PT1H", END_DATE, 10, "SKIP", null);
 
         assertThat(a).isEqualTo(b);
         assertThat(a).hasSameHashCodeAs(b);
@@ -119,8 +119,8 @@ class CreateScheduleRequestTest {
 
     @Test
     void should_beEqual_when_bothHaveAllNulls() {
-        var a = new CreateScheduleRequest(null, null, null, null, null, null, null, null, null, null, null, null);
-        var b = new CreateScheduleRequest(null, null, null, null, null, null, null, null, null, null, null, null);
+        var a = new CreateScheduleRequest(null, null, null, null, null, null, null, null, null, null, null, null, null);
+        var b = new CreateScheduleRequest(null, null, null, null, null, null, null, null, null, null, null, null, null);
 
         assertThat(a).isEqualTo(b);
         assertThat(a).hasSameHashCodeAs(b);
@@ -129,9 +129,9 @@ class CreateScheduleRequestTest {
     @Test
     void should_notBeEqual_when_workflowIdDiffers() {
         var a = new CreateScheduleRequest("wf-1", null, "WORKFLOW", "0 0 * * *", null,
-                null, "CRON", null, null, null, null, null);
+                null, "CRON", null, null, null, null, null, null);
         var b = new CreateScheduleRequest("wf-2", null, "WORKFLOW", "0 0 * * *", null,
-                null, "CRON", null, null, null, null, null);
+                null, "CRON", null, null, null, null, null, null);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -139,9 +139,9 @@ class CreateScheduleRequestTest {
     @Test
     void should_notBeEqual_when_cronExpressionDiffers() {
         var a = new CreateScheduleRequest("wf-1", null, "WORKFLOW", "0 0 * * *", null,
-                null, "CRON", null, null, null, null, null);
+                null, "CRON", null, null, null, null, null, null);
         var b = new CreateScheduleRequest("wf-1", null, "WORKFLOW", "0 12 * * *", null,
-                null, "CRON", null, null, null, null, null);
+                null, "CRON", null, null, null, null, null, null);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -149,7 +149,7 @@ class CreateScheduleRequestTest {
     @Test
     void should_notBeEqual_when_comparedToNull() {
         var request = new CreateScheduleRequest("wf-1", null, "WORKFLOW", "0 0 * * *", null,
-                null, "CRON", null, null, null, null, null);
+                null, "CRON", null, null, null, null, null, null);
 
         assertThat(request).isNotEqualTo(null);
     }
@@ -157,7 +157,7 @@ class CreateScheduleRequestTest {
     @Test
     void should_notBeEqual_when_comparedToDifferentType() {
         var request = new CreateScheduleRequest("wf-1", null, "WORKFLOW", "0 0 * * *", null,
-                null, "CRON", null, null, null, null, null);
+                null, "CRON", null, null, null, null, null, null);
 
         assertThat(request).isNotEqualTo("not a request");
     }
@@ -169,7 +169,7 @@ class CreateScheduleRequestTest {
         var request = new CreateScheduleRequest(
                 "wf-77", "ch-88", "WORKFLOW", "0 9 * * MON", "Monday morning",
                 Map.of("env", "prod"), "CRON", SCHEDULED_AT, "PT30M", END_DATE, 99, "SKIP"
-        );
+        , null);
 
         String s = request.toString();
         assertThat(s).contains("wf-77");

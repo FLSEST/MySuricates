@@ -105,7 +105,7 @@ public class ScheduleController {
                 request.description(), request.inputContext(),
                 request.scheduleType(), request.scheduledAt(),
                 request.delayExpression(), request.endDate(), request.maxRuns(),
-                request.conflictBehavior());
+                request.conflictBehavior(), request.catchUpOnResume());
         return ResponseEntity.status(HttpStatus.CREATED).body(scheduleMapper.toResponse(scheduled));
     }
 

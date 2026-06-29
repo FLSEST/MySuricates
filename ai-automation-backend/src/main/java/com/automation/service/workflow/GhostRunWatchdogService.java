@@ -6,12 +6,14 @@ import com.automation.entity.RunStatus;
 import com.automation.entity.WorkflowRun;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.activitylog.ActivityLogService;
+import com.automation.service.scheduler.SuspendState;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -34,6 +36,7 @@ public class GhostRunWatchdogService {
     private final DynamicSemaphore executionSemaphore;
     private final ExecutionBroadcaster broadcaster;
     private final ActivityLogService activityLogService;
+    private final SuspendState suspendState;
 
     @Scheduled(fixedRate = 120_000, initialDelay = 60_000)
     public void detectGhostRuns() {
@@ -43,7 +46,11 @@ public class GhostRunWatchdogService {
             return;
         }
 
-        Instant staleThreshold = Instant.now().minus(staleThresholdMinutes, ChronoUnit.MINUTES);
+        Instant now = Instant.now();
+        Instant staleThreshold = now.minus(staleThresholdMinutes, ChronoUnit.MINUTES);
+        // A resume detected within this window strongly implies the orphaning was caused by a
+        // system suspend (which kills the run's CLI/Docker subprocesses) rather than a true ghost.
+        boolean suspendRelated = suspendState.resumedRecently(now, Duration.ofMinutes(staleThresholdMinutes * 2));
         int ghostCount = 0;
 
         for (WorkflowRun run : runningRuns) {
@@ -54,15 +61,20 @@ public class GhostRunWatchdogService {
                 continue; // recently started, may still be initializing
             }
 
-            // Ghost run: RUNNING in DB but not in activeExecutions and older than threshold
+            // RUNNING in DB but not in activeExecutions and older than threshold.
+            String message = suspendRelated
+                    ? "Interrupted by system suspend/resume (paused ~"
+                            + (suspendState.getLastGapMillis() / 60_000) + " min) — no active execution thread"
+                    : "Ghost run detected by watchdog: no active execution thread found";
             run.setStatus(RunStatus.FAILED);
-            run.setCompletedAt(Instant.now());
+            run.setCompletedAt(now);
             run.setDurationMs(run.getCompletedAt().toEpochMilli() - run.getStartedAt().toEpochMilli());
-            run.setError(Map.of("message", "Ghost run detected by watchdog: no active execution thread found"));
+            run.setError(Map.of("message", message));
             runRepository.save(run);
             broadcaster.broadcastRunStatus(run.getId(), RunStatus.FAILED);
             ghostCount++;
-            log.warn("Ghost run detected and failed: {} (started {})", run.getId(), run.getStartedAt());
+            log.warn("{} run detected and failed: {} (started {})",
+                    suspendRelated ? "Suspend-interrupted" : "Ghost", run.getId(), run.getStartedAt());
         }
 
         if (ghostCount > 0) {

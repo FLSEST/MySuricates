@@ -57,12 +57,16 @@ public class SchedulerService {
     private final ActivityLogService activityLogService;
     private final AppSettingsRepository appSettingsRepository;
     private final SchedulerConfig schedulerConfig;
+    private final SuspendState suspendState;
     private final Clock clock;
 
     private static final String MAINTENANCE_MODE_KEY = "scheduler.maintenance-mode";
 
     /** Last unparseable skip-until value we already warned about, to avoid logging every 60s tick. */
     private volatile String lastInvalidSkipUntil = null;
+
+    /** Wall-clock time of the previous scheduler tick; a large gap signals a system resume. */
+    private Instant lastTickAt = null;
 
     @Transactional(readOnly = true)
     public List<ScheduledWorkflow> findAll() {
@@ -111,7 +115,7 @@ public class SchedulerService {
                                      String description, Map<String, Object> inputContext,
                                      String scheduleType, Instant scheduledAt,
                                      String delayExpression, Instant endDate, Integer maxRuns,
-                                     String conflictBehaviorStr) {
+                                     String conflictBehaviorStr, Boolean catchUpOnResume) {
         TargetType targetType = parseTargetType(targetTypeStr);
 
         // Validate mutual exclusivity
@@ -145,7 +149,8 @@ public class SchedulerService {
                 .scheduleType(type)
                 .endDate(endDate)
                 .maxRuns(maxRuns != null ? maxRuns : 0)
-                .conflictBehavior(conflictBehavior);
+                .conflictBehavior(conflictBehavior)
+                .catchUpOnResume(catchUpOnResume != null && catchUpOnResume);
 
         if (targetType == TargetType.CHAIN) {
             WorkflowChain chain = workflowChainRepository.findById(chainId)
@@ -200,6 +205,9 @@ public class SchedulerService {
         }
         if (request.inputContext() != null) {
             scheduled.setInputContext(request.inputContext());
+        }
+        if (request.catchUpOnResume() != null) {
+            scheduled.setCatchUpOnResume(request.catchUpOnResume());
         }
 
         if (scheduled.getScheduleType() == ScheduleType.CRON && request.cronExpression() != null) {
@@ -371,14 +379,27 @@ public class SchedulerService {
 
     @Scheduled(fixedRate = 60_000)
     public void checkAndExecuteScheduled() {
+        Instant now = Instant.now(clock);
+        Instant prevTick = lastTickAt;
+        lastTickAt = now;
+
         if (isMaintenanceMode()) {
             log.debug("Scheduler in maintenance mode — skipping execution");
             return;
         }
 
-        Optional<Instant> skipUntil = parseSkipUntil();
+        // System-resume detection: a tick that fired far later than the fixed 60s rate means the
+        // JVM was frozen (e.g. laptop suspend). Handle the accumulated backlog via each schedule's
+        // catch-up policy instead of firing it all at once (which spawned a stampede of runs that
+        // were then reaped as ghosts when the subprocesses had died across the suspend).
+        if (prevTick != null && schedulerConfig.getResumeGraceMinutes() > 0
+                && Duration.between(prevTick, now)
+                        .compareTo(Duration.ofMinutes(schedulerConfig.getResumeGraceMinutes())) > 0) {
+            handleResume(prevTick, now);
+            return;
+        }
 
-        Instant now = Instant.now(clock);
+        Optional<Instant> skipUntil = parseSkipUntil();
         List<ScheduledWorkflow> dueSchedules = scheduledRepository.findDueSchedules(now);
 
         if (skipUntil.isPresent() && now.isBefore(skipUntil.get())) {
@@ -397,6 +418,40 @@ public class SchedulerService {
                 activityLogService.error(LogCategory.SCHEDULE,
                         "Schedule execution failed: " + e.getMessage(),
                         "SchedulerService", scheduled.getId());
+            }
+        }
+    }
+
+    /**
+     * Handle the due-schedule backlog after a detected system resume. Schedules with
+     * {@code catchUpOnResume=true} run once; all others are skipped forward to their next future
+     * occurrence (and an ActivityLog entry records the suspend-skip), so a weekend of missed daily
+     * radars/audits does not fire a simultaneous stampede on Monday morning.
+     */
+    private void handleResume(Instant prevTick, Instant now) {
+        long gapMinutes = Duration.between(prevTick, now).toMinutes();
+        suspendState.recordResume(now, Duration.between(prevTick, now).toMillis());
+
+        List<ScheduledWorkflow> dueSchedules = scheduledRepository.findDueSchedules(now);
+        log.warn("System resume detected (paused ~{} min) — applying catch-up policy to {} due schedule(s)",
+                gapMinutes, dueSchedules.size());
+        activityLogService.warn(LogCategory.SCHEDULE,
+                "System resume detected (paused ~" + gapMinutes + " min) — applying catch-up policy to "
+                        + dueSchedules.size() + " due schedule(s)",
+                "SchedulerService");
+
+        for (ScheduledWorkflow scheduled : dueSchedules) {
+            if (scheduled.isCatchUpOnResume()) {
+                try {
+                    scheduledExecutor.executeSingleSchedule(scheduled.getId());
+                } catch (Exception e) {
+                    log.error("Failed to catch up scheduled workflow on resume: {}", scheduled.getId(), e);
+                    activityLogService.error(LogCategory.SCHEDULE,
+                            "Schedule catch-up failed: " + e.getMessage(),
+                            "SchedulerService", scheduled.getId());
+                }
+            } else {
+                skipScheduleForResume(scheduled, now, gapMinutes);
             }
         }
     }
@@ -427,7 +482,29 @@ public class SchedulerService {
         }
     }
 
+    /** Skip a schedule forward past a manual skip-until maintenance window. */
     private void skipScheduleUntil(ScheduledWorkflow scheduled, Instant until) {
+        Map<String, Object> extra = new HashMap<>();
+        extra.put("skipUntil", until.toString());
+        skipSchedule(scheduled, until, "scheduler-skip-until",
+                "Schedule skipped: " + scheduled.getTargetName(), extra);
+    }
+
+    /** Skip a schedule forward because the system resumed after a long suspend/freeze. */
+    private void skipScheduleForResume(ScheduledWorkflow scheduled, Instant now, long gapMinutes) {
+        Map<String, Object> extra = new HashMap<>();
+        extra.put("suspendGapMinutes", gapMinutes);
+        skipSchedule(scheduled, now, "suspend-resume",
+                "Schedule skipped (system suspend/resume): " + scheduled.getTargetName(), extra);
+    }
+
+    /**
+     * Advance a schedule past {@code until} without firing it, and record an ActivityLog entry.
+     * CRON schedules move to their next occurrence after {@code until}; ONCE/DELAYED schedules that
+     * fall inside the window are permanently disabled (their single firing is dropped).
+     */
+    private void skipSchedule(ScheduledWorkflow scheduled, Instant until, String reason,
+                              String message, Map<String, Object> extraMetadata) {
         Instant previousNextRunAt = scheduled.getNextRunAt();
 
         if (scheduled.getScheduleType() == ScheduleType.CRON) {
@@ -445,22 +522,24 @@ public class SchedulerService {
         }
 
         scheduledRepository.save(scheduled);
-        log.info("Schedule {} skipped until {}", scheduled.getId(), until);
+        log.info("Schedule {} skipped ({}) past {}", scheduled.getId(), reason, until);
 
         Map<String, Object> metadata = new HashMap<>();
-        metadata.put("reason", "scheduler-skip-until");
-        metadata.put("skipUntil", until.toString());
+        metadata.put("reason", reason);
         if (previousNextRunAt != null) {
             metadata.put("previousNextRunAt", previousNextRunAt.toString());
         }
         if (scheduled.getNextRunAt() != null) {
             metadata.put("nextRunAt", scheduled.getNextRunAt().toString());
         }
+        if (extraMetadata != null) {
+            metadata.putAll(extraMetadata);
+        }
 
         activityLogService.log(
                 LogLevel.INFO,
                 LogCategory.SCHEDULE,
-                "Schedule skipped: " + scheduled.getTargetName(),
+                message,
                 "SchedulerService",
                 scheduled.getId(),
                 metadata

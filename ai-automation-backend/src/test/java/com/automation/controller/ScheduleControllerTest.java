@@ -96,7 +96,7 @@ class ScheduleControllerTest {
                 true, "Hourly run", Map.of(), null,
                 Instant.parse("2026-02-16T00:00:00Z"), testScheduled.getCreatedAt(),
                 null, null, 0, 0, "SKIP"
-        );
+        , false);
     }
 
     @Test
@@ -142,7 +142,7 @@ class ScheduleControllerTest {
 
     @Test
     void createSchedule_validCronRequest_returns201() throws Exception {
-        when(schedulerService.create(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(testScheduled);
+        when(schedulerService.create(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(testScheduled);
         when(scheduleMapper.toResponse(testScheduled)).thenReturn(testResponse);
 
         String body = """
@@ -162,7 +162,7 @@ class ScheduleControllerTest {
 
     @Test
     void createSchedule_missingWorkflowId_returns400() throws Exception {
-        when(schedulerService.create(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        when(schedulerService.create(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenThrow(new IllegalArgumentException("workflowId is required for WORKFLOW schedules"));
 
         String body = """
@@ -195,9 +195,9 @@ class ScheduleControllerTest {
                 true, null, Map.of(), null,
                 Instant.parse("2026-03-01T10:00:00Z"), null,
                 null, null, 0, 0, "SKIP"
-        );
+        , false);
 
-        when(schedulerService.create(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(onceScheduled);
+        when(schedulerService.create(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(onceScheduled);
         when(scheduleMapper.toResponse(onceScheduled)).thenReturn(onceResponse);
 
         String body = """
@@ -237,7 +237,7 @@ class ScheduleControllerTest {
                 "0 0 * * * *", "CRON", null, null,
                 false, "Hourly run", Map.of(), null, null, testScheduled.getCreatedAt(),
                 null, null, 0, 0, "SKIP"
-        );
+        , false);
         when(scheduleMapper.toResponse(testScheduled)).thenReturn(disabledResponse);
 
         mockMvc.perform(post("/api/v1/schedules/sched-1/disable"))

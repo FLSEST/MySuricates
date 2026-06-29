@@ -64,7 +64,8 @@ public class ScheduleMapper {
                 s.getEndDate(),
                 s.getMaxRuns(),
                 s.getRunCount(),
-                s.getConflictBehavior() != null ? s.getConflictBehavior().name() : "SKIP"
+                s.getConflictBehavior() != null ? s.getConflictBehavior().name() : "SKIP",
+                s.isCatchUpOnResume()
         );
     }
 

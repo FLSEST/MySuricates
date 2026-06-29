@@ -99,6 +99,15 @@ public class ScheduledWorkflow {
     @Builder.Default
     private ConflictBehavior conflictBehavior = ConflictBehavior.SKIP;
 
+    /**
+     * Whether missed occurrences should be caught up (run once) when the system resumes after a
+     * long pause (e.g. laptop suspend). Default false: stale CRON schedules are skipped forward to
+     * their next future occurrence instead of firing a backlog stampede on resume.
+     */
+    @Column(name = "catch_up_on_resume", nullable = false)
+    @Builder.Default
+    private boolean catchUpOnResume = false;
+
     @CreatedDate
     @Column(updatable = false)
     private Instant createdAt;

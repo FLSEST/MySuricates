@@ -5,6 +5,7 @@ import com.automation.entity.RunStatus;
 import com.automation.entity.WorkflowRun;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.activitylog.ActivityLogService;
+import com.automation.service.scheduler.SuspendState;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -30,13 +31,14 @@ class GhostRunWatchdogServiceTest {
     @Mock private DynamicSemaphore executionSemaphore;
     @Mock private ExecutionBroadcaster broadcaster;
     @Mock private ActivityLogService activityLogService;
+    @Mock private SuspendState suspendState;
 
     private GhostRunWatchdogService service;
 
     @BeforeEach
     void setUp() {
         service = new GhostRunWatchdogService(runRepository, workflowExecutor,
-                executionSemaphore, broadcaster, activityLogService);
+                executionSemaphore, broadcaster, activityLogService, suspendState);
         ReflectionTestUtils.setField(service, "staleThresholdMinutes", 10L);
     }
 

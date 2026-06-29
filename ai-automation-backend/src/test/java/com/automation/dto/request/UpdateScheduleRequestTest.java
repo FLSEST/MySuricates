@@ -16,14 +16,14 @@ class UpdateScheduleRequestTest {
 
     @Test
     void should_returnCronExpression_when_constructedWithCron() {
-        var request = new UpdateScheduleRequest("0 0 * * *", null, null, null, null, null);
+        var request = new UpdateScheduleRequest("0 0 * * *", null, null, null, null, null, null);
 
         assertThat(request.cronExpression()).isEqualTo("0 0 * * *");
     }
 
     @Test
     void should_returnDescription_when_constructedWithDescription() {
-        var request = new UpdateScheduleRequest(null, "Daily backup", null, null, null, null);
+        var request = new UpdateScheduleRequest(null, "Daily backup", null, null, null, null, null);
 
         assertThat(request.description()).isEqualTo("Daily backup");
     }
@@ -31,7 +31,7 @@ class UpdateScheduleRequestTest {
     @Test
     void should_returnInputContext_when_constructedWithMap() {
         var context = Map.<String, Object>of("key", "value", "count", 42);
-        var request = new UpdateScheduleRequest(null, null, context, null, null, null);
+        var request = new UpdateScheduleRequest(null, null, context, null, null, null, null);
 
         assertThat(request.inputContext()).hasSize(2);
         assertThat(request.inputContext()).containsEntry("key", "value");
@@ -40,28 +40,28 @@ class UpdateScheduleRequestTest {
 
     @Test
     void should_returnScheduledAt_when_constructedWithInstant() {
-        var request = new UpdateScheduleRequest(null, null, null, NOW, null, null);
+        var request = new UpdateScheduleRequest(null, null, null, NOW, null, null, null);
 
         assertThat(request.scheduledAt()).isEqualTo(NOW);
     }
 
     @Test
     void should_returnEndDate_when_constructedWithInstant() {
-        var request = new UpdateScheduleRequest(null, null, null, null, LATER, null);
+        var request = new UpdateScheduleRequest(null, null, null, null, LATER, null, null);
 
         assertThat(request.endDate()).isEqualTo(LATER);
     }
 
     @Test
     void should_returnMaxRuns_when_constructedWithInteger() {
-        var request = new UpdateScheduleRequest(null, null, null, null, null, 10);
+        var request = new UpdateScheduleRequest(null, null, null, null, null, 10, null);
 
         assertThat(request.maxRuns()).isEqualTo(10);
     }
 
     @Test
     void should_returnNullForAllFields_when_constructedWithAllNulls() {
-        var request = new UpdateScheduleRequest(null, null, null, null, null, null);
+        var request = new UpdateScheduleRequest(null, null, null, null, null, null, null);
 
         assertThat(request.cronExpression()).isNull();
         assertThat(request.description()).isNull();
@@ -74,7 +74,7 @@ class UpdateScheduleRequestTest {
     @Test
     void should_returnAllFields_when_fullyPopulated() {
         var context = Map.<String, Object>of("env", "prod");
-        var request = new UpdateScheduleRequest("0 0 * * *", "Daily", context, NOW, LATER, 5);
+        var request = new UpdateScheduleRequest("0 0 * * *", "Daily", context, NOW, LATER, 5, null);
 
         assertThat(request.cronExpression()).isEqualTo("0 0 * * *");
         assertThat(request.description()).isEqualTo("Daily");
@@ -91,7 +91,7 @@ class UpdateScheduleRequestTest {
                 "features", List.of("alpha", "beta"),
                 "enabled", true
         );
-        var request = new UpdateScheduleRequest(null, null, nested, null, null, null);
+        var request = new UpdateScheduleRequest(null, null, nested, null, null, null, null);
 
         assertThat(request.inputContext()).hasSize(3);
         assertThat(request.inputContext().get("database")).isInstanceOf(Map.class);
@@ -104,21 +104,21 @@ class UpdateScheduleRequestTest {
 
     @Test
     void should_returnEmptyMap_when_inputContextIsEmpty() {
-        var request = new UpdateScheduleRequest(null, null, Map.of(), null, null, null);
+        var request = new UpdateScheduleRequest(null, null, Map.of(), null, null, null, null);
 
         assertThat(request.inputContext()).isEmpty();
     }
 
     @Test
     void should_handleZeroMaxRuns() {
-        var request = new UpdateScheduleRequest(null, null, null, null, null, 0);
+        var request = new UpdateScheduleRequest(null, null, null, null, null, 0, null);
 
         assertThat(request.maxRuns()).isZero();
     }
 
     @Test
     void should_handleEpochInstant_when_scheduledAtIsEpoch() {
-        var request = new UpdateScheduleRequest(null, null, null, Instant.EPOCH, null, null);
+        var request = new UpdateScheduleRequest(null, null, null, Instant.EPOCH, null, null, null);
 
         assertThat(request.scheduledAt()).isEqualTo(Instant.EPOCH);
     }
@@ -128,8 +128,8 @@ class UpdateScheduleRequestTest {
     @Test
     void should_beEqual_when_allFieldsMatch() {
         var context = Map.<String, Object>of("key", "value");
-        var a = new UpdateScheduleRequest("0 0 * * *", "Daily", context, NOW, LATER, 5);
-        var b = new UpdateScheduleRequest("0 0 * * *", "Daily", context, NOW, LATER, 5);
+        var a = new UpdateScheduleRequest("0 0 * * *", "Daily", context, NOW, LATER, 5, null);
+        var b = new UpdateScheduleRequest("0 0 * * *", "Daily", context, NOW, LATER, 5, null);
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -137,8 +137,8 @@ class UpdateScheduleRequestTest {
 
     @Test
     void should_beEqual_when_bothHaveNullFields() {
-        var a = new UpdateScheduleRequest(null, null, null, null, null, null);
-        var b = new UpdateScheduleRequest(null, null, null, null, null, null);
+        var a = new UpdateScheduleRequest(null, null, null, null, null, null, null);
+        var b = new UpdateScheduleRequest(null, null, null, null, null, null, null);
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -146,8 +146,8 @@ class UpdateScheduleRequestTest {
 
     @Test
     void should_beEqual_when_bothHaveEmptyInputContext() {
-        var a = new UpdateScheduleRequest(null, null, Map.of(), null, null, null);
-        var b = new UpdateScheduleRequest(null, null, Collections.emptyMap(), null, null, null);
+        var a = new UpdateScheduleRequest(null, null, Map.of(), null, null, null, null);
+        var b = new UpdateScheduleRequest(null, null, Collections.emptyMap(), null, null, null, null);
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -155,55 +155,55 @@ class UpdateScheduleRequestTest {
 
     @Test
     void should_notBeEqual_when_cronExpressionDiffers() {
-        var a = new UpdateScheduleRequest("0 0 * * *", "Desc", null, null, null, null);
-        var b = new UpdateScheduleRequest("0 12 * * *", "Desc", null, null, null, null);
+        var a = new UpdateScheduleRequest("0 0 * * *", "Desc", null, null, null, null, null);
+        var b = new UpdateScheduleRequest("0 12 * * *", "Desc", null, null, null, null, null);
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_notBeEqual_when_descriptionDiffers() {
-        var a = new UpdateScheduleRequest("0 0 * * *", "Daily", null, null, null, null);
-        var b = new UpdateScheduleRequest("0 0 * * *", "Weekly", null, null, null, null);
+        var a = new UpdateScheduleRequest("0 0 * * *", "Daily", null, null, null, null, null);
+        var b = new UpdateScheduleRequest("0 0 * * *", "Weekly", null, null, null, null, null);
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_notBeEqual_when_inputContextDiffers() {
-        var a = new UpdateScheduleRequest(null, null, Map.of("a", 1), null, null, null);
-        var b = new UpdateScheduleRequest(null, null, Map.of("b", 2), null, null, null);
+        var a = new UpdateScheduleRequest(null, null, Map.of("a", 1), null, null, null, null);
+        var b = new UpdateScheduleRequest(null, null, Map.of("b", 2), null, null, null, null);
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_notBeEqual_when_scheduledAtDiffers() {
-        var a = new UpdateScheduleRequest(null, null, null, NOW, null, null);
-        var b = new UpdateScheduleRequest(null, null, null, LATER, null, null);
+        var a = new UpdateScheduleRequest(null, null, null, NOW, null, null, null);
+        var b = new UpdateScheduleRequest(null, null, null, LATER, null, null, null);
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_notBeEqual_when_endDateDiffers() {
-        var a = new UpdateScheduleRequest(null, null, null, null, NOW, null);
-        var b = new UpdateScheduleRequest(null, null, null, null, LATER, null);
+        var a = new UpdateScheduleRequest(null, null, null, null, NOW, null, null);
+        var b = new UpdateScheduleRequest(null, null, null, null, LATER, null, null);
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_notBeEqual_when_maxRunsDiffers() {
-        var a = new UpdateScheduleRequest(null, null, null, null, null, 5);
-        var b = new UpdateScheduleRequest(null, null, null, null, null, 10);
+        var a = new UpdateScheduleRequest(null, null, null, null, null, 5, null);
+        var b = new UpdateScheduleRequest(null, null, null, null, null, 10, null);
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_notBeEqual_when_comparedToNull() {
-        var request = new UpdateScheduleRequest("0 0 * * *", "Daily", Map.of(), NOW, LATER, 5);
+        var request = new UpdateScheduleRequest("0 0 * * *", "Daily", Map.of(), NOW, LATER, 5, null);
 
         assertThat(request).isNotEqualTo(null);
     }
@@ -212,7 +212,7 @@ class UpdateScheduleRequestTest {
 
     @Test
     void should_containFieldNamesInToString() {
-        var request = new UpdateScheduleRequest("0 0 * * *", "Daily", Map.of(), NOW, LATER, 5);
+        var request = new UpdateScheduleRequest("0 0 * * *", "Daily", Map.of(), NOW, LATER, 5, null);
 
         assertThat(request.toString()).contains("cronExpression");
         assertThat(request.toString()).contains("description");
@@ -224,7 +224,7 @@ class UpdateScheduleRequestTest {
 
     @Test
     void should_containValuesInToString() {
-        var request = new UpdateScheduleRequest("0 0 * * *", "Daily", Map.of(), NOW, LATER, 5);
+        var request = new UpdateScheduleRequest("0 0 * * *", "Daily", Map.of(), NOW, LATER, 5, null);
 
         assertThat(request.toString()).contains("0 0 * * *");
         assertThat(request.toString()).contains("Daily");

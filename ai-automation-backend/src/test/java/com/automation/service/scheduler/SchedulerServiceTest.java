@@ -21,6 +21,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -58,6 +59,9 @@ class SchedulerServiceTest {
 
     @Mock
     private SchedulerConfig schedulerConfig;
+
+    @Mock
+    private SuspendState suspendState;
 
     // Fixed at noon UTC so getRemainingToday/Week behave deterministically regardless of wall-clock time.
     private static final Instant FIXED_NOW = Instant.parse("2026-04-26T12:00:00Z");
@@ -134,7 +138,7 @@ class SchedulerServiceTest {
         });
 
         ScheduledWorkflow result = schedulerService.create(
-                "wf-1", null, null, "0 0 * * * *", "Hourly", Map.of("env", "prod"), "CRON", null, null, null, null, null);
+                "wf-1", null, null, "0 0 * * * *", "Hourly", Map.of("env", "prod"), "CRON", null, null, null, null, null, null);
 
         assertThat(result.getId()).isEqualTo("sched-new");
         assertThat(result.getCronExpression()).isEqualTo("0 0 * * * *");
@@ -155,7 +159,7 @@ class SchedulerServiceTest {
         });
 
         ScheduledWorkflow result = schedulerService.create(
-                "wf-1", null, null, null, "One-time run", null, "ONCE", futureTime, null, null, null, null);
+                "wf-1", null, null, null, "One-time run", null, "ONCE", futureTime, null, null, null, null, null);
 
         assertThat(result.getId()).isEqualTo("sched-once");
         assertThat(result.getScheduleType()).isEqualTo(ScheduleType.ONCE);
@@ -170,7 +174,7 @@ class SchedulerServiceTest {
         when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
 
         assertThatThrownBy(() -> schedulerService.create(
-                "wf-1", null, null, null, "Test", null, "ONCE", null, null, null, null, null))
+                "wf-1", null, null, null, "Test", null, "ONCE", null, null, null, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("scheduledAt is required");
     }
@@ -180,7 +184,7 @@ class SchedulerServiceTest {
         when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
 
         assertThatThrownBy(() -> schedulerService.create(
-                "wf-1", null, null, null, "Test", null, "CRON", null, null, null, null, null))
+                "wf-1", null, null, null, "Test", null, "CRON", null, null, null, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("cronExpression is required");
     }
@@ -190,7 +194,7 @@ class SchedulerServiceTest {
         when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
 
         assertThatThrownBy(() -> schedulerService.create(
-                "wf-1", null, null, "invalid-cron", "Test", null, null, null, null, null, null, null))
+                "wf-1", null, null, "invalid-cron", "Test", null, null, null, null, null, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Invalid cron expression");
     }
@@ -200,7 +204,7 @@ class SchedulerServiceTest {
         when(workflowRepository.findById("unknown")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> schedulerService.create(
-                "unknown", null, null, "0 0 * * * *", "Test", null, null, null, null, null, null, null))
+                "unknown", null, null, "0 0 * * * *", "Test", null, null, null, null, null, null, null, null))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
@@ -210,7 +214,7 @@ class SchedulerServiceTest {
         when(scheduledRepository.save(any(ScheduledWorkflow.class))).thenAnswer(inv -> inv.getArgument(0));
 
         ScheduledWorkflow result = schedulerService.create(
-                "wf-1", null, null, "0 0 * * * *", "Test", null, null, null, null, null, null, null);
+                "wf-1", null, null, "0 0 * * * *", "Test", null, null, null, null, null, null, null, null);
 
         assertThat(result.getScheduleType()).isEqualTo(ScheduleType.CRON);
 
@@ -221,7 +225,7 @@ class SchedulerServiceTest {
         when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
         when(scheduledRepository.save(any(ScheduledWorkflow.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        ScheduledWorkflow result = schedulerService.create("wf-1", null, null, "0 0 * * * *", "Test", null, null, null, null, null, null, null);
+        ScheduledWorkflow result = schedulerService.create("wf-1", null, null, "0 0 * * * *", "Test", null, null, null, null, null, null, null, null);
 
         assertThat(result.getInputContext()).isNotNull().isEmpty();
     }
@@ -474,6 +478,72 @@ class SchedulerServiceTest {
                 any(),
                 any()
         );
+    }
+
+    @Test
+    void checkAndExecuteScheduled_resumeAfterSuspend_skipsStaleCronAndRecordsResume() {
+        // Previous tick 3 days ago → wall-clock gap >> grace → treated as a system resume.
+        ReflectionTestUtils.setField(schedulerService, "lastTickAt", FIXED_NOW.minus(3, ChronoUnit.DAYS));
+        testScheduled.setNextRunAt(FIXED_NOW.minus(3, ChronoUnit.DAYS));
+        testScheduled.setCatchUpOnResume(false);
+
+        when(schedulerConfig.getResumeGraceMinutes()).thenReturn(5L);
+        when(scheduledRepository.findDueSchedules(FIXED_NOW)).thenReturn(List.of(testScheduled));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        schedulerService.checkAndExecuteScheduled();
+
+        // Stale schedule is NOT fired; it is advanced to its next future occurrence.
+        verify(scheduledExecutor, never()).executeSingleSchedule(any());
+        verify(suspendState).recordResume(eq(FIXED_NOW), anyLong());
+        // Advanced from the 3-days-stale value forward to its next occurrence at/after now.
+        assertThat(testScheduled.getNextRunAt()).isNotNull().isAfterOrEqualTo(FIXED_NOW);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> metadataCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(activityLogService).log(
+                eq(LogLevel.INFO),
+                eq(LogCategory.SCHEDULE),
+                eq("Schedule skipped (system suspend/resume): Test Workflow"),
+                eq("SchedulerService"),
+                eq("sched-1"),
+                metadataCaptor.capture()
+        );
+        assertThat(metadataCaptor.getValue())
+                .containsEntry("reason", "suspend-resume")
+                .containsKey("suspendGapMinutes");
+    }
+
+    @Test
+    void checkAndExecuteScheduled_resumeAfterSuspend_catchUpSchedule_executesOnce() {
+        ReflectionTestUtils.setField(schedulerService, "lastTickAt", FIXED_NOW.minus(3, ChronoUnit.DAYS));
+        testScheduled.setNextRunAt(FIXED_NOW.minus(3, ChronoUnit.DAYS));
+        testScheduled.setCatchUpOnResume(true);
+
+        when(schedulerConfig.getResumeGraceMinutes()).thenReturn(5L);
+        when(scheduledRepository.findDueSchedules(FIXED_NOW)).thenReturn(List.of(testScheduled));
+
+        schedulerService.checkAndExecuteScheduled();
+
+        // Opt-in catch-up: the missed run is executed exactly once, not skipped.
+        verify(scheduledExecutor).executeSingleSchedule("sched-1");
+        verify(suspendState).recordResume(eq(FIXED_NOW), anyLong());
+        verify(scheduledRepository, never()).save(any());
+    }
+
+    @Test
+    void checkAndExecuteScheduled_normalTickWithinGrace_executesNormallyWithoutResume() {
+        // Previous tick 60s ago, grace 5min → ordinary tick, not a resume.
+        ReflectionTestUtils.setField(schedulerService, "lastTickAt", FIXED_NOW.minusSeconds(60));
+        testScheduled.setNextRunAt(FIXED_NOW.minusSeconds(30));
+
+        when(schedulerConfig.getResumeGraceMinutes()).thenReturn(5L);
+        when(scheduledRepository.findDueSchedules(FIXED_NOW)).thenReturn(List.of(testScheduled));
+
+        schedulerService.checkAndExecuteScheduled();
+
+        verify(scheduledExecutor).executeSingleSchedule("sched-1");
+        verify(suspendState, never()).recordResume(any(), anyLong());
     }
 
     @Test
