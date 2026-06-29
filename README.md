@@ -22,7 +22,7 @@ A self-hosted platform for automating AI-driven workflows. Projects run in isola
 
 ## Quickstart
 
-> New machine (Linux), possibly without Java/Node/Docker? → **[docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)**
+> New machine (Linux), possibly without Java/Node/Docker? → **[docs/en/GETTING-STARTED.md](docs/en/GETTING-STARTED.md)**
 > walks you through the setup step by step. Short version: `git clone … && cd autotrigger && ./scripts/setup.sh`.
 
 ```bash
@@ -61,17 +61,17 @@ docker compose up --build
 
 | Document | Content |
 |---|---|
-| [Getting Started](docs/GETTING-STARTED.md) | First-time installation on a new Linux machine (bootstrap script, prereqs, AI setup) |
-| [Architecture](docs/architektur.md) | System overview, layers, data flow, security |
-| [API Reference](docs/api-referenz.md) | All REST endpoints with request/response |
-| [Data Model](docs/datenmodell.md) | Entities, DB schema, migrations |
-| [Frontend](docs/frontend.md) | Pages, components, hooks, design system |
-| [Deployment](docs/deployment.md) | Docker, configuration, environment variables |
-| [Development](docs/entwicklung.md) | Local setup, build, tests, conventions |
-| [Integrations](docs/integrations.md) | Plugin system, OAuth, provider reference |
-| [Workflow Guide](docs/WORKFLOW-GUIDE.md) | Block types, patterns, timeouts |
-| [Assistant](docs/assistant-system.md) | Chat assistant, sessions, suggestions |
-| [Vision](VISION.md) | Product vision and roadmap |
+| [Getting Started](docs/en/GETTING-STARTED.md) | First-time installation on a new Linux machine (bootstrap script, prereqs, AI setup) |
+| [Architecture](docs/en/architektur.md) | System overview, layers, data flow, security |
+| [API Reference](docs/en/api-referenz.md) | All REST endpoints with request/response |
+| [Data Model](docs/en/datenmodell.md) | Entities, DB schema, migrations |
+| [Frontend](docs/en/frontend.md) | Pages, components, hooks, design system |
+| [Deployment](docs/en/deployment.md) | Docker, configuration, environment variables |
+| [Development](docs/en/entwicklung.md) | Local setup, build, tests, conventions |
+| [Integrations](docs/en/integrations.md) | Plugin system, OAuth, provider reference |
+| [Workflow Guide](docs/en/WORKFLOW-GUIDE.md) | Block types, patterns, timeouts |
+| [Assistant](docs/en/assistant-system.md) | Chat assistant, sessions, suggestions |
+| [Vision](docs/en/vision.md) | Product vision and roadmap |
 
 ## Todo Workflow Linking
 
