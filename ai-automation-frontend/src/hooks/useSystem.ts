@@ -161,6 +161,7 @@ export interface ExecutionConfig {
   rateLimitEnabled: number;
   rateLimitRequestsPerMinute: number;
   assistantChatTimeoutSeconds: number;
+  schedulerCatchUpOnResume: number;
   activeRuns: number;
 }
 

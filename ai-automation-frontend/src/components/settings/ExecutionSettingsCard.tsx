@@ -5,7 +5,7 @@ import { useExecutionConfig, useUpdateExecutionConfig } from '../../hooks/useSys
 import { Zap, Save, Loader2 } from 'lucide-react';
 import { Spinner } from '../ui';
 
-type NumericFormKeys = Exclude<keyof FormState, 'rateLimitEnabled'>;
+type NumericFormKeys = Exclude<keyof FormState, 'rateLimitEnabled' | 'schedulerCatchUpOnResume'>;
 
 interface FieldConfig {
   key: string;
@@ -26,6 +26,7 @@ interface FormState {
   rateLimitEnabled: boolean;
   rateLimitRequestsPerMinute: number;
   assistantChatTimeoutSeconds: number;
+  schedulerCatchUpOnResume: boolean;
 }
 
 export function ExecutionSettingsCard() {
@@ -43,6 +44,7 @@ export function ExecutionSettingsCard() {
     rateLimitEnabled: true,
     rateLimitRequestsPerMinute: 120,
     assistantChatTimeoutSeconds: 240,
+    schedulerCatchUpOnResume: true,
   });
 
   useEffect(() => {
@@ -57,6 +59,7 @@ export function ExecutionSettingsCard() {
         rateLimitEnabled: config.rateLimitEnabled === 1,
         rateLimitRequestsPerMinute: config.rateLimitRequestsPerMinute,
         assistantChatTimeoutSeconds: config.assistantChatTimeoutSeconds ?? 240,
+        schedulerCatchUpOnResume: (config.schedulerCatchUpOnResume ?? 1) === 1,
       });
     }
   }, [config]);
@@ -70,7 +73,8 @@ export function ExecutionSettingsCard() {
     form.chainWorkflowTimeoutMinutes !== config.chainWorkflowTimeoutMinutes ||
     form.rateLimitEnabled !== (config.rateLimitEnabled === 1) ||
     form.rateLimitRequestsPerMinute !== config.rateLimitRequestsPerMinute ||
-    form.assistantChatTimeoutSeconds !== (config.assistantChatTimeoutSeconds ?? 240)
+    form.assistantChatTimeoutSeconds !== (config.assistantChatTimeoutSeconds ?? 240) ||
+    form.schedulerCatchUpOnResume !== ((config.schedulerCatchUpOnResume ?? 1) === 1)
   );
 
   const fields: FieldConfig[] = [
@@ -95,6 +99,7 @@ export function ExecutionSettingsCard() {
       rateLimitEnabled: form.rateLimitEnabled ? 1 : 0,
       rateLimitRequestsPerMinute: form.rateLimitRequestsPerMinute,
       assistantChatTimeoutSeconds: form.assistantChatTimeoutSeconds,
+      schedulerCatchUpOnResume: form.schedulerCatchUpOnResume ? 1 : 0,
     });
   };
 
@@ -141,6 +146,18 @@ export function ExecutionSettingsCard() {
           <Toggle
             enabled={form.rateLimitEnabled}
             onChange={(v) => setForm(prev => ({ ...prev, rateLimitEnabled: v }))}
+          />
+        </div>
+
+        {/* Catch-up on resume toggle */}
+        <div className="flex items-center justify-between py-2">
+          <div>
+            <label className="block text-sm font-medium text-text">{t.settings.schedulerCatchUpOnResume}</label>
+            <p className="text-xs text-text-tertiary mt-0.5">{t.settings.schedulerCatchUpOnResumeHint}</p>
+          </div>
+          <Toggle
+            enabled={form.schedulerCatchUpOnResume}
+            onChange={(v) => setForm(prev => ({ ...prev, schedulerCatchUpOnResume: v }))}
           />
         </div>
 

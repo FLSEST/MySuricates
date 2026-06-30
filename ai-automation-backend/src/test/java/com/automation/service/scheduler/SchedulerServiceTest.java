@@ -532,6 +532,24 @@ class SchedulerServiceTest {
     }
 
     @Test
+    void checkAndExecuteScheduled_resumeAfterSuspend_globalCatchUpEnabled_executesScheduleWithPerScheduleCatchUpFalse() {
+        // Global catch-up=true overrides per-schedule catchUpOnResume=false → should EXECUTE, not skip.
+        ReflectionTestUtils.setField(schedulerService, "lastTickAt", FIXED_NOW.minus(3, ChronoUnit.DAYS));
+        testScheduled.setNextRunAt(FIXED_NOW.minus(3, ChronoUnit.DAYS));
+        testScheduled.setCatchUpOnResume(false);
+
+        when(schedulerConfig.getResumeGraceMinutes()).thenReturn(5L);
+        when(schedulerConfig.isCatchUpOnResume()).thenReturn(true);
+        when(scheduledRepository.findDueSchedules(FIXED_NOW)).thenReturn(List.of(testScheduled));
+
+        schedulerService.checkAndExecuteScheduled();
+
+        verify(scheduledExecutor).executeSingleSchedule("sched-1");
+        verify(scheduledRepository, never()).save(any());
+        verify(suspendState).recordResume(eq(FIXED_NOW), anyLong());
+    }
+
+    @Test
     void checkAndExecuteScheduled_normalTickWithinGrace_executesNormallyWithoutResume() {
         // Previous tick 60s ago, grace 5min → ordinary tick, not a resume.
         ReflectionTestUtils.setField(schedulerService, "lastTickAt", FIXED_NOW.minusSeconds(60));

@@ -893,6 +893,8 @@ export const en = {
     executionRateLimitRpmHint: 'Maximum requests per minute per client (10–10,000)',
     executionAssistantChatTimeout: 'Assistant chat timeout (s)',
     executionAssistantChatTimeoutHint: 'Maximum wait per assistant CLI call before aborting (30–900 s). Default: 240.',
+    schedulerCatchUpOnResume: 'Run triggers after suspend',
+    schedulerCatchUpOnResumeHint: 'Missed schedules will be executed after a system suspend instead of being skipped.',
     executionSave: 'Save Settings',
     executionSaved: 'Execution settings saved',
     executionSaveFailed: 'Failed to save execution settings',

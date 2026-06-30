@@ -19,4 +19,11 @@ public class SchedulerConfig {
      * catch-up policy instead of being fired all at once. 0 disables resume detection.
      */
     private long resumeGraceMinutes = 5;
+
+    /**
+     * Global default for catch-up behaviour after a system resume. When true, all due schedules
+     * are executed once on resume (catch-up) unless individually overridden. When false, per-schedule
+     * {@code catchUpOnResume} controls the behaviour. Configurable at runtime via the Settings UI.
+     */
+    private boolean catchUpOnResume = true;
 }

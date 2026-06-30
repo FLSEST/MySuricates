@@ -4,6 +4,7 @@ import com.automation.concurrency.DynamicSemaphore;
 import com.automation.config.ChainConfig;
 import com.automation.config.HostClaudeConfig;
 import com.automation.config.RateLimitConfig;
+import com.automation.config.SchedulerConfig;
 import com.automation.config.TaskCommandConfig;
 import com.automation.config.TodoHygieneConfig;
 import com.automation.repository.AppSettingsRepository;
@@ -37,7 +38,8 @@ public class ExecutionSettingsService {
             Map.entry("allow-extra-mounts",                new long[]{0, 1}),
             Map.entry("todo-hygiene-enabled",              new long[]{0, 1}),
             Map.entry("todo-stale-days",                   new long[]{7, 365}),
-            Map.entry("todo-hygiene-max-per-run",          new long[]{10, 2000})
+            Map.entry("todo-hygiene-max-per-run",          new long[]{10, 2000}),
+            Map.entry("scheduler-catch-up-on-resume",      new long[]{0, 1})
     );
 
     // Frontend sends camelCase keys, backend uses kebab-case internally
@@ -55,7 +57,8 @@ public class ExecutionSettingsService {
             Map.entry("allowExtraMounts",                "allow-extra-mounts"),
             Map.entry("todoHygieneEnabled",              "todo-hygiene-enabled"),
             Map.entry("todoStaleDays",                   "todo-stale-days"),
-            Map.entry("todoHygieneMaxPerRun",            "todo-hygiene-max-per-run")
+            Map.entry("todoHygieneMaxPerRun",            "todo-hygiene-max-per-run"),
+            Map.entry("schedulerCatchUpOnResume",        "scheduler-catch-up-on-resume")
     );
 
     private final AppSettingsRepository appSettingsRepository;
@@ -66,6 +69,7 @@ public class ExecutionSettingsService {
     private final RateLimitConfig rateLimitConfig;
     private final WorkflowExecutor workflowExecutor;
     private final ContainerShellService containerShellService;
+    private final SchedulerConfig schedulerConfig;
     private final TodoHygieneConfig todoHygieneConfig;
     private final TaskCommandConfig taskCommandConfig;
 
@@ -85,6 +89,7 @@ public class ExecutionSettingsService {
             RateLimitConfig rateLimitConfig,
             @Lazy WorkflowExecutor workflowExecutor,
             ContainerShellService containerShellService,
+            SchedulerConfig schedulerConfig,
             TodoHygieneConfig todoHygieneConfig,
             TaskCommandConfig taskCommandConfig) {
         this.appSettingsRepository = appSettingsRepository;
@@ -95,6 +100,7 @@ public class ExecutionSettingsService {
         this.rateLimitConfig = rateLimitConfig;
         this.workflowExecutor = workflowExecutor;
         this.containerShellService = containerShellService;
+        this.schedulerConfig = schedulerConfig;
         this.todoHygieneConfig = todoHygieneConfig;
         this.taskCommandConfig = taskCommandConfig;
     }
@@ -126,6 +132,7 @@ public class ExecutionSettingsService {
         applyIfPresent("todo-hygiene-enabled", v -> todoHygieneConfig.setEnabled(Integer.parseInt(v) == 1));
         applyIfPresent("todo-stale-days", v -> todoHygieneConfig.setStaleDays(Integer.parseInt(v)));
         applyIfPresent("todo-hygiene-max-per-run", v -> todoHygieneConfig.setMaxPerRun(Integer.parseInt(v)));
+        applyIfPresent("scheduler-catch-up-on-resume", v -> schedulerConfig.setCatchUpOnResume(Integer.parseInt(v) == 1));
 
         log.info("Execution settings initialized: maxConcurrent={}, maxCalls={}, timeout={}s, delay={}ms, chainTimeout={}min, rateLimit={}/{}rpm, assistantChatTimeout={}s",
                 executionSemaphore.getMaxPermits(), hostClaudeConfig.getMaxConcurrentCalls(),
@@ -182,6 +189,7 @@ public class ExecutionSettingsService {
         result.put("todoHygieneEnabled", todoHygieneConfig.isEnabled() ? 1 : 0);
         result.put("todoStaleDays", todoHygieneConfig.getStaleDays());
         result.put("todoHygieneMaxPerRun", todoHygieneConfig.getMaxPerRun());
+        result.put("schedulerCatchUpOnResume", schedulerConfig.isCatchUpOnResume() ? 1 : 0);
         result.put("activeRuns", workflowExecutor.getActiveRunCount());
         return result;
     }
@@ -205,6 +213,7 @@ public class ExecutionSettingsService {
             case "todo-hygiene-enabled" -> todoHygieneConfig.setEnabled(Integer.parseInt(value) == 1);
             case "todo-stale-days" -> todoHygieneConfig.setStaleDays(Integer.parseInt(value));
             case "todo-hygiene-max-per-run" -> todoHygieneConfig.setMaxPerRun(Integer.parseInt(value));
+            case "scheduler-catch-up-on-resume" -> schedulerConfig.setCatchUpOnResume(Integer.parseInt(value) == 1);
         }
     }
 

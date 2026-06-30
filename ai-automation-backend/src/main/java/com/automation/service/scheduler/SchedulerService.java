@@ -441,7 +441,7 @@ public class SchedulerService {
                 "SchedulerService");
 
         for (ScheduledWorkflow scheduled : dueSchedules) {
-            if (scheduled.isCatchUpOnResume()) {
+            if (scheduled.isCatchUpOnResume() || schedulerConfig.isCatchUpOnResume()) {
                 try {
                     scheduledExecutor.executeSingleSchedule(scheduled.getId());
                 } catch (Exception e) {

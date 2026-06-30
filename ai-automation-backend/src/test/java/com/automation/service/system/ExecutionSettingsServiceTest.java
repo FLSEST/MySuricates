@@ -4,6 +4,7 @@ import com.automation.concurrency.DynamicSemaphore;
 import com.automation.config.ChainConfig;
 import com.automation.config.HostClaudeConfig;
 import com.automation.config.RateLimitConfig;
+import com.automation.config.SchedulerConfig;
 import com.automation.config.TaskCommandConfig;
 import com.automation.config.TodoHygieneConfig;
 import com.automation.repository.AppSettingsRepository;
@@ -35,6 +36,7 @@ class ExecutionSettingsServiceTest {
     private HostClaudeConfig hostClaudeConfig;
     private ChainConfig chainConfig;
     private RateLimitConfig rateLimitConfig;
+    private SchedulerConfig schedulerConfig;
     private TodoHygieneConfig todoHygieneConfig;
     private TaskCommandConfig taskCommandConfig;
     private ExecutionSettingsService service;
@@ -45,6 +47,7 @@ class ExecutionSettingsServiceTest {
         hostClaudeConfig = new HostClaudeConfig();
         chainConfig = new ChainConfig();
         rateLimitConfig = new RateLimitConfig();
+        schedulerConfig = new SchedulerConfig();
         todoHygieneConfig = new TodoHygieneConfig();
         taskCommandConfig = new TaskCommandConfig();
 
@@ -52,7 +55,7 @@ class ExecutionSettingsServiceTest {
                 appSettingsRepository, executionSemaphore,
                 hostClaudeService, hostClaudeConfig, chainConfig,
                 rateLimitConfig, workflowExecutor, containerShellService,
-                todoHygieneConfig, taskCommandConfig
+                schedulerConfig, todoHygieneConfig, taskCommandConfig
         );
     }
 
@@ -297,6 +300,32 @@ class ExecutionSettingsServiceTest {
 
         verify(appSettingsRepository).set("todo-hygiene-max-per-run", "500");
         assertThat(todoHygieneConfig.getMaxPerRun()).isEqualTo(500);
+    }
+
+    @Test
+    void validateAndApply_schedulerCatchUpOnResume_disables_updatesConfig() {
+        service.validateAndApply("scheduler-catch-up-on-resume", "0");
+
+        verify(appSettingsRepository).set("scheduler-catch-up-on-resume", "0");
+        assertThat(schedulerConfig.isCatchUpOnResume()).isFalse();
+    }
+
+    @Test
+    void validateAndApply_schedulerCatchUpOnResume_camelCaseAlias_enables_updatesConfig() {
+        service.validateAndApply("schedulerCatchUpOnResume", "1");
+
+        verify(appSettingsRepository).set("scheduler-catch-up-on-resume", "1");
+        assertThat(schedulerConfig.isCatchUpOnResume()).isTrue();
+    }
+
+    @Test
+    void getCurrentSettings_includesSchedulerCatchUpOnResume() {
+        when(workflowExecutor.getActiveRunCount()).thenReturn(0);
+
+        Map<String, Object> settings = service.getCurrentSettings();
+
+        assertThat(settings).containsKey("schedulerCatchUpOnResume");
+        assertThat(settings.get("schedulerCatchUpOnResume")).isEqualTo(1); // default is true
     }
 
     @Test
