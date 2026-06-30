@@ -2,11 +2,14 @@ package com.automation.service.system;
 
 import com.automation.concurrency.DynamicSemaphore;
 import com.automation.config.ChainConfig;
+import com.automation.config.FactoryConfig;
 import com.automation.config.HostClaudeConfig;
 import com.automation.config.RateLimitConfig;
 import com.automation.config.SchedulerConfig;
+import com.automation.config.SummarizationConfig;
 import com.automation.config.TaskCommandConfig;
 import com.automation.config.TodoHygieneConfig;
+import com.automation.config.WishConfig;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.ai.HostClaudeService;
 import com.automation.service.cli.ContainerShellService;
@@ -39,7 +42,14 @@ public class ExecutionSettingsService {
             Map.entry("todo-hygiene-enabled",              new long[]{0, 1}),
             Map.entry("todo-stale-days",                   new long[]{7, 365}),
             Map.entry("todo-hygiene-max-per-run",          new long[]{10, 2000}),
-            Map.entry("scheduler-catch-up-on-resume",      new long[]{0, 1})
+            Map.entry("scheduler-catch-up-on-resume",      new long[]{0, 1}),
+            Map.entry("scheduler-resume-grace-minutes",    new long[]{1, 60}),
+            Map.entry("summarization-timeout-seconds",     new long[]{30, 600}),
+            Map.entry("factory-timeout-seconds",           new long[]{60, 3600}),
+            Map.entry("wish-total-timeout-minutes",        new long[]{5, 1440}),
+            Map.entry("wish-workflow-wait-minutes",        new long[]{1, 120}),
+            Map.entry("wish-default-shell-timeout-seconds",             new long[]{30, 3600}),
+            Map.entry("wish-default-agentic-total-timeout-seconds",     new long[]{60, 86400})
     );
 
     // Frontend sends camelCase keys, backend uses kebab-case internally
@@ -58,7 +68,14 @@ public class ExecutionSettingsService {
             Map.entry("todoHygieneEnabled",              "todo-hygiene-enabled"),
             Map.entry("todoStaleDays",                   "todo-stale-days"),
             Map.entry("todoHygieneMaxPerRun",            "todo-hygiene-max-per-run"),
-            Map.entry("schedulerCatchUpOnResume",        "scheduler-catch-up-on-resume")
+            Map.entry("schedulerCatchUpOnResume",        "scheduler-catch-up-on-resume"),
+            Map.entry("schedulerResumeGraceMinutes",     "scheduler-resume-grace-minutes"),
+            Map.entry("summarizationTimeoutSeconds",     "summarization-timeout-seconds"),
+            Map.entry("factoryTimeoutSeconds",           "factory-timeout-seconds"),
+            Map.entry("wishTotalTimeoutMinutes",                    "wish-total-timeout-minutes"),
+            Map.entry("wishWorkflowWaitMinutes",                    "wish-workflow-wait-minutes"),
+            Map.entry("wishDefaultShellTimeoutSeconds",             "wish-default-shell-timeout-seconds"),
+            Map.entry("wishDefaultAgenticTotalTimeoutSeconds",      "wish-default-agentic-total-timeout-seconds")
     );
 
     private final AppSettingsRepository appSettingsRepository;
@@ -72,6 +89,9 @@ public class ExecutionSettingsService {
     private final SchedulerConfig schedulerConfig;
     private final TodoHygieneConfig todoHygieneConfig;
     private final TaskCommandConfig taskCommandConfig;
+    private final SummarizationConfig summarizationConfig;
+    private final FactoryConfig factoryConfig;
+    private final WishConfig wishConfig;
 
     // Defaults from YAML/env (captured at startup)
     private int defaultMaxConcurrent;
@@ -91,7 +111,10 @@ public class ExecutionSettingsService {
             ContainerShellService containerShellService,
             SchedulerConfig schedulerConfig,
             TodoHygieneConfig todoHygieneConfig,
-            TaskCommandConfig taskCommandConfig) {
+            TaskCommandConfig taskCommandConfig,
+            SummarizationConfig summarizationConfig,
+            FactoryConfig factoryConfig,
+            WishConfig wishConfig) {
         this.appSettingsRepository = appSettingsRepository;
         this.executionSemaphore = executionSemaphore;
         this.hostClaudeService = hostClaudeService;
@@ -103,6 +126,9 @@ public class ExecutionSettingsService {
         this.schedulerConfig = schedulerConfig;
         this.todoHygieneConfig = todoHygieneConfig;
         this.taskCommandConfig = taskCommandConfig;
+        this.summarizationConfig = summarizationConfig;
+        this.factoryConfig = factoryConfig;
+        this.wishConfig = wishConfig;
     }
 
     @PostConstruct
@@ -133,6 +159,13 @@ public class ExecutionSettingsService {
         applyIfPresent("todo-stale-days", v -> todoHygieneConfig.setStaleDays(Integer.parseInt(v)));
         applyIfPresent("todo-hygiene-max-per-run", v -> todoHygieneConfig.setMaxPerRun(Integer.parseInt(v)));
         applyIfPresent("scheduler-catch-up-on-resume", v -> schedulerConfig.setCatchUpOnResume(Integer.parseInt(v) == 1));
+        applyIfPresent("scheduler-resume-grace-minutes", v -> schedulerConfig.setResumeGraceMinutes(Long.parseLong(v)));
+        applyIfPresent("summarization-timeout-seconds", v -> summarizationConfig.setTimeoutSeconds(Integer.parseInt(v)));
+        applyIfPresent("factory-timeout-seconds", v -> factoryConfig.setTimeoutSeconds(Integer.parseInt(v)));
+        applyIfPresent("wish-total-timeout-minutes", v -> wishConfig.setTotalTimeoutMinutes(Integer.parseInt(v)));
+        applyIfPresent("wish-workflow-wait-minutes", v -> wishConfig.setWorkflowWaitMinutes(Integer.parseInt(v)));
+        applyIfPresent("wish-default-shell-timeout-seconds", v -> wishConfig.setDefaultShellTimeoutSeconds(Integer.parseInt(v)));
+        applyIfPresent("wish-default-agentic-total-timeout-seconds", v -> wishConfig.setDefaultAgenticTotalTimeoutSeconds(Integer.parseInt(v)));
 
         log.info("Execution settings initialized: maxConcurrent={}, maxCalls={}, timeout={}s, delay={}ms, chainTimeout={}min, rateLimit={}/{}rpm, assistantChatTimeout={}s",
                 executionSemaphore.getMaxPermits(), hostClaudeConfig.getMaxConcurrentCalls(),
@@ -190,6 +223,13 @@ public class ExecutionSettingsService {
         result.put("todoStaleDays", todoHygieneConfig.getStaleDays());
         result.put("todoHygieneMaxPerRun", todoHygieneConfig.getMaxPerRun());
         result.put("schedulerCatchUpOnResume", schedulerConfig.isCatchUpOnResume() ? 1 : 0);
+        result.put("schedulerResumeGraceMinutes", schedulerConfig.getResumeGraceMinutes());
+        result.put("summarizationTimeoutSeconds", summarizationConfig.getTimeoutSeconds());
+        result.put("factoryTimeoutSeconds", factoryConfig.getTimeoutSeconds());
+        result.put("wishTotalTimeoutMinutes", wishConfig.getTotalTimeoutMinutes());
+        result.put("wishWorkflowWaitMinutes", wishConfig.getWorkflowWaitMinutes());
+        result.put("wishDefaultShellTimeoutSeconds", wishConfig.getDefaultShellTimeoutSeconds());
+        result.put("wishDefaultAgenticTotalTimeoutSeconds", wishConfig.getDefaultAgenticTotalTimeoutSeconds());
         result.put("activeRuns", workflowExecutor.getActiveRunCount());
         return result;
     }
@@ -214,6 +254,13 @@ public class ExecutionSettingsService {
             case "todo-stale-days" -> todoHygieneConfig.setStaleDays(Integer.parseInt(value));
             case "todo-hygiene-max-per-run" -> todoHygieneConfig.setMaxPerRun(Integer.parseInt(value));
             case "scheduler-catch-up-on-resume" -> schedulerConfig.setCatchUpOnResume(Integer.parseInt(value) == 1);
+            case "scheduler-resume-grace-minutes" -> schedulerConfig.setResumeGraceMinutes(Long.parseLong(value));
+            case "summarization-timeout-seconds" -> summarizationConfig.setTimeoutSeconds(Integer.parseInt(value));
+            case "factory-timeout-seconds" -> factoryConfig.setTimeoutSeconds(Integer.parseInt(value));
+            case "wish-total-timeout-minutes" -> wishConfig.setTotalTimeoutMinutes(Integer.parseInt(value));
+            case "wish-workflow-wait-minutes" -> wishConfig.setWorkflowWaitMinutes(Integer.parseInt(value));
+            case "wish-default-shell-timeout-seconds" -> wishConfig.setDefaultShellTimeoutSeconds(Integer.parseInt(value));
+            case "wish-default-agentic-total-timeout-seconds" -> wishConfig.setDefaultAgenticTotalTimeoutSeconds(Integer.parseInt(value));
         }
     }
 

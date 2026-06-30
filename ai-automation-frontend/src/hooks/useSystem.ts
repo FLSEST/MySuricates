@@ -162,6 +162,13 @@ export interface ExecutionConfig {
   rateLimitRequestsPerMinute: number;
   assistantChatTimeoutSeconds: number;
   schedulerCatchUpOnResume: number;
+  schedulerResumeGraceMinutes: number;
+  summarizationTimeoutSeconds: number;
+  factoryTimeoutSeconds: number;
+  wishTotalTimeoutMinutes?: number;
+  wishWorkflowWaitMinutes?: number;
+  wishDefaultShellTimeoutSeconds?: number;
+  wishDefaultAgenticTotalTimeoutSeconds?: number;
   activeRuns: number;
 }
 
@@ -178,7 +185,7 @@ export function useUpdateExecutionConfig() {
   const toast = useToast();
   const t = useT();
   return useMutation({
-    mutationFn: (config: Omit<ExecutionConfig, 'activeRuns'>) =>
+    mutationFn: (config: Partial<Omit<ExecutionConfig, 'activeRuns'>>) =>
       api.put<ExecutionConfig>('/system/execution-config', config),
     onSuccess: (data) => {
       qc.setQueryData(['system', 'execution-config'], data);

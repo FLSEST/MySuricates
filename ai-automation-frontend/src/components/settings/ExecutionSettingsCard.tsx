@@ -27,6 +27,9 @@ interface FormState {
   rateLimitRequestsPerMinute: number;
   assistantChatTimeoutSeconds: number;
   schedulerCatchUpOnResume: boolean;
+  schedulerResumeGraceMinutes: number;
+  summarizationTimeoutSeconds: number;
+  factoryTimeoutSeconds: number;
 }
 
 export function ExecutionSettingsCard() {
@@ -45,6 +48,9 @@ export function ExecutionSettingsCard() {
     rateLimitRequestsPerMinute: 120,
     assistantChatTimeoutSeconds: 240,
     schedulerCatchUpOnResume: true,
+    schedulerResumeGraceMinutes: 5,
+    summarizationTimeoutSeconds: 120,
+    factoryTimeoutSeconds: 600,
   });
 
   useEffect(() => {
@@ -60,6 +66,9 @@ export function ExecutionSettingsCard() {
         rateLimitRequestsPerMinute: config.rateLimitRequestsPerMinute,
         assistantChatTimeoutSeconds: config.assistantChatTimeoutSeconds ?? 240,
         schedulerCatchUpOnResume: (config.schedulerCatchUpOnResume ?? 1) === 1,
+        schedulerResumeGraceMinutes: config.schedulerResumeGraceMinutes ?? 5,
+        summarizationTimeoutSeconds: config.summarizationTimeoutSeconds ?? 120,
+        factoryTimeoutSeconds: config.factoryTimeoutSeconds ?? 600,
       });
     }
   }, [config]);
@@ -74,7 +83,10 @@ export function ExecutionSettingsCard() {
     form.rateLimitEnabled !== (config.rateLimitEnabled === 1) ||
     form.rateLimitRequestsPerMinute !== config.rateLimitRequestsPerMinute ||
     form.assistantChatTimeoutSeconds !== (config.assistantChatTimeoutSeconds ?? 240) ||
-    form.schedulerCatchUpOnResume !== ((config.schedulerCatchUpOnResume ?? 1) === 1)
+    form.schedulerCatchUpOnResume !== ((config.schedulerCatchUpOnResume ?? 1) === 1) ||
+    form.schedulerResumeGraceMinutes !== (config.schedulerResumeGraceMinutes ?? 5) ||
+    form.summarizationTimeoutSeconds !== (config.summarizationTimeoutSeconds ?? 120) ||
+    form.factoryTimeoutSeconds !== (config.factoryTimeoutSeconds ?? 600)
   );
 
   const fields: FieldConfig[] = [
@@ -86,6 +98,9 @@ export function ExecutionSettingsCard() {
     { key: 'chain', label: t.settings.executionChainTimeout, hint: t.settings.executionChainTimeoutHint, min: 5, max: 1440, configKey: 'chainWorkflowTimeoutMinutes' },
     { key: 'rateRpm', label: t.settings.executionRateLimitRpm, hint: t.settings.executionRateLimitRpmHint, min: 10, max: 10000, configKey: 'rateLimitRequestsPerMinute' },
     { key: 'assistantTimeout', label: t.settings.executionAssistantChatTimeout, hint: t.settings.executionAssistantChatTimeoutHint, min: 30, max: 900, configKey: 'assistantChatTimeoutSeconds' },
+    { key: 'resumeGrace', label: t.settings.schedulerResumeGraceMinutes, hint: t.settings.schedulerResumeGraceMinutesHint, min: 1, max: 60, configKey: 'schedulerResumeGraceMinutes' },
+    { key: 'summarizationTimeout', label: t.settings.summarizationTimeoutSeconds, hint: t.settings.summarizationTimeoutSecondsHint, min: 30, max: 600, configKey: 'summarizationTimeoutSeconds' },
+    { key: 'factoryTimeout', label: t.settings.factoryTimeoutSeconds, hint: t.settings.factoryTimeoutSecondsHint, min: 60, max: 3600, configKey: 'factoryTimeoutSeconds' },
   ];
 
   const handleSave = () => {
@@ -100,6 +115,9 @@ export function ExecutionSettingsCard() {
       rateLimitRequestsPerMinute: form.rateLimitRequestsPerMinute,
       assistantChatTimeoutSeconds: form.assistantChatTimeoutSeconds,
       schedulerCatchUpOnResume: form.schedulerCatchUpOnResume ? 1 : 0,
+      schedulerResumeGraceMinutes: form.schedulerResumeGraceMinutes,
+      summarizationTimeoutSeconds: form.summarizationTimeoutSeconds,
+      factoryTimeoutSeconds: form.factoryTimeoutSeconds,
     });
   };
 

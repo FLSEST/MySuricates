@@ -2,11 +2,14 @@ package com.automation.service.system;
 
 import com.automation.concurrency.DynamicSemaphore;
 import com.automation.config.ChainConfig;
+import com.automation.config.FactoryConfig;
 import com.automation.config.HostClaudeConfig;
 import com.automation.config.RateLimitConfig;
 import com.automation.config.SchedulerConfig;
+import com.automation.config.SummarizationConfig;
 import com.automation.config.TaskCommandConfig;
 import com.automation.config.TodoHygieneConfig;
+import com.automation.config.WishConfig;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.ai.HostClaudeService;
 import com.automation.service.cli.ContainerShellService;
@@ -39,6 +42,9 @@ class ExecutionSettingsServiceTest {
     private SchedulerConfig schedulerConfig;
     private TodoHygieneConfig todoHygieneConfig;
     private TaskCommandConfig taskCommandConfig;
+    private SummarizationConfig summarizationConfig;
+    private FactoryConfig factoryConfig;
+    private WishConfig wishConfig;
     private ExecutionSettingsService service;
 
     @BeforeEach
@@ -50,12 +56,16 @@ class ExecutionSettingsServiceTest {
         schedulerConfig = new SchedulerConfig();
         todoHygieneConfig = new TodoHygieneConfig();
         taskCommandConfig = new TaskCommandConfig();
+        summarizationConfig = new SummarizationConfig();
+        factoryConfig = new FactoryConfig();
+        wishConfig = new WishConfig();
 
         service = new ExecutionSettingsService(
                 appSettingsRepository, executionSemaphore,
                 hostClaudeService, hostClaudeConfig, chainConfig,
                 rateLimitConfig, workflowExecutor, containerShellService,
-                schedulerConfig, todoHygieneConfig, taskCommandConfig
+                schedulerConfig, todoHygieneConfig, taskCommandConfig,
+                summarizationConfig, factoryConfig, wishConfig
         );
     }
 
@@ -326,6 +336,169 @@ class ExecutionSettingsServiceTest {
 
         assertThat(settings).containsKey("schedulerCatchUpOnResume");
         assertThat(settings.get("schedulerCatchUpOnResume")).isEqualTo(1); // default is true
+    }
+
+    // --- Gruppe A: Scheduler resume-grace-minutes ---
+
+    @Test
+    void validateAndApply_schedulerResumeGraceMinutes_updatesConfig() {
+        service.validateAndApply("scheduler-resume-grace-minutes", "10");
+
+        verify(appSettingsRepository).set("scheduler-resume-grace-minutes", "10");
+        assertThat(schedulerConfig.getResumeGraceMinutes()).isEqualTo(10);
+    }
+
+    @Test
+    void validateAndApply_schedulerResumeGraceMinutes_camelCaseAlias() {
+        service.validateAndApply("schedulerResumeGraceMinutes", "3");
+
+        verify(appSettingsRepository).set("scheduler-resume-grace-minutes", "3");
+        assertThat(schedulerConfig.getResumeGraceMinutes()).isEqualTo(3);
+    }
+
+    @Test
+    void validateAndApply_schedulerResumeGraceMinutes_outOfBounds_throws() {
+        assertThatThrownBy(() -> service.validateAndApply("scheduler-resume-grace-minutes", "0"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must be between");
+    }
+
+    @Test
+    void getCurrentSettings_includesSchedulerResumeGraceMinutes() {
+        when(workflowExecutor.getActiveRunCount()).thenReturn(0);
+
+        Map<String, Object> settings = service.getCurrentSettings();
+
+        assertThat(settings).containsKey("schedulerResumeGraceMinutes");
+        assertThat(settings.get("schedulerResumeGraceMinutes")).isEqualTo(5L); // default
+    }
+
+    // --- Gruppe C: System-Timeouts ---
+
+    @Test
+    void validateAndApply_summarizationTimeoutSeconds_updatesConfig() {
+        service.validateAndApply("summarization-timeout-seconds", "240");
+
+        verify(appSettingsRepository).set("summarization-timeout-seconds", "240");
+        assertThat(summarizationConfig.getTimeoutSeconds()).isEqualTo(240);
+    }
+
+    @Test
+    void validateAndApply_summarizationTimeout_camelCaseAlias() {
+        service.validateAndApply("summarizationTimeoutSeconds", "180");
+
+        verify(appSettingsRepository).set("summarization-timeout-seconds", "180");
+        assertThat(summarizationConfig.getTimeoutSeconds()).isEqualTo(180);
+    }
+
+    @Test
+    void validateAndApply_summarizationTimeout_outOfBounds_throws() {
+        assertThatThrownBy(() -> service.validateAndApply("summarization-timeout-seconds", "10"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must be between");
+    }
+
+    @Test
+    void getCurrentSettings_includesSummarizationTimeoutSeconds() {
+        when(workflowExecutor.getActiveRunCount()).thenReturn(0);
+
+        Map<String, Object> settings = service.getCurrentSettings();
+
+        assertThat(settings).containsKey("summarizationTimeoutSeconds");
+        assertThat(settings.get("summarizationTimeoutSeconds")).isEqualTo(120); // default
+    }
+
+    @Test
+    void validateAndApply_factoryTimeoutSeconds_updatesConfig() {
+        service.validateAndApply("factory-timeout-seconds", "300");
+
+        verify(appSettingsRepository).set("factory-timeout-seconds", "300");
+        assertThat(factoryConfig.getTimeoutSeconds()).isEqualTo(300);
+    }
+
+    @Test
+    void validateAndApply_factoryTimeout_camelCaseAlias() {
+        service.validateAndApply("factoryTimeoutSeconds", "900");
+
+        verify(appSettingsRepository).set("factory-timeout-seconds", "900");
+        assertThat(factoryConfig.getTimeoutSeconds()).isEqualTo(900);
+    }
+
+    @Test
+    void validateAndApply_factoryTimeout_outOfBounds_throws() {
+        assertThatThrownBy(() -> service.validateAndApply("factory-timeout-seconds", "30"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must be between");
+    }
+
+    @Test
+    void getCurrentSettings_includesFactoryTimeoutSeconds() {
+        when(workflowExecutor.getActiveRunCount()).thenReturn(0);
+
+        Map<String, Object> settings = service.getCurrentSettings();
+
+        assertThat(settings).containsKey("factoryTimeoutSeconds");
+        assertThat(settings.get("factoryTimeoutSeconds")).isEqualTo(600); // default
+    }
+
+    // --- Gruppe B: WishConfig ---
+
+    @Test
+    void validateAndApply_wishTotalTimeoutMinutes_updatesConfig() {
+        service.validateAndApply("wish-total-timeout-minutes", "60");
+
+        verify(appSettingsRepository).set("wish-total-timeout-minutes", "60");
+        assertThat(wishConfig.getTotalTimeoutMinutes()).isEqualTo(60);
+    }
+
+    @Test
+    void validateAndApply_wishTotalTimeout_camelCaseAlias() {
+        service.validateAndApply("wishTotalTimeoutMinutes", "90");
+
+        verify(appSettingsRepository).set("wish-total-timeout-minutes", "90");
+        assertThat(wishConfig.getTotalTimeoutMinutes()).isEqualTo(90);
+    }
+
+    @Test
+    void validateAndApply_wishWorkflowWaitMinutes_updatesConfig() {
+        service.validateAndApply("wish-workflow-wait-minutes", "15");
+
+        verify(appSettingsRepository).set("wish-workflow-wait-minutes", "15");
+        assertThat(wishConfig.getWorkflowWaitMinutes()).isEqualTo(15);
+    }
+
+    @Test
+    void validateAndApply_wishDefaultShellTimeoutSeconds_updatesConfig() {
+        service.validateAndApply("wish-default-shell-timeout-seconds", "1200");
+
+        verify(appSettingsRepository).set("wish-default-shell-timeout-seconds", "1200");
+        assertThat(wishConfig.getDefaultShellTimeoutSeconds()).isEqualTo(1200);
+    }
+
+    @Test
+    void validateAndApply_wishDefaultAgenticTotalTimeoutSeconds_updatesConfig() {
+        service.validateAndApply("wish-default-agentic-total-timeout-seconds", "7200");
+
+        verify(appSettingsRepository).set("wish-default-agentic-total-timeout-seconds", "7200");
+        assertThat(wishConfig.getDefaultAgenticTotalTimeoutSeconds()).isEqualTo(7200);
+    }
+
+    @Test
+    void getCurrentSettings_includesWishSettings() {
+        when(workflowExecutor.getActiveRunCount()).thenReturn(0);
+
+        Map<String, Object> settings = service.getCurrentSettings();
+
+        assertThat(settings).containsKeys(
+                "wishTotalTimeoutMinutes",
+                "wishWorkflowWaitMinutes",
+                "wishDefaultShellTimeoutSeconds",
+                "wishDefaultAgenticTotalTimeoutSeconds"
+        );
+        assertThat(settings.get("wishTotalTimeoutMinutes")).isEqualTo(120);
+        assertThat(settings.get("wishWorkflowWaitMinutes")).isEqualTo(30);
+        assertThat(settings.get("wishDefaultShellTimeoutSeconds")).isEqualTo(600);
+        assertThat(settings.get("wishDefaultAgenticTotalTimeoutSeconds")).isEqualTo(3600);
     }
 
     @Test

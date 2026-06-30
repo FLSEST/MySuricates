@@ -14,6 +14,7 @@ import { StagingCard } from '../components/settings/StagingCard';
 import { TestingCard } from '../components/settings/TestingCard';
 import { NotificationsCard } from '../components/settings/NotificationsCard';
 import { ExecutionSettingsCard } from '../components/settings/ExecutionSettingsCard';
+import { WishSettingsCard } from '../components/settings/WishSettingsCard';
 import { SettingsNav, type NavSection } from '../components/settings/SettingsNav';
 import { SettingsSection } from '../components/settings/SettingsSection';
 
@@ -77,6 +78,7 @@ export function Settings() {
           {!simpleMode && (
             <SettingsSection id="execution" title={t.settings.settingsNavExecution} collapsible open={!!openSections['execution']} onToggle={() => toggleSection('execution')}>
               <ExecutionSettingsCard />
+              <WishSettingsCard />
             </SettingsSection>
           )}
 
