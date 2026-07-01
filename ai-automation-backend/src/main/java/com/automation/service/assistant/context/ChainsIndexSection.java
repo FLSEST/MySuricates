@@ -25,7 +25,7 @@ public class ChainsIndexSection implements AssistantContextSection {
                 return;
             }
             if (compact) {
-                sb.append("**Chains:** ").append(chains.size()).append(" verfügbar\n");
+                sb.append("**Chains:** ").append(chains.size()).append(" available\n");
                 return;
             }
             int shown = Math.min(chains.size(), MAX_ENTRIES);
@@ -34,10 +34,10 @@ public class ChainsIndexSection implements AssistantContextSection {
                     .append("  - ").append(c.getName())
                     .append(" — ").append(shortDesc(c.getDescription()))
                     .append(" (").append(c.getEntries() != null ? c.getEntries().size() : 0)
-                    .append(" Workflows, id: ").append(c.getId()).append(")\n"));
+                    .append(" workflows, id: ").append(c.getId()).append(")\n"));
             if (chains.size() > shown) {
-                sb.append("  … und ").append(chains.size() - shown)
-                  .append(" weitere. Detail via <fetch type=\"chain\" id=\"<chain-id>\"/>\n");
+                sb.append("  … and ").append(chains.size() - shown)
+                  .append(" more. Detail via <fetch type=\"chain\" id=\"<chain-id>\"/>\n");
             }
             sb.append("\n");
         } catch (Exception e) {
@@ -46,7 +46,7 @@ public class ChainsIndexSection implements AssistantContextSection {
     }
 
     private String shortDesc(String desc) {
-        if (desc == null || desc.isBlank()) return "(keine Beschreibung)";
+        if (desc == null || desc.isBlank()) return "(no description)";
         String trimmed = desc.replaceAll("\\s+", " ").trim();
         return trimmed.length() > 80 ? trimmed.substring(0, 77) + "..." : trimmed;
     }

@@ -145,7 +145,7 @@ public class AssistantService {
         String requestId = req.requestId();
         try {
             broadcaster.broadcastStatus(requestId, "BUILDING_CONTEXT", null, startNanos);
-            String systemPrompt = contextBuilder.buildSystemPrompt(req.context(), cachedBaseInstructions);
+            String systemPrompt = contextBuilder.buildSystemPrompt(req.context(), cachedBaseInstructions, req.language());
             String prompt = contextBuilder.buildPrompt(req.history(), req.message());
             String workingDir = contextBuilder.resolveWorkingDir(req.context());
             String model = cachedAssistantModel;
@@ -192,7 +192,7 @@ public class AssistantService {
                 if (fetches.isEmpty()) break;
                 fetchLoopEntered = true;
 
-                broadcaster.broadcastStatus(requestId, "FETCHING_DATA", "Runde " + (fetchRound + 1), startNanos);
+                broadcaster.broadcastStatus(requestId, "FETCHING_DATA", "Round " + (fetchRound + 1), startNanos);
                 String supplemental = fetches.stream()
                         .map(fetchService::executeFetch)
                         .filter(s -> !s.isBlank())
@@ -206,12 +206,12 @@ public class AssistantService {
                         ? supplemental
                         : accumulatedSupplemental + "\n\n" + supplemental;
                 String enrichedPrompt = prompt
-                        + "\n\n---\nNachgeladene Details (Runde " + (fetchRound + 1) + "):\n"
+                        + "\n\n---\nFetched details (round " + (fetchRound + 1) + "):\n"
                         + accumulatedSupplemental
-                        + "\n\n[Bitte beantworte die ursprüngliche Frage jetzt mit diesen Details. "
-                        + "Wenn wirklich noch etwas Entscheidendes fehlt, benenne es in 1 Satz und mach dann "
-                        + "höchstens einen weiteren konkreten <fetch>.]";
-                broadcaster.broadcastStatus(requestId, "THINKING", "Runde " + (fetchRound + 1), startNanos);
+                        + "\n\n[Please answer the original question now using these details. "
+                        + "If something truly essential is still missing, name it in 1 sentence and then make "
+                        + "at most one more specific <fetch>.]";
+                broadcaster.broadcastStatus(requestId, "THINKING", "Round " + (fetchRound + 1), startNanos);
                 result = executeOrFail(
                         HostExecutionRequest.builder()
                                 .projectPath(workingDir)
@@ -241,9 +241,9 @@ public class AssistantService {
             // because the model repeated the same fetch". Give the user a concrete error instead
             // of the silent "(Keine Antwort erhalten)" that the session log shows most often.
             if ((finalOutput == null || finalOutput.isBlank()) && fetchLoopEntered) {
-                finalOutput = "Ich konnte die Frage mit bis zu " + MAX_FETCH_ROUNDS
-                        + " Daten-Abfragen nicht vollständig auflösen. "
-                        + "Bitte formuliere die Frage konkreter oder gib die relevante ID direkt an.";
+                finalOutput = "I could not fully resolve the question with up to " + MAX_FETCH_ROUNDS
+                        + " data fetches. "
+                        + "Please phrase the question more specifically or provide the relevant ID directly.";
             }
 
             AssistantChatResponse parsed = parseResponse(finalOutput);
@@ -297,15 +297,15 @@ public class AssistantService {
         if (root instanceof IOException && msg.contains("timed out")) {
             int timeout = hostClaudeConfig.getAssistantChatTimeoutSeconds();
             return new ErrorKind("TIMEOUT",
-                    "Die Antwort hat länger als " + timeout + " Sekunden gedauert. " +
-                    "Versuche es erneut oder formuliere die Frage kürzer. " +
-                    "Den Timeout kannst du in den Einstellungen erhöhen.");
+                    "The response took longer than " + timeout + " seconds. " +
+                    "Try again or phrase the question more briefly. " +
+                    "You can increase the timeout in the settings.");
         }
         if (root instanceof SQLTransientConnectionException
                 || msg.contains("Connection is not available")) {
             return new ErrorKind("POOL_EXHAUSTED",
-                    "Das System ist gerade ausgelastet (Datenbank-Pool belegt). " +
-                    "Warte einen Moment und versuche es erneut.");
+                    "The system is currently busy (database pool in use). " +
+                    "Wait a moment and try again.");
         }
         // JSON parse failures from tool-call extraction (e.g. Unicode full-width comma in the
         // model's tool-JSON). Previously these surfaced as "Provider nicht konfiguriert",
@@ -315,13 +315,13 @@ public class AssistantService {
                 || msg.contains("was expecting comma")
                 || msg.contains("Unexpected character")) {
             return new ErrorKind("TOOL_CALL_MALFORMED",
-                    "Meine Tool-Eingabe war nicht valide (JSON-Fehler). " +
-                    "Formuliere die Anfrage einfacher oder ohne Sonderzeichen und versuche es erneut.");
+                    "My tool input was not valid (JSON error). " +
+                    "Phrase the request more simply or without special characters and try again.");
         }
         if (msg.toLowerCase().contains("api key")) {
             return new ErrorKind("PROVIDER_UNAVAILABLE",
-                    "Der KI-Provider ist nicht korrekt konfiguriert. " +
-                    "Prüfe die Einstellungen (API-Key, Modell).");
+                    "The AI provider is not configured correctly. " +
+                    "Check the settings (API key, model).");
         }
         if (msg.contains("Assistant CLI failed (exit ")) {
             // Surface the CLI exit code so debugging doesn't require digging through logs.
@@ -329,12 +329,12 @@ public class AssistantService {
             int excerptEnd = Math.min(msg.length(), excerptStart + 60);
             String excerpt = excerptStart >= 0 ? msg.substring(excerptStart, excerptEnd) : "";
             return new ErrorKind("CLI_NON_ZERO_EXIT",
-                    "Der KI-Prozess endete mit einem Fehler " + excerpt + ". " +
-                    "Prüfe die API-Konfiguration; Details stehen im Server-Log.");
+                    "The AI process ended with an error " + excerpt + ". " +
+                    "Check the API configuration; details are in the server log.");
         }
         return new ErrorKind("UNKNOWN",
-                "Entschuldigung, ich konnte deine Anfrage gerade nicht verarbeiten. " +
-                "Details stehen im Server-Log — bitte versuche es erneut.");
+                "Sorry, I could not process your request right now. " +
+                "Details are in the server log — please try again.");
     }
 
     private Throwable unwrap(Throwable e) {
@@ -504,7 +504,7 @@ public class AssistantService {
 
     private AssistantChatResponse parseResponse(String raw) {
         if (raw == null || raw.isBlank()) {
-            return new AssistantChatResponse("(Keine Antwort erhalten)", List.of());
+            return new AssistantChatResponse("(No response received)", List.of());
         }
 
         List<AssistantAction> actions = Collections.emptyList();

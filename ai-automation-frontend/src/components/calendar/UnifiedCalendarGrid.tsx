@@ -6,7 +6,7 @@ import { CalendarEventList } from './CalendarEventList';
 import { CalendarWeekView } from './CalendarWeekView';
 import { CalendarDayView } from './CalendarDayView';
 import { useCalendarAggregated } from '../../hooks/useCalendarAggregated';
-import { useT } from '../../i18n';
+import { useT, useI18nStore } from '../../i18n';
 import type { UnifiedCalendarEvent } from '../../types';
 
 type ViewMode = 'month' | 'week' | 'day';
@@ -42,7 +42,8 @@ const VIEW_LABELS = {
 
 export function UnifiedCalendarGrid() {
   const t = useT();
-  const isGerman = t.common.save === 'Speichern';
+  const locale = useI18nStore((s) => s.locale);
+  const isGerman = locale === 'de';
   const weekdays = isGerman ? WEEKDAYS_DE : WEEKDAYS_EN;
   const months = isGerman ? MONTHS_DE : MONTHS_EN;
 

@@ -261,7 +261,7 @@ export function Dashboard() {
                       <Clock className="w-3 h-3" />
                       {formatDuration(run.durationMs)}
                     </span>
-                    <span>{run.startedAt ? `${formatDateTime(run.startedAt)} · ${formatRelativeTime(run.startedAt, locale)}` : '-'}</span>
+                    <span>{run.startedAt ? `${formatDateTime(run.startedAt, locale)} · ${formatRelativeTime(run.startedAt, locale)}` : '-'}</span>
                   </div>
                 </div>
               ))}

@@ -8,9 +8,19 @@ public record AssistantChatRequest(
         List<MessageEntry> history,
         PageContext context,
         String provider,
+        String language,
         String sessionId,
         String requestId
 ) {
+    /**
+     * Backward-compatible constructor without an explicit UI language.
+     * {@code language} defaults to {@code null}, which resolves to German (the platform default).
+     */
+    public AssistantChatRequest(String message, List<MessageEntry> history, PageContext context,
+                                String provider, String sessionId, String requestId) {
+        this(message, history, context, provider, null, sessionId, requestId);
+    }
+
     public record MessageEntry(String role, String content) {}
 
     public record PageContext(

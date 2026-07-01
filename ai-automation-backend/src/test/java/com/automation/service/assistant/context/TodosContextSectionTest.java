@@ -46,7 +46,7 @@ class TodosContextSectionTest {
         section.append(sb, true);
 
         assertThat(sb.toString())
-                .contains("2 offen")
+                .contains("2 open")
                 .contains("1 HIGH")
                 .contains("0 MEDIUM")
                 .contains("1 LOW");
@@ -75,7 +75,7 @@ class TodosContextSectionTest {
         section.append(sb, false);
 
         assertThat(sb.toString())
-                .contains("Offene Todos (2):")
+                .contains("Open Todos (2):")
                 .contains("[HIGH] Fix critical bug")
                 .contains("[LOW] Nice to have");
     }
@@ -110,7 +110,7 @@ class TodosContextSectionTest {
         StringBuilder sb = new StringBuilder();
         section.append(sb, false);
 
-        assertThat(sb.toString()).contains("Offene Todos (10):");
+        assertThat(sb.toString()).contains("Open Todos (10):");
     }
 
     @Test

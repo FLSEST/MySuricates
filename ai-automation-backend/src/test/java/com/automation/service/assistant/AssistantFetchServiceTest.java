@@ -120,7 +120,7 @@ class AssistantFetchServiceTest {
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("run_detail", "missing"));
 
-        assertThat(result).contains("nicht gefunden");
+        assertThat(result).contains("not found");
     }
 
     @Test
@@ -159,7 +159,7 @@ class AssistantFetchServiceTest {
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("wish_detail", "missing"));
 
-        assertThat(result).contains("nicht gefunden");
+        assertThat(result).contains("not found");
     }
 
     @Test
@@ -191,7 +191,7 @@ class AssistantFetchServiceTest {
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("run_detail", "r1"));
 
-        assertThat(result).contains("Schritte");
+        assertThat(result).contains("Steps");
         assertThat(result).contains("COMPLETED");
         assertThat(result).contains("FAILED");
         assertThat(result).contains("error output");
@@ -201,14 +201,14 @@ class AssistantFetchServiceTest {
     void executeFetch_stepOutput_invalidFormat_returnsError() {
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("step_output", "no-slash"));
 
-        assertThat(result).contains("Ungültiges Format");
+        assertThat(result).contains("Invalid format");
     }
 
     @Test
     void executeFetch_stepOutput_invalidStepNumber_returnsError() {
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("step_output", "r1/abc"));
 
-        assertThat(result).contains("Schrittnummer ungültig");
+        assertThat(result).contains("Invalid step number");
     }
 
     @Test
@@ -217,7 +217,7 @@ class AssistantFetchServiceTest {
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("step_output", "r1/1"));
 
-        assertThat(result).contains("nicht gefunden");
+        assertThat(result).contains("not found");
     }
 
     @Test
@@ -228,7 +228,7 @@ class AssistantFetchServiceTest {
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("step_output", "r1/5"));
 
-        assertThat(result).contains("Step 5 nicht gefunden");
+        assertThat(result).contains("Step 5 not found");
     }
 
     @Test
@@ -241,7 +241,7 @@ class AssistantFetchServiceTest {
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("step_output", "r1/1"));
 
-        assertThat(result).contains("Kein Output");
+        assertThat(result).contains("No output");
     }
 
     @Test
@@ -250,7 +250,7 @@ class AssistantFetchServiceTest {
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("workflow_detail", "wf-missing"));
 
-        assertThat(result).contains("nicht gefunden");
+        assertThat(result).contains("not found");
     }
 
     @Test
@@ -259,7 +259,7 @@ class AssistantFetchServiceTest {
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("workflow_runs", "wf-1"));
 
-        assertThat(result).contains("Keine Runs");
+        assertThat(result).contains("No runs");
     }
 
     @Test
@@ -268,14 +268,14 @@ class AssistantFetchServiceTest {
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("project_context", "p-missing"));
 
-        assertThat(result).contains("nicht gefunden");
+        assertThat(result).contains("not found");
     }
 
     @Test
     void executeFetch_docs_unknownDoc_returnsError() {
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("docs", "nonexistent-doc"));
 
-        assertThat(result).contains("Unbekannte Dokumentation");
+        assertThat(result).contains("Unknown documentation");
     }
 
     @Test
@@ -284,7 +284,7 @@ class AssistantFetchServiceTest {
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("pool_workflows", "all"));
 
-        assertThat(result).contains("Keine Pool-Workflows");
+        assertThat(result).contains("No pool workflows");
     }
 
     @Test
@@ -293,7 +293,7 @@ class AssistantFetchServiceTest {
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("pool_workflow", "missing"));
 
-        assertThat(result).contains("nicht gefunden");
+        assertThat(result).contains("not found");
     }
 
     @Test
@@ -340,10 +340,10 @@ class AssistantFetchServiceTest {
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("workflow_detail", "wf-1"));
 
         assertThat(result).contains("**Workflow: Release** (Alpha)");
-        assertThat(result).contains("Projekt-ID: p1");
-        assertThat(result).contains("Beschreibung: Workflow fuer den Release-Build");
-        assertThat(result).contains("Modell: claude-sonnet");
-        assertThat(result).contains("Instruktionen: Baue und validiere den Release.");
+        assertThat(result).contains("Project ID: p1");
+        assertThat(result).contains("Description: Workflow fuer den Release-Build");
+        assertThat(result).contains("Model: claude-sonnet");
+        assertThat(result).contains("Instructions: Baue und validiere den Release.");
         assertThat(result).contains("1. [shell] Analyse");
         assertThat(result).contains("command: ls -la");
     }
@@ -363,7 +363,7 @@ class AssistantFetchServiceTest {
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("workflow_runs", "wf-1"));
 
-        assertThat(result).contains("**Letzte Runs für Workflow wf-1…:**");
+        assertThat(result).contains("**Recent runs for workflow wf-1…:**");
         assertThat(result).contains("[15.03. 09:00] FAILED (link:/runs/run-1) — bash exited 1");
     }
 
@@ -379,7 +379,7 @@ class AssistantFetchServiceTest {
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("step_output", "r1/1"));
 
         assertThat(result).contains("**Step 1** (COMPLETED) — 1s");
-        assertThat(result).contains("[Ausgabe gekürzt: 8000 von 8100 Zeichen]");
+        assertThat(result).contains("[Output truncated: 8000 of 8100 characters]");
     }
 
     @Test
@@ -389,9 +389,9 @@ class AssistantFetchServiceTest {
         // (no section) returns the table of contents.
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("docs", "workflow-guide"));
 
-        assertThat(result).contains("Dokumentation: workflow-guide");
-        assertThat(result).contains("Inhaltsübersicht");
-        assertThat(result).doesNotContain("nicht verfügbar");
+        assertThat(result).contains("Documentation: workflow-guide");
+        assertThat(result).contains("Table of contents");
+        assertThat(result).doesNotContain("not available");
     }
 
     @Test
@@ -421,11 +421,11 @@ class AssistantFetchServiceTest {
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("pool_workflow", "pool-1"));
 
-        assertThat(result).contains("**Pool-Workflow: Release Vorlage** (pool-1)");
-        assertThat(result).contains("Beschreibung: Fuehrt den Release-Prozess aus.");
-        assertThat(result).contains("Modell: claude-sonnet");
-        assertThat(result).contains("Instruktionen: Pruefe alle Artefakte.");
-        assertThat(result).contains("Default-Variablen: {branch=main}");
+        assertThat(result).contains("**Pool workflow: Release Vorlage** (pool-1)");
+        assertThat(result).contains("Description: Fuehrt den Release-Prozess aus.");
+        assertThat(result).contains("Model: claude-sonnet");
+        assertThat(result).contains("Instructions: Pruefe alle Artefakte.");
+        assertThat(result).contains("Default variables: {branch=main}");
         assertThat(result).contains("1. [shell] Build");
     }
 
@@ -437,7 +437,7 @@ class AssistantFetchServiceTest {
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("project_context", "p1"));
 
-        assertThat(result).contains("**Projekt-Analyse: Alpha** (Pfad: /srv/alpha)");
+        assertThat(result).contains("**Project analysis: Alpha** (path: /srv/alpha)");
         assertThat(result).contains("README vorhanden");
     }
 
@@ -449,7 +449,7 @@ class AssistantFetchServiceTest {
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("project_context", "p1"));
 
-        assertThat(result).contains("Kein Projekt-Kontext für 'Alpha' verfügbar.");
+        assertThat(result).contains("No project context available for 'Alpha'.");
     }
 
     @Test
@@ -469,8 +469,8 @@ class AssistantFetchServiceTest {
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("wish_detail", "w1"));
 
         assertThat(result).contains("**Wish w1…** — [FAILED] Erzeuge einen Build-Workflow");
-        assertThat(result).contains("Iterationen: 3/5");
-        assertThat(result).contains("Fehler: Timeout beim Deploy");
+        assertThat(result).contains("Iterations: 3/5");
+        assertThat(result).contains("Error: Timeout beim Deploy");
     }
 
     // ── Skill detail ─────────────────────────────────────────────────
@@ -481,7 +481,7 @@ class AssistantFetchServiceTest {
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("skill", "missing"));
 
-        assertThat(result).contains("nicht gefunden");
+        assertThat(result).contains("not found");
     }
 
     @Test
@@ -505,7 +505,7 @@ class AssistantFetchServiceTest {
 
         assertThat(result)
                 .contains("**Skill: Web Research** (id: s1)")
-                .contains("Kategorie: RESEARCH")
+                .contains("Category: RESEARCH")
                 .contains("Capabilities (2)")
                 .contains("- read — Read URL")
                 .contains("inputSchema keys: [url]")
@@ -520,7 +520,7 @@ class AssistantFetchServiceTest {
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("integration", "missing"));
 
-        assertThat(result).contains("nicht gefunden");
+        assertThat(result).contains("not found");
     }
 
     @Test
@@ -549,8 +549,8 @@ class AssistantFetchServiceTest {
         assertThat(result)
                 .contains("**Integration: GitHub** (id: github)")
                 .contains("Status: CONNECTED (flo@github)")
-                .contains("OAuth-Flow erforderlich: ja")
-                .contains("Verfügbare Actions (1)")
+                .contains("OAuth flow required: yes")
+                .contains("Available actions (1)")
                 .contains("create_issue")
                 .contains("scopes: [repo]");
     }
@@ -581,7 +581,7 @@ class AssistantFetchServiceTest {
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("chain", "missing"));
 
-        assertThat(result).contains("nicht gefunden");
+        assertThat(result).contains("not found");
     }
 
     @Test
@@ -603,7 +603,7 @@ class AssistantFetchServiceTest {
 
         assertThat(result)
                 .contains("**Chain: Daily Pipeline** (id: c1)")
-                .contains("Stop on failure: ja")
+                .contains("Stop on failure: yes")
                 .contains("Workflows in Chain (2)")
                 .contains("1. Build Workflow (id: wf-a) [Label: Build]")
                 .contains("2. wf-b (id: wf-b)");
@@ -616,7 +616,7 @@ class AssistantFetchServiceTest {
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("block-spec", "nonexistent"));
 
         assertThat(result)
-                .contains("Unbekannter Block-Typ 'nonexistent'")
+                .contains("Unknown block type 'nonexistent'")
                 .contains("simple")
                 .contains("agentic");
     }
@@ -626,9 +626,9 @@ class AssistantFetchServiceTest {
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("block-spec", "agentic"));
 
         assertThat(result)
-                .contains("**Block-Typ: agentic**")
+                .contains("**Block type: agentic**")
                 .contains("max_total_tokens")
-                .contains("Beispiel-Config");
+                .contains("Example config");
     }
 
     @Test
@@ -638,7 +638,7 @@ class AssistantFetchServiceTest {
                 "skill-capability", "human-input", "integration", "document")) {
             String result = service.executeFetch(new AssistantFetchService.FetchRequest("block-spec", type));
             assertThat(result).as("Block type %s should have spec", type)
-                    .contains("**Block-Typ: " + type + "**");
+                    .contains("**Block type: " + type + "**");
         }
     }
 
@@ -650,7 +650,7 @@ class AssistantFetchServiceTest {
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("workflow-full", "missing"));
 
-        assertThat(result).contains("nicht gefunden");
+        assertThat(result).contains("not found");
     }
 
     @Test
@@ -672,9 +672,9 @@ class AssistantFetchServiceTest {
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("workflow-full", "wf-1"));
 
         assertThat(result)
-                .contains("**Workflow (Vollständig): Test**")
-                .contains("Modell: claude-opus-4-6")
-                .contains("Default-Inputs: {input1=default-value}")
+                .contains("**Workflow (full): Test**")
+                .contains("Model: claude-opus-4-6")
+                .contains("Default inputs: {input1=default-value}")
                 .contains("type: shell")
                 .contains("command: ls -la");
     }
@@ -687,7 +687,7 @@ class AssistantFetchServiceTest {
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("workflow-inputs", "missing"));
 
-        assertThat(result).contains("nicht gefunden");
+        assertThat(result).contains("not found");
     }
 
     @Test
@@ -699,8 +699,8 @@ class AssistantFetchServiceTest {
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("workflow-inputs", "wf-1"));
 
         assertThat(result)
-                .contains("**Inputs für Workflow: NoInputs** (id: wf-1)")
-                .contains("(keine default Inputs definiert)");
+                .contains("**Inputs for workflow: NoInputs** (id: wf-1)")
+                .contains("(no default inputs defined)");
     }
 
     @Test
@@ -715,7 +715,7 @@ class AssistantFetchServiceTest {
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("workflow-inputs", "wf-1"));
 
         assertThat(result)
-                .contains("**Inputs für Workflow: WithInputs**")
+                .contains("**Inputs for workflow: WithInputs**")
                 .contains("- path = /tmp")
                 .contains("- limit = 10");
     }
@@ -730,8 +730,8 @@ class AssistantFetchServiceTest {
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("find_workflow", "markt"));
 
         assertThat(result)
-                .contains("Workflow-Suche für 'markt'")
-                .contains("1 Treffer")
+                .contains("Workflow search for 'markt'")
+                .contains("1 matches")
                 .contains("Markt-Radar Simap")
                 .contains("wf-42")
                 .contains("Proj");
@@ -744,13 +744,13 @@ class AssistantFetchServiceTest {
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("find_workflow", "nope"));
 
-        assertThat(result).contains("Kein Workflow gefunden");
+        assertThat(result).contains("No workflow found");
     }
 
     @Test
     void executeFetch_findWorkflow_blankQuery_returnsHint() {
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("find_workflow", ""));
 
-        assertThat(result).contains("Suchbegriff fehlt");
+        assertThat(result).contains("Search term missing");
     }
 }

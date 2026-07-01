@@ -27,7 +27,7 @@ public class TodosContextSection implements AssistantContextSection {
                     long high   = open.stream().filter(t -> t.getPriority() == Todo.Priority.HIGH).count();
                     long medium = open.stream().filter(t -> t.getPriority() == Todo.Priority.MEDIUM).count();
                     long low    = open.stream().filter(t -> t.getPriority() == Todo.Priority.LOW).count();
-                    sb.append("**Todos:** ").append(open.size()).append(" offen (")
+                    sb.append("**Todos:** ").append(open.size()).append(" open (")
                             .append(high).append(" HIGH, ").append(medium).append(" MEDIUM, ")
                             .append(low).append(" LOW)\n");
                 }
@@ -38,7 +38,7 @@ public class TodosContextSection implements AssistantContextSection {
                     .limit(10)
                     .collect(Collectors.toList());
             if (!top.isEmpty()) {
-                sb.append("**Offene Todos (").append(top.size()).append("):**\n");
+                sb.append("**Open Todos (").append(top.size()).append("):**\n");
                 top.forEach(t -> sb.append("  - [").append(t.getPriority()).append("] ")
                         .append(t.getTitle()).append("\n"));
                 sb.append("\n");

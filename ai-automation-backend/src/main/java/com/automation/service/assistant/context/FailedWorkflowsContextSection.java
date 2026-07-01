@@ -27,17 +27,17 @@ public class FailedWorkflowsContextSection implements AssistantContextSection {
     public void append(StringBuilder sb, boolean compact) {
         try {
             List<BrokenWorkflowResponse> broken = workflowDebugService.getBrokenWorkflows();
-            sb.append("## Kaputte Workflows (letzter Lauf fehlgeschlagen)\n");
+            sb.append("## Broken Workflows (last run failed)\n");
             if (broken.isEmpty()) {
-                sb.append("Keine — alle Workflows sind beim letzten Lauf sauber durchgelaufen.\n\n");
+                sb.append("None — all workflows ran cleanly on their last run.\n\n");
                 return;
             }
-            sb.append(broken.size()).append(" Workflow(s) mit rotem letztem Lauf:\n");
+            sb.append(broken.size()).append(" workflow(s) with a red last run:\n");
             broken.forEach(b -> {
-                sb.append("  - [").append(b.workflowName() != null ? b.workflowName() : "Unbekannt").append("] ")
+                sb.append("  - [").append(b.workflowName() != null ? b.workflowName() : "Unknown").append("] ")
                         .append(b.status());
                 if (b.failedStepIndex() != null) {
-                    sb.append(", Schritt ").append(b.failedStepIndex() + 1);
+                    sb.append(", step ").append(b.failedStepIndex() + 1);
                     if (b.failedBlockType() != null) {
                         sb.append(" (").append(b.failedBlockType()).append(")");
                     }
@@ -51,7 +51,7 @@ public class FailedWorkflowsContextSection implements AssistantContextSection {
                 }
                 sb.append(")\n");
             });
-            sb.append("Details zu einem Fehler: <fetch type=\"run_detail\" id=\"<run-id>\"/>\n\n");
+            sb.append("Details for a specific error: <fetch type=\"run_detail\" id=\"<run-id>\"/>\n\n");
         } catch (Exception e) {
             log.debug("Could not load broken workflows for assistant context", e);
         }

@@ -76,6 +76,26 @@ class AssistantContextBuilderTest {
     }
 
     @Test
+    void buildSystemPrompt_englishLanguage_instructsEnglishAnswer() {
+        String result = builder.buildSystemPrompt(null, "base", "en");
+        assertThat(result).contains("Always answer in English.");
+        assertThat(result).doesNotContain("Always answer in German.");
+    }
+
+    @Test
+    void buildSystemPrompt_germanLanguage_instructsGermanAnswer() {
+        String result = builder.buildSystemPrompt(null, "base", "de");
+        assertThat(result).contains("Always answer in German.");
+    }
+
+    @Test
+    void buildSystemPrompt_nullLanguage_defaultsToGerman() {
+        // Backward-compatible 2-arg overload and null language both fall back to German.
+        assertThat(builder.buildSystemPrompt(null, "base")).contains("Always answer in German.");
+        assertThat(builder.buildSystemPrompt(null, "base", null)).contains("Always answer in German.");
+    }
+
+    @Test
     void classifyPage_runs_returnsRuns() {
         assertThat(builder.classifyPage("runs")).isEqualTo(AssistantContextBuilder.PageCategory.RUNS);
         assertThat(builder.classifyPage("run")).isEqualTo(AssistantContextBuilder.PageCategory.RUNS);
@@ -154,7 +174,7 @@ class AssistantContextBuilderTest {
         String long_ = "x".repeat(200);
         String result = builder.truncate(long_, 50);
         assertThat(result.length()).isLessThan(200);
-        assertThat(result).contains("Ausgabe gekürzt");
+        assertThat(result).contains("Output truncated");
     }
 
     @Test
@@ -209,7 +229,7 @@ class AssistantContextBuilderTest {
     void runLabel_noWorkflow_returnsUnbekannt() {
         WorkflowRun run = WorkflowRun.builder().id("r1").build();
         String result = builder.runLabel(run);
-        assertThat(result).isEqualTo("Unbekannt");
+        assertThat(result).isEqualTo("Unknown");
     }
 
     @Test
@@ -317,7 +337,7 @@ class AssistantContextBuilderTest {
             String result = builder.buildSystemPrompt(null, "Du bist MySuricates.");
 
             assertThat(result).startsWith("Du bist MySuricates.");
-            assertThat(result).contains("Mein aktueller Zustand");
+            assertThat(result).contains("My Current State");
             assertThat(result).contains("1.0.0");
         }
 
@@ -336,7 +356,7 @@ class AssistantContextBuilderTest {
 
             String result = builder.buildSystemPrompt(null, null);
 
-            assertThat(result).contains("Mein aktueller Zustand");
+            assertThat(result).contains("My Current State");
         }
 
         @Test
@@ -358,7 +378,7 @@ class AssistantContextBuilderTest {
             // OVERVIEW page → todos in full mode
             String result = builder.buildSystemPrompt(null, "");
 
-            assertThat(result).contains("Offene Todos");
+            assertThat(result).contains("Open Todos");
             assertThat(result).contains("Fix Bug");
         }
 
@@ -371,7 +391,7 @@ class AssistantContextBuilderTest {
             var ctx = new AssistantChatRequest.PageContext("runs", "run-1", null);
             String result = builder.buildSystemPrompt(ctx, "");
 
-            assertThat(result).contains("Aktuell angezeigter Run");
+            assertThat(result).contains("Currently displayed run");
             assertThat(result).contains("Status: RUNNING");
             assertThat(result).doesNotContain("Todos:");
             assertThat(result).doesNotContain("Fix Bug");
@@ -388,12 +408,12 @@ class AssistantContextBuilderTest {
             var ctx = new AssistantChatRequest.PageContext("runs", "legacy-run", null, "wf-1", "run-1", "/workflows/wf-1/run/run-1");
             String result = builder.buildSystemPrompt(ctx, "");
 
-            assertThat(result).contains("Aktuell angezeigter Run");
+            assertThat(result).contains("Currently displayed run");
             assertThat(result).contains("COMPLETED");
-            assertThat(result).contains("Pfad: /workflows/wf-1/run/run-1");
-            assertThat(result).contains("Workflow-ID: wf-1");
-            assertThat(result).contains("Run-ID: run-1");
-            assertThat(result).contains("Schritte: 1 (COMPLETED=1)");
+            assertThat(result).contains("Path: /workflows/wf-1/run/run-1");
+            assertThat(result).contains("Workflow ID: wf-1");
+            assertThat(result).contains("Run ID: run-1");
+            assertThat(result).contains("Steps: 1 (COMPLETED=1)");
             assertThat(result).doesNotContain("step output");
             verify(workflowRunRepository).findByIdWithSteps("run-1");
         }
@@ -434,14 +454,14 @@ class AssistantContextBuilderTest {
 
             String result = builder.buildSystemPrompt(null, "Du bist MySuricates.");
 
-            assertThat(result).contains("**Meine Projekte (2):**");
-            assertThat(result).contains("Alpha (ID: p-alpha, 1 Workflows)");
-            assertThat(result).contains("Beta (ID: p-beta, 1 Workflows)");
-            assertThat(result).contains("**Meine Workflows (2):**");
-            assertThat(result).contains("[Build Alpha] Alpha (projekt: p-alpha)");
-            assertThat(result).contains("## Gelerntes & Fallstricke");
+            assertThat(result).contains("**My Projects (2):**");
+            assertThat(result).contains("Alpha (ID: p-alpha, 1 workflows)");
+            assertThat(result).contains("Beta (ID: p-beta, 1 workflows)");
+            assertThat(result).contains("**My Workflows (2):**");
+            assertThat(result).contains("[Build Alpha] Alpha (project: p-alpha)");
+            assertThat(result).contains("## Learnings & Pitfalls");
             assertThat(result).contains("[Build Alpha]: Vor Shell-Ausfuehrung immer den Eingabe-Kontext validieren.");
-            assertThat(result).contains("## Letzte Gespräche (Orientierung)");
+            assertThat(result).contains("## Recent Conversations (Context)");
             assertThat(result).contains("User: \"Wie ist der Status von Alpha?\"");
         }
 
@@ -463,14 +483,14 @@ class AssistantContextBuilderTest {
             var ctx = new AssistantChatRequest.PageContext("workflow", "wf-alpha", null, "wf-alpha", null, "/workflows/wf-alpha");
             String result = builder.buildSystemPrompt(ctx, "");
 
-            assertThat(result).contains("**Meine Projekte (2):**");
-            assertThat(result).contains("**Meine Workflows (2):**");
-            assertThat(result).contains("[A Workflow] Alpha (projekt: p-alpha)");
-            assertThat(result).contains("[B Workflow] Beta (projekt: p-beta)");
+            assertThat(result).contains("**My Projects (2):**");
+            assertThat(result).contains("**My Workflows (2):**");
+            assertThat(result).contains("[A Workflow] Alpha (project: p-alpha)");
+            assertThat(result).contains("[B Workflow] Beta (project: p-beta)");
             assertThat(result.indexOf("[A Workflow]")).isLessThan(result.indexOf("[B Workflow]"));
-            assertThat(result).contains("Pfad: /workflows/wf-alpha");
-            assertThat(result).contains("Aktiver Workflow: A Workflow (ID: wf-alpha)");
-            assertThat(result).contains("Aktives Projekt: Alpha (ID: p-alpha)");
+            assertThat(result).contains("Path: /workflows/wf-alpha");
+            assertThat(result).contains("Active workflow: A Workflow (ID: wf-alpha)");
+            assertThat(result).contains("Active project: Alpha (ID: p-alpha)");
         }
 
         @Test
@@ -488,8 +508,8 @@ class AssistantContextBuilderTest {
             var ctx = new AssistantChatRequest.PageContext("wishes", "wish-1", null);
             String result = builder.buildSystemPrompt(ctx, "");
 
-            assertThat(result).contains("**Wishes:** 1 aktiv, 0 fehlgeschlagen");
-            assertThat(result).contains("Wish-Details: [EXECUTING] Baue einen Deploy-Workflow, Iterationen: 2/5");
+            assertThat(result).contains("**Wishes:** 1 active, 0 failed");
+            assertThat(result).contains("Wish details: [EXECUTING] Baue einen Deploy-Workflow, iterations: 2/5");
         }
 
         @Test
@@ -502,9 +522,9 @@ class AssistantContextBuilderTest {
             var ctx = new AssistantChatRequest.PageContext("debug", null, null, null, null, "/debug");
             String result = builder.buildSystemPrompt(ctx, "");
 
-            assertThat(result).contains("Kaputte Workflows (letzter Lauf fehlgeschlagen)");
+            assertThat(result).contains("Broken Workflows (last run failed)");
             assertThat(result).contains("Build Alpha");
-            assertThat(result).contains("Schritt 3 (shell)");
+            assertThat(result).contains("step 3 (shell)");
             assertThat(result).contains("boom");
             assertThat(result).contains("run1");
             assertThat(result).contains("run_detail");

@@ -28,6 +28,8 @@ export interface AssistantChatRequest {
   history: AssistantHistoryEntry[];
   context?: AssistantPageContext;
   provider?: string;
+  /** UI locale ('en' | 'de') — drives the assistant's reply language. */
+  language?: string;
   sessionId?: string;
   requestId?: string;
 }

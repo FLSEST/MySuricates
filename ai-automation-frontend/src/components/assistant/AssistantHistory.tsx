@@ -10,6 +10,7 @@ import {
 } from '../../hooks/useAssistant';
 import { api } from '../../api/client';
 import { generateId } from '../../utils/uuid';
+import { useT, useI18nStore } from '../../i18n';
 
 interface MergedSession {
   id: string;
@@ -30,13 +31,15 @@ export function AssistantHistory({
   const { mutate: deleteBackend } = useDeleteAssistantSession();
   const queryClient = useQueryClient();
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const t = useT();
+  const locale = useI18nStore((s) => s.locale);
 
   // Merge: store sessions take priority, add backend-only sessions
   const merged: MergedSession[] = (() => {
     const storeIds = new Set(storeSessions.map((s) => s.id));
     const result: MergedSession[] = storeSessions.map((s) => ({
       id: s.id,
-      preview: s.preview || 'Leere Sitzung',
+      preview: s.preview || t.assistant.emptySession,
       startedAt: s.startedAt,
       inStore: true,
     }));
@@ -46,7 +49,7 @@ export function AssistantHistory({
         if (!storeIds.has(bs.id)) {
           result.push({
             id: bs.id,
-            preview: bs.preview || 'Leere Sitzung',
+            preview: bs.preview || t.assistant.emptySession,
             startedAt: new Date(bs.startedAt).getTime(),
             inStore: false,
           });
@@ -105,9 +108,10 @@ export function AssistantHistory({
     const d = new Date(ts);
     const today = new Date();
     const isToday = d.toDateString() === today.toDateString();
-    if (isToday) return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-    return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) +
-      ' ' + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    const intlLocale = locale === 'de' ? 'de-DE' : 'en-US';
+    if (isToday) return d.toLocaleTimeString(intlLocale, { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString(intlLocale, { day: '2-digit', month: '2-digit' }) +
+      ' ' + d.toLocaleTimeString(intlLocale, { hour: '2-digit', minute: '2-digit' });
   };
 
   return (
@@ -119,17 +123,17 @@ export function AssistantHistory({
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
-        <span className="text-sm font-medium text-text">Bisherige Gespräche</span>
+        <span className="text-sm font-medium text-text">{t.assistant.history}</span>
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5 min-h-0">
         {isLoading && merged.length === 0 ? (
           <div className="flex items-center justify-center py-8 text-text-tertiary text-sm gap-2">
             <Loader2 className="w-4 h-4 animate-spin" />
-            Lade Gespräche…
+            {t.assistant.loadingHistory}
           </div>
         ) : merged.length === 0 ? (
-          <div className="text-center py-8 text-text-tertiary text-sm">Noch keine Gespräche</div>
+          <div className="text-center py-8 text-text-tertiary text-sm">{t.assistant.noHistory}</div>
         ) : (
           merged.map((sess) => (
             <div
@@ -172,7 +176,7 @@ export function AssistantHistory({
                      hover:border-accent/40 hover:text-accent hover:bg-accent/5 transition-colors"
         >
           <Plus className="w-4 h-4" />
-          Neues Gespräch
+          {t.assistant.newSession}
         </button>
       </div>
     </div>

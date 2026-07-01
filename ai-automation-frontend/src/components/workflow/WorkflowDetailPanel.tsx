@@ -29,6 +29,7 @@ import { formatDuration, formatDateTime } from '../../utils/formatTime';
 import type { useNavigate } from 'react-router-dom';
 import type { Workflow } from '../../types';
 import type { TranslationKeys } from '../../i18n';
+import { useI18nStore } from '../../i18n';
 
 const BLOCK_TYPE_ICONS: Record<string, React.ReactNode> = {
   shell: <Terminal className="w-3.5 h-3.5" />,
@@ -75,6 +76,7 @@ export function WorkflowDetailPanel({
   saveAsTemplateLoading,
   navigate,
 }: WorkflowDetailPanelProps) {
+  const locale = useI18nStore((s) => s.locale);
   const { data: runsPage, isLoading: runsLoading } = useWorkflowRuns(workflow.id, 0, 5);
   const recentRuns = runsPage?.content ?? [];
   const { data: similarWorkflows = [] } = useSimilarWorkflows(workflow.id, 5);
@@ -329,7 +331,7 @@ export function WorkflowDetailPanel({
               >
                 <StatusBadge status={run.status} />
                 <span className="text-text-tertiary text-xs tabular-nums">
-                  {formatDateTime(run.startedAt)}
+                  {formatDateTime(run.startedAt, locale)}
                 </span>
                 {run.durationMs != null && (
                   <span className="text-text-tertiary/60 text-xs tabular-nums">

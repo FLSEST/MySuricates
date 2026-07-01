@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Trash2, Plus } from 'lucide-react';
-import { useT } from '../i18n';
+import { useT, useI18nStore } from '../i18n';
 import { useSchedules, useToggleSchedule, useDeleteSchedule, useCreateSchedule } from '../hooks/useSchedules';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { Spinner, Toggle, Button, Modal, Select, Input } from '../components/ui';
@@ -12,6 +12,7 @@ import { formatDateTime } from '../utils/formatTime';
 
 export function SimpleSchedules() {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const { data: schedules, isLoading, error, refetch } = useSchedules();
   const { data: workflows } = useWorkflows();
   const toggle = useToggleSchedule();
@@ -56,7 +57,7 @@ export function SimpleSchedules() {
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-text truncate">{s.workflowName ?? s.chainName ?? '—'}</p>
                   <p className="text-xs text-text-tertiary truncate">
-                    {s.scheduleType} · {t.simple.schedules.nextRun}: {s.nextRunAt ? formatDateTime(s.nextRunAt) : '—'}
+                    {s.scheduleType} · {t.simple.schedules.nextRun}: {s.nextRunAt ? formatDateTime(s.nextRunAt, locale) : '—'}
                   </p>
                 </div>
               </div>

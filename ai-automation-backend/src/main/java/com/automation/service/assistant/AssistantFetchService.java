@@ -112,10 +112,10 @@ public class AssistantFetchService {
                     sb.append(" (").append(run.getDurationMs() / 1000).append("s)");
                 sb.append("\n");
                 String err = contextBuilder.extractError(run);
-                if (err != null) sb.append("Run-Fehler: ").append(contextBuilder.truncate(err, 600)).append("\n");
+                if (err != null) sb.append("Run error: ").append(contextBuilder.truncate(err, 600)).append("\n");
                 var steps = run.getSteps();
                 if (!steps.isEmpty()) {
-                    sb.append("Schritte:\n");
+                    sb.append("Steps:\n");
                     steps.forEach(s -> {
                         sb.append("  ").append(s.getStepIndex() + 1).append(". ").append(s.getStatus());
                         if (s.getStatus() == StepStatus.FAILED && s.getOutput() != null)
@@ -124,7 +124,7 @@ public class AssistantFetchService {
                     });
                 }
                 return sb.toString();
-            }).orElse("Run " + id + " nicht gefunden.\n");
+            }).orElse("Run " + id + " not found.\n");
         } catch (Exception e) {
             log.debug("Could not fetch run detail for {}", id, e);
             return "";
@@ -138,12 +138,12 @@ public class AssistantFetchService {
                 sb.append("**Wish ").append(id, 0, Math.min(8, id.length())).append("…** — [")
                         .append(w.getStatus()).append("] ").append(contextBuilder.truncate(w.getOriginalText(), 200))
                         .append("\n");
-                sb.append("Iterationen: ").append(w.getIterationCount())
+                sb.append("Iterations: ").append(w.getIterationCount())
                         .append("/").append(w.getMaxIterations()).append("\n");
                 if (w.getError() != null)
-                    sb.append("Fehler: ").append(contextBuilder.truncate(w.getError(), 300)).append("\n");
+                    sb.append("Error: ").append(contextBuilder.truncate(w.getError(), 300)).append("\n");
                 return sb.toString();
-            }).orElse("Wish " + id + " nicht gefunden.\n");
+            }).orElse("Wish " + id + " not found.\n");
         } catch (Exception e) {
             log.debug("Could not fetch wish detail for {}", id, e);
             return "";
@@ -157,19 +157,19 @@ public class AssistantFetchService {
                 String projectName = wf.getProject() != null ? wf.getProject().getName() : "—";
                 String projectId = wf.getProject() != null ? wf.getProject().getId() : "—";
                 sb.append("**Workflow: ").append(wf.getName()).append("** (").append(projectName).append(")\n");
-                sb.append("Projekt-ID: ").append(projectId).append("\n");
+                sb.append("Project ID: ").append(projectId).append("\n");
                 if (wf.getDescription() != null && !wf.getDescription().isBlank()) {
-                    sb.append("Beschreibung: ").append(contextBuilder.truncate(wf.getDescription().trim(), 150)).append("\n");
+                    sb.append("Description: ").append(contextBuilder.truncate(wf.getDescription().trim(), 150)).append("\n");
                 }
                 if (wf.getModel() != null && !wf.getModel().isBlank()) {
-                    sb.append("Modell: ").append(wf.getModel()).append("\n");
+                    sb.append("Model: ").append(wf.getModel()).append("\n");
                 }
                 if (wf.getInstructions() != null && !wf.getInstructions().isBlank()) {
-                    sb.append("Instruktionen: ").append(contextBuilder.truncate(wf.getInstructions().trim(), 400)).append("\n");
+                    sb.append("Instructions: ").append(contextBuilder.truncate(wf.getInstructions().trim(), 400)).append("\n");
                 }
                 var blocks = wf.getBlocks();
                 if (blocks != null && !blocks.isEmpty()) {
-                    sb.append("\nBlöcke (").append(blocks.size()).append("):\n");
+                    sb.append("\nBlocks (").append(blocks.size()).append("):\n");
                     for (int i = 0; i < blocks.size(); i++) {
                         BlockDefinition block = blocks.get(i);
                         Map<String, Object> cfg = block.getConfig() != null ? block.getConfig() : Map.of();
@@ -181,7 +181,7 @@ public class AssistantFetchService {
                     }
                 }
                 return sb.toString();
-            }).orElse("Workflow " + workflowId + " nicht gefunden.\n");
+            }).orElse("Workflow " + workflowId + " not found.\n");
         } catch (Exception e) {
             log.debug("Could not fetch workflow detail for {}", workflowId, e);
             return "";
@@ -191,9 +191,9 @@ public class AssistantFetchService {
     private String formatWorkflowRuns(String workflowId) {
         try {
             List<WorkflowRun> runs = workflowRunRepository.findTop5ByWorkflowIdOrderByStartedAtDesc(workflowId);
-            if (runs.isEmpty()) return "Keine Runs für Workflow " + workflowId + ".\n";
+            if (runs.isEmpty()) return "No runs for workflow " + workflowId + ".\n";
             var sb = new StringBuilder();
-            sb.append("**Letzte Runs für Workflow ").append(workflowId, 0, Math.min(8, workflowId.length()))
+            sb.append("**Recent runs for workflow ").append(workflowId, 0, Math.min(8, workflowId.length()))
                     .append("…:**\n");
             runs.forEach(r -> {
                 sb.append("  - [").append(contextBuilder.fmt(r.getStartedAt())).append("] ")
@@ -213,13 +213,13 @@ public class AssistantFetchService {
 
     private String formatStepOutput(String idAndStep) {
         int slash = idAndStep.lastIndexOf('/');
-        if (slash < 0) return "Ungültiges Format. Erwartet: <runId>/<schrittnummer>\n";
+        if (slash < 0) return "Invalid format. Expected: <runId>/<stepNumber>\n";
         String runId = idAndStep.substring(0, slash);
         int stepNum;
         try {
             stepNum = Integer.parseInt(idAndStep.substring(slash + 1));
         } catch (NumberFormatException e) {
-            return "Schrittnummer ungültig: " + idAndStep.substring(slash + 1) + "\n";
+            return "Invalid step number: " + idAndStep.substring(slash + 1) + "\n";
         }
         int targetIndex = stepNum - 1;
         return workflowRunRepository.findByIdWithSteps(runId).map(run ->
@@ -233,15 +233,15 @@ public class AssistantFetchService {
                             sb.append("\n");
                             String out = s.getOutput();
                             if (out != null && !out.isBlank()) {
-                                if (out.length() > 8000) out = out.substring(0, 8000) + "\n[Ausgabe gekürzt: 8000 von " + s.getOutput().length() + " Zeichen]";
+                                if (out.length() > 8000) out = out.substring(0, 8000) + "\n[Output truncated: 8000 of " + s.getOutput().length() + " characters]";
                                 sb.append(out).append("\n");
                             } else {
-                                sb.append("(Kein Output)\n");
+                                sb.append("(No output)\n");
                             }
                             return sb.toString();
                         })
-                        .orElse("Step " + stepNum + " nicht gefunden in Run " + runId.substring(0, Math.min(8, runId.length())) + "…\n")
-        ).orElse("Run " + runId + " nicht gefunden.\n");
+                        .orElse("Step " + stepNum + " not found in run " + runId.substring(0, Math.min(8, runId.length())) + "…\n")
+        ).orElse("Run " + runId + " not found.\n");
     }
 
     // ── Docs ─────────────────────────────────────────────────────────────────
@@ -277,7 +277,7 @@ public class AssistantFetchService {
         }
 
         String filename = DOC_FILES.get(baseId);
-        if (filename == null) return "Unbekannte Dokumentation: " + baseId + "\n";
+        if (filename == null) return "Unknown documentation: " + baseId + "\n";
 
         try {
             var resource = new ClassPathResource(filename);
@@ -291,32 +291,32 @@ public class AssistantFetchService {
                     ? WF_GUIDE_SECTIONS.get(sectionKey) : null;
             if (sectionHeader == null) {
                 String content = fullContent.length() > 8000
-                        ? fullContent.substring(0, 8000) + "\n\n[Ausgabe gekürzt: 8000 von " + fullContent.length() + " Zeichen]" : fullContent;
-                return "**Dokumentation: " + baseId + "**\n\n" + content + "\n";
+                        ? fullContent.substring(0, 8000) + "\n\n[Output truncated: 8000 of " + fullContent.length() + " characters]" : fullContent;
+                return "**Documentation: " + baseId + "**\n\n" + content + "\n";
             }
 
             String section = extractSection(fullContent, sectionHeader);
-            if (section.isBlank()) return "Sektion '" + sectionKey + "' nicht gefunden in " + baseId + ".\n";
-            if (section.length() > 12000) section = section.substring(0, 12000) + "\n\n[Ausgabe gekürzt: 12000 von " + section.length() + " Zeichen]";
+            if (section.isBlank()) return "Section '" + sectionKey + "' not found in " + baseId + ".\n";
+            if (section.length() > 12000) section = section.substring(0, 12000) + "\n\n[Output truncated: 12000 of " + section.length() + " characters]";
             return "**" + baseId + " / " + sectionKey + ":**\n\n" + section + "\n";
 
         } catch (Exception e) {
             log.debug("Could not load doc '{}': {}", docId, e.getMessage());
-            return "Dokumentation '" + docId + "' nicht verfügbar.\n";
+            return "Documentation '" + docId + "' not available.\n";
         }
     }
 
     private String buildDocsToc(String docId, String content) {
         var sb = new StringBuilder();
-        sb.append("**Dokumentation: ").append(docId).append("** — Inhaltsübersicht\n\n");
+        sb.append("**Documentation: ").append(docId).append("** — Table of contents\n\n");
         content.lines()
                 .filter(l -> l.startsWith("## "))
                 .forEach(l -> sb.append(l).append("\n"));
         if ("workflow-guide".equals(docId)) {
-            sb.append("\nVerfügbare Sektions-IDs für `<fetch type=\"docs\" id=\"workflow-guide/<id>\"/>`:\n");
+            sb.append("\nAvailable section IDs for `<fetch type=\"docs\" id=\"workflow-guide/<id>\"/>`:\n");
             WF_GUIDE_SECTIONS.forEach((k, v) -> sb.append("  ").append(k).append("\n"));
         }
-        sb.append("\nLade eine Sektion nach um Details zu erhalten.\n");
+        sb.append("\nFetch a section to get details.\n");
         return sb.toString();
     }
 
@@ -340,44 +340,44 @@ public class AssistantFetchService {
     private String formatPoolWorkflows() {
         try {
             List<PoolWorkflowEntry> entries = workflowPoolService.listAll();
-            if (entries.isEmpty()) return "Keine Pool-Workflows verfügbar.\n";
+            if (entries.isEmpty()) return "No pool workflows available.\n";
             var sb = new StringBuilder();
-            sb.append("**Workflow-Pool (").append(entries.size()).append(" Vorlagen):**\n\n");
+            sb.append("**Workflow pool (").append(entries.size()).append(" templates):**\n\n");
             entries.forEach(e -> {
                 String deName = e.name() != null ? e.name().getOrDefault("de", e.name().getOrDefault("en", e.id())) : e.id();
                 sb.append("- **").append(deName).append("** (ID: `").append(e.id()).append("`");
-                if (e.category() != null) sb.append(", Kat: ").append(e.category());
-                if (e.blocks() != null) sb.append(", ").append(e.blocks().size()).append(" Blöcke");
+                if (e.category() != null) sb.append(", cat: ").append(e.category());
+                if (e.blocks() != null) sb.append(", ").append(e.blocks().size()).append(" blocks");
                 sb.append(")");
                 if (e.tags() != null && !e.tags().isEmpty()) sb.append(" Tags: ").append(String.join(", ", e.tags()));
                 String deDesc = e.description() != null ? e.description().getOrDefault("de", e.description().getOrDefault("en", "")) : "";
                 if (!deDesc.isBlank()) sb.append("\n  ").append(contextBuilder.truncate(deDesc, 120));
                 sb.append("\n");
             });
-            sb.append("\nNutze `<fetch type=\"pool_workflow\" id=\"<pool-id>\"/>` für Details inkl. Blöcke.\n");
+            sb.append("\nUse `<fetch type=\"pool_workflow\" id=\"<pool-id>\"/>` for details incl. blocks.\n");
             return sb.toString();
         } catch (Exception e) {
             log.debug("Could not load pool workflows for assistant", e);
-            return "Pool-Workflows konnten nicht geladen werden.\n";
+            return "Pool workflows could not be loaded.\n";
         }
     }
 
     private String formatPoolWorkflowDetail(String poolId) {
         try {
             PoolWorkflowEntry entry = workflowPoolService.findById(poolId);
-            if (entry == null) return "Pool-Workflow '" + poolId + "' nicht gefunden.\n";
+            if (entry == null) return "Pool workflow '" + poolId + "' not found.\n";
             var sb = new StringBuilder();
             String deName = entry.name() != null ? entry.name().getOrDefault("de", poolId) : poolId;
-            sb.append("**Pool-Workflow: ").append(deName).append("** (").append(poolId).append(")\n");
+            sb.append("**Pool workflow: ").append(deName).append("** (").append(poolId).append(")\n");
             String deDesc = entry.description() != null ? entry.description().getOrDefault("de", "") : "";
-            if (!deDesc.isBlank()) sb.append("Beschreibung: ").append(deDesc).append("\n");
-            if (entry.model() != null) sb.append("Modell: ").append(entry.model()).append("\n");
+            if (!deDesc.isBlank()) sb.append("Description: ").append(deDesc).append("\n");
+            if (entry.model() != null) sb.append("Model: ").append(entry.model()).append("\n");
             if (entry.instructions() != null && !entry.instructions().isBlank())
-                sb.append("Instruktionen: ").append(contextBuilder.truncate(entry.instructions(), 500)).append("\n");
+                sb.append("Instructions: ").append(contextBuilder.truncate(entry.instructions(), 500)).append("\n");
             if (entry.defaultContext() != null && !entry.defaultContext().isEmpty())
-                sb.append("Default-Variablen: ").append(entry.defaultContext()).append("\n");
+                sb.append("Default variables: ").append(entry.defaultContext()).append("\n");
             if (entry.blocks() != null && !entry.blocks().isEmpty()) {
-                sb.append("\nBlöcke (").append(entry.blocks().size()).append("):\n");
+                sb.append("\nBlocks (").append(entry.blocks().size()).append("):\n");
                 for (int i = 0; i < entry.blocks().size(); i++) {
                     BlockDefinition block = entry.blocks().get(i);
                     Map<String, Object> cfg = block.getConfig() != null ? block.getConfig() : Map.of();
@@ -391,16 +391,16 @@ public class AssistantFetchService {
             return sb.toString();
         } catch (Exception e) {
             log.debug("Could not load pool workflow detail for {}", poolId, e);
-            return "Pool-Workflow '" + poolId + "' nicht gefunden.\n";
+            return "Pool workflow '" + poolId + "' not found.\n";
         }
     }
 
     private String formatProjectContext(String projectId) {
         try {
             var project = projectRepository.findById(projectId).orElse(null);
-            if (project == null) return "Projekt '" + projectId + "' nicht gefunden.\n";
+            if (project == null) return "Project '" + projectId + "' not found.\n";
             if (project.getPath() == null || project.getPath().isBlank())
-                return "Projekt '" + project.getName() + "' hat keinen Pfad konfiguriert.\n";
+                return "Project '" + project.getName() + "' has no path configured.\n";
 
             // Cache-first: use stored aiContext if available
             String context = project.getAiContext();
@@ -413,11 +413,11 @@ public class AssistantFetchService {
             }
 
             if (context == null || context.isBlank())
-                return "Kein Projekt-Kontext für '" + project.getName() + "' verfügbar.\n";
-            return "**Projekt-Analyse: " + project.getName() + "** (Pfad: " + project.getPath() + ")\n\n" + context + "\n";
+                return "No project context available for '" + project.getName() + "'.\n";
+            return "**Project analysis: " + project.getName() + "** (path: " + project.getPath() + ")\n\n" + context + "\n";
         } catch (Exception e) {
             log.debug("Could not generate project context for {}", projectId, e);
-            return "Projekt-Kontext konnte nicht generiert werden: " + e.getMessage() + "\n";
+            return "Project context could not be generated: " + e.getMessage() + "\n";
         }
     }
 
@@ -439,22 +439,22 @@ public class AssistantFetchService {
     private String formatProjectFiles(String projectId) {
         try {
             var project = projectRepository.findById(projectId).orElse(null);
-            if (project == null) return "Projekt '" + projectId + "' nicht gefunden.\n";
+            if (project == null) return "Project '" + projectId + "' not found.\n";
             if (project.getPath() == null || project.getPath().isBlank())
-                return "Projekt '" + project.getName() + "' hat keinen Pfad konfiguriert.\n";
+                return "Project '" + project.getName() + "' has no path configured.\n";
 
             Path root = Path.of(project.getPath());
             if (!Files.isDirectory(root))
-                return "Projekt-Pfad existiert nicht: " + project.getPath() + "\n";
+                return "Project path does not exist: " + project.getPath() + "\n";
 
             var sb = new StringBuilder();
-            sb.append("**Projekt-Dateien: ").append(project.getName()).append("** (").append(project.getPath()).append(")\n\n");
+            sb.append("**Project files: ").append(project.getName()).append("** (").append(project.getPath()).append(")\n\n");
 
             // Top-level files
             int count = 0;
             try (Stream<Path> topLevel = Files.list(root).sorted()) {
                 for (Path entry : topLevel.toList()) {
-                    if (count >= 50) { sb.append("  … (weitere Dateien)\n"); break; }
+                    if (count >= 50) { sb.append("  … (more files)\n"); break; }
                     String name = entry.getFileName().toString();
                     if (Files.isDirectory(entry)) {
                         if (!IGNORED_DIRS.contains(name)) {
@@ -469,12 +469,12 @@ public class AssistantFetchService {
                 }
             }
 
-            sb.append("\nNutze `<fetch type=\"project_file\" id=\"").append(projectId)
-                    .append("/<pfad>\"/>` um eine Datei zu lesen.\n");
+            sb.append("\nUse `<fetch type=\"project_file\" id=\"").append(projectId)
+                    .append("/<path>\"/>` to read a file.\n");
             return sb.toString();
         } catch (Exception e) {
             log.debug("Could not list project files for {}", projectId, e);
-            return "Projekt-Dateien konnten nicht geladen werden: " + e.getMessage() + "\n";
+            return "Project files could not be loaded: " + e.getMessage() + "\n";
         }
     }
 
@@ -483,7 +483,7 @@ public class AssistantFetchService {
         try (Stream<Path> entries = Files.list(dir).sorted()) {
             int subCount = 0;
             for (Path entry : entries.toList()) {
-                if (subCount >= 10) { sb.append("    … (weitere)\n"); break; }
+                if (subCount >= 10) { sb.append("    … (more)\n"); break; }
                 String name = entry.getFileName().toString();
                 if (Files.isDirectory(entry)) {
                     if (!IGNORED_DIRS.contains(name)) {
@@ -500,28 +500,28 @@ public class AssistantFetchService {
 
     private String formatProjectFile(String idWithPath) {
         int slash = idWithPath.indexOf('/');
-        if (slash < 0) return "Ungültiges Format. Erwartet: <project-id>/<dateipfad>\n";
+        if (slash < 0) return "Invalid format. Expected: <project-id>/<filePath>\n";
         String projectId = idWithPath.substring(0, slash);
         String relativePath = idWithPath.substring(slash + 1);
 
         try {
             var project = projectRepository.findById(projectId).orElse(null);
-            if (project == null) return "Projekt '" + projectId + "' nicht gefunden.\n";
+            if (project == null) return "Project '" + projectId + "' not found.\n";
             if (project.getPath() == null || project.getPath().isBlank())
-                return "Projekt '" + project.getName() + "' hat keinen Pfad konfiguriert.\n";
+                return "Project '" + project.getName() + "' has no path configured.\n";
 
             Path root = Path.of(project.getPath()).toAbsolutePath().normalize();
             Path resolved = root.resolve(relativePath).normalize();
 
             // Path traversal protection
             if (!resolved.startsWith(root))
-                return "Zugriff verweigert: Pfad liegt außerhalb des Projekts.\n";
+                return "Access denied: path is outside the project.\n";
 
             if (!Files.exists(resolved))
-                return "Datei nicht gefunden: " + relativePath + "\n";
+                return "File not found: " + relativePath + "\n";
 
             if (Files.isDirectory(resolved))
-                return "'" + relativePath + "' ist ein Verzeichnis. Nutze `<fetch type=\"project_files\">` für Listings.\n";
+                return "'" + relativePath + "' is a directory. Use `<fetch type=\"project_files\">` for listings.\n";
 
             // File type check
             String fileName = resolved.getFileName().toString().toLowerCase();
@@ -530,25 +530,25 @@ public class AssistantFetchService {
                     || fileName.equals("makefile") || fileName.equals("dockerfile")
                     || fileName.startsWith(".");
             if (!isTextFile)
-                return "Datei '" + relativePath + "' ist keine Text-Datei (." + ext + ").\n";
+                return "File '" + relativePath + "' is not a text file (." + ext + ").\n";
 
             long fileSize = Files.size(resolved);
             if (fileSize > 500_000)
-                return "Datei '" + relativePath + "' ist zu groß (" + formatSize(fileSize) + "). Max 500 KB.\n";
+                return "File '" + relativePath + "' is too large (" + formatSize(fileSize) + "). Max 500 KB.\n";
 
             String content = Files.readString(resolved, StandardCharsets.UTF_8);
             var sb = new StringBuilder();
-            sb.append("**Datei: ").append(relativePath).append("** (").append(formatSize(fileSize)).append(")\n\n");
+            sb.append("**File: ").append(relativePath).append("** (").append(formatSize(fileSize)).append(")\n\n");
             if (content.length() > 8000) {
                 sb.append(content, 0, 8000);
-                sb.append("\n\n[Datei gekürzt: 8000 von ").append(content.length()).append(" Zeichen]\n");
+                sb.append("\n\n[File truncated: 8000 of ").append(content.length()).append(" characters]\n");
             } else {
                 sb.append(content).append("\n");
             }
             return sb.toString();
         } catch (Exception e) {
             log.debug("Could not read project file {}", idWithPath, e);
-            return "Datei konnte nicht gelesen werden: " + e.getMessage() + "\n";
+            return "File could not be read: " + e.getMessage() + "\n";
         }
     }
 
@@ -580,7 +580,7 @@ public class AssistantFetchService {
                 Object falseBlocks = cfg.get("false_blocks");
                 int trueCount  = trueBlocks  instanceof List<?> l ? l.size() : 0;
                 int falseCount = falseBlocks instanceof List<?> l ? l.size() : 0;
-                sb.append("     wenn true: ").append(trueCount).append(" Block(s), wenn false: ").append(falseCount).append(" Block(s)\n");
+                sb.append("     if true: ").append(trueCount).append(" block(s), if false: ").append(falseCount).append(" block(s)\n");
             }
             case "forEach" -> {
                 Object items = cfg.get("items");
@@ -637,12 +637,12 @@ public class AssistantFetchService {
             return skillRepository.findByIdWithCapabilities(skillId).map(s -> {
                 var sb = new StringBuilder();
                 sb.append("**Skill: ").append(s.getName()).append("** (id: ").append(s.getId()).append(")\n");
-                sb.append("Kategorie: ").append(s.getCategory()).append("\n");
+                sb.append("Category: ").append(s.getCategory()).append("\n");
                 if (s.getDescription() != null && !s.getDescription().isBlank()) {
-                    sb.append("Beschreibung: ").append(contextBuilder.truncate(s.getDescription().trim(), 200)).append("\n");
+                    sb.append("Description: ").append(contextBuilder.truncate(s.getDescription().trim(), 200)).append("\n");
                 }
                 if (s.getAiContext() != null && !s.getAiContext().isBlank()) {
-                    sb.append("AI-Kontext: ").append(contextBuilder.truncate(s.getAiContext().trim(), 400)).append("\n");
+                    sb.append("AI context: ").append(contextBuilder.truncate(s.getAiContext().trim(), 400)).append("\n");
                 }
                 var caps = s.getCapabilities();
                 if (caps != null && !caps.isEmpty()) {
@@ -659,7 +659,7 @@ public class AssistantFetchService {
                     });
                 }
                 return sb.toString();
-            }).orElse("Skill '" + skillId + "' nicht gefunden.\n");
+            }).orElse("Skill '" + skillId + "' not found.\n");
         } catch (Exception e) {
             log.debug("Could not fetch skill detail for {}", skillId, e);
             return "";
@@ -669,7 +669,7 @@ public class AssistantFetchService {
     private String formatIntegrationDetail(String providerId) {
         try {
             if (!integrationRegistry.hasProvider(providerId)) {
-                return "Integration '" + providerId + "' nicht gefunden.\n";
+                return "Integration '" + providerId + "' not found.\n";
             }
             IntegrationProvider p = integrationRegistry.getProvider(providerId);
             IntegrationConnection.ConnectionStatus status = integrationConnectionRepository.findByProviderId(providerId)
@@ -681,17 +681,17 @@ public class AssistantFetchService {
             var sb = new StringBuilder();
             sb.append("**Integration: ").append(p.getDisplayName()).append("** (id: ").append(p.getProviderId()).append(")\n");
             if (p.getDescription() != null && !p.getDescription().isBlank()) {
-                sb.append("Beschreibung: ").append(contextBuilder.truncate(p.getDescription().trim(), 200)).append("\n");
+                sb.append("Description: ").append(contextBuilder.truncate(p.getDescription().trim(), 200)).append("\n");
             }
             sb.append("Status: ").append(status);
             if (accountInfo != null && !accountInfo.isBlank()) {
                 sb.append(" (").append(contextBuilder.truncate(accountInfo, 80)).append(")");
             }
             sb.append("\n");
-            sb.append("OAuth-Flow erforderlich: ").append(p.requiresOAuthFlow() ? "ja" : "nein (API-Key/Token)").append("\n");
+            sb.append("OAuth flow required: ").append(p.requiresOAuthFlow() ? "yes" : "no (API key/token)").append("\n");
             List<IntegrationAction> actions = p.getAvailableActions();
             if (actions != null && !actions.isEmpty()) {
-                sb.append("\nVerfügbare Actions (").append(actions.size()).append("):\n");
+                sb.append("\nAvailable actions (").append(actions.size()).append("):\n");
                 actions.forEach(a -> {
                     sb.append("  - ").append(a.name());
                     if (a.description() != null && !a.description().isBlank()) {
@@ -719,9 +719,9 @@ public class AssistantFetchService {
                 var sb = new StringBuilder();
                 sb.append("**Chain: ").append(c.getName()).append("** (id: ").append(c.getId()).append(")\n");
                 if (c.getDescription() != null && !c.getDescription().isBlank()) {
-                    sb.append("Beschreibung: ").append(contextBuilder.truncate(c.getDescription().trim(), 200)).append("\n");
+                    sb.append("Description: ").append(contextBuilder.truncate(c.getDescription().trim(), 200)).append("\n");
                 }
-                sb.append("Stop on failure: ").append(c.isStopOnFailure() ? "ja" : "nein").append("\n");
+                sb.append("Stop on failure: ").append(c.isStopOnFailure() ? "yes" : "no").append("\n");
                 var entries = c.getEntries();
                 if (entries != null && !entries.isEmpty()) {
                     sb.append("\nWorkflows in Chain (").append(entries.size()).append("):\n");
@@ -742,7 +742,7 @@ public class AssistantFetchService {
                     }
                 }
                 return sb.toString();
-            }).orElse("Chain '" + chainId + "' nicht gefunden.\n");
+            }).orElse("Chain '" + chainId + "' not found.\n");
         } catch (Exception e) {
             log.debug("Could not fetch chain detail for {}", chainId, e);
             return "";
@@ -751,93 +751,93 @@ public class AssistantFetchService {
 
     private static final Map<String, String> BLOCK_SPECS = Map.ofEntries(
             Map.entry("simple", """
-                    **Block-Typ: simple** — Einfacher KI-Prompt, eine Antwort.
-                    Pflicht-Config: command (string) — Prompt-Text mit Template-Variablen ({{var}}).
+                    **Block type: simple** — Simple AI prompt, one response.
+                    Required config: command (string) — prompt text with template variables ({{var}}).
                     Optional: model (string), timeout_seconds (int), label (string).
-                    Beispiel-Config: { "command": "Analysiere {{input}} und gib JSON zurück" }
+                    Example config: { "command": "Analyze {{input}} and return JSON" }
                     """),
             Map.entry("shell", """
-                    **Block-Typ: shell** — Shell-Kommando ausführen. KEIN API-/DB-Zugriff erlaubt.
-                    Pflicht-Config: command (string) — Bash-Kommando, Template-Variablen unterstützt.
+                    **Block type: shell** — Run a shell command. NO API/DB access allowed.
+                    Required config: command (string) — bash command, template variables supported.
                     Optional: timeout_seconds (int), label (string).
-                    Beispiel-Config: { "command": "ls -la /tmp/{{run_id}}" }
-                    Hinweis: set -euo pipefail empfohlen, nutze actuator/health statt direkter DB.
+                    Example config: { "command": "ls -la /tmp/{{run_id}}" }
+                    Note: set -euo pipefail recommended, use actuator/health instead of direct DB.
                     """),
             Map.entry("agentic", """
-                    **Block-Typ: agentic** — Mehrstufiger Agent mit REASON+ACT-Phasen, langlaufend.
-                    Pflicht-Config: prompt (string), max_total_tokens (int) — kumulatives Budget.
+                    **Block type: agentic** — Multi-stage agent with REASON+ACT phases, long-running.
+                    Required config: prompt (string), max_total_tokens (int) — cumulative budget.
                     Optional: model, max_turns (int), timeout_seconds, label.
-                    Beispiel-Config: { "prompt": "Refaktoriere X bis Tests grün", "max_total_tokens": 50000 }
-                    Hinweis: REASON nutzt --system-prompt, ACT nutzt --append-system-prompt.
+                    Example config: { "prompt": "Refactor X until tests pass", "max_total_tokens": 50000 }
+                    Note: REASON uses --system-prompt, ACT uses --append-system-prompt.
                     """),
             Map.entry("conditional", """
-                    **Block-Typ: conditional** — Verzweigung anhand Bedingung.
-                    Pflicht-Config: condition (string-Expression, JSONPath/Template).
-                    Pflicht-Sub-Blocks: true_blocks (list), false_blocks (list).
-                    Beispiel: { "condition": "{{score}} > 0.8", "true_blocks": [...], "false_blocks": [...] }
+                    **Block type: conditional** — Branch based on a condition.
+                    Required config: condition (string expression, JSONPath/template).
+                    Required sub-blocks: true_blocks (list), false_blocks (list).
+                    Example: { "condition": "{{score}} > 0.8", "true_blocks": [...], "false_blocks": [...] }
                     """),
             Map.entry("foreach", """
-                    **Block-Typ: foreach** — Iteration über Liste.
-                    Pflicht-Config: items (Template-Variable, die eine Liste auflöst).
-                    Pflicht-Sub-Blocks: blocks (list).
-                    Beispiel: { "items": "{{file_list}}", "blocks": [...] }
-                    Hinweis: Iterator-Variable im Sub-Block heisst {{item}}.
+                    **Block type: foreach** — Iterate over a list.
+                    Required config: items (template variable that resolves to a list).
+                    Required sub-blocks: blocks (list).
+                    Example: { "items": "{{file_list}}", "blocks": [...] }
+                    Note: the iterator variable in the sub-block is called {{item}}.
                     """),
             Map.entry("while", """
-                    **Block-Typ: while** — Schleife mit Abbruchbedingung und max_iterations.
-                    Pflicht-Config: condition (string), max_iterations (int).
-                    Pflicht-Sub-Blocks: blocks (list).
-                    Beispiel: { "condition": "{{retries}} < 3", "max_iterations": 10, "blocks": [...] }
+                    **Block type: while** — Loop with a stop condition and max_iterations.
+                    Required config: condition (string), max_iterations (int).
+                    Required sub-blocks: blocks (list).
+                    Example: { "condition": "{{retries}} < 3", "max_iterations": 10, "blocks": [...] }
                     """),
             Map.entry("switch", """
-                    **Block-Typ: switch** — Multi-Way-Verzweigung anhand Match-Wert.
-                    Pflicht-Config: value (string), cases (list von { "match": ..., "blocks": [...] }).
+                    **Block type: switch** — Multi-way branch based on a match value.
+                    Required config: value (string), cases (list of { "match": ..., "blocks": [...] }).
                     Optional: default_blocks (list).
                     """),
             Map.entry("retry", """
-                    **Block-Typ: retry** — Wiederholt einen Sub-Block bei Fehler.
-                    Pflicht-Config: max_attempts (int), block (single block definition).
-                    Optional: backoff_ms (int), retry_on (list von Fehlertyp-Strings).
+                    **Block type: retry** — Retries a sub-block on failure.
+                    Required config: max_attempts (int), block (single block definition).
+                    Optional: backoff_ms (int), retry_on (list of error-type strings).
                     """),
             Map.entry("approval", """
-                    **Block-Typ: approval** — Pausiert bis User-Approval.
-                    Pflicht-Config: question (string).
-                    Optional: options (list von String-Antworten — z.B. ["Yes","No","Skip"]), timeout_seconds.
-                    Approve via POST /api/v1/executions/{id}/approve mit { "answer": "Yes" } (Feld: answer, NICHT approved).
+                    **Block type: approval** — Pauses until user approval.
+                    Required config: question (string).
+                    Optional: options (list of string answers — e.g. ["Yes","No","Skip"]), timeout_seconds.
+                    Approve via POST /api/v1/executions/{id}/approve with { "answer": "Yes" } (field: answer, NOT approved).
                     """),
             Map.entry("sub-workflow", """
-                    **Block-Typ: sub-workflow** — Anderen Workflow als Block ausführen.
-                    Pflicht-Config: workflow_id (string).
-                    Optional: input_context (Map) — wird als context an den Sub-Workflow übergeben.
+                    **Block type: sub-workflow** — Run another workflow as a block.
+                    Required config: workflow_id (string).
+                    Optional: input_context (Map) — passed as context to the sub-workflow.
                     """),
             Map.entry("skill-capability", """
-                    **Block-Typ: skill-capability** — Capability eines Skills ausführen (deklarativ).
-                    Pflicht-Config: skill_id (string), capability_name (string).
-                    Optional: inputs (Map) — wird gegen capability.inputSchema validiert.
+                    **Block type: skill-capability** — Run a capability of a skill (declarative).
+                    Required config: skill_id (string), capability_name (string).
+                    Optional: inputs (Map) — validated against capability.inputSchema.
                     """),
             Map.entry("human-input", """
-                    **Block-Typ: human-input** — Wert vom User abfragen, pausiert bis Antwort.
-                    Pflicht-Config: prompt (string).
+                    **Block type: human-input** — Ask the user for a value, pauses until answered.
+                    Required config: prompt (string).
                     Optional: input_type (text/number/boolean/json), default (any).
                     """),
             Map.entry("integration", """
-                    **Block-Typ: integration** — Aktion eines Integration-Providers.
-                    Pflicht-Config: provider_id (string), action (string).
-                    Optional: inputs (Map) — gegen action.inputSchema validiert.
-                    Beispiel: { "provider_id": "github", "action": "create_issue", "inputs": {...} }
-                    Lade verfügbare Provider via <fetch type="integration" id="<provider-id>"/>
+                    **Block type: integration** — Action of an integration provider.
+                    Required config: provider_id (string), action (string).
+                    Optional: inputs (Map) — validated against action.inputSchema.
+                    Example: { "provider_id": "github", "action": "create_issue", "inputs": {...} }
+                    Fetch available providers via <fetch type="integration" id="<provider-id>"/>
                     """),
             Map.entry("document", """
-                    **Block-Typ: document** — OCR/Dokumenten-Verarbeitung (PDF, Bilder).
-                    Pflicht-Config: file_path (string oder Template-Variable).
-                    Optional: extract_mode (text/structured), language (Hint für OCR).
+                    **Block type: document** — OCR/document processing (PDF, images).
+                    Required config: file_path (string or template variable).
+                    Optional: extract_mode (text/structured), language (hint for OCR).
                     """)
     );
 
     private String formatBlockSpec(String blockType) {
         String spec = BLOCK_SPECS.get(blockType);
         if (spec == null) {
-            return "Unbekannter Block-Typ '" + blockType + "'. Verfügbare: " + BLOCK_SPECS.keySet() + "\n";
+            return "Unknown block type '" + blockType + "'. Available: " + BLOCK_SPECS.keySet() + "\n";
         }
         return spec;
     }
@@ -847,20 +847,20 @@ public class AssistantFetchService {
             return workflowRepository.findById(workflowId).map(wf -> {
                 var sb = new StringBuilder();
                 String projectName = wf.getProject() != null ? wf.getProject().getName() : "—";
-                sb.append("**Workflow (Vollständig): ").append(wf.getName()).append("** (").append(projectName).append(")\n");
+                sb.append("**Workflow (full): ").append(wf.getName()).append("** (").append(projectName).append(")\n");
                 sb.append("ID: ").append(wf.getId()).append("\n");
                 if (wf.getModel() != null && !wf.getModel().isBlank()) {
-                    sb.append("Modell: ").append(wf.getModel()).append("\n");
+                    sb.append("Model: ").append(wf.getModel()).append("\n");
                 }
                 if (wf.getInstructions() != null && !wf.getInstructions().isBlank()) {
-                    sb.append("Instruktionen: ").append(contextBuilder.truncate(wf.getInstructions().trim(), 600)).append("\n");
+                    sb.append("Instructions: ").append(contextBuilder.truncate(wf.getInstructions().trim(), 600)).append("\n");
                 }
                 if (wf.getDefaultContext() != null && !wf.getDefaultContext().isEmpty()) {
-                    sb.append("Default-Inputs: ").append(wf.getDefaultContext()).append("\n");
+                    sb.append("Default inputs: ").append(wf.getDefaultContext()).append("\n");
                 }
                 var blocks = wf.getBlocks();
                 if (blocks != null && !blocks.isEmpty()) {
-                    sb.append("\nBlöcke (").append(blocks.size()).append(", vollständige Config):\n");
+                    sb.append("\nBlocks (").append(blocks.size()).append(", full config):\n");
                     for (int i = 0; i < blocks.size(); i++) {
                         BlockDefinition block = blocks.get(i);
                         Map<String, Object> cfg = block.getConfig() != null ? block.getConfig() : Map.of();
@@ -873,7 +873,7 @@ public class AssistantFetchService {
                     }
                 }
                 return sb.toString();
-            }).orElse("Workflow '" + workflowId + "' nicht gefunden.\n");
+            }).orElse("Workflow '" + workflowId + "' not found.\n");
         } catch (Exception e) {
             log.debug("Could not fetch workflow-full for {}", workflowId, e);
             return "";
@@ -882,31 +882,31 @@ public class AssistantFetchService {
 
     private String formatFindWorkflow(String query) {
         if (query == null || query.isBlank()) {
-            return "Suchbegriff fehlt. Erwartet: <fetch type=\"find_workflow\" id=\"<name-oder-substring>\"/>\n";
+            return "Search term missing. Expected: <fetch type=\"find_workflow\" id=\"<name-or-substring>\"/>\n";
         }
         try {
             List<com.automation.entity.Workflow> matches = workflowRepository.findByNameContainingIgnoreCase(query.trim());
             if (matches.isEmpty()) {
-                return "Kein Workflow gefunden, dessen Name '" + query + "' enthält.\n";
+                return "No workflow found whose name contains '" + query + "'.\n";
             }
             var sb = new StringBuilder();
-            sb.append("**Workflow-Suche für '").append(query).append("':** ")
-                    .append(matches.size()).append(" Treffer\n");
+            sb.append("**Workflow search for '").append(query).append("':** ")
+                    .append(matches.size()).append(" matches\n");
             int limit = Math.min(matches.size(), 20);
             for (int i = 0; i < limit; i++) {
                 var wf = matches.get(i);
                 String projectName = wf.getProject() != null ? wf.getProject().getName() : "—";
-                sb.append("  - **").append(wf.getName()).append("** (id: `").append(wf.getId()).append("`, Projekt: ")
+                sb.append("  - **").append(wf.getName()).append("** (id: `").append(wf.getId()).append("`, project: ")
                         .append(projectName).append(")\n");
             }
             if (matches.size() > limit) {
-                sb.append("  … weitere ").append(matches.size() - limit).append(" Treffer (Suche verfeinern).\n");
+                sb.append("  … ").append(matches.size() - limit).append(" more matches (refine the search).\n");
             }
-            sb.append("\nNutze `<fetch type=\"workflow_detail\" id=\"<id>\"/>` für Details.\n");
+            sb.append("\nUse `<fetch type=\"workflow_detail\" id=\"<id>\"/>` for details.\n");
             return sb.toString();
         } catch (Exception e) {
             log.debug("Could not search workflows for '{}'", query, e);
-            return "Workflow-Suche fehlgeschlagen.\n";
+            return "Workflow search failed.\n";
         }
     }
 
@@ -914,10 +914,10 @@ public class AssistantFetchService {
         try {
             return workflowRepository.findById(workflowId).map(wf -> {
                 var sb = new StringBuilder();
-                sb.append("**Inputs für Workflow: ").append(wf.getName()).append("** (id: ").append(wf.getId()).append(")\n");
+                sb.append("**Inputs for workflow: ").append(wf.getName()).append("** (id: ").append(wf.getId()).append(")\n");
                 Map<String, Object> ctx = wf.getDefaultContext();
                 if (ctx == null || ctx.isEmpty()) {
-                    sb.append("(keine default Inputs definiert)\n");
+                    sb.append("(no default inputs defined)\n");
                 } else {
                     ctx.forEach((k, v) -> {
                         String valStr = v == null ? "null" : String.valueOf(v);
@@ -926,7 +926,7 @@ public class AssistantFetchService {
                     });
                 }
                 return sb.toString();
-            }).orElse("Workflow '" + workflowId + "' nicht gefunden.\n");
+            }).orElse("Workflow '" + workflowId + "' not found.\n");
         } catch (Exception e) {
             log.debug("Could not fetch workflow-inputs for {}", workflowId, e);
             return "";

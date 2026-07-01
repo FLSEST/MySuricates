@@ -27,7 +27,7 @@ public class RunsContextSection implements AssistantContextSection {
 
     @Override
     public void append(StringBuilder sb, boolean compact) {
-        sb.append("## Mein aktueller Zustand\n");
+        sb.append("## My Current State\n");
         sb.append("Version: ").append(systemIdentity.getVersion()).append("\n\n");
 
         if (compact) {
@@ -39,8 +39,8 @@ public class RunsContextSection implements AssistantContextSection {
                 String failedIds = failed.stream()
                         .map(r -> r.getId().substring(0, Math.min(8, r.getId().length())))
                         .collect(Collectors.joining(", "));
-                sb.append("**Runs:** ").append(recent.size()).append(" zuletzt, ")
-                        .append(running).append(" laufend, ").append(failed.size()).append(" FAILED");
+                sb.append("**Runs:** ").append(recent.size()).append(" recent, ")
+                        .append(running).append(" running, ").append(failed.size()).append(" FAILED");
                 if (!failedIds.isEmpty()) sb.append(" (ids: ").append(failedIds).append(")");
                 sb.append("\n\n");
             } catch (Exception e) {
@@ -51,14 +51,14 @@ public class RunsContextSection implements AssistantContextSection {
 
         try {
             List<WorkflowRun> active = workflowRunRepository.findByStatus(RunStatus.RUNNING);
-            sb.append("**Aktive Ausführungen:** ").append(active.size()).append("\n");
+            sb.append("**Active Runs:** ").append(active.size()).append("\n");
             active.forEach(r -> sb.append("  - ").append(runLabel(r))
                     .append(" (link:").append(runLink(r)).append(")\n"));
         } catch (Exception e) {
             log.debug("Could not load active runs for assistant context", e);
         }
 
-        sb.append("\n**Letzte 10 Ausführungen:**\n");
+        sb.append("\n**Last 10 Runs:**\n");
         try {
             workflowRunRepository.findTop10ByOrderByStartedAtDesc().forEach(r -> {
                 sb.append("  - [").append(fmt(r.getStartedAt())).append("] ")
@@ -66,7 +66,7 @@ public class RunsContextSection implements AssistantContextSection {
                         .append(" (link:").append(runLink(r)).append(")");
                 if (r.getStatus() == RunStatus.FAILED) {
                     String err = extractError(r);
-                    if (err != null) sb.append(" — Fehler: ").append(truncate(err, 120));
+                    if (err != null) sb.append(" — Error: ").append(truncate(err, 120));
                 }
                 sb.append("\n");
             });
@@ -98,13 +98,13 @@ public class RunsContextSection implements AssistantContextSection {
                     proj = " (" + run.getWorkflow().getProject().getName() + ")";
                 }
             } else if (wfName != null) {
-                proj = " [gelöscht]";
+                proj = " [deleted]";
             }
         } catch (Exception e) {
             // Lazy-load failure (OSIV disabled and no active session): fall back to snapshot.
-            if (wfName != null) proj = " [gelöscht]";
+            if (wfName != null) proj = " [deleted]";
         }
-        return wfName != null ? wfName + proj : "Unbekannt";
+        return wfName != null ? wfName + proj : "Unknown";
     }
 
     public String fmt(Instant instant) {
@@ -119,6 +119,6 @@ public class RunsContextSection implements AssistantContextSection {
 
     public String truncate(String s, int max) {
         if (s == null || s.length() <= max) return s != null ? s : "";
-        return s.substring(0, max) + "\n[Ausgabe gekürzt: " + max + " von " + s.length() + " Zeichen]";
+        return s.substring(0, max) + "\n[Output truncated: " + max + " of " + s.length() + " characters]";
     }
 }

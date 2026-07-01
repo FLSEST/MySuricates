@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCalendarData } from '../../hooks/useSchedules';
-import { useT } from '../../i18n';
+import { useT, useI18nStore } from '../../i18n';
 import { Spinner } from '../ui';
 import type { CalendarEvent } from '../../types';
 
@@ -21,7 +21,7 @@ const MONTHS_DE = ['Januar', 'Februar', 'Maerz', 'April', 'Mai', 'Juni', 'Juli',
 
 export function CalendarView() {
   const t = useT();
-  const isGerman = t.common.save === 'Speichern';
+  const isGerman = useI18nStore((s) => s.locale) === 'de';
   const weekdays = isGerman ? WEEKDAYS_DE : WEEKDAYS_EN;
   const months = isGerman ? MONTHS_DE : MONTHS_EN;
 

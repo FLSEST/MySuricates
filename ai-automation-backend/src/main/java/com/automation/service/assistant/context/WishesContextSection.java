@@ -40,8 +40,8 @@ public class WishesContextSection implements AssistantContextSection {
                     String failedIds = failedWishes.stream()
                             .map(w -> w.getId().substring(0, Math.min(8, w.getId().length())))
                             .collect(Collectors.joining(", "));
-                    sb.append("**Wishes:** ").append(activeWishes.size()).append(" aktiv, ")
-                            .append(failedWishes.size()).append(" fehlgeschlagen");
+                    sb.append("**Wishes:** ").append(activeWishes.size()).append(" active, ")
+                            .append(failedWishes.size()).append(" failed");
                     if (!failedIds.isEmpty()) sb.append(" (ids: ").append(failedIds).append(")");
                     sb.append("\n");
                 }
@@ -49,14 +49,14 @@ public class WishesContextSection implements AssistantContextSection {
             }
 
             if (!activeWishes.isEmpty()) {
-                sb.append("**Aktive Wishes (").append(activeWishes.size()).append("):**\n");
+                sb.append("**Active Wishes (").append(activeWishes.size()).append("):**\n");
                 activeWishes.forEach(w -> sb.append("  - [").append(w.getStatus()).append("] ")
                         .append(truncate(w.getOriginalText(), 80)).append("\n"));
                 sb.append("\n");
             }
 
             if (!failedWishes.isEmpty()) {
-                sb.append("**Letzte fehlgeschlagene Wishes:**\n");
+                sb.append("**Recent Failed Wishes:**\n");
                 failedWishes.forEach(w -> {
                     sb.append("  - [").append(w.getStatus()).append("] ")
                             .append(truncate(w.getOriginalText(), 80));

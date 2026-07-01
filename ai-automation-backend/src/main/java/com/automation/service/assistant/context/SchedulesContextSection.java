@@ -28,12 +28,12 @@ public class SchedulesContextSection implements AssistantContextSection {
                     .findSchedulesInRange(Instant.now(), Instant.now().plusSeconds(86400));
             if (compact) {
                 if (!upcoming.isEmpty()) {
-                    sb.append("**Schedules:** ").append(upcoming.size()).append(" anstehend (nächste 24h)\n");
+                    sb.append("**Schedules:** ").append(upcoming.size()).append(" upcoming (next 24h)\n");
                 }
                 return;
             }
             if (!upcoming.isEmpty()) {
-                sb.append("**Anstehende Schedules (nächste 24h):**\n");
+                sb.append("**Upcoming Schedules (next 24h):**\n");
                 upcoming.forEach(s -> {
                     String name = s.getWorkflow() != null ? s.getWorkflow().getName() : s.getTargetName();
                     sb.append("  - ").append(name).append(": ").append(fmt(s.getNextRunAt())).append("\n");

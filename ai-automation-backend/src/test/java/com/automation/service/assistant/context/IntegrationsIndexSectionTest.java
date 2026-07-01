@@ -56,7 +56,7 @@ class IntegrationsIndexSectionTest {
         StringBuilder sb = new StringBuilder();
         section.append(sb, true);
 
-        assertThat(sb.toString()).contains("**Integrationen:** 3 Provider (1 verbunden)");
+        assertThat(sb.toString()).contains("**Integrations:** 3 providers (1 connected)");
     }
 
     @Test
@@ -82,7 +82,7 @@ class IntegrationsIndexSectionTest {
         section.append(sb, false);
 
         assertThat(sb.toString())
-                .contains("**Integrationen (2):**")
+                .contains("**Integrations (2):**")
                 .contains("[✓] GitHub")
                 .contains("[✗] Slack")
                 .contains("<fetch type=\"integration\"");

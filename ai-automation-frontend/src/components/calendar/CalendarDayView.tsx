@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { MapPin, ExternalLink } from 'lucide-react';
 import type { UnifiedCalendarEvent } from '../../types';
-import { useT } from '../../i18n';
+import { useT, useI18nStore } from '../../i18n';
 
 function formatTime(date: Date): string {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -16,7 +16,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 export function CalendarDayView({ date, events }: Props) {
   const t = useT();
-  const isGerman = t.common.save === 'Speichern';
+  const isGerman = useI18nStore((s) => s.locale) === 'de';
 
   const dayLabel = date.toLocaleDateString(isGerman ? 'de-DE' : 'en-US', {
     weekday: 'long',

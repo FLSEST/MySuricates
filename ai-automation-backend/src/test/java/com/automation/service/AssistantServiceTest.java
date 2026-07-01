@@ -208,7 +208,7 @@ class AssistantServiceTest {
 
         var result = chat("Test");
 
-        assertThat(result.message()).contains("Entschuldigung");
+        assertThat(result.message()).contains("Sorry");
         assertThat(result.actions()).isEmpty();
     }
 
@@ -221,7 +221,7 @@ class AssistantServiceTest {
         var result = chat("Test");
 
         assertThat(result.message()).doesNotContain("API key invalid");
-        assertThat(result.message()).contains("konfiguriert");
+        assertThat(result.message()).contains("configured");
         assertThat(result.actions()).isEmpty();
     }
 
@@ -243,8 +243,8 @@ class AssistantServiceTest {
         var result = chat("Test");
 
         assertThat(result.message())
-                .contains("240 Sekunden")
-                .contains("Einstellungen");
+                .contains("240 seconds")
+                .contains("settings");
     }
 
     @Test
@@ -257,7 +257,7 @@ class AssistantServiceTest {
         var result = chat("Test");
 
         assertThat(result.message())
-                .contains("ausgelastet");
+                .contains("busy");
     }
 
     @Test
@@ -269,7 +269,7 @@ class AssistantServiceTest {
 
         var result = chat("Test");
 
-        assertThat(result.message()).contains("500 Sekunden");
+        assertThat(result.message()).contains("500 seconds");
     }
 
     // ── Fetch loop ────────────────────────────────────────────────────────────
@@ -296,8 +296,8 @@ class AssistantServiceTest {
         verify(commandExecutorService).executeOnHost(argThat(req ->
                 req.command() != null
                         && req.command().contains("run r1: COMPLETED")
-                        && req.command().contains("Runde 1")
-                        && req.command().contains("ursprüngliche Frage jetzt")
+                        && req.command().contains("round 1")
+                        && req.command().contains("original question now")
         ));
     }
 
@@ -374,7 +374,7 @@ class AssistantServiceTest {
 
         var result = chat("Analysiere das Projekt");
 
-        assertThat(result.message()).isEqualTo("(Keine Antwort erhalten)");
+        assertThat(result.message()).isEqualTo("(No response received)");
         verify(commandExecutorService, org.mockito.Mockito.times(1))
                 .executeOnHost(any(HostExecutionRequest.class));
         verify(fetchService, never()).executeFetch(any());
@@ -413,7 +413,7 @@ class AssistantServiceTest {
                 req.command() != null
                         && req.command().contains("run r1: COMPLETED")
                         && req.command().contains("step 0: 1.2GB output")
-                        && req.command().contains("Runde 2")
+                        && req.command().contains("round 2")
         ));
     }
 
@@ -437,13 +437,13 @@ class AssistantServiceTest {
         // Only one fetch is executed, not two
         verify(fetchService, org.mockito.Mockito.times(1)).executeFetch(fetchReq);
         // Response is empty text after 2 rounds (initial + 1 follow-up) → fetch-exhaustion fallback
-        assertThat(result.message()).contains("Daten-Abfragen").contains("konkreter");
+        assertThat(result.message()).contains("data fetches").contains("specifically");
     }
 
     @Test
     void chat_exhaustedFetchRoundsProducesFallbackMessage() {
         // Model keeps emitting different fetches but never delivers a text answer.
-        // After MAX_FETCH_ROUNDS the user should see a concrete fallback, not "(Keine Antwort erhalten)".
+        // After MAX_FETCH_ROUNDS the user should see a concrete fallback, not "(No response received)".
         stubClaudeSequence(
                 "<fetch type=\"run_detail\" id=\"r1\"/>",
                 "<fetch type=\"run_detail\" id=\"r2\"/>",
@@ -468,8 +468,8 @@ class AssistantServiceTest {
         var result = chat("Analysiere die letzten Runs");
 
         assertThat(result.message())
-                .contains("Daten-Abfragen")
-                .contains("konkreter");
+                .contains("data fetches")
+                .contains("specifically");
     }
 
     @Test
@@ -483,8 +483,8 @@ class AssistantServiceTest {
         var result = chat("Erstelle einen Workflow");
 
         assertThat(result.message())
-                .contains("JSON-Fehler")
-                .doesNotContain("konfiguriert");
+                .contains("JSON error")
+                .doesNotContain("configured");
     }
 
     @Test

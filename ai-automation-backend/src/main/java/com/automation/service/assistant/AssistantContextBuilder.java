@@ -87,12 +87,25 @@ public class AssistantContextBuilder {
 
     // ── System prompt ────────────────────────────────────────────────────────
 
+    /**
+     * Resolves the UI language code ("de"/"en") to a display name used in the
+     * "Always answer in X." instruction. Null/blank/unknown falls back to German,
+     * the platform default, preserving legacy behaviour for requests without a language.
+     */
+    String resolveAnswerLanguageName(String languageCode) {
+        return "en".equalsIgnoreCase(languageCode) ? "English" : "German";
+    }
+
     public String buildSystemPrompt(AssistantChatRequest.PageContext ctx, String baseInstructions) {
+        return buildSystemPrompt(ctx, baseInstructions, null);
+    }
+
+    public String buildSystemPrompt(AssistantChatRequest.PageContext ctx, String baseInstructions, String language) {
         String page = ctx != null ? ctx.page() : null;
         PageCategory cat = classifyPage(page);
 
         if (cat == PageCategory.RUNS && resolveRunId(ctx) != null) {
-            return buildRunFocusedSystemPrompt(ctx, baseInstructions);
+            return buildRunFocusedSystemPrompt(ctx, baseInstructions, language);
         }
 
         var sb = new StringBuilder(4000);
@@ -101,6 +114,7 @@ public class AssistantContextBuilder {
         if (baseInstructions != null && !baseInstructions.isBlank()) {
             sb.append(baseInstructions).append("\n\n");
         }
+        sb.append("Always answer in ").append(resolveAnswerLanguageName(language)).append(".\n\n");
 
         // 2. Dynamic platform context (default: lean, only page-relevant sections)
         boolean includeRunsSection = cat == PageCategory.OVERVIEW;
@@ -160,24 +174,25 @@ public class AssistantContextBuilder {
         return sb.toString();
     }
 
-    private String buildRunFocusedSystemPrompt(AssistantChatRequest.PageContext ctx, String baseInstructions) {
+    private String buildRunFocusedSystemPrompt(AssistantChatRequest.PageContext ctx, String baseInstructions, String language) {
         var sb = new StringBuilder(2000);
         if (baseInstructions != null && !baseInstructions.isBlank()) {
             sb.append(baseInstructions).append("\n\n");
         }
+        sb.append("Always answer in ").append(resolveAnswerLanguageName(language)).append(".\n\n");
 
-        sb.append("## Aktueller Kontext des Users\n");
-        if (ctx.page() != null) sb.append("Seite: /").append(ctx.page()).append("\n");
-        if (ctx.pathname() != null) sb.append("Pfad: ").append(ctx.pathname()).append("\n");
-        if (ctx.workflowId() != null) sb.append("Workflow-ID: ").append(ctx.workflowId()).append("\n");
-        if (ctx.runId() != null) sb.append("Run-ID: ").append(ctx.runId()).append("\n");
-        if (ctx.entityId() != null) sb.append("Angezeigtes Element: ID ").append(ctx.entityId()).append("\n");
+        sb.append("## Current User Context\n");
+        if (ctx.page() != null) sb.append("Page: /").append(ctx.page()).append("\n");
+        if (ctx.pathname() != null) sb.append("Path: ").append(ctx.pathname()).append("\n");
+        if (ctx.workflowId() != null) sb.append("Workflow ID: ").append(ctx.workflowId()).append("\n");
+        if (ctx.runId() != null) sb.append("Run ID: ").append(ctx.runId()).append("\n");
+        if (ctx.entityId() != null) sb.append("Displayed element: ID ").append(ctx.entityId()).append("\n");
 
         String runId = resolveRunId(ctx);
         if (runId != null) {
             try {
                 workflowRunRepository.findByIdWithSteps(runId).ifPresent(run -> {
-                    sb.append("### Aktuell angezeigter Run\n");
+                    sb.append("### Currently displayed run\n");
                     appendRunSummary(sb, run);
                 });
             } catch (Exception ignored) {}
@@ -194,12 +209,12 @@ public class AssistantContextBuilder {
             return currentMessage;
         }
         var sb = new StringBuilder();
-        sb.append("Bisherige Unterhaltung:\n");
+        sb.append("Previous conversation:\n");
         history.forEach(entry -> {
             String speaker = "user".equals(entry.role()) ? "User" : "MySuricates";
             sb.append(speaker).append(": ").append(entry.content()).append("\n");
         });
-        sb.append("\nAktuelle Nachricht:\n").append(currentMessage);
+        sb.append("\nCurrent message:\n").append(currentMessage);
         return sb.toString();
     }
 
@@ -238,7 +253,7 @@ public class AssistantContextBuilder {
             var projects = projectRepository.findByArchivedAtIsNull();
             if (compact) {
                 if (!projects.isEmpty()) {
-                    sb.append("**Projekte:** ").append(projects.size()).append("\n");
+                    sb.append("**Projects:** ").append(projects.size()).append("\n");
                 }
                 return;
             }
@@ -246,10 +261,10 @@ public class AssistantContextBuilder {
                 Map<String, Long> wfCountByProject = allWorkflows.stream()
                         .filter(w -> w.getProject() != null)
                         .collect(Collectors.groupingBy(w -> w.getProject().getId(), Collectors.counting()));
-                sb.append("**Meine Projekte (").append(projects.size()).append("):**\n");
+                sb.append("**My Projects (").append(projects.size()).append("):**\n");
                 projects.forEach(p -> sb.append("  - ").append(p.getName())
                         .append(" (ID: ").append(p.getId()).append(", ")
-                        .append(wfCountByProject.getOrDefault(p.getId(), 0L)).append(" Workflows)\n"));
+                        .append(wfCountByProject.getOrDefault(p.getId(), 0L)).append(" workflows)\n"));
                 sb.append("\n");
             }
         } catch (Exception e) {
@@ -265,8 +280,8 @@ public class AssistantContextBuilder {
                 long projectCount = allWorkflows.stream()
                         .map(w -> w.getProject() != null ? w.getProject().getId() : "")
                         .distinct().count();
-                sb.append("**Workflows:** ").append(allWorkflows.size()).append(" gesamt (")
-                        .append(projectCount).append(" Projekte)\n");
+                sb.append("**Workflows:** ").append(allWorkflows.size()).append(" total (")
+                        .append(projectCount).append(" projects)\n");
                 return;
             }
 
@@ -291,27 +306,27 @@ public class AssistantContextBuilder {
                         .collect(Collectors.toList());
             }
 
-            sb.append("**Meine Workflows (").append(allWorkflows.size()).append("):**\n");
+            sb.append("**My Workflows (").append(allWorkflows.size()).append("):**\n");
             toShow.forEach(w -> {
                 String projectName = w.getProject() != null ? w.getProject().getName() : "—";
                 String projectId = w.getProject() != null ? w.getProject().getId() : "—";
                 sb.append("  - [").append(w.getName()).append("] ")
-                        .append(projectName).append(" (projekt: ").append(projectId).append(")")
+                        .append(projectName).append(" (project: ").append(projectId).append(")")
                         .append(" — /workflows/").append(w.getId());
                 if (w.getDescription() != null && !w.getDescription().isBlank()) {
                     sb.append(" (").append(truncate(w.getDescription().trim(), 60)).append(")");
                 }
                 int inputCount = w.getDefaultContext() != null ? w.getDefaultContext().size() : 0;
                 if (inputCount > 0) {
-                    sb.append(" — ").append(inputCount).append(" Inputs");
+                    sb.append(" — ").append(inputCount).append(" inputs");
                 }
                 sb.append("\n");
             });
             if (allWorkflows.size() > 25) {
-                sb.append("  … und ").append(allWorkflows.size() - 25)
-                  .append(" weitere. Inputs eines Workflows via <fetch type=\"workflow-inputs\" id=\"<workflow-id>\"/>\n");
+                sb.append("  … and ").append(allWorkflows.size() - 25)
+                  .append(" more. A workflow's inputs via <fetch type=\"workflow-inputs\" id=\"<workflow-id>\"/>\n");
             } else if (toShow.stream().anyMatch(w -> w.getDefaultContext() != null && !w.getDefaultContext().isEmpty())) {
-                sb.append("  Inputs eines Workflows via <fetch type=\"workflow-inputs\" id=\"<workflow-id>\"/>\n");
+                sb.append("  A workflow's inputs via <fetch type=\"workflow-inputs\" id=\"<workflow-id>\"/>\n");
             }
             sb.append("\n");
         } catch (Exception e) {
@@ -323,7 +338,7 @@ public class AssistantContextBuilder {
         try {
             List<WorkflowMemory> memories = workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc();
             if (memories.isEmpty()) return;
-            sb.append("## Gelerntes & Fallstricke\n");
+            sb.append("## Learnings & Pitfalls\n");
             memories.stream().limit(8).forEach(m -> {
                 String wfName = workflowById.containsKey(m.getWorkflowId())
                         ? workflowById.get(m.getWorkflowId()).getName()
@@ -340,14 +355,14 @@ public class AssistantContextBuilder {
         try {
             List<AssistantSession> sessions = assistantSessionRepository.findTop5ByOrderByStartedAtDesc();
             if (sessions.isEmpty()) return;
-            sb.append("## Letzte Gespräche (Orientierung)\n");
+            sb.append("## Recent Conversations (Context)\n");
             sessions.forEach(sess -> {
                 String[] firstExchange = extractFirstExchange(sess.getMessages());
                 if (firstExchange != null) {
                     sb.append("  - [").append(fmt(sess.getStartedAt())).append("] ")
                             .append("User: \"").append(truncate(firstExchange[0], 150)).append("\"");
                     if (firstExchange[1] != null) {
-                        sb.append(" → Antwort: \"").append(truncate(firstExchange[1], 100)).append("\"");
+                        sb.append(" → Response: \"").append(truncate(firstExchange[1], 100)).append("\"");
                     }
                     sb.append("\n");
                 }
@@ -412,13 +427,13 @@ public class AssistantContextBuilder {
     }
 
     private void appendPageContext(StringBuilder sb, AssistantChatRequest.PageContext ctx) {
-        sb.append("## Aktueller Kontext des Users\n");
-        if (ctx.page() != null) sb.append("Seite: /").append(ctx.page()).append("\n");
-        if (ctx.pathname() != null) sb.append("Pfad: ").append(ctx.pathname()).append("\n");
-        if (ctx.workflowId() != null) sb.append("Workflow-ID: ").append(ctx.workflowId()).append("\n");
-        if (ctx.runId() != null) sb.append("Run-ID: ").append(ctx.runId()).append("\n");
+        sb.append("## Current User Context\n");
+        if (ctx.page() != null) sb.append("Page: /").append(ctx.page()).append("\n");
+        if (ctx.pathname() != null) sb.append("Path: ").append(ctx.pathname()).append("\n");
+        if (ctx.workflowId() != null) sb.append("Workflow ID: ").append(ctx.workflowId()).append("\n");
+        if (ctx.runId() != null) sb.append("Run ID: ").append(ctx.runId()).append("\n");
         if (ctx.entityId() != null) {
-            sb.append("Angezeigtes Element: ID ").append(ctx.entityId()).append("\n");
+            sb.append("Displayed element: ID ").append(ctx.entityId()).append("\n");
         }
 
         String runId = resolveRunId(ctx);
@@ -437,9 +452,9 @@ public class AssistantContextBuilder {
         if ("wishes".equals(ctx.page()) && ctx.entityId() != null) {
             try {
                 wishRepository.findById(ctx.entityId()).ifPresent(w ->
-                        sb.append("Wish-Details: [").append(w.getStatus()).append("] ")
+                        sb.append("Wish details: [").append(w.getStatus()).append("] ")
                                 .append(truncate(w.getOriginalText(), 100))
-                                .append(", Iterationen: ").append(w.getIterationCount())
+                                .append(", iterations: ").append(w.getIterationCount())
                                 .append("/").append(w.getMaxIterations()).append("\n")
                 );
             } catch (Exception ignored) {}
@@ -447,7 +462,7 @@ public class AssistantContextBuilder {
         if (ctx.projectId() != null) {
             try {
                 projectRepository.findById(ctx.projectId()).ifPresent(p -> {
-                    sb.append("Aktives Projekt: ").append(p.getName())
+                    sb.append("Active project: ").append(p.getName())
                             .append(" (ID: ").append(p.getId()).append(")\n");
                     appendProjectFileListing(sb, p.getPath(), p.getId());
                 });
@@ -458,7 +473,7 @@ public class AssistantContextBuilder {
                         .map(Workflow::getProject)
                         .filter(project -> project != null)
                         .ifPresent(project -> {
-                            sb.append("Aktives Projekt: ").append(project.getName())
+                            sb.append("Active project: ").append(project.getName())
                                     .append(" (ID: ").append(project.getId()).append(")\n");
                             appendProjectFileListing(sb, project.getPath(), project.getId());
                         });
@@ -470,9 +485,9 @@ public class AssistantContextBuilder {
     private void appendRunSummary(StringBuilder sb, WorkflowRun run) {
         sb.append("Workflow: ").append(runLabel(run)).append("\n");
         if (run.getWorkflow() != null) {
-            sb.append("Workflow-ID: ").append(run.getWorkflow().getId()).append("\n");
+            sb.append("Workflow ID: ").append(run.getWorkflow().getId()).append("\n");
             if (run.getWorkflow().getProject() != null) {
-                sb.append("Workflow-Projekt: ").append(run.getWorkflow().getProject().getName())
+                sb.append("Workflow project: ").append(run.getWorkflow().getProject().getName())
                         .append(" (ID: ").append(run.getWorkflow().getProject().getId()).append(")\n");
             }
         }
@@ -483,12 +498,12 @@ public class AssistantContextBuilder {
         sb.append("\n");
         String runErr = extractError(run);
         if (runErr != null) {
-            sb.append("Run-Fehler: ").append(truncate(runErr, 200)).append("\n");
+            sb.append("Run error: ").append(truncate(runErr, 200)).append("\n");
         }
 
         List<StepResult> steps = run.getSteps();
         if (!steps.isEmpty()) {
-            sb.append("Schritte: ").append(steps.size());
+            sb.append("Steps: ").append(steps.size());
             String counts = summarizeStepStatuses(steps);
             if (!counts.isBlank()) {
                 sb.append(" (").append(counts).append(")");
@@ -497,7 +512,7 @@ public class AssistantContextBuilder {
             steps.stream()
                     .filter(step -> step.getStatus() == StepStatus.FAILED)
                     .findFirst()
-                    .ifPresent(step -> sb.append("Erster fehlgeschlagener Schritt: ")
+                    .ifPresent(step -> sb.append("First failed step: ")
                             .append(step.getStepIndex() + 1).append("\n"));
         }
     }
@@ -515,13 +530,13 @@ public class AssistantContextBuilder {
         if (workflowId == null) return;
         try {
             workflowRepository.findByIdWithSkills(workflowId).ifPresent(workflow -> {
-                sb.append("Aktiver Workflow: ").append(workflow.getName())
+                sb.append("Active workflow: ").append(workflow.getName())
                         .append(" (ID: ").append(workflow.getId()).append(")\n");
                 if (workflow.getProject() != null) {
-                    sb.append("Workflow-Projekt: ").append(workflow.getProject().getName())
+                    sb.append("Workflow project: ").append(workflow.getProject().getName())
                             .append(" (ID: ").append(workflow.getProject().getId()).append(")\n");
                     if (includeProjectFiles) {
-                        sb.append("Aktives Projekt: ").append(workflow.getProject().getName())
+                        sb.append("Active project: ").append(workflow.getProject().getName())
                                 .append(" (ID: ").append(workflow.getProject().getId()).append(")\n");
                         appendProjectFileListing(sb, workflow.getProject().getPath(), workflow.getProject().getId());
                     }
@@ -561,9 +576,9 @@ public class AssistantContextBuilder {
             if (!files.isEmpty()) {
                 String listing = String.join(", ", files);
                 if (listing.length() > 300) listing = listing.substring(0, 300) + "…";
-                sb.append("Projekt-Dateien: ").append(listing).append("\n");
-                sb.append("_(Nutze `<fetch type=\"project_file\" id=\"").append(projectId)
-                        .append("/<pfad>\"/>` um eine Datei zu lesen)_\n");
+                sb.append("Project files: ").append(listing).append("\n");
+                sb.append("_(Use `<fetch type=\"project_file\" id=\"").append(projectId)
+                        .append("/<path>\"/>` to read a file)_\n");
             }
         } catch (IOException e) {
             log.debug("Could not list project files for {}", projectPath, e);

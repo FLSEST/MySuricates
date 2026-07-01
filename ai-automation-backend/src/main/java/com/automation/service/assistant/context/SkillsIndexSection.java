@@ -25,7 +25,7 @@ public class SkillsIndexSection implements AssistantContextSection {
                 return;
             }
             if (compact) {
-                sb.append("**Skills:** ").append(skills.size()).append(" verfügbar\n");
+                sb.append("**Skills:** ").append(skills.size()).append(" available\n");
                 return;
             }
             int shown = Math.min(skills.size(), MAX_ENTRIES);
@@ -34,10 +34,10 @@ public class SkillsIndexSection implements AssistantContextSection {
                     .append("  - [").append(s.getCategory()).append("] ")
                     .append(s.getName())
                     .append(" — ").append(shortDesc(s.getDescription()))
-                    .append(" (").append(s.getCapabilities().size()).append(" Capabilities, id: ").append(s.getId()).append(")\n"));
+                    .append(" (").append(s.getCapabilities().size()).append(" capabilities, id: ").append(s.getId()).append(")\n"));
             if (skills.size() > shown) {
-                sb.append("  … und ").append(skills.size() - shown)
-                  .append(" weitere. Detail via <fetch type=\"skill\" id=\"<skill-id>\"/>\n");
+                sb.append("  … and ").append(skills.size() - shown)
+                  .append(" more. Detail via <fetch type=\"skill\" id=\"<skill-id>\"/>\n");
             }
             sb.append("\n");
         } catch (Exception e) {
@@ -46,7 +46,7 @@ public class SkillsIndexSection implements AssistantContextSection {
     }
 
     private String shortDesc(String desc) {
-        if (desc == null || desc.isBlank()) return "(keine Beschreibung)";
+        if (desc == null || desc.isBlank()) return "(no description)";
         String trimmed = desc.replaceAll("\\s+", " ").trim();
         return trimmed.length() > 80 ? trimmed.substring(0, 77) + "..." : trimmed;
     }

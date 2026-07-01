@@ -174,7 +174,7 @@ class AssistantControllerTest {
         when(pendingToolRegistry.take("tool-1")).thenReturn(java.util.Optional.of(tool));
         when(toolExecutor.executeConfirmed(tool))
                 .thenReturn(new com.automation.service.assistant.ToolExecutionResult(
-                        "tool-1", "create_todo", true, "✓ Todo angelegt"));
+                        "tool-1", "create_todo", true, "✓ Todo created"));
 
         mockMvc.perform(post("/api/v1/assistant/pending-tools/tool-1/confirm")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -182,7 +182,7 @@ class AssistantControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.toolId").value("tool-1"))
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("✓ Todo angelegt"));
+                .andExpect(jsonPath("$.message").value("✓ Todo created"));
 
         verify(toolExecutor).executeConfirmed(tool);
         verify(assistantSessionService).appendToolResult(

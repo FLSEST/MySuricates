@@ -34,4 +34,13 @@ export function useT(): TranslationKeys {
   return translations[locale];
 }
 
+/**
+ * Non-hook accessor for the current locale's translations.
+ * For use in class components (e.g. ErrorBoundary) and other non-React contexts
+ * where hooks are unavailable. Reads the persisted locale synchronously.
+ */
+export function getTranslations(): TranslationKeys {
+  return translations[useI18nStore.getState().locale];
+}
+
 export { type TranslationKeys };

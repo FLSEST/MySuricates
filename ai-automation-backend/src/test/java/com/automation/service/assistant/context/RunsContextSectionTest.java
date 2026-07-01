@@ -60,8 +60,8 @@ class RunsContextSectionTest {
             String result = sb.toString();
             assertThat(result)
                     .contains("Version: 0.6.4")
-                    .contains("2 zuletzt")
-                    .contains("2 laufend")
+                    .contains("2 recent")
+                    .contains("2 running")
                     .contains("1 FAILED")
                     .contains("abcdef12");
         }
@@ -96,8 +96,8 @@ class RunsContextSectionTest {
             section.append(sb, false);
 
             assertThat(sb.toString())
-                    .contains("Aktive Ausführungen:** 0")
-                    .contains("Letzte 10 Ausführungen:");
+                    .contains("Active Runs:** 0")
+                    .contains("Last 10 Runs:");
         }
 
         @Test
@@ -113,7 +113,7 @@ class RunsContextSectionTest {
             StringBuilder sb = new StringBuilder();
             section.append(sb, false);
 
-            assertThat(sb.toString()).contains("Fehler: Timeout after 300s");
+            assertThat(sb.toString()).contains("Error: Timeout after 300s");
         }
     }
 
@@ -154,7 +154,7 @@ class RunsContextSectionTest {
         void runLabel_withoutWorkflow() {
             WorkflowRun run = buildRun("run-1", RunStatus.COMPLETED);
 
-            assertThat(section.runLabel(run)).isEqualTo("Unbekannt");
+            assertThat(section.runLabel(run)).isEqualTo("Unknown");
         }
 
         @Test
@@ -163,7 +163,7 @@ class RunsContextSectionTest {
             run.setWorkflowName("Deploy");
             // workflow association resolved to null (e.g. soft-deleted via @SQLRestriction)
 
-            assertThat(section.runLabel(run)).isEqualTo("Deploy [gelöscht]");
+            assertThat(section.runLabel(run)).isEqualTo("Deploy [deleted]");
         }
 
         @Test
@@ -213,8 +213,8 @@ class RunsContextSectionTest {
         @Test
         void truncate_long_truncated() {
             String result = section.truncate("a".repeat(200), 50);
-            assertThat(result).hasSize(50 + "\n[Ausgabe gekürzt: 50 von 200 Zeichen]".length());
-            assertThat(result).contains("[Ausgabe gekürzt:");
+            assertThat(result).hasSize(50 + "\n[Output truncated: 50 of 200 characters]".length());
+            assertThat(result).contains("[Output truncated:");
         }
 
         @Test

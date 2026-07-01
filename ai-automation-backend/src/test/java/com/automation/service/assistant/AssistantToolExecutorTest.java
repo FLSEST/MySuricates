@@ -51,7 +51,7 @@ class AssistantToolExecutorTest {
         }
         String result = extraction.cleanedResponse();
         for (PendingTool t : extraction.pendingTools()) {
-            String placeholder = "[Aktion wartet auf Bestätigung: " + t.description() + "]";
+            String placeholder = "[Action awaiting confirmation: " + t.description() + "]";
             ToolExecutionResult r = executor.executeConfirmed(t);
             result = result.replace(placeholder, r.message());
         }
@@ -88,7 +88,7 @@ class AssistantToolExecutorTest {
         String result = runAllTools(input);
 
         assertThat(result).contains("⚠");
-        assertThat(result).contains("Titel fehlt");
+        assertThat(result).contains("title is missing");
         verify(todoService, never()).create(any());
     }
 
@@ -107,7 +107,7 @@ class AssistantToolExecutorTest {
         String result = runAllTools(input);
 
         assertThat(result).contains("⚠");
-        assertThat(result).contains("Ungültiger Status");
+        assertThat(result).contains("Invalid status");
     }
 
     @Test
@@ -128,7 +128,7 @@ class AssistantToolExecutorTest {
         String result = runAllTools(input);
 
         assertThat(result).contains("⚠");
-        assertThat(result).contains("Pflichtfeld");
+        assertThat(result).contains("required field");
     }
 
     @Test
@@ -137,7 +137,7 @@ class AssistantToolExecutorTest {
         String result = runAllTools(input);
 
         assertThat(result).contains("⚠");
-        assertThat(result).contains("Pflichtfeld");
+        assertThat(result).contains("required field");
     }
 
     @Test
@@ -146,7 +146,7 @@ class AssistantToolExecutorTest {
         String result = runAllTools(input);
 
         assertThat(result).contains("⚠");
-        assertThat(result).contains("Pflichtfeld");
+        assertThat(result).contains("required field");
     }
 
     @Test
@@ -160,7 +160,7 @@ class AssistantToolExecutorTest {
         String result = runAllTools(input);
 
         assertThat(result).contains("✓");
-        assertThat(result).contains("gestartet");
+        assertThat(result).contains("started");
     }
 
     @Test
@@ -181,7 +181,7 @@ class AssistantToolExecutorTest {
         String result = runAllTools(input);
 
         assertThat(result).contains("✓");
-        assertThat(result).contains("gelöscht");
+        assertThat(result).contains("deleted");
         verify(workflowService).delete("wf-1");
     }
 
@@ -194,7 +194,7 @@ class AssistantToolExecutorTest {
         String result = runAllTools(input);
 
         assertThat(result).contains("✓");
-        assertThat(result).contains("Chain erstellt");
+        assertThat(result).contains("Chain created");
     }
 
     @Test
@@ -214,7 +214,7 @@ class AssistantToolExecutorTest {
         String input = "<tool type=\"unknown_tool\">{}</tool>";
         String result = runAllTools(input);
 
-        assertThat(result).contains("Unbekanntes Tool");
+        assertThat(result).contains("Unknown tool");
     }
 
     @Test
@@ -226,8 +226,8 @@ class AssistantToolExecutorTest {
                 "<tool type=\"cancel_run\">{\"runId\": \"run-99998888\"}</tool> fertig.";
         String result = runAllTools(input);
 
-        assertThat(result).contains("✓ Todo angelegt");
-        assertThat(result).contains("✓ Run abgebrochen");
+        assertThat(result).contains("✓ Todo created");
+        assertThat(result).contains("✓ Run cancelled");
         assertThat(result).contains("Ich erstelle:");
         assertThat(result).contains("fertig.");
         verify(todoService).create(any());
@@ -243,7 +243,7 @@ class AssistantToolExecutorTest {
         String result = runAllTools(input);
 
         assertThat(result).contains("✓");
-        assertThat(result).contains("aktualisiert");
+        assertThat(result).contains("updated");
         verify(workflowService).update(eq("wf-1"), any());
     }
 
@@ -364,7 +364,7 @@ class AssistantToolExecutorTest {
         String result = runAllTools(input);
 
         assertThat(result).contains("⚠");
-        assertThat(result).contains("Pflichtfelder");
+        assertThat(result).contains("required fields");
     }
 
     @Test
@@ -385,7 +385,7 @@ class AssistantToolExecutorTest {
                 """;
         String result = runAllTools(input);
 
-        assertThat(result).contains("✓ Workflow erstellt");
+        assertThat(result).contains("✓ Workflow created");
         verify(workflowService).create(argThat(req ->
                 "p1".equals(req.projectId())
                         && "Deploy Flow".equals(req.name())
@@ -415,7 +415,7 @@ class AssistantToolExecutorTest {
                 """;
         String result = runAllTools(input);
 
-        assertThat(result).contains("✓ Workflow aktualisiert");
+        assertThat(result).contains("✓ Workflow updated");
         verify(workflowService).update(eq("wf-1"), argThat(req ->
                 "Deploy Flow".equals(req.name())
                         && req.blocks() != null
@@ -448,7 +448,7 @@ class AssistantToolExecutorTest {
                 """;
         String result = runAllTools(input);
 
-        assertThat(result).contains("✓ Chain erstellt");
+        assertThat(result).contains("✓ Chain created");
         verify(chainService).create(argThat(req ->
                 "Release Chain".equals(req.name())
                         && "CI to prod".equals(req.description())
@@ -469,7 +469,7 @@ class AssistantToolExecutorTest {
         String input = "<tool type=\"delete_workflow\">{\"workflowId\": \"wf-1\"}</tool>";
         String result = runAllTools(input);
 
-        assertThat(result).contains("⚠ Workflow konnte nicht gelöscht werden: not allowed");
+        assertThat(result).contains("⚠ Could not delete workflow: not allowed");
     }
 
     @Test
@@ -481,7 +481,7 @@ class AssistantToolExecutorTest {
         String input = "<tool type=\"start_workflow\">{\"workflowId\": \"wf-1\"}</tool>";
         String result = runAllTools(input);
 
-        assertThat(result).contains("⚠ Workflow konnte nicht gestartet werden: queue offline");
+        assertThat(result).contains("⚠ Could not start workflow: queue offline");
     }
 
     // ── Hard-gate semantics: extractTools MUST NOT execute ────────────────────
@@ -497,8 +497,8 @@ class AssistantToolExecutorTest {
         assertThat(extraction.pendingTools().get(0).type()).isEqualTo("create_todo");
         assertThat(extraction.pendingTools().get(0).id()).isNotBlank();
         assertThat(extraction.pendingTools().get(0).description())
-                .contains("TODO anlegen").contains("Gate me").contains("HIGH");
-        assertThat(extraction.cleanedResponse()).contains("Aktion wartet auf Bestätigung");
+                .contains("Create TODO").contains("Gate me").contains("HIGH");
+        assertThat(extraction.cleanedResponse()).contains("Action awaiting confirmation");
 
         // Critically: no TodoService call happened
         verify(todoService, never()).create(any());
@@ -528,7 +528,7 @@ class AssistantToolExecutorTest {
 
         assertThat(extraction.pendingTools()).isEmpty();
         assertThat(extraction.cleanedResponse()).contains("Ich schlage ein TODO vor.");
-        assertThat(extraction.cleanedResponse()).doesNotContain("Bestätigung");
+        assertThat(extraction.cleanedResponse()).doesNotContain("awaiting confirmation");
         assertThat(registry.size()).isZero();
         verifyNoInteractions(todoService, workflowService, workflowExecutor, chainService);
     }

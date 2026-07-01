@@ -10,7 +10,7 @@ import { ErrorState } from '../components/shared/ErrorState';
 import { useAllRuns, useWorkflows } from '../hooks/useWorkflows';
 import { useProjects } from '../hooks/useProjects';
 import { useAllChainRuns } from '../hooks/useChains';
-import { useT } from '../i18n';
+import { useT, useI18nStore } from '../i18n';
 import { formatDuration, formatDateTime } from '../utils/formatTime';
 import type { WorkflowRun, ChainRun } from '../types';
 
@@ -18,6 +18,7 @@ type ViewMode = 'workflows' | 'chains';
 
 export function Runs() {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const navigate = useNavigate();
 
   const [viewMode, setViewMode] = usePersistedState<ViewMode>('runs-view-mode', 'workflows');
@@ -149,7 +150,7 @@ export function Runs() {
       header: t.runs.date,
       render: (r: WorkflowRun) => (
         <span className="text-text-secondary text-xs">
-          {r.startedAt ? formatDateTime(r.startedAt) : '-'}
+          {r.startedAt ? formatDateTime(r.startedAt, locale) : '-'}
         </span>
       ),
       width: '120px',
@@ -194,7 +195,7 @@ export function Runs() {
       header: t.runs.date,
       render: (r: ChainRun) => (
         <span className="text-text-secondary text-xs">
-          {r.startedAt ? formatDateTime(r.startedAt) : '-'}
+          {r.startedAt ? formatDateTime(r.startedAt, locale) : '-'}
         </span>
       ),
       width: '120px',

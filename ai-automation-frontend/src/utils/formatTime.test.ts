@@ -24,9 +24,19 @@ describe('formatDuration', () => {
 });
 
 describe('formatDateTime', () => {
-  it('formats date string to DD.MM. HH:mm', () => {
-    const result = formatDateTime('2026-02-27T14:05:00Z');
+  it('formats German locale as DD.MM. HH:mm', () => {
+    const result = formatDateTime('2026-02-27T14:05:00Z', 'de');
     // Timezone-dependent, just check format pattern
     expect(result).toMatch(/^\d{2}\.\d{2}\. \d{2}:\d{2}$/);
+  });
+
+  it('formats English locale (default) as MM/DD HH:mm', () => {
+    const result = formatDateTime('2026-02-27T14:05:00Z', 'en');
+    expect(result).toMatch(/^\d{2}\/\d{2} \d{2}:\d{2}$/);
+  });
+
+  it('defaults to English format when no locale is passed', () => {
+    const result = formatDateTime('2026-02-27T14:05:00Z');
+    expect(result).toMatch(/^\d{2}\/\d{2} \d{2}:\d{2}$/);
   });
 });

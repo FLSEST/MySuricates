@@ -2,9 +2,11 @@ import { useRouteError, isRouteErrorResponse } from 'react-router-dom';
 import { AlertTriangle, RotateCcw, Home } from 'lucide-react';
 import { useEffect } from 'react';
 import { reportErrorToBackend } from '../../utils/errorReporter';
+import { useT } from '../../i18n';
 
 export function RouteErrorFallback() {
   const error = useRouteError();
+  const t = useT();
 
   useEffect(() => {
     reportErrorToBackend(error instanceof Error ? error : new Error(String(error)));
@@ -16,7 +18,7 @@ export function RouteErrorFallback() {
   } else if (error instanceof Error) {
     message = error.message;
   } else {
-    message = 'Ein unerwarteter Fehler ist aufgetreten.';
+    message = t.errorPage.unexpectedError;
   }
 
   return (
@@ -28,7 +30,7 @@ export function RouteErrorFallback() {
           </div>
         </div>
         <div className="space-y-2">
-          <h1 className="text-xl font-semibold text-text-primary">Etwas ist schiefgelaufen</h1>
+          <h1 className="text-xl font-semibold text-text-primary">{t.errorPage.somethingWentWrong}</h1>
           <p className="text-sm text-text-secondary">{message}</p>
         </div>
         <div className="flex gap-3 justify-center">
@@ -37,14 +39,14 @@ export function RouteErrorFallback() {
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:opacity-90 transition-opacity"
           >
             <RotateCcw className="w-4 h-4" />
-            Erneut versuchen
+            {t.errorPage.tryAgain}
           </button>
           <a
             href="/"
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-text-secondary text-sm font-medium hover:text-text-primary transition-colors"
           >
             <Home className="w-4 h-4" />
-            Zur Startseite
+            {t.errorPage.goHome}
           </a>
         </div>
       </div>

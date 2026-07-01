@@ -45,8 +45,8 @@ class WishesContextSectionTest {
         section.append(sb, true);
 
         assertThat(sb.toString())
-                .contains("1 aktiv")
-                .contains("1 fehlgeschlagen")
+                .contains("1 active")
+                .contains("1 failed")
                 .contains("22222222");
     }
 
@@ -83,7 +83,7 @@ class WishesContextSectionTest {
         section.append(sb, false);
 
         assertThat(sb.toString())
-                .contains("Aktive Wishes (2):")
+                .contains("Active Wishes (2):")
                 .contains("[EXECUTING] Deploy app")
                 .contains("[DECOMPOSING] Review code");
     }
@@ -98,7 +98,7 @@ class WishesContextSectionTest {
         section.append(sb, false);
 
         assertThat(sb.toString())
-                .contains("Letzte fehlgeschlagene Wishes:")
+                .contains("Recent Failed Wishes:")
                 .contains("[FAILED] Broken wish")
                 .contains("Timeout occurred");
     }

@@ -53,7 +53,7 @@ class SkillsIndexSectionTest {
         StringBuilder sb = new StringBuilder();
         section.append(sb, true);
 
-        assertThat(sb.toString()).contains("**Skills:** 2 verfügbar");
+        assertThat(sb.toString()).contains("**Skills:** 2 available");
     }
 
     @Test
@@ -79,7 +79,7 @@ class SkillsIndexSectionTest {
                 .contains("**Skills (1):**")
                 .contains("[RESEARCH] Web Research")
                 .contains("Recherchiert URLs")
-                .contains("3 Capabilities, id: s1");
+                .contains("3 capabilities, id: s1");
     }
 
     @Test
@@ -94,7 +94,7 @@ class SkillsIndexSectionTest {
 
         assertThat(sb.toString())
                 .contains("**Skills (25):**")
-                .contains("… und 5 weitere")
+                .contains("… and 5 more")
                 .contains("<fetch type=\"skill\"");
     }
 
@@ -107,7 +107,7 @@ class SkillsIndexSectionTest {
         StringBuilder sb = new StringBuilder();
         section.append(sb, false);
 
-        assertThat(sb.toString()).contains("(keine Beschreibung)");
+        assertThat(sb.toString()).contains("(no description)");
     }
 
     @Test

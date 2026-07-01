@@ -17,12 +17,23 @@ class AssistantChatRequestTest {
     void should_setAllFields_when_constructedWithAllArgs() {
         var history = List.of(new MessageEntry("user", "Hi"), new MessageEntry("assistant", "Hello"));
         var context = new PageContext("workflows", "e1", "p1", "w1", "r1", "/workflows/e1");
-        var request = new AssistantChatRequest("Test message", history, context, "claude-sonnet-4-6", "sess-1", "req-1");
+        var request = new AssistantChatRequest("Test message", history, context, "claude-sonnet-4-6", "en", "sess-1", "req-1");
 
         assertThat(request.message()).isEqualTo("Test message");
         assertThat(request.history()).hasSize(2);
         assertThat(request.context()).isEqualTo(context);
         assertThat(request.provider()).isEqualTo("claude-sonnet-4-6");
+        assertThat(request.language()).isEqualTo("en");
+        assertThat(request.sessionId()).isEqualTo("sess-1");
+        assertThat(request.requestId()).isEqualTo("req-1");
+    }
+
+    @Test
+    void should_defaultLanguageToNull_when_constructedWithLegacySixArgs() {
+        // Backward-compatible constructor without a language argument leaves language null (→ German default).
+        var request = new AssistantChatRequest("msg", List.of(), null, "provider", "sess-1", "req-1");
+
+        assertThat(request.language()).isNull();
         assertThat(request.sessionId()).isEqualTo("sess-1");
         assertThat(request.requestId()).isEqualTo("req-1");
     }

@@ -33,11 +33,11 @@ public class IntegrationsIndexSection implements AssistantContextSection {
                     .filter(p -> statusByProvider.get(p.getProviderId()) == IntegrationConnection.ConnectionStatus.CONNECTED)
                     .count();
             if (compact) {
-                sb.append("**Integrationen:** ").append(providers.size())
-                  .append(" Provider (").append(connected).append(" verbunden)\n");
+                sb.append("**Integrations:** ").append(providers.size())
+                  .append(" providers (").append(connected).append(" connected)\n");
                 return;
             }
-            sb.append("**Integrationen (").append(providers.size()).append("):**\n");
+            sb.append("**Integrations (").append(providers.size()).append("):**\n");
             providers.forEach(p -> {
                 IntegrationConnection.ConnectionStatus status = statusByProvider.get(p.getProviderId());
                 String marker = status == IntegrationConnection.ConnectionStatus.CONNECTED ? "✓" : "✗";
@@ -65,7 +65,7 @@ public class IntegrationsIndexSection implements AssistantContextSection {
     }
 
     private String shortDesc(String desc) {
-        if (desc == null || desc.isBlank()) return "(keine Beschreibung)";
+        if (desc == null || desc.isBlank()) return "(no description)";
         String trimmed = desc.replaceAll("\\s+", " ").trim();
         return trimmed.length() > 80 ? trimmed.substring(0, 77) + "..." : trimmed;
     }

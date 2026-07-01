@@ -51,7 +51,7 @@ class ChainsIndexSectionTest {
         StringBuilder sb = new StringBuilder();
         section.append(sb, true);
 
-        assertThat(sb.toString()).contains("**Chains:** 2 verfügbar");
+        assertThat(sb.toString()).contains("**Chains:** 2 available");
     }
 
     @Test
@@ -77,7 +77,7 @@ class ChainsIndexSectionTest {
                 .contains("**Chains (1):**")
                 .contains("Daily Report")
                 .contains("Tagesreport mit 4 Stufen")
-                .contains("4 Workflows, id: c1");
+                .contains("4 workflows, id: c1");
     }
 
     @Test
@@ -92,7 +92,7 @@ class ChainsIndexSectionTest {
 
         assertThat(sb.toString())
                 .contains("**Chains (20):**")
-                .contains("… und 5 weitere")
+                .contains("… and 5 more")
                 .contains("<fetch type=\"chain\"");
     }
 
@@ -104,7 +104,7 @@ class ChainsIndexSectionTest {
         StringBuilder sb = new StringBuilder();
         section.append(sb, false);
 
-        assertThat(sb.toString()).contains("0 Workflows, id: c1");
+        assertThat(sb.toString()).contains("0 workflows, id: c1");
     }
 
     @Test

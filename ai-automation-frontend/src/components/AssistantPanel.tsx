@@ -13,6 +13,7 @@ import { parsePageContext } from './assistantPanelUtils';
 import { MessageBubble } from './assistant/AssistantMessage';
 import { AssistantHistory } from './assistant/AssistantHistory';
 import { StatusIndicator, AssistantEmptyState, ContextChips } from './assistant/AssistantWelcome';
+import { useT, useI18nStore } from '../i18n';
 
 export function AssistantPanel() {
   const {
@@ -25,6 +26,8 @@ export function AssistantPanel() {
   } = useAssistantStore();
   const updateMessageStatus = useAssistantStore((s) => s.updateMessageStatus);
   const defaultAiProvider = useSettingsStore((s) => s.defaultAiProvider);
+  const t = useT();
+  const locale = useI18nStore((s) => s.locale);
 
   const location = useLocation();
   const [input, setInput] = useState('');
@@ -143,7 +146,7 @@ export function AssistantPanel() {
     setActiveRequestId(requestId);
 
     sendMessage(
-      { req: { message: text, history, context: ctx, provider: defaultAiProvider || undefined, sessionId, requestId }, signal: controller.signal },
+      { req: { message: text, history, context: ctx, provider: defaultAiProvider || undefined, language: locale, sessionId, requestId }, signal: controller.signal },
       {
         onSuccess: (res) => {
           abortRef.current = null;
@@ -347,7 +350,7 @@ export function AssistantPanel() {
             </button>
             <button
               onClick={handleNewSession}
-              title="Neues Gespräch"
+              title={t.assistant.newSession}
               className="p-1.5 rounded-lg text-text-tertiary hover:text-text hover:bg-[var(--color-assistant-raised)] transition-colors"
             >
               <Plus className="w-4 h-4" />
@@ -405,7 +408,7 @@ export function AssistantPanel() {
                     className="shrink-0 flex items-center gap-1 text-[11px] text-text-tertiary hover:text-text-secondary"
                   >
                     <Square className="w-3 h-3" />
-                    Abbrechen
+                    {t.common.cancel}
                   </button>
                 </div>
               )}

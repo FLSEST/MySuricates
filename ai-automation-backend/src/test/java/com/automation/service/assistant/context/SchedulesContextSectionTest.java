@@ -50,7 +50,7 @@ class SchedulesContextSectionTest {
         StringBuilder sb = new StringBuilder();
         section.append(sb, true);
 
-        assertThat(sb.toString()).contains("2 anstehend (nächste 24h)");
+        assertThat(sb.toString()).contains("2 upcoming (next 24h)");
     }
 
     @Test
@@ -78,7 +78,7 @@ class SchedulesContextSectionTest {
         section.append(sb, false);
 
         assertThat(sb.toString())
-                .contains("Anstehende Schedules (nächste 24h):")
+                .contains("Upcoming Schedules (next 24h):")
                 .contains("Report Workflow:");
     }
 

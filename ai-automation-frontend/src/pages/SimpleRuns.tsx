@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RotateCcw } from 'lucide-react';
-import { useT } from '../i18n';
+import { useT, useI18nStore } from '../i18n';
 import { useAllRuns, useExecuteWorkflow } from '../hooks/useWorkflows';
 import { Spinner, Button } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
@@ -13,6 +13,7 @@ import type { WorkflowRun } from '../types';
 
 export function SimpleRuns() {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const navigate = useNavigate();
   const { data: runsPage, isLoading, error, refetch } = useAllRuns({ size: 50 });
   const executeWorkflow = useExecuteWorkflow();
@@ -55,7 +56,7 @@ export function SimpleRuns() {
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-text truncate">{run.workflowName}</p>
                     <p className="text-xs text-text-tertiary truncate">
-                      {run.startedAt ? formatDateTime(run.startedAt) : '-'} · {formatDuration(run.durationMs)}
+                      {run.startedAt ? formatDateTime(run.startedAt, locale) : '-'} · {formatDuration(run.durationMs)}
                       {isFailed && run.error?.message ? ` · ${run.error.message}` : ''}
                     </p>
                   </div>

@@ -5,31 +5,30 @@ import { useAssistantSuggestions } from '../../hooks/useAssistant';
 import { useAssistantThinkingPhrases } from '../../hooks/useSystem';
 import { MeerkatIcon } from '../layout/Sidebar';
 import type { AssistantStatus } from '../../hooks/useAssistantWebSocket';
-
-const DEFAULT_PHRASES = ['Denke nach...', 'Analysiere...', 'Überlege kurz...', 'Einen Moment...'];
-
-const PHASE_LABELS: Record<string, string> = {
-  RECEIVED: 'Anfrage empfangen...',
-  BUILDING_CONTEXT: 'Kontext wird aufgebaut...',
-  THINKING: 'Denke nach...',
-  FETCHING_DATA: 'Lade Daten nach...',
-  EXECUTING_TOOLS: 'Führe Aktionen aus...',
-  COMPLETED: 'Fertig',
-  ERROR: 'Fehler',
-};
+import { useT } from '../../i18n';
 
 export function StatusIndicator({ phase }: { phase: AssistantStatus | null }) {
-  const { data: phrases = DEFAULT_PHRASES } = useAssistantThinkingPhrases();
+  const t = useT();
+  const phaseLabels: Record<string, string> = {
+    RECEIVED: t.assistant.phaseReceived,
+    BUILDING_CONTEXT: t.assistant.phaseBuildingContext,
+    THINKING: t.assistant.phaseThinking,
+    FETCHING_DATA: t.assistant.phaseFetchingData,
+    EXECUTING_TOOLS: t.assistant.phaseExecutingTools,
+    COMPLETED: t.assistant.phaseCompleted,
+    ERROR: t.assistant.phaseError,
+  };
+  const { data: phrases = t.assistant.defaultPhrases } = useAssistantThinkingPhrases();
   const [idx, setIdx] = useState(() => Math.floor(Math.random() * Math.max(phrases.length, 1)));
 
   useEffect(() => {
-    const t = setInterval(() => setIdx((i) => (i + 1) % phrases.length), 2500);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setIdx((i) => (i + 1) % phrases.length), 2500);
+    return () => clearInterval(timer);
   }, [phrases.length]);
 
   // Use WebSocket phase if available, otherwise fall back to rotating phrases
   const label = phase
-    ? (PHASE_LABELS[phase.phase] ?? phase.phase)
+    ? (phaseLabels[phase.phase] ?? phase.phase)
     : (phrases[idx % phrases.length] ?? '...');
   const detail = phase?.detail;
   const elapsed = phase ? Math.round(phase.elapsedMs / 1000) : null;
@@ -53,9 +52,10 @@ export function StatusIndicator({ phase }: { phase: AssistantStatus | null }) {
 }
 
 export function AssistantEmptyState({ page, onSuggestionClick, inputRef }: { page: string; onSuggestionClick: (text: string) => void; inputRef: React.RefObject<HTMLTextAreaElement | null> }) {
+  const t = useT();
   const suggestionsEnabled = useSettingsStore((s) => s.suggestionsEnabled);
   const { data: suggestions } = useAssistantSuggestions(page);
-  const fallback = ['Was lief heute?', 'Gibt es Probleme?', 'Was steht an?'];
+  const fallback = t.assistant.fallbackSuggestions;
   const items = suggestionsEnabled && suggestions?.length ? suggestions : fallback;
 
   return (
@@ -64,9 +64,9 @@ export function AssistantEmptyState({ page, onSuggestionClick, inputRef }: { pag
         <MeerkatIcon className="text-accent" size={52} />
       </div>
       <div>
-        <p className="text-sm font-semibold text-text">Hallo! Ich bin MySuricates.</p>
+        <p className="text-sm font-semibold text-text">{t.assistant.greeting}</p>
         <p className="text-xs text-text-secondary mt-1">
-          Frag mich alles über deine Automatisierungen.
+          {t.assistant.greetingSubtitle}
         </p>
       </div>
       <div className="flex flex-col gap-2 w-full mt-1">
@@ -88,6 +88,7 @@ export function AssistantEmptyState({ page, onSuggestionClick, inputRef }: { pag
 }
 
 export function ContextChips({ page, onChipClick, inputRef }: { page: string; onChipClick: (text: string) => void; inputRef: React.RefObject<HTMLTextAreaElement | null> }) {
+  const t = useT();
   const suggestionsEnabled = useSettingsStore((s) => s.suggestionsEnabled);
   const { data: suggestions } = useAssistantSuggestions(page);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
@@ -116,7 +117,7 @@ export function ContextChips({ page, onChipClick, inputRef }: { page: string; on
           <button
             onClick={(e) => { e.stopPropagation(); setDismissed((prev) => new Set(prev).add(s)); }}
             className="opacity-0 group-hover/chip:opacity-100 hover:text-danger transition-all"
-            aria-label="Entfernen"
+            aria-label={t.assistant.removeSuggestion}
           >
             <X className="w-3 h-3" />
           </button>

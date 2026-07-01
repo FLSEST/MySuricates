@@ -71,53 +71,53 @@ public class AssistantActionSuggestionService {
             "propose_cancel_run", "propose_rerun_workflow", "propose_update_todo_status");
 
     private static final String SYSTEM_PROMPT = """
-            Du erzeugst Action-Vorschläge für den MySuricates-Chat — sowohl Navigation als auch
-            mitdenkende Mutations-Vorschläge. Der User soll Optionen sehen, was er als Nächstes
-            tun könnte. Wenn etwas Sinnvolles ansteht (Bug erkannt → TODO; FAILED-Run → Re-Run;
-            hängender Run → Abbrechen), schlage es proaktiv vor — auch wenn der User nicht
-            explizit danach fragt. Lieber 1-2 wirklich passende Vorschläge als 4 generische.
+            You generate action suggestions for the MySuricates chat — both navigation and
+            proactive mutation proposals. The user should see options for what they could do
+            next. When something useful comes up (bug detected → TODO; FAILED run → re-run;
+            hanging run → cancel), propose it proactively — even if the user doesn't
+            explicitly ask for it. Prefer 1-2 truly fitting suggestions over 4 generic ones.
 
-            Antworte AUSSCHLIESSLICH mit einem JSON-Array (max 4 Einträge) oder [].
-            Keine Erklärungen, kein Markdown, kein ```-Fence, nur das Array.
+            Respond EXCLUSIVELY with a JSON array (max 4 entries) or [].
+            No explanations, no markdown, no ```-fence, just the array.
 
-            Navigations-Typen (User klickt → Seite öffnet):
-              show_run       {"type":"show_run","id":"<run-id>","name":"Run-Name","label":"Run öffnen"}
-              show_workflow  {"type":"show_workflow","id":"<workflow-id>","name":"Workflow-Name","label":"Workflow öffnen"}
-              start_wish     {"type":"start_wish","id":null,"name":"<Wunschtext>","label":"Als Wunsch formulieren"}
-              ask_choice     {"type":"ask_choice","id":null,"name":"Auswahl","label":"…","options":["A","B"]}
-              run_workflow   {"type":"run_workflow","id":"<workflow-id>","name":"Workflow-Name","label":"Jetzt starten"}
+            Navigation types (user clicks → page opens):
+              show_run       {"type":"show_run","id":"<run-id>","name":"Run name","label":"Open run"}
+              show_workflow  {"type":"show_workflow","id":"<workflow-id>","name":"Workflow name","label":"Open workflow"}
+              start_wish     {"type":"start_wish","id":null,"name":"<wish text>","label":"Phrase as a wish"}
+              ask_choice     {"type":"ask_choice","id":null,"name":"Choice","label":"…","options":["A","B"]}
+              run_workflow   {"type":"run_workflow","id":"<workflow-id>","name":"Workflow name","label":"Start now"}
 
-            Mitdenkende Mutations-Vorschläge (User bekommt Confirm/Reject-Karte):
+            Proactive mutation proposals (user gets a Confirm/Reject card):
               propose_create_todo
-                {"type":"propose_create_todo","id":null,"name":"<TODO-Titel>","label":"TODO anlegen",
-                 "payload":{"title":"<TODO-Titel>","priority":"HIGH|MEDIUM|LOW","tags":["bereich","typ"],"description":"<Kurz-Kontext optional>"}}
+                {"type":"propose_create_todo","id":null,"name":"<TODO title>","label":"Create TODO",
+                 "payload":{"title":"<TODO title>","priority":"HIGH|MEDIUM|LOW","tags":["area","type"],"description":"<short context optional>"}}
               propose_cancel_run
-                {"type":"propose_cancel_run","id":"<run-id>","name":"<Run-Bezeichnung>","label":"Run abbrechen"}
+                {"type":"propose_cancel_run","id":"<run-id>","name":"<run label>","label":"Cancel run"}
               propose_rerun_workflow
-                {"type":"propose_rerun_workflow","id":"<workflow-id>","name":"<Workflow-Name>","label":"Workflow neu starten"}
+                {"type":"propose_rerun_workflow","id":"<workflow-id>","name":"<workflow name>","label":"Restart workflow"}
               propose_update_todo_status
-                {"type":"propose_update_todo_status","id":"<todo-id>","name":"<TODO-Titel>","label":"Auf DONE setzen",
+                {"type":"propose_update_todo_status","id":"<todo-id>","name":"<TODO title>","label":"Set to DONE",
                  "payload":{"status":"DONE|OPEN|IN_PROGRESS|BACKLOG"}}
 
-            Beispiele für sinnvolles Mitdenken:
-            - User auf Run-Page mit FAILED-Status: `propose_rerun_workflow` (workflow-id aus dem Kontext)
-              und ggf. `propose_create_todo` mit einer Bug-Diagnose als Titel.
-            - User schreibt eine Bug-Beobachtung oder Feature-Idee: `propose_create_todo` mit
-              passendem Titel + Tags. Tags-Konvention: `[bereich, typ]` z.B. `["backend","bug"]`,
+            Examples of useful proactive thinking:
+            - User on a run page with FAILED status: `propose_rerun_workflow` (workflow-id from the context)
+              and possibly `propose_create_todo` with a bug diagnosis as the title.
+            - User writes a bug observation or feature idea: `propose_create_todo` with
+              a fitting title + tags. Tags convention: `[area, type]` e.g. `["backend","bug"]`,
               `["frontend","ux"]`, `["assistant","feature"]`.
-            - Run-Page mit Status RUNNING und Laufzeit > 10 Min in einem normal-kurzen Workflow:
-              `propose_cancel_run` mit der run-id der Page.
-            - User sagt „ist erledigt" o.ä. auf TODO-Page: `propose_update_todo_status` (status=DONE)
-              mit der todo-id aus dem Kontext.
+            - Run page with status RUNNING and runtime > 10 min in a normally-short workflow:
+              `propose_cancel_run` with the run-id of the page.
+            - User says "it's done" or similar on a TODO page: `propose_update_todo_status` (status=DONE)
+              with the todo-id from the context.
 
-            Regeln:
-            - Nutze ausschließlich IDs aus dem gelieferten Kontext (Page-Context, Workflow-Index,
-              Recent-Runs). Keine Erfindung von IDs.
-            - `payload` muss reines ASCII-JSON sein — keine Unicode-Vollbreite-Kommas (`，`).
-            - Bei mehrdeutigem Bezug → `ask_choice` statt zu raten.
-            - `run_workflow` (direkter Start ohne Confirm) NUR wenn der User explizit „starten/run/los"
-              sagt. Sonst lieber `propose_rerun_workflow`.
-            - Passt nichts → gib [] zurück. Lieber leer als schlecht.
+            Rules:
+            - Use only IDs from the provided context (page context, workflow index,
+              recent runs). Do not invent IDs.
+            - `payload` must be pure ASCII JSON — no Unicode fullwidth commas (`，`).
+            - For ambiguous references → `ask_choice` instead of guessing.
+            - `run_workflow` (direct start without confirm) ONLY when the user explicitly says
+              "start/run/go". Otherwise prefer `propose_rerun_workflow`.
+            - Nothing fits → return []. Better empty than bad.
             """;
 
     private final CommandExecutorService commandExecutorService;
@@ -297,28 +297,28 @@ public class AssistantActionSuggestionService {
 
     private String buildPrompt(AssistantChatRequest req, String assistantAnswer, String pageContext) {
         var sb = new StringBuilder(3500);
-        sb.append("Seiten-Kontext (nutze nur IDs und Namen aus diesem Abschnitt):\n");
+        sb.append("Page context (use only IDs and names from this section):\n");
         if (pageContext != null && !pageContext.isBlank()) {
             String trimmed = pageContext.length() > 6000
-                    ? pageContext.substring(0, 6000) + "\n…[gekürzt]"
+                    ? pageContext.substring(0, 6000) + "\n…[truncated]"
                     : pageContext;
             sb.append(trimmed).append("\n\n");
         } else {
-            sb.append("(kein zusätzlicher Kontext)\n\n");
+            sb.append("(no additional context)\n\n");
         }
 
-        sb.append("Aktueller Seiten-Pfad: ");
+        sb.append("Current page path: ");
         if (req != null && req.context() != null && req.context().page() != null) {
             sb.append("/").append(req.context().page());
         } else {
-            sb.append("(unbekannt)");
+            sb.append("(unknown)");
         }
         sb.append("\n\n");
 
         // Page entity: explicit so the suggestion model can refer to "this run"/"this workflow"
         // by id without re-deriving it from the page-context blob.
         if (req != null && req.context() != null && req.context().entityId() != null) {
-            sb.append("Aktuelle Entity-ID auf dieser Seite: ").append(req.context().entityId()).append("\n\n");
+            sb.append("Current entity ID on this page: ").append(req.context().entityId()).append("\n\n");
         }
 
         // Workflow index — names + IDs only — so the model can propose run_workflow /
@@ -328,15 +328,15 @@ public class AssistantActionSuggestionService {
         // Recent runs — gives the model run-ids for propose_cancel_run / propose_rerun_workflow.
         appendRecentRuns(sb);
 
-        sb.append("User-Frage:\n");
+        sb.append("User question:\n");
         sb.append(req != null && req.message() != null ? req.message() : "").append("\n\n");
 
-        sb.append("Antwort des Assistenten:\n");
+        sb.append("Assistant's answer:\n");
         sb.append(assistantAnswer).append("\n\n");
 
-        sb.append("Erzeuge jetzt das JSON-Array mit maximal ")
+        sb.append("Now generate the JSON array with at most ")
                 .append(MAX_ACTIONS)
-                .append(" Action-Vorschlägen (oder [] falls nichts passt).");
+                .append(" action suggestions (or [] if nothing fits).");
         return sb.toString();
     }
 
@@ -346,7 +346,7 @@ public class AssistantActionSuggestionService {
         try {
             List<Workflow> all = workflowRepository.findAll();
             if (all == null || all.isEmpty()) return;
-            sb.append("Workflow-Index (nutze diese IDs, falls passend):\n");
+            sb.append("Workflow index (use these IDs if applicable):\n");
             all.stream()
                     .sorted((a, b) -> {
                         var aU = a.getUpdatedAt();
@@ -372,7 +372,7 @@ public class AssistantActionSuggestionService {
             var page = workflowRunRepository.findAll(PageRequest.of(0, RECENT_RUNS_LIMIT));
             List<WorkflowRun> runs = page == null ? List.of() : page.getContent();
             if (runs.isEmpty()) return;
-            sb.append("Letzte Runs (nutze diese IDs für cancel/rerun):\n");
+            sb.append("Recent runs (use these IDs for cancel/rerun):\n");
             for (WorkflowRun r : runs) {
                 String wfId;
                 String wfName;

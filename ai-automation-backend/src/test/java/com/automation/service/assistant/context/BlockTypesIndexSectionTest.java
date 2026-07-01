@@ -20,8 +20,8 @@ class BlockTypesIndexSectionTest {
         section.append(sb, true);
 
         assertThat(sb.toString())
-                .contains("**Block-Typen:** ")
-                .contains(" verfügbar");
+                .contains("**Block Types:** ")
+                .contains(" available");
     }
 
     @Test
@@ -31,7 +31,7 @@ class BlockTypesIndexSectionTest {
 
         String out = sb.toString();
         assertThat(out)
-                .contains("**Block-Typen (")
+                .contains("**Block Types (")
                 .contains("[simple]")
                 .contains("[shell]")
                 .contains("[agentic]")
