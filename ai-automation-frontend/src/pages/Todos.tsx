@@ -85,7 +85,6 @@ export function Todos() {
   const resolveTodo = useResolveTodo();
   const exportTodo = useExportTodo();
   const { data: integrations } = useIntegrations();
-  const canExport = (integrations ?? []).some((p) => p.supportsTaskExport && p.status === 'CONNECTED');
 
   // Quick-add state
   const [quickTitle, setQuickTitle] = useState('');
@@ -203,9 +202,6 @@ export function Todos() {
     });
   };
 
-  const handleExport = (todo: Todo) => {
-    exportTodo.mutate({ id: todo.id });
-  };
 
   if (isLoading) {
     return (
@@ -477,9 +473,7 @@ export function Todos() {
                   onStatusChange={handleStatusChange}
                   onResolve={handleResolve}
                   resolveLoading={resolveTodo.isPending && resolveTodo.variables === todo.id}
-                  onExport={handleExport}
-                  canExport={canExport}
-                  exportLoading={exportTodo.isPending && exportTodo.variables?.id === todo.id}
+                  exportedIcon={integrations?.find((p) => p.providerId === todo.exportedProvider)?.icon}
                   onDelete={(id) => deleteTodo.mutate(id)}
                 />
               ))}
@@ -513,6 +507,9 @@ export function Todos() {
         onFormChange={setEditForm}
         onTagsChange={setEditTagsList}
         onSave={handleEditSave}
+        integrations={integrations ?? []}
+        exportLoading={exportTodo.isPending}
+        onExport={(provider, target) => { if (editTodo) exportTodo.mutate({ id: editTodo.id, provider, target }); }}
       />
     </div>
   );

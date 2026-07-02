@@ -135,6 +135,19 @@ public class IntegrationController {
         return ResponseEntity.ok(result);
     }
 
+    @GetMapping("/{providerId}/task-targets")
+    public List<com.automation.service.integration.TaskExportCapable.TaskTarget> taskTargets(@PathVariable String providerId) {
+        IntegrationProvider provider = registry.getProvider(providerId);
+        if (!(provider instanceof com.automation.service.integration.TaskExportCapable tc)) {
+            return List.of();
+        }
+        try {
+            return tc.listTargets(oAuthService.getValidAccessToken(providerId));
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
     private IntegrationProviderResponse toProviderResponse(IntegrationProvider provider) {
         var connection = oAuthService.getConnection(provider.getProviderId()).orElse(null);
 

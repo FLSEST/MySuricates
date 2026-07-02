@@ -37,7 +37,7 @@ class TodoResponseTest {
         return new TodoResponse(
                 ID, TITLE, DESCRIPTION, STATUS, PRIORITY, TAGS,
                 PROJECT_ID, PROJECT_NAME, LINKED_WORKFLOW_ID, LINKED_WORKFLOW_NAME, SOURCE, SOURCE_AGENT, SESSION_ID,
-                WORKFLOW_RUN_ID, REFERENCE_TYPE, REFERENCE_ID, FIX_ATTEMPTS,
+                WORKFLOW_RUN_ID, REFERENCE_TYPE, REFERENCE_ID, null, null, null, FIX_ATTEMPTS,
                 LAST_FIX_RUN_ID, RESOLUTION_STATE, DUE_DATE, CREATED_AT, UPDATED_AT
         );
     }
@@ -77,7 +77,7 @@ class TodoResponseTest {
         var response = new TodoResponse(
                 null, null, null, STATUS, PRIORITY, TAGS,
                 null, null, null, null, SOURCE, null, null,
-                null, null, null, 0,
+                null, null, null, null, null, null, 0,
                 null, null, null, null, null
         );
 
@@ -105,7 +105,7 @@ class TodoResponseTest {
         var response = new TodoResponse(
                 ID, TITLE, DESCRIPTION, null, null, TAGS,
                 PROJECT_ID, PROJECT_NAME, LINKED_WORKFLOW_ID, LINKED_WORKFLOW_NAME, null, SOURCE_AGENT, SESSION_ID,
-                WORKFLOW_RUN_ID, REFERENCE_TYPE, REFERENCE_ID, 0,
+                WORKFLOW_RUN_ID, REFERENCE_TYPE, REFERENCE_ID, null, null, null, 0,
                 LAST_FIX_RUN_ID, RESOLUTION_STATE, DUE_DATE, CREATED_AT, UPDATED_AT
         );
 
@@ -119,7 +119,7 @@ class TodoResponseTest {
         var response = new TodoResponse(
                 ID, TITLE, DESCRIPTION, STATUS, PRIORITY, null,
                 PROJECT_ID, PROJECT_NAME, LINKED_WORKFLOW_ID, LINKED_WORKFLOW_NAME, SOURCE, SOURCE_AGENT, SESSION_ID,
-                WORKFLOW_RUN_ID, REFERENCE_TYPE, REFERENCE_ID, 0,
+                WORKFLOW_RUN_ID, REFERENCE_TYPE, REFERENCE_ID, null, null, null, 0,
                 LAST_FIX_RUN_ID, RESOLUTION_STATE, DUE_DATE, CREATED_AT, UPDATED_AT
         );
 
@@ -131,7 +131,7 @@ class TodoResponseTest {
         var response = new TodoResponse(
                 ID, TITLE, DESCRIPTION, STATUS, PRIORITY, List.of(),
                 PROJECT_ID, PROJECT_NAME, LINKED_WORKFLOW_ID, LINKED_WORKFLOW_NAME, SOURCE, SOURCE_AGENT, SESSION_ID,
-                WORKFLOW_RUN_ID, REFERENCE_TYPE, REFERENCE_ID, 0,
+                WORKFLOW_RUN_ID, REFERENCE_TYPE, REFERENCE_ID, null, null, null, 0,
                 LAST_FIX_RUN_ID, RESOLUTION_STATE, DUE_DATE, CREATED_AT, UPDATED_AT
         );
 
@@ -143,7 +143,7 @@ class TodoResponseTest {
         var response = new TodoResponse(
                 null, null, null, null, null, null,
                 null, null, null, null, null, null, null,
-                null, null, null, 0,
+                null, null, null, null, null, null, 0,
                 null, null, null, null, null
         );
 
@@ -177,7 +177,7 @@ class TodoResponseTest {
         var zeroAttempts = new TodoResponse(
                 ID, TITLE, DESCRIPTION, STATUS, PRIORITY, TAGS,
                 PROJECT_ID, PROJECT_NAME, LINKED_WORKFLOW_ID, LINKED_WORKFLOW_NAME, SOURCE, SOURCE_AGENT, SESSION_ID,
-                WORKFLOW_RUN_ID, REFERENCE_TYPE, REFERENCE_ID, 0,
+                WORKFLOW_RUN_ID, REFERENCE_TYPE, REFERENCE_ID, null, null, null, 0,
                 LAST_FIX_RUN_ID, RESOLUTION_STATE, DUE_DATE, CREATED_AT, UPDATED_AT
         );
 
@@ -193,7 +193,7 @@ class TodoResponseTest {
             var response = new TodoResponse(
                     ID, TITLE, DESCRIPTION, status, PRIORITY, TAGS,
                     PROJECT_ID, PROJECT_NAME, LINKED_WORKFLOW_ID, LINKED_WORKFLOW_NAME, SOURCE, SOURCE_AGENT, SESSION_ID,
-                    WORKFLOW_RUN_ID, REFERENCE_TYPE, REFERENCE_ID, 0,
+                    WORKFLOW_RUN_ID, REFERENCE_TYPE, REFERENCE_ID, null, null, null, 0,
                     LAST_FIX_RUN_ID, RESOLUTION_STATE, DUE_DATE, CREATED_AT, UPDATED_AT
             );
             assertThat(response.status()).isEqualTo(status);
@@ -206,7 +206,7 @@ class TodoResponseTest {
             var response = new TodoResponse(
                     ID, TITLE, DESCRIPTION, STATUS, priority, TAGS,
                     PROJECT_ID, PROJECT_NAME, LINKED_WORKFLOW_ID, LINKED_WORKFLOW_NAME, SOURCE, SOURCE_AGENT, SESSION_ID,
-                    WORKFLOW_RUN_ID, REFERENCE_TYPE, REFERENCE_ID, 0,
+                    WORKFLOW_RUN_ID, REFERENCE_TYPE, REFERENCE_ID, null, null, null, 0,
                     LAST_FIX_RUN_ID, RESOLUTION_STATE, DUE_DATE, CREATED_AT, UPDATED_AT
             );
             assertThat(response.priority()).isEqualTo(priority);
@@ -219,7 +219,7 @@ class TodoResponseTest {
             var response = new TodoResponse(
                     ID, TITLE, DESCRIPTION, STATUS, PRIORITY, TAGS,
                     PROJECT_ID, PROJECT_NAME, LINKED_WORKFLOW_ID, LINKED_WORKFLOW_NAME, source, SOURCE_AGENT, SESSION_ID,
-                    WORKFLOW_RUN_ID, REFERENCE_TYPE, REFERENCE_ID, 0,
+                    WORKFLOW_RUN_ID, REFERENCE_TYPE, REFERENCE_ID, null, null, null, 0,
                     LAST_FIX_RUN_ID, RESOLUTION_STATE, DUE_DATE, CREATED_AT, UPDATED_AT
             );
             assertThat(response.source()).isEqualTo(source);
@@ -242,13 +242,13 @@ class TodoResponseTest {
         var a = new TodoResponse(
                 null, null, null, null, null, null,
                 null, null, null, null, null, null, null,
-                null, null, null, 0,
+                null, null, null, null, null, null, 0,
                 null, null, null, null, null
         );
         var b = new TodoResponse(
                 null, null, null, null, null, null,
                 null, null, null, null, null, null, null,
-                null, null, null, 0,
+                null, null, null, null, null, null, 0,
                 null, null, null, null, null
         );
 
@@ -259,7 +259,7 @@ class TodoResponseTest {
     @Test
     void should_notBeEqual_when_differentId() {
         var a = createFullResponse();
-        var b = new TodoResponse("other-id", TITLE, DESCRIPTION, STATUS, PRIORITY, TAGS, PROJECT_ID, PROJECT_NAME, LINKED_WORKFLOW_ID, LINKED_WORKFLOW_NAME, SOURCE, SOURCE_AGENT, SESSION_ID, WORKFLOW_RUN_ID, REFERENCE_TYPE, REFERENCE_ID, FIX_ATTEMPTS, LAST_FIX_RUN_ID, RESOLUTION_STATE, DUE_DATE, CREATED_AT, UPDATED_AT);
+        var b = new TodoResponse("other-id", TITLE, DESCRIPTION, STATUS, PRIORITY, TAGS, PROJECT_ID, PROJECT_NAME, LINKED_WORKFLOW_ID, LINKED_WORKFLOW_NAME, SOURCE, SOURCE_AGENT, SESSION_ID, WORKFLOW_RUN_ID, REFERENCE_TYPE, REFERENCE_ID, null, null, null, FIX_ATTEMPTS, LAST_FIX_RUN_ID, RESOLUTION_STATE, DUE_DATE, CREATED_AT, UPDATED_AT);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -267,7 +267,7 @@ class TodoResponseTest {
     @Test
     void should_notBeEqual_when_differentTitle() {
         var a = createFullResponse();
-        var b = new TodoResponse(ID, "Different title", DESCRIPTION, STATUS, PRIORITY, TAGS, PROJECT_ID, PROJECT_NAME, LINKED_WORKFLOW_ID, LINKED_WORKFLOW_NAME, SOURCE, SOURCE_AGENT, SESSION_ID, WORKFLOW_RUN_ID, REFERENCE_TYPE, REFERENCE_ID, FIX_ATTEMPTS, LAST_FIX_RUN_ID, RESOLUTION_STATE, DUE_DATE, CREATED_AT, UPDATED_AT);
+        var b = new TodoResponse(ID, "Different title", DESCRIPTION, STATUS, PRIORITY, TAGS, PROJECT_ID, PROJECT_NAME, LINKED_WORKFLOW_ID, LINKED_WORKFLOW_NAME, SOURCE, SOURCE_AGENT, SESSION_ID, WORKFLOW_RUN_ID, REFERENCE_TYPE, REFERENCE_ID, null, null, null, FIX_ATTEMPTS, LAST_FIX_RUN_ID, RESOLUTION_STATE, DUE_DATE, CREATED_AT, UPDATED_AT);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -275,7 +275,7 @@ class TodoResponseTest {
     @Test
     void should_notBeEqual_when_differentStatus() {
         var a = createFullResponse();
-        var b = new TodoResponse(ID, TITLE, DESCRIPTION, Todo.Status.DONE, PRIORITY, TAGS, PROJECT_ID, PROJECT_NAME, LINKED_WORKFLOW_ID, LINKED_WORKFLOW_NAME, SOURCE, SOURCE_AGENT, SESSION_ID, WORKFLOW_RUN_ID, REFERENCE_TYPE, REFERENCE_ID, FIX_ATTEMPTS, LAST_FIX_RUN_ID, RESOLUTION_STATE, DUE_DATE, CREATED_AT, UPDATED_AT);
+        var b = new TodoResponse(ID, TITLE, DESCRIPTION, Todo.Status.DONE, PRIORITY, TAGS, PROJECT_ID, PROJECT_NAME, LINKED_WORKFLOW_ID, LINKED_WORKFLOW_NAME, SOURCE, SOURCE_AGENT, SESSION_ID, WORKFLOW_RUN_ID, REFERENCE_TYPE, REFERENCE_ID, null, null, null, FIX_ATTEMPTS, LAST_FIX_RUN_ID, RESOLUTION_STATE, DUE_DATE, CREATED_AT, UPDATED_AT);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -283,7 +283,7 @@ class TodoResponseTest {
     @Test
     void should_notBeEqual_when_differentFixAttempts() {
         var a = createFullResponse();
-        var b = new TodoResponse(ID, TITLE, DESCRIPTION, STATUS, PRIORITY, TAGS, PROJECT_ID, PROJECT_NAME, LINKED_WORKFLOW_ID, LINKED_WORKFLOW_NAME, SOURCE, SOURCE_AGENT, SESSION_ID, WORKFLOW_RUN_ID, REFERENCE_TYPE, REFERENCE_ID, 99, LAST_FIX_RUN_ID, RESOLUTION_STATE, DUE_DATE, CREATED_AT, UPDATED_AT);
+        var b = new TodoResponse(ID, TITLE, DESCRIPTION, STATUS, PRIORITY, TAGS, PROJECT_ID, PROJECT_NAME, LINKED_WORKFLOW_ID, LINKED_WORKFLOW_NAME, SOURCE, SOURCE_AGENT, SESSION_ID, WORKFLOW_RUN_ID, REFERENCE_TYPE, REFERENCE_ID, null, null, null, 99, LAST_FIX_RUN_ID, RESOLUTION_STATE, DUE_DATE, CREATED_AT, UPDATED_AT);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -319,7 +319,7 @@ class TodoResponseTest {
         var response = new TodoResponse(
                 null, null, null, null, null, null,
                 null, null, null, null, null, null, null,
-                null, null, null, 0,
+                null, null, null, null, null, null, 0,
                 null, null, null, null, null
         );
         var str = response.toString();

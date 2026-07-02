@@ -29,9 +29,21 @@ public interface TaskExportCapable {
      */
     TaskRef createTask(TaskExportInput input, String accessToken);
 
+    /**
+     * Optional: the selectable targets to export into (GitHub repos, Jira projects, Trello lists).
+     * Returns an empty list if the provider cannot enumerate targets — callers then fall back to
+     * a free-text target. Enables an intuitive target dropdown instead of a free-text field.
+     */
+    default List<TaskTarget> listTargets(String accessToken) {
+        return List.of();
+    }
+
     /** Uniform, provider-agnostic task fields. */
     record TaskExportInput(String title, String body, List<String> labels, String target) {}
 
     /** Uniform reference to the created external item. */
     record TaskRef(String referenceType, String referenceId, String url) {}
+
+    /** A selectable export target: {@code id} is the value passed as {@code target}; {@code label} is shown to the user. */
+    record TaskTarget(String id, String label) {}
 }

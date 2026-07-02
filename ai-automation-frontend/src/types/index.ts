@@ -475,6 +475,12 @@ export interface IntegrationProviderInfo {
   supportsTaskExport?: boolean;
 }
 
+/** A selectable export target (GitHub repo, Jira project, Trello list). */
+export interface TaskTarget {
+  id: string;
+  label: string;
+}
+
 export interface IntegrationActionInfo {
   name: string;
   description: string;
@@ -968,6 +974,9 @@ export interface Todo {
   workflowRunId: string | null;
   referenceType: string | null;
   referenceId: string | null;
+  exportedProvider: string | null;
+  exportedRef: string | null;
+  exportedUrl: string | null;
   fixAttempts: number;
   lastFixRunId: string | null;
   resolutionState: TodoResolutionState | null;

@@ -229,9 +229,10 @@ public class TodoService {
     public TaskExportCapable.TaskRef exportToTracker(String id, String providerOverride, String targetOverride) {
         Todo todo = findById(id);
 
-        // Idempotent: schon mit einem externen Item verknüpft -> bestehende Referenz, kein Duplikat.
-        if (isNotBlank(todo.getReferenceType()) && isNotBlank(todo.getReferenceId())) {
-            return new TaskExportCapable.TaskRef(todo.getReferenceType(), todo.getReferenceId(), null);
+        // Idempotent: schon an einen Tracker exportiert -> bestehenden Export-Link zurueckgeben, kein Duplikat.
+        // (Bewusst NUR exported_*; referenceType bleibt fuer interne/Origin-Korrelation reserviert.)
+        if (isNotBlank(todo.getExportedProvider()) && isNotBlank(todo.getExportedRef())) {
+            return new TaskExportCapable.TaskRef(todo.getExportedProvider(), todo.getExportedRef(), todo.getExportedUrl());
         }
 
         Map<String, Object> taskExport = readTaskExportConfig(todo.getProjectId());
@@ -267,8 +268,10 @@ public class TodoService {
                 todo.getTitle(), todo.getDescription(), parseTags(todo.getTags()), target);
         TaskExportCapable.TaskRef ref = taskProvider.createTask(input, token);
 
-        todo.setReferenceType(ref.referenceType());
-        todo.setReferenceId(ref.referenceId());
+        // Export-Link getrennt von referenceType ablegen (kein Ueberschreiben interner Marker).
+        todo.setExportedProvider(ref.referenceType());
+        todo.setExportedRef(ref.referenceId());
+        todo.setExportedUrl(ref.url());
         todoRepository.save(todo);
         log.info("Exported todo {} ({}) to {} -> {}", todo.getId(), todo.getTitle(), providerId, ref.referenceId());
         return ref;
@@ -326,6 +329,7 @@ public class TodoService {
                 base.source(), base.sourceAgent(), base.sessionId(),
                 base.workflowRunId(),
                 base.referenceType(), base.referenceId(),
+                base.exportedProvider(), base.exportedRef(), base.exportedUrl(),
                 base.fixAttempts(), base.lastFixRunId(),
                 base.resolutionState(),
                 base.dueDate(),

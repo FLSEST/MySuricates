@@ -1,8 +1,11 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ExternalLink } from 'lucide-react';
 import { Modal, Button, Input, Select, TagInput } from '../ui';
 import { useT } from '../../i18n';
-import type { Todo, TodoStatus, TodoPriority, UpdateTodoRequest, Project, Workflow } from '../../types';
+import { useTaskTargets } from '../../hooks/useIntegrations';
+import { ProviderIcon } from './ProviderIcon';
+import type { Todo, TodoStatus, TodoPriority, UpdateTodoRequest, Project, Workflow, IntegrationProviderInfo } from '../../types';
 
 const STATUSES: TodoStatus[] = ['OPEN', 'IN_PROGRESS', 'DONE', 'BACKLOG', 'ARCHIVED'];
 const PRIORITIES: TodoPriority[] = ['LOW', 'MEDIUM', 'HIGH'];
@@ -19,6 +22,9 @@ interface TodoEditModalProps {
   onFormChange: (form: UpdateTodoRequest) => void;
   onTagsChange: (tags: string[]) => void;
   onSave: () => void;
+  integrations: IntegrationProviderInfo[];
+  onExport: (provider: string, target: string) => void;
+  exportLoading?: boolean;
 }
 
 export function TodoEditModal({
@@ -33,8 +39,29 @@ export function TodoEditModal({
   onFormChange,
   onTagsChange,
   onSave,
+  integrations,
+  onExport,
+  exportLoading,
 }: TodoEditModalProps) {
   const t = useT();
+  const [exportProvider, setExportProvider] = useState('');
+  const [exportTarget, setExportTarget] = useState('');
+  useEffect(() => { setExportProvider(''); setExportTarget(''); }, [editTodo?.id]);
+
+  const taskSinks = integrations.filter((p) => p.supportsTaskExport && p.status === 'CONNECTED');
+  const exportProject = projects.find((p) => p.id === (editForm.projectId ?? editTodo?.projectId ?? ''));
+  const exportCfg = (exportProject?.config?.taskExport ?? {}) as { provider?: string; target?: string };
+  const activeProvider = exportProvider || exportCfg.provider || taskSinks[0]?.providerId || '';
+  const activeTarget = (exportTarget.trim() || exportCfg.target || '').trim();
+  const { data: taskTargets } = useTaskTargets(
+    activeProvider,
+    !!editTodo && !editTodo.exportedProvider && taskSinks.length > 0,
+  );
+  const activeProviderName = taskSinks.find((p) => p.providerId === activeProvider)?.displayName ?? activeProvider;
+  const activeProviderIcon = taskSinks.find((p) => p.providerId === activeProvider)?.icon;
+  const exportedProviderName = integrations.find((p) => p.providerId === editTodo?.exportedProvider)?.displayName
+    ?? editTodo?.exportedProvider ?? '';
+  const exportedProviderIcon = integrations.find((p) => p.providerId === editTodo?.exportedProvider)?.icon;
 
   return (
     <Modal
@@ -156,6 +183,82 @@ export function TodoEditModal({
           suggestions={allTags}
           placeholder="bug, performance, ux"
         />
+
+        {/* Übertragung / Verknüpfungen */}
+        {editTodo && (
+          <div className="pt-3 border-t border-border space-y-2">
+            <label className="block text-sm font-medium text-text-secondary">{t.todos.exportSection}</label>
+            {editTodo.exportedProvider ? (
+              <p className="text-xs text-text-secondary">
+                {t.todos.exportedTo}: <ProviderIcon icon={exportedProviderIcon} className="w-3.5 h-3.5 inline-block align-text-bottom mr-0.5" /><span className="font-medium">{exportedProviderName}</span>{' '}
+                {editTodo.exportedUrl ? (
+                  <a href={editTodo.exportedUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-accent hover:underline">
+                    {editTodo.exportedRef}<ExternalLink className="w-3 h-3" />
+                  </a>
+                ) : (
+                  <span>{editTodo.exportedRef}</span>
+                )}
+              </p>
+            ) : taskSinks.length === 0 ? (
+              <Link to="/integrations" className="text-xs text-accent hover:underline">
+                {t.todos.exportNoTarget}
+              </Link>
+            ) : (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  {taskSinks.length > 1 ? (
+                    <select
+                      className="input-base text-sm"
+                      value={activeProvider}
+                      onChange={(e) => setExportProvider(e.target.value)}
+                    >
+                      {taskSinks.map((s) => (
+                        <option key={s.providerId} value={s.providerId}>{s.displayName}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-text-secondary shrink-0">
+                      <ProviderIcon icon={activeProviderIcon} className="w-3.5 h-3.5" />
+                      {activeProviderName}
+                    </span>
+                  )}
+                  {taskTargets && taskTargets.length > 0 ? (
+                    <select
+                      className="input-base text-sm flex-1"
+                      value={activeTarget}
+                      onChange={(e) => setExportTarget(e.target.value)}
+                    >
+                      <option value="">{t.todos.exportChooseTarget}</option>
+                      {activeTarget && !taskTargets.some((tt) => tt.id === activeTarget) && (
+                        <option value={activeTarget}>{activeTarget}</option>
+                      )}
+                      {taskTargets.map((tt) => (
+                        <option key={tt.id} value={tt.id}>{tt.label}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      className="input-base text-sm flex-1"
+                      value={exportTarget}
+                      onChange={(e) => setExportTarget(e.target.value)}
+                      placeholder={exportCfg.target || t.todos.exportTargetPlaceholder}
+                    />
+                  )}
+                  <Button size="sm" variant="secondary" loading={exportLoading} disabled={!activeTarget} onClick={() => onExport(activeProvider, activeTarget)}>
+                    {t.todos.exportToTracker}
+                  </Button>
+                </div>
+                {!activeTarget && <p className="text-xs text-text-tertiary">{t.todos.exportTargetHint}</p>}
+              </div>
+            )}
+            {editTodo.referenceType && (
+              <p className="text-xs text-text-tertiary">
+                {t.todos.internalReference}: {editTodo.referenceType}
+                {editTodo.referenceId ? ` / ${editTodo.referenceId}` : ''}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Read-only metadata */}
         {editTodo && (

@@ -2,12 +2,22 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
-import type { IntegrationProviderInfo } from '../types';
+import type { IntegrationProviderInfo, TaskTarget } from '../types';
 
 export function useIntegrations() {
   return useQuery({
     queryKey: ['integrations'],
     queryFn: () => api.get<IntegrationProviderInfo[]>('/integrations'),
+  });
+}
+
+/** Selectable export targets for a task-capable provider (GitHub repos, …). */
+export function useTaskTargets(providerId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['task-targets', providerId],
+    queryFn: () => api.get<TaskTarget[]>(`/integrations/${providerId}/task-targets`),
+    enabled: enabled && !!providerId,
+    staleTime: 60_000,
   });
 }
 

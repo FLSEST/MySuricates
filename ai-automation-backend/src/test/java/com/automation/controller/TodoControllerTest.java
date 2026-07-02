@@ -56,7 +56,7 @@ class TodoControllerTest {
     private TodoResponse sampleResponse() {
         return new TodoResponse("t-1", "Fix bug", "desc", Todo.Status.OPEN, Todo.Priority.HIGH,
                 List.of("backend"), null, null, null, null, Todo.Source.AI, "claude", null, null, null, null,
-                0, null, null, null, Instant.now(), Instant.now());
+                null, null, null, 0, null, null, null, Instant.now(), Instant.now());
     }
 
     @Test

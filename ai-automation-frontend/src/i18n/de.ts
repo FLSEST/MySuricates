@@ -650,6 +650,12 @@ export const de: TranslationKeys = {
     configMissing: 'Umgebungsvariablen noch nicht gesetzt',
     enterCredentials: 'Zugangsdaten eintragen',
     saveCredentials: 'Zugangsdaten speichern',
+    connectionDetails: 'Verbindungsdetails',
+    account: 'Konto',
+    grantedPermissions: 'Erteilte Berechtigungen',
+    configuration: 'Konfiguration & Setup-Guide',
+    credentialsSaved: 'Zugangsdaten sind gespeichert. Zum Ändern neu eintragen und speichern.',
+    updateCredentials: 'Zugangsdaten aktualisieren',
     providers: {
       github: {
         displayName: 'GitHub',
@@ -1353,6 +1359,12 @@ export const de: TranslationKeys = {
     exportToTracker: 'An Tracker übertragen',
     exportNoTarget: 'Keine verbundene Tracker-Integration — zuerst einrichten',
     alreadyExported: 'Bereits übertragen',
+    exportSection: 'Übertragung / Verknüpfungen',
+    exportedTo: 'Übertragen an',
+    internalReference: 'Interne Referenz',
+    exportTargetPlaceholder: 'owner/repo',
+    exportTargetHint: 'Ziel-Repo angeben, um zu übertragen',
+    exportChooseTarget: '— Repo wählen —',
     resolutionStates: {
       IDLE: 'Bereit',
       RUNNING: 'Läuft',

@@ -292,6 +292,22 @@ public class GitHubProvider implements IntegrationProvider, TaskExportCapable {
         return new TaskRef("github", input.target() + "#" + num, htmlUrl != null ? htmlUrl.toString() : null);
     }
 
+    @Override
+    public List<TaskTarget> listTargets(String accessToken) {
+        String token = extractToken(accessToken);
+        Object repos = httpGet(BASE_URL + "/user/repos?per_page=100&sort=updated", token, Object.class);
+        List<TaskTarget> out = new ArrayList<>();
+        if (repos instanceof List<?> list) {
+            for (Object o : list) {
+                if (o instanceof Map<?, ?> repo) {
+                    Object fullName = repo.get("full_name");
+                    if (fullName != null) out.add(new TaskTarget(fullName.toString(), fullName.toString()));
+                }
+            }
+        }
+        return out;
+    }
+
     // --- HTTP helpers ---
 
     private <T> T httpGet(String url, String token, Class<T> responseType) {

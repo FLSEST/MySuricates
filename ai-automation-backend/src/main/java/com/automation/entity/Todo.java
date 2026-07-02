@@ -72,6 +72,16 @@ public class Todo {
     @Column(name = "reference_id")
     private String referenceId;
 
+    // Single-TODO export link (to a task tracker), decoupled from reference_type.
+    @Column(name = "exported_provider")
+    private String exportedProvider;
+
+    @Column(name = "exported_ref")
+    private String exportedRef;
+
+    @Column(name = "exported_url")
+    private String exportedUrl;
+
     @Column(name = "related_todo_id")
     private String relatedTodoId;
 

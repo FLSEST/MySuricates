@@ -140,7 +140,7 @@ class TodoTest {
                     Todo.Status.DONE, Todo.Priority.CRITICAL,
                     "tag", "pid", "wfid",
                     Todo.Source.WORKFLOW, "agent", "sid",
-                    "run", "rt", "rid", "rel",
+                    "run", "rt", "rid", "ep", "er", "eu", "rel",
                     now, 5, "lastFix",
                     Todo.ResolutionState.SUCCEEDED,
                     now, now

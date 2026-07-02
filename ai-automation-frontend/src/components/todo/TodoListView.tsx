@@ -2,9 +2,10 @@ import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Pencil, Trash2, Clock, RefreshCw, ExternalLink, CalendarClock, Wrench, Upload, Check } from 'lucide-react';
+import { Pencil, Trash2, Clock, RefreshCw, ExternalLink, CalendarClock, Wrench } from 'lucide-react';
 import { Badge } from '../ui';
 import { useT } from '../../i18n';
+import { ProviderIcon } from '../shared/ProviderIcon';
 import { StatusDots } from './StatusDots';
 import { priorityColor, sourceIcon, formatRelative } from './todoConstants';
 import type { Todo, TodoStatus } from '../../types';
@@ -13,16 +14,14 @@ const MemoizedMarkdown = memo(function MemoizedMarkdown({ children }: { children
   return <ReactMarkdown remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown>;
 });
 
-export const TodoListItem = memo(function TodoListItem({ todo, onEdit, onStatusChange, onDelete, onResolve, resolveLoading, onExport, canExport, exportLoading }: {
+export const TodoListItem = memo(function TodoListItem({ todo, onEdit, onStatusChange, onDelete, onResolve, resolveLoading, exportedIcon }: {
   todo: Todo;
   onEdit: (todo: Todo) => void;
   onStatusChange: (todo: Todo, status: TodoStatus) => void;
   onDelete: (id: string) => void;
   onResolve: (todo: Todo) => void;
   resolveLoading?: boolean;
-  onExport: (todo: Todo) => void;
-  canExport?: boolean;
-  exportLoading?: boolean;
+  exportedIcon?: string;
 }) {
   const t = useT();
 
@@ -94,6 +93,20 @@ export const TodoListItem = memo(function TodoListItem({ todo, onEdit, onStatusC
                 <ExternalLink className="w-2.5 h-2.5" />
                 Run
               </Link>
+            )}
+
+            {/* Exported-to-tracker indicator (only when actually exported) */}
+            {todo.exportedProvider && (
+              <a
+                href={todo.exportedUrl ?? undefined}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-accent/10 text-accent font-medium hover:bg-accent/20 transition-colors"
+                title={`${t.todos.alreadyExported}: ${todo.exportedRef ?? ''}`}
+              >
+                <ProviderIcon icon={exportedIcon} className="w-3 h-3" />
+              </a>
             )}
 
             {todo.linkedWorkflowId && (
@@ -181,26 +194,6 @@ export const TodoListItem = memo(function TodoListItem({ todo, onEdit, onStatusC
           >
             <Wrench className="w-3.5 h-3.5" />
           </button>
-        )}
-        {todo.status !== 'DONE' && (
-          todo.referenceType ? (
-            <span
-              className="p-1.5 rounded-lg text-accent/70"
-              title={`${t.todos.alreadyExported}${todo.referenceId ? ': ' + todo.referenceId : ''}`}
-            >
-              <Check className="w-3.5 h-3.5" />
-            </span>
-          ) : (
-            <button
-              onClick={(e) => { e.stopPropagation(); onExport(todo); }}
-              disabled={!canExport || exportLoading}
-              className="p-1.5 rounded-lg text-text-tertiary hover:text-accent disabled:opacity-40 transition-colors"
-              aria-label={t.todos.exportToTracker}
-              title={canExport ? t.todos.exportToTracker : t.todos.exportNoTarget}
-            >
-              <Upload className="w-3.5 h-3.5" />
-            </button>
-          )
         )}
         <button
           onClick={(e) => { e.stopPropagation(); onEdit(todo); }}

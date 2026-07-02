@@ -648,6 +648,12 @@ export const en = {
     configMissing: 'Environment variables not set yet',
     enterCredentials: 'Enter credentials',
     saveCredentials: 'Save credentials',
+    connectionDetails: 'Connection details',
+    account: 'Account',
+    grantedPermissions: 'Granted permissions',
+    configuration: 'Configuration & setup guide',
+    credentialsSaved: 'Credentials are saved. Re-enter and save to change them.',
+    updateCredentials: 'Update credentials',
     providers: {
       github: {
         displayName: 'GitHub',
@@ -1356,6 +1362,12 @@ export const en = {
     exportToTracker: 'Export to tracker',
     exportNoTarget: 'No connected tracker integration — set one up first',
     alreadyExported: 'Already exported',
+    exportSection: 'Export / Links',
+    exportedTo: 'Exported to',
+    internalReference: 'Internal reference',
+    exportTargetPlaceholder: 'owner/repo',
+    exportTargetHint: 'Enter a target repo to export',
+    exportChooseTarget: '— Choose repo —',
     resolutionStates: {
       IDLE: 'Ready',
       RUNNING: 'Resolving',
