@@ -16,7 +16,8 @@ public record IntegrationProviderResponse(
         Instant connectedSince,
         String scopes,
         List<ScopeOptionResponse> optionalScopes,
-        List<IntegrationActionResponse> actions
+        List<IntegrationActionResponse> actions,
+        boolean supportsTaskExport
 ) {
     public record ScopeOptionResponse(String scope, String label, boolean granted) {}
 }

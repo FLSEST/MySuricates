@@ -177,7 +177,8 @@ public class IntegrationController {
                 connection != null ? connection.getCreatedAt() : null,
                 connection != null ? connection.getScopes() : null,
                 optionalScopes,
-                actions
+                actions,
+                provider instanceof com.automation.service.integration.TaskExportCapable
         );
     }
 

@@ -2,9 +2,11 @@ package com.automation.controller;
 
 import com.automation.dto.request.BulkUpdateTodoStatusRequest;
 import com.automation.dto.request.CreateTodoRequest;
+import com.automation.dto.request.ExportTodoRequest;
 import com.automation.dto.request.UpdateTodoRequest;
 import com.automation.dto.request.UpdateTodoStatusRequest;
 import com.automation.dto.response.PageResponse;
+import com.automation.dto.response.TodoExportResponse;
 import com.automation.dto.response.TodoCountResponse;
 import com.automation.dto.response.TodoOverviewResponse;
 import com.automation.dto.response.TodoResponse;
@@ -73,6 +75,15 @@ public class TodoController {
     @PostMapping("/{id}/resolve")
     public com.automation.dto.response.WorkflowRunResponse resolveTodo(@PathVariable String id) {
         return workflowMapper.toRunResponse(todoService.resolve(id));
+    }
+
+    @PostMapping("/{id}/export")
+    public TodoExportResponse exportTodo(@PathVariable String id,
+                                         @RequestBody(required = false) ExportTodoRequest request) {
+        var ref = todoService.exportToTracker(id,
+                request != null ? request.provider() : null,
+                request != null ? request.target() : null);
+        return new TodoExportResponse(ref.referenceType(), ref.referenceId(), ref.url());
     }
 
     @DeleteMapping("/{id}")

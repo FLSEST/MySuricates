@@ -31,7 +31,8 @@ class IntegrationProviderResponseTest {
             connectedSince,
             "calendar.read calendar.write",
             List.of(scopeOption),
-            List.of(action)
+            List.of(action),
+            true
         );
 
         assertThat(response.providerId()).isEqualTo("google-calendar");
@@ -47,6 +48,7 @@ class IntegrationProviderResponseTest {
         assertThat(response.scopes()).isEqualTo("calendar.read calendar.write");
         assertThat(response.optionalScopes()).containsExactly(scopeOption);
         assertThat(response.actions()).containsExactly(action);
+        assertThat(response.supportsTaskExport()).isTrue();
     }
 
     @Test
@@ -64,7 +66,8 @@ class IntegrationProviderResponseTest {
             null,
             null,
             null,
-            null
+            null,
+            false
         );
 
         assertThat(response.providerId()).isEqualTo("slack");
@@ -79,13 +82,14 @@ class IntegrationProviderResponseTest {
         assertThat(response.scopes()).isNull();
         assertThat(response.optionalScopes()).isNull();
         assertThat(response.actions()).isNull();
+        assertThat(response.supportsTaskExport()).isFalse();
     }
 
     @Test
     void should_expose_requiresCredentials_false_for_local_providers() {
         IntegrationProviderResponse response = new IntegrationProviderResponse(
             "taskwarrior", "Taskwarrior", "ListTodo", "Local tasks",
-            "DISCONNECTED", false, false, null, null, null, null, List.of(), List.of()
+            "DISCONNECTED", false, false, null, null, null, null, List.of(), List.of(), false
         );
 
         assertThat(response.requiresCredentials()).isFalse();
@@ -106,7 +110,8 @@ class IntegrationProviderResponseTest {
             Instant.now(),
             "",
             List.of(),
-            List.of()
+            List.of(),
+            false
         );
 
         assertThat(response.optionalScopes()).isNotNull().isEmpty();
@@ -121,11 +126,11 @@ class IntegrationProviderResponseTest {
         Instant ts = Instant.parse("2026-02-01T08:00:00Z");
         IntegrationProviderResponse a = new IntegrationProviderResponse(
             "id", "name", "icon", "desc", "OK", true, true,
-            "e@x", "n", ts, "s", List.of(), List.of()
+            "e@x", "n", ts, "s", List.of(), List.of(), false
         );
         IntegrationProviderResponse b = new IntegrationProviderResponse(
             "id", "name", "icon", "desc", "OK", true, true,
-            "e@x", "n", ts, "s", List.of(), List.of()
+            "e@x", "n", ts, "s", List.of(), List.of(), false
         );
 
         assertThat(a).isEqualTo(b);
@@ -135,10 +140,10 @@ class IntegrationProviderResponseTest {
     @Test
     void should_not_be_equal_when_provider_id_differs() {
         IntegrationProviderResponse a = new IntegrationProviderResponse(
-            "id-a", "name", null, null, "OK", true, true, null, null, null, null, null, null
+            "id-a", "name", null, null, "OK", true, true, null, null, null, null, null, null, false
         );
         IntegrationProviderResponse b = new IntegrationProviderResponse(
-            "id-b", "name", null, null, "OK", true, true, null, null, null, null, null, null
+            "id-b", "name", null, null, "OK", true, true, null, null, null, null, null, null, false
         );
 
         assertThat(a).isNotEqualTo(b);
@@ -147,10 +152,10 @@ class IntegrationProviderResponseTest {
     @Test
     void should_not_be_equal_when_configured_differs() {
         IntegrationProviderResponse a = new IntegrationProviderResponse(
-            "id", "name", null, null, "OK", true, true, null, null, null, null, null, null
+            "id", "name", null, null, "OK", true, true, null, null, null, null, null, null, false
         );
         IntegrationProviderResponse b = new IntegrationProviderResponse(
-            "id", "name", null, null, "OK", false, true, null, null, null, null, null, null
+            "id", "name", null, null, "OK", false, true, null, null, null, null, null, null, false
         );
 
         assertThat(a).isNotEqualTo(b);
@@ -162,7 +167,7 @@ class IntegrationProviderResponseTest {
     void should_include_field_names_in_toString() {
         IntegrationProviderResponse response = new IntegrationProviderResponse(
             "github", "GitHub", null, null, "CONNECTED", true, true,
-            "u@x", "U", null, null, null, null
+            "u@x", "U", null, null, null, null, true
         );
 
         String repr = response.toString();

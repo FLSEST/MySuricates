@@ -3,6 +3,7 @@ package com.automation.service.integration.providers.github;
 import com.automation.service.integration.IntegrationAction;
 import com.automation.service.integration.IntegrationProvider;
 import com.automation.service.integration.OAuthConfig;
+import com.automation.service.integration.TaskExportCapable;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,7 +37,7 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class GitHubProvider implements IntegrationProvider {
+public class GitHubProvider implements IntegrationProvider, TaskExportCapable {
 
     private static final String BASE_URL = "https://api.github.com";
     private static final String API_VERSION = "2022-11-28";
@@ -267,6 +268,28 @@ public class GitHubProvider implements IntegrationProvider {
     private String issueUrl(String[] repo, String number) {
         return BASE_URL + "/repos/" + urlEncode(repo[0]) + "/" + urlEncode(repo[1])
                 + "/issues/" + urlEncode(number);
+    }
+
+    // --- TaskExportCapable (integrations-agnostischer Single-TODO-Export) ---
+
+    @Override
+    public TaskRef createTask(TaskExportInput input, String accessToken) {
+        String token = extractToken(accessToken);
+        String[] repo = splitRepo(input.target()); // target = "owner/repo"
+        Map<String, Object> body = new HashMap<>();
+        body.put("title", input.title() != null && !input.title().isBlank() ? input.title() : "TODO");
+        if (input.body() != null) body.put("body", input.body());
+        if (input.labels() != null && !input.labels().isEmpty()) body.put("labels", input.labels());
+
+        String url = BASE_URL + "/repos/" + urlEncode(repo[0]) + "/" + urlEncode(repo[1]) + "/issues";
+        Object created = httpPost(url, body, token, Object.class);
+        if (!(created instanceof Map<?, ?> issue) || issue.get("number") == null) {
+            throw new IllegalStateException("GitHub issue creation returned no number");
+        }
+        Object number = issue.get("number");
+        String num = number instanceof Number n ? String.valueOf(n.longValue()) : number.toString();
+        Object htmlUrl = issue.get("html_url");
+        return new TaskRef("github", input.target() + "#" + num, htmlUrl != null ? htmlUrl.toString() : null);
     }
 
     // --- HTTP helpers ---

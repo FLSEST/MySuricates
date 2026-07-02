@@ -16,9 +16,10 @@ import { TodoProgressBar } from '../components/todo/TodoProgressBar';
 import { TodoKanbanView } from '../components/todo/TodoKanbanView';
 import { TodoListItem } from '../components/todo/TodoListView';
 import {
-  useTodos, useTodoCount, useCreateTodo, useUpdateTodo, useUpdateTodoStatus, useDeleteTodo, useResolveTodo,
+  useTodos, useTodoCount, useCreateTodo, useUpdateTodo, useUpdateTodoStatus, useDeleteTodo, useResolveTodo, useExportTodo,
 } from '../hooks/useTodos';
 import { useProjects } from '../hooks/useProjects';
+import { useIntegrations } from '../hooks/useIntegrations';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { useT } from '../i18n';
 import type { Todo, TodoStatus, TodoPriority, TodoSource, CreateTodoRequest, UpdateTodoRequest } from '../types';
@@ -82,6 +83,9 @@ export function Todos() {
   const updateStatus = useUpdateTodoStatus();
   const deleteTodo = useDeleteTodo();
   const resolveTodo = useResolveTodo();
+  const exportTodo = useExportTodo();
+  const { data: integrations } = useIntegrations();
+  const canExport = (integrations ?? []).some((p) => p.supportsTaskExport && p.status === 'CONNECTED');
 
   // Quick-add state
   const [quickTitle, setQuickTitle] = useState('');
@@ -197,6 +201,10 @@ export function Todos() {
         navigate(`/workflows/${run.workflowId}/run/${run.id}`);
       },
     });
+  };
+
+  const handleExport = (todo: Todo) => {
+    exportTodo.mutate({ id: todo.id });
   };
 
   if (isLoading) {
@@ -469,6 +477,9 @@ export function Todos() {
                   onStatusChange={handleStatusChange}
                   onResolve={handleResolve}
                   resolveLoading={resolveTodo.isPending && resolveTodo.variables === todo.id}
+                  onExport={handleExport}
+                  canExport={canExport}
+                  exportLoading={exportTodo.isPending && exportTodo.variables?.id === todo.id}
                   onDelete={(id) => deleteTodo.mutate(id)}
                 />
               ))}

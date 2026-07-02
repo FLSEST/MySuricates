@@ -151,6 +151,29 @@ export function useDeleteTodo() {
   });
 }
 
+export interface TodoExportResult {
+  referenceType: string;
+  referenceId: string;
+  url: string | null;
+}
+
+/** Export a single TODO to a connected task tracker (GitHub, Jira, …). Provider/target
+ *  default to the project's config.taskExport when not passed. */
+export function useExportTodo() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
+  return useMutation({
+    mutationFn: ({ id, provider, target }: { id: string; provider?: string; target?: string }) =>
+      api.post<TodoExportResult>(`/todos/${id}/export`, { provider, target }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['todos'] });
+      toast.success(t.toast.todoExported);
+    },
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.todoExportFailed)),
+  });
+}
+
 export function useResolveTodo() {
   const qc = useQueryClient();
   const toast = useToast();

@@ -106,4 +106,27 @@ class GitHubProviderTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("owner/repo");
     }
+
+    @Test
+    void implementsTaskExportCapable() {
+        assertThat(provider).isInstanceOf(TaskExportCapable.class);
+    }
+
+    @Test
+    void createTaskRejectsBlankTarget() {
+        TaskExportCapable tc = provider;
+        assertThatThrownBy(() -> tc.createTask(
+                new TaskExportCapable.TaskExportInput("Titel", "Body", java.util.List.of(), ""), "token"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("owner/repo");
+    }
+
+    @Test
+    void createTaskRejectsMalformedTarget() {
+        TaskExportCapable tc = provider;
+        assertThatThrownBy(() -> tc.createTask(
+                new TaskExportCapable.TaskExportInput("Titel", "Body", java.util.List.of(), "no-slash"), "token"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("owner/repo");
+    }
 }

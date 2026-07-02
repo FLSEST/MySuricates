@@ -938,6 +938,8 @@ export const en = {
     workflowDeleteFailed: 'Failed to delete workflow',
     workflowExecuted: 'Workflow execution started',
     workflowExecuteFailed: 'Failed to execute workflow',
+    todoExported: 'TODO exported to tracker',
+    todoExportFailed: 'Failed to export TODO to tracker',
     skillsActivated: 'Skills activated successfully',
     skillDeactivated: 'Skill deactivated',
     skillsActivateFailed: 'Failed to activate skills',
@@ -1351,6 +1353,9 @@ export const en = {
     linkedWorkflow: 'Resolver workflow',
     noLinkedWorkflow: 'No linked workflow',
     resolve: 'Resolve',
+    exportToTracker: 'Export to tracker',
+    exportNoTarget: 'No connected tracker integration — set one up first',
+    alreadyExported: 'Already exported',
     resolutionStates: {
       IDLE: 'Ready',
       RUNNING: 'Resolving',

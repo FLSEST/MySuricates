@@ -33,6 +33,13 @@ public class IntegrationRegistry {
         return providers.values();
     }
 
+    /** All registered providers that can receive a TODO as an external task (GitHub, Jira, …). */
+    public List<IntegrationProvider> getTaskExportProviders() {
+        return providers.values().stream()
+                .filter(p -> p instanceof TaskExportCapable)
+                .toList();
+    }
+
     public boolean hasProvider(String providerId) {
         return providers.containsKey(providerId);
     }

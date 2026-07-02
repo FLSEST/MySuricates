@@ -940,6 +940,8 @@ export const de: TranslationKeys = {
     workflowDeleteFailed: 'Workflow konnte nicht gelöscht werden',
     workflowExecuted: 'Workflow-Ausführung gestartet',
     workflowExecuteFailed: 'Workflow konnte nicht ausgeführt werden',
+    todoExported: 'TODO an Tracker übertragen',
+    todoExportFailed: 'Übertragen an Tracker fehlgeschlagen',
     skillsActivated: 'Skills erfolgreich aktiviert',
     skillDeactivated: 'Skill deaktiviert',
     skillsActivateFailed: 'Skills konnten nicht aktiviert werden',
@@ -1348,6 +1350,9 @@ export const de: TranslationKeys = {
     linkedWorkflow: 'Resolver-Workflow',
     noLinkedWorkflow: 'Kein verlinkter Workflow',
     resolve: 'Lösen',
+    exportToTracker: 'An Tracker übertragen',
+    exportNoTarget: 'Keine verbundene Tracker-Integration — zuerst einrichten',
+    alreadyExported: 'Bereits übertragen',
     resolutionStates: {
       IDLE: 'Bereit',
       RUNNING: 'Läuft',

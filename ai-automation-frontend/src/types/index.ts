@@ -471,6 +471,8 @@ export interface IntegrationProviderInfo {
   scopes: string | null;
   optionalScopes: ScopeOption[];
   actions: IntegrationActionInfo[];
+  /** Whether this provider can receive a TODO as a task (GitHub issue, Jira issue, Trello card, …). */
+  supportsTaskExport?: boolean;
 }
 
 export interface IntegrationActionInfo {

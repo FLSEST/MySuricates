@@ -17,6 +17,13 @@ import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
+import com.automation.service.integration.IntegrationRegistry;
+import com.automation.service.integration.IntegrationOAuthService;
+import com.automation.service.integration.IntegrationProvider;
+import com.automation.service.integration.TaskExportCapable;
+import com.automation.entity.IntegrationConnection;
+import com.automation.exception.ErrorCode;
+import com.automation.exception.TaskExportException;
 import jakarta.persistence.criteria.Predicate;
 import com.automation.event.TodoCreatedEvent;
 import lombok.RequiredArgsConstructor;
@@ -50,6 +57,8 @@ public class TodoService {
     private final WorkflowExecutor workflowExecutor;
     private final TodoMapper todoMapper;
     private final ApplicationEventPublisher eventPublisher;
+    private final IntegrationRegistry integrationRegistry;
+    private final IntegrationOAuthService integrationOAuthService;
 
     private static final Comparator<Todo> PRIORITY_COMPARATOR =
             Comparator.comparingInt((Todo t) -> switch (t.getPriority()) {
@@ -211,6 +220,60 @@ public class TodoService {
         return run;
     }
 
+    /**
+     * Integrations-agnostischer Single-TODO-Export: legt aus einem TODO ein Item im externen
+     * Tracker an (GitHub-Issue, Jira-Issue, Trello-Card, …) und verknüpft das TODO zurück.
+     * Provider/Ziel kommen aus dem Request-Override oder aus project.config.taskExport.
+     */
+    @Transactional
+    public TaskExportCapable.TaskRef exportToTracker(String id, String providerOverride, String targetOverride) {
+        Todo todo = findById(id);
+
+        // Idempotent: schon mit einem externen Item verknüpft -> bestehende Referenz, kein Duplikat.
+        if (isNotBlank(todo.getReferenceType()) && isNotBlank(todo.getReferenceId())) {
+            return new TaskExportCapable.TaskRef(todo.getReferenceType(), todo.getReferenceId(), null);
+        }
+
+        Map<String, Object> taskExport = readTaskExportConfig(todo.getProjectId());
+        String providerId = firstNonBlank(providerOverride, asString(taskExport.get("provider")));
+        String target = firstNonBlank(targetOverride, asString(taskExport.get("target")));
+
+        if (providerId == null) {
+            throw new TaskExportException(ErrorCode.NO_TASK_TARGET,
+                    "Kein Ziel-Tracker konfiguriert (project.config.taskExport.provider)");
+        }
+        if (!integrationRegistry.hasProvider(providerId)) {
+            throw new TaskExportException(ErrorCode.PROVIDER_NOT_TASK_CAPABLE, "Unbekannte Integration: " + providerId);
+        }
+        IntegrationProvider provider = integrationRegistry.getProvider(providerId);
+        if (!(provider instanceof TaskExportCapable taskProvider)) {
+            throw new TaskExportException(ErrorCode.PROVIDER_NOT_TASK_CAPABLE,
+                    "Integration '" + providerId + "' kann keine Tasks aufnehmen");
+        }
+        boolean connected = integrationOAuthService.getConnection(providerId)
+                .map(c -> c.getStatus() == IntegrationConnection.ConnectionStatus.CONNECTED)
+                .orElse(false);
+        if (!connected) {
+            throw new TaskExportException(ErrorCode.PROVIDER_NOT_CONNECTED,
+                    "Integration '" + providerId + "' ist nicht verbunden");
+        }
+        if (target == null) {
+            throw new TaskExportException(ErrorCode.NO_TASK_TARGET,
+                    "Kein Ziel für '" + providerId + "' konfiguriert (project.config.taskExport.target)");
+        }
+
+        String token = integrationOAuthService.getValidAccessToken(providerId);
+        var input = new TaskExportCapable.TaskExportInput(
+                todo.getTitle(), todo.getDescription(), parseTags(todo.getTags()), target);
+        TaskExportCapable.TaskRef ref = taskProvider.createTask(input, token);
+
+        todo.setReferenceType(ref.referenceType());
+        todo.setReferenceId(ref.referenceId());
+        todoRepository.save(todo);
+        log.info("Exported todo {} ({}) to {} -> {}", todo.getId(), todo.getTitle(), providerId, ref.referenceId());
+        return ref;
+    }
+
     @Transactional
     public void delete(String id) {
         Todo todo = findById(id);
@@ -305,6 +368,44 @@ public class TodoService {
         context.put("todo_reference_type", todo.getReferenceType() != null ? todo.getReferenceType() : "");
         context.put("todo_reference_id", todo.getReferenceId() != null ? todo.getReferenceId() : "");
         return context;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> readTaskExportConfig(String projectId) {
+        if (projectId == null || projectId.isBlank()) return Map.of();
+        return projectRepository.findById(projectId)
+                .map(p -> p.getConfig())
+                .map(cfg -> cfg.get("taskExport"))
+                .filter(v -> v instanceof Map)
+                .map(v -> (Map<String, Object>) v)
+                .orElse(Map.of());
+    }
+
+    /** Lenient parse of the stored tags field (JSON array or CSV) into a label list. */
+    private static List<String> parseTags(String tags) {
+        if (tags == null || tags.isBlank()) return List.of();
+        String stripped = tags.trim().replaceAll("^\\[|\\]$", "");
+        List<String> out = new ArrayList<>();
+        for (String part : stripped.split(",")) {
+            String s = part.trim().replaceAll("^\"|\"$", "");
+            if (!s.isEmpty()) out.add(s);
+        }
+        return out;
+    }
+
+    private static boolean isNotBlank(String s) {
+        return s != null && !s.isBlank();
+    }
+
+    private static String asString(Object o) {
+        if (o == null) return null;
+        String s = o.toString().trim();
+        return s.isEmpty() ? null : s;
+    }
+
+    private static String firstNonBlank(String a, String b) {
+        if (isNotBlank(a)) return a;
+        return isNotBlank(b) ? b : null;
     }
 
     private Specification<Todo> buildSpec(String projectId, List<String> status, String priority, String source, String tag, String q) {

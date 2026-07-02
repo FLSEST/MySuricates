@@ -56,6 +56,12 @@ public class GlobalExceptionHandler {
         return respond(ErrorCode.SERVICE_UNAVAILABLE, ex.getMessage());
     }
 
+    @ExceptionHandler(TaskExportException.class)
+    public ResponseEntity<ErrorResponse> handleTaskExport(TaskExportException ex) {
+        log.warn("Task export error [{}]: {}", ex.getCode(), ex.getMessage());
+        return respond(ex.getCode(), ex.getMessage());
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
         log.warn("Invalid argument: {}", ex.getMessage());

@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Pencil, Trash2, Clock, RefreshCw, ExternalLink, CalendarClock, Wrench } from 'lucide-react';
+import { Pencil, Trash2, Clock, RefreshCw, ExternalLink, CalendarClock, Wrench, Upload, Check } from 'lucide-react';
 import { Badge } from '../ui';
 import { useT } from '../../i18n';
 import { StatusDots } from './StatusDots';
@@ -13,13 +13,16 @@ const MemoizedMarkdown = memo(function MemoizedMarkdown({ children }: { children
   return <ReactMarkdown remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown>;
 });
 
-export const TodoListItem = memo(function TodoListItem({ todo, onEdit, onStatusChange, onDelete, onResolve, resolveLoading }: {
+export const TodoListItem = memo(function TodoListItem({ todo, onEdit, onStatusChange, onDelete, onResolve, resolveLoading, onExport, canExport, exportLoading }: {
   todo: Todo;
   onEdit: (todo: Todo) => void;
   onStatusChange: (todo: Todo, status: TodoStatus) => void;
   onDelete: (id: string) => void;
   onResolve: (todo: Todo) => void;
   resolveLoading?: boolean;
+  onExport: (todo: Todo) => void;
+  canExport?: boolean;
+  exportLoading?: boolean;
 }) {
   const t = useT();
 
@@ -178,6 +181,26 @@ export const TodoListItem = memo(function TodoListItem({ todo, onEdit, onStatusC
           >
             <Wrench className="w-3.5 h-3.5" />
           </button>
+        )}
+        {todo.status !== 'DONE' && (
+          todo.referenceType ? (
+            <span
+              className="p-1.5 rounded-lg text-accent/70"
+              title={`${t.todos.alreadyExported}${todo.referenceId ? ': ' + todo.referenceId : ''}`}
+            >
+              <Check className="w-3.5 h-3.5" />
+            </span>
+          ) : (
+            <button
+              onClick={(e) => { e.stopPropagation(); onExport(todo); }}
+              disabled={!canExport || exportLoading}
+              className="p-1.5 rounded-lg text-text-tertiary hover:text-accent disabled:opacity-40 transition-colors"
+              aria-label={t.todos.exportToTracker}
+              title={canExport ? t.todos.exportToTracker : t.todos.exportNoTarget}
+            >
+              <Upload className="w-3.5 h-3.5" />
+            </button>
+          )
         )}
         <button
           onClick={(e) => { e.stopPropagation(); onEdit(todo); }}
