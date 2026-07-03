@@ -6,6 +6,7 @@ import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowVersion;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.WorkflowVersionRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -127,6 +128,110 @@ class WorkflowVersionServiceTest {
 
             assertThat(result).isPresent();
         }
+
+        @Test
+        void providerChange_detected() {
+            Workflow workflow = Workflow.builder().id("wf-1")
+                    .blocks(List.of()).model("claude-sonnet-4-6").provider("CLAUDE")
+                    .build();
+            WorkflowSnapshot incoming = new WorkflowSnapshot(
+                    List.of(), null, "claude-sonnet-4-6", "CODEX", Map.of(), Map.of(), List.of());
+
+            when(versionRepository.countByWorkflowId("wf-1")).thenReturn(0);
+
+            Optional<Integer> result = service.snapshotBeforeUpdate(workflow, incoming, "user", null);
+
+            assertThat(result).isPresent();
+            verify(versionRepository).save(any());
+        }
+
+        @Test
+        void metadataChange_detected() {
+            Workflow workflow = Workflow.builder().id("wf-1")
+                    .blocks(List.of()).build();
+            WorkflowSnapshot incoming = new WorkflowSnapshot(
+                    List.of(), null, null, null, Map.of("key", "value"), Map.of(), List.of());
+
+            when(versionRepository.countByWorkflowId("wf-1")).thenReturn(0);
+
+            Optional<Integer> result = service.snapshotBeforeUpdate(workflow, incoming, "user", null);
+
+            assertThat(result).isPresent();
+            verify(versionRepository).save(any());
+        }
+
+        @Test
+        void defaultContextChange_detected() {
+            Workflow workflow = Workflow.builder().id("wf-1")
+                    .blocks(List.of()).build();
+            WorkflowSnapshot incoming = new WorkflowSnapshot(
+                    List.of(), null, null, null, Map.of(), Map.of("ctxKey", "ctxVal"), List.of());
+
+            when(versionRepository.countByWorkflowId("wf-1")).thenReturn(0);
+
+            Optional<Integer> result = service.snapshotBeforeUpdate(workflow, incoming, "user", null);
+
+            assertThat(result).isPresent();
+            verify(versionRepository).save(any());
+        }
+
+        @Test
+        void activatedSkillsChange_detected() {
+            Workflow workflow = Workflow.builder().id("wf-1")
+                    .blocks(List.of()).build();
+            WorkflowSnapshot incoming = new WorkflowSnapshot(
+                    List.of(), null, null, null, Map.of(), Map.of(), List.of("skill-1"));
+
+            when(versionRepository.countByWorkflowId("wf-1")).thenReturn(0);
+
+            Optional<Integer> result = service.snapshotBeforeUpdate(workflow, incoming, "user", null);
+
+            assertThat(result).isPresent();
+            verify(versionRepository).save(any());
+        }
+
+        @Test
+        void serializationFailure_swallowedButReturnsVersion() throws Exception {
+            ObjectMapper failingMapper = mock(ObjectMapper.class);
+            when(failingMapper.writeValueAsString(any())).thenThrow(new JsonProcessingException("boom") {});
+            WorkflowVersionService failingService = new WorkflowVersionService(versionRepository, failingMapper);
+
+            Workflow workflow = Workflow.builder().id("wf-1")
+                    .blocks(List.of()).instructions("old").build();
+            WorkflowSnapshot incoming = new WorkflowSnapshot(
+                    List.of(), "new", null, null, Map.of(), Map.of(), List.of());
+
+            when(versionRepository.countByWorkflowId("wf-1")).thenReturn(0);
+
+            Optional<Integer> result = failingService.snapshotBeforeUpdate(workflow, incoming, "user", null);
+
+            assertThat(result).contains(1);
+            verify(versionRepository, never()).save(any());
+        }
+
+        @Test
+        void savedSnapshot_isRestorableViaRoundTrip() throws Exception {
+            Workflow workflow = Workflow.builder().id("wf-1")
+                    .blocks(List.of()).instructions("original instructions")
+                    .model("claude-sonnet-4-6").provider("CLAUDE")
+                    .metadata(Map.of("k", "v"))
+                    .build();
+            WorkflowSnapshot stateBefore = WorkflowSnapshot.from(workflow);
+
+            WorkflowSnapshot incoming = new WorkflowSnapshot(
+                    List.of(), "changed instructions", "claude-sonnet-4-6", "CLAUDE",
+                    Map.of("k", "v"), Map.of(), List.of());
+
+            when(versionRepository.countByWorkflowId("wf-1")).thenReturn(0);
+            service.snapshotBeforeUpdate(workflow, incoming, "user", null);
+
+            ArgumentCaptor<WorkflowVersion> captor = ArgumentCaptor.forClass(WorkflowVersion.class);
+            verify(versionRepository).save(captor.capture());
+            WorkflowVersion saved = captor.getValue();
+
+            WorkflowSnapshot restored = objectMapper.readValue(saved.getSnapshot(), WorkflowSnapshot.class);
+            assertThat(restored.differs(stateBefore)).isFalse();
+        }
     }
 
     @Nested
@@ -195,6 +300,16 @@ class WorkflowVersionServiceTest {
             when(versionRepository.countByWorkflowId("wf-1")).thenReturn(0);
 
             assertThat(service.getVersionCount("wf-1")).isZero();
+        }
+
+        @Test
+        void findByWorkflowId_noVersions_returnsEmptyPage() {
+            when(versionRepository.findByWorkflowIdOrderByVersionNumberDesc("wf-1", PageRequest.of(0, 10)))
+                    .thenReturn(new PageImpl<>(List.of()));
+
+            Page<WorkflowVersion> result = service.findByWorkflowId("wf-1", PageRequest.of(0, 10));
+
+            assertThat(result.getContent()).isEmpty();
         }
     }
 }
