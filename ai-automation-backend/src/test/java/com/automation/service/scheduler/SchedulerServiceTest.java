@@ -28,6 +28,13 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import com.automation.dto.request.UpdateScheduleRequest;
+import com.automation.entity.ChainRun;
+import com.automation.entity.WorkflowChain;
+import com.automation.entity.WorkflowRun;
+import com.automation.repository.ChainRunRepository;
+import com.automation.repository.WorkflowRunRepository;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -63,6 +70,12 @@ class SchedulerServiceTest {
     @Mock
     private SuspendState suspendState;
 
+    @Mock
+    private WorkflowRunRepository workflowRunRepository;
+
+    @Mock
+    private ChainRunRepository chainRunRepository;
+
     // Fixed at noon UTC so getRemainingToday/Week behave deterministically regardless of wall-clock time.
     private static final Instant FIXED_NOW = Instant.parse("2026-04-26T12:00:00Z");
 
@@ -74,6 +87,7 @@ class SchedulerServiceTest {
 
     private Workflow testWorkflow;
     private ScheduledWorkflow testScheduled;
+    private WorkflowChain testChain;
 
     @BeforeEach
     void setUp() {
@@ -90,6 +104,11 @@ class SchedulerServiceTest {
                 .enabled(true)
                 .description("Hourly run")
                 .inputContext(Map.of("key", "value"))
+                .build();
+
+        testChain = WorkflowChain.builder()
+                .id("chain-1")
+                .name("Test Chain")
                 .build();
     }
 
@@ -755,5 +774,494 @@ class SchedulerServiceTest {
         // but it should be included since it's within 7 days and the week boundary
         // is at most 7 days away
         assertThat(result.count()).isGreaterThanOrEqualTo(0);
+    }
+
+    // --- findByChainId ---
+
+    @Test
+    void findByChainId_returnsMatching() {
+        when(scheduledRepository.findByChainId("chain-1")).thenReturn(List.of(testScheduled));
+
+        List<ScheduledWorkflow> result = schedulerService.findByChainId("chain-1");
+
+        assertThat(result).hasSize(1);
+    }
+
+    // --- findSchedulesInRange ---
+
+    @Test
+    void findSchedulesInRange_delegatesToRepository() {
+        Instant from = FIXED_NOW;
+        Instant to = FIXED_NOW.plus(1, ChronoUnit.DAYS);
+        when(scheduledRepository.findSchedulesInRange(from, to)).thenReturn(List.of(testScheduled));
+
+        List<ScheduledWorkflow> result = schedulerService.findSchedulesInRange(from, to);
+
+        assertThat(result).hasSize(1);
+    }
+
+    // --- findWorkflowRunsByScheduleId ---
+
+    @Test
+    void findWorkflowRunsByScheduleId_delegatesToRepository() {
+        WorkflowRun run = WorkflowRun.builder().id("run-1").build();
+        when(workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("sched-1"))
+                .thenReturn(List.of(run));
+
+        List<WorkflowRun> result = schedulerService.findWorkflowRunsByScheduleId("sched-1");
+
+        assertThat(result).hasSize(1);
+    }
+
+    // --- findChainRunsByScheduleId ---
+
+    @Test
+    void findChainRunsByScheduleId_delegatesToRepository() {
+        ChainRun run = ChainRun.builder().id("crun-1").build();
+        when(chainRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("sched-1"))
+                .thenReturn(List.of(run));
+
+        List<ChainRun> result = schedulerService.findChainRunsByScheduleId("sched-1");
+
+        assertThat(result).hasSize(1);
+    }
+
+    // --- findWorkflowRunsBetween ---
+
+    @Test
+    void findWorkflowRunsBetween_delegatesToRepository() {
+        Instant from = FIXED_NOW.minus(1, ChronoUnit.HOURS);
+        WorkflowRun run = WorkflowRun.builder().id("run-2").build();
+        when(workflowRunRepository.findByStartedAtBetween(from, FIXED_NOW)).thenReturn(List.of(run));
+
+        List<WorkflowRun> result = schedulerService.findWorkflowRunsBetween(from, FIXED_NOW);
+
+        assertThat(result).hasSize(1);
+    }
+
+    // --- update ---
+
+    @Test
+    void update_description_updatesDescription() {
+        when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        UpdateScheduleRequest request = new UpdateScheduleRequest(null, "New description", null, null, null, null, null);
+        ScheduledWorkflow result = schedulerService.update("sched-1", request);
+
+        assertThat(result.getDescription()).isEqualTo("New description");
+    }
+
+    @Test
+    void update_cronExpression_enabled_updatesNextRun() {
+        testScheduled.setEnabled(true);
+        when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        UpdateScheduleRequest request = new UpdateScheduleRequest("0 30 * * * *", null, null, null, null, null, null);
+        ScheduledWorkflow result = schedulerService.update("sched-1", request);
+
+        assertThat(result.getCronExpression()).isEqualTo("0 30 * * * *");
+        assertThat(result.getNextRunAt()).isNotNull();
+    }
+
+    @Test
+    void update_cronExpression_disabled_doesNotUpdateNextRun() {
+        testScheduled.setEnabled(false);
+        testScheduled.setNextRunAt(null);
+        when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        UpdateScheduleRequest request = new UpdateScheduleRequest("0 30 * * * *", null, null, null, null, null, null);
+        ScheduledWorkflow result = schedulerService.update("sched-1", request);
+
+        assertThat(result.getCronExpression()).isEqualTo("0 30 * * * *");
+        assertThat(result.getNextRunAt()).isNull();
+    }
+
+    @Test
+    void update_invalidCronExpression_throws() {
+        when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
+
+        UpdateScheduleRequest request = new UpdateScheduleRequest("not-a-cron", null, null, null, null, null, null);
+
+        assertThatThrownBy(() -> schedulerService.update("sched-1", request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid cron expression");
+    }
+
+    @Test
+    void update_onceScheduledAt_enabled_updatesScheduledAtAndNextRun() {
+        Instant newTime = FIXED_NOW.plus(3, ChronoUnit.HOURS);
+        ScheduledWorkflow onceSchedule = ScheduledWorkflow.builder()
+                .id("sched-once-upd")
+                .workflow(testWorkflow)
+                .cronExpression("")
+                .scheduleType(ScheduleType.ONCE)
+                .scheduledAt(FIXED_NOW.plus(1, ChronoUnit.HOURS))
+                .enabled(true)
+                .build();
+
+        when(scheduledRepository.findById("sched-once-upd")).thenReturn(Optional.of(onceSchedule));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        UpdateScheduleRequest request = new UpdateScheduleRequest(null, null, null, newTime, null, null, null);
+        ScheduledWorkflow result = schedulerService.update("sched-once-upd", request);
+
+        assertThat(result.getScheduledAt()).isEqualTo(newTime);
+        assertThat(result.getNextRunAt()).isEqualTo(newTime);
+    }
+
+    @Test
+    void update_endDateAndMaxRuns_updated() {
+        Instant endDate = FIXED_NOW.plus(30, ChronoUnit.DAYS);
+        when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        UpdateScheduleRequest request = new UpdateScheduleRequest(null, null, null, null, endDate, 10, null);
+        ScheduledWorkflow result = schedulerService.update("sched-1", request);
+
+        assertThat(result.getEndDate()).isEqualTo(endDate);
+        assertThat(result.getMaxRuns()).isEqualTo(10);
+    }
+
+    @Test
+    void update_catchUpOnResume_updated() {
+        when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        UpdateScheduleRequest request = new UpdateScheduleRequest(null, null, null, null, null, null, true);
+        ScheduledWorkflow result = schedulerService.update("sched-1", request);
+
+        assertThat(result.isCatchUpOnResume()).isTrue();
+    }
+
+    // --- getNextRuns ---
+
+    @Test
+    void getNextRuns_validCron_returnsRequestedCount() {
+        List<Instant> result = schedulerService.getNextRuns("0 0 * * * *", 3);
+
+        assertThat(result).hasSize(3);
+        for (int i = 1; i < result.size(); i++) {
+            assertThat(result.get(i)).isAfter(result.get(i - 1));
+        }
+    }
+
+    @Test
+    void getNextRuns_invalidCron_throws() {
+        assertThatThrownBy(() -> schedulerService.getNextRuns("bad-cron", 5))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid cron expression");
+    }
+
+    // --- isMaintenanceMode / setMaintenanceMode ---
+
+    @Test
+    void isMaintenanceMode_whenTrue_returnsTrue() {
+        when(appSettingsRepository.get("scheduler.maintenance-mode")).thenReturn(Optional.of("true"));
+
+        assertThat(schedulerService.isMaintenanceMode()).isTrue();
+    }
+
+    @Test
+    void isMaintenanceMode_whenNotSet_returnsFalse() {
+        when(appSettingsRepository.get("scheduler.maintenance-mode")).thenReturn(Optional.empty());
+
+        assertThat(schedulerService.isMaintenanceMode()).isFalse();
+    }
+
+    @Test
+    void setMaintenanceMode_enabled_setsValue() {
+        schedulerService.setMaintenanceMode(true);
+
+        verify(appSettingsRepository).set("scheduler.maintenance-mode", "true");
+    }
+
+    @Test
+    void setMaintenanceMode_disabled_setsValue() {
+        schedulerService.setMaintenanceMode(false);
+
+        verify(appSettingsRepository).set("scheduler.maintenance-mode", "false");
+    }
+
+    // --- create: CHAIN target type ---
+
+    @Test
+    void create_chainSchedule_success() {
+        when(workflowChainRepository.findById("chain-1")).thenReturn(Optional.of(testChain));
+        when(scheduledRepository.save(any(ScheduledWorkflow.class))).thenAnswer(inv -> {
+            ScheduledWorkflow s = inv.getArgument(0);
+            s.setId("sched-chain");
+            return s;
+        });
+
+        ScheduledWorkflow result = schedulerService.create(
+                null, "chain-1", "CHAIN", "0 0 * * * *", "Chain schedule",
+                null, "CRON", null, null, null, null, null, null);
+
+        assertThat(result.getId()).isEqualTo("sched-chain");
+        assertThat(result.getTargetType()).isEqualTo(ScheduledWorkflow.TargetType.CHAIN);
+        assertThat(result.getChain()).isEqualTo(testChain);
+        assertThat(result.isEnabled()).isTrue();
+    }
+
+    @Test
+    void create_chainSchedule_missingChainId_throws() {
+        assertThatThrownBy(() -> schedulerService.create(
+                null, null, "CHAIN", "0 0 * * * *", "Test", null, "CRON", null, null, null, null, null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("chainId is required");
+    }
+
+    @Test
+    void create_invalidTargetType_throws() {
+        assertThatThrownBy(() -> schedulerService.create(
+                "wf-1", null, "INVALID", "0 0 * * * *", "Test", null, "CRON", null, null, null, null, null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid target type");
+    }
+
+    // --- create: DELAYED schedule type ---
+
+    @Test
+    void create_delayedSchedule_success() {
+        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
+        when(scheduledRepository.save(any(ScheduledWorkflow.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ScheduledWorkflow result = schedulerService.create(
+                "wf-1", null, null, null, "Delayed run",
+                null, "DELAYED", null, "2h", null, null, null, null);
+
+        assertThat(result.getScheduleType()).isEqualTo(ScheduleType.DELAYED);
+        assertThat(result.getDelayExpression()).isEqualTo("2h");
+        assertThat(result.getScheduledAt()).isNotNull().isAfter(FIXED_NOW);
+        assertThat(result.getNextRunAt()).isEqualTo(result.getScheduledAt());
+        assertThat(result.getCronExpression()).isEmpty();
+    }
+
+    @Test
+    void create_delayedSchedule_missingDelayExpression_throws() {
+        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
+
+        assertThatThrownBy(() -> schedulerService.create(
+                "wf-1", null, null, null, "Test", null, "DELAYED", null, null, null, null, null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("delayExpression is required");
+    }
+
+    // --- parseDelay ---
+
+    @Test
+    void parseDelay_seconds_parsesCorrectly() {
+        assertThat(SchedulerService.parseDelay("30s")).isEqualTo(Duration.ofSeconds(30));
+    }
+
+    @Test
+    void parseDelay_minutes_parsesCorrectly() {
+        assertThat(SchedulerService.parseDelay("10m")).isEqualTo(Duration.ofMinutes(10));
+    }
+
+    @Test
+    void parseDelay_hours_parsesCorrectly() {
+        assertThat(SchedulerService.parseDelay("2h")).isEqualTo(Duration.ofHours(2));
+    }
+
+    @Test
+    void parseDelay_days_parsesCorrectly() {
+        assertThat(SchedulerService.parseDelay("1d")).isEqualTo(Duration.ofDays(1));
+    }
+
+    @Test
+    void parseDelay_unknownSuffix_throws() {
+        assertThatThrownBy(() -> SchedulerService.parseDelay("5w"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid delay expression");
+    }
+
+    @Test
+    void parseDelay_nonNumericValue_throws() {
+        assertThatThrownBy(() -> SchedulerService.parseDelay("abch"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid delay expression");
+    }
+
+    @Test
+    void parseDelay_emptyString_throws() {
+        assertThatThrownBy(() -> SchedulerService.parseDelay(""))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    // --- enable: DELAYED schedule ---
+
+    @Test
+    void enable_delayedSchedule_setsScheduledAt() {
+        Instant futureTime = FIXED_NOW.plus(1, ChronoUnit.HOURS);
+        ScheduledWorkflow delayedSchedule = ScheduledWorkflow.builder()
+                .id("sched-delayed")
+                .workflow(testWorkflow)
+                .cronExpression("")
+                .scheduleType(ScheduleType.DELAYED)
+                .scheduledAt(futureTime)
+                .enabled(false)
+                .build();
+
+        when(scheduledRepository.findById("sched-delayed")).thenReturn(Optional.of(delayedSchedule));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ScheduledWorkflow result = schedulerService.enable("sched-delayed");
+
+        assertThat(result.isEnabled()).isTrue();
+        assertThat(result.getNextRunAt()).isEqualTo(futureTime);
+    }
+
+    // --- create: missing workflowId for WORKFLOW target ---
+
+    @Test
+    void create_workflowSchedule_nullWorkflowId_throws() {
+        assertThatThrownBy(() -> schedulerService.create(
+                null, null, "WORKFLOW", "0 0 * * * *", "Test", null, "CRON", null, null, null, null, null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("workflowId is required");
+    }
+
+    // --- create: nonexistent chain ---
+
+    @Test
+    void create_chainSchedule_nonExistentChain_throws() {
+        when(workflowChainRepository.findById("unknown-chain")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> schedulerService.create(
+                null, "unknown-chain", "CHAIN", "0 0 * * * *", "Test", null, "CRON", null, null, null, null, null, null))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    // --- create: invalid scheduleType ---
+
+    @Test
+    void create_invalidScheduleType_throws() {
+        assertThatThrownBy(() -> schedulerService.create(
+                "wf-1", null, null, "0 0 * * * *", "Test", null, "INVALID_TYPE", null, null, null, null, null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid schedule type");
+    }
+
+    // --- create: catchUpOnResume is persisted ---
+
+    @Test
+    void create_catchUpOnResume_true_isSet() {
+        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
+        when(scheduledRepository.save(any(ScheduledWorkflow.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ScheduledWorkflow result = schedulerService.create(
+                "wf-1", null, null, "0 0 * * * *", "Test", null, "CRON", null, null, null, null, null, true);
+
+        assertThat(result.isCatchUpOnResume()).isTrue();
+    }
+
+    // --- update: inputContext ---
+
+    @Test
+    void update_inputContext_updated() {
+        when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Map<String, Object> newCtx = Map.of("env", "staging");
+        UpdateScheduleRequest request = new UpdateScheduleRequest(null, null, newCtx, null, null, null, null);
+        ScheduledWorkflow result = schedulerService.update("sched-1", request);
+
+        assertThat(result.getInputContext()).isEqualTo(newCtx);
+    }
+
+    // --- update: ONCE schedule, disabled — scheduledAt updated, nextRun stays null ---
+
+    @Test
+    void update_onceScheduledAt_disabled_doesNotUpdateNextRun() {
+        Instant newTime = FIXED_NOW.plus(3, ChronoUnit.HOURS);
+        ScheduledWorkflow onceSchedule = ScheduledWorkflow.builder()
+                .id("sched-once-disabled")
+                .workflow(testWorkflow)
+                .cronExpression("")
+                .scheduleType(ScheduleType.ONCE)
+                .scheduledAt(FIXED_NOW.plus(1, ChronoUnit.HOURS))
+                .enabled(false)
+                .nextRunAt(null)
+                .build();
+
+        when(scheduledRepository.findById("sched-once-disabled")).thenReturn(Optional.of(onceSchedule));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        UpdateScheduleRequest request = new UpdateScheduleRequest(null, null, null, newTime, null, null, null);
+        ScheduledWorkflow result = schedulerService.update("sched-once-disabled", request);
+
+        assertThat(result.getScheduledAt()).isEqualTo(newTime);
+        assertThat(result.getNextRunAt()).isNull();
+    }
+
+    // --- update: endDate/maxRuns ignored for ONCE schedule ---
+
+    @Test
+    void update_endDateAndMaxRuns_ignoredForOnceSchedule() {
+        Instant endDate = FIXED_NOW.plus(30, ChronoUnit.DAYS);
+        ScheduledWorkflow onceSchedule = ScheduledWorkflow.builder()
+                .id("sched-once-end")
+                .workflow(testWorkflow)
+                .cronExpression("")
+                .scheduleType(ScheduleType.ONCE)
+                .scheduledAt(FIXED_NOW.plus(1, ChronoUnit.HOURS))
+                .enabled(true)
+                .build();
+
+        when(scheduledRepository.findById("sched-once-end")).thenReturn(Optional.of(onceSchedule));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        UpdateScheduleRequest request = new UpdateScheduleRequest(null, null, null, null, endDate, 5, null);
+        ScheduledWorkflow result = schedulerService.update("sched-once-end", request);
+
+        assertThat(result.getEndDate()).isNull();
+        assertThat(result.getMaxRuns()).isZero();
+    }
+
+    // --- getRemainingToday: DELAYED schedule treated like ONCE ---
+
+    @Test
+    void getRemainingToday_delayedSchedule_futureToday_included() {
+        Instant inOneHour = FIXED_NOW.plus(1, ChronoUnit.HOURS);
+        ScheduledWorkflow delayedSchedule = ScheduledWorkflow.builder()
+                .id("sched-delayed-today")
+                .workflow(testWorkflow)
+                .cronExpression("")
+                .scheduleType(ScheduleType.DELAYED)
+                .scheduledAt(inOneHour)
+                .enabled(true)
+                .build();
+
+        when(scheduledRepository.findByEnabledTrue()).thenReturn(List.of(delayedSchedule));
+
+        UpcomingScheduleResponse result = schedulerService.getRemainingToday();
+
+        assertThat(result.count()).isEqualTo(1);
+        assertThat(result.schedules().get(0).scheduledAt()).isEqualTo(inOneHour);
+    }
+
+    // --- checkAndExecuteScheduled: resume emits ActivityLog warn ---
+
+    @Test
+    void checkAndExecuteScheduled_resumeAfterSuspend_warnsActivityLog() {
+        ReflectionTestUtils.setField(schedulerService, "lastTickAt", FIXED_NOW.minus(3, ChronoUnit.DAYS));
+        testScheduled.setNextRunAt(FIXED_NOW.minus(3, ChronoUnit.DAYS));
+        testScheduled.setCatchUpOnResume(false);
+
+        when(schedulerConfig.getResumeGraceMinutes()).thenReturn(5L);
+        when(scheduledRepository.findDueSchedules(FIXED_NOW)).thenReturn(List.of(testScheduled));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        schedulerService.checkAndExecuteScheduled();
+
+        verify(activityLogService).warn(
+                eq(LogCategory.SCHEDULE),
+                contains("System resume detected"),
+                eq("SchedulerService")
+        );
     }
 }
