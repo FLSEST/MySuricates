@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -200,5 +201,132 @@ class ChainServiceTest {
         chainService.delete("chain-1");
 
         verify(chainRepository).delete(testChain);
+    }
+
+    @Test
+    void findAll_noChains_returnsEmptyList() {
+        when(chainRepository.findAll()).thenReturn(List.of());
+
+        List<WorkflowChain> result = chainService.findAll();
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void create_explicitStopOnFailureFalse_persistsFalse() {
+        ChainEntryRequest entryRequest = new ChainEntryRequest(
+                "wf-1", "Step 1", 0, true, Map.of());
+        CreateChainRequest request = new CreateChainRequest(
+                "Chain", "desc", "icon", List.of(entryRequest), false);
+        when(workflowRepository.existsById("wf-1")).thenReturn(true);
+        when(chainRepository.save(any(WorkflowChain.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        WorkflowChain result = chainService.create(request);
+
+        assertThat(result.isStopOnFailure()).isFalse();
+    }
+
+    @Test
+    void create_mapsEntryFields() {
+        ChainEntryRequest entryRequest = new ChainEntryRequest(
+                "wf-1", "My Label", 3, true, Map.of("key", "value"));
+        CreateChainRequest request = new CreateChainRequest(
+                "Chain", "desc", "icon", List.of(entryRequest), true);
+        when(workflowRepository.existsById("wf-1")).thenReturn(true);
+        ArgumentCaptor<WorkflowChain> captor = ArgumentCaptor.forClass(WorkflowChain.class);
+        when(chainRepository.save(captor.capture()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        chainService.create(request);
+
+        ChainEntry saved = captor.getValue().getEntries().get(0);
+        assertThat(saved.getWorkflowId()).isEqualTo("wf-1");
+        assertThat(saved.getLabel()).isEqualTo("My Label");
+        assertThat(saved.getSortOrder()).isEqualTo(3);
+        assertThat(saved.getInputContext()).containsEntry("key", "value");
+    }
+
+    @Test
+    void create_entryNullDefaults_appliedByToEntries() {
+        ChainEntryRequest entryRequest = new ChainEntryRequest(
+                "wf-1", "Step", 0, null, null);
+        CreateChainRequest request = new CreateChainRequest(
+                "Chain", "desc", "icon", List.of(entryRequest), true);
+        when(workflowRepository.existsById("wf-1")).thenReturn(true);
+        ArgumentCaptor<WorkflowChain> captor = ArgumentCaptor.forClass(WorkflowChain.class);
+        when(chainRepository.save(captor.capture()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        chainService.create(request);
+
+        ChainEntry saved = captor.getValue().getEntries().get(0);
+        assertThat(saved.isStopOnFailure()).isTrue();
+        assertThat(saved.getInputContext()).isEmpty();
+    }
+
+    @Test
+    void update_nonExistentChain_throwsNoSuchElement() {
+        UpdateChainRequest request = new UpdateChainRequest(
+                "New Name", null, null, null, null);
+        when(chainRepository.findById("unknown")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> chainService.update("unknown", request))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessageContaining("Chain not found: unknown");
+        verify(chainRepository, never()).save(any());
+    }
+
+    @Test
+    void update_invalidWorkflowId_throwsIllegalArgument() {
+        ChainEntryRequest entryRequest = new ChainEntryRequest(
+                "wf-missing", "Step", 0, true, Map.of());
+        UpdateChainRequest request = new UpdateChainRequest(
+                null, null, null, List.of(entryRequest), null);
+        when(chainRepository.findById("chain-1")).thenReturn(Optional.of(testChain));
+        when(workflowRepository.existsById("wf-missing")).thenReturn(false);
+
+        assertThatThrownBy(() -> chainService.update("chain-1", request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Workflow not found: wf-missing");
+        verify(chainRepository, never()).save(any());
+    }
+
+    @Test
+    void update_stopOnFailure_togglesFlag() {
+        UpdateChainRequest request = new UpdateChainRequest(
+                null, null, null, null, false);
+        when(chainRepository.findById("chain-1")).thenReturn(Optional.of(testChain));
+        when(chainRepository.save(any(WorkflowChain.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        WorkflowChain result = chainService.update("chain-1", request);
+
+        assertThat(result.isStopOnFailure()).isFalse();
+    }
+
+    @Test
+    void update_descriptionAndIcon_updatesOnlyThoseFields() {
+        UpdateChainRequest request = new UpdateChainRequest(
+                null, "New description", "new-icon", null, null);
+        when(chainRepository.findById("chain-1")).thenReturn(Optional.of(testChain));
+        when(chainRepository.save(any(WorkflowChain.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        WorkflowChain result = chainService.update("chain-1", request);
+
+        assertThat(result.getDescription()).isEqualTo("New description");
+        assertThat(result.getIcon()).isEqualTo("new-icon");
+        assertThat(result.getName()).isEqualTo("Test Chain");
+    }
+
+    @Test
+    void delete_nonExistentChain_throwsNoSuchElement() {
+        when(chainRepository.findById("unknown")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> chainService.delete("unknown"))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessageContaining("Chain not found: unknown");
+        verify(chainRepository, never()).delete(any(WorkflowChain.class));
     }
 }
