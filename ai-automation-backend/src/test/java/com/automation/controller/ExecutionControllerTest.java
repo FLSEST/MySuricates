@@ -349,4 +349,134 @@ class ExecutionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.output").value("file1.txt\nfile2.txt"));
     }
+
+    @Test
+    void executeCommand_blankCommand_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/executions/run-1/command")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"command": ""}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void executeCommand_missingBody_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/executions/run-1/command")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void resumeFromStep_nonExistent_returns404() throws Exception {
+        when(workflowExecutor.resumeFromStep("unknown"))
+                .thenThrow(new ResourceNotFoundException("Execution", "unknown"));
+
+        mockMvc.perform(post("/api/v1/executions/unknown/resume-from-step"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void approveTodos_rejectFalse_returnsOk() throws Exception {
+        mockMvc.perform(post("/api/v1/executions/run-1/todos/approve")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"approved": false}
+                                """))
+                .andExpect(status().isOk());
+
+        verify(autoTodoService).approvePendingTodos("run-1", false);
+    }
+
+    @Test
+    void listExecutions_withWorkflowIdFilter_returnsOk() throws Exception {
+        var page = new org.springframework.data.domain.PageImpl<>(
+                List.<com.automation.entity.WorkflowRun>of(),
+                org.springframework.data.domain.PageRequest.of(0, 50), 0);
+        when(executionQueryService.listExecutions(0, 50, null, "wf-1", null, null))
+                .thenReturn(page);
+        when(workflowMapper.toRunResponseList(any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/executions").param("workflowId", "wf-1"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void listExecutions_withProjectIdFilter_returnsOk() throws Exception {
+        var page = new org.springframework.data.domain.PageImpl<>(
+                List.<com.automation.entity.WorkflowRun>of(),
+                org.springframework.data.domain.PageRequest.of(0, 50), 0);
+        when(executionQueryService.listExecutions(0, 50, null, null, "proj-1", null))
+                .thenReturn(page);
+        when(workflowMapper.toRunResponseList(any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/executions").param("projectId", "proj-1"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void listExecutions_customPaging_returnsOk() throws Exception {
+        var page = new org.springframework.data.domain.PageImpl<>(
+                List.<com.automation.entity.WorkflowRun>of(),
+                org.springframework.data.domain.PageRequest.of(2, 10), 0);
+        when(executionQueryService.listExecutions(2, 10, null, null, null, null))
+                .thenReturn(page);
+        when(workflowMapper.toRunResponseList(any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/executions").param("page", "2").param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(2));
+    }
+
+    @Test
+    void updateNotes_withNotes_returnsOk() throws Exception {
+        var run = WorkflowRun.builder().id("run-1").status(RunStatus.COMPLETED).build();
+        var response = new WorkflowRunResponse(
+                "run-1", "wf-1", "Test", null, null, RunStatus.COMPLETED, List.of(),
+                Instant.now(), Instant.now(), null, null, null, Map.of(), Map.of("notes", "my note"), null);
+
+        when(executionQueryService.findById("run-1")).thenReturn(run);
+        when(workflowMapper.toRunResponse(run)).thenReturn(response);
+
+        mockMvc.perform(patch("/api/v1/executions/run-1/notes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"notes": "my note"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("run-1"));
+
+        verify(workflowRunRepository).save(run);
+    }
+
+    @Test
+    void updateNotes_withBlankNotes_removesNote_returnsOk() throws Exception {
+        var run = WorkflowRun.builder().id("run-1").status(RunStatus.COMPLETED).build();
+        var response = new WorkflowRunResponse(
+                "run-1", "wf-1", "Test", null, null, RunStatus.COMPLETED, List.of(),
+                Instant.now(), Instant.now(), null, null, null, Map.of(), Map.of(), null);
+
+        when(executionQueryService.findById("run-1")).thenReturn(run);
+        when(workflowMapper.toRunResponse(run)).thenReturn(response);
+
+        mockMvc.perform(patch("/api/v1/executions/run-1/notes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"notes": ""}
+                                """))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void updateNotes_nonExistent_returns404() throws Exception {
+        when(executionQueryService.findById("unknown"))
+                .thenThrow(new ResourceNotFoundException("Execution", "unknown"));
+
+        mockMvc.perform(patch("/api/v1/executions/unknown/notes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"notes": "my note"}
+                                """))
+                .andExpect(status().isNotFound());
+    }
 }
