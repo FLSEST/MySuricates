@@ -234,4 +234,46 @@ class ChainControllerTest {
 
         verify(chainRunRepository).findFiltered(eq(RunStatus.COMPLETED), eq("foo"), any(Pageable.class));
     }
+
+    @Test
+    void createChain_returns400_whenNameBlank() throws Exception {
+        mockMvc.perform(post("/api/v1/chains")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "name": "",
+                                    "entries": [{"workflowId": "w-1", "sortOrder": 0}]
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createChain_returns400_whenEntriesEmpty() throws Exception {
+        mockMvc.perform(post("/api/v1/chains")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "name": "My Chain",
+                                    "entries": []
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void deleteChain_returns404_whenChainMissing() throws Exception {
+        doThrow(new java.util.NoSuchElementException("Chain not found")).when(chainService).delete("missing");
+
+        mockMvc.perform(delete("/api/v1/chains/missing"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void listRuns_returns404_whenChainMissing() throws Exception {
+        when(chainService.findById("missing")).thenThrow(new java.util.NoSuchElementException("not found"));
+
+        mockMvc.perform(get("/api/v1/chains/missing/runs"))
+                .andExpect(status().isNotFound());
+    }
 }
