@@ -870,6 +870,213 @@ class AssistantServiceTest {
         verify(fetchService, times(3)).executeFetch(any());
     }
 
+    // ── Cached model & settings (seedSettings / refreshCachedModel) ─────────
+
+    @Test
+    void refreshCachedModel_updatesModelUsedInChat() {
+        when(appSettingsRepository.get("assistant-model")).thenReturn(Optional.of("claude-opus-4-6"));
+        service.refreshCachedModel();
+        stubClaude("Antwort");
+
+        var result = chat("Frage");
+
+        assertThat(result.message()).isEqualTo("Antwort");
+        verify(commandExecutorService).executeOnHost(argThat(req ->
+                "claude-opus-4-6".equals(req.model())));
+    }
+
+    @Test
+    void refreshCachedModel_blankSetting_clearsCachedModel() {
+        when(appSettingsRepository.get("assistant-model")).thenReturn(Optional.of("   "));
+        service.refreshCachedModel();
+        stubClaude("Antwort");
+
+        var result = chat("Frage");
+
+        assertThat(result.message()).isEqualTo("Antwort");
+        verify(commandExecutorService).executeOnHost(argThat(req -> req.model() == null));
+    }
+
+    @Test
+    void seedSettings_seedsDefaultThinkingPhrases_whenMissing() {
+        when(appSettingsRepository.get("assistant-thinking-phrases")).thenReturn(Optional.empty());
+        when(appSettingsRepository.get("assistant-model")).thenReturn(Optional.of("claude-sonnet-4-6"));
+
+        service.seedSettings();
+
+        verify(appSettingsRepository).set(eq("assistant-thinking-phrases"),
+                argThat(v -> v.startsWith("{\"de\"") && v.contains("\"en\"")));
+    }
+
+    @Test
+    void seedSettings_migratesLegacyArrayThinkingPhrases() {
+        when(appSettingsRepository.get("assistant-thinking-phrases")).thenReturn(Optional.of("[\"Denke nach…\"]"));
+        when(appSettingsRepository.get("assistant-model")).thenReturn(Optional.of("claude-sonnet-4-6"));
+
+        service.seedSettings();
+
+        verify(appSettingsRepository).set(eq("assistant-thinking-phrases"), argThat(v -> v.startsWith("{")));
+    }
+
+    @Test
+    void seedSettings_seedsDefaultModel_whenBlank() {
+        when(appSettingsRepository.get("assistant-thinking-phrases")).thenReturn(Optional.of("{\"de\":[]}"));
+        when(appSettingsRepository.get("assistant-model"))
+                .thenReturn(Optional.of(" "), Optional.of("claude-sonnet-4-6"));
+
+        service.seedSettings();
+
+        verify(appSettingsRepository).set("assistant-model", "claude-sonnet-4-6");
+    }
+
+    // ── Chat context building ────────────────────────────────────────────────
+
+    @Test
+    void chat_passesSystemPromptWorkingDirTimeoutAndPriorityToCli() {
+        when(contextBuilder.buildSystemPrompt(any(), any(), eq("en"))).thenReturn("SYS-PROMPT");
+        when(contextBuilder.resolveWorkingDir(any())).thenReturn("/work/dir");
+        stubClaude("Answer");
+
+        var result = service.chat(new AssistantChatRequest(
+                "Question", List.of(), null, null, "en", null, null));
+
+        assertThat(result.message()).isEqualTo("Answer");
+        verify(commandExecutorService).executeOnHost(argThat(req ->
+                "SYS-PROMPT".equals(req.systemPrompt())
+                        && "/work/dir".equals(req.projectPath())
+                        && req.priority()
+                        && Integer.valueOf(240).equals(req.timeoutSeconds())));
+    }
+
+    @Test
+    void chat_passesLanguageToSystemPromptBuilder() {
+        stubClaude("Answer");
+
+        service.chat(new AssistantChatRequest("Question", List.of(), null, null, "en", null, null));
+
+        verify(contextBuilder).buildSystemPrompt(any(), any(), eq("en"));
+    }
+
+    @Test
+    void chat_passesProviderIdToCliAndResolvesIt() {
+        stubClaude("Antwort");
+
+        service.chat(new AssistantChatRequest("Frage", List.of(), null, "CODEX", null, null));
+
+        verify(commandExecutorService).executeOnHost(argThat(req -> "CODEX".equals(req.providerId())));
+        verify(aiProviderRegistry).resolve("CODEX");
+    }
+
+    // ── Status broadcasting ──────────────────────────────────────────────────
+
+    @Test
+    void chat_broadcastsLifecyclePhasesInOrder() {
+        stubClaude("Antwort");
+
+        service.chat(new AssistantChatRequest("Frage", List.of(), null, null, null, "req-42"));
+
+        var inOrder = org.mockito.Mockito.inOrder(broadcaster);
+        inOrder.verify(broadcaster).broadcastStatus(eq("req-42"), eq("BUILDING_CONTEXT"), any(), org.mockito.ArgumentMatchers.anyLong());
+        inOrder.verify(broadcaster).broadcastStatus(eq("req-42"), eq("THINKING"), any(), org.mockito.ArgumentMatchers.anyLong());
+        inOrder.verify(broadcaster).broadcastStatus(eq("req-42"), eq("EXECUTING_TOOLS"), any(), org.mockito.ArgumentMatchers.anyLong());
+        inOrder.verify(broadcaster).broadcastStatus(eq("req-42"), eq("COMPLETED"), any(), org.mockito.ArgumentMatchers.anyLong());
+    }
+
+    @Test
+    void chat_errorBroadcastsErrorPhaseWithCode() {
+        when(commandExecutorService.executeOnHost(any(HostExecutionRequest.class)))
+                .thenThrow(new RuntimeException("boom"));
+
+        service.chat(new AssistantChatRequest("Frage", List.of(), null, null, null, "req-err"));
+
+        verify(broadcaster).broadcastStatus(eq("req-err"), eq("ERROR"), eq("UNKNOWN"), org.mockito.ArgumentMatchers.anyLong());
+    }
+
+    // ── Fetch dispatch: limits & invalid requests ───────────────────────────
+
+    @Test
+    void chat_limitsFetchDispatchToThreePerRound() {
+        stubClaudeSequence(
+                "<fetch-multi/>",
+                "Fertig: Antwort auf Basis der ersten drei geladenen Details."
+        );
+        var f1 = new FetchRequest("run_detail", "r1");
+        var f2 = new FetchRequest("run_detail", "r2");
+        var f3 = new FetchRequest("run_detail", "r3");
+        var f4 = new FetchRequest("run_detail", "r4");
+        when(fetchService.parseFetchRequests("<fetch-multi/>")).thenReturn(List.of(f1, f2, f3, f4));
+        when(fetchService.executeFetch(any())).thenReturn("data");
+        when(fetchService.stripFetchTags("<fetch-multi/>")).thenReturn("");
+        when(fetchService.stripFetchTags("Fertig: Antwort auf Basis der ersten drei geladenen Details."))
+                .thenReturn("Fertig: Antwort auf Basis der ersten drei geladenen Details.");
+
+        var result = chat("Analysiere die Runs");
+
+        assertThat(result.message()).isEqualTo("Fertig: Antwort auf Basis der ersten drei geladenen Details.");
+        verify(fetchService, org.mockito.Mockito.times(3)).executeFetch(any());
+        verify(fetchService, never()).executeFetch(f4);
+    }
+
+    @Test
+    void chat_invalidFetchRequests_unknownType_isIgnored() {
+        stubClaude("<fetch type=\"kaputt\"/>");
+        var unknownType = new FetchRequest("delete_everything", "x2");
+        when(fetchService.parseFetchRequests("<fetch type=\"kaputt\"/>"))
+                .thenReturn(List.of(unknownType));
+        when(fetchService.stripFetchTags("<fetch type=\"kaputt\"/>")).thenReturn("");
+
+        var result = chat("Q");
+
+        assertThat(result.message()).isEqualTo("(No response received)");
+        verify(fetchService, never()).executeFetch(any());
+        verify(commandExecutorService, org.mockito.Mockito.times(1))
+                .executeOnHost(any(HostExecutionRequest.class));
+    }
+
+    @Test
+    void chat_shortFactualAnswerNextToFetchStopsLoop() {
+        String raw = "Der Run r1 ist fehlgeschlagen (Exit 137). <fetch type=\"run_detail\" id=\"r1\"/>";
+        stubClaude(raw);
+        when(fetchService.stripFetchTags(raw)).thenReturn("Der Run r1 ist fehlgeschlagen (Exit 137).");
+
+        var result = chat("Status?");
+
+        assertThat(result.message()).isEqualTo("Der Run r1 ist fehlgeschlagen (Exit 137).");
+        verify(fetchService, never()).executeFetch(any());
+        verify(commandExecutorService, org.mockito.Mockito.times(1))
+                .executeOnHost(any(HostExecutionRequest.class));
+    }
+
+    @Test
+    void chat_nonZeroExitWithoutApiKeyHint_surfacesExitCode() {
+        stubClaude("segfault: core dumped", 137);
+
+        var result = chat("Test");
+
+        assertThat(result.message()).contains("exit 137");
+    }
+
+    // ── Pending-tool merging ─────────────────────────────────────────────────
+
+    @Test
+    void chat_mergesInlinePendingToolsBeforeSuggestedOnes() {
+        var inline = new com.automation.service.assistant.PendingTool(
+                "p-inline", "create_todo", "Inline-Vorschlag", "{}", java.time.Instant.now().plusSeconds(60));
+        var suggested = new com.automation.service.assistant.PendingTool(
+                "p-sugg", "create_todo", "Suggestion-Vorschlag", "{}", java.time.Instant.now().plusSeconds(60));
+        when(toolExecutor.extractTools(any(), org.mockito.ArgumentMatchers.<Predicate<String>>any()))
+                .thenReturn(new AssistantToolExecutor.ExtractionResult("Antwort mit Vorschlag.", List.of(inline)));
+        when(fetchService.stripFetchTags("Antwort mit Vorschlag.")).thenReturn("Antwort mit Vorschlag.");
+        stubClaude("<tool type=\"create_todo\">{}</tool>");
+        when(actionSuggestionService.isEnabled()).thenReturn(true);
+        when(actionSuggestionService.suggest(any(), any(), any()))
+                .thenReturn(new AssistantActionSuggestionService.SuggestionResult(List.of(), List.of(suggested)));
+
+        var result = chat("Bitte lege ein Todo an.");
+
+        assertThat(result.pendingTools()).containsExactly(inline, suggested);
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private void stubClaude(String responseText) {
