@@ -31,7 +31,10 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import com.automation.entity.Todo.Priority;
+import com.automation.dto.request.UpdateTodoRequest;
+import com.automation.exception.ResourceNotFoundException;
 import com.automation.service.activitylog.ActivityLogService;
+import com.automation.service.integration.TaskExportCapable;
 import com.automation.service.todo.TodoSimilarityService;
 
 @WebMvcTest(TodoController.class)
@@ -244,5 +247,75 @@ class TodoControllerTest {
         mockMvc.perform(get("/api/v1/todos/similar")
                         .param("projectId", "proj-1"))
                 .andExpect(status().is5xxServerError());
+    }
+
+    @Test
+    void updateTodo_returnsUpdatedTodo() throws Exception {
+        var request = new UpdateTodoRequest("Updated title", "new desc", Todo.Status.IN_PROGRESS,
+                Todo.Priority.LOW, List.of("backend"), null, null, null, null, null);
+        when(todoService.updateAndReturn(eq("t-1"), any(UpdateTodoRequest.class))).thenReturn(sampleResponse());
+
+        mockMvc.perform(put("/api/v1/todos/t-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("t-1"));
+    }
+
+    @Test
+    void updateTodo_notFound_returns404() throws Exception {
+        var request = new UpdateTodoRequest("title", null, null, null, null, null, null, null, null, null);
+        when(todoService.updateAndReturn(eq("missing"), any(UpdateTodoRequest.class)))
+                .thenThrow(new ResourceNotFoundException("Todo", "missing"));
+
+        mockMvc.perform(put("/api/v1/todos/missing")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getTodo_notFound_returns404() throws Exception {
+        when(todoService.findByIdResponse("missing"))
+                .thenThrow(new ResourceNotFoundException("Todo", "missing"));
+
+        mockMvc.perform(get("/api/v1/todos/missing"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void exportTodo_returnsExportRef() throws Exception {
+        var ref = new TaskExportCapable.TaskRef("LINEAR", "ISS-123", "https://linear.app/issue/ISS-123");
+        when(todoService.exportToTracker(eq("t-1"), eq("LINEAR"), eq("team-a"))).thenReturn(ref);
+
+        var body = objectMapper.writeValueAsString(
+                new com.automation.dto.request.ExportTodoRequest("LINEAR", "team-a"));
+
+        mockMvc.perform(post("/api/v1/todos/t-1/export")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.referenceType").value("LINEAR"))
+                .andExpect(jsonPath("$.referenceId").value("ISS-123"))
+                .andExpect(jsonPath("$.url").value("https://linear.app/issue/ISS-123"));
+    }
+
+    @Test
+    void exportTodo_withoutBody_usesProjectDefaults() throws Exception {
+        var ref = new TaskExportCapable.TaskRef("GITHUB", "gh-42", "https://github.com/issues/42");
+        when(todoService.exportToTracker(eq("t-1"), isNull(), isNull())).thenReturn(ref);
+
+        mockMvc.perform(post("/api/v1/todos/t-1/export"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.referenceType").value("GITHUB"));
+    }
+
+    @Test
+    void archiveStale_withoutProjectId_archivesAll() throws Exception {
+        when(todoHygieneService.archiveStaleNow(null)).thenReturn(12);
+
+        mockMvc.perform(post("/api/v1/todos/archive-stale"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.archived").value(12));
     }
 }
