@@ -34,11 +34,16 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.anyLong;
+import com.automation.service.assistant.PendingTool;
+import java.time.Instant;
 
 @ExtendWith(MockitoExtension.class)
 class AssistantServiceTest {
@@ -678,6 +683,191 @@ class AssistantServiceTest {
         var result = chat("Welche Workflows gibt es?");
 
         assertThat(result.actions()).isEmpty();
+    }
+
+    // ── Broadcaster status sequence ──────────────────────────────────────────
+
+    @Test
+    void chat_successPath_broadcastsCorrectStatusSequenceInOrder() {
+        stubClaude("Antwort.");
+        when(fetchService.stripFetchTags("Antwort.")).thenReturn("Antwort.");
+
+        service.chat(new AssistantChatRequest("Frage", List.of(), null, null, null, "req-1"));
+
+        var inOrder = org.mockito.Mockito.inOrder(broadcaster);
+        inOrder.verify(broadcaster).broadcastStatus(eq("req-1"), eq("BUILDING_CONTEXT"), any(), anyLong());
+        inOrder.verify(broadcaster).broadcastStatus(eq("req-1"), eq("THINKING"), any(), anyLong());
+        inOrder.verify(broadcaster).broadcastStatus(eq("req-1"), eq("EXECUTING_TOOLS"), any(), anyLong());
+        inOrder.verify(broadcaster).broadcastStatus(eq("req-1"), eq("COMPLETED"), any(), anyLong());
+    }
+
+    @Test
+    void chat_errorPath_broadcastsErrorStatus() {
+        when(commandExecutorService.executeOnHost(any()))
+                .thenThrow(new RuntimeException("boom"));
+
+        service.chat(new AssistantChatRequest("Frage", List.of(), null, null, null, "req-err"));
+
+        verify(broadcaster).broadcastStatus(eq("req-err"), eq("ERROR"), anyString(), anyLong());
+    }
+
+    @Test
+    void chat_timeoutError_broadcastsTimeoutCode() {
+        when(commandExecutorService.executeOnHost(any()))
+                .thenThrow(new WorkflowExecutionException("x",
+                        new java.io.IOException("Host Claude action timed out after 240 seconds")));
+
+        service.chat(new AssistantChatRequest("Frage", List.of(), null, null, null, "req-timeout"));
+
+        verify(broadcaster).broadcastStatus(eq("req-timeout"), eq("ERROR"), eq("TIMEOUT"), anyLong());
+    }
+
+    @Test
+    void chat_cliNonZeroExit_broadcastsCliNonZeroExitCode() {
+        stubClaude("Fatal: segmentation fault in subprocess", 1);
+
+        service.chat(new AssistantChatRequest("Frage", List.of(), null, null, null, "req-exit"));
+
+        verify(broadcaster).broadcastStatus(eq("req-exit"), eq("ERROR"), eq("CLI_NON_ZERO_EXIT"), anyLong());
+    }
+
+    @Test
+    void chat_fetchRound_broadcastsFetchingDataStatusPerRound() {
+        stubClaudeSequence(
+                "<fetch type=\"run_detail\" id=\"r1\"/>",
+                "Der Run r1 ist fertig."
+        );
+        var fetchReq = new AssistantFetchService.FetchRequest("run_detail", "r1");
+        when(fetchService.parseFetchRequests("<fetch type=\"run_detail\" id=\"r1\"/>"))
+                .thenReturn(List.of(fetchReq));
+        when(fetchService.executeFetch(fetchReq)).thenReturn("run data");
+        when(fetchService.stripFetchTags("<fetch type=\"run_detail\" id=\"r1\"/>")).thenReturn("");
+        when(fetchService.stripFetchTags("Der Run r1 ist fertig.")).thenReturn("Der Run r1 ist fertig.");
+
+        service.chat(new AssistantChatRequest("Frage", List.of(), null, null, null, "req-fetch"));
+
+        verify(broadcaster).broadcastStatus(eq("req-fetch"), eq("FETCHING_DATA"), anyString(), anyLong());
+        verify(broadcaster, times(2)).broadcastStatus(eq("req-fetch"), eq("THINKING"), any(), anyLong());
+    }
+
+    // ── PendingTool merge ─────────────────────────────────────────────────────
+
+    @Test
+    void chat_mergesPendingToolsInlineBeforeSuggested() {
+        var inlineTool = new PendingTool("p-inline", "create_todo", "Inline TODO", "{}", Instant.now().plusSeconds(60));
+        var suggestedTool = new PendingTool("p-suggested", "create_workflow", "Suggested Workflow", "{}", Instant.now().plusSeconds(60));
+        stubClaude("Vorschlag.");
+        when(fetchService.stripFetchTags("Vorschlag.")).thenReturn("Vorschlag.");
+        when(toolExecutor.extractTools(any(), any()))
+                .thenReturn(new AssistantToolExecutor.ExtractionResult("Vorschlag.", List.of(inlineTool)));
+        when(actionSuggestionService.isEnabled()).thenReturn(true);
+        when(actionSuggestionService.suggest(any(), any(), any()))
+                .thenReturn(new AssistantActionSuggestionService.SuggestionResult(
+                        List.of(), List.of(suggestedTool)));
+
+        var result = chat("Lege bitte ein TODO an.");
+
+        assertThat(result.pendingTools()).hasSize(2);
+        assertThat(result.pendingTools().get(0).id()).isEqualTo("p-inline");
+        assertThat(result.pendingTools().get(1).id()).isEqualTo("p-suggested");
+    }
+
+    @Test
+    void chat_onlyInlinePendingTools_returnedCorrectly() {
+        var inlineTool = new PendingTool("p1", "create_todo", "TODO", "{}", Instant.now().plusSeconds(60));
+        stubClaude("Vorschlag.");
+        when(fetchService.stripFetchTags("Vorschlag.")).thenReturn("Vorschlag.");
+        when(toolExecutor.extractTools(any(), any()))
+                .thenReturn(new AssistantToolExecutor.ExtractionResult("Vorschlag.", List.of(inlineTool)));
+
+        var result = chat("Lege ein TODO an.");
+
+        assertThat(result.pendingTools()).hasSize(1);
+        assertThat(result.pendingTools().get(0).id()).isEqualTo("p1");
+    }
+
+    @Test
+    void chat_onlySuggestedPendingTools_returnedCorrectly() {
+        var suggestedTool = new PendingTool("p-sug", "create_workflow", "Workflow anlegen", "{}", Instant.now().plusSeconds(60));
+        stubClaude("Antwort.");
+        when(fetchService.stripFetchTags("Antwort.")).thenReturn("Antwort.");
+        when(actionSuggestionService.isEnabled()).thenReturn(true);
+        when(actionSuggestionService.suggest(any(), any(), any()))
+                .thenReturn(new AssistantActionSuggestionService.SuggestionResult(
+                        List.of(), List.of(suggestedTool)));
+
+        var result = chat("Erstelle einen Workflow.");
+
+        assertThat(result.pendingTools()).hasSize(1);
+        assertThat(result.pendingTools().get(0).id()).isEqualTo("p-sug");
+    }
+
+    @Test
+    void chat_noPendingTools_returnsEmpty() {
+        stubClaude("Normale Antwort.");
+        when(fetchService.stripFetchTags("Normale Antwort.")).thenReturn("Normale Antwort.");
+
+        var result = chat("Frage");
+
+        assertThat(result.pendingTools()).isNullOrEmpty();
+    }
+
+    // ── refreshCachedModel ────────────────────────────────────────────────────
+
+    @Test
+    void refreshCachedModel_updatesModelUsedInNextChatCall() {
+        when(appSettingsRepository.get("assistant-model")).thenReturn(Optional.of("claude-opus-4-8"));
+        service.refreshCachedModel();
+        stubClaude("ok");
+
+        service.chat(new AssistantChatRequest("Test", List.of(), null, null, null, null));
+
+        verify(commandExecutorService).executeOnHost(argThat(req -> "claude-opus-4-8".equals(req.model())));
+    }
+
+    @Test
+    void refreshCachedModel_withBlankSetting_setsModelToNull() {
+        when(appSettingsRepository.get("assistant-model")).thenReturn(Optional.of("  "));
+        service.refreshCachedModel();
+        stubClaude("ok");
+
+        service.chat(new AssistantChatRequest("Test", List.of(), null, null, null, null));
+
+        verify(commandExecutorService).executeOnHost(argThat(req -> req.model() == null));
+    }
+
+    @Test
+    void refreshCachedModel_withEmptySetting_setsModelToNull() {
+        when(appSettingsRepository.get("assistant-model")).thenReturn(Optional.empty());
+        service.refreshCachedModel();
+        stubClaude("ok");
+
+        service.chat(new AssistantChatRequest("Test", List.of(), null, null, null, null));
+
+        verify(commandExecutorService).executeOnHost(argThat(req -> req.model() == null));
+    }
+
+    // ── MAX_FETCHES_PER_ROUND capping ─────────────────────────────────────────
+
+    @Test
+    void chat_moreThanThreeFetchesInOneRound_capsAtThree() {
+        String firstResponse = "<fetch type=\"run_detail\" id=\"r1\"/>"
+                + "<fetch type=\"run_detail\" id=\"r2\"/>"
+                + "<fetch type=\"run_detail\" id=\"r3\"/>"
+                + "<fetch type=\"run_detail\" id=\"r4\"/>";
+        stubClaudeSequence(firstResponse, "Fertig.");
+        var f1 = new FetchRequest("run_detail", "r1");
+        var f2 = new FetchRequest("run_detail", "r2");
+        var f3 = new FetchRequest("run_detail", "r3");
+        var f4 = new FetchRequest("run_detail", "r4");
+        when(fetchService.parseFetchRequests(firstResponse)).thenReturn(List.of(f1, f2, f3, f4));
+        when(fetchService.executeFetch(any())).thenReturn("data");
+        when(fetchService.stripFetchTags(firstResponse)).thenReturn("");
+        when(fetchService.stripFetchTags("Fertig.")).thenReturn("Fertig.");
+
+        chat("Los gehts.");
+
+        verify(fetchService, times(3)).executeFetch(any());
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
