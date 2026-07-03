@@ -17,6 +17,7 @@ import {
 import { useT } from '../i18n';
 import { useI18nStore } from '../i18n';
 import { SETUP_GUIDES } from '../data/integrationSetupGuides';
+import { formatDateTime } from '../utils/formatTime';
 import type { IntegrationProviderInfo, IntegrationActionInfo } from '../types';
 import type { SetupStep } from '../data/integrationSetupGuides';
 
@@ -66,10 +67,11 @@ function ProviderStatusBadge({ provider }: { provider: IntegrationProviderInfo }
   );
 }
 
-function SetupGuidePanel({ providerId, displayName, requiresCredentials = true, onRefresh }: {
+function SetupGuidePanel({ providerId, displayName, requiresCredentials = true, connected = false, onRefresh }: {
   providerId: string;
   displayName: string;
   requiresCredentials?: boolean;
+  connected?: boolean;
   onRefresh: () => void;
 }) {
   const lang = useI18nStore.getState().locale;
@@ -96,16 +98,19 @@ function SetupGuidePanel({ providerId, displayName, requiresCredentials = true, 
     );
   };
 
-  return (
-    <Card>
-      <div className="p-4">
-        <div className="flex items-center gap-2 mb-1">
-          <Settings2 className="w-5 h-5 text-amber-500" />
-          <h3 className="font-semibold text-text">
-            {t.integrations.setupTitle.replace('{provider}', displayName)}
-          </h3>
-        </div>
-        <p className="text-sm text-text-secondary mb-4">{t.integrations.setupDescription}</p>
+  const content = (
+    <div className={connected ? '' : 'p-4'}>
+      {!connected && (
+        <>
+          <div className="flex items-center gap-2 mb-1">
+            <Settings2 className="w-5 h-5 text-amber-500" />
+            <h3 className="font-semibold text-text">
+              {t.integrations.setupTitle.replace('{provider}', displayName)}
+            </h3>
+          </div>
+          <p className="text-sm text-text-secondary mb-4">{t.integrations.setupDescription}</p>
+        </>
+      )}
 
         <div className="space-y-2">
           {guide.steps.map((step: SetupStep, i: number) => {
@@ -168,7 +173,12 @@ function SetupGuidePanel({ providerId, displayName, requiresCredentials = true, 
 
         {/* Credential input fields */}
         <div className="mt-4 p-3 rounded-lg border border-border bg-surface-secondary space-y-3">
-          <h4 className="text-sm font-medium text-text">{t.integrations.enterCredentials}</h4>
+          <h4 className="text-sm font-medium text-text">
+            {connected ? t.integrations.updateCredentials : t.integrations.enterCredentials}
+          </h4>
+          {connected && (
+            <p className="text-xs text-text-tertiary">{t.integrations.credentialsSaved}</p>
+          )}
           <Input
             placeholder={guide.credentialLabels?.clientIdPlaceholder[lang] ?? 'Client ID'}
             value={clientId}
@@ -199,16 +209,17 @@ function SetupGuidePanel({ providerId, displayName, requiresCredentials = true, 
             disabled={requiresCredentials && (!clientId.trim() || !clientSecret.trim())}
           >
             <CheckCircle2 className="w-3 h-3 mr-1" />
-            {t.integrations.saveCredentials}
+            {connected ? t.integrations.updateCredentials : t.integrations.saveCredentials}
           </Button>
         </div>
       </div>
-    </Card>
   );
+  return connected ? content : <Card>{content}</Card>;
 }
 
 export function Integrations() {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const { data: providers, isLoading, error, refetch } = useIntegrations();
   // Localized provider copy (DE/EN) with fallback to the backend-provided text.
   const providerCopy = (t.integrations as unknown as {
@@ -231,6 +242,7 @@ export function Integrations() {
   const [testResult, setTestResult] = useState<string | null>(null);
   const [testingAction, setTestingAction] = useState<string | null>(null);
   const [selectedScopes, setSelectedScopes] = useState<Record<string, boolean>>({});
+  const [showConfig, setShowConfig] = useState(false);
 
   if (isLoading) {
     return (
@@ -309,7 +321,11 @@ export function Integrations() {
             className={`cursor-pointer transition-all hover:border-primary/50 ${
               selected?.providerId === provider.providerId ? 'border-primary ring-1 ring-primary/30' : ''
             }`}
-            onClick={() => setSelected(selected?.providerId === provider.providerId ? null : provider)}
+            onClick={() => {
+              setShowConfig(false);
+              setTestResult(null);
+              setSelected(selected?.providerId === provider.providerId ? null : provider);
+            }}
           >
             <div className="flex items-start gap-4 p-4">
               <div className={`p-3 rounded-lg ${
@@ -399,8 +415,8 @@ export function Integrations() {
         ))}
       </div>
 
-      {/* Setup Guide (when not configured) */}
-      {selected && !selected.configured && selected.status !== 'CONNECTED' && (
+      {/* Setup Guide (when not yet connected — incl. credentials saved but not connected) */}
+      {selected && selected.status !== 'CONNECTED' && (
         <SetupGuidePanel
           key={selected.providerId}
           providerId={selected.providerId}
@@ -414,6 +430,71 @@ export function Integrations() {
       {selected && selected.status === 'CONNECTED' && (
         <Card>
           <div className="p-4">
+            {/* Connection details */}
+            <div className="mb-6">
+              <h3 className="font-semibold text-text mb-3">{t.integrations.connectionDetails}</h3>
+              <dl className="space-y-2 text-sm">
+                {(selected.accountName || selected.accountEmail) && (
+                  <div className="flex gap-2">
+                    <dt className="text-text-tertiary w-40 shrink-0">{t.integrations.account}</dt>
+                    <dd className="text-text-secondary">{selected.accountName || selected.accountEmail}</dd>
+                  </div>
+                )}
+                {selected.connectedSince && (
+                  <div className="flex gap-2">
+                    <dt className="text-text-tertiary w-40 shrink-0">{t.integrations.connectedSince}</dt>
+                    <dd className="text-text-secondary">{formatDateTime(selected.connectedSince, locale)}</dd>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <dt className="text-text-tertiary w-40 shrink-0">{t.integrations.grantedPermissions}</dt>
+                  <dd className="flex flex-wrap gap-1">
+                    {selected.scopes?.trim()
+                      ? selected.scopes.trim().split(/\s+/).map((s) => (
+                          <Badge key={s} variant="success">{s}</Badge>
+                        ))
+                      : <span className="text-text-secondary">—</span>}
+                  </dd>
+                </div>
+                {selected.optionalScopes?.length > 0 && (
+                  <div className="flex gap-2">
+                    <dt className="text-text-tertiary w-40 shrink-0">{t.integrations.optionalPermissions}</dt>
+                    <dd className="flex flex-wrap gap-1">
+                      {selected.optionalScopes.map((s) => (
+                        <Badge key={s.scope} variant={s.granted ? 'success' : 'default'}>{s.label}</Badge>
+                      ))}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+
+            {/* Configuration & setup guide (collapsible) */}
+            <div className="mb-6 border border-border rounded-lg overflow-hidden">
+              <button
+                onClick={() => setShowConfig((v) => !v)}
+                className="flex items-center gap-2 w-full p-3 text-left hover:bg-surface-secondary transition-colors"
+              >
+                <Settings2 className="w-4 h-4 text-text-secondary shrink-0" />
+                <span className="font-medium text-sm text-text flex-1">{t.integrations.configuration}</span>
+                <ChevronRight className={`w-4 h-4 text-text-secondary transition-transform duration-200 shrink-0 ${showConfig ? 'rotate-90' : ''}`} />
+              </button>
+              <div className={`grid transition-all duration-200 ease-in-out ${showConfig ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+                <div className="overflow-hidden">
+                  <div className="px-3 pb-3">
+                    <SetupGuidePanel
+                      key={selected.providerId}
+                      providerId={selected.providerId}
+                      displayName={localizedName(selected)}
+                      requiresCredentials={selected.requiresCredentials !== false}
+                      connected
+                      onRefresh={() => refetch()}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <h3 className="font-semibold text-text mb-4">
               {t.integrations.availableActions} — {localizedName(selected)}
             </h3>
