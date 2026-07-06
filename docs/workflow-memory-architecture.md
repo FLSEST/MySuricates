@@ -67,11 +67,12 @@ und stellt es bei zukuenftigen Ausfuehrungen als Kontext bereit. Es unterstuetzt
           │                  │
           ▼                  ▼
   ┌──────────────┐   ┌──────────────┐
-  │ claude -p    │   │ codex exec   │
+  │ claude -p    │   │ codex exec - │
   │ --max-turns 1│   │ -o result.txt│
   │ --output-    │   │ --skip-git-  │
   │  format      │   │  repo-check  │
   │  stream-json │   │ -C <workdir> │
+  │  --verbose   │   │              │
   └──────┬───────┘   └──────┬───────┘
          │                   │
          ▼                   ▼
@@ -86,9 +87,10 @@ und stellt es bei zukuenftigen Ausfuehrungen als Kontext bereit. Es unterstuetzt
 
 | Eigenschaft       | ClaudeSummarizer              | CodexSummarizer               |
 |-------------------|-------------------------------|-------------------------------|
-| CLI               | `claude -p`                   | `codex exec`                  |
+| CLI               | `claude -p`                   | `codex exec -`                |
+| Prompt-Uebergabe  | stdin                         | stdin (`-` Placeholder)       |
 | Max Turns         | 1 (kein Tool-Use)             | — (codex exec default)        |
-| Output-Methode    | Stream-JSON parsen            | `-o` Flag (Datei)             |
+| Output-Methode    | Stream-JSON parsen            | `-o` Flag (Temp-Datei)        |
 | Instruktionen     | `CLAUDE.md` im Working Dir    | `AGENTS.md` im Working Dir    |
 | Auth              | `~/.claude/` (CLI-eigen)      | `~/.codex/` (CLI-eigen)       |
 | Timeout           | `automation.summarization.timeout-seconds` (default: 120s) |
@@ -126,24 +128,30 @@ und stellt es bei zukuenftigen Ausfuehrungen als Kontext bereit. Es unterstuetzt
 
 ```
 ┌─────────────────────────┐       ┌─────────────────────────┐
-│     workflow_memory      │       │      workflow_run        │
+│     workflow_memory      │       │      workflow_runs       │
 ├─────────────────────────┤       ├─────────────────────────┤
 │ id          TEXT PK      │       │ id          TEXT PK      │
 │ workflow_id TEXT FK       │◄──────│ workflow_id TEXT FK       │
-│ title       TEXT          │       │ status      TEXT          │
-│ content     TEXT (MD)     │       │ started_at  TIMESTAMP    │
-│ tags        TEXT (JSON)   │       │ finished_at TIMESTAMP    │
-│ source_run_ids TEXT (JSON)│───────│ steps       (embedded)   │
-│ provider    TEXT          │       │   ├── step_index INT     │
-│ active      BOOLEAN       │       │   ├── input     TEXT     │
-│ created_at  TIMESTAMP    │       │   ├── output    TEXT     │
-└─────────────────────────┘       │   ├── status    TEXT     │
-                                   │   └── metadata  JSON     │
- provider: "CLAUDE" | "CODEX"     └─────────────────────────┘
- active: nur 1 pro Workflow
-
- Beziehung: source_run_ids verweist auf
- die Run-IDs die zur Extraktion genutzt wurden
+│ title       TEXT          │       │ workflow_name TEXT        │
+│ content     TEXT (MD)     │       │ status      TEXT          │
+│ tags        TEXT (JSON)   │       │ started_at  TIMESTAMP    │
+│ source_run_ids TEXT (JSON)│───────│ completed_at TIMESTAMP   │
+│ provider    TEXT          │       │ duration_ms INTEGER       │
+│ active      INTEGER       │       │ metadata    JSON          │
+│ created_at  TEXT          │       └────────┬────────────────┘
+└─────────────────────────┘                │ @OneToMany
+                                   ┌───────┴─────────────────┐
+ provider: "CLAUDE" | "CODEX"     │      step_results        │
+ active: nur 1 pro Workflow       ├─────────────────────────┤
+                                   │ id          TEXT PK      │
+ Beziehung: source_run_ids        │ workflow_run_id TEXT FK   │
+ verweist auf die Run-IDs die     │ step_index  INT           │
+ zur Extraktion genutzt wurden    │ input       TEXT           │
+                                   │ output      TEXT           │
+                                   │ status      TEXT           │
+                                   │ metadata    JSON           │
+                                   │ context_delta JSON         │
+                                   └─────────────────────────┘
 ```
 
 ---
@@ -175,7 +183,7 @@ beim naechsten Neustart uebernommen.
 ```yaml
 automation:
   summarization:
-    base-dir: ${AUTOMATION_SUMMARIZATION_DIR:~/.autotrigger/summarization}
+    base-dir: ${AUTOMATION_SUMMARIZATION_DIR:${user.home}/.autotrigger/summarization}
     timeout-seconds: ${AUTOMATION_SUMMARIZATION_TIMEOUT:120}
 ```
 
@@ -199,3 +207,49 @@ automation:
 | 400         | Unbekannter Provider                        |
 | 422         | Keine Runs / keine Steps gefunden           |
 | 502         | CLI-Aufruf fehlgeschlagen (Timeout, Crash)  |
+
+---
+
+## 8. Auto-Memory-Extraktion
+
+Der `AutoMemoryExtractionListener` extrahiert und aktiviert Memory automatisch
+nach erfolgreichen Workflow-Runs. Die Konfiguration erfolgt per Workflow ueber
+das `metadata`-Feld.
+
+### Aktivierung (Workflow-Metadata)
+
+```json
+{
+  "autoMemoryExtraction": {
+    "enabled": true,
+    "interval": 5
+  }
+}
+```
+
+- `enabled`: Auto-Extraktion ein-/ausschalten
+- `interval`: Anzahl erfolgreicher Runs zwischen Extraktionen (Default: 5)
+
+### Ablauf
+
+```
+  WorkflowRunCompletedEvent (status == COMPLETED)
+  │
+  ├─ 1. isAutoMemoryEnabled(workflowMetadata) → true?
+  │
+  ├─ 2. Erfolgreiche Runs seit letzter Extraktion zaehlen
+  │     └── WorkflowRunRepository.countByWorkflowIdAndStatusAndCompletedAtAfter()
+  │
+  ├─ 3. Schwellwert (interval) erreicht?
+  │     └── Nein → Abbruch (naechster Run zaehlt weiter)
+  │
+  └─ 4. extractAndActivate(workflowId, "CLAUDE")
+        ├── Extrahiert Knowledge aus den letzten 10 Runs
+        ├── Deaktiviert alle bisherigen Memories
+        ├── Aktiviert die neue Memory
+        └── Schreibt project-memory.md ins Projekt (falls projectPath vorhanden)
+```
+
+- Laeuft asynchron (`@Async @EventListener`) — blockiert den Workflow-Run nicht
+- Verwendet immer Provider `CLAUDE`
+- Auch `autoMemoryExtraction: true` (boolean statt Map) wird unterstuetzt (nutzt Default-Interval 5)

@@ -1,6 +1,4 @@
-<!-- last-sync: 2026-04-14 from: docs/vision.md -->
-
-> *Last updated: April 14, 2026 — Translated from German*
+> *Last updated: [auto-generated]*
 
 # MySuricates — Vision
 
@@ -19,7 +17,7 @@ Not just for developers. For anyone who wants to solve real problems.
 
 Perfection is not a state — it is a direction. A system that considers perfection achievable will eventually stop learning. This one won't.
 
-Every run produces data. Every iteration refines the next attempt. Learning, Memory, Factory, and Wishes are not features — they are the mechanisms of this continuous approximation. The system will never be perfect. But with every step, it gets closer to perfection — and that is exactly the point.
+Every run produces data. Every iteration refines the next attempt. Learning, Memory, Factory, and Wishes are not features — they are the mechanisms of this continuous approximation. The system will never be perfect. But with every step it gets closer to perfection — and that is exactly the point.
 
 ---
 
@@ -31,24 +29,24 @@ MySuricates solves real problems — in personal life and in the professional wo
 
 - **Morning Briefing**: News, calendar, priorities — everything at a glance
 - **Meeting Minutes**: Recording → Summary → Action Items → Distribution
-- **Social Media Calendar**: Content ideas → Texts → Schedule → Posting
+- **Social Media Calendar**: Content ideas → Copy → Schedule → Posting
 - **Security Audit**: Scan codebase → Assess vulnerabilities → Report
 - **Code Review**: Automatic analysis → Improvement suggestions → PR comments
 
 ### Personal
 
-- **Application Coach**: Analyze job posting → Cover letter → Adapt resume
+- **Job Application Coach**: Analyze job listing → Cover letter → Adapt resume
 - **Travel Planning**: Budget, interests, timeframe → Complete travel plan
 - **Vocabulary Songs**: Frequency-based song generation for language learning
-- **Event Organization**: Guest list, location, schedule, invitations
+- **Event Organization**: Guest list, venue, schedule, invitations
 
 ### Combined (Chains)
 
-- **Content Machine**: Research → Article → Social Posts → Newsletter
-- **Website Audit**: Performance → SEO → Accessibility → Overall Report
+- **Content Machine**: Research → Article → Social posts → Newsletter
+- **Website Audit**: Performance → SEO → Accessibility → Overall report
 - **Office Morning Routine**: Check emails → Calendar → Briefing → Prioritize todos
 
-The core: Every workflow is a solved problem. Every chain is a solved problem chain. The template library grows — and with it the number of problems that MySuricates can solve out-of-the-box.
+The core idea: Every workflow is a solved problem. Every chain is a solved problem chain. The template library grows — and with it the range of problems MySuricates can solve out-of-the-box.
 
 ---
 
@@ -61,7 +59,7 @@ The system gets better with every execution. Four mechanisms drive the evolution
 The user says what they want in natural language. The system decomposes, builds, tests, executes, evaluates, and iterates.
 
 ```
-User: "Ich brauche einen wöchentlichen Security-Report für mein Projekt"
+User: "I need a weekly security report for my project"
 
 MySuricates:
   1. Decompose → 3 sub-tasks identified
@@ -107,10 +105,10 @@ Workflows accumulate knowledge across runs:
 
 ---
 
-## What Has Been Built (v0.6.4)
+## What's Already Built (v0.6.4)
 
 | Component | Status |
-|----------|--------|
+|-----------|--------|
 | Block-based Workflows (12 block types) | Done |
 | Docker Container Execution | Done |
 | Agentic Blocks (Goal → Reason → Act → Observe) | Done |
@@ -118,18 +116,18 @@ Workflows accumulate knowledge across runs:
 | Workflow Factory (AI-generated + auto-test) | Done |
 | Wishes (Intent → Decompose → Execute → Evaluate) | Done |
 | Decompose-Approval Gate | Done |
-| Pre-flight Verification + Auto-Fix + AutoRepair-Config | Done |
+| Pre-flight Verification + Auto-Fix + AutoRepair Config | Done |
 | Learning Feedback in Prompts | Done |
 | Cross-Project Workflow Recognition | Done |
 | 53 Built-in Templates (Dev + Office + Everyday) | Done |
-| 16 Built-in Skills (Code-Review, Test-Generator, OCR etc.) | Done |
+| 16 Built-in Skills (Code Review, Test Generator, OCR, etc.) | Done |
 | Staging (Dev + Stable + Test) | Done |
 | Multi-Provider (Claude + Codex) | Done |
 | Assistant System (contextual floating chat with page suggestions) | Done |
-| Gate Status System (Quality Gates, AutoTodo integration) | Done |
+| Gate Status System (quality gates, AutoTodo integration) | Done |
 | Agent Instructions System (base and per-workflow instructions) | Done |
 | CompletionTrigger System (automatic actions after workflow completion) | Done |
-| TodoTrigger System (Self-Improvement Loop: TODO → Fix-Workflow → Verify → Close) | Done |
+| TodoTrigger System (self-improvement loop: TODO → Fix Workflow → Verify → Close) | Done |
 | Notification System (NotificationConfig) | Done |
 | Workflow Memory (knowledge extraction and accumulation across runs) | Done |
 | Template Verification (quality checks for workflow templates) | Done |
@@ -153,7 +151,7 @@ Workflows accumulate knowledge across runs:
 
 - **Cost Estimation Before Execution** — User sees expected token costs before a Wish runs
 - **Model Selection Per Wish** — Automatic or manual selection of the appropriate model
-- ~~**Auto-Refine Without User Intervention**~~ — Basic mechanism available (maxIterations, iterationCount), autoRefine flag still missing
+- ~~**Auto-Refine Without User Intervention**~~ — Basic mechanism exists (maxIterations, iterationCount), autoRefine flag still missing
 - ~~**Iteration History With Delta Tracking**~~ — iterationHistory stores iterations, delta tracking/diff view still missing
 
 ### Phase 3: Crystallize & Discovery
@@ -164,8 +162,8 @@ Workflows accumulate knowledge across runs:
 
 ### Long-term: Ecosystem
 
-- **External Skill Packages** — Installable packages (Git repo/ZIP) with new Skills + Capabilities
-- **MCP Servers as Skills** — Automatically make MCP servers available as Skills/Capabilities
+- **External Skill Packages** — Installable packages (Git repo/ZIP) with new skills + capabilities
+- **MCP Servers as Skills** — Automatically expose MCP servers as skills/capabilities
 - **Integration Plugins** — Slack, Jira, GitHub, Email as workflow blocks
 - **Workflow Marketplace** — Share and discover community templates
 
@@ -176,7 +174,7 @@ Workflows accumulate knowledge across runs:
 ```
                     User
                       |
-              "Ich will X lösen"
+              "I want to solve X"
                       |
                   [ Wish API ]
                       |

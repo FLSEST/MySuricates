@@ -1,5 +1,3 @@
-<!-- last-sync: 2026-06-29 from: docs/entwicklung.md -->
-
 > *Last updated: [auto-generated]*
 
 # Development
@@ -14,7 +12,7 @@
 | npm | 10+ | `npm --version` |
 | Docker | 24+ (optional) | `docker --version` |
 
-Docker is only required for container-execution workflow blocks — the backend boots fine without a running Docker daemon (the Docker client is initialized lazily). For first-time setup on a new machine see **[GETTING-STARTED.md](GETTING-STARTED.md)** (including `scripts/setup.sh`).
+Docker is only needed for container-execution workflow blocks — the backend boots even without a running Docker daemon (the Docker client is initialized lazily). For first-time setup on a new machine, see **[GETTING-STARTED.md](GETTING-STARTED.md)** (includes `scripts/setup.sh`).
 
 ## Local Setup
 
@@ -29,9 +27,9 @@ mvn clean compile
 # Start (port 9090)
 mvn spring-boot:run
 
-# Alternative: build JAR and run it
+# Alternative: build JAR and run
 mvn clean package -DskipTests
-java -jar target/ai-automation-backend-0.6.2-SNAPSHOT.jar
+java -jar target/ai-automation-backend-0.7.3-SNAPSHOT.jar
 ```
 
 The backend automatically creates `data/automation.db` on first start and runs Flyway migrations.
@@ -50,7 +48,7 @@ npm run dev
 
 The Vite dev server automatically proxies `/api/*` and `/ws/*` to `localhost:9090`.
 
-### Running Both in Parallel
+### Starting Both in Parallel
 
 Terminal 1 (Backend):
 ```bash
@@ -80,7 +78,7 @@ mvn clean package -DskipTests
 # Build JAR (with tests)
 mvn clean package
 
-# Output: target/ai-automation-backend-0.6.2-SNAPSHOT.jar
+# Output: target/ai-automation-backend-0.7.3-SNAPSHOT.jar
 ```
 
 ### Frontend
@@ -131,7 +129,7 @@ The tests use `spring-boot-starter-test` (JUnit 5, MockMvc) and `spring-security
 ```bash
 cd ai-automation-frontend
 
-# TypeScript type check
+# TypeScript type checking
 npx tsc --noEmit
 
 # Linting
@@ -143,10 +141,10 @@ npm run lint
 The E2E tests run with [Cypress](https://www.cypress.io/) against the **real backend** (no mocking). Test data is created and deleted directly via the API using `cy.request()`.
 
 There are two target modes:
-- **Dev**: frontend proxy and Cypress helpers point to `localhost:9090`
-- **Test**: frontend proxy and Cypress helpers point to `localhost:8090`
+- **Dev**: Frontend proxy and Cypress helper point to `localhost:9090`
+- **Test**: Frontend proxy and Cypress helper point to `localhost:8090`
 
-**Important:** The frontend and Cypress must always be started with the same `CYPRESS_TARGET`, otherwise the UI creates data on a different instance than the setup/cleanup.
+**Important:** Frontend and Cypress must always be started with the same `CYPRESS_TARGET`, otherwise the UI creates data on a different instance than the setup/cleanup.
 
 ### Dev Target (Default)
 
@@ -155,7 +153,7 @@ There are two target modes:
 ```bash
 cd ai-automation-frontend
 
-# Frontend starts with proxy to dev (:9090)
+# Frontend starts with proxy to Dev (:9090)
 npm run dev
 
 # Open Cypress interactively (browser UI)
@@ -168,18 +166,18 @@ npm run cy:run
 npm run test:e2e
 ```
 
-The dev API key is read automatically from `ai-automation-backend/data/automation.db` if available.
+The dev API key is automatically read from `ai-automation-backend/data/automation.db` if available.
 
-### Test Target (isolated, no test data in dev)
+### Test Target (isolated, no business test data in Dev)
 
-**Prerequisite:** Test instance on port `8090` is running.
+**Prerequisite:** Test instance running on port `8090`.
 
 ```bash
-# Example: start test instance with a fixed API key
+# Example: Start test instance with fixed API key
 cd ai-automation-backend
 AUTOMATION_API_KEY=<test-api-key> docker compose -f docker-compose.test.yml up -d
 
-# Optional: sync current definitions from dev to test
+# Optional: sync current definitions from Dev to Test
 curl -s -X POST http://localhost:9090/api/v1/testing/sync-definitions \
   -H "Content-Type: application/json" \
   -H "X-API-Key: $DEV_KEY" \
@@ -187,14 +185,14 @@ curl -s -X POST http://localhost:9090/api/v1/testing/sync-definitions \
 
 cd ../ai-automation-frontend
 
-# Frontend with proxy to test (:8090)
+# Frontend with proxy to Test (:8090)
 CYPRESS_TARGET=test CYPRESS_TEST_API_KEY=<test-api-key> npm run dev:e2e:test
 
 # Cypress against the same test instance
 CYPRESS_TARGET=test CYPRESS_TEST_API_KEY=<test-api-key> npm run test:e2e:test
 ```
 
-Targets can also be overridden directly:
+Optionally, the targets can also be overridden directly:
 
 ```bash
 CYPRESS_API_BASE_URL=http://localhost:8090/api/v1
@@ -203,10 +201,10 @@ CYPRESS_WS_BASE_URL=ws://localhost:8090
 
 ### Test Data and Cleanup
 
-- **Dev target:** Cypress-created projects, workflows, chains, and runs land on dev
-- **Test target:** the same data lands on the test instance
-- `cy.apiCleanup()` only removes Cypress test data with the `Cypress` prefix
-- For the test instance, `POST /api/v1/testing/reset` can additionally be used when a full reset is desired
+- **Dev target:** Cypress-created projects, workflows, chains, and runs end up in Dev
+- **Test target:** The same data ends up on the test instance
+- `cy.apiCleanup()` only cleans up Cypress test data with the prefix `Cypress`
+- For the test instance, `POST /api/v1/testing/reset` can additionally be used if a complete reset is desired
 
 **Test structure:**
 
@@ -217,18 +215,28 @@ cypress/
     commands.ts     ← Custom commands (apiCreateProject, shouldShowToast, navTo, ...)
     api.ts          ← HTTP helpers for test data setup (CRUD against backend API)
   e2e/
-    navigation.cy.ts  ← Sidebar navigation, routing, collapse/expand
-    dashboard.cy.ts   ← Stat cards, charts, quick actions
-    projects.cy.ts    ← Projects CRUD (create, search, detail, delete)
-    workflows.cy.ts   ← Workflows CRUD, template selection, detail, blocks, skills
-    skills.cy.ts      ← Skill catalog, filter, detail slide-over
-    schedules.cy.ts   ← Schedules CRUD, toggle, table
-    webhooks.cy.ts    ← Webhooks CRUD, toggle, copy button
-    settings.cy.ts    ← Theme, language, API key, system health
+    activity-log.cy.ts       ← Activity log view
+    assistant-panel.cy.ts    ← Assistant panel
+    chains.cy.ts             ← Chains CRUD and execution
+    dashboard.cy.ts          ← Stat cards, charts, quick actions
+    navigation.cy.ts         ← Sidebar navigation, routing, collapse/expand
+    project-detail.cy.ts     ← Project detail page
+    projects.cy.ts           ← Projects CRUD (create, search, detail, delete)
+    responsive-layout.cy.ts  ← Responsive layout
+    runs.cy.ts               ← Workflow runs view
+    schedules.cy.ts          ← Schedules CRUD, toggle, table
+    settings.cy.ts           ← Theme, language, API key, system health
+    skills.cy.ts             ← Skill catalog, filter, detail slide-over
+    staging.cy.ts            ← Staging management
+    todos.cy.ts              ← Todos CRUD
+    webhooks.cy.ts           ← Webhooks CRUD, toggle, copy button
+    wishes.cy.ts             ← Wishes
+    workflow-execution.cy.ts ← Workflow execution
+    workflows.cy.ts          ← Workflows CRUD, template selection, detail, blocks, skills
 ```
 
 **Conventions:**
-- English locale is forced via `localStorage` before each test
+- English locale is enforced via `localStorage` before each test
 - Selectors use `aria-label`, button text, `h1` text, `placeholder`, `role="switch"` (no `data-testid`)
 - `before()` / `after()` hooks ensure clean test data via `cy.apiCleanup()`
 
@@ -238,8 +246,8 @@ cypress/
 
 | File | Format | Example |
 |---|---|---|
-| `ai-automation-backend/pom.xml` | `X.Y.Z-SNAPSHOT` | `0.6.2-SNAPSHOT` |
-| `ai-automation-frontend/package.json` | `X.Y.Z` | `0.6.2` |
+| `ai-automation-backend/pom.xml` | `X.Y.Z-SNAPSHOT` | `0.7.3-SNAPSHOT` |
+| `ai-automation-frontend/package.json` | `X.Y.Z` | `0.7.3` |
 | `application.yml` | via `@project.version@` (Maven filtering) | automatic |
 
 The dashboard displays the version via the `/api/v1/system/info` endpoint.
@@ -256,20 +264,20 @@ The script:
 1. Reads the current version from `pom.xml` (without `-SNAPSHOT`)
 2. Calculates the new version (increments the segment)
 3. Updates `pom.xml` (`X.Y.Z-SNAPSHOT`) and `package.json` (`X.Y.Z`)
-4. Creates a Git commit: `Release vX.Y.Z`
-5. Sets a Git tag: `vX.Y.Z`
+4. Creates a git commit: `Release vX.Y.Z`
+5. Sets a git tag: `vX.Y.Z`
 
 **Prerequisite:** Clean working tree (no uncommitted changes).
 
 ### Interaction with Staging
 
-After a release, `./scripts/staging.sh promote` can be run to deploy the new version to the stable environment. The settings page then shows a version comparison (dev vs. stable) and recommends a promote when the versions differ.
+After a release, `./scripts/staging.sh promote` can be run to deploy the new version to the stable environment. The settings page then shows a version comparison (Dev vs. Stable) and recommends a promote if the versions differ.
 
 ### Git Tags
 
-There are two types of Git tags:
+There are two types of git tags:
 
-| Tag format | Created by | Purpose |
+| Tag Format | Created by | Purpose |
 |---|---|---|
 | `v0.1.1` | `release.sh` | Semver release marker |
 | `stable-20250225-143022` | `staging.sh promote` | Deployment timestamp |
@@ -282,12 +290,12 @@ There are two types of Git tags:
 |---|---|
 | **Entities** | JPA entities with Lombok (`@Getter`, `@Setter`, `@Builder`, `@NoArgsConstructor`, `@AllArgsConstructor`) |
 | **DTOs** | Java records (`record` instead of classes) for request and response objects |
-| **Mappers** | MapStruct for entity ↔ DTO conversion (automatic code generation) |
-| **IDs** | UUID as String (`@GeneratedValue(strategy = GenerationType.UUID)`) |
+| **Mapper** | MapStruct for entity ↔ DTO conversion (automatic code generation) |
+| **IDs** | UUID as string (`@GeneratedValue(strategy = GenerationType.UUID)`) |
 | **JSON fields** | `@Convert(converter = JsonMapConverter.class)` for `Map<String, Object>` in TEXT columns |
-| **Auditing** | `@CreatedDate`, `@LastModifiedDate` via Spring Data JPA auditing |
+| **Auditing** | `@CreatedDate`, `@LastModifiedDate` via Spring Data JPA Auditing |
 | **Validation** | Jakarta Validation (`@NotBlank`, `@NotNull`, `@NotEmpty`) on DTOs |
-| **Exceptions** | `GlobalExceptionHandler` with `@RestControllerAdvice`, uniform error format |
+| **Exceptions** | `GlobalExceptionHandler` with `@RestControllerAdvice`, unified error format |
 | **Logging** | SLF4J with `@Slf4j` (Lombok) |
 | **Transactions** | `@Transactional` on service methods |
 
@@ -306,7 +314,7 @@ There are two types of Git tags:
 
 ### Annotation Processors
 
-The backend uses three annotation processors that must be ordered correctly in the compiler configuration (`pom.xml`):
+The backend uses three annotation processors that must be correctly ordered in the compiler configuration (`pom.xml`):
 
 1. **Lombok** — Generates getters, setters, builders, etc.
 2. **MapStruct** — Generates mapper implementations
@@ -316,17 +324,17 @@ The backend uses three annotation processors that must be ordered correctly in t
 
 ### Backend Structure
 
-The backend comprises **26 REST controllers** and **12 block types**:
+The backend comprises **33 REST controllers** and **14 block types**:
 
-**Controllers:** Workflow, WorkflowTemplate, Skill, Execution, Learning, Schedule, Webhook, System, Project, Conversion, Todo, ActivityLog, WorkflowMemory, Staging, Testing, Chain, ChainTemplate, WorkflowPool, WorkflowFactory, Wish, Docs, Assistant, PageSuggestion, CompletionTrigger, Notification, Dialog
+**Controllers:** Workflow, WorkflowTemplate, Skill, Execution, Learning, Schedule, Webhook, System, Project, Conversion, Todo, TodoTrigger, ActivityLog, WorkflowMemory, Staging, Testing, Chain, ChainTemplate, WorkflowPool, WorkflowFactory, Wish, Docs, Assistant, PageSuggestion, CompletionTrigger, Notification, Dialog, DeadLetter, Integration, OnboardingProfile, Reports, Search, WorkflowDebug
 
-**Block types:** `simple`, `shell`, `retry`, `conditional`, `forEach`, `while`, `switch`, `agentic`, `approval`, `sub-workflow`, `skill-capability`, `human-input`
+**Block types:** `simple`, `shell`, `retry`, `conditional`, `foreach`, `while`, `switch`, `agentic`, `approval`, `sub-workflow`, `skill-capability`, `human-input`, `document`, `integration`
 
-**Flyway migrations:** V1–V47 (SQLite)
+**Flyway migrations:** V1–V66 (SQLite)
 
 ### Gate Status System
 
-Workflow blocks can emit quality-gate markers:
+Workflow blocks can emit quality gate markers:
 ```
 gate_status: GREEN|YELLOW|RED
 gate_category: <category>
@@ -338,7 +346,7 @@ gate_description: <description>
 
 ### Chains
 
-Chains link multiple workflows sequentially:
+Chains sequence multiple workflows in order:
 - `ChainService` / `ChainExecutor` for CRUD and execution
 - Cross-project: a chain does not belong to any project
 - `previous_chain_output` as a context variable between entries
@@ -354,29 +362,29 @@ Workflows can accumulate knowledge across runs:
 ### Soft-Delete Pattern
 
 - **Workflows:** `@SQLRestriction("deleted_at IS NULL")` on the entity class — automatically excluded from all queries
-- **Projects:** `archived_at IS NOT NULL` = archived — filtered via repository methods (no `@SQLRestriction`, as it would break eagerly loaded `Workflow.project` associations)
+- **Projects:** `archived_at IS NOT NULL` = archived — filtering via repository methods (no `@SQLRestriction`, as it would break eager-loaded `Workflow.project` associations)
 
-### Seeders
+### Seeder
 
-- **SkillSeeder:** Creates 16 built-in skills on startup (idempotent) and registers them in the `SkillRegistry`
-- **WorkflowTemplateSeeder:** Creates 44 built-in templates on startup (idempotent, updates on version bump)
+- **SkillSeeder:** Creates 19 built-in skills on startup (idempotent) and registers them in the `SkillRegistry`
+- **WorkflowTemplateSeeder:** Creates 66 built-in templates on startup (idempotent, updates on version bump)
 - Template definitions as JSON under `src/main/resources/templates/builtin/`
 
 ## Known Limitations
 
 ### SQLite
 
-- **Concurrent writes:** SQLite allows only one writer at a time. HikariCP is configured with pool size=1 to serialize all DB operations and avoid `SQLITE_BUSY` errors under parallel workflow runs.
+- **Concurrent writes:** SQLite only allows one write operation at a time. HikariCP is configured with pool-size=1 to serialize all DB operations and avoid `SQLITE_BUSY` errors under concurrent workflow runs.
 - **No native types:** Booleans as INTEGER, timestamps as TEXT, JSON as TEXT.
 - **No ALTER COLUMN:** Schema changes are limited (ADD COLUMN only).
-- **NEVER write directly to the DB** (via `sqlite3` CLI or raw SQL). Always use the REST API or the service/repository layer — direct writes bypass the Hibernate cache.
+- **NEVER write directly to the DB** (via `sqlite3` CLI or SQL). Always use the REST API or service/repository layer — direct writes bypass the Hibernate cache.
 
 ### Docker Dependency
 
-- The backend requires access to the Docker socket (`/var/run/docker.sock`).
-- Without Docker, no projects can be started (containers created) and no workflows can be executed.
+- The backend boots even without a running Docker daemon (the Docker client is initialized lazily).
+- Without Docker, container-execution blocks in workflows cannot be executed.
 - Agent images must be built beforehand (`docker compose --profile build-only build`).
-- **Claude CLI always runs on the host**, not inside containers (avoids nested-session detection).
+- **Claude CLI always runs on the host**, not in containers (avoids nested session detection).
 
 ### Security
 
@@ -387,4 +395,4 @@ Workflows can accumulate knowledge across runs:
 ### Frontend
 
 - No offline mode (PWA shell is cached, but API data is not).
-- Monaco Editor loads external bundles (requires an internet connection on first load).
+- Monaco Editor loads external bundles (requires internet connection on first load).

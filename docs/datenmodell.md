@@ -1,4 +1,4 @@
-> *Zuletzt aktualisiert: 14. April 2026 — Manuelles Doku-Audit (V53-V59, integration_connections, onboarding_profiles, workflow_versions)*
+> *Zuletzt aktualisiert: [auto-generated]*
 
 # Datenmodell
 
@@ -173,6 +173,7 @@ erDiagram
         INTEGER max_runs "DEFAULT 0"
         INTEGER run_count "DEFAULT 0"
         TEXT conflict_behavior "DEFAULT SKIP"
+        INTEGER catch_up_on_resume "DEFAULT 0"
         TEXT created_at
         TEXT updated_at
     }
@@ -197,6 +198,9 @@ erDiagram
         TEXT resolution_state
         INTEGER fix_attempts "DEFAULT 0"
         TEXT last_fix_run_id
+        TEXT exported_provider
+        TEXT exported_ref
+        TEXT exported_url
         TEXT created_at
         TEXT updated_at
     }
@@ -261,6 +265,7 @@ erDiagram
         INTEGER enabled "DEFAULT 1"
         INTEGER max_attempts "DEFAULT 3"
         INTEGER auto_close "DEFAULT 1"
+        INTEGER process_backlog "DEFAULT 1"
         TEXT description
         TEXT last_triggered_at
         INTEGER trigger_count "DEFAULT 0"
@@ -321,8 +326,8 @@ erDiagram
     onboarding_profiles {
         TEXT id PK
         TEXT key "NOT NULL, UNIQUE"
-        TEXT name "NOT NULL"
-        TEXT description
+        TEXT name "JSON i18n map, NOT NULL"
+        TEXT description "JSON i18n map"
         TEXT content "NOT NULL"
         TEXT type "NOT NULL"
         INTEGER built_in "DEFAULT 0"
@@ -345,9 +350,24 @@ erDiagram
         TEXT id PK
         TEXT workflow_id FK "NOT NULL"
         INTEGER version_number "NOT NULL"
-        TEXT snapshot "JSON"
-        TEXT change_source
+        TEXT snapshot "JSON, NOT NULL"
+        TEXT change_source "NOT NULL, DEFAULT 'user'"
+        TEXT change_message
         TEXT created_at
+    }
+
+    dead_letter_entries {
+        TEXT id PK
+        TEXT workflow_run_id
+        TEXT workflow_id
+        TEXT workflow_name
+        TEXT error_message
+        INTEGER failed_step_index
+        INTEGER retry_count "DEFAULT 0"
+        TEXT last_failure_at "NOT NULL"
+        TEXT status "DEFAULT OPEN"
+        TEXT created_at
+        TEXT updated_at
     }
 
     app_settings {
@@ -408,7 +428,7 @@ erDiagram
 | `created_at` | TEXT | | Erstellzeitpunkt |
 | `updated_at` | TEXT | | Aktualisierungszeitpunkt |
 
-16 eingebaute Skills werden durch `SkillSeeder` beim Start angelegt (idempotent). Built-in Skills haben stabile IDs (z.B. `builtin-code-review`).
+19 eingebaute Skills werden durch `SkillSeeder` beim Start angelegt (idempotent). Built-in Skills haben stabile IDs (z.B. `builtin-code-review`).
 
 ### `capabilities`
 
@@ -518,6 +538,7 @@ M:N-Beziehung zwischen Workflows und Skills.
 | `max_runs` | INTEGER | DEFAULT 0 | Maximale Anzahl Ausführungen (0 = unbegrenzt) (V44) |
 | `run_count` | INTEGER | DEFAULT 0 | Zähler, wird nach jeder Ausführung inkrementiert (V44) |
 | `conflict_behavior` | TEXT | DEFAULT 'SKIP' | Verhalten bei bereits laufender Ausführung: `SKIP` oder `OVERLAP` (V45) |
+| `catch_up_on_resume` | INTEGER | NOT NULL, DEFAULT 0 | Per-Schedule-Policy bei System-Resume nach Suspend/Freeze: 0 = verpasste Runs überspringen, 1 = einmal nachholen (V65) |
 | `created_at` | TEXT | | Erstellzeitpunkt |
 | `updated_at` | TEXT | | Aktualisierungszeitpunkt |
 
@@ -557,7 +578,7 @@ M:N-Beziehung zwischen Workflows und Skills.
 | `created_at` | TEXT | | |
 | `updated_at` | TEXT | | |
 
-44 Built-in-Templates werden durch `WorkflowTemplateSeeder` beim Start angelegt. Template-Definitionen liegen als JSON unter `src/main/resources/templates/builtin/`.
+66 Built-in-Templates werden durch `WorkflowTemplateSeeder` beim Start angelegt. Template-Definitionen liegen als JSON unter `src/main/resources/templates/builtin/`.
 
 ### `template_verifications`
 
@@ -654,7 +675,7 @@ Eine Chain gehört zu keinem Projekt und kann Workflows aus verschiedenen Projek
 | `id` | TEXT | PK | UUID |
 | `title` | TEXT | NOT NULL | Kurztitel im Imperativ |
 | `description` | TEXT | | Markdown-Beschreibung |
-| `status` | TEXT | NOT NULL, DEFAULT 'OPEN' | `OPEN`, `IN_PROGRESS`, `DONE`, `BACKLOG` |
+| `status` | TEXT | NOT NULL, DEFAULT 'OPEN' | `OPEN`, `IN_PROGRESS`, `DONE`, `BACKLOG`, `ARCHIVED` |
 | `priority` | TEXT | NOT NULL, DEFAULT 'MEDIUM' | `CRITICAL`, `HIGH`, `MEDIUM`, `LOW` |
 | `tags` | TEXT | | JSON-Array als Text |
 | `project_id` | TEXT | FK → projects, ON DELETE SET NULL | Optionale Projektzuordnung |
@@ -669,7 +690,10 @@ Eine Chain gehört zu keinem Projekt und kann Workflows aus verschiedenen Projek
 | `last_fix_run_id` | TEXT | | ID des letzten Fix-Workflow-Runs (V52) |
 | `due_date` | TEXT | | Fälligkeitsdatum (V57) |
 | `linked_workflow_id` | TEXT | FK → workflows, ON DELETE SET NULL | Optionaler Resolver-Workflow (V59) |
-| `resolution_state` | TEXT | | Status der Workflow-Auflösung: `RUNNING`, `FAILED` (V59) |
+| `resolution_state` | TEXT | | Enum: ResolutionState — Status der Workflow-Auflösung (V59) |
+| `exported_provider` | TEXT | | Provider-Kennung des externen Systems (z.B. `jira`, `github`), entkoppelt von `reference_type` (V66) |
+| `exported_ref` | TEXT | | Externe Referenz-ID (z.B. Issue-Key) (V66) |
+| `exported_url` | TEXT | | URL zum externen Objekt (V66) |
 | `created_at` | TEXT | NOT NULL | |
 | `updated_at` | TEXT | NOT NULL | |
 
@@ -753,6 +777,7 @@ Startet automatisch einen Ziel-Workflow, wenn ein Quell-Workflow abgeschlossen w
 | `enabled` | INTEGER | NOT NULL, DEFAULT 1 | Aktiv/Inaktiv |
 | `max_attempts` | INTEGER | NOT NULL, DEFAULT 3 | Max. Fix-Versuche pro TODO |
 | `auto_close` | INTEGER | NOT NULL, DEFAULT 1 | TODO bei GREEN Gate automatisch schliessen |
+| `process_backlog` | INTEGER | NOT NULL, DEFAULT 1 | Bestehende offene TODOs beim Aktivieren des Triggers nachträglich verarbeiten (V53) |
 | `description` | TEXT | | Menschenlesbare Beschreibung |
 | `last_triggered_at` | TEXT | | Letzte Auslösung |
 | `trigger_count` | INTEGER | NOT NULL, DEFAULT 0 | Anzahl Auslösungen |
@@ -816,7 +841,7 @@ KI-generierte Aktionsvorschläge pro Seite, basierend auf Assistenten-Sessions (
 |---|---|---|---|
 | `id` | TEXT | PK | UUID |
 | `provider_id` | TEXT | NOT NULL, UNIQUE | Provider-Identifier (z.B. `google-calendar`, `jira`) |
-| `status` | TEXT | NOT NULL, DEFAULT 'DISCONNECTED' | Verbindungsstatus: CONNECTED, DISCONNECTED |
+| `status` | TEXT | NOT NULL, DEFAULT 'DISCONNECTED' | Enum: ConnectionStatus (CONNECTED, DISCONNECTED, EXPIRED) |
 | `access_token_encrypted` | TEXT | | AES-256-GCM-verschlüsselter OAuth Access Token |
 | `refresh_token_encrypted` | TEXT | | AES-256-GCM-verschlüsselter OAuth Refresh Token |
 | `token_expiry` | TEXT | | Token-Ablaufzeitpunkt (ISO-8601) |
@@ -835,17 +860,17 @@ Speichert OAuth-Verbindungen und Client-Credentials für Integration-Provider. A
 |---|---|---|---|
 | `id` | TEXT | PK | UUID |
 | `key` | TEXT | NOT NULL, UNIQUE | Profil-Schlüssel (z.B. `developer`, `research`) |
-| `name` | TEXT | NOT NULL | Anzeigename |
-| `description` | TEXT | | Beschreibung des Profils |
+| `name` | TEXT | NOT NULL | JSON i18n-Map: `{"de":"...","en":"..."}` |
+| `description` | TEXT | | JSON i18n-Map |
 | `content` | TEXT | NOT NULL | Markdown-Content des AI-Kontext-Templates |
-| `type` | TEXT | NOT NULL | Profiltyp: BASE, DEVELOPER, RESEARCH, CONTENT, OPS |
+| `type` | TEXT | NOT NULL | Enum: OnboardingProfileType |
 | `built_in` | INTEGER | NOT NULL, DEFAULT 0 | Ob Built-in (nicht löschbar) |
 | `sort_order` | INTEGER | NOT NULL, DEFAULT 0 | Sortierreihenfolge |
 | `version` | INTEGER | NOT NULL, DEFAULT 1 | Aktuelle Version |
 | `created_at` | TEXT | | Erstellzeitpunkt |
 | `updated_at` | TEXT | | Aktualisierungszeitpunkt |
 
-AI-Kontext-Templates für Projekt-Onboarding. 5 Built-in-Profile + benutzerdefinierte Profile (V49).
+AI-Kontext-Templates für Projekt-Onboarding. Built-in-Profile + benutzerdefinierte Profile (V49).
 
 ### `onboarding_profile_history`
 
@@ -867,8 +892,9 @@ Versionierungshistorie für Onboarding-Profile (V49).
 | `id` | TEXT | PK | UUID |
 | `workflow_id` | TEXT | FK NOT NULL | Referenz auf `workflows.id` |
 | `version_number` | INTEGER | NOT NULL | Fortlaufende Versionsnummer |
-| `snapshot` | TEXT | | JSON-Snapshot des Workflow-Zustands (Blöcke, Instructions, etc.) |
-| `change_source` | TEXT | | Änderungsquelle: `user`, `ai`, `pool-install`, `import`, `api` |
+| `snapshot` | TEXT | NOT NULL | JSON-Snapshot des Workflow-Zustands (Blöcke, Instructions, etc.) |
+| `change_source` | TEXT | NOT NULL, DEFAULT 'user' | Änderungsquelle: `user`, `ai`, `pool-install`, `import`, `api` |
+| `change_message` | TEXT | | Optionale Beschreibung der Änderung (V50) |
 | `created_at` | TEXT | | Erstellzeitpunkt |
 
 UNIQUE-Constraint auf (`workflow_id`, `version_number`). Speichert vollständige Workflow-Snapshots für Versionshistorie und Restore (V50).
@@ -885,7 +911,7 @@ UNIQUE-Constraint auf (`workflow_id`, `version_number`). Speichert vollständige
 | `failed_step_index` | INTEGER | | Index des fehlgeschlagenen Schritts |
 | `retry_count` | INTEGER | NOT NULL, DEFAULT 0 | Anzahl der Wiederholungsversuche |
 | `last_failure_at` | TEXT | NOT NULL | Zeitpunkt des letzten Fehlschlags |
-| `status` | TEXT | NOT NULL, DEFAULT 'OPEN' | Bearbeitungsstatus, z.B. `OPEN` |
+| `status` | TEXT | NOT NULL, DEFAULT 'OPEN' | Enum: DeadLetterEntry.Status (`OPEN`, `RETRIED`, `DISCARDED`) |
 | `created_at` | TEXT | NOT NULL | Erstellzeitpunkt |
 | `updated_at` | TEXT | | Aktualisierungszeitpunkt |
 
@@ -999,6 +1025,16 @@ Einzige persistente Systemkonfiguration außerhalb der `application.yml`.
 | `IN_PROGRESS` | In Bearbeitung |
 | `DONE` | Erledigt |
 | `BACKLOG` | Zurückgestellt |
+| `ARCHIVED` | Archiviert |
+
+### Todo.ResolutionState
+
+| Wert | Beschreibung |
+|---|---|
+| `IDLE` | Kein Resolver-Workflow aktiv |
+| `RUNNING` | Resolver-Workflow läuft |
+| `FAILED` | Resolver-Workflow fehlgeschlagen |
+| `SUCCEEDED` | Resolver-Workflow erfolgreich |
 
 ### Todo.Priority
 
@@ -1007,6 +1043,7 @@ Einzige persistente Systemkonfiguration außerhalb der `application.yml`.
 | `LOW` | Nice-to-have |
 | `MEDIUM` | Bald erledigen |
 | `HIGH` | Blockierend, sofort erledigen |
+| `CRITICAL` | Kritisch, höchste Priorität |
 
 ### Todo.Source
 
@@ -1035,6 +1072,7 @@ Einzige persistente Systemkonfiguration außerhalb der `application.yml`.
 | `WEBHOOK` | Webhook-Ereignisse |
 | `SECURITY` | Sicherheits-Ereignisse |
 | `CONTAINER` | Container-Ereignisse |
+| `PLUGIN` | Plugin/Integration-Ereignisse |
 
 ### ScheduleType (ScheduledWorkflow)
 
@@ -1058,13 +1096,37 @@ Einzige persistente Systemkonfiguration außerhalb der `application.yml`.
 | `WEBHOOK` | Benachrichtigung über Webhook (Slack/Discord/Teams) |
 | `DESKTOP` | Desktop-Benachrichtigung |
 
+### ConnectionStatus (IntegrationConnection)
+
+| Wert | Beschreibung |
+|---|---|
+| `CONNECTED` | Verbindung aktiv |
+| `DISCONNECTED` | Nicht verbunden |
+| `EXPIRED` | Token abgelaufen |
+
+### OnboardingProfileType
+
+| Wert | Beschreibung |
+|---|---|
+| `BASE` | Basis-Profil |
+| `PROFILE` | Spezialisiertes Profil |
+
+### DeadLetterEntry.Status
+
+| Wert | Beschreibung |
+|---|---|
+| `OPEN` | Offen, noch nicht bearbeitet |
+| `RETRIED` | Erneut versucht |
+| `DISCARDED` | Verworfen |
+
 ## BlockDefinition (JSON-Struktur)
 
 Blöcke werden als JSON-Array in der `blocks`-Spalte der `workflows`-Tabelle gespeichert.
 
 ```json
 {
-  "type": "simple | shell | retry | conditional | forEach | while | switch | agentic | approval | sub-workflow | skill-capability | human-input",
+  "type": "simple | shell | retry | conditional | foreach | while | switch | agentic | approval | sub-workflow | skill-capability | human-input | document | integration",
+  "name": "Optionaler Anzeigename",
   "config": {
     "prompt": "Anweisung oder Befehl",
     "timeout_seconds": 300,
@@ -1078,6 +1140,7 @@ Blöcke werden als JSON-Array in der `blocks`-Spalte der `workflows`-Tabelle ges
 | Feld | Typ | Beschreibung |
 |---|---|---|
 | `type` | string | Block-Typ (siehe unten) |
+| `name` | string | Optional. Anzeigename des Blocks |
 | `config` | object | Typ-spezifische Konfiguration |
 | `requiredCapabilities` | string[] | Optional. Benötigte Capabilities |
 | `skillIds` | string[] | Optional. Skill-IDs die zusätzlich zu Workflow-Skills für diesen Block aktiviert werden (additiv) |
@@ -1090,7 +1153,7 @@ Blöcke werden als JSON-Array in der `blocks`-Spalte der `workflows`-Tabelle ges
 | `shell` | `command` (Shell-Skript), `on_failure`, `timeout_seconds` |
 | `retry` | `prompt`, `maxRetries`, `on_failure`, `timeout_seconds` |
 | `conditional` | `condition`, `thenPrompt`, `elsePrompt` |
-| `forEach` | `items`, `prompt`, `on_failure` |
+| `foreach` | `items`, `prompt`, `on_failure` |
 | `while` | `condition`, `prompt`, `maxIterations` |
 | `switch` | `expression`, `cases` (Liste mit `value`, `blocks`) |
 | `agentic` | `goal`, `max_iterations` (10), `iteration_timeout_seconds` (300), `total_timeout_seconds` (1800), `max_total_tokens` (200000), `max_repeated_actions` (3), `require_approval` (false) |
@@ -1098,6 +1161,8 @@ Blöcke werden als JSON-Array in der `blocks`-Spalte der `workflows`-Tabelle ges
 | `sub-workflow` | `workflowId`, `inputContext` |
 | `skill-capability` | `skillId`, `capabilityName`, `input` |
 | `human-input` | `prompt`, `input_type` (text/select), `variable_name`, `options`, `default_value`, `required`, `timeout_minutes` (30), `use_default_on_timeout` |
+| `document` | `prompt`, `on_failure`, `timeout_seconds` |
+| `integration` | `provider_id`, `action`, `parameters`, `on_failure`, `timeout_seconds` |
 
 **Gemeinsames optionales Feld** `timeout_seconds` übersteuert für alle Block-Typen den globalen Claude-CLI-Timeout (`automation.host-claude.timeout-seconds`, Standard 300s).
 
@@ -1169,12 +1234,14 @@ Blöcke werden als JSON-Array in der `blocks`-Spalte der `workflows`-Tabelle ges
 | V62 | `V62__add_auto_refine_to_wishes.sql` | `auto_refine` in wishes |
 | V63 | `V63__create_dead_letter_entries.sql` | dead_letter_entries-Tabelle + Indizes (Dead-Letter-Queue) |
 | V64 | `V64__add_writes_to_capabilities.sql` | `writes` in capabilities (+ Backfill write-fähiger Built-in-Capabilities) |
+| V65 | `V65__add_catch_up_on_resume_to_schedules.sql` | `catch_up_on_resume` in scheduled_workflows (Per-Schedule-Policy bei System-Resume) |
+| V66 | `V66__add_todo_export_link.sql` | `exported_provider`, `exported_ref`, `exported_url` in todos (Export-Link zu externen Systemen) |
 
 ## SQLite-Besonderheiten
 
 - **Kein nativer TIMESTAMP-Typ:** Alle Zeitstempel werden als `TEXT` im ISO-8601-Format gespeichert (`Instant.toString()`)
 - **Kein nativer BOOLEAN-Typ:** Booleans werden als `INTEGER` gespeichert (`0` = false, `1` = true)
-- **JSON als TEXT:** Alle JSON-Felder werden als `TEXT` gespeichert und über JPA-`@Convert`-Annotationen gemappt (`JsonMapConverter`, `BlockDefinitionListConverter`, `JsonStringMapConverter`, `ChainEntryListConverter`, `ChainRunEntryListConverter`, `StringListConverter`, `JsonListConverter`)
+- **JSON als TEXT:** Alle JSON-Felder werden als `TEXT` gespeichert und über JPA-`@Convert`-Annotationen gemappt (`JsonMapConverter`, `BlockDefinitionListConverter`, `JsonStringMapConverter`, `ChainEntryListConverter`, `ChainRunEntryListConverter`, `StringListConverter`, `JsonListConverter`, `InstantStringConverter`)
 - **UUID als TEXT:** IDs werden als `TEXT` gespeichert
 - **WAL-Modus:** Aktiviert für bessere Concurrent-Read-Performance (`?journal_mode=WAL`)
 - **Busy Timeout:** 10 Sekunden (`?busy_timeout=10000`)

@@ -31,7 +31,7 @@ mvn spring-boot:run
 
 # Alternativ: JAR bauen und ausführen
 mvn clean package -DskipTests
-java -jar target/ai-automation-backend-0.6.2-SNAPSHOT.jar
+java -jar target/ai-automation-backend-0.7.3-SNAPSHOT.jar
 ```
 
 Das Backend erstellt automatisch `data/automation.db` beim ersten Start und führt Flyway-Migrationen aus.
@@ -80,7 +80,7 @@ mvn clean package -DskipTests
 # JAR bauen (mit Tests)
 mvn clean package
 
-# Ergebnis: target/ai-automation-backend-0.6.2-SNAPSHOT.jar
+# Ergebnis: target/ai-automation-backend-0.7.3-SNAPSHOT.jar
 ```
 
 ### Frontend
@@ -217,14 +217,24 @@ cypress/
     commands.ts     ← Custom Commands (apiCreateProject, shouldShowToast, navTo, ...)
     api.ts          ← HTTP-Helpers für Testdaten-Setup (CRUD gegen Backend-API)
   e2e/
-    navigation.cy.ts  ← Sidebar-Navigation, Routing, Collapse/Expand
-    dashboard.cy.ts   ← Stat-Cards, Charts, Quick Actions
-    projects.cy.ts    ← Projekte CRUD (Create, Search, Detail, Delete)
-    workflows.cy.ts   ← Workflows CRUD, Template-Auswahl, Detail, Blocks, Skills
-    skills.cy.ts      ← Skill-Katalog, Filter, Detail-Slide-Over
-    schedules.cy.ts   ← Schedules CRUD, Toggle, Tabelle
-    webhooks.cy.ts    ← Webhooks CRUD, Toggle, Copy-Button
-    settings.cy.ts    ← Theme, Sprache, API-Key, System Health
+    activity-log.cy.ts       ← Activity-Log-Ansicht
+    assistant-panel.cy.ts    ← Assistent-Panel
+    chains.cy.ts             ← Chains CRUD und Ausführung
+    dashboard.cy.ts          ← Stat-Cards, Charts, Quick Actions
+    navigation.cy.ts         ← Sidebar-Navigation, Routing, Collapse/Expand
+    project-detail.cy.ts     ← Projekt-Detailseite
+    projects.cy.ts           ← Projekte CRUD (Create, Search, Detail, Delete)
+    responsive-layout.cy.ts  ← Responsive Layout
+    runs.cy.ts               ← Workflow-Runs-Ansicht
+    schedules.cy.ts          ← Schedules CRUD, Toggle, Tabelle
+    settings.cy.ts           ← Theme, Sprache, API-Key, System Health
+    skills.cy.ts             ← Skill-Katalog, Filter, Detail-Slide-Over
+    staging.cy.ts            ← Staging-Management
+    todos.cy.ts              ← Todos CRUD
+    webhooks.cy.ts           ← Webhooks CRUD, Toggle, Copy-Button
+    wishes.cy.ts             ← Wishes
+    workflow-execution.cy.ts ← Workflow-Ausführung
+    workflows.cy.ts          ← Workflows CRUD, Template-Auswahl, Detail, Blocks, Skills
 ```
 
 **Konventionen:**
@@ -238,8 +248,8 @@ cypress/
 
 | Datei | Format | Beispiel |
 |---|---|---|
-| `ai-automation-backend/pom.xml` | `X.Y.Z-SNAPSHOT` | `0.6.2-SNAPSHOT` |
-| `ai-automation-frontend/package.json` | `X.Y.Z` | `0.6.2` |
+| `ai-automation-backend/pom.xml` | `X.Y.Z-SNAPSHOT` | `0.7.3-SNAPSHOT` |
+| `ai-automation-frontend/package.json` | `X.Y.Z` | `0.7.3` |
 | `application.yml` | via `@project.version@` (Maven-Filtering) | automatisch |
 
 Das Dashboard zeigt die Version über den `/api/v1/system/info`-Endpunkt an.
@@ -316,13 +326,13 @@ Das Backend nutzt drei Annotation-Prozessoren, die in der Compiler-Konfiguration
 
 ### Backend-Struktur
 
-Das Backend umfasst **26 REST-Controller** und **12 Block-Typen**:
+Das Backend umfasst **33 REST-Controller** und **14 Block-Typen**:
 
-**Controller:** Workflow, WorkflowTemplate, Skill, Execution, Learning, Schedule, Webhook, System, Project, Conversion, Todo, ActivityLog, WorkflowMemory, Staging, Testing, Chain, ChainTemplate, WorkflowPool, WorkflowFactory, Wish, Docs, Assistant, PageSuggestion, CompletionTrigger, Notification, Dialog
+**Controller:** Workflow, WorkflowTemplate, Skill, Execution, Learning, Schedule, Webhook, System, Project, Conversion, Todo, TodoTrigger, ActivityLog, WorkflowMemory, Staging, Testing, Chain, ChainTemplate, WorkflowPool, WorkflowFactory, Wish, Docs, Assistant, PageSuggestion, CompletionTrigger, Notification, Dialog, DeadLetter, Integration, OnboardingProfile, Reports, Search, WorkflowDebug
 
-**Block-Typen:** `simple`, `shell`, `retry`, `conditional`, `forEach`, `while`, `switch`, `agentic`, `approval`, `sub-workflow`, `skill-capability`, `human-input`
+**Block-Typen:** `simple`, `shell`, `retry`, `conditional`, `foreach`, `while`, `switch`, `agentic`, `approval`, `sub-workflow`, `skill-capability`, `human-input`, `document`, `integration`
 
-**Flyway-Migrationen:** V1–V47 (SQLite)
+**Flyway-Migrationen:** V1–V66 (SQLite)
 
 ### Gate Status System
 
@@ -358,8 +368,8 @@ Workflows können Wissen über Runs hinweg akkumulieren:
 
 ### Seeder
 
-- **SkillSeeder:** Legt 16 Built-in-Skills beim Start an (idempotent) und registriert sie im `SkillRegistry`
-- **WorkflowTemplateSeeder:** Legt 44 Built-in-Templates beim Start an (idempotent, Update bei Version-Bump)
+- **SkillSeeder:** Legt 19 Built-in-Skills beim Start an (idempotent) und registriert sie im `SkillRegistry`
+- **WorkflowTemplateSeeder:** Legt 66 Built-in-Templates beim Start an (idempotent, Update bei Version-Bump)
 - Template-Definitionen als JSON unter `src/main/resources/templates/builtin/`
 
 ## Bekannte Einschränkungen
@@ -373,8 +383,8 @@ Workflows können Wissen über Runs hinweg akkumulieren:
 
 ### Docker-Abhängigkeit
 
-- Das Backend benötigt Zugriff auf den Docker Socket (`/var/run/docker.sock`).
-- Ohne Docker können keine Projekte gestartet (Container erstellt) und keine Workflows ausgeführt werden.
+- Das Backend bootet auch ohne laufenden Docker-Daemon (der Docker-Client wird lazy aufgebaut).
+- Ohne Docker können keine Container-Execution-Blöcke in Workflows ausgeführt werden.
 - Agent-Images müssen vorher gebaut sein (`docker compose --profile build-only build`).
 - **Claude CLI läuft immer auf dem Host**, nicht in Containern (vermeidet Nested-Session-Erkennung).
 

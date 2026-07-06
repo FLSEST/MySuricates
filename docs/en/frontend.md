@@ -1,6 +1,4 @@
-<!-- last-sync: 2026-04-14 from: docs/frontend.md -->
-
-> *Last updated: April 14, 2026 — Manual doc audit (11 missing hooks added)*
+> *Last updated: [auto-generated]*
 
 # Frontend
 
@@ -25,31 +23,43 @@
 | `/webhooks` | Webhooks | Webhook trigger management |
 | `/todos` | Todos | TODO list, filters, status management |
 | `/activity` | ActivityLog | System activity log with filters |
+| `/dlq` | DeadLetterQueue | Dead letter queue for failed events |
+| `/debug` | WorkflowDebug | Analyze workflows with failed runs |
 | `/docs` | Docs | Markdown documentation (split layout) |
+| `/reports` | Reports | View generated reports |
 | `/insights` | Insights | Platform insights and analytics |
+| `/integrations` | Integrations | Manage integration providers |
+| `/calendar` | Calendar | Aggregated calendar (schedules, runs, integrations) |
+| `/cockpit` | ProjectCockpit | Project cockpit with todo overview |
+| `/onboarding-profiles` | OnboardingProfiles | Manage onboarding profiles |
 | `/settings` | Settings | Language, theme, API key, Tailscale, staging, testing |
 
-All routes are defined in `src/App.tsx` and wrapped by a `<Layout>` wrapper (sidebar + header).
+All routes are defined in `src/App.tsx` and wrapped by a `<Layout>` component (sidebar + header).
 
 ### Simple Mode
 
-`useSettingsStore().simpleMode` switches four pages between normal and simple variants:
+`useSettingsStore().simpleMode` toggles nine pages between normal and simple variants:
 
 | Route | Normal | Simple |
 |---|---|---|
-| `/` | `Dashboard` | `SimpleDashboard` |
+| `/` | `Dashboard` | `SimpleHome` |
+| `/projects` | `Projects` | `SimpleProjects` |
 | `/workflows` | `Workflows` | `SimpleWorkflows` |
 | `/workflows/:id` | `WorkflowDetail` | `SimpleWorkflowDetail` |
 | `/workflows/:id/run/:runId` | `WorkflowExecution` | `SimpleWorkflowExecution` |
+| `/runs` | `Runs` | `SimpleRuns` |
+| `/schedules` | `Schedules` | `SimpleSchedules` |
+| `/todos` | `Todos` | `SimpleTodos` |
+| `/activity` | `ActivityLog` | `SimpleActivity` |
 
-The switching is done via route wrapper components (e.g., `DashboardRoute`, `WorkflowsRoute`) in `App.tsx`, which render the corresponding variant depending on the `simpleMode` flag.
+The switching is handled by route wrapper components (e.g. `DashboardRoute`, `WorkflowsRoute`, `RunsRoute`) in `App.tsx`, which render the corresponding variant based on the `simpleMode` flag.
 
 ## Pages
 
 ### Dashboard (`/`)
 
 - 4 stat cards: Active projects, workflows, runs today, success rate
-- 2 Recharts charts: Runs history (AreaChart), success rate (AreaChart)
+- 2 Recharts charts: Runs over time (AreaChart), success rate (AreaChart)
 - List of recent runs (clickable → execution page)
 - Top workflows by execution count
 
@@ -66,7 +76,7 @@ The switching is done via route wrapper components (e.g., `DashboardRoute`, `Wor
 
 - 2-step creation: Template selection → form (project, name, description)
 - 44 built-in templates (from DB, via `WorkflowTemplateSeeder`) plus custom templates
-- Detail page: 2/3-column block editor (drag & drop), 1/3-sidebar (skills, runs, memory, info)
+- Detail page: 2/3-column block editor (drag & drop), 1/3 sidebar (skills, runs, memory, info)
 - Block editor with `@dnd-kit` for drag-and-drop sorting
 - Modals: Add block (type + JSON config via Monaco Editor), activate skill
 
@@ -108,7 +118,7 @@ The switching is done via route wrapper components (e.g., `DashboardRoute`, `Wor
 - List of all TODOs with filters by status, priority, project, source, tag
 - Status workflow: OPEN → IN_PROGRESS → DONE / CANCELLED
 - Automatically detects AI-created TODOs (source: AI, sourceAgent: claude-code)
-- Badge display in the sidebar for open TODOs
+- Badge display in sidebar for open TODOs
 
 ### ActivityLog (`/activity`)
 
@@ -117,7 +127,7 @@ The switching is done via route wrapper components (e.g., `DashboardRoute`, `Wor
 
 ### Wishes (`/wishes`)
 
-- Enter natural-language wishes and have them fulfilled asynchronously
+- Enter natural language wishes and have them fulfilled asynchronously
 - Iteration display, provide feedback, cancel or crystallize wish
 
 ### WorkflowFactory (`/factory`)
@@ -134,7 +144,7 @@ The switching is done via route wrapper components (e.g., `DashboardRoute`, `Wor
 ### Docs (`/docs`)
 
 - Split layout: Document list on the left, Markdown rendering on the right
-- Documents are loaded via `GET /api/v1/docs` from the `docs/` directory
+- Documents loaded via `GET /api/v1/docs` from the `docs/` directory
 - Markdown rendering with `react-markdown` + `remark-gfm` + `@tailwindcss/typography`
 
 ### Insights (`/insights`)
@@ -144,18 +154,22 @@ The switching is done via route wrapper components (e.g., `DashboardRoute`, `Wor
 
 ### WorkflowDetail (`/workflows/:id`) — Extensions
 
-- **Memory tab:** Display, activate, delete, re-extract workflow memory entries
-- **Instructions tab:** Edit workflow-specific agent instructions in the Monaco editor
+- **Memory tab:** View, activate, delete, and re-extract workflow memory entries
+- **Instructions tab:** Edit workflow-specific agent instructions in Monaco Editor
 - **Gate status:** Display of the last gate status in the run history
 
 ### Settings (`/settings`)
 
 - General: Language (EN/DE), Advanced Mode
-- Appearance: Theme toggle (Light/Dark), color selection
+- Appearance: Theme toggle (light/dark), color selection
 - Security: API key input (masked)
 - Remote Access: Tailscale status + enable/disable
-- **Stable:** Version comparison Dev/Stable, sync preview, sync definitions, start/stop/promote
-- **Testing:** Test instance status, start/stop/reset, sync preview, sync definitions
+- Execution: Claude concurrency, reserved-for-interactive, timeouts
+- Notifications: Notification configurations
+- Backups: Database backup list
+- Wishes: Wish settings
+- **Stable:** Version comparison dev/stable, sync preview, sync definitions, start/stop/promote
+- **Testing:** Test instance status, start/stop/reset, sync preview, sync definitions, pull changes
 - System: Health status, system info, Docker status
 
 ## Components
@@ -169,8 +183,9 @@ The switching is done via route wrapper components (e.g., `DashboardRoute`, `Wor
 
 ### `src/components/settings/`
 
-- Settings sub-components for the modular settings page
-- Separate components for General, Appearance, Security, Stable, Testing, System
+- Settings subcomponents for the modular settings page
+- Separate components: `GeneralSettingsCard`, `AppearanceCard`, `SecurityCard`, `ExecutionSettingsCard`, `NotificationsCard`, `BackupCard`, `WishSettingsCard`, `RemoteAccessCard`, `StagingCard`, `TestingCard`, `SystemInfoCard`
+- Navigation via `SettingsNav`, shared layout via `SettingsSection`
 
 ### Shared Components (`src/components/shared/`)
 
@@ -181,6 +196,24 @@ The switching is done via route wrapper components (e.g., `DashboardRoute`, `Wor
 | `MonacoEditor` | JSON editor (Monaco, dark theme) |
 | `ErrorState` | Error message with icon |
 | `EmptyState` | Empty state with description |
+| `Pagination` | Page navigation for paginated lists |
+| `CopyButton` | Copy button with success feedback |
+| `GateStatusBadge` | Gate status display (RED/YELLOW/GREEN) |
+| `GateStatusBanner` | Gate status banner for run details |
+| `AgenticStepCard` | Display of agentic block steps |
+| `ForEachStepCard` | Display of ForEach block iterations |
+| `ApprovalDialog` | Dialog for approval block interaction |
+| `HumanInputDialog` | Dialog for human input block interaction |
+| `ExecutionBadges` | Status badges for executions |
+| `ConversionSuggestion` | Suggestion for workflow conversion |
+| `InsightsPanel` | Insights display for runs |
+| `PathLinkedOutput` | Output with clickable file paths |
+| `ProviderIcon` | Icon display for AI providers |
+| `RouteErrorFallback` | Error boundary for route errors |
+| `SyncSelectModal` | Selection modal for definition sync |
+| `TerminalPanel` | Terminal-like output view |
+| `TodoEditModal` | Modal for editing TODOs |
+| `ErrorBoundary` | React error boundary with fallback UI |
 
 ## UI Component Library
 
@@ -194,45 +227,53 @@ All components in `src/components/ui/`:
 | `Modal` | `open`, `onClose`, `title`, `footer`, `size` (sm/md/lg) | Overlay modal with backdrop blur |
 | `Badge` | `variant` (default/success/warning/danger/accent), `dot` | Status badge with optional dot |
 | `Input` | `label`, `error`, `hint`, `icon` + HTML attributes | Form input with validation |
-| `Select` | `label`, `options`, `error` | Dropdown select |
+| `Select` | `label`, `options`, `error` | Dropdown selection |
 | `Toggle` | `enabled`, `onChange`, `label`, `disabled` | Switch element |
 | `Spinner` | `size` (sm/md/lg), `text` | Loading indicator |
 | `Table<T>` | `columns`, `data`, `keyExtractor`, `onRowClick`, `emptyText` | Generic table |
 | `ToastContainer` | (global) | Toast notifications (max 5) |
+| `DirectoryPicker` | `value`, `onChange`, `label` | Server filesystem browser |
+| `CronPicker` | `value`, `onChange` | Cron expression editor with preview |
+| `TagInput` | `tags`, `onChange`, `suggestions` | Tag input with autocomplete |
+| `ModalFooter` | `onCancel`, `onConfirm`, `loading` | Standardized modal footer |
 
 ## Design System
 
 ### CSS Variables
 
-The theme is controlled via CSS custom properties (`src/index.css`, `src/theme/tokens.ts`):
+The theme is controlled via CSS custom properties (`src/theme/tokens.ts` for JS access, `src/index.css` for CSS defaults):
 
 **Dark Theme (Default):**
 
 | Variable | Value | Usage |
 |---|---|---|
-| `--color-surface` | `#0f172a` | Page background |
-| `--color-surface-raised` | `#1e293b` | Cards, elevated surfaces |
-| `--color-surface-overlay` | `#1e293b` | Modal background |
-| `--color-border` | `#334155` | Standard border |
-| `--color-border-strong` | `#475569` | Emphasized border |
-| `--color-text` | `#f1f5f9` | Primary text |
-| `--color-text-secondary` | `#94a3b8` | Secondary text |
-| `--color-text-tertiary` | `#64748b` | Tertiary text |
-| `--color-accent` | `#06b6d4` | Accent color (Cyan) |
-| `--color-accent-hover` | `#22d3ee` | Accent hover |
-| `--color-accent-subtle` | `#083344` | Accent background |
-| `--color-success` | `#34d399` | Success (Emerald) |
-| `--color-warning` | `#fbbf24` | Warning (Amber) |
-| `--color-danger` | `#f87171` | Error (Red) |
-| `--color-sidebar` | `#020617` | Sidebar background |
+| `--color-surface` | `#231e19` | Page background |
+| `--color-surface-secondary` | `#2a241e` | Secondary background |
+| `--color-surface-raised` | `#2e2720` | Cards, elevated surfaces |
+| `--color-surface-overlay` | `#332c24` | Modal background |
+| `--color-surface-hover` | `#3a3128` | Hover background |
+| `--color-border` | `#4a3f33` | Standard border |
+| `--color-border-strong` | `#5e5143` | Emphasized border |
+| `--color-text` | `#f7f3ee` | Primary text |
+| `--color-text-secondary` | `#b8aa9a` | Secondary text |
+| `--color-text-tertiary` | `#8c7e6e` | Tertiary text |
+| `--color-text-inverse` | `#231e19` | Inverse text |
+| `--color-accent` | `#eba44a` | Accent color (amber) |
+| `--color-accent-hover` | `#f2ba62` | Accent hover |
+| `--color-accent-subtle` | `#3d2e14` | Accent background |
+| `--color-success` | `#6cc66c` | Success (green) |
+| `--color-warning` | `#eba44a` | Warning (amber) |
+| `--color-danger` | `#e07272` | Error (red) |
+| `--color-sidebar` | `#1a1614` | Sidebar background |
+| `--color-assistant` | `#1c1812` | Assistant background |
 
-**Light Theme:** Inverted variants with white background and dark text.
+**Light Theme:** Warm color scheme with `#fff8f3` background, `#3a2e22` text and `#f7bd54` accent color.
 
 ### Tailwind Configuration
 
 - **Dark Mode:** `class`-based (toggle via Zustand store)
 - **Fonts:**
-  - Sans: Plus Jakarta Sans (system UI fallback)
+  - Sans: Plus Jakarta Sans (system-ui fallback)
   - Mono: JetBrains Mono (Fira Code fallback)
 - **Custom Animations:** `fade-in`, `slide-in`, `slide-up`, `pulse-subtle`, `slide-in-right`
 
@@ -253,18 +294,21 @@ The theme is controlled via CSS custom properties (`src/index.css`, `src/theme/t
 
 | Store | State | Persistence |
 |---|---|---|
-| `useSidebarStore` | `collapsed: boolean`, `toggle()`, `setCollapsed()` | `localStorage: sidebar-state` |
-| `useThemeStore` | `mode: 'light'\|'dark'`, `overrides`, `toggleMode()`, `apply()` | `localStorage: theme-settings` |
-| `useSettingsStore` | `apiKey: string`, `advancedMode: boolean`, `simpleMode: boolean` | `localStorage: app-settings` |
+| `useSidebarStore` | `collapsed`, `mobileOpen`, `toggle()`, `setCollapsed()`, `setMobileOpen()` | `localStorage: sidebar-state` (`collapsed` only) |
+| `useThemeStore` | `mode: 'light'\|'dark'`, `overrides`, `toggleMode()`, `setOverride()`, `resetOverrides()`, `apply()` | `localStorage: theme-settings` |
+| `useSettingsStore` | `apiKey`, `advancedMode`, `simpleMode`, `autoTodoDefault`, `autoRepairDefault`, `autoRepairMode`, `defaultAiProvider`, `assistantModel`, `suggestionsModel`, `suggestionsEnabled`, `sidebarItemOrder`, `sidebarHiddenItems`, `pinnedWorkflowIds`, `simpleOnboardingSeen` | `localStorage: app-settings` |
+| `useAssistantStore` | `open`, `sessions[]`, `activeSessionId`, `showHistory`, `panelWidth`, `panelHeight`, `pendingInput`, `pendingContext` | `localStorage: assistant-sessions` (sessions, panel size) |
 | `useI18nStore` | `locale: 'en'\|'de'`, `setLocale()` | `localStorage: i18n-locale` |
 | `useToastStore` | `toasts[]`, `addToast()`, `removeToast()` | None (ephemeral) |
+
+`useI18nStore` is defined in `src/i18n/index.ts` (not in `src/stores/`).
 
 ### TanStack Query (Server State)
 
 All API data is managed via React Query:
 
 - **Caching:** Automatic with query keys
-- **Invalidation:** After mutations, associated queries are invalidated
+- **Invalidation:** Related queries are invalidated after mutations
 - **Optimistic Updates:** For drag-and-drop block sorting
 - **Auto-Refetch:** Health check every 30 seconds
 
@@ -278,9 +322,17 @@ All API data is managed via React Query:
 | `useProject(id)` | Query | Single project |
 | `useCreateProject()` | Mutation | Create project |
 | `useUpdateProject()` | Mutation | Update project |
-| `useDeleteProject()` | Mutation | Delete project |
+| `useArchiveProject()` | Mutation | Archive project (soft delete) |
+| `useRestoreProject()` | Mutation | Restore archived project |
+| `useArchivedProjects()` | Query | Archived projects |
 | `useStartContainer(id)` | Mutation | Start container |
 | `useStopContainer(id)` | Mutation | Stop container |
+| `useGenerateProjectContext()` | Mutation | Generate AI context for project |
+| `useOnboardingStatus(id)` | Query | Onboarding status of a project |
+| `useEnableOnboarding()` | Mutation | Enable onboarding |
+| `useDisableOnboarding()` | Mutation | Disable onboarding |
+| `useRefreshOnboarding()` | Mutation | Refresh onboarding |
+| `useOnboardingPreview(id)` | Query | Onboarding preview |
 
 ### `useWorkflows.ts`
 
@@ -288,14 +340,25 @@ All API data is managed via React Query:
 |---|---|---|
 | `useWorkflows()` | Query | All workflows |
 | `useWorkflow(id)` | Query | Single workflow |
-| `useWorkflowRuns(workflowId)` | Query | All runs of a workflow |
+| `useWorkflowRuns(workflowId)` | Query | Runs of a workflow (paginated, auto-refetch) |
+| `useSimilarWorkflows(id)` | Query | Find similar workflows |
+| `useAllRuns(page, size, filters)` | Query | All runs (paginated) |
 | `useCreateWorkflow()` | Mutation | Create workflow |
 | `useUpdateWorkflow()` | Mutation | Update workflow |
-| `useDeleteWorkflow()` | Mutation | Delete workflow |
+| `useDeleteWorkflow()` | Mutation | Delete workflow (soft delete) |
 | `useExecuteWorkflow()` | Mutation | Execute workflow |
 | `usePauseExecution(runId)` | Mutation | Pause execution |
 | `useResumeExecution(runId)` | Mutation | Resume execution |
+| `useResumeFromStep()` | Mutation | Resume from a specific step |
 | `useCancelExecution(runId)` | Mutation | Cancel execution |
+| `useRetryExecution()` | Mutation | Retry failed execution |
+| `useRunCommand()` | Mutation | Send command to running execution |
+| `useSubmitApproval()` | Mutation | Submit approval response |
+| `useApproveTodos()` | Mutation | Approve TODOs for execution |
+| `useImportWorkflow()` | Mutation | Import workflow from JSON |
+| `useOptimizeWorkflow()` | Mutation | Optimize workflow via AI |
+| `useRepairWorkflow()` | Mutation | Repair failed workflow |
+| `useUpdateRunNotes()` | Mutation | Update notes on a run |
 
 ### `useSkills.ts`
 
@@ -312,7 +375,15 @@ All API data is managed via React Query:
 | Hook | Type | Description |
 |---|---|---|
 | `useSchedules()` | Query | All schedules |
+| `useMaintenanceMode()` | Query | Maintenance mode status |
+| `useSetMaintenanceMode()` | Mutation | Toggle maintenance mode |
+| `useCalendarData(start, end)` | Query | Calendar data for time range |
+| `useRemainingToday()` | Query | Remaining runs today |
+| `useRemainingThisWeek()` | Query | Remaining runs this week |
+| `useCronPreview(expr)` | Query | Preview of next executions |
+| `useScheduleRuns(id)` | Query | Runs of a schedule |
 | `useCreateSchedule()` | Mutation | Create schedule |
+| `useUpdateSchedule()` | Mutation | Update schedule |
 | `useToggleSchedule()` | Mutation | Enable/disable schedule |
 | `useDeleteSchedule()` | Mutation | Delete schedule |
 
@@ -334,6 +405,18 @@ All API data is managed via React Query:
 | `useRemoteAccessStatus()` | Query | Tailscale status |
 | `useEnableRemoteAccess()` | Mutation | Enable Tailscale |
 | `useDisableRemoteAccess()` | Mutation | Disable Tailscale |
+| `useBackupList()` | Query | Database backups |
+| `useAiProviders()` | Query | AI providers and default |
+| `usePiCatalog()` | Query | Pi provider catalog |
+| `useUpdateSystemSetting()` | Mutation | Update system setting |
+| `useAssistantModelSetting()` | Query | Assistant model setting |
+| `useAutoRepairModeSetting()` | Query | Auto-repair mode setting |
+| `useSuggestionsModelSetting()` | Query | Suggestions model setting |
+| `useAssistantThinkingPhrases()` | Query | Localized thinking phrases |
+| `useRepairAllFailed()` | Mutation | Repair all failed runs |
+| `useExecutionConfig()` | Query | Execution configuration |
+| `useUpdateExecutionConfig()` | Mutation | Update execution configuration |
+| `useBrowseDirectory()` | Query | Browse server filesystem |
 
 ### `useChains.ts`
 
@@ -354,13 +437,18 @@ All API data is managed via React Query:
 
 | Hook | Type | Description |
 |---|---|---|
-| `useTodos(filters)` | Query | TODOs with filters |
+| `useTodos(filters)` | Query | TODOs with filters (paginated, auto-refetch) |
 | `useTodo(id)` | Query | Single TODO |
 | `useTodoCount()` | Query | TODO count by status |
+| `useProjectActiveTodos(projectId)` | Query | Active TODOs of a project |
 | `useCreateTodo()` | Mutation | Create TODO |
 | `useUpdateTodo()` | Mutation | Update TODO |
-| `useUpdateTodoStatus()` | Mutation | Change status |
+| `useUpdateTodoStatus()` | Mutation | Update status |
+| `useBulkUpdateTodoStatus()` | Mutation | Bulk update multiple TODOs |
+| `useArchiveStale()` | Mutation | Archive stale TODOs |
 | `useDeleteTodo()` | Mutation | Delete TODO |
+| `useExportTodo()` | Mutation | Export TODO to external tracker |
+| `useResolveTodo()` | Mutation | Start AI resolution for TODO |
 
 ### `useActivityLog.ts`
 
@@ -372,7 +460,7 @@ All API data is managed via React Query:
 
 | Hook | Type | Description |
 |---|---|---|
-| `useWorkflowMemory(workflowId)` | Query | Memory entries of a workflow |
+| `useWorkflowMemories(workflowId)` | Query | Memory entries of a workflow |
 | `useExtractMemory()` | Mutation | Extract knowledge from runs |
 | `useActivateMemory()` | Mutation | Activate memory entry |
 | `useUpdateMemory()` | Mutation | Edit memory entry |
@@ -429,7 +517,7 @@ All API data is managed via React Query:
 
 | Hook | Type | Description |
 |---|---|---|
-| `useAssistantChat()` | Mutation | Send chat message to the assistant |
+| `useAssistantChat()` | Mutation | Send chat message to assistant |
 | `useAssistantSuggestions(page)` | Query | Load page-specific suggestions |
 | `useRefreshSuggestions()` | Mutation | Regenerate suggestions |
 
@@ -484,7 +572,7 @@ Generic hook for persisted state via `localStorage`.
 | Hook | Type | Description |
 |---|---|---|
 | `useGenerateWorkflow()` | Mutation | Generate workflow from topic |
-| `useFactoryStatus()` | Query | Status of the factory pipeline |
+| `useFactoryStatus()` | Query | Factory pipeline status |
 
 ### `useWebSocket.ts`
 
@@ -508,7 +596,7 @@ useToast() → {
 
 ### `useAssistantWebSocket.ts`
 
-WebSocket connection for real-time status updates of the assistant (typing indicator, session updates).
+WebSocket connection for real-time assistant status updates (typing indicator, session updates).
 
 ### `useIntegrations.ts`
 
@@ -535,7 +623,7 @@ WebSocket connection for real-time status updates of the assistant (typing indic
 
 ### `useCalendarAggregated.ts`
 
-Aggregates events from multiple sources (Google Calendar, Trello, Schedules, Runs) via the calendar adapter pattern.
+Aggregates events from multiple sources (Google Calendar, Trello, schedules, runs) via the calendar adapter pattern.
 
 ### `useCalendarColors.ts`
 
@@ -546,7 +634,7 @@ Manages custom colors per calendar source (persisted in `localStorage`).
 | Hook | Type | Description |
 |---|---|---|
 | `useConversionSuggestions()` | Query | Suggestions for workflow conversions |
-| `useCreateConversion()` | Mutation | Convert agentic run to deterministic workflow |
+| `useCreateConversion()` | Mutation | Convert agentic run into deterministic workflow |
 
 ### `useLearning.ts`
 
@@ -578,23 +666,23 @@ Responsive hook, detects mobile breakpoint for adaptive UI adjustments.
 - **Files:** `src/i18n/de.ts`, `src/i18n/en.ts`
 - **Hook:** `useT()` → returns the current translation object
 - **Store:** `useI18nStore()` → `locale`, `setLocale()`
-- **Switching:** Button in the header
+- **Toggle:** Button in the header
 
 ### Translation Structure
 
 ```
-common (24 Keys) ─── General labels (Create, Delete, Search, ...)
-nav (7 Keys) ─────── Navigation (Dashboard, Projects, ...)
-dashboard (8 Keys) ─ Dashboard texts
-projects (11 Keys) ─ Projects + nested types & status
-workflows (18 Keys)  Workflows + block types & execution
-skills (10 Keys) ─── Skills + categories
-schedules (7 Keys) ─ Schedules
-webhooks (7 Keys) ── Webhooks
-settings (16 Keys) ─ Settings
-toast (26 Keys) ──── Toast messages
-templates (13 Keys)  Workflow templates
-charts (5 Keys) ──── Chart labels
+common (24 keys) ─── General labels (Create, Delete, Search, ...)
+nav (7 keys) ─────── Navigation (Dashboard, Projects, ...)
+dashboard (8 keys) ─ Dashboard texts
+projects (11 keys) ─ Projects + nested types & statuses
+workflows (18 keys)  Workflows + block types & execution
+skills (10 keys) ─── Skills + categories
+schedules (7 keys) ─ Schedules
+webhooks (7 keys) ── Webhooks
+settings (16 keys) ─ Settings
+toast (26 keys) ──── Toast messages
+templates (13 keys)  Workflow templates
+charts (5 keys) ──── Chart labels
 ```
 
 ## PWA Configuration

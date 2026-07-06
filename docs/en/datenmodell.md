@@ -1,6 +1,4 @@
-<!-- last-sync: 2026-06-29 from: docs/datenmodell.md -->
-
-> *Last updated: April 14, 2026 — Manual documentation audit (V53-V59, integration_connections, onboarding_profiles, workflow_versions)*
+> *Last updated: [auto-generated]*
 
 # Data Model
 
@@ -8,25 +6,25 @@
 
 ```mermaid
 erDiagram
-    projects ||--o| containers : "hat"
-    projects ||--o{ workflows : "enthält"
-    workflows ||--o{ workflow_runs : "hat"
-    workflows }o--o{ skills : "aktiviert"
-    workflow_runs ||--o{ step_results : "enthält"
-    skills ||--o{ capabilities : "hat"
-    workflows ||--o{ scheduled_workflows : "geplant"
-    workflows ||--o{ webhook_triggers : "getriggert"
-    workflows ||--o{ workflow_memory : "hat"
-    workflow_templates ||--o{ workflows : "instanziiert"
-    workflow_chains ||--o{ chain_runs : "hat"
-    projects ||--o{ todos : "hat"
-    projects ||--o{ wishes : "hat"
-    workflows ||--o{ completion_triggers_source : "löst aus"
-    workflows ||--o{ completion_triggers_target : "wird ausgelöst"
-    workflows ||--o{ todo_triggers : "Fix-Workflow"
-    workflows ||--o{ notification_configs : "benachrichtigt"
-    workflows ||--o{ workflow_versions : "versioniert"
-    projects ||--o{ onboarding_profiles : "hat"
+    projects ||--o| containers : "has"
+    projects ||--o{ workflows : "contains"
+    workflows ||--o{ workflow_runs : "has"
+    workflows }o--o{ skills : "activates"
+    workflow_runs ||--o{ step_results : "contains"
+    skills ||--o{ capabilities : "has"
+    workflows ||--o{ scheduled_workflows : "scheduled"
+    workflows ||--o{ webhook_triggers : "triggered"
+    workflows ||--o{ workflow_memory : "has"
+    workflow_templates ||--o{ workflows : "instantiates"
+    workflow_chains ||--o{ chain_runs : "has"
+    projects ||--o{ todos : "has"
+    projects ||--o{ wishes : "has"
+    workflows ||--o{ completion_triggers_source : "triggers"
+    workflows ||--o{ completion_triggers_target : "is triggered"
+    workflows ||--o{ todo_triggers : "fix workflow"
+    workflows ||--o{ notification_configs : "notifies"
+    workflows ||--o{ workflow_versions : "versioned"
+    projects ||--o{ onboarding_profiles : "has"
 
     projects {
         TEXT id PK
@@ -175,6 +173,7 @@ erDiagram
         INTEGER max_runs "DEFAULT 0"
         INTEGER run_count "DEFAULT 0"
         TEXT conflict_behavior "DEFAULT SKIP"
+        INTEGER catch_up_on_resume "DEFAULT 0"
         TEXT created_at
         TEXT updated_at
     }
@@ -199,6 +198,9 @@ erDiagram
         TEXT resolution_state
         INTEGER fix_attempts "DEFAULT 0"
         TEXT last_fix_run_id
+        TEXT exported_provider
+        TEXT exported_ref
+        TEXT exported_url
         TEXT created_at
         TEXT updated_at
     }
@@ -263,6 +265,7 @@ erDiagram
         INTEGER enabled "DEFAULT 1"
         INTEGER max_attempts "DEFAULT 3"
         INTEGER auto_close "DEFAULT 1"
+        INTEGER process_backlog "DEFAULT 1"
         TEXT description
         TEXT last_triggered_at
         INTEGER trigger_count "DEFAULT 0"
@@ -323,8 +326,8 @@ erDiagram
     onboarding_profiles {
         TEXT id PK
         TEXT key "NOT NULL, UNIQUE"
-        TEXT name "NOT NULL"
-        TEXT description
+        TEXT name "JSON i18n map, NOT NULL"
+        TEXT description "JSON i18n map"
         TEXT content "NOT NULL"
         TEXT type "NOT NULL"
         INTEGER built_in "DEFAULT 0"
@@ -347,9 +350,24 @@ erDiagram
         TEXT id PK
         TEXT workflow_id FK "NOT NULL"
         INTEGER version_number "NOT NULL"
-        TEXT snapshot "JSON"
-        TEXT change_source
+        TEXT snapshot "JSON, NOT NULL"
+        TEXT change_source "NOT NULL, DEFAULT 'user'"
+        TEXT change_message
         TEXT created_at
+    }
+
+    dead_letter_entries {
+        TEXT id PK
+        TEXT workflow_run_id
+        TEXT workflow_id
+        TEXT workflow_name
+        TEXT error_message
+        INTEGER failed_step_index
+        INTEGER retry_count "DEFAULT 0"
+        TEXT last_failure_at "NOT NULL"
+        TEXT status "DEFAULT OPEN"
+        TEXT created_at
+        TEXT updated_at
     }
 
     app_settings {
@@ -374,9 +392,9 @@ erDiagram
 | `config` | TEXT | | JSON configuration |
 | `status` | TEXT | NOT NULL, DEFAULT 'STOPPED' | Enum: ProjectStatus |
 | `ai_context` | TEXT | | Additional AI context for the project (V30) |
-| `archived_at` | TEXT | | Archiving timestamp, NULL = active (V35) |
-| `created_at` | TEXT | | ISO-8601 Timestamp |
-| `updated_at` | TEXT | | ISO-8601 Timestamp |
+| `archived_at` | TEXT | | Archival timestamp, NULL = active (V35) |
+| `created_at` | TEXT | | ISO-8601 timestamp |
+| `updated_at` | TEXT | | ISO-8601 timestamp |
 
 **Note:** Projects are not hard-deleted but archived (`archived_at IS NOT NULL`). Archived projects retain all workflows, runs, and data.
 
@@ -386,8 +404,8 @@ erDiagram
 |---|---|---|---|
 | `id` | TEXT | PK | UUID |
 | `project_id` | TEXT | FK → projects, UNIQUE, NOT NULL | 1:1 relationship |
-| `docker_container_id` | TEXT | NOT NULL | Docker Container ID |
-| `image_name` | TEXT | NOT NULL | Docker Image Name |
+| `docker_container_id` | TEXT | NOT NULL | Docker container ID |
+| `image_name` | TEXT | NOT NULL | Docker image name |
 | `status` | TEXT | NOT NULL, DEFAULT 'CREATED' | Enum: ContainerStatus |
 | `mounts` | TEXT | | JSON: mounted volumes |
 | `started_at` | TEXT | | Start time |
@@ -407,10 +425,10 @@ erDiagram
 | `config_schema` | TEXT | | JSON schema |
 | `builtin` | INTEGER | NOT NULL, DEFAULT 0 | 0=custom, 1=builtin |
 | `version` | TEXT | DEFAULT '1.0.0' | Version number |
-| `created_at` | TEXT | | Creation timestamp |
-| `updated_at` | TEXT | | Last updated timestamp |
+| `created_at` | TEXT | | Creation time |
+| `updated_at` | TEXT | | Last updated |
 
-16 built-in skills are created by `SkillSeeder` on startup (idempotent). Built-in skills have stable IDs (e.g. `builtin-code-review`).
+19 built-in skills are created by `SkillSeeder` at startup (idempotent). Built-in skills have stable IDs (e.g. `builtin-code-review`).
 
 ### `capabilities`
 
@@ -424,7 +442,7 @@ erDiagram
 | `input_schema` | TEXT | | JSON schema for input |
 | `output_schema` | TEXT | | JSON schema for output |
 | `async` | INTEGER | NOT NULL, DEFAULT 0 | Asynchronous execution |
-| `writes` | INTEGER | NOT NULL, DEFAULT 0 | Capability modifies files/state (V64). Block config must set `allow_writes: true`; keeps BuiltInSkills.capWrites(...) in sync |
+| `writes` | INTEGER | NOT NULL, DEFAULT 0 | Capability modifies files/state (V64). Block config must set `allow_writes: true`; kept in sync by BuiltInSkills.capWrites(...) |
 
 ### `workflows`
 
@@ -442,20 +460,20 @@ erDiagram
 | `default_context` | TEXT | DEFAULT '{}' | JSON: default context variables (V23) |
 | `template_id` | TEXT | FK → workflow_templates, ON DELETE SET NULL | Source template (V19) |
 | `test_status` | TEXT | DEFAULT 'UNTESTED' | Test status: UNTESTED, PASSED, FAILED (V25) |
-| `last_tested_at` | TEXT | | Last test timestamp (V25) |
+| `last_tested_at` | TEXT | | Last test time (V25) |
 | `block_types` | TEXT | DEFAULT '' | Denormalized block types, comma-separated (V26) |
 | `tags` | TEXT | | JSON array as text — tags for intent-based discovery (V61) |
 | `category` | VARCHAR(32) | | Closed taxonomy: Productivity, Dev, Content, Analysis, Ops, Data, Integration, Other (V61) |
 | `tags_generated_at` | TIMESTAMP | | When the tagging service last wrote tags (V61) |
-| `tags_user_edited` | BOOLEAN | NOT NULL, DEFAULT 0 | Prevents tags from being auto-regenerated once edited by the user (V61) |
+| `tags_user_edited` | BOOLEAN | NOT NULL, DEFAULT 0 | Locks tags against auto-regeneration once edited by user (V61) |
 | `version` | TEXT | DEFAULT '1.0.0' | Version number |
 | `metadata` | TEXT | | JSON: additional metadata |
 | `deleted_at` | TEXT | | Soft-delete timestamp (V32). `@SQLRestriction("deleted_at IS NULL")` |
-| `stable_synced_at` | TEXT | | Timestamp of last sync to Stable (V46) |
-| `created_at` | TEXT | | Creation timestamp |
-| `updated_at` | TEXT | | Last updated timestamp |
+| `stable_synced_at` | TEXT | | Timestamp of last synchronization to Stable (V46) |
+| `created_at` | TEXT | | Creation time |
+| `updated_at` | TEXT | | Last updated |
 
-**Soft-Delete:** The entity class carries `@SQLRestriction("deleted_at IS NULL")`. Deleted workflows are permanently excluded from all queries.
+**Soft-Delete:** The entity class carries `@SQLRestriction("deleted_at IS NULL")`. Deleted workflows are permanently hidden from all queries.
 
 ### `workflow_skills` (Join Table)
 
@@ -472,13 +490,13 @@ M:N relationship between workflows and skills.
 |---|---|---|---|
 | `id` | TEXT | PK | UUID |
 | `workflow_id` | TEXT | FK → workflows, NOT NULL | Associated workflow |
-| `workflow_name` | TEXT | | Snapshot of the workflow name at run creation (V60). Remains stable on soft-delete and avoids lazy loading (OSIV disabled) |
+| `workflow_name` | TEXT | | Snapshot of workflow name at run creation (V60). Remains stable on soft-delete and avoids lazy-load (OSIV disabled) |
 | `status` | TEXT | NOT NULL, DEFAULT 'PENDING' | Enum: RunStatus |
 | `input_context` | TEXT | | JSON: input context at start (V20) |
 | `started_at` | TEXT | | Start time |
 | `completed_at` | TEXT | | End time |
 | `duration_ms` | INTEGER | | Duration in milliseconds |
-| `user_rating` | INTEGER | | Rating 1–5 |
+| `user_rating` | INTEGER | | Rating 1-5 |
 | `error` | TEXT | | JSON: error description |
 | `metadata` | TEXT | | JSON: gate status, additional info (`gate_status`, `gate_category`, `gate_description`) |
 | `triggered_by_schedule_id` | TEXT | | ID of the triggering schedule (V43) |
@@ -490,38 +508,39 @@ M:N relationship between workflows and skills.
 | `id` | TEXT | PK | UUID |
 | `workflow_run_id` | TEXT | FK → workflow_runs, NOT NULL | Associated run |
 | `step_index` | INTEGER | NOT NULL | Order (0-based) |
-| `input` | TEXT | | Input/prompt of the step |
-| `output` | TEXT | | Output of the step |
+| `input` | TEXT | | Step input/prompt |
+| `output` | TEXT | | Step output |
 | `status` | TEXT | NOT NULL, DEFAULT 'PENDING' | Enum: StepStatus |
 | `started_at` | TEXT | | Start time |
 | `completed_at` | TEXT | | End time |
 | `duration_ms` | INTEGER | | Duration in milliseconds |
 | `metadata` | TEXT | | JSON: additional metadata |
-| `context_delta` | TEXT | | JSON: cumulative snapshot of context variables at the end of the step (V47). Used to restore context for INTERRUPTED runs |
+| `context_delta` | TEXT | | JSON: cumulative snapshot of context variables at step end (V47). Used for context recovery on INTERRUPTED runs |
 
 ### `scheduled_workflows`
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
 | `id` | TEXT | PK | UUID |
-| `workflow_id` | TEXT | FK → workflows | Workflow (or NULL for chain targets) (V38) |
+| `workflow_id` | TEXT | FK → workflows | Workflow (or NULL for chain target) (V38) |
 | `chain_id` | TEXT | FK → workflow_chains | Chain (V27, when `target_type = CHAIN`) |
 | `target_type` | TEXT | NOT NULL, DEFAULT 'WORKFLOW' | `WORKFLOW` or `CHAIN` (V27) |
-| `schedule_type` | TEXT | NOT NULL, DEFAULT 'CRON' | `CRON`, `ONCE` (V14), or `DELAYED` (V37) |
-| `cron_expression` | TEXT | NOT NULL | Spring cron (6 fields) |
+| `schedule_type` | TEXT | NOT NULL, DEFAULT 'CRON' | `CRON`, `ONCE` (V14) or `DELAYED` (V37) |
+| `cron_expression` | TEXT | NOT NULL | Spring Cron (6 fields) |
 | `scheduled_at` | TEXT | | One-time execution timestamp (V14, for `ONCE`) |
 | `delay_expression` | TEXT | | Human-readable delay for `DELAYED`, e.g. `"2h"`, `"30m"`, `"1d"` (V37) |
-| `enabled` | INTEGER | NOT NULL, DEFAULT 1 | Active/inactive |
+| `enabled` | INTEGER | NOT NULL, DEFAULT 1 | Active/Inactive |
 | `description` | TEXT | | Description |
 | `input_context` | TEXT | DEFAULT '{}' | JSON: context variables |
 | `last_run_at` | TEXT | | Last execution |
 | `next_run_at` | TEXT | | Next scheduled execution |
-| `end_date` | TEXT | | Optional end date for CRON schedules — schedule is deactivated when `now >= endDate` (V44) |
+| `end_date` | TEXT | | Optional end date for CRON schedules — schedule is disabled when `now >= endDate` (V44) |
 | `max_runs` | INTEGER | DEFAULT 0 | Maximum number of executions (0 = unlimited) (V44) |
 | `run_count` | INTEGER | DEFAULT 0 | Counter, incremented after each execution (V44) |
-| `conflict_behavior` | TEXT | DEFAULT 'SKIP' | Behavior when target is already running: `SKIP` or `OVERLAP` (V45) |
-| `created_at` | TEXT | | Creation timestamp |
-| `updated_at` | TEXT | | Last updated timestamp |
+| `conflict_behavior` | TEXT | DEFAULT 'SKIP' | Behavior when execution is already running: `SKIP` or `OVERLAP` (V45) |
+| `catch_up_on_resume` | INTEGER | NOT NULL, DEFAULT 0 | Per-schedule policy on system resume after suspend/freeze: 0 = skip missed runs, 1 = catch up once (V65) |
+| `created_at` | TEXT | | Creation time |
+| `updated_at` | TEXT | | Last updated |
 
 ### `webhook_triggers`
 
@@ -530,13 +549,13 @@ M:N relationship between workflows and skills.
 | `id` | TEXT | PK | UUID |
 | `workflow_id` | TEXT | FK → workflows, NOT NULL | Workflow |
 | `secret_token` | TEXT | NOT NULL, UNIQUE | Trigger token |
-| `enabled` | INTEGER | NOT NULL, DEFAULT 1 | Active/inactive |
+| `enabled` | INTEGER | NOT NULL, DEFAULT 1 | Active/Inactive |
 | `description` | TEXT | | Description |
 | `default_context` | TEXT | DEFAULT '{}' | JSON: default context |
-| `last_triggered_at` | TEXT | | Last trigger |
+| `last_triggered_at` | TEXT | | Last trigger time |
 | `trigger_count` | INTEGER | NOT NULL, DEFAULT 0 | Number of triggers |
-| `created_at` | TEXT | | Creation timestamp |
-| `updated_at` | TEXT | | Last updated timestamp |
+| `created_at` | TEXT | | Creation time |
+| `updated_at` | TEXT | | Last updated |
 
 **Index:** `idx_webhook_triggers_token` on `secret_token` (UNIQUE)
 
@@ -559,7 +578,7 @@ M:N relationship between workflows and skills.
 | `created_at` | TEXT | | |
 | `updated_at` | TEXT | | |
 
-44 built-in templates are created by `WorkflowTemplateSeeder` on startup. Template definitions are stored as JSON under `src/main/resources/templates/builtin/`.
+66 built-in templates are created by `WorkflowTemplateSeeder` at startup. Template definitions are stored as JSON under `src/main/resources/templates/builtin/`.
 
 ### `template_verifications`
 
@@ -569,7 +588,7 @@ M:N relationship between workflows and skills.
 | `template_id` | TEXT | FK → workflow_templates, NOT NULL | Template |
 | `project_id` | TEXT | FK → projects, NOT NULL | Project |
 | `last_run_id` | TEXT | FK → workflow_runs, ON DELETE SET NULL | Last test run |
-| `verified_at` | TIMESTAMP | NOT NULL | Verification timestamp |
+| `verified_at` | TIMESTAMP | NOT NULL | Verification time |
 
 **Unique Constraint:** `(template_id, project_id)` — one entry per template+project combination.
 
@@ -582,7 +601,7 @@ M:N relationship between workflows and skills.
 | `title` | TEXT | | Short title of the knowledge entry |
 | `content` | TEXT | NOT NULL | Extracted knowledge (Markdown) |
 | `tags` | TEXT | | Comma-separated tags (JSON array as text) |
-| `source_run_ids` | TEXT | | JSON array of run IDs from which this was extracted |
+| `source_run_ids` | TEXT | | JSON array of run IDs from which knowledge was extracted |
 | `provider` | TEXT | NOT NULL | `CLAUDE` or `CODEX` |
 | `active` | INTEGER | NOT NULL, DEFAULT 0 | 1 = inject into subsequent runs |
 | `created_at` | TEXT | NOT NULL | |
@@ -609,7 +628,7 @@ A chain does not belong to any project and can reference workflows from differen
 ```json
 {
   "workflowId": "uuid",
-  "label": "optionaler Anzeigename",
+  "label": "optional display name",
   "sortOrder": 0,
   "inputContext": {},
   "stopOnFailure": true
@@ -638,7 +657,7 @@ A chain does not belong to any project and can reference workflows from differen
   "entryIndex": 0,
   "workflowId": "uuid",
   "workflowName": "Name",
-  "projectName": "Projekt",
+  "projectName": "Project",
   "workflowRunId": "uuid",
   "status": "PENDING",
   "startedAt": null,
@@ -656,7 +675,7 @@ A chain does not belong to any project and can reference workflows from differen
 | `id` | TEXT | PK | UUID |
 | `title` | TEXT | NOT NULL | Short title in imperative form |
 | `description` | TEXT | | Markdown description |
-| `status` | TEXT | NOT NULL, DEFAULT 'OPEN' | `OPEN`, `IN_PROGRESS`, `DONE`, `BACKLOG` |
+| `status` | TEXT | NOT NULL, DEFAULT 'OPEN' | `OPEN`, `IN_PROGRESS`, `DONE`, `BACKLOG`, `ARCHIVED` |
 | `priority` | TEXT | NOT NULL, DEFAULT 'MEDIUM' | `CRITICAL`, `HIGH`, `MEDIUM`, `LOW` |
 | `tags` | TEXT | | JSON array as text |
 | `project_id` | TEXT | FK → projects, ON DELETE SET NULL | Optional project assignment |
@@ -671,13 +690,16 @@ A chain does not belong to any project and can reference workflows from differen
 | `last_fix_run_id` | TEXT | | ID of the last fix workflow run (V52) |
 | `due_date` | TEXT | | Due date (V57) |
 | `linked_workflow_id` | TEXT | FK → workflows, ON DELETE SET NULL | Optional resolver workflow (V59) |
-| `resolution_state` | TEXT | | Workflow resolution state: `RUNNING`, `FAILED` (V59) |
+| `resolution_state` | TEXT | | Enum: ResolutionState — status of workflow resolution (V59) |
+| `exported_provider` | TEXT | | Provider identifier of the external system (e.g. `jira`, `github`), decoupled from `reference_type` (V66) |
+| `exported_ref` | TEXT | | External reference ID (e.g. issue key) (V66) |
+| `exported_url` | TEXT | | URL to the external object (V66) |
 | `created_at` | TEXT | NOT NULL | |
 | `updated_at` | TEXT | NOT NULL | |
 
 **Indexes:** `idx_todos_status`, `idx_todos_project`, `idx_todos_source`, `idx_todos_created`, `idx_todos_status_priority_created` (V54), `idx_todos_project_status` (V54), `idx_todos_linked_workflow_id` (V59)
 
-TODOs are created automatically by `AutoTodoService` on RED/YELLOW gate status (RED → HIGH, YELLOW → MEDIUM). When a `TodoTrigger` is configured, fix workflows are started automatically (self-improvement loop).
+TODOs are automatically created by `AutoTodoService` on RED/YELLOW gate status (RED → HIGH, YELLOW → MEDIUM). When a `TodoTrigger` is configured, fix workflows are automatically started (self-improvement loop).
 
 ### `activity_log`
 
@@ -690,7 +712,7 @@ TODOs are created automatically by `AutoTodoService` on RED/YELLOW gate status (
 | `message` | TEXT | NOT NULL | Log message |
 | `source` | TEXT | | Source (service name, etc.) |
 | `reference_id` | TEXT | | ID of the affected object |
-| `workflow_id` | TEXT | | Linked workflow (V31) |
+| `workflow_id` | TEXT | | Associated workflow (V31) |
 | `metadata` | TEXT | | JSON: additional info |
 | `created_at` | TEXT | NOT NULL | DB insertion timestamp |
 
@@ -727,17 +749,17 @@ TODOs are created automatically by `AutoTodoService` on RED/YELLOW gate status (
 |---|---|---|---|
 | `id` | TEXT | PK | UUID |
 | `source_workflow_id` | TEXT | FK → workflows, NOT NULL | Workflow that fires the trigger |
-| `target_workflow_id` | TEXT | FK → workflows, NOT NULL | Workflow that is started |
-| `enabled` | INTEGER | NOT NULL, DEFAULT 1 | Active/inactive |
+| `target_workflow_id` | TEXT | FK → workflows, NOT NULL | Workflow that gets started |
+| `enabled` | INTEGER | NOT NULL, DEFAULT 1 | Active/Inactive |
 | `trigger_on_success` | INTEGER | NOT NULL, DEFAULT 1 | Trigger on successful completion |
 | `trigger_on_failure` | INTEGER | NOT NULL, DEFAULT 0 | Trigger on failure |
 | `trigger_always` | INTEGER | NOT NULL, DEFAULT 0 | Always trigger, regardless of status |
 | `description` | TEXT | | Description |
 | `context_variables` | TEXT | | JSON: context variables for the target workflow |
-| `last_triggered_at` | TEXT | | Last trigger |
+| `last_triggered_at` | TEXT | | Last trigger time |
 | `trigger_count` | INTEGER | NOT NULL, DEFAULT 0 | Number of triggers |
-| `created_at` | TEXT | | Creation timestamp |
-| `updated_at` | TEXT | | Last updated timestamp |
+| `created_at` | TEXT | | Creation time |
+| `updated_at` | TEXT | | Last updated |
 
 Automatically starts a target workflow when a source workflow completes. The trigger condition (success, failure, always) is configurable (V39).
 
@@ -747,23 +769,24 @@ Automatically starts a target workflow when a source workflow completes. The tri
 |---|---|---|---|
 | `id` | TEXT | PK | UUID |
 | `tag_pattern` | TEXT | NOT NULL | Comma-separated tags (AND logic), e.g. `"backend,testing"` |
-| `project_id` | TEXT | | Optional: match only TODOs in this project |
-| `source_filter` | TEXT | | Optional: `"USER"`, `"AI"`, or `"WORKFLOW"` |
+| `project_id` | TEXT | | Optional: only match TODOs in this project |
+| `source_filter` | TEXT | | Optional: `"USER"`, `"AI"` or `"WORKFLOW"` |
 | `min_priority` | TEXT | | Optional: `"LOW"`, `"MEDIUM"`, `"HIGH"`, `"CRITICAL"` |
 | `target_workflow_id` | TEXT | FK → workflows, NOT NULL | Fix workflow to start |
 | `context_template` | TEXT | DEFAULT '{}' | JSON: static context variables (merged with TODO data) |
-| `enabled` | INTEGER | NOT NULL, DEFAULT 1 | Active/inactive |
-| `max_attempts` | INTEGER | NOT NULL, DEFAULT 3 | Max. fix attempts per TODO |
+| `enabled` | INTEGER | NOT NULL, DEFAULT 1 | Active/Inactive |
+| `max_attempts` | INTEGER | NOT NULL, DEFAULT 3 | Max fix attempts per TODO |
 | `auto_close` | INTEGER | NOT NULL, DEFAULT 1 | Automatically close TODO on GREEN gate |
+| `process_backlog` | INTEGER | NOT NULL, DEFAULT 1 | Retroactively process existing open TODOs when the trigger is activated (V53) |
 | `description` | TEXT | | Human-readable description |
-| `last_triggered_at` | TEXT | | Last trigger |
+| `last_triggered_at` | TEXT | | Last trigger time |
 | `trigger_count` | INTEGER | NOT NULL, DEFAULT 0 | Number of triggers |
-| `created_at` | TEXT | | Creation timestamp |
-| `updated_at` | TEXT | | Last updated timestamp |
+| `created_at` | TEXT | | Creation time |
+| `updated_at` | TEXT | | Last updated |
 
 **Indexes:** `idx_todo_triggers_enabled`
 
-Closes the self-improvement loop: when a TODO is created (e.g. by AutoTodoService), `TodoTriggerService` checks all active todo triggers. On a tag match the fix workflow is started; on GREEN gate the TODO is closed. Loop prevention via `todoTriggerRun` metadata flag, max-attempts counter, and running check (V51/V52).
+Closes the self-improvement loop: when a TODO is created (e.g. by AutoTodoService), `TodoTriggerService` checks all active todo triggers. On tag match, the fix workflow is started; on GREEN gate, the TODO is closed. Loop prevention via `todoTriggerRun` metadata flag, max-attempts counter, and running check (V51/V52).
 
 ### `notification_configs`
 
@@ -771,7 +794,7 @@ Closes the self-improvement loop: when a TODO is created (e.g. by AutoTodoServic
 |---|---|---|---|
 | `id` | TEXT | PK | UUID |
 | `name` | TEXT | NOT NULL | Name of the notification configuration |
-| `enabled` | INTEGER | NOT NULL, DEFAULT 1 | Active/inactive |
+| `enabled` | INTEGER | NOT NULL, DEFAULT 1 | Active/Inactive |
 | `channel_type` | TEXT | NOT NULL, DEFAULT 'WEBHOOK' | `WEBHOOK` or `DESKTOP` |
 | `webhook_url` | TEXT | | URL for WEBHOOK channel (Slack/Discord/Teams incoming webhook) |
 | `workflow_id` | TEXT | FK → workflows | Optional workflow filter (NULL = global for all workflows) |
@@ -779,8 +802,8 @@ Closes the self-improvement loop: when a TODO is created (e.g. by AutoTodoServic
 | `trigger_on_failure` | INTEGER | NOT NULL, DEFAULT 1 | Notify on failure |
 | `trigger_always` | INTEGER | NOT NULL, DEFAULT 0 | Always notify |
 | `message_template` | TEXT | | Optional message template with variables: `{{workflow_name}}`, `{{status}}`, `{{duration}}`, `{{error_message}}` |
-| `created_at` | TEXT | | Creation timestamp |
-| `updated_at` | TEXT | | Last updated timestamp |
+| `created_at` | TEXT | | Creation time |
+| `updated_at` | TEXT | | Last updated |
 
 Configurable notifications via webhook or desktop on workflow completion (V40).
 
@@ -790,7 +813,7 @@ Configurable notifications via webhook or desktop on workflow completion (V40).
 |---|---|---|---|
 | `id` | TEXT | PK | UUID |
 | `page` | TEXT | NOT NULL | Page/context of the assistant session |
-| `entity_id` | TEXT | | Optional entity ID for context-aware sessions |
+| `entity_id` | TEXT | | Optional entity ID for context-bound sessions |
 | `messages` | TEXT | NOT NULL, DEFAULT '[]' | JSON array of chat messages |
 | `message_count` | INTEGER | NOT NULL, DEFAULT 0 | Number of messages |
 | `preview` | TEXT | | Preview text of the last response |
@@ -807,7 +830,7 @@ Stores assistant chat sessions for the floating chat panel (V41, V58).
 | `page` | TEXT | NOT NULL, UNIQUE | Page identifier |
 | `suggestions` | TEXT | NOT NULL, DEFAULT '[]' | JSON array of suggestions |
 | `generated_by` | TEXT | NOT NULL, DEFAULT 'CLAUDE' | Generator (e.g. `CLAUDE`) |
-| `generated_at` | TEXT | NOT NULL | Generation timestamp |
+| `generated_at` | TEXT | NOT NULL | Generation time |
 | `based_on_sessions` | INTEGER | NOT NULL, DEFAULT 0 | Number of underlying sessions |
 
 AI-generated action suggestions per page, based on assistant sessions (V42).
@@ -818,18 +841,18 @@ AI-generated action suggestions per page, based on assistant sessions (V42).
 |---|---|---|---|
 | `id` | TEXT | PK | UUID |
 | `provider_id` | TEXT | NOT NULL, UNIQUE | Provider identifier (e.g. `google-calendar`, `jira`) |
-| `status` | TEXT | NOT NULL, DEFAULT 'DISCONNECTED' | Connection status: CONNECTED, DISCONNECTED |
-| `access_token_encrypted` | TEXT | | AES-256-GCM-encrypted OAuth access token |
-| `refresh_token_encrypted` | TEXT | | AES-256-GCM-encrypted OAuth refresh token |
-| `token_expiry` | TEXT | | Token expiry timestamp (ISO-8601) |
+| `status` | TEXT | NOT NULL, DEFAULT 'DISCONNECTED' | Enum: ConnectionStatus (CONNECTED, DISCONNECTED, EXPIRED) |
+| `access_token_encrypted` | TEXT | | AES-256-GCM encrypted OAuth access token |
+| `refresh_token_encrypted` | TEXT | | AES-256-GCM encrypted OAuth refresh token |
+| `token_expiry` | TEXT | | Token expiry time (ISO-8601) |
 | `scopes` | TEXT | | Granted OAuth scopes (comma-separated) |
 | `account_info` | TEXT | | JSON with account details (name, email) |
-| `client_id_encrypted` | TEXT | | AES-256-GCM-encrypted OAuth client ID |
-| `client_secret_encrypted` | TEXT | | AES-256-GCM-encrypted OAuth client secret |
-| `created_at` | TEXT | | Creation timestamp |
-| `updated_at` | TEXT | | Last updated timestamp |
+| `client_id_encrypted` | TEXT | | AES-256-GCM encrypted OAuth client ID |
+| `client_secret_encrypted` | TEXT | | AES-256-GCM encrypted OAuth client secret |
+| `created_at` | TEXT | | Creation time |
+| `updated_at` | TEXT | | Last updated |
 
-Stores OAuth connections and client credentials for integration providers. All sensitive data is AES-256-GCM-encrypted (V55 + V56).
+Stores OAuth connections and client credentials for integration providers. All sensitive data is AES-256-GCM encrypted (V55 + V56).
 
 ### `onboarding_profiles`
 
@@ -837,17 +860,17 @@ Stores OAuth connections and client credentials for integration providers. All s
 |---|---|---|---|
 | `id` | TEXT | PK | UUID |
 | `key` | TEXT | NOT NULL, UNIQUE | Profile key (e.g. `developer`, `research`) |
-| `name` | TEXT | NOT NULL | Display name |
-| `description` | TEXT | | Profile description |
+| `name` | TEXT | NOT NULL | JSON i18n map: `{"de":"...","en":"..."}` |
+| `description` | TEXT | | JSON i18n map |
 | `content` | TEXT | NOT NULL | Markdown content of the AI context template |
-| `type` | TEXT | NOT NULL | Profile type: BASE, DEVELOPER, RESEARCH, CONTENT, OPS |
+| `type` | TEXT | NOT NULL | Enum: OnboardingProfileType |
 | `built_in` | INTEGER | NOT NULL, DEFAULT 0 | Whether built-in (not deletable) |
 | `sort_order` | INTEGER | NOT NULL, DEFAULT 0 | Sort order |
 | `version` | INTEGER | NOT NULL, DEFAULT 1 | Current version |
-| `created_at` | TEXT | | Creation timestamp |
-| `updated_at` | TEXT | | Last updated timestamp |
+| `created_at` | TEXT | | Creation time |
+| `updated_at` | TEXT | | Last updated |
 
-AI context templates for project onboarding. 5 built-in profiles + custom profiles (V49).
+AI context templates for project onboarding. Built-in profiles + user-defined profiles (V49).
 
 ### `onboarding_profile_history`
 
@@ -858,7 +881,7 @@ AI context templates for project onboarding. 5 built-in profiles + custom profil
 | `version` | INTEGER | NOT NULL | Version number |
 | `content` | TEXT | NOT NULL | Profile content of this version |
 | `changed_by` | TEXT | NOT NULL | Who made the change |
-| `changed_at` | TEXT | NOT NULL | Timestamp of the change |
+| `changed_at` | TEXT | NOT NULL | Time of the change |
 
 Version history for onboarding profiles (V49).
 
@@ -869,9 +892,10 @@ Version history for onboarding profiles (V49).
 | `id` | TEXT | PK | UUID |
 | `workflow_id` | TEXT | FK NOT NULL | Reference to `workflows.id` |
 | `version_number` | INTEGER | NOT NULL | Sequential version number |
-| `snapshot` | TEXT | | JSON snapshot of the workflow state (blocks, instructions, etc.) |
-| `change_source` | TEXT | | Change source: `user`, `ai`, `pool-install`, `import`, `api` |
-| `created_at` | TEXT | | Creation timestamp |
+| `snapshot` | TEXT | NOT NULL | JSON snapshot of the workflow state (blocks, instructions, etc.) |
+| `change_source` | TEXT | NOT NULL, DEFAULT 'user' | Change source: `user`, `ai`, `pool-install`, `import`, `api` |
+| `change_message` | TEXT | | Optional description of the change (V50) |
+| `created_at` | TEXT | | Creation time |
 
 UNIQUE constraint on (`workflow_id`, `version_number`). Stores complete workflow snapshots for version history and restore (V50).
 
@@ -886,10 +910,10 @@ UNIQUE constraint on (`workflow_id`, `version_number`). Stores complete workflow
 | `error_message` | TEXT | | Error message of the last attempt |
 | `failed_step_index` | INTEGER | | Index of the failed step |
 | `retry_count` | INTEGER | NOT NULL, DEFAULT 0 | Number of retry attempts |
-| `last_failure_at` | TEXT | NOT NULL | Timestamp of the last failure |
-| `status` | TEXT | NOT NULL, DEFAULT 'OPEN' | Processing status, e.g. `OPEN` |
-| `created_at` | TEXT | NOT NULL | Creation timestamp |
-| `updated_at` | TEXT | | Last updated timestamp |
+| `last_failure_at` | TEXT | NOT NULL | Time of the last failure |
+| `status` | TEXT | NOT NULL, DEFAULT 'OPEN' | Enum: DeadLetterEntry.Status (`OPEN`, `RETRIED`, `DISCARDED`) |
+| `created_at` | TEXT | NOT NULL | Creation time |
+| `updated_at` | TEXT | | Last updated |
 
 **Indexes:** `idx_dlq_status`, `idx_dlq_created_at` (DESC). Dead-letter queue for repeatedly failed workflow runs (V63).
 
@@ -897,8 +921,8 @@ UNIQUE constraint on (`workflow_id`, `version_number`). Stores complete workflow
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
-| `key` | TEXT | PK | Settings key, e.g. `api-key` |
-| `value` | TEXT | NOT NULL | Settings value |
+| `key` | TEXT | PK | Setting key, e.g. `api-key` |
+| `value` | TEXT | NOT NULL | Setting value |
 | `created_at` | TEXT | NOT NULL, DEFAULT `datetime('now')` | |
 
 The only persistent system configuration outside of `application.yml`.
@@ -920,16 +944,16 @@ The only persistent system configuration outside of `application.yml`.
 | Value | Description |
 |---|---|
 | `STOPPED` | Container stopped |
-| `STARTING` | Container starting |
-| `RUNNING` | Container running |
-| `ERROR` | Error on container start |
+| `STARTING` | Container is starting |
+| `RUNNING` | Container is running |
+| `ERROR` | Error during container start |
 
 ### ContainerStatus
 
 | Value | Description |
 |---|---|
 | `CREATED` | Container created, not yet started |
-| `RUNNING` | Container running |
+| `RUNNING` | Container is running |
 | `STOPPED` | Container stopped |
 | `ERROR` | Container error |
 
@@ -938,10 +962,10 @@ The only persistent system configuration outside of `application.yml`.
 | Value | Description |
 |---|---|
 | `PENDING` | Waiting for execution |
-| `RUNNING` | Running |
-| `PAUSED` | Paused (Approval/HumanInput block waiting) |
-| `COMPLETED` | Completed successfully |
-| `COMPLETED_WITH_ERRORS` | Completed but with YELLOW gate status |
+| `RUNNING` | Being executed |
+| `PAUSED` | Paused (approval/human-input block waiting) |
+| `COMPLETED` | Successfully completed |
+| `COMPLETED_WITH_ERRORS` | Completed, but YELLOW gate status |
 | `FAILED` | Failed |
 | `CANCELLED` | Cancelled |
 | `INTERRUPTED` | Interrupted (e.g. by server restart), can be resumed |
@@ -951,18 +975,18 @@ The only persistent system configuration outside of `application.yml`.
 | Value | Description |
 |---|---|
 | `PENDING` | Not yet started |
-| `RUNNING` | Running |
+| `RUNNING` | Being executed |
 | `COMPLETED` | Successful |
 | `FAILED` | Failed |
 | `SKIPPED` | Skipped (e.g. in conditional) |
-| `WAITING_APPROVAL` | Waiting for approval (Approval/HumanInput block) |
+| `WAITING_APPROVAL` | Waiting for approval (approval/human-input block) |
 
 ### SkillCategory
 
 | Value | Description |
 |---|---|
 | `DOCUMENT` | Document processing |
-| `CODE` | Code analysis and generation |
+| `CODE` | Code analysis and creation |
 | `DATA` | Data analysis |
 | `CONTENT` | Content creation |
 | `RESEARCH` | Research |
@@ -975,21 +999,21 @@ The only persistent system configuration outside of `application.yml`.
 |---|---|
 | `GREEN` | Quality gate passed |
 | `YELLOW` | Gate passed with warnings (run status becomes `COMPLETED_WITH_ERRORS`) |
-| `RED` | Gate failed (AutoTodoService creates HIGH-priority TODO) |
+| `RED` | Gate not passed (AutoTodoService creates HIGH-priority TODO) |
 
 ### WishStatus
 
 | Value | Description |
 |---|---|
 | `RECEIVED` | Wish received, not yet processed |
-| `DECOMPOSING` | Wish being decomposed into tasks |
+| `DECOMPOSING` | Wish is being decomposed into tasks |
 | `AWAITING_DECOMPOSE_APPROVAL` | Waiting for decomposition approval |
-| `EXECUTING` | Generated workflows being executed |
-| `EVALUATING` | Results being evaluated |
-| `REFINING` | Workflows being refined (iteration) |
-| `AWAITING_CLARIFICATION` | Waiting for user clarification |
+| `EXECUTING` | Generated workflows are being executed |
+| `EVALUATING` | Results are being evaluated |
+| `REFINING` | Workflows are being refined (iteration) |
+| `AWAITING_CLARIFICATION` | Waiting for clarification from the user |
 | `AWAITING_APPROVAL` | Waiting for final approval |
-| `COMPLETED` | Wish completed successfully |
+| `COMPLETED` | Wish successfully implemented |
 | `FAILED` | Implementation failed |
 | `CANCELLED` | Wish cancelled |
 
@@ -1000,15 +1024,26 @@ The only persistent system configuration outside of `application.yml`.
 | `OPEN` | Open, ready for processing |
 | `IN_PROGRESS` | In progress |
 | `DONE` | Done |
-| `BACKLOG` | Backlogged |
+| `BACKLOG` | Deferred |
+| `ARCHIVED` | Archived |
+
+### Todo.ResolutionState
+
+| Value | Description |
+|---|---|
+| `IDLE` | No resolver workflow active |
+| `RUNNING` | Resolver workflow running |
+| `FAILED` | Resolver workflow failed |
+| `SUCCEEDED` | Resolver workflow succeeded |
 
 ### Todo.Priority
 
 | Value | Description |
 |---|---|
 | `LOW` | Nice-to-have |
-| `MEDIUM` | Complete soon |
-| `HIGH` | Blocking, resolve immediately |
+| `MEDIUM` | Should be done soon |
+| `HIGH` | Blocking, do immediately |
+| `CRITICAL` | Critical, highest priority |
 
 ### Todo.Source
 
@@ -1037,12 +1072,13 @@ The only persistent system configuration outside of `application.yml`.
 | `WEBHOOK` | Webhook events |
 | `SECURITY` | Security events |
 | `CONTAINER` | Container events |
+| `PLUGIN` | Plugin/integration events |
 
 ### ScheduleType (ScheduledWorkflow)
 
 | Value | Description |
 |---|---|
-| `CRON` | Recurring according to cron expression |
+| `CRON` | Recurring by cron expression |
 | `ONCE` | One-time execution at a specific time |
 | `DELAYED` | Delayed execution (e.g. `"2h"`, `"30m"`) |
 
@@ -1050,8 +1086,8 @@ The only persistent system configuration outside of `application.yml`.
 
 | Value | Description |
 |---|---|
-| `SKIP` | Skip if the target is already running |
-| `OVERLAP` | Start anyway, even if the target is already running |
+| `SKIP` | Skip if target is already running |
+| `OVERLAP` | Start anyway, even if target is already running |
 
 ### ChannelType (NotificationConfig)
 
@@ -1060,15 +1096,39 @@ The only persistent system configuration outside of `application.yml`.
 | `WEBHOOK` | Notification via webhook (Slack/Discord/Teams) |
 | `DESKTOP` | Desktop notification |
 
+### ConnectionStatus (IntegrationConnection)
+
+| Value | Description |
+|---|---|
+| `CONNECTED` | Connection active |
+| `DISCONNECTED` | Not connected |
+| `EXPIRED` | Token expired |
+
+### OnboardingProfileType
+
+| Value | Description |
+|---|---|
+| `BASE` | Base profile |
+| `PROFILE` | Specialized profile |
+
+### DeadLetterEntry.Status
+
+| Value | Description |
+|---|---|
+| `OPEN` | Open, not yet processed |
+| `RETRIED` | Retried |
+| `DISCARDED` | Discarded |
+
 ## BlockDefinition (JSON Structure)
 
 Blocks are stored as a JSON array in the `blocks` column of the `workflows` table.
 
 ```json
 {
-  "type": "simple | shell | retry | conditional | forEach | while | switch | agentic | approval | sub-workflow | skill-capability | human-input",
+  "type": "simple | shell | retry | conditional | foreach | while | switch | agentic | approval | sub-workflow | skill-capability | human-input | document | integration",
+  "name": "Optional display name",
   "config": {
-    "prompt": "Anweisung oder Befehl",
+    "prompt": "Instruction or command",
     "timeout_seconds": 300,
     "on_failure": "stop | continue"
   },
@@ -1080,19 +1140,20 @@ Blocks are stored as a JSON array in the `blocks` column of the `workflows` tabl
 | Field | Type | Description |
 |---|---|---|
 | `type` | string | Block type (see below) |
+| `name` | string | Optional. Display name of the block |
 | `config` | object | Type-specific configuration |
 | `requiredCapabilities` | string[] | Optional. Required capabilities |
-| `skillIds` | string[] | Optional. Skill IDs activated in addition to workflow-level skills for this block (additive) |
+| `skillIds` | string[] | Optional. Skill IDs additionally activated for this block on top of workflow skills (additive) |
 
 **Type-specific config fields:**
 
-| Type | Key config fields |
+| Type | Key Config Fields |
 |---|---|
 | `simple` | `prompt`, `on_failure`, `timeout_seconds` |
 | `shell` | `command` (shell script), `on_failure`, `timeout_seconds` |
 | `retry` | `prompt`, `maxRetries`, `on_failure`, `timeout_seconds` |
 | `conditional` | `condition`, `thenPrompt`, `elsePrompt` |
-| `forEach` | `items`, `prompt`, `on_failure` |
+| `foreach` | `items`, `prompt`, `on_failure` |
 | `while` | `condition`, `prompt`, `maxIterations` |
 | `switch` | `expression`, `cases` (list with `value`, `blocks`) |
 | `agentic` | `goal`, `max_iterations` (10), `iteration_timeout_seconds` (300), `total_timeout_seconds` (1800), `max_total_tokens` (200000), `max_repeated_actions` (3), `require_approval` (false) |
@@ -1100,24 +1161,26 @@ Blocks are stored as a JSON array in the `blocks` column of the `workflows` tabl
 | `sub-workflow` | `workflowId`, `inputContext` |
 | `skill-capability` | `skillId`, `capabilityName`, `input` |
 | `human-input` | `prompt`, `input_type` (text/select), `variable_name`, `options`, `default_value`, `required`, `timeout_minutes` (30), `use_default_on_timeout` |
+| `document` | `prompt`, `on_failure`, `timeout_seconds` |
+| `integration` | `provider_id`, `action`, `parameters`, `on_failure`, `timeout_seconds` |
 
-**Common optional field** `timeout_seconds` overrides the global Claude CLI timeout for all block types (`automation.host-claude.timeout-seconds`, default 300s).
+**Common optional field** `timeout_seconds` overrides the global Claude CLI timeout (`automation.host-claude.timeout-seconds`, default 300s) for all block types.
 
 ## Flyway Migrations
 
 | Version | File | Description |
 |---|---|---|
 | V1 | `V1__create_projects_table.sql` | Projects table |
-| V2 | `V2__create_containers_table.sql` | Container table (FK → projects) |
+| V2 | `V2__create_containers_table.sql` | Containers table (FK → projects) |
 | V3 | `V3__create_skills_table.sql` | Skills table |
 | V4 | `V4__create_capabilities_table.sql` | Capabilities table (FK → skills) |
 | V5 | `V5__create_workflows_table.sql` | Workflows + workflow_skills join table |
 | V6 | `V6__create_workflow_runs_table.sql` | workflow_runs + step_results |
 | V7 | `V7__create_scheduled_workflows_table.sql` | Scheduled workflows |
-| V8 | `V8__create_webhook_triggers_table.sql` | Webhook trigger + index |
+| V8 | `V8__create_webhook_triggers_table.sql` | Webhook triggers + index |
 | V9 | `V9__add_updated_at_columns.sql` | `updated_at` for scheduled_workflows, webhook_triggers, skills |
 | V10 | `V10__add_performance_indexes.sql` | Performance indexes |
-| V11 | `V11__add_container_last_activity.sql` | `last_activity_at` for container (auto-stop) |
+| V11 | `V11__add_container_last_activity.sql` | `last_activity_at` for containers (auto-stop) |
 | V12 | `V12__create_app_settings.sql` | App settings (API key) |
 | V13 | `V13__add_workflow_model_and_instructions.sql` | `instructions`, `model` for workflows |
 | V14 | `V14__add_schedule_type_and_scheduled_at.sql` | `schedule_type`, `scheduled_at` for one-time schedules |
@@ -1171,15 +1234,17 @@ Blocks are stored as a JSON array in the `blocks` column of the `workflows` tabl
 | V62 | `V62__add_auto_refine_to_wishes.sql` | `auto_refine` in wishes |
 | V63 | `V63__create_dead_letter_entries.sql` | dead_letter_entries table + indexes (dead-letter queue) |
 | V64 | `V64__add_writes_to_capabilities.sql` | `writes` in capabilities (+ backfill of write-capable built-in capabilities) |
+| V65 | `V65__add_catch_up_on_resume_to_schedules.sql` | `catch_up_on_resume` in scheduled_workflows (per-schedule policy on system resume) |
+| V66 | `V66__add_todo_export_link.sql` | `exported_provider`, `exported_ref`, `exported_url` in todos (export link to external systems) |
 
 ## SQLite Specifics
 
 - **No native TIMESTAMP type:** All timestamps are stored as `TEXT` in ISO-8601 format (`Instant.toString()`)
 - **No native BOOLEAN type:** Booleans are stored as `INTEGER` (`0` = false, `1` = true)
-- **JSON as TEXT:** All JSON fields are stored as `TEXT` and mapped via JPA `@Convert` annotations (`JsonMapConverter`, `BlockDefinitionListConverter`, `JsonStringMapConverter`, `ChainEntryListConverter`, `ChainRunEntryListConverter`, `StringListConverter`, `JsonListConverter`)
+- **JSON as TEXT:** All JSON fields are stored as `TEXT` and mapped via JPA `@Convert` annotations (`JsonMapConverter`, `BlockDefinitionListConverter`, `JsonStringMapConverter`, `ChainEntryListConverter`, `ChainRunEntryListConverter`, `StringListConverter`, `JsonListConverter`, `InstantStringConverter`)
 - **UUID as TEXT:** IDs are stored as `TEXT`
 - **WAL mode:** Enabled for better concurrent read performance (`?journal_mode=WAL`)
-- **Busy timeout:** 10 seconds (`?busy_timeout=10000`)
-- **Connection pool:** HikariCP with max. 1 connection (SQLite allows only one concurrent writer; pool-size=1 serializes all DB operations)
+- **Busy Timeout:** 10 seconds (`?busy_timeout=10000`)
+- **Connection Pool:** HikariCP with max 1 connection (SQLite only allows one concurrent writer; pool-size=1 serializes all DB operations)
 - **Dialect:** `org.hibernate.community.dialect.SQLiteDialect`
 - **NEVER write directly to the DB** (via `sqlite3` CLI or SQL). Always use the REST API or service/repository layer — direct writes bypass the Hibernate cache and cause inconsistent state.

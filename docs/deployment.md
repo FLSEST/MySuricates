@@ -28,9 +28,9 @@ Das Backend ist dann unter `http://localhost:9090` erreichbar.
 | Service | Image | Port | Beschreibung |
 |---|---|---|---|
 | `backend` | `Dockerfile.backend` | 9090 | Spring Boot Backend |
-| `agent-node` | `Dockerfile.agent-node` | - | Node.js 21 Agent-Container |
+| `agent-node` | `Dockerfile.agent-node` | - | Node.js 22 Agent-Container |
 | `agent-python` | `Dockerfile.agent-python` | - | Python 3.12 Agent-Container |
-| `agent-go` | `Dockerfile.agent-go` | - | Go 1.22 Agent-Container |
+| `agent-go` | `Dockerfile.agent-go` | - | Go 1.24 Agent-Container |
 
 Die Agent-Images werden nur gebaut (`profiles: build-only`), nicht direkt über Compose gestartet. Das Backend erstellt und verwaltet Agent-Container dynamisch über die Docker API.
 
@@ -41,12 +41,12 @@ Die Agent-Images werden nur gebaut (`profiles: build-only`), nicht direkt über 
 - **Base:** `eclipse-temurin:21-jre-alpine`
 - **User:** `appuser` (UID 1000, nicht-root)
 - **JVM:** ZGC (Generational), 256MB–1GB Heap
-- **Extras:** Tailscale CLI (optional, für Remote-Access)
-- **Healthcheck:** `curl http://localhost:9090/api/v1/system/health`
+- **Extras:** Tailscale CLI (pinned Version + SHA256-Verifizierung, multi-arch amd64/arm64), sudo
+- **Healthcheck:** `curl -f http://localhost:9090/api/v1/system/health`
 
 ### Agent Node (`docker/Dockerfile.agent-node`)
 
-- **Base:** `node:21-slim`
+- **Base:** `node:22-slim`
 - **Tools:** git, curl, jq
 - **User:** `agent` (UID 1000)
 - **Claude CLI:** Verzeichnisse vorbereitet (Binary + Config vom Host gemountet)
@@ -60,16 +60,25 @@ Die Agent-Images werden nur gebaut (`profiles: build-only`), nicht direkt über 
 
 ### Agent Go (`docker/Dockerfile.agent-go`)
 
-- **Base:** `golang:1.22-alpine`
+- **Base:** `golang:1.24-alpine`
 - **Tools:** git, curl, bash, jq
+- **User:** `aiuser` (UID 1000)
 
 ### Agent DevOps (`docker/Dockerfile.agent-devops`)
 
 - **Base:** `ubuntu:24.04`
 - **Tools:** git, curl, jq, bash, python3
 - **GitHub CLI:** `gh` aus dem offiziellen APT-Repository
-- **Security-Tools:** gitleaks (Binary von GitHub Releases), trivy (offizieller Installer)
+- **Security-Tools:** gitleaks, trivy (Binaries mit SHA256-Verifizierung, multi-arch)
 - **Docker:** Docker CE CLI (nur Client, kein Daemon)
+- **User:** `agent` (UID 1000)
+- **CMD:** `tail -f /dev/null`
+
+### Agent Java (`docker/Dockerfile.agent-java`)
+
+- **Base:** `eclipse-temurin:21-jdk-jammy`
+- **Tools:** maven, git, curl, jq, bash, python3, libreoffice-writer (headless DOCX→PDF)
+- **Fonts:** fonts-liberation, fonts-dejavu
 - **User:** `agent` (UID 1000)
 - **CMD:** `tail -f /dev/null`
 
@@ -77,10 +86,10 @@ Die Agent-Images werden nur gebaut (`profiles: build-only`), nicht direkt über 
 
 - **Base:** `eclipse-temurin:21-jre-jammy` (Ubuntu-basiert, glibc für Claude CLI)
 - **ARGs:** `HOST_USER`, `HOST_UID`, `HOST_GID`, `HOST_HOME` — für User-Mapping mit dem Host
-- **Tools:** curl, git, gosu, python3, jq, nodejs, npm, wget, unzip
-- **Entrypoint:** `entrypoint.sh` (User-Switching via gosu)
+- **Tools:** curl, git, gosu, python3, jq, nodejs, npm, wget, unzip, Docker CE CLI
+- **Entrypoint:** `entrypoint.sh` (User-Switching via gosu, Docker-Socket-Permissions)
 - **Port:** 9091
-- **Healthcheck:** `curl http://localhost:9091/api/v1/system/health`
+- **Healthcheck:** `curl -f http://localhost:9091/api/v1/system/health`
 - **JVM:** ZGC (Generational), 256MB–1GB Heap, headless AWT
 
 ## Docker Compose Files
@@ -94,17 +103,17 @@ Backend + Agent-Images (build-only). Netzwerk: `automation` (Bridge).
 Stable-Umgebung auf Port 9091:
 - Container: `mysuricates-stable`
 - Profil: `SPRING_PROFILES_ACTIVE=stable`
-- Volumes: `stable-data` (persistente DB), `stable-frontend/` (read-only), Docker Socket, Claude CLI Directories vom Host
+- Volumes: `stable-data` (persistente DB), `stable-frontend/` (read-only), Docker Socket, Claude CLI Directories vom Host, Host-Projektverzeichnisse, Backup-Volume (`~/.autotrigger/backups/stable`)
 - Named Volume: `stable-data`
 
 ### `docker-compose.test.yml`
 
-Test-Instanz auf Port 8090:
+Test-Instanz auf Port 8090 (nutzt `docker/Dockerfile.stable` als Build-Basis):
 - Container: `mysuricates-test`
 - Image: `ai-automation-backend-test`
 - Profil: `SPRING_PROFILES_ACTIVE=test`
-- Volumes: `test-data` (persistente DB), `stable-frontend/` (read-only), `application-test.yml` (read-only), Docker Socket, Claude CLI Directories vom Host
-- Healthcheck: `curl http://localhost:8090/api/v1/system/health`
+- Volumes: `test-data` (persistente DB), `stable-frontend/` (read-only), `application-test.yml` (read-only), Docker Socket, Claude CLI Directories vom Host, Backup-Volume (`~/.autotrigger/backups/test`)
+- Healthcheck: `curl -f http://localhost:8090/api/v1/system/health`
 - Named Volume: `test-data`
 
 ## Umgebungsvariablen
@@ -117,9 +126,12 @@ Test-Instanz auf Port 8090:
 | `AUTOMATION_API_KEY` | (leer) | API-Key für Authentifizierung |
 | `AUTOMATION_RATE_LIMIT_ENABLED` | `true` | Rate Limiting aktivieren (auch zur Laufzeit in Settings → Execution konfigurierbar) |
 | `AUTOMATION_RATE_LIMIT_RPM` | `120` | Requests pro Minute (auch zur Laufzeit konfigurierbar, 10–10.000) |
-| `AUTOMATION_TAILSCALE_ENABLED` | `false` | Tailscale Remote-Access |
+| `AUTOMATION_TAILSCALE_ENABLED` | `true` | Tailscale Remote-Access |
 | `AUTOMATION_HOST_CLAUDE_MAX_TOKENS` | (leer) | Optionales per-Call Token-Limit für Claude CLI |
 | `AUTOMATION_HOST_CLAUDE_TIMEOUT_SECONDS` | `300` | Globaler Claude-CLI-Timeout in Sekunden |
+| `AUTOMATION_SSL_ENABLED` | `false` | SSL/TLS aktivieren |
+| `AUTOMATION_SSL_KEYSTORE` | `./certs/dev.p12` | Pfad zum PKCS12-Keystore |
+| `AUTOMATION_SSL_PASSWORD` | `mysuricates` | Keystore-Passwort |
 | `DOCKER_HOST` | `unix:///var/run/docker.sock` | Docker Socket Pfad |
 
 ### Container-Limits (application.yml)
@@ -139,13 +151,11 @@ Test-Instanz auf Port 8090:
 # application.yml Defaults
 automation.security.enabled: true
 automation.security.rate-limit.enabled: true
-automation.tailscale.enabled: false
-logging.level.com.automation: DEBUG
+automation.tailscale.enabled: true
 ```
 
 - API-Key-Authentifizierung aktiv (Key wird beim ersten Start auto-generiert)
 - Rate Limiting aktiv (120 req/min, konfigurierbar in Settings → Execution)
-- Debug-Logging
 - SQLite unter `./data/automation.db`
 
 ### Produktion
@@ -181,7 +191,7 @@ Das Backend kann über Tailscale von außerhalb des lokalen Netzwerks erreichbar
 ### Voraussetzungen
 
 - Tailscale CLI im Container installiert (Dockerfile.backend enthält dies)
-- `AUTOMATION_TAILSCALE_ENABLED=true` in Umgebungsvariablen
+- `AUTOMATION_TAILSCALE_ENABLED=true` (Standard in application.yml, in docker-compose.yml auf `false` gesetzt)
 
 ### Aktivierung
 
@@ -213,9 +223,15 @@ Response bei Erfolg:
 {
   "status": "UP",
   "timestamp": "...",
-  "docker": "CONNECTED"
+  "docker": "CONNECTED",
+  "components": {
+    "database": { "status": "UP", "responseTimeMs": 1 },
+    "docker": { "status": "UP" }
+  }
 }
 ```
+
+Mögliche `status`-Werte: `UP` (DB + Docker ok), `DEGRADED` (DB ok, Docker nicht erreichbar), `DOWN` (DB nicht erreichbar).
 
 ## Datenbank-Backup
 
@@ -231,7 +247,7 @@ sqlite3 data/automation.db ".backup 'data/automation.db.backup'"
 
 **Speicherort:** `ai-automation-backend/data/automation.db` (lokal) bzw. `/app/data/automation.db` (Docker)
 
-Die Datei enthält alle Projekte, Workflows, Runs, Skills, Schedules und Webhooks. Ein Backup dieser Datei sichert den gesamten Zustand der Plattform.
+Die Datei enthält alle Projekte, Workflows, Runs, Skills, Schedules, Webhooks, Chains, Todos, Integrations, Templates und weitere Entitäten. Ein Backup dieser Datei sichert den gesamten Zustand der Plattform.
 
 ## Netzwerk
 
@@ -276,7 +292,7 @@ Die Test-Instanz ist ein dedizierter Docker-Container für automatisierte Workfl
 
 - `TestingService` — verwaltet den Test-Docker-Container
 - Auto-Start beim Boot wenn `automation.staging.test-auto-start=true` und Snapshot vorhanden
-- Auto-Sync von Dev-Definitionen beim Start
+- Kein Auto-Sync von Definitionen beim Boot (nur bei `reset`)
 - Datenbank kann via API zurückgesetzt werden (`POST /api/v1/testing/reset`)
 
 **Key-Dateien:**
@@ -304,6 +320,9 @@ Die Test-Instanz ist ein dedizierter Docker-Container für automatisierte Workfl
 | Projekte | Name + Pfad | Überspringen wenn vorhanden, erstellen wenn neu |
 | Workflows | Name + Projektname | Aktualisieren wenn vorhanden, importieren wenn neu |
 | Custom Skills | Name | Überspringen wenn vorhanden, importieren wenn neu |
+| Chains | Name | Aktualisieren wenn vorhanden, erstellen wenn neu |
+
+Zusätzlich werden die App-Settings `auto-todo-default` und `auto-repair-default` synchronisiert.
 
 **Nicht synciert** (auf Stable/Test erhalten): workflow_runs, step_results, scheduled_workflows, webhook_triggers, activity_log, todos, built-in Skills/Templates. Archivierte Projekte und soft-deleted Workflows werden automatisch ausgeschlossen.
 

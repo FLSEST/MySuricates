@@ -1,4 +1,4 @@
-> *Zuletzt aktualisiert: 1. April 2026 — Vision-Check Workflow*
+> *Zuletzt aktualisiert: [auto-generated]*
 
 # MySuricates — Vision
 

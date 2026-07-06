@@ -14,15 +14,38 @@ Alle Fehler folgen diesem Format:
 
 ```json
 {
+  "code": "INTERNAL_ERROR",
   "error": "Fehlermeldung",
   "timestamp": "2025-01-15T10:30:00Z"
 }
 ```
 
-Bei Validierungsfehlern (400) zusätzlich:
+Das Feld `details` wird nur bei Bedarf mitgeliefert (`@JsonInclude(NON_NULL)`).
+
+**Error-Codes:**
+
+| Code | HTTP-Status |
+|---|---|
+| `RESOURCE_NOT_FOUND` | 404 |
+| `VALIDATION_FAILED` | 400 |
+| `INVALID_ARGUMENT` | 400 |
+| `WORKFLOW_EXECUTION_FAILED` | 500 |
+| `CONTAINER_ERROR` | 500 |
+| `STAGING_ERROR` | 500 |
+| `STATE_CONFLICT` | 409 |
+| `NO_TASK_TARGET` | 400 |
+| `PROVIDER_NOT_CONNECTED` | 409 |
+| `PROVIDER_NOT_TASK_CAPABLE` | 400 |
+| `SERVICE_UNAVAILABLE` | 503 |
+| `TOKEN_BUDGET_EXCEEDED` | 429 |
+| `OPERATION_TIMEOUT` | 504 |
+| `INTERNAL_ERROR` | 500 |
+
+Bei Validierungsfehlern (`VALIDATION_FAILED`, 400) zusätzlich:
 
 ```json
 {
+  "code": "VALIDATION_FAILED",
   "error": "Validation failed",
   "timestamp": "2025-01-15T10:30:00Z",
   "fieldErrors": {
@@ -46,6 +69,7 @@ Bei Validierungsfehlern (400) zusätzlich:
 | 429 | Rate Limit überschritten |
 | 500 | Interner Serverfehler |
 | 503 | Service nicht verfügbar (z.B. Test-Instanz nicht gesund) |
+| 504 | Operation Timeout |
 
 ---
 
@@ -62,11 +86,15 @@ Alle Projekte auflisten.
   {
     "id": "uuid",
     "name": "Mein Projekt",
+    "subtitle": null,
+    "description": null,
     "type": "CODE",
     "path": "/workspace/projekt",
     "config": {},
+    "aiContext": null,
     "status": "STOPPED",
     "container": null,
+    "archivedAt": null,
     "createdAt": "2025-01-15T10:00:00Z",
     "updatedAt": "2025-01-15T10:00:00Z"
   }
@@ -91,9 +119,12 @@ Neues Projekt erstellen.
 | Feld | Typ | Pflicht | Werte |
 |---|---|---|---|
 | `name` | String | Ja | |
+| `subtitle` | String | Nein | |
+| `description` | String | Nein | |
 | `type` | Enum | Ja | `CODE`, `CONTENT`, `RESEARCH`, `BUSINESS`, `PERSONAL` |
 | `path` | String | Ja | Pfad im Container |
 | `config` | Object | Nein | Freies JSON |
+| `aiContext` | String | Nein | KI-Kontext für das Projekt |
 
 **Response:** `201` mit `ProjectResponse`
 
@@ -112,9 +143,12 @@ Projekt aktualisieren.
 ```json
 {
   "name": "Neuer Name",
+  "subtitle": "Untertitel",
+  "description": "Beschreibung",
   "type": "RESEARCH",
   "path": "/workspace/neu",
-  "config": {}
+  "config": {},
+  "aiContext": "..."
 }
 ```
 
@@ -234,6 +268,7 @@ Neuen Workflow erstellen.
 | Feld | Typ | Pflicht | Beschreibung |
 |---|---|---|---|
 | `type` | String | Ja | Block-Typ (simple, shell, agentic, ...) |
+| `name` | String | Nein | Menschenlesbarer Name für `{{ block.<name>.output }}`-Referenzen |
 | `config` | Object | Ja | Typ-spezifische Konfiguration |
 | `requiredCapabilities` | String[] | Nein | Benoetigte Capabilities |
 | `skillIds` | String[] | Nein | Skill-IDs die zusaetzlich zu Workflow-Skills fuer diesen Block aktiviert werden (additiv) |
@@ -406,6 +441,14 @@ Optimierungsvorschlag für einen Workflow generieren (KI-basiert).
 
 **Response:** `Map<String, Object>` mit Optimierungsvorschlag
 
+### `GET /api/v1/workflows/{id}/similar`
+
+Ähnliche Workflows finden.
+
+**Query-Parameter:** `limit` (Standard: 5, Max: 20)
+
+**Response:** `List<Map<String, Object>>`
+
 ### `POST /api/v1/workflows/{id}/repair`
 
 Fehlgeschlagenen Workflow auf der Test-Instanz reparieren. Setzt voraus, dass der Workflow fehlgeschlagene Runs hat und die Test-Instanz gesund ist.
@@ -548,6 +591,7 @@ Alle Ausführungen auflisten (paginiert, filterbar).
 | `status` | String | Filter nach Status: `PENDING`, `RUNNING`, `PAUSED`, `COMPLETED`, `COMPLETED_WITH_ERRORS`, `FAILED`, `CANCELLED`, `INTERRUPTED` |
 | `workflowId` | String | Filter nach Workflow |
 | `projectId` | String | Filter nach Projekt |
+| `search` | String | Volltextsuche |
 
 **Response:** `PageResponse<WorkflowRunResponse>`
 
@@ -584,6 +628,20 @@ Fehlgeschlagene Ausführung erneut starten (erstellt einen neuen Run mit gleiche
 ### `POST /api/v1/executions/{id}/resume-from-step`
 
 Unterbrochene Ausführung ab dem fehlgeschlagenen Step fortsetzen.
+
+**Response:** `WorkflowRunResponse`
+
+### `PATCH /api/v1/executions/{id}/notes`
+
+Notizen einer Ausführung aktualisieren.
+
+**Request:**
+
+```json
+{
+  "notes": "Freitext-Notiz zum Run"
+}
+```
 
 **Response:** `WorkflowRunResponse`
 
@@ -713,7 +771,8 @@ Alle Skills auflisten.
         "description": "Analysiert Code",
         "inputSchema": {},
         "outputSchema": {},
-        "async": false
+        "async": false,
+        "writes": false
       }
     ],
     "createdAt": "2025-01-15T10:00:00Z"
@@ -797,12 +856,23 @@ Alle Schedules auflisten.
     "id": "uuid",
     "workflowId": "uuid",
     "workflowName": "Nightly Build",
+    "projectName": "Mein Projekt",
+    "chainId": null,
+    "chainName": null,
+    "targetType": "WORKFLOW",
     "cronExpression": "0 0 2 * * ?",
+    "scheduleType": "CRON",
     "enabled": true,
     "description": "Nächtlicher Build",
     "inputContext": {},
     "lastRunAt": null,
+    "lastRunStatus": null,
     "nextRunAt": "2025-01-16T02:00:00Z",
+    "endDate": null,
+    "maxRuns": 0,
+    "runCount": 0,
+    "conflictBehavior": "SKIP",
+    "catchUpOnResume": false,
     "createdAt": "2025-01-15T10:00:00Z"
   }
 ]
@@ -907,6 +977,7 @@ Neuen Schedule erstellen.
 | `endDate` | Instant | Nein (optionales Ende für `CRON`-Schedules) |
 | `maxRuns` | Integer | Nein (max. Ausführungen, 0 = unbegrenzt) |
 | `conflictBehavior` | String | Nein (Standard: `SKIP`, Werte: `SKIP`, `OVERLAP`) |
+| `catchUpOnResume` | boolean | Nein (Standard: `false`) |
 
 **Response:** `201` mit `ScheduledWorkflowResponse`
 
@@ -1209,6 +1280,12 @@ OAuth-Verbindung trennen. Löscht gespeicherte Tokens.
 
 **Response:** `204 No Content`
 
+### `DELETE /api/v1/integrations/{providerId}/credentials`
+
+Client-Credentials löschen.
+
+**Response:** `204 No Content`
+
 ### `GET /api/v1/integrations/{providerId}/actions`
 
 Liste aller verfügbaren Actions des Providers. `available` ist `false` wenn benötigte OAuth-Scopes fehlen.
@@ -1226,6 +1303,12 @@ Action ausführen. Body enthält die Action-spezifischen Parameter.
 }
 ```
 
+### `GET /api/v1/integrations/{providerId}/task-targets`
+
+Verfügbare Task-Export-Ziele (z.B. Jira-Boards, Trello-Listen) auflisten.
+
+**Response:** `List<TaskTarget>`
+
 ---
 
 ## Onboarding-Profile
@@ -1242,20 +1325,90 @@ Onboarding für ein Projekt aktivieren. Generiert die Onboarding-Datei aus den a
 
 **Body:**
 ```json
-{ "profileKeys": ["developer", "research"] }
+{ "format": "md", "profileIds": ["profile-uuid-1", "profile-uuid-2"] }
 ```
+
+**Response:** `OnboardingStatusResponse`
+
+### `POST /api/v1/projects/{id}/onboarding/disable`
+
+Onboarding für ein Projekt deaktivieren.
+
+**Response:** `OnboardingStatusResponse`
+
+### `POST /api/v1/projects/{id}/onboarding/refresh`
+
+Onboarding-Datei neu generieren.
+
+**Response:** `OnboardingStatusResponse`
 
 ### `GET /api/v1/projects/{id}/onboarding/preview`
 
 Vorschau der generierten Onboarding-Datei.
 
+**Response:** `{ "content": "..." }`
+
 ### `GET /api/v1/onboarding-profiles`
 
 Alle Onboarding-Profile auflisten.
 
+**Response:** `OnboardingProfileResponse[]`
+
+### `GET /api/v1/onboarding-profiles/{id}`
+
+Einzelnes Profil abrufen.
+
+**Response:** `OnboardingProfileResponse`
+
+### `POST /api/v1/onboarding-profiles`
+
+Neues Profil erstellen.
+
+**Request:**
+
+```json
+{
+  "key": "my-profile",
+  "name": {"de": "Mein Profil", "en": "My Profile"},
+  "description": {"de": "...", "en": "..."},
+  "content": "Profilinhalt...",
+  "type": "PROFILE"
+}
+```
+
+| Feld | Typ | Pflicht | Werte |
+|---|---|---|---|
+| `key` | String | Ja | Pattern: `^[a-z0-9-]+$` |
+| `name` | Map<String, String> | Ja | |
+| `description` | Map<String, String> | Nein | |
+| `content` | String | Ja | |
+| `type` | Enum | Ja | `BASE`, `PROFILE` |
+
+**Response:** `201` mit `OnboardingProfileResponse`
+
 ### `PUT /api/v1/onboarding-profiles/{id}`
 
 Profil-Content aktualisieren (erstellt automatisch einen History-Eintrag).
+
+**Response:** `OnboardingProfileResponse`
+
+### `DELETE /api/v1/onboarding-profiles/{id}`
+
+Profil löschen.
+
+**Response:** `204 No Content`
+
+### `POST /api/v1/onboarding-profiles/{id}/reset`
+
+Built-in-Profil auf Originalinhalt zurücksetzen.
+
+**Response:** `OnboardingProfileResponse`
+
+### `GET /api/v1/onboarding-profiles/{id}/history`
+
+Änderungshistorie eines Profils abrufen.
+
+**Response:** `OnboardingProfileHistoryResponse[]`
 
 ---
 
@@ -1311,6 +1464,7 @@ Neuen Todo-Trigger erstellen.
 | `description` | Nein | Menschenlesbare Beschreibung |
 | `maxAttempts` | Nein | Max. Fix-Versuche pro TODO (Default: 3) |
 | `autoClose` | Nein | TODO bei GREEN Gate automatisch schliessen (Default: true) |
+| `processBacklog` | Nein | Bei Erstellung bestehende passende TODOs abarbeiten (Default: true) |
 | `contextTemplate` | Nein | Statische Context-Variablen, gemerged mit TODO-Daten |
 
 **Response:** `201` mit `TodoTriggerResponse`
@@ -1457,8 +1611,8 @@ Systeminformationen.
 ```json
 {
   "name": "MySuricates",
-  "version": "0.6.2",
-  "buildType": "dev",
+  "version": "0.7.3",
+  "buildType": "SNAPSHOT",
   "buildTimestamp": null,
   "java": "21.0.1",
   "tailscale": "DISABLED",
@@ -1480,10 +1634,22 @@ Verfügbare KI-Provider und Standard-Provider abfragen.
 
 ```json
 {
-  "providers": ["CLAUDE", "CODEX"],
+  "providers": ["CLAUDE", "PI", "CODEX"],
   "default": "CLAUDE"
 }
 ```
+
+### `GET /api/v1/system/capabilities`
+
+System-Capabilities abrufen (API-Version, App-Version, verfügbare Routen und Block-Typen).
+
+**Response:** `SystemCapabilitiesResponse`
+
+### `GET /api/v1/system/ai-providers/PI/catalog`
+
+Modell-Katalog des Pi-Providers abrufen.
+
+**Response:** `PiCatalog`
 
 ### `POST /api/v1/system/client-errors`
 
@@ -1529,11 +1695,25 @@ Tailscale-Status abfragen.
 
 **Response:** `RemoteAccessResponse`
 
+### `POST /api/v1/system/vacuum`
+
+SQLite-Datenbank VACUUM ausführen.
+
+**Response:** `Map<String, Object>`
+
 ### `GET /api/v1/system/backup`
 
-Datenbank-Backup erstellen und herunterladen.
+Datenbank-Backup herunterladen.
 
 **Response:** Datei-Download (SQLite-Backup)
+
+### `POST /api/v1/system/backup`
+
+Benanntes Backup erstellen.
+
+**Query-Parameter:** `reason` (optional, String)
+
+**Response:** `BackupMetadata` mit `filename`, `sizeBytes`, `createdAt`
 
 ### `GET /api/v1/system/backups`
 
@@ -1551,7 +1731,7 @@ Bestimmtes Backup herunterladen.
 
 Anwendungs-Einstellung abrufen.
 
-**Erlaubte Keys:** `auto-todo-default`, `auto-repair-default`, `default-ai-provider`, `assistant-thinking-phrases`, `assistant-model`
+**Erlaubte Keys:** `auto-todo-default`, `auto-repair-default`, `auto-repair-mode`, `auto-repair-max-retries`, `auto-repair-timeout-seconds`, `default-ai-provider`, `assistant-thinking-phrases`, `assistant-model`, `suggestions-model`, `suggestions-enabled`, `backup-retain-count`
 
 **Response:** `{ "key": "...", "value": "..." }`
 
@@ -1605,6 +1785,14 @@ Datei oder Verzeichnis im nativen Dateimanager öffnen (Linux: `xdg-open`).
 
 **Response:** `{ "status": "ok" }`
 
+### `GET /api/v1/system/integration-snippet`
+
+Markdown-Integration-Snippet für ein Projekt rendern (für AGENTS.md o.ä.).
+
+**Query-Parameter:** `projectPath` (optional)
+
+**Response:** `String` (Content-Type: `text/markdown`)
+
 ### `GET /api/v1/system/browse`
 
 Verzeichnisinhalt durchsuchen (nur Unterverzeichnisse, keine versteckten Ordner).
@@ -1631,6 +1819,8 @@ Verzeichnisinhalt durchsuchen (nur Unterverzeichnisse, keine versteckten Ordner)
 
 Dashboard-Daten mit Statistiken.
 
+**Query-Parameter:** `days` (Standard: 30), `projectId` (optional)
+
 **Response:**
 
 ```json
@@ -1648,6 +1838,12 @@ Dashboard-Daten mit Statistiken.
   ]
 }
 ```
+
+### `GET /api/v1/learning/platform-stats`
+
+Plattform-weite Statistiken (Projekte, Workflows, Skills, Schedules, Chains, TODOs, Wishes, Assistent).
+
+**Response:** `PlatformStatsResponse`
 
 ### `GET /api/v1/learning/workflows/{workflowId}/stats`
 
@@ -1784,7 +1980,7 @@ Chain ausführen.
 
 Alle Chain-Runs (paginiert).
 
-**Query-Parameter:** `page`, `size`, `status`
+**Query-Parameter:** `page`, `size`, `status`, `search`
 
 **Response:** `PageResponse<ChainRunResponse>`
 
@@ -1881,8 +2077,8 @@ TODOs auflisten (paginiert, filterbar).
 | `page` | int | Seite (Standard: 0) |
 | `size` | int | Einträge pro Seite (Standard: 50) |
 | `projectId` | String | Filter nach Projekt |
-| `status` | String[] | Filter nach Status: `OPEN`, `IN_PROGRESS`, `DONE`, `BACKLOG` |
-| `priority` | String | Filter nach Priorität: `HIGH`, `MEDIUM`, `LOW` |
+| `status` | String[] | Filter nach Status: `OPEN`, `IN_PROGRESS`, `DONE`, `BACKLOG`, `ARCHIVED` |
+| `priority` | String | Filter nach Priorität: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW` |
 | `source` | String | Filter nach Quelle: `USER`, `AI`, `WORKFLOW` |
 | `tag` | String | Filter nach Tag |
 | `q` | String | Volltextsuche |
@@ -1937,6 +2133,27 @@ Status eines TODOs ändern.
 
 **Response:** `TodoResponse`
 
+### `POST /api/v1/todos/{id}/resolve`
+
+TODO automatisch lösen (startet einen passenden Fix-Workflow).
+
+**Response:** `WorkflowRunResponse`
+
+### `POST /api/v1/todos/{id}/export`
+
+TODO in ein externes System exportieren (z.B. Jira, Trello).
+
+**Request (optional):**
+
+```json
+{
+  "provider": "jira",
+  "target": "board-id"
+}
+```
+
+**Response:** `TodoExportResponse` mit `referenceType`, `referenceId`, `url`
+
 ### `DELETE /api/v1/todos/{id}`
 
 TODO löschen.
@@ -1947,7 +2164,44 @@ TODO löschen.
 
 Anzahl TODOs nach Status.
 
-**Response:** `TodoCountResponse`
+**Response:** `TodoCountResponse` mit `open`, `inProgress`, `done`, `backlog`, `archived`
+
+### `GET /api/v1/todos/overview`
+
+TODO-Übersicht mit Projekt-Rollups und "Needs You"-Items.
+
+**Response:** `TodoOverviewResponse`
+
+### `POST /api/v1/todos/bulk-status`
+
+Status mehrerer TODOs gleichzeitig ändern.
+
+**Request:**
+
+```json
+{
+  "ids": ["uuid-1", "uuid-2"],
+  "status": "DONE"
+}
+```
+
+**Response:** `{ "updated": 2 }`
+
+### `POST /api/v1/todos/archive-stale`
+
+Veraltete TODOs archivieren.
+
+**Query-Parameter:** `projectId` (optional)
+
+**Response:** `{ "archived": 5 }`
+
+### `GET /api/v1/todos/similar`
+
+Ähnliche TODOs suchen (für Duplikat-Erkennung).
+
+**Query-Parameter:** `projectId` (Pflicht), `title` (Pflicht)
+
+**Response:** `SimilarTodoResponse[]` mit `id`, `title`, `priority`, `score`, `similarity`
 
 ---
 
@@ -1986,7 +2240,7 @@ Memory-Eintrag aktualisieren.
 
 Memory-Eintrag aktivieren (wird in nachfolgende Runs injiziert).
 
-**Response:** `200 OK`
+**Response:** `204 No Content`
 
 ### `DELETE /api/v1/workflows/{workflowId}/memory/{memoryId}`
 
@@ -2002,9 +2256,28 @@ Memory-Eintrag löschen.
 
 Activity-Log auflisten (paginiert, filterbar).
 
-**Query-Parameter:** `page`, `size`, `level` (`INFO`, `WARN`, `ERROR`, `DEBUG`), `category`, `workflowId`
+**Query-Parameter:** `page`, `size`, `level` (`INFO`, `WARN`, `ERROR`, `DEBUG`), `category` (`SYSTEM`, `EXECUTION`, `SCHEDULE`, `WEBHOOK`, `SECURITY`, `CONTAINER`, `PLUGIN`), `workflowId`
 
 **Response:** `PageResponse<ActivityLogResponse>`
+
+### `POST /api/v1/activity-log`
+
+Neuen Activity-Log-Eintrag erstellen.
+
+**Request:**
+
+```json
+{
+  "level": "INFO",
+  "message": "Manueller Eintrag",
+  "source": "manual",
+  "referenceId": null,
+  "workflowId": null,
+  "metadata": {}
+}
+```
+
+**Response:** `201` mit `ActivityLogResponse`
 
 ---
 
@@ -2059,6 +2332,52 @@ Chat-Nachricht an den KI-Assistenten senden.
 ```
 
 Action-Typen: `run_workflow`, `show_workflow`, `start_wish`, `show_run`, `ask_choice`
+
+### `GET /api/v1/assistant/sessions`
+
+Alle Chat-Sessions auflisten.
+
+**Response:** `AssistantSessionSummary[]`
+
+### `GET /api/v1/assistant/sessions/{id}`
+
+Einzelne Chat-Session mit Nachrichten abrufen.
+
+**Response:** `AssistantSessionDetail`
+
+### `DELETE /api/v1/assistant/sessions/{id}`
+
+Chat-Session löschen.
+
+**Response:** `200 OK`
+
+### `POST /api/v1/assistant/pending-tools/{id}/confirm`
+
+Pending Tool-Call bestätigen (z.B. Workflow-Start durch Assistenten).
+
+**Request (optional):**
+
+```json
+{
+  "sessionId": "session-uuid"
+}
+```
+
+**Response:** `ToolExecutionResult` (oder `410 Gone` wenn bereits verarbeitet/abgelaufen)
+
+### `POST /api/v1/assistant/pending-tools/{id}/reject`
+
+Pending Tool-Call ablehnen.
+
+**Request (optional):**
+
+```json
+{
+  "sessionId": "session-uuid"
+}
+```
+
+**Response:** `ToolExecutionResult` (oder `410 Gone` wenn bereits verarbeitet/abgelaufen)
 
 ### `GET /api/v1/assistant/suggestions`
 
@@ -2298,7 +2617,27 @@ Pool-Workflow in ein Projekt installieren.
 }
 ```
 
-**Response:** `201` mit `{ "workflowId": "uuid", "workflowName": "..." }`
+**Response:** `{ "workflowId": "uuid", "workflowName": "...", "created": true }`
+
+### `POST /api/v1/pool/export/{workflowId}`
+
+Bestehenden Workflow in den Pool exportieren.
+
+**Request (optional):**
+
+```json
+{
+  "nameEn": "English Name",
+  "nameDe": "Deutscher Name",
+  "descriptionEn": "...",
+  "descriptionDe": "...",
+  "category": "CODE",
+  "tags": ["review"],
+  "author": "..."
+}
+```
+
+**Response:** `201` mit `ExportToPoolResponse` (`poolId`, `filename`)
 
 ---
 
@@ -2395,6 +2734,7 @@ Neuen Wunsch erstellen und asynchron erfüllen.
 | `projectId` | String | Ja |
 | `maxIterations` | Integer | Nein |
 | `referenceWorkflowIds` | String[] | Nein |
+| `autoRefine` | boolean | Nein (Standard: `false`) |
 
 **Response:** `201` mit `WishResponse`
 
@@ -2450,11 +2790,13 @@ Wish löschen.
 
 Verfügbare Dokumentationsdateien auflisten.
 
-**Response:** `Array<{ "name": "architektur.md", "label": "Architektur" }>`
+**Response:** `Array<{ "name": "architektur.md", "label": "Architektur", "lang": "de" }>`
 
 ### `GET /api/v1/docs/{name}`
 
 Inhalt einer Dokumentationsdatei abrufen (nur `.md`-Dateien).
+
+**Query-Parameter:** `lang` (Standard: `"de"`, Werte: `"de"`, `"en"`)
 
 **Response:** `{ "content": "# Architektur\n..." }`
 
@@ -2473,8 +2815,12 @@ Protokoll: STOMP
 
 | Topic | Beschreibung |
 |---|---|
-| `/topic/executions/{runId}/logs` | Workflow-Ausführungs-Logs |
+| `/topic/executions/{runId}/logs` | Workflow-Ausführungs-Logs (Steps, Status, Approval-Prompts) |
 | `/topic/chains/{chainRunId}/status` | Chain-Ausführungs-Status-Updates |
+| `/topic/assistant/{requestId}/status` | Assistent-Chat-Fortschritt (Phase, Detail, Elapsed) |
+| `/topic/assistant/{sessionId}/events` | Assistent-Push-Events (erstellte Items, Suggestions) |
+| `/topic/wishes/{wishId}/status` | Wish-Iterations-Status |
+| `/topic/activity-log` | Globale Activity-Log-Events |
 
 ### Nachrichtenformat (Execution-Logs)
 

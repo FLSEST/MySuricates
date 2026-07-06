@@ -7,7 +7,7 @@
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                      Browser                            │
-│  React 18 PWA (Vite Dev-Server :3000 / statisch)        │
+│  React 19 PWA (Vite Dev-Server :3000 / statisch)        │
 └──────────┬──────────────────────┬───────────────────────┘
            │ REST /api/v1/*       │ WebSocket /ws
            │ (Vite Proxy)         │ (STOMP/SockJS)
@@ -57,7 +57,7 @@ Dev startet Stable und Test bei Boot automatisch, wenn ein Snapshot vorhanden is
 ### Schichtenmodell
 
 ```
-Controller (REST API, 26 Controller)
+Controller (REST API, 33 Controller)
     ↓ DTO (Request/Response Records)
 Service (Geschäftslogik)
     ↓ Entity (JPA)
@@ -70,31 +70,37 @@ SQLite (Datei: data/automation.db)
 
 ```
 com.automation
-├── controller/          30 REST-Controller
+├── controller/          33 REST-Controller
 ├── service/
-│   ├── project/         ProjectService, ContainerService, ProjectContextService, PathValidator
-│   ├── workflow/        WorkflowExecutor, WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService, GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService
+│   ├── project/         ProjectService, ContainerService, ProjectContextService, PathValidator, OnboardingProfileService, ProjectOnboardingService
+│   ├── workflow/        WorkflowExecutor, WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService, GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, WorkflowTaggingService, WorkflowVersionService
 │   ├── skill/           SkillService, SkillImportExportService, SkillRegistry, CapabilityRegistry
-│   ├── scheduler/       SchedulerService, ScheduledWorkflowExecutor
+│   ├── scheduler/       SchedulerService, ScheduledWorkflowExecutor, SuspendState
 │   ├── webhook/         WebhookService, GitWebhookPayloadParser
-│   ├── learning/        LearningService, AgenticLearningService, ExecutionInsightsService, WorkflowStatsService, WorkflowSimilarityService, BlockTypesBackfillService, MetadataExtractor
-│   ├── system/          ApiKeyService, DatabaseBackupService, ExecutionSettingsService, SystemIdentityService, TailscaleService
-│   ├── ai/              HostClaudeService, HostCodexService, AiProviderRegistry, ClaudeAiProvider, CodexAiProvider
-│   ├── cli/             CommandExecutorService, CliSessionManager, ClaudeOutputParser, ShellCommandService, ContainerShellService
+│   ├── learning/        LearningService, AgenticLearningService, ExecutionInsightsService, WorkflowStatsService, WorkflowSimilarityService, BlockTypesBackfillService, MetadataExtractor, PlatformStatsService
+│   ├── system/          ApiKeyService, DatabaseBackupService, ExecutionSettingsService, SystemIdentityService, TailscaleService, FileBrowserService, IntegrationSnippetService, SystemSettingsService
+│   ├── ai/              HostClaudeService, HostCodexService, HostPiService, AiProviderRegistry, ClaudeAiProvider, CodexAiProvider, PiAiProvider, PiCatalogService
+│   ├── cli/             CommandExecutorService, CliSessionManager, ClaudeOutputParser, ShellCommandService, ContainerShellService, TaskCommandService
 │   ├── chain/           ChainService, ChainExecutor, ChainTemplateService, BuiltInChainTemplate
 │   ├── memory/          WorkflowMemoryService, ClaudeSummarizer, CodexSummarizer, KnowledgeSummarizer, ConversationPreprocessor, SummarizationSetupService
 │   ├── staging/         StagingService, TestingService, InstanceSyncHelper, DockerContainerManager
-│   ├── todo/            TodoService, AutoTodoService, GateStatusResolver, GateStatusOutputParser, ProjectPathResolver
+│   ├── todo/            TodoService, AutoTodoService, GateStatusResolver, GateStatusOutputParser, ProjectPathResolver, TodoHygieneService, TodoOutputParser, TodoOverviewService, TodoResolutionListener, TodoSimilarityService
 │   ├── conversion/      WorkflowConversionService, WorkflowSuggestion, DialogWorkflowSuggestion
 │   ├── dialog/          DialogSessionScanner, DialogConversionService, ClaudeJsonlParser
 │   ├── factory/         WorkflowFactoryService, ClaudeWorkflowGenerator, CodexWorkflowGenerator, WorkflowTextGenerator, FactorySetupService
 │   ├── pool/            WorkflowPoolService
-│   ├── wish/            WishService, WishWatchdogService
+│   ├── wish/            WishService, WishWatchdogService, WishDecomposeService, WishExecutionService, WishEvaluatePromptBuilder u.a.
 │   ├── notification/    NotificationService
 │   ├── trigger/         CompletionTriggerService, TodoTriggerService, TodoFeedbackListener
 │   ├── health/          HealthAutoTodoService
-│   ├── integration/     IntegrationRegistry, IntegrationOAuthService, IntegrationEncryptionService, IntegrationBlockExecutor, 5 Provider
-│   ├── onboarding/      OnboardingProfileService, ProjectOnboardingService, OnboardingProfileSeeder
+│   ├── integration/     IntegrationRegistry, IntegrationOAuthService, IntegrationEncryptionService, 7 Provider (Confluence, GitHub, GoogleCalendar, GoogleGmail, Jira, Taskwarrior, Trello)
+│   ├── assistant/       AssistantContextBuilder, AssistantChatBroadcaster, AssistantFetchService, AssistantToolExecutor, PendingToolRegistry, AssistantActionSuggestionService
+│   ├── assistant/context/ BlockTypesIndexSection, ChainsIndexSection, FailedWorkflowsContextSection, RunsContextSection u.a.
+│   ├── execution/       ExecutionQueryService, WorkflowDebugService
+│   ├── dlq/             DeadLetterService
+│   ├── document/        DocumentExtractionService
+│   ├── search/          SemanticWorkflowSearchService
+│   ├── watchdog/        ConnectionPoolWatchdogService
 │   ├── repair/          AutoRepairService
 │   ├── tray/            SystemTrayService
 │   ├── activitylog/     ActivityLogService, ActivityLogLifecycleListener
@@ -108,7 +114,7 @@ com.automation
 ├── repository/          Spring Data Repositories
 ├── mapper/              MapStruct-Mapper (Entity ↔ DTO)
 ├── executor/            Workflow-Ausführungs-Engine
-│   └── blocks/          12 Block-Executors
+│   └── blocks/          14 Block-Executors
 ├── config/              Konfigurationsklassen, Seeder (Skill, Template)
 ├── security/            ApiKeyAuthFilter, RateLimitFilter
 ├── exception/           GlobalExceptionHandler + Exception-Klassen

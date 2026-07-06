@@ -1,5 +1,3 @@
-<!-- last-sync: 2026-05-12 from: docs/workflow-memory-architecture.md -->
-
 > *Last updated: [auto-generated]*
 
 # Workflow Memory — Architecture & Data Flow
@@ -42,7 +40,7 @@ and provides it as context for future executions. It supports two providers:
  │  │     ├── Remove meta comments                                 │
  │  │     ├── Consolidate repeated errors                          │
  │  │     └── Compress agentic iterations                          │
- │  │     Reduction: typically 50-70%                               │
+ │  │     Reduction: typically 50-70%                              │
  │  │                                                               │
  │  ├─ 4. getSummarizer(provider)                                  │
  │  │     ├── "CLAUDE" ──► ClaudeSummarizer                        │
@@ -69,11 +67,12 @@ and provides it as context for future executions. It supports two providers:
           │                  │
           ▼                  ▼
   ┌──────────────┐   ┌──────────────┐
-  │ claude -p    │   │ codex exec   │
+  │ claude -p    │   │ codex exec - │
   │ --max-turns 1│   │ -o result.txt│
   │ --output-    │   │ --skip-git-  │
   │  format      │   │  repo-check  │
   │  stream-json │   │ -C <workdir> │
+  │  --verbose   │   │              │
   └──────┬───────┘   └──────┬───────┘
          │                   │
          ▼                   ▼
@@ -88,11 +87,12 @@ and provides it as context for future executions. It supports two providers:
 
 | Property          | ClaudeSummarizer              | CodexSummarizer               |
 |-------------------|-------------------------------|-------------------------------|
-| CLI               | `claude -p`                   | `codex exec`                  |
+| CLI               | `claude -p`                   | `codex exec -`                |
+| Prompt delivery   | stdin                         | stdin (`-` placeholder)       |
 | Max Turns         | 1 (no tool use)               | — (codex exec default)        |
-| Output Method     | Parse stream JSON             | `-o` flag (file)              |
+| Output method     | Stream-JSON parsing           | `-o` flag (temp file)         |
 | Instructions      | `CLAUDE.md` in working dir    | `AGENTS.md` in working dir    |
-| Auth              | `~/.claude/` (CLI-native)     | `~/.codex/` (CLI-native)      |
+| Auth              | `~/.claude/` (CLI-managed)    | `~/.codex/` (CLI-managed)     |
 | Timeout           | `automation.summarization.timeout-seconds` (default: 120s) |
 
 ---
@@ -110,7 +110,7 @@ and provides it as context for future executions. It supports two providers:
   │     ├── If present:
   │     │   └── Writes .claude/rules/project-memory.md into the project
   │     │
-  │     └── If not present:
+  │     └── If absent:
   │         └── Deletes old project-memory.md (cleanup logic)
   │
   ├─ 2. Block execution starts
@@ -128,24 +128,30 @@ and provides it as context for future executions. It supports two providers:
 
 ```
 ┌─────────────────────────┐       ┌─────────────────────────┐
-│     workflow_memory      │       │      workflow_run        │
+│     workflow_memory      │       │      workflow_runs       │
 ├─────────────────────────┤       ├─────────────────────────┤
 │ id          TEXT PK      │       │ id          TEXT PK      │
 │ workflow_id TEXT FK       │◄──────│ workflow_id TEXT FK       │
-│ title       TEXT          │       │ status      TEXT          │
-│ content     TEXT (MD)     │       │ started_at  TIMESTAMP    │
-│ tags        TEXT (JSON)   │       │ finished_at TIMESTAMP    │
-│ source_run_ids TEXT (JSON)│───────│ steps       (embedded)   │
-│ provider    TEXT          │       │   ├── step_index INT     │
-│ active      BOOLEAN       │       │   ├── input     TEXT     │
-│ created_at  TIMESTAMP    │       │   ├── output    TEXT     │
-└─────────────────────────┘       │   ├── status    TEXT     │
-                                   │   └── metadata  JSON     │
- provider: "CLAUDE" | "CODEX"     └─────────────────────────┘
- active: only 1 per workflow
-
- Relationship: source_run_ids references
- the run IDs that were used for extraction
+│ title       TEXT          │       │ workflow_name TEXT        │
+│ content     TEXT (MD)     │       │ status      TEXT          │
+│ tags        TEXT (JSON)   │       │ started_at  TIMESTAMP    │
+│ source_run_ids TEXT (JSON)│───────│ completed_at TIMESTAMP   │
+│ provider    TEXT          │       │ duration_ms INTEGER       │
+│ active      INTEGER       │       │ metadata    JSON          │
+│ created_at  TEXT          │       └────────┬────────────────┘
+└─────────────────────────┘                │ @OneToMany
+                                   ┌───────┴─────────────────┐
+ provider: "CLAUDE" | "CODEX"     │      step_results        │
+ active: only 1 per workflow      ├─────────────────────────┤
+                                   │ id          TEXT PK      │
+ Relationship: source_run_ids     │ workflow_run_id TEXT FK   │
+ references the run IDs used      │ step_index  INT           │
+ for extraction                   │ input       TEXT           │
+                                   │ output      TEXT           │
+                                   │ status      TEXT           │
+                                   │ metadata    JSON           │
+                                   │ context_delta JSON         │
+                                   └─────────────────────────┘
 ```
 
 ---
@@ -167,7 +173,7 @@ ai-automation-backend/src/main/resources/
 ```
 
 `SummarizationSetupService` copies the templates into the working directories
-on backend startup. Changes to the resource files are picked up on the next restart.
+on backend startup. Changes to the resource files take effect on the next restart.
 
 ---
 
@@ -176,7 +182,7 @@ on backend startup. Changes to the resource files are picked up on the next rest
 ```yaml
 automation:
   summarization:
-    base-dir: ${AUTOMATION_SUMMARIZATION_DIR:~/.autotrigger/summarization}
+    base-dir: ${AUTOMATION_SUMMARIZATION_DIR:${user.home}/.autotrigger/summarization}
     timeout-seconds: ${AUTOMATION_SUMMARIZATION_TIMEOUT:120}
 ```
 
@@ -184,19 +190,65 @@ automation:
 
 ## 7. API Endpoints
 
-| Method   | Path                                              | Description                              |
-|----------|---------------------------------------------------|------------------------------------------|
-| `GET`    | `/api/v1/workflows/{id}/memory`                   | All memories of a workflow                |
-| `POST`   | `/api/v1/workflows/{id}/memory/extract`            | Extract knowledge (async, ~30-60s)       |
-| `PUT`    | `/api/v1/workflows/{id}/memory/{memId}`            | Update title/content                     |
-| `PUT`    | `/api/v1/workflows/{id}/memory/{memId}/activate`   | Activate memory                          |
-| `DELETE` | `/api/v1/workflows/{id}/memory/{memId}`            | Delete memory                            |
+| Method   | Path                                              | Description                         |
+|----------|---------------------------------------------------|-------------------------------------|
+| `GET`    | `/api/v1/workflows/{id}/memory`                   | All memories for a workflow         |
+| `POST`   | `/api/v1/workflows/{id}/memory/extract`            | Extract knowledge (async, ~30-60s)  |
+| `PUT`    | `/api/v1/workflows/{id}/memory/{memId}`            | Update title/content                |
+| `PUT`    | `/api/v1/workflows/{id}/memory/{memId}/activate`   | Activate a memory                   |
+| `DELETE` | `/api/v1/workflows/{id}/memory/{memId}`            | Delete a memory                     |
 
 ### Error Responses (POST /extract)
 
-| HTTP Status | Cause                                        |
-|-------------|----------------------------------------------|
-| 201         | Successfully extracted                       |
-| 400         | Unknown provider                             |
-| 422         | No runs / no steps found                     |
-| 502         | CLI call failed (timeout, crash)             |
+| HTTP Status | Cause                                       |
+|-------------|---------------------------------------------|
+| 201         | Successfully extracted                      |
+| 400         | Unknown provider                            |
+| 422         | No runs / no steps found                    |
+| 502         | CLI call failed (timeout, crash)            |
+
+---
+
+## 8. Auto-Memory Extraction
+
+The `AutoMemoryExtractionListener` automatically extracts and activates memory
+after successful workflow runs. Configuration is done per workflow via the
+`metadata` field.
+
+### Activation (Workflow Metadata)
+
+```json
+{
+  "autoMemoryExtraction": {
+    "enabled": true,
+    "interval": 5
+  }
+}
+```
+
+- `enabled`: Enable/disable auto-extraction
+- `interval`: Number of successful runs between extractions (default: 5)
+
+### Flow
+
+```
+  WorkflowRunCompletedEvent (status == COMPLETED)
+  │
+  ├─ 1. isAutoMemoryEnabled(workflowMetadata) → true?
+  │
+  ├─ 2. Count successful runs since last extraction
+  │     └── WorkflowRunRepository.countByWorkflowIdAndStatusAndCompletedAtAfter()
+  │
+  ├─ 3. Threshold (interval) reached?
+  │     └── No → Abort (next run continues counting)
+  │
+  └─ 4. extractAndActivate(workflowId, "CLAUDE")
+        ├── Extracts knowledge from the last 10 runs
+        ├── Deactivates all previous memories
+        ├── Activates the new memory
+        └── Writes project-memory.md into the project (if projectPath is present)
+```
+
+- Runs asynchronously (`@Async @EventListener`) — does not block the workflow run
+- Always uses provider `CLAUDE`
+- `autoMemoryExtraction: true` (boolean instead of map) is also supported (uses default interval 5)

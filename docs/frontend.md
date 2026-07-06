@@ -1,4 +1,4 @@
-> *Zuletzt aktualisiert: 14. April 2026 — Manuelles Doku-Audit (11 fehlende Hooks ergänzt)*
+> *Zuletzt aktualisiert: [auto-generated]*
 
 # Frontend
 
@@ -23,24 +23,36 @@
 | `/webhooks` | Webhooks | Webhook-Trigger-Verwaltung |
 | `/todos` | Todos | TODO-Liste, Filter, Statusverwaltung |
 | `/activity` | ActivityLog | System-Activity-Log mit Filtern |
+| `/dlq` | DeadLetterQueue | Dead-Letter-Queue für fehlgeschlagene Events |
+| `/debug` | WorkflowDebug | Workflows mit fehlgeschlagenen Runs analysieren |
 | `/docs` | Docs | Markdown-Dokumentation (Split-Layout) |
+| `/reports` | Reports | Generierte Berichte anzeigen |
 | `/insights` | Insights | Plattform-Einblicke und Analysen |
+| `/integrations` | Integrations | Integrations-Provider verwalten |
+| `/calendar` | Calendar | Aggregierter Kalender (Schedules, Runs, Integrationen) |
+| `/cockpit` | ProjectCockpit | Projekt-Cockpit mit Todo-Übersicht |
+| `/onboarding-profiles` | OnboardingProfiles | Onboarding-Profile verwalten |
 | `/settings` | Settings | Sprache, Theme, API-Key, Tailscale, Staging, Testing |
 
 Alle Routen sind in `src/App.tsx` definiert und von einem `<Layout>`-Wrapper umgeben (Sidebar + Header).
 
 ### Simple Mode
 
-`useSettingsStore().simpleMode` schaltet vier Seiten zwischen Normal- und Simple-Variante um:
+`useSettingsStore().simpleMode` schaltet neun Seiten zwischen Normal- und Simple-Variante um:
 
 | Route | Normal | Simple |
 |---|---|---|
-| `/` | `Dashboard` | `SimpleDashboard` |
+| `/` | `Dashboard` | `SimpleHome` |
+| `/projects` | `Projects` | `SimpleProjects` |
 | `/workflows` | `Workflows` | `SimpleWorkflows` |
 | `/workflows/:id` | `WorkflowDetail` | `SimpleWorkflowDetail` |
 | `/workflows/:id/run/:runId` | `WorkflowExecution` | `SimpleWorkflowExecution` |
+| `/runs` | `Runs` | `SimpleRuns` |
+| `/schedules` | `Schedules` | `SimpleSchedules` |
+| `/todos` | `Todos` | `SimpleTodos` |
+| `/activity` | `ActivityLog` | `SimpleActivity` |
 
-Die Umschaltung erfolgt über Route-Wrapper-Komponenten (z.B. `DashboardRoute`, `WorkflowsRoute`) in `App.tsx`, die je nach `simpleMode`-Flag die entsprechende Variante rendern.
+Die Umschaltung erfolgt über Route-Wrapper-Komponenten (z.B. `DashboardRoute`, `WorkflowsRoute`, `RunsRoute`) in `App.tsx`, die je nach `simpleMode`-Flag die entsprechende Variante rendern.
 
 ## Seiten
 
@@ -152,8 +164,12 @@ Die Umschaltung erfolgt über Route-Wrapper-Komponenten (z.B. `DashboardRoute`, 
 - Darstellung: Theme-Toggle (Light/Dark), Farbauswahl
 - Sicherheit: API-Key-Eingabe (maskiert)
 - Remote-Access: Tailscale-Status + Enable/Disable
+- Ausführung: Claude-Concurrency, Reserved-for-Interactive, Timeouts
+- Benachrichtigungen: Notification-Konfigurationen
+- Backups: Datenbank-Backup-Liste
+- Wishes: Wish-Einstellungen
 - **Stable:** Versionsvergleich Dev/Stable, Sync-Preview, Sync-Definitions, Start/Stop/Promote
-- **Testing:** Test-Instanz-Status, Start/Stop/Reset, Sync-Preview, Sync-Definitions
+- **Testing:** Test-Instanz-Status, Start/Stop/Reset, Sync-Preview, Sync-Definitions, Pull-Changes
 - System: Health-Status, Systeminfos, Docker-Status
 
 ## Komponenten
@@ -168,7 +184,8 @@ Die Umschaltung erfolgt über Route-Wrapper-Komponenten (z.B. `DashboardRoute`, 
 ### `src/components/settings/`
 
 - Settings-Unterkomponenten für die modulare Settings-Seite
-- Separate Komponenten für Allgemein, Darstellung, Sicherheit, Stable, Testing, System
+- Separate Komponenten: `GeneralSettingsCard`, `AppearanceCard`, `SecurityCard`, `ExecutionSettingsCard`, `NotificationsCard`, `BackupCard`, `WishSettingsCard`, `RemoteAccessCard`, `StagingCard`, `TestingCard`, `SystemInfoCard`
+- Navigation über `SettingsNav`, gemeinsames Layout via `SettingsSection`
 
 ### Shared-Komponenten (`src/components/shared/`)
 
@@ -179,6 +196,24 @@ Die Umschaltung erfolgt über Route-Wrapper-Komponenten (z.B. `DashboardRoute`, 
 | `MonacoEditor` | JSON-Editor (Monaco, Dark Theme) |
 | `ErrorState` | Fehlermeldung mit Icon |
 | `EmptyState` | Leerer Zustand mit Beschreibung |
+| `Pagination` | Seitennavigation für paginierte Listen |
+| `CopyButton` | Kopier-Button mit Erfolgsfeedback |
+| `GateStatusBadge` | Gate-Status-Anzeige (RED/YELLOW/GREEN) |
+| `GateStatusBanner` | Gate-Status-Banner für Run-Details |
+| `AgenticStepCard` | Darstellung von Agentic-Block-Steps |
+| `ForEachStepCard` | Darstellung von ForEach-Block-Iterationen |
+| `ApprovalDialog` | Dialog für Approval-Block-Interaktion |
+| `HumanInputDialog` | Dialog für Human-Input-Block-Interaktion |
+| `ExecutionBadges` | Status-Badges für Ausführungen |
+| `ConversionSuggestion` | Vorschlag zur Workflow-Konvertierung |
+| `InsightsPanel` | Insights-Anzeige für Runs |
+| `PathLinkedOutput` | Output mit klickbaren Dateipfaden |
+| `ProviderIcon` | Icon-Anzeige für AI-Provider |
+| `RouteErrorFallback` | Error-Boundary für Route-Fehler |
+| `SyncSelectModal` | Auswahl-Modal für Definition-Sync |
+| `TerminalPanel` | Terminal-ähnliche Ausgabeansicht |
+| `TodoEditModal` | Modal zum Bearbeiten von TODOs |
+| `ErrorBoundary` | React Error Boundary mit Fallback-UI |
 
 ## UI-Komponentenbibliothek
 
@@ -197,34 +232,42 @@ Alle Komponenten in `src/components/ui/`:
 | `Spinner` | `size` (sm/md/lg), `text` | Lade-Indikator |
 | `Table<T>` | `columns`, `data`, `keyExtractor`, `onRowClick`, `emptyText` | Generische Tabelle |
 | `ToastContainer` | (global) | Toast-Benachrichtigungen (max. 5) |
+| `DirectoryPicker` | `value`, `onChange`, `label` | Server-Dateisystem-Browser |
+| `CronPicker` | `value`, `onChange` | Cron-Ausdruck-Editor mit Vorschau |
+| `TagInput` | `tags`, `onChange`, `suggestions` | Tag-Eingabe mit Autovervollständigung |
+| `ModalFooter` | `onCancel`, `onConfirm`, `loading` | Standardisierter Modal-Footer |
 
 ## Design-System
 
 ### CSS-Variablen
 
-Das Theme wird über CSS Custom Properties gesteuert (`src/index.css`, `src/theme/tokens.ts`):
+Das Theme wird über CSS Custom Properties gesteuert (`src/theme/tokens.ts` für JS-Zugriff, `src/index.css` für CSS-Defaults):
 
 **Dark Theme (Standard):**
 
 | Variable | Wert | Verwendung |
 |---|---|---|
-| `--color-surface` | `#0f172a` | Seiten-Hintergrund |
-| `--color-surface-raised` | `#1e293b` | Cards, erhöhte Flächen |
-| `--color-surface-overlay` | `#1e293b` | Modal-Hintergrund |
-| `--color-border` | `#334155` | Standard-Rahmen |
-| `--color-border-strong` | `#475569` | Betonte Rahmen |
-| `--color-text` | `#f1f5f9` | Primärtext |
-| `--color-text-secondary` | `#94a3b8` | Sekundärtext |
-| `--color-text-tertiary` | `#64748b` | Tertiärtext |
-| `--color-accent` | `#06b6d4` | Akzentfarbe (Cyan) |
-| `--color-accent-hover` | `#22d3ee` | Akzent-Hover |
-| `--color-accent-subtle` | `#083344` | Akzent-Hintergrund |
-| `--color-success` | `#34d399` | Erfolg (Emerald) |
-| `--color-warning` | `#fbbf24` | Warnung (Amber) |
-| `--color-danger` | `#f87171` | Fehler (Rot) |
-| `--color-sidebar` | `#020617` | Sidebar-Hintergrund |
+| `--color-surface` | `#231e19` | Seiten-Hintergrund |
+| `--color-surface-secondary` | `#2a241e` | Sekundärer Hintergrund |
+| `--color-surface-raised` | `#2e2720` | Cards, erhöhte Flächen |
+| `--color-surface-overlay` | `#332c24` | Modal-Hintergrund |
+| `--color-surface-hover` | `#3a3128` | Hover-Hintergrund |
+| `--color-border` | `#4a3f33` | Standard-Rahmen |
+| `--color-border-strong` | `#5e5143` | Betonte Rahmen |
+| `--color-text` | `#f7f3ee` | Primärtext |
+| `--color-text-secondary` | `#b8aa9a` | Sekundärtext |
+| `--color-text-tertiary` | `#8c7e6e` | Tertiärtext |
+| `--color-text-inverse` | `#231e19` | Invertierter Text |
+| `--color-accent` | `#eba44a` | Akzentfarbe (Amber) |
+| `--color-accent-hover` | `#f2ba62` | Akzent-Hover |
+| `--color-accent-subtle` | `#3d2e14` | Akzent-Hintergrund |
+| `--color-success` | `#6cc66c` | Erfolg (Grün) |
+| `--color-warning` | `#eba44a` | Warnung (Amber) |
+| `--color-danger` | `#e07272` | Fehler (Rot) |
+| `--color-sidebar` | `#1a1614` | Sidebar-Hintergrund |
+| `--color-assistant` | `#1c1812` | Assistenten-Hintergrund |
 
-**Light Theme:** Invertierte Varianten mit weißem Hintergrund und dunklem Text.
+**Light Theme:** Warmes Farbschema mit `#fff8f3`-Hintergrund, `#3a2e22`-Text und `#f7bd54`-Akzentfarbe.
 
 ### Tailwind-Konfiguration
 
@@ -251,11 +294,14 @@ Das Theme wird über CSS Custom Properties gesteuert (`src/index.css`, `src/them
 
 | Store | State | Persistenz |
 |---|---|---|
-| `useSidebarStore` | `collapsed: boolean`, `toggle()`, `setCollapsed()` | `localStorage: sidebar-state` |
-| `useThemeStore` | `mode: 'light'\|'dark'`, `overrides`, `toggleMode()`, `apply()` | `localStorage: theme-settings` |
-| `useSettingsStore` | `apiKey: string`, `advancedMode: boolean`, `simpleMode: boolean` | `localStorage: app-settings` |
+| `useSidebarStore` | `collapsed`, `mobileOpen`, `toggle()`, `setCollapsed()`, `setMobileOpen()` | `localStorage: sidebar-state` (nur `collapsed`) |
+| `useThemeStore` | `mode: 'light'\|'dark'`, `overrides`, `toggleMode()`, `setOverride()`, `resetOverrides()`, `apply()` | `localStorage: theme-settings` |
+| `useSettingsStore` | `apiKey`, `advancedMode`, `simpleMode`, `autoTodoDefault`, `autoRepairDefault`, `autoRepairMode`, `defaultAiProvider`, `assistantModel`, `suggestionsModel`, `suggestionsEnabled`, `sidebarItemOrder`, `sidebarHiddenItems`, `pinnedWorkflowIds`, `simpleOnboardingSeen` | `localStorage: app-settings` |
+| `useAssistantStore` | `open`, `sessions[]`, `activeSessionId`, `showHistory`, `panelWidth`, `panelHeight`, `pendingInput`, `pendingContext` | `localStorage: assistant-sessions` (Sessions, Panel-Größe) |
 | `useI18nStore` | `locale: 'en'\|'de'`, `setLocale()` | `localStorage: i18n-locale` |
 | `useToastStore` | `toasts[]`, `addToast()`, `removeToast()` | Kein (flüchtig) |
+
+`useI18nStore` ist in `src/i18n/index.ts` definiert (nicht in `src/stores/`).
 
 ### TanStack Query (Server State)
 
@@ -276,9 +322,17 @@ Alle API-Daten werden über React Query verwaltet:
 | `useProject(id)` | Query | Einzelnes Projekt |
 | `useCreateProject()` | Mutation | Projekt erstellen |
 | `useUpdateProject()` | Mutation | Projekt aktualisieren |
-| `useDeleteProject()` | Mutation | Projekt löschen |
+| `useArchiveProject()` | Mutation | Projekt archivieren (Soft-Delete) |
+| `useRestoreProject()` | Mutation | Archiviertes Projekt wiederherstellen |
+| `useArchivedProjects()` | Query | Archivierte Projekte |
 | `useStartContainer(id)` | Mutation | Container starten |
 | `useStopContainer(id)` | Mutation | Container stoppen |
+| `useGenerateProjectContext()` | Mutation | AI-Kontext für Projekt generieren |
+| `useOnboardingStatus(id)` | Query | Onboarding-Status eines Projekts |
+| `useEnableOnboarding()` | Mutation | Onboarding aktivieren |
+| `useDisableOnboarding()` | Mutation | Onboarding deaktivieren |
+| `useRefreshOnboarding()` | Mutation | Onboarding aktualisieren |
+| `useOnboardingPreview(id)` | Query | Onboarding-Vorschau |
 
 ### `useWorkflows.ts`
 
@@ -286,14 +340,25 @@ Alle API-Daten werden über React Query verwaltet:
 |---|---|---|
 | `useWorkflows()` | Query | Alle Workflows |
 | `useWorkflow(id)` | Query | Einzelner Workflow |
-| `useWorkflowRuns(workflowId)` | Query | Alle Runs eines Workflows |
+| `useWorkflowRuns(workflowId)` | Query | Runs eines Workflows (paginiert, Auto-Refetch) |
+| `useSimilarWorkflows(id)` | Query | Ähnliche Workflows finden |
+| `useAllRuns(page, size, filters)` | Query | Alle Runs (paginiert) |
 | `useCreateWorkflow()` | Mutation | Workflow erstellen |
 | `useUpdateWorkflow()` | Mutation | Workflow aktualisieren |
-| `useDeleteWorkflow()` | Mutation | Workflow löschen |
+| `useDeleteWorkflow()` | Mutation | Workflow löschen (Soft-Delete) |
 | `useExecuteWorkflow()` | Mutation | Workflow ausführen |
 | `usePauseExecution(runId)` | Mutation | Ausführung pausieren |
 | `useResumeExecution(runId)` | Mutation | Ausführung fortsetzen |
+| `useResumeFromStep()` | Mutation | Ab bestimmtem Step fortsetzen |
 | `useCancelExecution(runId)` | Mutation | Ausführung abbrechen |
+| `useRetryExecution()` | Mutation | Fehlgeschlagene Ausführung wiederholen |
+| `useRunCommand()` | Mutation | Befehl an laufende Ausführung senden |
+| `useSubmitApproval()` | Mutation | Approval-Antwort senden |
+| `useApproveTodos()` | Mutation | TODOs für Ausführung genehmigen |
+| `useImportWorkflow()` | Mutation | Workflow aus JSON importieren |
+| `useOptimizeWorkflow()` | Mutation | Workflow per AI optimieren |
+| `useRepairWorkflow()` | Mutation | Fehlgeschlagenen Workflow reparieren |
+| `useUpdateRunNotes()` | Mutation | Notizen an Run aktualisieren |
 
 ### `useSkills.ts`
 
@@ -310,7 +375,15 @@ Alle API-Daten werden über React Query verwaltet:
 | Hook | Typ | Beschreibung |
 |---|---|---|
 | `useSchedules()` | Query | Alle Schedules |
+| `useMaintenanceMode()` | Query | Maintenance-Mode-Status |
+| `useSetMaintenanceMode()` | Mutation | Maintenance-Mode umschalten |
+| `useCalendarData(start, end)` | Query | Kalender-Daten für Zeitraum |
+| `useRemainingToday()` | Query | Verbleibende Runs heute |
+| `useRemainingThisWeek()` | Query | Verbleibende Runs diese Woche |
+| `useCronPreview(expr)` | Query | Vorschau nächster Ausführungen |
+| `useScheduleRuns(id)` | Query | Runs eines Schedules |
 | `useCreateSchedule()` | Mutation | Schedule erstellen |
+| `useUpdateSchedule()` | Mutation | Schedule aktualisieren |
 | `useToggleSchedule()` | Mutation | Schedule ein-/ausschalten |
 | `useDeleteSchedule()` | Mutation | Schedule löschen |
 
@@ -332,6 +405,18 @@ Alle API-Daten werden über React Query verwaltet:
 | `useRemoteAccessStatus()` | Query | Tailscale-Status |
 | `useEnableRemoteAccess()` | Mutation | Tailscale aktivieren |
 | `useDisableRemoteAccess()` | Mutation | Tailscale deaktivieren |
+| `useBackupList()` | Query | Datenbank-Backups |
+| `useAiProviders()` | Query | AI-Provider und Default |
+| `usePiCatalog()` | Query | Pi-Provider-Katalog |
+| `useUpdateSystemSetting()` | Mutation | System-Einstellung ändern |
+| `useAssistantModelSetting()` | Query | Assistenten-Modell-Einstellung |
+| `useAutoRepairModeSetting()` | Query | Auto-Repair-Modus-Einstellung |
+| `useSuggestionsModelSetting()` | Query | Suggestions-Modell-Einstellung |
+| `useAssistantThinkingPhrases()` | Query | Lokalisierte Thinking-Phrasen |
+| `useRepairAllFailed()` | Mutation | Alle fehlgeschlagenen Runs reparieren |
+| `useExecutionConfig()` | Query | Ausführungs-Konfiguration |
+| `useUpdateExecutionConfig()` | Mutation | Ausführungs-Konfiguration ändern |
+| `useBrowseDirectory()` | Query | Server-Dateisystem durchsuchen |
 
 ### `useChains.ts`
 
@@ -352,13 +437,18 @@ Alle API-Daten werden über React Query verwaltet:
 
 | Hook | Typ | Beschreibung |
 |---|---|---|
-| `useTodos(filters)` | Query | TODOs mit Filtern |
+| `useTodos(filters)` | Query | TODOs mit Filtern (paginiert, Auto-Refetch) |
 | `useTodo(id)` | Query | Einzelnes TODO |
 | `useTodoCount()` | Query | Anzahl TODOs nach Status |
+| `useProjectActiveTodos(projectId)` | Query | Aktive TODOs eines Projekts |
 | `useCreateTodo()` | Mutation | TODO erstellen |
 | `useUpdateTodo()` | Mutation | TODO aktualisieren |
 | `useUpdateTodoStatus()` | Mutation | Status ändern |
+| `useBulkUpdateTodoStatus()` | Mutation | Mehrere TODOs gleichzeitig ändern |
+| `useArchiveStale()` | Mutation | Veraltete TODOs archivieren |
 | `useDeleteTodo()` | Mutation | TODO löschen |
+| `useExportTodo()` | Mutation | TODO in externen Tracker exportieren |
+| `useResolveTodo()` | Mutation | AI-Auflösung für TODO starten |
 
 ### `useActivityLog.ts`
 
@@ -370,7 +460,7 @@ Alle API-Daten werden über React Query verwaltet:
 
 | Hook | Typ | Beschreibung |
 |---|---|---|
-| `useWorkflowMemory(workflowId)` | Query | Memory-Einträge eines Workflows |
+| `useWorkflowMemories(workflowId)` | Query | Memory-Einträge eines Workflows |
 | `useExtractMemory()` | Mutation | Wissen aus Runs extrahieren |
 | `useActivateMemory()` | Mutation | Memory-Eintrag aktivieren |
 | `useUpdateMemory()` | Mutation | Memory-Eintrag bearbeiten |
