@@ -70,6 +70,24 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
     List<Todo> findBacklogCandidates(@Param("maxAttempts") int maxAttempts, Pageable pageable);
 
     /**
+     * Backlog candidates scoped to one trigger's hard criteria (project, source,
+     * the trigger's own maxAttempts). Prevents starvation: the unscoped global
+     * top-N page fills up with old high-priority todos no trigger matches, so
+     * trigger-relevant todos deep in the list never get a retry. Tag and
+     * minPriority matching stay in TodoTriggerService (tags are a JSON column).
+     */
+    @Query("SELECT t FROM Todo t WHERE t.status IN ('OPEN', 'BACKLOG') "
+         + "AND t.fixAttempts < :maxAttempts "
+         + "AND (:projectId IS NULL OR t.projectId = :projectId) "
+         + "AND (:source IS NULL OR t.source = :source) "
+         + "ORDER BY CASE t.priority WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 "
+         + "WHEN 'MEDIUM' THEN 2 ELSE 3 END, t.createdAt ASC")
+    List<Todo> findBacklogCandidatesForTrigger(
+            @Param("projectId") String projectId,
+            @Param("source") Todo.Source source,
+            @Param("maxAttempts") int maxAttempts, Pageable pageable);
+
+    /**
      * Find an open todo by referenceType and referenceId (source-agnostic).
      * Used for health check deduplication.
      */

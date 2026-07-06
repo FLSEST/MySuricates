@@ -152,14 +152,15 @@ public class TodoTriggerService {
             return;
         }
 
-        int globalMaxAttempts = triggers.stream()
-                .mapToInt(TodoTrigger::getMaxAttempts)
-                .max().orElse(3);
+        // Per-trigger scoped candidate query instead of one global top-N page:
+        // the global page filled up with old high-priority todos no trigger
+        // matches, starving trigger-relevant todos further down the list.
+        for (TodoTrigger trigger : triggers) {
+            Todo.Source sourceFilter = parseSourceFilter(trigger.getSourceFilter());
+            List<Todo> candidates = todoRepository.findBacklogCandidatesForTrigger(
+                    trigger.getProjectId(), sourceFilter, trigger.getMaxAttempts(), PageRequest.of(0, 50));
 
-        List<Todo> candidates = todoRepository.findBacklogCandidates(globalMaxAttempts, PageRequest.of(0, 20));
-
-        for (Todo todo : candidates) {
-            for (TodoTrigger trigger : triggers) {
+            for (Todo todo : candidates) {
                 if (matches(trigger, todo) && canFire(trigger, todo)) {
                     try {
                         fireTrigger(trigger, todo);
@@ -171,6 +172,18 @@ public class TodoTriggerService {
                     return; // Only 1 per tick
                 }
             }
+        }
+    }
+
+    private Todo.Source parseSourceFilter(String sourceFilter) {
+        if (sourceFilter == null || sourceFilter.isBlank()) {
+            return null;
+        }
+        try {
+            return Todo.Source.valueOf(sourceFilter);
+        } catch (IllegalArgumentException e) {
+            log.warn("Unknown sourceFilter '{}' — ignoring for backlog query", sourceFilter);
+            return null;
         }
     }
 

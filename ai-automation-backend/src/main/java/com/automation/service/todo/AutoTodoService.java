@@ -179,54 +179,36 @@ public class AutoTodoService {
                 List<TodoSimilarityService.SimilarTodo> similar =
                         similarityService.findSimilar(projectId, title, null);
 
-                // TX 3: persist based on similarity result
+                // TX 3: persist — granular items are ALWAYS created as their own todo.
+                // Exact dedup already happened via composite key above. A similarity
+                // match (SAME or RELATED) only links via relatedTodoId, never merges:
+                // merging swallowed the TodoCreatedEvent, so TodoTriggers never fired
+                // and the items of one batch collapsed into a single todo.
                 Todo.Priority finalPriority = priority;
                 tx.execute(status -> {
-                    TodoSimilarityService.SimilarTodo sameMatch = similar.stream()
-                            .filter(s -> s.similarity() == TodoSimilarityService.Similarity.SAME)
+                    TodoSimilarityService.SimilarTodo linkMatch = similar.stream()
+                            .filter(s -> s.similarity() == TodoSimilarityService.Similarity.SAME
+                                    || s.similarity() == TodoSimilarityService.Similarity.RELATED)
                             .findFirst().orElse(null);
 
-                    if (sameMatch != null) {
-                        Todo existingTodo = todoRepository.findById(sameMatch.todo().getId()).orElse(null);
-                        if (existingTodo != null) {
-                            String updateEntry = String.format("\n\n### Update %s\n*%s (Run `%s`)*\n%s",
-                                    java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")),
-                                    event.getWorkflowName(), event.getRunId(),
-                                    itemDescription != null ? itemDescription : title);
-                            String mergedDescription = (existingTodo.getDescription() != null ? existingTodo.getDescription() : "")
-                                    + updateEntry;
-                            existingTodo.setDescription(mergedDescription);
-                            existingTodo.setWorkflowRunId(event.getRunId());
-                            if (finalPriority.ordinal() > existingTodo.getPriority().ordinal()) {
-                                existingTodo.setPriority(finalPriority);
-                            }
-                            todoRepository.save(existingTodo);
-                            log.info("Auto-todo (granular) merged into existing '{}': {}", existingTodo.getTitle(), title);
-                        }
-                    } else {
-                        TodoSimilarityService.SimilarTodo relatedMatch = similar.stream()
-                                .filter(s -> s.similarity() == TodoSimilarityService.Similarity.RELATED)
-                                .findFirst().orElse(null);
-
-                        Todo todo = Todo.builder()
-                                .title(title)
-                                .description(fullDescription)
-                                .status(Todo.Status.OPEN)
-                                .priority(finalPriority)
-                                .tags(tagsJson)
-                                .projectId(projectId)
-                                .source(Todo.Source.WORKFLOW)
-                                .sourceAgent(SOURCE_AGENT)
-                                .workflowRunId(event.getRunId())
-                                .referenceType(REFERENCE_TYPE)
-                                .referenceId(event.getWorkflowId())
-                                .relatedTodoId(relatedMatch != null ? relatedMatch.todo().getId() : null)
-                                .build();
-                        Todo saved = todoRepository.save(todo);
-                        eventPublisher.publishEvent(new TodoCreatedEvent(AutoTodoService.this, saved));
-                        log.info("Auto-todo (granular) created: {}{}", title,
-                                relatedMatch != null ? " (related to: " + relatedMatch.todo().getTitle() + ")" : "");
-                    }
+                    Todo todo = Todo.builder()
+                            .title(title)
+                            .description(fullDescription)
+                            .status(Todo.Status.OPEN)
+                            .priority(finalPriority)
+                            .tags(tagsJson)
+                            .projectId(projectId)
+                            .source(Todo.Source.WORKFLOW)
+                            .sourceAgent(SOURCE_AGENT)
+                            .workflowRunId(event.getRunId())
+                            .referenceType(REFERENCE_TYPE)
+                            .referenceId(event.getWorkflowId())
+                            .relatedTodoId(linkMatch != null ? linkMatch.todo().getId() : null)
+                            .build();
+                    Todo saved = todoRepository.save(todo);
+                    eventPublisher.publishEvent(new TodoCreatedEvent(AutoTodoService.this, saved));
+                    log.info("Auto-todo (granular) created: {}{}", title,
+                            linkMatch != null ? " (related to: " + linkMatch.todo().getTitle() + ")" : "");
                     return null;
                 });
             }

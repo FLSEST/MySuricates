@@ -221,6 +221,60 @@ class TodoTriggerServiceTest {
     // ── Event Handling ──────────────────────
 
     @Nested
+    class BacklogProcessingTests {
+
+        @Test
+        void processBacklog_usesTriggerScopedQuery_andFires() {
+            Workflow targetWf = Workflow.builder().id("wf-fix").name("Hunt Quality Rebuild").build();
+            TodoTrigger trigger = TodoTrigger.builder()
+                    .id("trig-1").tagPattern("hunt-rebuild")
+                    .projectId("proj-1").sourceFilter("WORKFLOW")
+                    .targetWorkflow(targetWf).maxAttempts(2)
+                    .enabled(true).processBacklog(true).build();
+            when(repository.findByEnabledTrue()).thenReturn(List.of(trigger));
+
+            Todo todo = Todo.builder()
+                    .id("todo-hd").title("Hunt rebuild: heidelberg").status(Todo.Status.OPEN)
+                    .tags(TodoMapper.listToJson(List.of("hunt-rebuild", "auto:workflow")))
+                    .projectId("proj-1")
+                    .priority(Todo.Priority.MEDIUM).source(Todo.Source.WORKFLOW)
+                    .fixAttempts(1).build();
+            // Scoped query returns the trigger-relevant todo — regardless of how
+            // many unrelated high-priority todos exist globally (starvation fix).
+            when(todoRepository.findBacklogCandidatesForTrigger(
+                    eq("proj-1"), eq(Todo.Source.WORKFLOW), eq(2), any()))
+                    .thenReturn(List.of(todo));
+
+            when(workflowService.findByIdEager("wf-fix")).thenReturn(targetWf);
+            WorkflowRun run = WorkflowRun.builder().id("run-2").build();
+            when(workflowExecutor.execute(eq(targetWf), anyMap(), isNull(), anyMap())).thenReturn(run);
+            when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            service.processBacklog();
+
+            verify(workflowExecutor).execute(eq(targetWf), anyMap(), isNull(), anyMap());
+            assertThat(todo.getFixAttempts()).isEqualTo(2);
+            // The old unscoped global query must not be used anymore
+            verify(todoRepository, never()).findBacklogCandidates(anyInt(), any());
+        }
+
+        @Test
+        void processBacklog_noBacklogTriggers_doesNothing() {
+            TodoTrigger trigger = TodoTrigger.builder()
+                    .id("trig-1").tagPattern("hunt-rebuild")
+                    .targetWorkflow(Workflow.builder().id("wf-1").build())
+                    .maxAttempts(2).enabled(true).processBacklog(false).build();
+            when(repository.findByEnabledTrue()).thenReturn(List.of(trigger));
+
+            service.processBacklog();
+
+            verifyNoInteractions(todoRepository);
+            verifyNoInteractions(workflowExecutor);
+        }
+    }
+
+    @Nested
     class EventHandlingTests {
 
         @Test

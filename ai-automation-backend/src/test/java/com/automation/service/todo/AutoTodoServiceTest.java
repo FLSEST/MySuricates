@@ -5,6 +5,7 @@ import com.automation.entity.RunStatus;
 import com.automation.entity.Todo;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
+import com.automation.event.TodoCreatedEvent;
 import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.repository.StepResultRepository;
@@ -418,7 +419,10 @@ class AutoTodoServiceTest {
         }
 
         @Test
-        void granularTodos_similarSameMatch_mergesIntoExisting() {
+        void granularTodos_similarSameMatch_createsOwnTodoWithLink() {
+            // SAME matches must NOT merge anymore: merging swallowed the
+            // TodoCreatedEvent (TodoTriggers never fired) and collapsed the
+            // items of one batch into a single todo. SAME now only links.
             Map<String, Object> todoItem = Map.of(
                     "title", "Fix memory leak",
                     "priority", "HIGH",
@@ -447,7 +451,6 @@ class AutoTodoServiceTest {
             when(similarityService.findSimilar(eq("proj-1"), eq("Fix memory leak"), any()))
                     .thenReturn(List.of(new TodoSimilarityService.SimilarTodo(
                             similarTodo, 0.9, TodoSimilarityService.Similarity.SAME)));
-            when(todoRepository.findById("similar-1")).thenReturn(Optional.of(similarTodo));
 
             when(todoRepository.findByProjectIdAndSourceAndReferenceTypeAndReferenceIdAndStatusNot(
                     anyString(), any(), anyString(), anyString(), any()))
@@ -458,14 +461,58 @@ class AutoTodoServiceTest {
 
             ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
             verify(todoRepository, atLeastOnce()).save(captor.capture());
-            // The similar todo should have been merged (description updated, priority upgraded)
+            // A NEW todo is created, linked to the similar one — the similar
+            // todo itself is never modified.
             assertThat(captor.getAllValues()).anyMatch(t ->
-                    "similar-1".equals(t.getId())
-                    && t.getDescription() != null && t.getDescription().contains("Update"));
-            // Priority should be upgraded from MEDIUM to HIGH (new finding is more severe)
-            Todo merged = captor.getAllValues().stream()
-                    .filter(t -> "similar-1".equals(t.getId())).findFirst().orElseThrow();
-            assertThat(merged.getPriority()).isEqualTo(Todo.Priority.HIGH);
+                    "Fix memory leak".equals(t.getTitle())
+                    && "similar-1".equals(t.getRelatedTodoId()));
+            assertThat(captor.getAllValues()).noneMatch(t -> "similar-1".equals(t.getId()));
+            // The TodoCreatedEvent must fire so TodoTriggers can react
+            verify(eventPublisher, atLeastOnce()).publishEvent(any(TodoCreatedEvent.class));
+        }
+
+        @Test
+        void granularTodos_batchItems_allCreatedDespiteSameMatches() {
+            // Regression for the batch collapse: 3 items in one run, the
+            // similarity check flags items 2+3 as SAME to item 1 — all three
+            // must still become their own todos.
+            List<Map<String, Object>> items = List.of(
+                    Map.of("title", "Hunt rebuild: hornberg", "priority", "HIGH", "tags", List.of("hunt-rebuild")),
+                    Map.of("title", "Hunt rebuild: wesel", "priority", "HIGH", "tags", List.of("hunt-rebuild")),
+                    Map.of("title", "Hunt rebuild: bad-windsheim", "priority", "HIGH", "tags", List.of("hunt-rebuild")));
+
+            Map<String, Object> runMeta = new HashMap<>();
+            runMeta.put("todo_items", items);
+
+            WorkflowRunCompletedEvent event = createEvent(RunStatus.COMPLETED, runMeta, AUTO_TODO_ENABLED_META);
+            when(gateStatusResolver.resolve(event))
+                    .thenReturn(new GateResult(GateStatus.RED, "hunt-quality", "Issues"));
+
+            when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
+                    .thenReturn(Optional.empty());
+
+            Todo first = Todo.builder().id("first-1").title("Hunt rebuild: hornberg").build();
+            when(similarityService.findSimilar(eq("proj-1"), startsWith("Hunt rebuild:"), any()))
+                    .thenAnswer(inv -> "Hunt rebuild: hornberg".equals(inv.getArgument(1))
+                            ? List.of()
+                            : List.of(new TodoSimilarityService.SimilarTodo(
+                                    first, 0.9, TodoSimilarityService.Similarity.SAME)));
+
+            when(todoRepository.findByProjectIdAndSourceAndReferenceTypeAndReferenceIdAndStatusNot(
+                    anyString(), any(), anyString(), anyString(), any()))
+                    .thenReturn(List.of());
+            when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            autoTodoService.onWorkflowRunCompleted(event);
+
+            ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+            verify(todoRepository, atLeastOnce()).save(captor.capture());
+            List<String> createdTitles = captor.getAllValues().stream()
+                    .map(Todo::getTitle).filter(t -> t != null && t.startsWith("Hunt rebuild:")).toList();
+            assertThat(createdTitles).contains(
+                    "Hunt rebuild: hornberg", "Hunt rebuild: wesel", "Hunt rebuild: bad-windsheim");
+            // 3 granular events + 1 for the RED-gate incident aggregate (upsertTodo)
+            verify(eventPublisher, times(4)).publishEvent(any(TodoCreatedEvent.class));
         }
 
         @Test
