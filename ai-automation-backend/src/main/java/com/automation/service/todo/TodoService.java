@@ -6,6 +6,7 @@ import com.automation.dto.request.UpdateTodoStatusRequest;
 import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.TodoCountResponse;
 import com.automation.dto.response.TodoResponse;
+import com.automation.entity.Project;
 import com.automation.entity.RunStatus;
 import com.automation.entity.Todo;
 import com.automation.entity.WorkflowRun;
@@ -120,7 +121,7 @@ public class TodoService {
                 .status(request.status() != null ? request.status() : Todo.Status.OPEN)
                 .priority(request.priority() != null ? request.priority() : Todo.Priority.MEDIUM)
                 .tags(TodoMapper.listToJson(request.tags()))
-                .projectId(request.projectId())
+                .projectId(resolveProjectId(request.projectId()))
                 .linkedWorkflowId(validateLinkedWorkflowId(request.linkedWorkflowId()))
                 .source(request.source() != null ? request.source() : Todo.Source.USER)
                 .sourceAgent(request.sourceAgent())
@@ -150,7 +151,7 @@ public class TodoService {
         if (request.status() != null) todo.setStatus(request.status());
         if (request.priority() != null) todo.setPriority(request.priority());
         if (request.tags() != null) todo.setTags(TodoMapper.listToJson(request.tags()));
-        if (request.projectId() != null) todo.setProjectId(request.projectId().isBlank() ? null : request.projectId());
+        if (request.projectId() != null) todo.setProjectId(resolveProjectId(request.projectId()));
         if (request.linkedWorkflowId() != null) {
             todo.setLinkedWorkflowId(validateLinkedWorkflowId(request.linkedWorkflowId()));
             todo.setResolutionState(todo.getLinkedWorkflowId() != null ? Todo.ResolutionState.IDLE : null);
@@ -335,6 +336,33 @@ public class TodoService {
                 base.dueDate(),
                 base.createdAt(), base.updatedAt()
         );
+    }
+
+    /**
+     * Resolves a caller-supplied projectId to a real project id, or null.
+     * <p>The chat assistant surfaces ids shortened to 8 chars ("23e55750…") and the model
+     * occasionally echoes that trimmed prefix back as a projectId. An exact FK insert then
+     * fails with an opaque {@code SQLITE_CONSTRAINT_FOREIGNKEY}. We recover the intended
+     * project when the value uniquely prefixes exactly one project; a genuine miss throws a
+     * clear {@link ResourceNotFoundException} instead of the raw SQLite error. Mirrors
+     * {@link #validateLinkedWorkflowId(String)} for the {@code project_id → projects(id)} FK.
+     */
+    private String resolveProjectId(String projectId) {
+        if (projectId == null) {
+            return null;
+        }
+        String normalized = projectId.trim();
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        if (projectRepository.existsById(normalized)) {
+            return normalized;
+        }
+        List<Project> prefixMatches = projectRepository.findByIdStartingWith(normalized);
+        if (prefixMatches.size() == 1) {
+            return prefixMatches.get(0).getId();
+        }
+        throw new ResourceNotFoundException("Project", projectId);
     }
 
     private String validateLinkedWorkflowId(String linkedWorkflowId) {

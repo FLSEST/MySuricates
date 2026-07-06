@@ -5,6 +5,7 @@ import com.automation.dto.request.UpdateTodoRequest;
 import com.automation.dto.request.UpdateTodoStatusRequest;
 import com.automation.dto.response.TodoCountResponse;
 import com.automation.dto.response.TodoResponse;
+import com.automation.entity.Project;
 import com.automation.entity.RunStatus;
 import com.automation.entity.Todo;
 import com.automation.entity.Workflow;
@@ -111,6 +112,7 @@ class TodoServiceTest {
                 List.of("backend", "bug"), "proj-1", null, Todo.Source.AI, "claude-code",
                 null, null, null, null, null);
 
+        when(projectRepository.existsById("proj-1")).thenReturn(true);
         when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Todo result = todoService.create(request);
@@ -121,6 +123,107 @@ class TodoServiceTest {
         assertThat(result.getSource()).isEqualTo(Todo.Source.AI);
         assertThat(result.getSourceAgent()).isEqualTo("claude-code");
         assertThat(result.getProjectId()).isEqualTo("proj-1");
+    }
+
+    // --- create: projectId resolution (FK guard) ---
+
+    @Test
+    void create_projectIdExactMatch_usesItAsIs() {
+        String fullId = "23e55750-d31e-428b-afda-d5c04b7805df";
+        when(projectRepository.existsById(fullId)).thenReturn(true);
+        when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Todo result = todoService.create(createRequestWithProjectId(fullId));
+
+        assertThat(result.getProjectId()).isEqualTo(fullId);
+        verify(projectRepository, never()).findByIdStartingWith(any());
+    }
+
+    @Test
+    void create_projectIdShortenedPrefix_expandsToFullUuid() {
+        // The assistant surfaces ids shortened to 8 chars; the model echoes that
+        // trimmed prefix back. It must resolve to the real project, not FK-fail.
+        String fullId = "23e55750-d31e-428b-afda-d5c04b7805df";
+        when(projectRepository.existsById("23e55750")).thenReturn(false);
+        when(projectRepository.findByIdStartingWith("23e55750"))
+                .thenReturn(List.of(Project.builder().id(fullId).build()));
+        when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Todo result = todoService.create(createRequestWithProjectId("23e55750"));
+
+        assertThat(result.getProjectId()).isEqualTo(fullId);
+    }
+
+    @Test
+    void create_projectIdUnknown_throwsResourceNotFound() {
+        when(projectRepository.existsById("nope")).thenReturn(false);
+        when(projectRepository.findByIdStartingWith("nope")).thenReturn(List.of());
+
+        assertThatThrownBy(() -> todoService.create(createRequestWithProjectId("nope")))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(todoRepository, never()).save(any());
+    }
+
+    @Test
+    void create_projectIdAmbiguousPrefix_throwsResourceNotFound() {
+        when(projectRepository.existsById("23")).thenReturn(false);
+        when(projectRepository.findByIdStartingWith("23")).thenReturn(List.of(
+                Project.builder().id("23e55750-d31e-428b-afda-d5c04b7805df").build(),
+                Project.builder().id("2312aaaa-0000-0000-0000-000000000000").build()));
+
+        assertThatThrownBy(() -> todoService.create(createRequestWithProjectId("23")))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(todoRepository, never()).save(any());
+    }
+
+    @Test
+    void create_blankProjectId_setsNullWithoutLookup() {
+        when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Todo result = todoService.create(createRequestWithProjectId("   "));
+
+        assertThat(result.getProjectId()).isNull();
+        verify(projectRepository, never()).existsById(any());
+        verify(projectRepository, never()).findByIdStartingWith(any());
+    }
+
+    private CreateTodoRequest createRequestWithProjectId(String projectId) {
+        return new CreateTodoRequest(
+                "Todo", null, null, null, null, projectId, null,
+                Todo.Source.AI, "assistant", null, null, null, null, null);
+    }
+
+    @Test
+    void update_projectIdShortenedPrefix_expandsToFullUuid() {
+        String fullId = "23e55750-d31e-428b-afda-d5c04b7805df";
+        Todo existing = Todo.builder().id("t-1").title("Test").build();
+        when(todoRepository.findById("t-1")).thenReturn(Optional.of(existing));
+        when(projectRepository.existsById("23e55750")).thenReturn(false);
+        when(projectRepository.findByIdStartingWith("23e55750"))
+                .thenReturn(List.of(Project.builder().id(fullId).build()));
+        when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UpdateTodoRequest request = new UpdateTodoRequest(
+                null, null, null, null, null, "23e55750", null, null, null, null);
+
+        Todo result = todoService.update("t-1", request);
+
+        assertThat(result.getProjectId()).isEqualTo(fullId);
+    }
+
+    @Test
+    void update_unknownProjectId_throwsResourceNotFound() {
+        Todo existing = Todo.builder().id("t-1").title("Test").projectId("old").build();
+        when(todoRepository.findById("t-1")).thenReturn(Optional.of(existing));
+        when(projectRepository.existsById("nope")).thenReturn(false);
+        when(projectRepository.findByIdStartingWith("nope")).thenReturn(List.of());
+
+        UpdateTodoRequest request = new UpdateTodoRequest(
+                null, null, null, null, null, "nope", null, null, null, null);
+
+        assertThatThrownBy(() -> todoService.update("t-1", request))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(todoRepository, never()).save(any());
     }
 
     // --- update ---

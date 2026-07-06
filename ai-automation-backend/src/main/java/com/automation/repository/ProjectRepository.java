@@ -19,6 +19,13 @@ public interface ProjectRepository extends JpaRepository<Project, String> {
 
     List<Project> findByNameContainingIgnoreCase(String name);
 
+    /**
+     * Projects whose id starts with the given prefix. Used to recover a full project
+     * UUID when a caller (notably the chat assistant) supplies only the shortened
+     * 8-char display prefix of an id — see {@code TodoService#resolveProjectId}.
+     */
+    List<Project> findByIdStartingWith(String prefix);
+
     Optional<Project> findFirstByName(String name);
 
     boolean existsByPath(String path);
