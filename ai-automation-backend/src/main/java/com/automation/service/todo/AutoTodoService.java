@@ -480,11 +480,16 @@ public class AutoTodoService {
         StringBuilder sb = new StringBuilder();
         sb.append("## ").append(gate.status()).append(" — ").append(gate.category()).append("\n\n");
 
-        String reportContent = loadReportFromSteps(event.getRunId());
-        if (reportContent != null && !reportContent.isBlank()) {
-            sb.append(reportContent);
-        } else if (gate.description() != null) {
+        // The workflow's explicit gate_description is authoritative — the step heuristic
+        // below only guesses by position and can pick a misleading step (e.g. a green
+        // frontend build as "evidence" for a backend-test-failure).
+        if (gate.description() != null && !gate.description().isBlank()) {
             sb.append(gate.description());
+        } else {
+            String reportContent = loadReportFromSteps(event.getRunId());
+            if (reportContent != null && !reportContent.isBlank()) {
+                sb.append(reportContent);
+            }
         }
 
         sb.append("\n\n---\n").append(buildSourceFooter(event));

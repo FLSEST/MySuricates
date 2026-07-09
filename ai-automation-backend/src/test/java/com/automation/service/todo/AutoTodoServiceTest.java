@@ -2,6 +2,8 @@ package com.automation.service.todo;
 
 import com.automation.entity.GateStatus;
 import com.automation.entity.RunStatus;
+import com.automation.entity.StepResult;
+import com.automation.entity.StepStatus;
 import com.automation.entity.Todo;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
@@ -195,6 +197,71 @@ class AutoTodoServiceTest {
     }
 
     @Test
+    void redGate_explicitGateDescription_winsOverStepHeuristic() {
+        // Regression: loadReportFromSteps() guesses the report by position (second-to-last
+        // step) and used to override the workflow's explicit gate_description. Observed with
+        // self-care-platform-health: the incident showed the GREEN frontend build (step 1)
+        // instead of the LLM verdict's precise backend-test diagnosis.
+        WorkflowRunCompletedEvent event = createEvent(RunStatus.COMPLETED,
+                Map.of("gate_status", "RED"), AUTO_TODO_ENABLED_META);
+        when(gateStatusResolver.resolve(event))
+                .thenReturn(new GateResult(GateStatus.RED, "backend-test-failure",
+                        "1 Failure + 159 Errors (ApplicationContext-Startup-Crash)"));
+        when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(Optional.empty());
+        when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // Step layout like self-care-platform-health: step 1 (second-to-last) is the
+        // misleading green frontend build — the position heuristic would pick it.
+        String greenBuildOutput = "dist/assets/index.js 457 kB\n✓ built in 8.56s\n"
+                + "=== LINT ===\n✖ 26 problems (0 errors, 26 warnings)\n"
+                + "x".repeat(200);
+        lenient().when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-1"))
+                .thenReturn(List.of(
+                        StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED)
+                                .output("mvn test failure output " + "y".repeat(300)).build(),
+                        StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED)
+                                .output(greenBuildOutput).build(),
+                        StepResult.builder().stepIndex(2).status(StepStatus.COMPLETED)
+                                .output("LLM verdict").build()));
+
+        autoTodoService.onWorkflowRunCompleted(event);
+
+        ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+        verify(todoRepository).save(captor.capture());
+        assertThat(captor.getValue().getDescription())
+                .contains("1 Failure + 159 Errors (ApplicationContext-Startup-Crash)")
+                .doesNotContain("built in 8.56s");
+    }
+
+    @Test
+    void redGate_noGateDescription_fallsBackToStepReport() {
+        // Without an explicit gate_description the step heuristic remains the source.
+        WorkflowRunCompletedEvent event = createEvent(RunStatus.FAILED,
+                Map.of(), AUTO_TODO_ENABLED_META);
+        when(gateStatusResolver.resolve(event))
+                .thenReturn(new GateResult(GateStatus.RED, "execution-failure", null));
+        when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(Optional.empty());
+        when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-1"))
+                .thenReturn(List.of(
+                        StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED)
+                                .output("data collection").build(),
+                        StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED)
+                                .output("analysis report content " + "z".repeat(300)).build(),
+                        StepResult.builder().stepIndex(2).status(StepStatus.FAILED)
+                                .output("verdict shell failed").build()));
+
+        autoTodoService.onWorkflowRunCompleted(event);
+
+        ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+        verify(todoRepository).save(captor.capture());
+        assertThat(captor.getValue().getDescription()).contains("analysis report content");
+    }
+
+    @Test
     void dedupe_updateExistingTodo() {
         WorkflowRunCompletedEvent event = createEvent(RunStatus.COMPLETED,
                 Map.of("gate_status", "RED"), AUTO_TODO_ENABLED_META);
@@ -267,8 +334,6 @@ class AutoTodoServiceTest {
         when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(Optional.empty());
         when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-1"))
-                .thenReturn(List.of());
 
         autoTodoService.onWorkflowRunCompleted(event);
 
@@ -288,8 +353,6 @@ class AutoTodoServiceTest {
         when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(Optional.empty());
         when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-1"))
-                .thenReturn(List.of());
 
         autoTodoService.onWorkflowRunCompleted(event);
 
@@ -308,8 +371,6 @@ class AutoTodoServiceTest {
         when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(Optional.empty());
         when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-1"))
-                .thenReturn(List.of());
 
         autoTodoService.onWorkflowRunCompleted(event);
 
@@ -327,8 +388,6 @@ class AutoTodoServiceTest {
         when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(Optional.empty());
         when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-1"))
-                .thenReturn(List.of());
 
         autoTodoService.onWorkflowRunCompleted(event);
 
