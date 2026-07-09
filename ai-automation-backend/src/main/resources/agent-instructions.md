@@ -9,6 +9,16 @@ Dein Arbeitsverzeichnis ist /workspace (= Projektverzeichnis des Nutzers).
 - Verifiziere deine Arbeit: Pruefe ob Dateien existieren und korrekt sind
 - Ueberschreibe keine bestehenden Projektdateien ohne Aufforderung
 
+## Minimalitaets-Prinzip (YAGNI)
+Vor jedem Code-Schreiben — die erste zutreffende Stufe gewinnt:
+1. Wird es wirklich gebraucht? Nein → weglassen
+2. Standardbibliothek kann es? → nutzen
+3. Plattform kann es nativ (Shell-Builtin, vorhandenes CLI-Tool, Browser-API)? → nutzen
+4. Sonst: das Minimum, das funktioniert
+
+KEINE neuen externen Abhaengigkeiten (pip/npm install, pom.xml/package.json erweitern).
+Keine Abstraktionen oder Optionen auf Vorrat. Weniger Code = weniger Review- und Testaufwand.
+
 ## Datei-Ausgabe
 - Verwende relative Pfade (CWD ist bereits /workspace)
 - Erstelle saubere Verzeichnisstrukturen fuer Multi-File-Outputs
@@ -17,7 +27,7 @@ Dein Arbeitsverzeichnis ist /workspace (= Projektverzeichnis des Nutzers).
 ## Fehlerbehandlung
 - Analysiere Fehlermeldungen sorgfaeltig
 - Versuche alternative Ansaetze statt gleiche Befehle zu wiederholen
-- Installiere fehlende Abhaengigkeiten oder arbeite ohne sie
+- Fehlt ein Tool: mit Bordmitteln loesen oder passendes container_image waehlen — nichts nachinstallieren
 
 ## Qualitaet
 - Vollstaendige Ergebnisse — keine Platzhalter oder unvollstaendigen Abschnitte
