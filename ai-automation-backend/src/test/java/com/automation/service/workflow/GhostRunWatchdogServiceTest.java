@@ -126,6 +126,31 @@ class GhostRunWatchdogServiceTest {
         }
 
         @Test
+        void suspendRelatedRun_markedInterruptedWithoutError() {
+            Instant startTime = Instant.now().minus(25, ChronoUnit.MINUTES);
+            WorkflowRun run = WorkflowRun.builder().id("r1").status(RunStatus.RUNNING)
+                    .startedAt(startTime).build();
+            when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of(run));
+            when(workflowExecutor.isRunActive("r1")).thenReturn(false);
+            when(suspendState.resumedRecently(any(), any())).thenReturn(true);
+            when(suspendState.getLastGapMillis()).thenReturn(300_000L);
+            stubPermitsBalanced();
+
+            service.detectGhostRuns();
+
+            ArgumentCaptor<WorkflowRun> captor = ArgumentCaptor.forClass(WorkflowRun.class);
+            verify(runRepository).save(captor.capture());
+            WorkflowRun saved = captor.getValue();
+            // Suspend-related → resumable INTERRUPTED, no error payload (so the UI shows Resume, not a
+            // failure — WorkflowExecution.tsx only renders the error box when the error map is non-empty).
+            assertThat(saved.getStatus()).isEqualTo(RunStatus.INTERRUPTED);
+            assertThat(saved.getError()).isEmpty();
+            assertThat(saved.getCompletedAt()).isNotNull();
+            verify(broadcaster).broadcastRunStatus("r1", RunStatus.INTERRUPTED);
+            verify(activityLogService).warn(any(), contains("INTERRUPTED"), anyString());
+        }
+
+        @Test
         void broadcastsStatusChange() {
             WorkflowRun run = WorkflowRun.builder().id("r1").status(RunStatus.RUNNING)
                     .startedAt(Instant.now().minus(15, ChronoUnit.MINUTES)).build();

@@ -51,7 +51,8 @@ public class GhostRunWatchdogService {
         // A resume detected within this window strongly implies the orphaning was caused by a
         // system suspend (which kills the run's CLI/Docker subprocesses) rather than a true ghost.
         boolean suspendRelated = suspendState.resumedRecently(now, Duration.ofMinutes(staleThresholdMinutes * 2));
-        int ghostCount = 0;
+        int failedCount = 0;
+        int interruptedCount = 0;
 
         for (WorkflowRun run : runningRuns) {
             if (workflowExecutor.isRunActive(run.getId())) {
@@ -62,24 +63,38 @@ public class GhostRunWatchdogService {
             }
 
             // RUNNING in DB but not in activeExecutions and older than threshold.
+            // Suspend-related orphans are resumable: mark them INTERRUPTED (no error payload) so the UI
+            // offers "Resume from Step". Only true ghosts are hard-failed with an error.
             String message = suspendRelated
                     ? "Interrupted by system suspend/resume (paused ~"
                             + (suspendState.getLastGapMillis() / 60_000) + " min) — no active execution thread"
                     : "Ghost run detected by watchdog: no active execution thread found";
-            run.setStatus(RunStatus.FAILED);
+            RunStatus targetStatus = suspendRelated ? RunStatus.INTERRUPTED : RunStatus.FAILED;
+            run.setStatus(targetStatus);
             run.setCompletedAt(now);
             run.setDurationMs(run.getCompletedAt().toEpochMilli() - run.getStartedAt().toEpochMilli());
-            run.setError(Map.of("message", message));
+            if (targetStatus == RunStatus.FAILED) {
+                run.setError(Map.of("message", message));
+            }
             runRepository.save(run);
-            broadcaster.broadcastRunStatus(run.getId(), RunStatus.FAILED);
-            ghostCount++;
-            log.warn("{} run detected and failed: {} (started {})",
-                    suspendRelated ? "Suspend-interrupted" : "Ghost", run.getId(), run.getStartedAt());
+            broadcaster.broadcastRunStatus(run.getId(), targetStatus);
+            if (suspendRelated) {
+                interruptedCount++;
+            } else {
+                failedCount++;
+            }
+            log.warn("{} run detected: {} (started {}) — marked {}",
+                    suspendRelated ? "Suspend-interrupted" : "Ghost", run.getId(), run.getStartedAt(), targetStatus);
         }
 
-        if (ghostCount > 0) {
+        if (failedCount > 0) {
             activityLogService.warn(LogCategory.EXECUTION,
-                    "Watchdog: " + ghostCount + " ghost run(s) detected and marked as FAILED",
+                    "Watchdog: " + failedCount + " ghost run(s) detected and marked as FAILED",
+                    "GhostRunWatchdogService");
+        }
+        if (interruptedCount > 0) {
+            activityLogService.warn(LogCategory.EXECUTION,
+                    "Watchdog: " + interruptedCount + " run(s) interrupted by system suspend — marked INTERRUPTED (resumable)",
                     "GhostRunWatchdogService");
         }
 
