@@ -81,7 +81,7 @@ Topic in, verified template out:
 3. **Verify**: Check success, output quality, cost
 4. **Promote**: Successful workflows become reusable templates
 
-Multi-provider support (Claude + Codex) means the best model for each generation task.
+Multi-provider support (Claude + Codex + Pi) means the best model for each generation task.
 
 ### Learning — Feedback Loop
 
@@ -105,13 +105,13 @@ Workflows accumulate knowledge across runs:
 
 ---
 
-## Was schon gebaut ist (v0.6.4)
+## Was schon gebaut ist (v0.7.3)
 
 | Baustein | Status |
 |----------|--------|
-| Block-basierte Workflows (12 Block-Typen) | Done |
+| Block-basierte Workflows (14 Block-Typen) | Done |
 | Docker-Container-Execution | Done |
-| Agentic Blocks (Goal → Reason → Act → Observe) | Done |
+| Agentic Blocks (Reason → Act → Observe) | Done |
 | Workflow Chains (sequentielle Komposition) | Done |
 | Workflow Factory (AI-generiert + Auto-Test) | Done |
 | Wishes (Intent → Decompose → Execute → Evaluate) | Done |
@@ -119,10 +119,10 @@ Workflows accumulate knowledge across runs:
 | Pre-flight Verification + Auto-Fix + AutoRepair-Config | Done |
 | Learning-Feedback in Prompts | Done |
 | Cross-Project Workflow-Erkennung | Done |
-| 53 Built-in Templates (Dev + Büro + Alltag) | Done |
-| 16 Built-in Skills (Code-Review, Test-Generator, OCR u.a.) | Done |
+| 66 Built-in Templates (Dev + Büro + Alltag) | Done |
+| 19 Built-in Skills (Code-Review, Test-Generator, Security-Analyzer u.a.) | Done |
 | Staging (Dev + Stable + Test) | Done |
-| Multi-Provider (Claude + Codex) | Done |
+| Multi-Provider (Claude + Codex + Pi) | Done |
 | Assistent-System (kontextueller Floating-Chat mit Page-Suggestions) | Done |
 | Gate Status System (Quality-Gates, AutoTodo-Integration) | Done |
 | Agent Instructions System (Base- und Per-Workflow-Instruktionen) | Done |
@@ -151,8 +151,8 @@ Workflows accumulate knowledge across runs:
 
 - **Kosten-Schätzung vor Ausführung** — User sieht erwartete Token-Kosten bevor ein Wish läuft
 - **Modell-Auswahl pro Wish** — Automatische oder manuelle Wahl des passenden Modells
-- ~~**Auto-Refine ohne User-Intervention**~~ — Grundmechanismus vorhanden (maxIterations, iterationCount), autoRefine-Flag fehlt noch
-- ~~**Iterations-Historie mit Delta-Tracking**~~ — iterationHistory speichert Iterationen, Delta-Tracking/Diff-Ansicht fehlt noch
+- ~~**Auto-Refine ohne User-Intervention**~~ — Done (`Wish.autoRefine` + auto-approve in `WishDecomposeService`)
+- ~~**Iterations-Historie mit Delta-Tracking**~~ — Done (`Wish.iterationHistory` + `iterationDiff.ts` Diff-Ansicht)
 
 ### Phase 3: Crystallize & Discovery
 
@@ -186,9 +186,9 @@ Workflows accumulate knowledge across runs:
              /  |  \
         Shell  Agentic  Human-Input  ...
                 |
-        [ Host Claude/Codex CLI ]
+        [ Host Claude/Codex/Pi CLI ]
                 |
-        Goal → Reason → Act → Observe
+        Reason → Act → Observe
                 |
         [ Learning + Memory ]
                 |
@@ -199,5 +199,5 @@ Workflows accumulate knowledge across runs:
 
 - **Backend**: Spring Boot 3.4, Java 21, SQLite, Flyway
 - **Frontend**: React 19, TypeScript, TailwindCSS, TanStack Query, Zustand
-- **Execution**: Docker containers (Python/Node/Go), Host Claude CLI, Host Codex CLI
+- **Execution**: Docker containers (Python/Node/Go), Host Claude CLI, Host Codex CLI, Host Pi CLI
 - **Deployment**: Dev (source) + Stable (Docker, port 9091) + Test (Docker, port 8090)

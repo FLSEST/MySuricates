@@ -213,17 +213,34 @@ List all workflows.
   {
     "id": "uuid",
     "projectId": "uuid",
+    "projectName": "My Project",
+    "projectSubtitle": null,
+    "projectDescription": null,
     "name": "Code Review",
     "description": "Automated code review",
     "icon": "🔍",
     "blocks": [
-      { "type": "simple", "config": { "prompt": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
+      { "type": "simple", "config": { "command": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
     ],
     "version": "1.0.0",
     "metadata": {},
-    "activatedSkills": [],
+    "activatedSkillIds": [],
+    "activatedSkillNames": [],
+    "runCount": 0,
+    "instructions": null,
+    "model": null,
+    "provider": null,
+    "templateId": null,
+    "defaultContext": {},
+    "testStatus": "UNTESTED",
+    "lastTestedAt": null,
+    "tags": [],
+    "category": null,
+    "tagsGeneratedAt": null,
+    "tagsUserEdited": false,
     "createdAt": "2025-01-15T10:00:00Z",
-    "updatedAt": "2025-01-15T10:00:00Z"
+    "updatedAt": "2025-01-15T10:00:00Z",
+    "stableSyncedAt": null
   }
 ]
 ```
@@ -241,7 +258,7 @@ Create a new workflow.
   "description": "Automated code review",
   "icon": "🔍",
   "blocks": [
-    { "type": "simple", "config": { "prompt": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
+    { "type": "simple", "config": { "command": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
   ],
   "activatedSkillIds": ["skill-uuid-1"]
 }
@@ -271,7 +288,7 @@ Create a new workflow.
 | `name` | String | No | Human-readable name for `{{ block.<name>.output }}` references |
 | `config` | Object | Yes | Type-specific configuration |
 | `requiredCapabilities` | String[] | No | Required capabilities |
-| `skillIds` | String[] | No | Skill IDs activated additionally to workflow skills for this block (additive) |
+| `skillIds` | String[] | No | Skill IDs additionally activated for this block on top of workflow skills (additive) |
 
 **Response:** `201` with `WorkflowResponse`
 
@@ -290,7 +307,7 @@ Update a workflow.
 ```json
 {
   "name": "New Name",
-  "description": "New Description",
+  "description": "New description",
   "icon": "✨",
   "blocks": []
 }
@@ -306,7 +323,7 @@ Delete a workflow.
 
 ### `GET /api/v1/workflows/export/{id}`
 
-Export a workflow as portable JSON (without IDs, without project association).
+Export a workflow as portable JSON (without IDs, without project assignment).
 
 **Response:** `ExportWorkflowResponse`
 
@@ -316,7 +333,7 @@ Export a workflow as portable JSON (without IDs, without project association).
   "description": "Automated code review",
   "icon": "🔍",
   "blocks": [
-    { "type": "simple", "config": { "prompt": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
+    { "type": "simple", "config": { "command": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
   ],
   "instructions": null,
   "model": null,
@@ -338,7 +355,7 @@ Import a workflow from JSON (exported format + target project).
   "description": "Automated code review",
   "icon": "🔍",
   "blocks": [
-    { "type": "simple", "config": { "prompt": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
+    { "type": "simple", "config": { "command": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
   ],
   "instructions": null,
   "model": null,
@@ -357,12 +374,12 @@ Import a workflow from JSON (exported format + target project).
 | `model` | String | No |
 | `updateIfExists` | Boolean | No (default: `false`) |
 
-When `updateIfExists=true` and a workflow with the same name exists in the target project, it is updated instead of created anew.
+When `updateIfExists=true` and a workflow with the same name exists in the target project, it will be updated instead of creating a new one.
 
 #### Block Config: `timeout_seconds`
 
 All block types support an optional `timeout_seconds` field in the block config.
-This overrides the Claude CLI timeout per block (default: global value from `automation.host-claude.timeout-seconds`, standard 300s).
+This overrides the Claude CLI timeout per block (default: global value from `automation.host-claude.timeout-seconds`, default 300s).
 
 ```json
 {
@@ -410,6 +427,9 @@ Execute a workflow.
 {
   "id": "run-uuid",
   "workflowId": "workflow-uuid",
+  "workflowName": "Code Review",
+  "projectName": "My Project",
+  "projectPath": "/workspace/project",
   "status": "RUNNING",
   "steps": [],
   "startedAt": "2025-01-15T10:00:00Z",
@@ -417,7 +437,9 @@ Execute a workflow.
   "durationMs": null,
   "userRating": null,
   "error": {},
-  "metadata": {}
+  "metadata": {},
+  "inputContext": {},
+  "triggeredByScheduleId": null
 }
 ```
 
@@ -451,7 +473,7 @@ Find similar workflows.
 
 ### `POST /api/v1/workflows/{id}/repair`
 
-Repair a failed workflow on the test instance. Requires the workflow to have failed runs and the test instance to be healthy.
+Repair a failed workflow on the test instance. Requires that the workflow has failed runs and the test instance is healthy.
 
 **Response:** `202 Accepted` with `{ "status": "repair_started", "workflowId": "...", "workflowName": "..." }`
 
@@ -472,6 +494,46 @@ Activate skills for a workflow.
 ### `DELETE /api/v1/workflows/{id}/skills/{skillId}`
 
 Deactivate a skill from a workflow.
+
+**Response:** `WorkflowResponse`
+
+### `GET /api/v1/workflows/{id}/versions`
+
+List all versions of a workflow (paginated).
+
+**Query Parameters:** `page` (default: 0), `size` (default: 20)
+
+**Response:** `PageResponse<WorkflowVersionResponse>`
+
+```json
+{
+  "content": [
+    {
+      "id": "version-uuid",
+      "workflowId": "workflow-uuid",
+      "versionNumber": 3,
+      "snapshot": { ... },
+      "changeSource": "USER",
+      "changeMessage": "Prompt adjusted",
+      "createdAt": "2025-01-15T10:00:00Z"
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 3,
+  "totalPages": 1
+}
+```
+
+### `GET /api/v1/workflows/{id}/versions/{versionId}`
+
+Retrieve a single version.
+
+**Response:** `WorkflowVersionResponse`
+
+### `POST /api/v1/workflows/{id}/versions/{versionId}/restore`
+
+Restore a workflow to a previous version.
 
 **Response:** `WorkflowResponse`
 
@@ -500,11 +562,16 @@ List all workflow templates (sorted by `sortOrder`).
     "model": null,
     "builtIn": true,
     "sortOrder": 0,
+    "qualityStatus": null,
+    "verifications": [],
+    "version": "1.0.0",
     "createdAt": "2025-01-15T10:00:00Z",
     "updatedAt": "2025-01-15T10:00:00Z"
   }
 ]
 ```
+
+`verifications` contains one object per project in which the template was verified, with `projectId`, `projectName`, `lastRunId`, `verifiedAt`.
 
 ### `GET /api/v1/workflow-templates/{id}`
 
@@ -696,7 +763,7 @@ Check whether an approval or human input is pending.
 {
   "pending": true,
   "blockId": "block-id",
-  "question": "Please enter file name:",
+  "question": "Please enter a filename:",
   "options": [],
   "stepIndex": 3,
   "type": "human-input",
@@ -862,6 +929,8 @@ List all schedules.
     "targetType": "WORKFLOW",
     "cronExpression": "0 0 2 * * ?",
     "scheduleType": "CRON",
+    "scheduledAt": null,
+    "delayExpression": null,
     "enabled": true,
     "description": "Nightly build",
     "inputContext": {},
@@ -1081,7 +1150,7 @@ Webhooks of a specific workflow.
 
 ### `POST /api/v1/webhooks`
 
-Create a new webhook (token is generated automatically).
+Create a new webhook (token is automatically generated).
 
 **Request:**
 
@@ -1156,13 +1225,13 @@ Retrieve a single trigger.
 
 ### `GET /api/v1/completion-triggers/workflow/{workflowId}/as-source`
 
-Retrieve triggers where the specified workflow acts as the source.
+Retrieve triggers where the specified workflow acts as a source.
 
 **Response:** `CompletionTriggerResponse[]`
 
 ### `GET /api/v1/completion-triggers/workflow/{workflowId}/as-target`
 
-Retrieve triggers where the specified workflow acts as the target.
+Retrieve triggers where the specified workflow acts as a target.
 
 **Response:** `CompletionTriggerResponse[]`
 
@@ -1196,6 +1265,8 @@ Create a new completion trigger.
 
 **Response:** `201` with `CompletionTriggerResponse`
 
+**CompletionTriggerResponse Fields:** `id`, `sourceWorkflowId`, `sourceWorkflowName`, `targetWorkflowId`, `targetWorkflowName`, `enabled`, `triggerOnSuccess`, `triggerOnFailure`, `triggerAlways`, `description`, `contextVariables`, `lastTriggeredAt`, `triggerCount`, `createdAt`
+
 ### `POST /api/v1/completion-triggers/{id}/enable`
 
 Enable a trigger.
@@ -1222,7 +1293,7 @@ Plugin system for external services (Google Calendar, Gmail, Jira, Confluence, T
 
 ### `GET /api/v1/integrations`
 
-List of all providers with connection status, actions, and account info.
+List all providers with connection status, actions, and account info.
 
 **Response:** `200 OK`
 ```json
@@ -1234,11 +1305,15 @@ List of all providers with connection status, actions, and account info.
     "description": "...",
     "status": "CONNECTED",
     "configured": true,
+    "requiresCredentials": true,
     "accountEmail": "user@gmail.com",
     "accountName": "Max Mustermann",
-    "connectedAt": "2026-04-01T10:00:00Z",
+    "connectedSince": "2026-04-01T10:00:00Z",
     "scopes": "https://www.googleapis.com/auth/calendar",
-    "optionalScopes": [],
+    "optionalScopes": [
+      { "scope": "https://www.googleapis.com/auth/calendar.events", "label": "Manage events", "granted": true }
+    ],
+    "supportsTaskExport": false,
     "actions": [
       { "name": "list_events", "description": "...", "inputSchema": {...}, "available": true }
     ]
@@ -1263,7 +1338,7 @@ Generate an OAuth authorization URL.
 
 ### `GET /api/v1/integrations/{providerId}/callback`
 
-OAuth callback (public, no API key). Exchanges the authorization code for tokens and closes the popup window via `postMessage`.
+OAuth callback (public, no API key). Exchanges authorization code for tokens and closes the popup window via `postMessage`.
 
 ### `POST /api/v1/integrations/{providerId}/credentials`
 
@@ -1274,9 +1349,11 @@ Save client credentials (Client ID + Secret). Stored AES-256-GCM encrypted in th
 { "clientId": "...", "clientSecret": "..." }
 ```
 
+**Response:** `IntegrationProviderResponse`
+
 ### `DELETE /api/v1/integrations/{providerId}/connection`
 
-Disconnect the OAuth connection. Deletes stored tokens.
+Disconnect OAuth connection. Deletes stored tokens.
 
 **Response:** `204 No Content`
 
@@ -1317,7 +1394,7 @@ AI context templates for project onboarding. 5 built-in profiles (Developer, Res
 
 ### `GET /api/v1/projects/{id}/onboarding/status`
 
-Check the onboarding status of a project (active profiles, generated file).
+Check onboarding status of a project (active profiles, generated file).
 
 ### `POST /api/v1/projects/{id}/onboarding/enable`
 
@@ -1386,6 +1463,8 @@ Create a new profile.
 
 **Response:** `201` with `OnboardingProfileResponse`
 
+**OnboardingProfileResponse Fields:** `id`, `key`, `name`, `description`, `content`, `type`, `builtIn`, `sortOrder`, `version`, `historyCount`, `createdAt`, `updatedAt`
+
 ### `PUT /api/v1/onboarding-profiles/{id}`
 
 Update profile content (automatically creates a history entry).
@@ -1430,7 +1509,7 @@ Retrieve a single todo trigger.
 
 ### `GET /api/v1/todo-triggers/workflow/{workflowId}`
 
-Retrieve todo triggers that have the specified workflow as their target.
+Retrieve todo triggers that have the specified workflow as a target.
 
 **Response:** `TodoTriggerResponse[]`
 
@@ -1460,7 +1539,7 @@ Create a new todo trigger.
 | `targetWorkflowId` | Yes | ID of the fix workflow to be started |
 | `projectId` | No | Optional: only match TODOs in this project |
 | `sourceFilter` | No | Optional: `"USER"`, `"AI"` or `"WORKFLOW"` |
-| `minPriority` | No | Optional: minimum priority (`"LOW"`, `"MEDIUM"`, `"HIGH"`, `"CRITICAL"`) |
+| `minPriority` | No | Optional: Minimum priority (`"LOW"`, `"MEDIUM"`, `"HIGH"`, `"CRITICAL"`) |
 | `description` | No | Human-readable description |
 | `maxAttempts` | No | Max fix attempts per TODO (default: 3) |
 | `autoClose` | No | Automatically close TODO on GREEN gate (default: true) |
@@ -1468,6 +1547,8 @@ Create a new todo trigger.
 | `contextTemplate` | No | Static context variables, merged with TODO data |
 
 **Response:** `201` with `TodoTriggerResponse`
+
+**TodoTriggerResponse Fields:** `id`, `tagPattern`, `projectId`, `sourceFilter`, `minPriority`, `targetWorkflowId`, `targetWorkflowName`, `contextTemplate`, `enabled`, `maxAttempts`, `autoClose`, `processBacklog`, `description`, `lastTriggeredAt`, `triggerCount`, `createdAt`
 
 **Context variables** automatically provided to the fix workflow:
 
@@ -1513,7 +1594,7 @@ Fix workflows started by a TodoTrigger set `todoTriggerRun: true` in the run met
 
 ## Notifications
 
-Notifications on workflow completion (webhook or desktop).
+Notifications upon workflow completion (webhook or desktop).
 
 ### `GET /api/v1/notifications`
 
@@ -1559,6 +1640,8 @@ Create a new notification configuration.
 
 **Response:** `201` with `NotificationConfigResponse`
 
+**NotificationConfigResponse Fields:** `id`, `name`, `enabled`, `channelType`, `webhookUrl`, `workflowId`, `triggerOnSuccess`, `triggerOnFailure`, `triggerAlways`, `messageTemplate`, `createdAt`
+
 ### `POST /api/v1/notifications/{id}/enable`
 
 Enable a notification.
@@ -1599,7 +1682,7 @@ Health check.
 }
 ```
 
-`status` can be `UP`, `DEGRADED` (Docker unavailable) or `DOWN` (database unavailable).
+`status` can be `UP`, `DEGRADED` (Docker unavailable), or `DOWN` (database unavailable).
 `docker` can be `CONNECTED` or `UNAVAILABLE`.
 
 ### `GET /api/v1/system/info` (Public)
@@ -1697,13 +1780,13 @@ Query Tailscale status.
 
 ### `POST /api/v1/system/vacuum`
 
-Run SQLite database VACUUM.
+Execute SQLite database VACUUM.
 
 **Response:** `Map<String, Object>`
 
 ### `GET /api/v1/system/backup`
 
-Download a database backup.
+Download database backup.
 
 **Response:** File download (SQLite backup)
 
@@ -1731,7 +1814,7 @@ Download a specific backup.
 
 Retrieve an application setting.
 
-**Allowed keys:** `auto-todo-default`, `auto-repair-default`, `auto-repair-mode`, `auto-repair-max-retries`, `auto-repair-timeout-seconds`, `default-ai-provider`, `assistant-thinking-phrases`, `assistant-model`, `suggestions-model`, `suggestions-enabled`, `backup-retain-count`
+**Allowed Keys:** `auto-todo-default`, `auto-repair-default`, `auto-repair-mode`, `auto-repair-max-retries`, `auto-repair-timeout-seconds`, `default-ai-provider`, `assistant-thinking-phrases`, `assistant-model`, `suggestions-model`, `suggestions-enabled`, `backup-retain-count`
 
 **Response:** `{ "key": "...", "value": "..." }`
 
@@ -1751,7 +1834,34 @@ Set an application setting.
 
 ### `GET /api/v1/system/execution-config`
 
-Retrieve current execution configuration (timeouts, token limits, etc.).
+Retrieve current execution configuration (timeouts, token limits, etc.). Additionally contains a read-only field `activeRuns` with the number of active runs.
+
+**Allowed Keys:**
+
+| Key | Range |
+|---|---|
+| `execution-max-concurrent` | 1–50 |
+| `claude-max-concurrent-calls` | 1–20 |
+| `claude-reserved-for-interactive` | 0–10 |
+| `claude-timeout-seconds` | 30–3600 |
+| `claude-inter-call-delay-ms` | 0–30000 |
+| `chain-workflow-timeout-minutes` | 5–1440 |
+| `rate-limit-enabled` | 0–1 |
+| `rate-limit-requests-per-minute` | 10–10000 |
+| `assistant-chat-timeout-seconds` | 30–900 |
+| `task-command-timeout-seconds` | 10–3600 |
+| `allow-extra-mounts` | 0–1 |
+| `todo-hygiene-enabled` | 0–1 |
+| `todo-stale-days` | 7–365 |
+| `todo-hygiene-max-per-run` | 10–2000 |
+| `scheduler-catch-up-on-resume` | 0–1 |
+| `scheduler-resume-grace-minutes` | 1–60 |
+| `summarization-timeout-seconds` | 30–600 |
+| `factory-timeout-seconds` | 60–3600 |
+| `wish-total-timeout-minutes` | 5–1440 |
+| `wish-workflow-wait-minutes` | 1–120 |
+| `wish-default-shell-timeout-seconds` | 30–3600 |
+| `wish-default-agentic-total-timeout-seconds` | 60–86400 |
 
 **Response:** `Map<String, Object>` with current settings
 
@@ -1759,7 +1869,7 @@ Retrieve current execution configuration (timeouts, token limits, etc.).
 
 Update execution configuration.
 
-**Request:** `Map<String, String>` with the settings to change
+**Request:** `Map<String, String>` with the settings to change (keys as above, camelCase also accepted)
 
 **Response:** `Map<String, Object>` with updated settings
 
@@ -1827,23 +1937,51 @@ Dashboard data with statistics.
 {
   "totalWorkflows": 12,
   "totalRuns": 156,
+  "runsToday": 5,
   "successfulRuns": 140,
   "failedRuns": 16,
   "averageDurationMs": 45000,
   "successRate": 89.7,
-  "topWorkflows": [...],
+  "totalCostUsd30d": 12.50,
+  "totalTokens30d": 250000,
+  "totalInputTokens": 180000,
+  "totalOutputTokens": 70000,
+  "topWorkflows": [
+    { "workflowId": "uuid", "workflowName": "Code Review", "runCount": 42 }
+  ],
   "recentRuns": [...],
   "timeSeries": [
-    { "date": "2025-01-15", "count": 8, "successRate": 87.5 }
-  ]
+    { "date": "2025-01-15", "count": 8, "successRate": 87.5, "failedCount": 1, "avgDurationMs": 32000, "totalCostUsd": 0.45, "totalTokens": 9500 }
+  ],
+  "providerStats": [
+    { "provider": "CLAUDE", "runCount": 150, "totalTokens": 240000, "totalCostUsd": 11.0, "successRate": 90.0 }
+  ],
+  "modelStats": [
+    { "model": "claude-sonnet-4-6", "stepCount": 200, "totalTokens": 180000, "totalCostUsd": 8.5 }
+  ],
+  "gateStatusSummary": [
+    { "status": "GREEN", "count": 10 }
+  ],
+  "failureReasons": [
+    { "reason": "timeout", "count": 3 }
+  ],
+  "costByWorkflow": [
+    { "workflowId": "uuid", "workflowName": "Code Review", "totalCostUsd": 5.0, "runCount": 42 }
+  ],
+  "blockTypeUsage": [
+    { "blockType": "simple", "stepCount": 100, "failedCount": 2, "failureRate": 2.0 }
+  ],
+  "triggerDistribution": {
+    "manual": 50, "scheduled": 80, "webhook": 10, "completionTrigger": 5, "todoTrigger": 11
+  }
 }
 ```
 
 ### `GET /api/v1/learning/platform-stats`
 
-Platform-wide statistics (projects, workflows, skills, schedules, chains, TODOs, wishes, assistant).
+Platform-wide statistics.
 
-**Response:** `PlatformStatsResponse`
+**Response:** `PlatformStatsResponse` with `activeProjects`, `archivedProjects`, `totalWorkflows`, `workflowPoolSize`, `totalSkills`, `builtinSkills`, `customSkills`, `topSkillsByUsage`, `totalTemplates`, `builtinTemplates`, `customTemplates`, `activeSchedules`, `totalSchedules`, `activeWebhooks`, `totalWebhooks`, `chainStats`, `activeTodoTriggers`, `activeCompletionTriggers`, `activeMemoryEntries`, `todoStats`, `wishStats`, `assistantStats`
 
 ### `GET /api/v1/learning/workflows/{workflowId}/stats`
 
@@ -1944,9 +2082,13 @@ Create a new chain.
   "entries": [
     { "workflowId": "uuid", "sortOrder": 0, "inputContext": {}, "stopOnFailure": true }
   ],
-  "stopOnFailure": true
+  "stopOnFailure": true,
+  "runCount": 0,
+  "metadata": {}
 }
 ```
+
+`ChainEntryResponse` additionally contains: `workflowName`, `projectName`, `label`.
 
 **Response:** `201` with `ChainResponse`
 
@@ -2018,11 +2160,11 @@ List all chain templates.
 [
   {
     "id": "template-id",
-    "name": "CI/CD Pipeline",
-    "description": "Build, Test, Deploy Chain",
+    "name": {"de": "CI/CD Pipeline", "en": "CI/CD Pipeline"},
+    "description": {"de": "Build, Test, Deploy Chain", "en": "Build, Test, Deploy Chain"},
     "icon": "🔄",
     "entries": [
-      { "templateId": "workflow-template-id", "label": "Build" }
+      { "templateId": "workflow-template-id", "label": {"de": "Build", "en": "Build"} }
     ]
   }
 ]
@@ -2095,16 +2237,41 @@ Create a new TODO.
 {
   "title": "Short imperative title",
   "description": "Markdown with context",
+  "status": "OPEN",
   "priority": "HIGH",
   "tags": ["backend", "bug"],
   "projectId": "uuid",
+  "linkedWorkflowId": null,
   "source": "AI",
   "sourceAgent": "claude-code",
-  "sessionId": "shell-session-id"
+  "sessionId": "shell-session-id",
+  "workflowRunId": null,
+  "referenceType": null,
+  "referenceId": null,
+  "dueDate": null
 }
 ```
 
+| Field | Type | Required |
+|---|---|---|
+| `title` | String | Yes |
+| `description` | String | No |
+| `status` | Enum | No (default: `OPEN`) |
+| `priority` | Enum | No |
+| `tags` | String[] | No |
+| `projectId` | String | No |
+| `linkedWorkflowId` | String | No |
+| `source` | Enum | No |
+| `sourceAgent` | String | No |
+| `sessionId` | String | No |
+| `workflowRunId` | String | No |
+| `referenceType` | String | No |
+| `referenceId` | String | No |
+| `dueDate` | Instant | No |
+
 **Response:** `201` with `TodoResponse`
+
+**TodoResponse Fields:** `id`, `title`, `description`, `status`, `priority`, `tags`, `projectId`, `projectName`, `linkedWorkflowId`, `linkedWorkflowName`, `source`, `sourceAgent`, `sessionId`, `workflowRunId`, `referenceType`, `referenceId`, `exportedProvider`, `exportedRef`, `exportedUrl`, `fixAttempts`, `lastFixRunId`, `resolutionState` (`IDLE`, `RUNNING`, `FAILED`, `SUCCEEDED`), `dueDate`, `createdAt`, `updatedAt`
 
 ### `GET /api/v1/todos/{id}`
 
@@ -2170,7 +2337,7 @@ Count TODOs by status.
 
 TODO overview with project rollups and "Needs You" items.
 
-**Response:** `TodoOverviewResponse`
+**Response:** `TodoOverviewResponse` with `projects` (List), `needsYou` (List), `generatedAt`, `staleThresholdDays`
 
 ### `POST /api/v1/todos/bulk-status`
 
@@ -2228,6 +2395,8 @@ Extract knowledge from runs.
 
 **Response:** `201` with `WorkflowMemoryResponse`
 
+**WorkflowMemoryResponse Fields:** `id`, `workflowId`, `title`, `content`, `tags`, `sourceRunIds`, `provider`, `active`, `createdAt`
+
 ### `PUT /api/v1/workflows/{workflowId}/memory/{memoryId}`
 
 Update a memory entry.
@@ -2238,7 +2407,7 @@ Update a memory entry.
 
 ### `PUT /api/v1/workflows/{workflowId}/memory/{memoryId}/activate`
 
-Activate a memory entry (injected into subsequent runs).
+Activate a memory entry (will be injected into subsequent runs).
 
 **Response:** `204 No Content`
 
@@ -2256,7 +2425,7 @@ Delete a memory entry.
 
 List activity log (paginated, filterable).
 
-**Query Parameters:** `page`, `size`, `level` (`INFO`, `WARN`, `ERROR`, `DEBUG`), `category` (`SYSTEM`, `EXECUTION`, `SCHEDULE`, `WEBHOOK`, `SECURITY`, `CONTAINER`, `PLUGIN`), `workflowId`
+**Query Parameters:** `page` (default: 0), `size` (default: 50), `level` (`DEBUG`, `INFO`, `WARN`, `ERROR`), `category` (`SYSTEM`, `EXECUTION`, `SCHEDULE`, `WEBHOOK`, `SECURITY`, `CONTAINER`, `PLUGIN`), `workflowId`
 
 **Response:** `PageResponse<ActivityLogResponse>`
 
@@ -2270,12 +2439,14 @@ Create a new activity log entry.
 {
   "level": "INFO",
   "message": "Manual entry",
-  "source": "manual",
+  "source": "plugin",
   "referenceId": null,
   "workflowId": null,
   "metadata": {}
 }
 ```
+
+**ActivityLogResponse Fields:** `id`, `timestamp`, `level`, `category`, `message`, `source`, `referenceId`, `workflowId`, `metadata`, `createdAt`
 
 **Response:** `201` with `ActivityLogResponse`
 
@@ -2299,10 +2470,15 @@ Send a chat message to the AI assistant.
   "context": {
     "page": "workflows",
     "entityId": "workflow-uuid",
-    "projectId": "project-uuid"
+    "projectId": "project-uuid",
+    "workflowId": "workflow-uuid",
+    "runId": null,
+    "pathname": "/workflows/workflow-uuid"
   },
   "provider": "CLAUDE",
-  "sessionId": "session-uuid"
+  "language": "de",
+  "sessionId": "session-uuid",
+  "requestId": "request-uuid"
 }
 ```
 
@@ -2312,7 +2488,9 @@ Send a chat message to the AI assistant.
 | `history` | MessageEntry[] | No |
 | `context` | PageContext | No |
 | `provider` | String | No |
+| `language` | String | No |
 | `sessionId` | String | No |
+| `requestId` | String | No |
 
 **Response:** `AssistantChatResponse`
 
@@ -2324,26 +2502,40 @@ Send a chat message to the AI assistant.
       "type": "run_workflow",
       "id": "workflow-uuid",
       "name": "Code Review",
-      "label": "Start workflow"
+      "label": "Start workflow",
+      "options": null,
+      "payload": null
     }
   ],
-  "model": "claude-sonnet-4-6"
+  "model": "claude-sonnet-4-6",
+  "provider": "CLAUDE",
+  "responseTimeMs": 1234,
+  "pendingTools": [
+    {
+      "id": "tool-uuid",
+      "type": "create_todo",
+      "description": "Create TODO: Add unit tests",
+      "expiresAt": "2025-01-15T10:30:00Z"
+    }
+  ]
 }
 ```
 
-Action types: `run_workflow`, `show_workflow`, `start_wish`, `show_run`, `ask_choice`
+**Navigation Types:** `run_workflow`, `show_workflow`, `start_wish`, `show_run`, `ask_choice`
+
+**Mutating Proposal Types** (handled server-side as `PendingTool` with confirm/reject UI): `propose_create_todo`, `propose_cancel_run`, `propose_rerun_workflow`, `propose_update_todo_status`
 
 ### `GET /api/v1/assistant/sessions`
 
 List all chat sessions.
 
-**Response:** `AssistantSessionSummary[]`
+**Response:** `AssistantSessionSummary[]` with `id`, `preview`, `page`, `messageCount`, `startedAt`
 
 ### `GET /api/v1/assistant/sessions/{id}`
 
 Retrieve a single chat session with messages.
 
-**Response:** `AssistantSessionDetail`
+**Response:** `AssistantSessionDetail` with `id`, `preview`, `page`, `entityId`, `messages`, `messageCount`, `startedAt`, `endedAt`
 
 ### `DELETE /api/v1/assistant/sessions/{id}`
 
@@ -2353,7 +2545,7 @@ Delete a chat session.
 
 ### `POST /api/v1/assistant/pending-tools/{id}/confirm`
 
-Confirm a pending tool call (e.g. workflow start by assistant).
+Confirm a pending tool call (e.g. workflow start by the assistant).
 
 **Request (optional):**
 
@@ -2381,7 +2573,7 @@ Reject a pending tool call.
 
 ### `GET /api/v1/assistant/suggestions`
 
-Retrieve context-based suggestions for a page.
+Retrieve context-related suggestions for a page.
 
 **Query Parameters:** `page` (String, required)
 
@@ -2470,7 +2662,7 @@ Create a workflow from a suggestion.
 
 Status of the stable environment.
 
-**Response:** `StagingStatusResponse` (incl. `stableVersion`, `stableBuildTimestamp`, health status)
+**Response:** `StagingStatusResponse` with `containerRunning`, `healthy`, `promotePhase`, `promoteStep`, `promoteTotalSteps`, `lastSnapshot`, `error`, `stableVersion`, `stableBuildTimestamp`
 
 ### `POST /api/v1/staging/start`
 
@@ -2500,15 +2692,26 @@ Cancel an ongoing promote operation.
 
 Preview of sync operations (what would be transferred from dev to stable?).
 
-**Response:** `SyncPreview`
+**Response:** `SyncPreview` with `projects`, `workflows`, `skills`, `chains` (each a list of `SyncPreviewItem`)
 
 ### `POST /api/v1/staging/sync-definitions`
 
-Transfer definitions from dev to stable (projects, workflows, skills).
+Transfer definitions from dev to stable (projects, workflows, skills, chains).
 
-**Request (optional):** `SyncDefinitionsRequest` with optional filters
+**Request (optional):**
 
-**Response:** `SyncResult`
+```json
+{
+  "projectIds": ["uuid"],
+  "workflowIds": ["uuid"],
+  "skillIds": ["uuid"],
+  "chainIds": ["uuid"]
+}
+```
+
+All fields are optional; without filters, all definitions are synchronized.
+
+**Response:** `SyncResult` with `projectsSynced`, `workflowsSynced`, `skillsSynced`, `chainsSynced`, `skipped`, `errors`, `preSyncBackup`
 
 ---
 
@@ -2518,7 +2721,7 @@ Transfer definitions from dev to stable (projects, workflows, skills).
 
 Status of the test instance (port 8090).
 
-**Response:** `TestingStatusResponse`
+**Response:** `TestingStatusResponse` with `containerRunning`, `healthy`, `testVersion`, `testBuildTimestamp`
 
 ### `POST /api/v1/testing/start`
 
@@ -2546,7 +2749,7 @@ Preview of sync operations (dev → test).
 
 ### `POST /api/v1/testing/sync-definitions`
 
-Transfer definitions from dev to test.
+Transfer definitions from dev to test. Request format same as `POST /api/v1/staging/sync-definitions`.
 
 **Response:** `SyncResult`
 
@@ -2613,9 +2816,17 @@ Install a pool workflow into a project.
 
 ```json
 {
-  "projectId": "uuid"
+  "projectId": "uuid",
+  "name": "Optional Name",
+  "forceCreate": false
 }
 ```
+
+| Field | Type | Required |
+|---|---|---|
+| `projectId` | String | Yes |
+| `name` | String | No |
+| `forceCreate` | Boolean | No |
 
 **Response:** `{ "workflowId": "uuid", "workflowName": "...", "created": true }`
 
@@ -2689,7 +2900,7 @@ Full factory pipeline: Generate → Test Instance → Verify → optionally Prom
 
 **Request:** `WorkflowFactoryRequest` (as above)
 
-**Response:** `WorkflowFactoryResult`
+**Response:** `WorkflowFactoryResult` with `workflowId`, `workflowName`, `status`, `testRunId`, `testStatus`, `testError`, `promotedAsTemplate`, `durationMs`, `retryErrors`
 
 ### `POST /api/v1/factory/verify/{id}`
 
@@ -2737,6 +2948,10 @@ Create a new wish and fulfill it asynchronously.
 | `autoRefine` | boolean | No (default: `false`) |
 
 **Response:** `201` with `WishResponse`
+
+**WishResponse Fields:** `id`, `originalText`, `status`, `projectId`, `projectName`, `decomposition`, `generatedWorkflowIds`, `generatedWorkflowNames`, `referenceWorkflowIds`, `referenceWorkflowNames`, `generatedChainId`, `iterationCount`, `maxIterations`, `currentRunId`, `resultSummary`, `error`, `iterationHistory`, `metadata`, `autoRefine`, `createdAt`, `updatedAt`
+
+**WishStatus Values:** `RECEIVED`, `DECOMPOSING`, `AWAITING_DECOMPOSE_APPROVAL`, `EXECUTING`, `EVALUATING`, `REFINING`, `AWAITING_CLARIFICATION`, `AWAITING_APPROVAL`, `COMPLETED`, `FAILED`, `CANCELLED`
 
 ### `GET /api/v1/wishes/{id}`
 
@@ -2802,6 +3017,109 @@ Retrieve the content of a documentation file (`.md` files only).
 
 ---
 
+## Search
+
+### `GET /api/v1/search`
+
+Aggregated search across workflows (substring/fuzzy ranking).
+
+**Query Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `q` | String | Search term |
+| `types` | String | Types to search (default: `"workflow"`) |
+| `limit` | int | Max results (default: 20, max: 50) |
+
+**Response:**
+
+```json
+{
+  "workflows": [...]
+}
+```
+
+### `POST /api/v1/search/workflows/semantic`
+
+Semantic workflow search via AI model. Returns `204 No Content` when semantic search is not enabled.
+
+**Request:**
+
+```json
+{
+  "query": "Check code quality",
+  "limit": 5
+}
+```
+
+**Response:** `SemanticSearchResult[]` with `workflowId`, `workflowName`, `reason`, `score`
+
+---
+
+## Reports
+
+### `GET /api/v1/reports`
+
+List available report files (`.md` files in the configured reports directory, sorted by date descending).
+
+**Response:** `Array<{ "name": "report-2025-01.md", "label": "Report 2025 01" }>`
+
+### `GET /api/v1/reports/{name}`
+
+Retrieve the content of a report file (`.md` files only, path traversal protection).
+
+**Response:** `{ "content": "# Report\n..." }`
+
+---
+
+## Dead Letter Queue
+
+Failed workflow runs are automatically captured in the DLQ and can be managed there.
+
+### `GET /api/v1/dlq`
+
+List DLQ entries (paginated).
+
+**Query Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `status` | String | Filter: `OPEN`, `RETRIED`, `DISCARDED` |
+| `page` | int | Page (default: 0) |
+| `size` | int | Entries per page (default: 20) |
+
+**Response:** `Page<DeadLetterEntry>` with `id`, `workflowRunId`, `workflowId`, `workflowName`, `errorMessage`, `failedStepIndex`, `retryCount`, `lastFailureAt`, `status`, `createdAt`, `updatedAt`
+
+### `GET /api/v1/dlq/{id}`
+
+Retrieve a single DLQ entry.
+
+**Response:** `DeadLetterEntry`
+
+### `POST /api/v1/dlq/{id}/retry`
+
+Retry a DLQ entry (starts a fresh workflow execution with the original input context).
+
+**Response:** `DeadLetterEntry` (status changes to `RETRIED`)
+
+### `DELETE /api/v1/dlq/{id}`
+
+Discard a DLQ entry.
+
+**Response:** `204 No Content`
+
+---
+
+## Debug
+
+### `GET /api/v1/debug/failed-workflows`
+
+Workflows whose last run failed (`FAILED` / `COMPLETED_WITH_ERRORS`), sorted by last error descending.
+
+**Response:** `BrokenWorkflowResponse[]`
+
+---
+
 ## WebSocket
 
 ### Connection
@@ -2837,7 +3155,7 @@ Level: `INFO`, `WARN`, `ERROR`, `DEBUG`
 ### Terminal WebSocket
 
 ```
-Endpoint: ws://localhost:9090/ws/terminal
+Endpoint: ws://localhost:9090/ws/terminal/{runId}?apiKey=...
 ```
 
-For real-time container access (interactive shell).
+For real-time container access (interactive shell). Raw WebSocket (no SockJS/STOMP). Max 3 sessions per container. Authentication via `apiKey` query parameter.

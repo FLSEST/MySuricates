@@ -213,17 +213,34 @@ Alle Workflows auflisten.
   {
     "id": "uuid",
     "projectId": "uuid",
+    "projectName": "Mein Projekt",
+    "projectSubtitle": null,
+    "projectDescription": null,
     "name": "Code Review",
     "description": "Automatisiertes Code Review",
     "icon": "🔍",
     "blocks": [
-      { "type": "simple", "config": { "prompt": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
+      { "type": "simple", "config": { "command": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
     ],
     "version": "1.0.0",
     "metadata": {},
-    "activatedSkills": [],
+    "activatedSkillIds": [],
+    "activatedSkillNames": [],
+    "runCount": 0,
+    "instructions": null,
+    "model": null,
+    "provider": null,
+    "templateId": null,
+    "defaultContext": {},
+    "testStatus": "UNTESTED",
+    "lastTestedAt": null,
+    "tags": [],
+    "category": null,
+    "tagsGeneratedAt": null,
+    "tagsUserEdited": false,
     "createdAt": "2025-01-15T10:00:00Z",
-    "updatedAt": "2025-01-15T10:00:00Z"
+    "updatedAt": "2025-01-15T10:00:00Z",
+    "stableSyncedAt": null
   }
 ]
 ```
@@ -241,7 +258,7 @@ Neuen Workflow erstellen.
   "description": "Automatisiertes Code Review",
   "icon": "🔍",
   "blocks": [
-    { "type": "simple", "config": { "prompt": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
+    { "type": "simple", "config": { "command": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
   ],
   "activatedSkillIds": ["skill-uuid-1"]
 }
@@ -316,7 +333,7 @@ Workflow als portables JSON exportieren (ohne IDs, ohne Projekt-Zuordnung).
   "description": "Automatisiertes Code Review",
   "icon": "🔍",
   "blocks": [
-    { "type": "simple", "config": { "prompt": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
+    { "type": "simple", "config": { "command": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
   ],
   "instructions": null,
   "model": null,
@@ -338,7 +355,7 @@ Workflow aus JSON importieren (exportiertes Format + Zielprojekt).
   "description": "Automatisiertes Code Review",
   "icon": "🔍",
   "blocks": [
-    { "type": "simple", "config": { "prompt": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
+    { "type": "simple", "config": { "command": "Review code" }, "requiredCapabilities": [], "skillIds": [] }
   ],
   "instructions": null,
   "model": null,
@@ -410,6 +427,9 @@ Workflow ausführen.
 {
   "id": "run-uuid",
   "workflowId": "workflow-uuid",
+  "workflowName": "Code Review",
+  "projectName": "Mein Projekt",
+  "projectPath": "/workspace/projekt",
   "status": "RUNNING",
   "steps": [],
   "startedAt": "2025-01-15T10:00:00Z",
@@ -417,7 +437,9 @@ Workflow ausführen.
   "durationMs": null,
   "userRating": null,
   "error": {},
-  "metadata": {}
+  "metadata": {},
+  "inputContext": {},
+  "triggeredByScheduleId": null
 }
 ```
 
@@ -475,6 +497,46 @@ Skill von einem Workflow deaktivieren.
 
 **Response:** `WorkflowResponse`
 
+### `GET /api/v1/workflows/{id}/versions`
+
+Alle Versionen eines Workflows auflisten (paginiert).
+
+**Query-Parameter:** `page` (Standard: 0), `size` (Standard: 20)
+
+**Response:** `PageResponse<WorkflowVersionResponse>`
+
+```json
+{
+  "content": [
+    {
+      "id": "version-uuid",
+      "workflowId": "workflow-uuid",
+      "versionNumber": 3,
+      "snapshot": { ... },
+      "changeSource": "USER",
+      "changeMessage": "Prompt angepasst",
+      "createdAt": "2025-01-15T10:00:00Z"
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 3,
+  "totalPages": 1
+}
+```
+
+### `GET /api/v1/workflows/{id}/versions/{versionId}`
+
+Einzelne Version abrufen.
+
+**Response:** `WorkflowVersionResponse`
+
+### `POST /api/v1/workflows/{id}/versions/{versionId}/restore`
+
+Workflow auf eine frühere Version zurücksetzen.
+
+**Response:** `WorkflowResponse`
+
 ---
 
 ## Workflow Templates
@@ -500,11 +562,16 @@ Alle Workflow-Templates auflisten (sortiert nach `sortOrder`).
     "model": null,
     "builtIn": true,
     "sortOrder": 0,
+    "qualityStatus": null,
+    "verifications": [],
+    "version": "1.0.0",
     "createdAt": "2025-01-15T10:00:00Z",
     "updatedAt": "2025-01-15T10:00:00Z"
   }
 ]
 ```
+
+`verifications` enthält pro Projekt, in dem das Template verifiziert wurde, ein Objekt mit `projectId`, `projectName`, `lastRunId`, `verifiedAt`.
 
 ### `GET /api/v1/workflow-templates/{id}`
 
@@ -862,6 +929,8 @@ Alle Schedules auflisten.
     "targetType": "WORKFLOW",
     "cronExpression": "0 0 2 * * ?",
     "scheduleType": "CRON",
+    "scheduledAt": null,
+    "delayExpression": null,
     "enabled": true,
     "description": "Nächtlicher Build",
     "inputContext": {},
@@ -1196,6 +1265,8 @@ Neuen Completion-Trigger erstellen.
 
 **Response:** `201` mit `CompletionTriggerResponse`
 
+**CompletionTriggerResponse-Felder:** `id`, `sourceWorkflowId`, `sourceWorkflowName`, `targetWorkflowId`, `targetWorkflowName`, `enabled`, `triggerOnSuccess`, `triggerOnFailure`, `triggerAlways`, `description`, `contextVariables`, `lastTriggeredAt`, `triggerCount`, `createdAt`
+
 ### `POST /api/v1/completion-triggers/{id}/enable`
 
 Trigger aktivieren.
@@ -1234,11 +1305,15 @@ Liste aller Provider mit Verbindungsstatus, Actions und Account-Info.
     "description": "...",
     "status": "CONNECTED",
     "configured": true,
+    "requiresCredentials": true,
     "accountEmail": "user@gmail.com",
     "accountName": "Max Mustermann",
-    "connectedAt": "2026-04-01T10:00:00Z",
+    "connectedSince": "2026-04-01T10:00:00Z",
     "scopes": "https://www.googleapis.com/auth/calendar",
-    "optionalScopes": [],
+    "optionalScopes": [
+      { "scope": "https://www.googleapis.com/auth/calendar.events", "label": "Events verwalten", "granted": true }
+    ],
+    "supportsTaskExport": false,
     "actions": [
       { "name": "list_events", "description": "...", "inputSchema": {...}, "available": true }
     ]
@@ -1273,6 +1348,8 @@ Client-Credentials (Client ID + Secret) speichern. Werden AES-256-GCM-verschlüs
 ```json
 { "clientId": "...", "clientSecret": "..." }
 ```
+
+**Response:** `IntegrationProviderResponse`
 
 ### `DELETE /api/v1/integrations/{providerId}/connection`
 
@@ -1386,6 +1463,8 @@ Neues Profil erstellen.
 
 **Response:** `201` mit `OnboardingProfileResponse`
 
+**OnboardingProfileResponse-Felder:** `id`, `key`, `name`, `description`, `content`, `type`, `builtIn`, `sortOrder`, `version`, `historyCount`, `createdAt`, `updatedAt`
+
 ### `PUT /api/v1/onboarding-profiles/{id}`
 
 Profil-Content aktualisieren (erstellt automatisch einen History-Eintrag).
@@ -1468,6 +1547,8 @@ Neuen Todo-Trigger erstellen.
 | `contextTemplate` | Nein | Statische Context-Variablen, gemerged mit TODO-Daten |
 
 **Response:** `201` mit `TodoTriggerResponse`
+
+**TodoTriggerResponse-Felder:** `id`, `tagPattern`, `projectId`, `sourceFilter`, `minPriority`, `targetWorkflowId`, `targetWorkflowName`, `contextTemplate`, `enabled`, `maxAttempts`, `autoClose`, `processBacklog`, `description`, `lastTriggeredAt`, `triggerCount`, `createdAt`
 
 **Context-Variablen** die der Fix-Workflow automatisch erhält:
 
@@ -1558,6 +1639,8 @@ Neue Benachrichtigungs-Konfiguration erstellen.
 | `messageTemplate` | String | Nein | Unterstützt `{{workflow_name}}`, `{{status}}`, `{{duration}}`, `{{error_message}}` |
 
 **Response:** `201` mit `NotificationConfigResponse`
+
+**NotificationConfigResponse-Felder:** `id`, `name`, `enabled`, `channelType`, `webhookUrl`, `workflowId`, `triggerOnSuccess`, `triggerOnFailure`, `triggerAlways`, `messageTemplate`, `createdAt`
 
 ### `POST /api/v1/notifications/{id}/enable`
 
@@ -1751,7 +1834,34 @@ Anwendungs-Einstellung setzen.
 
 ### `GET /api/v1/system/execution-config`
 
-Aktuelle Execution-Konfiguration abrufen (Timeouts, Token-Limits etc.).
+Aktuelle Execution-Konfiguration abrufen (Timeouts, Token-Limits etc.). Enthält zusätzlich ein read-only-Feld `activeRuns` mit der Anzahl aktiver Runs.
+
+**Erlaubte Keys:**
+
+| Key | Bereich |
+|---|---|
+| `execution-max-concurrent` | 1–50 |
+| `claude-max-concurrent-calls` | 1–20 |
+| `claude-reserved-for-interactive` | 0–10 |
+| `claude-timeout-seconds` | 30–3600 |
+| `claude-inter-call-delay-ms` | 0–30000 |
+| `chain-workflow-timeout-minutes` | 5–1440 |
+| `rate-limit-enabled` | 0–1 |
+| `rate-limit-requests-per-minute` | 10–10000 |
+| `assistant-chat-timeout-seconds` | 30–900 |
+| `task-command-timeout-seconds` | 10–3600 |
+| `allow-extra-mounts` | 0–1 |
+| `todo-hygiene-enabled` | 0–1 |
+| `todo-stale-days` | 7–365 |
+| `todo-hygiene-max-per-run` | 10–2000 |
+| `scheduler-catch-up-on-resume` | 0–1 |
+| `scheduler-resume-grace-minutes` | 1–60 |
+| `summarization-timeout-seconds` | 30–600 |
+| `factory-timeout-seconds` | 60–3600 |
+| `wish-total-timeout-minutes` | 5–1440 |
+| `wish-workflow-wait-minutes` | 1–120 |
+| `wish-default-shell-timeout-seconds` | 30–3600 |
+| `wish-default-agentic-total-timeout-seconds` | 60–86400 |
 
 **Response:** `Map<String, Object>` mit aktuellen Einstellungen
 
@@ -1759,7 +1869,7 @@ Aktuelle Execution-Konfiguration abrufen (Timeouts, Token-Limits etc.).
 
 Execution-Konfiguration aktualisieren.
 
-**Request:** `Map<String, String>` mit den zu ändernden Einstellungen
+**Request:** `Map<String, String>` mit den zu ändernden Einstellungen (Keys wie oben, auch in camelCase erlaubt)
 
 **Response:** `Map<String, Object>` mit aktualisierten Einstellungen
 
@@ -1827,23 +1937,51 @@ Dashboard-Daten mit Statistiken.
 {
   "totalWorkflows": 12,
   "totalRuns": 156,
+  "runsToday": 5,
   "successfulRuns": 140,
   "failedRuns": 16,
   "averageDurationMs": 45000,
   "successRate": 89.7,
-  "topWorkflows": [...],
+  "totalCostUsd30d": 12.50,
+  "totalTokens30d": 250000,
+  "totalInputTokens": 180000,
+  "totalOutputTokens": 70000,
+  "topWorkflows": [
+    { "workflowId": "uuid", "workflowName": "Code Review", "runCount": 42 }
+  ],
   "recentRuns": [...],
   "timeSeries": [
-    { "date": "2025-01-15", "count": 8, "successRate": 87.5 }
-  ]
+    { "date": "2025-01-15", "count": 8, "successRate": 87.5, "failedCount": 1, "avgDurationMs": 32000, "totalCostUsd": 0.45, "totalTokens": 9500 }
+  ],
+  "providerStats": [
+    { "provider": "CLAUDE", "runCount": 150, "totalTokens": 240000, "totalCostUsd": 11.0, "successRate": 90.0 }
+  ],
+  "modelStats": [
+    { "model": "claude-sonnet-4-6", "stepCount": 200, "totalTokens": 180000, "totalCostUsd": 8.5 }
+  ],
+  "gateStatusSummary": [
+    { "status": "GREEN", "count": 10 }
+  ],
+  "failureReasons": [
+    { "reason": "timeout", "count": 3 }
+  ],
+  "costByWorkflow": [
+    { "workflowId": "uuid", "workflowName": "Code Review", "totalCostUsd": 5.0, "runCount": 42 }
+  ],
+  "blockTypeUsage": [
+    { "blockType": "simple", "stepCount": 100, "failedCount": 2, "failureRate": 2.0 }
+  ],
+  "triggerDistribution": {
+    "manual": 50, "scheduled": 80, "webhook": 10, "completionTrigger": 5, "todoTrigger": 11
+  }
 }
 ```
 
 ### `GET /api/v1/learning/platform-stats`
 
-Plattform-weite Statistiken (Projekte, Workflows, Skills, Schedules, Chains, TODOs, Wishes, Assistent).
+Plattform-weite Statistiken.
 
-**Response:** `PlatformStatsResponse`
+**Response:** `PlatformStatsResponse` mit `activeProjects`, `archivedProjects`, `totalWorkflows`, `workflowPoolSize`, `totalSkills`, `builtinSkills`, `customSkills`, `topSkillsByUsage`, `totalTemplates`, `builtinTemplates`, `customTemplates`, `activeSchedules`, `totalSchedules`, `activeWebhooks`, `totalWebhooks`, `chainStats`, `activeTodoTriggers`, `activeCompletionTriggers`, `activeMemoryEntries`, `todoStats`, `wishStats`, `assistantStats`
 
 ### `GET /api/v1/learning/workflows/{workflowId}/stats`
 
@@ -1944,9 +2082,13 @@ Neue Chain erstellen.
   "entries": [
     { "workflowId": "uuid", "sortOrder": 0, "inputContext": {}, "stopOnFailure": true }
   ],
-  "stopOnFailure": true
+  "stopOnFailure": true,
+  "runCount": 0,
+  "metadata": {}
 }
 ```
+
+`ChainEntryResponse` enthält zusätzlich: `workflowName`, `projectName`, `label`.
 
 **Response:** `201` mit `ChainResponse`
 
@@ -2018,11 +2160,11 @@ Alle Chain-Templates auflisten.
 [
   {
     "id": "template-id",
-    "name": "CI/CD Pipeline",
-    "description": "Build, Test, Deploy Chain",
+    "name": {"de": "CI/CD Pipeline", "en": "CI/CD Pipeline"},
+    "description": {"de": "Build, Test, Deploy Chain", "en": "Build, Test, Deploy Chain"},
     "icon": "🔄",
     "entries": [
-      { "templateId": "workflow-template-id", "label": "Build" }
+      { "templateId": "workflow-template-id", "label": {"de": "Build", "en": "Build"} }
     ]
   }
 ]
@@ -2095,16 +2237,41 @@ Neues TODO erstellen.
 {
   "title": "Kurzer Titel im Imperativ",
   "description": "Markdown mit Kontext",
+  "status": "OPEN",
   "priority": "HIGH",
   "tags": ["backend", "bug"],
   "projectId": "uuid",
+  "linkedWorkflowId": null,
   "source": "AI",
   "sourceAgent": "claude-code",
-  "sessionId": "shell-session-id"
+  "sessionId": "shell-session-id",
+  "workflowRunId": null,
+  "referenceType": null,
+  "referenceId": null,
+  "dueDate": null
 }
 ```
 
+| Feld | Typ | Pflicht |
+|---|---|---|
+| `title` | String | Ja |
+| `description` | String | Nein |
+| `status` | Enum | Nein (Standard: `OPEN`) |
+| `priority` | Enum | Nein |
+| `tags` | String[] | Nein |
+| `projectId` | String | Nein |
+| `linkedWorkflowId` | String | Nein |
+| `source` | Enum | Nein |
+| `sourceAgent` | String | Nein |
+| `sessionId` | String | Nein |
+| `workflowRunId` | String | Nein |
+| `referenceType` | String | Nein |
+| `referenceId` | String | Nein |
+| `dueDate` | Instant | Nein |
+
 **Response:** `201` mit `TodoResponse`
+
+**TodoResponse-Felder:** `id`, `title`, `description`, `status`, `priority`, `tags`, `projectId`, `projectName`, `linkedWorkflowId`, `linkedWorkflowName`, `source`, `sourceAgent`, `sessionId`, `workflowRunId`, `referenceType`, `referenceId`, `exportedProvider`, `exportedRef`, `exportedUrl`, `fixAttempts`, `lastFixRunId`, `resolutionState` (`IDLE`, `RUNNING`, `FAILED`, `SUCCEEDED`), `dueDate`, `createdAt`, `updatedAt`
 
 ### `GET /api/v1/todos/{id}`
 
@@ -2170,7 +2337,7 @@ Anzahl TODOs nach Status.
 
 TODO-Übersicht mit Projekt-Rollups und "Needs You"-Items.
 
-**Response:** `TodoOverviewResponse`
+**Response:** `TodoOverviewResponse` mit `projects` (List), `needsYou` (List), `generatedAt`, `staleThresholdDays`
 
 ### `POST /api/v1/todos/bulk-status`
 
@@ -2228,6 +2395,8 @@ Wissen aus Runs extrahieren.
 
 **Response:** `201` mit `WorkflowMemoryResponse`
 
+**WorkflowMemoryResponse-Felder:** `id`, `workflowId`, `title`, `content`, `tags`, `sourceRunIds`, `provider`, `active`, `createdAt`
+
 ### `PUT /api/v1/workflows/{workflowId}/memory/{memoryId}`
 
 Memory-Eintrag aktualisieren.
@@ -2256,7 +2425,7 @@ Memory-Eintrag löschen.
 
 Activity-Log auflisten (paginiert, filterbar).
 
-**Query-Parameter:** `page`, `size`, `level` (`INFO`, `WARN`, `ERROR`, `DEBUG`), `category` (`SYSTEM`, `EXECUTION`, `SCHEDULE`, `WEBHOOK`, `SECURITY`, `CONTAINER`, `PLUGIN`), `workflowId`
+**Query-Parameter:** `page` (Standard: 0), `size` (Standard: 50), `level` (`DEBUG`, `INFO`, `WARN`, `ERROR`), `category` (`SYSTEM`, `EXECUTION`, `SCHEDULE`, `WEBHOOK`, `SECURITY`, `CONTAINER`, `PLUGIN`), `workflowId`
 
 **Response:** `PageResponse<ActivityLogResponse>`
 
@@ -2270,12 +2439,14 @@ Neuen Activity-Log-Eintrag erstellen.
 {
   "level": "INFO",
   "message": "Manueller Eintrag",
-  "source": "manual",
+  "source": "plugin",
   "referenceId": null,
   "workflowId": null,
   "metadata": {}
 }
 ```
+
+**ActivityLogResponse-Felder:** `id`, `timestamp`, `level`, `category`, `message`, `source`, `referenceId`, `workflowId`, `metadata`, `createdAt`
 
 **Response:** `201` mit `ActivityLogResponse`
 
@@ -2299,10 +2470,15 @@ Chat-Nachricht an den KI-Assistenten senden.
   "context": {
     "page": "workflows",
     "entityId": "workflow-uuid",
-    "projectId": "project-uuid"
+    "projectId": "project-uuid",
+    "workflowId": "workflow-uuid",
+    "runId": null,
+    "pathname": "/workflows/workflow-uuid"
   },
   "provider": "CLAUDE",
-  "sessionId": "session-uuid"
+  "language": "de",
+  "sessionId": "session-uuid",
+  "requestId": "request-uuid"
 }
 ```
 
@@ -2312,7 +2488,9 @@ Chat-Nachricht an den KI-Assistenten senden.
 | `history` | MessageEntry[] | Nein |
 | `context` | PageContext | Nein |
 | `provider` | String | Nein |
+| `language` | String | Nein |
 | `sessionId` | String | Nein |
+| `requestId` | String | Nein |
 
 **Response:** `AssistantChatResponse`
 
@@ -2324,26 +2502,40 @@ Chat-Nachricht an den KI-Assistenten senden.
       "type": "run_workflow",
       "id": "workflow-uuid",
       "name": "Code Review",
-      "label": "Workflow starten"
+      "label": "Workflow starten",
+      "options": null,
+      "payload": null
     }
   ],
-  "model": "claude-sonnet-4-6"
+  "model": "claude-sonnet-4-6",
+  "provider": "CLAUDE",
+  "responseTimeMs": 1234,
+  "pendingTools": [
+    {
+      "id": "tool-uuid",
+      "type": "create_todo",
+      "description": "TODO erstellen: Unit-Tests ergänzen",
+      "expiresAt": "2025-01-15T10:30:00Z"
+    }
+  ]
 }
 ```
 
-Action-Typen: `run_workflow`, `show_workflow`, `start_wish`, `show_run`, `ask_choice`
+**Navigations-Typen:** `run_workflow`, `show_workflow`, `start_wish`, `show_run`, `ask_choice`
+
+**Mutating-Proposal-Typen** (werden serverseitig als `PendingTool` mit Confirm/Reject-UI behandelt): `propose_create_todo`, `propose_cancel_run`, `propose_rerun_workflow`, `propose_update_todo_status`
 
 ### `GET /api/v1/assistant/sessions`
 
 Alle Chat-Sessions auflisten.
 
-**Response:** `AssistantSessionSummary[]`
+**Response:** `AssistantSessionSummary[]` mit `id`, `preview`, `page`, `messageCount`, `startedAt`
 
 ### `GET /api/v1/assistant/sessions/{id}`
 
 Einzelne Chat-Session mit Nachrichten abrufen.
 
-**Response:** `AssistantSessionDetail`
+**Response:** `AssistantSessionDetail` mit `id`, `preview`, `page`, `entityId`, `messages`, `messageCount`, `startedAt`, `endedAt`
 
 ### `DELETE /api/v1/assistant/sessions/{id}`
 
@@ -2470,7 +2662,7 @@ Workflow aus einer Suggestion erstellen.
 
 Status der Stable-Umgebung.
 
-**Response:** `StagingStatusResponse` (inkl. `stableVersion`, `stableBuildTimestamp`, Health-Status)
+**Response:** `StagingStatusResponse` mit `containerRunning`, `healthy`, `promotePhase`, `promoteStep`, `promoteTotalSteps`, `lastSnapshot`, `error`, `stableVersion`, `stableBuildTimestamp`
 
 ### `POST /api/v1/staging/start`
 
@@ -2500,15 +2692,26 @@ Laufenden Promote-Vorgang abbrechen.
 
 Vorschau der Sync-Operationen (was würde von Dev nach Stable übertragen?).
 
-**Response:** `SyncPreview`
+**Response:** `SyncPreview` mit `projects`, `workflows`, `skills`, `chains` (jeweils Liste von `SyncPreviewItem`)
 
 ### `POST /api/v1/staging/sync-definitions`
 
-Definitionen von Dev nach Stable übertragen (Projekte, Workflows, Skills).
+Definitionen von Dev nach Stable übertragen (Projekte, Workflows, Skills, Chains).
 
-**Request (optional):** `SyncDefinitionsRequest` mit optionalen Filtern
+**Request (optional):**
 
-**Response:** `SyncResult`
+```json
+{
+  "projectIds": ["uuid"],
+  "workflowIds": ["uuid"],
+  "skillIds": ["uuid"],
+  "chainIds": ["uuid"]
+}
+```
+
+Alle Felder optional; ohne Filter werden alle Definitionen synchronisiert.
+
+**Response:** `SyncResult` mit `projectsSynced`, `workflowsSynced`, `skillsSynced`, `chainsSynced`, `skipped`, `errors`, `preSyncBackup`
 
 ---
 
@@ -2518,7 +2721,7 @@ Definitionen von Dev nach Stable übertragen (Projekte, Workflows, Skills).
 
 Status der Test-Instanz (Port 8090).
 
-**Response:** `TestingStatusResponse`
+**Response:** `TestingStatusResponse` mit `containerRunning`, `healthy`, `testVersion`, `testBuildTimestamp`
 
 ### `POST /api/v1/testing/start`
 
@@ -2546,7 +2749,7 @@ Vorschau der Sync-Operationen (Dev → Test).
 
 ### `POST /api/v1/testing/sync-definitions`
 
-Definitionen von Dev nach Test übertragen.
+Definitionen von Dev nach Test übertragen. Request-Format wie bei `POST /api/v1/staging/sync-definitions`.
 
 **Response:** `SyncResult`
 
@@ -2613,9 +2816,17 @@ Pool-Workflow in ein Projekt installieren.
 
 ```json
 {
-  "projectId": "uuid"
+  "projectId": "uuid",
+  "name": "Optionaler Name",
+  "forceCreate": false
 }
 ```
+
+| Feld | Typ | Pflicht |
+|---|---|---|
+| `projectId` | String | Ja |
+| `name` | String | Nein |
+| `forceCreate` | Boolean | Nein |
 
 **Response:** `{ "workflowId": "uuid", "workflowName": "...", "created": true }`
 
@@ -2689,7 +2900,7 @@ Vollständige Factory-Pipeline: Generieren → Test-Instanz → Verifizieren →
 
 **Request:** `WorkflowFactoryRequest` (wie oben)
 
-**Response:** `WorkflowFactoryResult`
+**Response:** `WorkflowFactoryResult` mit `workflowId`, `workflowName`, `status`, `testRunId`, `testStatus`, `testError`, `promotedAsTemplate`, `durationMs`, `retryErrors`
 
 ### `POST /api/v1/factory/verify/{id}`
 
@@ -2737,6 +2948,10 @@ Neuen Wunsch erstellen und asynchron erfüllen.
 | `autoRefine` | boolean | Nein (Standard: `false`) |
 
 **Response:** `201` mit `WishResponse`
+
+**WishResponse-Felder:** `id`, `originalText`, `status`, `projectId`, `projectName`, `decomposition`, `generatedWorkflowIds`, `generatedWorkflowNames`, `referenceWorkflowIds`, `referenceWorkflowNames`, `generatedChainId`, `iterationCount`, `maxIterations`, `currentRunId`, `resultSummary`, `error`, `iterationHistory`, `metadata`, `autoRefine`, `createdAt`, `updatedAt`
+
+**WishStatus-Werte:** `RECEIVED`, `DECOMPOSING`, `AWAITING_DECOMPOSE_APPROVAL`, `EXECUTING`, `EVALUATING`, `REFINING`, `AWAITING_CLARIFICATION`, `AWAITING_APPROVAL`, `COMPLETED`, `FAILED`, `CANCELLED`
 
 ### `GET /api/v1/wishes/{id}`
 
@@ -2802,6 +3017,109 @@ Inhalt einer Dokumentationsdatei abrufen (nur `.md`-Dateien).
 
 ---
 
+## Search
+
+### `GET /api/v1/search`
+
+Aggregierte Suche über Workflows (Substring/Fuzzy-Ranking).
+
+**Query-Parameter:**
+
+| Parameter | Typ | Beschreibung |
+|---|---|---|
+| `q` | String | Suchbegriff |
+| `types` | String | Zu durchsuchende Typen (Standard: `"workflow"`) |
+| `limit` | int | Max. Ergebnisse (Standard: 20, Max: 50) |
+
+**Response:**
+
+```json
+{
+  "workflows": [...]
+}
+```
+
+### `POST /api/v1/search/workflows/semantic`
+
+Semantische Workflow-Suche via KI-Modell. Gibt `204 No Content` zurück wenn semantische Suche nicht aktiviert ist.
+
+**Request:**
+
+```json
+{
+  "query": "Code-Qualität prüfen",
+  "limit": 5
+}
+```
+
+**Response:** `SemanticSearchResult[]` mit `workflowId`, `workflowName`, `reason`, `score`
+
+---
+
+## Reports
+
+### `GET /api/v1/reports`
+
+Verfügbare Report-Dateien auflisten (`.md`-Dateien im konfigurierten Reports-Verzeichnis, sortiert nach Datum absteigend).
+
+**Response:** `Array<{ "name": "report-2025-01.md", "label": "Report 2025 01" }>`
+
+### `GET /api/v1/reports/{name}`
+
+Inhalt einer Report-Datei abrufen (nur `.md`-Dateien, Path-Traversal-Schutz).
+
+**Response:** `{ "content": "# Report\n..." }`
+
+---
+
+## Dead Letter Queue
+
+Fehlgeschlagene Workflow-Runs werden automatisch in der DLQ erfasst und können dort verwaltet werden.
+
+### `GET /api/v1/dlq`
+
+DLQ-Einträge auflisten (paginiert).
+
+**Query-Parameter:**
+
+| Parameter | Typ | Beschreibung |
+|---|---|---|
+| `status` | String | Filter: `OPEN`, `RETRIED`, `DISCARDED` |
+| `page` | int | Seite (Standard: 0) |
+| `size` | int | Einträge pro Seite (Standard: 20) |
+
+**Response:** `Page<DeadLetterEntry>` mit `id`, `workflowRunId`, `workflowId`, `workflowName`, `errorMessage`, `failedStepIndex`, `retryCount`, `lastFailureAt`, `status`, `createdAt`, `updatedAt`
+
+### `GET /api/v1/dlq/{id}`
+
+Einzelnen DLQ-Eintrag abrufen.
+
+**Response:** `DeadLetterEntry`
+
+### `POST /api/v1/dlq/{id}/retry`
+
+DLQ-Eintrag erneut ausführen (startet eine frische Workflow-Ausführung mit dem Original-Input-Kontext).
+
+**Response:** `DeadLetterEntry` (Status wechselt zu `RETRIED`)
+
+### `DELETE /api/v1/dlq/{id}`
+
+DLQ-Eintrag verwerfen.
+
+**Response:** `204 No Content`
+
+---
+
+## Debug
+
+### `GET /api/v1/debug/failed-workflows`
+
+Workflows deren letzter Run fehlgeschlagen ist (`FAILED` / `COMPLETED_WITH_ERRORS`), sortiert nach letztem Fehler absteigend.
+
+**Response:** `BrokenWorkflowResponse[]`
+
+---
+
 ## WebSocket
 
 ### Verbindung
@@ -2837,7 +3155,7 @@ Level: `INFO`, `WARN`, `ERROR`, `DEBUG`
 ### Terminal-WebSocket
 
 ```
-Endpunkt: ws://localhost:9090/ws/terminal
+Endpunkt: ws://localhost:9090/ws/terminal/{runId}?apiKey=...
 ```
 
-Für Echtzeit-Container-Zugriff (interaktive Shell).
+Für Echtzeit-Container-Zugriff (interaktive Shell). Raw WebSocket (kein SockJS/STOMP). Max. 3 Sessions pro Container. Authentifizierung über `apiKey`-Query-Parameter.

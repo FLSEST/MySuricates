@@ -56,6 +56,10 @@ erDiagram
         TEXT test_status "DEFAULT UNTESTED"
         TEXT last_tested_at
         TEXT block_types
+        TEXT tags "JSON"
+        VARCHAR category
+        TIMESTAMP tags_generated_at
+        BOOLEAN tags_user_edited "DEFAULT 0"
         TEXT version "DEFAULT 1.0.0"
         TEXT metadata "JSON"
         TEXT deleted_at
@@ -67,6 +71,7 @@ erDiagram
     workflow_runs {
         TEXT id PK
         TEXT workflow_id FK "NOT NULL"
+        TEXT workflow_name
         TEXT status "NOT NULL, DEFAULT PENDING"
         TEXT input_context "JSON"
         TEXT started_at
@@ -229,6 +234,7 @@ erDiagram
         TEXT reference_workflow_ids
         INTEGER iteration_count "DEFAULT 0"
         INTEGER max_iterations "DEFAULT 5"
+        BOOLEAN auto_refine "DEFAULT FALSE"
         TEXT current_run_id
         TEXT result_summary
         TEXT iteration_history
@@ -1156,7 +1162,7 @@ Blöcke werden als JSON-Array in der `blocks`-Spalte der `workflows`-Tabelle ges
 | `foreach` | `items`, `prompt`, `on_failure` |
 | `while` | `condition`, `prompt`, `maxIterations` |
 | `switch` | `expression`, `cases` (Liste mit `value`, `blocks`) |
-| `agentic` | `goal`, `max_iterations` (10), `iteration_timeout_seconds` (300), `total_timeout_seconds` (1800), `max_total_tokens` (200000), `max_repeated_actions` (3), `require_approval` (false) |
+| `agentic` | `goal`, `success_criteria`, `max_iterations` (10), `iteration_timeout_seconds` (300), `total_timeout_seconds` (1800), `max_total_tokens` (200000), `max_repeated_actions` (3), `require_approval` (false) |
 | `approval` | `message`, `timeout_minutes` |
 | `sub-workflow` | `workflowId`, `inputContext` |
 | `skill-capability` | `skillId`, `capabilityName`, `input` |

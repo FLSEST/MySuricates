@@ -29,7 +29,8 @@
 | `/reports` | Reports | Generierte Berichte anzeigen |
 | `/insights` | Insights | Plattform-Einblicke und Analysen |
 | `/integrations` | Integrations | Integrations-Provider verwalten |
-| `/calendar` | Calendar | Aggregierter Kalender (Schedules, Runs, Integrationen) |
+| `/runs/:runId` | RunRedirect | Redirect → `/workflows/:workflowId/run/:runId` (API-Lookup) |
+| `/calendar` | CalendarPage | Aggregierter Kalender (Schedules, Runs, Integrationen) |
 | `/cockpit` | ProjectCockpit | Projekt-Cockpit mit Todo-Übersicht |
 | `/onboarding-profiles` | OnboardingProfiles | Onboarding-Profile verwalten |
 | `/settings` | Settings | Sprache, Theme, API-Key, Tailscale, Staging, Testing |
@@ -211,7 +212,7 @@ Die Umschaltung erfolgt über Route-Wrapper-Komponenten (z.B. `DashboardRoute`, 
 | `ProviderIcon` | Icon-Anzeige für AI-Provider |
 | `RouteErrorFallback` | Error-Boundary für Route-Fehler |
 | `SyncSelectModal` | Auswahl-Modal für Definition-Sync |
-| `TerminalPanel` | Terminal-ähnliche Ausgabeansicht |
+| `TerminalPanel` | Interaktives xterm.js-Terminal mit WebSocket-Anbindung |
 | `TodoEditModal` | Modal zum Bearbeiten von TODOs |
 | `ErrorBoundary` | React Error Boundary mit Fallback-UI |
 
@@ -224,7 +225,7 @@ Alle Komponenten in `src/components/ui/`:
 | `Button` | `variant` (primary/secondary/ghost/danger), `size` (sm/md/lg), `loading`, `icon` | Standard-Button mit Loading-State |
 | `Card` | `padding`, `className` | Container mit Border und Hintergrund |
 | `CardHeader` | `title`, `subtitle`, `action` | Card-Header mit optionaler Action |
-| `Modal` | `open`, `onClose`, `title`, `footer`, `size` (sm/md/lg) | Overlay-Modal mit Backdrop-Blur |
+| `Modal` | `open`, `onClose`, `title`, `footer`, `size` (sm/md/lg/xl) | Overlay-Modal mit Backdrop-Blur |
 | `Badge` | `variant` (default/success/warning/danger/accent), `dot` | Status-Badge mit optionalem Punkt |
 | `Input` | `label`, `error`, `hint`, `icon` + HTML-Attribute | Formular-Input mit Validierung |
 | `Select` | `label`, `options`, `error` | Dropdown-Auswahl |
@@ -232,10 +233,10 @@ Alle Komponenten in `src/components/ui/`:
 | `Spinner` | `size` (sm/md/lg), `text` | Lade-Indikator |
 | `Table<T>` | `columns`, `data`, `keyExtractor`, `onRowClick`, `emptyText` | Generische Tabelle |
 | `ToastContainer` | (global) | Toast-Benachrichtigungen (max. 5) |
-| `DirectoryPicker` | `value`, `onChange`, `label` | Server-Dateisystem-Browser |
-| `CronPicker` | `value`, `onChange` | Cron-Ausdruck-Editor mit Vorschau |
-| `TagInput` | `tags`, `onChange`, `suggestions` | Tag-Eingabe mit Autovervollständigung |
-| `ModalFooter` | `onCancel`, `onConfirm`, `loading` | Standardisierter Modal-Footer |
+| `DirectoryPicker` | `value`, `onChange`, `label`, `placeholder`, `error` | Server-Dateisystem-Browser |
+| `CronPicker` | `value`, `onChange`, `label` | Cron-Ausdruck-Editor mit Vorschau |
+| `TagInput` | `tags`, `onChange`, `suggestions`, `label`, `hint`, `placeholder`, `compact` | Tag-Eingabe mit Autovervollständigung |
+| `ModalFooter` | `onCancel`, `onAction`, `actionLabel`, `actionVariant`, `actionLoading`, `actionDisabled`, `cancelLabel`, `cancelVariant` | Standardisierter Modal-Footer |
 
 ## Design-System
 
@@ -264,14 +265,27 @@ Das Theme wird über CSS Custom Properties gesteuert (`src/theme/tokens.ts` für
 | `--color-success` | `#6cc66c` | Erfolg (Grün) |
 | `--color-warning` | `#eba44a` | Warnung (Amber) |
 | `--color-danger` | `#e07272` | Fehler (Rot) |
+| `--color-success-subtle` | `#1e3320` | Erfolg-Hintergrund |
+| `--color-warning-subtle` | `#3d2e14` | Warnung-Hintergrund |
+| `--color-danger-subtle` | `#3d1f1f` | Fehler-Hintergrund |
 | `--color-sidebar` | `#1a1614` | Sidebar-Hintergrund |
+| `--color-sidebar-border` | `#342b23` | Sidebar-Rahmen |
+| `--color-sidebar-hover` | `#252019` | Sidebar-Hover |
+| `--color-sidebar-active` | `#332b22` | Sidebar-Aktiv |
+| `--color-sidebar-text` | `#f7f3ee` | Sidebar-Text |
+| `--color-sidebar-text-muted` | `#a6917f` | Sidebar-Text (gedämpft) |
 | `--color-assistant` | `#1c1812` | Assistenten-Hintergrund |
+| `--color-assistant-raised` | `#252019` | Assistenten-Card-Hintergrund |
+| `--color-assistant-border` | `#3d3020` | Assistenten-Rahmen |
 
 **Light Theme:** Warmes Farbschema mit `#fff8f3`-Hintergrund, `#3a2e22`-Text und `#f7bd54`-Akzentfarbe.
 
-### Tailwind-Konfiguration
+### Tailwind-Konfiguration (v4, Inline)
 
-- **Dark Mode:** `class`-basiert (Toggle über Zustand-Store)
+Kein `tailwind.config.js` — die Konfiguration erfolgt über `@theme inline` und `@custom-variant` direkt in `src/index.css` (Tailwind CSS v4).
+
+- **Dark Mode:** `class`-basiert via `@custom-variant dark (&:is(.dark *))` (Toggle über Zustand-Store)
+- **Plugin:** `@tailwindcss/typography` via `@plugin`
 - **Schriftarten:**
   - Sans: Plus Jakarta Sans (System-UI Fallback)
   - Mono: JetBrains Mono (Fira Code Fallback)
@@ -295,7 +309,7 @@ Das Theme wird über CSS Custom Properties gesteuert (`src/theme/tokens.ts` für
 | Store | State | Persistenz |
 |---|---|---|
 | `useSidebarStore` | `collapsed`, `mobileOpen`, `toggle()`, `setCollapsed()`, `setMobileOpen()` | `localStorage: sidebar-state` (nur `collapsed`) |
-| `useThemeStore` | `mode: 'light'\|'dark'`, `overrides`, `toggleMode()`, `setOverride()`, `resetOverrides()`, `apply()` | `localStorage: theme-settings` |
+| `useThemeStore` | `mode: 'light'\|'dark'`, `overrides`, `setMode()`, `toggleMode()`, `setOverride()`, `resetOverrides()`, `apply()` | `localStorage: theme-settings` |
 | `useSettingsStore` | `apiKey`, `advancedMode`, `simpleMode`, `autoTodoDefault`, `autoRepairDefault`, `autoRepairMode`, `defaultAiProvider`, `assistantModel`, `suggestionsModel`, `suggestionsEnabled`, `sidebarItemOrder`, `sidebarHiddenItems`, `pinnedWorkflowIds`, `simpleOnboardingSeen` | `localStorage: app-settings` |
 | `useAssistantStore` | `open`, `sessions[]`, `activeSessionId`, `showHistory`, `panelWidth`, `panelHeight`, `pendingInput`, `pendingContext` | `localStorage: assistant-sessions` (Sessions, Panel-Größe) |
 | `useI18nStore` | `locale: 'en'\|'de'`, `setLocale()` | `localStorage: i18n-locale` |
@@ -474,8 +488,9 @@ Alle API-Daten werden über React Query verwaltet:
 | `useStagingStart()` | Mutation | Stable starten |
 | `useStagingStop()` | Mutation | Stable stoppen |
 | `useStagingPromote()` | Mutation | Promote ausführen |
-| `useSyncPreview()` | Query | Sync-Vorschau |
-| `useSyncDefinitions()` | Mutation | Definitionen synchronisieren |
+| `useStagingCancel()` | Mutation | Laufende Promotion abbrechen |
+| `useStagingSyncPreview(enabled)` | Query | Sync-Vorschau |
+| `useStagingSync()` | Mutation | Definitionen synchronisieren |
 
 ### `useTesting.ts`
 
@@ -485,7 +500,9 @@ Alle API-Daten werden über React Query verwaltet:
 | `useTestingStart()` | Mutation | Test-Instanz starten |
 | `useTestingStop()` | Mutation | Test-Instanz stoppen |
 | `useTestingReset()` | Mutation | Test-Datenbank zurücksetzen |
-| `useTestingSyncDefinitions()` | Mutation | Definitionen zu Test synchronisieren |
+| `useTestingSyncPreview(enabled)` | Query | Sync-Vorschau für Test-Instanz |
+| `useTestingSync()` | Mutation | Definitionen zu Test synchronisieren |
+| `useTestingPullChanges()` | Mutation | Änderungen von Test nach Dev ziehen |
 
 ### `useWishes.ts`
 
@@ -504,36 +521,45 @@ Alle API-Daten werden über React Query verwaltet:
 | Hook | Typ | Beschreibung |
 |---|---|---|
 | `useDocsList()` | Query | Verfügbare Dokumente |
-| `useDoc(name)` | Query | Inhalt eines Dokuments |
+| `useGroupedDocs()` | Query (Wrapper) | Dokumente gruppiert nach Label mit DE/EN-Varianten |
+| `useDocContent(name, lang)` | Query | Inhalt eines Dokuments (sprachspezifisch) |
 
 ### `usePool.ts`
 
 | Hook | Typ | Beschreibung |
 |---|---|---|
-| `usePool()` | Query | Pool-Workflows |
+| `usePoolWorkflows()` | Query | Pool-Workflows |
 | `useInstallPoolWorkflow()` | Mutation | Workflow aus Pool installieren |
+| `usePoolExport()` | Mutation | Workflow in den Pool exportieren |
 
 ### `useAssistant.ts`
 
 | Hook | Typ | Beschreibung |
 |---|---|---|
-| `useAssistantChat()` | Mutation | Chat-Nachricht an den Assistenten senden |
+| `useAssistantChat()` | Mutation | Chat-Nachricht an den Assistenten senden (Abort-Support) |
+| `useConfirmPendingTool()` | Mutation | Pending-Tool-Aktion bestätigen |
+| `useRejectPendingTool()` | Mutation | Pending-Tool-Aktion ablehnen |
 | `useAssistantSuggestions(page)` | Query | Seitenspezifische Vorschläge laden |
-| `useRefreshSuggestions()` | Mutation | Vorschläge neu generieren |
+| `useAssistantSessions(enabled)` | Query | Session-Zusammenfassungen laden |
+| `useAssistantSessionDetail(sessionId)` | Query | Vollständige Session-Details |
+| `useDeleteAssistantSession()` | Mutation | Session löschen |
 
 ### `useChainTemplates.ts`
 
 | Hook | Typ | Beschreibung |
 |---|---|---|
 | `useChainTemplates()` | Query | Verfügbare Chain-Templates |
+| `useInstallChainTemplate()` | Mutation | Chain-Template installieren |
 
 ### `useCompletionTriggers.ts`
 
 | Hook | Typ | Beschreibung |
 |---|---|---|
-| `useCompletionTriggers(workflowId)` | Query | CompletionTrigger eines Workflows |
+| `useCompletionTriggersAsSource(workflowId)` | Query | Trigger, bei denen dieser Workflow Quelle ist |
+| `useCompletionTriggersAsTarget(workflowId)` | Query | Trigger, bei denen dieser Workflow Ziel ist |
 | `useCreateCompletionTrigger()` | Mutation | Trigger erstellen |
-| `useDeleteCompletionTrigger()` | Mutation | Trigger löschen |
+| `useToggleCompletionTrigger(workflowId)` | Mutation | Trigger ein-/ausschalten |
+| `useDeleteCompletionTrigger(workflowId)` | Mutation | Trigger löschen |
 
 ### `useTodoTriggers.ts`
 
@@ -548,20 +574,26 @@ Alle API-Daten werden über React Query verwaltet:
 
 | Hook | Typ | Beschreibung |
 |---|---|---|
-| `useDialogSessions()` | Query | Verfügbare Claude-Sessions |
-| `useImportDialog()` | Mutation | Session als Workflow importieren |
+| `useDialogSessionCounts()` | Query | Session-Anzahl pro Projekt |
+| `useDialogSessions(projectPath?, limit)` | Query | Claude-Sessions (optional nach Projekt gefiltert) |
+| `useDialogProjects()` | Query | Projektpfade mit Dialog-Sessions |
+| `useAnalyzeDialog()` | Mutation | Session analysieren für Workflow-Vorschläge |
+| `useCreateWorkflowFromDialog()` | Mutation | Workflow aus Dialog-Analyse erstellen |
 
 ### `useInsights.ts`
 
 | Hook | Typ | Beschreibung |
 |---|---|---|
-| `useInsights()` | Query | Plattform-Einblicke und Statistiken |
+| `useRunInsights(runId)` | Query | AI-generierte Insights für einen spezifischen Run |
 
 ### `useNotifications.ts`
 
 | Hook | Typ | Beschreibung |
 |---|---|---|
-| `useNotifications()` | Query | Benachrichtigungen laden |
+| `useNotifications()` | Query | Alle Notification-Konfigurationen |
+| `useCreateNotification()` | Mutation | Notification erstellen |
+| `useToggleNotification()` | Mutation | Notification ein-/ausschalten |
+| `useDeleteNotification()` | Mutation | Notification löschen |
 
 ### `usePersistedState.ts`
 
@@ -571,20 +603,27 @@ Generischer Hook für persistierten State via `localStorage`.
 
 | Hook | Typ | Beschreibung |
 |---|---|---|
-| `useGenerateWorkflow()` | Mutation | Workflow aus Topic generieren |
-| `useFactoryStatus()` | Query | Status der Factory-Pipeline |
+| `useFactoryTopics()` | Query | Factory-Topic-Kategorien |
+| `useFactoryGenerate()` | Mutation | Workflow aus Topic generieren |
+| `useFactoryRun()` | Mutation | Factory-Request End-to-End ausführen |
+| `useFactoryVerify()` | Mutation | Factory-Workflow verifizieren |
+| `useFactoryPromote()` | Mutation | Factory-Workflow promoten |
 
 ### `useWebSocket.ts`
 
 ```typescript
-useWebSocket(runId: string | null) → {
+useExecutionWebSocket(runId: string | null, workflowId?: string) → {
   logs: Array<{ timestamp, level, message }>,
   connected: boolean,
-  clearLogs: () => void
+  clearLogs: () => void,
+  pendingApproval: PendingApproval | null,
+  pendingHumanInput: object | null,
+  agenticStates: Map<number, object>,
+  forEachStates: Map<number, ForEachState>
 }
 ```
 
-Verbindet sich über SockJS/STOMP mit dem Backend und empfängt Live-Logs.
+Verbindet sich über SockJS/STOMP mit dem Backend und empfängt Live-Logs, Approval-Prompts, Human-Input-Prompts, Agentic-States und ForEach-States.
 
 ### `useToast.ts`
 
@@ -596,16 +635,29 @@ useToast() → {
 
 ### `useAssistantWebSocket.ts`
 
-WebSocket-Verbindung für Echtzeit-Status-Updates des Assistenten (Typing-Indicator, Session-Updates).
+```typescript
+useAssistantWebSocket(requestId: string | null, sessionId: string | null) → {
+  currentPhase: string | null,
+  events: AssistantPushEvent[],
+  connected: boolean,
+  clearEvents: () => void
+}
+```
+
+WebSocket-Verbindung für Echtzeit-Status-Updates und Push-Events des Assistenten.
 
 ### `useIntegrations.ts`
 
 | Hook | Typ | Beschreibung |
 |---|---|---|
 | `useIntegrations()` | Query | Alle Provider mit Verbindungsstatus |
+| `useIntegration(providerId)` | Query | Einzelner Integration-Provider |
+| `useTaskTargets(providerId, enabled)` | Query | Task-Export-Ziele eines Providers |
 | `useConnectIntegration()` | Mutation | OAuth-Verbindung herstellen |
 | `useDisconnectIntegration()` | Mutation | OAuth-Verbindung trennen |
-| `useTestIntegration()` | Mutation | Provider-Verbindung testen |
+| `useSaveCredentials()` | Mutation | OAuth-Credentials speichern |
+| `useDeleteCredentials()` | Mutation | Credentials löschen |
+| `useTestIntegrationAction()` | Mutation | Provider-Aktion testen |
 
 ### `useWorkflowVersions.ts`
 
@@ -619,11 +671,16 @@ WebSocket-Verbindung für Echtzeit-Status-Updates des Assistenten (Typing-Indica
 | Hook | Typ | Beschreibung |
 |---|---|---|
 | `useOnboardingProfiles()` | Query | Alle Onboarding-Profile |
+| `useOnboardingProfile(id)` | Query | Einzelnes Profil |
+| `useCreateOnboardingProfile()` | Mutation | Profil erstellen |
 | `useUpdateOnboardingProfile()` | Mutation | Profil aktualisieren |
+| `useDeleteOnboardingProfile()` | Mutation | Profil löschen |
+| `useResetOnboardingProfile()` | Mutation | Profil auf Built-in-Defaults zurücksetzen |
+| `useOnboardingProfileHistory(profileId)` | Query | Versionshistorie eines Profils |
 
 ### `useCalendarAggregated.ts`
 
-Aggregiert Events aus mehreren Quellen (Google Calendar, Trello, Schedules, Runs) über das Calendar-Adapter-Pattern.
+Aggregiert Events aus mehreren Quellen (Google Calendar, Trello, Taskwarrior, Schedules, Runs) über das Calendar-Adapter-Pattern. Gibt `{ events, sources, isLoading, setSourceColor }` zurück.
 
 ### `useCalendarColors.ts`
 
@@ -633,32 +690,67 @@ Verwaltet benutzerdefinierte Farben pro Kalender-Quelle (persistiert in `localSt
 
 | Hook | Typ | Beschreibung |
 |---|---|---|
-| `useConversionSuggestions()` | Query | Vorschläge für Workflow-Konvertierungen |
-| `useCreateConversion()` | Mutation | Agentic-Run in deterministischen Workflow konvertieren |
+| `useConversionSuggestion(runId, enabled)` | Query | AI-generierter Workflow-Vorschlag aus einem Run |
+| `useCreateWorkflowFromSuggestion()` | Mutation | Workflow aus Konvertierungs-Vorschlag erstellen |
 
 ### `useLearning.ts`
 
 | Hook | Typ | Beschreibung |
 |---|---|---|
-| `useLearningDashboard()` | Query | Lern-Dashboard-Daten |
-| `useLearningStats()` | Query | Erfolgsraten und Statistiken |
+| `useDashboard(days, projectId?)` | Query | Lern-Dashboard-Daten (Auto-Poll 30s) |
+| `usePlatformStats()` | Query | Plattform-weite Statistiken |
+| `useRateRun()` | Mutation | Workflow-Run bewerten |
 
 ### `useReports.ts`
 
 | Hook | Typ | Beschreibung |
 |---|---|---|
-| `useReports()` | Query | Alle generierten Reports |
+| `useReportsList()` | Query | Liste verfügbarer Reports |
+| `useReportContent(name)` | Query | Inhalt eines spezifischen Reports |
 
 ### `useTemplates.ts`
 
 | Hook | Typ | Beschreibung |
 |---|---|---|
 | `useTemplates()` | Query | Alle Workflow-Templates |
-| `useCreateFromTemplate()` | Mutation | Workflow aus Template erstellen |
+| `useCreateTemplate()` | Mutation | Workflow-Template erstellen |
+| `useSaveWorkflowAsTemplate()` | Mutation | Bestehenden Workflow als Template speichern |
+
+### `useDeadLetters.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useDeadLetters(status, page, size)` | Query | Paginierte Dead-Letter-Queue-Einträge |
+| `useRetryDeadLetter()` | Mutation | Dead-Letter-Eintrag erneut versuchen |
+| `useDiscardDeadLetter()` | Mutation | Dead-Letter-Eintrag verwerfen |
+
+### `useLatestRunStatuses.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useLatestRunStatuses(size)` | Hook | Map von Workflow-ID → letzter Run-Status (abgeleitet aus `useAllRuns`) |
+
+### `usePaletteHistory.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `usePaletteHistory(contextId)` | Hook | Recent/Pinned-IDs für die Command-Palette (localStorage-basiert) |
+
+### `useTodoOverview.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useTodoOverview()` | Query | Projektübergreifende Cockpit-Übersicht mit per-Projekt-Rollups |
+
+### `useWorkflowDebug.ts`
+
+| Hook | Typ | Beschreibung |
+|---|---|---|
+| `useBrokenWorkflows()` | Query | Workflows mit fehlgeschlagenem letztem Run (Auto-Poll 30s) |
 
 ### `useIsMobile.ts`
 
-Responsive-Hook, erkennt Mobile-Breakpoint für adaptive UI-Anpassungen.
+Responsive-Hook, erkennt Mobile-Breakpoint (max-width: 1023px) für adaptive UI-Anpassungen.
 
 ## Internationalisierung (i18n)
 
@@ -670,19 +762,37 @@ Responsive-Hook, erkennt Mobile-Breakpoint für adaptive UI-Anpassungen.
 
 ### Übersetzungsstruktur
 
+~1.250 Leaf-Strings in 34+ Top-Level-Keys (Auszug):
+
 ```
-common (24 Keys) ─── Allgemeine Labels (Erstellen, Löschen, Suchen, ...)
-nav (7 Keys) ─────── Navigation (Dashboard, Projekte, ...)
-dashboard (8 Keys) ─ Dashboard-Texte
-projects (11 Keys) ─ Projekte + verschachtelte Typen & Status
-workflows (18 Keys)  Workflows + Block-Typen & Ausführung
-skills (10 Keys) ─── Skills + Kategorien
-schedules (7 Keys) ─ Zeitpläne
-webhooks (7 Keys) ── Webhooks
-settings (16 Keys) ─ Einstellungen
-toast (26 Keys) ──── Toast-Nachrichten
-templates (13 Keys)  Workflow-Templates
-charts (5 Keys) ──── Chart-Labels
+common (~46 Keys) ──── Allgemeine Labels (Erstellen, Löschen, Suchen, ...)
+nav (~27 Keys) ──────── Navigation (Dashboard, Projekte, ...)
+simple (~95 Keys) ───── Simple-Mode-Texte (Home, Workflows, Runs, ...)
+dashboard (~26 Keys) ── Dashboard-Texte
+projects (~52 Keys) ─── Projekte + Onboarding, Typen, Status
+workflows (~155 Keys)   Workflows + Block-Typen, Ausführung, Gate, Agentic
+skills (~13 Keys) ───── Skills + Kategorien
+schedules (~55 Keys) ── Zeitpläne + Wochentage
+webhooks (8 Keys) ───── Webhooks
+integrations (~40 Keys) Integrations-Provider
+calendar (~8 Keys) ──── Kalender + Quellen
+notifications (~16 Keys) Benachrichtigungen
+todoTriggers (~17 Keys) Todo-Trigger
+completionTriggers (~15 Keys) Completion-Trigger
+settings (~150 Keys) ── Einstellungen (General, Execution, Staging, Testing)
+toast (~60 Keys) ────── Toast-Nachrichten
+templates (~14 Keys) ── Workflow-Templates
+pool (7 Keys) ───────── Workflow-Pool
+insights (~75 Keys) ─── Plattform-Insights
+runs (~16 Keys) ──────── Run-Übersicht
+activityLog (~12 Keys)  Activity-Log
+todos (~38 Keys) ────── Todos + Status, Prioritäten, Quellen
+wishes (~55 Keys) ───── Wishes + Status, Iteration
+chains (~27 Keys) ───── Chains + Ausführung
+factory (~40 Keys) ──── Workflow-Factory
+assistant (~22 Keys) ── Assistent
+commandPalette (~28 Keys) Command-Palette
+charts (~10 Keys) ───── Chart-Labels
 ```
 
 ## PWA-Konfiguration
@@ -690,9 +800,9 @@ charts (5 Keys) ──── Chart-Labels
 Konfiguriert über `vite-plugin-pwa` in `vite.config.ts`:
 
 - **Name:** MySuricates
-- **Kurzname:** AutoPilot
+- **Kurzname:** MySuricates
 - **Display:** Standalone
-- **Theme-Color:** `#0f172a`
+- **Theme-Color:** `#231e19`
 - **Service Worker:** Auto-Update
 - **Icon:** `/icons/icon.svg` (SVG, maskierbar)
 
@@ -705,13 +815,16 @@ class ApiClient {
   getHeaders() → { Content-Type: application/json, X-API-Key: ... }
 
   get<T>(path) → Promise<T>
-  post<T>(path, body?) → Promise<T>
+  post<T>(path, body?, options?) → Promise<T>
   put<T>(path, body?) → Promise<T>
+  patch<T>(path, body?) → Promise<T>
   delete<T>(path) → Promise<T>
 }
 ```
 
-Fehler werden als `ApiError` geworfen mit `{ error, timestamp, fieldErrors? }`.
+Fehler werden als `ApiError` geworfen mit `{ error, timestamp, fieldErrors? }`. Requests haben ein 300-Sekunden-Timeout via `AbortController`.
+
+Standalone-Exports: `openPath(path)` öffnet einen Dateipfad via Backend, `apiErrorMessage(err, fallback)` extrahiert Fehlermeldungen aus API-Responses.
 
 Der API-Key wird aus dem `settingsStore` gelesen und automatisch an alle Requests angehängt.
 
@@ -721,7 +834,7 @@ In `vite.config.ts`:
 
 | Pfad | Ziel | Beschreibung |
 |---|---|---|
-| `/api/*` | `http://localhost:9090` | REST-API |
-| `/ws/*` | `ws://localhost:9090` | WebSocket (STOMP/SockJS) |
+| `/api` | `http://localhost:9090` | REST-API |
+| `/ws` | `ws://localhost:9090` | WebSocket (STOMP/SockJS) |
 
-Der Dev-Server läuft auf Port 3000 und proxied alle API-Anfragen an das Backend auf Port 9090.
+Der Dev-Server läuft auf Port 3000 (`strictPort`) und proxied alle API-Anfragen an das Backend auf Port 9090. Via `CYPRESS_TARGET=test` werden die Proxy-Ziele auf Port 8090 umgeleitet. HTTPS wird automatisch aktiviert wenn `../certs/dev.crt` und `../certs/dev.key` existieren.

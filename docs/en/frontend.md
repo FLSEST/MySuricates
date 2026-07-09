@@ -29,16 +29,17 @@
 | `/reports` | Reports | View generated reports |
 | `/insights` | Insights | Platform insights and analytics |
 | `/integrations` | Integrations | Manage integration providers |
-| `/calendar` | Calendar | Aggregated calendar (schedules, runs, integrations) |
+| `/runs/:runId` | RunRedirect | Redirect → `/workflows/:workflowId/run/:runId` (API lookup) |
+| `/calendar` | CalendarPage | Aggregated calendar (schedules, runs, integrations) |
 | `/cockpit` | ProjectCockpit | Project cockpit with todo overview |
 | `/onboarding-profiles` | OnboardingProfiles | Manage onboarding profiles |
 | `/settings` | Settings | Language, theme, API key, Tailscale, staging, testing |
 
-All routes are defined in `src/App.tsx` and wrapped by a `<Layout>` component (sidebar + header).
+All routes are defined in `src/App.tsx` and wrapped by a `<Layout>` wrapper (sidebar + header).
 
 ### Simple Mode
 
-`useSettingsStore().simpleMode` toggles nine pages between normal and simple variants:
+`useSettingsStore().simpleMode` switches nine pages between normal and simple variants:
 
 | Route | Normal | Simple |
 |---|---|---|
@@ -59,7 +60,7 @@ The switching is handled by route wrapper components (e.g. `DashboardRoute`, `Wo
 ### Dashboard (`/`)
 
 - 4 stat cards: Active projects, workflows, runs today, success rate
-- 2 Recharts charts: Runs over time (AreaChart), success rate (AreaChart)
+- 2 Recharts charts: Runs history (AreaChart), success rate (AreaChart)
 - List of recent runs (clickable → execution page)
 - Top workflows by execution count
 
@@ -69,21 +70,21 @@ The switching is handled by route wrapper components (e.g. `DashboardRoute`, `Wo
 - Grid layout (1/2/3 columns depending on screen width)
 - Project cards with type icon and color coding
 - Start/stop buttons for Docker containers
-- Detail page: Project info, container status, associated workflows
-- Modals: Create, edit, delete confirmation
+- Detail page: project info, container status, associated workflows
+- Modals: create, edit, delete confirmation
 
 ### Workflows (`/workflows`, `/workflows/:id`)
 
-- 2-step creation: Template selection → form (project, name, description)
+- 2-step creation: template selection → form (project, name, description)
 - 44 built-in templates (from DB, via `WorkflowTemplateSeeder`) plus custom templates
 - Detail page: 2/3-column block editor (drag & drop), 1/3 sidebar (skills, runs, memory, info)
 - Block editor with `@dnd-kit` for drag-and-drop sorting
-- Modals: Add block (type + JSON config via Monaco Editor), activate skill
+- Modals: add block (type + JSON config via Monaco Editor), activate skill
 
 ### WorkflowExecution (`/workflows/:id/run/:runId`)
 
 - Live status badge (PENDING, RUNNING, PAUSED, COMPLETED, FAILED, CANCELLED)
-- Split view: Steps panel (step indicators) + live logs (WebSocket)
+- Split view: steps panel (step indicators) + live logs (WebSocket)
 - Pause/resume/cancel buttons during execution
 - Star rating (1-5) after completion
 - Error panel for failed runs
@@ -92,33 +93,33 @@ The switching is handled by route wrapper components (e.g. `DashboardRoute`, `Wo
 
 - Search filter + category filter
 - Grid layout with skill cards
-- Detail slide-over: Capabilities, async badges, AI context preview
+- Detail slide-over: capabilities, async badges, AI context preview
 - Category icons and colors
 
 ### Schedules (`/schedules`)
 
-- Table: Workflow, cron expression, next/last execution, status toggle
-- Create modal: Workflow selection + cron expression + description
+- Table: workflow, cron expression, next/last execution, status toggle
+- Create modal: workflow selection + cron expression + description
 
 ### Webhooks (`/webhooks`)
 
-- Table: Workflow, URL (copyable), token (masked + copyable), trigger count, status
+- Table: workflow, URL (copyable), token (masked + copyable), trigger count, status
 - CopyButton component with success feedback
-- Create modal: Workflow selection + description
+- Create modal: workflow selection + description
 
 ### Chains (`/chains`, `/chains/:id/run/:runId`)
 
-- Split-panel layout: Chain list on the left, detail/execution on the right
+- Split-panel layout: chain list on the left, detail/execution on the right
 - Pipeline visualization of chain entries
 - Create/edit modal with workflow search and sorting
-- ChainExecution: Live polling for entry status, navigation to individual workflow runs
+- ChainExecution: live polling for entry status, navigation to individual workflow runs
 
 ### Todos (`/todos`)
 
 - List of all TODOs with filters by status, priority, project, source, tag
 - Status workflow: OPEN → IN_PROGRESS → DONE / CANCELLED
 - Automatically detects AI-created TODOs (source: AI, sourceAgent: claude-code)
-- Badge display in sidebar for open TODOs
+- Badge display in the sidebar for open TODOs
 
 ### ActivityLog (`/activity`)
 
@@ -128,12 +129,12 @@ The switching is handled by route wrapper components (e.g. `DashboardRoute`, `Wo
 ### Wishes (`/wishes`)
 
 - Enter natural language wishes and have them fulfilled asynchronously
-- Iteration display, provide feedback, cancel or crystallize wish
+- Iteration display, provide feedback, cancel or crystallize wishes
 
 ### WorkflowFactory (`/factory`)
 
 - Generate workflow from topic category
-- Complete pipeline: Generate → test instance → verify → promote
+- Full pipeline: generate → test instance → verify → promote
 - Topic category selection
 
 ### DialogImport (`/dialogs`)
@@ -143,8 +144,8 @@ The switching is handled by route wrapper components (e.g. `DashboardRoute`, `Wo
 
 ### Docs (`/docs`)
 
-- Split layout: Document list on the left, Markdown rendering on the right
-- Documents loaded via `GET /api/v1/docs` from the `docs/` directory
+- Split layout: document list on the left, Markdown rendering on the right
+- Documents are loaded via `GET /api/v1/docs` from the `docs/` directory
 - Markdown rendering with `react-markdown` + `remark-gfm` + `@tailwindcss/typography`
 
 ### Insights (`/insights`)
@@ -154,7 +155,7 @@ The switching is handled by route wrapper components (e.g. `DashboardRoute`, `Wo
 
 ### WorkflowDetail (`/workflows/:id`) — Extensions
 
-- **Memory tab:** View, activate, delete, and re-extract workflow memory entries
+- **Memory tab:** View, activate, delete, re-extract workflow memory entries
 - **Instructions tab:** Edit workflow-specific agent instructions in Monaco Editor
 - **Gate status:** Display of the last gate status in the run history
 
@@ -163,7 +164,7 @@ The switching is handled by route wrapper components (e.g. `DashboardRoute`, `Wo
 - General: Language (EN/DE), Advanced Mode
 - Appearance: Theme toggle (light/dark), color selection
 - Security: API key input (masked)
-- Remote Access: Tailscale status + enable/disable
+- Remote access: Tailscale status + enable/disable
 - Execution: Claude concurrency, reserved-for-interactive, timeouts
 - Notifications: Notification configurations
 - Backups: Database backup list
@@ -176,14 +177,14 @@ The switching is handled by route wrapper components (e.g. `DashboardRoute`, `Wo
 
 ### `AssistantPanel.tsx` (`src/components/AssistantPanel.tsx`)
 
-- Floating chat panel, displayed globally above the layout
+- Floating chat panel, globally overlaid on the layout
 - Context-sensitive chat with page suggestions
 - Persisted sessions, WebSocket integration
 - See [Assistant System](assistant-system.md) for details
 
 ### `src/components/settings/`
 
-- Settings subcomponents for the modular settings page
+- Settings sub-components for the modular settings page
 - Separate components: `GeneralSettingsCard`, `AppearanceCard`, `SecurityCard`, `ExecutionSettingsCard`, `NotificationsCard`, `BackupCard`, `WishSettingsCard`, `RemoteAccessCard`, `StagingCard`, `TestingCard`, `SystemInfoCard`
 - Navigation via `SettingsNav`, shared layout via `SettingsSection`
 
@@ -211,7 +212,7 @@ The switching is handled by route wrapper components (e.g. `DashboardRoute`, `Wo
 | `ProviderIcon` | Icon display for AI providers |
 | `RouteErrorFallback` | Error boundary for route errors |
 | `SyncSelectModal` | Selection modal for definition sync |
-| `TerminalPanel` | Terminal-like output view |
+| `TerminalPanel` | Interactive xterm.js terminal with WebSocket connection |
 | `TodoEditModal` | Modal for editing TODOs |
 | `ErrorBoundary` | React error boundary with fallback UI |
 
@@ -224,7 +225,7 @@ All components in `src/components/ui/`:
 | `Button` | `variant` (primary/secondary/ghost/danger), `size` (sm/md/lg), `loading`, `icon` | Standard button with loading state |
 | `Card` | `padding`, `className` | Container with border and background |
 | `CardHeader` | `title`, `subtitle`, `action` | Card header with optional action |
-| `Modal` | `open`, `onClose`, `title`, `footer`, `size` (sm/md/lg) | Overlay modal with backdrop blur |
+| `Modal` | `open`, `onClose`, `title`, `footer`, `size` (sm/md/lg/xl) | Overlay modal with backdrop blur |
 | `Badge` | `variant` (default/success/warning/danger/accent), `dot` | Status badge with optional dot |
 | `Input` | `label`, `error`, `hint`, `icon` + HTML attributes | Form input with validation |
 | `Select` | `label`, `options`, `error` | Dropdown selection |
@@ -232,10 +233,10 @@ All components in `src/components/ui/`:
 | `Spinner` | `size` (sm/md/lg), `text` | Loading indicator |
 | `Table<T>` | `columns`, `data`, `keyExtractor`, `onRowClick`, `emptyText` | Generic table |
 | `ToastContainer` | (global) | Toast notifications (max 5) |
-| `DirectoryPicker` | `value`, `onChange`, `label` | Server filesystem browser |
-| `CronPicker` | `value`, `onChange` | Cron expression editor with preview |
-| `TagInput` | `tags`, `onChange`, `suggestions` | Tag input with autocomplete |
-| `ModalFooter` | `onCancel`, `onConfirm`, `loading` | Standardized modal footer |
+| `DirectoryPicker` | `value`, `onChange`, `label`, `placeholder`, `error` | Server filesystem browser |
+| `CronPicker` | `value`, `onChange`, `label` | Cron expression editor with preview |
+| `TagInput` | `tags`, `onChange`, `suggestions`, `label`, `hint`, `placeholder`, `compact` | Tag input with autocomplete |
+| `ModalFooter` | `onCancel`, `onAction`, `actionLabel`, `actionVariant`, `actionLoading`, `actionDisabled`, `cancelLabel`, `cancelVariant` | Standardized modal footer |
 
 ## Design System
 
@@ -264,18 +265,31 @@ The theme is controlled via CSS custom properties (`src/theme/tokens.ts` for JS 
 | `--color-success` | `#6cc66c` | Success (green) |
 | `--color-warning` | `#eba44a` | Warning (amber) |
 | `--color-danger` | `#e07272` | Error (red) |
+| `--color-success-subtle` | `#1e3320` | Success background |
+| `--color-warning-subtle` | `#3d2e14` | Warning background |
+| `--color-danger-subtle` | `#3d1f1f` | Error background |
 | `--color-sidebar` | `#1a1614` | Sidebar background |
+| `--color-sidebar-border` | `#342b23` | Sidebar border |
+| `--color-sidebar-hover` | `#252019` | Sidebar hover |
+| `--color-sidebar-active` | `#332b22` | Sidebar active |
+| `--color-sidebar-text` | `#f7f3ee` | Sidebar text |
+| `--color-sidebar-text-muted` | `#a6917f` | Sidebar text (muted) |
 | `--color-assistant` | `#1c1812` | Assistant background |
+| `--color-assistant-raised` | `#252019` | Assistant card background |
+| `--color-assistant-border` | `#3d3020` | Assistant border |
 
 **Light Theme:** Warm color scheme with `#fff8f3` background, `#3a2e22` text and `#f7bd54` accent color.
 
-### Tailwind Configuration
+### Tailwind Configuration (v4, Inline)
 
-- **Dark Mode:** `class`-based (toggle via Zustand store)
+No `tailwind.config.js` — configuration is done via `@theme inline` and `@custom-variant` directly in `src/index.css` (Tailwind CSS v4).
+
+- **Dark Mode:** `class`-based via `@custom-variant dark (&:is(.dark *))` (toggled via Zustand store)
+- **Plugin:** `@tailwindcss/typography` via `@plugin`
 - **Fonts:**
-  - Sans: Plus Jakarta Sans (system-ui fallback)
+  - Sans: Plus Jakarta Sans (system-UI fallback)
   - Mono: JetBrains Mono (Fira Code fallback)
-- **Custom Animations:** `fade-in`, `slide-in`, `slide-up`, `pulse-subtle`, `slide-in-right`
+- **Custom animations:** `fade-in`, `slide-in`, `slide-up`, `pulse-subtle`, `slide-in-right`
 
 ### CSS Utility Classes (`index.css`)
 
@@ -294,8 +308,8 @@ The theme is controlled via CSS custom properties (`src/theme/tokens.ts` for JS 
 
 | Store | State | Persistence |
 |---|---|---|
-| `useSidebarStore` | `collapsed`, `mobileOpen`, `toggle()`, `setCollapsed()`, `setMobileOpen()` | `localStorage: sidebar-state` (`collapsed` only) |
-| `useThemeStore` | `mode: 'light'\|'dark'`, `overrides`, `toggleMode()`, `setOverride()`, `resetOverrides()`, `apply()` | `localStorage: theme-settings` |
+| `useSidebarStore` | `collapsed`, `mobileOpen`, `toggle()`, `setCollapsed()`, `setMobileOpen()` | `localStorage: sidebar-state` (only `collapsed`) |
+| `useThemeStore` | `mode: 'light'\|'dark'`, `overrides`, `setMode()`, `toggleMode()`, `setOverride()`, `resetOverrides()`, `apply()` | `localStorage: theme-settings` |
 | `useSettingsStore` | `apiKey`, `advancedMode`, `simpleMode`, `autoTodoDefault`, `autoRepairDefault`, `autoRepairMode`, `defaultAiProvider`, `assistantModel`, `suggestionsModel`, `suggestionsEnabled`, `sidebarItemOrder`, `sidebarHiddenItems`, `pinnedWorkflowIds`, `simpleOnboardingSeen` | `localStorage: app-settings` |
 | `useAssistantStore` | `open`, `sessions[]`, `activeSessionId`, `showHistory`, `panelWidth`, `panelHeight`, `pendingInput`, `pendingContext` | `localStorage: assistant-sessions` (sessions, panel size) |
 | `useI18nStore` | `locale: 'en'\|'de'`, `setLocale()` | `localStorage: i18n-locale` |
@@ -309,8 +323,8 @@ All API data is managed via React Query:
 
 - **Caching:** Automatic with query keys
 - **Invalidation:** Related queries are invalidated after mutations
-- **Optimistic Updates:** For drag-and-drop block sorting
-- **Auto-Refetch:** Health check every 30 seconds
+- **Optimistic updates:** For drag-and-drop block sorting
+- **Auto-refetch:** Health check every 30 seconds
 
 ## API Hooks (`src/hooks/`)
 
@@ -349,7 +363,7 @@ All API data is managed via React Query:
 | `useExecuteWorkflow()` | Mutation | Execute workflow |
 | `usePauseExecution(runId)` | Mutation | Pause execution |
 | `useResumeExecution(runId)` | Mutation | Resume execution |
-| `useResumeFromStep()` | Mutation | Resume from a specific step |
+| `useResumeFromStep()` | Mutation | Resume from specific step |
 | `useCancelExecution(runId)` | Mutation | Cancel execution |
 | `useRetryExecution()` | Mutation | Retry failed execution |
 | `useRunCommand()` | Mutation | Send command to running execution |
@@ -377,7 +391,7 @@ All API data is managed via React Query:
 | `useSchedules()` | Query | All schedules |
 | `useMaintenanceMode()` | Query | Maintenance mode status |
 | `useSetMaintenanceMode()` | Mutation | Toggle maintenance mode |
-| `useCalendarData(start, end)` | Query | Calendar data for time range |
+| `useCalendarData(start, end)` | Query | Calendar data for time period |
 | `useRemainingToday()` | Query | Remaining runs today |
 | `useRemainingThisWeek()` | Query | Remaining runs this week |
 | `useCronPreview(expr)` | Query | Preview of next executions |
@@ -408,14 +422,14 @@ All API data is managed via React Query:
 | `useBackupList()` | Query | Database backups |
 | `useAiProviders()` | Query | AI providers and default |
 | `usePiCatalog()` | Query | Pi provider catalog |
-| `useUpdateSystemSetting()` | Mutation | Update system setting |
+| `useUpdateSystemSetting()` | Mutation | Change system setting |
 | `useAssistantModelSetting()` | Query | Assistant model setting |
 | `useAutoRepairModeSetting()` | Query | Auto-repair mode setting |
 | `useSuggestionsModelSetting()` | Query | Suggestions model setting |
 | `useAssistantThinkingPhrases()` | Query | Localized thinking phrases |
 | `useRepairAllFailed()` | Mutation | Repair all failed runs |
 | `useExecutionConfig()` | Query | Execution configuration |
-| `useUpdateExecutionConfig()` | Mutation | Update execution configuration |
+| `useUpdateExecutionConfig()` | Mutation | Change execution configuration |
 | `useBrowseDirectory()` | Query | Browse server filesystem |
 
 ### `useChains.ts`
@@ -443,8 +457,8 @@ All API data is managed via React Query:
 | `useProjectActiveTodos(projectId)` | Query | Active TODOs of a project |
 | `useCreateTodo()` | Mutation | Create TODO |
 | `useUpdateTodo()` | Mutation | Update TODO |
-| `useUpdateTodoStatus()` | Mutation | Update status |
-| `useBulkUpdateTodoStatus()` | Mutation | Bulk update multiple TODOs |
+| `useUpdateTodoStatus()` | Mutation | Change status |
+| `useBulkUpdateTodoStatus()` | Mutation | Change multiple TODOs at once |
 | `useArchiveStale()` | Mutation | Archive stale TODOs |
 | `useDeleteTodo()` | Mutation | Delete TODO |
 | `useExportTodo()` | Mutation | Export TODO to external tracker |
@@ -474,8 +488,9 @@ All API data is managed via React Query:
 | `useStagingStart()` | Mutation | Start stable |
 | `useStagingStop()` | Mutation | Stop stable |
 | `useStagingPromote()` | Mutation | Execute promote |
-| `useSyncPreview()` | Query | Sync preview |
-| `useSyncDefinitions()` | Mutation | Synchronize definitions |
+| `useStagingCancel()` | Mutation | Cancel running promotion |
+| `useStagingSyncPreview(enabled)` | Query | Sync preview |
+| `useStagingSync()` | Mutation | Synchronize definitions |
 
 ### `useTesting.ts`
 
@@ -485,7 +500,9 @@ All API data is managed via React Query:
 | `useTestingStart()` | Mutation | Start test instance |
 | `useTestingStop()` | Mutation | Stop test instance |
 | `useTestingReset()` | Mutation | Reset test database |
-| `useTestingSyncDefinitions()` | Mutation | Synchronize definitions to test |
+| `useTestingSyncPreview(enabled)` | Query | Sync preview for test instance |
+| `useTestingSync()` | Mutation | Synchronize definitions to test |
+| `useTestingPullChanges()` | Mutation | Pull changes from test to dev |
 
 ### `useWishes.ts`
 
@@ -504,36 +521,45 @@ All API data is managed via React Query:
 | Hook | Type | Description |
 |---|---|---|
 | `useDocsList()` | Query | Available documents |
-| `useDoc(name)` | Query | Content of a document |
+| `useGroupedDocs()` | Query (wrapper) | Documents grouped by label with DE/EN variants |
+| `useDocContent(name, lang)` | Query | Content of a document (language-specific) |
 
 ### `usePool.ts`
 
 | Hook | Type | Description |
 |---|---|---|
-| `usePool()` | Query | Pool workflows |
+| `usePoolWorkflows()` | Query | Pool workflows |
 | `useInstallPoolWorkflow()` | Mutation | Install workflow from pool |
+| `usePoolExport()` | Mutation | Export workflow to pool |
 
 ### `useAssistant.ts`
 
 | Hook | Type | Description |
 |---|---|---|
-| `useAssistantChat()` | Mutation | Send chat message to assistant |
+| `useAssistantChat()` | Mutation | Send chat message to assistant (abort support) |
+| `useConfirmPendingTool()` | Mutation | Confirm pending tool action |
+| `useRejectPendingTool()` | Mutation | Reject pending tool action |
 | `useAssistantSuggestions(page)` | Query | Load page-specific suggestions |
-| `useRefreshSuggestions()` | Mutation | Regenerate suggestions |
+| `useAssistantSessions(enabled)` | Query | Load session summaries |
+| `useAssistantSessionDetail(sessionId)` | Query | Full session details |
+| `useDeleteAssistantSession()` | Mutation | Delete session |
 
 ### `useChainTemplates.ts`
 
 | Hook | Type | Description |
 |---|---|---|
 | `useChainTemplates()` | Query | Available chain templates |
+| `useInstallChainTemplate()` | Mutation | Install chain template |
 
 ### `useCompletionTriggers.ts`
 
 | Hook | Type | Description |
 |---|---|---|
-| `useCompletionTriggers(workflowId)` | Query | CompletionTriggers of a workflow |
+| `useCompletionTriggersAsSource(workflowId)` | Query | Triggers where this workflow is the source |
+| `useCompletionTriggersAsTarget(workflowId)` | Query | Triggers where this workflow is the target |
 | `useCreateCompletionTrigger()` | Mutation | Create trigger |
-| `useDeleteCompletionTrigger()` | Mutation | Delete trigger |
+| `useToggleCompletionTrigger(workflowId)` | Mutation | Enable/disable trigger |
+| `useDeleteCompletionTrigger(workflowId)` | Mutation | Delete trigger |
 
 ### `useTodoTriggers.ts`
 
@@ -548,20 +574,26 @@ All API data is managed via React Query:
 
 | Hook | Type | Description |
 |---|---|---|
-| `useDialogSessions()` | Query | Available Claude sessions |
-| `useImportDialog()` | Mutation | Import session as workflow |
+| `useDialogSessionCounts()` | Query | Session count per project |
+| `useDialogSessions(projectPath?, limit)` | Query | Claude sessions (optionally filtered by project) |
+| `useDialogProjects()` | Query | Project paths with dialog sessions |
+| `useAnalyzeDialog()` | Mutation | Analyze session for workflow suggestions |
+| `useCreateWorkflowFromDialog()` | Mutation | Create workflow from dialog analysis |
 
 ### `useInsights.ts`
 
 | Hook | Type | Description |
 |---|---|---|
-| `useInsights()` | Query | Platform insights and statistics |
+| `useRunInsights(runId)` | Query | AI-generated insights for a specific run |
 
 ### `useNotifications.ts`
 
 | Hook | Type | Description |
 |---|---|---|
-| `useNotifications()` | Query | Load notifications |
+| `useNotifications()` | Query | All notification configurations |
+| `useCreateNotification()` | Mutation | Create notification |
+| `useToggleNotification()` | Mutation | Enable/disable notification |
+| `useDeleteNotification()` | Mutation | Delete notification |
 
 ### `usePersistedState.ts`
 
@@ -571,20 +603,27 @@ Generic hook for persisted state via `localStorage`.
 
 | Hook | Type | Description |
 |---|---|---|
-| `useGenerateWorkflow()` | Mutation | Generate workflow from topic |
-| `useFactoryStatus()` | Query | Factory pipeline status |
+| `useFactoryTopics()` | Query | Factory topic categories |
+| `useFactoryGenerate()` | Mutation | Generate workflow from topic |
+| `useFactoryRun()` | Mutation | Execute factory request end-to-end |
+| `useFactoryVerify()` | Mutation | Verify factory workflow |
+| `useFactoryPromote()` | Mutation | Promote factory workflow |
 
 ### `useWebSocket.ts`
 
 ```typescript
-useWebSocket(runId: string | null) → {
+useExecutionWebSocket(runId: string | null, workflowId?: string) → {
   logs: Array<{ timestamp, level, message }>,
   connected: boolean,
-  clearLogs: () => void
+  clearLogs: () => void,
+  pendingApproval: PendingApproval | null,
+  pendingHumanInput: object | null,
+  agenticStates: Map<number, object>,
+  forEachStates: Map<number, ForEachState>
 }
 ```
 
-Connects to the backend via SockJS/STOMP and receives live logs.
+Connects to the backend via SockJS/STOMP and receives live logs, approval prompts, human input prompts, agentic states, and ForEach states.
 
 ### `useToast.ts`
 
@@ -596,16 +635,29 @@ useToast() → {
 
 ### `useAssistantWebSocket.ts`
 
-WebSocket connection for real-time assistant status updates (typing indicator, session updates).
+```typescript
+useAssistantWebSocket(requestId: string | null, sessionId: string | null) → {
+  currentPhase: string | null,
+  events: AssistantPushEvent[],
+  connected: boolean,
+  clearEvents: () => void
+}
+```
+
+WebSocket connection for real-time status updates and push events from the assistant.
 
 ### `useIntegrations.ts`
 
 | Hook | Type | Description |
 |---|---|---|
 | `useIntegrations()` | Query | All providers with connection status |
+| `useIntegration(providerId)` | Query | Single integration provider |
+| `useTaskTargets(providerId, enabled)` | Query | Task export targets of a provider |
 | `useConnectIntegration()` | Mutation | Establish OAuth connection |
 | `useDisconnectIntegration()` | Mutation | Disconnect OAuth connection |
-| `useTestIntegration()` | Mutation | Test provider connection |
+| `useSaveCredentials()` | Mutation | Save OAuth credentials |
+| `useDeleteCredentials()` | Mutation | Delete credentials |
+| `useTestIntegrationAction()` | Mutation | Test provider action |
 
 ### `useWorkflowVersions.ts`
 
@@ -619,11 +671,16 @@ WebSocket connection for real-time assistant status updates (typing indicator, s
 | Hook | Type | Description |
 |---|---|---|
 | `useOnboardingProfiles()` | Query | All onboarding profiles |
+| `useOnboardingProfile(id)` | Query | Single profile |
+| `useCreateOnboardingProfile()` | Mutation | Create profile |
 | `useUpdateOnboardingProfile()` | Mutation | Update profile |
+| `useDeleteOnboardingProfile()` | Mutation | Delete profile |
+| `useResetOnboardingProfile()` | Mutation | Reset profile to built-in defaults |
+| `useOnboardingProfileHistory(profileId)` | Query | Version history of a profile |
 
 ### `useCalendarAggregated.ts`
 
-Aggregates events from multiple sources (Google Calendar, Trello, schedules, runs) via the calendar adapter pattern.
+Aggregates events from multiple sources (Google Calendar, Trello, Taskwarrior, schedules, runs) via the calendar adapter pattern. Returns `{ events, sources, isLoading, setSourceColor }`.
 
 ### `useCalendarColors.ts`
 
@@ -633,32 +690,67 @@ Manages custom colors per calendar source (persisted in `localStorage`).
 
 | Hook | Type | Description |
 |---|---|---|
-| `useConversionSuggestions()` | Query | Suggestions for workflow conversions |
-| `useCreateConversion()` | Mutation | Convert agentic run into deterministic workflow |
+| `useConversionSuggestion(runId, enabled)` | Query | AI-generated workflow suggestion from a run |
+| `useCreateWorkflowFromSuggestion()` | Mutation | Create workflow from conversion suggestion |
 
 ### `useLearning.ts`
 
 | Hook | Type | Description |
 |---|---|---|
-| `useLearningDashboard()` | Query | Learning dashboard data |
-| `useLearningStats()` | Query | Success rates and statistics |
+| `useDashboard(days, projectId?)` | Query | Learning dashboard data (auto-poll 30s) |
+| `usePlatformStats()` | Query | Platform-wide statistics |
+| `useRateRun()` | Mutation | Rate workflow run |
 
 ### `useReports.ts`
 
 | Hook | Type | Description |
 |---|---|---|
-| `useReports()` | Query | All generated reports |
+| `useReportsList()` | Query | List of available reports |
+| `useReportContent(name)` | Query | Content of a specific report |
 
 ### `useTemplates.ts`
 
 | Hook | Type | Description |
 |---|---|---|
 | `useTemplates()` | Query | All workflow templates |
-| `useCreateFromTemplate()` | Mutation | Create workflow from template |
+| `useCreateTemplate()` | Mutation | Create workflow template |
+| `useSaveWorkflowAsTemplate()` | Mutation | Save existing workflow as template |
+
+### `useDeadLetters.ts`
+
+| Hook | Type | Description |
+|---|---|---|
+| `useDeadLetters(status, page, size)` | Query | Paginated dead letter queue entries |
+| `useRetryDeadLetter()` | Mutation | Retry dead letter entry |
+| `useDiscardDeadLetter()` | Mutation | Discard dead letter entry |
+
+### `useLatestRunStatuses.ts`
+
+| Hook | Type | Description |
+|---|---|---|
+| `useLatestRunStatuses(size)` | Hook | Map of workflow ID → latest run status (derived from `useAllRuns`) |
+
+### `usePaletteHistory.ts`
+
+| Hook | Type | Description |
+|---|---|---|
+| `usePaletteHistory(contextId)` | Hook | Recent/pinned IDs for the command palette (localStorage-based) |
+
+### `useTodoOverview.ts`
+
+| Hook | Type | Description |
+|---|---|---|
+| `useTodoOverview()` | Query | Cross-project cockpit overview with per-project rollups |
+
+### `useWorkflowDebug.ts`
+
+| Hook | Type | Description |
+|---|---|---|
+| `useBrokenWorkflows()` | Query | Workflows with failed last run (auto-poll 30s) |
 
 ### `useIsMobile.ts`
 
-Responsive hook, detects mobile breakpoint for adaptive UI adjustments.
+Responsive hook, detects mobile breakpoint (max-width: 1023px) for adaptive UI adjustments.
 
 ## Internationalization (i18n)
 
@@ -670,19 +762,37 @@ Responsive hook, detects mobile breakpoint for adaptive UI adjustments.
 
 ### Translation Structure
 
+~1,250 leaf strings in 34+ top-level keys (excerpt):
+
 ```
-common (24 keys) ─── General labels (Create, Delete, Search, ...)
-nav (7 keys) ─────── Navigation (Dashboard, Projects, ...)
-dashboard (8 keys) ─ Dashboard texts
-projects (11 keys) ─ Projects + nested types & statuses
-workflows (18 keys)  Workflows + block types & execution
-skills (10 keys) ─── Skills + categories
-schedules (7 keys) ─ Schedules
-webhooks (7 keys) ── Webhooks
-settings (16 keys) ─ Settings
-toast (26 keys) ──── Toast messages
-templates (13 keys)  Workflow templates
-charts (5 keys) ──── Chart labels
+common (~46 keys) ──── General labels (create, delete, search, ...)
+nav (~27 keys) ──────── Navigation (dashboard, projects, ...)
+simple (~95 keys) ───── Simple mode texts (home, workflows, runs, ...)
+dashboard (~26 keys) ── Dashboard texts
+projects (~52 keys) ─── Projects + onboarding, types, status
+workflows (~155 keys)   Workflows + block types, execution, gate, agentic
+skills (~13 keys) ───── Skills + categories
+schedules (~55 keys) ── Schedules + weekdays
+webhooks (8 keys) ───── Webhooks
+integrations (~40 keys) Integration providers
+calendar (~8 keys) ──── Calendar + sources
+notifications (~16 keys) Notifications
+todoTriggers (~17 keys) Todo triggers
+completionTriggers (~15 keys) Completion triggers
+settings (~150 keys) ── Settings (general, execution, staging, testing)
+toast (~60 keys) ────── Toast messages
+templates (~14 keys) ── Workflow templates
+pool (7 keys) ───────── Workflow pool
+insights (~75 keys) ─── Platform insights
+runs (~16 keys) ──────── Run overview
+activityLog (~12 keys)  Activity log
+todos (~38 keys) ────── Todos + status, priorities, sources
+wishes (~55 keys) ───── Wishes + status, iteration
+chains (~27 keys) ───── Chains + execution
+factory (~40 keys) ──── Workflow factory
+assistant (~22 keys) ── Assistant
+commandPalette (~28 keys) Command palette
+charts (~10 keys) ───── Chart labels
 ```
 
 ## PWA Configuration
@@ -690,10 +800,10 @@ charts (5 keys) ──── Chart labels
 Configured via `vite-plugin-pwa` in `vite.config.ts`:
 
 - **Name:** MySuricates
-- **Short Name:** AutoPilot
+- **Short name:** MySuricates
 - **Display:** Standalone
-- **Theme Color:** `#0f172a`
-- **Service Worker:** Auto-update
+- **Theme color:** `#231e19`
+- **Service worker:** Auto-update
 - **Icon:** `/icons/icon.svg` (SVG, maskable)
 
 ## API Client (`src/api/client.ts`)
@@ -705,13 +815,16 @@ class ApiClient {
   getHeaders() → { Content-Type: application/json, X-API-Key: ... }
 
   get<T>(path) → Promise<T>
-  post<T>(path, body?) → Promise<T>
+  post<T>(path, body?, options?) → Promise<T>
   put<T>(path, body?) → Promise<T>
+  patch<T>(path, body?) → Promise<T>
   delete<T>(path) → Promise<T>
 }
 ```
 
-Errors are thrown as `ApiError` with `{ error, timestamp, fieldErrors? }`.
+Errors are thrown as `ApiError` with `{ error, timestamp, fieldErrors? }`. Requests have a 300-second timeout via `AbortController`.
+
+Standalone exports: `openPath(path)` opens a file path via the backend, `apiErrorMessage(err, fallback)` extracts error messages from API responses.
 
 The API key is read from the `settingsStore` and automatically appended to all requests.
 
@@ -721,7 +834,7 @@ In `vite.config.ts`:
 
 | Path | Target | Description |
 |---|---|---|
-| `/api/*` | `http://localhost:9090` | REST API |
-| `/ws/*` | `ws://localhost:9090` | WebSocket (STOMP/SockJS) |
+| `/api` | `http://localhost:9090` | REST API |
+| `/ws` | `ws://localhost:9090` | WebSocket (STOMP/SockJS) |
 
-The dev server runs on port 3000 and proxies all API requests to the backend on port 9090.
+The dev server runs on port 3000 (`strictPort`) and proxies all API requests to the backend on port 9090. Via `CYPRESS_TARGET=test`, the proxy targets are redirected to port 8090. HTTPS is automatically enabled when `../certs/dev.crt` and `../certs/dev.key` exist.
