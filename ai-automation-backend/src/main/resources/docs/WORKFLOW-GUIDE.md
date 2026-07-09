@@ -63,7 +63,7 @@ Zugriff in Block-Configs mit `{{ filepath }}` oder `{{ language }}`.
 
 ## 2. Block-Typ-Referenz
 
-MySuricates unterstuetzt 13 Block-Typen. Jeder Block hat einen `type` und eine `config`-Map.
+MySuricates unterstuetzt 14 Block-Typen. Jeder Block hat einen `type` und eine `config`-Map.
 
 ### Allgemeine Block-Eigenschaften
 
@@ -100,7 +100,7 @@ Sendet den Prompt an die Claude CLI auf dem Host. Keine Shell-Ausfuehrung.
 | Config-Schluessel | Typ | Default | Beschreibung |
 |---|---|---|---|
 | `command` | string | **erforderlich** | Der Prompt, der an Claude gesendet wird |
-| `timeout_seconds` | int | 300 | Claude-CLI-Timeout |
+| `timeout_seconds` | int | null | Claude-CLI-Timeout (wenn null, gilt der globale `automation.host-claude.timeout-seconds`-Wert) |
 
 ```json
 {
@@ -124,7 +124,9 @@ Fuehrt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 | `command` | string | **erforderlich** | Shell-Befehl(e) zur Ausfuehrung |
 | `container_image` | string | null | Docker-Image (siehe Ausfuehrungsumgebung) |
 | `timeout_seconds` | int | 300 | Ausfuehrungs-Timeout |
+| `shell_escape_variables` | bool | false | Template-Variablen POSIX-sicher escapen (Single-Quotes) |
 | `mount_docker_socket` | bool | false | Docker-Socket in den Container mounten (nur wirksam wenn `container_image` gesetzt) |
+| `mounts` | list | `[]` | Zusaetzliche Docker-Volume-Mounts im Format `host:container[:ro\|rw]` (nur wirksam wenn `container_image` gesetzt) |
 
 ```json
 {
@@ -210,7 +212,7 @@ Wertet eine Bedingung aus und fuehrt einen von zwei Zweigen aus.
 | Config-Schluessel | Typ | Default | Beschreibung |
 |---|---|---|---|
 | `condition` | string | **erforderlich** | Auszuwertende Bedingung |
-| `then_command` | string | **erforderlich** | Befehl wenn Bedingung wahr |
+| `then_command` | string | null | Befehl wenn Bedingung wahr (wenn null, wird nichts ausgefuehrt) |
 | `else_command` | string | null | Befehl wenn Bedingung falsch |
 | `execution_mode` | string | `"claude"` | `"claude"` (KI) oder `"shell"` |
 | `timeout_seconds` | int | 300 | Ausfuehrungs-Timeout |
@@ -390,6 +392,7 @@ Pausiert die Ausfuehrung um Freitext-Eingaben vom Benutzer zu sammeln.
 | `validation_pattern` | string | — | Regex-Pattern zur Validierung |
 | `timeout_minutes` | int | 30 | Wartezeit |
 | `use_default_on_timeout` | bool | **true** | Bei Timeout den Standardwert verwenden statt fehlzuschlagen |
+| `fields` | list | `[]` | Multi-Field-Formular: jeder Eintrag hat `variable_name`, `label`, `input_type`, `required`, `default_value`, `options`, `placeholder`, `description`, `validation_pattern` |
 
 ```json
 {
@@ -510,6 +513,7 @@ Variablen verwenden doppelte Klammern: `{{ variable_name }}` (Leerzeichen option
 |---|---|---|
 | `{{ previous_output }}` | Auto | Ausgabe des vorherigen Blocks (Step N-1) |
 | `{{ step_N_output }}` | Auto | Ausgabe von Step N (z.B. `{{ step_0_output }}` fuer den ersten Block) |
+| `{{ block.<name>.output }}` | Auto | Ausgabe eines benannten Blocks (Block muss ein `name`-Feld haben) |
 | `{{ previous_chain_output }}` | Auto | Ausgabe des vorherigen Chain-Eintrags (nur Chains) |
 | `{{ item }}` / `{{ <variable_name> }}` | ForEach | Aktuelles Schleifen-Item |
 
@@ -522,11 +526,18 @@ Folgende Variablen werden vom `WorkflowExecutor` automatisch bei jedem Run geset
 | `{{ workflow_run_id }}` | Eindeutige Run-ID |
 | `{{ workflow_id }}` | Workflow-ID |
 | `{{ workflow_name }}` | Workflow-Name |
-| `{{ project_path }}` | Projektpfad |
+| `{{ project_id }}` | Projekt-ID (oder leer) |
+| `{{ project_path }}` | Projektpfad (oder leer) |
 | `{{ model }}` | Konfiguriertes Modell (oder leer) |
 | `{{ provider }}` | Konfigurierter AI-Provider (oder leer) |
 | `{{ started_at }}` | Startzeitpunkt des Runs (ISO-8601, z.B. `2026-04-22T21:30:45.123Z`) |
-| `{{ run_timestamp }}` | Pfadsicherer Timestamp (UTC, Format `yyyyMMdd-HHmmss`, z.B. `20260422-213045`) — ideal für Output-Verzeichnisse pro Run |
+| `{{ run_timestamp }}` | Pfadsicherer Timestamp (UTC, Format `yyyyMMdd-HHmmss`, z.B. `20260422-213045`) — ideal fuer Output-Verzeichnisse pro Run |
+| `{{ home_dir }}` | Home-Verzeichnis des JVM-Benutzers |
+| `{{ user }}` | Betriebssystem-Benutzername |
+| `{{ workflow_version }}` | Aktuelle Versionsnummer des Workflows |
+| `{{ workflow_changed_since_last_run }}` | `"true"` oder `"false"` — ob sich der Workflow seit dem letzten Run geaendert hat |
+| `{{ previous_report }}` | Laengster Non-Shell-Step-Output des letzten COMPLETED-Runs desselben Workflows (max. 3000 Zeichen), oder `"(kein vorheriger Report vorhanden)"` |
+| `{{ open_todos }}` | Markdown-Liste offener/in-Bearbeitung-TODOs des Projekts, oder `"(keine offenen TODOs)"` |
 
 ### Kontext-Variablen
 
@@ -561,7 +572,7 @@ Antworten aus `approval`- und `human-input`-Bloecken werden als Kontext-Variable
 
 ## 4. Bewaehrte Workflow-Patterns
 
-Diese Patterns sind aus den 40+ eingebauten Templates destilliert. Jedes Pattern hat eine klare Struktur und einen Anwendungsfall.
+Diese Patterns sind aus den 65+ eingebauten Templates destilliert. Jedes Pattern hat eine klare Struktur und einen Anwendungsfall.
 
 ### Pattern 1: Sequentielle Simple-Kette
 
@@ -693,6 +704,42 @@ Block 5 (conditional): Rollback bei Fehler
 Block 6 (approval): Menschliche Freigabe vor Push
 Block 7 (shell): Push + PR erstellen (oder abbrechen)
 ```
+
+---
+
+### Pattern 8: Bildgenerierung via Codex (imagegen-Skill)
+
+**Struktur**: `shell` (Projektkontext lesen) -> `simple` (Bild-Prompt destillieren, Opus) -> `shell` (Codex generiert, Bash kopiert)
+
+Erzeugt ein Raster-Bild (Hero, Cover, Illustration) **ohne tiefe Plattform-Integration**: ein `shell`-Block ruft die auf dem Host installierte Codex-CLI (`codex exec`) mit dem `imagegen`-Skill auf. Das built-in `image_gen`-Tool nutzt `gpt-image-2` und braucht **keinen `OPENAI_API_KEY`** (Codex' eigener Login). Der destillierte Prompt fliesst per `{{ block.prompt.output }}` in den Codex-Block.
+
+**Anwendungsfall**: App-Hero/Cover aus Projektkontext ableiten, Marketing-Bilder, Illustrationen.
+
+```bash
+set -euo pipefail
+TS=$(date +%Y%m%d-%H%M%S)
+OUT="assets/generated/hero-$TS.png"
+mkdir -p "$(dirname "$OUT")"
+GENDIR="${CODEX_HOME:-$HOME/.codex}/generated_images"
+MARKER="$(mktemp)"
+DESC={{ block.prompt.output }}   # Block-Config: shell_escape_variables: true -> sicher gequotet
+# Codex NUR generieren lassen (siehe Fallen); das Kopieren macht der Workflow-Bash.
+timeout 240 codex exec --skip-git-repo-check --sandbox workspace-write -C "$PWD" \
+  "Nutze imagegen (built-in image_gen), erzeuge GENAU EIN Bild 1536x1024. Keine Shell/Validierung/Kopie. Bildbeschreibung: $DESC" </dev/null || true
+IMG=$(find "$GENDIR" -name '*.png' -newer "$MARKER" -printf '%T@ %p\n' | sort -rn | head -1 | cut -d' ' -f2-)
+cp "$IMG" "$OUT" && echo "IMAGE_PATH=$PWD/$OUT"
+```
+
+**Zwei Fallen (beide zwingend):**
+1. **stdin auf `/dev/null`** — `codex exec` liest stdin bis EOF (auch wenn der Prompt als Argument uebergeben wird). Ohne `</dev/null` erbt Codex vom Backend eine stdin ohne EOF und **blockiert bis zum Block-Timeout**.
+2. **Codex nicht selbst kopieren lassen** — Codex' Shell-Sandbox (bubblewrap) startet im Backend-Kontext nicht (`bwrap: loopback: … Operation not permitted`); jeder von Codex gestartete Shell-/`cp`-/`view_image`-Befehl scheitert. Deshalb Codex **nur generieren** lassen (built-in `image_gen` speichert nach `$CODEX_HOME/generated_images/<session>/ig_*.png`) und die Datei mit dem **Workflow-Bash** kopieren (der laeuft ohne bwrap). `timeout … || true` kappt Codex' Retry-Schleifen; das Bild ist zu dem Zeitpunkt bereits gespeichert.
+
+**Grenzen:**
+- **Nur auf dem Dev-Host** — Codex ist in den Docker-Containern (Stable/Test) nicht installiert/eingeloggt → dort Exit 127.
+- Umgeht das CLI-Semaphore (`HostClaudeService`), da direkter Shell-Aufruf.
+- Der Block liefert den **Pfad**, nicht das Bild — Anzeige im Run-UI braeuchte Artefakt-Handling.
+
+**Beispiel-Workflow**: „Bild aus Projektkontext generieren" (Projekt „Deutschlandticket Entdecker").
 
 ---
 
@@ -926,7 +973,7 @@ RICHTIG: "In /home/user/project/src/main/java/com/example/UserService.java
 
 ### History-Komprimierung
 
-Nach 7 Turns werden aeltere Turns zusammengefasst um das Context-Window zu verwalten. Das bedeutet, fruehere Beobachtungen koennen komprimiert werden. Ziele und Erfolgskriterien so gestalten, dass sie aus dem juengsten Kontext auswertbar sind.
+Wenn die History mehr als 7 Eintraege hat, werden mittlere Turns zusammengefasst — der erste Turn (initialer Prompt) und die letzten 4 Turns bleiben vollstaendig erhalten. Das bedeutet, fruehere Beobachtungen koennen komprimiert werden. Ziele und Erfolgskriterien so gestalten, dass sie aus dem juengsten Kontext auswertbar sind.
 
 ### Verschmutzung durch veraltete Dateien
 
@@ -1042,7 +1089,7 @@ Chains gruppieren mehrere Workflows zur **sequentiellen Ausfuehrung**.
 - **Projektuebergreifend**: Eine Chain kann Workflows aus beliebigen Projekten referenzieren
 - **Sequentiell**: Workflows laufen nacheinander (nicht parallel)
 - **Kontextweitergabe**: Jeder Eintrag kann auf `{{ previous_chain_output }}` des letzten abgeschlossenen Workflows zugreifen
-- **stopOnFailure**: Steuert ob die Chain bei Workflow-Fehler stoppt (konfigurierbar pro Chain und pro Eintrag)
+- **stopOnFailure**: Steuert ob die Chain bei Workflow-Fehler stoppt — stoppt nur wenn **beide** Flags gesetzt sind (Chain-Level UND Entry-Level muessen `true` sein)
 
 ### Chain-Struktur
 
@@ -1069,15 +1116,22 @@ Chains gruppieren mehrere Workflows zur **sequentiellen Ausfuehrung**.
 ### API
 
 ```
-POST   /api/v1/chains              # Chain erstellen
-POST   /api/v1/chains/{id}/execute  # Ausfuehrung starten
-DELETE /api/v1/chains/{id}          # Chain loeschen
+GET    /api/v1/chains                      # Alle Chains auflisten
+POST   /api/v1/chains                      # Chain erstellen
+GET    /api/v1/chains/{id}                 # Chain abrufen
+PUT    /api/v1/chains/{id}                 # Chain aktualisieren
+DELETE /api/v1/chains/{id}                 # Chain loeschen
+POST   /api/v1/chains/{id}/execute         # Ausfuehrung starten
+GET    /api/v1/chains/runs                 # Alle Chain-Runs auflisten
+GET    /api/v1/chains/{id}/runs            # Runs einer Chain auflisten
+GET    /api/v1/chains/{id}/runs/{runId}    # Einzelnen Run abrufen
+POST   /api/v1/chains/runs/{runId}/cancel  # Run abbrechen
 ```
 
 ### Limits
 
 - Polling-basierte Fertigstellungspruefung (2s Intervall)
-- 30-Minuten-Timeout pro Workflow in der Chain
+- 180-Minuten-Timeout pro Workflow in der Chain (3 Stunden, konfigurierbar via `automation.chain.workflow-timeout-minutes`)
 
 ---
 
@@ -1185,7 +1239,7 @@ Wenn der Provider nicht verbunden ist oder die API fehlschlaegt, wird der Block 
 
 ## Anhang: Template-Kurzreferenz
 
-Alle 40+ eingebauten Templates mit ihrem primaeren Pattern:
+Alle 65+ eingebauten Templates mit ihrem primaeren Pattern:
 
 | Template | Pattern | Kategorie |
 |---|---|---|
@@ -1220,16 +1274,41 @@ Alle 40+ eingebauten Templates mit ihrem primaeren Pattern:
 | `architecture-debt-radar` | Audit-Pipeline | CODE |
 | `test-coverage-gaps` | Audit-Pipeline | CODE |
 | `audit-fix-pr-pipeline` | Mehrstufig + Freigabe | CODE |
+| `auto-fix-java` | Mehrstufig + Freigabe | CODE |
+| `auto-fix-python` | Mehrstufig + Freigabe | CODE |
+| `auto-fix-typescript` | Mehrstufig + Freigabe | CODE |
 | `hunt-quality-pipeline` | Mehrstufige Pipeline | CODE |
 | `folder-backup` | Shell-Kette | UTILITY |
+| `github-issues-export` | Shell | TEAM |
+| `github-issues-import` | Shell | TEAM |
+| `github-issues-sync` | Shell-Kette | TEAM |
 | `github-project-bootstrap` | Shell-Kette | CODE |
 | `dependency-update-check` | Shell + Conditional | CODE |
+| `log-rotate-cleanup` | Shell sammeln + KI analysieren | INFRA |
+| `pool-neutrality-audit` | Audit-Pipeline | QUALITY |
+| `pr-review-summary` | Shell sammeln + KI analysieren | TEAM |
+| `research-enhance` | Sequentielle Simple-Kette | RESEARCH |
+| `saas-auto-fix` | Analysieren + Agentic + Verifizieren | CODE |
+| `saas-containerize` | Shell + Freigabe | DEPLOY |
+| `saas-continuous-improve` | Shell sammeln + KI analysieren | AUTOMATION |
+| `saas-doc-update` | Agentic | DOCS |
+| `saas-feature-implement` | Analysieren + Agentic + Verifizieren | CODE |
+| `saas-feature-loop` | Shell scannen + ForEach | TRANSFORM |
+| `saas-marketing-site` | Analysieren + Agentic | CONTENT |
+| `saas-scaffold` | Shell-Kette | TRANSFORM |
+| `saas-spec-to-buildplan` | Document + Analysieren + Freigabe | BUSINESS |
 | `secret-scanner` | Shell + Conditional | CODE |
+| `service-health-monitor` | Shell scannen + ForEach + KI | INFRA |
+| `sprint-retrospective` | Shell sammeln + KI analysieren | TEAM |
+| `ssl-cert-check` | ForEach + KI analysieren | INFRA |
+| `standup-from-git` | Shell sammeln + KI analysieren | TEAM |
 | `container-vuln-scan` | Shell + Conditional | CODE |
 | `database-backup-verify` | Shell-Kette | CODE |
 | `directory-sync` | Shell-Kette | UTILITY |
 | `docker-image-build-push` | Shell + Conditional | CODE |
+| `test-matrix` | Shell scannen + ForEach + Skill | CODE |
 | `todo-creator` | Agentic | UTILITY |
+| `topic-deep-dive` | Sequentielle Simple-Kette | RESEARCH |
 
 ---
 
@@ -1242,7 +1321,7 @@ Auto-Repair ist der Self-Healing-Mechanismus der Plattform: Wenn ein Workflow fe
 1. **Erkennung** — Ein `WorkflowRunCompletedEvent` mit Status `FAILED` wird erkannt
 2. **Analyse** — Die KI (`WorkflowTextGenerator`) analysiert den Fehler und die aktuellen Blocks
 3. **Fix** — Korrigierte Blocks werden als JSON generiert und im Workflow gespeichert
-4. **Verifikation** — Der reparierte Workflow wird erneut ausgeführt (bis zu 2 Versuche)
+4. **Verifikation** — Der reparierte Workflow wird erneut ausgeführt (Default: bis zu 2 Versuche, konfigurierbar 1–5)
 5. **Loop-Schutz** — Repair-Runs werden mit `autoRepairAttempt=true` markiert, um Endlosschleifen zu verhindern
 
 ### Repair-Modi
@@ -1265,11 +1344,20 @@ Auto-Repair ist der Self-Healing-Mechanismus der Plattform: Wenn ein Workflow fe
   "metadata": {
     "autoRepair": {
       "enabled": true,
-      "mode": "auto"
+      "mode": "auto",
+      "maxRetries": 3,
+      "timeoutSeconds": 900
     }
   }
 }
 ```
+
+| Feld | Default | Bereich | Beschreibung |
+|------|---------|---------|-------------|
+| `enabled` | false | — | Auto-Repair aktivieren |
+| `mode` | `"auto"` | `auto`/`test`/`local` | Repair-Modus |
+| `maxRetries` | 2 | 1–5 | Maximale Reparaturversuche |
+| `timeoutSeconds` | 600 (10 Min) | 60–3600 | Timeout pro Reparaturversuch |
 
 Priorität: Workflow-Metadata > Globales Setting > Default (`auto`, deaktiviert).
 
@@ -1280,11 +1368,14 @@ Priorität: Workflow-Metadata > Globales Setting > Default (`auto`, deaktiviert)
 | Einzelnen Workflow reparieren | POST | `/api/v1/workflows/{id}/repair` |
 | Alle fehlgeschlagenen reparieren | POST | `/api/v1/system/repair-failed?force=false` |
 | Globalen Repair-Modus setzen | PUT | `/api/v1/system/settings/auto-repair-mode` — body: `{"value": "auto"}` |
+| Max-Retries setzen | PUT | `/api/v1/system/settings/auto-repair-max-retries` — body: `{"value": "3"}` |
+| Timeout setzen | PUT | `/api/v1/system/settings/auto-repair-timeout-seconds` — body: `{"value": "900"}` |
 
 ### Hinweise
 
 - Im Modus `auto` oder `local` braucht die Test-Instanz **nicht** zu laufen
-- Maximal 2 Reparaturversuche pro Fehlschlag (hardcoded)
+- Default 2 Reparaturversuche pro Fehlschlag (konfigurierbar 1–5 via Metadata oder Global Setting `auto-repair-max-retries`)
+- Default 600s Timeout pro Versuch (konfigurierbar 60–3600 via Metadata oder Global Setting `auto-repair-timeout-seconds`)
 - Repair-Runs erscheinen im ActivityLog
 - Die KI-Reparatur nutzt das konfigurierte `WorkflowTextGenerator`-Interface (Claude oder Codex)
 
@@ -1314,11 +1405,22 @@ Audit-Workflow → AutoTodoService → TODO (OPEN)
   "targetWorkflowId": "<fix-workflow-id>",
   "description": "Backend-Bugs automatisch fixen",
   "maxAttempts": 3,
-  "autoClose": true
+  "autoClose": true,
+  "enabled": true,
+  "processBacklog": true,
+  "contextTemplate": {}
 }
 ```
 
-**Tag-Matching**: Komma-separiert mit AND-Semantik. Alle Tags im Pattern müssen im TODO vorhanden sein. Beispiel: `"backend,bug"` matcht ein TODO mit Tags `["backend", "bug", "security"]`, aber nicht `["backend", "feature"]`.
+**Tag-Matching**: Komma-separiert mit AND-Semantik. Alle Tags im Pattern muessen im TODO vorhanden sein. Beispiel: `"backend,bug"` matcht ein TODO mit Tags `["backend", "bug", "security"]`, aber nicht `["backend", "feature"]`.
+
+**Weitere Felder**:
+
+| Feld | Default | Beschreibung |
+|------|---------|-------------|
+| `enabled` | `true` | Trigger aktiv/inaktiv |
+| `processBacklog` | `true` | Bestehende offene TODOs nachträglich verarbeiten (Polling alle 5 Min, max 1 pro Tick) |
+| `contextTemplate` | `{}` | Statische Key-Value-Paare, die zusaetzlich zum TODO-Kontext an den Fix-Workflow uebergeben werden |
 
 ### Optionale Filter
 
@@ -1326,7 +1428,7 @@ Audit-Workflow → AutoTodoService → TODO (OPEN)
 |------|-------------|----------|
 | `projectId` | Nur TODOs aus diesem Projekt | `"ebf4f50c-..."` |
 | `sourceFilter` | Nur TODOs aus dieser Quelle | `"WORKFLOW"` |
-| `minPriority` | Mindest-Priorität (HIGH, MEDIUM, LOW) | `"HIGH"` |
+| `minPriority` | Mindest-Prioritaet (HIGH, MEDIUM, LOW) | `"HIGH"` |
 
 ### Kontext-Variablen im Fix-Workflow
 
@@ -1337,13 +1439,27 @@ Der Fix-Workflow erhält automatisch diese Variablen:
 | `todo_id` | UUID des TODOs |
 | `todo_title` | Titel |
 | `todo_description` | Beschreibung (Markdown) |
-| `todo_tags` | Komma-separierte Tags |
+| `todo_tags` | Tags als JSON-String (z.B. `["backend","bug"]`) |
 | `todo_priority` | HIGH / MEDIUM / LOW |
 | `todo_project_id` | Projekt-UUID |
 | `todo_source` | USER / AI / WORKFLOW |
 | `todo_reference_type` | z.B. `WORKFLOW_RUN` |
 | `todo_reference_id` | Run-UUID |
 | `todo_trigger_id` | Trigger-UUID |
+
+Zusaetzlich werden alle Eintraege aus `contextTemplate` des Triggers als weitere Variablen uebergeben.
+
+### API
+
+| Methode | Pfad | Beschreibung |
+|---------|------|-------------|
+| GET | `/api/v1/todo-triggers` | Alle Trigger auflisten |
+| GET | `/api/v1/todo-triggers/{id}` | Einzelnen Trigger abrufen |
+| GET | `/api/v1/todo-triggers/workflow/{workflowId}` | Trigger nach Ziel-Workflow |
+| POST | `/api/v1/todo-triggers` | Trigger erstellen |
+| POST | `/api/v1/todo-triggers/{id}/enable` | Trigger aktivieren |
+| POST | `/api/v1/todo-triggers/{id}/disable` | Trigger deaktivieren |
+| DELETE | `/api/v1/todo-triggers/{id}` | Trigger loeschen |
 
 ### Loop-Prevention (3 Schichten)
 
