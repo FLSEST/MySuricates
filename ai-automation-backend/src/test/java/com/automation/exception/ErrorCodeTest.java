@@ -15,7 +15,7 @@ class ErrorCodeTest {
 
     @Test
     void should_containAllExpectedValues_when_enumValuesQueried() {
-        assertThat(ErrorCode.values()).hasSize(11)
+        assertThat(ErrorCode.values()).hasSize(14)
                 .containsExactly(
                         ErrorCode.RESOURCE_NOT_FOUND,
                         ErrorCode.VALIDATION_FAILED,
@@ -24,6 +24,9 @@ class ErrorCodeTest {
                         ErrorCode.CONTAINER_ERROR,
                         ErrorCode.STAGING_ERROR,
                         ErrorCode.STATE_CONFLICT,
+                        ErrorCode.NO_TASK_TARGET,
+                        ErrorCode.PROVIDER_NOT_CONNECTED,
+                        ErrorCode.PROVIDER_NOT_TASK_CAPABLE,
                         ErrorCode.SERVICE_UNAVAILABLE,
                         ErrorCode.TOKEN_BUDGET_EXCEEDED,
                         ErrorCode.OPERATION_TIMEOUT,
@@ -57,6 +60,9 @@ class ErrorCodeTest {
         assertThat(ErrorCode.VALIDATION_FAILED.getHttpStatus().is4xxClientError()).isTrue();
         assertThat(ErrorCode.INVALID_ARGUMENT.getHttpStatus().is4xxClientError()).isTrue();
         assertThat(ErrorCode.STATE_CONFLICT.getHttpStatus().is4xxClientError()).isTrue();
+        assertThat(ErrorCode.NO_TASK_TARGET.getHttpStatus().is4xxClientError()).isTrue();
+        assertThat(ErrorCode.PROVIDER_NOT_CONNECTED.getHttpStatus().is4xxClientError()).isTrue();
+        assertThat(ErrorCode.PROVIDER_NOT_TASK_CAPABLE.getHttpStatus().is4xxClientError()).isTrue();
         assertThat(ErrorCode.TOKEN_BUDGET_EXCEEDED.getHttpStatus().is4xxClientError()).isTrue();
     }
 
@@ -79,6 +85,9 @@ class ErrorCodeTest {
                 Arguments.of(ErrorCode.CONTAINER_ERROR, HttpStatus.INTERNAL_SERVER_ERROR, "Container error"),
                 Arguments.of(ErrorCode.STAGING_ERROR, HttpStatus.INTERNAL_SERVER_ERROR, "Staging error"),
                 Arguments.of(ErrorCode.STATE_CONFLICT, HttpStatus.CONFLICT, "State conflict"),
+                Arguments.of(ErrorCode.NO_TASK_TARGET, HttpStatus.BAD_REQUEST, "No task export target configured"),
+                Arguments.of(ErrorCode.PROVIDER_NOT_CONNECTED, HttpStatus.CONFLICT, "Integration provider not connected"),
+                Arguments.of(ErrorCode.PROVIDER_NOT_TASK_CAPABLE, HttpStatus.BAD_REQUEST, "Integration provider cannot receive tasks"),
                 Arguments.of(ErrorCode.SERVICE_UNAVAILABLE, HttpStatus.SERVICE_UNAVAILABLE, "Service unavailable"),
                 Arguments.of(ErrorCode.TOKEN_BUDGET_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS, "Token budget exceeded"),
                 Arguments.of(ErrorCode.OPERATION_TIMEOUT, HttpStatus.GATEWAY_TIMEOUT, "Operation timed out"),
