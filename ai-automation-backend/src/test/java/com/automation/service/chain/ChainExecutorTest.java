@@ -16,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -338,9 +339,43 @@ class ChainExecutorTest {
         ArgumentCaptor<Map<String, Object>> contextCaptor = ArgumentCaptor.forClass(Map.class);
         verify(workflowExecutor, times(2)).execute(any(Workflow.class), contextCaptor.capture());
 
+        // First entry: no prior output → placeholder must resolve to "" (not leak literally)
+        Map<String, Object> firstContext = contextCaptor.getAllValues().get(0);
+        assertThat(firstContext).containsEntry("previous_chain_output", "");
+        assertThat(firstContext).containsEntry("env", "test");
+
         Map<String, Object> secondContext = contextCaptor.getAllValues().get(1);
         assertThat(secondContext).containsEntry("previous_chain_output", "first-output");
         assertThat(secondContext).containsEntry("env", "test");
+    }
+
+    @Test
+    void cleanupZombieChainRuns_marksNestedEntryRunsInterrupted() {
+        ChainRunEntry runningEntry = ChainRunEntry.builder()
+                .entryIndex(0).workflowId("wf-1").status(RunStatus.RUNNING)
+                .startedAt(Instant.now()).build();
+        ChainRunEntry completedEntry = ChainRunEntry.builder()
+                .entryIndex(1).workflowId("wf-2").status(RunStatus.COMPLETED)
+                .startedAt(Instant.now()).completedAt(Instant.now()).build();
+        ChainRun zombie = ChainRun.builder()
+                .id("zombie-1").status(RunStatus.RUNNING).startedAt(Instant.now())
+                .entryRuns(new ArrayList<>(List.of(runningEntry, completedEntry)))
+                .build();
+
+        when(chainRunRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of(zombie));
+        when(chainRunRepository.findByStatus(RunStatus.PAUSED)).thenReturn(List.of());
+
+        chainExecutor.cleanupZombieChainRuns();
+
+        ArgumentCaptor<ChainRun> captor = ArgumentCaptor.forClass(ChainRun.class);
+        verify(chainRunRepository).save(captor.capture());
+        ChainRun saved = captor.getValue();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.INTERRUPTED);
+        // RUNNING entry reconciled to INTERRUPTED + completedAt
+        assertThat(saved.getEntryRuns().get(0).getStatus()).isEqualTo(RunStatus.INTERRUPTED);
+        assertThat(saved.getEntryRuns().get(0).getCompletedAt()).isNotNull();
+        // Already-COMPLETED entry left untouched
+        assertThat(saved.getEntryRuns().get(1).getStatus()).isEqualTo(RunStatus.COMPLETED);
     }
 
     @Test

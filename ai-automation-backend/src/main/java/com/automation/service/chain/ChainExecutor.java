@@ -106,10 +106,24 @@ public class ChainExecutor {
         }
         log.warn("Found {} chain-run(s) stuck in RUNNING/PAUSED — marking as INTERRUPTED", zombies.size());
         for (ChainRun zombie : zombies) {
+            Instant completedAt = Instant.now();
             zombie.setStatus(RunStatus.INTERRUPTED);
-            zombie.setCompletedAt(Instant.now());
+            zombie.setCompletedAt(completedAt);
             if (zombie.getStartedAt() != null) {
-                zombie.setDurationMs(zombie.getCompletedAt().toEpochMilli() - zombie.getStartedAt().toEpochMilli());
+                zombie.setDurationMs(completedAt.toEpochMilli() - zombie.getStartedAt().toEpochMilli());
+            }
+            // Also reconcile the nested entryRuns — otherwise the UI shows an INTERRUPTED chain
+            // whose entries are still stuck on RUNNING/PAUSED (inconsistent status).
+            if (zombie.getEntryRuns() != null) {
+                for (ChainRunEntry entryRun : zombie.getEntryRuns()) {
+                    if (entryRun.getStatus() == RunStatus.RUNNING || entryRun.getStatus() == RunStatus.PAUSED) {
+                        entryRun.setStatus(RunStatus.INTERRUPTED);
+                        entryRun.setCompletedAt(completedAt);
+                        if (entryRun.getStartedAt() != null) {
+                            entryRun.setDurationMs(completedAt.toEpochMilli() - entryRun.getStartedAt().toEpochMilli());
+                        }
+                    }
+                }
             }
             chainRunRepository.save(zombie);
         }
@@ -181,9 +195,9 @@ public class ChainExecutor {
                 if (entry.getInputContext() != null) {
                     context.putAll(entry.getInputContext());
                 }
-                if (previousOutput != null) {
-                    context.put("previous_chain_output", previousOutput);
-                }
+                // Always set it (empty string for the first entry) so {{ previous_chain_output }}
+                // resolves instead of leaking the literal placeholder to the LLM.
+                context.put("previous_chain_output", previousOutput != null ? previousOutput : "");
 
                 run.getEntryRuns().add(runEntry);
                 chainRunRepository.save(run);
