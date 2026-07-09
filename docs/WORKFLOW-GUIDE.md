@@ -530,6 +530,7 @@ Folgende Variablen werden vom `WorkflowExecutor` automatisch bei jedem Run geset
 | `{{ project_path }}` | Projektpfad (oder leer) |
 | `{{ model }}` | Konfiguriertes Modell (oder leer) |
 | `{{ provider }}` | Konfigurierter AI-Provider (oder leer) |
+| `{{ effort }}` | Konfigurierter Reasoning-Effort (oder leer) |
 | `{{ started_at }}` | Startzeitpunkt des Runs (ISO-8601, z.B. `2026-04-22T21:30:45.123Z`) |
 | `{{ run_timestamp }}` | Pfadsicherer Timestamp (UTC, Format `yyyyMMdd-HHmmss`, z.B. `20260422-213045`) — ideal fuer Output-Verzeichnisse pro Run |
 | `{{ home_dir }}` | Home-Verzeichnis des JVM-Benutzers |
@@ -573,6 +574,19 @@ Antworten aus `approval`- und `human-input`-Bloecken werden als Kontext-Variable
 ## 4. Bewaehrte Workflow-Patterns
 
 Diese Patterns sind aus den 65+ eingebauten Templates destilliert. Jedes Pattern hat eine klare Struktur und einen Anwendungsfall.
+
+### Block-Wahl: Sparsamkeits-Leiter
+
+Beim Workflow-Bau gilt dieselbe YAGNI-Logik wie beim Code — die erste zutreffende Stufe gewinnt:
+
+1. **Geht es deterministisch?** → `shell`-Block (0 Tokens, schnell, reproduzierbar)
+2. **Reicht ein einzelner KI-Call?** → `simple` (1 Call) statt `agentic` (N Calls: REASON + ACT pro Iteration)
+3. **`agentic` nur**, wenn die noetigen Schritte vorab unbekannt sind und das Ergebnis verifizierbar ist
+4. **Existierender Block-Typ vor neuem Plattform-Feature** — erst die Referenz in Abschnitt 2 pruefen
+5. **Wenige Bloecke vor vielen** — jeder Block kostet Tokens, Laufzeit und ist ein eigenes Timeout-Risiko
+
+Keine Bloecke „auf Vorrat" (Zusammenfassungen, Reports, Formatierungen, die niemand liest).
+Token-Budget ist knapp: Jeder vermiedene KI-Call verlaengert die Laufzeit des Kontingents.
 
 ### Pattern 1: Sequentielle Simple-Kette
 
@@ -852,6 +866,30 @@ Via API:
 Im Workflow-Entity wird das `model`-Feld via `--model`-Flag an die Claude CLI uebergeben.
 
 **Wichtig**: Ein null-Model-Feld nutzt den System-Standard (der Sonnet sein kann). Wenn Opus benoetigt wird, explizit setzen.
+
+### Reasoning-Effort (Denkaufwand)
+
+Zusaetzlich zum Modell kann pro Workflow ein einheitlicher Effort-Level gesetzt werden (`workflow.effort`-Feld, UI: Sidebar → „Denkaufwand"). Gueltige Werte: `low`, `medium`, `high`, `xhigh`. Unset (null) = Provider-Default, es wird **kein** Flag emittiert.
+
+| Provider | CLI-Mapping | Hinweise |
+|---|---|---|
+| Claude | `--effort <level>` | REASON- und ACT-Aufrufe |
+| Pi | `--thinking <level>` | Explizites Effort gewinnt ueber die maxTurns-Heuristik; ohne Effort verhaelt sich der ACT-Pfad wie bisher (kein Flag) |
+| Codex | — | Wird ignoriert (`supportsEffort=false`), UI blendet den Regler aus |
+
+**Pro Block ueberschreiben**: Block-Config-Key `"effort"` uebersteuert das Workflow-Level (Praezedenz: Block > Workflow > Provider-Default). Ungueltige Block-Werte werden mit Warnung ignoriert.
+
+```json
+{
+  "type": "simple",
+  "config": {
+    "command": "Analysiere die Architektur ...",
+    "effort": "xhigh"
+  }
+}
+```
+
+Faustregel: `high`/`xhigh` fuer Analyse-/Audit-Bloecke, `low` fuer mechanische Transformationen. Der gesetzte Effort ist im Step-Metadata (`aiRequest.effort`) der Run-Details sichtbar.
 
 ---
 

@@ -204,6 +204,56 @@ class HostClaudeServiceTest {
         assertThat(cmd).doesNotContain("--disallowed-tools");
     }
 
+    // --- effort mapping ---
+
+    @Test
+    void buildReasonCommand_withEffort_addsEffortFlag() {
+        HostClaudeService service = createService(null, false, List.of());
+        List<String> cmd = service.buildReasonCommand("test prompt", null, null, "high");
+
+        assertThat(cmd).containsSubsequence("--effort", "high");
+    }
+
+    @Test
+    void buildReasonCommand_withoutEffort_omitsEffortFlag() {
+        HostClaudeService service = createService(null, false, List.of());
+        List<String> cmd = service.buildReasonCommand("test prompt", null, null, null);
+
+        assertThat(cmd).doesNotContain("--effort");
+    }
+
+    @Test
+    void buildActionCommand_withEffort_addsEffortFlag() {
+        HostClaudeService service = createService(null, false, List.of());
+        List<String> cmd = service.buildActionCommand("test prompt", "claude-opus-4-6", null, null, null, "xhigh");
+
+        assertThat(cmd).containsSubsequence("--effort", "xhigh");
+    }
+
+    @Test
+    void buildActionCommand_withoutEffort_omitsEffortFlag() {
+        HostClaudeService service = createService(null, false, List.of());
+        List<String> cmd = service.buildActionCommand("test prompt", null, null, null, null, null);
+
+        assertThat(cmd).doesNotContain("--effort");
+    }
+
+    @Test
+    void buildActionCommand_invalidEffort_omitsEffortFlag() {
+        HostClaudeService service = createService(null, false, List.of());
+        List<String> cmd = service.buildActionCommand("test prompt", null, null, null, null, "turbo");
+
+        assertThat(cmd).doesNotContain("--effort");
+    }
+
+    @Test
+    void buildActionCommand_effortIsCaseInsensitive() {
+        HostClaudeService service = createService(null, false, List.of());
+        List<String> cmd = service.buildActionCommand("test prompt", null, null, null, null, "Medium");
+
+        assertThat(cmd).containsSubsequence("--effort", "medium");
+    }
+
     // --- timeout behavior ---
 
     @Test
@@ -218,7 +268,7 @@ class HostClaudeServiceTest {
         // Use a service that will execute a hanging process
         HostClaudeService service = new HostClaudeService(config, perms) {
             @Override
-            List<String> buildReasonCommand(String prompt, String systemPrompt) {
+            List<String> buildReasonCommand(String prompt, String systemPrompt, Integer maxTurns, String effort) {
                 // "sleep 60" will hang for 60s, well beyond 1s timeout
                 return List.of("sleep", "60");
             }
@@ -240,7 +290,9 @@ class HostClaudeServiceTest {
 
         HostClaudeService service = new HostClaudeService(config, perms) {
             @Override
-            List<String> buildActionCommand(String prompt, String model, String systemPrompt) {
+            List<String> buildActionCommand(String prompt, String model, String systemPrompt,
+                                            List<String> callAllowedTools, List<String> callDisallowedTools,
+                                            String effort) {
                 return List.of("sleep", "60");
             }
         };
@@ -263,7 +315,7 @@ class HostClaudeServiceTest {
 
         HostClaudeService service = new HostClaudeService(config, perms) {
             @Override
-            List<String> buildReasonCommand(String prompt, String systemPrompt, Integer maxTurns) {
+            List<String> buildReasonCommand(String prompt, String systemPrompt, Integer maxTurns, String effort) {
                 // "sleep 60" hangs for 60s, well beyond 2s override
                 return List.of("sleep", "60");
             }
@@ -286,7 +338,7 @@ class HostClaudeServiceTest {
 
         HostClaudeService service = new HostClaudeService(config, perms) {
             @Override
-            List<String> buildReasonCommand(String prompt, String systemPrompt, Integer maxTurns) {
+            List<String> buildReasonCommand(String prompt, String systemPrompt, Integer maxTurns, String effort) {
                 return List.of("sleep", "60");
             }
         };
@@ -308,7 +360,9 @@ class HostClaudeServiceTest {
 
         HostClaudeService service = new HostClaudeService(config, perms) {
             @Override
-            List<String> buildActionCommand(String prompt, String model, String systemPrompt) {
+            List<String> buildActionCommand(String prompt, String model, String systemPrompt,
+                                            List<String> callAllowedTools, List<String> callDisallowedTools,
+                                            String effort) {
                 return List.of("sleep", "60");
             }
         };
@@ -330,7 +384,9 @@ class HostClaudeServiceTest {
 
         HostClaudeService service = new HostClaudeService(config, perms) {
             @Override
-            List<String> buildActionCommand(String prompt, String model, String systemPrompt) {
+            List<String> buildActionCommand(String prompt, String model, String systemPrompt,
+                                            List<String> callAllowedTools, List<String> callDisallowedTools,
+                                            String effort) {
                 return List.of("sleep", "60");
             }
         };

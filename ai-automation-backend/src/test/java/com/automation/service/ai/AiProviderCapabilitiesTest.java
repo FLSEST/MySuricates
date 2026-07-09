@@ -17,6 +17,7 @@ class AiProviderCapabilitiesTest {
         assertThat(caps.supportsAllowedTools()).isTrue();
         assertThat(caps.tokenTracking()).isTrue();
         assertThat(caps.supportsMultiTurnReasoning()).isTrue();
+        assertThat(caps.supportsEffort()).isTrue();
     }
 
     @Test
@@ -30,6 +31,7 @@ class AiProviderCapabilitiesTest {
         assertThat(caps.supportsAllowedTools()).isFalse();
         assertThat(caps.tokenTracking()).isFalse();
         assertThat(caps.supportsMultiTurnReasoning()).isFalse();
+        assertThat(caps.supportsEffort()).isFalse();
     }
 
     @Test
@@ -61,21 +63,21 @@ class AiProviderCapabilitiesTest {
 
     @Test
     void full_should_equalManuallyConstructedEquivalent() {
-        var manual = new AiProviderCapabilities(true, true, true, true, true, true, true);
+        var manual = new AiProviderCapabilities(true, true, true, true, true, true, true, true);
 
         assertThat(AiProviderCapabilities.full()).isEqualTo(manual);
     }
 
     @Test
     void minimal_should_equalManuallyConstructedEquivalent() {
-        var manual = new AiProviderCapabilities(false, false, false, false, false, false, false);
+        var manual = new AiProviderCapabilities(false, false, false, false, false, false, false, false);
 
         assertThat(AiProviderCapabilities.minimal()).isEqualTo(manual);
     }
 
     @Test
     void customCapabilities_should_differFromFullAndMinimal() {
-        var custom = new AiProviderCapabilities(true, false, true, false, true, false, true);
+        var custom = new AiProviderCapabilities(true, false, true, false, true, false, true, false);
 
         assertThat(custom).isNotEqualTo(AiProviderCapabilities.full());
         assertThat(custom).isNotEqualTo(AiProviderCapabilities.minimal());

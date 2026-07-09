@@ -34,8 +34,48 @@ public record WorkflowResponse(
         List<String> tags,
         String category,
         Instant tagsGeneratedAt,
-        boolean tagsUserEdited
+        boolean tagsUserEdited,
+        String effort
 ) {
+    /** Backwards-compat constructor for call-sites written before effort support existed. */
+    public WorkflowResponse(
+            String id,
+            String projectId,
+            String projectName,
+            String projectSubtitle,
+            String projectDescription,
+            String name,
+            String description,
+            String icon,
+            List<BlockDefinition> blocks,
+            String version,
+            Map<String, Object> metadata,
+            List<String> activatedSkillIds,
+            List<String> activatedSkillNames,
+            long runCount,
+            String instructions,
+            String model,
+            String provider,
+            String templateId,
+            Map<String, Object> defaultContext,
+            String testStatus,
+            Instant lastTestedAt,
+            Instant createdAt,
+            Instant updatedAt,
+            Instant stableSyncedAt,
+            List<String> tags,
+            String category,
+            Instant tagsGeneratedAt,
+            boolean tagsUserEdited
+    ) {
+        this(id, projectId, projectName, projectSubtitle, projectDescription,
+                name, description, icon, blocks, version, metadata,
+                activatedSkillIds, activatedSkillNames, runCount,
+                instructions, model, provider, templateId, defaultContext,
+                testStatus, lastTestedAt, createdAt, updatedAt, stableSyncedAt,
+                tags, category, tagsGeneratedAt, tagsUserEdited, null);
+    }
+
     /** Backwards-compat constructor for call-sites written before tag support existed. */
     public WorkflowResponse(
             String id,

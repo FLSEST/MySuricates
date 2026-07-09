@@ -49,10 +49,26 @@ export function useBackupList() {
   });
 }
 
+export interface AiProviderCapabilities {
+  supportsSystemPrompt: boolean;
+  supportsModelSelection: boolean;
+  supportsMaxTurns: boolean;
+  supportsStreamJson: boolean;
+  supportsAllowedTools: boolean;
+  tokenTracking: boolean;
+  supportsMultiTurnReasoning: boolean;
+  supportsEffort: boolean;
+}
+
 export function useAiProviders() {
   return useQuery({
     queryKey: ['system', 'ai-providers'],
-    queryFn: () => api.get<{ providers: string[]; default: string }>('/system/ai-providers'),
+    queryFn: () =>
+      api.get<{
+        providers: string[];
+        default: string;
+        capabilities?: Record<string, AiProviderCapabilities>;
+      }>('/system/ai-providers'),
   });
 }
 

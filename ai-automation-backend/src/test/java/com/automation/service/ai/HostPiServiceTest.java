@@ -205,6 +205,57 @@ class HostPiServiceTest {
         assertThat(cmd).containsSubsequence("--tools", "read,bash");
     }
 
+    // --- effort mapping ---
+
+    @Test
+    void buildActionCommand_withEffort_addsThinkingFlag() {
+        HostPiService service = createDefaultService();
+        List<String> cmd = service.buildActionCommand(null, null, null, null, "high");
+
+        assertThat(cmd).containsSubsequence("--thinking", "high");
+    }
+
+    @Test
+    void buildActionCommand_withoutEffort_omitsThinkingFlag() {
+        HostPiService service = createDefaultService();
+        List<String> cmd = service.buildActionCommand(null, null, null, null, null);
+
+        assertThat(cmd).doesNotContain("--thinking");
+    }
+
+    @Test
+    void buildActionCommand_invalidEffort_omitsThinkingFlag() {
+        HostPiService service = createDefaultService();
+        List<String> cmd = service.buildActionCommand(null, null, null, null, "turbo");
+
+        assertThat(cmd).doesNotContain("--thinking");
+    }
+
+    @Test
+    void buildReasonCommand_effortOverridesMaxTurnsHeuristic() {
+        HostPiService service = createDefaultService();
+        List<String> cmd = service.buildReasonCommand(null, null, 1, "xhigh");
+
+        assertThat(cmd).containsSubsequence("--thinking", "xhigh");
+        assertThat(cmd).doesNotContain("low");
+    }
+
+    @Test
+    void buildReasonCommand_withoutEffort_keepsMaxTurnsHeuristic() {
+        HostPiService service = createDefaultService();
+        List<String> cmd = service.buildReasonCommand(null, null, 1, null);
+
+        assertThat(cmd).containsSubsequence("--thinking", "low");
+    }
+
+    @Test
+    void buildReasonCommand_effortIsCaseInsensitive() {
+        HostPiService service = createDefaultService();
+        List<String> cmd = service.buildReasonCommand(null, null, null, "HIGH");
+
+        assertThat(cmd).containsSubsequence("--thinking", "high");
+    }
+
     // --- timeout behavior ---
 
     @Test
@@ -217,7 +268,8 @@ class HostPiServiceTest {
         HostPiService service = new HostPiService(config) {
             @Override
             List<String> buildActionCommand(String model, String systemPrompt,
-                                             List<String> allowedTools, List<String> disallowedTools) {
+                                             List<String> allowedTools, List<String> disallowedTools,
+                                             String effort) {
                 return List.of("sleep", "60");
             }
         };
@@ -236,7 +288,7 @@ class HostPiServiceTest {
 
         HostPiService service = new HostPiService(config) {
             @Override
-            List<String> buildReasonCommand(String systemPrompt, String model, Integer maxTurns) {
+            List<String> buildReasonCommand(String systemPrompt, String model, Integer maxTurns, String effort) {
                 return List.of("sleep", "60");
             }
         };

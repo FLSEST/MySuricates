@@ -13,6 +13,7 @@ import com.automation.repository.ProjectRepository;
 import com.automation.repository.SkillRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.service.activitylog.ActivityLogService;
+import com.automation.service.ai.ReasoningEffort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -77,6 +78,7 @@ public class WorkflowService {
                 .instructions(request.instructions())
                 .model(request.model())
                 .provider(request.provider())
+                .effort(normalizeEffort(request.effort()))
                 .templateId(request.templateId())
                 .build();
 
@@ -135,6 +137,9 @@ public class WorkflowService {
         if (request.provider() != null) {
             workflow.setProvider(request.provider());
         }
+        if (request.effort() != null) {
+            workflow.setEffort(normalizeEffort(request.effort()));
+        }
         if (request.metadata() != null) {
             Map<String, Object> merged = new HashMap<>(workflow.getMetadata());
             merged.putAll(request.metadata());
@@ -179,6 +184,7 @@ public class WorkflowService {
         workflow.setInstructions(snapshot.instructions());
         workflow.setModel(snapshot.model());
         workflow.setProvider(snapshot.provider());
+        workflow.setEffort(snapshot.effort());
         workflow.setMetadata(snapshot.metadata() != null ? new HashMap<>(snapshot.metadata()) : new HashMap<>());
         workflow.setDefaultContext(snapshot.defaultContext() != null ? new HashMap<>(snapshot.defaultContext()) : new HashMap<>());
 
@@ -193,6 +199,7 @@ public class WorkflowService {
         String instructions = request.instructions() != null ? request.instructions() : current.getInstructions();
         String model = request.model() != null ? request.model() : current.getModel();
         String provider = request.provider() != null ? request.provider() : current.getProvider();
+        String effort = request.effort() != null ? normalizeEffort(request.effort()) : current.getEffort();
 
         Map<String, Object> metadata;
         if (request.metadata() != null) {
@@ -208,7 +215,18 @@ public class WorkflowService {
         List<String> skillIds = current.getActivatedSkills().stream()
                 .map(Skill::getId).toList();
 
-        return new WorkflowSnapshot(blocks, instructions, model, provider, metadata, defaultContext, skillIds);
+        return new WorkflowSnapshot(blocks, instructions, model, provider, metadata, defaultContext, skillIds, effort);
+    }
+
+    /** Blank clears the level (null); invalid values are rejected with 400. */
+    private static String normalizeEffort(String effort) {
+        if (effort == null || effort.isBlank()) {
+            return null;
+        }
+        return ReasoningEffort.parse(effort)
+                .map(ReasoningEffort::cliValue)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Invalid effort level: '" + effort + "' (valid: low, medium, high, xhigh)"));
     }
 
     @Transactional(readOnly = true)

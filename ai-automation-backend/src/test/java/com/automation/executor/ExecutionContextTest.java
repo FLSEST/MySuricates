@@ -18,6 +18,50 @@ class ExecutionContextTest {
     }
 
     @Test
+    void effortFor_blockConfigOverridesWorkflowEffort() {
+        context.setEffort("medium");
+        var block = com.automation.entity.BlockDefinition.builder()
+                .type("simple")
+                .config(new java.util.HashMap<>(java.util.Map.of("command", "x", "effort", "XHIGH")))
+                .build();
+
+        assertThat(context.effortFor(block)).isEqualTo("xhigh");
+    }
+
+    @Test
+    void effortFor_fallsBackToWorkflowEffort_whenBlockHasNone() {
+        context.setEffort("high");
+        var block = com.automation.entity.BlockDefinition.builder()
+                .type("simple")
+                .config(new java.util.HashMap<>(java.util.Map.of("command", "x")))
+                .build();
+
+        assertThat(context.effortFor(block)).isEqualTo("high");
+    }
+
+    @Test
+    void effortFor_invalidBlockEffort_isIgnored() {
+        context.setEffort("low");
+        var block = com.automation.entity.BlockDefinition.builder()
+                .type("simple")
+                .config(new java.util.HashMap<>(java.util.Map.of("command", "x", "effort", "turbo")))
+                .build();
+
+        assertThat(context.effortFor(block)).isEqualTo("low");
+    }
+
+    @Test
+    void effortFor_returnsNull_whenNothingSet() {
+        var block = com.automation.entity.BlockDefinition.builder()
+                .type("simple")
+                .config(new java.util.HashMap<>())
+                .build();
+
+        assertThat(context.effortFor(block)).isNull();
+        assertThat(context.effortFor(null)).isNull();
+    }
+
+    @Test
     void resolveTemplate_previousOutput_withSpaces() {
         context.setPreviousOutput("some output");
 

@@ -83,6 +83,13 @@ public class AiProviderRegistry {
         return cachedDefaultProviderId != null ? cachedDefaultProviderId : config.getDefaultProvider();
     }
 
+    /** Returns each registered provider's declared capabilities, keyed by provider ID. */
+    public Map<String, AiProviderCapabilities> getCapabilitiesByProvider() {
+        Map<String, AiProviderCapabilities> result = new java.util.LinkedHashMap<>();
+        providers.forEach((id, provider) -> result.put(id, provider.getCapabilities()));
+        return result;
+    }
+
     private String resolveId(String workflowProvider) {
         if (workflowProvider != null && !workflowProvider.isBlank()) {
             return workflowProvider.toUpperCase();

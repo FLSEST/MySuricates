@@ -50,7 +50,7 @@ class PiAiProviderTest {
 
     @Test
     void reason_delegatesToHostService() throws IOException {
-        when(hostPiService.reason(eq("prompt"), eq("system"), isNull(), eq("/path"), eq(3), eq(60)))
+        when(hostPiService.reason(eq("prompt"), eq("system"), isNull(), eq("/path"), eq(3), eq(60), isNull()))
                 .thenReturn(new HostPiService.ReasoningResult("pi reasoning output"));
 
         var request = new AiProvider.ReasoningRequest("prompt", "system", "/path", 3, 60);
@@ -59,6 +59,17 @@ class PiAiProviderTest {
         assertThat(result.text()).isEqualTo("pi reasoning output");
         // Estimated metadata is flagged
         assertThat(result.metadata().estimated()).isTrue();
+    }
+
+    @Test
+    void reason_forwardsEffortToHostService() throws IOException {
+        when(hostPiService.reason(eq("prompt"), isNull(), isNull(), isNull(), isNull(), isNull(), eq("xhigh")))
+                .thenReturn(new HostPiService.ReasoningResult("out"));
+
+        var request = new AiProvider.ReasoningRequest("prompt", null, null, null, null, "xhigh");
+        provider.reason(request);
+
+        verify(hostPiService).reason(eq("prompt"), isNull(), isNull(), isNull(), isNull(), isNull(), eq("xhigh"));
     }
 
     @Test
@@ -71,12 +82,13 @@ class PiAiProviderTest {
                 eq(120),
                 eq(true),
                 eq(List.of("read", "bash")),
-                isNull()))
+                isNull(),
+                eq("high")))
                 .thenReturn(new HostPiService.ActionResult("done", 0));
 
         var request = new AiProvider.ActionRequest(
                 "user prompt", "google/gemini-2.0-flash", "instructions", "/work",
-                120, true, false, List.of("read", "bash"), null);
+                120, true, false, List.of("read", "bash"), null, "high");
         AiProvider.ActionResult result = provider.executeAction(request);
 
         assertThat(result.text()).isEqualTo("done");
@@ -90,12 +102,13 @@ class PiAiProviderTest {
                 eq(120),
                 eq(true),
                 eq(List.of("read", "bash")),
-                isNull());
+                isNull(),
+                eq("high"));
     }
 
     @Test
     void executeAction_nonZeroExit_isPropagated() throws IOException {
-        when(hostPiService.executeAction(any(), any(), any(), any(), any(), anyBoolean(), any(), any()))
+        when(hostPiService.executeAction(any(), any(), any(), any(), any(), anyBoolean(), any(), any(), any()))
                 .thenReturn(new HostPiService.ActionResult("error message", 2));
 
         var request = new AiProvider.ActionRequest("prompt", null, null, null, null, false, true, null, null);

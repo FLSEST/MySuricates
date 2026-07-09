@@ -54,6 +54,7 @@ public class ConditionalBlockExecutor implements BlockExecutor {
                             .command("Evaluate this condition and respond with ONLY the word TRUE or FALSE, nothing else: " + condition)
                             .timeoutSeconds(claudeTimeout)
                             .providerId(context.getProvider())
+                            .effort(context.effortFor(block))
                             .build()
             ).output();
             String trimmed = conditionResult.trim().toUpperCase();
@@ -89,6 +90,7 @@ public class ConditionalBlockExecutor implements BlockExecutor {
                                 .model(context.getModel())
                                 .timeoutSeconds(claudeTimeout)
                                 .providerId(context.getProvider())
+                                .effort(context.effortFor(block))
                                 .build()
                 );
             }

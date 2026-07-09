@@ -115,6 +115,7 @@ export interface Workflow {
   instructions: string | null;
   model: string | null;
   provider: string | null;
+  effort: string | null;
   metadata?: WorkflowMetadata;
   defaultContext?: Record<string, string>;
   testStatus?: 'UNTESTED' | 'PASSED' | 'FAILED';
@@ -138,9 +139,13 @@ export interface CreateWorkflowRequest {
   instructions?: string;
   model?: string;
   provider?: string;
+  effort?: EffortLevel | string;
   templateId?: string;
   metadata?: WorkflowMetadata;
 }
+
+/** Unified reasoning-effort levels (Claude --effort ∩ Pi --thinking). Empty string clears. */
+export type EffortLevel = 'low' | 'medium' | 'high' | 'xhigh';
 
 // ── Workflow Version ─────────────────────────────────────
 
@@ -198,6 +203,7 @@ export interface UpdateWorkflowRequest {
   instructions?: string;
   model?: string;
   provider?: string;
+  effort?: EffortLevel | string;
   metadata?: Record<string, unknown>;
   defaultContext?: Record<string, string>;
   tags?: string[];

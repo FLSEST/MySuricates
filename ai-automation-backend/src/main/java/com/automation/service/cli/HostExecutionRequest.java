@@ -47,6 +47,9 @@ public record HostExecutionRequest(
         /** AI provider ID (e.g. "CLAUDE", "CODEX"). Null defaults to Claude. */
         String providerId,
 
+        /** Reasoning-effort level (low/medium/high/xhigh). Null = provider default, no flag emitted. */
+        String effort,
+
         /** If true, execute as pure shell (no Claude CLI). Default false. */
         boolean shell,
 

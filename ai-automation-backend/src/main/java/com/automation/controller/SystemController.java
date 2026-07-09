@@ -136,7 +136,8 @@ public class SystemController {
     public Map<String, Object> aiProviders() {
         return Map.of(
                 "providers", aiProviderRegistry.getAvailableProviderIds(),
-                "default", aiProviderRegistry.getDefaultProviderId()
+                "default", aiProviderRegistry.getDefaultProviderId(),
+                "capabilities", aiProviderRegistry.getCapabilitiesByProvider()
         );
     }
 

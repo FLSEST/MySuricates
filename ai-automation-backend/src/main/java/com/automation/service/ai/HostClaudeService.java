@@ -111,7 +111,13 @@ public class HostClaudeService {
     public ReasoningResult reasonStructured(String prompt, String systemPrompt,
                                              String workingDirectory, Integer maxTurns,
                                              Integer timeoutSeconds) throws IOException {
-        List<String> cmd = buildReasonCommand(prompt, systemPrompt, maxTurns);
+        return reasonStructured(prompt, systemPrompt, workingDirectory, maxTurns, timeoutSeconds, null);
+    }
+
+    public ReasoningResult reasonStructured(String prompt, String systemPrompt,
+                                             String workingDirectory, Integer maxTurns,
+                                             Integer timeoutSeconds, String effort) throws IOException {
+        List<String> cmd = buildReasonCommand(prompt, systemPrompt, maxTurns, effort);
         var result = executeProcess(cmd, prompt, workingDirectory, timeoutSeconds, "Host Claude reasoning");
         return new ReasoningResult(result.text, result.parsed);
     }
@@ -149,7 +155,16 @@ public class HostClaudeService {
                                        String systemPrompt, String workingDirectory,
                                        Integer timeoutSeconds, boolean priority,
                                        List<String> allowedTools, List<String> disallowedTools) throws IOException {
-        List<String> cmd = buildActionCommand(prompt, model, systemPrompt, allowedTools, disallowedTools);
+        return executeAction(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, priority,
+                allowedTools, disallowedTools, null);
+    }
+
+    public ActionResult executeAction(String prompt, String model,
+                                       String systemPrompt, String workingDirectory,
+                                       Integer timeoutSeconds, boolean priority,
+                                       List<String> allowedTools, List<String> disallowedTools,
+                                       String effort) throws IOException {
+        List<String> cmd = buildActionCommand(prompt, model, systemPrompt, allowedTools, disallowedTools, effort);
         var result = executeProcess(cmd, prompt, workingDirectory, timeoutSeconds, "Host Claude action", priority);
         return new ActionResult(result.text, result.exitCode, result.parsed);
     }
@@ -213,6 +228,10 @@ public class HostClaudeService {
     }
 
     List<String> buildReasonCommand(String prompt, String systemPrompt, Integer maxTurns) {
+        return buildReasonCommand(prompt, systemPrompt, maxTurns, null);
+    }
+
+    List<String> buildReasonCommand(String prompt, String systemPrompt, Integer maxTurns, String effort) {
         List<String> cmd = new ArrayList<>(List.of(
                 "claude", "-p",
                 "--output-format", "stream-json", "--verbose"
@@ -230,6 +249,11 @@ public class HostClaudeService {
 
         cmd.add("--max-turns");
         cmd.add(String.valueOf(maxTurns != null ? maxTurns : 3));
+
+        ReasoningEffort.parse(effort).ifPresent(e -> {
+            cmd.add("--effort");
+            cmd.add(e.cliValue());
+        });
 
         if (config.getMaxTokens() != null) {
             cmd.add("--max-tokens");
@@ -249,6 +273,12 @@ public class HostClaudeService {
 
     List<String> buildActionCommand(String prompt, String model, String systemPrompt,
                                     List<String> callAllowedTools, List<String> callDisallowedTools) {
+        return buildActionCommand(prompt, model, systemPrompt, callAllowedTools, callDisallowedTools, null);
+    }
+
+    List<String> buildActionCommand(String prompt, String model, String systemPrompt,
+                                    List<String> callAllowedTools, List<String> callDisallowedTools,
+                                    String effort) {
         List<String> cmd = new ArrayList<>(List.of(
                 "claude", "-p",
                 "--output-format", "stream-json", "--verbose"
@@ -258,6 +288,10 @@ public class HostClaudeService {
             cmd.add("--model");
             cmd.add(model);
         }
+        ReasoningEffort.parse(effort).ifPresent(e -> {
+            cmd.add("--effort");
+            cmd.add(e.cliValue());
+        });
         if (systemPrompt != null && !systemPrompt.isBlank()) {
             cmd.add("--append-system-prompt");
             cmd.add(systemPrompt);

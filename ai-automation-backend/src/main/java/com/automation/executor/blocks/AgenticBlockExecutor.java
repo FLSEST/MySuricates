@@ -82,6 +82,7 @@ public class AgenticBlockExecutor implements BlockExecutor {
 
         // Resolve AI provider
         AiProvider provider = aiProviderRegistry.resolve(context.getProvider());
+        String effort = context.effortFor(block);
         log.info("Agentic block using AI provider: {}", provider.getId());
 
         // Initialize state
@@ -134,7 +135,7 @@ public class AgenticBlockExecutor implements BlockExecutor {
             try {
                 String conversationPrompt = provider.buildConversationPrompt(systemPrompt, history);
                 AiProvider.ReasoningResult reasonResult = provider.reason(
-                        new AiProvider.ReasoningRequest(conversationPrompt, systemPrompt, null, null, cfg.claudeTimeout()));
+                        new AiProvider.ReasoningRequest(conversationPrompt, systemPrompt, null, null, cfg.claudeTimeout(), effort));
                 reasoning = reasonResult.text();
                 tokenTracker.captureReasonMeta(iterData, reasonResult.metadata(), conversationPrompt, reasoning, iteration);
             } catch (Exception e) {
@@ -224,7 +225,7 @@ public class AgenticBlockExecutor implements BlockExecutor {
                 AiProvider.ActionResult actResult = provider.executeAction(
                         new AiProvider.ActionRequest(action, context.getModel(),
                                 context.getInstructionPrefix(), context.getProjectPath(),
-                                cfg.claudeTimeout(), false, false));
+                                cfg.claudeTimeout(), false, false, null, null, effort));
                 actionOutput = actResult.text() != null ? actResult.text() : "";
                 exitCode = actResult.exitCode();
                 tokenTracker.captureActMeta(iterData, actResult.metadata(), action, actionOutput, iteration);

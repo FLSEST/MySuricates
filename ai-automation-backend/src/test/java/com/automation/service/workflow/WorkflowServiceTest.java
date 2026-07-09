@@ -168,6 +168,65 @@ class WorkflowServiceTest {
         assertThat(result.getDescription()).isEqualTo("A test workflow"); // unchanged
     }
 
+    // --- effort ---
+
+    @Test
+    void create_withEffort_normalizesAndPersists() {
+        var request = new CreateWorkflowRequest("proj-1", "WF", null, null, List.of(), null,
+                null, null, null, null, null, null, null, "HIGH");
+        when(projectRepository.findById("proj-1")).thenReturn(Optional.of(testProject));
+        when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Workflow result = workflowService.create(request);
+
+        assertThat(result.getEffort()).isEqualTo("high");
+    }
+
+    @Test
+    void create_invalidEffort_throwsIllegalArgument() {
+        var request = new CreateWorkflowRequest("proj-1", "WF", null, null, List.of(), null,
+                null, null, null, null, null, null, null, "turbo");
+        when(projectRepository.findById("proj-1")).thenReturn(Optional.of(testProject));
+
+        assertThatThrownBy(() -> workflowService.create(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("effort");
+    }
+
+    @Test
+    void update_setsEffort_andBlankClears() {
+        when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(testWorkflow));
+        when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var set = new UpdateWorkflowRequest(null, null, null, null, null, null, null,
+                null, null, null, null, null, null, "xhigh");
+        assertThat(workflowService.update("wf-1", set).getEffort()).isEqualTo("xhigh");
+
+        var clear = new UpdateWorkflowRequest(null, null, null, null, null, null, null,
+                null, null, null, null, null, null, "");
+        assertThat(workflowService.update("wf-1", clear).getEffort()).isNull();
+    }
+
+    @Test
+    void update_nullEffort_keepsExisting() {
+        testWorkflow.setEffort("medium");
+        when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(testWorkflow));
+        when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new UpdateWorkflowRequest("New Name", null, null, null, null, null, null, null, null);
+        assertThat(workflowService.update("wf-1", request).getEffort()).isEqualTo("medium");
+    }
+
+    @Test
+    void update_invalidEffort_throwsIllegalArgument() {
+        when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(testWorkflow));
+
+        var request = new UpdateWorkflowRequest(null, null, null, null, null, null, null,
+                null, null, null, null, null, null, "banana");
+        assertThatThrownBy(() -> workflowService.update("wf-1", request))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     @Test
     void delete_existingWorkflow_softDeletes() {
         when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(testWorkflow));

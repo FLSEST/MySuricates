@@ -41,7 +41,8 @@ public class PiAiProvider implements AiProvider {
                 false,  // supportsStreamJson (not consumed yet)
                 true,   // supportsAllowedTools (--tools)
                 false,  // tokenTracking (estimated)
-                true    // supportsMultiTurnReasoning
+                true,   // supportsMultiTurnReasoning
+                true    // supportsEffort (--thinking)
         );
     }
 
@@ -53,7 +54,8 @@ public class PiAiProvider implements AiProvider {
                 null,
                 request.workingDirectory(),
                 request.maxTurns(),
-                request.timeoutSeconds()
+                request.timeoutSeconds(),
+                request.effort()
         );
         return new ReasoningResult(
                 result.text(),
@@ -71,7 +73,8 @@ public class PiAiProvider implements AiProvider {
                 request.timeoutSeconds(),
                 request.priority(),
                 request.allowedTools(),
-                request.disallowedTools()
+                request.disallowedTools(),
+                request.effort()
         );
         return new ActionResult(
                 result.text(),

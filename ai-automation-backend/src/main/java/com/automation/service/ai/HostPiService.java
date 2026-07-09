@@ -72,24 +72,42 @@ public class HostPiService {
 
     /**
      * Reasoning call: read-only analysis, no tool execution. Uses {@code --no-tools}.
-     * The {@code maxTurns} hint is mapped onto pi's {@code --thinking} level: 1 → low, 3 → medium, ≥5 → high.
+     * An explicit {@code effort} wins; otherwise the {@code maxTurns} hint is mapped onto
+     * pi's {@code --thinking} level: 1 → low, 3 → medium, ≥5 → high.
      */
     public ReasoningResult reason(String prompt, String systemPrompt, String model,
                                    String workingDirectory, Integer maxTurns,
-                                   Integer timeoutSeconds) throws IOException {
-        List<String> cmd = buildReasonCommand(systemPrompt, model, maxTurns);
+                                   Integer timeoutSeconds, String effort) throws IOException {
+        List<String> cmd = buildReasonCommand(systemPrompt, model, maxTurns, effort);
         var result = executeProcess(cmd, prompt, workingDirectory, timeoutSeconds, "Host pi reasoning", false);
         return new ReasoningResult(result.text);
+    }
+
+    /** Backwards-compat overload for call-sites written before effort support existed. */
+    public ReasoningResult reason(String prompt, String systemPrompt, String model,
+                                   String workingDirectory, Integer maxTurns,
+                                   Integer timeoutSeconds) throws IOException {
+        return reason(prompt, systemPrompt, model, workingDirectory, maxTurns, timeoutSeconds, null);
     }
 
     public ActionResult executeAction(String prompt, String model, String systemPrompt,
                                        String workingDirectory, Integer timeoutSeconds,
                                        boolean priority,
                                        List<String> allowedTools,
-                                       List<String> disallowedTools) throws IOException {
-        List<String> cmd = buildActionCommand(model, systemPrompt, allowedTools, disallowedTools);
+                                       List<String> disallowedTools, String effort) throws IOException {
+        List<String> cmd = buildActionCommand(model, systemPrompt, allowedTools, disallowedTools, effort);
         var result = executeProcess(cmd, prompt, workingDirectory, timeoutSeconds, "Host pi action", priority);
         return new ActionResult(result.text, result.exitCode);
+    }
+
+    /** Backwards-compat overload for call-sites written before effort support existed. */
+    public ActionResult executeAction(String prompt, String model, String systemPrompt,
+                                       String workingDirectory, Integer timeoutSeconds,
+                                       boolean priority,
+                                       List<String> allowedTools,
+                                       List<String> disallowedTools) throws IOException {
+        return executeAction(prompt, model, systemPrompt, workingDirectory, timeoutSeconds,
+                priority, allowedTools, disallowedTools, null);
     }
 
     // --- Command builders (package-private for testability) ---
@@ -97,18 +115,25 @@ public class HostPiService {
     /**
      * Builds the pi CLI command for a reasoning call.
      * Reasoning is read-only — disable all tools so the model only thinks/responds.
+     * An explicit effort level overrides the maxTurns-derived thinking heuristic.
      */
-    List<String> buildReasonCommand(String systemPrompt, String model, Integer maxTurns) {
+    List<String> buildReasonCommand(String systemPrompt, String model, Integer maxTurns, String effort) {
         List<String> cmd = baseCommand();
         applyBackendAndModel(cmd, model);
         cmd.add("--no-tools");
         cmd.add("--thinking");
-        cmd.add(thinkingLevelFor(maxTurns));
+        cmd.add(ReasoningEffort.parse(effort)
+                .map(ReasoningEffort::cliValue)
+                .orElseGet(() -> thinkingLevelFor(maxTurns)));
         if (systemPrompt != null && !systemPrompt.isBlank()) {
             cmd.add("--system-prompt");
             cmd.add(systemPrompt);
         }
         return cmd;
+    }
+
+    List<String> buildReasonCommand(String systemPrompt, String model, Integer maxTurns) {
+        return buildReasonCommand(systemPrompt, model, maxTurns, null);
     }
 
     /**
@@ -118,9 +143,16 @@ public class HostPiService {
      * via {@code --tools}; otherwise pi's built-in tools (read/write/edit/bash) remain available.
      */
     List<String> buildActionCommand(String model, String systemPrompt,
-                                    List<String> allowedTools, List<String> disallowedTools) {
+                                    List<String> allowedTools, List<String> disallowedTools,
+                                    String effort) {
         List<String> cmd = baseCommand();
         applyBackendAndModel(cmd, model);
+        // Only an explicit effort emits --thinking here — unset keeps pi's own default
+        // (unlike reasoning, where the maxTurns heuristic always picks a level).
+        ReasoningEffort.parse(effort).ifPresent(e -> {
+            cmd.add("--thinking");
+            cmd.add(e.cliValue());
+        });
         if (systemPrompt != null && !systemPrompt.isBlank()) {
             cmd.add("--append-system-prompt");
             cmd.add(systemPrompt);
@@ -135,6 +167,11 @@ public class HostPiService {
             log.warn("Pi CLI does not support --disallowed-tools; ignoring denylist: {}", disallowedTools);
         }
         return cmd;
+    }
+
+    List<String> buildActionCommand(String model, String systemPrompt,
+                                    List<String> allowedTools, List<String> disallowedTools) {
+        return buildActionCommand(model, systemPrompt, allowedTools, disallowedTools, null);
     }
 
     /**

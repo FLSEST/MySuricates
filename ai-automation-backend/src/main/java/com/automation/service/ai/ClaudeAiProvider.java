@@ -35,7 +35,8 @@ public class ClaudeAiProvider implements AiProvider {
                 request.systemPrompt(),
                 request.workingDirectory(),
                 request.maxTurns(),
-                request.timeoutSeconds()
+                request.timeoutSeconds(),
+                request.effort()
         );
         return new ReasoningResult(
                 result.text(),
@@ -53,7 +54,8 @@ public class ClaudeAiProvider implements AiProvider {
                 request.timeoutSeconds(),
                 request.priority(),
                 request.allowedTools(),
-                request.disallowedTools()
+                request.disallowedTools(),
+                request.effort()
         );
         return new ActionResult(
                 result.text(),

@@ -41,14 +41,27 @@ class ClaudeAiProviderTest {
     void reason_delegatesToHostService() throws IOException {
         var hostResult = new HostClaudeService.ReasoningResult("reasoning text", null);
         when(hostClaudeService.reasonStructured(
-                eq("prompt"), eq("system"), eq("/path"), eq(3), eq(300)))
+                eq("prompt"), eq("system"), eq("/path"), eq(3), eq(300), isNull()))
                 .thenReturn(hostResult);
 
         var request = new AiProvider.ReasoningRequest("prompt", "system", "/path", 3, 300);
         AiProvider.ReasoningResult result = provider.reason(request);
 
         assertThat(result.text()).isEqualTo("reasoning text");
-        verify(hostClaudeService).reasonStructured("prompt", "system", "/path", 3, 300);
+        verify(hostClaudeService).reasonStructured("prompt", "system", "/path", 3, 300, null);
+    }
+
+    @Test
+    void reason_forwardsEffortToHostService() throws IOException {
+        var hostResult = new HostClaudeService.ReasoningResult("out", null);
+        when(hostClaudeService.reasonStructured(
+                eq("prompt"), isNull(), isNull(), isNull(), isNull(), eq("high")))
+                .thenReturn(hostResult);
+
+        var request = new AiProvider.ReasoningRequest("prompt", null, null, null, null, "high");
+        provider.reason(request);
+
+        verify(hostClaudeService).reasonStructured(eq("prompt"), isNull(), isNull(), isNull(), isNull(), eq("high"));
     }
 
     @Test
@@ -56,7 +69,7 @@ class ClaudeAiProviderTest {
         var hostResult = new HostClaudeService.ActionResult("output", 0, null);
         when(hostClaudeService.executeAction(
                 eq("prompt"), eq("model"), eq("system"), eq("/path"), eq(300), eq(false),
-                any(), any()))
+                any(), any(), isNull()))
                 .thenReturn(hostResult);
 
         var request = new AiProvider.ActionRequest("prompt", "model", "system", "/path", 300, false);
@@ -64,6 +77,22 @@ class ClaudeAiProviderTest {
 
         assertThat(result.text()).isEqualTo("output");
         assertThat(result.exitCode()).isEqualTo(0);
+    }
+
+    @Test
+    void executeAction_forwardsEffortToHostService() throws IOException {
+        var hostResult = new HostClaudeService.ActionResult("output", 0, null);
+        when(hostClaudeService.executeAction(
+                eq("prompt"), isNull(), isNull(), isNull(), isNull(), eq(false),
+                any(), any(), eq("xhigh")))
+                .thenReturn(hostResult);
+
+        var request = new AiProvider.ActionRequest("prompt", null, null, null, null, false, true, null, null, "xhigh");
+        provider.executeAction(request);
+
+        verify(hostClaudeService).executeAction(
+                eq("prompt"), isNull(), isNull(), isNull(), isNull(), eq(false),
+                any(), any(), eq("xhigh"));
     }
 
     @Test

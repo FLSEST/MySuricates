@@ -90,6 +90,25 @@ class CodexAiProviderTest {
     }
 
     @Test
+    void executeAction_withEffort_isIgnoredWithoutError() throws IOException {
+        when(summarizationConfig.getTimeoutSeconds()).thenReturn(120);
+        when(hostCodexService.execute(anyString(), isNull(), eq(120), eq(true)))
+                .thenReturn("action output");
+
+        var request = new AiProvider.ActionRequest("prompt", null, null, null, null, false, true,
+                null, null, "high");
+        AiProvider.ActionResult result = provider.executeAction(request);
+
+        assertThat(result.exitCode()).isEqualTo(0);
+        assertThat(result.text()).isEqualTo("action output");
+    }
+
+    @Test
+    void getCapabilities_doesNotSupportEffort() {
+        assertThat(provider.getCapabilities().supportsEffort()).isFalse();
+    }
+
+    @Test
     void executeAction_notReadOnly_passesFalse() throws IOException {
         when(summarizationConfig.getTimeoutSeconds()).thenReturn(120);
         when(hostCodexService.execute(anyString(), isNull(), eq(120), eq(false)))

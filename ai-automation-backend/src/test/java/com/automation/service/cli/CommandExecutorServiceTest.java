@@ -339,6 +339,69 @@ class CommandExecutorServiceTest {
         assertThat(aiRequest).doesNotContainKey("priority");
     }
 
+    @SuppressWarnings("unchecked")
+    @Test
+    void executeStepOnHost_propagatesEffortToActionRequestAndMetadata() throws IOException {
+        when(aiProvider.executeAction(any())).thenReturn(new AiProvider.ActionResult("ok", 0, null));
+        when(aiProvider.getId()).thenReturn("CLAUDE");
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("simple")
+                .config(Map.of("command", "task"))
+                .build();
+
+        StepResult result = commandExecutorService.executeStepOnHost(
+                HostExecutionRequest.builder()
+                        .projectPath("/project")
+                        .block(block)
+                        .effort("high")
+                        .build());
+
+        var captor = org.mockito.ArgumentCaptor.forClass(AiProvider.ActionRequest.class);
+        verify(aiProvider).executeAction(captor.capture());
+        assertThat(captor.getValue().effort()).isEqualTo("high");
+
+        Map<String, Object> aiRequest = (Map<String, Object>) result.getMetadata().get("aiRequest");
+        assertThat(aiRequest).containsEntry("effort", "high");
+    }
+
+    @Test
+    void executeOnHost_propagatesEffortToActionRequest() throws IOException {
+        when(aiProvider.executeAction(any())).thenReturn(new AiProvider.ActionResult("ok", 0, null));
+
+        commandExecutorService.executeOnHost(
+                HostExecutionRequest.builder()
+                        .projectPath("/project")
+                        .command("cmd")
+                        .effort("xhigh")
+                        .build());
+
+        var captor = org.mockito.ArgumentCaptor.forClass(AiProvider.ActionRequest.class);
+        verify(aiProvider).executeAction(captor.capture());
+        assertThat(captor.getValue().effort()).isEqualTo("xhigh");
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void executeStepOnHost_omitsEffortFromMetadataWhenUnset() throws IOException {
+        when(aiProvider.executeAction(any())).thenReturn(new AiProvider.ActionResult("ok", 0, null));
+        when(aiProvider.getId()).thenReturn("CLAUDE");
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("simple")
+                .config(Map.of("command", "task"))
+                .build();
+
+        StepResult result = commandExecutorService.executeStepOnHost(
+                HostExecutionRequest.builder()
+                        .projectPath("/project")
+                        .block(block)
+                        .build());
+
+        Map<String, Object> aiRequest = (Map<String, Object>) result.getMetadata().get("aiRequest");
+        assertThat(aiRequest).doesNotContainKey("effort");
+    }
+
     @Test
     void executeStepOnHost_omitsAiSystemPromptWhenNull() throws IOException {
         when(aiProvider.executeAction(any())).thenReturn(new AiProvider.ActionResult("ok", 0, null));

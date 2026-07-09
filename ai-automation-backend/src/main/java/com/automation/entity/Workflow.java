@@ -81,6 +81,9 @@ public class Workflow {
 
     private String provider;
 
+    /** Reasoning-effort level (low/medium/high/xhigh); null = provider default. */
+    private String effort;
+
     private String templateId;
 
     @Column(name = "block_types")

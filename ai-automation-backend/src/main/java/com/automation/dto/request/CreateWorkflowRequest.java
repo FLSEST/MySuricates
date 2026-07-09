@@ -19,10 +19,21 @@ public record CreateWorkflowRequest(
         String templateId,
         Map<String, Object> metadata,
         Map<String, Object> defaultContext,
-        String version
+        String version,
+        String effort
 ) {
     public CreateWorkflowRequest {
         if (blocks == null) blocks = List.of();
         if (activatedSkillIds == null) activatedSkillIds = List.of();
+    }
+
+    /** Backwards-compat constructor for call-sites written before effort support existed. */
+    public CreateWorkflowRequest(String projectId, String name, String description, String icon,
+                                 List<BlockDefinition> blocks, List<String> activatedSkillIds,
+                                 String instructions, String model, String provider,
+                                 String templateId, Map<String, Object> metadata,
+                                 Map<String, Object> defaultContext, String version) {
+        this(projectId, name, description, icon, blocks, activatedSkillIds, instructions,
+                model, provider, templateId, metadata, defaultContext, version, null);
     }
 }

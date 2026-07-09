@@ -52,6 +52,9 @@ public class CodexAiProvider implements AiProvider {
 
     @Override
     public ActionResult executeAction(ActionRequest request) throws IOException {
+        if (request.effort() != null && !request.effort().isBlank()) {
+            log.debug("Codex provider ignores effort '{}' (no CLI reasoning flag)", request.effort());
+        }
         boolean readOnly = request.readOnly();
         String fullPrompt = mergeSystemPrompt(request.systemPrompt(), request.prompt(), readOnly);
         Path workDir = request.workingDirectory() != null ? Path.of(request.workingDirectory()) : null;

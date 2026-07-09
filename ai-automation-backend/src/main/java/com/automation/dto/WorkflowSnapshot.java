@@ -15,8 +15,16 @@ public record WorkflowSnapshot(
         String provider,
         Map<String, Object> metadata,
         Map<String, Object> defaultContext,
-        List<String> activatedSkillIds
+        List<String> activatedSkillIds,
+        String effort
 ) {
+
+    /** Backwards-compat constructor for call-sites written before effort support existed. */
+    public WorkflowSnapshot(List<BlockDefinition> blocks, String instructions, String model,
+                            String provider, Map<String, Object> metadata,
+                            Map<String, Object> defaultContext, List<String> activatedSkillIds) {
+        this(blocks, instructions, model, provider, metadata, defaultContext, activatedSkillIds, null);
+    }
 
     public static WorkflowSnapshot from(Workflow workflow) {
         return new WorkflowSnapshot(
@@ -28,7 +36,8 @@ public record WorkflowSnapshot(
                 workflow.getDefaultContext() != null ? Map.copyOf(workflow.getDefaultContext()) : Map.of(),
                 workflow.getActivatedSkills() != null
                         ? workflow.getActivatedSkills().stream().map(Skill::getId).toList()
-                        : List.of()
+                        : List.of(),
+                workflow.getEffort()
         );
     }
 
@@ -39,6 +48,7 @@ public record WorkflowSnapshot(
                 || !Objects.equals(this.provider, other.provider)
                 || !Objects.equals(this.metadata, other.metadata)
                 || !Objects.equals(this.defaultContext, other.defaultContext)
-                || !Objects.equals(this.activatedSkillIds, other.activatedSkillIds);
+                || !Objects.equals(this.activatedSkillIds, other.activatedSkillIds)
+                || !Objects.equals(this.effort, other.effort);
     }
 }

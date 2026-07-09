@@ -35,6 +35,10 @@ export function WorkflowDetailSidebar({
   const updateWorkflow = useUpdateWorkflow();
   const { data: aiProviders } = useAiProviders();
   const isPi = isFreeTextModelProvider(workflow.provider);
+  const activeProvider = workflow.provider || aiProviders?.default || '';
+  // Show the effort control unless the active provider explicitly declares no support
+  // (Codex). Missing capabilities (older backend) fall back to showing it.
+  const supportsEffort = aiProviders?.capabilities?.[activeProvider]?.supportsEffort !== false;
   const { data: piCatalog } = usePiCatalog();
   const [runPage, setRunPage] = useState(0);
   const { data: runs } = useWorkflowRuns(workflow.id, runPage, RUN_PAGE_SIZE);
@@ -189,6 +193,29 @@ export function WorkflowDetailSidebar({
           {t.workflows.modelHint}
         </p>
       </Card>
+
+      {supportsEffort && (
+        <Card>
+          <CardHeader title={t.workflows.effort} />
+          <Select
+            value={workflow.effort || ''}
+            onChange={(e) => {
+              updateWorkflow.mutate({ id: workflow.id, data: { effort: e.target.value } });
+            }}
+            options={[
+              { value: '', label: t.workflows.effortDefault },
+              { value: 'low', label: t.workflows.effortLow },
+              { value: 'medium', label: t.workflows.effortMedium },
+              { value: 'high', label: t.workflows.effortHigh },
+              { value: 'xhigh', label: t.workflows.effortXhigh },
+            ]}
+          />
+          <p className="text-xs text-text-tertiary mt-2 flex items-center gap-1.5">
+            <Bot className="w-3.5 h-3.5" />
+            {t.workflows.effortHint}
+          </p>
+        </Card>
+      )}
 
       <Card>
         <div className="flex items-center justify-between">

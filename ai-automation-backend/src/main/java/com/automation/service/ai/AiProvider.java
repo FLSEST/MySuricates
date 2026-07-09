@@ -40,14 +40,21 @@ public interface AiProvider {
             String systemPrompt,
             String workingDirectory,
             Integer maxTurns,
-            Integer timeoutSeconds
+            Integer timeoutSeconds,
+            String effort
     ) {
         public ReasoningRequest(String prompt) {
-            this(prompt, null, null, null, null);
+            this(prompt, null, null, null, null, null);
         }
 
         public ReasoningRequest(String prompt, String systemPrompt) {
-            this(prompt, systemPrompt, null, null, null);
+            this(prompt, systemPrompt, null, null, null, null);
+        }
+
+        /** Backwards-compat constructor for call-sites written before effort support existed. */
+        public ReasoningRequest(String prompt, String systemPrompt, String workingDirectory,
+                                Integer maxTurns, Integer timeoutSeconds) {
+            this(prompt, systemPrompt, workingDirectory, maxTurns, timeoutSeconds, null);
         }
     }
 
@@ -60,25 +67,26 @@ public interface AiProvider {
             boolean priority,
             boolean readOnly,
             List<String> allowedTools,
-            List<String> disallowedTools
+            List<String> disallowedTools,
+            String effort
     ) {
         public ActionRequest(String prompt, String model, String systemPrompt, String workingDirectory) {
-            this(prompt, model, systemPrompt, workingDirectory, null, false, true, null, null);
+            this(prompt, model, systemPrompt, workingDirectory, null, false, true, null, null, null);
         }
 
         public ActionRequest(String prompt, String model, String systemPrompt, String workingDirectory, Integer timeoutSeconds) {
-            this(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, false, true, null, null);
+            this(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, false, true, null, null, null);
         }
 
         /** Backward-compatible: 6-arg calls default to readOnly=true (analysis mode). */
         public ActionRequest(String prompt, String model, String systemPrompt, String workingDirectory, Integer timeoutSeconds, boolean priority) {
-            this(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, priority, true, null, null);
+            this(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, priority, true, null, null, null);
         }
 
         /** Backward-compatible 7-arg constructor for callers that previously set readOnly explicitly. */
         public ActionRequest(String prompt, String model, String systemPrompt, String workingDirectory,
                              Integer timeoutSeconds, boolean priority, boolean readOnly) {
-            this(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, priority, readOnly, null, null);
+            this(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, priority, readOnly, null, null, null);
         }
 
         /** Chat-scoped constructor with explicit tool whitelist. */
@@ -86,7 +94,15 @@ public interface AiProvider {
                              Integer timeoutSeconds, boolean priority,
                              List<String> allowedTools, List<String> disallowedTools) {
             this(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, priority, true,
-                    allowedTools, disallowedTools);
+                    allowedTools, disallowedTools, null);
+        }
+
+        /** Backwards-compat constructor for call-sites written before effort support existed. */
+        public ActionRequest(String prompt, String model, String systemPrompt, String workingDirectory,
+                             Integer timeoutSeconds, boolean priority, boolean readOnly,
+                             List<String> allowedTools, List<String> disallowedTools) {
+            this(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, priority, readOnly,
+                    allowedTools, disallowedTools, null);
         }
     }
 

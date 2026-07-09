@@ -11,15 +11,16 @@ public record AiProviderCapabilities(
         boolean supportsStreamJson,
         boolean supportsAllowedTools,
         boolean tokenTracking,
-        boolean supportsMultiTurnReasoning
+        boolean supportsMultiTurnReasoning,
+        boolean supportsEffort
 ) {
     /** All features supported (Claude). */
     public static AiProviderCapabilities full() {
-        return new AiProviderCapabilities(true, true, true, true, true, true, true);
+        return new AiProviderCapabilities(true, true, true, true, true, true, true, true);
     }
 
     /** Minimal capabilities (Codex). */
     public static AiProviderCapabilities minimal() {
-        return new AiProviderCapabilities(false, false, false, false, false, false, false);
+        return new AiProviderCapabilities(false, false, false, false, false, false, false, false);
     }
 }

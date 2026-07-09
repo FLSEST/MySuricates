@@ -137,7 +137,8 @@ public class CommandExecutorService {
             AiProvider.ActionResult result = provider.executeAction(
                     new AiProvider.ActionRequest(request.command(), request.model(),
                             request.systemPrompt(), request.projectPath(), request.timeoutSeconds(),
-                            request.priority(), request.allowedTools(), request.disallowedTools()));
+                            request.priority(), true, request.allowedTools(), request.disallowedTools(),
+                            request.effort()));
             return new CliSession.EnrichedCommandResult(result.text(), result.exitCode(), null);
         } catch (IOException e) {
             throw new WorkflowExecutionException(
@@ -176,7 +177,7 @@ public class CommandExecutorService {
             AiProvider.ActionResult providerResult = provider.executeAction(
                     new AiProvider.ActionRequest(command, request.model(), request.systemPrompt(),
                             request.projectPath(), request.timeoutSeconds(), request.priority(),
-                            request.allowedTools(), request.disallowedTools()));
+                            true, request.allowedTools(), request.disallowedTools(), request.effort()));
             step.setOutput(providerResult.text());
             step.setStatus(providerResult.exitCode() == 0 ? StepStatus.COMPLETED : StepStatus.FAILED);
 
@@ -353,6 +354,9 @@ public class CommandExecutorService {
         }
         if (request.timeoutSeconds() != null) {
             params.put("timeoutSeconds", request.timeoutSeconds());
+        }
+        if (request.effort() != null && !request.effort().isBlank()) {
+            params.put("effort", request.effort());
         }
         if (request.priority()) {
             params.put("priority", true);

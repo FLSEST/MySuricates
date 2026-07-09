@@ -64,6 +64,7 @@ public class WhileBlockExecutor implements BlockExecutor {
                                     .command(resolvedCondition)
                                     .timeoutSeconds(claudeTimeout)
                                     .providerId(context.getProvider())
+                                    .effort(context.effortFor(block))
                                     .build()
                     ).output();
                     if ("false".equalsIgnoreCase(conditionResult.trim()) ||
@@ -96,6 +97,7 @@ public class WhileBlockExecutor implements BlockExecutor {
                                 .model(context.getModel())
                                 .timeoutSeconds(claudeTimeout)
                                 .providerId(context.getProvider())
+                                .effort(context.effortFor(block))
                                 .build()
                 );
             }

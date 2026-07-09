@@ -24,6 +24,7 @@ interface WorkflowApiResponse {
   instructions: string | null;
   model: string | null;
   provider: string | null;
+  effort: string | null;
   templateId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -41,6 +42,7 @@ function mapWorkflow(raw: WorkflowApiResponse): Workflow {
     instructions: raw.instructions ?? null,
     model: raw.model ?? null,
     provider: raw.provider ?? null,
+    effort: raw.effort ?? null,
     metadata: raw.metadata ?? {},
   };
 }

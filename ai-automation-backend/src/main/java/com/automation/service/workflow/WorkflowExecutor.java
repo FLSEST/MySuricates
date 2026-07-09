@@ -68,7 +68,7 @@ public class WorkflowExecutor {
 
     private static final java.util.Set<String> SYSTEM_VAR_KEYS = java.util.Set.of(
             "workflow_run_id", "workflow_id", "workflow_name", "project_id", "project_path",
-            "model", "provider", "started_at", "run_timestamp",
+            "model", "provider", "effort", "started_at", "run_timestamp",
             "previous_report", "open_todos",
             "workflow_version", "workflow_changed_since_last_run"
     );
@@ -108,6 +108,7 @@ public class WorkflowExecutor {
         final String instructions;
         final String model;
         final String provider;
+        final String effort;
         final Map<String, Object> workflowMeta;
         final String templateId;
         final Map<String, Object> contextVars;
@@ -119,6 +120,7 @@ public class WorkflowExecutor {
             instructions = workflow.getInstructions();
             model = workflow.getModel();
             provider = workflow.getProvider();
+            effort = workflow.getEffort();
             workflowMeta = Map.copyOf(workflow.getMetadata());
             templateId = workflow.getTemplateId();
 
@@ -167,7 +169,7 @@ public class WorkflowExecutor {
         activityLogService.info(LogCategory.EXECUTION,
                 "Workflow execution started: " + workflowName,
                 "WorkflowExecutor", runId, workflowId);
-        virtualThreadExecutor.submit(() -> executeBlocks(runId, workflowId, workflowName, project, blocks, skills, finalBlockSkillLookup, contextVars, instructions, model, provider, workflowMeta, templateId, 0, null));
+        virtualThreadExecutor.submit(() -> executeBlocks(runId, workflowId, workflowName, project, blocks, skills, finalBlockSkillLookup, contextVars, instructions, model, provider, effort, workflowMeta, templateId, 0, null));
 
         return run;
     }
@@ -179,7 +181,7 @@ public class WorkflowExecutor {
      */
     private void executeBlocks(String runId, String workflowId, String workflowName, Project project, List<BlockDefinition> blocks,
                                List<Skill> skills, Map<String, Skill> blockSkillLookup, Map<String, Object> inputContext,
-                               String instructions, String model, String provider, Map<String, Object> workflowMeta,
+                               String instructions, String model, String provider, String effort, Map<String, Object> workflowMeta,
                                String templateId, int skipToStepIndex, String resumePreviousOutput) {
         // Single try-finally ensures semaphore is always released, even if the thread
         // dies between acquire() and the execution body (eliminates the leak window).
@@ -220,6 +222,7 @@ public class WorkflowExecutor {
             context.setVariable("project_path", project.getPath() != null ? project.getPath() : "");
             context.setVariable("model", model != null ? model : "");
             context.setVariable("provider", provider != null ? provider : "");
+            context.setVariable("effort", effort != null ? effort : "");
             java.time.Instant startedAt = java.time.Instant.now();
             context.setVariable("started_at", startedAt.toString());
             // Path-safe timestamp for output-directory naming (no ':' or timezone).
@@ -271,6 +274,9 @@ public class WorkflowExecutor {
             }
             if (provider != null && !provider.isBlank()) {
                 context.setProvider(provider);
+            }
+            if (effort != null && !effort.isBlank()) {
+                context.setEffort(effort);
             }
 
             executionRegistry.register(runId, context);
@@ -675,6 +681,7 @@ public class WorkflowExecutor {
         final String instructions;
         final String model;
         final String provider;
+        final String effort;
         final Map<String, Object> workflowMeta;
         final String templateId;
         Map<String, Skill> resumeBlockSkillLookup;
@@ -685,6 +692,7 @@ public class WorkflowExecutor {
             instructions = workflow.getInstructions();
             model = workflow.getModel();
             provider = workflow.getProvider();
+            effort = workflow.getEffort();
             workflowMeta = Map.copyOf(workflow.getMetadata());
             templateId = workflow.getTemplateId();
 
@@ -720,7 +728,7 @@ public class WorkflowExecutor {
 
         virtualThreadExecutor.submit(() -> executeBlocks(
                 runId, wfId, wfName, project, blocks, skills, finalResumeBlockSkillLookup,
-                contextForResume, instructions, model, provider, workflowMeta, templateId,
+                contextForResume, instructions, model, provider, effort, workflowMeta, templateId,
                 resumeIdx, previousOutput));
 
         return run;

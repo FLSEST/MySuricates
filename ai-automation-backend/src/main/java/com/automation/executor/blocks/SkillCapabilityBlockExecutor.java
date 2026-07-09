@@ -125,7 +125,8 @@ public class SkillCapabilityBlockExecutor implements BlockExecutor {
                     .model(context.getModel())
                     .systemPrompt(composedSystemPrompt)
                     .timeoutSeconds(claudeTimeout)
-                    .providerId(context.getProvider());
+                    .providerId(context.getProvider())
+                    .effort(context.effortFor(block));
 
             // Defense-in-depth: when the workflow author has not explicitly opted in to writes,
             // restrict the host-CLI to a read-only tool whitelist. This applies regardless of

@@ -121,7 +121,7 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_goalAchievedOnFirstIteration() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull())).thenReturn(
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull())).thenReturn(
                 rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Already done\nACTION:\nSUMMARY: Goal was already met"));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -136,18 +136,18 @@ class AgenticBlockExecutorTest {
         assertThat(metadata.get("totalIterations")).isEqualTo(1);
 
         // Should not have called action execution
-        verify(hostClaude, never()).executeAction(anyString(), any(), any(), any(), any(), anyBoolean(), any(), any());
+        verify(hostClaude, never()).executeAction(anyString(), any(), any(), any(), any(), anyBoolean(), any(), any(), any());
     }
 
     @Test
     void execute_multiIterationUntilGoalAchieved() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
 
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull()))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Need to create file\nACTION: Create test.txt\nSUMMARY: Creating file"))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: File created\nACTION:\nSUMMARY: Done"));
 
-        when(hostClaude.executeAction(eq("Create test.txt"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull()))
+        when(hostClaude.executeAction(eq("Create test.txt"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull()))
                 .thenReturn(new HostClaudeService.ActionResult("File created", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -164,10 +164,10 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_maxIterationsReached() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull())).thenReturn(
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull())).thenReturn(
                 rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Still working\nACTION: Try again\nSUMMARY: Retrying"));
 
-        when(hostClaude.executeAction(eq("Try again"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull()))
+        when(hostClaude.executeAction(eq("Try again"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull()))
                 .thenReturn(new HostClaudeService.ActionResult("Still failing", 1, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -195,14 +195,14 @@ class AgenticBlockExecutorTest {
     void execute_cancellationStopsLoop() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
 
-        when(hostClaude.executeAction(eq("Do something"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull()))
+        when(hostClaude.executeAction(eq("Do something"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull()))
                 .thenReturn(new HostClaudeService.ActionResult("partial", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
         ExecutionContext context = buildContext();
         // Cancel after first iteration observe
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull()))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Do something\nSUMMARY: Step 1"))
                 .thenAnswer(invocation -> {
                     context.cancel();
@@ -217,7 +217,7 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_hostClaudeError_stopsWithFailure() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull())).thenThrow(new java.io.IOException("Connection refused"));
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull())).thenThrow(new java.io.IOException("Connection refused"));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
         StepResult result = executor.execute(buildBlock("Test"), buildContext());
@@ -230,14 +230,14 @@ class AgenticBlockExecutorTest {
     void execute_containerCommandFailure_isObservedAndRetried() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
 
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull()))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: First try\nACTION: Run tests\nSUMMARY: Running tests"))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Try different approach\nACTION: Fix and run\nSUMMARY: Fixing"))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Fixed\nACTION:\nSUMMARY: All good"));
 
-        when(hostClaude.executeAction(eq("Run tests"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull()))
+        when(hostClaude.executeAction(eq("Run tests"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull()))
                 .thenReturn(new HostClaudeService.ActionResult("Tests failed: 3 errors", 1, null));
-        when(hostClaude.executeAction(eq("Fix and run"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull()))
+        when(hostClaude.executeAction(eq("Fix and run"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull()))
                 .thenReturn(new HostClaudeService.ActionResult("All tests pass", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -252,7 +252,7 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_metadataStoredCorrectly() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull())).thenReturn(
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull())).thenReturn(
                 rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -277,7 +277,7 @@ class AgenticBlockExecutorTest {
         ));
 
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull())).thenReturn(
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull())).thenReturn(
                 rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
 
         executor.execute(buildBlock("Test"), buildContext());
@@ -289,7 +289,7 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_learningServiceCalledWithWorkflowId_notRunId() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull())).thenReturn(
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull())).thenReturn(
                 rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
         when(learningService.getAgenticStrategyHistory("workflow-1")).thenReturn(List.of());
 
@@ -303,7 +303,7 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_broadcastsWebSocketEvents() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull())).thenReturn(
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull())).thenReturn(
                 rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -318,7 +318,7 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_goalImpossible_returnsFailed() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull())).thenReturn(
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull())).thenReturn(
                 rr("GOAL_STATUS: IMPOSSIBLE\nRATIONALE: No access\nACTION:\nSUMMARY: Cannot proceed"));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -348,11 +348,11 @@ class AgenticBlockExecutorTest {
                 "result", null, 1.0, 1000L, 800L, 1, highUsage, null, null);
 
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull()))
                 .thenReturn(new ReasoningResult(
                         "GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Do work\nSUMMARY: Step", parsedWithUsage));
 
-        when(hostClaude.executeAction(eq("Do work"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull()))
+        when(hostClaude.executeAction(eq("Do work"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull()))
                 .thenReturn(new HostClaudeService.ActionResult("Done", 0, parsedWithUsage));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -380,14 +380,14 @@ class AgenticBlockExecutorTest {
     void execute_tokenTrackingFailed_afterConsecutiveBlindIterations() throws Exception {
         // All iterations return null parsed (no usage data) — triggers fallback estimation + abort after 3
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull()))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Step A\nSUMMARY: Doing A"))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Continuing\nACTION: Step B\nSUMMARY: Doing B"))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: More work\nACTION: Step C\nSUMMARY: Doing C"))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Keep going\nACTION: Step D\nSUMMARY: Doing D"));
 
         // ActionResult with null parsed → no usage data
-        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull()))
+        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull()))
                 .thenReturn(new HostClaudeService.ActionResult("output", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -422,18 +422,18 @@ class AgenticBlockExecutorTest {
                 "result", null, 0.01, 500L, 400L, 1, realUsage, null, null);
 
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull()))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: First\nACTION: Step 1\nSUMMARY: S1"))
                 .thenReturn(new ReasoningResult(
                         "GOAL_STATUS: IN_PROGRESS\nRATIONALE: Second\nACTION: Step 2\nSUMMARY: S2", parsedWithUsage))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Third\nACTION: Step 3\nSUMMARY: S3"))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
 
-        when(hostClaude.executeAction(eq("Step 1"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull()))
+        when(hostClaude.executeAction(eq("Step 1"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull()))
                 .thenReturn(new HostClaudeService.ActionResult("out1", 0, null));
-        when(hostClaude.executeAction(eq("Step 2"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull()))
+        when(hostClaude.executeAction(eq("Step 2"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull()))
                 .thenReturn(new HostClaudeService.ActionResult("out2", 0, parsedWithUsage));
-        when(hostClaude.executeAction(eq("Step 3"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull()))
+        when(hostClaude.executeAction(eq("Step 3"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull()))
                 .thenReturn(new HostClaudeService.ActionResult("out3", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -448,7 +448,7 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_setsContextVariables() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull())).thenReturn(
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull())).thenReturn(
                 rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -465,10 +465,10 @@ class AgenticBlockExecutorTest {
         ClaudeJsonResponse parsed = new ClaudeJsonResponse("result", null, 0.01, 200L, 100L, 1, usage, null, null);
 
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull()))
                 .thenReturn(new ReasoningResult("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Trying\nACTION: same action\nSUMMARY: Retry", parsed));
 
-        when(hostClaude.executeAction(eq("same action"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull()))
+        when(hostClaude.executeAction(eq("same action"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull()))
                 .thenReturn(new HostClaudeService.ActionResult("failed", 1, parsed));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -492,7 +492,7 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_noActionInPlan_asksForAction() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull()))
                 // First response has no action
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Thinking\nACTION: \nSUMMARY: Planning"))
                 // Second response achieves goal
@@ -505,7 +505,7 @@ class AgenticBlockExecutorTest {
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         assertThat(result.getMetadata().get("totalIterations")).isEqualTo(2);
         // No executeAction call for the empty-action iteration
-        verify(hostClaude, never()).executeAction(anyString(), any(), any(), any(), any(), anyBoolean(), any(), any());
+        verify(hostClaude, never()).executeAction(anyString(), any(), any(), any(), any(), anyBoolean(), any(), any(), any());
     }
 
     @Test
@@ -517,14 +517,14 @@ class AgenticBlockExecutorTest {
         ClaudeJsonResponse parsed = new ClaudeJsonResponse("result", null, 0.01, 200L, 100L, 1, usage, null, null);
 
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull()))
                 .thenReturn(new ReasoningResult("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Step1\nACTION: Action A\nSUMMARY: S1", parsed))
                 .thenReturn(new ReasoningResult("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Step2\nACTION: Action B\nSUMMARY: S2", parsed))
                 .thenReturn(new ReasoningResult("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Step3\nACTION: Action C\nSUMMARY: S3", parsed))
                 .thenReturn(new ReasoningResult("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Step4\nACTION: Action D\nSUMMARY: S4", parsed))
                 .thenReturn(new ReasoningResult("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete", parsed));
 
-        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull()))
+        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull()))
                 .thenReturn(new HostClaudeService.ActionResult("ok", 0, parsed));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -546,15 +546,15 @@ class AgenticBlockExecutorTest {
                 "x".repeat(110_000) + "\nSUMMARY: Large action";
 
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull()))
                 .thenReturn(rr(oversizedAction))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
 
         // The compression call via reason (provider.reason)
-        when(hostClaude.reasonStructured(contains("OVERSIZED ACTION"), isNull(), isNull(), eq(1), eq(60)))
+        when(hostClaude.reasonStructured(contains("OVERSIZED ACTION"), isNull(), isNull(), eq(1), eq(60), isNull()))
                 .thenReturn(rr("Compressed: do the thing"));
 
-        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull()))
+        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull()))
                 .thenReturn(new HostClaudeService.ActionResult("done", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -563,7 +563,7 @@ class AgenticBlockExecutorTest {
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         // The compressed action should have been used for execution
-        verify(hostClaude).executeAction(eq("Compressed: do the thing"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull());
+        verify(hostClaude).executeAction(eq("Compressed: do the thing"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull());
     }
 
     @Test
@@ -572,15 +572,15 @@ class AgenticBlockExecutorTest {
                 "y".repeat(110_000) + "\nSUMMARY: Large";
 
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull()))
                 .thenReturn(rr(oversizedAction))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
 
         // Compression fails
-        when(hostClaude.reasonStructured(contains("OVERSIZED ACTION"), isNull(), isNull(), eq(1), eq(60)))
+        when(hostClaude.reasonStructured(contains("OVERSIZED ACTION"), isNull(), isNull(), eq(1), eq(60), isNull()))
                 .thenThrow(new java.io.IOException("Compression failed"));
 
-        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull()))
+        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull()))
                 .thenReturn(new HostClaudeService.ActionResult("done", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -590,17 +590,17 @@ class AgenticBlockExecutorTest {
         // Should still complete — fallback truncation was used
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         // The action passed to executeAction should be truncated (contains [TRUNCATED:...)
-        verify(hostClaude).executeAction(contains("[TRUNCATED:"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull());
+        verify(hostClaude).executeAction(contains("[TRUNCATED:"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull());
     }
 
     @Test
     void execute_withModelAndInstructions_passedToProvider() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull()))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Do it\nSUMMARY: Step"))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
 
-        when(hostClaude.executeAction(eq("Do it"), eq("claude-opus-4-6"), eq("Custom instructions for this workflow"), eq("/test/project"), isNull(), eq(false), isNull(), isNull()))
+        when(hostClaude.executeAction(eq("Do it"), eq("claude-opus-4-6"), eq("Custom instructions for this workflow"), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull()))
                 .thenReturn(new HostClaudeService.ActionResult("done", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -615,18 +615,18 @@ class AgenticBlockExecutorTest {
         // System prompt should include custom instructions (called once per iteration)
         verify(hostClaude, atLeast(1)).buildConversationPrompt(contains("Custom instructions for this workflow"), anyList());
         // Model and instructions passed to executeAction
-        verify(hostClaude).executeAction(eq("Do it"), eq("claude-opus-4-6"), eq("Custom instructions for this workflow"), eq("/test/project"), isNull(), eq(false), isNull(), isNull());
+        verify(hostClaude).executeAction(eq("Do it"), eq("claude-opus-4-6"), eq("Custom instructions for this workflow"), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull());
     }
 
     @Test
     void execute_actPhaseException_capturedAsError() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull()))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Do something\nSUMMARY: Step"))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
 
         // ACT phase throws exception
-        when(hostClaude.executeAction(eq("Do something"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull()))
+        when(hostClaude.executeAction(eq("Do something"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull()))
                 .thenThrow(new RuntimeException("Process crashed"));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -640,7 +640,7 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_providerResolved_fromContext() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull()))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -659,7 +659,7 @@ class AgenticBlockExecutorTest {
                 .thenThrow(new RuntimeException("DB connection failed"));
 
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull()))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
 
         StepResult result = executor.execute(buildBlock("Resilience test"), buildContext());
@@ -674,7 +674,7 @@ class AgenticBlockExecutorTest {
         when(runRepository.findById("run-1")).thenReturn(Optional.empty());
 
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull()))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
 
         StepResult result = executor.execute(buildBlock("No run test"), buildContext());
@@ -687,7 +687,7 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_websocketBroadcastFailure_doesNotAbortExecution() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull()))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -713,27 +713,27 @@ class AgenticBlockExecutorTest {
         BlockDefinition block = BlockDefinition.builder().type("agentic").config(config).build();
 
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), eq(600)))
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), eq(600), isNull()))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Do it\nSUMMARY: Step"))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
-        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), eq(600), eq(false), isNull(), isNull()))
+        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), eq(600), eq(false), isNull(), isNull(), isNull()))
                 .thenReturn(new HostClaudeService.ActionResult("done", 0, null));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
         StepResult result = executor.execute(block, buildContext());
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
-        verify(hostClaude, atLeast(1)).reasonStructured(anyString(), anyString(), isNull(), isNull(), eq(600));
-        verify(hostClaude).executeAction(anyString(), isNull(), isNull(), eq("/test/project"), eq(600), eq(false), isNull(), isNull());
+        verify(hostClaude, atLeast(1)).reasonStructured(anyString(), anyString(), isNull(), isNull(), eq(600), isNull());
+        verify(hostClaude).executeAction(anyString(), isNull(), isNull(), eq("/test/project"), eq(600), eq(false), isNull(), isNull(), isNull());
     }
 
     @Test
     void execute_reasonAndActPhases_useDistinctSystemPromptArguments() throws Exception {
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull()))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Do it\nSUMMARY: Step"))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
-        when(hostClaude.executeAction(anyString(), eq("claude-opus-4-6"), eq("WORKFLOW_INSTR_X"), eq("/test/project"), isNull(), eq(false), isNull(), isNull()))
+        when(hostClaude.executeAction(anyString(), eq("claude-opus-4-6"), eq("WORKFLOW_INSTR_X"), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull()))
                 .thenReturn(new HostClaudeService.ActionResult("done", 0, null));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -744,9 +744,9 @@ class AgenticBlockExecutorTest {
         executor.execute(buildBlock("Phase-args goal"), context);
 
         ArgumentCaptor<String> reasonSysPrompt = ArgumentCaptor.forClass(String.class);
-        verify(hostClaude, atLeast(1)).reasonStructured(anyString(), reasonSysPrompt.capture(), isNull(), isNull(), isNull());
+        verify(hostClaude, atLeast(1)).reasonStructured(anyString(), reasonSysPrompt.capture(), isNull(), isNull(), isNull(), isNull());
         ArgumentCaptor<String> actSysPrompt = ArgumentCaptor.forClass(String.class);
-        verify(hostClaude).executeAction(anyString(), eq("claude-opus-4-6"), actSysPrompt.capture(), eq("/test/project"), isNull(), eq(false), isNull(), isNull());
+        verify(hostClaude).executeAction(anyString(), eq("claude-opus-4-6"), actSysPrompt.capture(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull());
 
         // REASON gets the full agentic system prompt (contains goal + structured format)
         assertThat(reasonSysPrompt.getValue()).contains("Phase-args goal");
@@ -769,9 +769,9 @@ class AgenticBlockExecutorTest {
         BlockDefinition block = BlockDefinition.builder().type("agentic").config(config).build();
 
         when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull()))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Do something\nSUMMARY: Step"));
-        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull()))
+        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull()))
                 .thenThrow(new RuntimeException("claude binary not found in PATH"));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
