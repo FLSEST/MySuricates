@@ -1,6 +1,11 @@
 spring:
   datasource:
-    url: jdbc:sqlite:/tmp/autotrigger-integrationtest.db?journal_mode=WAL&busy_timeout=10000
+    # integration.db.path is set per test JVM by IntegrationTestDbSessionListener so that
+    # CONCURRENT mvn test runs (e.g. two quality-gate workflows on the same schedule tick)
+    # never share one SQLite file — two WAL writer processes corrupt it (SQLITE_BUSY_SNAPSHOT
+    # → SQLITE_CORRUPT, seen 2026-07-09). The fallback path only applies when the listener
+    # did not run (e.g. exotic runners); the pre-test clean in pom.xml keeps it fresh.
+    url: jdbc:sqlite:${integration.db.path:/tmp/autotrigger-integrationtest.db}?journal_mode=WAL&busy_timeout=10000
     driver-class-name: org.sqlite.JDBC
     hikari:
       # SQLite supports only one writer — integration tests MUST mirror prod (pool-size=1).
@@ -26,7 +31,7 @@ spring:
     # Use the same file-based URL as the datasource. File DBs persist across
     # DataSource lifetimes (unlike in-memory), so Flyway can use its own
     # non-pooled DataSource without the DB vanishing before HikariCP connects.
-    url: jdbc:sqlite:/tmp/autotrigger-integrationtest.db?journal_mode=WAL&busy_timeout=10000
+    url: jdbc:sqlite:${integration.db.path:/tmp/autotrigger-integrationtest.db}?journal_mode=WAL&busy_timeout=10000
     driver-class-name: org.sqlite.JDBC
 
 automation:
