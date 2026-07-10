@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { api, apiErrorMessage } from '../api/client';
+import { api, apiErrorMessage, fetchWorkflowBpmn } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
 import { downloadJSON } from '../utils/downloadFile';
@@ -88,6 +88,15 @@ export interface SimilarWorkflow {
   workflowName: string;
   similarity: number;
   blockTypes: string[];
+}
+
+export function useWorkflowBpmn(id: string, enabled = true) {
+  return useQuery({
+    queryKey: ['workflows', id, 'bpmn'],
+    queryFn: () => fetchWorkflowBpmn(id),
+    enabled: !!id && enabled,
+    staleTime: 30_000,
+  });
 }
 
 export function useSimilarWorkflows(workflowId: string, limit = 5) {

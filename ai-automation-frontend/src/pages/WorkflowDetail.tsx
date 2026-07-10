@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Plus, History } from 'lucide-react';
 
 const WorkflowVersionsTab = lazy(() => import('../components/workflow/WorkflowVersionsTab'));
+const WorkflowDiagramTab = lazy(() => import('../components/workflow/WorkflowDiagramTab'));
 import { Card, CardHeader, Button, Spinner } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
 import {
@@ -61,7 +62,7 @@ export function WorkflowDetail() {
     skillIds: [],
   });
   const [selectedSkillId, setSelectedSkillId] = useState('');
-  const [activeTab, setActiveTab] = useState<'blocks' | 'versions'>('blocks');
+  const [activeTab, setActiveTab] = useState<'blocks' | 'versions' | 'diagram'>('blocks');
   const [showExecuteDialog, setShowExecuteDialog] = useState(false);
   const [showClone, setShowClone] = useState(false);
   const [cloneForm, setCloneForm] = useState({ projectId: '', name: '' });
@@ -280,6 +281,16 @@ export function WorkflowDetail() {
               <History className="w-3.5 h-3.5" />
               {t.workflows.versionsTab}
             </button>
+            <button
+              onClick={() => setActiveTab('diagram')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'diagram'
+                  ? 'border-accent text-accent'
+                  : 'border-transparent text-text-secondary hover:text-text hover:border-border'
+              }`}
+            >
+              {t.workflows.diagramTab}
+            </button>
           </div>
 
           {activeTab === 'blocks' && (
@@ -317,6 +328,12 @@ export function WorkflowDetail() {
           {activeTab === 'versions' && (
             <Suspense fallback={<div className="py-8 text-center text-text-secondary">{t.common.loading}</div>}>
               <WorkflowVersionsTab workflowId={workflow.id} />
+            </Suspense>
+          )}
+
+          {activeTab === 'diagram' && id && (
+            <Suspense fallback={<div className="p-6 text-sm text-text-secondary">{t.common.loading}</div>}>
+              <WorkflowDiagramTab workflowId={id} />
             </Suspense>
           )}
         </div>
