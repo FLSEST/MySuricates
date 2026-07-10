@@ -284,7 +284,7 @@ class BpmnModelBuilder {
         if (isDefault) {
             split.defaultFlowId = in.id;
         }
-        return rowAxis + Math.max(ROW_STEP, extentBelow + ROW_STEP / 2);
+        return rowAxis + Math.max(ROW_STEP, extentBelow + SUB_PAD * 2); // Puffer >= SubProcess-Halbhöhe (SUB_PAD*2), sonst 5px-Überlappung bei gestapelten Loop-Rows
     }
 
     /** Vertikale Ausdehnung einer Zeile relativ zu ihrer eigenen Achse (y=0), inkl. Kindknoten. */

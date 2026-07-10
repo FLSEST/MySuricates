@@ -151,6 +151,40 @@ class BpmnModelBuilderTest {
     }
 
     @Test
+    void switchMitZweiForeachsUeberlappenNicht() {
+        // Fix für Findings 2: Zwei foreach-Blöcke in verschiedenen Switch-Cases
+        // (case 0 und case 1) dürfen sich nicht vertikal überlappen. Jeder foreach wird
+        // zu einem SubProcess mit Halbhöhe SUB_PAD*2 = 80. Die attachRow-Puffergröße muss
+        // diesen Überhang abdecken.
+        BpmnModel model = build(WorkflowFixtures.workflow("SwitchForeachLoop", List.of(
+                WorkflowFixtures.block("switch", null, Map.of(
+                        "expression", "{{ mode }}",
+                        "cases", List.of(
+                                Map.of("value", "case0", "blocks", List.of(
+                                        Map.of("type", "foreach", "config", Map.of(
+                                                "variable_name", "x",
+                                                "command", "Tu was",
+                                                "execution_mode", "claude")))),
+                                Map.of("value", "case1", "blocks", List.of(
+                                        Map.of("type", "foreach", "config", Map.of(
+                                                "variable_name", "y",
+                                                "command", "Tu was auch",
+                                                "execution_mode", "claude"))))))))));
+
+        List<BpmnModel.Node> subProcesses = model.nodes.stream()
+                .filter(n -> n.kind == BpmnModel.Kind.SUB_PROCESS)
+                .sorted((a, b) -> Double.compare(a.y, b.y))
+                .toList();
+
+        assertThat(subProcesses).hasSize(2);
+        BpmnModel.Node upper = subProcesses.get(0);
+        BpmnModel.Node lower = subProcesses.get(1);
+
+        // Lower SubProcess muss unterhalb der Upper SubProcess liegen (keine Überlappung)
+        assertThat(lower.y).isGreaterThanOrEqualTo(upper.y + upper.h);
+    }
+
+    @Test
     void foreachWirdZuSubProcessMitMultiInstance() {
         BpmnModel model = build(WorkflowFixtures.workflow("Loop", List.of(
                 WorkflowFixtures.block("foreach", null, Map.of(
