@@ -321,6 +321,10 @@ GET /api/v1/projects
 # Workflows eines Projekts
 GET /api/v1/workflows?projectId=<uuid>
 
+# Workflow als BPMN 2.0 XML exportieren
+GET /api/v1/workflows/{id}/export/bpmn
+# → File-Download (.bpmn, Camunda-Modeler-kompatibel)
+
 # System-Backup erstellen
 GET /api/v1/system/backup
 # → File-Download

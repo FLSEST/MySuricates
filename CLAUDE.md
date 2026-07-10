@@ -207,6 +207,7 @@ These use non-obvious paths — always use these, never guess:
 | List workflow versions | GET | `/api/v1/workflows/{id}/versions?page=0&size=20` |
 | Get workflow version | GET | `/api/v1/workflows/{id}/versions/{versionId}` |
 | Restore workflow version | POST | `/api/v1/workflows/{id}/versions/{versionId}/restore` |
+| Export workflow as BPMN | GET | `/api/v1/workflows/{id}/export/bpmn` |
 
 See [AGENTS.md](AGENTS.md) for a complete REST API reference (workflow/chain CRUD, test instance).
 
