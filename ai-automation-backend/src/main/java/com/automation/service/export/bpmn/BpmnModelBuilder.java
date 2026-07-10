@@ -16,6 +16,7 @@ import static com.automation.service.export.bpmn.BpmnModel.Kind.EXCLUSIVE_GATEWA
 import static com.automation.service.export.bpmn.BpmnModel.Kind.SCRIPT_TASK;
 import static com.automation.service.export.bpmn.BpmnModel.Kind.SERVICE_TASK;
 import static com.automation.service.export.bpmn.BpmnModel.Kind.START_EVENT;
+import static com.automation.service.export.bpmn.BpmnModel.Kind.SUB_PROCESS;
 import static com.automation.service.export.bpmn.BpmnModel.Kind.TASK;
 import static com.automation.service.export.bpmn.BpmnModel.Kind.USER_TASK;
 
@@ -106,7 +107,7 @@ class BpmnModelBuilder {
         return switch (type) {
             case "conditional" -> buildConditional(block, idBase);
             case "switch" -> buildSwitch(block, idBase);
-            // Task 4 ergänzt: case "foreach", "while" -> buildLoop(block, idBase);
+            case "foreach", "while" -> buildLoop(block, idBase);
             default -> singleTask(block, idBase);
         };
     }
@@ -273,6 +274,46 @@ class BpmnModelBuilder {
             split.defaultFlowId = in.id;
         }
         return rowIndex + 1;
+    }
+
+    private Segment buildLoop(BlockDefinition block, String idBase) {
+        Map<String, Object> c = block.getConfig();
+        boolean foreach = "foreach".equals(block.getType());
+        boolean shellMode = "shell".equals(str(c, "execution_mode"));
+
+        double innerWidth = EVT + GAP + TASK_W + GAP + EVT;
+        double subW = innerWidth + 2 * SUB_PAD;
+        double subH = TASK_H + 2 * SUB_PAD;
+
+        String label = block.getName() != null && !block.getName().isBlank()
+                ? block.getName()
+                : (foreach ? "Für jedes " + str(c, "variable_name") : "Schleife bis Bedingung");
+
+        BpmnModel.Node sub = node(idBase + "_loop", BpmnModel.Kind.SUB_PROCESS, label, subW, subH);
+        sub.loop = foreach ? "multiInstanceSequential" : "standardLoop";
+        sub.documentation = documentationFor(block);
+        sub.configJson = toJson(c);
+        place(sub, 0, 0);
+
+        BpmnModel.Node innerStart = node(idBase + "_start", BpmnModel.Kind.START_EVENT, null, EVT, EVT);
+        BpmnModel.Node body = commandTask(idBase + "_body", str(c, "command"), shellMode);
+        BpmnModel.Node innerEnd = node(idBase + "_end", BpmnModel.Kind.END_EVENT, null, EVT, EVT);
+        place(innerStart, SUB_PAD, 0);
+        place(body, SUB_PAD + EVT + GAP, 0);
+        place(innerEnd, SUB_PAD + EVT + GAP + TASK_W + GAP, 0);
+
+        sub.children.add(innerStart);
+        sub.children.add(body);
+        sub.children.add(innerEnd);
+        sub.childEdges.add(edge(innerStart.id, body.id, null));
+        sub.childEdges.add(edge(body.id, innerEnd.id, null));
+
+        Segment seg = new Segment();
+        seg.nodes.add(sub);
+        seg.entryId = sub.id;
+        seg.exitId = sub.id;
+        seg.width = subW;
+        return seg;
     }
 
     @SuppressWarnings("unchecked")

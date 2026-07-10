@@ -119,4 +119,45 @@ class BpmnModelBuilderTest {
         assertThat(gateways.get(0).defaultFlowId).isNotNull();
         assertThat(model.nodes.stream().anyMatch(n -> n.kind == BpmnModel.Kind.SERVICE_TASK)).isTrue();
     }
+
+    @Test
+    void foreachWirdZuSubProcessMitMultiInstance() {
+        BpmnModel model = build(WorkflowFixtures.workflow("Loop", List.of(
+                WorkflowFixtures.block("foreach", null, Map.of(
+                        "variable_name", "chunk",
+                        "command", "Erstelle einen Song für {{ chunk }}",
+                        "execution_mode", "claude")))));
+
+        BpmnModel.Node sub = model.nodes.stream()
+                .filter(n -> n.kind == BpmnModel.Kind.SUB_PROCESS).findFirst().orElseThrow();
+        assertThat(sub.loop).isEqualTo("multiInstanceSequential");
+        assertThat(sub.name).isEqualTo("Für jedes chunk");
+        assertThat(sub.children).hasSize(3);
+        assertThat(sub.children.get(0).kind).isEqualTo(BpmnModel.Kind.START_EVENT);
+        assertThat(sub.children.get(1).kind).isEqualTo(BpmnModel.Kind.SERVICE_TASK);
+        assertThat(sub.children.get(2).kind).isEqualTo(BpmnModel.Kind.END_EVENT);
+        assertThat(sub.childEdges).hasSize(2);
+        // Kinder liegen innerhalb der SubProcess-Bounds
+        for (BpmnModel.Node child : sub.children) {
+            assertThat(child.x).isGreaterThanOrEqualTo(sub.x);
+            assertThat(child.x + child.w).isLessThanOrEqualTo(sub.x + sub.w);
+            assertThat(child.y).isGreaterThanOrEqualTo(sub.y);
+            assertThat(child.y + child.h).isLessThanOrEqualTo(sub.y + sub.h);
+        }
+    }
+
+    @Test
+    void whileWirdZuSubProcessMitStandardLoop() {
+        BpmnModel model = build(WorkflowFixtures.workflow("While", List.of(
+                WorkflowFixtures.block("while", null, Map.of(
+                        "command", "npm test 2>&1 | tail -5",
+                        "condition_command", "npm test > /dev/null || echo weiter",
+                        "execution_mode", "shell")))));
+
+        BpmnModel.Node sub = model.nodes.stream()
+                .filter(n -> n.kind == BpmnModel.Kind.SUB_PROCESS).findFirst().orElseThrow();
+        assertThat(sub.loop).isEqualTo("standardLoop");
+        assertThat(sub.documentation).startsWith("Wiederholen solange:");
+        assertThat(sub.children.get(1).kind).isEqualTo(BpmnModel.Kind.SCRIPT_TASK);
+    }
 }
