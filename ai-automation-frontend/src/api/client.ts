@@ -85,3 +85,13 @@ export function apiErrorMessage(err: unknown, fallback: string): string {
   }
   return fallback;
 }
+
+/** Lädt den BPMN-2.0-Export eines Workflows als XML-String (kein JSON — daher raw fetch). */
+export async function fetchWorkflowBpmn(id: string): Promise<string> {
+  const headers: HeadersInit = {};
+  const apiKey = useSettingsStore.getState().apiKey;
+  if (apiKey) headers['X-API-Key'] = apiKey;
+  const res = await fetch(`${BASE_URL}/workflows/${id}/export/bpmn`, { headers });
+  if (!res.ok) throw new Error(`BPMN export failed (${res.status})`);
+  return res.text();
+}

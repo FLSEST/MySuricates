@@ -1,9 +1,12 @@
 import {
-  ArrowLeft, Play, Pencil, Wand2, Wrench, Copy, Download, Trash2,
+  ArrowLeft, Play, Pencil, Wand2, Wrench, Copy, Download, FileCode2, Trash2,
 } from 'lucide-react';
 import { Button } from '../ui';
 import type { Workflow } from '../../types';
 import { exportWorkflow } from '../../hooks/useWorkflows';
+import { fetchWorkflowBpmn } from '../../api/client';
+import { downloadBlob } from '../../utils/downloadFile';
+import { useToast } from '../../hooks/useToast';
 
 interface WorkflowDetailHeaderProps {
   workflow: Workflow;
@@ -36,6 +39,18 @@ export function WorkflowDetailHeader({
   repairLoading,
   hasFailedRuns,
 }: WorkflowDetailHeaderProps) {
+  const toast = useToast();
+
+  const handleBpmnExport = async () => {
+    try {
+      const xml = await fetchWorkflowBpmn(workflow.id);
+      const safeName = workflow.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+      downloadBlob(new Blob([xml], { type: 'application/xml' }), `${safeName}.bpmn`);
+    } catch {
+      toast.error(t.workflows.bpmnExportFailed);
+    }
+  };
+
   return (
     <div className="flex items-center gap-4">
       <button
@@ -101,6 +116,14 @@ export function WorkflowDetailHeader({
           }}
           title={t.workflows.exportWorkflow}
           aria-label={t.workflows.exportWorkflow}
+        />
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={<FileCode2 className="w-4 h-4" />}
+          onClick={handleBpmnExport}
+          title={t.workflows.exportBpmn}
+          aria-label={t.workflows.exportBpmn}
         />
         <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4" />} onClick={onDelete} title={t.common.delete} aria-label={t.common.delete} />
       </div>
