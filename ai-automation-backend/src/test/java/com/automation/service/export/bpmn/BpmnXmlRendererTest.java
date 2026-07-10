@@ -48,7 +48,13 @@ class BpmnXmlRendererTest {
                                 "expression", "{{ gate }}",
                                 "cases", List.of(Map.of("value", "RED", "blocks", List.of(
                                         Map.of("type", "shell", "config", Map.of("command", "echo alarm"))))))),
-                        WorkflowFixtures.block("sub-workflow", "Unterprozess", Map.of("workflow_id", "wf-child-1")))));
+                        WorkflowFixtures.block("sub-workflow", "Unterprozess", Map.of("workflow_id", "wf-child-1")))),
+                WorkflowFixtures.workflow("While", List.of(WorkflowFixtures.block("while", null, Map.of(
+                        "command", "npm test 2>&1 | tail -5",
+                        "condition_command", "npm test > /dev/null || echo weiter",
+                        "execution_mode", "shell")))),
+                WorkflowFixtures.workflow("Unbekannt", List.of(WorkflowFixtures.block("quantum", null, Map.of(
+                        "command", "irgendwas")))));
     }
 
     @Test
