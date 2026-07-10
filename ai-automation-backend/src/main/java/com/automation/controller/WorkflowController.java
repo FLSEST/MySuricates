@@ -20,6 +20,7 @@ import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.project.ProjectService;
 import com.automation.entity.RunStatus;
 import com.automation.service.learning.WorkflowSimilarityService;
+import com.automation.service.export.ProcessFormatAdapter;
 import com.automation.service.repair.AutoRepairService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowOptimizationService;
@@ -29,7 +30,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -54,6 +57,7 @@ public class WorkflowController {
     private final WorkflowVersionMapper workflowVersionMapper;
     private final WorkflowSimilarityService workflowSimilarityService;
     private final ObjectMapper objectMapper;
+    private final ProcessFormatAdapter bpmnExportAdapter;
 
     @GetMapping
     public List<WorkflowResponse> listWorkflows() {
@@ -179,6 +183,19 @@ public class WorkflowController {
                 workflow.getMetadata(),
                 Instant.now()
         );
+    }
+
+    /** Exportiert den Workflow als BPMN 2.0 XML (Spec: docs/plans/2026-07-09-bpmn-integration-design.md). */
+    @GetMapping(value = "/{id}/export/bpmn", produces = MediaType.APPLICATION_XML_VALUE)
+    public ResponseEntity<String> exportWorkflowAsBpmn(@PathVariable String id) {
+        Workflow workflow = workflowService.findByIdEager(id);
+        String xml = bpmnExportAdapter.export(workflow);
+        String safeName = workflow.getName().replaceAll("[^a-zA-Z0-9_-]", "_");
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + safeName + "." + bpmnExportAdapter.fileExtension() + "\"")
+                .contentType(MediaType.APPLICATION_XML)
+                .body(xml);
     }
 
     // --- Workflow Versions ---

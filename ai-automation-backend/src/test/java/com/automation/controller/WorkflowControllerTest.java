@@ -8,6 +8,7 @@ import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.export.ProcessFormatAdapter;
 import com.automation.service.project.ProjectService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowOptimizationService;
@@ -86,6 +87,9 @@ class WorkflowControllerTest {
     private com.automation.service.learning.WorkflowSimilarityService workflowSimilarityService;
     @MockitoBean
     private RateLimitConfig rateLimitConfig;
+
+    @MockitoBean
+    private ProcessFormatAdapter bpmnExportAdapter;
 
     private Workflow testWorkflow;
     private WorkflowResponse testResponse;
