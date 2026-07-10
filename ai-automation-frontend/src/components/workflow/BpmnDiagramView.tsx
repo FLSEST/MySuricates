@@ -11,7 +11,18 @@ interface Shape {
   y: number;
   w: number;
   h: number;
+  loop: 'multi' | 'standard' | null;
 }
+
+/** Menschenlesbare Typ-Bezeichnung für Tooltips (Block-Typ am Kasten erkennbar). */
+const TYPE_LABELS: Record<string, string> = {
+  scriptTask: 'Shell-Kommando',
+  serviceTask: 'KI / Service',
+  userTask: 'Benutzer-Interaktion',
+  callActivity: 'Sub-Workflow',
+  task: 'Unbekannter Block-Typ',
+  subProcess: 'Schleife (Sub-Prozess)',
+};
 
 interface EdgeLine {
   id: string;
@@ -36,6 +47,9 @@ function parseBpmn(xml: string): Diagram | null {
     const bounds = s.getElementsByTagNameNS(NS_DC, 'Bounds')[0];
     const ref = byId.get(s.getAttribute('bpmnElement') ?? '');
     if (!bounds || !ref) return [];
+    const loopEl = Array.from(ref.children).find(
+      (c) => c.localName === 'multiInstanceLoopCharacteristics' || c.localName === 'standardLoopCharacteristics',
+    );
     return [{
       id: ref.getAttribute('id') ?? '',
       kind: ref.localName,
@@ -44,6 +58,7 @@ function parseBpmn(xml: string): Diagram | null {
       y: Number(bounds.getAttribute('y')),
       w: Number(bounds.getAttribute('width')),
       h: Number(bounds.getAttribute('height')),
+      loop: loopEl ? (loopEl.localName === 'multiInstanceLoopCharacteristics' ? 'multi' : 'standard') : null,
     }];
   });
   const edges: EdgeLine[] = Array.from(doc.getElementsByTagNameNS(NS_DI, 'BPMNEdge')).map((e) => ({
@@ -72,6 +87,54 @@ function wrapLabel(name: string): string[] {
   }
   if (current) lines.push(current);
   return lines.slice(0, 3);
+}
+
+/** BPMN-Standard-Marker: macht den Block-Typ am Kasten erkennbar. */
+function TaskMarker({ s }: { s: Shape }) {
+  const x = s.x + 7;
+  const y = s.y + 7;
+  switch (s.kind) {
+    case 'scriptTask': // Skript: drei Textzeilen
+      return (
+        <g className="stroke-text-secondary" strokeWidth={1.2} strokeLinecap="round">
+          <line x1={x} y1={y + 1} x2={x + 10} y2={y + 1} />
+          <line x1={x} y1={y + 4.5} x2={x + 8} y2={y + 4.5} />
+          <line x1={x} y1={y + 8} x2={x + 10} y2={y + 8} />
+        </g>
+      );
+    case 'userTask': // Person: Kopf + Schultern
+      return (
+        <g className="stroke-text-secondary" fill="none" strokeWidth={1.2}>
+          <circle cx={x + 5} cy={y + 2.5} r={2.5} />
+          <path d={`M ${x} ${y + 10} Q ${x + 5} ${y + 4.5} ${x + 10} ${y + 10}`} />
+        </g>
+      );
+    case 'serviceTask': // Zahnrad (vereinfacht): Kreis + Speichen
+      return (
+        <g className="stroke-text-secondary" fill="none" strokeWidth={1.1}>
+          <circle cx={x + 5} cy={y + 5} r={2.8} />
+          <line x1={x + 5} y1={y - 0.5} x2={x + 5} y2={y + 10.5} />
+          <line x1={x - 0.5} y1={y + 5} x2={x + 10.5} y2={y + 5} />
+          <line x1={x + 1.1} y1={y + 1.1} x2={x + 8.9} y2={y + 8.9} />
+          <line x1={x + 8.9} y1={y + 1.1} x2={x + 1.1} y2={y + 8.9} />
+        </g>
+      );
+    case 'callActivity': { // [+]-Marker unten mittig (aufrufbarer Sub-Workflow)
+      const bx = s.x + s.w / 2 - 6;
+      const by = s.y + s.h - 15;
+      return (
+        <g className="stroke-text-secondary" fill="none" strokeWidth={1.2}>
+          <rect x={bx} y={by} width={12} height={12} rx={2} />
+          <line x1={bx + 6} y1={by + 2.5} x2={bx + 6} y2={by + 9.5} />
+          <line x1={bx + 2.5} y1={by + 6} x2={bx + 9.5} y2={by + 6} />
+        </g>
+      );
+    }
+    case 'task': // Unbekannter Typ
+      return <text x={x + 5} y={y + 9} textAnchor="middle" className="fill-text-secondary text-[11px]">?</text>;
+    default:
+      return null;
+  }
 }
 
 function ShapeSvg({ s }: { s: Shape }) {
@@ -108,16 +171,29 @@ function ShapeSvg({ s }: { s: Shape }) {
     case 'subProcess':
       return (
         <g>
+          <title>{TYPE_LABELS.subProcess}</title>
           <rect x={s.x} y={s.y} width={s.w} height={s.h} rx={12}
             className="fill-accent/5 stroke-text" strokeWidth={1.6} />
           {s.name && <text x={cx} y={s.y + 18} textAnchor="middle" className="fill-text-secondary text-[11px]">{s.name}</text>}
+          {s.loop === 'multi' && (
+            <g className="stroke-text-secondary" strokeWidth={1.4} strokeLinecap="round">
+              <line x1={cx - 6} y1={s.y + s.h - 13} x2={cx + 6} y2={s.y + s.h - 13} />
+              <line x1={cx - 6} y1={s.y + s.h - 10} x2={cx + 6} y2={s.y + s.h - 10} />
+              <line x1={cx - 6} y1={s.y + s.h - 7} x2={cx + 6} y2={s.y + s.h - 7} />
+            </g>
+          )}
+          {s.loop === 'standard' && (
+            <text x={cx} y={s.y + s.h - 6} textAnchor="middle" className="fill-text-secondary text-[12px]">↻</text>
+          )}
         </g>
       );
     default: // task, serviceTask, scriptTask, userTask, callActivity
       return (
         <g>
+          <title>{TYPE_LABELS[s.kind] ?? s.kind}</title>
           <rect x={s.x} y={s.y} width={s.w} height={s.h} rx={10}
             className="fill-surface stroke-text" strokeWidth={1.6} />
+          <TaskMarker s={s} />
           <text x={cx} y={cy - (wrapLabel(s.name).length - 1) * 7} textAnchor="middle" className="fill-text text-[12px]">
             {wrapLabel(s.name).map((line, i) => (
               <tspan key={i} x={cx} dy={i === 0 ? 0 : 14}>{line}</tspan>

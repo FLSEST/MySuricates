@@ -46,4 +46,13 @@ describe('BpmnDiagramView', () => {
     render(<BpmnDiagramView xml="kein xml" />);
     expect(screen.getByRole('alert')).toBeInTheDocument();
   });
+
+  it('zeigt Typ-Marker und Tooltip am Task', () => {
+    const { container } = render(<BpmnDiagramView xml={SAMPLE_XML} />);
+    // scriptTask: SVG-<title>-Tooltip mit Typ-Label
+    const titles = Array.from(container.querySelectorAll('title')).map((t) => t.textContent);
+    expect(titles).toContain('Shell-Kommando');
+    // Skript-Marker: drei Linien oben links im Kasten
+    expect(container.querySelectorAll('g.stroke-text-secondary line').length).toBeGreaterThanOrEqual(3);
+  });
 });
