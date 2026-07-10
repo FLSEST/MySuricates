@@ -88,13 +88,20 @@ function ShapeSvg({ s }: { s: Shape }) {
         </g>
       );
     case 'exclusiveGateway':
+    case 'parallelGateway':
+    case 'inclusiveGateway':
+    case 'eventBasedGateway':
       return (
         <g>
           <polygon
             points={`${cx},${s.y} ${s.x + s.w},${cy} ${cx},${s.y + s.h} ${s.x},${cy}`}
             className="fill-surface stroke-text" strokeWidth={1.6} />
-          <line x1={cx - 8} y1={cy - 8} x2={cx + 8} y2={cy + 8} className="stroke-text" strokeWidth={2.2} />
-          <line x1={cx + 8} y1={cy - 8} x2={cx - 8} y2={cy + 8} className="stroke-text" strokeWidth={2.2} />
+          {s.kind === 'exclusiveGateway' && (
+            <>
+              <line x1={cx - 8} y1={cy - 8} x2={cx + 8} y2={cy + 8} className="stroke-text" strokeWidth={2.2} />
+              <line x1={cx + 8} y1={cy - 8} x2={cx - 8} y2={cy + 8} className="stroke-text" strokeWidth={2.2} />
+            </>
+          )}
           {s.name && <text x={cx} y={s.y - 8} textAnchor="middle" className="fill-text-secondary text-[11px]">{s.name}</text>}
         </g>
       );
@@ -127,7 +134,10 @@ export default function BpmnDiagramView({ xml }: { xml: string }) {
     return <div role="alert" className="p-4 text-sm text-text-secondary">Invalid BPMN XML</div>;
   }
   const pad = 40;
-  const xs = diagram.shapes.flatMap((s) => [s.x, s.x + s.w]);
+  const xs = [
+    ...diagram.shapes.flatMap((s) => [s.x, s.x + s.w]),
+    ...diagram.edges.flatMap((e) => e.points.map((p) => p[0])),
+  ];
   const ys = [...diagram.shapes.flatMap((s) => [s.y, s.y + s.h + 20]), ...diagram.edges.flatMap((e) => e.points.map((p) => p[1]))];
   const minX = Math.min(...xs) - pad;
   const minY = Math.min(...ys) - pad;
