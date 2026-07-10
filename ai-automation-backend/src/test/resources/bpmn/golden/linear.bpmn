@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<definitions xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:mysuricates="https://mysuricates.dev/schema/bpmn/1.0" exporter="MySuricates" exporterVersion="1.0" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn" xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL">
+  <process id="process_linear_demo" isExecutable="true" name="Linear Demo">
+    <startEvent id="start_event" name="Start"/>
+    <scriptTask id="b_0_daten_sammeln" name="Daten sammeln" scriptFormat="bash">
+      <documentation>git log --oneline -20</documentation>
+      <extensionElements>
+        <mysuricates:blockConfig>{"command":"git log --oneline -20"}</mysuricates:blockConfig>
+      </extensionElements>
+      <script>git log --oneline -20</script>
+    </scriptTask>
+    <serviceTask id="b_1_ki_fasse_die_historie_zusammen" name="KI: Fasse die Historie zusammen:">
+      <documentation>Fasse die Historie zusammen:</documentation>
+      <extensionElements>
+        <mysuricates:blockConfig>{"command":"Fasse die Historie zusammen:\n{{ previous_output }}"}</mysuricates:blockConfig>
+      </extensionElements>
+    </serviceTask>
+    <userTask id="b_2_freigabe_bericht_freigeben" name="Freigabe: Bericht freigeben?">
+      <documentation>Freigabefrage: Bericht freigeben?</documentation>
+      <extensionElements>
+        <mysuricates:blockConfig>{"question":"Bericht freigeben?"}</mysuricates:blockConfig>
+      </extensionElements>
+    </userTask>
+    <endEvent id="end_event" name="Ende"/>
+    <sequenceFlow id="flow_0" sourceRef="b_0_daten_sammeln" targetRef="b_1_ki_fasse_die_historie_zusammen"/>
+    <sequenceFlow id="flow_1" sourceRef="b_1_ki_fasse_die_historie_zusammen" targetRef="b_2_freigabe_bericht_freigeben"/>
+    <sequenceFlow id="flow_2" sourceRef="start_event" targetRef="b_0_daten_sammeln"/>
+    <sequenceFlow id="flow_3" sourceRef="b_2_freigabe_bericht_freigeben" targetRef="end_event"/>
+  </process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane bpmnElement="process_linear_demo" id="BPMNPlane_1">
+      <bpmndi:BPMNShape bpmnElement="start_event" id="shape_start_event">
+        <dc:Bounds height="36" width="36" x="100" y="182"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="b_0_daten_sammeln" id="shape_b_0_daten_sammeln">
+        <dc:Bounds height="80" width="100" x="286" y="160"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="b_1_ki_fasse_die_historie_zusammen" id="shape_b_1_ki_fasse_die_historie_zusammen">
+        <dc:Bounds height="80" width="100" x="536" y="160"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="b_2_freigabe_bericht_freigeben" id="shape_b_2_freigabe_bericht_freigeben">
+        <dc:Bounds height="80" width="100" x="786" y="160"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="end_event" id="shape_end_event">
+        <dc:Bounds height="36" width="36" x="1036" y="182"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="flow_0" id="edge_flow_0">
+        <di:waypoint x="386" y="200"/>
+        <di:waypoint x="536" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow_1" id="edge_flow_1">
+        <di:waypoint x="636" y="200"/>
+        <di:waypoint x="786" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow_2" id="edge_flow_2">
+        <di:waypoint x="136" y="200"/>
+        <di:waypoint x="286" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow_3" id="edge_flow_3">
+        <di:waypoint x="886" y="200"/>
+        <di:waypoint x="1036" y="200"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>
