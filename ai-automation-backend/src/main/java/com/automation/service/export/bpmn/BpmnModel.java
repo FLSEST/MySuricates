@@ -19,6 +19,7 @@ class BpmnModel {
         String name;
         String documentation;
         String configJson;
+        String blockType;       // Original-Block-Typ (z. B. "shell", "conditional") für verlustfreien Reimport
         String script;          // nur SCRIPT_TASK
         String calledElement;   // nur CALL_ACTIVITY
         String loop;            // null | "multiInstanceSequential" | "standardLoop"

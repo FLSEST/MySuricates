@@ -133,6 +133,7 @@ class BpmnModelBuilder {
         BpmnModel.Node n = node(BpmnNames.elementId(idBase, name), kind, name, TASK_W, TASK_H);
         n.documentation = documentationFor(block);
         n.configJson = toJson(config);
+        n.blockType = type;
         if (kind == SCRIPT_TASK) {
             n.script = str(config, "command");
         }
@@ -169,6 +170,7 @@ class BpmnModelBuilder {
 
         BpmnModel.Node split = node(idBase + "_split", EXCLUSIVE_GATEWAY, str(c, "condition"), GW, GW);
         split.configJson = toJson(c);
+        split.blockType = "conditional";
         BpmnModel.Node merge = node(idBase + "_merge", EXCLUSIVE_GATEWAY, null, GW, GW);
         place(split, 0, 0);
         place(merge, GW + GAP + TASK_W + GAP, 0);
@@ -209,6 +211,7 @@ class BpmnModelBuilder {
 
         BpmnModel.Node split = node(idBase + "_split", EXCLUSIVE_GATEWAY, str(c, "expression"), GW, GW);
         split.configJson = toJson(c);
+        split.blockType = "switch";
         BpmnModel.Node merge = node(idBase + "_merge", EXCLUSIVE_GATEWAY, null, GW, GW);
         place(split, 0, 0);
 
@@ -234,16 +237,16 @@ class BpmnModelBuilder {
         double mergeX = GW + GAP + maxChainWidth + GAP;
         place(merge, mergeX, 0);
 
-        int rowIndex = 1;
+        double nextRowAxis = ROW_STEP;
         for (int k = 0; k < rows.size(); k++) {
-            rowIndex = attachRow(seg, split, merge, rows.get(k), rowNames.get(k), rowIndex, false);
+            nextRowAxis = attachRow(seg, split, merge, rows.get(k), rowNames.get(k), nextRowAxis, false);
         }
         if (defaultRow == null) {
             BpmnModel.Edge direct = edge(split.id, merge.id, "default");
             seg.edges.add(direct);
             split.defaultFlowId = direct.id;
         } else {
-            rowIndex = attachRow(seg, split, merge, defaultRow, "default", rowIndex, true);
+            nextRowAxis = attachRow(seg, split, merge, defaultRow, "default", nextRowAxis, true);
         }
 
         seg.nodes.add(merge);
@@ -253,18 +256,26 @@ class BpmnModelBuilder {
         return seg;
     }
 
-    /** Hängt eine Case-Zeile unterhalb der Hauptlinie ein; leere Zeilen werden zur Direktkante. */
-    private int attachRow(Segment seg, BpmnModel.Node split, BpmnModel.Node merge,
-                          Segment row, String label, int rowIndex, boolean isDefault) {
+    /**
+     * Hängt eine Case-Zeile unterhalb der Hauptlinie ein; leere Zeilen werden zur Direktkante
+     * (kein Achsen-Verbrauch). Höhenbewusst: die nächste Zeilenachse berücksichtigt die reale
+     * vertikale Ausdehnung der Zeile (z. B. verschachtelte conditional-Blöcke oder SubProcesse),
+     * damit sich Zeilen nicht überlappen (Finding 2 des Branch-Reviews).
+     */
+    private double attachRow(Segment seg, BpmnModel.Node split, BpmnModel.Node merge,
+                          Segment row, String label, double rowAxis, boolean isDefault) {
         if (row.entryId == null) {
             BpmnModel.Edge direct = edge(split.id, merge.id, label);
             seg.edges.add(direct);
             if (isDefault) {
                 split.defaultFlowId = direct.id;
             }
-            return rowIndex;
+            return rowAxis;
         }
-        row.translate(GW + GAP, rowIndex * ROW_STEP);
+        // Ausdehnung VOR dem Verschieben ermitteln: bei y=0 (eigene Achse) ist n.y + n.h
+        // exakt die Ausdehnung unterhalb/um die Zeilenachse.
+        double extentBelow = maxYExtentBelow(row);
+        row.translate(GW + GAP, rowAxis);
         seg.nodes.addAll(row.nodes);
         seg.edges.addAll(row.edges);
         BpmnModel.Edge in = edge(split.id, row.entryId, label);
@@ -273,7 +284,21 @@ class BpmnModelBuilder {
         if (isDefault) {
             split.defaultFlowId = in.id;
         }
-        return rowIndex + 1;
+        return rowAxis + Math.max(ROW_STEP, extentBelow + ROW_STEP / 2);
+    }
+
+    /** Vertikale Ausdehnung einer Zeile relativ zu ihrer eigenen Achse (y=0), inkl. Kindknoten. */
+    private static double maxYExtentBelow(Segment seg) {
+        return maxYExtent(seg.nodes);
+    }
+
+    private static double maxYExtent(List<BpmnModel.Node> nodes) {
+        double max = 0;
+        for (BpmnModel.Node n : nodes) {
+            max = Math.max(max, n.y + n.h);
+            max = Math.max(max, maxYExtent(n.children));
+        }
+        return max;
     }
 
     private Segment buildLoop(BlockDefinition block, String idBase) {
@@ -293,6 +318,7 @@ class BpmnModelBuilder {
         sub.loop = foreach ? "multiInstanceSequential" : "standardLoop";
         sub.documentation = documentationFor(block);
         sub.configJson = toJson(c);
+        sub.blockType = block.getType();
         place(sub, 0, 0);
 
         BpmnModel.Node innerStart = node(idBase + "_start", BpmnModel.Kind.START_EVENT, null, EVT, EVT);

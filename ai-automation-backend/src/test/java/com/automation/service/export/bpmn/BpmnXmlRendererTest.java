@@ -112,6 +112,9 @@ class BpmnXmlRendererTest {
         assertThat(xml).contains("mysuricates:blockConfig");
         assertThat(xml).contains("git log --oneline -20");
         assertThat(xml).contains("scriptFormat=\"bash\"");
+        // Finding 1 (Verlustfreiheit, Spec §6): der Block-Typ wird als Attribut mitgeführt,
+        // damit der Import nicht aus der BPMN-Semantik geraten werden muss.
+        assertThat(xml).contains("blockConfig type=\"shell\"");
     }
 
     private static Document parse(String xml) throws Exception {

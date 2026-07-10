@@ -121,6 +121,36 @@ class BpmnModelBuilderTest {
     }
 
     @Test
+    void switchRowsUeberlappenNichtBeiVerschachteltemKontrollfluss() {
+        // Finding 2 des Branch-Reviews: Case A enthält einen verschachtelten conditional-Block
+        // (then-Zweig bei +ROW_STEP), Case B einen einfachen Shell-Task. Bei einem naiven
+        // rowIndex * ROW_STEP würde Case B (Achse bei 2 * ROW_STEP) mit Case As then-Zweig
+        // (bei 1 * ROW_STEP + ROW_STEP) kollidieren; das höhenbewusste Layout muss das verhindern.
+        BpmnModel model = build(WorkflowFixtures.workflow("SwitchNested", List.of(
+                WorkflowFixtures.block("switch", null, Map.of(
+                        "expression", "{{ status }}",
+                        "cases", List.of(
+                                Map.of("value", "A", "blocks", List.of(
+                                        Map.of("type", "conditional", "config", Map.of(
+                                                "condition", "Verschachtelt?",
+                                                "then_command", "Verarbeite verschachtelt")))),
+                                Map.of("value", "B", "blocks", List.of(
+                                        Map.of("type", "shell", "config", Map.of("command", "echo case-b"))))))))));
+
+        BpmnModel.Node splitA = model.nodes.stream()
+                .filter(n -> "Verschachtelt?".equals(n.name)).findFirst().orElseThrow();
+        BpmnModel.Node thenA = model.nodes.stream()
+                .filter(n -> n.name != null && n.name.startsWith("KI: Verarbeite verschachtelt"))
+                .findFirst().orElseThrow();
+        BpmnModel.Node taskB = model.nodes.stream()
+                .filter(n -> "echo case-b".equals(n.script)).findFirst().orElseThrow();
+
+        double maxExtentCaseA = Math.max(splitA.y + splitA.h, thenA.y + thenA.h);
+        // Case Bs Task-Mitte liegt unterhalb der maximalen Ausdehnung von Case A -> keine Überlappung.
+        assertThat(taskB.y + taskB.h / 2).isGreaterThan(maxExtentCaseA);
+    }
+
+    @Test
     void foreachWirdZuSubProcessMitMultiInstance() {
         BpmnModel model = build(WorkflowFixtures.workflow("Loop", List.of(
                 WorkflowFixtures.block("foreach", null, Map.of(

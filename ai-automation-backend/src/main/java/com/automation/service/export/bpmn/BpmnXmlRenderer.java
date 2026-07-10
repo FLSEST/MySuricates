@@ -83,6 +83,9 @@ class BpmnXmlRenderer {
         if (n.configJson != null) {
             Element ext = appendChild(doc, el, "extensionElements");
             Element cfg = doc.createElementNS(NS_MYSURICATES, "mysuricates:blockConfig");
+            if (n.blockType != null && !n.blockType.isBlank()) {
+                cfg.setAttribute("type", n.blockType);
+            }
             cfg.setTextContent(n.configJson);
             ext.appendChild(cfg);
         }

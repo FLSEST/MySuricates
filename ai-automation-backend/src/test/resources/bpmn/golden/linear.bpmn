@@ -5,20 +5,20 @@
     <scriptTask id="b_0_daten_sammeln" name="Daten sammeln" scriptFormat="bash">
       <documentation>git log --oneline -20</documentation>
       <extensionElements>
-        <mysuricates:blockConfig>{"command":"git log --oneline -20"}</mysuricates:blockConfig>
+        <mysuricates:blockConfig type="shell">{"command":"git log --oneline -20"}</mysuricates:blockConfig>
       </extensionElements>
       <script>git log --oneline -20</script>
     </scriptTask>
     <serviceTask id="b_1_ki_fasse_die_historie_zusammen" name="KI: Fasse die Historie zusammen:">
       <documentation>Fasse die Historie zusammen:</documentation>
       <extensionElements>
-        <mysuricates:blockConfig>{"command":"Fasse die Historie zusammen:\n{{ previous_output }}"}</mysuricates:blockConfig>
+        <mysuricates:blockConfig type="simple">{"command":"Fasse die Historie zusammen:\n{{ previous_output }}"}</mysuricates:blockConfig>
       </extensionElements>
     </serviceTask>
     <userTask id="b_2_freigabe_bericht_freigeben" name="Freigabe: Bericht freigeben?">
       <documentation>Freigabefrage: Bericht freigeben?</documentation>
       <extensionElements>
-        <mysuricates:blockConfig>{"question":"Bericht freigeben?"}</mysuricates:blockConfig>
+        <mysuricates:blockConfig type="approval">{"question":"Bericht freigeben?"}</mysuricates:blockConfig>
       </extensionElements>
     </userTask>
     <endEvent id="end_event" name="Ende"/>

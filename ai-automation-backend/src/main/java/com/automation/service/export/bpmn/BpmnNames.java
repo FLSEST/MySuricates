@@ -1,5 +1,7 @@
 package com.automation.service.export.bpmn;
 
+import java.util.Locale;
+
 final class BpmnNames {
 
     private static final int MAX_NAME = 60;
@@ -27,7 +29,7 @@ final class BpmnNames {
         if (name == null || name.isBlank()) {
             return base;
         }
-        String slug = name.toLowerCase()
+        String slug = name.toLowerCase(Locale.ROOT)
                 .replaceAll("[^a-z0-9]+", "_")
                 .replaceAll("^_+|_+$", "");
         if (slug.length() > 30) {
