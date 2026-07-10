@@ -70,4 +70,53 @@ class BpmnModelBuilderTest {
             assertThat(e.waypoints.size()).isGreaterThanOrEqualTo(2);
         }
     }
+
+    @Test
+    void conditionalWirdZuGatewayPaarMitDefaultFlow() {
+        BpmnModel model = build(WorkflowFixtures.workflow("Cond", List.of(
+                WorkflowFixtures.block("conditional", null, Map.of(
+                        "condition", "Tests fehlgeschlagen?",
+                        "then_command", "Analysiere die Fehler",
+                        "execution_mode", "claude")))));
+
+        List<BpmnModel.Node> gateways = model.nodes.stream()
+                .filter(n -> n.kind == BpmnModel.Kind.EXCLUSIVE_GATEWAY).toList();
+        assertThat(gateways).hasSize(2);
+        BpmnModel.Node split = gateways.get(0);
+        assertThat(split.name).isEqualTo("Tests fehlgeschlagen?");
+        assertThat(split.defaultFlowId).isNotNull();
+        // Default-Flow (kein else_command) geht direkt zum Merge-Gateway
+        BpmnModel.Edge defaultFlow = model.edges.stream()
+                .filter(e -> e.id.equals(split.defaultFlowId)).findFirst().orElseThrow();
+        assertThat(defaultFlow.targetRef).isEqualTo(gateways.get(1).id);
+        // Then-Zweig liegt unterhalb der Hauptachse
+        BpmnModel.Node thenTask = model.nodes.stream()
+                .filter(n -> n.kind == BpmnModel.Kind.SERVICE_TASK).findFirst().orElseThrow();
+        assertThat(thenTask.y + thenTask.h / 2).isEqualTo(350.0); // 200 + ROW_STEP
+    }
+
+    @Test
+    void switchMitCasesUndDefaultBlocks() {
+        BpmnModel model = build(WorkflowFixtures.workflow("Switch", List.of(
+                WorkflowFixtures.block("switch", null, Map.of(
+                        "expression", "{{ status }}",
+                        "cases", List.of(
+                                Map.of("value", "RED", "blocks", List.of(
+                                        Map.of("type", "shell", "config", Map.of("command", "echo alarm")))),
+                                Map.of("value", "GREEN", "blocks", List.of())),
+                        "default", List.of(
+                                Map.of("type", "simple", "config", Map.of("command", "Prüfe manuell"))))))));
+
+        List<BpmnModel.Node> gateways = model.nodes.stream()
+                .filter(n -> n.kind == BpmnModel.Kind.EXCLUSIVE_GATEWAY).toList();
+        assertThat(gateways).hasSize(2);
+        assertThat(gateways.get(0).name).isEqualTo("{{ status }}");
+        // RED-Case: scriptTask; leerer GREEN-Case: Direktkante mit Namen "GREEN"
+        assertThat(model.nodes.stream().anyMatch(n -> n.kind == BpmnModel.Kind.SCRIPT_TASK
+                && "echo alarm".equals(n.script))).isTrue();
+        assertThat(model.edges.stream().anyMatch(e -> "GREEN".equals(e.name))).isTrue();
+        // Default-Zweig existiert als serviceTask und ist der Default-Flow des Splits
+        assertThat(gateways.get(0).defaultFlowId).isNotNull();
+        assertThat(model.nodes.stream().anyMatch(n -> n.kind == BpmnModel.Kind.SERVICE_TASK)).isTrue();
+    }
 }

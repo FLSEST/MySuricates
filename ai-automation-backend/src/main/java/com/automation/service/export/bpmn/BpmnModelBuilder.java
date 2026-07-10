@@ -12,6 +12,7 @@ import java.util.Map;
 
 import static com.automation.service.export.bpmn.BpmnModel.Kind.CALL_ACTIVITY;
 import static com.automation.service.export.bpmn.BpmnModel.Kind.END_EVENT;
+import static com.automation.service.export.bpmn.BpmnModel.Kind.EXCLUSIVE_GATEWAY;
 import static com.automation.service.export.bpmn.BpmnModel.Kind.SCRIPT_TASK;
 import static com.automation.service.export.bpmn.BpmnModel.Kind.SERVICE_TASK;
 import static com.automation.service.export.bpmn.BpmnModel.Kind.START_EVENT;
@@ -101,8 +102,13 @@ class BpmnModelBuilder {
     }
 
     private Segment buildBlock(BlockDefinition block, String idBase) {
-        // Task 3 ergänzt: case "conditional" / "switch"; Task 4 ergänzt: case "foreach" / "while"
-        return singleTask(block, idBase);
+        String type = block.getType() == null ? "" : block.getType();
+        return switch (type) {
+            case "conditional" -> buildConditional(block, idBase);
+            case "switch" -> buildSwitch(block, idBase);
+            // Task 4 ergänzt: case "foreach", "while" -> buildLoop(block, idBase);
+            default -> singleTask(block, idBase);
+        };
     }
 
     /** Einzelner Block -> ein Task-Knoten. */
@@ -154,6 +160,148 @@ class BpmnModelBuilder {
             n.script = command;
         }
         return n;
+    }
+
+    private Segment buildConditional(BlockDefinition block, String idBase) {
+        Map<String, Object> c = block.getConfig();
+        boolean shellMode = "shell".equals(str(c, "execution_mode"));
+
+        BpmnModel.Node split = node(idBase + "_split", EXCLUSIVE_GATEWAY, str(c, "condition"), GW, GW);
+        split.configJson = toJson(c);
+        BpmnModel.Node merge = node(idBase + "_merge", EXCLUSIVE_GATEWAY, null, GW, GW);
+        place(split, 0, 0);
+        place(merge, GW + GAP + TASK_W + GAP, 0);
+
+        Segment seg = new Segment();
+        seg.nodes.add(split);
+
+        BpmnModel.Node thenTask = commandTask(idBase + "_then", str(c, "then_command"), shellMode);
+        place(thenTask, GW + GAP, ROW_STEP);
+        seg.nodes.add(thenTask);
+        seg.edges.add(edge(split.id, thenTask.id, "ja"));
+        seg.edges.add(edge(thenTask.id, merge.id, null));
+
+        String elseCommand = str(c, "else_command");
+        if (elseCommand.isBlank()) {
+            BpmnModel.Edge direct = edge(split.id, merge.id, "nein");
+            seg.edges.add(direct);
+            split.defaultFlowId = direct.id;
+        } else {
+            BpmnModel.Node elseTask = commandTask(idBase + "_else", elseCommand, shellMode);
+            place(elseTask, GW + GAP, 2 * ROW_STEP);
+            seg.nodes.add(elseTask);
+            BpmnModel.Edge elseEdge = edge(split.id, elseTask.id, "nein");
+            seg.edges.add(elseEdge);
+            seg.edges.add(edge(elseTask.id, merge.id, null));
+            split.defaultFlowId = elseEdge.id;
+        }
+
+        seg.nodes.add(merge);
+        seg.entryId = split.id;
+        seg.exitId = merge.id;
+        seg.width = GW + GAP + TASK_W + GAP + GW;
+        return seg;
+    }
+
+    private Segment buildSwitch(BlockDefinition block, String idBase) {
+        Map<String, Object> c = block.getConfig();
+
+        BpmnModel.Node split = node(idBase + "_split", EXCLUSIVE_GATEWAY, str(c, "expression"), GW, GW);
+        split.configJson = toJson(c);
+        BpmnModel.Node merge = node(idBase + "_merge", EXCLUSIVE_GATEWAY, null, GW, GW);
+        place(split, 0, 0);
+
+        Segment seg = new Segment();
+        seg.nodes.add(split);
+
+        List<Map<String, Object>> cases = listOfMaps(c.get("cases"));
+        List<Segment> rows = new ArrayList<>();
+        List<String> rowNames = new ArrayList<>();
+        double maxChainWidth = TASK_W;
+        for (int k = 0; k < cases.size(); k++) {
+            Segment row = buildChain(toBlockDefinitions(cases.get(k).get("blocks")), idBase + "_c" + k);
+            rows.add(row);
+            rowNames.add(str(cases.get(k), "value").isBlank() ? "case" + k : str(cases.get(k), "value"));
+            maxChainWidth = Math.max(maxChainWidth, row.width);
+        }
+        List<BlockDefinition> defaultBlocks = toBlockDefinitions(c.get("default"));
+        Segment defaultRow = defaultBlocks.isEmpty() ? null : buildChain(defaultBlocks, idBase + "_default");
+        if (defaultRow != null) {
+            maxChainWidth = Math.max(maxChainWidth, defaultRow.width);
+        }
+
+        double mergeX = GW + GAP + maxChainWidth + GAP;
+        place(merge, mergeX, 0);
+
+        int rowIndex = 1;
+        for (int k = 0; k < rows.size(); k++) {
+            rowIndex = attachRow(seg, split, merge, rows.get(k), rowNames.get(k), rowIndex, false);
+        }
+        if (defaultRow == null) {
+            BpmnModel.Edge direct = edge(split.id, merge.id, "default");
+            seg.edges.add(direct);
+            split.defaultFlowId = direct.id;
+        } else {
+            rowIndex = attachRow(seg, split, merge, defaultRow, "default", rowIndex, true);
+        }
+
+        seg.nodes.add(merge);
+        seg.entryId = split.id;
+        seg.exitId = merge.id;
+        seg.width = mergeX + GW;
+        return seg;
+    }
+
+    /** Hängt eine Case-Zeile unterhalb der Hauptlinie ein; leere Zeilen werden zur Direktkante. */
+    private int attachRow(Segment seg, BpmnModel.Node split, BpmnModel.Node merge,
+                          Segment row, String label, int rowIndex, boolean isDefault) {
+        if (row.entryId == null) {
+            BpmnModel.Edge direct = edge(split.id, merge.id, label);
+            seg.edges.add(direct);
+            if (isDefault) {
+                split.defaultFlowId = direct.id;
+            }
+            return rowIndex;
+        }
+        row.translate(GW + GAP, rowIndex * ROW_STEP);
+        seg.nodes.addAll(row.nodes);
+        seg.edges.addAll(row.edges);
+        BpmnModel.Edge in = edge(split.id, row.entryId, label);
+        seg.edges.add(in);
+        seg.edges.add(edge(row.exitId, merge.id, null));
+        if (isDefault) {
+            split.defaultFlowId = in.id;
+        }
+        return rowIndex + 1;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> listOfMaps(Object value) {
+        if (!(value instanceof List<?> list)) {
+            return List.of();
+        }
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Object item : list) {
+            if (item instanceof Map<?, ?> map) {
+                result.add((Map<String, Object>) map);
+            }
+        }
+        return result;
+    }
+
+    /** Verschachtelte Block-Maps (switch cases[].blocks / default) -> BlockDefinitions. */
+    @SuppressWarnings("unchecked")
+    private static List<BlockDefinition> toBlockDefinitions(Object value) {
+        List<BlockDefinition> result = new ArrayList<>();
+        for (Map<String, Object> map : listOfMaps(value)) {
+            BlockDefinition b = new BlockDefinition();
+            b.setType((String) map.get("type"));
+            b.setName((String) map.get("name"));
+            Object config = map.get("config");
+            b.setConfig(config instanceof Map<?, ?> m ? new HashMap<>((Map<String, Object>) m) : new HashMap<>());
+            result.add(b);
+        }
+        return result;
     }
 
     private String nameSource(BlockDefinition block) {
