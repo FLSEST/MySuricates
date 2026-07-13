@@ -414,6 +414,11 @@ export const en = {
     diagramLoadFailed: 'Could not load diagram',
     diagramHint: 'BPMN 2.0 · Camunda Modeler compatible',
     diagramInfoToggle: 'Details',
+    diagramInvalid: 'Invalid BPMN XML',
+    diagramEmpty: 'No diagram data (no layout information)',
+    orientationToggle: 'Toggle orientation',
+    orientationVertical: 'Vertical',
+    orientationHorizontal: 'Horizontal',
     viewDefinition: 'View definition',
     definitionHint: 'Full workflow definition (JSON). The line numbers in the diagram refer to this document.',
     bpmnLabels: {

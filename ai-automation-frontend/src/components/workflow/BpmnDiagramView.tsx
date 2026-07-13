@@ -44,6 +44,20 @@ interface Diagram {
   edges: EdgeLine[];
 }
 
+export type DiagramOrientation = 'horizontal' | 'vertical';
+
+/**
+ * Transponiert das Diagramm (x↔y), damit aus dem links→rechts-Fluss ein
+ * oben→unten-Fluss wird. Boxen behalten Größe und horizontalen Text — nur die
+ * Positionen und Kanten-Waypoints werden gespiegelt.
+ */
+function transpose(d: Diagram): Diagram {
+  return {
+    shapes: d.shapes.map((s) => ({ ...s, x: s.y, y: s.x })),
+    edges: d.edges.map((e) => ({ ...e, points: e.points.map(([x, y]) => [y, x] as [number, number]) })),
+  };
+}
+
 function parseBpmn(xml: string): Diagram | null {
   const doc = new DOMParser().parseFromString(xml, 'application/xml');
   if (doc.getElementsByTagName('parsererror').length > 0) return null;
@@ -77,7 +91,6 @@ function parseBpmn(xml: string): Diagram | null {
       (w) => [Number(w.getAttribute('x')), Number(w.getAttribute('y'))] as [number, number],
     ),
   }));
-  if (shapes.length === 0) return null;
   return { shapes, edges };
 }
 
@@ -303,6 +316,7 @@ export default function BpmnDiagramView({
   onSelectBlock,
   statusByBlock,
   infoByBlock,
+  orientation,
 }: {
   xml: string;
   onSelectBlock?: (selection: DiagramSelection) => void;
@@ -310,13 +324,19 @@ export default function BpmnDiagramView({
   statusByBlock?: Map<number, RunStatus>;
   /** Zeilenbereich je Block-Index — eingeschaltet zeigt jeder Kasten „#N · Z.a–b". */
   infoByBlock?: Map<number, { start: number; end: number }>;
+  /** Fluss-Richtung: links→rechts (Standard) oder oben→unten. */
+  orientation?: DiagramOrientation;
 }) {
   const t = useT();
   const maps = t.workflows.bpmnLabels as unknown as BpmnLabelMaps;
-  const diagram = parseBpmn(xml);
-  if (!diagram) {
-    return <div role="alert" className="p-4 text-sm text-text-secondary">Invalid BPMN XML</div>;
+  const parsed = parseBpmn(xml);
+  if (!parsed) {
+    return <div role="alert" className="p-4 text-sm text-text-secondary">{t.workflows.diagramInvalid}</div>;
   }
+  if (parsed.shapes.length === 0) {
+    return <div role="alert" className="p-4 text-sm text-text-secondary">{t.workflows.diagramEmpty}</div>;
+  }
+  const diagram = orientation === 'vertical' ? transpose(parsed) : parsed;
   const pad = 40;
   const xs = [
     ...diagram.shapes.flatMap((s) => [s.x, s.x + s.w]),

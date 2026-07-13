@@ -50,6 +50,23 @@ describe('BpmnDiagramView', () => {
     expect(screen.getByRole('alert')).toBeInTheDocument();
   });
 
+  it('zeigt eine eigene Meldung für wohlgeformtes BPMN ohne Layout-Daten', () => {
+    const noDi = `<?xml version="1.0"?><definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL">
+      <process id="p"><startEvent id="s"/></process></definitions>`;
+    render(<BpmnDiagramView xml={noDi} />);
+    // andere Meldung als bei kaputtem XML
+    expect(screen.getByRole('alert')).toHaveTextContent(/kein Diagramm|no diagram/i);
+  });
+
+  it('transponiert das Layout bei vertikaler Ausrichtung', () => {
+    const { container, rerender } = render(<BpmnDiagramView xml={SAMPLE_XML} orientation="horizontal" />);
+    const h = container.querySelector('svg')!.getAttribute('viewBox')!.split(' ').map(Number);
+    rerender(<BpmnDiagramView xml={SAMPLE_XML} orientation="vertical" />);
+    const v = container.querySelector('svg')!.getAttribute('viewBox')!.split(' ').map(Number);
+    expect(h[2]!).toBeGreaterThan(h[3]!); // horizontal: breiter als hoch
+    expect(v[3]!).toBeGreaterThan(v[2]!); // vertikal: höher als breit
+  });
+
   it('lokalisiert das deutsche Typ-Präfix namenloser Kästen (EN)', () => {
     useI18nStore.setState({ locale: 'en' });
     const nameless = SAMPLE_XML.replace('name="Maven Tests ausführen"', 'name="KI: git status"');

@@ -416,6 +416,11 @@ export const de: TranslationKeys = {
     diagramLoadFailed: 'Diagramm konnte nicht geladen werden',
     diagramHint: 'BPMN 2.0 · Camunda-Modeler-kompatibel',
     diagramInfoToggle: 'Details',
+    diagramInvalid: 'Ungültiges BPMN-XML',
+    diagramEmpty: 'Kein Diagramm vorhanden (keine Layout-Daten)',
+    orientationToggle: 'Ausrichtung wechseln',
+    orientationVertical: 'Vertikal',
+    orientationHorizontal: 'Horizontal',
     viewDefinition: 'Definition ansehen',
     definitionHint: 'Vollständige Workflow-Definition (JSON). Die Zeilennummern im Diagramm beziehen sich auf dieses Dokument.',
     bpmnLabels: {

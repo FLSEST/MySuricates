@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { FileCode2, Info, ListTree } from 'lucide-react';
+import { FileCode2, Info, ListTree, MoveHorizontal, MoveVertical } from 'lucide-react';
 import { useT } from '../../i18n';
 import { useWorkflowBpmn } from '../../hooks/useWorkflows';
 import { Button, Modal } from '../ui';
 import { MonacoEditor } from '../shared/MonacoEditor';
 import { downloadBlob } from '../../utils/downloadFile';
 import type { LineRange } from '../../utils/workflowDefinition';
-import BpmnDiagramView, { type DiagramSelection } from './BpmnDiagramView';
+import BpmnDiagramView, { type DiagramSelection, type DiagramOrientation } from './BpmnDiagramView';
 
 export default function WorkflowDiagramTab({
   workflowId,
@@ -25,6 +25,7 @@ export default function WorkflowDiagramTab({
   const { data: xml, isLoading, isError } = useWorkflowBpmn(workflowId);
   const [showInfo, setShowInfo] = useState(false);
   const [showDefinition, setShowDefinition] = useState(false);
+  const [orientation, setOrientation] = useState<DiagramOrientation>('horizontal');
 
   if (isLoading) {
     return <div className="p-6 text-sm text-text-secondary">{t.common.loading}</div>;
@@ -43,6 +44,15 @@ export default function WorkflowDiagramTab({
       <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
         <span className="text-xs text-text-tertiary">{t.workflows.diagramHint}</span>
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={orientation === 'horizontal' ? <MoveVertical className="w-4 h-4" /> : <MoveHorizontal className="w-4 h-4" />}
+            onClick={() => setOrientation((o) => (o === 'horizontal' ? 'vertical' : 'horizontal'))}
+            title={t.workflows.orientationToggle}
+          >
+            {orientation === 'horizontal' ? t.workflows.orientationVertical : t.workflows.orientationHorizontal}
+          </Button>
           <Button
             variant={showInfo ? 'primary' : 'ghost'}
             size="sm"
@@ -75,6 +85,7 @@ export default function WorkflowDiagramTab({
         xml={xml}
         onSelectBlock={onSelectBlock}
         infoByBlock={showInfo ? lineRanges : undefined}
+        orientation={orientation}
       />
 
       <Modal open={showDefinition} onClose={() => setShowDefinition(false)} title={t.workflows.viewDefinition} size="xl">
