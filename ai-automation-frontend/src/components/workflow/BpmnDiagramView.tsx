@@ -36,6 +36,8 @@ interface Shape {
 interface EdgeLine {
   id: string;
   name: string;
+  sourceRef: string;
+  targetRef: string;
   points: [number, number][];
 }
 
@@ -46,41 +48,39 @@ interface Diagram {
 
 export type DiagramOrientation = 'horizontal' | 'vertical';
 
-/**
- * Transponiert das Diagramm (x↔y), damit aus dem links→rechts-Fluss ein
- * oben→unten-Fluss wird. Boxen behalten Größe und horizontalen Text — nur die
- * Positionen und Kanten-Waypoints werden gespiegelt.
- */
-function transpose(d: Diagram): Diagram {
-  return {
-    shapes: d.shapes.map((s) => ({ ...s, x: s.y, y: s.x })),
-    edges: d.edges.map((e) => ({ ...e, points: e.points.map(([x, y]) => [y, x] as [number, number]) })),
-  };
-}
-
-const VERTICAL_GAP = 80; // Ziel-Leerraum zwischen Kästen im vertikalen Fluss (statt ~170)
+const VERTICAL_GAP = 70; // Leerraum zwischen Kästen im vertikalen Fluss
 
 /**
- * Staucht im vertikalen Layout die Leerräume entlang der Fluss-Achse (y) auf {@link VERTICAL_GAP},
- * ohne die Kästen zu verkleinern: Kästen bleiben gleich groß, nur die Lücken (und damit die
- * Pfeillängen) schrumpfen. Kanten-Waypoints wandern mit — die Segmente über einer Lücke
- * verkürzen sich exakt um deren Reduktion, also bleiben Pfeile korrekt an den Kästen.
+ * Baut aus dem links→rechts-Layout ein sauberes oben→unten-Layout:
+ * 1) Kästen transponieren (Position x↔y, Größe bleibt — horizontaler Text lesbar),
+ * 2) Leerräume entlang der Fluss-Achse auf {@link VERTICAL_GAP} stauchen,
+ * 3) Kanten aus den Kasten-Positionen NEU routen (unten-Mitte → oben-Mitte, orthogonal).
+ *
+ * Schritt 3 ist entscheidend: Ein reiner Punkt-Tausch der Waypoints dockt falsch an,
+ * weil die Kästen nicht quadratisch sind (100×80). Neu-Routing setzt die Pfeile exakt
+ * an die Kasten-Mitten.
  */
-function compactVertical(d: Diagram): Diagram {
-  // belegte y-Intervalle der Kästen zusammenfassen
-  const intervals = d.shapes.map((s) => [s.y, s.y + s.h] as [number, number]).sort((a, b) => a[0] - b[0]);
+function verticalLayout(d: Diagram): Diagram {
+  // 1) Kästen transponieren — über die MITTE (nicht die Ecke), sonst wandern nicht-quadratische
+  //    Kästen (100×80) um (w-h)/2 seitlich weg und die Hauptlinie bekommt einen Zickzack.
+  let shapes = d.shapes.map((s) => ({
+    ...s,
+    x: s.y + s.h / 2 - s.w / 2,
+    y: s.x + s.w / 2 - s.h / 2,
+  }));
+
+  // 2) Leerräume stauchen: belegte y-Intervalle mergen, überschüssige Lücken kürzen
+  const intervals = shapes.map((s) => [s.y, s.y + s.h] as [number, number]).sort((a, b) => a[0] - b[0]);
   const merged: [number, number][] = [];
   for (const [a, b] of intervals) {
     const last = merged[merged.length - 1];
     if (last && a <= last[1] + 1) last[1] = Math.max(last[1], b);
     else merged.push([a, b]);
   }
-  // je Lücke die Reduktion aufsummieren: alles ab der nächsten belegten Kante rückt hoch
   const cuts: { threshold: number; shift: number }[] = [];
   let cumulative = 0;
   for (let i = 0; i < merged.length - 1; i++) {
-    const gap = merged[i + 1]![0] - merged[i]![1];
-    cumulative += Math.max(0, gap - VERTICAL_GAP);
+    cumulative += Math.max(0, merged[i + 1]![0] - merged[i]![1] - VERTICAL_GAP);
     cuts.push({ threshold: merged[i + 1]![0], shift: cumulative });
   }
   const shiftFor = (y: number): number => {
@@ -88,10 +88,26 @@ function compactVertical(d: Diagram): Diagram {
     for (const c of cuts) if (y >= c.threshold - 0.001) s = c.shift;
     return s;
   };
-  return {
-    shapes: d.shapes.map((s) => ({ ...s, y: s.y - shiftFor(s.y) })),
-    edges: d.edges.map((e) => ({ ...e, points: e.points.map(([x, y]) => [x, y - shiftFor(y)] as [number, number]) })),
-  };
+  shapes = shapes.map((s) => ({ ...s, y: s.y - shiftFor(s.y) }));
+
+  // 3) Kanten neu routen — orthogonal von Unterkante-Mitte der Quelle zur Oberkante-Mitte des Ziels
+  const byId = new Map(shapes.map((s) => [s.id, s]));
+  const edges = d.edges.map((e) => {
+    const src = byId.get(e.sourceRef);
+    const tgt = byId.get(e.targetRef);
+    if (!src || !tgt) return { ...e }; // Fallback: alte (gespiegelte) Punkte behalten
+    const sx = src.x + src.w / 2;
+    const sy = src.y + src.h;
+    const tx = tgt.x + tgt.w / 2;
+    const ty = tgt.y;
+    const points: [number, number][] =
+      Math.abs(sx - tx) < 1
+        ? [[sx, sy], [tx, ty]]
+        : [[sx, sy], [sx, (sy + ty) / 2], [tx, (sy + ty) / 2], [tx, ty]]; // orthogonaler Versatz (Verzweigung)
+    return { ...e, points };
+  });
+
+  return { shapes, edges };
 }
 
 function parseBpmn(xml: string): Diagram | null {
@@ -120,13 +136,18 @@ function parseBpmn(xml: string): Diagram | null {
       loop: loopEl ? (loopEl.localName === 'multiInstanceLoopCharacteristics' ? 'multi' : 'standard') : null,
     }];
   });
-  const edges: EdgeLine[] = Array.from(doc.getElementsByTagNameNS(NS_DI, 'BPMNEdge')).map((e) => ({
-    id: e.getAttribute('id') ?? '',
-    name: byId.get(e.getAttribute('bpmnElement') ?? '')?.getAttribute('name') ?? '',
-    points: Array.from(e.getElementsByTagNameNS(NS_DDI, 'waypoint')).map(
-      (w) => [Number(w.getAttribute('x')), Number(w.getAttribute('y'))] as [number, number],
-    ),
-  }));
+  const edges: EdgeLine[] = Array.from(doc.getElementsByTagNameNS(NS_DI, 'BPMNEdge')).map((e) => {
+    const flow = byId.get(e.getAttribute('bpmnElement') ?? '');
+    return {
+      id: e.getAttribute('id') ?? '',
+      name: flow?.getAttribute('name') ?? '',
+      sourceRef: flow?.getAttribute('sourceRef') ?? '',
+      targetRef: flow?.getAttribute('targetRef') ?? '',
+      points: Array.from(e.getElementsByTagNameNS(NS_DDI, 'waypoint')).map(
+        (w) => [Number(w.getAttribute('x')), Number(w.getAttribute('y'))] as [number, number],
+      ),
+    };
+  });
   return { shapes, edges };
 }
 
@@ -372,7 +393,7 @@ export default function BpmnDiagramView({
   if (parsed.shapes.length === 0) {
     return <div role="alert" className="p-4 text-sm text-text-secondary">{t.workflows.diagramEmpty}</div>;
   }
-  const diagram = orientation === 'vertical' ? compactVertical(transpose(parsed)) : parsed;
+  const diagram = orientation === 'vertical' ? verticalLayout(parsed) : parsed;
   const pad = 40;
   const xs = [
     ...diagram.shapes.flatMap((s) => [s.x, s.x + s.w]),

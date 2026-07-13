@@ -70,6 +70,17 @@ describe('BpmnDiagramView', () => {
     expect(v[3]!).toBeLessThan(h[2]! * 0.85);
   });
 
+  it('dockt Pfeile im vertikalen Layout an den Kasten-Mitten an', () => {
+    const { container } = render(<BpmnDiagramView xml={SAMPLE_XML} orientation="vertical" />);
+    const rect = container.querySelector('rect')!; // Task-Box
+    const cx = Number(rect.getAttribute('x')) + Number(rect.getAttribute('width')) / 2;
+    const polyXs = Array.from(container.querySelectorAll('polyline')).flatMap((p) =>
+      (p.getAttribute('points') || '').trim().split(/\s+/).map((pt) => Number(pt.split(',')[0])),
+    );
+    // Neu-Routing: mindestens eine Kante dockt exakt an der Task-Mitte an (früher ~10px daneben)
+    expect(polyXs.some((x) => Math.abs(x - cx) < 0.5)).toBe(true);
+  });
+
   it('lokalisiert das deutsche Typ-Präfix namenloser Kästen (EN)', () => {
     useI18nStore.setState({ locale: 'en' });
     const nameless = SAMPLE_XML.replace('name="Maven Tests ausführen"', 'name="KI: git status"');
