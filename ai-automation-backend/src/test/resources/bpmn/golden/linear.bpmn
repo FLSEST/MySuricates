@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <definitions xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:mysuricates="https://mysuricates.dev/schema/bpmn/1.0" exporter="MySuricates" exporterVersion="1.0" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn" xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL">
-  <process id="process_linear_demo" isExecutable="true" name="Linear Demo">
+  <process id="process_linear_demo" isExecutable="false" name="Linear Demo">
     <startEvent id="start_event" name="Start"/>
     <scriptTask id="b_0_daten_sammeln" name="Daten sammeln" scriptFormat="bash">
       <documentation>git log --oneline -20</documentation>

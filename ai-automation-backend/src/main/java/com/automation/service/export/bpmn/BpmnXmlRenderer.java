@@ -43,7 +43,9 @@ class BpmnXmlRenderer {
             Element process = appendChild(doc, definitions, "process");
             process.setAttribute("id", model.processId);
             process.setAttribute("name", model.processName);
-            process.setAttribute("isExecutable", "true");
+            // false, solange serviceTasks keine Engine-Implementierung tragen (Stufe 1) —
+            // ein Camunda-Deploy würde sonst scheitern; Modeler-Ansicht unberührt.
+            process.setAttribute("isExecutable", "false");
             for (BpmnModel.Node n : model.nodes) {
                 appendNode(doc, process, n);
             }
@@ -60,7 +62,8 @@ class BpmnXmlRenderer {
 
     private void appendNode(Document doc, Element parent, BpmnModel.Node n) {
         if (n.warning != null) {
-            parent.appendChild(doc.createComment(" " + n.warning + " "));
+            // "--" ist in XML-Kommentaren unzulässig und würde beim Re-Parsen brechen
+            parent.appendChild(doc.createComment(" " + n.warning.replace("--", "- -") + " "));
         }
         Element el = appendChild(doc, parent, elementName(n.kind));
         el.setAttribute("id", n.id);
