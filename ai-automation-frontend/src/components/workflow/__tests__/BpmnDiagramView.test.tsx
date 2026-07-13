@@ -47,6 +47,21 @@ describe('BpmnDiagramView', () => {
     expect(screen.getByRole('alert')).toBeInTheDocument();
   });
 
+  it('kürzt zu lange Labels mit Ellipsis und hält sie in der Box', () => {
+    const longXml = SAMPLE_XML.replace(
+      'name="Maven Tests ausführen"',
+      'name="Vollautomatische Integrationstestsuite mit ausführlicher Fehleranalyse und Reporting"',
+    );
+    const { container } = render(<BpmnDiagramView xml={longXml} />);
+    const tspans = Array.from(container.querySelectorAll('tspan'));
+    // max. 3 Zeilen, letzte endet mit Ellipsis
+    expect(tspans.length).toBeLessThanOrEqual(3);
+    expect(tspans.some((t) => t.textContent?.endsWith('…'))).toBe(true);
+    // voller Name bleibt als Tooltip erhalten
+    const titles = Array.from(container.querySelectorAll('title')).map((t) => t.textContent);
+    expect(titles).toContain('Vollautomatische Integrationstestsuite mit ausführlicher Fehleranalyse und Reporting');
+  });
+
   it('zeigt Typ-Marker und Tooltip am Task', () => {
     const { container } = render(<BpmnDiagramView xml={SAMPLE_XML} />);
     // scriptTask: SVG-<title>-Tooltip mit Typ-Label

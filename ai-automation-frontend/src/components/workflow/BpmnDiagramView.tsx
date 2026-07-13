@@ -72,21 +72,52 @@ function parseBpmn(xml: string): Diagram | null {
   return { shapes, edges };
 }
 
-/** Bricht einen Namen in maximal 3 Zeilen à ~24 Zeichen um (rein visuell). */
-function wrapLabel(name: string): string[] {
-  const words = name.split(/\s+/).filter(Boolean);
+const LABEL_FONT_PX = 12;
+const CHAR_PX = LABEL_FONT_PX * 0.55; // grobe Mittelwert-Breite eines Zeichens bei 12px
+const MAX_LINES = 3;
+
+/**
+ * Bricht einen Namen so um, dass jede Zeile in die Box-Innenbreite passt.
+ * Umbruch primär an Wortgrenzen; überlange Einzelwörter werden hart getrennt;
+ * bei Überlänge endet die letzte Zeile mit Ellipsis — nichts ragt mehr heraus.
+ */
+function wrapLabel(name: string, boxWidth: number): string[] {
+  const maxChars = Math.max(4, Math.floor((boxWidth - 12) / CHAR_PX));
   const lines: string[] = [];
   let current = '';
-  for (const word of words) {
-    if (current && (current + ' ' + word).length > 24) {
+
+  const pushWord = (word: string) => {
+    // Wort länger als eine ganze Zeile → hart in Stücke schneiden
+    while (word.length > maxChars) {
+      if (current) {
+        lines.push(current);
+        current = '';
+      }
+      lines.push(word.slice(0, maxChars));
+      word = word.slice(maxChars);
+    }
+    if (!current) {
+      current = word;
+    } else if ((current + ' ' + word).length <= maxChars) {
+      current += ' ' + word;
+    } else {
       lines.push(current);
       current = word;
-    } else {
-      current = current ? current + ' ' + word : word;
     }
+  };
+
+  for (const word of name.split(/\s+/).filter(Boolean)) {
+    pushWord(word);
   }
   if (current) lines.push(current);
-  return lines.slice(0, 3);
+
+  if (lines.length <= MAX_LINES) return lines;
+  // Überlänge: auf MAX_LINES kürzen und die letzte Zeile ellipsieren
+  const kept = lines.slice(0, MAX_LINES);
+  let last = kept[MAX_LINES - 1]!;
+  last = last.length > maxChars - 1 ? last.slice(0, maxChars - 1) : last;
+  kept[MAX_LINES - 1] = last.replace(/\s+$/, '') + '…';
+  return kept;
 }
 
 /** BPMN-Standard-Marker: macht den Block-Typ am Kasten erkennbar. */
@@ -194,11 +225,17 @@ function ShapeSvg({ s }: { s: Shape }) {
           <rect x={s.x} y={s.y} width={s.w} height={s.h} rx={10}
             className="fill-surface stroke-text" strokeWidth={1.6} />
           <TaskMarker s={s} />
-          <text x={cx} y={cy - (wrapLabel(s.name).length - 1) * 7} textAnchor="middle" className="fill-text text-[12px]">
-            {wrapLabel(s.name).map((line, i) => (
-              <tspan key={i} x={cx} dy={i === 0 ? 0 : 14}>{line}</tspan>
-            ))}
-          </text>
+          {(() => {
+            const lines = wrapLabel(s.name, s.w);
+            return (
+              <text x={cx} y={cy - (lines.length - 1) * 7} textAnchor="middle" className="fill-text text-[12px]">
+                <title>{s.name}</title>
+                {lines.map((line, i) => (
+                  <tspan key={i} x={cx} dy={i === 0 ? 0 : 14}>{line}</tspan>
+                ))}
+              </text>
+            );
+          })()}
         </g>
       );
   }
