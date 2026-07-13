@@ -416,6 +416,20 @@ export const en = {
     diagramInfoToggle: 'Details',
     viewDefinition: 'View definition',
     definitionHint: 'Full workflow definition (JSON). The line numbers in the diagram refer to this document.',
+    bpmnLabels: {
+      // Type prefix of nameless boxes (generated in German by the backend; keyed by the German value)
+      prefix: {
+        'KI': 'AI', 'Shell': 'Shell', 'Agent': 'Agent', 'Skill': 'Skill', 'Integration': 'Integration',
+        'Dokument': 'Document', 'Freigabe': 'Approval', 'Eingabe': 'Input', 'Sub-Workflow': 'Sub-workflow', 'Retry': 'Retry',
+      },
+      // Tooltips per BPMN element type
+      tip: {
+        scriptTask: 'Shell command', serviceTask: 'AI / Service', userTask: 'User interaction',
+        callActivity: 'Sub-workflow', task: 'Unknown block type', subProcess: 'Loop (sub-process)',
+      },
+      // Start/end event names
+      event: { 'Start': 'Start', 'Ende': 'End' },
+    },
     versionsTab: 'Versions',
     blocksTab: 'Blocks',
     noVersions: 'No versions yet.',

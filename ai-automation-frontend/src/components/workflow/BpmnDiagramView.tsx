@@ -1,7 +1,25 @@
+import { useT } from '../../i18n';
+
 const NS_MODEL = 'http://www.omg.org/spec/BPMN/20100524/MODEL';
 const NS_DI = 'http://www.omg.org/spec/BPMN/20100524/DI';
 const NS_DC = 'http://www.omg.org/spec/DD/20100524/DC';
 const NS_DDI = 'http://www.omg.org/spec/DD/20100524/DI';
+
+/** Übersetzt Backend-Beschriftungen (deutsches Typ-Präfix, Event-Namen) in die App-Sprache. */
+interface BpmnLabelMaps {
+  prefix: Record<string, string>;
+  tip: Record<string, string>;
+  event: Record<string, string>;
+}
+function localizeName(name: string, maps: BpmnLabelMaps): string {
+  if (maps.event[name] !== undefined) return maps.event[name]!;      // "Start" / "Ende"
+  const idx = name.indexOf(': ');
+  if (idx > 0 && maps.prefix[name.slice(0, idx)] !== undefined) {
+    return maps.prefix[name.slice(0, idx)]! + name.slice(idx);        // "KI: git status" → "AI: git status"
+  }
+  if (maps.prefix[name] !== undefined) return maps.prefix[name]!;      // namenlos ohne Befehl: "Freigabe" → "Approval"
+  return name;                                                         // Block-Name / Befehl: unverändert
+}
 
 interface Shape {
   id: string;
@@ -14,15 +32,6 @@ interface Shape {
   loop: 'multi' | 'standard' | null;
 }
 
-/** Menschenlesbare Typ-Bezeichnung für Tooltips (Block-Typ am Kasten erkennbar). */
-const TYPE_LABELS: Record<string, string> = {
-  scriptTask: 'Shell-Kommando',
-  serviceTask: 'KI / Service',
-  userTask: 'Benutzer-Interaktion',
-  callActivity: 'Sub-Workflow',
-  task: 'Unbekannter Block-Typ',
-  subProcess: 'Schleife (Sub-Prozess)',
-};
 
 interface EdgeLine {
   id: string;
@@ -183,12 +192,13 @@ function statusFill(status: RunStatus | undefined, base: string): string {
   return base;
 }
 
-function ShapeSvg({ s, status }: { s: Shape; status?: RunStatus }) {
+function ShapeSvg({ s, status, maps }: { s: Shape; status?: RunStatus; maps: BpmnLabelMaps }) {
   const cx = s.x + s.w / 2;
   const cy = s.y + s.h / 2;
   const stroke = statusStroke(status);
   const strokeW = status ? 2.4 : 1.6;
   const pulse = status === 'running' ? 'animate-pulse' : '';
+  const label = localizeName(s.name, maps);
   switch (s.kind) {
     case 'startEvent':
     case 'endEvent':
@@ -196,7 +206,7 @@ function ShapeSvg({ s, status }: { s: Shape; status?: RunStatus }) {
         <g>
           <circle cx={cx} cy={cy} r={s.w / 2} className={`${statusFill(status, 'fill-surface')} ${stroke} ${pulse}`}
             strokeWidth={s.kind === 'endEvent' ? 3.5 : strokeW} />
-          {s.name && <text x={cx} y={s.y + s.h + 16} textAnchor="middle" className="fill-text-secondary text-[11px]">{s.name}</text>}
+          {s.name && <text x={cx} y={s.y + s.h + 16} textAnchor="middle" className="fill-text-secondary text-[11px]">{label}</text>}
         </g>
       );
     case 'exclusiveGateway':
@@ -214,16 +224,16 @@ function ShapeSvg({ s, status }: { s: Shape; status?: RunStatus }) {
               <line x1={cx + 8} y1={cy - 8} x2={cx - 8} y2={cy + 8} className="stroke-text" strokeWidth={2.2} />
             </>
           )}
-          {s.name && <text x={cx} y={s.y - 8} textAnchor="middle" className="fill-text-secondary text-[11px]">{s.name}</text>}
+          {s.name && <text x={cx} y={s.y - 8} textAnchor="middle" className="fill-text-secondary text-[11px]">{label}</text>}
         </g>
       );
     case 'subProcess':
       return (
         <g>
-          <title>{TYPE_LABELS.subProcess}</title>
+          <title>{maps.tip.subProcess}</title>
           <rect x={s.x} y={s.y} width={s.w} height={s.h} rx={12}
             className={`${statusFill(status, 'fill-accent/5')} ${stroke} ${pulse}`} strokeWidth={strokeW} />
-          {s.name && <text x={cx} y={s.y + 18} textAnchor="middle" className="fill-text-secondary text-[11px]">{s.name}</text>}
+          {s.name && <text x={cx} y={s.y + 18} textAnchor="middle" className="fill-text-secondary text-[11px]">{label}</text>}
           {s.loop === 'multi' && (
             <g className="stroke-text-secondary" strokeWidth={1.4} strokeLinecap="round">
               <line x1={cx - 6} y1={s.y + s.h - 13} x2={cx + 6} y2={s.y + s.h - 13} />
@@ -239,15 +249,15 @@ function ShapeSvg({ s, status }: { s: Shape; status?: RunStatus }) {
     default: // task, serviceTask, scriptTask, userTask, callActivity
       return (
         <g>
-          <title>{TYPE_LABELS[s.kind] ?? s.kind}</title>
+          <title>{maps.tip[s.kind] ?? s.kind}</title>
           <rect x={s.x} y={s.y} width={s.w} height={s.h} rx={10}
             className={`${statusFill(status, 'fill-surface')} ${stroke} ${pulse}`} strokeWidth={strokeW} />
           <TaskMarker s={s} />
           {(() => {
-            const lines = wrapLabel(s.name, s.w);
+            const lines = wrapLabel(label, s.w);
             return (
               <text x={cx} y={cy - (lines.length - 1) * 7} textAnchor="middle" className="fill-text text-[12px]">
-                <title>{s.name}</title>
+                <title>{label}</title>
                 {lines.map((line, i) => (
                   <tspan key={i} x={cx} dy={i === 0 ? 0 : 14}>{line}</tspan>
                 ))}
@@ -301,6 +311,8 @@ export default function BpmnDiagramView({
   /** Zeilenbereich je Block-Index — eingeschaltet zeigt jeder Kasten „#N · Z.a–b". */
   infoByBlock?: Map<number, { start: number; end: number }>;
 }) {
+  const t = useT();
+  const maps = t.workflows.bpmnLabels as unknown as BpmnLabelMaps;
   const diagram = parseBpmn(xml);
   if (!diagram) {
     return <div role="alert" className="p-4 text-sm text-text-secondary">Invalid BPMN XML</div>;
@@ -353,7 +365,7 @@ export default function BpmnDiagramView({
               tabIndex={clickable ? 0 : undefined}
               onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectBlock!(sel!); } } : undefined}
             >
-              <ShapeSvg s={s} status={status} />
+              <ShapeSvg s={s} status={status} maps={maps} />
               {info && sel && (
                 <text x={s.x} y={s.y - 4} className="fill-text-tertiary text-[9px]" style={{ fontFamily: 'monospace' }}>
                   #{sel.blockIndex + 1} · Z.{info.start}–{info.end}

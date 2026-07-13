@@ -1,6 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import BpmnDiagramView from '../BpmnDiagramView';
+import { useI18nStore } from '../../../i18n';
+
+afterEach(() => useI18nStore.setState({ locale: 'de' }));
 
 const SAMPLE_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
@@ -45,6 +48,22 @@ describe('BpmnDiagramView', () => {
   it('zeigt eine Meldung bei ungültigem XML', () => {
     render(<BpmnDiagramView xml="kein xml" />);
     expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+
+  it('lokalisiert das deutsche Typ-Präfix namenloser Kästen (EN)', () => {
+    useI18nStore.setState({ locale: 'en' });
+    const nameless = SAMPLE_XML.replace('name="Maven Tests ausführen"', 'name="KI: git status"');
+    render(<BpmnDiagramView xml={nameless} />);
+    // Präfix "KI:" wird zu "AI:", der Befehl "git status" bleibt unverändert
+    expect(screen.getByText('AI: git status')).toBeInTheDocument();
+    expect(screen.queryByText('KI: git status')).toBeNull();
+  });
+
+  it('lässt Block-Namen unübersetzt (nur Präfixe werden lokalisiert)', () => {
+    useI18nStore.setState({ locale: 'en' });
+    render(<BpmnDiagramView xml={SAMPLE_XML} />);
+    // "Maven Tests ausführen" ist ein Nutzer-Name ohne Typ-Präfix → unverändert in EN
+    expect(screen.getByText('Maven Tests ausführen')).toBeInTheDocument();
   });
 
   it('meldet den Block-Index beim Klick auf einen Kasten', () => {

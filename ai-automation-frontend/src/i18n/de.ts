@@ -418,6 +418,20 @@ export const de: TranslationKeys = {
     diagramInfoToggle: 'Details',
     viewDefinition: 'Definition ansehen',
     definitionHint: 'Vollständige Workflow-Definition (JSON). Die Zeilennummern im Diagramm beziehen sich auf dieses Dokument.',
+    bpmnLabels: {
+      // Typ-Präfix namenloser Kästen (im Backend deutsch erzeugt, hier lokalisiert — Schlüssel = deutscher Wert)
+      prefix: {
+        'KI': 'KI', 'Shell': 'Shell', 'Agent': 'Agent', 'Skill': 'Skill', 'Integration': 'Integration',
+        'Dokument': 'Dokument', 'Freigabe': 'Freigabe', 'Eingabe': 'Eingabe', 'Sub-Workflow': 'Sub-Workflow', 'Retry': 'Retry',
+      },
+      // Tooltips je BPMN-Element-Typ
+      tip: {
+        scriptTask: 'Shell-Kommando', serviceTask: 'KI / Service', userTask: 'Benutzer-Interaktion',
+        callActivity: 'Sub-Workflow', task: 'Unbekannter Block-Typ', subProcess: 'Schleife (Sub-Prozess)',
+      },
+      // Start-/End-Event-Namen
+      event: { 'Start': 'Start', 'Ende': 'Ende' },
+    },
     versionsTab: 'Versionen',
     blocksTab: 'Blöcke',
     noVersions: 'Noch keine Versionen vorhanden.',
