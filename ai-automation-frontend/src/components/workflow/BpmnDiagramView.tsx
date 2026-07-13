@@ -292,11 +292,14 @@ export default function BpmnDiagramView({
   xml,
   onSelectBlock,
   statusByBlock,
+  infoByBlock,
 }: {
   xml: string;
   onSelectBlock?: (selection: DiagramSelection) => void;
   /** Live-Status je Top-Level-Block-Index (färbt den zugehörigen Kasten). */
   statusByBlock?: Map<number, RunStatus>;
+  /** Zeilenbereich je Block-Index — eingeschaltet zeigt jeder Kasten „#N · Z.a–b". */
+  infoByBlock?: Map<number, { start: number; end: number }>;
 }) {
   const diagram = parseBpmn(xml);
   if (!diagram) {
@@ -340,6 +343,7 @@ export default function BpmnDiagramView({
           const sel = selectionOf(s.id);
           const clickable = sel !== null && !!onSelectBlock;
           const status = sel && statusByBlock ? statusByBlock.get(sel.blockIndex) : undefined;
+          const info = sel && infoByBlock ? infoByBlock.get(sel.blockIndex) : undefined;
           return (
             <g
               key={s.id}
@@ -350,6 +354,11 @@ export default function BpmnDiagramView({
               onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectBlock!(sel!); } } : undefined}
             >
               <ShapeSvg s={s} status={status} />
+              {info && sel && (
+                <text x={s.x} y={s.y - 4} className="fill-text-tertiary text-[9px]" style={{ fontFamily: 'monospace' }}>
+                  #{sel.blockIndex + 1} · Z.{info.start}–{info.end}
+                </text>
+              )}
             </g>
           );
         })}

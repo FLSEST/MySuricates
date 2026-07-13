@@ -20,6 +20,7 @@ import { WorkflowDetailModals } from '../components/workflow/WorkflowDetailModal
 import { CompletionTriggerSection } from '../components/workflow/CompletionTriggerSection';
 import { useT } from '../i18n';
 import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
+import { buildDefinitionText, blockLineRanges } from '../utils/workflowDefinition';
 import { readContextSchema } from '../utils/contextSchema';
 import type { BlockDefinition, BlockType, OptimizeResult, UpdateWorkflowRequest } from '../types';
 
@@ -106,6 +107,9 @@ export function WorkflowDetail() {
   const hasFailedRuns = runs?.content?.some((r) => r.status === 'FAILED') ?? false;
 
   const workflowVariables = extractWorkflowVariables(workflow.blocks);
+  // Günstig (JSON.stringify der Blöcke) und nach dem Early-Return — daher ohne useMemo (Hook-Regel)
+  const definitionText = buildDefinitionText(workflow.blocks);
+  const definitionLineRanges = blockLineRanges(workflow.blocks);
 
   const handleExecute = () => {
     if (workflowVariables.length > 0) {
@@ -380,6 +384,8 @@ export function WorkflowDetail() {
               <WorkflowDiagramTab
                 workflowId={id}
                 workflowName={workflow.name}
+                definitionText={definitionText}
+                lineRanges={definitionLineRanges}
                 onSelectBlock={handleSelectFromDiagram}
               />
             </Suspense>

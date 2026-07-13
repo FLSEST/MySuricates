@@ -82,6 +82,13 @@ describe('BpmnDiagramView', () => {
     expect(titles).toContain('Vollautomatische Integrationstestsuite mit ausführlicher Fehleranalyse und Reporting');
   });
 
+  it('zeigt Block-Nummer und Zeilenbereich, wenn infoByBlock gesetzt ist', () => {
+    const infoXml = SAMPLE_XML.replace('id="t1"', 'id="b_2_maven"').replace('bpmnElement="t1"', 'bpmnElement="b_2_maven"');
+    render(<BpmnDiagramView xml={infoXml} infoByBlock={new Map([[2, { start: 8, end: 12 }]])} />);
+    // Block-Index wird 1-basiert angezeigt (#3), Zeilenbereich aus der Definition
+    expect(screen.getByText('#3 · Z.8–12')).toBeInTheDocument();
+  });
+
   it('färbt einen Kasten nach Live-Run-Status', () => {
     const statusXml = SAMPLE_XML.replace('id="t1"', 'id="b_2_maven"').replace('bpmnElement="t1"', 'bpmnElement="b_2_maven"');
     const { container } = render(
