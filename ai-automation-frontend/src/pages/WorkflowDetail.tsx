@@ -1,5 +1,5 @@
 import { useState, lazy, Suspense } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, History } from 'lucide-react';
 
 const WorkflowVersionsTab = lazy(() => import('../components/workflow/WorkflowVersionsTab'));
@@ -62,7 +62,11 @@ export function WorkflowDetail() {
     skillIds: [],
   });
   const [selectedSkillId, setSelectedSkillId] = useState('');
-  const [activeTab, setActiveTab] = useState<'blocks' | 'versions' | 'diagram'>('blocks');
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState<'blocks' | 'versions' | 'diagram'>(
+    initialTab === 'diagram' || initialTab === 'versions' ? initialTab : 'blocks',
+  );
   const [blockHighlight, setBlockHighlight] = useState<{ index: number; nonce: number } | null>(null);
   const [showExecuteDialog, setShowExecuteDialog] = useState(false);
   const [showClone, setShowClone] = useState(false);
