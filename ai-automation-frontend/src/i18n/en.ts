@@ -412,6 +412,7 @@ export const en = {
     bpmnExportFailed: 'BPMN export failed',
     diagramTab: 'Diagram',
     diagramLoadFailed: 'Could not load diagram',
+    diagramHint: 'BPMN 2.0 · Camunda Modeler compatible',
     versionsTab: 'Versions',
     blocksTab: 'Blocks',
     noVersions: 'No versions yet.',

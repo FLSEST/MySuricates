@@ -414,6 +414,7 @@ export const de: TranslationKeys = {
     bpmnExportFailed: 'BPMN-Export fehlgeschlagen',
     diagramTab: 'Diagramm',
     diagramLoadFailed: 'Diagramm konnte nicht geladen werden',
+    diagramHint: 'BPMN 2.0 · Camunda-Modeler-kompatibel',
     versionsTab: 'Versionen',
     blocksTab: 'Blöcke',
     noVersions: 'Noch keine Versionen vorhanden.',

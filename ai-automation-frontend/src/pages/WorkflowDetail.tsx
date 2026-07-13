@@ -333,7 +333,7 @@ export function WorkflowDetail() {
 
           {activeTab === 'diagram' && id && (
             <Suspense fallback={<div className="p-6 text-sm text-text-secondary">{t.common.loading}</div>}>
-              <WorkflowDiagramTab workflowId={id} />
+              <WorkflowDiagramTab workflowId={id} workflowName={workflow.name} />
             </Suspense>
           )}
         </div>
