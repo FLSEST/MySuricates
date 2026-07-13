@@ -55,7 +55,16 @@ describe('BpmnDiagramView', () => {
     const clickable = container.querySelector('g[role="button"]');
     expect(clickable).not.toBeNull();
     fireEvent.click(clickable!);
-    expect(onSelectBlock).toHaveBeenCalledWith(2);
+    expect(onSelectBlock).toHaveBeenCalledWith({ blockIndex: 2 });
+  });
+
+  it('meldet Block- und Case-Index bei einem verschachtelten Switch-Case-Kasten', () => {
+    // Switch-Case-Kind trägt den Pfad in der ID: b_<block>_c<case>_…
+    const caseXml = SAMPLE_XML.replace('id="t1"', 'id="b_3_c1_0_alarm"').replace('bpmnElement="t1"', 'bpmnElement="b_3_c1_0_alarm"');
+    const onSelectBlock = vi.fn();
+    const { container } = render(<BpmnDiagramView xml={caseXml} onSelectBlock={onSelectBlock} />);
+    fireEvent.click(container.querySelector('g[role="button"]')!);
+    expect(onSelectBlock).toHaveBeenCalledWith({ blockIndex: 3, sub: { kind: 'case', caseIndex: 1 } });
   });
 
   it('kürzt zu lange Labels mit Ellipsis und hält sie in der Box', () => {

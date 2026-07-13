@@ -4,6 +4,7 @@ import { Plus, History } from 'lucide-react';
 
 const WorkflowVersionsTab = lazy(() => import('../components/workflow/WorkflowVersionsTab'));
 const WorkflowDiagramTab = lazy(() => import('../components/workflow/WorkflowDiagramTab'));
+type DiagramSelection = import('../components/workflow/BpmnDiagramView').DiagramSelection;
 import { Card, CardHeader, Button, Spinner } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
 import {
@@ -68,6 +69,7 @@ export function WorkflowDetail() {
     initialTab === 'diagram' || initialTab === 'versions' ? initialTab : 'blocks',
   );
   const [blockHighlight, setBlockHighlight] = useState<{ index: number; nonce: number } | null>(null);
+  const [blockReveal, setBlockReveal] = useState<{ text: string; nonce: number } | null>(null);
   const [showExecuteDialog, setShowExecuteDialog] = useState(false);
   const [showClone, setShowClone] = useState(false);
   const [cloneForm, setCloneForm] = useState({ projectId: '', name: '' });
@@ -152,12 +154,42 @@ export function WorkflowDetail() {
     updateWorkflow.mutate({ id: workflow.id, data: { blocks } });
   };
 
-  const handleOpenEditBlock = (index: number) => {
+  const handleOpenEditBlock = (index: number, revealText?: string) => {
     const block = workflow.blocks[index];
     if (!block) return;
     setEditBlockIndex(index);
     setEditBlock({ type: block.type, config: JSON.stringify(block.config, null, 2), skillIds: block.skillIds ?? [] });
+    setBlockReveal(revealText ? { text: revealText, nonce: Date.now() } : null);
     setShowEditBlock(true);
+  };
+
+  /** Ermittelt aus einer Diagramm-Auswahl den JSON-Suchtext, auf den der Editor springen soll. */
+  const revealTextFor = (sel: DiagramSelection): string | undefined => {
+    const config = workflow.blocks[sel.blockIndex]?.config as Record<string, unknown> | undefined;
+    if (!sel.sub || !config) return undefined;
+    switch (sel.sub.kind) {
+      case 'case': {
+        const cases = Array.isArray(config.cases) ? (config.cases as Array<{ value?: unknown }>) : [];
+        const value = cases[sel.sub.caseIndex]?.value;
+        return typeof value === 'string' && value ? `"${value}"` : '"cases"';
+      }
+      case 'default': return '"default"';
+      case 'then': return '"then_command"';
+      case 'else': return '"else_command"';
+      case 'body': return '"command"';
+    }
+  };
+
+  const handleSelectFromDiagram = (sel: DiagramSelection) => {
+    if (sel.sub) {
+      // Verschachtelt (Switch-Case, Zweig, Schleifen-Body): Editor öffnen und zur Zeile springen
+      handleOpenEditBlock(sel.blockIndex, revealTextFor(sel));
+    } else {
+      // Top-Level-Block: Blöcke-Tab öffnen und Zeile hervorheben
+      setActiveTab('blocks');
+      setBlockHighlight((prev) => ({ index: sel.blockIndex, nonce: (prev?.nonce ?? 0) + 1 }));
+      window.setTimeout(() => setBlockHighlight(null), 1800);
+    }
   };
 
   const handleSaveBlock = () => {
@@ -343,11 +375,7 @@ export function WorkflowDetail() {
               <WorkflowDiagramTab
                 workflowId={id}
                 workflowName={workflow.name}
-                onSelectBlock={(index) => {
-                  setActiveTab('blocks');
-                  setBlockHighlight((prev) => ({ index, nonce: (prev?.nonce ?? 0) + 1 }));
-                  window.setTimeout(() => setBlockHighlight(null), 1800);
-                }}
+                onSelectBlock={handleSelectFromDiagram}
               />
             </Suspense>
           )}
@@ -390,6 +418,8 @@ export function WorkflowDetail() {
         editBlock={editBlock}
         setEditBlock={setEditBlock}
         onSaveBlock={handleSaveBlock}
+        editBlockRevealText={blockReveal?.text}
+        editBlockRevealNonce={blockReveal?.nonce}
         showAddSkill={showAddSkill}
         setShowAddSkill={setShowAddSkill}
         selectedSkillId={selectedSkillId}

@@ -3,7 +3,7 @@ import { useT } from '../../i18n';
 import { useWorkflowBpmn } from '../../hooks/useWorkflows';
 import { Button } from '../ui';
 import { downloadBlob } from '../../utils/downloadFile';
-import BpmnDiagramView from './BpmnDiagramView';
+import BpmnDiagramView, { type DiagramSelection } from './BpmnDiagramView';
 
 export default function WorkflowDiagramTab({
   workflowId,
@@ -12,7 +12,7 @@ export default function WorkflowDiagramTab({
 }: {
   workflowId: string;
   workflowName: string;
-  onSelectBlock?: (blockIndex: number) => void;
+  onSelectBlock?: (selection: DiagramSelection) => void;
 }) {
   const t = useT();
   const { data: xml, isLoading, isError } = useWorkflowBpmn(workflowId);

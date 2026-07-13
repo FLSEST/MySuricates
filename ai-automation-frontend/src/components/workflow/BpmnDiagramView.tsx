@@ -241,10 +241,33 @@ function ShapeSvg({ s }: { s: Shape }) {
   }
 }
 
-/** Extrahiert den Top-Level-Block-Index aus einer BPMN-Element-ID (`b_<index>_…`). */
-function blockIndexOf(shapeId: string): number | null {
-  const m = shapeId.match(/^b_(\d+)/);
-  return m ? Number(m[1]) : null;
+/** Verweist auf einen (ggf. verschachtelten) Teil einer Block-Definition. */
+export type DiagramSelection = {
+  blockIndex: number;
+  sub?:
+    | { kind: 'case'; caseIndex: number }
+    | { kind: 'default' }
+    | { kind: 'then' }
+    | { kind: 'else' }
+    | { kind: 'body' };
+};
+
+/**
+ * Leitet aus einer BPMN-Element-ID die Block-Auswahl ab. Die IDs kodieren den Pfad
+ * deterministisch: `b_<i>_c<k>_…` (Switch-Case k), `b_<i>_default`, `b_<i>_then/else`
+ * (Conditional), `b_<i>_body` (Schleife), sonst der Block selbst.
+ */
+function selectionOf(shapeId: string): DiagramSelection | null {
+  const base = shapeId.match(/^b_(\d+)/);
+  if (!base) return null;
+  const blockIndex = Number(base[1]);
+  const caseMatch = shapeId.match(/^b_\d+_c(\d+)/);
+  if (caseMatch) return { blockIndex, sub: { kind: 'case', caseIndex: Number(caseMatch[1]) } };
+  if (/^b_\d+_default/.test(shapeId)) return { blockIndex, sub: { kind: 'default' } };
+  if (/^b_\d+_then/.test(shapeId)) return { blockIndex, sub: { kind: 'then' } };
+  if (/^b_\d+_else/.test(shapeId)) return { blockIndex, sub: { kind: 'else' } };
+  if (/^b_\d+_body/.test(shapeId)) return { blockIndex, sub: { kind: 'body' } };
+  return { blockIndex };
 }
 
 export default function BpmnDiagramView({
@@ -252,7 +275,7 @@ export default function BpmnDiagramView({
   onSelectBlock,
 }: {
   xml: string;
-  onSelectBlock?: (blockIndex: number) => void;
+  onSelectBlock?: (selection: DiagramSelection) => void;
 }) {
   const diagram = parseBpmn(xml);
   if (!diagram) {
@@ -293,16 +316,16 @@ export default function BpmnDiagramView({
           </g>
         ))}
         {diagram.shapes.map((s) => {
-          const idx = blockIndexOf(s.id);
-          const clickable = idx !== null && !!onSelectBlock;
+          const sel = selectionOf(s.id);
+          const clickable = sel !== null && !!onSelectBlock;
           return (
             <g
               key={s.id}
               className={clickable ? 'cursor-pointer transition-opacity hover:opacity-70' : undefined}
-              onClick={clickable ? () => onSelectBlock!(idx!) : undefined}
+              onClick={clickable ? () => onSelectBlock!(sel!) : undefined}
               role={clickable ? 'button' : undefined}
               tabIndex={clickable ? 0 : undefined}
-              onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectBlock!(idx!); } } : undefined}
+              onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectBlock!(sel!); } } : undefined}
             >
               <ShapeSvg s={s} />
             </g>

@@ -201,3 +201,9 @@
     background-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
   }
 }
+
+/* Kurzes Aufblitzen der angesprungenen JSON-Zeile im Monaco-Editor (BPMN → Definitionszeile) */
+.bpmn-reveal-flash {
+  background-color: color-mix(in srgb, var(--color-accent) 28%, transparent);
+  transition: background-color 0.3s ease-out;
+}
