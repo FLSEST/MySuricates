@@ -5,7 +5,7 @@
     <scriptTask id="b_0_daten_sammeln" name="Daten sammeln" scriptFormat="bash">
       <documentation>git log --oneline -20</documentation>
       <extensionElements>
-        <mysuricates:blockConfig type="shell">{"command":"git log --oneline -20"}</mysuricates:blockConfig>
+        <mysuricates:blockConfig name="Daten sammeln" type="shell">{"command":"git log --oneline -20"}</mysuricates:blockConfig>
       </extensionElements>
       <script>git log --oneline -20</script>
     </scriptTask>

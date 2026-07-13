@@ -35,6 +35,7 @@ final class BpmnGatewayBuilder {
         BpmnModel.Node split = f.node(idBase + "_split", EXCLUSIVE_GATEWAY, str(c, "condition"), GW, GW);
         split.configJson = f.toJson(c);
         split.blockType = "conditional";
+        split.blockName = block.getName();
         BpmnModel.Node merge = f.node(idBase + "_merge", EXCLUSIVE_GATEWAY, null, GW, GW);
         f.place(split, 0, 0);
         f.place(merge, GW + GAP + TASK_W + GAP, 0);
@@ -76,6 +77,7 @@ final class BpmnGatewayBuilder {
         BpmnModel.Node split = f.node(idBase + "_split", EXCLUSIVE_GATEWAY, str(c, "expression"), GW, GW);
         split.configJson = f.toJson(c);
         split.blockType = "switch";
+        split.blockName = block.getName();
         BpmnModel.Node merge = f.node(idBase + "_merge", EXCLUSIVE_GATEWAY, null, GW, GW);
         f.place(split, 0, 0);
 
@@ -88,6 +90,7 @@ final class BpmnGatewayBuilder {
         double maxChainWidth = TASK_W;
         for (int k = 0; k < cases.size(); k++) {
             BpmnSegment row = chains.buildChain(toBlockDefinitions(cases.get(k).get("blocks")), idBase + "_c" + k);
+            stripDerivedBlockConfig(row.nodes);
             rows.add(row);
             rowNames.add(str(cases.get(k), "value").isBlank() ? "case" + k : str(cases.get(k), "value"));
             maxChainWidth = Math.max(maxChainWidth, row.width);
@@ -95,6 +98,7 @@ final class BpmnGatewayBuilder {
         List<BlockDefinition> defaultBlocks = toBlockDefinitions(c.get("default"));
         BpmnSegment defaultRow = defaultBlocks.isEmpty() ? null : chains.buildChain(defaultBlocks, idBase + "_default");
         if (defaultRow != null) {
+            stripDerivedBlockConfig(defaultRow.nodes);
             maxChainWidth = Math.max(maxChainWidth, defaultRow.width);
         }
 
@@ -149,6 +153,20 @@ final class BpmnGatewayBuilder {
             split.defaultFlowId = in.id;
         }
         return rowAxis + Math.max(ROW_STEP, extentBelow + SUB_PAD * 2); // Puffer >= SubProcess-Halbhöhe (SUB_PAD*2), sonst 5px-Überlappung bei gestapelten Loop-Rows
+    }
+
+    /**
+     * Entfernt blockConfig/type/name von abgeleiteten Knoten (Switch-Case-/Default-Inhalte).
+     * Deren Config steckt bereits im Config-JSON des Switch-Blocks — ein eigenes blockConfig
+     * würde den Reimport doppelt zählen lassen. Rein visuelle Knoten bleiben so config-los.
+     */
+    private static void stripDerivedBlockConfig(List<BpmnModel.Node> nodes) {
+        for (BpmnModel.Node n : nodes) {
+            n.configJson = null;
+            n.blockType = null;
+            n.blockName = null;
+            stripDerivedBlockConfig(n.children);
+        }
     }
 
     /** Vertikale Ausdehnung einer Zeile relativ zu ihrer eigenen Achse (y=0), inkl. Kindknoten. */

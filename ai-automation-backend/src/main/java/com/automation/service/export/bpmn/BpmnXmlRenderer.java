@@ -89,6 +89,9 @@ class BpmnXmlRenderer {
             if (n.blockType != null && !n.blockType.isBlank()) {
                 cfg.setAttribute("type", n.blockType);
             }
+            if (n.blockName != null && !n.blockName.isBlank()) {
+                cfg.setAttribute("name", n.blockName);
+            }
             cfg.setTextContent(n.configJson);
             ext.appendChild(cfg);
         }

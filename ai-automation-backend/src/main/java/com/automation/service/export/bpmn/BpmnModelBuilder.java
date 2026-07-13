@@ -124,6 +124,7 @@ class BpmnModelBuilder implements BpmnGatewayBuilder.ChainBuilder {
         n.documentation = BpmnBlockText.documentationFor(block);
         n.configJson = f.toJson(config);
         n.blockType = type;
+        n.blockName = block.getName();
         if (kind == SCRIPT_TASK) {
             n.script = BpmnBlockText.str(config, "command");
         }
@@ -161,6 +162,7 @@ class BpmnModelBuilder implements BpmnGatewayBuilder.ChainBuilder {
         sub.documentation = BpmnBlockText.documentationFor(block);
         sub.configJson = f.toJson(c);
         sub.blockType = block.getType();
+        sub.blockName = block.getName();
         f.place(sub, 0, 0);
 
         BpmnModel.Node innerStart = f.node(idBase + "_start", BpmnModel.Kind.START_EVENT, null, EVT, EVT);
