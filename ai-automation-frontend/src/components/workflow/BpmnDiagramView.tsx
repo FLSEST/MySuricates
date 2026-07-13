@@ -58,6 +58,42 @@ function transpose(d: Diagram): Diagram {
   };
 }
 
+const VERTICAL_GAP = 80; // Ziel-Leerraum zwischen Kästen im vertikalen Fluss (statt ~170)
+
+/**
+ * Staucht im vertikalen Layout die Leerräume entlang der Fluss-Achse (y) auf {@link VERTICAL_GAP},
+ * ohne die Kästen zu verkleinern: Kästen bleiben gleich groß, nur die Lücken (und damit die
+ * Pfeillängen) schrumpfen. Kanten-Waypoints wandern mit — die Segmente über einer Lücke
+ * verkürzen sich exakt um deren Reduktion, also bleiben Pfeile korrekt an den Kästen.
+ */
+function compactVertical(d: Diagram): Diagram {
+  // belegte y-Intervalle der Kästen zusammenfassen
+  const intervals = d.shapes.map((s) => [s.y, s.y + s.h] as [number, number]).sort((a, b) => a[0] - b[0]);
+  const merged: [number, number][] = [];
+  for (const [a, b] of intervals) {
+    const last = merged[merged.length - 1];
+    if (last && a <= last[1] + 1) last[1] = Math.max(last[1], b);
+    else merged.push([a, b]);
+  }
+  // je Lücke die Reduktion aufsummieren: alles ab der nächsten belegten Kante rückt hoch
+  const cuts: { threshold: number; shift: number }[] = [];
+  let cumulative = 0;
+  for (let i = 0; i < merged.length - 1; i++) {
+    const gap = merged[i + 1]![0] - merged[i]![1];
+    cumulative += Math.max(0, gap - VERTICAL_GAP);
+    cuts.push({ threshold: merged[i + 1]![0], shift: cumulative });
+  }
+  const shiftFor = (y: number): number => {
+    let s = 0;
+    for (const c of cuts) if (y >= c.threshold - 0.001) s = c.shift;
+    return s;
+  };
+  return {
+    shapes: d.shapes.map((s) => ({ ...s, y: s.y - shiftFor(s.y) })),
+    edges: d.edges.map((e) => ({ ...e, points: e.points.map(([x, y]) => [x, y - shiftFor(y)] as [number, number]) })),
+  };
+}
+
 function parseBpmn(xml: string): Diagram | null {
   const doc = new DOMParser().parseFromString(xml, 'application/xml');
   if (doc.getElementsByTagName('parsererror').length > 0) return null;
@@ -336,7 +372,7 @@ export default function BpmnDiagramView({
   if (parsed.shapes.length === 0) {
     return <div role="alert" className="p-4 text-sm text-text-secondary">{t.workflows.diagramEmpty}</div>;
   }
-  const diagram = orientation === 'vertical' ? transpose(parsed) : parsed;
+  const diagram = orientation === 'vertical' ? compactVertical(transpose(parsed)) : parsed;
   const pad = 40;
   const xs = [
     ...diagram.shapes.flatMap((s) => [s.x, s.x + s.w]),

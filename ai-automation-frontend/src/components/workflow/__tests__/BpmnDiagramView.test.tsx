@@ -65,6 +65,9 @@ describe('BpmnDiagramView', () => {
     const v = container.querySelector('svg')!.getAttribute('viewBox')!.split(' ').map(Number);
     expect(h[2]!).toBeGreaterThan(h[3]!); // horizontal: breiter als hoch
     expect(v[3]!).toBeGreaterThan(v[2]!); // vertikal: höher als breit
+    // Stauchung: die vertikale Höhe ist deutlich kleiner als die horizontale Breite
+    // (ohne Kompaktierung wäre sie ~gleich, weil transponiert). 0.85 lässt Padding-Spielraum.
+    expect(v[3]!).toBeLessThan(h[2]! * 0.85);
   });
 
   it('lokalisiert das deutsche Typ-Präfix namenloser Kästen (EN)', () => {
