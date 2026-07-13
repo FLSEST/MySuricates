@@ -168,16 +168,34 @@ function TaskMarker({ s }: { s: Shape }) {
   }
 }
 
-function ShapeSvg({ s }: { s: Shape }) {
+export type RunStatus = 'running' | 'completed' | 'failed';
+
+function statusStroke(status?: RunStatus): string {
+  if (status === 'running') return 'stroke-accent';
+  if (status === 'completed') return 'stroke-success';
+  if (status === 'failed') return 'stroke-danger';
+  return 'stroke-text';
+}
+function statusFill(status: RunStatus | undefined, base: string): string {
+  if (status === 'running') return 'fill-accent/15';
+  if (status === 'completed') return 'fill-success/10';
+  if (status === 'failed') return 'fill-danger/10';
+  return base;
+}
+
+function ShapeSvg({ s, status }: { s: Shape; status?: RunStatus }) {
   const cx = s.x + s.w / 2;
   const cy = s.y + s.h / 2;
+  const stroke = statusStroke(status);
+  const strokeW = status ? 2.4 : 1.6;
+  const pulse = status === 'running' ? 'animate-pulse' : '';
   switch (s.kind) {
     case 'startEvent':
     case 'endEvent':
       return (
         <g>
-          <circle cx={cx} cy={cy} r={s.w / 2} className="fill-surface stroke-text"
-            strokeWidth={s.kind === 'endEvent' ? 3.5 : 1.6} />
+          <circle cx={cx} cy={cy} r={s.w / 2} className={`${statusFill(status, 'fill-surface')} ${stroke} ${pulse}`}
+            strokeWidth={s.kind === 'endEvent' ? 3.5 : strokeW} />
           {s.name && <text x={cx} y={s.y + s.h + 16} textAnchor="middle" className="fill-text-secondary text-[11px]">{s.name}</text>}
         </g>
       );
@@ -189,7 +207,7 @@ function ShapeSvg({ s }: { s: Shape }) {
         <g>
           <polygon
             points={`${cx},${s.y} ${s.x + s.w},${cy} ${cx},${s.y + s.h} ${s.x},${cy}`}
-            className="fill-surface stroke-text" strokeWidth={1.6} />
+            className={`${statusFill(status, 'fill-surface')} ${stroke} ${pulse}`} strokeWidth={strokeW} />
           {s.kind === 'exclusiveGateway' && (
             <>
               <line x1={cx - 8} y1={cy - 8} x2={cx + 8} y2={cy + 8} className="stroke-text" strokeWidth={2.2} />
@@ -204,7 +222,7 @@ function ShapeSvg({ s }: { s: Shape }) {
         <g>
           <title>{TYPE_LABELS.subProcess}</title>
           <rect x={s.x} y={s.y} width={s.w} height={s.h} rx={12}
-            className="fill-accent/5 stroke-text" strokeWidth={1.6} />
+            className={`${statusFill(status, 'fill-accent/5')} ${stroke} ${pulse}`} strokeWidth={strokeW} />
           {s.name && <text x={cx} y={s.y + 18} textAnchor="middle" className="fill-text-secondary text-[11px]">{s.name}</text>}
           {s.loop === 'multi' && (
             <g className="stroke-text-secondary" strokeWidth={1.4} strokeLinecap="round">
@@ -223,7 +241,7 @@ function ShapeSvg({ s }: { s: Shape }) {
         <g>
           <title>{TYPE_LABELS[s.kind] ?? s.kind}</title>
           <rect x={s.x} y={s.y} width={s.w} height={s.h} rx={10}
-            className="fill-surface stroke-text" strokeWidth={1.6} />
+            className={`${statusFill(status, 'fill-surface')} ${stroke} ${pulse}`} strokeWidth={strokeW} />
           <TaskMarker s={s} />
           {(() => {
             const lines = wrapLabel(s.name, s.w);
@@ -273,9 +291,12 @@ function selectionOf(shapeId: string): DiagramSelection | null {
 export default function BpmnDiagramView({
   xml,
   onSelectBlock,
+  statusByBlock,
 }: {
   xml: string;
   onSelectBlock?: (selection: DiagramSelection) => void;
+  /** Live-Status je Top-Level-Block-Index (färbt den zugehörigen Kasten). */
+  statusByBlock?: Map<number, RunStatus>;
 }) {
   const diagram = parseBpmn(xml);
   if (!diagram) {
@@ -318,6 +339,7 @@ export default function BpmnDiagramView({
         {diagram.shapes.map((s) => {
           const sel = selectionOf(s.id);
           const clickable = sel !== null && !!onSelectBlock;
+          const status = sel && statusByBlock ? statusByBlock.get(sel.blockIndex) : undefined;
           return (
             <g
               key={s.id}
@@ -327,7 +349,7 @@ export default function BpmnDiagramView({
               tabIndex={clickable ? 0 : undefined}
               onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectBlock!(sel!); } } : undefined}
             >
-              <ShapeSvg s={s} />
+              <ShapeSvg s={s} status={status} />
             </g>
           );
         })}

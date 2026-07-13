@@ -82,6 +82,16 @@ describe('BpmnDiagramView', () => {
     expect(titles).toContain('Vollautomatische Integrationstestsuite mit ausführlicher Fehleranalyse und Reporting');
   });
 
+  it('färbt einen Kasten nach Live-Run-Status', () => {
+    const statusXml = SAMPLE_XML.replace('id="t1"', 'id="b_2_maven"').replace('bpmnElement="t1"', 'bpmnElement="b_2_maven"');
+    const { container } = render(
+      <BpmnDiagramView xml={statusXml} statusByBlock={new Map([[2, 'running']])} />,
+    );
+    const rect = container.querySelector('rect');
+    expect(rect?.getAttribute('class')).toContain('stroke-accent');
+    expect(rect?.getAttribute('class')).toContain('animate-pulse');
+  });
+
   it('zeigt Typ-Marker und Tooltip am Task', () => {
     const { container } = render(<BpmnDiagramView xml={SAMPLE_XML} />);
     // scriptTask: SVG-<title>-Tooltip mit Typ-Label

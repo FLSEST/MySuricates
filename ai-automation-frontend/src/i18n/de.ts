@@ -465,6 +465,7 @@ export const de: TranslationKeys = {
       rate: 'Bewertung:',
       waitingSteps: 'Warte auf Schritte...',
       noSteps: 'Keine Schritte aufgezeichnet',
+      diagramTitle: 'Ablauf-Diagramm (live)',
       error: 'Fehler',
       command: 'Befehl',
       commandPlaceholder: 'Befehl im Container ausführen...',

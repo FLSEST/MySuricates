@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Pause, Play, XCircle, Clock, CheckCircle2, AlertCircle, Send, TerminalSquare,
@@ -20,10 +20,11 @@ import { PathLinkedOutput } from '../components/shared/PathLinkedOutput';
 import { InsightsPanel } from '../components/shared/InsightsPanel';
 import { ConversionSuggestion } from '../components/shared/ConversionSuggestion';
 import {
-  useWorkflow, useWorkflowRuns,
+  useWorkflow, useWorkflowRuns, useWorkflowBpmn,
   usePauseExecution, useResumeExecution, useCancelExecution, useRunCommand, useSubmitApproval,
   useRetryExecution, useApproveTodos, useResumeFromStep, useUpdateRunNotes,
 } from '../hooks/useWorkflows';
+import BpmnDiagramView, { type RunStatus } from '../components/workflow/BpmnDiagramView';
 import { useCreateTodo } from '../hooks/useTodos';
 import { useExecutionWebSocket } from '../hooks/useWebSocket';
 import { useRateRun } from '../hooks/useLearning';
@@ -269,6 +270,17 @@ export function WorkflowExecution() {
 
   const run: WorkflowRun | undefined = runs?.content?.find((r) => r.id === runId);
   const isRunning = run?.status === 'RUNNING' || run?.status === 'PAUSED';
+
+  // BPMN-Diagramm nur laden, wenn es einen Run mit Schritten gibt (Ablauf-Visualisierung)
+  const { data: bpmnXml } = useWorkflowBpmn(id!, (run?.steps?.length ?? 0) > 0);
+  const statusByBlock = useMemo(() => {
+    const map = new Map<number, RunStatus>();
+    for (const step of run?.steps ?? []) {
+      const s = step.status === 'RUNNING' ? 'running' : step.status === 'COMPLETED' ? 'completed' : step.status === 'FAILED' ? 'failed' : undefined;
+      if (s) map.set(step.stepIndex, s);
+    }
+    return map;
+  }, [run?.steps]);
 
   // Clear recovered dialogs when run is no longer active
   useEffect(() => {
@@ -537,6 +549,18 @@ export function WorkflowExecution() {
           </div>
         );
       })()}
+
+      {/* Ablauf-Diagramm mit Live-Status je Block */}
+      {bpmnXml && run.steps.length > 0 && (
+        <Card padding={false}>
+          <div className="p-5 pb-3">
+            <CardHeader title={t.workflows.execution.diagramTitle} />
+          </div>
+          <div className="px-5 pb-5">
+            <BpmnDiagramView xml={bpmnXml} statusByBlock={statusByBlock} />
+          </div>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Steps */}

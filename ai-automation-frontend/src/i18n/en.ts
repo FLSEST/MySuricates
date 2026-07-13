@@ -463,6 +463,7 @@ export const en = {
       rate: 'Rate:',
       waitingSteps: 'Waiting for steps...',
       noSteps: 'No steps recorded',
+      diagramTitle: 'Flow diagram (live)',
       error: 'Error',
       command: 'Command',
       commandPlaceholder: 'Enter command to run in container...',
