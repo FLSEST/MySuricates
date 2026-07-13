@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { api, apiErrorMessage, fetchWorkflowBpmn } from '../api/client';
+import { api, apiErrorMessage, fetchWorkflowBpmn, importWorkflowBpmn } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
 import { downloadJSON } from '../utils/downloadFile';
@@ -129,6 +129,14 @@ export function useAllRuns(params?: { status?: string; workflowId?: string; proj
       return hasActiveRuns ? 5_000 : 30_000;
     },
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useImportWorkflowBpmn() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ xml, projectId }: { xml: string; projectId: string }) => importWorkflowBpmn(xml, projectId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['workflows'] }),
   });
 }
 

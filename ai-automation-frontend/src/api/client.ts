@@ -86,6 +86,24 @@ export function apiErrorMessage(err: unknown, fallback: string): string {
   return fallback;
 }
 
+/** Importiert einen BPMN-Prozess als neuen Workflow (Body = XML, kein JSON — daher raw fetch). */
+export async function importWorkflowBpmn(xml: string, projectId: string): Promise<{ id: string }> {
+  const headers: HeadersInit = { 'Content-Type': 'application/xml' };
+  const apiKey = useSettingsStore.getState().apiKey;
+  if (apiKey) headers['X-API-Key'] = apiKey;
+  const res = await fetch(`${BASE_URL}/workflows/import/bpmn?projectId=${encodeURIComponent(projectId)}`, {
+    method: 'POST',
+    headers,
+    body: xml,
+  });
+  if (!res.ok) {
+    let body: unknown;
+    try { body = await res.json(); } catch { body = undefined; }
+    throw body ?? new Error(`BPMN import failed (${res.status})`);
+  }
+  return res.json();
+}
+
 /** Lädt den BPMN-2.0-Export eines Workflows als XML-String (kein JSON — daher raw fetch). */
 export async function fetchWorkflowBpmn(id: string): Promise<string> {
   const headers: HeadersInit = {};

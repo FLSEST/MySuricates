@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { Plus, Upload } from 'lucide-react';
 import { Button } from '../ui';
+import { BpmnImportButton } from './BpmnImportButton';
 import type { WorkflowExportData } from '../../types';
 import type { TranslationKeys } from '../../i18n';
 import { useToast } from '../../hooks/useToast';
@@ -29,6 +30,7 @@ export function WorkflowListHeader({ t, onOpenCreate, onImportReady }: WorkflowL
         >
           {t.common.import}
         </Button>
+        <BpmnImportButton />
         <Button icon={<Plus className="w-4 h-4" />} onClick={onOpenCreate}>
           {t.workflows.create}
         </Button>
