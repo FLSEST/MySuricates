@@ -348,9 +348,19 @@ export default function BpmnDiagramView({
   const width = Math.max(...xs) + pad - minX;
   const height = Math.max(...ys) + pad - minY;
 
+  // Horizontal: breitenfüllend (fit-to-width), horizontal scrollbar.
+  // Vertikal: native Größe (schmal, hoch) mit begrenzter Höhe + vertikalem Scrollen —
+  // sonst streckt der Container die schmal-hohe viewBox und das Diagramm wird riesig.
+  const isVertical = orientation === 'vertical';
+
   return (
-    <div className="overflow-x-auto text-text">
-      <svg viewBox={`${minX} ${minY} ${width} ${height}`} style={{ minWidth: width * 0.75 }} role="img">
+    <div className={isVertical ? 'overflow-auto max-h-[70vh] text-text' : 'overflow-x-auto text-text'}>
+      <svg
+        viewBox={`${minX} ${minY} ${width} ${height}`}
+        {...(isVertical ? { width, height } : {})}
+        style={isVertical ? { maxWidth: 'none' } : { minWidth: width * 0.75 }}
+        role="img"
+      >
         <defs>
           <marker id="bpmn-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
             <path d="M 0 0 L 10 5 L 0 10 z" className="fill-text" />
