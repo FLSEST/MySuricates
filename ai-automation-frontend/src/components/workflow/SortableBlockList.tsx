@@ -24,11 +24,9 @@ interface SortableBlockListProps {
   blocks: BlockDefinition[];
   onEditBlock: (index: number) => void;
   onRemoveBlock: (index: number) => void;
-  highlightIndex?: number | null;
-  highlightNonce?: number;
 }
 
-export function SortableBlockList({ workflowId, blocks, onEditBlock, onRemoveBlock, highlightIndex = null, highlightNonce = 0 }: SortableBlockListProps) {
+export function SortableBlockList({ workflowId, blocks, onEditBlock, onRemoveBlock }: SortableBlockListProps) {
   const updateWorkflow = useUpdateWorkflow();
   const toast = useToast();
   const t = useT();
@@ -83,8 +81,6 @@ export function SortableBlockList({ workflowId, blocks, onEditBlock, onRemoveBlo
               block={block}
               onEdit={onEditBlock}
               onRemove={onRemoveBlock}
-              highlighted={idx === highlightIndex}
-              highlightNonce={highlightNonce}
             />
           ))}
         </div>

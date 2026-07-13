@@ -68,7 +68,6 @@ export function WorkflowDetail() {
   const [activeTab, setActiveTab] = useState<'blocks' | 'versions' | 'diagram'>(
     initialTab === 'diagram' || initialTab === 'versions' ? initialTab : 'blocks',
   );
-  const [blockHighlight, setBlockHighlight] = useState<{ index: number; nonce: number } | null>(null);
   const [blockReveal, setBlockReveal] = useState<{ text: string; nonce: number } | null>(null);
   const [showExecuteDialog, setShowExecuteDialog] = useState(false);
   const [showClone, setShowClone] = useState(false);
@@ -163,33 +162,41 @@ export function WorkflowDetail() {
     setShowEditBlock(true);
   };
 
+  /** Primäres Config-Feld je Block-Typ — die Zeile, auf die ein Top-Level-Klick springt. */
+  const PRIMARY_FIELD: Partial<Record<BlockType, string>> = {
+    shell: 'command', simple: 'command', retry: 'command',
+    agentic: 'goal', approval: 'question', 'human-input': 'prompt',
+    'skill-capability': 'capability', 'sub-workflow': 'workflow_id',
+    conditional: 'condition', switch: 'expression', foreach: 'variable_name',
+    while: 'condition_command', document: 'file_path',
+  };
+
   /** Ermittelt aus einer Diagramm-Auswahl den JSON-Suchtext, auf den der Editor springen soll. */
   const revealTextFor = (sel: DiagramSelection): string | undefined => {
-    const config = workflow.blocks[sel.blockIndex]?.config as Record<string, unknown> | undefined;
-    if (!sel.sub || !config) return undefined;
-    switch (sel.sub.kind) {
-      case 'case': {
-        const cases = Array.isArray(config.cases) ? (config.cases as Array<{ value?: unknown }>) : [];
-        const value = cases[sel.sub.caseIndex]?.value;
-        return typeof value === 'string' && value ? `"${value}"` : '"cases"';
+    const block = workflow.blocks[sel.blockIndex];
+    const config = block?.config as Record<string, unknown> | undefined;
+    if (!config) return undefined;
+    if (sel.sub) {
+      switch (sel.sub.kind) {
+        case 'case': {
+          const cases = Array.isArray(config.cases) ? (config.cases as Array<{ value?: unknown }>) : [];
+          const value = cases[sel.sub.caseIndex]?.value;
+          return typeof value === 'string' && value ? `"${value}"` : '"cases"';
+        }
+        case 'default': return '"default"';
+        case 'then': return '"then_command"';
+        case 'else': return '"else_command"';
+        case 'body': return '"command"';
       }
-      case 'default': return '"default"';
-      case 'then': return '"then_command"';
-      case 'else': return '"else_command"';
-      case 'body': return '"command"';
     }
+    // Top-Level: primäres Feld des Block-Typs, falls vorhanden
+    const key = block ? PRIMARY_FIELD[block.type] : undefined;
+    return key && key in config ? `"${key}"` : undefined;
   };
 
   const handleSelectFromDiagram = (sel: DiagramSelection) => {
-    if (sel.sub) {
-      // Verschachtelt (Switch-Case, Zweig, Schleifen-Body): Editor öffnen und zur Zeile springen
-      handleOpenEditBlock(sel.blockIndex, revealTextFor(sel));
-    } else {
-      // Top-Level-Block: Blöcke-Tab öffnen und Zeile hervorheben
-      setActiveTab('blocks');
-      setBlockHighlight((prev) => ({ index: sel.blockIndex, nonce: (prev?.nonce ?? 0) + 1 }));
-      window.setTimeout(() => setBlockHighlight(null), 1800);
-    }
+    // Jeder Kasten öffnet den Block-Editor und springt zur passenden Definitionszeile
+    handleOpenEditBlock(sel.blockIndex, revealTextFor(sel));
   };
 
   const handleSaveBlock = () => {
@@ -357,8 +364,6 @@ export function WorkflowDetail() {
                   blocks={workflow.blocks}
                   onEditBlock={handleOpenEditBlock}
                   onRemoveBlock={handleRemoveBlock}
-                  highlightIndex={blockHighlight?.index ?? null}
-                  highlightNonce={blockHighlight?.nonce ?? 0}
                 />
               )}
             </Card>

@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Pencil, Trash2, Link2, Terminal, Zap } from 'lucide-react';
@@ -30,23 +29,11 @@ interface SortableBlockProps {
   block: BlockDefinition;
   onEdit: (index: number) => void;
   onRemove: (index: number) => void;
-  highlighted?: boolean;
-  highlightNonce?: number;
 }
 
-export function SortableBlock({ id, index, block, onEdit, onRemove, highlighted = false, highlightNonce = 0 }: SortableBlockProps) {
+export function SortableBlock({ id, index, block, onEdit, onRemove }: SortableBlockProps) {
   const t = useT();
   const advancedMode = useSettingsStore((s) => s.advancedMode);
-  const rowRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    // Nur scrollen (Seiteneffekt, kein State) — das Ring-Styling folgt aus `highlighted`,
-    // das Auto-Ausblenden übernimmt der Parent per Timeout. highlightNonce lässt denselben
-    // Block bei erneutem Klick erneut ins Bild scrollen.
-    if (highlighted) {
-      rowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  }, [highlighted, highlightNonce]);
   const {
     attributes,
     listeners,
@@ -65,11 +52,11 @@ export function SortableBlock({ id, index, block, onEdit, onRemove, highlighted 
 
   return (
     <div
-      ref={(node) => { setNodeRef(node); rowRef.current = node; }}
+      ref={setNodeRef}
       style={style}
       className={`flex items-start gap-3 px-5 py-4 group cursor-pointer hover:bg-surface/50 transition-colors ${
         isDragging ? 'bg-surface-raised shadow-lg rounded-xl' : ''
-      } ${highlighted ? 'bg-accent/10 ring-2 ring-accent ring-inset rounded-lg' : ''}`}
+      }`}
       onClick={() => onEdit(index)}
     >
       <button
