@@ -414,6 +414,29 @@ export const de: TranslationKeys = {
     bpmnExportFailed: 'BPMN-Export fehlgeschlagen',
     diagramTab: 'Diagramm',
     diagramLoadFailed: 'Diagramm konnte nicht geladen werden',
+    diagramHint: 'BPMN 2.0 · Camunda-Modeler-kompatibel',
+    diagramInfoToggle: 'Details',
+    diagramInvalid: 'Ungültiges BPMN-XML',
+    diagramEmpty: 'Kein Diagramm vorhanden (keine Layout-Daten)',
+    orientationToggle: 'Ausrichtung wechseln',
+    orientationVertical: 'Vertikal',
+    orientationHorizontal: 'Horizontal',
+    viewDefinition: 'Definition ansehen',
+    definitionHint: 'Vollständige Workflow-Definition (JSON). Die Zeilennummern im Diagramm beziehen sich auf dieses Dokument.',
+    bpmnLabels: {
+      // Typ-Präfix namenloser Kästen (im Backend deutsch erzeugt, hier lokalisiert — Schlüssel = deutscher Wert)
+      prefix: {
+        'KI': 'KI', 'Shell': 'Shell', 'Agent': 'Agent', 'Skill': 'Skill', 'Integration': 'Integration',
+        'Dokument': 'Dokument', 'Freigabe': 'Freigabe', 'Eingabe': 'Eingabe', 'Sub-Workflow': 'Sub-Workflow', 'Retry': 'Retry',
+      },
+      // Tooltips je BPMN-Element-Typ
+      tip: {
+        scriptTask: 'Shell-Kommando', serviceTask: 'KI / Service', userTask: 'Benutzer-Interaktion',
+        callActivity: 'Sub-Workflow', task: 'Unbekannter Block-Typ', subProcess: 'Schleife (Sub-Prozess)',
+      },
+      // Start-/End-Event-Namen
+      event: { 'Start': 'Start', 'Ende': 'Ende' },
+    },
     versionsTab: 'Versionen',
     blocksTab: 'Blöcke',
     noVersions: 'Noch keine Versionen vorhanden.',
@@ -464,6 +487,9 @@ export const de: TranslationKeys = {
       rate: 'Bewertung:',
       waitingSteps: 'Warte auf Schritte...',
       noSteps: 'Keine Schritte aufgezeichnet',
+      diagramTitle: 'Ablauf-Diagramm (live)',
+      hideDiagram: 'Ausblenden',
+      showDiagram: 'Diagramm',
       error: 'Fehler',
       command: 'Befehl',
       commandPlaceholder: 'Befehl im Container ausführen...',

@@ -1,6 +1,9 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import BpmnDiagramView from '../BpmnDiagramView';
+import { useI18nStore } from '../../../i18n';
+
+afterEach(() => useI18nStore.setState({ locale: 'de' }));
 
 const SAMPLE_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
@@ -45,5 +48,113 @@ describe('BpmnDiagramView', () => {
   it('zeigt eine Meldung bei ungültigem XML', () => {
     render(<BpmnDiagramView xml="kein xml" />);
     expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+
+  it('zeigt eine eigene Meldung für wohlgeformtes BPMN ohne Layout-Daten', () => {
+    const noDi = `<?xml version="1.0"?><definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL">
+      <process id="p"><startEvent id="s"/></process></definitions>`;
+    render(<BpmnDiagramView xml={noDi} />);
+    // andere Meldung als bei kaputtem XML
+    expect(screen.getByRole('alert')).toHaveTextContent(/kein Diagramm|no diagram/i);
+  });
+
+  it('transponiert das Layout bei vertikaler Ausrichtung', () => {
+    const { container, rerender } = render(<BpmnDiagramView xml={SAMPLE_XML} orientation="horizontal" />);
+    const h = container.querySelector('svg')!.getAttribute('viewBox')!.split(' ').map(Number);
+    rerender(<BpmnDiagramView xml={SAMPLE_XML} orientation="vertical" />);
+    const v = container.querySelector('svg')!.getAttribute('viewBox')!.split(' ').map(Number);
+    expect(h[2]!).toBeGreaterThan(h[3]!); // horizontal: breiter als hoch
+    expect(v[3]!).toBeGreaterThan(v[2]!); // vertikal: höher als breit
+    // Stauchung: die vertikale Höhe ist deutlich kleiner als die horizontale Breite
+    // (ohne Kompaktierung wäre sie ~gleich, weil transponiert). 0.85 lässt Padding-Spielraum.
+    expect(v[3]!).toBeLessThan(h[2]! * 0.85);
+  });
+
+  it('dockt Pfeile im vertikalen Layout an den Kasten-Mitten an', () => {
+    const { container } = render(<BpmnDiagramView xml={SAMPLE_XML} orientation="vertical" />);
+    const rect = container.querySelector('rect')!; // Task-Box
+    const cx = Number(rect.getAttribute('x')) + Number(rect.getAttribute('width')) / 2;
+    const polyXs = Array.from(container.querySelectorAll('polyline')).flatMap((p) =>
+      (p.getAttribute('points') || '').trim().split(/\s+/).map((pt) => Number(pt.split(',')[0])),
+    );
+    // Neu-Routing: mindestens eine Kante dockt exakt an der Task-Mitte an (früher ~10px daneben)
+    expect(polyXs.some((x) => Math.abs(x - cx) < 0.5)).toBe(true);
+  });
+
+  it('lokalisiert das deutsche Typ-Präfix namenloser Kästen (EN)', () => {
+    useI18nStore.setState({ locale: 'en' });
+    const nameless = SAMPLE_XML.replace('name="Maven Tests ausführen"', 'name="KI: git status"');
+    render(<BpmnDiagramView xml={nameless} />);
+    // Präfix "KI:" wird zu "AI:", der Befehl "git status" bleibt unverändert
+    expect(screen.getByText('AI: git status')).toBeInTheDocument();
+    expect(screen.queryByText('KI: git status')).toBeNull();
+  });
+
+  it('lässt Block-Namen unübersetzt (nur Präfixe werden lokalisiert)', () => {
+    useI18nStore.setState({ locale: 'en' });
+    render(<BpmnDiagramView xml={SAMPLE_XML} />);
+    // "Maven Tests ausführen" ist ein Nutzer-Name ohne Typ-Präfix → unverändert in EN
+    expect(screen.getByText('Maven Tests ausführen')).toBeInTheDocument();
+  });
+
+  it('meldet den Block-Index beim Klick auf einen Kasten', () => {
+    // scriptTask-ID trägt den Block-Index (b_2_…) wie im echten Export
+    const clickableXml = SAMPLE_XML.replace('id="t1"', 'id="b_2_maven"').replace('bpmnElement="t1"', 'bpmnElement="b_2_maven"');
+    const onSelectBlock = vi.fn();
+    const { container } = render(<BpmnDiagramView xml={clickableXml} onSelectBlock={onSelectBlock} />);
+    const clickable = container.querySelector('g[role="button"]');
+    expect(clickable).not.toBeNull();
+    fireEvent.click(clickable!);
+    expect(onSelectBlock).toHaveBeenCalledWith({ blockIndex: 2 });
+  });
+
+  it('meldet Block- und Case-Index bei einem verschachtelten Switch-Case-Kasten', () => {
+    // Switch-Case-Kind trägt den Pfad in der ID: b_<block>_c<case>_…
+    const caseXml = SAMPLE_XML.replace('id="t1"', 'id="b_3_c1_0_alarm"').replace('bpmnElement="t1"', 'bpmnElement="b_3_c1_0_alarm"');
+    const onSelectBlock = vi.fn();
+    const { container } = render(<BpmnDiagramView xml={caseXml} onSelectBlock={onSelectBlock} />);
+    fireEvent.click(container.querySelector('g[role="button"]')!);
+    expect(onSelectBlock).toHaveBeenCalledWith({ blockIndex: 3, sub: { kind: 'case', caseIndex: 1 } });
+  });
+
+  it('kürzt zu lange Labels mit Ellipsis und hält sie in der Box', () => {
+    const longXml = SAMPLE_XML.replace(
+      'name="Maven Tests ausführen"',
+      'name="Vollautomatische Integrationstestsuite mit ausführlicher Fehleranalyse und Reporting"',
+    );
+    const { container } = render(<BpmnDiagramView xml={longXml} />);
+    const tspans = Array.from(container.querySelectorAll('tspan'));
+    // max. 3 Zeilen, letzte endet mit Ellipsis
+    expect(tspans.length).toBeLessThanOrEqual(3);
+    expect(tspans.some((t) => t.textContent?.endsWith('…'))).toBe(true);
+    // voller Name bleibt als Tooltip erhalten
+    const titles = Array.from(container.querySelectorAll('title')).map((t) => t.textContent);
+    expect(titles).toContain('Vollautomatische Integrationstestsuite mit ausführlicher Fehleranalyse und Reporting');
+  });
+
+  it('zeigt Block-Nummer und Zeilenbereich, wenn infoByBlock gesetzt ist', () => {
+    const infoXml = SAMPLE_XML.replace('id="t1"', 'id="b_2_maven"').replace('bpmnElement="t1"', 'bpmnElement="b_2_maven"');
+    render(<BpmnDiagramView xml={infoXml} infoByBlock={new Map([[2, { start: 8, end: 12 }]])} />);
+    // Block-Index wird 1-basiert angezeigt (#3), Zeilenbereich aus der Definition
+    expect(screen.getByText('#3 · Z.8–12')).toBeInTheDocument();
+  });
+
+  it('färbt einen Kasten nach Live-Run-Status', () => {
+    const statusXml = SAMPLE_XML.replace('id="t1"', 'id="b_2_maven"').replace('bpmnElement="t1"', 'bpmnElement="b_2_maven"');
+    const { container } = render(
+      <BpmnDiagramView xml={statusXml} statusByBlock={new Map([[2, 'running']])} />,
+    );
+    const rect = container.querySelector('rect');
+    expect(rect?.getAttribute('class')).toContain('stroke-accent');
+    expect(rect?.getAttribute('class')).toContain('animate-pulse');
+  });
+
+  it('zeigt Typ-Marker und Tooltip am Task', () => {
+    const { container } = render(<BpmnDiagramView xml={SAMPLE_XML} />);
+    // scriptTask: SVG-<title>-Tooltip mit Typ-Label
+    const titles = Array.from(container.querySelectorAll('title')).map((t) => t.textContent);
+    expect(titles).toContain('Shell-Kommando');
+    // Skript-Marker: drei Linien oben links im Kasten
+    expect(container.querySelectorAll('g.stroke-text-secondary line').length).toBeGreaterThanOrEqual(3);
   });
 });

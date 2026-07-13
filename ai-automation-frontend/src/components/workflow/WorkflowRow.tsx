@@ -6,7 +6,9 @@ import {
   Bell,
   FlaskConical,
   Cloud,
+  Workflow as WorkflowFlowIcon,
 } from 'lucide-react';
+import { useT } from '../../i18n';
 import { ExecutionBadges } from '../shared/ExecutionBadges';
 import { WorkflowIcon } from '../../utils/workflowIcon';
 import type { useNavigate } from 'react-router-dom';
@@ -37,6 +39,7 @@ export function WorkflowRow({
   onToggleCheck,
   showDetails = false,
 }: WorkflowRowProps) {
+  const t = useT();
   const handleClick = () => {
     if (selectMode) {
       onToggleCheck();
@@ -111,6 +114,13 @@ export function WorkflowRow({
               {workflow.runCount}
             </span>
           )}
+          <button
+            onClick={(e) => { e.stopPropagation(); navigate(`/workflows/${workflow.id}?tab=diagram`); }}
+            className="sm:opacity-0 sm:group-hover:opacity-100 p-0.5 rounded-sm hover:bg-accent/20 text-text-tertiary hover:text-accent transition-all shrink-0"
+            title={t.workflows.diagramTab}
+          >
+            <WorkflowFlowIcon className="w-3.5 h-3.5" />
+          </button>
           <button
             onClick={(e) => { e.stopPropagation(); onExecute(); }}
             className="sm:opacity-0 sm:group-hover:opacity-100 p-0.5 rounded-sm hover:bg-accent/20 text-accent transition-all shrink-0"

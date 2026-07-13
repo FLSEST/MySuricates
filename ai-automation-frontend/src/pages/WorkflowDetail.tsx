@@ -1,9 +1,10 @@
 import { useState, lazy, Suspense } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, History } from 'lucide-react';
 
 const WorkflowVersionsTab = lazy(() => import('../components/workflow/WorkflowVersionsTab'));
 const WorkflowDiagramTab = lazy(() => import('../components/workflow/WorkflowDiagramTab'));
+type DiagramSelection = import('../components/workflow/BpmnDiagramView').DiagramSelection;
 import { Card, CardHeader, Button, Spinner } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
 import {
@@ -19,6 +20,7 @@ import { WorkflowDetailModals } from '../components/workflow/WorkflowDetailModal
 import { CompletionTriggerSection } from '../components/workflow/CompletionTriggerSection';
 import { useT } from '../i18n';
 import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
+import { buildDefinitionText, blockLineRanges } from '../utils/workflowDefinition';
 import { readContextSchema } from '../utils/contextSchema';
 import type { BlockDefinition, BlockType, OptimizeResult, UpdateWorkflowRequest } from '../types';
 
@@ -62,7 +64,12 @@ export function WorkflowDetail() {
     skillIds: [],
   });
   const [selectedSkillId, setSelectedSkillId] = useState('');
-  const [activeTab, setActiveTab] = useState<'blocks' | 'versions' | 'diagram'>('blocks');
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState<'blocks' | 'versions' | 'diagram'>(
+    initialTab === 'diagram' || initialTab === 'versions' ? initialTab : 'blocks',
+  );
+  const [blockReveal, setBlockReveal] = useState<{ text: string; nonce: number } | null>(null);
   const [showExecuteDialog, setShowExecuteDialog] = useState(false);
   const [showClone, setShowClone] = useState(false);
   const [cloneForm, setCloneForm] = useState({ projectId: '', name: '' });
@@ -100,6 +107,9 @@ export function WorkflowDetail() {
   const hasFailedRuns = runs?.content?.some((r) => r.status === 'FAILED') ?? false;
 
   const workflowVariables = extractWorkflowVariables(workflow.blocks);
+  // Günstig (JSON.stringify der Blöcke) und nach dem Early-Return — daher ohne useMemo (Hook-Regel)
+  const definitionText = buildDefinitionText(workflow.blocks);
+  const definitionLineRanges = blockLineRanges(workflow.blocks);
 
   const handleExecute = () => {
     if (workflowVariables.length > 0) {
@@ -147,12 +157,50 @@ export function WorkflowDetail() {
     updateWorkflow.mutate({ id: workflow.id, data: { blocks } });
   };
 
-  const handleOpenEditBlock = (index: number) => {
+  const handleOpenEditBlock = (index: number, revealText?: string) => {
     const block = workflow.blocks[index];
     if (!block) return;
     setEditBlockIndex(index);
     setEditBlock({ type: block.type, config: JSON.stringify(block.config, null, 2), skillIds: block.skillIds ?? [] });
+    setBlockReveal(revealText ? { text: revealText, nonce: Date.now() } : null);
     setShowEditBlock(true);
+  };
+
+  /** Primäres Config-Feld je Block-Typ — die Zeile, auf die ein Top-Level-Klick springt. */
+  const PRIMARY_FIELD: Partial<Record<BlockType, string>> = {
+    shell: 'command', simple: 'command', retry: 'command',
+    agentic: 'goal', approval: 'question', 'human-input': 'prompt',
+    'skill-capability': 'capability', 'sub-workflow': 'workflow_id',
+    conditional: 'condition', switch: 'expression', foreach: 'variable_name',
+    while: 'condition_command', document: 'file_path',
+  };
+
+  /** Ermittelt aus einer Diagramm-Auswahl den JSON-Suchtext, auf den der Editor springen soll. */
+  const revealTextFor = (sel: DiagramSelection): string | undefined => {
+    const block = workflow.blocks[sel.blockIndex];
+    const config = block?.config as Record<string, unknown> | undefined;
+    if (!config) return undefined;
+    if (sel.sub) {
+      switch (sel.sub.kind) {
+        case 'case': {
+          const cases = Array.isArray(config.cases) ? (config.cases as Array<{ value?: unknown }>) : [];
+          const value = cases[sel.sub.caseIndex]?.value;
+          return typeof value === 'string' && value ? `"${value}"` : '"cases"';
+        }
+        case 'default': return '"default"';
+        case 'then': return '"then_command"';
+        case 'else': return '"else_command"';
+        case 'body': return '"command"';
+      }
+    }
+    // Top-Level: primäres Feld des Block-Typs, falls vorhanden
+    const key = block ? PRIMARY_FIELD[block.type] : undefined;
+    return key && key in config ? `"${key}"` : undefined;
+  };
+
+  const handleSelectFromDiagram = (sel: DiagramSelection) => {
+    // Jeder Kasten öffnet den Block-Editor und springt zur passenden Definitionszeile
+    handleOpenEditBlock(sel.blockIndex, revealTextFor(sel));
   };
 
   const handleSaveBlock = () => {
@@ -333,7 +381,13 @@ export function WorkflowDetail() {
 
           {activeTab === 'diagram' && id && (
             <Suspense fallback={<div className="p-6 text-sm text-text-secondary">{t.common.loading}</div>}>
-              <WorkflowDiagramTab workflowId={id} />
+              <WorkflowDiagramTab
+                workflowId={id}
+                workflowName={workflow.name}
+                definitionText={definitionText}
+                lineRanges={definitionLineRanges}
+                onSelectBlock={handleSelectFromDiagram}
+              />
             </Suspense>
           )}
         </div>
@@ -375,6 +429,8 @@ export function WorkflowDetail() {
         editBlock={editBlock}
         setEditBlock={setEditBlock}
         onSaveBlock={handleSaveBlock}
+        editBlockRevealText={blockReveal?.text}
+        editBlockRevealNonce={blockReveal?.nonce}
         showAddSkill={showAddSkill}
         setShowAddSkill={setShowAddSkill}
         selectedSkillId={selectedSkillId}

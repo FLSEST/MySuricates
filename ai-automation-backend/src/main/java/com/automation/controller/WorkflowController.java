@@ -186,7 +186,7 @@ public class WorkflowController {
     }
 
     /** Exportiert den Workflow als BPMN 2.0 XML (Spec: docs/plans/2026-07-09-bpmn-integration-design.md). */
-    @GetMapping(value = "/{id}/export/bpmn", produces = MediaType.APPLICATION_XML_VALUE)
+    @GetMapping("/{id}/export/bpmn")
     public ResponseEntity<String> exportWorkflowAsBpmn(@PathVariable String id) {
         Workflow workflow = workflowService.findByIdEager(id);
         String xml = bpmnExportAdapter.export(workflow);
@@ -194,7 +194,7 @@ public class WorkflowController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=\"" + safeName + "." + bpmnExportAdapter.fileExtension() + "\"")
-                .contentType(MediaType.APPLICATION_XML)
+                .contentType(MediaType.parseMediaType(bpmnExportAdapter.contentType()))
                 .body(xml);
     }
 

@@ -54,7 +54,22 @@ class BpmnXmlRendererTest {
                         "condition_command", "npm test > /dev/null || echo weiter",
                         "execution_mode", "shell")))),
                 WorkflowFixtures.workflow("Unbekannt", List.of(WorkflowFixtures.block("quantum", null, Map.of(
-                        "command", "irgendwas")))));
+                        "command", "irgendwas")))),
+                WorkflowFixtures.workflow("Sonderzeichen", List.of(WorkflowFixtures.block("shell", "A & B <C>", Map.of(
+                        "command", "if [ $x -lt 5 ] && echo \"<ok>\" || echo 'A & B'")))));
+    }
+
+    @Test
+    void xmlSonderzeichenWerdenKorrektEscaped() {
+        String xml = render(WorkflowFixtures.workflow("Sonderzeichen", List.of(
+                WorkflowFixtures.block("shell", "A & B <C>", Map.of(
+                        "command", "grep 'x' && echo \"<ok>\"")))));
+        // Roh-Zeichen dürfen nicht unescaped im Dokument stehen …
+        assertThat(xml).doesNotContain("<ok>");
+        assertThat(xml).doesNotContain("A & B");
+        // … sondern als Entities (das XML bleibt wohlgeformt, s. alleFixturesSindSchemaValide)
+        assertThat(xml).contains("&amp;");
+        assertThat(xml).contains("&lt;ok&gt;");
     }
 
     @Test

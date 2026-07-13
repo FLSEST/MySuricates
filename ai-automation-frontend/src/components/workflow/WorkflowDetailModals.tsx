@@ -44,6 +44,8 @@ interface WorkflowDetailModalsProps {
   editBlock: { type: BlockType; config: string; skillIds: string[] };
   setEditBlock: (v: { type: BlockType; config: string; skillIds: string[] }) => void;
   onSaveBlock: () => void;
+  editBlockRevealText?: string;
+  editBlockRevealNonce?: number;
 
   showAddSkill: boolean;
   setShowAddSkill: (v: boolean) => void;
@@ -113,6 +115,8 @@ export function WorkflowDetailModals({
   editBlock,
   setEditBlock,
   onSaveBlock,
+  editBlockRevealText,
+  editBlockRevealNonce,
 
   showAddSkill,
   setShowAddSkill,
@@ -334,6 +338,8 @@ export function WorkflowDetailModals({
               onChange={(val) => setEditBlock({ ...editBlock, config: val })}
               language="json"
               height="250px"
+              revealText={editBlockRevealText}
+              revealNonce={editBlockRevealNonce}
             />
           </div>
           {allSkills.length > 0 && (

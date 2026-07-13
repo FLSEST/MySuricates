@@ -362,13 +362,18 @@ class BpmnModelBuilder {
         List<BlockDefinition> result = new ArrayList<>();
         for (Map<String, Object> map : listOfMaps(value)) {
             BlockDefinition b = new BlockDefinition();
-            b.setType((String) map.get("type"));
-            b.setName((String) map.get("name"));
+            b.setType(asString(map.get("type")));
+            b.setName(asString(map.get("name")));
             Object config = map.get("config");
             b.setConfig(config instanceof Map<?, ?> m ? new HashMap<>((Map<String, Object>) m) : new HashMap<>());
             result.add(b);
         }
         return result;
+    }
+
+    /** Null-sicherer String-Cast: verhindert ClassCastException bei fehlerhaften Configs. */
+    private static String asString(Object value) {
+        return value instanceof String s ? s : null;
     }
 
     private String nameSource(BlockDefinition block) {
