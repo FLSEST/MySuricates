@@ -5,6 +5,7 @@ import {
   FolderOpen, ListTodo, Save,
   Terminal, Sparkles, Brain, Repeat, GitBranch, RefreshCw, ShieldCheck, Layers,
   MessageSquare, Route, RotateCcw, Wrench, Plug,
+  Eye, EyeOff, MoveHorizontal, MoveVertical,
 } from 'lucide-react';
 import { Card, CardHeader, Button, Spinner, Badge, Input } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
@@ -24,7 +25,7 @@ import {
   usePauseExecution, useResumeExecution, useCancelExecution, useRunCommand, useSubmitApproval,
   useRetryExecution, useApproveTodos, useResumeFromStep, useUpdateRunNotes,
 } from '../hooks/useWorkflows';
-import BpmnDiagramView, { type RunStatus } from '../components/workflow/BpmnDiagramView';
+import BpmnDiagramView, { type RunStatus, type DiagramOrientation, type DiagramSelection } from '../components/workflow/BpmnDiagramView';
 import { useCreateTodo } from '../hooks/useTodos';
 import { useExecutionWebSocket } from '../hooks/useWebSocket';
 import { useRateRun } from '../hooks/useLearning';
@@ -281,6 +282,16 @@ export function WorkflowExecution() {
     }
     return map;
   }, [run?.steps]);
+
+  // Ablauf-Diagramm: ein-/ausblenden, Ausrichtung, Klick-zu-Step
+  const [showFlow, setShowFlow] = useState(true);
+  const [flowOrientation, setFlowOrientation] = useState<DiagramOrientation>('horizontal');
+  const [stepHighlight, setStepHighlight] = useState<{ index: number; nonce: number } | null>(null);
+  const handleSelectStep = (sel: DiagramSelection) => {
+    document.getElementById(`exec-step-${sel.blockIndex}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setStepHighlight((prev) => ({ index: sel.blockIndex, nonce: (prev?.nonce ?? 0) + 1 }));
+    window.setTimeout(() => setStepHighlight(null), 1800);
+  };
 
   // Clear recovered dialogs when run is no longer active
   useEffect(() => {
@@ -554,11 +565,44 @@ export function WorkflowExecution() {
       {bpmnXml && run.steps.length > 0 && (
         <Card padding={false}>
           <div className="p-5 pb-3">
-            <CardHeader title={t.workflows.execution.diagramTitle} />
+            <CardHeader
+              title={t.workflows.execution.diagramTitle}
+              action={
+                <div className="flex items-center gap-2">
+                  {showFlow && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={flowOrientation === 'horizontal' ? <MoveVertical className="w-4 h-4" /> : <MoveHorizontal className="w-4 h-4" />}
+                      onClick={() => setFlowOrientation((o) => (o === 'horizontal' ? 'vertical' : 'horizontal'))}
+                      title={t.workflows.orientationToggle}
+                    >
+                      {flowOrientation === 'horizontal' ? t.workflows.orientationVertical : t.workflows.orientationHorizontal}
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={showFlow ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    onClick={() => setShowFlow((v) => !v)}
+                    title={showFlow ? t.workflows.execution.hideDiagram : t.workflows.execution.showDiagram}
+                  >
+                    {showFlow ? t.workflows.execution.hideDiagram : t.workflows.execution.showDiagram}
+                  </Button>
+                </div>
+              }
+            />
           </div>
-          <div className="px-5 pb-5">
-            <BpmnDiagramView xml={bpmnXml} statusByBlock={statusByBlock} />
-          </div>
+          {showFlow && (
+            <div className="px-5 pb-5">
+              <BpmnDiagramView
+                xml={bpmnXml}
+                statusByBlock={statusByBlock}
+                orientation={flowOrientation}
+                onSelectBlock={handleSelectStep}
+              />
+            </div>
+          )}
         </Card>
       )}
 
@@ -569,15 +613,21 @@ export function WorkflowExecution() {
             <CardHeader title={`${t.workflows.execution.steps} (${run.steps.length})`} />
           </div>
           <div className="px-5 pb-5 divide-y divide-border">
-            {run.steps.map((step) =>
-              step.blockType === 'agentic' ? (
-                <AgenticStepCard key={step.id} step={step} agenticState={agenticStates.get(step.stepIndex)} />
-              ) : step.blockType === 'foreach' ? (
-                <ForEachStepCard key={step.id} step={step} forEachState={forEachStates.get(step.stepIndex)} />
-              ) : (
-                <StepCard key={step.id} step={step} />
-              ),
-            )}
+            {run.steps.map((step) => (
+              <div
+                key={step.id}
+                id={`exec-step-${step.stepIndex}`}
+                className={stepHighlight?.index === step.stepIndex ? 'ring-2 ring-accent ring-inset rounded-lg bg-accent/5' : ''}
+              >
+                {step.blockType === 'agentic' ? (
+                  <AgenticStepCard step={step} agenticState={agenticStates.get(step.stepIndex)} />
+                ) : step.blockType === 'foreach' ? (
+                  <ForEachStepCard step={step} forEachState={forEachStates.get(step.stepIndex)} />
+                ) : (
+                  <StepCard step={step} />
+                )}
+              </div>
+            ))}
             {run.steps.length === 0 && (
               <div className="py-8 text-center text-sm text-text-tertiary">
                 {isRunning ? t.workflows.execution.waitingSteps : t.workflows.execution.noSteps}

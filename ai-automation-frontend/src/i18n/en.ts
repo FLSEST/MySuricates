@@ -486,6 +486,8 @@ export const en = {
       waitingSteps: 'Waiting for steps...',
       noSteps: 'No steps recorded',
       diagramTitle: 'Flow diagram (live)',
+      hideDiagram: 'Hide',
+      showDiagram: 'Diagram',
       error: 'Error',
       command: 'Command',
       commandPlaceholder: 'Enter command to run in container...',

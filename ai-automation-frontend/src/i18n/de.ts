@@ -488,6 +488,8 @@ export const de: TranslationKeys = {
       waitingSteps: 'Warte auf Schritte...',
       noSteps: 'Keine Schritte aufgezeichnet',
       diagramTitle: 'Ablauf-Diagramm (live)',
+      hideDiagram: 'Ausblenden',
+      showDiagram: 'Diagramm',
       error: 'Fehler',
       command: 'Befehl',
       commandPlaceholder: 'Befehl im Container ausführen...',
