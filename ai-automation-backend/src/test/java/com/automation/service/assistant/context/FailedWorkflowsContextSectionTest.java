@@ -105,9 +105,11 @@ class FailedWorkflowsContextSectionTest {
         section.append(sb, false);
 
         String out = sb.toString();
+        // Tail-biased since the diagnosis rework: keep the END of the message
+        // (the actual error sits there), prefixed with an ellipsis.
         assertThat(out).contains("…");
         assertThat(out).doesNotContain("E".repeat(200));
-        assertThat(out).contains("E".repeat(160) + "…");
+        assertThat(out).contains("…" + "E".repeat(160));
     }
 
     @Test

@@ -234,15 +234,15 @@ Alle 8 Tool-Typen sind in `MUTATING_TOOL_TYPES` definiert und erfordern User-Bes
 Der Assistent kann über `<fetch type="..." id="..."/>`-Tags zusätzliche Daten nachladen. `AssistantFetchService` (`service/assistant/AssistantFetchService.java`) löst diese auf und liefert die Daten als Supplemental-Kontext zurück.
 
 - **Max. 3 Fetch-Runden** mit je **3 Fetches** pro Runde (`MAX_FETCH_ROUNDS`, `MAX_FETCHES_PER_ROUND` in `AssistantService`)
-- Truncation-Marker zeigen Größeninfo: `[Output truncated: N of M characters]`
+- Truncation-Marker zeigen Größeninfo: `[... skipped N of M characters ...]` (tail-bewusst via `TruncationUtil.smart`, Kopf + Ende bleiben erhalten) bzw. `[Output truncated: N of M characters]` (Legacy head-first)
 - Auto-Fetch ist auf bestimmte Typen beschränkt (`AUTO_FETCH_TYPES`)
 
 ### Verfügbare Fetch-Typen (18)
 
 | Typ | Beschreibung | Truncation |
 |-----|-------------|------------|
-| `run_detail` | Run-Detail mit Steps | Error: 600, Output: 800 |
-| `step_output` | Einzelner Step-Output (`runId/stepNumber`) | 8000 Zeichen |
+| `run_detail` | Run-Detail mit Steps | Error: smart(200,400), Output: smart(200,600) — tail-bewusst |
+| `step_output` | Einzelner Step-Output (`runId/stepNumber`); Paging via `?offset=<n>` / `?tail=<n>` | Default smart(2000,6000); Window/Tail max 8000 |
 | `workflow_detail` | Workflow-Überblick | Desc: 150, Instructions: 400, Prompt: 200 |
 | `workflow-full` | Vollständiger Workflow inkl. Config | Instructions: 600, Config-Values: 300 |
 | `workflow-inputs` | Workflow-Input-Variablen | Values: 100 |
@@ -292,7 +292,7 @@ Doc-Dateien: `workflow-guide` → `docs/WORKFLOW-GUIDE.md`, `architektur` → `d
 | Skills/Integrations/Chains/BlockTypes | — | ✓(compact) | — | — | — | — | ✓ |
 | Memory & Sessions | — | — | — | — | — | — | ✓ |
 
-**Sonderfall RUNS**: Wenn ein Run-ID aufgelöst werden kann, wird `buildRunFocusedSystemPrompt()` verwendet — ein schlanker Prompt mit nur dem Run/Workflow-Detail, ohne globale Sections.
+**Sonderfall RUNS**: Wenn ein Run-ID aufgelöst werden kann, wird `buildRunFocusedSystemPrompt()` verwendet — ein schlanker Prompt mit nur dem Run/Workflow-Detail, ohne globale Sections. Der Workflow wird dabei separat per `workflowRepository.findById()` geladen (kein Lazy-Proxy-Zugriff — OSIV ist aus; kein `JOIN FETCH` — `@SQLRestriction` auf `Workflow` würde bei Soft-Delete `FetchNotFoundException` werfen). Bei **FAILED**-Runs wird die Diagnose-Evidenz direkt vorgeladen: Block-Typ + Block-Config des gescheiterten Steps sowie der Step-Output tail-bewusst (`TruncationUtil.smart(output, 500, 4000)`) — eine Diagnose braucht damit in der Regel keinen Fetch-Roundtrip mehr.
 
 ### 9 Context-Section-Klassen (Paket `service/assistant/context/`)
 

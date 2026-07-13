@@ -4,6 +4,7 @@ import com.automation.entity.RunStatus;
 import com.automation.entity.WorkflowRun;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.system.SystemIdentityService;
+import com.automation.util.TruncationUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -66,7 +67,7 @@ public class RunsContextSection implements AssistantContextSection {
                         .append(" (link:").append(runLink(r)).append(")");
                 if (r.getStatus() == RunStatus.FAILED) {
                     String err = extractError(r);
-                    if (err != null) sb.append(" — Error: ").append(truncate(err, 120));
+                    if (err != null) sb.append(" — Error: ").append(TruncationUtil.tailInline(err, 120));
                 }
                 sb.append("\n");
             });

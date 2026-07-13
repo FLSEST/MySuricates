@@ -20,6 +20,7 @@ import com.automation.service.todo.TodoOutputParser;
 import com.automation.service.project.ContainerService;
 import com.automation.service.project.ProjectContextService;
 import com.automation.service.system.SystemIdentityService;
+import com.automation.util.TruncationUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -425,8 +426,9 @@ public class WorkflowExecutor {
                 if (step.getStatus() == StepStatus.FAILED && block.shouldStopOnFailure()) {
                     run.setStatus(RunStatus.FAILED);
                     String output = step.getOutput() != null ? step.getOutput() : "";
+                    // Tail-biased: the actual error (HTTP status, exception) usually sits at the END of the output.
                     String message = "Step " + step.getStepIndex() + " (" + block.getType() + ") failed: "
-                            + (output.length() > 500 ? output.substring(0, 500) + "..." : output);
+                            + TruncationUtil.smart(output, 100, 400);
                     run.setError(Map.of("step", step.getStepIndex(), "blockType", block.getType(), "message", message));
                     break;
                 }

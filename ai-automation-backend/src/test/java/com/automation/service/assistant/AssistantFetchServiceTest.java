@@ -169,7 +169,6 @@ class AssistantFetchServiceTest {
         when(workflowRunRepository.findByIdWithSteps("r1")).thenReturn(Optional.of(run));
         when(contextBuilder.runLabel(run)).thenReturn("TestWF");
         when(contextBuilder.extractError(run)).thenReturn("Something broke");
-        when(contextBuilder.truncate("Something broke", 600)).thenReturn("Something broke");
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("run_detail", "r1"));
 
@@ -187,7 +186,6 @@ class AssistantFetchServiceTest {
         when(workflowRunRepository.findByIdWithSteps("r1")).thenReturn(Optional.of(run));
         when(contextBuilder.runLabel(run)).thenReturn("TestWF");
         when(contextBuilder.extractError(run)).thenReturn(null);
-        when(contextBuilder.truncate("error output", 800)).thenReturn("error output");
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("run_detail", "r1"));
 
@@ -379,7 +377,72 @@ class AssistantFetchServiceTest {
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("step_output", "r1/1"));
 
         assertThat(result).contains("**Step 1** (COMPLETED) — 1s");
-        assertThat(result).contains("[Output truncated: 8000 of 8100 characters]");
+        assertThat(result).contains("[... skipped 100 of 8100 characters ...]");
+    }
+
+    @Test
+    void executeFetch_stepOutput_longOutput_tailSurvives() {
+        String longOutput = "x".repeat(9000) + "HTTP 502 Bad Gateway";
+        StepResult step = StepResult.builder().stepIndex(0).status(StepStatus.FAILED)
+                .output(longOutput).build();
+        WorkflowRun run = WorkflowRun.builder().id("r1").status(RunStatus.FAILED)
+                .steps(new ArrayList<>(List.of(step))).build();
+        when(workflowRunRepository.findByIdWithSteps("r1")).thenReturn(Optional.of(run));
+
+        String result = service.executeFetch(new AssistantFetchService.FetchRequest("step_output", "r1/1"));
+
+        assertThat(result).contains("HTTP 502 Bad Gateway");
+    }
+
+    @Test
+    void executeFetch_stepOutput_offsetPaging_returnsWindow() {
+        String longOutput = "a".repeat(9000) + "END-MARKER";
+        StepResult step = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED)
+                .output(longOutput).build();
+        WorkflowRun run = WorkflowRun.builder().id("r1").status(RunStatus.COMPLETED)
+                .steps(new ArrayList<>(List.of(step))).build();
+        when(workflowRunRepository.findByIdWithSteps("r1")).thenReturn(Optional.of(run));
+
+        String result = service.executeFetch(new AssistantFetchService.FetchRequest("step_output", "r1/1?offset=9000"));
+
+        assertThat(result).contains("[showing characters 9000-9010 of 9010]");
+        assertThat(result).contains("END-MARKER");
+    }
+
+    @Test
+    void executeFetch_stepOutput_tailParam_returnsTail() {
+        String longOutput = "x".repeat(5000) + "FINAL LINE";
+        StepResult step = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED)
+                .output(longOutput).build();
+        WorkflowRun run = WorkflowRun.builder().id("r1").status(RunStatus.COMPLETED)
+                .steps(new ArrayList<>(List.of(step))).build();
+        when(workflowRunRepository.findByIdWithSteps("r1")).thenReturn(Optional.of(run));
+
+        String result = service.executeFetch(new AssistantFetchService.FetchRequest("step_output", "r1/1?tail=100"));
+
+        assertThat(result).contains("[... skipped 4910 of 5010 characters ...]");
+        assertThat(result).contains("FINAL LINE");
+        assertThat(result).doesNotContain("x".repeat(101));
+    }
+
+    @Test
+    void executeFetch_stepOutput_invalidPagingParam_returnsError() {
+        String result = service.executeFetch(new AssistantFetchService.FetchRequest("step_output", "r1/1?foo=bar"));
+
+        assertThat(result).contains("Invalid paging parameter");
+    }
+
+    @Test
+    void executeFetch_stepOutput_offsetBeyondLength_returnsExplanation() {
+        StepResult step = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED)
+                .output("short").build();
+        WorkflowRun run = WorkflowRun.builder().id("r1").status(RunStatus.COMPLETED)
+                .steps(new ArrayList<>(List.of(step))).build();
+        when(workflowRunRepository.findByIdWithSteps("r1")).thenReturn(Optional.of(run));
+
+        String result = service.executeFetch(new AssistantFetchService.FetchRequest("step_output", "r1/1?offset=100"));
+
+        assertThat(result).contains("beyond output length 5");
     }
 
     @Test

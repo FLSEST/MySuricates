@@ -85,8 +85,9 @@ function BrokenRow({ wf, onRestart }: { wf: BrokenWorkflow; onRestart: () => voi
     const stepLabel = wf.failedStepIndex != null
       ? `${wf.failedStepIndex + 1}${wf.failedBlockType ? ` (${wf.failedBlockType})` : ''}`
       : '—';
+    // Keep the END of the message — the actual error (HTTP status, exception) sits there.
     const errorText = wf.errorMessage
-      ? (wf.errorMessage.length > 600 ? `${wf.errorMessage.slice(0, 600)}…` : wf.errorMessage)
+      ? (wf.errorMessage.length > 600 ? `…${wf.errorMessage.slice(-600)}` : wf.errorMessage)
       : t.workflowDebug.noError;
     const prompt = t.workflowDebug.diagnosePrompt
       .replace('{name}', () => wf.workflowName ?? '—')

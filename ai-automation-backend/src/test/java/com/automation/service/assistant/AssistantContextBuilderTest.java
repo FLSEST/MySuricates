@@ -26,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -416,6 +417,82 @@ class AssistantContextBuilderTest {
             assertThat(result).contains("Steps: 1 (COMPLETED=1)");
             assertThat(result).doesNotContain("step output");
             verify(workflowRunRepository).findByIdWithSteps("run-1");
+        }
+
+        @Test
+        void runPage_failedRun_preloadsFailedStepEvidence() {
+            String output = "noise ".repeat(1000) + "curl: (22) The requested URL returned error: 502 Bad Gateway";
+            StepResult failedStep = StepResult.builder().stepIndex(1).status(StepStatus.FAILED)
+                    .output(output)
+                    .metadata(new HashMap<>(Map.of("blockType", "shell"))).build();
+            StepResult okStep = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED)
+                    .output("ok").build();
+            WorkflowRun run = WorkflowRun.builder().id("run-1").status(RunStatus.FAILED)
+                    .workflowName("Deploy")
+                    .error(Map.of("message", "Step 1 (shell) failed: ..."))
+                    .steps(new ArrayList<>(List.of(okStep, failedStep))).build();
+            when(workflowRunRepository.findByIdWithSteps("run-1")).thenReturn(Optional.of(run));
+
+            Workflow wf = Workflow.builder().id("wf-1").name("Deploy")
+                    .blocks(new ArrayList<>(List.of(
+                            BlockDefinition.builder().type("simple").config(new HashMap<>(Map.of("prompt", "summarize"))).build(),
+                            BlockDefinition.builder().type("shell").name("Deploy step")
+                                    .config(new HashMap<>(Map.of("command", "curl -f https://example.org/deploy"))).build()
+                    ))).build();
+            when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(wf));
+
+            var ctx = new AssistantChatRequest.PageContext("run", "run-1", null, "wf-1", "run-1", "/workflows/wf-1/run/run-1");
+            String result = builder.buildSystemPrompt(ctx, "");
+
+            assertThat(result).contains("Failed step 2 (shell)");
+            assertThat(result).contains("curl -f https://example.org/deploy");
+            assertThat(result).contains("502 Bad Gateway");
+            assertThat(result).contains("[... skipped");
+            assertThat(result).contains("<fetch type=\"step_output\" id=\"run-1/2\"/>");
+        }
+
+        @Test
+        void runPage_failedRun_workflowDeleted_skipsBlockConfigGracefully() {
+            StepResult failedStep = StepResult.builder().stepIndex(0).status(StepStatus.FAILED)
+                    .output("boom: exit code 7")
+                    .metadata(new HashMap<>(Map.of("blockType", "shell"))).build();
+            WorkflowRun run = WorkflowRun.builder().id("run-1").status(RunStatus.FAILED)
+                    .workflowName("Deploy")
+                    .steps(new ArrayList<>(List.of(failedStep))).build();
+            when(workflowRunRepository.findByIdWithSteps("run-1")).thenReturn(Optional.of(run));
+            when(workflowRepository.findById("wf-1")).thenReturn(Optional.empty());
+
+            var ctx = new AssistantChatRequest.PageContext("run", "run-1", null, "wf-1", "run-1", null);
+            String result = builder.buildSystemPrompt(ctx, "");
+
+            assertThat(result).contains("Failed step 1 (shell)");
+            assertThat(result).contains("boom: exit code 7");
+            assertThat(result).doesNotContain("Block command");
+        }
+
+        @Test
+        void runPage_failedRun_blockIndexMismatch_showsTypeOnly() {
+            StepResult failedStep = StepResult.builder().stepIndex(0).status(StepStatus.FAILED)
+                    .output("fail output")
+                    .metadata(new HashMap<>(Map.of("blockType", "shell"))).build();
+            WorkflowRun run = WorkflowRun.builder().id("run-1").status(RunStatus.FAILED)
+                    .steps(new ArrayList<>(List.of(failedStep))).build();
+            when(workflowRunRepository.findByIdWithSteps("run-1")).thenReturn(Optional.of(run));
+
+            // Workflow edited since the run: block at index 0 is now a different type
+            Workflow wf = Workflow.builder().id("wf-1").name("Deploy")
+                    .blocks(new ArrayList<>(List.of(
+                            BlockDefinition.builder().type("simple")
+                                    .config(new HashMap<>(Map.of("prompt", "stale prompt"))).build()
+                    ))).build();
+            when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(wf));
+
+            var ctx = new AssistantChatRequest.PageContext("run", "run-1", null, "wf-1", "run-1", null);
+            String result = builder.buildSystemPrompt(ctx, "");
+
+            assertThat(result).contains("Failed step 1 (shell)");
+            assertThat(result).contains("fail output");
+            assertThat(result).doesNotContain("stale prompt");
         }
 
         @Test

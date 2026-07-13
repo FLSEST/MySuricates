@@ -234,15 +234,15 @@ All 8 tool types are defined in `MUTATING_TOOL_TYPES` and require user confirmat
 The assistant can load additional data via `<fetch type="..." id="..."/>` tags. `AssistantFetchService` (`service/assistant/AssistantFetchService.java`) resolves these and returns the data as supplemental context.
 
 - **Max. 3 fetch rounds** with **3 fetches** per round (`MAX_FETCH_ROUNDS`, `MAX_FETCHES_PER_ROUND` in `AssistantService`)
-- Truncation markers show size info: `[Output truncated: N of M characters]`
+- Truncation markers show size info: `[... skipped N of M characters ...]` (tail-aware via `TruncationUtil.smart`, head + end are preserved) or `[Output truncated: N of M characters]` (legacy head-first)
 - Auto-fetch is restricted to specific types (`AUTO_FETCH_TYPES`)
 
 ### Available Fetch Types (18)
 
 | Type | Description | Truncation |
 |------|------------|------------|
-| `run_detail` | Run detail with steps | Error: 600, Output: 800 |
-| `step_output` | Single step output (`runId/stepNumber`) | 8000 characters |
+| `run_detail` | Run detail with steps | Error: smart(200,400), Output: smart(200,600) — tail-aware |
+| `step_output` | Single step output (`runId/stepNumber`); paging via `?offset=<n>` / `?tail=<n>` | Default smart(2000,6000); window/tail max 8000 |
 | `workflow_detail` | Workflow overview | Desc: 150, Instructions: 400, Prompt: 200 |
 | `workflow-full` | Complete workflow including config | Instructions: 600, Config values: 300 |
 | `workflow-inputs` | Workflow input variables | Values: 100 |
@@ -292,7 +292,7 @@ Doc files: `workflow-guide` → `docs/WORKFLOW-GUIDE.md`, `architektur` → `doc
 | Skills/Integrations/Chains/BlockTypes | — | ✓(compact) | — | — | — | — | ✓ |
 | Memory & Sessions | — | — | — | — | — | — | ✓ |
 
-**Special case RUNS**: When a run ID can be resolved, `buildRunFocusedSystemPrompt()` is used — a lean prompt with only the run/workflow detail, without global sections.
+**Special case RUNS**: When a run ID can be resolved, `buildRunFocusedSystemPrompt()` is used — a lean prompt with only the run/workflow detail, without global sections. The workflow is loaded separately via `workflowRepository.findById()` (no lazy-proxy access — OSIV is off; no `JOIN FETCH` — `@SQLRestriction` on `Workflow` would throw `FetchNotFoundException` for soft-deleted workflows). For **FAILED** runs the diagnosis evidence is pre-loaded directly: block type + block config of the failed step plus the step output tail-aware (`TruncationUtil.smart(output, 500, 4000)`) — a diagnosis usually needs no fetch round-trip anymore.
 
 ### 9 Context Section Classes (Package `service/assistant/context/`)
 

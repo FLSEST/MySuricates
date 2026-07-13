@@ -2,6 +2,7 @@ package com.automation.service.assistant.context;
 
 import com.automation.dto.response.BrokenWorkflowResponse;
 import com.automation.service.execution.WorkflowDebugService;
+import com.automation.util.TruncationUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -43,7 +44,7 @@ public class FailedWorkflowsContextSection implements AssistantContextSection {
                     }
                 }
                 if (b.errorMessage() != null) {
-                    sb.append(" — ").append(truncate(b.errorMessage(), 160));
+                    sb.append(" — ").append(TruncationUtil.tailInline(b.errorMessage(), 160));
                 }
                 sb.append(" (run:").append(b.runId());
                 if (b.workflowId() != null) {
@@ -55,10 +56,5 @@ public class FailedWorkflowsContextSection implements AssistantContextSection {
         } catch (Exception e) {
             log.debug("Could not load broken workflows for assistant context", e);
         }
-    }
-
-    private String truncate(String s, int max) {
-        if (s == null) return "";
-        return s.length() <= max ? s : s.substring(0, max) + "…";
     }
 }

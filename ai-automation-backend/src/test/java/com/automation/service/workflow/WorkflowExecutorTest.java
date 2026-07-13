@@ -815,6 +815,22 @@ class WorkflowExecutorTest {
     }
 
     @Test
+    void execute_failedStep_persistsErrorTail() {
+        String output = "x".repeat(970) + "HTTP 500 Internal Server Error";
+        StepResult failed = StepResult.builder()
+                .stepIndex(0).status(StepStatus.FAILED).output(output).build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(failed);
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        WorkflowRun saved = captureLastSavedRun();
+        String message = (String) saved.getError().get("message");
+        assertThat(message).endsWith("HTTP 500 Internal Server Error");
+        assertThat(message).contains("[... skipped 500 of 1000 characters ...]");
+    }
+
+    @Test
     void execute_exceptionDuringExecution_setsFailedWithMessage() {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenThrow(new RuntimeException("Unexpected failure"));

@@ -18,6 +18,7 @@ import com.automation.service.integration.IntegrationProvider;
 import com.automation.service.integration.IntegrationRegistry;
 import com.automation.service.pool.WorkflowPoolService;
 import com.automation.service.project.ProjectContextService;
+import com.automation.util.TruncationUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
@@ -112,14 +113,14 @@ public class AssistantFetchService {
                     sb.append(" (").append(run.getDurationMs() / 1000).append("s)");
                 sb.append("\n");
                 String err = contextBuilder.extractError(run);
-                if (err != null) sb.append("Run error: ").append(contextBuilder.truncate(err, 600)).append("\n");
+                if (err != null) sb.append("Run error: ").append(TruncationUtil.smart(err, 200, 400)).append("\n");
                 var steps = run.getSteps();
                 if (!steps.isEmpty()) {
                     sb.append("Steps:\n");
                     steps.forEach(s -> {
                         sb.append("  ").append(s.getStepIndex() + 1).append(". ").append(s.getStatus());
                         if (s.getStatus() == StepStatus.FAILED && s.getOutput() != null)
-                            sb.append(": ").append(contextBuilder.truncate(s.getOutput(), 800));
+                            sb.append(": ").append(TruncationUtil.smart(s.getOutput(), 200, 600));
                         sb.append("\n");
                     });
                 }
@@ -212,15 +213,40 @@ public class AssistantFetchService {
     }
 
     private String formatStepOutput(String idAndStep) {
-        int slash = idAndStep.lastIndexOf('/');
+        // Optional paging suffix: <runId>/<stepNumber>?offset=<n> or ?tail=<n>
+        String idPart = idAndStep;
+        String paging = null;
+        int q = idAndStep.indexOf('?');
+        if (q >= 0) {
+            idPart = idAndStep.substring(0, q);
+            paging = idAndStep.substring(q + 1);
+        }
+        int slash = idPart.lastIndexOf('/');
         if (slash < 0) return "Invalid format. Expected: <runId>/<stepNumber>\n";
-        String runId = idAndStep.substring(0, slash);
+        String runId = idPart.substring(0, slash);
         int stepNum;
         try {
-            stepNum = Integer.parseInt(idAndStep.substring(slash + 1));
+            stepNum = Integer.parseInt(idPart.substring(slash + 1));
         } catch (NumberFormatException e) {
-            return "Invalid step number: " + idAndStep.substring(slash + 1) + "\n";
+            return "Invalid step number: " + idPart.substring(slash + 1) + "\n";
         }
+        Integer offset = null;
+        Integer tailChars = null;
+        if (paging != null) {
+            try {
+                if (paging.startsWith("offset=")) {
+                    offset = Integer.parseInt(paging.substring("offset=".length()));
+                } else if (paging.startsWith("tail=")) {
+                    tailChars = Integer.parseInt(paging.substring("tail=".length()));
+                } else {
+                    throw new NumberFormatException();
+                }
+            } catch (NumberFormatException e) {
+                return "Invalid paging parameter: " + paging + ". Expected ?offset=<int> or ?tail=<int>\n";
+            }
+        }
+        final Integer windowOffset = offset;
+        final Integer tailLimit = tailChars;
         int targetIndex = stepNum - 1;
         return workflowRunRepository.findByIdWithSteps(runId).map(run ->
                 run.getSteps().stream()
@@ -233,8 +259,16 @@ public class AssistantFetchService {
                             sb.append("\n");
                             String out = s.getOutput();
                             if (out != null && !out.isBlank()) {
-                                if (out.length() > 8000) out = out.substring(0, 8000) + "\n[Output truncated: 8000 of " + s.getOutput().length() + " characters]";
-                                sb.append(out).append("\n");
+                                String rendered;
+                                if (windowOffset != null) {
+                                    rendered = TruncationUtil.window(out, windowOffset, 8000);
+                                } else if (tailLimit != null) {
+                                    rendered = TruncationUtil.tail(out, Math.min(tailLimit, 8000));
+                                } else {
+                                    // Tail-biased default: errors sit at the end of the output.
+                                    rendered = TruncationUtil.smart(out, 2000, 6000);
+                                }
+                                sb.append(rendered).append("\n");
                             } else {
                                 sb.append("(No output)\n");
                             }

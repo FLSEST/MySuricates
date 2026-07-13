@@ -2,6 +2,7 @@ package com.automation.service.assistant;
 
 import com.automation.dto.AssistantChatRequest;
 import com.automation.entity.AssistantSession;
+import com.automation.entity.RunStatus;
 import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.entity.Workflow;
@@ -22,6 +23,7 @@ import com.automation.service.assistant.context.SchedulesContextSection;
 import com.automation.service.assistant.context.SkillsIndexSection;
 import com.automation.service.assistant.context.TodosContextSection;
 import com.automation.service.assistant.context.WishesContextSection;
+import com.automation.util.TruncationUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -193,7 +195,7 @@ public class AssistantContextBuilder {
             try {
                 workflowRunRepository.findByIdWithSteps(runId).ifPresent(run -> {
                     sb.append("### Currently displayed run\n");
-                    appendRunSummary(sb, run);
+                    appendRunSummary(sb, run, resolveRunWorkflow(ctx, run));
                 });
             } catch (Exception ignored) {}
         }
@@ -441,7 +443,7 @@ public class AssistantContextBuilder {
             try {
                 workflowRunRepository.findByIdWithSteps(runId).ifPresent(run -> {
                     sb.append("### Aktuell angezeigter Run\n");
-                    appendRunSummary(sb, run);
+                    appendRunSummary(sb, run, resolveRunWorkflow(ctx, run));
                 });
             } catch (Exception ignored) {}
         }
@@ -482,13 +484,45 @@ public class AssistantContextBuilder {
         sb.append("\n");
     }
 
-    private void appendRunSummary(StringBuilder sb, WorkflowRun run) {
-        sb.append("Workflow: ").append(runLabel(run)).append("\n");
-        if (run.getWorkflow() != null) {
-            sb.append("Workflow ID: ").append(run.getWorkflow().getId()).append("\n");
-            if (run.getWorkflow().getProject() != null) {
-                sb.append("Workflow project: ").append(run.getWorkflow().getProject().getName())
-                        .append(" (ID: ").append(run.getWorkflow().getProject().getId()).append(")\n");
+    /**
+     * Loads the run's workflow via the repository instead of navigating the lazy
+     * {@code run.workflow} proxy: OSIV is off and the assistant path has no open
+     * session, so proxy navigation throws LazyInitializationException (silently
+     * swallowed by callers — the summary then vanished from the prompt). A fetch
+     * join is no option either: Workflow's @SQLRestriction turns it into a
+     * FetchNotFoundException for soft-deleted workflows. Returns null when the
+     * workflow is soft-deleted or unresolvable.
+     */
+    private Workflow resolveRunWorkflow(AssistantChatRequest.PageContext ctx, WorkflowRun run) {
+        String wfId = resolveWorkflowId(ctx);
+        if (wfId == null) {
+            try {
+                wfId = run.getWorkflow() != null ? run.getWorkflow().getId() : null;
+            } catch (Exception ignored) {}
+        }
+        if (wfId == null) return null;
+        try {
+            return workflowRepository.findById(wfId).orElse(null);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private void appendRunSummary(StringBuilder sb, WorkflowRun run, Workflow workflow) {
+        String name = run.getWorkflowName();
+        if ((name == null || name.isBlank()) && workflow != null) {
+            name = workflow.getName();
+        }
+        sb.append("Workflow: ").append(name != null ? name : "(unknown)");
+        if (workflow == null && name != null) {
+            sb.append(" [deleted]");
+        }
+        sb.append("\n");
+        if (workflow != null) {
+            sb.append("Workflow ID: ").append(workflow.getId()).append("\n");
+            if (workflow.getProject() != null) {
+                sb.append("Workflow project: ").append(workflow.getProject().getName())
+                        .append(" (ID: ").append(workflow.getProject().getId()).append(")\n");
             }
         }
         sb.append("Status: ").append(run.getStatus());
@@ -498,7 +532,7 @@ public class AssistantContextBuilder {
         sb.append("\n");
         String runErr = extractError(run);
         if (runErr != null) {
-            sb.append("Run error: ").append(truncate(runErr, 200)).append("\n");
+            sb.append("Run error: ").append(TruncationUtil.smart(runErr, 200, 400)).append("\n");
         }
 
         List<StepResult> steps = run.getSteps();
@@ -514,6 +548,68 @@ public class AssistantContextBuilder {
                     .findFirst()
                     .ifPresent(step -> sb.append("First failed step: ")
                             .append(step.getStepIndex() + 1).append("\n"));
+        }
+        if (run.getStatus() == RunStatus.FAILED) {
+            appendFailedStepEvidence(sb, run, workflow);
+        }
+    }
+
+    /**
+     * Pre-loads the diagnosis evidence for a FAILED run directly into the system
+     * prompt: block config and a tail-biased slice of the failed step's output.
+     * One-shot diagnosis without a fetch round-trip; costs tokens only for
+     * failed runs on run pages.
+     */
+    private void appendFailedStepEvidence(StringBuilder sb, WorkflowRun run, Workflow workflow) {
+        List<StepResult> failed = run.getSteps().stream()
+                .filter(s -> s.getStatus() == StepStatus.FAILED)
+                .toList();
+        if (failed.isEmpty()) return;
+        StepResult step = failed.get(0);
+        String blockType = step.getMetadata() != null
+                ? String.valueOf(step.getMetadata().getOrDefault("blockType", "?"))
+                : "?";
+        sb.append("Failed step ").append(step.getStepIndex() + 1)
+                .append(" (").append(blockType).append(")\n");
+        appendFailedBlockConfig(sb, workflow, step, blockType);
+        String output = step.getOutput();
+        sb.append("Failed step output:\n")
+                .append(output == null || output.isBlank()
+                        ? "(no output captured)"
+                        : TruncationUtil.smart(output, 500, 4000))
+                .append("\n");
+        sb.append("Full output via <fetch type=\"step_output\" id=\"").append(run.getId())
+                .append("/").append(step.getStepIndex() + 1)
+                .append("\"/> (page with ?offset=...)\n");
+        if (failed.size() > 1) {
+            sb.append("Other failed steps: ")
+                    .append(failed.stream().skip(1)
+                            .map(s -> String.valueOf(s.getStepIndex() + 1))
+                            .collect(Collectors.joining(", ")))
+                    .append("\n");
+        }
+    }
+
+    private void appendFailedBlockConfig(StringBuilder sb, Workflow workflow, StepResult step, String blockType) {
+        if (workflow == null || workflow.getBlocks() == null) return;
+        int idx = step.getStepIndex();
+        if (idx < 0 || idx >= workflow.getBlocks().size()) return;
+        var block = workflow.getBlocks().get(idx);
+        if (block == null || block.getType() == null) return;
+        sb.append("Block type: ").append(block.getType());
+        if (block.getName() != null && !block.getName().isBlank()) {
+            sb.append(" — ").append(block.getName());
+        }
+        sb.append("\n");
+        // Workflow may have been edited since the run — only show config when the
+        // block type still matches what actually executed (step metadata snapshot).
+        if (!block.getType().equals(blockType) || block.getConfig() == null) return;
+        for (String key : List.of("command", "prompt", "model", "timeout_seconds")) {
+            Object value = block.getConfig().get(key);
+            if (value != null) {
+                sb.append("Block ").append(key).append(": ")
+                        .append(truncate(String.valueOf(value), 500)).append("\n");
+            }
         }
     }
 
