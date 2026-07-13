@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import BpmnDiagramView from '../BpmnDiagramView';
 
 const SAMPLE_XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -45,6 +45,17 @@ describe('BpmnDiagramView', () => {
   it('zeigt eine Meldung bei ungültigem XML', () => {
     render(<BpmnDiagramView xml="kein xml" />);
     expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+
+  it('meldet den Block-Index beim Klick auf einen Kasten', () => {
+    // scriptTask-ID trägt den Block-Index (b_2_…) wie im echten Export
+    const clickableXml = SAMPLE_XML.replace('id="t1"', 'id="b_2_maven"').replace('bpmnElement="t1"', 'bpmnElement="b_2_maven"');
+    const onSelectBlock = vi.fn();
+    const { container } = render(<BpmnDiagramView xml={clickableXml} onSelectBlock={onSelectBlock} />);
+    const clickable = container.querySelector('g[role="button"]');
+    expect(clickable).not.toBeNull();
+    fireEvent.click(clickable!);
+    expect(onSelectBlock).toHaveBeenCalledWith(2);
   });
 
   it('kürzt zu lange Labels mit Ellipsis und hält sie in der Box', () => {

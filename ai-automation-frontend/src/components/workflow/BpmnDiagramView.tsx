@@ -241,7 +241,19 @@ function ShapeSvg({ s }: { s: Shape }) {
   }
 }
 
-export default function BpmnDiagramView({ xml }: { xml: string }) {
+/** Extrahiert den Top-Level-Block-Index aus einer BPMN-Element-ID (`b_<index>_…`). */
+function blockIndexOf(shapeId: string): number | null {
+  const m = shapeId.match(/^b_(\d+)/);
+  return m ? Number(m[1]) : null;
+}
+
+export default function BpmnDiagramView({
+  xml,
+  onSelectBlock,
+}: {
+  xml: string;
+  onSelectBlock?: (blockIndex: number) => void;
+}) {
   const diagram = parseBpmn(xml);
   if (!diagram) {
     return <div role="alert" className="p-4 text-sm text-text-secondary">Invalid BPMN XML</div>;
@@ -280,7 +292,22 @@ export default function BpmnDiagramView({ xml }: { xml: string }) {
             )}
           </g>
         ))}
-        {diagram.shapes.map((s) => <ShapeSvg key={s.id} s={s} />)}
+        {diagram.shapes.map((s) => {
+          const idx = blockIndexOf(s.id);
+          const clickable = idx !== null && !!onSelectBlock;
+          return (
+            <g
+              key={s.id}
+              className={clickable ? 'cursor-pointer transition-opacity hover:opacity-70' : undefined}
+              onClick={clickable ? () => onSelectBlock!(idx!) : undefined}
+              role={clickable ? 'button' : undefined}
+              tabIndex={clickable ? 0 : undefined}
+              onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectBlock!(idx!); } } : undefined}
+            >
+              <ShapeSvg s={s} />
+            </g>
+          );
+        })}
       </svg>
     </div>
   );

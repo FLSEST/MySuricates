@@ -63,6 +63,7 @@ export function WorkflowDetail() {
   });
   const [selectedSkillId, setSelectedSkillId] = useState('');
   const [activeTab, setActiveTab] = useState<'blocks' | 'versions' | 'diagram'>('blocks');
+  const [blockHighlight, setBlockHighlight] = useState<{ index: number; nonce: number } | null>(null);
   const [showExecuteDialog, setShowExecuteDialog] = useState(false);
   const [showClone, setShowClone] = useState(false);
   const [cloneForm, setCloneForm] = useState({ projectId: '', name: '' });
@@ -320,6 +321,8 @@ export function WorkflowDetail() {
                   blocks={workflow.blocks}
                   onEditBlock={handleOpenEditBlock}
                   onRemoveBlock={handleRemoveBlock}
+                  highlightIndex={blockHighlight?.index ?? null}
+                  highlightNonce={blockHighlight?.nonce ?? 0}
                 />
               )}
             </Card>
@@ -333,7 +336,15 @@ export function WorkflowDetail() {
 
           {activeTab === 'diagram' && id && (
             <Suspense fallback={<div className="p-6 text-sm text-text-secondary">{t.common.loading}</div>}>
-              <WorkflowDiagramTab workflowId={id} workflowName={workflow.name} />
+              <WorkflowDiagramTab
+                workflowId={id}
+                workflowName={workflow.name}
+                onSelectBlock={(index) => {
+                  setActiveTab('blocks');
+                  setBlockHighlight((prev) => ({ index, nonce: (prev?.nonce ?? 0) + 1 }));
+                  window.setTimeout(() => setBlockHighlight(null), 1800);
+                }}
+              />
             </Suspense>
           )}
         </div>

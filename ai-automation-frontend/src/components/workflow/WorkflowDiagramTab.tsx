@@ -8,9 +8,11 @@ import BpmnDiagramView from './BpmnDiagramView';
 export default function WorkflowDiagramTab({
   workflowId,
   workflowName,
+  onSelectBlock,
 }: {
   workflowId: string;
   workflowName: string;
+  onSelectBlock?: (blockIndex: number) => void;
 }) {
   const t = useT();
   const { data: xml, isLoading, isError } = useWorkflowBpmn(workflowId);
@@ -40,7 +42,7 @@ export default function WorkflowDiagramTab({
           {t.workflows.exportBpmn}
         </Button>
       </div>
-      <BpmnDiagramView xml={xml} />
+      <BpmnDiagramView xml={xml} onSelectBlock={onSelectBlock} />
     </div>
   );
 }
