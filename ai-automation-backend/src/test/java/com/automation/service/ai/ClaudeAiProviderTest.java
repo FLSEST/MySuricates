@@ -41,27 +41,41 @@ class ClaudeAiProviderTest {
     void reason_delegatesToHostService() throws IOException {
         var hostResult = new HostClaudeService.ReasoningResult("reasoning text", null);
         when(hostClaudeService.reasonStructured(
-                eq("prompt"), eq("system"), eq("/path"), eq(3), eq(300), isNull()))
+                eq("prompt"), eq("system"), isNull(), eq("/path"), eq(3), eq(300), isNull()))
                 .thenReturn(hostResult);
 
         var request = new AiProvider.ReasoningRequest("prompt", "system", "/path", 3, 300);
         AiProvider.ReasoningResult result = provider.reason(request);
 
         assertThat(result.text()).isEqualTo("reasoning text");
-        verify(hostClaudeService).reasonStructured("prompt", "system", "/path", 3, 300, null);
+        verify(hostClaudeService).reasonStructured("prompt", "system", null, "/path", 3, 300, null);
     }
 
     @Test
     void reason_forwardsEffortToHostService() throws IOException {
         var hostResult = new HostClaudeService.ReasoningResult("out", null);
         when(hostClaudeService.reasonStructured(
-                eq("prompt"), isNull(), isNull(), isNull(), isNull(), eq("high")))
+                eq("prompt"), isNull(), isNull(), isNull(), isNull(), isNull(), eq("high")))
                 .thenReturn(hostResult);
 
         var request = new AiProvider.ReasoningRequest("prompt", null, null, null, null, "high");
         provider.reason(request);
 
-        verify(hostClaudeService).reasonStructured(eq("prompt"), isNull(), isNull(), isNull(), isNull(), eq("high"));
+        verify(hostClaudeService).reasonStructured(eq("prompt"), isNull(), isNull(), isNull(), isNull(), isNull(), eq("high"));
+    }
+
+    @Test
+    void reason_forwardsModelToHostService() throws IOException {
+        var hostResult = new HostClaudeService.ReasoningResult("out", null);
+        when(hostClaudeService.reasonStructured(
+                eq("prompt"), isNull(), eq("claude-opus-4-6"), isNull(), isNull(), isNull(), isNull()))
+                .thenReturn(hostResult);
+
+        var request = new AiProvider.ReasoningRequest("prompt", null, "claude-opus-4-6", null, null, null, null);
+        provider.reason(request);
+
+        verify(hostClaudeService).reasonStructured(
+                eq("prompt"), isNull(), eq("claude-opus-4-6"), isNull(), isNull(), isNull(), isNull());
     }
 
     @Test

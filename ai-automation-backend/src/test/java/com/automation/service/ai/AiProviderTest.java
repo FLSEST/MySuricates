@@ -62,6 +62,27 @@ class AiProviderTest {
             assertThat(a).isEqualTo(b);
             assertThat(a.hashCode()).isEqualTo(b.hashCode());
         }
+
+        @Test
+        void should_assign_model_when_canonical_constructor_used() {
+            ReasoningRequest req = new ReasoningRequest("p", "s", "openai-codex/gpt-5.5", "/work", 3, 60, "high");
+
+            assertThat(req.prompt()).isEqualTo("p");
+            assertThat(req.systemPrompt()).isEqualTo("s");
+            assertThat(req.model()).isEqualTo("openai-codex/gpt-5.5");
+            assertThat(req.workingDirectory()).isEqualTo("/work");
+            assertThat(req.maxTurns()).isEqualTo(3);
+            assertThat(req.timeoutSeconds()).isEqualTo(60);
+            assertThat(req.effort()).isEqualTo("high");
+        }
+
+        @Test
+        void should_default_model_to_null_in_all_compat_constructors() {
+            assertThat(new ReasoningRequest("p").model()).isNull();
+            assertThat(new ReasoningRequest("p", "s").model()).isNull();
+            assertThat(new ReasoningRequest("p", "s", "/w", 1, 10).model()).isNull();
+            assertThat(new ReasoningRequest("p", "s", "/w", 1, 10, "low").model()).isNull();
+        }
     }
 
     @Nested

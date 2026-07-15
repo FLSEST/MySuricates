@@ -62,6 +62,17 @@ class PiAiProviderTest {
     }
 
     @Test
+    void reason_forwardsWorkflowModelToHostService() throws IOException {
+        when(hostPiService.reason(eq("prompt"), eq("system"), eq("openai-codex/gpt-5.5"), eq("/path"), eq(3), eq(60), isNull()))
+                .thenReturn(new HostPiService.ReasoningResult("out"));
+
+        var request = new AiProvider.ReasoningRequest("prompt", "system", "openai-codex/gpt-5.5", "/path", 3, 60, null);
+        provider.reason(request);
+
+        verify(hostPiService).reason(eq("prompt"), eq("system"), eq("openai-codex/gpt-5.5"), eq("/path"), eq(3), eq(60), isNull());
+    }
+
+    @Test
     void reason_forwardsEffortToHostService() throws IOException {
         when(hostPiService.reason(eq("prompt"), isNull(), isNull(), isNull(), isNull(), isNull(), eq("xhigh")))
                 .thenReturn(new HostPiService.ReasoningResult("out"));

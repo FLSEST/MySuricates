@@ -375,7 +375,7 @@ Injektionspfade:
 
 Alle Claude-CLI-Aufrufe erfolgen auf dem Host (nicht im Container):
 - `HostClaudeService.executeAction()` — ACT-Phase, nutzt `--append-system-prompt`, `--model`-Flag, Projekt-Arbeitsverzeichnis
-- `HostClaudeService.reasonStructured()` — REASON-Phase, nutzt `--system-prompt`, `--max-turns 3`, kein Modell-Flag
+- `HostClaudeService.reasonStructured()` — REASON-Phase, nutzt `--system-prompt`, `--max-turns 3`; `--model` wird gesetzt, wenn der Workflow ein Modell konfiguriert (`ReasoningRequest.model`)
 - Prompt wird via **stdin** an den Prozess geschrieben (`writePromptToStdin()`) — vermeidet Linux ARG_MAX-Limit
 - `CLAUDE_CODE` und `CLAUDECODE` Umgebungsvariablen werden aus dem Prozess-Environment entfernt (verhindert Nested-Session-Fehler)
 - `CommandExecutorService` bietet `executeOnHost(HostExecutionRequest)` / `executeStepOnHost(HostExecutionRequest)` / `writeSkillContextToProject()` — alle Overloads nutzen die `HostExecutionRequest`-Builder-API
@@ -401,7 +401,7 @@ Blöcke können über das `skillIds`-Feld eigene Skills mitbringen, die additiv 
 
 - `workflow.model`-Feld (z.B. `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5`)
 - Wird via `--model`-Flag an die Claude CLI auf dem Host übergeben
-- Die Agentic-REASON-Phase verwendet das lokal konfigurierte Standard-Modell
+- REASON und ACT eines Agentic-Laufs verwenden dasselbe Workflow-Modell (`ReasoningRequest.model` bzw. `ActionRequest.model`); ohne konfiguriertes Modell fällt der Provider auf seinen Default zurück
 
 ## Per-Call Token Limit
 

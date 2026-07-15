@@ -241,7 +241,7 @@ For full architecture documentation: [docs/architektur.md](docs/architektur.md)
 ## Execution Config
 
 - **Agent Instructions**: Two-level injection — base instructions (`src/main/resources/agent-instructions.md`, all workflows) + per-workflow instructions (`workflow.instructions` column, editable in UI). Block execution uses `--append-system-prompt`, agentic REASON uses `--system-prompt`.
-- **Model Selection**: `workflow.model` field (e.g. `claude-opus-4-6`, `claude-sonnet-4-6`), passed via `--model` flag. Agentic REASON phase uses the locally configured default model.
+- **Model Selection**: `workflow.model` field (e.g. `claude-opus-4-6`, `claude-sonnet-4-6`), passed via `--model` flag. Agentic REASON and ACT both use the workflow model (`ReasoningRequest.model`); providers fall back to their default only when no model is configured.
 - **Reasoning Effort**: `workflow.effort` field (`low`/`medium`/`high`/`xhigh`, nullable), optionally overridden per block via config key `"effort"` (precedence: block > workflow > provider default). Mapping: Claude → `--effort`, Pi → `--thinking` (explicit effort beats the maxTurns heuristic), Codex → ignored (`supportsEffort=false`). Unset ⇒ no flag emitted (byte-identical to pre-effort behavior). Visible in step metadata `aiRequest.effort`.
 - **Per-Call Token Limit**: `HostClaudeConfig.maxTokens` (property `automation.host-claude.max-tokens`) — optional output token limit via `--max-tokens` flag. Distinct from agentic block's `max_total_tokens` budget (cumulative input+output).
 - **Per-Block Timeout**: Optional `timeout_seconds` in block config overrides global `automation.host-claude.timeout-seconds` (default: 300s). Applies to both shell and Claude CLI calls.

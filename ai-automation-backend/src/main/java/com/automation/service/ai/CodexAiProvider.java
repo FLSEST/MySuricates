@@ -34,6 +34,9 @@ public class CodexAiProvider implements AiProvider {
 
     @Override
     public ReasoningResult reason(ReasoningRequest request) throws IOException {
+        if (request.model() != null && !request.model().isBlank()) {
+            log.debug("Codex provider ignores model '{}' (supportsModelSelection=false)", request.model());
+        }
         // Merge system prompt into user prompt since Codex doesn't support --system-prompt
         // Reasoning is always read-only (analysis only, no file writes)
         String fullPrompt = mergeSystemPrompt(request.systemPrompt(), request.prompt(), true);
