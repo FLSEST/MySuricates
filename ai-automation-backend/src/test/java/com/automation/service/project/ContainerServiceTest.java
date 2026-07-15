@@ -293,6 +293,73 @@ class ContainerServiceTest {
         verify(containerRepository).save(idle);
     }
 
+    // --- Reconciliation: Docker-Container ohne RUNNING-DB-Zeile (State-Drift) ---
+
+    private void stubDockerList(List<com.github.dockerjava.api.model.Container> containers) {
+        ListContainersCmd listCmd = mock(ListContainersCmd.class);
+        lenient().when(listCmd.withNameFilter(any())).thenReturn(listCmd);
+        lenient().when(listCmd.exec()).thenReturn(containers);
+        lenient().when(dockerClient.listContainersCmd()).thenReturn(listCmd);
+    }
+
+    private com.github.dockerjava.api.model.Container dockerContainer(String id, Instant created) {
+        var dc = mock(com.github.dockerjava.api.model.Container.class);
+        lenient().when(dc.getId()).thenReturn(id);
+        lenient().when(dc.getCreated()).thenReturn(created.getEpochSecond());
+        return dc;
+    }
+
+    @Test
+    void reconcile_orphanedDockerContainer_isForceStopped() {
+        when(containerRepository.findByStatus(ContainerStatus.RUNNING)).thenReturn(List.of());
+        when(workflowExecutor.getActiveContainerIds()).thenReturn(Set.of());
+        stubDockerList(List.of(dockerContainer("docker-orphan", Instant.now().minus(2, ChronoUnit.HOURS))));
+        stubDockerRemoveCommands();
+
+        service.cleanupIdleContainers();
+
+        verify(dockerClient).stopContainerCmd("docker-orphan");
+        verify(dockerClient).removeContainerCmd("docker-orphan");
+    }
+
+    @Test
+    void reconcile_dockerContainerWithRunningDbRow_notTouched() {
+        Container tracked = Container.builder()
+                .id("c1").project(testProject).dockerContainerId("docker-known")
+                .status(ContainerStatus.RUNNING)
+                .lastActivityAt(Instant.now()).startedAt(Instant.now())
+                .build();
+        when(containerRepository.findByStatus(ContainerStatus.RUNNING)).thenReturn(List.of(tracked));
+        when(workflowExecutor.getActiveContainerIds()).thenReturn(Set.of());
+        stubDockerList(List.of(dockerContainer("docker-known", Instant.now().minus(2, ChronoUnit.HOURS))));
+
+        service.cleanupIdleContainers();
+
+        verify(dockerClient, never()).stopContainerCmd(anyString());
+    }
+
+    @Test
+    void reconcile_recentlyCreatedOrphan_skippedByGracePeriod() {
+        when(containerRepository.findByStatus(ContainerStatus.RUNNING)).thenReturn(List.of());
+        when(workflowExecutor.getActiveContainerIds()).thenReturn(Set.of());
+        stubDockerList(List.of(dockerContainer("docker-fresh", Instant.now())));
+
+        service.cleanupIdleContainers();
+
+        verify(dockerClient, never()).stopContainerCmd(anyString());
+    }
+
+    @Test
+    void reconcile_containerWithActiveExecution_skipped() {
+        when(containerRepository.findByStatus(ContainerStatus.RUNNING)).thenReturn(List.of());
+        when(workflowExecutor.getActiveContainerIds()).thenReturn(Set.of("docker-busy"));
+        stubDockerList(List.of(dockerContainer("docker-busy", Instant.now().minus(2, ChronoUnit.HOURS))));
+
+        service.cleanupIdleContainers();
+
+        verify(dockerClient, never()).stopContainerCmd(anyString());
+    }
+
     // --- Defense-in-depth: PathValidator must be invoked for both project path and hostHome (H2 + M3) ---
 
     @Test
