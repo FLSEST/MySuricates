@@ -1,6 +1,7 @@
 package com.automation.service.system;
 
 import com.automation.concurrency.DynamicSemaphore;
+import com.automation.config.AssistantGuardrailsConfig;
 import com.automation.config.ChainConfig;
 import com.automation.config.FactoryConfig;
 import com.automation.config.HostClaudeConfig;
@@ -8,6 +9,7 @@ import com.automation.config.RateLimitConfig;
 import com.automation.config.SchedulerConfig;
 import com.automation.config.SummarizationConfig;
 import com.automation.config.TaskCommandConfig;
+import com.automation.config.TodoGhostWatchdogConfig;
 import com.automation.config.TodoHygieneConfig;
 import com.automation.config.WishConfig;
 import com.automation.repository.AppSettingsRepository;
@@ -42,6 +44,9 @@ public class ExecutionSettingsService {
             Map.entry("todo-hygiene-enabled",              new long[]{0, 1}),
             Map.entry("todo-stale-days",                   new long[]{7, 365}),
             Map.entry("todo-hygiene-max-per-run",          new long[]{10, 2000}),
+            Map.entry("todo-watchdog-enabled",             new long[]{0, 1}),
+            Map.entry("todo-watchdog-stale-hours",         new long[]{1, 720}),
+            Map.entry("assistant-max-actions-per-hour",    new long[]{1, 500}),
             Map.entry("scheduler-catch-up-on-resume",      new long[]{0, 1}),
             Map.entry("scheduler-resume-grace-minutes",    new long[]{1, 60}),
             Map.entry("summarization-timeout-seconds",     new long[]{30, 600}),
@@ -68,6 +73,9 @@ public class ExecutionSettingsService {
             Map.entry("todoHygieneEnabled",              "todo-hygiene-enabled"),
             Map.entry("todoStaleDays",                   "todo-stale-days"),
             Map.entry("todoHygieneMaxPerRun",            "todo-hygiene-max-per-run"),
+            Map.entry("todoWatchdogEnabled",             "todo-watchdog-enabled"),
+            Map.entry("todoWatchdogStaleHours",          "todo-watchdog-stale-hours"),
+            Map.entry("assistantMaxActionsPerHour",      "assistant-max-actions-per-hour"),
             Map.entry("schedulerCatchUpOnResume",        "scheduler-catch-up-on-resume"),
             Map.entry("schedulerResumeGraceMinutes",     "scheduler-resume-grace-minutes"),
             Map.entry("summarizationTimeoutSeconds",     "summarization-timeout-seconds"),
@@ -88,6 +96,8 @@ public class ExecutionSettingsService {
     private final ContainerShellService containerShellService;
     private final SchedulerConfig schedulerConfig;
     private final TodoHygieneConfig todoHygieneConfig;
+    private final TodoGhostWatchdogConfig todoGhostWatchdogConfig;
+    private final AssistantGuardrailsConfig assistantGuardrailsConfig;
     private final TaskCommandConfig taskCommandConfig;
     private final SummarizationConfig summarizationConfig;
     private final FactoryConfig factoryConfig;
@@ -111,6 +121,8 @@ public class ExecutionSettingsService {
             ContainerShellService containerShellService,
             SchedulerConfig schedulerConfig,
             TodoHygieneConfig todoHygieneConfig,
+            TodoGhostWatchdogConfig todoGhostWatchdogConfig,
+            AssistantGuardrailsConfig assistantGuardrailsConfig,
             TaskCommandConfig taskCommandConfig,
             SummarizationConfig summarizationConfig,
             FactoryConfig factoryConfig,
@@ -125,6 +137,8 @@ public class ExecutionSettingsService {
         this.containerShellService = containerShellService;
         this.schedulerConfig = schedulerConfig;
         this.todoHygieneConfig = todoHygieneConfig;
+        this.todoGhostWatchdogConfig = todoGhostWatchdogConfig;
+        this.assistantGuardrailsConfig = assistantGuardrailsConfig;
         this.taskCommandConfig = taskCommandConfig;
         this.summarizationConfig = summarizationConfig;
         this.factoryConfig = factoryConfig;
@@ -158,6 +172,9 @@ public class ExecutionSettingsService {
         applyIfPresent("todo-hygiene-enabled", v -> todoHygieneConfig.setEnabled(Integer.parseInt(v) == 1));
         applyIfPresent("todo-stale-days", v -> todoHygieneConfig.setStaleDays(Integer.parseInt(v)));
         applyIfPresent("todo-hygiene-max-per-run", v -> todoHygieneConfig.setMaxPerRun(Integer.parseInt(v)));
+        applyIfPresent("todo-watchdog-enabled", v -> todoGhostWatchdogConfig.setEnabled(Integer.parseInt(v) == 1));
+        applyIfPresent("todo-watchdog-stale-hours", v -> todoGhostWatchdogConfig.setStaleHours(Integer.parseInt(v)));
+        applyIfPresent("assistant-max-actions-per-hour", v -> assistantGuardrailsConfig.setMaxActionsPerHour(Integer.parseInt(v)));
         applyIfPresent("scheduler-catch-up-on-resume", v -> schedulerConfig.setCatchUpOnResume(Integer.parseInt(v) == 1));
         applyIfPresent("scheduler-resume-grace-minutes", v -> schedulerConfig.setResumeGraceMinutes(Long.parseLong(v)));
         applyIfPresent("summarization-timeout-seconds", v -> summarizationConfig.setTimeoutSeconds(Integer.parseInt(v)));
@@ -222,6 +239,9 @@ public class ExecutionSettingsService {
         result.put("todoHygieneEnabled", todoHygieneConfig.isEnabled() ? 1 : 0);
         result.put("todoStaleDays", todoHygieneConfig.getStaleDays());
         result.put("todoHygieneMaxPerRun", todoHygieneConfig.getMaxPerRun());
+        result.put("todoWatchdogEnabled", todoGhostWatchdogConfig.isEnabled() ? 1 : 0);
+        result.put("todoWatchdogStaleHours", todoGhostWatchdogConfig.getStaleHours());
+        result.put("assistantMaxActionsPerHour", assistantGuardrailsConfig.getMaxActionsPerHour());
         result.put("schedulerCatchUpOnResume", schedulerConfig.isCatchUpOnResume() ? 1 : 0);
         result.put("schedulerResumeGraceMinutes", schedulerConfig.getResumeGraceMinutes());
         result.put("summarizationTimeoutSeconds", summarizationConfig.getTimeoutSeconds());
@@ -253,6 +273,9 @@ public class ExecutionSettingsService {
             case "todo-hygiene-enabled" -> todoHygieneConfig.setEnabled(Integer.parseInt(value) == 1);
             case "todo-stale-days" -> todoHygieneConfig.setStaleDays(Integer.parseInt(value));
             case "todo-hygiene-max-per-run" -> todoHygieneConfig.setMaxPerRun(Integer.parseInt(value));
+            case "todo-watchdog-enabled" -> todoGhostWatchdogConfig.setEnabled(Integer.parseInt(value) == 1);
+            case "todo-watchdog-stale-hours" -> todoGhostWatchdogConfig.setStaleHours(Integer.parseInt(value));
+            case "assistant-max-actions-per-hour" -> assistantGuardrailsConfig.setMaxActionsPerHour(Integer.parseInt(value));
             case "scheduler-catch-up-on-resume" -> schedulerConfig.setCatchUpOnResume(Integer.parseInt(value) == 1);
             case "scheduler-resume-grace-minutes" -> schedulerConfig.setResumeGraceMinutes(Long.parseLong(value));
             case "summarization-timeout-seconds" -> summarizationConfig.setTimeoutSeconds(Integer.parseInt(value));

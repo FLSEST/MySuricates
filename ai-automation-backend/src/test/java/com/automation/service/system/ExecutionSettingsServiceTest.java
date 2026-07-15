@@ -8,6 +8,8 @@ import com.automation.config.RateLimitConfig;
 import com.automation.config.SchedulerConfig;
 import com.automation.config.SummarizationConfig;
 import com.automation.config.TaskCommandConfig;
+import com.automation.config.AssistantGuardrailsConfig;
+import com.automation.config.TodoGhostWatchdogConfig;
 import com.automation.config.TodoHygieneConfig;
 import com.automation.config.WishConfig;
 import com.automation.repository.AppSettingsRepository;
@@ -41,6 +43,8 @@ class ExecutionSettingsServiceTest {
     private RateLimitConfig rateLimitConfig;
     private SchedulerConfig schedulerConfig;
     private TodoHygieneConfig todoHygieneConfig;
+    private TodoGhostWatchdogConfig todoGhostWatchdogConfig;
+    private AssistantGuardrailsConfig assistantGuardrailsConfig;
     private TaskCommandConfig taskCommandConfig;
     private SummarizationConfig summarizationConfig;
     private FactoryConfig factoryConfig;
@@ -55,6 +59,8 @@ class ExecutionSettingsServiceTest {
         rateLimitConfig = new RateLimitConfig();
         schedulerConfig = new SchedulerConfig();
         todoHygieneConfig = new TodoHygieneConfig();
+        todoGhostWatchdogConfig = new TodoGhostWatchdogConfig();
+        assistantGuardrailsConfig = new AssistantGuardrailsConfig();
         taskCommandConfig = new TaskCommandConfig();
         summarizationConfig = new SummarizationConfig();
         factoryConfig = new FactoryConfig();
@@ -64,7 +70,7 @@ class ExecutionSettingsServiceTest {
                 appSettingsRepository, executionSemaphore,
                 hostClaudeService, hostClaudeConfig, chainConfig,
                 rateLimitConfig, workflowExecutor, containerShellService,
-                schedulerConfig, todoHygieneConfig, taskCommandConfig,
+                schedulerConfig, todoHygieneConfig, todoGhostWatchdogConfig, assistantGuardrailsConfig, taskCommandConfig,
                 summarizationConfig, factoryConfig, wishConfig
         );
     }

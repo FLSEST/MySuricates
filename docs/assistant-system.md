@@ -12,6 +12,10 @@ Das Assistant-System besteht aus vier Bereichen:
 2. **Sessions** — Persistierte Chat-Verläufe pro Page (V41-Migration: `assistant_sessions`)
 3. **Page Suggestions** — Vorberechnete, seitenspezifische Aktions-Vorschläge (V42-Migration: `page_suggestions`)
 4. **Pending Tools** — Bestätigungspflichtiger Tool-Mechanismus für destruktive Aktionen (in-memory Registry)
+5. **Guardrails** — Backend-erzwungene Sicherheitsschicht vor jeder bestätigten Aktion (`AssistantToolValidator` + Rate-Limit + Audit-Trail):
+   - **Payload-Validierung vor DB-Write**: `create_workflow`/`update_workflow`-Blöcke werden gegen die bekannten Block-Typen und Pflicht-Config-Keys geprüft (`command` bei simple/shell/retry/foreach/while, `goal` bei agentic); `create_chain`-Einträge brauchen `workflowId`. Strukturell kaputte Payloads werden abgelehnt, bevor sie die Workflows-Seite crashen können.
+   - **Rate-Limit**: max. N bestätigte mutierende Aktionen pro Stunde (rolling window; Setting `assistant-max-actions-per-hour`, Default 30).
+   - **Audit-Trail**: jede bestätigte Tool-Ausführung (Erfolg wie Ablehnung) landet als ActivityLog-Eintrag (Kategorie SYSTEM, Quelle `AssistantToolExecutor`).
 
 ## Backend-Komponenten
 

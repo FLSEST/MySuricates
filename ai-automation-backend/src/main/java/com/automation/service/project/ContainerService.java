@@ -266,10 +266,12 @@ public class ContainerService {
     public void cleanupIdleContainers() {
         List<Container> running = readOnlyTransactionTemplate.execute(status ->
                 containerRepository.findByStatus(ContainerStatus.RUNNING));
+        Set<String> activeContainers = workflowExecutor.getActiveContainerIds();
+
+        reconcileDockerOrphans(running, activeContainers);
         if (running == null || running.isEmpty()) return;
 
         Instant threshold = Instant.now().minus(Duration.ofMinutes(idleTimeoutMinutes));
-        Set<String> activeContainers = workflowExecutor.getActiveContainerIds();
 
         for (Container container : running) {
             if (activeContainers.contains(container.getDockerContainerId())) {
@@ -298,6 +300,46 @@ public class ContainerService {
                         "Idle container cleaned up: " + container.getDockerContainerId(),
                         "ContainerService");
             }
+        }
+    }
+
+    /**
+     * State-drift reconciliation: Docker containers named automation-* that are RUNNING
+     * in Docker but have no RUNNING row in the containers table are invisible to the
+     * DB-driven idle cleanup and would live forever. Such orphans are force-stopped;
+     * they restart lazily on the next container workflow (~5-15s cold start).
+     * A grace period (idleTimeoutMinutes, based on Docker's created timestamp) protects
+     * containers whose DB row is still being written.
+     */
+    private void reconcileDockerOrphans(List<Container> runningRows, Set<String> activeContainers) {
+        List<com.github.dockerjava.api.model.Container> dockerRunning;
+        try {
+            dockerRunning = dockerClient.listContainersCmd()
+                    .withNameFilter(List.of("automation-"))
+                    .exec();
+        } catch (Exception e) {
+            log.warn("Container reconcile: docker list failed: {}", e.getMessage());
+            return;
+        }
+        if (dockerRunning == null || dockerRunning.isEmpty()) return;
+
+        Set<String> knownRunningIds = runningRows == null ? Set.of() : runningRows.stream()
+                .map(Container::getDockerContainerId)
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        Instant graceCutoff = Instant.now().minus(Duration.ofMinutes(idleTimeoutMinutes));
+
+        for (var docker : dockerRunning) {
+            String id = docker.getId();
+            if (id == null || knownRunningIds.contains(id) || activeContainers.contains(id)) continue;
+            if (docker.getCreated() != null && Instant.ofEpochSecond(docker.getCreated()).isAfter(graceCutoff)) {
+                continue; // startup race: DB row may not be committed yet
+            }
+            log.warn("Container reconcile: orphaned Docker container {} has no RUNNING DB row — force-stopping", id);
+            removeDockerContainer(id);
+            activityLogService.warn(LogCategory.CONTAINER,
+                    "Reconcile: verwaister Docker-Container ohne DB-Eintrag gestoppt: " + id,
+                    "ContainerService");
         }
     }
 

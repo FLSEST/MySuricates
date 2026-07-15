@@ -117,7 +117,13 @@ public class HostClaudeService {
     public ReasoningResult reasonStructured(String prompt, String systemPrompt,
                                              String workingDirectory, Integer maxTurns,
                                              Integer timeoutSeconds, String effort) throws IOException {
-        List<String> cmd = buildReasonCommand(prompt, systemPrompt, maxTurns, effort);
+        return reasonStructured(prompt, systemPrompt, null, workingDirectory, maxTurns, timeoutSeconds, effort);
+    }
+
+    public ReasoningResult reasonStructured(String prompt, String systemPrompt, String model,
+                                             String workingDirectory, Integer maxTurns,
+                                             Integer timeoutSeconds, String effort) throws IOException {
+        List<String> cmd = buildReasonCommand(prompt, systemPrompt, model, maxTurns, effort);
         var result = executeProcess(cmd, prompt, workingDirectory, timeoutSeconds, "Host Claude reasoning");
         return new ReasoningResult(result.text, result.parsed);
     }
@@ -232,6 +238,10 @@ public class HostClaudeService {
     }
 
     List<String> buildReasonCommand(String prompt, String systemPrompt, Integer maxTurns, String effort) {
+        return buildReasonCommand(prompt, systemPrompt, null, maxTurns, effort);
+    }
+
+    List<String> buildReasonCommand(String prompt, String systemPrompt, String model, Integer maxTurns, String effort) {
         List<String> cmd = new ArrayList<>(List.of(
                 "claude", "-p",
                 "--output-format", "stream-json", "--verbose"
@@ -240,6 +250,11 @@ public class HostClaudeService {
         if (systemPrompt != null && !systemPrompt.isBlank()) {
             cmd.add("--system-prompt");
             cmd.add(systemPrompt);
+        }
+
+        if (model != null && !model.isBlank()) {
+            cmd.add("--model");
+            cmd.add(model);
         }
 
         // Skip permissions to prevent hanging on interactive tool approval prompts

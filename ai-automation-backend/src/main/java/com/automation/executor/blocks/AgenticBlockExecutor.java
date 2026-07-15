@@ -135,7 +135,8 @@ public class AgenticBlockExecutor implements BlockExecutor {
             try {
                 String conversationPrompt = provider.buildConversationPrompt(systemPrompt, history);
                 AiProvider.ReasoningResult reasonResult = provider.reason(
-                        new AiProvider.ReasoningRequest(conversationPrompt, systemPrompt, null, null, cfg.claudeTimeout(), effort));
+                        new AiProvider.ReasoningRequest(conversationPrompt, systemPrompt, context.getModel(),
+                                null, null, cfg.claudeTimeout(), effort));
                 reasoning = reasonResult.text();
                 tokenTracker.captureReasonMeta(iterData, reasonResult.metadata(), conversationPrompt, reasoning, iteration);
             } catch (Exception e) {
@@ -205,7 +206,7 @@ public class AgenticBlockExecutor implements BlockExecutor {
                         "agentic_action_compressed",
                         Map.of("iteration", iteration, "originalLength", action.length()));
                 try {
-                    action = compressAction(action, provider);
+                    action = compressAction(action, provider, context.getModel());
                     log.info("Agentic iteration {}: ACTION compressed {} → {} chars",
                             iteration, plan.getAction().length(), action.length());
                 } catch (Exception e) {
@@ -438,10 +439,10 @@ public class AgenticBlockExecutor implements BlockExecutor {
         history.addAll(compressed);
     }
 
-    private String compressAction(String oversizedAction, AiProvider provider) throws IOException {
+    private String compressAction(String oversizedAction, AiProvider provider, String model) throws IOException {
         String prompt = ACTION_COMPRESS_PROMPT + oversizedAction;
         AiProvider.ReasoningResult result = provider.reason(
-                new AiProvider.ReasoningRequest(prompt, null, null, 1, AGENTIC_ACTION_COMPRESS_TIMEOUT));
+                new AiProvider.ReasoningRequest(prompt, null, model, null, 1, AGENTIC_ACTION_COMPRESS_TIMEOUT, null));
         String compressed = result.text();
         if (compressed == null || compressed.isBlank()) {
             throw new IOException("Action compression returned empty result");

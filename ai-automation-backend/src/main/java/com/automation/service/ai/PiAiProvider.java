@@ -51,7 +51,7 @@ public class PiAiProvider implements AiProvider {
         HostPiService.ReasoningResult result = hostPiService.reason(
                 request.prompt(),
                 request.systemPrompt(),
-                null,
+                request.model(),
                 request.workingDirectory(),
                 request.maxTurns(),
                 request.timeoutSeconds(),

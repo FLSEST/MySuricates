@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,7 @@ public class ForEachBlockExecutor implements BlockExecutor {
         String command = (String) config.get("command");
         String executionMode = (String) config.getOrDefault("execution_mode", "claude");
         boolean isShell = "shell".equals(executionMode);
+        boolean continueOnError = Boolean.parseBoolean(String.valueOf(config.getOrDefault("continue_on_error", "false")));
         int shellTimeout = ((Number) config.getOrDefault("timeout_seconds", SHELL_TIMEOUT_SECONDS)).intValue();
         Integer claudeTimeout = config.containsKey("timeout_seconds")
                 ? ((Number) config.get("timeout_seconds")).intValue()
@@ -68,6 +70,7 @@ public class ForEachBlockExecutor implements BlockExecutor {
 
         StringBuilder outputs = new StringBuilder();
         boolean anyFailed = false;
+        List<String> failedItems = new ArrayList<>();
         String runId = context.getWorkflowRunId();
         int stepIndex = aggregateResult.getStepIndex();
         int totalItems = items.size();
@@ -125,11 +128,20 @@ public class ForEachBlockExecutor implements BlockExecutor {
             outputs.append("[").append(item).append("]: ").append(itemResult.getOutput()).append("\n");
             if (failed) {
                 anyFailed = true;
+                failedItems.add(item);
             }
         }
 
+        if (continueOnError && anyFailed) {
+            outputs.append("\n[continue_on_error] ").append(failedItems.size()).append("/").append(totalItems)
+                    .append(" items failed: ").append(String.join(", ", failedItems));
+            aggregateResult.getMetadata().put("failedItemCount", failedItems.size());
+            aggregateResult.getMetadata().put("failedItems", List.copyOf(failedItems));
+            aggregateResult.getMetadata().put("totalItems", totalItems);
+        }
+
         aggregateResult.setOutput(outputs.toString().trim());
-        aggregateResult.setStatus(anyFailed ? StepStatus.FAILED : StepStatus.COMPLETED);
+        aggregateResult.setStatus(anyFailed && !continueOnError ? StepStatus.FAILED : StepStatus.COMPLETED);
         aggregateResult.setCompletedAt(Instant.now());
         aggregateResult.setDurationMs(
                 aggregateResult.getCompletedAt().toEpochMilli() - aggregateResult.getStartedAt().toEpochMilli()

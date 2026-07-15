@@ -24,16 +24,10 @@
       "requiredCapabilities": []
     },
     {
-      "type": "agentic",
+      "type": "simple",
       "config": {
-        "max_iterations": 10,
-        "max_total_tokens": 150000,
-        "iteration_timeout_seconds": 120,
-        "goal": "Erstelle TODOs via REST API basierend auf der Analyse aus {{ previous_output }}.\n\nKONTEXT vom WorkflowExecutor:\n- $AUTOMATION_API_KEY — Backend-API-Key als Bash-Env-Var (nicht als Template-Variable, damit der Wert nicht im persistierten Step-Output landet)\n- {{ open_todos }} — alle offenen TODOs des Projekts (optional, falls Duplikat-Check gewünscht)\n\nVORGEHEN:\n1. Fuer jedes TODO aus der Analyse einen API-Call ausfuehren:\n   curl -X POST http://localhost:9090/api/v1/todos \\\n     -H 'Content-Type: application/json' \\\n     -H \"X-API-Key: $AUTOMATION_API_KEY\" \\\n     -d '{\"title\": \"...\", \"description\": \"...\", \"priority\": \"...\", \"tags\": [...], \"projectId\": \"{{ project_id }}\", \"source\": \"AI\", \"sourceAgent\": \"todo-creator\"}'\n\n2. Ergebnis jedes API-Calls pruefen (HTTP 200/201 = Erfolg).\n\nHINWEIS Anti-Pattern: REST-Self-Call (POST /api/v1/todos) ist noch nicht ideal — ein nativer todo-create Block-Typ ersetzt das in einem Folge-Refactor. Der API-Key wird als Env-Var \"AUTOMATION_API_KEY\" auf den Agent-Prozess gesetzt; er erscheint NICHT im persistierten Step-Output.",
-        "max_repeated_actions": 3,
-        "success_criteria": "Alle TODOs aus der Analyse wurden erfolgreich via API angelegt.",
-        "total_timeout_seconds": 900,
-        "require_approval": false
+        "timeout_seconds": 300,
+        "command": "Wandle die Findings aus {{ previous_output }} in native TODO-Marker um. KEINE Dateien schreiben, KEINE API-Aufrufe, kein curl — nur Marker-Zeilen ausgeben; die Plattform legt die TODOs selbst an (AutoTodoService).\n\n## Bestehende offene TODOs (Duplikate vermeiden)\n{{ open_todos }}\n\n## Regeln\n- Pro umsetzbarem Finding genau eine Zeile im Format:\n  todo_item: <Titel im Imperativ> | <HIGH|MEDIUM|LOW> | <tag1,tag2> | <Kurzbeschreibung mit Fundstelle>\n- Maximal 10 todo_item-Zeilen, nur echte, umsetzbare Findings\n- Findings, die ein bestehendes offenes TODO bereits abdeckt, NICHT erneut ausgeben\n- Am Ende genau eine Zeile Gesamtbewertung:\n  gate_status: GREEN (keine Findings) | YELLOW (nur kleinere Findings) | RED (kritische Findings)"
       },
       "requiredCapabilities": []
     },
@@ -45,5 +39,10 @@
       },
       "requiredCapabilities": []
     }
-  ]
+  ],
+  "metadata": {
+    "autoTodo": {
+      "enabled": true
+    }
+  }
 }

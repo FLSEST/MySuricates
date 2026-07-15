@@ -38,23 +38,30 @@ public interface AiProvider {
     record ReasoningRequest(
             String prompt,
             String systemPrompt,
+            String model,
             String workingDirectory,
             Integer maxTurns,
             Integer timeoutSeconds,
             String effort
     ) {
         public ReasoningRequest(String prompt) {
-            this(prompt, null, null, null, null, null);
+            this(prompt, null, null, null, null, null, null);
         }
 
         public ReasoningRequest(String prompt, String systemPrompt) {
-            this(prompt, systemPrompt, null, null, null, null);
+            this(prompt, systemPrompt, null, null, null, null, null);
         }
 
         /** Backwards-compat constructor for call-sites written before effort support existed. */
         public ReasoningRequest(String prompt, String systemPrompt, String workingDirectory,
                                 Integer maxTurns, Integer timeoutSeconds) {
-            this(prompt, systemPrompt, workingDirectory, maxTurns, timeoutSeconds, null);
+            this(prompt, systemPrompt, null, workingDirectory, maxTurns, timeoutSeconds, null);
+        }
+
+        /** Backwards-compat constructor for call-sites written before model support existed. */
+        public ReasoningRequest(String prompt, String systemPrompt, String workingDirectory,
+                                Integer maxTurns, Integer timeoutSeconds, String effort) {
+            this(prompt, systemPrompt, null, workingDirectory, maxTurns, timeoutSeconds, effort);
         }
     }
 

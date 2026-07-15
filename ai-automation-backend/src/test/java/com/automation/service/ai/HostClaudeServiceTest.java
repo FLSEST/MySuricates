@@ -81,6 +81,22 @@ class HostClaudeServiceTest {
         assertThat(cmd).contains("--max-turns", "1");
     }
 
+    @Test
+    void buildReasonCommand_includesModel_whenProvided() {
+        HostClaudeService service = createService(null, false, List.of());
+        List<String> cmd = service.buildReasonCommand("hello", null, "claude-opus-4-6", null, null);
+
+        assertThat(cmd).contains("--model", "claude-opus-4-6");
+    }
+
+    @Test
+    void buildReasonCommand_omitsModel_whenNullOrBlank() {
+        HostClaudeService service = createService(null, false, List.of());
+
+        assertThat(service.buildReasonCommand("hello", null, null, null, null)).doesNotContain("--model");
+        assertThat(service.buildReasonCommand("hello", null, "  ", null, null)).doesNotContain("--model");
+    }
+
     // --- buildActionCommand ---
 
     @Test

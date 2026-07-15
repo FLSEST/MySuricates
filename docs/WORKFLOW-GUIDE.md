@@ -290,6 +290,7 @@ Fuehrt einen Befehl fuer jedes Item in einer Liste aus.
 | `command` | string | **erforderlich** | Befehl pro Item |
 | `execution_mode` | string | `"claude"` | `"claude"` (KI) oder `"shell"` |
 | `timeout_seconds` | int | 300 | Timeout pro Iteration |
+| `continue_on_error` | bool | `false` | `true`: fehlgeschlagene Items lassen den Block nicht scheitern — er endet COMPLETED, Folge-Bloecke laufen. Fehler werden im Output zusammengefasst (`N/M items failed: ...`) und in den Step-Metadaten (`failedItemCount`, `failedItems`, `totalItems`) gelistet |
 
 ```json
 {
@@ -306,6 +307,8 @@ Fuehrt einen Befehl fuer jedes Item in einer Liste aus.
 ```
 
 **Hinweis**: `items_command` wird immer als Shell-Befehl ausgefuehrt (unabhaengig von `execution_mode`), da es nur die Iterations-Ziele sammelt.
+
+**Abgrenzung `continue_on_error` vs. `on_failure`**: `continue_on_error: true` toleriert Item-Fehler *innerhalb* des Blocks (Block endet COMPLETED, z. B. 29/30 Items erfolgreich → Folge-Bloecke wie Commit/Gate laufen). Das blockweite `on_failure: "continue"` laesst dagegen nur den Workflow trotz FAILED-Block weiterlaufen — der Block selbst bleibt FAILED.
 
 **Wann verwenden**: Verarbeitung mehrerer Dateien, Repos oder Items mit derselben Operation.
 
@@ -498,6 +501,39 @@ Liest eine Datei (PDF, DOCX, XLSX, PPTX, HTML, TXT, EPUB, RTF, …) und extrahie
   { "type": "simple", "config": { "command": "Fasse zusammen:\n\n{{ text }}" } }
 ]
 ```
+
+---
+
+### `todo-create` / `todo-update` / `todo-close` — Native TODO-Operationen
+
+Legen TODOs direkt über den TodoService an bzw. ändern sie — **kein REST-Self-Call, kein DB-Zugriff, 0 Tokens**. Ersetzen das Anti-Pattern `curl POST /api/v1/todos` aus shell-/agentic-Blöcken.
+
+**`todo-create`**:
+
+| Config-Schluessel | Typ | Default | Beschreibung |
+|---|---|---|---|
+| `title` | string | **erforderlich** | Titel (Template-fähig) |
+| `description` | string | null | Markdown-Beschreibung (Template-fähig) |
+| `priority` | string | `MEDIUM` | HIGH / MEDIUM / LOW / CRITICAL |
+| `tags` | list oder string | null | Liste oder kommagetrennt |
+| `project_id` | string | Kontext-Variable `project_id` | Ziel-Projekt |
+| `source` | string | `WORKFLOW` | USER / AI / WORKFLOW |
+| `source_agent` | string | `workflow` | Quell-Agent-Label |
+| `variable_name` | string | `todo_id` | Kontext-Variable, die die neue TODO-ID erhält |
+
+**`todo-update`**: `id` (erforderlich, Template-fähig — z. B. `{{ todo_id }}`), optional `title`/`description`/`priority`/`tags` — nur gesetzte Felder werden geändert.
+
+**`todo-close`**: `id` (erforderlich, Template-fähig) — setzt den Status auf DONE.
+
+```json
+[
+  { "type": "todo-create", "config": { "title": "Fix {{ component }}", "priority": "HIGH", "tags": ["bug"] } },
+  { "type": "simple", "config": { "command": "Behebe das Problem ..." } },
+  { "type": "todo-close", "config": { "id": "{{ todo_id }}" } }
+]
+```
+
+**Wann verwenden**: Deterministische Einzel-TODO-Operationen (Tracking-TODO anlegen und am Ende schließen). Für **dynamisch viele** TODOs aus Analyse-Findings stattdessen `todo_item:`-Marker im Block-Output ausgeben (siehe §Auto-TODO/Detector-Format) — die Plattform legt sie über den AutoTodoService an; die Audit-Templates nutzen diesen Marker-Pfad.
 
 ---
 

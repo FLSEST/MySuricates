@@ -162,6 +162,16 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
                                                 @Param("cutoff") Instant cutoff, Pageable pageable);
 
     /**
+     * IDs of orphaned machine todos: IN_PROGRESS with a machine source (AI/WORKFLOW)
+     * and no activity since cutoff — the pattern left behind when a CLI session dies
+     * without its closing status PATCH. Oldest first, capped via Pageable.
+     */
+    @Query("SELECT t.id FROM Todo t WHERE t.status = 'IN_PROGRESS' "
+         + "AND t.source IN ('AI','WORKFLOW') "
+         + "AND t.updatedAt < :cutoff ORDER BY t.updatedAt ASC")
+    List<String> findStaleInProgressAutoTodoIds(@Param("cutoff") Instant cutoff, Pageable pageable);
+
+    /**
      * Bulk status change without loading entities. Sets updatedAt explicitly because
      * bulk JPQL bypasses @LastModifiedDate auditing. Caller must be @Transactional.
      */

@@ -33,6 +33,7 @@ public class ClaudeAiProvider implements AiProvider {
         HostClaudeService.ReasoningResult result = hostClaudeService.reasonStructured(
                 request.prompt(),
                 request.systemPrompt(),
+                request.model(),
                 request.workingDirectory(),
                 request.maxTurns(),
                 request.timeoutSeconds(),

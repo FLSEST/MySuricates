@@ -1,5 +1,7 @@
 package com.automation.service.assistant;
 
+import com.automation.config.AssistantGuardrailsConfig;
+import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.BlockDefinition;
 import com.automation.entity.Todo;
 import com.automation.entity.Workflow;
@@ -10,6 +12,7 @@ import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.dto.request.UpdateTodoStatusRequest;
 import com.automation.dto.request.UpdateWorkflowRequest;
 import com.automation.entity.WorkflowRun;
+import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.chain.ChainService;
 import com.automation.service.todo.TodoService;
 import com.automation.service.workflow.WorkflowExecutor;
@@ -20,7 +23,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -64,6 +71,12 @@ public class AssistantToolExecutor {
     private final ChainService chainService;
     private final ObjectMapper objectMapper;
     private final PendingToolRegistry pendingToolRegistry;
+    private final AssistantToolValidator toolValidator;
+    private final AssistantGuardrailsConfig guardrailsConfig;
+    private final ActivityLogService activityLogService;
+
+    /** Timestamps of confirmed mutating executions within the rolling rate-limit window. */
+    private final Deque<Instant> mutationTimestamps = new ArrayDeque<>();
 
     /**
      * Result of {@link #extractTools(String)}: the cleaned response (with tool tags replaced
@@ -118,19 +131,66 @@ public class AssistantToolExecutor {
      */
     public ToolExecutionResult executeConfirmed(PendingTool tool) {
         String payload = sanitizeJson(tool.payloadJson());
-        String rawResult = switch (tool.type()) {
-            case "create_todo"        -> executeCreateTodo(payload);
-            case "update_todo_status" -> executeUpdateTodoStatus(payload);
-            case "create_workflow"    -> executeCreateWorkflow(payload);
-            case "update_workflow"    -> executeUpdateWorkflow(payload);
-            case "delete_workflow"    -> executeDeleteWorkflow(payload);
-            case "start_workflow"     -> executeStartWorkflow(payload);
-            case "cancel_run"         -> executeCancelRun(payload);
-            case "create_chain"       -> executeCreateChain(payload);
-            default -> "[Unknown tool: " + tool.type() + "]";
-        };
+
+        String rawResult = checkGuardrails(tool.type(), payload);
+        if (rawResult == null) {
+            rawResult = switch (tool.type()) {
+                case "create_todo"        -> executeCreateTodo(payload);
+                case "update_todo_status" -> executeUpdateTodoStatus(payload);
+                case "create_workflow"    -> executeCreateWorkflow(payload);
+                case "update_workflow"    -> executeUpdateWorkflow(payload);
+                case "delete_workflow"    -> executeDeleteWorkflow(payload);
+                case "start_workflow"     -> executeStartWorkflow(payload);
+                case "cancel_run"         -> executeCancelRun(payload);
+                case "create_chain"       -> executeCreateChain(payload);
+                default -> "[Unknown tool: " + tool.type() + "]";
+            };
+        }
         boolean success = rawResult != null && rawResult.startsWith("✓");
+        audit(tool, success, rawResult);
         return new ToolExecutionResult(tool.id(), tool.type(), success, rawResult);
+    }
+
+    /**
+     * Pre-execution guardrails (TODO 9f022277): payload validation and a rolling
+     * rate limit for mutating actions. Returns a user-facing rejection message,
+     * or {@code null} when execution may proceed (recording the rate-limit slot).
+     */
+    private String checkGuardrails(String type, String payload) {
+        var validationError = toolValidator.validate(type, payload);
+        if (validationError.isPresent()) {
+            return "⚠ Validierung fehlgeschlagen — Aktion nicht ausgeführt: " + validationError.get();
+        }
+        if (!isMutatingToolType(type)) {
+            return null;
+        }
+        synchronized (mutationTimestamps) {
+            Instant windowStart = Instant.now().minus(Duration.ofHours(1));
+            while (!mutationTimestamps.isEmpty() && mutationTimestamps.peekFirst().isBefore(windowStart)) {
+                mutationTimestamps.pollFirst();
+            }
+            if (mutationTimestamps.size() >= guardrailsConfig.getMaxActionsPerHour()) {
+                return "⚠ Rate-Limit erreicht: maximal " + guardrailsConfig.getMaxActionsPerHour()
+                        + " Assistent-Aktionen pro Stunde. Aktion nicht ausgeführt.";
+            }
+            mutationTimestamps.addLast(Instant.now());
+        }
+        return null;
+    }
+
+    /** Audit trail (TODO 9f022277): every confirmed tool execution lands in the ActivityLog. */
+    private void audit(PendingTool tool, boolean success, String result) {
+        try {
+            String message = "Assistant-Tool " + tool.type() + (success ? " ausgeführt: " : " abgelehnt/fehlgeschlagen: ")
+                    + tool.description();
+            if (success) {
+                activityLogService.info(LogCategory.SYSTEM, message, "AssistantToolExecutor");
+            } else {
+                activityLogService.warn(LogCategory.SYSTEM, message + " — " + result, "AssistantToolExecutor");
+            }
+        } catch (Exception e) {
+            log.warn("Assistant audit log failed for tool {}: {}", tool.type(), e.getMessage());
+        }
     }
 
     /** Builds a short, user-facing description for a tool proposal. */
