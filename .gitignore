@@ -70,14 +70,17 @@ __pycache__/
 *.pyc
 
 # Private workflow templates (project-specific, not generic platform demos)
+/workflow-pool/add_prospects.py
 /workflow-pool/app-build-gate.json
 /workflow-pool/backend-build-gate.json
 /workflow-pool/bahnhof-hunt-sync-deploy.json
 /workflow-pool/bilingual-narrative-song.json
 /workflow-pool/grammatik-uebungs-generator.json
 /workflow-pool/hunt-data-quality-gate.json
+/workflow-pool/job-rav-pending.json
 /workflow-pool/job-shortlist-generator.json
 /workflow-pool/job-shortlist-template.html
+/workflow-pool/job_dashboard_server.py
 /workflow-pool/kreuzwort-generator.json
 /workflow-pool/lehrplan-extraktor.json
 /workflow-pool/lehrplan-extraktor-bw.json
