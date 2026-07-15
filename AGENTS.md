@@ -1,5 +1,7 @@
 # AGENTS.md — Codex Workflow-Referenz
 
+> **Scope:** Kuratierte Kurzreferenz für externe Agents. Die vollständige REST-API-Referenz steht in [docs/api-referenz.md](docs/api-referenz.md).
+
 Anleitung für OpenAI Codex CLI, um eigenständig Workflows und Chains über die REST API anzulegen und auf der Test-Instanz zu validieren.
 
 ## Voraussetzungen
@@ -145,6 +147,7 @@ Response: 201 Created
 | `skill-capability` | `description`, `capability`, `input` | Skill-Ausführung |
 | `human-input` | `description`, `prompt`, `input_type`, `variable_name`, `options`, `timeout_minutes` | User-Eingabe |
 | `integration` | `description`, `provider`, `action`, `params` | Integration-Provider-Aktion (Google Calendar, Gmail, Jira, Confluence, Trello) |
+| `document` | `description`, `file_path`, `fail_on_empty?`, `min_characters?`, `variable_name?` | Dokument/OCR-Extraktion (PDF, Bilder) |
 
 ### 2. Chain erstellen
 
@@ -341,6 +344,22 @@ GET /api/v1/assistant/sessions/<session-uuid>
 # Session loeschen
 DELETE /api/v1/assistant/sessions/<session-uuid>
 ```
+
+### 11. CRUD-Kurzreferenz
+
+| Aktion | Endpunkt |
+|--------|----------|
+| Workflow lesen / ändern / löschen | `GET`/`PUT`/`DELETE /api/v1/workflows/{id}` (DELETE = Soft-Delete) |
+| Chains auflisten / lesen / ändern / löschen | `GET /api/v1/chains`, `GET`/`PUT`/`DELETE /api/v1/chains/{id}` |
+| Chain-Runs | `GET /api/v1/chains/runs`, `GET /api/v1/chains/{id}/runs`, `POST /api/v1/chains/runs/{runId}/cancel` |
+| TODOs auflisten (Filter) | `GET /api/v1/todos?status=OPEN&status=IN_PROGRESS&projectId=<uuid>&tag=<tag>&q=<suche>` |
+| TODO lesen / ändern / löschen | `GET`/`PUT`/`DELETE /api/v1/todos/{id}` |
+| TODO-Status setzen | `PATCH /api/v1/todos/{id}/status` — Body: `{"status": "IN_PROGRESS", "sessionId": "..."}` |
+| Projekt anlegen / lesen / ändern | `POST /api/v1/projects`, `GET`/`PUT /api/v1/projects/{id}` |
+| App-Setting lesen / setzen | `GET`/`PUT /api/v1/system/settings/{key}` — PUT-Body: `{"value": "..."}` |
+| Execution-Config (Timeouts, Concurrency) | `GET`/`PUT /api/v1/system/execution-config` |
+
+Feld-Details zu allen Endpunkten: [docs/api-referenz.md](docs/api-referenz.md).
 
 ## Todo-Resolve in der Praxis
 

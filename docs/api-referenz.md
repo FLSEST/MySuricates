@@ -2,6 +2,8 @@
 
 # API-Referenz
 
+> **Scope:** Vollständige interne REST-API-Referenz für MySuricates. Die kuratierte Kurzreferenz für externe Agents ist [AGENTS.md](../AGENTS.md).
+
 ## Allgemein
 
 - **Basis-URL:** `http://localhost:9090/api/v1`
@@ -338,9 +340,17 @@ Workflow als portables JSON exportieren (ohne IDs, ohne Projekt-Zuordnung).
   "instructions": null,
   "model": null,
   "version": "1.0.0",
+  "defaultContext": {},
+  "metadata": {},
   "exportedAt": "2025-02-22T14:00:00Z"
 }
 ```
+
+### `GET /api/v1/workflows/{id}/export/bpmn`
+
+Workflow als BPMN 2.0 XML exportieren (Camunda-Modeler-kompatibel).
+
+**Response:** Datei-Download (`.bpmn`, `Content-Disposition: attachment`)
 
 ### `POST /api/v1/workflows/import`
 
@@ -1854,6 +1864,9 @@ Aktuelle Execution-Konfiguration abrufen (Timeouts, Token-Limits etc.). Enthält
 | `todo-hygiene-enabled` | 0–1 |
 | `todo-stale-days` | 7–365 |
 | `todo-hygiene-max-per-run` | 10–2000 |
+| `todo-watchdog-enabled` | 0–1 |
+| `todo-watchdog-stale-hours` | 1–720 |
+| `assistant-max-actions-per-hour` | 1–500 |
 | `scheduler-catch-up-on-resume` | 0–1 |
 | `scheduler-resume-grace-minutes` | 1–60 |
 | `summarization-timeout-seconds` | 30–600 |
