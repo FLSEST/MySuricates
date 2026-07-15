@@ -5,6 +5,7 @@ import com.automation.entity.WorkflowRun;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Set;
 
 /**
  * Shared formatting helpers for assistant prompt building: run links/labels,
@@ -13,6 +14,15 @@ import java.time.format.DateTimeFormatter;
  * context sections — single source of truth so all prompt output stays consistent.
  */
 public final class AssistantFormatUtils {
+
+    /**
+     * Directories skipped when listing project files for the assistant
+     * (system prompt listing and {@code project_files} fetch alike).
+     */
+    public static final Set<String> IGNORED_DIRS = Set.of(
+            "node_modules", ".git", "target", "build", "dist", "__pycache__",
+            ".gradle", ".idea", ".vscode", ".next", "venv", ".venv", ".cache"
+    );
 
     private static final DateTimeFormatter FMT =
             DateTimeFormatter.ofPattern("dd.MM. HH:mm").withZone(ZoneId.systemDefault());

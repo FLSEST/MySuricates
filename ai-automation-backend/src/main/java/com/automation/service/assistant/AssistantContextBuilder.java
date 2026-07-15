@@ -34,7 +34,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -477,11 +476,6 @@ public class AssistantContextBuilder {
 
     // ── Project file listing ──────────────────────────────────────────────
 
-    private static final Set<String> LISTING_IGNORED_DIRS = Set.of(
-            "node_modules", ".git", "target", "build", "dist", "__pycache__",
-            ".gradle", ".idea", ".vscode", ".next", "venv", ".venv", ".cache"
-    );
-
     private void appendProjectFileListing(StringBuilder sb, String projectPath, String projectId) {
         if (projectPath == null || projectPath.isBlank()) return;
         Path root = Path.of(projectPath);
@@ -492,7 +486,7 @@ public class AssistantContextBuilder {
             for (Path entry : topLevel.toList()) {
                 String name = entry.getFileName().toString();
                 if (Files.isDirectory(entry)) {
-                    if (!LISTING_IGNORED_DIRS.contains(name) && name.equals("docs")) {
+                    if (!AssistantFormatUtils.IGNORED_DIRS.contains(name) && name.equals("docs")) {
                         try (Stream<Path> docs = Files.list(entry).sorted()) {
                             docs.filter(Files::isRegularFile)
                                     .limit(5)

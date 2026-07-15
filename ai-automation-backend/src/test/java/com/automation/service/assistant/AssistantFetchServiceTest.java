@@ -21,6 +21,13 @@ import com.automation.repository.WishRepository;
 import com.automation.repository.WorkflowChainRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.assistant.fetch.BlockConfigSummaryFormatter;
+import com.automation.service.assistant.fetch.DocsFetchHandler;
+import com.automation.service.assistant.fetch.InventoryFetchHandler;
+import com.automation.service.assistant.fetch.PoolFetchHandler;
+import com.automation.service.assistant.fetch.ProjectFetchHandler;
+import com.automation.service.assistant.fetch.RunFetchHandler;
+import com.automation.service.assistant.fetch.WorkflowFetchHandler;
 import com.automation.service.integration.IntegrationAction;
 import com.automation.service.integration.IntegrationProvider;
 import com.automation.service.integration.IntegrationRegistry;
@@ -61,10 +68,21 @@ class AssistantFetchServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AssistantFetchService(workflowRunRepository, workflowRepository,
-                projectRepository, wishRepository, skillRepository,
-                integrationRegistry, integrationConnectionRepository, workflowChainRepository,
-                workflowPoolService, projectContextService, contextBuilder);
+        BlockConfigSummaryFormatter blockConfigSummaryFormatter =
+                new BlockConfigSummaryFormatter(workflowRepository, contextBuilder);
+        RunFetchHandler runFetchHandler = new RunFetchHandler(workflowRunRepository, contextBuilder);
+        WorkflowFetchHandler workflowFetchHandler =
+                new WorkflowFetchHandler(workflowRepository, contextBuilder, blockConfigSummaryFormatter);
+        DocsFetchHandler docsFetchHandler = new DocsFetchHandler();
+        PoolFetchHandler poolFetchHandler =
+                new PoolFetchHandler(workflowPoolService, contextBuilder, blockConfigSummaryFormatter);
+        ProjectFetchHandler projectFetchHandler =
+                new ProjectFetchHandler(projectRepository, projectContextService);
+        InventoryFetchHandler inventoryFetchHandler = new InventoryFetchHandler(wishRepository,
+                skillRepository, integrationRegistry, integrationConnectionRepository,
+                workflowChainRepository, workflowRepository, contextBuilder);
+        service = new AssistantFetchService(runFetchHandler, workflowFetchHandler, docsFetchHandler,
+                poolFetchHandler, projectFetchHandler, inventoryFetchHandler);
     }
 
     @Test
