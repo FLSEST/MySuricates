@@ -290,6 +290,7 @@ Fuehrt einen Befehl fuer jedes Item in einer Liste aus.
 | `command` | string | **erforderlich** | Befehl pro Item |
 | `execution_mode` | string | `"claude"` | `"claude"` (KI) oder `"shell"` |
 | `timeout_seconds` | int | 300 | Timeout pro Iteration |
+| `continue_on_error` | bool | `false` | `true`: fehlgeschlagene Items lassen den Block nicht scheitern — er endet COMPLETED, Folge-Bloecke laufen. Fehler werden im Output zusammengefasst (`N/M items failed: ...`) und in den Step-Metadaten (`failedItemCount`, `failedItems`, `totalItems`) gelistet |
 
 ```json
 {
@@ -306,6 +307,8 @@ Fuehrt einen Befehl fuer jedes Item in einer Liste aus.
 ```
 
 **Hinweis**: `items_command` wird immer als Shell-Befehl ausgefuehrt (unabhaengig von `execution_mode`), da es nur die Iterations-Ziele sammelt.
+
+**Abgrenzung `continue_on_error` vs. `on_failure`**: `continue_on_error: true` toleriert Item-Fehler *innerhalb* des Blocks (Block endet COMPLETED, z. B. 29/30 Items erfolgreich → Folge-Bloecke wie Commit/Gate laufen). Das blockweite `on_failure: "continue"` laesst dagegen nur den Workflow trotz FAILED-Block weiterlaufen — der Block selbst bleibt FAILED.
 
 **Wann verwenden**: Verarbeitung mehrerer Dateien, Repos oder Items mit derselben Operation.
 

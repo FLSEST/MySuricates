@@ -128,6 +128,59 @@ class ForEachBlockExecutorTest {
     }
 
     @Test
+    void execute_continueOnError_failedItemDoesNotFailBlock() {
+        StepResult failed = StepResult.builder()
+                .stepIndex(0).status(StepStatus.FAILED).output("timeout").build();
+        StepResult success = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("ok").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(failed, success, success);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("items", List.of("bad-langensalza", "gotha", "erfurt"));
+        config.put("command", "rebuild {{ item }}");
+        config.put("continue_on_error", true);
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("foreach")
+                .config(config)
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        // Block completes so follow-up blocks run; failures are reported, not swallowed
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getOutput()).contains("1/3 items failed", "bad-langensalza");
+        assertThat(result.getMetadata().get("failedItemCount")).isEqualTo(1);
+        assertThat(result.getMetadata().get("failedItems")).isEqualTo(List.of("bad-langensalza"));
+        verify(commandExecutor, times(3)).executeStepOnHost(any(HostExecutionRequest.class));
+    }
+
+    @Test
+    void execute_continueOnError_allItemsSucceed_noFailureMetadata() {
+        StepResult success = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(success);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("items", List.of("a", "b"));
+        config.put("command", "process {{ item }}");
+        config.put("continue_on_error", true);
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("foreach")
+                .config(config)
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getOutput()).doesNotContain("items failed");
+        assertThat(result.getMetadata()).doesNotContainKey("failedItemCount");
+    }
+
+    @Test
     void execute_emptyItems_returnsCompleted() {
         Map<String, Object> config = new HashMap<>();
         config.put("items_source", "list");
