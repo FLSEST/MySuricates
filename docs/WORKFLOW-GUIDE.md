@@ -504,6 +504,39 @@ Liest eine Datei (PDF, DOCX, XLSX, PPTX, HTML, TXT, EPUB, RTF, …) und extrahie
 
 ---
 
+### `todo-create` / `todo-update` / `todo-close` — Native TODO-Operationen
+
+Legen TODOs direkt über den TodoService an bzw. ändern sie — **kein REST-Self-Call, kein DB-Zugriff, 0 Tokens**. Ersetzen das Anti-Pattern `curl POST /api/v1/todos` aus shell-/agentic-Blöcken.
+
+**`todo-create`**:
+
+| Config-Schluessel | Typ | Default | Beschreibung |
+|---|---|---|---|
+| `title` | string | **erforderlich** | Titel (Template-fähig) |
+| `description` | string | null | Markdown-Beschreibung (Template-fähig) |
+| `priority` | string | `MEDIUM` | HIGH / MEDIUM / LOW / CRITICAL |
+| `tags` | list oder string | null | Liste oder kommagetrennt |
+| `project_id` | string | Kontext-Variable `project_id` | Ziel-Projekt |
+| `source` | string | `WORKFLOW` | USER / AI / WORKFLOW |
+| `source_agent` | string | `workflow` | Quell-Agent-Label |
+| `variable_name` | string | `todo_id` | Kontext-Variable, die die neue TODO-ID erhält |
+
+**`todo-update`**: `id` (erforderlich, Template-fähig — z. B. `{{ todo_id }}`), optional `title`/`description`/`priority`/`tags` — nur gesetzte Felder werden geändert.
+
+**`todo-close`**: `id` (erforderlich, Template-fähig) — setzt den Status auf DONE.
+
+```json
+[
+  { "type": "todo-create", "config": { "title": "Fix {{ component }}", "priority": "HIGH", "tags": ["bug"] } },
+  { "type": "simple", "config": { "command": "Behebe das Problem ..." } },
+  { "type": "todo-close", "config": { "id": "{{ todo_id }}" } }
+]
+```
+
+**Wann verwenden**: Deterministische Einzel-TODO-Operationen (Tracking-TODO anlegen und am Ende schließen). Für **dynamisch viele** TODOs aus Analyse-Findings stattdessen `todo_item:`-Marker im Block-Output ausgeben (siehe §Auto-TODO/Detector-Format) — die Plattform legt sie über den AutoTodoService an; die Audit-Templates nutzen diesen Marker-Pfad.
+
+---
+
 ## 3. Template-Variablen
 
 ### Variablen-Syntax
