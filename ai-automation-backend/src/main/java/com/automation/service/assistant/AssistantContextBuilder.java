@@ -1,31 +1,29 @@
 package com.automation.service.assistant;
 
 import com.automation.dto.AssistantChatRequest;
-import com.automation.entity.AssistantSession;
 import com.automation.entity.RunStatus;
 import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.entity.Workflow;
-import com.automation.entity.WorkflowMemory;
 import com.automation.entity.WorkflowRun;
-import com.automation.repository.AssistantSessionRepository;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.WishRepository;
-import com.automation.repository.WorkflowMemoryRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.assistant.context.BlockTypesIndexSection;
 import com.automation.service.assistant.context.ChainsIndexSection;
 import com.automation.service.assistant.context.FailedWorkflowsContextSection;
 import com.automation.service.assistant.context.IntegrationsIndexSection;
+import com.automation.service.assistant.context.ProjectsContextSection;
+import com.automation.service.assistant.context.RecentSessionsContextSection;
 import com.automation.service.assistant.context.RunsContextSection;
 import com.automation.service.assistant.context.SchedulesContextSection;
 import com.automation.service.assistant.context.SkillsIndexSection;
 import com.automation.service.assistant.context.TodosContextSection;
 import com.automation.service.assistant.context.WishesContextSection;
+import com.automation.service.assistant.context.WorkflowMemoryContextSection;
+import com.automation.service.assistant.context.WorkflowsIndexSection;
 import com.automation.util.TruncationUtil;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -34,7 +32,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -55,9 +52,6 @@ public class AssistantContextBuilder {
     private final ProjectRepository projectRepository;
     private final WishRepository wishRepository;
     private final WorkflowRepository workflowRepository;
-    private final WorkflowMemoryRepository workflowMemoryRepository;
-    private final AssistantSessionRepository assistantSessionRepository;
-    private final ObjectMapper objectMapper;
 
     // Extracted context sections
     private final RunsContextSection runsSection;
@@ -69,6 +63,10 @@ public class AssistantContextBuilder {
     private final ChainsIndexSection chainsSection;
     private final BlockTypesIndexSection blockTypesSection;
     private final FailedWorkflowsContextSection failedWorkflowsSection;
+    private final ProjectsContextSection projectsSection;
+    private final WorkflowsIndexSection workflowsSection;
+    private final WorkflowMemoryContextSection workflowMemorySection;
+    private final RecentSessionsContextSection recentSessionsSection;
 
     // ── Page classification ───────────────────────────────────────────────────
 
@@ -154,10 +152,10 @@ public class AssistantContextBuilder {
             schedulesSection.append(sb, cat != PageCategory.OVERVIEW);
         }
         if (includeProjects) {
-            appendProjects(sb, compactProjects, allWorkflows);
+            projectsSection.append(sb, compactProjects, allWorkflows);
         }
         if (includeWorkflows) {
-            appendWorkflows(sb, compactWorkflows, allWorkflows, ctx);
+            workflowsSection.append(sb, compactWorkflows, allWorkflows, ctx);
         }
         if (includeRepertoire) {
             skillsSection.append(sb, compactRepertoire);
@@ -166,8 +164,8 @@ public class AssistantContextBuilder {
             blockTypesSection.append(sb, compactRepertoire);
         }
         if (includeMemoryAndSessions) {
-            appendWorkflowMemory(sb, workflowById);
-            appendRecentSessions(sb);
+            workflowMemorySection.append(sb, workflowById);
+            recentSessionsSection.append(sb, false);
         }
 
         // 3. Page-specific context (enriched with step outputs for run pages)
@@ -247,170 +245,6 @@ public class AssistantContextBuilder {
         } catch (Exception e) {
             log.debug("Could not load workflows for assistant context", e);
             return List.of();
-        }
-    }
-
-    private void appendProjects(StringBuilder sb, boolean compact, List<Workflow> allWorkflows) {
-        try {
-            var projects = projectRepository.findByArchivedAtIsNull();
-            if (compact) {
-                if (!projects.isEmpty()) {
-                    sb.append("**Projects:** ").append(projects.size()).append("\n");
-                }
-                return;
-            }
-            if (!projects.isEmpty()) {
-                Map<String, Long> wfCountByProject = allWorkflows.stream()
-                        .filter(w -> w.getProject() != null)
-                        .collect(Collectors.groupingBy(w -> w.getProject().getId(), Collectors.counting()));
-                sb.append("**My Projects (").append(projects.size()).append("):**\n");
-                projects.forEach(p -> sb.append("  - ").append(p.getName())
-                        .append(" (ID: ").append(p.getId()).append(", ")
-                        .append(wfCountByProject.getOrDefault(p.getId(), 0L)).append(" workflows)\n"));
-                sb.append("\n");
-            }
-        } catch (Exception e) {
-            log.debug("Could not load projects for assistant context", e);
-        }
-    }
-
-    private void appendWorkflows(StringBuilder sb, boolean compact, List<Workflow> allWorkflows,
-                                 AssistantChatRequest.PageContext ctx) {
-        if (allWorkflows.isEmpty()) return;
-        try {
-            if (compact) {
-                long projectCount = allWorkflows.stream()
-                        .map(w -> w.getProject() != null ? w.getProject().getId() : "")
-                        .distinct().count();
-                sb.append("**Workflows:** ").append(allWorkflows.size()).append(" total (")
-                        .append(projectCount).append(" projects)\n");
-                return;
-            }
-
-            String focusProjectId = resolveFocusProjectId(ctx);
-            List<Workflow> toShow;
-            if (focusProjectId != null) {
-                toShow = allWorkflows.stream()
-                        .filter(w -> w.getProject() != null && focusProjectId.equals(w.getProject().getId()))
-                        .sorted(Comparator.comparing(Workflow::getName))
-                        .collect(Collectors.toList());
-                List<Workflow> others = allWorkflows.stream()
-                        .filter(w -> w.getProject() == null || !focusProjectId.equals(w.getProject().getId()))
-                        .sorted(Comparator.comparing(Workflow::getName))
-                        .limit(Math.max(0, 25 - toShow.size()))
-                        .collect(Collectors.toList());
-                toShow = new ArrayList<>(toShow);
-                toShow.addAll(others);
-            } else {
-                toShow = allWorkflows.stream()
-                        .sorted(Comparator.comparing(Workflow::getName))
-                        .limit(25)
-                        .collect(Collectors.toList());
-            }
-
-            sb.append("**My Workflows (").append(allWorkflows.size()).append("):**\n");
-            toShow.forEach(w -> {
-                String projectName = w.getProject() != null ? w.getProject().getName() : "—";
-                String projectId = w.getProject() != null ? w.getProject().getId() : "—";
-                sb.append("  - [").append(w.getName()).append("] ")
-                        .append(projectName).append(" (project: ").append(projectId).append(")")
-                        .append(" — /workflows/").append(w.getId());
-                if (w.getDescription() != null && !w.getDescription().isBlank()) {
-                    sb.append(" (").append(truncate(w.getDescription().trim(), 60)).append(")");
-                }
-                int inputCount = w.getDefaultContext() != null ? w.getDefaultContext().size() : 0;
-                if (inputCount > 0) {
-                    sb.append(" — ").append(inputCount).append(" inputs");
-                }
-                sb.append("\n");
-            });
-            if (allWorkflows.size() > 25) {
-                sb.append("  … and ").append(allWorkflows.size() - 25)
-                  .append(" more. A workflow's inputs via <fetch type=\"workflow-inputs\" id=\"<workflow-id>\"/>\n");
-            } else if (toShow.stream().anyMatch(w -> w.getDefaultContext() != null && !w.getDefaultContext().isEmpty())) {
-                sb.append("  A workflow's inputs via <fetch type=\"workflow-inputs\" id=\"<workflow-id>\"/>\n");
-            }
-            sb.append("\n");
-        } catch (Exception e) {
-            log.debug("Could not build workflow list for assistant context", e);
-        }
-    }
-
-    private void appendWorkflowMemory(StringBuilder sb, Map<String, Workflow> workflowById) {
-        try {
-            List<WorkflowMemory> memories = workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc();
-            if (memories.isEmpty()) return;
-            sb.append("## Learnings & Pitfalls\n");
-            memories.stream().limit(8).forEach(m -> {
-                String wfName = workflowById.containsKey(m.getWorkflowId())
-                        ? workflowById.get(m.getWorkflowId()).getName()
-                        : m.getWorkflowId().substring(0, Math.min(8, m.getWorkflowId().length())) + "…";
-                sb.append("  - [").append(wfName).append("]: ").append(truncate(m.getContent(), 300)).append("\n");
-            });
-            sb.append("\n");
-        } catch (Exception e) {
-            log.debug("Could not load workflow memory for assistant context", e);
-        }
-    }
-
-    private void appendRecentSessions(StringBuilder sb) {
-        try {
-            List<AssistantSession> sessions = assistantSessionRepository.findTop5ByOrderByStartedAtDesc();
-            if (sessions.isEmpty()) return;
-            sb.append("## Recent Conversations (Context)\n");
-            sessions.forEach(sess -> {
-                String[] firstExchange = extractFirstExchange(sess.getMessages());
-                if (firstExchange != null) {
-                    sb.append("  - [").append(fmt(sess.getStartedAt())).append("] ")
-                            .append("User: \"").append(truncate(firstExchange[0], 150)).append("\"");
-                    if (firstExchange[1] != null) {
-                        sb.append(" → Response: \"").append(truncate(firstExchange[1], 100)).append("\"");
-                    }
-                    sb.append("\n");
-                }
-            });
-            sb.append("\n");
-        } catch (Exception e) {
-            log.debug("Could not load recent sessions for assistant context", e);
-        }
-    }
-
-    /**
-     * Extracts the first user message and assistant response from a session's messages JSON.
-     * Returns [userMessage, assistantResponse] or null if no user message found.
-     */
-    private String[] extractFirstExchange(String messagesJson) {
-        if (messagesJson == null || messagesJson.isBlank() || "[]".equals(messagesJson)) return null;
-        try {
-            List<Map<String, String>> messages = objectMapper.readValue(messagesJson, new TypeReference<>() {});
-            String userMsg = null;
-            String assistantMsg = null;
-            for (Map<String, String> m : messages) {
-                if (userMsg == null && "user".equals(m.get("role"))) {
-                    userMsg = m.get("content");
-                } else if (userMsg != null && assistantMsg == null && "assistant".equals(m.get("role"))) {
-                    assistantMsg = m.get("content");
-                    break;
-                }
-            }
-            if (userMsg == null || userMsg.isBlank()) return null;
-            return new String[]{ userMsg, assistantMsg };
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private String resolveFocusProjectId(AssistantChatRequest.PageContext ctx) {
-        if (ctx == null) return null;
-        if (ctx.projectId() != null) return ctx.projectId();
-        if (ctx.workflowId() == null) return null;
-        try {
-            return workflowRepository.findByIdWithSkills(ctx.workflowId())
-                    .map(Workflow::getProject)
-                    .map(project -> project != null ? project.getId() : null)
-                    .orElse(null);
-        } catch (Exception ignored) {
-            return null;
         }
     }
 
@@ -681,25 +515,25 @@ public class AssistantContextBuilder {
         }
     }
 
-    // ── Shared helpers (delegate to RunsContextSection) ──────────────────
+    // ── Shared helpers (delegate to AssistantFormatUtils) ─────────────────
 
     public String runLink(WorkflowRun run) {
-        return runsSection.runLink(run);
+        return AssistantFormatUtils.runLink(run);
     }
 
     public String runLabel(WorkflowRun run) {
-        return runsSection.runLabel(run);
+        return AssistantFormatUtils.runLabel(run);
     }
 
     public String fmt(java.time.Instant instant) {
-        return runsSection.fmt(instant);
+        return AssistantFormatUtils.fmt(instant);
     }
 
     public String extractError(WorkflowRun run) {
-        return runsSection.extractError(run);
+        return AssistantFormatUtils.extractError(run);
     }
 
     public String truncate(String s, int max) {
-        return runsSection.truncate(s, max);
+        return AssistantFormatUtils.truncate(s, max);
     }
 }

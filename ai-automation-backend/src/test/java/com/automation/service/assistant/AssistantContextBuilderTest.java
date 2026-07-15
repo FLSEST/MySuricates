@@ -8,11 +8,15 @@ import com.automation.service.assistant.context.BlockTypesIndexSection;
 import com.automation.service.assistant.context.ChainsIndexSection;
 import com.automation.service.assistant.context.FailedWorkflowsContextSection;
 import com.automation.service.assistant.context.IntegrationsIndexSection;
+import com.automation.service.assistant.context.ProjectsContextSection;
+import com.automation.service.assistant.context.RecentSessionsContextSection;
 import com.automation.service.assistant.context.RunsContextSection;
 import com.automation.service.assistant.context.SchedulesContextSection;
 import com.automation.service.assistant.context.SkillsIndexSection;
 import com.automation.service.assistant.context.TodosContextSection;
 import com.automation.service.assistant.context.WishesContextSection;
+import com.automation.service.assistant.context.WorkflowMemoryContextSection;
+import com.automation.service.assistant.context.WorkflowsIndexSection;
 import com.automation.service.execution.WorkflowDebugService;
 import com.automation.service.integration.IntegrationRegistry;
 import com.automation.service.system.SystemIdentityService;
@@ -68,12 +72,17 @@ class AssistantContextBuilderTest {
         ChainsIndexSection chainsSection = new ChainsIndexSection(workflowChainRepository);
         BlockTypesIndexSection blockTypesSection = new BlockTypesIndexSection();
         FailedWorkflowsContextSection failedWorkflowsSection = new FailedWorkflowsContextSection(workflowDebugService);
+        ProjectsContextSection projectsSection = new ProjectsContextSection(projectRepository);
+        WorkflowsIndexSection workflowsSection = new WorkflowsIndexSection(workflowRepository);
+        WorkflowMemoryContextSection workflowMemorySection = new WorkflowMemoryContextSection(workflowMemoryRepository);
+        RecentSessionsContextSection recentSessionsSection =
+                new RecentSessionsContextSection(assistantSessionRepository, new ObjectMapper());
         builder = new AssistantContextBuilder(workflowRunRepository, projectRepository,
-                wishRepository, workflowRepository, workflowMemoryRepository,
-                assistantSessionRepository, new ObjectMapper(),
+                wishRepository, workflowRepository,
                 runsSection, todosSection, wishesSection, schedulesSection,
                 skillsSection, integrationsSection, chainsSection, blockTypesSection,
-                failedWorkflowsSection);
+                failedWorkflowsSection, projectsSection, workflowsSection,
+                workflowMemorySection, recentSessionsSection);
     }
 
     @Test
