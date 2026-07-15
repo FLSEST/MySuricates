@@ -1,9 +1,12 @@
 package com.automation.service.assistant;
 
+import com.automation.config.AssistantGuardrailsConfig;
+import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.Todo;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowChain;
 import com.automation.entity.WorkflowRun;
+import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.chain.ChainService;
 import com.automation.service.todo.TodoService;
 import com.automation.service.workflow.WorkflowExecutor;
@@ -18,6 +21,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -27,15 +32,20 @@ class AssistantToolExecutorTest {
     @Mock private WorkflowService workflowService;
     @Mock private WorkflowExecutor workflowExecutor;
     @Mock private ChainService chainService;
+    @Mock private ActivityLogService activityLogService;
 
     private AssistantToolExecutor executor;
     private PendingToolRegistry registry;
+    private AssistantGuardrailsConfig guardrailsConfig;
 
     @BeforeEach
     void setUp() {
         registry = new PendingToolRegistry();
+        guardrailsConfig = new AssistantGuardrailsConfig();
+        ObjectMapper mapper = new ObjectMapper();
         executor = new AssistantToolExecutor(todoService, workflowService,
-                workflowExecutor, chainService, new ObjectMapper(), registry);
+                workflowExecutor, chainService, mapper, registry,
+                new AssistantToolValidator(mapper), guardrailsConfig, activityLogService);
     }
 
     /**
@@ -408,7 +418,7 @@ class AssistantToolExecutorTest {
                 <tool type="update_workflow">{
                   "workflowId": "wf-1",
                   "name": "Deploy Flow",
-                  "blocks": [{"type": "simple", "config": {"prompt": "Deploy now"}}],
+                  "blocks": [{"type": "simple", "config": {"command": "Deploy now"}}],
                   "metadata": {"owner": "ops"},
                   "defaultContext": {"env": "prod"}
                 }</tool>
@@ -421,7 +431,7 @@ class AssistantToolExecutorTest {
                         && req.blocks() != null
                         && req.blocks().size() == 1
                         && "simple".equals(req.blocks().get(0).getType())
-                        && "Deploy now".equals(req.blocks().get(0).getConfig().get("prompt"))
+                        && "Deploy now".equals(req.blocks().get(0).getConfig().get("command"))
                         && "ops".equals(req.metadata().get("owner"))
                         && "prod".equals(req.defaultContext().get("env"))
         ));
@@ -561,5 +571,59 @@ class AssistantToolExecutorTest {
 
         assertThat(result.success()).isFalse();
         assertThat(result.message()).contains("⚠").contains("db full");
+    }
+
+    // --- Guardrails: Validierung, Rate-Limit, Audit-Trail (TODO 9f022277) ---
+
+    @Test
+    void executeConfirmed_invalidWorkflowBlocks_rejectedBeforeDbWrite() {
+        PendingTool tool = registry.register("create_workflow", "Create workflow: \"Broken\"",
+                "{\"projectId\":\"p1\",\"name\":\"Broken\",\"blocks\":[{\"type\":\"quantum-magic\"}]}");
+
+        ToolExecutionResult result = executor.executeConfirmed(tool);
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.message()).contains("⚠").contains("quantum-magic");
+        verify(workflowService, never()).create(any());
+    }
+
+    @Test
+    void executeConfirmed_mutatingAction_isRateLimited() {
+        guardrailsConfig.setMaxActionsPerHour(2);
+        Todo created = Todo.builder().id("abcdef12-xxx").title("T").build();
+        when(todoService.create(any())).thenReturn(created);
+
+        for (int i = 0; i < 2; i++) {
+            PendingTool ok = registry.register("create_todo", "t", "{\"title\":\"T\"}");
+            assertThat(executor.executeConfirmed(ok).success()).isTrue();
+        }
+
+        PendingTool third = registry.register("create_todo", "t", "{\"title\":\"T\"}");
+        ToolExecutionResult result = executor.executeConfirmed(third);
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.message()).contains("Rate-Limit");
+        verify(todoService, times(2)).create(any());
+    }
+
+    @Test
+    void executeConfirmed_successfulAction_writesAuditTrail() {
+        Todo created = Todo.builder().id("abcdef12-xxx").title("Audit me").build();
+        when(todoService.create(any())).thenReturn(created);
+        PendingTool tool = registry.register("create_todo", "t", "{\"title\":\"Audit me\"}");
+
+        executor.executeConfirmed(tool);
+
+        verify(activityLogService).info(eq(LogCategory.SYSTEM), contains("create_todo"), eq("AssistantToolExecutor"));
+    }
+
+    @Test
+    void executeConfirmed_failedAction_writesAuditTrailAsWarning() {
+        when(todoService.create(any())).thenThrow(new RuntimeException("db full"));
+        PendingTool tool = registry.register("create_todo", "t", "{\"title\":\"X\"}");
+
+        executor.executeConfirmed(tool);
+
+        verify(activityLogService).warn(eq(LogCategory.SYSTEM), contains("create_todo"), eq("AssistantToolExecutor"));
     }
 }
