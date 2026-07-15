@@ -147,7 +147,7 @@ Response: 201 Created
 | `skill-capability` | `description`, `capability`, `input` | Skill-Ausführung |
 | `human-input` | `description`, `prompt`, `input_type`, `variable_name`, `options`, `timeout_minutes` | User-Eingabe |
 | `integration` | `description`, `provider`, `action`, `params` | Integration-Provider-Aktion (Google Calendar, Gmail, Jira, Confluence, Trello) |
-| `document` | `description`, `file_path`, `fail_on_empty?`, `min_characters?`, `variable_name?` | Dokument/OCR-Extraktion (PDF, Bilder) |
+| `document` | `description`, `file_path`, `fail_on_empty?`, `min_characters?`, `variable_name?` | Text-Extraktion aus Dokumenten via Tika (PDF mit Text-Layer, DOCX, …) — kein OCR |
 
 ### 2. Chain erstellen
 
