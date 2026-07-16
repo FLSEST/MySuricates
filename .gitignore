@@ -42,6 +42,7 @@ ai-automation-backend/stable-frontend/
 ai-automation-backend/src/main/resources/docs/
 
 # Generated session artifacts (anchored to repo root)
+/explainer/
 /portfolio/
 /dashboard/
 /presentation/
