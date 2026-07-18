@@ -18,8 +18,9 @@ def head_sha(repo_root):
 
 
 def q(s):
-    """Dot-Quoting für Knotennamen/Labels."""
-    return '"%s"' % str(s).replace("\\", "\\\\").replace('"', '\\"')
+    """Dot-Quoting für Knotennamen/Labels. Backslashes bleiben erhalten,
+    damit beabsichtigte dot-Escapes wie \\n als Zeilenumbruch wirken."""
+    return '"%s"' % str(s).replace('"', '\\"')
 
 
 def render_svg(dot_source, out_path):

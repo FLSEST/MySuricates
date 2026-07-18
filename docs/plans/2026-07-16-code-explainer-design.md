@@ -3,6 +3,12 @@
 > **Umgesetzt am 2026-07-16.** Workflow `4885414e-76a0-4828-beba-4ee0f807a4be`,
 > Schedule `c71847f5-b75a-4e3d-a6f4-f826098e5b4e` (`0 30 6 ? * FRI`, SKIP),
 > MySuricates-TODO `57f589c2-91b4-4f51-b0c4-158060b06ee0`.
+>
+> **Erweitert 2026-07-16** (TODO `14a07a49`): viertes deterministisches Diagramm
+> `hierarchies` — Backend-Familien: Interfaces/Basisklassen mit ≥3 Implementierungen
+> (BlockExecutor, IntegrationProvider, AiProvider, …) als Cluster-Bäume
+> (`scripts/explainer/extract_hierarchies.py`, `unflatten -l 3` + `packmode=array_u2`
+> für ~2:1-Seitenverhältnis statt 35:1-Haarlinie unter `max-width:100%`).
 
 ## Kontext
 

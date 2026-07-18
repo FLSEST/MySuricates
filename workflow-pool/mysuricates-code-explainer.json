@@ -10,7 +10,7 @@
       "type": "shell",
       "config": {
         "label": "Delta + Diagramme",
-        "command": "set -euo pipefail\nBASE=\"{{ project_path }}\"\nRUN_DIR=\"/tmp/code-explainer-{{ workflow_run_id }}\"\nmkdir -p \"$RUN_DIR\"\npython3 \"$BASE/scripts/explainer/delta_report.py\" \"$BASE\" \"$RUN_DIR\"\npython3 \"$BASE/scripts/explainer/extract_backend_deps.py\" \"$BASE\" \"$RUN_DIR\"\npython3 \"$BASE/scripts/explainer/extract_entities.py\" \"$BASE\" \"$RUN_DIR\"\npython3 \"$BASE/scripts/explainer/extract_frontend_deps.py\" \"$BASE\" \"$RUN_DIR\"\n",
+        "command": "set -euo pipefail\nBASE=\"{{ project_path }}\"\nRUN_DIR=\"/tmp/code-explainer-{{ workflow_run_id }}\"\nmkdir -p \"$RUN_DIR\"\npython3 \"$BASE/scripts/explainer/delta_report.py\" \"$BASE\" \"$RUN_DIR\"\npython3 \"$BASE/scripts/explainer/extract_backend_deps.py\" \"$BASE\" \"$RUN_DIR\"\npython3 \"$BASE/scripts/explainer/extract_hierarchies.py\" \"$BASE\" \"$RUN_DIR\"\npython3 \"$BASE/scripts/explainer/extract_entities.py\" \"$BASE\" \"$RUN_DIR\"\npython3 \"$BASE/scripts/explainer/extract_frontend_deps.py\" \"$BASE\" \"$RUN_DIR\"\n",
         "timeout_seconds": 240
       }
     },

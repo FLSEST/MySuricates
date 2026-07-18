@@ -18,6 +18,8 @@ import common
 STATIC_GRAPHS = [
     ("backend_deps", "Backend-Package-Abhängigkeiten",
      "Deterministisch aus den Java-Imports extrahiert (com.automation.*, Tiefe 2)."),
+    ("hierarchies", "Backend-Familien (Erweiterungspunkte)",
+     "Deterministisch: Interfaces/Basisklassen mit ≥3 Implementierungen — die Plugin-Muster des Systems."),
     ("entities", "Entity-Modell (JPA)",
      "Deterministisch aus den @Entity-Klassen extrahiert; Kanten von der Owning-Seite."),
     ("frontend_deps", "Frontend-Importstruktur",
