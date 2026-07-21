@@ -33,8 +33,9 @@
       "config": {
         "label": "Delta-Analyse + Scorecard (Opus)",
         "timeout_seconds": 900,
-        "command": "Du erstellst die Gesundheits-Scorecard fuer MySuricates.\n\nAKTUELLE METRIKEN:\n{{ previous_output }}\n\nLETZTER REPORT:\n{{ previous_report }}\n\nOFFENE TODOS:\n{{ open_todos }}\n\nWORKFLOW GEAENDERT: {{ workflow_changed_since_last_run }}\n\n---\n\nMODUS:\nFalls KEIN letzter Report: VOLLE BEWERTUNG.\nSonst: DELTA — Scores vergleichen, Trend zeigen.\n\n6 DIMENSIONEN (je 1-10):\n1. **Build-Stabilitaet** (20%): Kompiliert Backend+Frontend? Tests bestanden?\n2. **Test-Abdeckung** (20%): Test-to-Source-Ratio, Qualitaet\n3. **Code-Komplexitaet** (15%): God Classes, LOC-Verteilung\n4. **Dependency-Gesundheit** (15%): npm audit, aktuelle Versionen\n5. **Dokumentation** (15%): CLAUDE.md, WORKFLOW-GUIDE.md aktuell?\n6. **Architektur** (15%): Schichtentrennung, Kopplung\n\nFORMAT:\n\n### MySuricates Health — {{ workflow_name }}\n**Modus**: [VOLL / DELTA]\n**Gesamtscore: X.X / 10**\n\n| Dimension | Score | Trend | Handlungsbedarf |\n|-----------|-------|-------|-----------------|\n| Build | X/10 | ↑↓→ | |\n| Tests | X/10 | | |\n| Komplexitaet | X/10 | | |\n| Dependencies | X/10 | | |\n| Dokumentation | X/10 | | |\n| Architektur | X/10 | | |\n\n### Top-3 Handlungsempfehlungen\n1. ...\n\n### todo_items (nur bei NEUEN Problemen)\ntodo_item: <Titel> | HIGH oder MEDIUM | <tags> | <Beschreibung>\n\ngate_status: GREEN wenn >7.0, YELLOW wenn 5.0-7.0, RED wenn <5.0\ngate_category: project-health\ngate_description: Score X.X/10, Trend <besser/schlechter/gleich>"
-      }
+        "command": "Du erstellst die Gesundheits-Scorecard fuer MySuricates.\n\nAKTUELLE METRIKEN:\n{{ previous_output }}\n\nLETZTER REPORT:\n{{ previous_report }}\n\nOFFENE TODOS:\n{{ open_todos }}\n\nWORKFLOW GEAENDERT: {{ workflow_changed_since_last_run }}\n\n---\n\nMODUS:\nFalls KEIN letzter Report: VOLLE BEWERTUNG.\nSonst: DELTA — Scores vergleichen, Trend zeigen.\n\n6 DIMENSIONEN (je 1-10):\n1. **Build-Stabilitaet** (20%): Kompiliert Backend+Frontend? Tests bestanden?\n2. **Test-Abdeckung** (20%): Test-to-Source-Ratio, Qualitaet\n3. **Code-Komplexitaet** (15%): God Classes, LOC-Verteilung\n4. **Dependency-Gesundheit** (15%): npm audit, aktuelle Versionen\n5. **Dokumentation** (15%): CLAUDE.md, WORKFLOW-GUIDE.md aktuell?\n6. **Architektur** (15%): Schichtentrennung, Kopplung\n\nFORMAT:\n\n### MySuricates Health — {{ workflow_name }}\n**Modus**: [VOLL / DELTA]\n**Gesamtscore: X.X / 10**\n\n| Dimension | Score | Trend | Handlungsbedarf |\n|-----------|-------|-------|-----------------|\n| Build | X/10 | ↑↓→ | |\n| Tests | X/10 | | |\n| Komplexitaet | X/10 | | |\n| Dependencies | X/10 | | |\n| Dokumentation | X/10 | | |\n| Architektur | X/10 | | |\n\n### Top-3 Handlungsempfehlungen\n1. ...\n\ngate_status: GREEN wenn >7.0, YELLOW wenn 5.0-7.0, RED wenn <5.0\ngate_category: project-health\ngate_description: Score X.X/10, Trend <besser/schlechter/gleich>\n\nSTRUKTURIERTES AUDIT-ERGEBNIS (VERBINDLICH):\nDer Markdown-Report darf im Delta-Modus Aenderungen hervorheben. Das strukturierte Finding-Array muss dagegen IMMER den vollstaendigen, aktuell noch bestehenden Finding-Snapshot enthalten, auch bekannte Findings. Nur nachweislich nicht mehr vorhandene Findings weglassen. Keine todo_item-Zeilen ausgeben; TODOs werden aus den strukturierten Findings verwaltet.\n\nSchliesse die Antwort mit genau einem versteckten Envelope ab (gueltiges JSON, keine Markdown-Code-Fence):\n<!-- mysuricates:audit-result:v1\n{\"snapshotComplete\":true,\"findings\":[{\"ruleKey\":\"stabile-regel-id\",\"subject\":\"stabile-datei-komponente-oder-metrik\",\"severity\":\"CRITICAL|HIGH|MEDIUM|LOW\",\"title\":\"Kurztitel\",\"description\":\"konkretes Problem und empfohlene Behebung\",\"evidence\":\"Datei:Zeile, Messwert oder reproduzierbarer Nachweis\",\"tags\":[\"backend\"]}]}\n-->\nWenn es keine Findings gibt, findings als leeres Array ausgeben. ruleKey und subject muessen zwischen Runs stabil bleiben; Titeltexte duerfen sich aendern."
+      },
+      "name": "report"
     },
     {
       "type": "simple",
@@ -53,12 +54,15 @@
       }
     }
   ],
-  "version": "3.0.0",
+  "version": "4.0.0",
   "author": "MySuricates",
   "metadata": {
-    "autoTodo": {
+    "audit": {
       "enabled": true,
-      "mode": "track"
+      "key": "mysuricates.health",
+      "category": "health",
+      "reportBlock": "report",
+      "schemaVersion": 1
     }
   }
 }

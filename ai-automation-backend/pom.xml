@@ -248,6 +248,7 @@
                                     <includes>
                                         <include>architektur.md</include>
                                         <include>WORKFLOW-GUIDE.md</include>
+                                        <include>audit-workflow-protocol.md</include>
                                         <include>assistant-system.md</include>
                                         <include>vision.md</include>
                                     </includes>

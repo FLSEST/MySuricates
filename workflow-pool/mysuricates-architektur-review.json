@@ -34,8 +34,9 @@
       "config": {
         "label": "Delta-Analyse + Report (Opus)",
         "timeout_seconds": 900,
-        "command": "Du bist der Architektur-Auditor fuer MySuricates (Spring Boot + React).\n\nAKTUELLE METRIKEN UND DELTA:\n{{ previous_output }}\n\nLETZTER REPORT:\n{{ previous_report }}\n\nOFFENE TODOS:\n{{ open_todos }}\n\nWORKFLOW GEAENDERT: {{ workflow_changed_since_last_run }}\n\n---\n\nMODUS:\n\nFalls KEIN letzter Report oder workflow_changed_since_last_run == 'true':\n→ VOLLE ANALYSE aller Metriken.\n\nFalls letzter Report vorhanden UND Workflow unveraendert:\n→ DELTA-ANALYSE:\n  1. Was ist NEU? Neue God Classes, neue Kopplung, neue Layer-Verletzungen?\n  2. Was wurde VERBESSERT? Aufgeteilte Klassen, reduzierte Dependencies?\n  3. Was ist UNVERAENDERT? Bekannte Probleme die als TODO existieren → nicht nochmal melden\n\n---\n\nBEWERTUNGSKRITERIEN:\n- God Classes: >300 LOC UND >7 deps = CRITICAL, >200 LOC UND >5 deps = HIGH\n- @Lazy: SubWorkflow→WorkflowExecutor ist BEKANNT/AKZEPTIERT → kein Finding\n- Cross-Layer: Service→Controller = CRITICAL, Controller→Repository = HIGH\n- Kopplung: >10 deps = CRITICAL, >7 = HIGH, >5 = MEDIUM\n- Frontend: >500 LOC Komponente = HIGH, >300 = MEDIUM\n\nREPORT-FORMAT:\n\n### Architektur-Review — {{ workflow_name }}\n**Modus**: [VOLL / DELTA]\n\n### Radar\n| Dimension | Score (1-10) | Trend | Kritischster Fund |\n|-----------|-------------|-------|-------------------|\n| God Classes | | | |\n| Kopplung | | | |\n| Schichtverletzungen | | | |\n| Frontend-Komplexitaet | | | |\n\n### Findings (nur NEUE bei Delta)\n| # | Klasse | Problem | Schweregrad | Empfehlung |\n\n### Naechste Schritte (Top 3 mit groesstem Impact)\n1. ...\n2. ...\n3. ...\n\n### todo_items (NUR fuer NEUE Findings)\n\ntodo_item: <Titel> | CRITICAL oder HIGH oder MEDIUM | <tags> | <Beschreibung>\n\nWICHTIG:\n- NUR todo_items fuer NEUE Findings\n- Pruefe offene TODOs — kein Duplikat erstellen\n- CRITICAL fuer: Cross-Layer-Verletzungen, >10 deps, >500 LOC God Classes\n\ngate_status: GREEN wenn kein CRITICAL, YELLOW wenn CRITICAL vorhanden aber bekannt, RED wenn neues CRITICAL\ngate_category: architecture\ngate_description: <Score>, <Anzahl> Findings, Trend <besser/schlechter/gleich>"
-      }
+        "command": "Du bist der Architektur-Auditor fuer MySuricates (Spring Boot + React).\n\nAKTUELLE METRIKEN UND DELTA:\n{{ previous_output }}\n\nLETZTER REPORT:\n{{ previous_report }}\n\nOFFENE TODOS:\n{{ open_todos }}\n\nWORKFLOW GEAENDERT: {{ workflow_changed_since_last_run }}\n\n---\n\nMODUS:\n\nFalls KEIN letzter Report oder workflow_changed_since_last_run == 'true':\n→ VOLLE ANALYSE aller Metriken.\n\nFalls letzter Report vorhanden UND Workflow unveraendert:\n→ DELTA-ANALYSE:\n  1. Was ist NEU? Neue God Classes, neue Kopplung, neue Layer-Verletzungen?\n  2. Was wurde VERBESSERT? Aufgeteilte Klassen, reduzierte Dependencies?\n  3. Was ist UNVERAENDERT? Bekannte Probleme die als TODO existieren → nicht nochmal melden\n\n---\n\nBEWERTUNGSKRITERIEN:\n- God Classes: >300 LOC UND >7 deps = CRITICAL, >200 LOC UND >5 deps = HIGH\n- @Lazy: SubWorkflow→WorkflowExecutor ist BEKANNT/AKZEPTIERT → kein Finding\n- Cross-Layer: Service→Controller = CRITICAL, Controller→Repository = HIGH\n- Kopplung: >10 deps = CRITICAL, >7 = HIGH, >5 = MEDIUM\n- Frontend: >500 LOC Komponente = HIGH, >300 = MEDIUM\n\nREPORT-FORMAT:\n\n### Architektur-Review — {{ workflow_name }}\n**Modus**: [VOLL / DELTA]\n\n### Radar\n| Dimension | Score (1-10) | Trend | Kritischster Fund |\n|-----------|-------------|-------|-------------------|\n| God Classes | | | |\n| Kopplung | | | |\n| Schichtverletzungen | | | |\n| Frontend-Komplexitaet | | | |\n\n### Findings (nur NEUE bei Delta)\n| # | Klasse | Problem | Schweregrad | Empfehlung |\n\n### Naechste Schritte (Top 3 mit groesstem Impact)\n1. ...\n2. ...\n3. ...\n\ngate_status: GREEN wenn kein CRITICAL, YELLOW wenn CRITICAL vorhanden aber bekannt, RED wenn neues CRITICAL\ngate_category: architecture\ngate_description: <Score>, <Anzahl> Findings, Trend <besser/schlechter/gleich>\n\nSTRUKTURIERTES AUDIT-ERGEBNIS (VERBINDLICH):\nDer Markdown-Report darf im Delta-Modus Aenderungen hervorheben. Das strukturierte Finding-Array muss dagegen IMMER den vollstaendigen, aktuell noch bestehenden Finding-Snapshot enthalten, auch bekannte Findings. Nur nachweislich nicht mehr vorhandene Findings weglassen. Keine todo_item-Zeilen ausgeben; TODOs werden aus den strukturierten Findings verwaltet.\n\nSchliesse die Antwort mit genau einem versteckten Envelope ab (gueltiges JSON, keine Markdown-Code-Fence):\n<!-- mysuricates:audit-result:v1\n{\"snapshotComplete\":true,\"findings\":[{\"ruleKey\":\"stabile-regel-id\",\"subject\":\"stabile-datei-komponente-oder-metrik\",\"severity\":\"CRITICAL|HIGH|MEDIUM|LOW\",\"title\":\"Kurztitel\",\"description\":\"konkretes Problem und empfohlene Behebung\",\"evidence\":\"Datei:Zeile, Messwert oder reproduzierbarer Nachweis\",\"tags\":[\"backend\"]}]}\n-->\nWenn es keine Findings gibt, findings als leeres Array ausgeben. ruleKey und subject muessen zwischen Runs stabil bleiben; Titeltexte duerfen sich aendern."
+      },
+      "name": "report"
     },
     {
       "type": "simple",
@@ -54,12 +55,15 @@
       }
     }
   ],
-  "version": "3.0.0",
+  "version": "4.0.0",
   "author": "MySuricates",
   "metadata": {
-    "autoTodo": {
+    "audit": {
       "enabled": true,
-      "mode": "track"
+      "key": "mysuricates.architecture",
+      "category": "architecture",
+      "reportBlock": "report",
+      "schemaVersion": 1
     }
   }
 }
