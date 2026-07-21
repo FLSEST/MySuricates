@@ -363,6 +363,10 @@ public class AutoTodoService {
      */
     @SuppressWarnings("unchecked")
     boolean isAutoTodoEnabled(WorkflowRunCompletedEvent event) {
+        Object audit = event.getWorkflowMetadata().get("audit");
+        if (audit instanceof Map<?, ?> map && Boolean.TRUE.equals(map.get("enabled"))) {
+            return false;
+        }
         Object autoTodo = event.getWorkflowMetadata().get("autoTodo");
         if (autoTodo instanceof Map<?, ?> map) {
             Object enabled = map.get("enabled");

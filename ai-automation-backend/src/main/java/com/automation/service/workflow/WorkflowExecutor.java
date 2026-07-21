@@ -395,9 +395,14 @@ public class WorkflowExecutor {
                 step.setStatus(result.getStatus());
                 step.setCompletedAt(result.getCompletedAt());
                 step.setDurationMs(result.getDurationMs());
-                if (result.getMetadata() != null) {
-                    step.setMetadata(result.getMetadata());
+                Map<String, Object> stepMetadata = result.getMetadata() != null
+                        ? new HashMap<>(result.getMetadata())
+                        : new HashMap<>();
+                stepMetadata.put("blockType", block.getType());
+                if (block.getName() != null && !block.getName().isBlank()) {
+                    stepMetadata.put("blockName", block.getName());
                 }
+                step.setMetadata(stepMetadata);
                 context.setPreviousOutput(step.getOutput());
                 context.setVariable("step_" + step.getStepIndex() + "_output",
                         step.getOutput() != null ? step.getOutput() : "");
