@@ -101,7 +101,7 @@ const DeadLetterQueue = lazy(() => import('./pages/DeadLetterQueue').then(m => (
 const WorkflowDebug = lazy(() => import('./pages/WorkflowDebug').then(m => ({ default: m.WorkflowDebug })));
 const WorkflowFactory = lazy(() => import('./pages/WorkflowFactory').then(m => ({ default: m.WorkflowFactory })));
 const Docs = lazy(() => import('./pages/Docs').then(m => ({ default: m.Docs })));
-const Reports = lazy(() => import('./pages/Reports').then(m => ({ default: m.Reports })));
+const Reports = lazy(() => import('./pages/AuditCenter').then(m => ({ default: m.AuditCenter })));
 const Insights = lazy(() => import('./pages/Insights').then(m => ({ default: m.Insights })));
 const DialogImport = lazy(() => import('./pages/DialogImport').then(m => ({ default: m.DialogImport })));
 const OnboardingProfiles = lazy(() => import('./pages/OnboardingProfiles').then(m => ({ default: m.OnboardingProfiles })));

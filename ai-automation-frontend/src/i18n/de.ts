@@ -67,7 +67,7 @@ export const de: TranslationKeys = {
     wishes: 'Wünsche',
     factory: 'Factory',
     docs: 'Dokumentation',
-    reports: 'Berichte',
+    reports: 'Audit-Center',
     insights: 'Insights',
     dialogs: 'Session2Workflow',
     onboardingProfiles: 'Onboarding-Profile',

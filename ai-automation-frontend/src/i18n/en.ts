@@ -65,7 +65,7 @@ export const en = {
     wishes: 'Wishes',
     factory: 'Factory',
     docs: 'Documentation',
-    reports: 'Reports',
+    reports: 'Audit Center',
     insights: 'Insights',
     dialogs: 'Session2Workflow',
     onboardingProfiles: 'Onboarding Profiles',
