@@ -13,6 +13,9 @@ public interface AuditReportRepository extends JpaRepository<AuditReport, String
     boolean existsByWorkflowRunId(String workflowRunId);
     Optional<AuditReport> findTopByProjectIdAndAuditKeyAndIngestionStatusOrderByGeneratedAtDesc(
             String projectId, String auditKey, AuditIngestionStatus ingestionStatus);
+    Optional<AuditReport> findTopByProjectIdAndAuditKeyOrderByGeneratedAtDesc(String projectId, String auditKey);
+    Page<AuditReport> findByProjectIdAndAuditKeyAndIngestionStatusOrderByGeneratedAtDesc(
+            String projectId, String auditKey, AuditIngestionStatus ingestionStatus, Pageable pageable);
     Page<AuditReport> findByProjectIdAndAuditKeyOrderByGeneratedAtDesc(
             String projectId, String auditKey, Pageable pageable);
     List<AuditReport> findByProjectIdOrderByGeneratedAtDesc(String projectId);

@@ -27,6 +27,7 @@ import com.automation.exception.ErrorCode;
 import com.automation.exception.TaskExportException;
 import jakarta.persistence.criteria.Predicate;
 import com.automation.event.TodoCreatedEvent;
+import com.automation.service.audit.AuditCenterService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -61,6 +62,7 @@ public class TodoService {
     private final ApplicationEventPublisher eventPublisher;
     private final IntegrationRegistry integrationRegistry;
     private final IntegrationOAuthService integrationOAuthService;
+    private final AuditCenterService auditCenterService;
 
     private static final Comparator<Todo> PRIORITY_COMPARATOR =
             Comparator.comparingInt((Todo t) -> switch (t.getPriority()) {
@@ -164,6 +166,9 @@ public class TodoService {
         }
 
         Todo saved = todoRepository.save(todo);
+        if (request.status() == Todo.Status.DONE) {
+            auditCenterService.markAwaitingVerification(saved.getId());
+        }
         log.info("Updated todo: {} ({})", saved.getTitle(), saved.getId());
         return saved;
     }
@@ -182,6 +187,9 @@ public class TodoService {
             todo.setSessionId(request.sessionId());
         }
         Todo saved = todoRepository.save(todo);
+        if (request.status() == Todo.Status.DONE) {
+            auditCenterService.markAwaitingVerification(saved.getId());
+        }
         log.info("Updated todo status: {} → {} ({})", todo.getTitle(), request.status(), todo.getId());
         return saved;
     }

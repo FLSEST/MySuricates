@@ -16,6 +16,7 @@ import com.automation.repository.ProjectRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.audit.AuditCenterService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
 import org.junit.jupiter.api.Test;
@@ -64,6 +65,9 @@ class TodoServiceTest {
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    private AuditCenterService auditCenterService;
 
     @InjectMocks
     private TodoService todoService;
@@ -253,6 +257,21 @@ class TodoServiceTest {
     }
 
     @Test
+    void update_doneMarksManagedAuditFindingForVerification() {
+        Todo existing = Todo.builder().id("t-1").title("Audit fix").status(Todo.Status.OPEN).build();
+        when(todoRepository.findById("t-1")).thenReturn(Optional.of(existing));
+        when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UpdateTodoRequest request = new UpdateTodoRequest(
+                null, null, Todo.Status.DONE, null, null, null, null, null, null, null);
+
+        Todo result = todoService.update("t-1", request);
+
+        assertThat(result.getStatus()).isEqualTo(Todo.Status.DONE);
+        verify(auditCenterService).markAwaitingVerification("t-1");
+    }
+
+    @Test
     void update_blankProjectId_setsToNull() {
         Todo existing = Todo.builder()
                 .id("t-1").title("Test").projectId("proj-1")
@@ -280,6 +299,7 @@ class TodoServiceTest {
 
         assertThat(result.getStatus()).isEqualTo(Todo.Status.DONE);
         verify(todoRepository).save(todo);
+        verify(auditCenterService).markAwaitingVerification("t-1");
     }
 
     @Test
