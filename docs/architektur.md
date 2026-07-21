@@ -57,7 +57,7 @@ Dev startet Stable und Test bei Boot automatisch, wenn ein Snapshot vorhanden is
 ### Schichtenmodell
 
 ```
-Controller (REST API, 33 Controller)
+Controller (REST API, 34 Controller)
     ↓ DTO (Request/Response Records)
 Service (Geschäftslogik)
     ↓ Entity (JPA)
@@ -70,7 +70,7 @@ SQLite (Datei: data/automation.db)
 
 ```
 com.automation
-├── controller/          33 REST-Controller
+├── controller/          34 REST-Controller
 ├── service/
 │   ├── project/         ProjectService, ContainerService, ProjectContextService, PathValidator, OnboardingProfileService, ProjectOnboardingService
 │   ├── workflow/        WorkflowExecutor, WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService, GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
@@ -93,6 +93,7 @@ com.automation
 │   ├── notification/    NotificationService
 │   ├── trigger/         CompletionTriggerService, TodoTriggerService, TodoFeedbackListener
 │   ├── health/          HealthAutoTodoService
+│   ├── audit/           AuditResultParser, AuditIngestionService, AuditIngestionListener, AuditCenterService
 │   ├── integration/     IntegrationRegistry, IntegrationOAuthService, IntegrationEncryptionService, IntegrationProvider, OAuthConfig, TaskExportCapable
 │   ├── integration/providers/ 7 Provider in Unterverzeichnissen (confluence/, github/, google/, jira/, taskwarrior/, trello/)
 │   ├── assistant/       AssistantContextBuilder, AssistantChatBroadcaster, AssistantFetchService, AssistantToolExecutor, AssistantActionSuggestionService, PendingTool, PendingToolRegistry, ToolExecutionResult
@@ -126,7 +127,7 @@ com.automation
 └── util/                JPA-Converter (JSON, BlockDefinitions)
 ```
 
-### Alle 33 REST-Controller
+### Alle 34 REST-Controller
 
 | Controller | Base-Path | Beschreibung |
 |---|---|---|
@@ -162,6 +163,7 @@ com.automation
 | `IntegrationController` | `/api/v1/integrations` | OAuth-Flow, Credentials, Actions, Provider-Liste, Task-Export-Ziele |
 | `OnboardingProfileController` | `/api/v1/onboarding-profiles` | Onboarding-Profile CRUD, Reset, History |
 | `ReportsController` | `/api/v1/reports` | Report-Generierung und -Abruf |
+| `AuditController` | `/api/v1/audits`, `/api/v1/audit-*` | Audit-Übersicht, Report-Historie, Findings und TODO-Verknüpfungen |
 | `DocsController` | `/api/v1/docs` | Markdown-Dokumentation lesen |
 
 ### Workflow-Ausführung
@@ -304,8 +306,8 @@ Automatische Verkettung von Workflows auf Basis von Abschluss-Ereignissen:
 Automatische Ausführung von Fix-Workflows wenn TODOs erstellt werden — schliesst den Self-Improvement-Loop:
 
 ```
-Audit-Workflow → AutoTodoService → TODO (OPEN)
-                                     ↓ TodoCreatedEvent
+Audit-Workflow → AuditIngestionService → Finding → TODO (OPEN)
+                                                 ↓ TodoCreatedEvent
                              TodoTriggerService → Fix-Workflow
                                                      ↓ WorkflowRunCompletedEvent
                                              TodoFeedbackListener → TODO (DONE)
@@ -775,6 +777,8 @@ Die DB-Migrationen (`src/main/resources/db/migration/`) dokumentieren die Featur
 | V64 | Writes-Flag auf Capabilities |
 | V65 | Catch-Up-On-Resume auf Schedules |
 | V66 | Todo-Export-Link |
+| V67 | Aufwandsschätzung auf Workflows |
+| V68 | Audit-Reports, Findings, Occurrences und TODO-Verknüpfungen |
 
 ## Verzeichnisstruktur
 
@@ -813,7 +817,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev-Profil
 │           ├── agent-instructions.md  ← Basis-Agent-Instructions
 │           ├── templates/builtin/     ← Built-in Template JSON-Dateien
-│           └── db/migration/          ← 66 Flyway-Migrationen (V1–V66)
+│           └── db/migration/          ← 68 Flyway-Migrationen (V1–V68)
 │
 └── ai-automation-frontend/
     ├── package.json

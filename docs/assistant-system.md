@@ -6,7 +6,7 @@ Der Assistant ist ein kontext-sensitiver Chat-Assistent, der als Floating-Panel 
 
 ## Überblick
 
-Das Assistant-System besteht aus vier Bereichen:
+Das Assistant-System besteht aus fünf Bereichen:
 
 1. **Chat** — Freeform-Konversation via `POST /api/v1/assistant/chat`
 2. **Sessions** — Persistierte Chat-Verläufe pro Page (V41-Migration: `assistant_sessions`)

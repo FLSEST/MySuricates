@@ -7,7 +7,7 @@
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                      Browser                            │
-│  React 18 PWA (Vite Dev-Server :3000 / statisch)        │
+│  React 19 PWA (Vite Dev-Server :3000 / statisch)        │
 └──────────┬──────────────────────┬───────────────────────┘
            │ REST /api/v1/*       │ WebSocket /ws
            │ (Vite Proxy)         │ (STOMP/SockJS)
@@ -57,7 +57,7 @@ Dev startet Stable und Test bei Boot automatisch, wenn ein Snapshot vorhanden is
 ### Schichtenmodell
 
 ```
-Controller (REST API, 26 Controller)
+Controller (REST API, 34 Controller)
     ↓ DTO (Request/Response Records)
 Service (Geschäftslogik)
     ↓ Entity (JPA)
@@ -70,31 +70,39 @@ SQLite (Datei: data/automation.db)
 
 ```
 com.automation
-├── controller/          30 REST-Controller
+├── controller/          34 REST-Controller
 ├── service/
-│   ├── project/         ProjectService, ContainerService, ProjectContextService, PathValidator
-│   ├── workflow/        WorkflowExecutor, WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService, GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService
+│   ├── project/         ProjectService, ContainerService, ProjectContextService, PathValidator, OnboardingProfileService, ProjectOnboardingService
+│   ├── workflow/        WorkflowExecutor, WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService, GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
 │   ├── skill/           SkillService, SkillImportExportService, SkillRegistry, CapabilityRegistry
-│   ├── scheduler/       SchedulerService, ScheduledWorkflowExecutor
+│   ├── scheduler/       SchedulerService, ScheduledWorkflowExecutor, SuspendState
 │   ├── webhook/         WebhookService, GitWebhookPayloadParser
-│   ├── learning/        LearningService, AgenticLearningService, ExecutionInsightsService, WorkflowStatsService, WorkflowSimilarityService, BlockTypesBackfillService, MetadataExtractor
-│   ├── system/          ApiKeyService, DatabaseBackupService, ExecutionSettingsService, SystemIdentityService, TailscaleService
-│   ├── ai/              HostClaudeService, HostCodexService, AiProviderRegistry, ClaudeAiProvider, CodexAiProvider
-│   ├── cli/             CommandExecutorService, CliSessionManager, ClaudeOutputParser, ShellCommandService, ContainerShellService
+│   ├── learning/        LearningService, AgenticLearningService, ExecutionInsightsService, WorkflowStatsService, WorkflowSimilarityService, BlockTypesBackfillService, MetadataExtractor, PlatformStatsService
+│   ├── system/          ApiKeyService, DatabaseBackupService, ExecutionSettingsService, SystemIdentityService, TailscaleService, FileBrowserService, IntegrationSnippetService, SystemSettingsService
+│   ├── ai/              HostClaudeService, HostCodexService, HostPiService, AiProviderRegistry, AiProvider, AiProviderCapabilities, AiResponseMetadata, ClaudeAiProvider, CodexAiProvider, PiAiProvider, PiCatalogService
+│   ├── cli/             CommandExecutorService, CliSessionManager, CliSession, ClaudeOutputParser, ClaudeJsonResponse, HostExecutionRequest, ShellCommandService, ContainerShellService, TaskCommandService
 │   ├── chain/           ChainService, ChainExecutor, ChainTemplateService, BuiltInChainTemplate
-│   ├── memory/          WorkflowMemoryService, ClaudeSummarizer, CodexSummarizer, KnowledgeSummarizer, ConversationPreprocessor, SummarizationSetupService
+│   ├── memory/          WorkflowMemoryService, ClaudeSummarizer, CodexSummarizer, KnowledgeSummarizer, ConversationPreprocessor, SummarizationSetupService, AutoMemoryExtractionListener
 │   ├── staging/         StagingService, TestingService, InstanceSyncHelper, DockerContainerManager
-│   ├── todo/            TodoService, AutoTodoService, GateStatusResolver, GateStatusOutputParser, ProjectPathResolver
+│   ├── todo/            TodoService, AutoTodoService, GateStatusResolver, GateStatusOutputParser, ProjectPathResolver, TodoGhostWatchdogService, TodoHygieneService, TodoOutputParser, TodoOverviewService, TodoResolutionListener, TodoSimilarityService
 │   ├── conversion/      WorkflowConversionService, WorkflowSuggestion, DialogWorkflowSuggestion
 │   ├── dialog/          DialogSessionScanner, DialogConversionService, ClaudeJsonlParser
 │   ├── factory/         WorkflowFactoryService, ClaudeWorkflowGenerator, CodexWorkflowGenerator, WorkflowTextGenerator, FactorySetupService
 │   ├── pool/            WorkflowPoolService
-│   ├── wish/            WishService, WishWatchdogService
+│   ├── wish/            WishService, WishWatchdogService, WishDecomposeService, WishDecomposePromptBuilder, WishExecutionService, WishEvaluatePromptBuilder, WishPromptBuilder, WishPromptHelper, WishJsonUtil, WishStatusHelper, WishStringUtil
 │   ├── notification/    NotificationService
 │   ├── trigger/         CompletionTriggerService, TodoTriggerService, TodoFeedbackListener
 │   ├── health/          HealthAutoTodoService
-│   ├── integration/     IntegrationRegistry, IntegrationOAuthService, IntegrationEncryptionService, IntegrationBlockExecutor, 5 Provider
-│   ├── onboarding/      OnboardingProfileService, ProjectOnboardingService, OnboardingProfileSeeder
+│   ├── audit/           AuditResultParser, AuditIngestionService, AuditIngestionListener, AuditCenterService
+│   ├── integration/     IntegrationRegistry, IntegrationOAuthService, IntegrationEncryptionService, IntegrationProvider, OAuthConfig, TaskExportCapable
+│   ├── integration/providers/ 7 Provider in Unterverzeichnissen (confluence/, github/, google/, jira/, taskwarrior/, trello/)
+│   ├── assistant/       AssistantContextBuilder, AssistantChatBroadcaster, AssistantFetchService, AssistantToolExecutor, AssistantActionSuggestionService, PendingTool, PendingToolRegistry, ToolExecutionResult
+│   ├── assistant/context/ AssistantContextSection, BlockTypesIndexSection, ChainsIndexSection, FailedWorkflowsContextSection, IntegrationsIndexSection, RunsContextSection, SchedulesContextSection, SkillsIndexSection, TodosContextSection, WishesContextSection
+│   ├── execution/       ExecutionQueryService, WorkflowDebugService
+│   ├── dlq/             DeadLetterService
+│   ├── document/        DocumentExtractionService, DocumentExtractionException
+│   ├── search/          SemanticWorkflowSearchService
+│   ├── watchdog/        ConnectionPoolWatchdogService
 │   ├── repair/          AutoRepairService
 │   ├── tray/            SystemTrayService
 │   ├── activitylog/     ActivityLogService, ActivityLogLifecycleListener
@@ -108,48 +116,54 @@ com.automation
 ├── repository/          Spring Data Repositories
 ├── mapper/              MapStruct-Mapper (Entity ↔ DTO)
 ├── executor/            Workflow-Ausführungs-Engine
-│   └── blocks/          12 Block-Executors
-├── config/              Konfigurationsklassen, Seeder (Skill, Template)
-├── security/            ApiKeyAuthFilter, RateLimitFilter
-├── exception/           GlobalExceptionHandler + Exception-Klassen
-├── websocket/           WebSocket-Konfiguration
-├── event/               WorkflowRunCompletedEvent, AssistantSessionUpdatedEvent
+│   └── blocks/          14 Block-Executors + Agentic-Hilfsklassen
+├── concurrency/         DynamicSemaphore
+├── config/              Konfigurationsklassen, Seeder (Skill, Template, OnboardingProfile)
+├── security/            ApiKeyAuthFilter, RateLimitFilter, ActivityLogSizeLimitFilter, WebhookRateLimiter, WebSocketAuthInterceptor
+├── skills/handlers/     CapabilityHandler, LintHandler, SecurityScanHandler, FactCheckHandler, GrammarCheckHandler, OCRHandler
+├── exception/           GlobalExceptionHandler, ErrorCode + Exception-Klassen
+├── websocket/           LogWebSocketHandler, TerminalWebSocketHandler, TerminalSession, Message-DTOs
+├── event/               WorkflowRunCompletedEvent, AssistantSessionUpdatedEvent, TodoCreatedEvent
 └── util/                JPA-Converter (JSON, BlockDefinitions)
 ```
 
-### Alle 30 REST-Controller
+### Alle 34 REST-Controller
 
 | Controller | Base-Path | Beschreibung |
 |---|---|---|
 | `ProjectController` | `/api/v1/projects` | CRUD, Archivierung, Container-Lifecycle, Kontext-Generierung |
-| `WorkflowController` | `/api/v1/workflows` | CRUD, Ausführung, Export/Import, Skills, Optimize, Repair |
-| `ExecutionController` | `/api/v1/executions` | Pause, Resume, Resume-from-Step, Cancel, Retry, Approve, Todos-Approve, Command |
+| `WorkflowController` | `/api/v1/workflows` | CRUD, Ausführung, Runs, Export/Import, Skills, Optimize, Similar, Repair, Versions |
+| `ExecutionController` | `/api/v1/executions` | Liste, Detail, Pause, Resume, Resume-from-Step, Cancel, Retry, Approve, Approval-Check, Todos-Approve, Notes, Command |
 | `SkillController` | `/api/v1/skills` | CRUD, Capabilities, Export/Import |
 | `ScheduleController` | `/api/v1/schedules` | CRUD, Enable/Disable, Runs, Calendar, Preview, Remaining-Stats, Chain-Schedules, Maintenance |
 | `WebhookController` | `/api/v1/webhooks` | CRUD, Enable/Disable; Trigger via `/api/v1/webhook/trigger/{token}` |
-| `ChainController` | `/api/v1/chains` | CRUD, Ausführung, Runs |
+| `ChainController` | `/api/v1/chains` | CRUD, Ausführung, Runs, Cancel |
 | `ChainTemplateController` | `/api/v1/chain-templates` | Liste, Abrufen, Installieren als Chain |
 | `WorkflowTemplateController` | `/api/v1/workflow-templates` | CRUD, Aus-Workflow erstellen |
 | `WorkflowMemoryController` | `/api/v1/workflows/{id}/memory` | CRUD, Extrahieren, Aktivieren |
 | `WorkflowFactoryController` | `/api/v1/factory` | Generate, Run, Verify, Promote, Topics |
-| `WorkflowPoolController` | `/api/v1/pool` | Liste, Abrufen, Installieren |
+| `WorkflowPoolController` | `/api/v1/pool` | Liste, Abrufen, Installieren, Export |
 | `ConversionController` | `/api/v1/conversions` | Suggest, Create-Workflow aus Run |
 | `DialogController` | `/api/v1/dialog` | Sessions, Projekte, Claude-Session-Analyse, Workflow-Erstellung |
 | `LearningController` | `/api/v1/learning` | Dashboard, Stats, Step-Analytics, Suggestions, Similar, Agentic-History, Agentic-Analytics, Tool-Patterns, Execution-Insights, Run-Insights, Rate |
-| `TodoController` | `/api/v1/todos` | CRUD, Status-Patch, Count, Overview (Cockpit), Bulk-Status, Archive-Stale |
-| `ActivityLogController` | `/api/v1/activity-log` | Liste |
-| `AssistantController` | `/api/v1/assistant` | Chat (`POST /chat`) |
+| `TodoController` | `/api/v1/todos` | CRUD, Status-Patch, Resolve, Export, Count, Overview (Cockpit), Bulk-Status, Archive-Stale, Similar |
+| `ActivityLogController` | `/api/v1/activity-log` | Liste, Erstellen |
+| `AssistantController` | `/api/v1/assistant` | Chat (`POST /chat`), Sessions, Pending-Tool-Bestätigung/Ablehnung |
 | `PageSuggestionController` | `/api/v1/assistant` | Suggestions per Page (Get/Refresh) |
+| `DeadLetterController` | `/api/v1/dlq` | Dead-Letter-Queue: Liste, Retry, Löschen |
+| `SearchController` | `/api/v1/search` | Aggregierte Suche über Workflows (Substring/Fuzzy + Semantic Ranking) |
+| `WorkflowDebugController` | `/api/v1/debug` | Debug-Seite: Workflows mit fehlgeschlagenem letztem Run |
 | `CompletionTriggerController` | `/api/v1/completion-triggers` | CRUD, Enable/Disable, Filter by Workflow |
 | `TodoTriggerController` | `/api/v1/todo-triggers` | CRUD, Enable/Disable, Filter by Target-Workflow |
 | `NotificationController` | `/api/v1/notifications` | CRUD, Enable/Disable |
 | `WishController` | `/api/v1/wishes` | CRUD, Cancel, Respond, Crystallize |
 | `StagingController` | `/api/v1/staging` | Status, Start, Stop, Promote, Promote-Cancel, Sync-Preview, Sync-Definitions |
 | `TestingController` | `/api/v1/testing` | Status, Start, Stop, Reset, Sync-Preview, Sync-Definitions, Report-Result, Pull-Changes |
-| `SystemController` | `/api/v1/system` | Health, Auth-Status, Info, Settings, Execution-Config, AI-Providers, Backup, Backups, Remote-Access, Browse, Open-Path, Repair, Client-Errors |
-| `IntegrationController` | `/api/v1/integrations` | OAuth-Flow, Credentials, Actions, Provider-Liste |
-| `OnboardingProfileController` | `/api/v1/projects/{id}/onboarding` | Onboarding-Profile CRUD, Enable/Disable, Preview |
+| `SystemController` | `/api/v1/system` | Health, Auth-Status, Info, Settings, Execution-Config, AI-Providers, AI-Provider-Katalog, Capabilities, Backup, Backups, Remote-Access, Vacuum, Browse, Open-Path, Repair, Client-Errors, Integration-Snippet |
+| `IntegrationController` | `/api/v1/integrations` | OAuth-Flow, Credentials, Actions, Provider-Liste, Task-Export-Ziele |
+| `OnboardingProfileController` | `/api/v1/onboarding-profiles` | Onboarding-Profile CRUD, Reset, History |
 | `ReportsController` | `/api/v1/reports` | Report-Generierung und -Abruf |
+| `AuditController` | `/api/v1/audits`, `/api/v1/audit-*` | Audit-Übersicht, Report-Historie, Findings und TODO-Verknüpfungen |
 | `DocsController` | `/api/v1/docs` | Markdown-Dokumentation lesen |
 
 ### Workflow-Ausführung
@@ -166,15 +180,15 @@ Die Workflow-Engine führt Blöcke sequenziell aus. Claude CLI läuft **immer au
 7. Nach Abschluss wertet `WorkflowExecutor` Gate-Status aus (alle Block-Outputs)
 8. `WorkflowRunCompletedEvent` wird gefeuert → `AutoTodoService` reagiert
 
-### Block-Typen (12 gesamt)
+### Block-Typen (14 gesamt)
 
 | Typ | Executor | Beschreibung |
 |---|---|---|
 | `simple` | `SimpleBlockExecutor` | Einzelner Claude-CLI-Aufruf mit Prompt |
-| `shell` | `SimpleBlockExecutor` (dual-mode) | Shell-Skript oder Claude-CLI |
+| `shell` | `ShellBlockExecutor` | Shell-Skript, optional via Docker-Container |
 | `retry` | `RetryBlockExecutor` | Prompt mit konfigurierbaren Wiederholungsversuchen |
 | `conditional` | `ConditionalBlockExecutor` | If/Else-Verzweigung basierend auf Bedingung |
-| `forEach` | `ForEachBlockExecutor` | Iteration über eine Liste von Elementen |
+| `foreach` | `ForEachBlockExecutor` | Iteration über eine Liste von Elementen |
 | `while` | `WhileBlockExecutor` | Wiederholung mit Abbruchbedingung und Max-Iterations |
 | `switch` | `SwitchBlockExecutor` | Multi-Way-Branching per Expression mit Cases |
 | `agentic` | `AgenticBlockExecutor` | Goal→Reason→Act→Observe Loop, bis zu 10 Iterationen |
@@ -182,6 +196,8 @@ Die Workflow-Engine führt Blöcke sequenziell aus. Claude CLI läuft **immer au
 | `sub-workflow` | `SubWorkflowBlockExecutor` | Führt einen anderen Workflow als Unterprozess aus |
 | `skill-capability` | `SkillCapabilityBlockExecutor` | Ruft eine benannte Skill-Capability auf |
 | `human-input` | `HumanInputBlockExecutor` | Sammelt Nutzereingabe via WebSocket, speichert als Kontext-Variable |
+| `integration` | `IntegrationBlockExecutor` | Führt eine Aktion auf einem externen Integration-Provider aus |
+| `document` | `DocumentBlockExecutor` | Extrahiert Text aus PDF/DOCX/XLSX/HTML/TXT via Apache Tika |
 
 **Template-Variablen** (`{{ variable }}`, `${varName}`) werden zur Laufzeit im `ExecutionContext` aufgelöst. `{{ previous_output }}` enthält die Ausgabe des vorherigen Blocks.
 
@@ -205,7 +221,7 @@ Der Agentic-Block implementiert eine autonome Ausführungsschleife:
 | `max_repeated_actions` | 3 | Abbruch nach N identischen Aktionen |
 | `require_approval` | false | Approval-Gate vor jeder Aktion |
 
-Zusätzlich: History-Kompression nach 7 Turns, Token-Tracking-Warnungen im Log. Alle 6 Safety-Felder werden im Frontend-"Block hinzufügen"-Dialog als Defaults vorbelegt.
+Zusätzlich: History-Kompression nach 7 Turns, Action-Kompression bei >100.000 Zeichen, Token-Tracking-Warnungen im Log. Alle 6 Safety-Felder werden im Frontend-"Block hinzufügen"-Dialog als Defaults vorbelegt. Hilfsklassen: `AgenticBlockConfig`, `AgenticSafetyGuard`, `AgenticTokenTracker`, `AgenticPlan`.
 
 ### Switch Block
 
@@ -264,7 +280,7 @@ gate_description: <beschreibung>
 Chains gruppieren mehrere Workflows für sequenzielle Ausführung:
 
 - **Projektübergreifend:** Eine Chain gehört keinem Projekt und kann Workflows aus verschiedenen Projekten referenzieren
-- **Sequenziell:** `ChainExecutor` führt Entries in `sortOrder`-Reihenfolge aus (virtual threads, polling alle 2s, 30-Min.-Timeout)
+- **Sequenziell:** `ChainExecutor` führt Entries in `sortOrder`-Reihenfolge aus (virtual threads, polling alle 2s, 180-Min.-Timeout)
 - **Kontext-Weitergabe:** Jeder Entry bekommt Chain-Level-Kontext + Entry-Level-Kontext + `previous_chain_output` vom letzten abgeschlossenen Workflow
 - **Stop-on-Failure:** Flag auf Chain- und Entry-Ebene — Chain stoppt nur wenn beide `true` sind
 - **Cancellation:** Via `ConcurrentHashMap<String, AtomicBoolean>`
@@ -290,8 +306,8 @@ Automatische Verkettung von Workflows auf Basis von Abschluss-Ereignissen:
 Automatische Ausführung von Fix-Workflows wenn TODOs erstellt werden — schliesst den Self-Improvement-Loop:
 
 ```
-Audit-Workflow → AutoTodoService → TODO (OPEN)
-                                     ↓ TodoCreatedEvent
+Audit-Workflow → AuditIngestionService → Finding → TODO (OPEN)
+                                                 ↓ TodoCreatedEvent
                              TodoTriggerService → Fix-Workflow
                                                      ↓ WorkflowRunCompletedEvent
                                              TodoFeedbackListener → TODO (DONE)
@@ -311,6 +327,7 @@ Da TODOs zu ~96 % maschinell erzeugt und über viele Projekte verstreut sind, gi
 - **Cockpit** (`GET /api/v1/todos/overview`, `TodoOverviewService`): liefert pro Projekt einen Rollup (Status-Counts, `staleCount`, `userActive` vs. `machineActive`, `needsYouCount`) plus eine globale „Braucht dich"-Liste (USER-Source ∨ CRITICAL ∨ überfällig). Alles aus schlanken GROUP-BY-Projektionen (keine TEXT-Blobs → pool-size=1-safe), Frontend-Seite `ProjectCockpit.tsx` (Route `/cockpit`).
 - **ARCHIVED-Status**: Ablage neben BACKLOG für „aus den Augen". Aus der Default-Liste ausgeblendet (`TodoService.buildSpec` schließt ARCHIVED aus, wenn kein Status-Filter gesetzt ist), erreichbar über den Archiv-Tab / Edit-Modal.
 - **Hygiene** (`TodoHygieneService`): `archiveStaleNow(projectId)` verschiebt verstaubte Auto-Todos (OPEN/BACKLOG, Source AI/WORKFLOW, Tag `auto:workflow`, `updatedAt` älter als Schwelle) nach ARCHIVED — per Bulk-UPDATE in kurzer Transaktion. Cockpit-Knopf „Verstaubtes archivieren" (`POST /todos/archive-stale?projectId=`) ist der primäre, human-in-the-loop Weg. Der `@Scheduled`-Job (täglich 03:30) ruft denselben Pfad, ist aber per Default **AUS** (`todo-hygiene-enabled`). Schwellen runtime-konfigurierbar via `ExecutionSettingsService`: `todo-hygiene-enabled` [0,1], `todo-stale-days` [7,365], `todo-hygiene-max-per-run` [10,2000].
+- **Ghost-Watchdog** (`TodoGhostWatchdogService`): setzt verwaiste IN_PROGRESS-TODOs mit Maschinen-Source (AI/WORKFLOW) zurück auf OPEN, wenn die zugehörige CLI-Session ohne abschließenden Status-PATCH gestorben ist (`updatedAt` älter als Schwelle). Poll alle 5 min (`automation.todo-watchdog.poll-ms`), per Default **AN**; Human-TODOs (Source USER) werden nie angefasst. ActivityLog-WARNING pro Lauf. Runtime-Settings: `todo-watchdog-enabled` [0,1], `todo-watchdog-stale-hours` [1,720] (Default 24h).
 - **Bulk-Status** (`POST /todos/bulk-status`): generischer Bulk-UPDATE für viele TODO-IDs auf einen Status.
 
 ## Notification System (V40)
@@ -328,7 +345,7 @@ Kontext-sensitiver Chat-Assistent für die Plattform. Siehe auch: [assistant-sys
 - `AssistantSessionService` — Session-Persistierung in DB (V41-Migration: `assistant_sessions`, V58: `preview`-Spalte). Endpunkte: `GET /sessions` (Top 50), `GET /sessions/{id}` (Detail), `DELETE /sessions/{id}`
 - `AssistantContextBuilder` — injiziert letzte 5 Sessions (User-Nachricht + Antwort) und bis zu 8 aktive Workflow Memories in den System-Prompt — auf **allen** Seiten
 - `PageSuggestionService` — generiert und cached kontextsensitive UI-Vorschläge pro Seite (V42-Migration: `page_suggestions`)
-- `AssistantController` — `POST /api/v1/assistant/chat`, `GET /sessions`, `GET /sessions/{id}`, `DELETE /sessions/{id}`
+- `AssistantController` — `POST /api/v1/assistant/chat`, `GET /sessions`, `GET /sessions/{id}`, `DELETE /sessions/{id}`, `POST /pending-tools/{id}/confirm`, `POST /pending-tools/{id}/reject`
 - `PageSuggestionController` — `GET /api/v1/assistant/suggestions?page=...`, `POST /api/v1/assistant/suggestions/refresh?page=...`
 - Sessions werden nach jedem Chat-Aufruf persistiert; `AssistantSessionUpdatedEvent` triggert Page-Suggestion-Refresh
 - Standard-Modell: `claude-sonnet-4-6`
@@ -361,7 +378,7 @@ Injektionspfade:
 
 Alle Claude-CLI-Aufrufe erfolgen auf dem Host (nicht im Container):
 - `HostClaudeService.executeAction()` — ACT-Phase, nutzt `--append-system-prompt`, `--model`-Flag, Projekt-Arbeitsverzeichnis
-- `HostClaudeService.reasonStructured()` — REASON-Phase, nutzt `--system-prompt`, `--max-turns 3`, kein Modell-Flag
+- `HostClaudeService.reasonStructured()` — REASON-Phase, nutzt `--system-prompt`, `--max-turns 3`; `--model` wird gesetzt, wenn der Workflow ein Modell konfiguriert (`ReasoningRequest.model`)
 - Prompt wird via **stdin** an den Prozess geschrieben (`writePromptToStdin()`) — vermeidet Linux ARG_MAX-Limit
 - `CLAUDE_CODE` und `CLAUDECODE` Umgebungsvariablen werden aus dem Prozess-Environment entfernt (verhindert Nested-Session-Fehler)
 - `CommandExecutorService` bietet `executeOnHost(HostExecutionRequest)` / `executeStepOnHost(HostExecutionRequest)` / `writeSkillContextToProject()` — alle Overloads nutzen die `HostExecutionRequest`-Builder-API
@@ -369,7 +386,7 @@ Alle Claude-CLI-Aufrufe erfolgen auf dem Host (nicht im Container):
 
 ## Provider Routing
 
-Alle Block-Executors (simple, retry, conditional, forEach, while, switch, skill-capability) leiten `context.getProvider()` als `providerId` via `HostExecutionRequest.builder()` an den `CommandExecutorService` weiter. Das Setzen von `"provider": "CODEX"` in einem Workflow-JSON gilt damit für jeden nicht-Shell-Block-Typ.
+Alle Block-Executors (simple, retry, conditional, foreach, while, switch, skill-capability, integration) leiten `context.getProvider()` als `providerId` via `HostExecutionRequest.builder()` an den `CommandExecutorService` weiter. Das Setzen von `"provider": "CODEX"` in einem Workflow-JSON gilt damit für jeden nicht-Shell-Block-Typ.
 
 `AiProviderRegistry.resolve()` fällt auf den konfigurierten Standard-Provider zurück (nicht hardcodiertes CLAUDE), wenn eine unbekannte Provider-ID übergeben wird.
 
@@ -387,7 +404,7 @@ Blöcke können über das `skillIds`-Feld eigene Skills mitbringen, die additiv 
 
 - `workflow.model`-Feld (z.B. `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5`)
 - Wird via `--model`-Flag an die Claude CLI auf dem Host übergeben
-- Die Agentic-REASON-Phase verwendet das lokal konfigurierte Standard-Modell
+- REASON und ACT eines Agentic-Laufs verwenden dasselbe Workflow-Modell (`ReasoningRequest.model` bzw. `ActionRequest.model`); ohne konfiguriertes Modell fällt der Provider auf seinen Default zurück
 
 ## Per-Call Token Limit
 
@@ -422,7 +439,7 @@ Claude-Code-Sessions können ebenfalls als Vorlage für Workflows dienen:
 ## Workflow Templates
 
 - Templates werden in der `workflow_templates`-DB-Tabelle gespeichert (V19-Migration), nicht hardcodiert
-- **44 Built-in Templates** werden beim Start durch `WorkflowTemplateSeeder` eingespielt (idempotent, fügt fehlende ein, aktualisiert bei Version-Bump)
+- **66 Built-in Templates** werden beim Start durch `WorkflowTemplateSeeder` eingespielt (idempotent, fügt fehlende ein, aktualisiert bei Version-Bump)
 - Template-Definitionen liegen als einzelne JSON-Dateien in `src/main/resources/templates/builtin/` (eine Datei pro Template, geladen durch `BuiltInTemplateLoader`)
 - Name und Beschreibung sind i18n JSON-Maps: `{"de":"...","en":"..."}` — gespeichert via `JsonStringMapConverter`
 - Built-in Templates (`builtIn=true`) können nicht gelöscht werden; nur `sortOrder` und `category` sind aktualisierbar
@@ -434,12 +451,12 @@ Claude-Code-Sessions können ebenfalls als Vorlage für Workflows dienen:
 ## Built-in Skills
 
 - Skills werden in der `skills`-DB-Tabelle gespeichert, nicht in Frontend oder In-Memory-Beans hardcodiert
-- **16 Built-in Skills** werden beim Start durch `SkillSeeder` eingespielt (idempotent)
+- **19 Built-in Skills** werden beim Start durch `SkillSeeder` eingespielt (idempotent)
 - Skill-Definitionen liegen in `BuiltInSkills.java` (`config/`-Package)
 - Built-in Skills haben stabile IDs (z.B. `builtin-code-review`, `builtin-test-generator`)
 - `SkillSeeder` registriert alle Skills auch im In-Memory `SkillRegistry` für Capability-Lookups
 - `SkillRegistry` hängt nicht mehr von `SkillProvider`-Beans ab — Seeder übernimmt die Registrierung
-- Capability-Handler-Klassen (z.B. `LintHandler`, `OCRHandler`) bleiben als unabhängige `@Component`-Beans in `skills/handlers/`
+- Capability-Handler-Klassen (z.B. `LintHandler`, `OCRHandler`, `SecurityScanHandler`, `FactCheckHandler`, `GrammarCheckHandler`) in `skills/handlers/` (Unterverzeichnisse `code/`, `document/`)
 - Nutzer können eigene Skills via Import-API anlegen (`POST /api/v1/skills/import`)
 - `Skill.java`-Entity nutzt `@PrePersist ensureId()` (statt `@GeneratedValue`) für explizite IDs bei Built-ins
 
@@ -473,6 +490,7 @@ Vorgefertigte Workflow-Definitionen aus dem `workflow-pool/`-Verzeichnis:
   - `GET /` — alle Pool-Workflows auflisten
   - `GET /{id}` — einzelnen Pool-Workflow abrufen
   - `POST /{id}/install` — Workflow aus Pool in Zielprojekt importieren
+  - `POST /export/{workflowId}` — Workflow in den Pool exportieren
 
 ## Wishes (Wunsch-System)
 
@@ -482,6 +500,31 @@ Natürlichsprachige Wünsche werden automatisch in Workflows/Chains umgesetzt:
 - Iterativer Prozess: Decomposition → Workflow-/Chain-Generierung → Ausführung → Feedback
 - Unterstützt bis zu `max_iterations` Iterationen für Verbesserungen
 - `crystallize()` — promotet erfolgreichen Wish als Template
+
+## Integration System (V55/V56)
+
+Plugin-Framework für externe Dienste:
+- `IntegrationRegistry` — Auto-Discovery aller `IntegrationProvider`-Beans
+- `IntegrationOAuthService` — OAuth2-Flow (Authorization Code Grant)
+- `IntegrationEncryptionService` — Verschlüsselung von Credentials (AES-GCM)
+- `IntegrationConnection`-Entity — Verbindungsstatus (CONNECTED, DISCONNECTED, EXPIRED)
+- `IntegrationController` — `/api/v1/integrations` mit OAuth-Callback, Credentials, Actions
+- 7 Provider in Unterverzeichnissen: Confluence, GitHub, GoogleCalendar, GoogleGmail, Jira, Taskwarrior, Trello
+- `IntegrationBlockExecutor` — Führt Provider-Aktionen als Workflow-Block aus
+- `TaskExportCapable` — Interface für Provider, die TODO-Export unterstützen
+
+## Dead Letter Queue (V63)
+
+Fehlgeschlagene asynchrone Operationen werden in einer Dead-Letter-Queue gespeichert:
+- `DeadLetterService` — Verwaltung von Dead-Letter-Entries (CRUD, Retry, Discard)
+- `DeadLetterController` — `/api/v1/dlq`
+- `DeadLetterEntry`-Entity mit Status: OPEN, RETRIED, DISCARDED
+
+## Workflow Search
+
+Aggregierte Suche über Workflows mit mehreren Such-Strategien:
+- `SemanticWorkflowSearchService` — Substring/Fuzzy-Suche + semantisches Ranking via AI
+- `SearchController` — `/api/v1/search`
 
 ## Docs System
 
@@ -504,9 +547,13 @@ Alle JPA-Entities und Enums im `com.automation.entity`-Package:
 | `ChainRun` | `chain_runs` | Ausführungs-Instanz einer Chain mit Entry-Runs |
 | `ChainRunEntry` | *(eingebettet)* | Status eines einzelnen Chain-Eintrags während der Ausführung (Value Object) |
 | `CompletionTrigger` | `completion_triggers` | Verknüpfung Source→Target-Workflow bei Abschluss |
+| `DeadLetterEntry` | `dead_letter_entries` | Fehlgeschlagene Nachrichten in der Dead-Letter-Queue |
+| `IntegrationConnection` | `integration_connections` | Verbindung zu externem Dienst (OAuth, Credentials) |
 | `TodoTrigger` | `todo_triggers` | Automatische Fix-Workflow-Ausführung bei TODO-Erstellung (Self-Improvement-Loop) |
 | `Container` | `containers` | Docker-Container pro Projekt mit Status und Mounts |
 | `NotificationConfig` | `notification_configs` | Benachrichtigungs-Konfiguration (Webhook/Desktop) |
+| `OnboardingProfile` | `onboarding_profiles` | Onboarding-Profil mit Typ (BASE/PROFILE) |
+| `OnboardingProfileHistory` | `onboarding_profile_history` | Änderungshistorie eines Onboarding-Profils |
 | `PageSuggestion` | `page_suggestions` | Gecachte UI-Vorschläge pro Seite |
 | `Project` | `projects` | Projekt mit Typ, Pfad, Status, AI-Kontext |
 | `ScheduledWorkflow` | `scheduled_workflows` | Cron-/Once-/Delayed-Schedule für Workflows und Chains |
@@ -521,6 +568,7 @@ Alle JPA-Entities und Enums im `com.automation.entity`-Package:
 | `WorkflowMemory` | `workflow_memory` | Extrahiertes Wissen aus Workflow-Runs |
 | `WorkflowRun` | `workflow_runs` | Ausführungs-Instanz eines Workflows mit Steps und Metadata |
 | `WorkflowTemplate` | `workflow_templates` | Template mit i18n Name/Description und Blöcken |
+| `WorkflowVersion` | `workflow_versions` | Versionierte Workflow-Snapshots |
 
 **Enums:**
 
@@ -535,14 +583,18 @@ Alle JPA-Entities und Enums im `com.automation.entity`-Package:
 | `StepStatus` | PENDING, RUNNING, COMPLETED, FAILED, SKIPPED, WAITING_APPROVAL |
 | `WishStatus` | RECEIVED, DECOMPOSING, AWAITING_DECOMPOSE_APPROVAL, EXECUTING, EVALUATING, REFINING, AWAITING_CLARIFICATION, AWAITING_APPROVAL, COMPLETED, FAILED, CANCELLED |
 | `Todo.Status` | OPEN, IN_PROGRESS, DONE, BACKLOG, ARCHIVED (ARCHIVED = „aus den Augen" — aus der Default-Liste ausgeblendet, eigener Archiv-Tab; Ziel der Hygiene/Bulk-Archivierung) |
-| `Todo.Priority` | LOW, MEDIUM, HIGH |
+| `Todo.Priority` | LOW, MEDIUM, HIGH, CRITICAL |
 | `Todo.Source` | USER, AI, WORKFLOW |
 | `ActivityLog.LogLevel` | DEBUG, INFO, WARN, ERROR |
-| `ActivityLog.LogCategory` | SYSTEM, EXECUTION, SCHEDULE, WEBHOOK, SECURITY, CONTAINER |
+| `ActivityLog.LogCategory` | SYSTEM, EXECUTION, SCHEDULE, WEBHOOK, SECURITY, CONTAINER, PLUGIN |
 | `ScheduledWorkflow.ScheduleType` | CRON, ONCE, DELAYED |
 | `ScheduledWorkflow.TargetType` | WORKFLOW, CHAIN |
 | `ScheduledWorkflow.ConflictBehavior` | SKIP, OVERLAP |
 | `NotificationConfig.ChannelType` | WEBHOOK, DESKTOP |
+| `OnboardingProfileType` | BASE, PROFILE |
+| `Todo.ResolutionState` | IDLE, RUNNING, FAILED, SUCCEEDED |
+| `IntegrationConnection.ConnectionStatus` | CONNECTED, DISCONNECTED, EXPIRED |
+| `DeadLetterEntry.Status` | OPEN, RETRIED, DISCARDED |
 
 ## Frontend-Architektur
 
@@ -554,24 +606,28 @@ App.tsx (Router)
 │   ├── Sidebar (Navigation, Collapse)
 │   └── Header (Sprache, Theme)
 │
-├── Pages (18+ Routen)
-│   ├── Dashboard, Projects, ProjectDetail
-│   ├── Workflows, WorkflowDetail, WorkflowExecution
-│   ├── Skills, Schedules, Webhooks, Settings
-│   ├── Runs, ActivityLog, Todos
+├── Pages (28 Routen)
+│   ├── Dashboard, Projects, ProjectDetail, ProjectCockpit
+│   ├── Workflows, WorkflowDetail, WorkflowExecution, WorkflowDebug, WorkflowFactory
+│   ├── Skills, Schedules, Calendar, Webhooks, Integrations, Settings
+│   ├── Runs, ActivityLog, Todos, DeadLetterQueue
 │   ├── Chains, ChainExecution
-│   ├── Wishes, WorkflowFactory, Docs
+│   ├── Wishes, Docs, Reports, Insights, OnboardingProfiles, DialogImport
+│   ├── Simple*-Varianten (SimpleDashboard, SimpleWorkflows, etc.)
 │
-├── Hooks (TanStack Query + Custom)
-│   ├── useProjects, useWorkflows, useSkills, ...
-│   ├── useChains, useTodos, useActivityLog
-│   ├── useWorkflowMemory, useWishes, useWorkflowFactory
-│   ├── useStaging, useTesting, usePool, useDocs
-│   └── useWebSocket, useToast
+├── Hooks (TanStack Query + Custom, 40+)
+│   ├── useProjects, useWorkflows, useSkills, useSchedules, ...
+│   ├── useChains, useChainTemplates, useTodos, useTodoTriggers, useTodoOverview
+│   ├── useActivityLog, useWorkflowMemory, useWishes, useWorkflowFactory
+│   ├── useStaging, useTesting, usePool, useDocs, useReports, useInsights
+│   ├── useIntegrations, useDeadLetters, useCompletionTriggers, useWorkflowVersions
+│   ├── useAssistant, useAssistantWebSocket, useCalendarAggregated
+│   ├── useWebSocket, useToast
+│   └── calendar-adapters/ (Google, Runs, Schedules, Taskwarrior, Trello)
 │
 ├── Stores (Zustand)
 │   ├── sidebarStore, themeStore
-│   ├── settingsStore, i18nStore, toastStore
+│   ├── settingsStore, toastStore, assistantStore
 │
 └── API Client
     └── /api/v1/* → Vite Proxy → Backend :9090
@@ -605,8 +661,12 @@ Response (DTO) → React Query Cache → UI-Update
 - **Topics:**
   - `/topic/executions/{runId}/logs` — Workflow-Ausführungs-Logs
   - `/topic/chains/{chainRunId}/status` — Chain-Ausführungs-Status
+  - `/topic/activity-log` — Live-Activity-Log-Updates
+  - `/topic/wishes/{wishId}/status` — Wish-Status-Updates
+  - `/topic/assistant/{requestId}/status` — Assistenten-Chat-Status (pro Request)
+  - `/topic/assistant/{sessionId}/events` — Assistenten-Push-Events (pro Session)
 - **Nachrichtenformat:** `{ timestamp, level, message }`
-- **Terminal-WebSocket:** `/ws/terminal` für Echtzeit-Container-Zugriff
+- **Terminal-WebSocket:** `/ws/terminal/**` für Echtzeit-Container-Zugriff (Raw WebSocket via `RawWebSocketConfig`, Handler: `TerminalWebSocketHandler`)
 
 ## Sicherheit
 
@@ -622,9 +682,12 @@ Response (DTO) → React Query Cache → UI-Update
 
 - `GET /api/v1/system/health`
 - `GET /api/v1/system/info`
+- `GET /api/v1/system/auth-status`
+- `GET /api/v1/system/integration-snippet`
 - `POST /api/v1/webhook/trigger/{token}`
+- `/api/v1/integrations/*/callback` (OAuth2 Callbacks)
 - `/ws/**` (WebSocket)
-- `/actuator/**`
+- `/actuator/health`
 
 ### Rate Limiting
 
@@ -634,11 +697,23 @@ Response (DTO) → React Query Cache → UI-Update
 - **Response-Header:** `X-RateLimit-Remaining`
 - **Runtime-konfigurierbar:** Settings → Execution → API-Ratenbegrenzung (Toggle + RPM-Wert)
 - **Env-Override:** `AUTOMATION_RATE_LIMIT_ENABLED` / `AUTOMATION_RATE_LIMIT_RPM`
+- **Webhook Rate Limiter:** `WebhookRateLimiter` — separater Per-IP-Limiter für `/api/v1/webhook/trigger/**`, immer aktiv
+
+### Request-Size-Limit
+
+- **Filter:** `ActivityLogSizeLimitFilter`
+- **Max:** 64 KB (konfigurierbar via `automation.activity-log.max-request-bytes`)
+- Nur für `/api/**`-Pfade
+
+### WebSocket-Authentifizierung
+
+- **Interceptor:** `WebSocketAuthInterceptor` — validiert API-Key bei WebSocket-Handshake
 
 ### CORS
 
-- Alle Origins erlaubt (`*`) mit Credentials
-- Alle HTTP-Methoden (GET, POST, PUT, DELETE, PATCH, OPTIONS)
+- Origin-Patterns konfigurierbar via `automation.cors.allowed-origins` (Default: localhost:3000/5173 + Tailscale-Patterns)
+- Alle HTTP-Methoden (GET, POST, PUT, PATCH, DELETE, OPTIONS)
+- Credentials erlaubt
 
 ## Datenbankmigrationen (Flyway)
 
@@ -688,6 +763,22 @@ Die DB-Migrationen (`src/main/resources/db/migration/`) dokumentieren die Featur
 | V50 | Workflow-Versions |
 | V51 | Todo-Triggers-Tabelle |
 | V52 | Fix-Attempts + Last-Fix-Run-ID auf TODOs |
+| V53 | Process-Backlog-Flag auf Todo-Triggers |
+| V54 | Composite-Indexes auf Todos |
+| V55 | Integration-Connections-Tabelle |
+| V56 | Client-Credentials auf Connections |
+| V57 | Due-Date auf Todos |
+| V58 | Assistant-Session-Preview-Spalte |
+| V59 | Linked-Workflow auf Todos |
+| V60 | Workflow-Name in Runs |
+| V61 | Workflow-Tags und Category |
+| V62 | Auto-Refine auf Wishes |
+| V63 | Dead-Letter-Entries-Tabelle |
+| V64 | Writes-Flag auf Capabilities |
+| V65 | Catch-Up-On-Resume auf Schedules |
+| V66 | Todo-Export-Link |
+| V67 | Aufwandsschätzung auf Workflows |
+| V68 | Audit-Reports, Findings, Occurrences und TODO-Verknüpfungen |
 
 ## Verzeichnisstruktur
 
@@ -699,7 +790,8 @@ autotrigger/
 ├── workflow-pool/                     ← Vorgefertigte Workflow-Definitionen (JSON)
 ├── scripts/
 │   ├── release.sh                     ← Versions-Bump + Git-Tag
-│   └── staging.sh                     ← Stable-Umgebung verwalten
+│   ├── staging.sh                     ← Stable/Test-Umgebung verwalten
+│   └── start-autotrigger-dev.sh       ← Dev-Umgebung starten
 │
 ├── ai-automation-backend/
 │   ├── pom.xml
@@ -711,16 +803,21 @@ autotrigger/
 │   │   ├── Dockerfile.stable          ← Ubuntu-basiert (glibc für Claude CLI)
 │   │   ├── Dockerfile.agent-node
 │   │   ├── Dockerfile.agent-python
-│   │   └── Dockerfile.agent-go
+│   │   ├── Dockerfile.agent-go
+│   │   ├── Dockerfile.agent-devops
+│   │   └── Dockerfile.agent-java
 │   ├── data/                          ← SQLite-DB (gitignored)
 │   └── src/main/
 │       ├── java/com/automation/       ← Java-Quelldateien
 │       └── resources/
 │           ├── application.yml
 │           ├── application-stable.yml ← Stable-Profil
+│           ├── application-prod.yml   ← Produktions-Profil
+│           ├── application-test.yml   ← Test-Profil
+│           ├── application-dev.yml    ← Dev-Profil
 │           ├── agent-instructions.md  ← Basis-Agent-Instructions
 │           ├── templates/builtin/     ← Built-in Template JSON-Dateien
-│           └── db/migration/          ← 47 Flyway-Migrationen (V1–V47)
+│           └── db/migration/          ← 68 Flyway-Migrationen (V1–V68)
 │
 └── ai-automation-frontend/
     ├── package.json
@@ -734,13 +831,20 @@ autotrigger/
         ├── index.css                  ← Globale Styles
         ├── api/client.ts              ← HTTP-Client (Singleton)
         ├── types/index.ts             ← TypeScript-Typen
-        ├── pages/                     ← 18+ Seiten
+        ├── pages/                     ← 37 Seiten (inkl. Simple-Mode-Varianten)
         ├── components/
-        │   ├── ui/                    ← Wiederverwendbare UI-Komponenten
-        │   ├── layout/                ← Sidebar, Header, Layout
+        │   ├── ui/                    ← Basis-UI-Primitives
+        │   ├── layout/                ← App-Shell, Sidebar, Navigation
         │   ├── shared/                ← StatusBadge, LogViewer, etc.
-        │   ├── dashboard/             ← Chart-Komponenten
-        │   └── workflow/              ← Block-Editor, Templates
+        │   ├── dashboard/             ← Dashboard-Widgets
+        │   ├── workflow/              ← Block-Editor, Templates
+        │   ├── assistant/             ← AI-Assistenten-Panel
+        │   ├── calendar/              ← Kalender-Ansicht
+        │   ├── factory/               ← Workflow-Factory-Builder
+        │   ├── insights/              ← Analytics/Insights
+        │   ├── simple/                ← Simple-Mode-Komponenten
+        │   ├── todo/                  ← TODO-Verwaltung
+        │   └── wishes/ u.a.           ← Weitere Feature-Komponenten
         ├── hooks/                     ← TanStack Query Hooks
         ├── stores/                    ← Zustand Stores
         ├── i18n/                      ← DE/EN Übersetzungen

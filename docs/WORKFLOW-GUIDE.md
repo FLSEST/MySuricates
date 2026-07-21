@@ -533,7 +533,7 @@ Legen TODOs direkt über den TodoService an bzw. ändern sie — **kein REST-Sel
 ]
 ```
 
-**Wann verwenden**: Deterministische Einzel-TODO-Operationen (Tracking-TODO anlegen und am Ende schließen). Für **dynamisch viele** TODOs aus Analyse-Findings stattdessen `todo_item:`-Marker im Block-Output ausgeben (siehe §Auto-TODO/Detector-Format) — die Plattform legt sie über den AutoTodoService an; die Audit-Templates nutzen diesen Marker-Pfad.
+**Wann verwenden**: Deterministische Einzel-TODO-Operationen (Tracking-TODO anlegen und am Ende schließen). Für **dynamisch viele** TODOs aus allgemeinen Analyse-Workflows `todo_item:`-Marker verwenden (siehe §Auto-TODO/Detector-Format). Strukturierte v4-Audit-Templates verwenden stattdessen das versionierte `mysuricates:audit-result:v1`-Envelope; das Audit Center verwaltet daraus Findings und TODO-Verknüpfungen.
 
 ---
 

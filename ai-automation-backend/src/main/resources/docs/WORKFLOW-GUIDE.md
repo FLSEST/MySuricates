@@ -290,6 +290,7 @@ Fuehrt einen Befehl fuer jedes Item in einer Liste aus.
 | `command` | string | **erforderlich** | Befehl pro Item |
 | `execution_mode` | string | `"claude"` | `"claude"` (KI) oder `"shell"` |
 | `timeout_seconds` | int | 300 | Timeout pro Iteration |
+| `continue_on_error` | bool | `false` | `true`: fehlgeschlagene Items lassen den Block nicht scheitern — er endet COMPLETED, Folge-Bloecke laufen. Fehler werden im Output zusammengefasst (`N/M items failed: ...`) und in den Step-Metadaten (`failedItemCount`, `failedItems`, `totalItems`) gelistet |
 
 ```json
 {
@@ -306,6 +307,8 @@ Fuehrt einen Befehl fuer jedes Item in einer Liste aus.
 ```
 
 **Hinweis**: `items_command` wird immer als Shell-Befehl ausgefuehrt (unabhaengig von `execution_mode`), da es nur die Iterations-Ziele sammelt.
+
+**Abgrenzung `continue_on_error` vs. `on_failure`**: `continue_on_error: true` toleriert Item-Fehler *innerhalb* des Blocks (Block endet COMPLETED, z. B. 29/30 Items erfolgreich → Folge-Bloecke wie Commit/Gate laufen). Das blockweite `on_failure: "continue"` laesst dagegen nur den Workflow trotz FAILED-Block weiterlaufen — der Block selbst bleibt FAILED.
 
 **Wann verwenden**: Verarbeitung mehrerer Dateien, Repos oder Items mit derselben Operation.
 
@@ -501,6 +504,39 @@ Liest eine Datei (PDF, DOCX, XLSX, PPTX, HTML, TXT, EPUB, RTF, …) und extrahie
 
 ---
 
+### `todo-create` / `todo-update` / `todo-close` — Native TODO-Operationen
+
+Legen TODOs direkt über den TodoService an bzw. ändern sie — **kein REST-Self-Call, kein DB-Zugriff, 0 Tokens**. Ersetzen das Anti-Pattern `curl POST /api/v1/todos` aus shell-/agentic-Blöcken.
+
+**`todo-create`**:
+
+| Config-Schluessel | Typ | Default | Beschreibung |
+|---|---|---|---|
+| `title` | string | **erforderlich** | Titel (Template-fähig) |
+| `description` | string | null | Markdown-Beschreibung (Template-fähig) |
+| `priority` | string | `MEDIUM` | HIGH / MEDIUM / LOW / CRITICAL |
+| `tags` | list oder string | null | Liste oder kommagetrennt |
+| `project_id` | string | Kontext-Variable `project_id` | Ziel-Projekt |
+| `source` | string | `WORKFLOW` | USER / AI / WORKFLOW |
+| `source_agent` | string | `workflow` | Quell-Agent-Label |
+| `variable_name` | string | `todo_id` | Kontext-Variable, die die neue TODO-ID erhält |
+
+**`todo-update`**: `id` (erforderlich, Template-fähig — z. B. `{{ todo_id }}`), optional `title`/`description`/`priority`/`tags` — nur gesetzte Felder werden geändert.
+
+**`todo-close`**: `id` (erforderlich, Template-fähig) — setzt den Status auf DONE.
+
+```json
+[
+  { "type": "todo-create", "config": { "title": "Fix {{ component }}", "priority": "HIGH", "tags": ["bug"] } },
+  { "type": "simple", "config": { "command": "Behebe das Problem ..." } },
+  { "type": "todo-close", "config": { "id": "{{ todo_id }}" } }
+]
+```
+
+**Wann verwenden**: Deterministische Einzel-TODO-Operationen (Tracking-TODO anlegen und am Ende schließen). Für **dynamisch viele** TODOs aus allgemeinen Analyse-Workflows `todo_item:`-Marker verwenden (siehe §Auto-TODO/Detector-Format). Strukturierte v4-Audit-Templates verwenden stattdessen das versionierte `mysuricates:audit-result:v1`-Envelope; das Audit Center verwaltet daraus Findings und TODO-Verknüpfungen.
+
+---
+
 ## 3. Template-Variablen
 
 ### Variablen-Syntax
@@ -530,6 +566,7 @@ Folgende Variablen werden vom `WorkflowExecutor` automatisch bei jedem Run geset
 | `{{ project_path }}` | Projektpfad (oder leer) |
 | `{{ model }}` | Konfiguriertes Modell (oder leer) |
 | `{{ provider }}` | Konfigurierter AI-Provider (oder leer) |
+| `{{ effort }}` | Konfigurierter Reasoning-Effort (oder leer) |
 | `{{ started_at }}` | Startzeitpunkt des Runs (ISO-8601, z.B. `2026-04-22T21:30:45.123Z`) |
 | `{{ run_timestamp }}` | Pfadsicherer Timestamp (UTC, Format `yyyyMMdd-HHmmss`, z.B. `20260422-213045`) — ideal fuer Output-Verzeichnisse pro Run |
 | `{{ home_dir }}` | Home-Verzeichnis des JVM-Benutzers |
@@ -573,6 +610,19 @@ Antworten aus `approval`- und `human-input`-Bloecken werden als Kontext-Variable
 ## 4. Bewaehrte Workflow-Patterns
 
 Diese Patterns sind aus den 65+ eingebauten Templates destilliert. Jedes Pattern hat eine klare Struktur und einen Anwendungsfall.
+
+### Block-Wahl: Sparsamkeits-Leiter
+
+Beim Workflow-Bau gilt dieselbe YAGNI-Logik wie beim Code — die erste zutreffende Stufe gewinnt:
+
+1. **Geht es deterministisch?** → `shell`-Block (0 Tokens, schnell, reproduzierbar)
+2. **Reicht ein einzelner KI-Call?** → `simple` (1 Call) statt `agentic` (N Calls: REASON + ACT pro Iteration)
+3. **`agentic` nur**, wenn die noetigen Schritte vorab unbekannt sind und das Ergebnis verifizierbar ist
+4. **Existierender Block-Typ vor neuem Plattform-Feature** — erst die Referenz in Abschnitt 2 pruefen
+5. **Wenige Bloecke vor vielen** — jeder Block kostet Tokens, Laufzeit und ist ein eigenes Timeout-Risiko
+
+Keine Bloecke „auf Vorrat" (Zusammenfassungen, Reports, Formatierungen, die niemand liest).
+Token-Budget ist knapp: Jeder vermiedene KI-Call verlaengert die Laufzeit des Kontingents.
 
 ### Pattern 1: Sequentielle Simple-Kette
 
@@ -704,42 +754,6 @@ Block 5 (conditional): Rollback bei Fehler
 Block 6 (approval): Menschliche Freigabe vor Push
 Block 7 (shell): Push + PR erstellen (oder abbrechen)
 ```
-
----
-
-### Pattern 8: Bildgenerierung via Codex (imagegen-Skill)
-
-**Struktur**: `shell` (Projektkontext lesen) -> `simple` (Bild-Prompt destillieren, Opus) -> `shell` (Codex generiert, Bash kopiert)
-
-Erzeugt ein Raster-Bild (Hero, Cover, Illustration) **ohne tiefe Plattform-Integration**: ein `shell`-Block ruft die auf dem Host installierte Codex-CLI (`codex exec`) mit dem `imagegen`-Skill auf. Das built-in `image_gen`-Tool nutzt `gpt-image-2` und braucht **keinen `OPENAI_API_KEY`** (Codex' eigener Login). Der destillierte Prompt fliesst per `{{ block.prompt.output }}` in den Codex-Block.
-
-**Anwendungsfall**: App-Hero/Cover aus Projektkontext ableiten, Marketing-Bilder, Illustrationen.
-
-```bash
-set -euo pipefail
-TS=$(date +%Y%m%d-%H%M%S)
-OUT="assets/generated/hero-$TS.png"
-mkdir -p "$(dirname "$OUT")"
-GENDIR="${CODEX_HOME:-$HOME/.codex}/generated_images"
-MARKER="$(mktemp)"
-DESC={{ block.prompt.output }}   # Block-Config: shell_escape_variables: true -> sicher gequotet
-# Codex NUR generieren lassen (siehe Fallen); das Kopieren macht der Workflow-Bash.
-timeout 240 codex exec --skip-git-repo-check --sandbox workspace-write -C "$PWD" \
-  "Nutze imagegen (built-in image_gen), erzeuge GENAU EIN Bild 1536x1024. Keine Shell/Validierung/Kopie. Bildbeschreibung: $DESC" </dev/null || true
-IMG=$(find "$GENDIR" -name '*.png' -newer "$MARKER" -printf '%T@ %p\n' | sort -rn | head -1 | cut -d' ' -f2-)
-cp "$IMG" "$OUT" && echo "IMAGE_PATH=$PWD/$OUT"
-```
-
-**Zwei Fallen (beide zwingend):**
-1. **stdin auf `/dev/null`** — `codex exec` liest stdin bis EOF (auch wenn der Prompt als Argument uebergeben wird). Ohne `</dev/null` erbt Codex vom Backend eine stdin ohne EOF und **blockiert bis zum Block-Timeout**.
-2. **Codex nicht selbst kopieren lassen** — Codex' Shell-Sandbox (bubblewrap) startet im Backend-Kontext nicht (`bwrap: loopback: … Operation not permitted`); jeder von Codex gestartete Shell-/`cp`-/`view_image`-Befehl scheitert. Deshalb Codex **nur generieren** lassen (built-in `image_gen` speichert nach `$CODEX_HOME/generated_images/<session>/ig_*.png`) und die Datei mit dem **Workflow-Bash** kopieren (der laeuft ohne bwrap). `timeout … || true` kappt Codex' Retry-Schleifen; das Bild ist zu dem Zeitpunkt bereits gespeichert.
-
-**Grenzen:**
-- **Nur auf dem Dev-Host** — Codex ist in den Docker-Containern (Stable/Test) nicht installiert/eingeloggt → dort Exit 127.
-- Umgeht das CLI-Semaphore (`HostClaudeService`), da direkter Shell-Aufruf.
-- Der Block liefert den **Pfad**, nicht das Bild — Anzeige im Run-UI braeuchte Artefakt-Handling.
-
-**Beispiel-Workflow**: „Bild aus Projektkontext generieren" (Projekt „Deutschlandticket Entdecker").
 
 ---
 
@@ -888,6 +902,30 @@ Via API:
 Im Workflow-Entity wird das `model`-Feld via `--model`-Flag an die Claude CLI uebergeben.
 
 **Wichtig**: Ein null-Model-Feld nutzt den System-Standard (der Sonnet sein kann). Wenn Opus benoetigt wird, explizit setzen.
+
+### Reasoning-Effort (Denkaufwand)
+
+Zusaetzlich zum Modell kann pro Workflow ein einheitlicher Effort-Level gesetzt werden (`workflow.effort`-Feld, UI: Sidebar → „Denkaufwand"). Gueltige Werte: `low`, `medium`, `high`, `xhigh`. Unset (null) = Provider-Default, es wird **kein** Flag emittiert.
+
+| Provider | CLI-Mapping | Hinweise |
+|---|---|---|
+| Claude | `--effort <level>` | REASON- und ACT-Aufrufe |
+| Pi | `--thinking <level>` | Explizites Effort gewinnt ueber die maxTurns-Heuristik; ohne Effort verhaelt sich der ACT-Pfad wie bisher (kein Flag) |
+| Codex | — | Wird ignoriert (`supportsEffort=false`), UI blendet den Regler aus |
+
+**Pro Block ueberschreiben**: Block-Config-Key `"effort"` uebersteuert das Workflow-Level (Praezedenz: Block > Workflow > Provider-Default). Ungueltige Block-Werte werden mit Warnung ignoriert.
+
+```json
+{
+  "type": "simple",
+  "config": {
+    "command": "Analysiere die Architektur ...",
+    "effort": "xhigh"
+  }
+}
+```
+
+Faustregel: `high`/`xhigh` fuer Analyse-/Audit-Bloecke, `low` fuer mechanische Transformationen. Der gesetzte Effort ist im Step-Metadata (`aiRequest.effort`) der Run-Details sichtbar.
 
 ---
 

@@ -105,7 +105,7 @@ Workflows accumulate knowledge across runs:
 
 ---
 
-## Was schon gebaut ist (v0.7.3)
+## Was schon gebaut ist (v0.7.4)
 
 | Baustein | Status |
 |----------|--------|
