@@ -115,4 +115,34 @@ class ApiKeyServiceTest {
 
         verifyNoInteractions(settingsRepo);
     }
+
+    @Test
+    void matchesEffectiveApiKey_exactValue_returnsTrue() {
+        ReflectionTestUtils.setField(service, "cachedApiKey", "sëcret-🔐");
+
+        assertThat(service.matchesEffectiveApiKey("sëcret-🔐")).isTrue();
+    }
+
+    @Test
+    void matchesEffectiveApiKey_differentValue_returnsFalse() {
+        ReflectionTestUtils.setField(service, "cachedApiKey", "correct-key");
+
+        assertThat(service.matchesEffectiveApiKey("wrong-key")).isFalse();
+    }
+
+    @Test
+    void matchesEffectiveApiKey_nullOrBlankCandidate_returnsFalse() {
+        ReflectionTestUtils.setField(service, "cachedApiKey", "correct-key");
+
+        assertThat(service.matchesEffectiveApiKey(null)).isFalse();
+        assertThat(service.matchesEffectiveApiKey("")).isFalse();
+        assertThat(service.matchesEffectiveApiKey("   ")).isFalse();
+    }
+
+    @Test
+    void matchesEffectiveApiKey_missingEffectiveKey_returnsFalse() {
+        ReflectionTestUtils.setField(service, "cachedApiKey", "");
+
+        assertThat(service.matchesEffectiveApiKey("candidate")).isFalse();
+    }
 }

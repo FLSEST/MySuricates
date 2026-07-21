@@ -41,11 +41,13 @@ class WebSocketAuthInterceptorTest {
         when(apiKeyService.getEffectiveApiKey()).thenReturn("test-key-123");
         when(request.getServletRequest()).thenReturn(servletRequest);
         when(servletRequest.getParameter("apiKey")).thenReturn("test-key-123");
+        when(apiKeyService.matchesEffectiveApiKey("test-key-123")).thenReturn(true);
 
         boolean result = interceptor.beforeHandshake(request, response, handler, new HashMap<>());
 
         assertThat(result).isTrue();
         verify(response, never()).setStatusCode(any());
+        verify(apiKeyService).matchesEffectiveApiKey("test-key-123");
     }
 
     @Test

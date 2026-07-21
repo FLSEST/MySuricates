@@ -17,8 +17,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.List;
 
 @Component
@@ -50,7 +48,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
         String apiKey = request.getHeader(API_KEY_HEADER);
 
-        if (apiKey != null && constantTimeEquals(apiKey, effectiveApiKey)) {
+        if (apiKeyService.matchesEffectiveApiKey(apiKey)) {
             setAuthenticated("api-key-user");
             filterChain.doFilter(request, response);
         } else {
@@ -77,12 +75,6 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
                 && !uri.equals("/api/v1/system/info")
                 && !uri.equals("/api/v1/system/auth-status")
                 && !uri.startsWith("/api/v1/webhook/trigger/");
-    }
-
-    private boolean constantTimeEquals(String a, String b) {
-        return MessageDigest.isEqual(
-                a.getBytes(StandardCharsets.UTF_8),
-                b.getBytes(StandardCharsets.UTF_8));
     }
 
     private void setAuthenticated(String principal) {

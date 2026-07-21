@@ -1,6 +1,8 @@
 package com.automation.security;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -17,20 +19,23 @@ public class WebhookRateLimiter {
 
     private static final int MAX_REQUESTS_PER_MINUTE = 10;
 
+    private final ClientIpResolver clientIpResolver;
     private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
 
-    public boolean tryAcquire(HttpServletRequest request) {
-        String clientIp = getClientIp(request);
-        Bucket bucket = buckets.computeIfAbsent(clientIp, k -> new Bucket());
-        return bucket.tryConsume();
+    @Autowired
+    public WebhookRateLimiter(
+            @Value("${automation.security.trusted-proxies:127.0.0.1,::1}") String trustedProxies) {
+        this(new ClientIpResolver(trustedProxies));
     }
 
-    private String getClientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
+    WebhookRateLimiter(ClientIpResolver clientIpResolver) {
+        this.clientIpResolver = clientIpResolver;
+    }
+
+    public boolean tryAcquire(HttpServletRequest request) {
+        String clientIp = clientIpResolver.resolve(request);
+        Bucket bucket = buckets.computeIfAbsent(clientIp, k -> new Bucket());
+        return bucket.tryConsume();
     }
 
     private static class Bucket {

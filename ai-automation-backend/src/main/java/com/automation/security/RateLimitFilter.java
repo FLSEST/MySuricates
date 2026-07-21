@@ -1,11 +1,13 @@
 package com.automation.security;
 
 import com.automation.config.RateLimitConfig;
+import com.automation.service.system.ApiKeyService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -13,7 +15,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -22,14 +23,25 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private final RateLimitConfig rateLimitConfig;
-
-    @Value("${automation.security.trusted-proxies:127.0.0.1,::1}")
-    private String trustedProxies;
+    private final ClientIpResolver clientIpResolver;
+    private final ApiKeyService apiKeyService;
 
     private final Map<String, ClientBucket> buckets = new ConcurrentHashMap<>();
 
-    public RateLimitFilter(RateLimitConfig rateLimitConfig) {
+    @Autowired
+    public RateLimitFilter(
+            RateLimitConfig rateLimitConfig,
+            ApiKeyService apiKeyService,
+            @Value("${automation.security.trusted-proxies:127.0.0.1,::1}") String trustedProxies) {
+        this(rateLimitConfig, new ClientIpResolver(trustedProxies), apiKeyService);
+    }
+
+    RateLimitFilter(RateLimitConfig rateLimitConfig,
+                    ClientIpResolver clientIpResolver,
+                    ApiKeyService apiKeyService) {
         this.rateLimitConfig = rateLimitConfig;
+        this.clientIpResolver = clientIpResolver;
+        this.apiKeyService = apiKeyService;
     }
 
     @Override
@@ -43,8 +55,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if (!path.startsWith("/api/")) {
             return true;
         }
-        // Internal sync traffic (InstanceSyncHelper) bypasses rate limiting
-        return "true".equals(request.getHeader("X-Internal-Sync"));
+        // Internal sync traffic bypasses rate limiting only when it proves that it
+        // is an authenticated instance-to-instance request. The marker alone is
+        // client-controlled and must never be a trust boundary.
+        return "true".equals(request.getHeader("X-Internal-Sync"))
+                && apiKeyService.matchesEffectiveApiKey(request.getHeader("X-API-Key"));
     }
 
     @Override
@@ -58,7 +73,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         int limit = rateLimitConfig.getRequestsPerMinute();
-        String clientId = getClientId(request);
+        String clientId = clientIpResolver.resolve(request);
         ClientBucket bucket = buckets.computeIfAbsent(clientId, k -> new ClientBucket());
 
         if (bucket.tryConsume(limit)) {
@@ -72,17 +87,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
                     {"error": "Rate limit exceeded", "retryAfterSeconds": 60}
                     """);
         }
-    }
-
-    private String getClientId(HttpServletRequest request) {
-        String remoteAddr = request.getRemoteAddr();
-        if (Set.of(trustedProxies.split(",")).contains(remoteAddr)) {
-            String forwarded = request.getHeader("X-Forwarded-For");
-            if (forwarded != null && !forwarded.isBlank()) {
-                return forwarded.split(",")[0].trim();
-            }
-        }
-        return remoteAddr;
     }
 
     private static class ClientBucket {

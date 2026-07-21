@@ -12,8 +12,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.server.HandshakeInterceptor;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.Map;
 
 @Component
@@ -40,7 +38,7 @@ public class WebSocketAuthInterceptor implements HandshakeInterceptor {
             apiKey = servletRequest.getServletRequest().getParameter("apiKey");
         }
 
-        if (apiKey != null && constantTimeEquals(apiKey, effectiveApiKey)) {
+        if (apiKeyService.matchesEffectiveApiKey(apiKey)) {
             return true;
         }
 
@@ -54,11 +52,5 @@ public class WebSocketAuthInterceptor implements HandshakeInterceptor {
     public void afterHandshake(ServerHttpRequest request, ServerHttpResponse response,
                                WebSocketHandler wsHandler, Exception exception) {
         // no-op
-    }
-
-    private boolean constantTimeEquals(String a, String b) {
-        return MessageDigest.isEqual(
-                a.getBytes(StandardCharsets.UTF_8),
-                b.getBytes(StandardCharsets.UTF_8));
     }
 }

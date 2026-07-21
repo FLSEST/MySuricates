@@ -73,6 +73,7 @@ class ApiKeyAuthFilterTest {
         ReflectionTestUtils.setField(filter, "securityEnabled", true);
         when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
         when(request.getHeader("X-API-Key")).thenReturn("my-secret-key");
+        when(apiKeyService.matchesEffectiveApiKey("my-secret-key")).thenReturn(true);
 
         filter.doFilterInternal(request, response, filterChain);
 
@@ -80,6 +81,7 @@ class ApiKeyAuthFilterTest {
         assertThat(SecurityContextHolder.getContext().getAuthentication().getPrincipal())
                 .isEqualTo("api-key-user");
         verify(filterChain).doFilter(request, response);
+        verify(apiKeyService).matchesEffectiveApiKey("my-secret-key");
     }
 
     @Test

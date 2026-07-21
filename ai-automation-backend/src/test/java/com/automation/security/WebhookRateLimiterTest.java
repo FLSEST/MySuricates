@@ -24,7 +24,7 @@ class WebhookRateLimiterTest {
 
     @BeforeEach
     void setUp() {
-        rateLimiter = new WebhookRateLimiter();
+        rateLimiter = new WebhookRateLimiter(new ClientIpResolver("10.0.0.10"));
     }
 
     @Test
@@ -77,19 +77,19 @@ class WebhookRateLimiterTest {
 
     @Test
     void should_useForwardedForIp_when_headerPresent() {
+        when(request.getRemoteAddr()).thenReturn("10.0.0.10");
         when(request.getHeader("X-Forwarded-For")).thenReturn("10.0.0.1");
-        // remoteAddr should not be used when X-Forwarded-For is present
 
         boolean result = rateLimiter.tryAcquire(request);
 
         assertThat(result).isTrue();
-        // Verify remoteAddr was never called (X-Forwarded-For took precedence)
-        verify(request, never()).getRemoteAddr();
+        verify(request).getRemoteAddr();
     }
 
     @Test
     void should_useFirstIpFromForwardedFor_when_multipleIps() {
         // First request with forwarded IP "10.0.0.1, 10.0.0.2"
+        when(request.getRemoteAddr()).thenReturn("10.0.0.10");
         when(request.getHeader("X-Forwarded-For")).thenReturn("10.0.0.1, 10.0.0.2");
 
         // Exhaust limit for the first IP (10.0.0.1)
@@ -102,14 +102,31 @@ class WebhookRateLimiterTest {
 
         // A request from the second IP (10.0.0.2) should still be allowed
         HttpServletRequest request2 = mock(HttpServletRequest.class);
+        when(request2.getRemoteAddr()).thenReturn("10.0.0.10");
         when(request2.getHeader("X-Forwarded-For")).thenReturn("10.0.0.2");
         assertThat(rateLimiter.tryAcquire(request2)).isTrue();
     }
 
     @Test
+    void should_ignoreSpoofedForwardedFor_when_peerIsUntrusted() {
+        when(request.getRemoteAddr()).thenReturn("198.51.100.20");
+        lenient().when(request.getHeader("X-Forwarded-For")).thenReturn("10.0.0.1");
+
+        for (int i = 0; i < 10; i++) {
+            assertThat(rateLimiter.tryAcquire(request)).isTrue();
+        }
+
+        HttpServletRequest samePeerWithDifferentSpoof = mock(HttpServletRequest.class);
+        when(samePeerWithDifferentSpoof.getRemoteAddr()).thenReturn("198.51.100.20");
+        lenient().when(samePeerWithDifferentSpoof.getHeader("X-Forwarded-For")).thenReturn("10.0.0.2");
+
+        assertThat(rateLimiter.tryAcquire(samePeerWithDifferentSpoof)).isFalse();
+    }
+
+    @Test
     void should_useRemoteAddr_when_forwardedForIsNull() {
         when(request.getHeader("X-Forwarded-For")).thenReturn(null);
-        when(request.getRemoteAddr()).thenReturn("192.168.1.100");
+        when(request.getRemoteAddr()).thenReturn("10.0.0.10");
 
         assertThat(rateLimiter.tryAcquire(request)).isTrue();
         verify(request).getRemoteAddr();
@@ -118,7 +135,7 @@ class WebhookRateLimiterTest {
     @Test
     void should_useRemoteAddr_when_forwardedForIsBlank() {
         when(request.getHeader("X-Forwarded-For")).thenReturn("   ");
-        when(request.getRemoteAddr()).thenReturn("192.168.1.100");
+        when(request.getRemoteAddr()).thenReturn("10.0.0.10");
 
         assertThat(rateLimiter.tryAcquire(request)).isTrue();
         verify(request).getRemoteAddr();
@@ -169,6 +186,7 @@ class WebhookRateLimiterTest {
 
     @Test
     void should_trimWhitespace_when_forwardedForHasSpaces() {
+        when(request.getRemoteAddr()).thenReturn("10.0.0.10");
         when(request.getHeader("X-Forwarded-For")).thenReturn("  10.0.0.1  , 10.0.0.2");
 
         // This should work and use trimmed "10.0.0.1"
@@ -176,6 +194,7 @@ class WebhookRateLimiterTest {
 
         // Verify it's tracked under the same IP as a clean request
         HttpServletRequest request2 = mock(HttpServletRequest.class);
+        when(request2.getRemoteAddr()).thenReturn("10.0.0.10");
         when(request2.getHeader("X-Forwarded-For")).thenReturn("10.0.0.1");
 
         // Both should share the same bucket - exhaust remaining 9

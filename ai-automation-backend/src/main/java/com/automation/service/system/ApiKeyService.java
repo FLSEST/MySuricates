@@ -8,9 +8,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.security.MessageDigest;
 import java.util.UUID;
 
 @Service
@@ -77,5 +79,15 @@ public class ApiKeyService {
 
     public String getEffectiveApiKey() {
         return cachedApiKey != null ? cachedApiKey : "";
+    }
+
+    public boolean matchesEffectiveApiKey(String candidate) {
+        String effectiveApiKey = getEffectiveApiKey();
+        if (candidate == null || candidate.isBlank() || effectiveApiKey.isBlank()) {
+            return false;
+        }
+        return MessageDigest.isEqual(
+                candidate.getBytes(StandardCharsets.UTF_8),
+                effectiveApiKey.getBytes(StandardCharsets.UTF_8));
     }
 }

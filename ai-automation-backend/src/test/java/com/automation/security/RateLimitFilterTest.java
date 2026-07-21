@@ -1,6 +1,7 @@
 package com.automation.security;
 
 import com.automation.config.RateLimitConfig;
+import com.automation.service.system.ApiKeyService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -9,7 +10,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -28,6 +28,12 @@ class RateLimitFilterTest {
     private RateLimitConfig rateLimitConfig;
 
     @Mock
+    private ClientIpResolver clientIpResolver;
+
+    @Mock
+    private ApiKeyService apiKeyService;
+
+    @Mock
     private HttpServletRequest request;
 
     @Mock
@@ -39,8 +45,7 @@ class RateLimitFilterTest {
     @BeforeEach
     void setUp() {
         rateLimitConfig = new RateLimitConfig();
-        filter = new RateLimitFilter(rateLimitConfig);
-        ReflectionTestUtils.setField(filter, "trustedProxies", "127.0.0.1,::1");
+        filter = new RateLimitFilter(rateLimitConfig, clientIpResolver, apiKeyService);
     }
 
     @Test
@@ -56,7 +61,7 @@ class RateLimitFilterTest {
     void rateLimitEnabled_underLimit_passesThrough() throws Exception {
         rateLimitConfig.setEnabled(true);
         rateLimitConfig.setRequestsPerMinute(10);
-        when(request.getRemoteAddr()).thenReturn("127.0.0.1");
+        when(clientIpResolver.resolve(request)).thenReturn("127.0.0.1");
 
         filter.doFilterInternal(request, response, filterChain);
 
@@ -68,7 +73,7 @@ class RateLimitFilterTest {
     void rateLimitEnabled_exceedsLimit_returns429() throws Exception {
         rateLimitConfig.setEnabled(true);
         rateLimitConfig.setRequestsPerMinute(2);
-        when(request.getRemoteAddr()).thenReturn("127.0.0.1");
+        when(clientIpResolver.resolve(request)).thenReturn("127.0.0.1");
 
         StringWriter stringWriter = new StringWriter();
         PrintWriter writer = new PrintWriter(stringWriter);
@@ -89,11 +94,10 @@ class RateLimitFilterTest {
     }
 
     @Test
-    void rateLimitEnabled_usesForwardedFor() throws Exception {
+    void rateLimitEnabled_usesResolvedClientIp() throws Exception {
         rateLimitConfig.setEnabled(true);
         rateLimitConfig.setRequestsPerMinute(1);
-        when(request.getRemoteAddr()).thenReturn("127.0.0.1");
-        when(request.getHeader("X-Forwarded-For")).thenReturn("10.0.0.1, 10.0.0.2");
+        when(clientIpResolver.resolve(request)).thenReturn("10.0.0.1");
 
         StringWriter stringWriter = new StringWriter();
         PrintWriter writer = new PrintWriter(stringWriter);
@@ -108,25 +112,54 @@ class RateLimitFilterTest {
     }
 
     @Test
-    void rateLimitEnabled_internalSync_bypassesLimit() throws Exception {
+    void rateLimitEnabled_authenticatedInternalSync_bypassesLimit() {
         rateLimitConfig.setEnabled(true);
         rateLimitConfig.setRequestsPerMinute(1);
         when(request.getRequestURI()).thenReturn("/api/v1/workflows/import");
         when(request.getHeader("X-Internal-Sync")).thenReturn("true");
+        when(request.getHeader("X-API-Key")).thenReturn("sync-key");
+        when(apiKeyService.matchesEffectiveApiKey("sync-key")).thenReturn(true);
 
-        // Should bypass rate limit entirely (shouldNotFilter returns true)
         boolean shouldSkip = filter.shouldNotFilter(request);
+
         assertThat(shouldSkip).isTrue();
     }
 
     @Test
-    void rateLimitEnabled_noInternalSyncHeader_notBypassed() throws Exception {
+    void rateLimitEnabled_spoofedInternalSyncWithInvalidKey_notBypassed() {
+        rateLimitConfig.setEnabled(true);
+        when(request.getRequestURI()).thenReturn("/api/v1/workflows/import");
+        when(request.getHeader("X-Internal-Sync")).thenReturn("true");
+        when(request.getHeader("X-API-Key")).thenReturn("attacker-key");
+
+        boolean shouldSkip = filter.shouldNotFilter(request);
+
+        assertThat(shouldSkip).isFalse();
+        verify(apiKeyService).matchesEffectiveApiKey("attacker-key");
+    }
+
+    @Test
+    void rateLimitEnabled_internalSyncWithoutKey_notBypassed() {
+        rateLimitConfig.setEnabled(true);
+        when(request.getRequestURI()).thenReturn("/api/v1/workflows/import");
+        when(request.getHeader("X-Internal-Sync")).thenReturn("true");
+
+        boolean shouldSkip = filter.shouldNotFilter(request);
+
+        assertThat(shouldSkip).isFalse();
+        verify(apiKeyService).matchesEffectiveApiKey(null);
+    }
+
+    @Test
+    void rateLimitEnabled_noInternalSyncHeader_notBypassed() {
         rateLimitConfig.setEnabled(true);
         when(request.getRequestURI()).thenReturn("/api/v1/workflows/import");
         when(request.getHeader("X-Internal-Sync")).thenReturn(null);
 
         boolean shouldSkip = filter.shouldNotFilter(request);
+
         assertThat(shouldSkip).isFalse();
+        verifyNoInteractions(apiKeyService);
     }
 
     @Test
@@ -150,6 +183,7 @@ class RateLimitFilterTest {
     void rateLimitEnabled_concurrentRequests_exactlyLimitPass() throws Exception {
         rateLimitConfig.setEnabled(true);
         rateLimitConfig.setRequestsPerMinute(10);
+        when(clientIpResolver.resolve(any())).thenReturn("10.0.0.99");
 
         int totalThreads = 20;
         CountDownLatch ready = new CountDownLatch(totalThreads);
@@ -164,7 +198,6 @@ class RateLimitFilterTest {
                     HttpServletRequest req = mock(HttpServletRequest.class);
                     HttpServletResponse resp = mock(HttpServletResponse.class);
                     FilterChain chain = mock(FilterChain.class);
-                    when(req.getRemoteAddr()).thenReturn("10.0.0.99");
                     StringWriter sw = new StringWriter();
                     when(resp.getWriter()).thenReturn(new PrintWriter(sw));
 
@@ -204,8 +237,8 @@ class RateLimitFilterTest {
         rateLimitConfig.setRequestsPerMinute(1);
 
         HttpServletRequest request2 = mock(HttpServletRequest.class);
-        when(request.getRemoteAddr()).thenReturn("10.0.0.1");
-        when(request2.getRemoteAddr()).thenReturn("10.0.0.2");
+        when(clientIpResolver.resolve(request)).thenReturn("10.0.0.1");
+        when(clientIpResolver.resolve(request2)).thenReturn("10.0.0.2");
 
         // Both first requests should pass
         filter.doFilterInternal(request, response, filterChain);
