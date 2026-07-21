@@ -24,6 +24,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
@@ -54,6 +55,9 @@ class TodoServiceTest {
 
     @Mock
     private WorkflowExecutor workflowExecutor;
+
+    @Mock
+    private ObjectProvider<WorkflowExecutor> workflowExecutorProvider;
 
     @Mock
     private TodoMapper todoMapper;
@@ -293,6 +297,7 @@ class TodoServiceTest {
 
         when(todoRepository.findById("t-1")).thenReturn(Optional.of(todo));
         when(workflowService.findByIdEager("wf-1")).thenReturn(workflow);
+        when(workflowExecutorProvider.getObject()).thenReturn(workflowExecutor);
         when(workflowExecutor.execute(eq(workflow), anyMap(), isNull(), anyMap())).thenReturn(run);
         when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
 

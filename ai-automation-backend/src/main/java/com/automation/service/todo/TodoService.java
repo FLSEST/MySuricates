@@ -29,6 +29,7 @@ import jakarta.persistence.criteria.Predicate;
 import com.automation.event.TodoCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -55,7 +56,7 @@ public class TodoService {
     private final WorkflowRepository workflowRepository;
     private final WorkflowRunRepository workflowRunRepository;
     private final WorkflowService workflowService;
-    private final WorkflowExecutor workflowExecutor;
+    private final ObjectProvider<WorkflowExecutor> workflowExecutorProvider;
     private final TodoMapper todoMapper;
     private final ApplicationEventPublisher eventPublisher;
     private final IntegrationRegistry integrationRegistry;
@@ -212,7 +213,8 @@ public class TodoService {
         runMetadata.put("linkedTodoPreviousStatus", previousStatus.name());
         runMetadata.put("linkedTodoWorkflowId", workflow.getId());
 
-        WorkflowRun run = workflowExecutor.execute(workflow, buildResolveContext(todo), null, runMetadata);
+        WorkflowRun run = workflowExecutorProvider.getObject()
+                .execute(workflow, buildResolveContext(todo), null, runMetadata);
         todo.setStatus(Todo.Status.IN_PROGRESS);
         todo.setLastFixRunId(run.getId());
         todo.setResolutionState(Todo.ResolutionState.RUNNING);
