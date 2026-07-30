@@ -147,7 +147,11 @@ automation:
     test-compose-file: ${AUTOMATION_TEST_COMPOSE:docker-compose.test.yml}
     test-container-name: ${AUTOMATION_TEST_CONTAINER:mysuricates-test}
     test-health-url: ${AUTOMATION_TEST_HEALTH_URL:http://localhost:8090/api/v1/system/health}
-    test-auto-start: ${AUTOMATION_TEST_AUTO_START:true}
+    # Stable/Test werden nicht mehr automatisch mit dem Dev-Backend hochgefahren,
+    # sondern bewusst per Desktop-Icon bzw. ./scripts/staging.sh gestartet.
+    # Zum Reaktivieren: AUTOMATION_STAGING_AUTO_START / AUTOMATION_TEST_AUTO_START=true.
+    auto-start: ${AUTOMATION_STAGING_AUTO_START:false}
+    test-auto-start: ${AUTOMATION_TEST_AUTO_START:false}
   factory:
     provider: ${AUTOMATION_FACTORY_PROVIDER:CLAUDE}
     base-dir: ${AUTOMATION_FACTORY_DIR:${user.home}/.autotrigger/factory}

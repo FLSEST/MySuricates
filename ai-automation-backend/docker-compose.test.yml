@@ -35,7 +35,9 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-    restart: unless-stopped
+    # Kein Auto-Start beim Boot — die Test-Instanz wird bewusst per Desktop-Icon
+    # bzw. ./scripts/staging.sh test-start gestartet.
+    restart: "no"
 
 volumes:
   test-data:

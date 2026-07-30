@@ -29,7 +29,9 @@ services:
       - ${HOME}/Entwicklung:${HOME}/Entwicklung
       - ${HOME}/dokumente:${HOME}/dokumente
       - ${HOME}/.autotrigger/backups/stable:/host-backups/stable
-    restart: unless-stopped
+    # Kein Auto-Start beim Boot — die Stable-Instanz wird bewusst per Desktop-Icon
+    # bzw. ./scripts/staging.sh start gestartet.
+    restart: "no"
 
 volumes:
   stable-data:

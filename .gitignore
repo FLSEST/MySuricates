@@ -8,6 +8,8 @@ certs/
 .env
 .env.*
 !.env.example
+# Lokale Spring-Boot-Override-Config (./config/ hat Vorrang vor der Classpath-Config)
+ai-automation-backend/config/
 ai-automation-frontend/.env
 ai-automation-frontend/.env.*
 !ai-automation-frontend/.env.example

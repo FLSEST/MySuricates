@@ -269,13 +269,32 @@ Das Projekt unterstützt drei parallele Umgebungen:
 | **Stable** | 9091 | Docker-Container, Backend + eingebettetes Frontend |
 | **Test** | 8090 | Docker-Container, dedizierte Test-Instanz für Workflow-Tests |
 
-### Auto-Start
+### Start (kein Auto-Start)
 
-Dev startet Stable und Test automatisch beim Boot (`ApplicationReadyEvent`), wenn:
-1. Ein Snapshot vorhanden ist (`stable-frontend/`-Verzeichnis existiert)
-2. Der Container nicht bereits läuft
+Stable und Test starten **nicht** automatisch — weder beim Boot noch mit dem Dev-Backend. Gestartet werden sie bewusst über die Desktop-Icons oder `scripts/staging.sh`:
 
-Kontrolliert via `automation.staging.auto-start` (Standard: `true`, in `application-stable.yml` deaktiviert).
+| Umgebung | Icon | Kommando |
+|---|---|---|
+| Dev | „MySuricates Dev" | `scripts/start-autotrigger-dev.sh` |
+| Stable | „MySuricates Stable" | `scripts/staging.sh start` |
+| Test | „MySuricates Test" | `scripts/staging.sh test-start` |
+
+Icons (Desktop + Anwendungsmenü) anlegen bzw. erneuern: `scripts/install_desktop_launcher.sh`.
+
+Zwei Mechanismen wurden dafür abgeschaltet:
+- **Docker-Restart-Policy** — `restart: "no"` in `docker-compose.stable.yml` / `docker-compose.test.yml`. Vorher (`unless-stopped`) fuhr der Docker-Daemon beide Container bei jedem Boot wieder hoch.
+- **Dev-Auto-Start** — `automation.staging.auto-start` und `automation.staging.test-auto-start` stehen auf `false`. Vorher startete das Dev-Backend beide Container beim `ApplicationReadyEvent`, sofern ein Snapshot (`stable-frontend/`) vorhanden war und der Container nicht schon lief.
+
+Reaktivieren ohne Code-Änderung: `AUTOMATION_STAGING_AUTO_START=true` bzw. `AUTOMATION_TEST_AUTO_START=true` setzen (und ggf. die Restart-Policy in der Compose-Datei zurückstellen).
+
+### Automatische Trigger pausieren
+
+Für ein befristetes Ruhigstellen des Schedulers gibt es zwei Wege:
+
+- **`automation.scheduler.skip-until`** (`AUTOMATION_SCHEDULER_SKIP_UNTIL`, ISO-Instant, z. B. `2026-07-30T22:00:00Z`) — für Zeitfenster. Fällige Schedules werden übersprungen **und** ihr `nextRunAt` hinter das Fenster gespult, es gibt also am Ende keinen Nachhol-Stau. Läuft am Stichtag von selbst aus; ein unparsebarer Wert wird ignoriert (fail open). Wird nur beim Backend-Start gelesen.
+- **Wartungsmodus** (`POST /api/v1/schedules/maintenance`, Pause-Button auf der Schedules-Seite) — Laufzeit-Schalter ohne Enddatum, persistiert in `app_settings`. Achtung: `nextRunAt` wird dabei *nicht* vorgespult, beim Abschalten feuern also alle inzwischen fällig gewordenen Schedules gemeinsam.
+
+Für lokale, nicht eingecheckte Overrides eignet sich `ai-automation-backend/config/application.yml` — Spring Boot lädt dieses Verzeichnis zusätzlich zur Classpath-Config und mit höherer Priorität (das Verzeichnis ist in `.gitignore`).
 
 ### Stable-Umgebung (Port 9091)
 
@@ -291,7 +310,7 @@ Die Stable-Umgebung ist ein Docker-Container, der Backend + eingebettetes React-
 Die Test-Instanz ist ein dedizierter Docker-Container für automatisierte Workflow-Tests:
 
 - `TestingService` — verwaltet den Test-Docker-Container
-- Auto-Start beim Boot wenn `automation.staging.test-auto-start=true` und Snapshot vorhanden
+- Kein Auto-Start beim Boot (`automation.staging.test-auto-start=false`) — Start via Icon „MySuricates Test" bzw. `staging.sh test-start`
 - Kein Auto-Sync von Definitionen beim Boot (nur bei `reset`)
 - Datenbank kann via API zurückgesetzt werden (`POST /api/v1/testing/reset`)
 
