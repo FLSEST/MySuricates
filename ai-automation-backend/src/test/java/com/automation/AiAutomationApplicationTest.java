@@ -37,10 +37,27 @@ class AiAutomationApplicationTest {
                 org.springframework.boot.autoconfigure.SpringBootApplication.class)).isTrue();
     }
 
+    /**
+     * Scheduling wird nicht mehr an der Application-Klasse aktiviert, sondern in
+     * {@link com.automation.config.SchedulingConfig} — dort profil-gebunden, damit im
+     * Integrationstest-Profil keine Hintergrund-Jobs in die Test-DB schreiben.
+     */
     @Test
-    void should_haveEnableSchedulingAnnotation_when_classIsInspected() {
+    void should_enableSchedulingInProfileBoundConfig_when_classIsInspected() {
         assertThat(AiAutomationApplication.class.isAnnotationPresent(
-                org.springframework.scheduling.annotation.EnableScheduling.class)).isTrue();
+                org.springframework.scheduling.annotation.EnableScheduling.class))
+                .as("Application-Klasse darf Scheduling nicht global aktivieren")
+                .isFalse();
+
+        assertThat(com.automation.config.SchedulingConfig.class.isAnnotationPresent(
+                org.springframework.scheduling.annotation.EnableScheduling.class))
+                .as("SchedulingConfig aktiviert Scheduling")
+                .isTrue();
+
+        var profile = com.automation.config.SchedulingConfig.class.getAnnotation(
+                org.springframework.context.annotation.Profile.class);
+        assertThat(profile).isNotNull();
+        assertThat(profile.value()).containsExactly("!integration");
     }
 
     @Test

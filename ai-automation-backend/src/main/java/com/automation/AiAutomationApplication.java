@@ -2,10 +2,9 @@ package com.automation;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.scheduling.annotation.EnableScheduling;
 
+// @EnableScheduling steht in config/SchedulingConfig — dort profil-gebunden (nicht unter "integration").
 @SpringBootApplication
-@EnableScheduling
 public class AiAutomationApplication {
 
     public static void main(String[] args) {
