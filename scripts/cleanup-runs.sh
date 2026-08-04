@@ -27,6 +27,7 @@
 #   --workflow <name>   Filter by workflow name substring (case-insensitive)
 #   --status <list>     Comma-separated statuses (default: FAILED,CANCELLED)
 #   --before <date>     Only runs started before YYYY-MM-DD
+#   --after <date>      Only runs started on or after YYYY-MM-DD
 #   -h, --help          Show this help
 #
 # Protected statuses (never deletable):
@@ -37,6 +38,7 @@
 #   ./scripts/cleanup-runs.sh --workflow "Hunt Quality"
 #   ./scripts/cleanup-runs.sh --workflow "Hunt Quality" --execute
 #   ./scripts/cleanup-runs.sh --status CANCELLED --before 2026-03-01 --execute
+#   ./scripts/cleanup-runs.sh --status FAILED --after 2026-07-14 --execute
 # =============================================================================
 set -euo pipefail
 
