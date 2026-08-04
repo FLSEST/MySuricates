@@ -65,6 +65,7 @@ MODE="dry-run"
 WORKFLOW_FILTER=""
 STATUS_FILTER="FAILED,CANCELLED"
 BEFORE_DATE=""
+AFTER_DATE=""
 YES=false
 
 usage() {
@@ -76,6 +77,7 @@ usage() {
     echo "  --workflow <name>   Filter by workflow name substring (case-insensitive)"
     echo "  --status <list>     Comma-separated statuses (default: FAILED,CANCELLED)"
     echo "  --before <date>     Only runs started before YYYY-MM-DD"
+    echo "  --after <date>      Only runs started on or after YYYY-MM-DD"
     echo "  -h, --help          Show this help"
     echo ""
     echo "Protected statuses (never deletable):"
@@ -86,6 +88,7 @@ usage() {
     echo "  $(basename "$0") --workflow 'Hunt Quality'"
     echo "  $(basename "$0") --workflow 'Hunt Quality' --execute"
     echo "  $(basename "$0") --status CANCELLED --before 2026-03-01 --execute"
+    echo "  $(basename "$0") --status FAILED --after 2026-07-27 --execute"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -96,6 +99,7 @@ while [[ $# -gt 0 ]]; do
         --workflow)  WORKFLOW_FILTER="$2"; shift ;;
         --status)    STATUS_FILTER="$2"; shift ;;
         --before)    BEFORE_DATE="$2"; shift ;;
+        --after)     AFTER_DATE="$2"; shift ;;
         -h|--help)   usage; exit 0 ;;
         *)           err "Unknown option: $1"; echo ""; usage; exit 1 ;;
     esac
@@ -136,6 +140,28 @@ check_backend_stopped() {
         err ""
         err "Danach Script erneut ausführen, dann Backend neu starten."
         exit 1
+    fi
+}
+
+# Datumsangaben landen unquoted in der WHERE-Klausel — Format hart prüfen,
+# damit weder kaputtes SQL noch eingeschleuste Bedingungen möglich sind.
+validate_dates() {
+    local name value flag
+    for name in BEFORE_DATE AFTER_DATE; do
+        value="${!name}"
+        [[ -z "$value" ]] && continue
+        flag="${name%_DATE}"
+        if [[ ! "$value" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+            err "Invalid date for --${flag,,}: '$value' (expected YYYY-MM-DD)"
+            exit 1
+        fi
+    done
+
+    if [[ -n "$BEFORE_DATE" && -n "$AFTER_DATE" ]]; then
+        if [[ ! "$AFTER_DATE" < "$BEFORE_DATE" ]]; then
+            err "--after ($AFTER_DATE) must be earlier than --before ($BEFORE_DATE)"
+            exit 1
+        fi
     fi
 }
 
@@ -222,6 +248,10 @@ build_where_clause() {
 
     if [[ -n "$BEFORE_DATE" ]]; then
         where="$where AND wr.started_at < '${BEFORE_DATE}T00:00:00'"
+    fi
+
+    if [[ -n "$AFTER_DATE" ]]; then
+        where="$where AND wr.started_at >= '${AFTER_DATE}T00:00:00'"
     fi
 
     echo "$where"
@@ -384,6 +414,7 @@ PYEOF
 
 main() {
     check_dependencies
+    validate_dates
     validate_statuses
 
     export DB_PATH
@@ -396,6 +427,7 @@ main() {
     info "Status:   $STATUS_FILTER"
     [[ -n "$WORKFLOW_FILTER" ]] && info "Workflow: *${WORKFLOW_FILTER}*"
     [[ -n "$BEFORE_DATE" ]]     && info "Before:   ${BEFORE_DATE}"
+    [[ -n "$AFTER_DATE" ]]      && info "After:    ${AFTER_DATE}"
     info "Mode:     $MODE"
 
     if [[ "$MODE" == "execute" ]]; then
