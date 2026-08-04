@@ -31,6 +31,12 @@ FRONTEND_PID_FILE="${STATE_DIR}/frontend.pid"
 BACKEND_LOG="${STATE_DIR}/backend.log"
 FRONTEND_LOG="${STATE_DIR}/frontend.log"
 
+# Kommandozeilen-Muster, an denen eine PID-Datei als "gehoert wirklich uns" erkannt
+# wird — Backend startet als Maven-Launcher (java ... spring-boot:run), Frontend als
+# `npm run dev` (spaeter node/vite).
+BACKEND_PROCESS_PATTERN='(mvn|maven|spring-boot|java)'
+FRONTEND_PROCESS_PATTERN='(npm|node|vite)'
+
 BACKEND_READY_URL="http://localhost:9090/api/v1/system/info"
 # Vite serves HTTPS only when certs/dev.crt exists, otherwise plain HTTP.
 # Probe both schemes so a fresh clone (no certs -> HTTP) is detected correctly.
@@ -52,16 +58,62 @@ read_pid() {
   fi
 }
 
-pid_is_running() {
+# Kommandozeile eines Prozesses lesen: /proc auf Linux, sonst ps.
+process_cmdline() {
+  local pid="$1"
+
+  if [[ -r "/proc/${pid}/cmdline" ]]; then
+    tr '\0' ' ' < "/proc/${pid}/cmdline"
+    return 0
+  fi
+
+  ps -p "${pid}" -o args= 2>/dev/null || true
+}
+
+# `kill -0` allein reicht nicht: nach einem Crash bleibt die PID-Datei liegen und
+# das OS vergibt die PID irgendwann neu (2026-08-04 an einen snapd-Helper). Der
+# Starter hielt das Backend dann fuer laufend und startete es nie — Frontend lief,
+# alle /api-Proxy-Requests liefen in ECONNREFUSED. Deshalb zusaetzlich pruefen, ob
+# die Kommandozeile ueberhaupt zum erwarteten Dienst passt.
+pid_belongs_to_service() {
   local pid_file="$1"
-  local pid
+  local pattern="$2"
+  local pid cmdline
 
   pid="$(read_pid "${pid_file}")"
   if [[ -z "${pid}" || ! "${pid}" =~ ^[0-9]+$ ]]; then
     return 1
   fi
 
-  kill -0 "${pid}" >/dev/null 2>&1
+  if ! kill -0 "${pid}" >/dev/null 2>&1; then
+    return 1
+  fi
+
+  cmdline="$(process_cmdline "${pid}")"
+  if [[ -z "${cmdline}" ]]; then
+    return 1   # Kommandozeile nicht lesbar -> PID nicht vertrauenswuerdig
+  fi
+
+  [[ "${cmdline}" =~ ${pattern} ]]
+}
+
+# PID-Datei verwerfen, die auf einen toten oder fremden Prozess zeigt. Damit
+# entscheidet danach allein der Readiness-Endpoint, ob neu gestartet wird.
+discard_stale_pid_file() {
+  local pid_file="$1"
+  local pattern="$2"
+  local name="$3"
+  local pid
+
+  [[ -f "${pid_file}" ]] || return 0
+
+  if pid_belongs_to_service "${pid_file}" "${pattern}"; then
+    return 0
+  fi
+
+  pid="$(read_pid "${pid_file}")"
+  echo "Verwaiste PID-Datei fuer ${name} entfernt (PID ${pid:-leer}): ${pid_file}"
+  rm -f "${pid_file}"
 }
 
 endpoint_is_ready() {
@@ -114,7 +166,10 @@ wait_for_frontend() {
 }
 
 start_backend() {
-  if pid_is_running "${BACKEND_PID_FILE}" || endpoint_is_ready "${BACKEND_READY_URL}"; then
+  discard_stale_pid_file "${BACKEND_PID_FILE}" "${BACKEND_PROCESS_PATTERN}" "Backend"
+
+  if pid_belongs_to_service "${BACKEND_PID_FILE}" "${BACKEND_PROCESS_PATTERN}" \
+    || endpoint_is_ready "${BACKEND_READY_URL}"; then
     echo "Backend laeuft bereits auf http://localhost:9090"
     return 0
   fi
@@ -129,7 +184,10 @@ start_backend() {
 }
 
 start_frontend() {
-  if pid_is_running "${FRONTEND_PID_FILE}" || frontend_is_ready; then
+  discard_stale_pid_file "${FRONTEND_PID_FILE}" "${FRONTEND_PROCESS_PATTERN}" "Frontend"
+
+  if pid_belongs_to_service "${FRONTEND_PID_FILE}" "${FRONTEND_PROCESS_PATTERN}" \
+    || frontend_is_ready; then
     echo "Frontend laeuft bereits auf $(resolved_frontend_url)"
     return 0
   fi
