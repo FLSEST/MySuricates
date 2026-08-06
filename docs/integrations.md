@@ -176,6 +176,11 @@ Refresh — `getValidAccessToken()` gibt das gespeicherte Credential unveränder
   read-only Home), fällt der Service mit lautem ERROR-Log auf die DB zurück.
 - **Auflösungsreihenfolge** für Client-ID/-Secret: zuerst DB (verschlüsselt), dann Env-Var-Fallback
   (`GOOGLE_CLIENT_ID` etc.) — praktisch für Deployment-Szenarien ohne UI-Eingabe.
+- **GitHub-Repo-Allowlist**: App-Setting `github.repo-allowlist` (kommaseparierte `owner/repo`-Einträge,
+  `owner/*` erlaubt einen ganzen Owner; Groß-/Kleinschreibung egal). Jede repo-bezogene GitHub-Action
+  und der Task-Export validieren dagegen — ein breiter PAT kann damit nicht mehr in fremde Repos
+  schreiben. Leer/unset = Legacy-Verhalten (alles erlaubt) mit WARN-Log. Setzen via
+  `PUT /api/v1/system/settings/github.repo-allowlist`.
 
 ---
 

@@ -1,12 +1,17 @@
 package com.automation.service.integration;
 
+import com.automation.repository.AppSettingsRepository;
 import com.automation.service.integration.providers.github.GitHubProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Contract test for the integration-agnostic single-TODO export.
@@ -19,8 +24,10 @@ import static org.assertj.core.api.Assertions.*;
 class TaskExportContractTest {
 
     static List<IntegrationProvider> taskSinks() {
+        AppSettingsRepository appSettings = mock(AppSettingsRepository.class);
+        when(appSettings.get(anyString())).thenReturn(Optional.empty());
         return List.of(
-                new GitHubProvider(new ObjectMapper())
+                new GitHubProvider(new ObjectMapper(), appSettings)
                 // + new JiraProvider(...), new TrelloProvider(...) once they implement TaskExportCapable
         );
     }

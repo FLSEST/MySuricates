@@ -1,5 +1,6 @@
 package com.automation.service.integration.providers.github;
 
+import com.automation.repository.AppSettingsRepository;
 import com.automation.service.integration.IntegrationAction;
 import com.automation.service.integration.IntegrationProvider;
 import com.automation.service.integration.OAuthConfig;
@@ -33,6 +34,12 @@ import java.util.Map;
  * <p>This provider is generic and reusable for any GitHub repository: every action
  * takes a {@code repo} parameter in {@code "owner/repo"} form, so a single provider
  * + sync workflow serves arbitrarily many projects/repositories.
+ *
+ * <p>Because the PAT may grant access far beyond the target project, every
+ * repo-scoped action is validated against the {@code github.repo-allowlist}
+ * app-setting (comma-separated {@code owner/repo} entries, {@code owner/*}
+ * allows a whole owner). An empty/unset allowlist keeps the legacy allow-all
+ * behavior but logs a warning.
  */
 @Component
 @RequiredArgsConstructor
@@ -41,8 +48,11 @@ public class GitHubProvider implements IntegrationProvider, TaskExportCapable {
 
     private static final String BASE_URL = "https://api.github.com";
     private static final String API_VERSION = "2022-11-28";
+    private static final String ALLOWLIST_KEY = "github.repo-allowlist";
 
     private final ObjectMapper objectMapper;
+    private final AppSettingsRepository appSettingsRepository;
+    private volatile boolean warnedNoAllowlist;
 
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
@@ -204,7 +214,7 @@ public class GitHubProvider implements IntegrationProvider, TaskExportCapable {
     }
 
     private Object listIssues(Map<String, Object> params, String token) {
-        String[] repo = splitRepo(requireParam(params, "repo"));
+        String[] repo = requireAllowedRepo(params);
         int perPage = paramInt(params, "perPage", 50);
         int page = paramInt(params, "page", 1);
         String state = paramString(params, "state", "open");
@@ -224,13 +234,13 @@ public class GitHubProvider implements IntegrationProvider, TaskExportCapable {
     }
 
     private Object getIssue(Map<String, Object> params, String token) {
-        String[] repo = splitRepo(requireParam(params, "repo"));
+        String[] repo = requireAllowedRepo(params);
         String number = requireParam(params, "number");
         return httpGet(issueUrl(repo, number), token, Object.class);
     }
 
     private Object createIssue(Map<String, Object> params, String token) {
-        String[] repo = splitRepo(requireParam(params, "repo"));
+        String[] repo = requireAllowedRepo(params);
         String title = requireParam(params, "title");
 
         Map<String, Object> body = new HashMap<>();
@@ -244,7 +254,7 @@ public class GitHubProvider implements IntegrationProvider, TaskExportCapable {
     }
 
     private Object updateIssue(Map<String, Object> params, String token) {
-        String[] repo = splitRepo(requireParam(params, "repo"));
+        String[] repo = requireAllowedRepo(params);
         String number = requireParam(params, "number");
 
         Map<String, Object> body = new HashMap<>();
@@ -258,7 +268,7 @@ public class GitHubProvider implements IntegrationProvider, TaskExportCapable {
     }
 
     private Object addComment(Map<String, Object> params, String token) {
-        String[] repo = splitRepo(requireParam(params, "repo"));
+        String[] repo = requireAllowedRepo(params);
         String number = requireParam(params, "number");
         String comment = requireParam(params, "body");
         String url = issueUrl(repo, number) + "/comments";
@@ -275,7 +285,7 @@ public class GitHubProvider implements IntegrationProvider, TaskExportCapable {
     @Override
     public TaskRef createTask(TaskExportInput input, String accessToken) {
         String token = extractToken(accessToken);
-        String[] repo = splitRepo(input.target()); // target = "owner/repo"
+        String[] repo = allowedRepo(input.target()); // target = "owner/repo"
         Map<String, Object> body = new HashMap<>();
         body.put("title", input.title() != null && !input.title().isBlank() ? input.title() : "TODO");
         if (input.body() != null) body.put("body", input.body());
@@ -378,6 +388,35 @@ public class GitHubProvider implements IntegrationProvider, TaskExportCapable {
             throw new IllegalArgumentException("Parameter 'repo' must be in the form 'owner/repo'");
         }
         return parts;
+    }
+
+    private String[] requireAllowedRepo(Map<String, Object> params) {
+        return allowedRepo(requireParam(params, "repo"));
+    }
+
+    /** Splits {@code owner/repo} and enforces the {@code github.repo-allowlist} setting. */
+    private String[] allowedRepo(String repoParam) {
+        String[] repo = splitRepo(repoParam);
+        List<String> allowlist = appSettingsRepository.get(ALLOWLIST_KEY)
+                .map(GitHubProvider::csv)
+                .orElse(List.of());
+        if (allowlist.isEmpty()) {
+            if (!warnedNoAllowlist) {
+                warnedNoAllowlist = true;
+                log.warn("No GitHub repo allowlist configured ({}) — actions may target any repository the PAT can access", ALLOWLIST_KEY);
+            }
+            return repo;
+        }
+        String full = (repo[0] + "/" + repo[1]).toLowerCase(java.util.Locale.ROOT);
+        String ownerWildcard = repo[0].toLowerCase(java.util.Locale.ROOT) + "/*";
+        boolean allowed = allowlist.stream()
+                .map(e -> e.toLowerCase(java.util.Locale.ROOT))
+                .anyMatch(e -> e.equals(full) || e.equals(ownerWildcard));
+        if (!allowed) {
+            throw new IllegalArgumentException(
+                    "Repository '" + repo[0] + "/" + repo[1] + "' is not covered by the '" + ALLOWLIST_KEY + "' setting");
+        }
+        return repo;
     }
 
     private static List<String> csv(Object value) {

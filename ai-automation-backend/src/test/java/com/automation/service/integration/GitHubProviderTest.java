@@ -1,21 +1,33 @@
 package com.automation.service.integration;
 
+import com.automation.repository.AppSettingsRepository;
 import com.automation.service.integration.providers.github.GitHubProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class GitHubProviderTest {
 
+    private AppSettingsRepository appSettings;
     private GitHubProvider provider;
 
     @BeforeEach
     void setUp() {
-        provider = new GitHubProvider(new ObjectMapper());
+        appSettings = mock(AppSettingsRepository.class);
+        when(appSettings.get(anyString())).thenReturn(Optional.empty());
+        provider = new GitHubProvider(new ObjectMapper(), appSettings);
+    }
+
+    private void allowlist(String value) {
+        when(appSettings.get("github.repo-allowlist")).thenReturn(Optional.of(value));
     }
 
     @Test
@@ -128,5 +140,55 @@ class GitHubProviderTest {
                 new TaskExportCapable.TaskExportInput("Titel", "Body", java.util.List.of(), "no-slash"), "token"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("owner/repo");
+    }
+
+    // --- github.repo-allowlist ---
+
+    @Test
+    void allowlistBlocksUnlistedRepo() {
+        allowlist("FLSEST/MySuricates, other/repo");
+        assertThatThrownBy(() -> provider.executeAction("list_issues", Map.of("repo", "evil/repo"), "token"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("github.repo-allowlist")
+                .hasMessageContaining("evil/repo");
+    }
+
+    @Test
+    void allowlistPermitsListedRepoCaseInsensitive() {
+        allowlist("FLSEST/MySuricates");
+        // Passes the allowlist check and fails on the next validation (missing number) — no HTTP involved
+        assertThatThrownBy(() -> provider.executeAction("get_issue", Map.of("repo", "flsest/mysuricates"), "token"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("number");
+    }
+
+    @Test
+    void allowlistSupportsOwnerWildcard() {
+        allowlist("FLSEST/*");
+        assertThatThrownBy(() -> provider.executeAction("get_issue", Map.of("repo", "FLSEST/brand-new-repo"), "token"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("number");
+        assertThatThrownBy(() -> provider.executeAction("get_issue", Map.of("repo", "other/brand-new-repo"), "token"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("github.repo-allowlist");
+    }
+
+    @Test
+    void allowlistAppliesToCreateTask() {
+        allowlist("FLSEST/MySuricates");
+        TaskExportCapable tc = provider;
+        assertThatThrownBy(() -> tc.createTask(
+                new TaskExportCapable.TaskExportInput("Titel", "Body", java.util.List.of(), "evil/repo"), "token"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("github.repo-allowlist");
+    }
+
+    @Test
+    void emptyAllowlistValueAllowsAll() {
+        allowlist("   ");
+        // Legacy allow-all: validation passes, next check (missing number) fires
+        assertThatThrownBy(() -> provider.executeAction("get_issue", Map.of("repo", "any/repo"), "token"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("number");
     }
 }

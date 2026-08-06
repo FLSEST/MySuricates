@@ -177,6 +177,11 @@ refresh — `getValidAccessToken()` returns the stored credential unchanged.
   service fall back to the DB with a loud ERROR log.
 - **Resolution order** for client ID/secret: DB first (encrypted), then env var fallback
   (`GOOGLE_CLIENT_ID` etc.) — practical for deployment scenarios without UI input.
+- **GitHub repo allowlist**: app setting `github.repo-allowlist` (comma-separated `owner/repo`
+  entries, `owner/*` allows a whole owner; case-insensitive). Every repo-scoped GitHub action and
+  the task export validate against it — a broad PAT can no longer write to foreign repos.
+  Empty/unset = legacy behavior (allow all) with a WARN log. Set via
+  `PUT /api/v1/system/settings/github.repo-allowlist`.
 
 ---
 

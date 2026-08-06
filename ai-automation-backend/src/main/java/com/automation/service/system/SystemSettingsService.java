@@ -25,7 +25,8 @@ public class SystemSettingsService {
             "auto-repair-max-retries", "auto-repair-timeout-seconds",
             "default-ai-provider", "assistant-thinking-phrases", "assistant-model",
             "suggestions-model", "suggestions-enabled",
-            "backup-retain-count"
+            "backup-retain-count",
+            "github.repo-allowlist"
     );
 
     private final AppSettingsRepository appSettingsRepository;
