@@ -1,26 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Search, Play, ExternalLink, Star, ArrowLeft, RotateCw, X, Sparkles } from 'lucide-react';
+import { Search, Star, X } from 'lucide-react';
 import { useExecuteWorkflow } from '../../hooks/useWorkflows';
 import { usePaletteHistory } from '../../hooks/usePaletteHistory';
 import { useAssistantStore } from '../../stores/assistantStore';
 import { useT } from '../../i18n';
-import { WorkflowIcon } from '../../utils/workflowIcon';
 import type { Workflow } from '../../types';
 import { resolveContextId } from './resolveContext';
 import { useWorkflowContext } from './contexts/workflowContext';
 import { useRunContext } from './contexts/runContext';
 import { useProjectContext } from './contexts/projectContext';
-import type { PaletteContextHandle, PaletteContextId, PaletteItem, BadgeTone, PaletteMatch, HighlightKey } from './contexts/types';
+import type { PaletteContextHandle, PaletteContextId, PaletteItem } from './contexts/types';
 import { parsePaletteQuery } from './queryParser';
+import { PaletteRow } from './PaletteRow';
+import { Section } from './Section';
+import { AssistantRow } from './AssistantRow';
+import { CollectForm, type CollectingState } from './CollectForm';
+import { useDebounced } from './useDebounced';
 
 const CONTEXT_ORDER: PaletteContextId[] = ['workflow', 'run', 'project'];
 
-interface CollectingState {
-  workflow: Workflow;
-  variables: string[];
-  values: Record<string, string>;
-}
 
 interface CommandPaletteProps {
   open: boolean;
@@ -451,263 +450,4 @@ function InnerPalette({ context, onClose, query, setQuery, contextId, cycleConte
       </div>
     </div>
   );
-}
-
-interface SectionProps {
-  title: string;
-  icon?: React.ReactNode;
-  borderTop?: boolean;
-  children: React.ReactNode;
-}
-
-function Section({ title, icon, borderTop, children }: SectionProps) {
-  return (
-    <div className={`py-1 ${borderTop ? 'border-t border-border' : ''}`}>
-      <div className="px-4 py-1 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary flex items-center gap-1">
-        {icon}
-        {title}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-const TONE_CLASSES: Record<BadgeTone, string> = {
-  success: 'bg-success/10 text-success',
-  danger: 'bg-danger/10 text-danger',
-  warn: 'bg-warning/10 text-warning',
-  info: 'bg-accent/10 text-accent',
-  neutral: 'bg-surface-raised text-text-tertiary',
-};
-
-interface PaletteRowProps {
-  item: PaletteItem;
-  selected: boolean;
-  pinned: boolean;
-  onHover: () => void;
-  onRun: () => void;
-  onOpen: () => void;
-  onTogglePin: () => void;
-  altAction?: {
-    label: string;
-    shortcut: string;
-    run: () => void;
-  };
-  numberHint?: number;
-  t: ReturnType<typeof useT>;
-}
-
-function renderHighlighted(text: string, matches: PaletteMatch[] | undefined, key: HighlightKey): React.ReactNode {
-  if (!text) return text;
-  const ranges = matches?.filter((m) => m.key === key).flatMap((m) => m.indices) ?? [];
-  if (ranges.length === 0) return text;
-  const sorted = [...ranges].sort((a, b) => a[0] - b[0]);
-  const out: React.ReactNode[] = [];
-  let cursor = 0;
-  sorted.forEach(([start, end], i) => {
-    if (start > cursor) out.push(text.slice(cursor, start));
-    out.push(
-      <span key={`h${i}`} className="font-semibold text-accent">
-        {text.slice(start, end + 1)}
-      </span>,
-    );
-    cursor = end + 1;
-  });
-  if (cursor < text.length) out.push(text.slice(cursor));
-  return out;
-}
-
-function PaletteRow({ item, selected, pinned, onHover, onRun, onOpen, onTogglePin, altAction, numberHint, t }: PaletteRowProps) {
-  return (
-    <div
-      onMouseEnter={onHover}
-      onClick={onRun}
-      className={`flex items-center gap-3 px-4 py-2 cursor-pointer ${
-        selected ? 'bg-accent/10' : 'hover:bg-surface-raised'
-      }`}
-    >
-      {numberHint !== undefined && (
-        <span className="shrink-0 text-[9px] text-text-tertiary font-mono w-4 text-right">
-          ⌥{numberHint}
-        </span>
-      )}
-      <span className="shrink-0">
-        <WorkflowIcon icon={item.icon ?? null} className="w-4 h-4" />
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="text-sm text-text truncate">{renderHighlighted(item.title, item.matches, 'title')}</div>
-        {item.subtitle && (
-          <div className="text-xs text-text-tertiary truncate">
-            {renderHighlighted(item.subtitle, item.matches, 'subtitle')}
-          </div>
-        )}
-      </div>
-      {item.badge && (
-        <span className={`text-[10px] px-1.5 py-0.5 rounded-sm shrink-0 ${TONE_CLASSES[item.badge.tone]}`}>
-          {item.badge.label}
-        </span>
-      )}
-      <button
-        onClick={(e) => { e.stopPropagation(); onTogglePin(); }}
-        className={`p-1 rounded-sm transition-colors ${
-          pinned ? 'text-accent' : 'text-text-tertiary hover:text-accent'
-        }`}
-        title={pinned ? t.commandPalette.unpinHint : t.commandPalette.pinHint}
-        aria-label={pinned ? t.commandPalette.unpinHint : t.commandPalette.pinHint}
-      >
-        <Star className={`w-3.5 h-3.5 ${pinned ? 'fill-current' : ''}`} />
-      </button>
-      {altAction && (
-        <button
-          onClick={(e) => { e.stopPropagation(); altAction.run(); }}
-          className="p-1 rounded-sm hover:bg-warning/20 text-warning"
-          title={`${altAction.label} (Alt+${altAction.shortcut.toUpperCase()})`}
-          aria-label={altAction.label}
-        >
-          <RotateCw className="w-3.5 h-3.5" />
-        </button>
-      )}
-      <button
-        onClick={(e) => { e.stopPropagation(); onOpen(); }}
-        className="p-1 rounded-sm hover:bg-surface text-text-tertiary hover:text-text"
-        title={t.commandPalette.openHint}
-        aria-label={t.commandPalette.openHint}
-      >
-        <ExternalLink className="w-3.5 h-3.5" />
-      </button>
-      <button
-        onClick={(e) => { e.stopPropagation(); onRun(); }}
-        className="p-1 rounded-sm hover:bg-accent/20 text-accent"
-        title={t.commandPalette.runHint}
-        aria-label={t.commandPalette.runHint}
-      >
-        <Play className="w-3.5 h-3.5" />
-      </button>
-    </div>
-  );
-}
-
-interface AssistantRowProps {
-  query: string;
-  selected: boolean;
-  onHover: () => void;
-  onClick: () => void;
-  label: string;
-  borderTop: boolean;
-  numberHint?: number;
-}
-
-function AssistantRow({ query, selected, onHover, onClick, label, borderTop, numberHint }: AssistantRowProps) {
-  return (
-    <div
-      onMouseEnter={onHover}
-      onClick={onClick}
-      className={`flex items-center gap-3 px-4 py-2 cursor-pointer ${
-        borderTop ? 'border-t border-border' : ''
-      } ${selected ? 'bg-accent/10' : 'hover:bg-surface-raised'}`}
-    >
-      {numberHint !== undefined && (
-        <span className="shrink-0 text-[9px] text-text-tertiary font-mono w-4 text-right">
-          ⌥{numberHint}
-        </span>
-      )}
-      <span className="shrink-0 text-accent">
-        <Sparkles className="w-4 h-4" />
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="text-sm text-text truncate">
-          {label}: <span className="text-text-tertiary">»{query}«</span>
-        </div>
-      </div>
-      <span className="text-[10px] text-text-tertiary border border-border px-1.5 py-0.5 rounded-sm shrink-0">
-        ⏎
-      </span>
-    </div>
-  );
-}
-
-interface CollectFormProps {
-  state: CollectingState;
-  onChange: (values: Record<string, string>) => void;
-  onSubmit: () => void;
-  onCancel: () => void;
-  loading: boolean;
-  t: ReturnType<typeof useT>;
-}
-
-function CollectForm({ state, onChange, onSubmit, onCancel, loading, t }: CollectFormProps) {
-  const firstRef = useRef<HTMLInputElement>(null);
-  useEffect(() => { firstRef.current?.focus(); }, []);
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, idx: number) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (idx === state.variables.length - 1 || (e.metaKey || e.ctrlKey)) {
-        onSubmit();
-      } else {
-        const form = (e.target as HTMLInputElement).form;
-        const nextInput = form?.elements[idx + 1] as HTMLInputElement | undefined;
-        nextInput?.focus();
-      }
-    }
-  };
-
-  return (
-    <form
-      onSubmit={(e) => { e.preventDefault(); onSubmit(); }}
-      className="divide-y divide-border"
-    >
-      <div className="flex items-center gap-2 px-4 py-3">
-        <WorkflowIcon icon={state.workflow.icon} className="w-4 h-4 shrink-0" />
-        <div className="flex-1 min-w-0">
-          <div className="text-xs text-text-tertiary">{t.commandPalette.collectVariablesHeader}</div>
-          <div className="text-sm text-text truncate">{state.workflow.name}</div>
-        </div>
-      </div>
-      <div className="px-4 py-3 space-y-2 max-h-[50vh] overflow-y-auto">
-        {state.variables.map((v, idx) => (
-          <label key={v} className="block">
-            <div className="text-[11px] text-text-tertiary mb-1 font-mono">{v}</div>
-            <input
-              ref={idx === 0 ? firstRef : undefined}
-              type="text"
-              value={state.values[v] ?? ''}
-              onChange={(e) => onChange({ ...state.values, [v]: e.target.value })}
-              onKeyDown={(e) => handleKeyDown(e, idx)}
-              placeholder={state.workflow.defaultContext?.[v] ?? ''}
-              className="w-full px-3 py-1.5 text-sm bg-surface-raised border border-border rounded-md text-text focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-          </label>
-        ))}
-      </div>
-      <div className="flex items-center justify-between gap-2 px-4 py-3">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="flex items-center gap-1 px-3 py-1.5 text-xs text-text-tertiary hover:text-text rounded-md hover:bg-surface-raised"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          {t.commandPalette.collectCancel}
-        </button>
-        <button
-          type="submit"
-          disabled={loading}
-          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-accent rounded-md hover:bg-accent/90 disabled:opacity-50"
-        >
-          <Play className="w-3.5 h-3.5" />
-          {t.commandPalette.collectStart}
-          <span className="ml-1 text-[10px] border border-white/30 rounded-sm px-1">⏎</span>
-        </button>
-      </div>
-    </form>
-  );
-}
-
-function useDebounced<T>(value: T, delay = 250): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const h = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(h);
-  }, [value, delay]);
-  return debounced;
 }
