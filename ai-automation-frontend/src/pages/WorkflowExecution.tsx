@@ -1,13 +1,10 @@
 import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Pause, Play, XCircle, Clock, CheckCircle2, AlertCircle, Send, TerminalSquare,
+  ArrowLeft, Pause, Play, XCircle, Clock, Send, TerminalSquare,
   FolderOpen, ListTodo, Save,
-  Terminal, Sparkles, Brain, Repeat, GitBranch, RefreshCw, ShieldCheck, Layers,
-  MessageSquare, Route, RotateCcw, Wrench, Plug,
-  Eye, EyeOff, MoveHorizontal, MoveVertical,
 } from 'lucide-react';
-import { Card, CardHeader, Button, Spinner, Badge, Input } from '../components/ui';
+import { Card, CardHeader, Button, Spinner, Input } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { GateStatusBadge } from '../components/shared/GateStatusBadge';
 import { GateStatusBanner } from '../components/shared/GateStatusBanner';
@@ -17,7 +14,6 @@ import { ApprovalDialog } from '../components/shared/ApprovalDialog';
 import { HumanInputDialog } from '../components/shared/HumanInputDialog';
 import { AgenticStepCard } from '../components/shared/AgenticStepCard';
 import { ForEachStepCard } from '../components/shared/ForEachStepCard';
-import { PathLinkedOutput } from '../components/shared/PathLinkedOutput';
 import { InsightsPanel } from '../components/shared/InsightsPanel';
 import { ConversionSuggestion } from '../components/shared/ConversionSuggestion';
 import {
@@ -25,7 +21,9 @@ import {
   usePauseExecution, useResumeExecution, useCancelExecution, useRunCommand, useSubmitApproval,
   useRetryExecution, useApproveTodos, useResumeFromStep, useUpdateRunNotes,
 } from '../hooks/useWorkflows';
-import BpmnDiagramView, { type RunStatus, type DiagramOrientation, type DiagramSelection } from '../components/workflow/BpmnDiagramView';
+import { type RunStatus, type DiagramSelection } from '../components/workflow/BpmnDiagramView';
+import { ExecutionDiagramPanel } from '../components/workflow/ExecutionDiagramPanel';
+import { ExecutionStepCard } from '../components/workflow/ExecutionStepCard';
 import { useCreateTodo } from '../hooks/useTodos';
 import { useExecutionWebSocket } from '../hooks/useWebSocket';
 import { useRateRun } from '../hooks/useLearning';
@@ -33,177 +31,9 @@ import { useToast } from '../hooks/useToast';
 import { useT } from '../i18n';
 import { formatDuration } from '../utils/formatTime';
 import { api, openPath } from '../api/client';
-import type { WorkflowRun, StepResult, PendingHumanInput, PendingTodoItem } from '../types';
+import type { WorkflowRun, PendingHumanInput, PendingTodoItem } from '../types';
 
 const TerminalPanel = lazy(() => import('../components/shared/TerminalPanel').then(m => ({ default: m.TerminalPanel })));
-
-const BLOCK_TYPE_ICONS: Record<string, React.ReactNode> = {
-  shell: <Terminal className="w-3 h-3" />,
-  simple: <Sparkles className="w-3 h-3" />,
-  agentic: <Brain className="w-3 h-3" />,
-  foreach: <Repeat className="w-3 h-3" />,
-  conditional: <GitBranch className="w-3 h-3" />,
-  while: <RefreshCw className="w-3 h-3" />,
-  approval: <ShieldCheck className="w-3 h-3" />,
-  'sub-workflow': <Layers className="w-3 h-3" />,
-  'human-input': <MessageSquare className="w-3 h-3" />,
-  switch: <Route className="w-3 h-3" />,
-  retry: <RotateCcw className="w-3 h-3" />,
-  'skill-capability': <Wrench className="w-3 h-3" />,
-  integration: <Plug className="w-3 h-3" />,
-};
-
-function stepMetadataSummary(step: StepResult) {
-  const metadata = step.metadata ?? {};
-  const provider = typeof metadata.provider === 'string' ? metadata.provider : null;
-  const model = typeof metadata.model === 'string' ? metadata.model : null;
-  const requestedModel = typeof metadata.requestedModel === 'string' ? metadata.requestedModel : null;
-  const aiSystemPrompt = typeof metadata.aiSystemPrompt === 'string' ? metadata.aiSystemPrompt : null;
-  const aiRequest = metadata.aiRequest && typeof metadata.aiRequest === 'object' && !Array.isArray(metadata.aiRequest)
-    ? (metadata.aiRequest as Record<string, unknown>)
-    : null;
-
-  return {
-    provider,
-    model,
-    requestedModel,
-    showRequestedModel: requestedModel != null && requestedModel !== model,
-    aiSystemPrompt,
-    aiRequest,
-  };
-}
-
-function StepCard({ step }: { step: StepResult }) {
-  const t = useT();
-  const [inputExpanded, setInputExpanded] = useState(false);
-  const [systemPromptExpanded, setSystemPromptExpanded] = useState(false);
-  const { provider, model, requestedModel, showRequestedModel, aiSystemPrompt, aiRequest } = stepMetadataSummary(step);
-  const systemPromptLineCount = aiSystemPrompt ? aiSystemPrompt.split('\n').length : 0;
-  const aiRequestEntries = aiRequest
-    ? Object.entries(aiRequest).filter(([, v]) => v !== null && v !== undefined && v !== '')
-    : [];
-
-  return (
-    <div className="flex gap-3 py-3">
-      <div className="pt-0.5">
-        {step.status === 'COMPLETED' ? (
-          <CheckCircle2 className="w-5 h-5 text-success" />
-        ) : step.status === 'FAILED' ? (
-          <AlertCircle className="w-5 h-5 text-danger" />
-        ) : step.status === 'RUNNING' ? (
-          <div className="w-5 h-5 rounded-full border-2 border-accent border-t-transparent animate-spin" />
-        ) : (
-          <div className="w-5 h-5 rounded-full border-2 border-border" />
-        )}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-xs font-mono text-text-tertiary">Step {step.stepIndex + 1}</span>
-          <Badge variant={step.status === 'COMPLETED' ? 'success' : step.status === 'FAILED' ? 'danger' : 'default'}>
-            <span className="inline-flex items-center gap-1">
-              {BLOCK_TYPE_ICONS[step.blockType]}
-              {step.blockType}
-            </span>
-          </Badge>
-          {step.durationMs != null && (
-            <span className="text-xs text-text-tertiary flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              {formatDuration(step.durationMs)}
-            </span>
-          )}
-        </div>
-        {(provider || model || showRequestedModel) && (
-          <div className="flex flex-wrap gap-2 mb-2">
-            {provider && (
-              <span className="px-2 py-0.5 rounded-full bg-surface-raised text-[11px] font-mono text-text-tertiary">
-                provider={provider}
-              </span>
-            )}
-            {model && (
-              <span className="px-2 py-0.5 rounded-full bg-surface-raised text-[11px] font-mono text-text">
-                model={model}
-              </span>
-            )}
-            {showRequestedModel && (
-              <span className="px-2 py-0.5 rounded-full bg-warning/10 text-[11px] font-mono text-warning">
-                requested={requestedModel}
-              </span>
-            )}
-          </div>
-        )}
-        {step.input && !inputExpanded && (
-          <p
-            className="text-xs text-text-secondary font-mono mb-1 truncate cursor-pointer hover:text-text transition-colors"
-            onClick={() => setInputExpanded(true)}
-            title="Klicken zum Aufklappen"
-          >{step.input}</p>
-        )}
-        {step.input && inputExpanded && (
-          <div className="mb-2 space-y-2">
-            <div>
-              <button
-                type="button"
-                onClick={() => setInputExpanded(false)}
-                className="text-[11px] uppercase tracking-wide text-text-tertiary hover:text-text mb-1"
-                title="Klicken zum Einklappen"
-              >
-                {t.workflows.execution.stepInput.command}
-              </button>
-              <pre className="text-xs text-text-secondary font-mono bg-surface rounded-lg p-3 overflow-x-auto max-h-60 whitespace-pre-wrap break-all">{step.input}</pre>
-            </div>
-
-            {aiSystemPrompt && (
-              <div>
-                <button
-                  type="button"
-                  onClick={() => setSystemPromptExpanded(e => !e)}
-                  className="text-[11px] uppercase tracking-wide text-text-tertiary hover:text-text mb-1 flex items-center gap-2"
-                >
-                  <span>{t.workflows.execution.stepInput.systemPrompt}</span>
-                  <span className="text-text-tertiary normal-case tracking-normal">
-                    ({t.workflows.execution.stepInput.lineCount.replace('{count}', String(systemPromptLineCount))})
-                  </span>
-                  <span className="text-text-tertiary normal-case tracking-normal">
-                    · {systemPromptExpanded
-                      ? t.workflows.execution.stepInput.hideSystemPrompt
-                      : t.workflows.execution.stepInput.showSystemPrompt}
-                  </span>
-                </button>
-                {systemPromptExpanded && (
-                  <pre className="text-xs text-text-secondary font-mono bg-surface rounded-lg p-3 overflow-auto max-h-80 whitespace-pre-wrap break-all">{aiSystemPrompt}</pre>
-                )}
-              </div>
-            )}
-
-            {aiRequestEntries.length > 0 && (
-              <div>
-                <div className="text-[11px] uppercase tracking-wide text-text-tertiary mb-1">
-                  {t.workflows.execution.stepInput.request}
-                </div>
-                <ul className="text-xs font-mono bg-surface rounded-lg p-3 space-y-0.5">
-                  {aiRequestEntries.map(([k, v]) => (
-                    <li key={k} className="flex gap-2">
-                      <span className="text-text-tertiary">{k}</span>
-                      <span className="text-text">{String(v)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-        {step.output && (
-          <pre className="text-xs text-text font-mono bg-surface rounded-lg p-3 overflow-x-auto max-h-40 whitespace-pre-wrap">
-            <PathLinkedOutput text={step.output} />
-          </pre>
-        )}
-        {step.error && (
-          <p className="text-xs text-danger mt-1">{step.error}</p>
-        )}
-      </div>
-    </div>
-  );
-}
 
 export function WorkflowExecution() {
   const { id, runId } = useParams<{ id: string; runId: string }>();
@@ -283,9 +113,7 @@ export function WorkflowExecution() {
     return map;
   }, [run?.steps]);
 
-  // Ablauf-Diagramm: ein-/ausblenden, Ausrichtung, Klick-zu-Step
-  const [showFlow, setShowFlow] = useState(true);
-  const [flowOrientation, setFlowOrientation] = useState<DiagramOrientation>('horizontal');
+  // Klick im Diagramm scrollt zum Step und hebt ihn kurz hervor
   const [stepHighlight, setStepHighlight] = useState<{ index: number; nonce: number } | null>(null);
   const handleSelectStep = (sel: DiagramSelection) => {
     document.getElementById(`exec-step-${sel.blockIndex}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -563,47 +391,7 @@ export function WorkflowExecution() {
 
       {/* Ablauf-Diagramm mit Live-Status je Block */}
       {bpmnXml && run.steps.length > 0 && (
-        <Card padding={false}>
-          <div className="p-5 pb-3">
-            <CardHeader
-              title={t.workflows.execution.diagramTitle}
-              action={
-                <div className="flex items-center gap-2">
-                  {showFlow && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      icon={flowOrientation === 'horizontal' ? <MoveVertical className="w-4 h-4" /> : <MoveHorizontal className="w-4 h-4" />}
-                      onClick={() => setFlowOrientation((o) => (o === 'horizontal' ? 'vertical' : 'horizontal'))}
-                      title={t.workflows.orientationToggle}
-                    >
-                      {flowOrientation === 'horizontal' ? t.workflows.orientationVertical : t.workflows.orientationHorizontal}
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    icon={showFlow ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    onClick={() => setShowFlow((v) => !v)}
-                    title={showFlow ? t.workflows.execution.hideDiagram : t.workflows.execution.showDiagram}
-                  >
-                    {showFlow ? t.workflows.execution.hideDiagram : t.workflows.execution.showDiagram}
-                  </Button>
-                </div>
-              }
-            />
-          </div>
-          {showFlow && (
-            <div className="px-5 pb-5">
-              <BpmnDiagramView
-                xml={bpmnXml}
-                statusByBlock={statusByBlock}
-                orientation={flowOrientation}
-                onSelectBlock={handleSelectStep}
-              />
-            </div>
-          )}
-        </Card>
+        <ExecutionDiagramPanel xml={bpmnXml} statusByBlock={statusByBlock} onSelectBlock={handleSelectStep} />
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -624,7 +412,7 @@ export function WorkflowExecution() {
                 ) : step.blockType === 'foreach' ? (
                   <ForEachStepCard step={step} forEachState={forEachStates.get(step.stepIndex)} />
                 ) : (
-                  <StepCard step={step} />
+                  <ExecutionStepCard step={step} />
                 )}
               </div>
             ))}
