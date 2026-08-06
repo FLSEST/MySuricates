@@ -69,6 +69,8 @@ automation:
   discovery:
     auto-tagging-enabled: ${AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED:true}
     semantic-enabled: ${AUTOMATION_DISCOVERY_SEMANTIC_ENABLED:true}
+  integration:
+    key-file: ${AUTOMATION_INTEGRATION_KEY_FILE:${user.home}/.autotrigger/integration-encryption.key}    # AES-Key für Integration-Credentials — nie in der DB neben dem Ciphertext
   autopilot:
     project-id: ${AUTOMATION_AUTOPILOT_PROJECT_ID:}    # Optional: UUID des Autopilot-Projekts für Health-Auto-Todos (leer = kein Project-Bezug)
   cli:

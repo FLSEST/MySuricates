@@ -4,10 +4,17 @@ import com.automation.repository.AppSettingsRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
+import java.util.Base64;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -17,17 +24,27 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class IntegrationEncryptionServiceTest {
 
+    private static final String SETTINGS_KEY = "integration-encryption-key";
+
     @Mock
     private AppSettingsRepository appSettingsRepository;
 
+    @TempDir
+    Path tempDir;
+
+    private Path keyFile;
     private IntegrationEncryptionService service;
 
     @BeforeEach
     void setUp() {
-        when(appSettingsRepository.get(eq("integration-encryption-key"))).thenReturn(Optional.empty());
-        doNothing().when(appSettingsRepository).set(anyString(), anyString());
-        service = new IntegrationEncryptionService(appSettingsRepository);
+        keyFile = tempDir.resolve("integration-encryption.key");
+        when(appSettingsRepository.get(eq(SETTINGS_KEY))).thenReturn(Optional.empty());
+        service = newService(Map.of());
         service.init();
+    }
+
+    private IntegrationEncryptionService newService(Map<String, String> env) {
+        return new IntegrationEncryptionService(appSettingsRepository, keyFile, env::get);
     }
 
     @Test
@@ -69,27 +86,102 @@ class IntegrationEncryptionServiceTest {
     }
 
     @Test
-    void generatesAndStoresKeyOnFirstStart() {
-        verify(appSettingsRepository).set(eq("integration-encryption-key"), anyString());
+    void generatesKeyIntoFileNotDatabaseOnFirstStart() throws Exception {
+        assertThat(keyFile).isRegularFile();
+        assertThat(Base64.getDecoder().decode(Files.readString(keyFile).trim())).hasSize(32);
+        verify(appSettingsRepository, never()).set(anyString(), anyString());
     }
 
     @Test
-    void loadsExistingKeyFromDatabase() {
-        // Create a service that generates a key
-        IntegrationEncryptionService first = service;
-        String encrypted = first.encrypt("test");
+    void keyFileIsOwnerOnly() throws Exception {
+        Set<PosixFilePermission> perms = Files.getPosixFilePermissions(keyFile);
+        assertThat(perms).containsExactlyInAnyOrder(
+                PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE);
+    }
 
-        // Capture the stored key
-        var keyCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
-        verify(appSettingsRepository).set(eq("integration-encryption-key"), keyCaptor.capture());
-        String storedKey = keyCaptor.getValue();
+    @Test
+    void loadsExistingKeyFromFile() {
+        String encrypted = service.encrypt("test");
 
-        // Create a new service that loads the existing key
-        when(appSettingsRepository.get(eq("integration-encryption-key"))).thenReturn(Optional.of(storedKey));
-        IntegrationEncryptionService second = new IntegrationEncryptionService(appSettingsRepository);
+        IntegrationEncryptionService second = newService(Map.of());
         second.init();
 
-        // Should be able to decrypt what the first service encrypted
         assertThat(second.decrypt(encrypted)).isEqualTo("test");
+    }
+
+    @Test
+    void envKeyTakesPrecedenceOverFile() {
+        String envKey = Base64.getEncoder().encodeToString(new byte[32]);
+        IntegrationEncryptionService envService = newService(Map.of("AUTOMATION_INTEGRATION_KEY", envKey));
+        envService.init();
+
+        // File-based service and env-based service use different keys
+        String encrypted = envService.encrypt("env-secret");
+        assertThat(envService.decrypt(encrypted)).isEqualTo("env-secret");
+        assertThat(Files.exists(keyFile)).isTrue();
+    }
+
+    @Test
+    void migratesLegacyDatabaseKeyToFileAndDeletesDbEntry() throws Exception {
+        Files.deleteIfExists(keyFile);
+        String legacyKey = Base64.getEncoder().encodeToString(generateRawKey());
+        when(appSettingsRepository.get(eq(SETTINGS_KEY))).thenReturn(Optional.of(legacyKey));
+
+        IntegrationEncryptionService migrated = newService(Map.of());
+        migrated.init();
+
+        assertThat(Files.readString(keyFile).trim()).isEqualTo(legacyKey);
+        verify(appSettingsRepository).delete(eq(SETTINGS_KEY));
+
+        // Data encrypted under the legacy key must remain decryptable
+        IntegrationEncryptionService reloaded = newService(Map.of());
+        reloaded.init();
+        String encrypted = migrated.encrypt("legacy-data");
+        assertThat(reloaded.decrypt(encrypted)).isEqualTo("legacy-data");
+    }
+
+    @Test
+    void removesDbCopyWhenFileAlreadyMigrated() throws Exception {
+        String fileKey = Files.readString(keyFile).trim();
+        when(appSettingsRepository.get(eq(SETTINGS_KEY))).thenReturn(Optional.of(fileKey));
+
+        IntegrationEncryptionService second = newService(Map.of());
+        second.init();
+
+        verify(appSettingsRepository).delete(eq(SETTINGS_KEY));
+    }
+
+    @Test
+    void keepsDivergingDbKeyAndUsesFile() throws Exception {
+        String otherKey = Base64.getEncoder().encodeToString(generateRawKey());
+        when(appSettingsRepository.get(eq(SETTINGS_KEY))).thenReturn(Optional.of(otherKey));
+
+        String encrypted = service.encrypt("file-key-data");
+        IntegrationEncryptionService second = newService(Map.of());
+        second.init();
+
+        verify(appSettingsRepository, never()).delete(anyString());
+        assertThat(second.decrypt(encrypted)).isEqualTo("file-key-data");
+    }
+
+    @Test
+    void fallsBackToDatabaseWhenKeyFileNotWritable() throws Exception {
+        // Parent "directory" is a regular file → createDirectories fails
+        Path blocker = tempDir.resolve("blocker");
+        Files.writeString(blocker, "not a directory");
+        keyFile = blocker.resolve("integration-encryption.key");
+
+        IntegrationEncryptionService fallback = newService(Map.of());
+        fallback.init();
+
+        verify(appSettingsRepository).set(eq(SETTINGS_KEY), anyString());
+        String encrypted = fallback.encrypt("fallback-data");
+        assertThat(fallback.decrypt(encrypted)).isEqualTo("fallback-data");
+    }
+
+    private static byte[] generateRawKey() throws Exception {
+        javax.crypto.KeyGenerator keyGen = javax.crypto.KeyGenerator.getInstance("AES");
+        keyGen.init(256);
+        return keyGen.generateKey().getEncoded();
     }
 }

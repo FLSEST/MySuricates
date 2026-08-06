@@ -38,4 +38,8 @@ public class AppSettingsRepository {
                 key, value
         );
     }
+
+    public void delete(String key) {
+        jdbcTemplate.update("DELETE FROM app_settings WHERE key = ?", key);
+    }
 }

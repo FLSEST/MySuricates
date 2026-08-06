@@ -167,9 +167,13 @@ Refresh — `getValidAccessToken()` gibt das gespeicherte Credential unveränder
   Status-Enum `ConnectionStatus`: `CONNECTED`, `DISCONNECTED`, `EXPIRED`.
 - Verschlüsselung: **AES/GCM/NoPadding**, 128-Bit-Auth-Tag, 12-Byte-IV
   (`IntegrationEncryptionService`).
-- Der Schlüssel kommt aus der Env-Var `AUTOMATION_INTEGRATION_KEY` (Base64-AES-Key) oder wird
-  beim ersten Start generiert und in `app_settings` unter `integration-encryption-key`
-  gespeichert.
+- Der Schlüssel kommt aus der Env-Var `AUTOMATION_INTEGRATION_KEY` (Base64-AES-Key) oder aus der
+  Key-Datei (`automation.integration.key-file`, Default `~/.autotrigger/integration-encryption.key`,
+  chmod 600); fehlt beides, wird er beim ersten Start generiert und in die Key-Datei geschrieben.
+  Ein Legacy-Schlüssel in `app_settings` (`integration-encryption-key`) wird beim Start automatisch
+  in die Key-Datei migriert und aus der DB gelöscht — Schlüssel und Ciphertext liegen damit nicht
+  mehr in derselben SQLite-Datei. Nur wenn die Key-Datei nicht schreibbar ist (z. B. Container mit
+  read-only Home), fällt der Service mit lautem ERROR-Log auf die DB zurück.
 - **Auflösungsreihenfolge** für Client-ID/-Secret: zuerst DB (verschlüsselt), dann Env-Var-Fallback
   (`GOOGLE_CLIENT_ID` etc.) — praktisch für Deployment-Szenarien ohne UI-Eingabe.
 

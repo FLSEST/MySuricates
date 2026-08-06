@@ -168,8 +168,13 @@ refresh — `getValidAccessToken()` returns the stored credential unchanged.
   status enum `ConnectionStatus`: `CONNECTED`, `DISCONNECTED`, `EXPIRED`.
 - Encryption: **AES/GCM/NoPadding**, 128-bit auth tag, 12-byte IV
   (`IntegrationEncryptionService`).
-- The key comes from the env var `AUTOMATION_INTEGRATION_KEY` (Base64-AES key) or is
-  generated on first startup and stored in `app_settings` under `integration-encryption-key`.
+- The key comes from the env var `AUTOMATION_INTEGRATION_KEY` (Base64-AES key) or from the
+  key file (`automation.integration.key-file`, default `~/.autotrigger/integration-encryption.key`,
+  chmod 600); if neither exists, it is generated on first startup and written to the key file.
+  A legacy key in `app_settings` (`integration-encryption-key`) is automatically migrated to the
+  key file on startup and deleted from the DB — key and ciphertext no longer live in the same
+  SQLite file. Only if the key file is not writable (e.g. container with read-only home) does the
+  service fall back to the DB with a loud ERROR log.
 - **Resolution order** for client ID/secret: DB first (encrypted), then env var fallback
   (`GOOGLE_CLIENT_ID` etc.) — practical for deployment scenarios without UI input.
 
