@@ -1,5 +1,6 @@
 package com.automation.service.trigger;
 
+import com.automation.config.TodoTriggerConfig;
 import com.automation.dto.request.CreateTodoTriggerRequest;
 import com.automation.entity.RunStatus;
 import com.automation.entity.Todo;
@@ -15,6 +16,7 @@ import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageRequest;
@@ -26,6 +28,7 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 
 @Service
@@ -38,19 +41,39 @@ public class TodoTriggerService {
     private final WorkflowRunRepository workflowRunRepository;
     private final WorkflowService workflowService;
     private final WorkflowExecutor workflowExecutor;
+    private final TodoTriggerConfig config;
+
+    /** Last unparseable skip-until we already warned about, so the 5-min poll does not spam the log. */
+    private volatile String lastInvalidSkipUntil = null;
 
     public TodoTriggerService(TodoTriggerRepository repository,
                               WorkflowRepository workflowRepository,
                               TodoRepository todoRepository,
                               WorkflowRunRepository workflowRunRepository,
                               WorkflowService workflowService,
-                              @Lazy WorkflowExecutor workflowExecutor) {
+                              @Lazy WorkflowExecutor workflowExecutor,
+                              TodoTriggerConfig config) {
         this.repository = repository;
         this.workflowRepository = workflowRepository;
         this.todoRepository = todoRepository;
         this.workflowRunRepository = workflowRunRepository;
         this.workflowService = workflowService;
         this.workflowExecutor = workflowExecutor;
+        this.config = config;
+    }
+
+    /**
+     * A configured pause is invisible in the UI — log it once at startup so „the loop stopped
+     * picking up todos" is diagnosable without reading the config file.
+     */
+    @PostConstruct
+    void logPauseWindowAtStartup() {
+        parseSkipUntil().ifPresent(until -> {
+            if (Instant.now().isBefore(until)) {
+                log.warn("TodoTrigger mechanism paused until {} (automation.todo-trigger.skip-until) "
+                        + "— no trigger will fire before that", until);
+            }
+        });
     }
 
     // ── CRUD ──────────────────────────────────────
@@ -124,6 +147,11 @@ public class TodoTriggerService {
             return;
         }
 
+        if (isPaused()) {
+            log.debug("TodoTrigger paused — ignoring created todo '{}'", todo.getTitle());
+            return;
+        }
+
         List<TodoTrigger> triggers = repository.findByEnabledTrue();
         if (triggers.isEmpty()) {
             return;
@@ -145,6 +173,11 @@ public class TodoTriggerService {
 
     @Scheduled(fixedDelayString = "${automation.todo-trigger.poll-interval-ms:300000}")
     public void processBacklog() {
+        if (isPaused()) {
+            log.debug("TodoTrigger paused — skipping backlog poll");
+            return;
+        }
+
         List<TodoTrigger> triggers = repository.findByEnabledTrue().stream()
                 .filter(TodoTrigger::isProcessBacklog)
                 .toList();
@@ -172,6 +205,37 @@ public class TodoTriggerService {
                     return; // Only 1 per tick
                 }
             }
+        }
+    }
+
+    /** True while the configured pause window (automation.todo-trigger.skip-until) is still open. */
+    private boolean isPaused() {
+        return parseSkipUntil().map(Instant.now()::isBefore).orElse(false);
+    }
+
+    /**
+     * Mirrors {@code SchedulerService.parseSkipUntil}: fail open. A misconfigured (unparseable)
+     * value must NOT silently disable the whole self-improvement loop, so it is treated as „no
+     * pause" and warned about once per distinct value.
+     */
+    private Optional<Instant> parseSkipUntil() {
+        String raw = config.getSkipUntil();
+        if (raw == null || raw.isBlank()) {
+            lastInvalidSkipUntil = null;
+            return Optional.empty();
+        }
+
+        try {
+            Optional<Instant> parsed = Optional.of(Instant.parse(raw.trim()));
+            lastInvalidSkipUntil = null;
+            return parsed;
+        } catch (DateTimeParseException e) {
+            if (!raw.equals(lastInvalidSkipUntil)) {
+                lastInvalidSkipUntil = raw;
+                log.error("Invalid automation.todo-trigger.skip-until value '{}'; ignoring it and "
+                        + "firing triggers normally", raw);
+            }
+            return Optional.empty();
         }
     }
 

@@ -319,6 +319,7 @@ Audit-Workflow → AuditIngestionService → Finding → TODO (OPEN)
 - API: List, Get, Create, Enable/Disable, Delete
 - **Loop-Prevention**: 3 Schichten — Metadata-Flag (`todoTriggerRun`), Max-Attempts-Zähler (`todo.fixAttempts`), Running-Check (`todo.lastFixRunId`)
 - **Context-Variablen** für Fix-Workflow: `todo_id`, `todo_title`, `todo_description`, `todo_tags`, `todo_priority`, `todo_project_id`, `todo_trigger_id`
+- **Pause** (`automation.todo-trigger.skip-until`, ISO-Instant, leer = aus): legt den gesamten Mechanismus bis zu diesem Zeitpunkt still — Backlog-Poll **und** Event-Pfad. Greift ab dem ersten Tick nach dem Start, braucht also kein laufendes Backend zum Setzen. Zusammen mit `automation.scheduler.skip-until` (+ `catch-up-on-resume: false`) ergibt das eine vollständige Trigger-Pause aus wenigen Config-Zeilen, z. B. in der gitignorierten `ai-automation-backend/config/application.yml`. Bewusst ein Datum statt eines Flags: es läuft von selbst aus, während ein vergessenes `enabled=false` auf den einzelnen Triggern den Loop stumm stillstehen lässt (kein Fehler, kein roter Status — die TODOs bleiben nur liegen). Unparsebarer Wert ⇒ fail-open (ERROR-Log, Trigger feuern normal). Eine aktive Pause wird beim Start als WARNING geloggt.
 
 ## Projekt-Cockpit & TODO-Hygiene
 

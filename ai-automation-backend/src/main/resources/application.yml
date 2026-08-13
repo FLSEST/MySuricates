@@ -111,6 +111,12 @@ automation:
     timeout-seconds: ${AUTOMATION_TASK_COMMAND_TIMEOUT:60}    # Timeout für einen `task`-CLI-Aufruf (Taskwarrior-Integration)
   todo-trigger:
     poll-interval-ms: ${AUTOMATION_TODO_TRIGGER_POLL_MS:300000}
+    # Pausiert den TodoTrigger-Mechanismus (Backlog-Poll UND Event-Pfad) bis zu diesem
+    # ISO-Instant — das Gegenstueck zu automation.scheduler.skip-until, mit dem zusammen
+    # eine komplette Trigger-Pause aus zwei Zeilen besteht. Bewusst ein Datum statt eines
+    # Flags: es laeuft von selbst aus, waehrend ein vergessenes enabled=false den
+    # Self-Improvement-Loop stumm stillstehen laesst. Leer = keine Pause.
+    skip-until: ${AUTOMATION_TODO_TRIGGER_SKIP_UNTIL:}
   scheduler:
     skip-until: ${AUTOMATION_SCHEDULER_SKIP_UNTIL:}
     # Gap between two scheduler ticks (minutes) interpreted as a system resume after suspend/freeze.

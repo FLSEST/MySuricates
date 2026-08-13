@@ -1,5 +1,6 @@
 package com.automation.service.trigger;
 
+import com.automation.config.TodoTriggerConfig;
 import com.automation.dto.request.CreateTodoTriggerRequest;
 import com.automation.entity.Todo;
 import com.automation.entity.TodoTrigger;
@@ -43,12 +44,14 @@ class TodoTriggerServiceTest {
     @Mock private WorkflowExecutor workflowExecutor;
 
     private TodoTriggerService service;
+    private TodoTriggerConfig config;
 
     @BeforeEach
     void setUp() {
+        config = new TodoTriggerConfig();   // skipUntil = "" → keine Pause
         service = new TodoTriggerService(
                 repository, workflowRepository, todoRepository,
-                workflowRunRepository, workflowService, workflowExecutor);
+                workflowRunRepository, workflowService, workflowExecutor, config);
     }
 
     // ── CRUD ──────────────────────────────
@@ -271,6 +274,69 @@ class TodoTriggerServiceTest {
 
             verifyNoInteractions(todoRepository);
             verifyNoInteractions(workflowExecutor);
+        }
+    }
+
+    // ── Pause-Fenster (automation.todo-trigger.skip-until) ──
+
+    @Nested
+    class PauseWindowTests {
+
+        private static final String FUTURE = "2999-01-01T00:00:00Z";
+        private static final String PAST = "2000-01-01T00:00:00Z";
+
+        @Test
+        void processBacklog_whilePaused_touchesNothing() {
+            config.setSkipUntil(FUTURE);
+
+            service.processBacklog();
+
+            // Nicht einmal die Trigger-Liste wird geladen — die Pause greift vor jeder DB-Arbeit.
+            verifyNoInteractions(repository);
+            verifyNoInteractions(todoRepository);
+            verifyNoInteractions(workflowExecutor);
+        }
+
+        @Test
+        void onTodoCreated_whilePaused_touchesNothing() {
+            config.setSkipUntil(FUTURE);
+            Todo todo = Todo.builder()
+                    .id("todo-1").title("Fix bug").status(Todo.Status.OPEN)
+                    .tags(TodoMapper.listToJson(List.of("backend")))
+                    .priority(Todo.Priority.HIGH).source(Todo.Source.AI).build();
+
+            service.onTodoCreated(new TodoCreatedEvent(this, todo));
+
+            verifyNoInteractions(repository);
+            verifyNoInteractions(workflowExecutor);
+        }
+
+        @Test
+        void processBacklog_afterWindowExpired_runsNormally() {
+            config.setSkipUntil(PAST);
+            when(repository.findByEnabledTrue()).thenReturn(List.of());
+
+            service.processBacklog();
+
+            // Kein Aufraeumen noetig: ein abgelaufenes Fenster gibt den Loop von selbst frei.
+            verify(repository).findByEnabledTrue();
+        }
+
+        @Test
+        void unparseableSkipUntil_failsOpen_soTheLoopKeepsRunning() {
+            config.setSkipUntil("naechste Woche");
+            when(repository.findByEnabledTrue()).thenReturn(List.of());
+
+            service.processBacklog();
+
+            verify(repository).findByEnabledTrue();
+        }
+
+        @Test
+        void startupLog_withUnparseableValue_doesNotThrow() {
+            config.setSkipUntil("kaputt");
+
+            service.logPauseWindowAtStartup();   // darf den Boot nicht verhindern
         }
     }
 
