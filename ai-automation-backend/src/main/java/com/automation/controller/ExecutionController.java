@@ -10,6 +10,7 @@ import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.executor.ApprovalRequest;
 import com.automation.mapper.WorkflowMapper;
+import com.automation.service.workflow.RunDeletionService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
 import jakarta.validation.Valid;
@@ -33,6 +34,7 @@ public class ExecutionController {
     private final WorkflowMapper workflowMapper;
     private final AutoTodoService autoTodoService;
     private final WorkflowRunRepository workflowRunRepository;
+    private final RunDeletionService runDeletionService;
 
     @GetMapping
     @Transactional(readOnly = true)
@@ -61,6 +63,18 @@ public class ExecutionController {
     public ResponseEntity<WorkflowRunResponse> getExecution(@PathVariable String id) {
         var run = executionQueryService.findById(id);
         return ResponseEntity.ok(workflowMapper.toRunResponse(run));
+    }
+
+    /**
+     * Loescht einen Lauf samt Schritten und den losen Verweisen darauf.
+     *
+     * <p>409, wenn der Lauf noch aktiv ist oder ein Audit-Bericht an ihm haengt.
+     * TODOs und Audit-Daten werden nie mitgeloescht — siehe {@link RunDeletionService}.
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteExecution(@PathVariable String id) {
+        runDeletionService.delete(id);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/pause")

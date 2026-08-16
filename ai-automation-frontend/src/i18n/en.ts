@@ -980,6 +980,8 @@ export const en = {
     workflowUpdateFailed: 'Failed to update workflow',
     workflowDeleteFailed: 'Failed to delete workflow',
     workflowExecuted: 'Workflow execution started',
+    runDeleted: 'Run deleted',
+    runDeleteFailed: 'Failed to delete run',
     workflowExecuteFailed: 'Failed to execute workflow',
     todoExported: 'TODO exported to tracker',
     todoExportFailed: 'Failed to export TODO to tracker',
@@ -1250,6 +1252,8 @@ export const en = {
     progress: 'Progress',
     noChainRuns: 'No chain runs found.',
     result: 'Result',
+    delete: 'Delete run',
+    deleteConfirm: 'Permanently delete this run? Its steps and the matching dead-letter entry go with it. Linked todos are kept, but lose the reference.',
   },
   activityLog: {
     title: 'Activity Log',

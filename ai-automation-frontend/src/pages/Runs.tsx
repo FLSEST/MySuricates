@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { usePersistedState } from '../hooks/usePersistedState';
 import { useNavigate } from 'react-router-dom';
-import { History, Link2 } from 'lucide-react';
+import { History, Link2, Trash2 } from 'lucide-react';
 import { Card, Select, Spinner, Table } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { Pagination } from '../components/shared/Pagination';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
-import { useAllRuns, useWorkflows } from '../hooks/useWorkflows';
+import { useAllRuns, useDeleteRun, useWorkflows } from '../hooks/useWorkflows';
 import { useProjects } from '../hooks/useProjects';
 import { useAllChainRuns } from '../hooks/useChains';
 import { useT, useI18nStore } from '../i18n';
@@ -155,6 +155,12 @@ export function Runs() {
       ),
       width: '120px',
     },
+    {
+      key: 'actions',
+      header: '',
+      render: (r: WorkflowRun) => <DeleteRunButton run={r} t={t} />,
+      width: '48px',
+    },
   ];
 
   const chainColumns = [
@@ -271,6 +277,31 @@ export function Runs() {
         />
       )}
     </div>
+  );
+}
+
+/** Aktive Läufe lehnt das Backend mit 409 ab — der Knopf bleibt hier gleich gesperrt. */
+const AKTIVE_STATUS = ['RUNNING', 'PENDING', 'PAUSED'];
+
+function DeleteRunButton({ run, t }: { run: WorkflowRun; t: ReturnType<typeof useT> }) {
+  const deleteRun = useDeleteRun();
+  const aktiv = AKTIVE_STATUS.includes(run.status);
+
+  return (
+    <button
+      type="button"
+      title={t.runs.delete}
+      aria-label={t.runs.delete}
+      disabled={aktiv || deleteRun.isPending}
+      className="p-1.5 rounded text-text-secondary hover:text-red-500 hover:bg-red-500/10
+                 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (window.confirm(t.runs.deleteConfirm)) deleteRun.mutate(run.id);
+      }}
+    >
+      <Trash2 className="w-4 h-4" />
+    </button>
   );
 }
 

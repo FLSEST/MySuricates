@@ -982,6 +982,8 @@ export const de: TranslationKeys = {
     workflowUpdateFailed: 'Workflow konnte nicht aktualisiert werden',
     workflowDeleteFailed: 'Workflow konnte nicht gelöscht werden',
     workflowExecuted: 'Workflow-Ausführung gestartet',
+    runDeleted: 'Lauf gelöscht',
+    runDeleteFailed: 'Lauf konnte nicht gelöscht werden',
     workflowExecuteFailed: 'Workflow konnte nicht ausgeführt werden',
     todoExported: 'TODO an Tracker übertragen',
     todoExportFailed: 'Übertragen an Tracker fehlgeschlagen',
@@ -1247,6 +1249,8 @@ export const de: TranslationKeys = {
     progress: 'Fortschritt',
     noChainRuns: 'Keine Ketten-Ausführungen gefunden.',
     result: 'Ergebnis',
+    delete: 'Lauf löschen',
+    deleteConfirm: 'Diesen Lauf endgültig löschen? Die Schritte und der zugehörige Dead-Letter-Eintrag verschwinden mit. Verknüpfte TODOs bleiben erhalten, verlieren aber den Verweis.',
   },
   activityLog: {
     title: 'Aktivitätslog',

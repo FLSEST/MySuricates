@@ -99,6 +99,16 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
 
     Optional<Todo> findByLastFixRunId(String lastFixRunId);
 
+    /**
+     * TODOs, die auf einen Run zeigen — als Ausloeser oder als Reparaturlauf.
+     *
+     * <p>Beide Spalten sind lose Textverweise ohne Fremdschluessel. Wird ein Run
+     * geloescht, muessen sie genullt werden: sonst zeigt der „Run →"-Link ins
+     * Leere, und {@code isFixRunStillRunning} kann einen haengenden
+     * Reparaturlauf nicht mehr aufloesen.
+     */
+    List<Todo> findByWorkflowRunIdOrLastFixRunId(String workflowRunId, String lastFixRunId);
+
     // ── Projekt-Cockpit aggregation (lean projections, no TEXT blobs) ──────────
 
     /**

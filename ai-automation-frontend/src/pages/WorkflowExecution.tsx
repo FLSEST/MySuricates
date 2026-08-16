@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Pause, Play, XCircle, Clock, Send, TerminalSquare,
-  FolderOpen, ListTodo, Save,
+  FolderOpen, ListTodo, Save, Trash2,
 } from 'lucide-react';
 import { Card, CardHeader, Button, Spinner, Input } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
@@ -19,7 +19,7 @@ import { ConversionSuggestion } from '../components/shared/ConversionSuggestion'
 import {
   useWorkflow, useWorkflowRuns, useWorkflowBpmn,
   usePauseExecution, useResumeExecution, useCancelExecution, useRunCommand, useSubmitApproval,
-  useRetryExecution, useApproveTodos, useResumeFromStep, useUpdateRunNotes,
+  useRetryExecution, useApproveTodos, useResumeFromStep, useUpdateRunNotes, useDeleteRun,
 } from '../hooks/useWorkflows';
 import { type RunStatus, type DiagramSelection } from '../components/workflow/BpmnDiagramView';
 import { ExecutionDiagramPanel } from '../components/workflow/ExecutionDiagramPanel';
@@ -49,6 +49,7 @@ export function WorkflowExecution() {
   const resumeExecution = useResumeExecution();
   const cancelExecution = useCancelExecution();
   const retryExecution = useRetryExecution();
+  const deleteRun = useDeleteRun();
   const resumeFromStep = useResumeFromStep();
   const runCommand = useRunCommand();
   const submitApproval = useSubmitApproval();
@@ -248,6 +249,20 @@ export function WorkflowExecution() {
               {t.workflows.execution.retry}
             </Button>
           </div>
+        )}
+        {!isRunning && (
+          <Button
+            variant="secondary" size="sm"
+            icon={<Trash2 className="w-4 h-4" />}
+            loading={deleteRun.isPending}
+            onClick={() => {
+              if (!window.confirm(t.runs.deleteConfirm)) return;
+              // Der Lauf existiert gleich nicht mehr — weg von seiner Detailseite.
+              deleteRun.mutate(runId!, { onSuccess: () => navigate(`/workflows/${id}`) });
+            }}
+          >
+            {t.runs.delete}
+          </Button>
         )}
         {isRunning && (
           <div className="flex items-center gap-2">

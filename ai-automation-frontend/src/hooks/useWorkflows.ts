@@ -225,6 +225,28 @@ export function useResumeFromStep() {
   });
 }
 
+/**
+ * Löscht einen Lauf endgültig — samt Schritten und Dead-Letter-Einträgen.
+ * Referenzierende TODOs bleiben erhalten, sie verlieren nur den Verweis.
+ * Das Backend antwortet mit 409, solange der Lauf noch aktiv ist.
+ */
+export function useDeleteRun() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
+  return useMutation({
+    mutationFn: (runId: string) => api.delete(`/executions/${runId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['runs'] });
+      qc.invalidateQueries({ queryKey: ['workflows'] });
+      qc.invalidateQueries({ queryKey: ['learning'] });
+      qc.invalidateQueries({ queryKey: ['dlq'] });
+      toast.success(t.toast.runDeleted);
+    },
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.runDeleteFailed)),
+  });
+}
+
 export function useCancelExecution() {
   const qc = useQueryClient();
   return useMutation({

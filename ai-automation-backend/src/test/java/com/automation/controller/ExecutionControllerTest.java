@@ -9,6 +9,7 @@ import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.service.execution.ExecutionQueryService;
 import com.automation.service.system.ApiKeyService;
+import com.automation.service.workflow.RunDeletionService;
 import com.automation.service.workflow.WorkflowExecutor;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +31,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -57,6 +59,8 @@ class ExecutionControllerTest {
     private WorkflowService workflowService;
     @MockitoBean
     private WorkflowRunRepository workflowRunRepository;
+    @MockitoBean
+    private RunDeletionService runDeletionService;
 
     @MockitoBean
     private ExecutionQueryService executionQueryService;
@@ -93,6 +97,32 @@ class ExecutionControllerTest {
                 .thenThrow(new ResourceNotFoundException("Execution", "unknown"));
 
         mockMvc.perform(get("/api/v1/executions/unknown"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deleteExecution_returns204AndDelegates() throws Exception {
+        mockMvc.perform(delete("/api/v1/executions/run-1"))
+                .andExpect(status().isNoContent());
+
+        verify(runDeletionService).delete("run-1");
+    }
+
+    @Test
+    void deleteExecution_activeRun_returns409() throws Exception {
+        doThrow(new IllegalStateException("Run run-1 is still active (RUNNING) — cancel it before deleting"))
+                .when(runDeletionService).delete("run-1");
+
+        mockMvc.perform(delete("/api/v1/executions/run-1"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void deleteExecution_nonExistent_returns404() throws Exception {
+        doThrow(new ResourceNotFoundException("WorkflowRun", "unknown"))
+                .when(runDeletionService).delete("unknown");
+
+        mockMvc.perform(delete("/api/v1/executions/unknown"))
                 .andExpect(status().isNotFound());
     }
 
