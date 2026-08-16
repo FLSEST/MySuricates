@@ -4,6 +4,7 @@ import { Card, CardHeader } from '../ui';
 import { useTodoCount, useTodos } from '../../hooks/useTodos';
 import { useT } from '../../i18n';
 import { formatRelativeTime } from '../../utils/formatTime';
+import { todoDeepLink } from '../../utils/todoLinks';
 import type { Todo, TodoPriority } from '../../types';
 
 const priorityColor: Record<TodoPriority, string> = {
@@ -24,7 +25,7 @@ function TodoRow({ todo }: { todo: Todo }) {
   return (
     <div
       className="flex items-center gap-3 px-5 py-2.5 hover:bg-surface transition-colors cursor-pointer group"
-      onClick={() => navigate('/todos')}
+      onClick={() => navigate(todoDeepLink(todo))}
     >
       {/* Priority indicator */}
       <div className={`w-1 h-8 rounded-full shrink-0 ${priorityColor[todo.priority]}`} />

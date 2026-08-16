@@ -8,6 +8,7 @@ import { TodoProgressBar } from '../components/todo/TodoProgressBar';
 import { priorityColor, sourceIcon, formatRelative } from '../components/todo/todoConstants';
 import { useTodoOverview } from '../hooks/useTodoOverview';
 import { useArchiveStale, useProjectActiveTodos } from '../hooks/useTodos';
+import { todoDeepLink } from '../utils/todoLinks';
 import { useT } from '../i18n';
 import type { NeedsYouItem, ProjectRollup, Todo } from '../types';
 
@@ -67,7 +68,7 @@ export function ProjectCockpit() {
           <Card padding={false}>
             <div className="divide-y divide-border">
               {needsYou.map((item) => (
-                <NeedsYouRow key={item.id} item={item} onClick={() => gotoProject(item.projectId)} t={t} />
+                <NeedsYouRow key={item.id} item={item} onClick={() => navigate(todoDeepLink(item))} t={t} />
               ))}
             </div>
           </Card>
@@ -227,6 +228,7 @@ function ProjectCard({
 
 /* ─── Expanded project todo list (lazy) ─────────────────── */
 function ProjectTodoList({ projectId, onOpen, t }: { projectId: string; onOpen: () => void; t: ReturnType<typeof useT> }) {
+  const navigate = useNavigate();
   const { data, isLoading } = useProjectActiveTodos(projectId, true);
   const todos = data?.content ?? [];
   const total = data?.totalElements ?? 0;
@@ -241,7 +243,7 @@ function ProjectTodoList({ projectId, onOpen, t }: { projectId: string; onOpen: 
       ) : (
         <div className="-mx-1">
           {todos.map((todo) => (
-            <TodoMiniRow key={todo.id} todo={todo} onClick={onOpen} t={t} />
+            <TodoMiniRow key={todo.id} todo={todo} onClick={() => navigate(todoDeepLink(todo))} t={t} />
           ))}
           <button
             onClick={onOpen}

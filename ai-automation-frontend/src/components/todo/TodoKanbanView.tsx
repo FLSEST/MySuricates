@@ -13,17 +13,22 @@ const MemoizedMarkdown = memo(function MemoizedMarkdown({ children }: { children
 });
 
 /* ─── Kanban Card ───────────────────────────────────────── */
-const KanbanCard = memo(function KanbanCard({ todo, onEdit, onStatusChange, onResolve, resolveLoading }: {
+const KanbanCard = memo(function KanbanCard({ todo, onEdit, onStatusChange, onResolve, resolveLoading, highlighted }: {
   todo: Todo;
   onEdit: (todo: Todo) => void;
   onStatusChange: (todo: Todo, status: TodoStatus) => void;
   onResolve: (todo: Todo) => void;
   resolveLoading?: boolean;
+  /** Deep-linked card — see TodoListItem. */
+  highlighted?: boolean;
 }) {
   const t = useT();
   return (
     <div
-      className="bg-surface-base border border-border rounded-lg p-3 hover:border-border-strong transition-colors cursor-pointer group"
+      id={`todo-${todo.id}`}
+      className={`bg-surface-base border rounded-lg p-3 transition-colors cursor-pointer group scroll-mt-4 ${
+        highlighted ? 'border-accent/40 bg-accent/10' : 'border-border hover:border-border-strong'
+      }`}
       onClick={() => onEdit(todo)}
     >
       <div className="flex gap-2">
@@ -169,13 +174,14 @@ const KanbanCard = memo(function KanbanCard({ todo, onEdit, onStatusChange, onRe
 });
 
 /* ─── Kanban Board ──────────────────────────────────────── */
-export function TodoKanbanView({ todos, onEdit, onStatusChange, onResolve, resolveLoadingId, totalCounts }: {
+export function TodoKanbanView({ todos, onEdit, onStatusChange, onResolve, resolveLoadingId, totalCounts, highlightId }: {
   todos: Todo[];
   onEdit: (todo: Todo) => void;
   onStatusChange: (todo: Todo, status: TodoStatus) => void;
   onResolve: (todo: Todo) => void;
   resolveLoadingId?: string | null;
   totalCounts?: TodoCountResponse;
+  highlightId?: string | null;
 }) {
   const t = useT();
 
@@ -224,6 +230,7 @@ export function TodoKanbanView({ todos, onEdit, onStatusChange, onResolve, resol
                   onStatusChange={onStatusChange}
                   onResolve={onResolve}
                   resolveLoading={resolveLoadingId === todo.id}
+                  highlighted={highlightId === todo.id}
                 />
               ))
             )}

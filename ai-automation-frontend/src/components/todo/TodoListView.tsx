@@ -14,7 +14,7 @@ const MemoizedMarkdown = memo(function MemoizedMarkdown({ children }: { children
   return <ReactMarkdown remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown>;
 });
 
-export const TodoListItem = memo(function TodoListItem({ todo, onEdit, onStatusChange, onDelete, onResolve, resolveLoading, exportedIcon }: {
+export const TodoListItem = memo(function TodoListItem({ todo, onEdit, onStatusChange, onDelete, onResolve, resolveLoading, exportedIcon, highlighted }: {
   todo: Todo;
   onEdit: (todo: Todo) => void;
   onStatusChange: (todo: Todo, status: TodoStatus) => void;
@@ -22,14 +22,17 @@ export const TodoListItem = memo(function TodoListItem({ todo, onEdit, onStatusC
   onResolve: (todo: Todo) => void;
   resolveLoading?: boolean;
   exportedIcon?: string;
+  /** Deep-linked row — gets a temporary accent so it stands out after the modal closes. */
+  highlighted?: boolean;
 }) {
   const t = useT();
 
   return (
     <div
-      className={`flex items-start gap-3 px-4 py-3 hover:bg-surface-raised/50 transition-colors cursor-pointer group ${
+      id={`todo-${todo.id}`}
+      className={`flex items-start gap-3 px-4 py-3 hover:bg-surface-raised/50 transition-colors cursor-pointer group scroll-mt-4 ${
         todo.status === 'DONE' || todo.status === 'BACKLOG' ? 'opacity-50' : ''
-      }`}
+      } ${highlighted ? 'bg-accent/10 ring-1 ring-inset ring-accent/40' : ''}`}
       onClick={() => onEdit(todo)}
     >
       {/* Status dots */}

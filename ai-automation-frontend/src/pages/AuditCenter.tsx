@@ -16,6 +16,7 @@ import {
 } from '../hooks/useAuditCenter';
 import { useI18nStore } from '../i18n';
 import { formatDateTime, formatRelativeTime } from '../utils/formatTime';
+import { todoDeepLink } from '../utils/todoLinks';
 
 type MainView = 'overview' | 'audit' | 'legacy';
 type AuditTab = 'report' | 'history' | 'findings';
@@ -208,7 +209,7 @@ function Findings({ findings, requestedFinding, workflowId }: { findings: AuditF
               <Link className="text-accent hover:underline" to={`/workflows/${workflowId}/run/${finding.lastSeenRunId}`}>Evidenz-Run</Link>
             </div>
             {finding.todos.length > 0 && <div className="flex items-center gap-2 mt-3 flex-wrap">
-              {finding.todos.map((todo) => <Link key={todo.id} to="/todos" className="inline-flex items-center gap-1 text-xs text-accent hover:underline">
+              {finding.todos.map((todo) => <Link key={todo.id} to={todoDeepLink(todo)} className="inline-flex items-center gap-1 text-xs text-accent hover:underline">
                 <Link2 className="w-3 h-3" /> {todo.title} · {todo.status}{todo.managed ? ' · verwaltet' : ''}
               </Link>)}
             </div>}

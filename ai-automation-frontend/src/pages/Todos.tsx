@@ -16,7 +16,7 @@ import { TodoProgressBar } from '../components/todo/TodoProgressBar';
 import { TodoKanbanView } from '../components/todo/TodoKanbanView';
 import { TodoListItem } from '../components/todo/TodoListView';
 import {
-  useTodos, useTodoCount, useCreateTodo, useUpdateTodo, useUpdateTodoStatus, useDeleteTodo, useResolveTodo, useExportTodo,
+  useTodos, useTodo, useTodoCount, useCreateTodo, useUpdateTodo, useUpdateTodoStatus, useDeleteTodo, useResolveTodo, useExportTodo,
 } from '../hooks/useTodos';
 import { useProjects } from '../hooks/useProjects';
 import { useIntegrations } from '../hooks/useIntegrations';
@@ -40,6 +40,11 @@ export function Todos() {
     if (pid) setProjectFilter(pid);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  // Deep-link to a single todo: ?todoId=… is resolved by id (not by searching the
+  // paginated list), so it works regardless of persisted filters and page.
+  const linkedTodoId = searchParams.get('todoId') ?? '';
+  const { data: linkedTodo } = useTodo(linkedTodoId);
   const [search, setSearch] = usePersistedState('todos-search', '');
   const [debouncedSearch, setDebouncedSearch] = useState(search);
   const [tagFilter, setTagFilter] = usePersistedState('todos-tag-filter', '');
@@ -99,6 +104,12 @@ export function Todos() {
   const [editTodo, setEditTodo] = useState<Todo | null>(null);
   const [editForm, setEditForm] = useState<UpdateTodoRequest>({});
   const [editTagsList, setEditTagsList] = useState<string[]>([]);
+
+  // Deep-link highlight: marks the row the user came from until shortly after the modal closes
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const handledDeepLink = useRef<string | null>(null);
+  const highlightTimer = useRef<number | null>(null);
+  useEffect(() => () => { if (highlightTimer.current) window.clearTimeout(highlightTimer.current); }, []);
 
   // Keyboard shortcut: 'n' focuses quick-add
   useEffect(() => {
@@ -183,6 +194,32 @@ export function Todos() {
     setEditTagsList([...todo.tags]);
   };
 
+  const closeEdit = () => {
+    const closedId = editTodo?.id;
+    setEditTodo(null);
+    // Coming back from a deep link: reveal the row the modal was covering
+    if (closedId && closedId === highlightId) {
+      document.getElementById(`todo-${closedId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (highlightTimer.current) window.clearTimeout(highlightTimer.current);
+      highlightTimer.current = window.setTimeout(() => setHighlightId(null), 2500);
+    }
+  };
+
+  // Open the deep-linked todo as soon as it is loaded. The ref guard keeps the modal
+  // closed once the user dismissed it — the param stays in the URL.
+  useEffect(() => {
+    if (!linkedTodo || handledDeepLink.current === linkedTodo.id) return;
+    handledDeepLink.current = linkedTodo.id;
+    // Preselect the project unless the link already carried it
+    if (!searchParams.get('projectId') && linkedTodo.projectId) setProjectFilter(linkedTodo.projectId);
+    // Release persisted filters that would hide exactly this todo
+    if (statusFilter !== 'ALL' && statusFilter !== linkedTodo.status) setStatusFilter('ALL');
+    if (tagFilter && !linkedTodo.tags.includes(tagFilter)) setTagFilter('');
+    openEdit(linkedTodo);
+    setHighlightId(linkedTodo.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedTodo]);
+
   const handleEditSave = () => {
     if (!editTodo) return;
     const data: UpdateTodoRequest = {
@@ -190,7 +227,7 @@ export function Todos() {
       tags: editTagsList,
     };
     updateTodo.mutate({ id: editTodo.id, data }, {
-      onSuccess: () => setEditTodo(null),
+      onSuccess: closeEdit,
     });
   };
 
@@ -452,6 +489,7 @@ export function Todos() {
             onResolve={handleResolve}
             resolveLoadingId={resolveTodo.variables ?? null}
             totalCounts={statusFilter === 'ALL' ? counts ?? undefined : undefined}
+            highlightId={highlightId}
           />
           {todosPage && todosPage.totalElements > KANBAN_PAGE_SIZE && (
             <p className="text-xs text-text-tertiary text-center mt-2">
@@ -475,6 +513,7 @@ export function Todos() {
                   resolveLoading={resolveTodo.isPending && resolveTodo.variables === todo.id}
                   exportedIcon={integrations?.find((p) => p.providerId === todo.exportedProvider)?.icon}
                   onDelete={(id) => deleteTodo.mutate(id)}
+                  highlighted={highlightId === todo.id}
                 />
               ))}
             </div>
@@ -503,7 +542,7 @@ export function Todos() {
         workflows={workflows}
         allTags={allTags}
         isLoading={updateTodo.isPending}
-        onClose={() => setEditTodo(null)}
+        onClose={closeEdit}
         onFormChange={setEditForm}
         onTagsChange={setEditTagsList}
         onSave={handleEditSave}
