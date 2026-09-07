@@ -44,7 +44,7 @@ cmd_prepare() {
     git -C "$WT" checkout --detach "$sha" >&2
     git -C "$WT" reset --hard "$sha" >&2
     # Keep build caches; drop everything else that is untracked.
-    git -C "$WT" clean -fdq -e target -e node_modules -e data
+    git -C "$WT" clean -fdq -e target -e node_modules -e data -e .qa-npm-lock-hash
   fi
 
   # Reinstall node_modules only when the lockfile actually changed (npm ci is expensive).
