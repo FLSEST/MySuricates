@@ -151,4 +151,29 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().getCode()).isEqualTo("INTERNAL_ERROR");
         assertThat(response.getBody().getError()).isEqualTo("Internal server error");
     }
+
+    @Test
+    void handleMissingParameter_returnsBadRequestNamingTheParameter() {
+        var ex = new org.springframework.web.bind.MissingServletRequestParameterException("projectId", "String");
+
+        ResponseEntity<ErrorResponse> response = handler.handleMissingParameter(ex);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getCode()).isEqualTo("INVALID_ARGUMENT");
+        assertThat(response.getBody().getError()).isEqualTo("Missing required parameter: projectId");
+    }
+
+    @Test
+    void handleTypeMismatch_returnsBadRequestNamingTheParameter() {
+        var ex = new org.springframework.web.method.annotation.MethodArgumentTypeMismatchException(
+                "BOGUS", com.automation.entity.AuditSeverity.class, "severity", null, null);
+
+        ResponseEntity<ErrorResponse> response = handler.handleTypeMismatch(ex);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getCode()).isEqualTo("INVALID_ARGUMENT");
+        assertThat(response.getBody().getError()).isEqualTo("Invalid value for parameter 'severity'");
+    }
 }

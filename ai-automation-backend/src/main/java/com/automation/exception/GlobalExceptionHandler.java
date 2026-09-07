@@ -2,6 +2,8 @@ package com.automation.exception;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.validation.FieldError;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -100,6 +102,20 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleTimeout(java.util.concurrent.TimeoutException ex) {
         log.warn("Operation timed out: {}", ex.getMessage());
         return respond(ErrorCode.OPERATION_TIMEOUT, ex.getMessage() != null ? ex.getMessage() : "Operation timed out");
+    }
+
+    // Spring MVC binding failures. Without explicit handlers they fall into handleGeneral
+    // (the advice wins over DefaultHandlerExceptionResolver) and surface as 500 INTERNAL_ERROR.
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingParameter(MissingServletRequestParameterException ex) {
+        log.warn("Missing request parameter: {}", ex.getParameterName());
+        return respond(ErrorCode.INVALID_ARGUMENT, "Missing required parameter: " + ex.getParameterName());
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        log.warn("Invalid value for request parameter '{}': {}", ex.getName(), ex.getValue());
+        return respond(ErrorCode.INVALID_ARGUMENT, "Invalid value for parameter '" + ex.getName() + "'");
     }
 
     @ExceptionHandler(Exception.class)

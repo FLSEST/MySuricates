@@ -239,14 +239,14 @@ class TodoControllerTest {
     void findSimilar_missingProjectId_returnsError() throws Exception {
         mockMvc.perform(get("/api/v1/todos/similar")
                         .param("title", "Fix bug"))
-                .andExpect(status().is5xxServerError());
+                .andExpect(status().isBadRequest());
     }
 
     @Test
     void findSimilar_missingTitle_returnsError() throws Exception {
         mockMvc.perform(get("/api/v1/todos/similar")
                         .param("projectId", "proj-1"))
-                .andExpect(status().is5xxServerError());
+                .andExpect(status().isBadRequest());
     }
 
     @Test

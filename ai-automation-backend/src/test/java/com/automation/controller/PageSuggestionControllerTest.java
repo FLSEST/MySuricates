@@ -61,7 +61,7 @@ class PageSuggestionControllerTest {
     @Test
     void getSuggestions_missingPageParam_returnsError() throws Exception {
         mockMvc.perform(get("/api/v1/assistant/suggestions"))
-                .andExpect(status().is5xxServerError());
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -82,6 +82,6 @@ class PageSuggestionControllerTest {
     @Test
     void refreshSuggestions_missingPageParam_returnsError() throws Exception {
         mockMvc.perform(post("/api/v1/assistant/suggestions/refresh"))
-                .andExpect(status().is5xxServerError());
+                .andExpect(status().isBadRequest());
     }
 }
