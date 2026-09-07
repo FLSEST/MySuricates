@@ -107,6 +107,30 @@ docker compose build backend
 docker compose --profile build-only build
 ```
 
+## Builds neben dem laufenden Dev-Backend
+
+Das Dev-Backend (`mvn spring-boot:run`) läuft mit `-cp target/classes` — einem **Verzeichnis**,
+nicht einer JAR. Die JVM lädt Klassen über ihre gesamte Lebensdauer lazy von Platte nach.
+
+Ein zweiter Maven-Lauf im selben Checkout schreibt `target/classes` neu und zieht der laufenden
+JVM die Klassen unter den Füßen weg → `NoClassDefFoundError`. Der Fehler ist **sticky** (der
+Classloader cached das Load-Failure), nur ein Neustart heilt ihn. Am 2026-07-27 sind so elf
+Workflow-Runs gestorben (siehe `docs/plans/2026-07-27-ghost-run-root-cause-fixes.md`).
+
+**Regel:** Kein `mvn` und kein `npm run build` im Haupt-Checkout, solange das Dev-Backend läuft.
+Stattdessen:
+
+```bash
+WT=$(scripts/qa-worktree.sh prepare)   # legt/synct ~/.mysuricates/qa-worktree/autotrigger auf HEAD
+cd "$WT/ai-automation-backend" && mvn test
+```
+
+Der Worktree ist detached auf `HEAD` des Haupt-Checkouts und bleibt zwischen Läufen bestehen
+(`target/` und `node_modules/` werden wiederverwendet). **Uncommittete Änderungen sind darin nicht
+enthalten** — was dort läuft, testet den committeten Stand. Der Workflow „AutoPilot Backend Quality
+Gate" nutzt genau diesen Worktree. Dieselbe Regel gilt für `./scripts/staging.sh test-promote`,
+das im Haupt-Checkout ein `mvn clean` ausführt.
+
 ## Tests
 
 ### Backend-Tests
