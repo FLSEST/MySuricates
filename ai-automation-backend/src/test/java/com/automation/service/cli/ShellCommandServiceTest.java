@@ -65,4 +65,13 @@ class ShellCommandServiceTest {
 
         assertThat(result.output()).contains("error_msg");
     }
+
+    @Test
+    void execute_envAssignmentPrefix_isVisibleInsideQuotedHeredoc() {
+        ShellCommandService.ShellResult result = service.execute(
+                "PROJECT_ID='abc' python3 - <<'PY'\nimport os\nprint(os.environ['PROJECT_ID'])\nPY", null, 10);
+
+        assertThat(result.exitCode()).isZero();
+        assertThat(result.output().trim()).isEqualTo("abc");
+    }
 }

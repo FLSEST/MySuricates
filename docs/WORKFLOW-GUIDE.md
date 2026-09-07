@@ -128,6 +128,12 @@ Fuehrt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 | `mount_docker_socket` | bool | false | Docker-Socket in den Container mounten (nur wirksam wenn `container_image` gesetzt) |
 | `mounts` | list | `[]` | Zusaetzliche Docker-Volume-Mounts im Format `host:container[:ro\|rw]` (nur wirksam wenn `container_image` gesetzt) |
 
+> **Platzhalter in Heredocs:** `{{ var }}` innerhalb eines quoted Heredocs (`<<'PY'`) landet als
+> Quelltext im Interpreter — bei `PID = '{{ project_id }}'` wird jeder Wert mit `'` zu Python-Code.
+> Werte deshalb auf der Shell-Zeile übergeben und im Skript aus der Umgebung lesen:
+> `PROJECT_ID={{ project_id }} python3 - <<'PY'` … `os.environ['PROJECT_ID']`, Block-Option
+> `"shell_escape_variables": true`. Shell-Blöcke erhalten sonst keine Umgebungsvariablen.
+
 ```json
 {
   "type": "shell",

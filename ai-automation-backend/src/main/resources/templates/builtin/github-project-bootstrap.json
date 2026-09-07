@@ -11,7 +11,7 @@
   },
   "category" : "CODE",
   "sortOrder" : 28,
-  "version" : "1.1.0",
+  "version" : "1.1.1",
   "model" : null,
   "instructions" : "Erstelle ein neues GitHub-Repository mit Standardkonfiguration. Variablen: repo_name, visibility (public/private), org (Organisation oder 'none').",
   "blocks" : [ {
@@ -34,7 +34,8 @@
   }, {
     "type" : "shell",
     "config" : {
-      "command" : "set -euo pipefail\ncd \"{{ repo_name }}\"\ngh api repos/{owner}/{repo}/branches/main/protection \\\n  --method PUT \\\n  --input - <<'JSON'\n{\n  \"required_pull_request_reviews\": { \"required_approving_review_count\": 1 },\n  \"enforce_admins\": false,\n  \"required_status_checks\": null,\n  \"restrictions\": null\n}\nJSON\necho \"Branch protection enabled on main\"",
+      "command" : "set -euo pipefail\ncd {{ repo_name }}\ngh api repos/{owner}/{repo}/branches/main/protection \\\n  --method PUT \\\n  --input - <<'JSON'\n{\n  \"required_pull_request_reviews\": { \"required_approving_review_count\": 1 },\n  \"enforce_admins\": false,\n  \"required_status_checks\": null,\n  \"restrictions\": null\n}\nJSON\necho \"Branch protection enabled on main\"",
+      "shell_escape_variables" : true,
       "container_image" : "automation-agent-devops:latest"
     },
     "requiredCapabilities" : [ ]

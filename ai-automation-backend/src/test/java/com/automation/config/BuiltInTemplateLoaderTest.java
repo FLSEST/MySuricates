@@ -6,9 +6,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -68,6 +71,32 @@ class BuiltInTemplateLoaderTest {
                         .contains(block.getType());
             }
         }
+    }
+
+    @Test
+    void shellBlocks_neverInterpolatePlaceholdersInsideQuotedHeredocs() {
+        // Security review 356c461e / P4: a {{ var }} inside a quoted heredoc is pasted into the
+        // interpreter's source (e.g. as a Python string literal). Pass values on the shell line
+        // with shell_escape_variables=true and read them from the environment instead.
+        Pattern heredoc = Pattern.compile("<<'(\\w+)'\\n(.*?)\\n\\1(?:\\n|$)", Pattern.DOTALL);
+        List<String> violations = new ArrayList<>();
+        for (WorkflowTemplate t : templates) {
+            for (BlockDefinition b : t.getBlocks()) {
+                if (!"shell".equals(b.getType()) || b.getConfig() == null || b.getConfig().get("command") == null) continue;
+                String cmd = b.getConfig().get("command").toString();
+                Matcher m = heredoc.matcher(cmd);
+                while (m.find()) {
+                    if (m.group(2).contains("{{")) {
+                        violations.add(t.getId() + "/" + b.getName() + ": placeholder inside heredoc");
+                    }
+                }
+                if (cmd.contains("<<'") && cmd.contains("{{")
+                        && !Boolean.TRUE.equals(b.getConfig().get("shell_escape_variables"))) {
+                    violations.add(t.getId() + "/" + b.getName() + ": placeholder without shell_escape_variables");
+                }
+            }
+        }
+        assertThat(violations).isEmpty();
     }
 
     @Test

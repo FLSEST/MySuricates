@@ -11,7 +11,7 @@
   },
   "category" : "AUTOMATION",
   "sortOrder" : 62,
-  "version" : "1.0.0",
+  "version" : "1.0.1",
   "model" : null,
   "instructions" : "Wird per Schedule (wöchentlich) ausgeführt. Räumt alte Container auf, listet offene TODOs, triggert Auto-Fix für test-failed-TODOs falls noch nicht gefixt.",
   "blocks" : [ {
@@ -25,7 +25,8 @@
     "type" : "shell",
     "config" : {
       "timeout_seconds" : 60,
-      "command" : "set -euo pipefail\necho '=== Offene SaaS-Factory-TODOs ==='\ncat <<'TODOS'\n{{ open_todos }}\nTODOS"
+      "command" : "set -euo pipefail\necho '=== Offene SaaS-Factory-TODOs ==='\nprintf '%s\\n' {{ open_todos }}",
+      "shell_escape_variables" : true
     },
     "requiredCapabilities" : [ ]
   }, {

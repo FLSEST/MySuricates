@@ -128,6 +128,12 @@ Executes a shell command on the host or inside a Docker container.
 | `mount_docker_socket` | bool | false | Mount Docker socket into the container (only effective when `container_image` is set) |
 | `mounts` | list | `[]` | Additional Docker volume mounts in format `host:container[:ro\|rw]` (only effective when `container_image` is set) |
 
+> **Placeholders inside heredocs:** a `{{ var }}` inside a quoted heredoc (`<<'PY'`) ends up as
+> source code in the interpreter — with `PID = '{{ project_id }}'` any value containing `'` becomes
+> Python code. Pass values on the shell line and read them from the environment instead:
+> `PROJECT_ID={{ project_id }} python3 - <<'PY'` … `os.environ['PROJECT_ID']`, block option
+> `"shell_escape_variables": true`. Shell blocks receive no other environment variables.
+
 ```json
 {
   "type": "shell",

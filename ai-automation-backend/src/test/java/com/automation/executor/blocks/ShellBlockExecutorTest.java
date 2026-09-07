@@ -204,6 +204,27 @@ class ShellBlockExecutorTest {
     }
 
     @Test
+    void execute_shellEscapeVariables_envPrefixBeforeHeredoc_quotesOnlyTheShellLine() {
+        // Pattern used by the github-issues templates: the value travels via an env assignment
+        // on the shell line; the quoted heredoc body must stay byte-identical.
+        context.setVariable("project_id", "abc");
+        when(shellService.execute(eq("PROJECT_ID='abc' python3 - <<'PY'\nimport os\nprint(os.environ['PROJECT_ID'])\nPY"),
+                eq("/test/project"), eq(300), any()))
+                .thenReturn(new ShellResult("abc", 0, 10));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("shell")
+                .config(new HashMap<>(Map.of(
+                        "command", "PROJECT_ID={{ project_id }} python3 - <<'PY'\nimport os\nprint(os.environ['PROJECT_ID'])\nPY",
+                        "shell_escape_variables", true)))
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+    }
+
+    @Test
     void execute_containerImageProvided_routesToContainerShellService() {
         when(containerShellService.execute(eq("echo hi"), eq("/test/project"), eq(300),
                 eq("python:3.12"), eq(false), eq(List.of())))
