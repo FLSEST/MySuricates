@@ -544,14 +544,20 @@ public class WorkflowExecutor {
             Thread.currentThread().interrupt();
             failRun(runId, "Interrupted while waiting for execution slot");
             return;
-        } catch (Exception e) {
-            log.error("Workflow execution failed: {}", runId, e);
+        } catch (Throwable t) {
+            // Throwable, not Exception: an Error (e.g. NoClassDefFoundError when a build
+            // rewrites target/classes under the running JVM) would otherwise slip past every
+            // handler, leave the run at RUNNING and only surface as an anonymous ghost run
+            // 30 minutes later. See docs/plans/2026-07-27-ghost-run-root-cause-fixes.md
+            String detail = t.getMessage() != null ? t.getMessage() : t.getClass().getName();
+            String message = t.getClass().getSimpleName() + ": " + detail;
+            log.error("Workflow execution failed: {}", runId, t);
             if (run != null) {
                 run.setStatus(RunStatus.FAILED);
-                run.setError(Map.of("message", e.getMessage() != null ? e.getMessage() : e.getClass().getName()));
+                run.setError(Map.of("message", message));
             }
             activityLogService.error(LogCategory.EXECUTION,
-                    "Workflow execution error: " + (e.getMessage() != null ? e.getMessage() : e.getClass().getName()),
+                    "Workflow execution error: " + message,
                     "WorkflowExecutor", runId, workflowId);
         } finally {
             if (semaphoreAcquired) {

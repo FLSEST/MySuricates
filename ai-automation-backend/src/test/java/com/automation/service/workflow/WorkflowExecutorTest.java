@@ -261,6 +261,24 @@ class WorkflowExecutorTest {
     }
 
     @Test
+    void execute_blockThrowsError_savesFailedRunInsteadOfLeavingRunning() {
+        // Reproduces the 2026-07-27 incident: `mvn test` rewrote target/classes under the
+        // running JVM, so lazily loaded classes vanished and blocks died with an Error
+        // (not an Exception). The run then stayed RUNNING until the ghost watchdog reaped it.
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenThrow(new NoClassDefFoundError("com/automation/service/todo/GateStatusResolver$1"));
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(saved.getError()).containsKey("message");
+        assertThat(String.valueOf(saved.getError().get("message")))
+                .startsWith("NoClassDefFoundError: ")
+                .contains("GateStatusResolver");
+    }
+
+    @Test
     void execute_setsInputContextVariables() {
         StepResult step = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
@@ -839,7 +857,7 @@ class WorkflowExecutorTest {
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
-        assertThat(saved.getError().get("message")).isEqualTo("Unexpected failure");
+        assertThat(saved.getError().get("message")).isEqualTo("RuntimeException: Unexpected failure");
     }
 
     @Test
@@ -1080,7 +1098,7 @@ class WorkflowExecutorTest {
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
-        assertThat(saved.getError().get("message")).isEqualTo("custom block failure");
+        assertThat(saved.getError().get("message")).isEqualTo("WorkflowExecutionException: custom block failure");
         verify(eventPublisher).publishEvent(any(WorkflowRunCompletedEvent.class));
     }
 
@@ -1093,7 +1111,7 @@ class WorkflowExecutorTest {
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
-        assertThat(saved.getError().get("message")).isEqualTo("java.lang.RuntimeException");
+        assertThat(saved.getError().get("message")).isEqualTo("RuntimeException: java.lang.RuntimeException");
     }
 
     @Test
@@ -1108,7 +1126,7 @@ class WorkflowExecutorTest {
 
         WorkflowRun savedRun = captureLastSavedRun();
         assertThat(savedRun.getStatus()).isEqualTo(RunStatus.FAILED);
-        assertThat(savedRun.getError().get("message")).isEqualTo("second block crashed");
+        assertThat(savedRun.getError().get("message")).isEqualTo("RuntimeException: second block crashed");
 
         // First block's StepResult must have been persisted before the crash
         ArgumentCaptor<StepResult> stepCaptor = ArgumentCaptor.forClass(StepResult.class);
@@ -1242,7 +1260,7 @@ class WorkflowExecutorTest {
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
-        assertThat(saved.getError().get("message")).isEqualTo("Sub-workflow timed out after 30 minutes");
+        assertThat(saved.getError().get("message")).isEqualTo("WorkflowExecutionException: Sub-workflow timed out after 30 minutes");
     }
 
     // --- Group E: failRun path (WorkflowExecutor.java:516–518, 527–542) ------
