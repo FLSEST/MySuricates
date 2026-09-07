@@ -80,6 +80,7 @@ usage() {
     echo "  --status <list>     Comma-separated statuses (default: FAILED,CANCELLED)"
     echo "  --before <date>     Only runs started before YYYY-MM-DD"
     echo "  --after <date>      Only runs started on or after YYYY-MM-DD"
+    echo "  --db <path>         SQLite file (default: ai-automation-backend/data/automation.db)"
     echo "  -h, --help          Show this help"
     echo ""
     echo "Protected statuses (never deletable):"
@@ -102,6 +103,7 @@ while [[ $# -gt 0 ]]; do
         --status)    STATUS_FILTER="$2"; shift ;;
         --before)    BEFORE_DATE="$2"; shift ;;
         --after)     AFTER_DATE="$2"; shift ;;
+        --db)        DB_PATH="$2"; shift ;;
         -h|--help)   usage; exit 0 ;;
         *)           err "Unknown option: $1"; echo ""; usage; exit 1 ;;
     esac
@@ -143,6 +145,35 @@ check_backend_stopped() {
         err "Danach Script erneut ausführen, dann Backend neu starten."
         exit 1
     fi
+}
+
+check_db_integrity() {
+    # Refuse to touch a corrupt database. On 2026-08-04 a DELETE on an already damaged
+    # btree made the corruption worse, and the later index rebuild resurrected rows that
+    # had been deleted. quick_check reads every page (seconds on a 300 MB file).
+    local result
+    if ! result=$(python3 - <<'PYEOF'
+import sqlite3, os, sys
+try:
+    conn = sqlite3.connect(os.environ["DB_PATH"])
+    rows = [r[0] for r in conn.execute("PRAGMA quick_check")]
+    conn.close()
+except sqlite3.DatabaseError as e:
+    rows = [f"quick_check failed: {e}"]
+print("\n".join(rows))
+sys.exit(0 if rows == ["ok"] else 1)
+PYEOF
+    ); then
+        err "SQLite-Integritätsprüfung fehlgeschlagen (PRAGMA quick_check)!"
+        err ""
+        while IFS= read -r line; do err "  $line"; done <<< "$result"
+        err ""
+        err "Kein Zugriff auf diese DB — ein DELETE auf einer beschädigten Datenbank verschlimmert"
+        err "den Schaden (siehe 2026-08-04). Erst reparieren (Backup einspielen oder .recover),"
+        err "dann erneut versuchen."
+        exit 1
+    fi
+    log "Integritätsprüfung: ok"
 }
 
 # Datumsangaben landen unquoted in der WHERE-Klausel — Format hart prüfen,
@@ -431,6 +462,8 @@ main() {
     [[ -n "$BEFORE_DATE" ]]     && info "Before:   ${BEFORE_DATE}"
     [[ -n "$AFTER_DATE" ]]      && info "After:    ${AFTER_DATE}"
     info "Mode:     $MODE"
+
+    check_db_integrity
 
     if [[ "$MODE" == "execute" ]]; then
         check_backend_stopped

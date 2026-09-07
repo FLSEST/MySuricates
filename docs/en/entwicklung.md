@@ -265,6 +265,11 @@ cypress/
 - Selectors use `aria-label`, button text, `h1` text, `placeholder`, `role="switch"` (no `data-testid`)
 - `before()` / `after()` hooks ensure clean test data via `cy.apiCleanup()`
 
+`scripts/cleanup-runs.sh` runs `PRAGMA quick_check` on the file before touching it and aborts on
+any finding (on 2026-08-04 a DELETE on an already corrupt DB made the damage worse). `--db <path>`
+points the script at a different file. Script tests live under `scripts/tests/` and run without a
+backend: `bash scripts/tests/test-cleanup-runs.sh`.
+
 ## Versioning & Releases
 
 ### Where the Version Is Defined
