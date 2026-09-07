@@ -127,13 +127,12 @@ class WorkflowExecutorTest {
                 workflowMemoryService,
                 projectContextService,
                 eventPublisher,
-                templateVerificationService,
+                new RunCompletionHandler(templateVerificationService, activityLogService, deadLetterService),
                 systemIdentity,
                 new WorkflowContextDataService(runRepository, stepResultRepository, todoRepository),
                 workflowVersionService,
                 new WorkflowExecutionRegistry(),
-                new BlockOutputValidator(),
-                deadLetterService
+                new BlockOutputValidator()
         );
 
         testProject = Project.builder()
@@ -1077,13 +1076,12 @@ class WorkflowExecutorTest {
                 workflowMemoryService,
                 projectContextService,
                 eventPublisher,
-                templateVerificationService,
+                new RunCompletionHandler(templateVerificationService, activityLogService, deadLetterService),
                 systemIdentity,
                 new WorkflowContextDataService(runRepository, stepResultRepository, todoRepository),
                 workflowVersionService,
                 new WorkflowExecutionRegistry(),
-                new BlockOutputValidator(),
-                deadLetterService
+                new BlockOutputValidator()
         );
     }
 

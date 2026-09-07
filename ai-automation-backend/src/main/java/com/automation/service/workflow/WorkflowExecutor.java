@@ -15,8 +15,6 @@ import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.memory.WorkflowMemoryService;
-import com.automation.service.todo.GateStatusOutputParser;
-import com.automation.service.todo.TodoOutputParser;
 import com.automation.service.project.ContainerService;
 import com.automation.service.project.ProjectContextService;
 import com.automation.service.system.SystemIdentityService;
@@ -59,13 +57,12 @@ public class WorkflowExecutor {
     private final WorkflowMemoryService workflowMemoryService;
     private final ProjectContextService projectContextService;
     private final ApplicationEventPublisher eventPublisher;
-    private final TemplateVerificationService templateVerificationService;
+    private final RunCompletionHandler completionHandler;
     private final SystemIdentityService systemIdentity;
     private final WorkflowContextDataService contextDataService;
     private final WorkflowVersionService workflowVersionService;
     private final WorkflowExecutionRegistry executionRegistry;
     private final BlockOutputValidator blockOutputValidator;
-    private final com.automation.service.dlq.DeadLetterService deadLetterService;
 
     private static final java.util.Set<String> SYSTEM_VAR_KEYS = java.util.Set.of(
             "workflow_run_id", "workflow_id", "workflow_name", "project_id", "project_path",
@@ -439,106 +436,7 @@ public class WorkflowExecutor {
                 }
             }
 
-            // Parse gate_status markers from ALL blocks — highest severity wins.
-            // GateStatus ordinal: GREEN(0) < YELLOW(1) < RED(2)
-            GateStatus highestGate = null;
-            String gateCategory = null;
-            String gateDescription = null;
-            // Aggregate every parsed gate so trend tooling (e.g. public-readiness chains) can
-            // diff runs without re-parsing step outputs.
-            List<Map<String, Object>> gateItems = new ArrayList<>();
-            Map<String, Integer> gateCountsByStatus = new HashMap<>();
-            for (StepResult step : run.getSteps()) {
-                if (step.getOutput() != null) {
-                    var parsedGate = GateStatusOutputParser.parse(step.getOutput());
-                    if (parsedGate.isPresent()) {
-                        var gate = parsedGate.get();
-                        if (highestGate == null || gate.status().ordinal() > highestGate.ordinal()) {
-                            highestGate = gate.status();
-                            gateCategory = gate.category();
-                            gateDescription = gate.description();
-                        }
-                        Map<String, Object> item = new HashMap<>();
-                        item.put("status", gate.status().name());
-                        if (gate.category() != null) item.put("category", gate.category());
-                        if (gate.description() != null) item.put("description", gate.description());
-                        item.put("step_index", step.getStepIndex());
-                        gateItems.add(item);
-                        gateCountsByStatus.merge(gate.status().name(), 1, Integer::sum);
-                    }
-                }
-            }
-            if (highestGate != null) {
-                context.setRunMetadata("gate_status", highestGate.name());
-                if (gateCategory != null) context.setRunMetadata("gate_category", gateCategory);
-                if (gateDescription != null) context.setRunMetadata("gate_description", gateDescription);
-
-                // gate_summary aggregates ALL parsed gates so a follow-up run can be diffed
-                // against a previous one without re-walking step outputs.
-                Map<String, Object> gateSummary = new HashMap<>();
-                gateSummary.put("highest", highestGate.name());
-                gateSummary.put("counts_by_status", gateCountsByStatus);
-                gateSummary.put("items", gateItems);
-                context.setRunMetadata("gate_summary", gateSummary);
-            }
-
-            // Parse todo_item markers from ALL blocks — collect granular TODO items
-            List<TodoOutputParser.ParsedTodoItem> allTodoItems = new ArrayList<>();
-            for (StepResult step : run.getSteps()) {
-                if (step.getOutput() != null) {
-                    allTodoItems.addAll(TodoOutputParser.parse(step.getOutput()));
-                }
-            }
-            if (!allTodoItems.isEmpty()) {
-                context.setRunMetadata("todo_items", allTodoItems.stream()
-                        .map(t -> {
-                            Map<String, Object> m = new HashMap<>();
-                            m.put("title", t.title());
-                            m.put("priority", t.priority());
-                            m.put("tags", t.tags());
-                            if (t.description() != null) m.put("description", t.description());
-                            return m;
-                        })
-                        .toList());
-                log.info("Parsed {} todo_item markers from workflow {}", allTodoItems.size(), workflowName);
-            }
-
-            if (run.getStatus() == RunStatus.RUNNING) {
-                run.setStatus(RunStatus.COMPLETED);
-            }
-
-            if (run.getStatus() == RunStatus.COMPLETED || run.getStatus() == RunStatus.COMPLETED_WITH_ERRORS) {
-                // Record template verification if workflow was created from a template
-                if (templateId != null && !templateId.isBlank()) {
-                    try {
-                        templateVerificationService.recordSuccessfulRun(workflowId, templateId, project.getId(), run.getId());
-                    } catch (Exception e) {
-                        log.warn("Failed to record template verification: {}", e.getMessage());
-                    }
-                }
-                if (highestGate == GateStatus.RED) {
-                    activityLogService.warn(LogCategory.EXECUTION,
-                            "Workflow completed with critical findings: " + runId,
-                            "WorkflowExecutor", runId, workflowId);
-                } else if (highestGate == GateStatus.YELLOW) {
-                    activityLogService.warn(LogCategory.EXECUTION,
-                            "Workflow completed with warnings: " + runId,
-                            "WorkflowExecutor", runId, workflowId);
-                } else {
-                    activityLogService.info(LogCategory.EXECUTION,
-                            "Workflow execution completed: " + runId,
-                            "WorkflowExecutor", runId, workflowId);
-                }
-            } else if (run.getStatus() == RunStatus.FAILED) {
-                activityLogService.error(LogCategory.EXECUTION,
-                        "Workflow execution failed: " + runId,
-                        "WorkflowExecutor", runId, workflowId);
-                try {
-                    deadLetterService.recordFailure(run);
-                } catch (Exception dlqError) {
-                    log.warn("Failed to record DLQ entry for run {}: {}", runId, dlqError.getMessage());
-                }
-            }
+            completionHandler.complete(run, context, workflowId, workflowName, templateId, project.getId());
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
