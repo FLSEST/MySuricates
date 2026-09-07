@@ -8,7 +8,7 @@ import com.automation.entity.ProjectType;
 import com.automation.exception.ContainerException;
 import com.automation.repository.ContainerRepository;
 import com.automation.service.activitylog.ActivityLogService;
-import com.automation.service.workflow.WorkflowExecutor;
+import com.automation.service.workflow.WorkflowExecutionRegistry;
 import com.automation.util.HostProcessUtils;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.CreateContainerResponse;
@@ -16,7 +16,6 @@ import com.github.dockerjava.api.model.Bind;
 import com.github.dockerjava.api.model.HostConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -35,7 +34,7 @@ public class ContainerService {
 
     private final DockerClient dockerClient;
     private final ContainerRepository containerRepository;
-    private final WorkflowExecutor workflowExecutor;
+    private final WorkflowExecutionRegistry executionRegistry;
     private final ActivityLogService activityLogService;
     private final HostProcessUtils hostProcessUtils;
     private final PathValidator pathValidator;
@@ -59,7 +58,7 @@ public class ContainerService {
     public ContainerService(
             DockerClient dockerClient,
             ContainerRepository containerRepository,
-            @Lazy WorkflowExecutor workflowExecutor,
+            WorkflowExecutionRegistry executionRegistry,
             ActivityLogService activityLogService,
             HostProcessUtils hostProcessUtils,
             PathValidator pathValidator,
@@ -71,7 +70,7 @@ public class ContainerService {
             @Value("${automation.cli.host-home:}") String hostHome) {
         this.dockerClient = dockerClient;
         this.containerRepository = containerRepository;
-        this.workflowExecutor = workflowExecutor;
+        this.executionRegistry = executionRegistry;
         this.activityLogService = activityLogService;
         this.hostProcessUtils = hostProcessUtils;
         this.pathValidator = pathValidator;
@@ -266,7 +265,7 @@ public class ContainerService {
     public void cleanupIdleContainers() {
         List<Container> running = readOnlyTransactionTemplate.execute(status ->
                 containerRepository.findByStatus(ContainerStatus.RUNNING));
-        Set<String> activeContainers = workflowExecutor.getActiveContainerIds();
+        Set<String> activeContainers = executionRegistry.getActiveContainerIds();
 
         reconcileDockerOrphans(running, activeContainers);
         if (running == null || running.isEmpty()) return;

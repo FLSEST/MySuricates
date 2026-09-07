@@ -2,7 +2,7 @@ package com.automation.websocket;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.dockerjava.api.DockerClient;
-import com.automation.service.workflow.WorkflowExecutor;
+import com.automation.service.workflow.WorkflowExecutionRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,7 +22,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class TerminalWebSocketHandlerTest {
 
-    @Mock private WorkflowExecutor workflowExecutor;
+    @Mock private WorkflowExecutionRegistry executionRegistry;
     @Mock private DockerClient dockerClient;
     @Mock private WebSocketSession session;
 
@@ -31,7 +31,7 @@ class TerminalWebSocketHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new TerminalWebSocketHandler(workflowExecutor, dockerClient, objectMapper);
+        handler = new TerminalWebSocketHandler(executionRegistry, dockerClient, objectMapper);
     }
 
     @Test
@@ -47,7 +47,7 @@ class TerminalWebSocketHandlerTest {
     @Test
     void afterConnectionEstablished_noActiveExecution_closesPolicyViolation() throws Exception {
         when(session.getUri()).thenReturn(URI.create("/ws/terminal/run-123"));
-        when(workflowExecutor.getContainerIdForRun("run-123")).thenReturn(null);
+        when(executionRegistry.getContainerIdForRun("run-123")).thenReturn(null);
 
         handler.afterConnectionEstablished(session);
 

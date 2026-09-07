@@ -4,13 +4,12 @@ import com.automation.config.TrayConfig;
 import com.automation.entity.RunStatus;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.system.SystemIdentityService;
-import com.automation.service.workflow.WorkflowExecutor;
+import com.automation.service.workflow.WorkflowExecutionRegistry;
 import com.github.dockerjava.api.DockerClient;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -38,7 +37,7 @@ public class SystemTrayService {
 
     private final TrayConfig trayConfig;
     private final WorkflowRunRepository runRepository;
-    private final WorkflowExecutor workflowExecutor;
+    private final WorkflowExecutionRegistry executionRegistry;
     private final DockerClient dockerClient;
     private final SystemIdentityService systemIdentity;
 
@@ -53,12 +52,12 @@ public class SystemTrayService {
 
     public SystemTrayService(TrayConfig trayConfig,
                              WorkflowRunRepository runRepository,
-                             @Lazy WorkflowExecutor workflowExecutor,
+                             WorkflowExecutionRegistry executionRegistry,
                              DockerClient dockerClient,
                              SystemIdentityService systemIdentity) {
         this.trayConfig = trayConfig;
         this.runRepository = runRepository;
-        this.workflowExecutor = workflowExecutor;
+        this.executionRegistry = executionRegistry;
         this.dockerClient = dockerClient;
         this.systemIdentity = systemIdentity;
     }
@@ -191,10 +190,10 @@ public class SystemTrayService {
     TrayState collectStatus() {
         Instant todayStart = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant();
 
-        int activeRuns = workflowExecutor.getActiveRunCount();
+        int activeRuns = executionRegistry.getActiveRunCount();
         long runsToday = runRepository.countByStartedAtAfter(todayStart);
         long failedToday = runRepository.countByStatusAndStartedAtAfter(RunStatus.FAILED, todayStart);
-        int pendingApprovals = workflowExecutor.getPendingApprovalCount();
+        int pendingApprovals = executionRegistry.getPendingApprovalCount();
         boolean dockerOk = checkDocker();
         boolean frontendOk = checkFrontend();
         boolean stableOk = checkStable();

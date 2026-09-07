@@ -15,7 +15,7 @@ import com.automation.config.WishConfig;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.ai.HostClaudeService;
 import com.automation.service.cli.ContainerShellService;
-import com.automation.service.workflow.WorkflowExecutor;
+import com.automation.service.workflow.WorkflowExecutionRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,7 +34,7 @@ class ExecutionSettingsServiceTest {
 
     @Mock private AppSettingsRepository appSettingsRepository;
     @Mock private HostClaudeService hostClaudeService;
-    @Mock private WorkflowExecutor workflowExecutor;
+    @Mock private WorkflowExecutionRegistry executionRegistry;
     @Mock private ContainerShellService containerShellService;
 
     private DynamicSemaphore executionSemaphore;
@@ -69,7 +69,7 @@ class ExecutionSettingsServiceTest {
         service = new ExecutionSettingsService(
                 appSettingsRepository, executionSemaphore,
                 hostClaudeService, hostClaudeConfig, chainConfig,
-                rateLimitConfig, workflowExecutor, containerShellService,
+                rateLimitConfig, executionRegistry, containerShellService,
                 schedulerConfig, todoHygieneConfig, todoGhostWatchdogConfig, assistantGuardrailsConfig, taskCommandConfig,
                 summarizationConfig, factoryConfig, wishConfig
         );
@@ -180,7 +180,7 @@ class ExecutionSettingsServiceTest {
 
     @Test
     void getCurrentSettings_returnsAllValues() {
-        when(workflowExecutor.getActiveRunCount()).thenReturn(3);
+        when(executionRegistry.getActiveRunCount()).thenReturn(3);
 
         Map<String, Object> settings = service.getCurrentSettings();
 
@@ -336,7 +336,7 @@ class ExecutionSettingsServiceTest {
 
     @Test
     void getCurrentSettings_includesSchedulerCatchUpOnResume() {
-        when(workflowExecutor.getActiveRunCount()).thenReturn(0);
+        when(executionRegistry.getActiveRunCount()).thenReturn(0);
 
         Map<String, Object> settings = service.getCurrentSettings();
 
@@ -371,7 +371,7 @@ class ExecutionSettingsServiceTest {
 
     @Test
     void getCurrentSettings_includesSchedulerResumeGraceMinutes() {
-        when(workflowExecutor.getActiveRunCount()).thenReturn(0);
+        when(executionRegistry.getActiveRunCount()).thenReturn(0);
 
         Map<String, Object> settings = service.getCurrentSettings();
 
@@ -406,7 +406,7 @@ class ExecutionSettingsServiceTest {
 
     @Test
     void getCurrentSettings_includesSummarizationTimeoutSeconds() {
-        when(workflowExecutor.getActiveRunCount()).thenReturn(0);
+        when(executionRegistry.getActiveRunCount()).thenReturn(0);
 
         Map<String, Object> settings = service.getCurrentSettings();
 
@@ -439,7 +439,7 @@ class ExecutionSettingsServiceTest {
 
     @Test
     void getCurrentSettings_includesFactoryTimeoutSeconds() {
-        when(workflowExecutor.getActiveRunCount()).thenReturn(0);
+        when(executionRegistry.getActiveRunCount()).thenReturn(0);
 
         Map<String, Object> settings = service.getCurrentSettings();
 
@@ -491,7 +491,7 @@ class ExecutionSettingsServiceTest {
 
     @Test
     void getCurrentSettings_includesWishSettings() {
-        when(workflowExecutor.getActiveRunCount()).thenReturn(0);
+        when(executionRegistry.getActiveRunCount()).thenReturn(0);
 
         Map<String, Object> settings = service.getCurrentSettings();
 

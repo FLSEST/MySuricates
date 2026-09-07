@@ -15,7 +15,7 @@ import com.automation.config.WishConfig;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.ai.HostClaudeService;
 import com.automation.service.cli.ContainerShellService;
-import com.automation.service.workflow.WorkflowExecutor;
+import com.automation.service.workflow.WorkflowExecutionRegistry;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -92,7 +92,7 @@ public class ExecutionSettingsService {
     private final HostClaudeConfig hostClaudeConfig;
     private final ChainConfig chainConfig;
     private final RateLimitConfig rateLimitConfig;
-    private final WorkflowExecutor workflowExecutor;
+    private final WorkflowExecutionRegistry executionRegistry;
     private final ContainerShellService containerShellService;
     private final SchedulerConfig schedulerConfig;
     private final TodoHygieneConfig todoHygieneConfig;
@@ -117,7 +117,7 @@ public class ExecutionSettingsService {
             HostClaudeConfig hostClaudeConfig,
             ChainConfig chainConfig,
             RateLimitConfig rateLimitConfig,
-            @Lazy WorkflowExecutor workflowExecutor,
+            WorkflowExecutionRegistry executionRegistry,
             ContainerShellService containerShellService,
             SchedulerConfig schedulerConfig,
             TodoHygieneConfig todoHygieneConfig,
@@ -133,7 +133,7 @@ public class ExecutionSettingsService {
         this.hostClaudeConfig = hostClaudeConfig;
         this.chainConfig = chainConfig;
         this.rateLimitConfig = rateLimitConfig;
-        this.workflowExecutor = workflowExecutor;
+        this.executionRegistry = executionRegistry;
         this.containerShellService = containerShellService;
         this.schedulerConfig = schedulerConfig;
         this.todoHygieneConfig = todoHygieneConfig;
@@ -250,7 +250,7 @@ public class ExecutionSettingsService {
         result.put("wishWorkflowWaitMinutes", wishConfig.getWorkflowWaitMinutes());
         result.put("wishDefaultShellTimeoutSeconds", wishConfig.getDefaultShellTimeoutSeconds());
         result.put("wishDefaultAgenticTotalTimeoutSeconds", wishConfig.getDefaultAgenticTotalTimeoutSeconds());
-        result.put("activeRuns", workflowExecutor.getActiveRunCount());
+        result.put("activeRuns", executionRegistry.getActiveRunCount());
         return result;
     }
 

@@ -548,7 +548,8 @@ public class WorkflowExecutor {
         return delta.isEmpty() ? null : delta;
     }
 
-    // ── Delegation to WorkflowExecutionRegistry ──────────────────────────
+    // ── Run control (pause/resume/cancel/approval) — status queries such as active run count,
+    // container ids or pending approvals go straight to WorkflowExecutionRegistry.
 
     public void pauseExecution(String runId) {
         executionRegistry.pauseExecution(runId);
@@ -556,14 +557,6 @@ public class WorkflowExecutor {
 
     public void resumeExecution(String runId) {
         executionRegistry.resumeExecution(runId);
-    }
-
-    public Set<String> getActiveContainerIds() {
-        return executionRegistry.getActiveContainerIds();
-    }
-
-    public String getContainerIdForRun(String runId) {
-        return executionRegistry.getContainerIdForRun(runId);
     }
 
     public void cancelExecution(String runId) {
@@ -595,18 +588,6 @@ public class WorkflowExecutor {
 
     public void resolveApproval(String runId, String answer) {
         executionRegistry.resolveApproval(runId, answer);
-    }
-
-    public int getActiveRunCount() {
-        return executionRegistry.getActiveRunCount();
-    }
-
-    public boolean isRunActive(String runId) {
-        return executionRegistry.isRunActive(runId);
-    }
-
-    public int getPendingApprovalCount() {
-        return executionRegistry.getPendingApprovalCount();
     }
 
     public ApprovalRequest getPendingApproval(String runId) {

@@ -97,6 +97,7 @@ class WorkflowExecutorTest {
     private SystemIdentityService systemIdentity;
 
     private WorkflowExecutor workflowExecutor;
+    private WorkflowExecutionRegistry registry;
 
     private Workflow testWorkflow;
     private Project testProject;
@@ -112,6 +113,7 @@ class WorkflowExecutorTest {
         lenient().when(systemIdentity.getName()).thenReturn("MySuricates");
         lenient().when(systemIdentity.getVersion()).thenReturn("0.2.3");
 
+        registry = new WorkflowExecutionRegistry();
         workflowExecutor = new WorkflowExecutor(
                 List.of(simpleBlockExecutor),
                 containerService,
@@ -129,7 +131,7 @@ class WorkflowExecutorTest {
                 activityLogService,
                 eventPublisher,
                 new RunCompletionHandler(templateVerificationService, activityLogService, deadLetterService),
-                new WorkflowExecutionRegistry(),
+                registry,
                 new BlockOutputValidator()
         );
 
@@ -519,7 +521,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenAnswer(inv -> {
                     // During execution, the container ID should be accessible
-                    String containerId = workflowExecutor.getContainerIdForRun("run-1");
+                    String containerId = registry.getContainerIdForRun("run-1");
                     assertThat(containerId).isEqualTo("docker-container-1");
                     return step;
                 });
@@ -529,7 +531,7 @@ class WorkflowExecutorTest {
 
     @Test
     void getContainerIdForRun_noActiveExecution_returnsNull() {
-        String result = workflowExecutor.getContainerIdForRun("non-existent-run");
+        String result = registry.getContainerIdForRun("non-existent-run");
         assertThat(result).isNull();
     }
 
@@ -807,7 +809,7 @@ class WorkflowExecutorTest {
 
     @Test
     void getActiveRunCount_returnsZero_whenNoActiveRuns() {
-        assertThat(workflowExecutor.getActiveRunCount()).isEqualTo(0);
+        assertThat(registry.getActiveRunCount()).isEqualTo(0);
     }
 
     @Test
@@ -816,14 +818,14 @@ class WorkflowExecutorTest {
                 .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenAnswer(inv -> {
-                    assertThat(workflowExecutor.getActiveRunCount()).isEqualTo(1);
+                    assertThat(registry.getActiveRunCount()).isEqualTo(1);
                     return step;
                 });
 
         workflowExecutor.execute(testWorkflow, null);
 
         // After execution completes, active count should be 0 again
-        assertThat(workflowExecutor.getActiveRunCount()).isEqualTo(0);
+        assertThat(registry.getActiveRunCount()).isEqualTo(0);
     }
 
     @Test
@@ -1096,12 +1098,12 @@ class WorkflowExecutorTest {
 
     @Test
     void getActiveRunCount_noExecution_returnsZero() {
-        assertThat(workflowExecutor.getActiveRunCount()).isZero();
+        assertThat(registry.getActiveRunCount()).isZero();
     }
 
     @Test
     void isRunActive_inactiveRun_returnsFalse() {
-        assertThat(workflowExecutor.isRunActive("non-existent-run")).isFalse();
+        assertThat(registry.isRunActive("non-existent-run")).isFalse();
     }
 
     // -------------------------------------------------------------------------
@@ -1251,8 +1253,8 @@ class WorkflowExecutorTest {
 
         workflowExecutor.execute(testWorkflow, null);
 
-        assertThat(workflowExecutor.isRunActive("run-1")).isFalse();
-        assertThat(workflowExecutor.getActiveRunCount()).isZero();
+        assertThat(registry.isRunActive("run-1")).isFalse();
+        assertThat(registry.getActiveRunCount()).isZero();
     }
 
     // --- Group D: Sub-workflow failure propagation ---------------------------

@@ -7,7 +7,7 @@ import com.automation.entity.ProjectType;
 import com.automation.exception.ContainerException;
 import com.automation.repository.ContainerRepository;
 import com.automation.service.activitylog.ActivityLogService;
-import com.automation.service.workflow.WorkflowExecutor;
+import com.automation.service.workflow.WorkflowExecutionRegistry;
 import com.automation.util.HostProcessUtils;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.*;
@@ -41,7 +41,7 @@ class ContainerServiceTest {
     private ContainerRepository containerRepository;
 
     @Mock
-    private WorkflowExecutor workflowExecutor;
+    private WorkflowExecutionRegistry executionRegistry;
 
     @Mock
     private ActivityLogService activityLogService;
@@ -73,7 +73,7 @@ class ContainerServiceTest {
         service = new ContainerService(
                 dockerClient,
                 containerRepository,
-                workflowExecutor,
+                executionRegistry,
                 activityLogService,
                 hostProcessUtils,
                 pathValidator,
@@ -283,7 +283,7 @@ class ContainerServiceTest {
                 .build();
         when(containerRepository.findByStatus(ContainerStatus.RUNNING)).thenReturn(List.of(idle));
         when(containerRepository.findById("c1")).thenReturn(Optional.of(idle));
-        when(workflowExecutor.getActiveContainerIds()).thenReturn(Set.of());
+        when(executionRegistry.getActiveContainerIds()).thenReturn(Set.of());
         stubDockerRemoveCommands();
         when(containerRepository.save(any(Container.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -312,7 +312,7 @@ class ContainerServiceTest {
     @Test
     void reconcile_orphanedDockerContainer_isForceStopped() {
         when(containerRepository.findByStatus(ContainerStatus.RUNNING)).thenReturn(List.of());
-        when(workflowExecutor.getActiveContainerIds()).thenReturn(Set.of());
+        when(executionRegistry.getActiveContainerIds()).thenReturn(Set.of());
         stubDockerList(List.of(dockerContainer("docker-orphan", Instant.now().minus(2, ChronoUnit.HOURS))));
         stubDockerRemoveCommands();
 
@@ -330,7 +330,7 @@ class ContainerServiceTest {
                 .lastActivityAt(Instant.now()).startedAt(Instant.now())
                 .build();
         when(containerRepository.findByStatus(ContainerStatus.RUNNING)).thenReturn(List.of(tracked));
-        when(workflowExecutor.getActiveContainerIds()).thenReturn(Set.of());
+        when(executionRegistry.getActiveContainerIds()).thenReturn(Set.of());
         stubDockerList(List.of(dockerContainer("docker-known", Instant.now().minus(2, ChronoUnit.HOURS))));
 
         service.cleanupIdleContainers();
@@ -341,7 +341,7 @@ class ContainerServiceTest {
     @Test
     void reconcile_recentlyCreatedOrphan_skippedByGracePeriod() {
         when(containerRepository.findByStatus(ContainerStatus.RUNNING)).thenReturn(List.of());
-        when(workflowExecutor.getActiveContainerIds()).thenReturn(Set.of());
+        when(executionRegistry.getActiveContainerIds()).thenReturn(Set.of());
         stubDockerList(List.of(dockerContainer("docker-fresh", Instant.now())));
 
         service.cleanupIdleContainers();
@@ -352,7 +352,7 @@ class ContainerServiceTest {
     @Test
     void reconcile_containerWithActiveExecution_skipped() {
         when(containerRepository.findByStatus(ContainerStatus.RUNNING)).thenReturn(List.of());
-        when(workflowExecutor.getActiveContainerIds()).thenReturn(Set.of("docker-busy"));
+        when(executionRegistry.getActiveContainerIds()).thenReturn(Set.of("docker-busy"));
         stubDockerList(List.of(dockerContainer("docker-busy", Instant.now().minus(2, ChronoUnit.HOURS))));
 
         service.cleanupIdleContainers();

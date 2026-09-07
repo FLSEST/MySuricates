@@ -6,7 +6,7 @@ import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.system.SystemIdentityService;
 import com.automation.service.tray.SystemTrayService.IconColor;
 import com.automation.service.tray.SystemTrayService.TrayState;
-import com.automation.service.workflow.WorkflowExecutor;
+import com.automation.service.workflow.WorkflowExecutionRegistry;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.PingCmd;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,7 +32,7 @@ class SystemTrayServiceTest {
     private WorkflowRunRepository runRepository;
 
     @Mock
-    private WorkflowExecutor workflowExecutor;
+    private WorkflowExecutionRegistry executionRegistry;
 
     @Mock
     private DockerClient dockerClient;
@@ -47,15 +47,15 @@ class SystemTrayServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SystemTrayService(trayConfig, runRepository, workflowExecutor, dockerClient, systemIdentity);
+        service = new SystemTrayService(trayConfig, runRepository, executionRegistry, dockerClient, systemIdentity);
     }
 
     @Test
     void collectStatus_aggregatesDataCorrectly() {
-        when(workflowExecutor.getActiveRunCount()).thenReturn(2);
+        when(executionRegistry.getActiveRunCount()).thenReturn(2);
         when(runRepository.countByStartedAtAfter(any(Instant.class))).thenReturn(10L);
         when(runRepository.countByStatusAndStartedAtAfter(eq(RunStatus.FAILED), any(Instant.class))).thenReturn(1L);
-        when(workflowExecutor.getPendingApprovalCount()).thenReturn(0);
+        when(executionRegistry.getPendingApprovalCount()).thenReturn(0);
         when(dockerClient.pingCmd()).thenReturn(pingCmd);
         when(trayConfig.getWebUiUrl()).thenReturn("http://localhost:99999");
         when(trayConfig.getStableUrl()).thenReturn("http://localhost:99998");
@@ -71,10 +71,10 @@ class SystemTrayServiceTest {
 
     @Test
     void collectStatus_dockerOffline() {
-        when(workflowExecutor.getActiveRunCount()).thenReturn(0);
+        when(executionRegistry.getActiveRunCount()).thenReturn(0);
         when(runRepository.countByStartedAtAfter(any(Instant.class))).thenReturn(0L);
         when(runRepository.countByStatusAndStartedAtAfter(eq(RunStatus.FAILED), any(Instant.class))).thenReturn(0L);
-        when(workflowExecutor.getPendingApprovalCount()).thenReturn(0);
+        when(executionRegistry.getPendingApprovalCount()).thenReturn(0);
         when(dockerClient.pingCmd()).thenThrow(new RuntimeException("Connection refused"));
         when(trayConfig.getWebUiUrl()).thenReturn("http://localhost:99999");
         when(trayConfig.getStableUrl()).thenReturn("http://localhost:99998");

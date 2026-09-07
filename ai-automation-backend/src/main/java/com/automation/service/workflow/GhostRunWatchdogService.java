@@ -32,7 +32,7 @@ public class GhostRunWatchdogService {
     private long staleThresholdMinutes;
 
     private final WorkflowRunRepository runRepository;
-    private final WorkflowExecutor workflowExecutor;
+    private final WorkflowExecutionRegistry executionRegistry;
     private final DynamicSemaphore executionSemaphore;
     private final ExecutionBroadcaster broadcaster;
     private final ActivityLogService activityLogService;
@@ -55,7 +55,7 @@ public class GhostRunWatchdogService {
         int interruptedCount = 0;
 
         for (WorkflowRun run : runningRuns) {
-            if (workflowExecutor.isRunActive(run.getId())) {
+            if (executionRegistry.isRunActive(run.getId())) {
                 continue; // legitimate active run
             }
             if (run.getStartedAt() != null && run.getStartedAt().isAfter(staleThreshold)) {
@@ -106,7 +106,7 @@ public class GhostRunWatchdogService {
      * If permits were leaked (thread died without releasing), this recovers them.
      */
     private void reconcilePermits() {
-        int activeCount = workflowExecutor.getActiveRunCount();
+        int activeCount = executionRegistry.getActiveRunCount();
         int maxPermits = executionSemaphore.getMaxPermits();
         int availablePermits = executionSemaphore.availablePermits();
         int expectedAvailable = maxPermits - activeCount;

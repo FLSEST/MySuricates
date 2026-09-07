@@ -3,7 +3,7 @@ package com.automation.websocket;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.dockerjava.api.DockerClient;
-import com.automation.service.workflow.WorkflowExecutor;
+import com.automation.service.workflow.WorkflowExecutionRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -24,7 +24,7 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
 
     private static final int MAX_SESSIONS_PER_CONTAINER = 3;
 
-    private final WorkflowExecutor workflowExecutor;
+    private final WorkflowExecutionRegistry executionRegistry;
     private final DockerClient dockerClient;
     private final ObjectMapper objectMapper;
 
@@ -39,7 +39,7 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        String containerId = workflowExecutor.getContainerIdForRun(runId);
+        String containerId = executionRegistry.getContainerIdForRun(runId);
         if (containerId == null) {
             session.close(CloseStatus.POLICY_VIOLATION.withReason("No active execution for run: " + runId));
             return;

@@ -27,7 +27,7 @@ import static org.mockito.Mockito.*;
 class GhostRunWatchdogServiceTest {
 
     @Mock private WorkflowRunRepository runRepository;
-    @Mock private WorkflowExecutor workflowExecutor;
+    @Mock private WorkflowExecutionRegistry executionRegistry;
     @Mock private DynamicSemaphore executionSemaphore;
     @Mock private ExecutionBroadcaster broadcaster;
     @Mock private ActivityLogService activityLogService;
@@ -37,13 +37,13 @@ class GhostRunWatchdogServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new GhostRunWatchdogService(runRepository, workflowExecutor,
+        service = new GhostRunWatchdogService(runRepository, executionRegistry,
                 executionSemaphore, broadcaster, activityLogService, suspendState);
         ReflectionTestUtils.setField(service, "staleThresholdMinutes", 10L);
     }
 
     private void stubPermitsBalanced() {
-        when(workflowExecutor.getActiveRunCount()).thenReturn(0);
+        when(executionRegistry.getActiveRunCount()).thenReturn(0);
         when(executionSemaphore.getMaxPermits()).thenReturn(5);
         when(executionSemaphore.availablePermits()).thenReturn(5);
     }
@@ -66,8 +66,8 @@ class GhostRunWatchdogServiceTest {
             WorkflowRun run = WorkflowRun.builder().id("r1").status(RunStatus.RUNNING)
                     .startedAt(Instant.now().minus(20, ChronoUnit.MINUTES)).build();
             when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of(run));
-            when(workflowExecutor.isRunActive("r1")).thenReturn(true);
-            when(workflowExecutor.getActiveRunCount()).thenReturn(1);
+            when(executionRegistry.isRunActive("r1")).thenReturn(true);
+            when(executionRegistry.getActiveRunCount()).thenReturn(1);
             when(executionSemaphore.getMaxPermits()).thenReturn(5);
             when(executionSemaphore.availablePermits()).thenReturn(4);
 
@@ -81,7 +81,7 @@ class GhostRunWatchdogServiceTest {
             WorkflowRun run = WorkflowRun.builder().id("r1").status(RunStatus.RUNNING)
                     .startedAt(Instant.now().minus(2, ChronoUnit.MINUTES)).build();
             when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of(run));
-            when(workflowExecutor.isRunActive("r1")).thenReturn(false);
+            when(executionRegistry.isRunActive("r1")).thenReturn(false);
             stubPermitsBalanced();
 
             service.detectGhostRuns();
@@ -94,7 +94,7 @@ class GhostRunWatchdogServiceTest {
             WorkflowRun run = WorkflowRun.builder().id("r1").status(RunStatus.RUNNING)
                     .startedAt(Instant.now().minus(30, ChronoUnit.MINUTES)).build();
             when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of(run));
-            when(workflowExecutor.isRunActive("r1")).thenReturn(false);
+            when(executionRegistry.isRunActive("r1")).thenReturn(false);
             stubPermitsBalanced();
 
             service.detectGhostRuns();
@@ -110,7 +110,7 @@ class GhostRunWatchdogServiceTest {
             WorkflowRun run = WorkflowRun.builder().id("r1").status(RunStatus.RUNNING)
                     .startedAt(startTime).build();
             when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of(run));
-            when(workflowExecutor.isRunActive("r1")).thenReturn(false);
+            when(executionRegistry.isRunActive("r1")).thenReturn(false);
             stubPermitsBalanced();
 
             service.detectGhostRuns();
@@ -131,7 +131,7 @@ class GhostRunWatchdogServiceTest {
             WorkflowRun run = WorkflowRun.builder().id("r1").status(RunStatus.RUNNING)
                     .startedAt(startTime).build();
             when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of(run));
-            when(workflowExecutor.isRunActive("r1")).thenReturn(false);
+            when(executionRegistry.isRunActive("r1")).thenReturn(false);
             when(suspendState.resumedRecently(any(), any())).thenReturn(true);
             when(suspendState.getLastGapMillis()).thenReturn(300_000L);
             stubPermitsBalanced();
@@ -155,7 +155,7 @@ class GhostRunWatchdogServiceTest {
             WorkflowRun run = WorkflowRun.builder().id("r1").status(RunStatus.RUNNING)
                     .startedAt(Instant.now().minus(15, ChronoUnit.MINUTES)).build();
             when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of(run));
-            when(workflowExecutor.isRunActive("r1")).thenReturn(false);
+            when(executionRegistry.isRunActive("r1")).thenReturn(false);
             stubPermitsBalanced();
 
             service.detectGhostRuns();
@@ -171,7 +171,7 @@ class GhostRunWatchdogServiceTest {
             WorkflowRun r3 = WorkflowRun.builder().id("r3").status(RunStatus.RUNNING).startedAt(staleTime).build();
 
             when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of(r1, r2, r3));
-            when(workflowExecutor.isRunActive(anyString())).thenReturn(false);
+            when(executionRegistry.isRunActive(anyString())).thenReturn(false);
             stubPermitsBalanced();
 
             service.detectGhostRuns();
@@ -191,10 +191,10 @@ class GhostRunWatchdogServiceTest {
                     .startedAt(Instant.now().minus(15, ChronoUnit.MINUTES)).build();
 
             when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of(active, recent, stale));
-            when(workflowExecutor.isRunActive("active")).thenReturn(true);
-            when(workflowExecutor.isRunActive("recent")).thenReturn(false);
-            when(workflowExecutor.isRunActive("stale")).thenReturn(false);
-            when(workflowExecutor.getActiveRunCount()).thenReturn(1);
+            when(executionRegistry.isRunActive("active")).thenReturn(true);
+            when(executionRegistry.isRunActive("recent")).thenReturn(false);
+            when(executionRegistry.isRunActive("stale")).thenReturn(false);
+            when(executionRegistry.getActiveRunCount()).thenReturn(1);
             when(executionSemaphore.getMaxPermits()).thenReturn(5);
             when(executionSemaphore.availablePermits()).thenReturn(4);
 
@@ -211,7 +211,7 @@ class GhostRunWatchdogServiceTest {
             WorkflowRun run = WorkflowRun.builder().id("r1").status(RunStatus.RUNNING)
                     .startedAt(null).build();
             when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of(run));
-            when(workflowExecutor.isRunActive("r1")).thenReturn(false);
+            when(executionRegistry.isRunActive("r1")).thenReturn(false);
 
             try {
                 service.detectGhostRuns();
@@ -227,7 +227,7 @@ class GhostRunWatchdogServiceTest {
         @Test
         void leakedPermits_released() {
             when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of());
-            when(workflowExecutor.getActiveRunCount()).thenReturn(1);
+            when(executionRegistry.getActiveRunCount()).thenReturn(1);
             when(executionSemaphore.getMaxPermits()).thenReturn(5);
             when(executionSemaphore.availablePermits()).thenReturn(2); // expected 4, got 2 → 2 leaked
 
@@ -240,7 +240,7 @@ class GhostRunWatchdogServiceTest {
         @Test
         void permitsBalanced_noRelease() {
             when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of());
-            when(workflowExecutor.getActiveRunCount()).thenReturn(3);
+            when(executionRegistry.getActiveRunCount()).thenReturn(3);
             when(executionSemaphore.getMaxPermits()).thenReturn(5);
             when(executionSemaphore.availablePermits()).thenReturn(2); // 5 - 3 = 2 → balanced
 
@@ -252,7 +252,7 @@ class GhostRunWatchdogServiceTest {
         @Test
         void allPermitsLeaked_allReleased() {
             when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of());
-            when(workflowExecutor.getActiveRunCount()).thenReturn(0);
+            when(executionRegistry.getActiveRunCount()).thenReturn(0);
             when(executionSemaphore.getMaxPermits()).thenReturn(5);
             when(executionSemaphore.availablePermits()).thenReturn(0); // 5 leaked
 
@@ -265,7 +265,7 @@ class GhostRunWatchdogServiceTest {
         void moreAvailableThanExpected_noRelease() {
             // Edge case: more permits available than expected (shouldn't happen normally)
             when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of());
-            when(workflowExecutor.getActiveRunCount()).thenReturn(3);
+            when(executionRegistry.getActiveRunCount()).thenReturn(3);
             when(executionSemaphore.getMaxPermits()).thenReturn(5);
             when(executionSemaphore.availablePermits()).thenReturn(5); // more than expected 2
 
