@@ -23,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import com.automation.concurrency.DynamicSemaphore;
@@ -683,6 +684,59 @@ class WorkflowExecutorTest {
         workflowExecutor.cleanupZombieRuns();
 
         verify(runRepository, never()).save(any(WorkflowRun.class));
+    }
+
+    // --- resumeFromStep (previously untested; safety net for the WorkflowSnapshot refactoring) ----
+
+    @Test
+    void resumeFromStep_skipsCompletedSteps_seedsPreviousOutput_andCompletes() {
+        WorkflowRun interrupted = WorkflowRun.builder().id("run-1").workflow(testWorkflow).workflowName("Test Workflow")
+                .status(RunStatus.INTERRUPTED).startedAt(Instant.now()).inputContext(Map.of("foo", "bar")).build();
+        WorkflowRun running = WorkflowRun.builder().id("run-1").workflow(testWorkflow).workflowName("Test Workflow")
+                .status(RunStatus.RUNNING).startedAt(Instant.now()).build();
+        when(runRepository.findById("run-1")).thenReturn(Optional.of(interrupted)).thenReturn(Optional.of(running));
+        StepResult done = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("first-output").build();
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-1")).thenReturn(List.of(done));
+        List<String> previousOutputSeenByBlock = new java.util.ArrayList<>();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenAnswer(inv -> {
+                    previousOutputSeenByBlock.add(((ExecutionContext) inv.getArgument(1)).getPreviousOutput());
+                    return StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED).output("second-output").build();
+                });
+
+        workflowExecutor.resumeFromStep("run-1");
+
+        ArgumentCaptor<ExecutionContext> ctx = ArgumentCaptor.forClass(ExecutionContext.class);
+        verify(simpleBlockExecutor, times(1)).execute(any(BlockDefinition.class), ctx.capture());   // only block 2 ran
+        assertThat(ctx.getValue().getVariable("step_0_output")).isEqualTo("first-output");
+        assertThat(ctx.getValue().getVariable("foo")).isEqualTo("bar");
+        assertThat(previousOutputSeenByBlock).containsExactly("first-output");   // seed from the last completed step
+        assertThat(captureLastSavedRun().getStatus()).isEqualTo(RunStatus.COMPLETED);
+        verify(broadcaster).broadcastRunStatus("run-1", RunStatus.RUNNING);
+    }
+
+    @Test
+    void resumeFromStep_nonInterruptedRun_throws() {
+        WorkflowRun completed = WorkflowRun.builder().id("run-1").workflow(testWorkflow).status(RunStatus.COMPLETED).build();
+        when(runRepository.findById("run-1")).thenReturn(Optional.of(completed));
+
+        assertThatThrownBy(() -> workflowExecutor.resumeFromStep("run-1"))
+                .isInstanceOf(WorkflowExecutionException.class)
+                .hasMessageContaining("cannot be resumed");
+    }
+
+    @Test
+    void resumeFromStep_noCompletedSteps_fallsBackToFullRetry() {
+        WorkflowRun interrupted = WorkflowRun.builder().id("run-1").workflow(testWorkflow).workflowName("Test Workflow")
+                .status(RunStatus.INTERRUPTED).startedAt(Instant.now()).build();
+        when(runRepository.findById("run-1")).thenReturn(Optional.of(interrupted));
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-1")).thenReturn(List.of());
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build());
+
+        workflowExecutor.resumeFromStep("run-1");
+
+        verify(simpleBlockExecutor, times(2)).execute(any(BlockDefinition.class), any(ExecutionContext.class));   // both blocks
     }
 
     @Test

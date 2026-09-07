@@ -70,6 +70,40 @@ public class WorkflowExecutor {
      * Creates a WorkflowRun with RUNNING status and returns it immediately.
      * The actual block execution happens in a background virtual thread.
      */
+    /** Detached copy of everything the async loop needs — taken while the JPA session is open. */
+    private record WorkflowSnapshot(Project project, List<BlockDefinition> blocks, List<Skill> skills,
+                                    String instructions, String model, String provider, String effort,
+                                    Map<String, Object> workflowMeta, String templateId,
+                                    Map<String, Skill> blockSkillLookup) {}
+
+    /**
+     * Eagerly copies the lazy workflow graph and pre-resolves per-block skill IDs to entities
+     * (single DB query). Must run while the JPA session is open; callers wrap it in try/catch
+     * so a LazyInitializationException fails the run instead of leaving a ghost.
+     */
+    private WorkflowSnapshot snapshot(Workflow workflow) {
+        List<BlockDefinition> blocks = List.copyOf(workflow.getBlocks());
+        List<Skill> skills = List.copyOf(workflow.getActivatedSkills());
+        Set<String> workflowSkillIds = skills.stream().map(Skill::getId).collect(Collectors.toSet());
+        Set<String> blockSkillIds = blocks.stream()
+                .filter(b -> b.getSkillIds() != null)
+                .flatMap(b -> b.getSkillIds().stream())
+                .filter(id -> !workflowSkillIds.contains(id))
+                .collect(Collectors.toSet());
+        Map<String, Skill> blockSkillLookup = blockSkillIds.isEmpty()
+                ? Map.of()
+                : skillRepository.findAllById(blockSkillIds).stream()
+                        .collect(Collectors.toMap(Skill::getId, s -> s));
+        if (!blockSkillIds.isEmpty() && blockSkillLookup.size() < blockSkillIds.size()) {
+            Set<String> missing = new java.util.HashSet<>(blockSkillIds);
+            missing.removeAll(blockSkillLookup.keySet());
+            log.warn("Per-block skill IDs not found (deleted?): {}", missing);
+        }
+        return new WorkflowSnapshot(workflow.getProject(), blocks, skills, workflow.getInstructions(),
+                workflow.getModel(), workflow.getProvider(), workflow.getEffort(),
+                Map.copyOf(workflow.getMetadata()), workflow.getTemplateId(), blockSkillLookup);
+    }
+
     public WorkflowRun execute(Workflow workflow, Map<String, Object> inputContext) {
         return execute(workflow, inputContext, null, null);
     }
@@ -92,27 +126,10 @@ public class WorkflowExecutor {
         // Wrapped in try-catch: if a LazyInitializationException or similar occurs here
         // (e.g. when called from a scheduled executor without an active JPA session),
         // the run is immediately marked as FAILED instead of being stuck as a ghost run.
-        final Project project;
-        final List<BlockDefinition> blocks;
-        final List<Skill> skills;
-        final String instructions;
-        final String model;
-        final String provider;
-        final String effort;
-        final Map<String, Object> workflowMeta;
-        final String templateId;
+        final WorkflowSnapshot wf;
         final Map<String, Object> contextVars;
-        Map<String, Skill> blockSkillLookup;
         try {
-            project = workflow.getProject();
-            blocks = List.copyOf(workflow.getBlocks());
-            skills = List.copyOf(workflow.getActivatedSkills());
-            instructions = workflow.getInstructions();
-            model = workflow.getModel();
-            provider = workflow.getProvider();
-            effort = workflow.getEffort();
-            workflowMeta = Map.copyOf(workflow.getMetadata());
-            templateId = workflow.getTemplateId();
+            wf = snapshot(workflow);
 
             Map<String, Object> mergedContext = new HashMap<>(workflow.getDefaultContext());
             if (inputContext != null) {
@@ -124,23 +141,6 @@ public class WorkflowExecutor {
             if (!contextVars.isEmpty()) {
                 run.setInputContext(new HashMap<>(contextVars));
                 runRepository.save(run);
-            }
-
-            // Pre-resolve per-block skill IDs to Skill entities (single DB query)
-            Set<String> workflowSkillIds = skills.stream().map(Skill::getId).collect(Collectors.toSet());
-            Set<String> blockSkillIds = blocks.stream()
-                    .filter(b -> b.getSkillIds() != null)
-                    .flatMap(b -> b.getSkillIds().stream())
-                    .filter(id -> !workflowSkillIds.contains(id))
-                    .collect(Collectors.toSet());
-            blockSkillLookup = blockSkillIds.isEmpty()
-                    ? Map.of()
-                    : skillRepository.findAllById(blockSkillIds).stream()
-                            .collect(Collectors.toMap(Skill::getId, s -> s));
-            if (!blockSkillIds.isEmpty() && blockSkillLookup.size() < blockSkillIds.size()) {
-                Set<String> missing = new java.util.HashSet<>(blockSkillIds);
-                missing.removeAll(blockSkillLookup.keySet());
-                log.warn("Per-block skill IDs not found (deleted?): {}", missing);
             }
         } catch (Exception e) {
             log.error("Failed to initialize workflow data for run {}: {}", run.getId(), e.getMessage(), e);
@@ -155,11 +155,10 @@ public class WorkflowExecutor {
         final String runId = run.getId();
         final String workflowId = workflow.getId();
         final String workflowName = workflow.getName();
-        final Map<String, Skill> finalBlockSkillLookup = blockSkillLookup;
         activityLogService.info(LogCategory.EXECUTION,
                 "Workflow execution started: " + workflowName,
                 "WorkflowExecutor", runId, workflowId);
-        virtualThreadExecutor.submit(() -> executeBlocks(runId, workflowId, workflowName, project, blocks, skills, finalBlockSkillLookup, contextVars, instructions, model, provider, effort, workflowMeta, templateId, 0, null));
+        virtualThreadExecutor.submit(() -> executeBlocks(runId, workflowId, workflowName, wf, contextVars, 0, null));
 
         return run;
     }
@@ -169,10 +168,18 @@ public class WorkflowExecutor {
      * @param skipToStepIndex for resume: skip blocks with index < this value (0 = no skip)
      * @param resumePreviousOutput for resume: pre-seed previousOutput from the last completed step
      */
-    private void executeBlocks(String runId, String workflowId, String workflowName, Project project, List<BlockDefinition> blocks,
-                               List<Skill> skills, Map<String, Skill> blockSkillLookup, Map<String, Object> inputContext,
-                               String instructions, String model, String provider, String effort, Map<String, Object> workflowMeta,
-                               String templateId, int skipToStepIndex, String resumePreviousOutput) {
+    private void executeBlocks(String runId, String workflowId, String workflowName, WorkflowSnapshot wf,
+                               Map<String, Object> inputContext, int skipToStepIndex, String resumePreviousOutput) {
+        Project project = wf.project();
+        List<BlockDefinition> blocks = wf.blocks();
+        List<Skill> skills = wf.skills();
+        Map<String, Skill> blockSkillLookup = wf.blockSkillLookup();
+        String instructions = wf.instructions();
+        String model = wf.model();
+        String provider = wf.provider();
+        String effort = wf.effort();
+        Map<String, Object> workflowMeta = wf.workflowMeta();
+        String templateId = wf.templateId();
         // Single try-finally ensures semaphore is always released, even if the thread
         // dies between acquire() and the execution body (eliminates the leak window).
         WorkflowRun run = null;
@@ -498,38 +505,9 @@ public class WorkflowExecutor {
 
         // Load workflow data eagerly before updating run status
         final Workflow workflow = run.getWorkflow();
-        final Project project;
-        final List<BlockDefinition> blocks;
-        final List<Skill> skills;
-        final String instructions;
-        final String model;
-        final String provider;
-        final String effort;
-        final Map<String, Object> workflowMeta;
-        final String templateId;
-        Map<String, Skill> resumeBlockSkillLookup;
+        final WorkflowSnapshot wf;
         try {
-            project = workflow.getProject();
-            blocks = List.copyOf(workflow.getBlocks());
-            skills = List.copyOf(workflow.getActivatedSkills());
-            instructions = workflow.getInstructions();
-            model = workflow.getModel();
-            provider = workflow.getProvider();
-            effort = workflow.getEffort();
-            workflowMeta = Map.copyOf(workflow.getMetadata());
-            templateId = workflow.getTemplateId();
-
-            // Pre-resolve per-block skill IDs (same logic as execute())
-            Set<String> wfSkillIds = skills.stream().map(Skill::getId).collect(Collectors.toSet());
-            Set<String> blkSkillIds = blocks.stream()
-                    .filter(b -> b.getSkillIds() != null)
-                    .flatMap(b -> b.getSkillIds().stream())
-                    .filter(id -> !wfSkillIds.contains(id))
-                    .collect(Collectors.toSet());
-            resumeBlockSkillLookup = blkSkillIds.isEmpty()
-                    ? Map.of()
-                    : skillRepository.findAllById(blkSkillIds).stream()
-                            .collect(Collectors.toMap(Skill::getId, s -> s));
+            wf = snapshot(workflow);
         } catch (Exception e) {
             throw new WorkflowExecutionException("Failed to load workflow data for resume: " + e.getMessage(), e);
         }
@@ -544,15 +522,11 @@ public class WorkflowExecutor {
         final String wfId = workflow.getId();
         final String wfName = workflow.getName();
         final int resumeIdx = resumeFromIndex;
-        final Map<String, Skill> finalResumeBlockSkillLookup = resumeBlockSkillLookup;
         activityLogService.info(LogCategory.EXECUTION,
                 "Resuming workflow from step " + resumeIdx + ": " + wfName,
                 "WorkflowExecutor", runId, wfId);
 
-        virtualThreadExecutor.submit(() -> executeBlocks(
-                runId, wfId, wfName, project, blocks, skills, finalResumeBlockSkillLookup,
-                contextForResume, instructions, model, provider, effort, workflowMeta, templateId,
-                resumeIdx, previousOutput));
+        virtualThreadExecutor.submit(() -> executeBlocks(runId, wfId, wfName, wf, contextForResume, resumeIdx, previousOutput));
 
         return run;
     }
