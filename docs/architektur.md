@@ -73,7 +73,7 @@ com.automation
 ├── controller/          34 REST-Controller
 ├── service/
 │   ├── project/         ProjectService, ContainerService, ProjectContextService, PathValidator, OnboardingProfileService, ProjectOnboardingService
-│   ├── workflow/        WorkflowExecutor, WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService, GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
+│   ├── workflow/        WorkflowExecutor (+ ExecutionContextFactory, RunCompletionHandler, WorkflowContextDataService), WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService, GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
 │   ├── skill/           SkillService, SkillImportExportService, SkillRegistry, CapabilityRegistry
 │   ├── scheduler/       SchedulerService, ScheduledWorkflowExecutor, SuspendState
 │   ├── webhook/         WebhookService, GitWebhookPayloadParser
@@ -177,7 +177,7 @@ Die Workflow-Engine führt Blöcke sequenziell aus. Claude CLI läuft **immer au
 4. Shell-Befehle können optional via Docker Exec im Container ausgeführt werden
 5. Ergebnisse werden als `StepResult` gespeichert
 6. Live-Logs gehen über WebSocket (STOMP) an das Frontend
-7. Nach Abschluss wertet `WorkflowExecutor` Gate-Status aus (alle Block-Outputs)
+7. Nach Abschluss wertet `RunCompletionHandler` Gate-Status und TODO-Marker aus (alle Block-Outputs), verbucht Template-Verification, Activity-Log und DLQ
 8. `WorkflowRunCompletedEvent` wird gefeuert → `AutoTodoService` reagiert
 
 ### Block-Typen (14 gesamt)
@@ -239,7 +239,7 @@ Der Switch-Block evaluiert einen Ausdruck gegen mehrere Cases:
 - Zirkuläre Referenzen werden via `__parent_workflow_ids` erkannt
 - Maximale Verschachtelungstiefe: 5 Ebenen
 - Polling-basierter Abschluss, 30-Minuten-Timeout
-- `@Lazy`-Injection auf `WorkflowExecutor`, um Spring-DI-Zyklen zu brechen
+- `@Lazy`-Injection auf `WorkflowExecutor` nur dort, wo ein Aufrufer selbst Runs startet (Sub-Workflow, Chains, Trigger); reine Status-Abfragen (aktive Runs, Container-IDs, Approvals) gehen direkt an `WorkflowExecutionRegistry`
 
 ### Human-Input Block
 
@@ -261,7 +261,7 @@ gate_description: <beschreibung>
 
 **Verarbeitung:**
 - `GateStatusOutputParser` — parst Marker aus Block-Ausgaben (tolerant gegenüber Markdown-Formatierung)
-- `WorkflowExecutor` scannt alle Block-Ausgaben — höchste Schwere gewinnt (GREEN < YELLOW < RED)
+- `RunCompletionHandler` scannt alle Block-Ausgaben — höchste Schwere gewinnt (GREEN < YELLOW < RED)
 - Gate-Status wird in `WorkflowRun.metadata` gespeichert (`gate_status`, `gate_category`, `gate_description`)
 
 **Gate → Run-Status-Mapping:**
