@@ -1,19 +1,14 @@
 package com.automation.service.chain;
 
-import com.automation.config.ChainConfig;
 import com.automation.entity.*;
 import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.repository.ChainRunRepository;
-import com.automation.repository.StepResultRepository;
 import com.automation.repository.WorkflowRunRepository;
-import com.automation.exception.WorkflowExecutionException;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
@@ -24,44 +19,44 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static com.automation.config.ExecutionDefaults.POLLING_INTERVAL_MS;
-
+/**
+ * Runs a workflow chain: one workflow after the other on a virtual thread, passing the previous
+ * output along, honouring stop-on-failure and cancellation. Waiting for an entry's run lives in
+ * {@link ChainRunWaiter}, the startup zombie cleanup in {@link ChainZombieRunCleaner}.
+ */
 @Service
 @Slf4j
 public class ChainExecutor {
 
-    private final ChainConfig chainConfig;
     private final ChainRunRepository chainRunRepository;
-    private final StepResultRepository stepResultRepository;
     private final WorkflowRunRepository workflowRunRepository;
     private final WorkflowService workflowService;
     private final WorkflowExecutor workflowExecutor;
     private final SimpMessagingTemplate messagingTemplate;
     private final ExecutorService virtualThreadExecutor;
     private final ActivityLogService activityLogService;
+    private final ChainRunWaiter runWaiter;
 
     private final Map<String, AtomicBoolean> activeCancellations = new ConcurrentHashMap<>();
 
     public ChainExecutor(
-            ChainConfig chainConfig,
             ChainRunRepository chainRunRepository,
-            StepResultRepository stepResultRepository,
             WorkflowRunRepository workflowRunRepository,
             WorkflowService workflowService,
             @Lazy WorkflowExecutor workflowExecutor,
             SimpMessagingTemplate messagingTemplate,
             ExecutorService virtualThreadExecutor,
-            ActivityLogService activityLogService
+            ActivityLogService activityLogService,
+            ChainRunWaiter runWaiter
     ) {
-        this.chainConfig = chainConfig;
         this.chainRunRepository = chainRunRepository;
-        this.stepResultRepository = stepResultRepository;
         this.workflowRunRepository = workflowRunRepository;
         this.workflowService = workflowService;
         this.workflowExecutor = workflowExecutor;
         this.messagingTemplate = messagingTemplate;
         this.virtualThreadExecutor = virtualThreadExecutor;
         this.activityLogService = activityLogService;
+        this.runWaiter = runWaiter;
     }
 
     public ChainRun execute(WorkflowChain chain, Map<String, Object> inputContext) {
@@ -94,42 +89,6 @@ public class ChainExecutor {
         if (flag != null) {
             flag.set(true);
         }
-    }
-
-    @EventListener(ApplicationReadyEvent.class)
-    public void cleanupZombieChainRuns() {
-        List<ChainRun> zombies = new ArrayList<>();
-        zombies.addAll(chainRunRepository.findByStatus(RunStatus.RUNNING));
-        zombies.addAll(chainRunRepository.findByStatus(RunStatus.PAUSED));
-        if (zombies.isEmpty()) {
-            return;
-        }
-        log.warn("Found {} chain-run(s) stuck in RUNNING/PAUSED — marking as INTERRUPTED", zombies.size());
-        for (ChainRun zombie : zombies) {
-            Instant completedAt = Instant.now();
-            zombie.setStatus(RunStatus.INTERRUPTED);
-            zombie.setCompletedAt(completedAt);
-            if (zombie.getStartedAt() != null) {
-                zombie.setDurationMs(completedAt.toEpochMilli() - zombie.getStartedAt().toEpochMilli());
-            }
-            // Also reconcile the nested entryRuns — otherwise the UI shows an INTERRUPTED chain
-            // whose entries are still stuck on RUNNING/PAUSED (inconsistent status).
-            if (zombie.getEntryRuns() != null) {
-                for (ChainRunEntry entryRun : zombie.getEntryRuns()) {
-                    if (entryRun.getStatus() == RunStatus.RUNNING || entryRun.getStatus() == RunStatus.PAUSED) {
-                        entryRun.setStatus(RunStatus.INTERRUPTED);
-                        entryRun.setCompletedAt(completedAt);
-                        if (entryRun.getStartedAt() != null) {
-                            entryRun.setDurationMs(completedAt.toEpochMilli() - entryRun.getStartedAt().toEpochMilli());
-                        }
-                    }
-                }
-            }
-            chainRunRepository.save(zombie);
-        }
-        activityLogService.warn(LogCategory.EXECUTION,
-                "Startup cleanup: marked " + zombies.size() + " chain-run(s) as INTERRUPTED",
-                "ChainExecutor");
     }
 
     private void executeEntries(String runId, WorkflowChain chain, Map<String, Object> inputContext) {
@@ -209,7 +168,7 @@ public class ChainExecutor {
                     chainRunRepository.save(run);
                     broadcastStatus(runId, run);
 
-                    WorkflowRun completed = waitForCompletion(workflowRun.getId(), cancelled);
+                    WorkflowRun completed = runWaiter.waitForCompletion(workflowRun.getId(), cancelled);
                     // Fresh read to avoid stale Hibernate cache
                     completed = workflowRunRepository.findById(completed.getId()).orElseThrow();
 
@@ -218,10 +177,10 @@ public class ChainExecutor {
 
                     if (completed.getStatus() == RunStatus.COMPLETED) {
                         runEntry.setStatus(RunStatus.COMPLETED);
-                        previousOutput = extractOutput(completed);
+                        previousOutput = runWaiter.extractOutput(completed);
                     } else if (completed.getStatus() == RunStatus.COMPLETED_WITH_ERRORS) {
                         runEntry.setStatus(RunStatus.COMPLETED_WITH_ERRORS);
-                        previousOutput = extractOutput(completed);
+                        previousOutput = runWaiter.extractOutput(completed);
                         hasWarnings = true;
                     } else if (completed.getStatus() == RunStatus.CANCELLED) {
                         runEntry.setStatus(RunStatus.CANCELLED);
@@ -302,40 +261,6 @@ public class ChainExecutor {
 
     private boolean shouldStop(WorkflowChain chain, ChainEntry entry) {
         return entry.isStopOnFailure() && chain.isStopOnFailure();
-    }
-
-    private WorkflowRun waitForCompletion(String runId, AtomicBoolean cancelled) {
-        Duration maxWait = Duration.ofMinutes(chainConfig.getWorkflowTimeoutMinutes());
-        Instant deadline = Instant.now().plus(maxWait);
-        while (Instant.now().isBefore(deadline)) {
-            if (cancelled != null && cancelled.get()) {
-                throw new java.util.concurrent.CancellationException("Chain execution cancelled");
-            }
-            WorkflowRun run = workflowRunRepository.findById(runId).orElseThrow();
-            if (run.getStatus() != RunStatus.RUNNING
-                    && run.getStatus() != RunStatus.PENDING
-                    && run.getStatus() != RunStatus.PAUSED) {
-                return run;
-            }
-            try {
-                Thread.sleep(POLLING_INTERVAL_MS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new WorkflowExecutionException("Interrupted while waiting for workflow completion", e);
-            }
-        }
-        throw new WorkflowExecutionException("Workflow timed out after " + maxWait.toMinutes() + " minutes");
-    }
-
-    private String extractOutput(WorkflowRun run) {
-        // Use repository query instead of lazy-loaded collection to avoid
-        // LazyInitializationException outside of a Hibernate session
-        List<StepResult> steps = stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc(run.getId());
-        if (steps == null || steps.isEmpty()) {
-            return null;
-        }
-        StepResult lastStep = steps.get(steps.size() - 1);
-        return lastStep.getOutput();
     }
 
     private void broadcastStatus(String runId, ChainRun run) {

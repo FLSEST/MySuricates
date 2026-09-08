@@ -66,15 +66,14 @@ class ChainExecutorTest {
         chainConfig.setWorkflowTimeoutMinutes(180);
 
         chainExecutor = new ChainExecutor(
-                chainConfig,
                 chainRunRepository,
-                stepResultRepository,
                 workflowRunRepository,
                 workflowService,
                 workflowExecutor,
                 messagingTemplate,
                 virtualThreadExecutor,
-                activityLogService
+                activityLogService,
+                new ChainRunWaiter(chainConfig, workflowRunRepository, stepResultRepository)
         );
 
         testChain = WorkflowChain.builder()
@@ -347,35 +346,6 @@ class ChainExecutorTest {
         Map<String, Object> secondContext = contextCaptor.getAllValues().get(1);
         assertThat(secondContext).containsEntry("previous_chain_output", "first-output");
         assertThat(secondContext).containsEntry("env", "test");
-    }
-
-    @Test
-    void cleanupZombieChainRuns_marksNestedEntryRunsInterrupted() {
-        ChainRunEntry runningEntry = ChainRunEntry.builder()
-                .entryIndex(0).workflowId("wf-1").status(RunStatus.RUNNING)
-                .startedAt(Instant.now()).build();
-        ChainRunEntry completedEntry = ChainRunEntry.builder()
-                .entryIndex(1).workflowId("wf-2").status(RunStatus.COMPLETED)
-                .startedAt(Instant.now()).completedAt(Instant.now()).build();
-        ChainRun zombie = ChainRun.builder()
-                .id("zombie-1").status(RunStatus.RUNNING).startedAt(Instant.now())
-                .entryRuns(new ArrayList<>(List.of(runningEntry, completedEntry)))
-                .build();
-
-        when(chainRunRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of(zombie));
-        when(chainRunRepository.findByStatus(RunStatus.PAUSED)).thenReturn(List.of());
-
-        chainExecutor.cleanupZombieChainRuns();
-
-        ArgumentCaptor<ChainRun> captor = ArgumentCaptor.forClass(ChainRun.class);
-        verify(chainRunRepository).save(captor.capture());
-        ChainRun saved = captor.getValue();
-        assertThat(saved.getStatus()).isEqualTo(RunStatus.INTERRUPTED);
-        // RUNNING entry reconciled to INTERRUPTED + completedAt
-        assertThat(saved.getEntryRuns().get(0).getStatus()).isEqualTo(RunStatus.INTERRUPTED);
-        assertThat(saved.getEntryRuns().get(0).getCompletedAt()).isNotNull();
-        // Already-COMPLETED entry left untouched
-        assertThat(saved.getEntryRuns().get(1).getStatus()).isEqualTo(RunStatus.COMPLETED);
     }
 
     @Test
