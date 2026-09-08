@@ -1,10 +1,7 @@
 package com.automation.service.staging;
 
 import com.automation.dto.request.SyncDefinitionsRequest;
-import com.automation.dto.response.SyncPreview;
-import com.automation.dto.response.SyncPreviewItem;
 import com.automation.dto.response.SyncResult;
-import com.automation.dto.response.WorkflowDiff;
 import com.automation.entity.ChainEntry;
 import com.automation.entity.Project;
 import com.automation.entity.Skill;
@@ -15,174 +12,43 @@ import com.automation.repository.ProjectRepository;
 import com.automation.repository.SkillRepository;
 import com.automation.repository.WorkflowChainRepository;
 import com.automation.repository.WorkflowRepository;
-import com.automation.service.system.ApiKeyService;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.sql.DataSource;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.time.Instant;
 import java.util.*;
 
+/**
+ * Pushes the local definitions (projects, workflows, custom skills, chains, two settings) to a
+ * Stable/Test instance, with a pre-sync backup on the target and stable_synced_at bookkeeping.
+ * Transport lives in {@link InstanceHttpClient}, the dry-run in {@link SyncPreviewService}.
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class InstanceSyncHelper {
-
-    private static final String API_KEY_HEADER = "X-API-Key";
 
     private final AppSettingsRepository appSettingsRepository;
     private final ProjectRepository projectRepository;
     private final WorkflowRepository workflowRepository;
     private final SkillRepository skillRepository;
     private final WorkflowChainRepository chainRepository;
-    private final ApiKeyService apiKeyService;
-    private final ObjectMapper objectMapper;
+    private final InstanceHttpClient httpClient;
     private final DataSource dataSource;
 
-    /** Overrides the API key for outgoing HTTP calls within the current thread (used for Stable/Test targets). */
-    private final ThreadLocal<String> targetApiKeyOverride = new ThreadLocal<>();
-
-    /** Sets the API key override for the current thread. Call {@link #clearTargetApiKeyOverride()} in a finally block. */
-    public void setTargetApiKeyOverride(String apiKey) {
-        targetApiKeyOverride.set(apiKey);
-    }
-
-    /** Clears the API key override for the current thread. */
-    public void clearTargetApiKeyOverride() {
-        targetApiKeyOverride.remove();
-    }
-
-    // ── Target maps record ──────────────────────────────────
-
-    private record TargetMaps(
-            Map<String, JsonNode> projectsByNamePath,
-            Map<String, JsonNode> workflowsByNameProject,
-            Set<String> skillNames,
-            Map<String, JsonNode> chainsByName
-    ) {}
-
-    private TargetMaps buildTargetMaps(String targetBaseUrl) {
-        Map<String, JsonNode> projectsByNamePath = new HashMap<>();
-        JsonNode targetProjects = httpGet(targetBaseUrl + "/projects");
-        if (targetProjects != null && targetProjects.isArray()) {
-            for (JsonNode sp : targetProjects) {
-                String key = sp.path("name").asText() + "|" + sp.path("path").asText();
-                projectsByNamePath.put(key, sp);
-            }
-        }
-
-        Map<String, JsonNode> workflowsByNameProject = new HashMap<>();
-        JsonNode targetWorkflows = httpGet(targetBaseUrl + "/workflows");
-        if (targetWorkflows != null && targetWorkflows.isArray()) {
-            for (JsonNode sw : targetWorkflows) {
-                String wKey = sw.path("name").asText() + "|" + sw.path("projectName").asText();
-                workflowsByNameProject.put(wKey, sw);
-            }
-        }
-
-        Set<String> skillNames = new HashSet<>();
-        JsonNode targetSkills = httpGet(targetBaseUrl + "/skills");
-        if (targetSkills != null && targetSkills.isArray()) {
-            for (JsonNode ss : targetSkills) {
-                skillNames.add(ss.path("name").asText());
-            }
-        }
-
-        Map<String, JsonNode> chainsByName = new HashMap<>();
-        JsonNode targetChains = httpGet(targetBaseUrl + "/chains");
-        if (targetChains != null && targetChains.isArray()) {
-            for (JsonNode sc : targetChains) {
-                chainsByName.put(sc.path("name").asText(), sc);
-            }
-        }
-
-        return new TargetMaps(projectsByNamePath, workflowsByNameProject, skillNames, chainsByName);
-    }
-
-    // ── Sync preview ────────────────────────────────────────
-
-    public SyncPreview syncPreview(String targetBaseUrl) {
-        TargetMaps target = buildTargetMaps(targetBaseUrl);
-
-        List<SyncPreviewItem> projects = new ArrayList<>();
-        for (Project project : projectRepository.findAll()) {
-            String key = project.getName() + "|" + project.getPath();
-            JsonNode existing = target.projectsByNamePath().get(key);
-            String action = existing != null ? "SKIP" : "NEW";
-            projects.add(new SyncPreviewItem(project.getId(), project.getName(), null, action));
-        }
-
-        List<SyncPreviewItem> workflows = new ArrayList<>();
-        for (Workflow workflow : workflowRepository.findAllReadOnly()) {
-            String projectName = workflow.getProject() != null ? workflow.getProject().getName() : "";
-            String wKey = workflow.getName() + "|" + projectName;
-            JsonNode existing = target.workflowsByNameProject().get(wKey);
-            String action;
-            WorkflowDiff diff = null;
-            if (existing != null) {
-                diff = computeWorkflowDiff(workflow, existing);
-                action = diff.changedFields().isEmpty() ? "SKIP" : "UPDATE";
-            } else {
-                action = "NEW";
-            }
-            workflows.add(new SyncPreviewItem(
-                    workflow.getId(),
-                    workflow.getName(),
-                    projectName.isEmpty() ? null : projectName,
-                    action,
-                    diff
-            ));
-        }
-
-        List<SyncPreviewItem> skills = new ArrayList<>();
-        for (Skill skill : skillRepository.findByBuiltin(false)) {
-            String action = target.skillNames().contains(skill.getName()) ? "SKIP" : "NEW";
-            skills.add(new SyncPreviewItem(skill.getId(), skill.getName(), null, action));
-        }
-
-        List<SyncPreviewItem> chains = new ArrayList<>();
-        for (WorkflowChain chain : chainRepository.findAll()) {
-            String action = target.chainsByName().containsKey(chain.getName()) ? "UPDATE" : "NEW";
-            chains.add(new SyncPreviewItem(chain.getId(), chain.getName(), null, action));
-        }
-
-        return new SyncPreview(projects, workflows, skills, chains);
-    }
-
-    // ── Sync all (backwards compatible) ─────────────────────
-
-    public SyncResult syncDefinitionsTo(String targetBaseUrl) {
-        return syncDefinitionsTo(targetBaseUrl, null, null);
-    }
-
-    public SyncResult syncDefinitionsTo(String targetBaseUrl, SyncDefinitionsRequest request) {
-        return syncDefinitionsTo(targetBaseUrl, null, request);
-    }
+    // ── Sync ────────────────────────────────────────────────
 
     public SyncResult syncDefinitionsTo(String targetBaseUrl, String targetApiKey, SyncDefinitionsRequest request) {
-        targetApiKeyOverride.set(targetApiKey);
+        httpClient.setTargetApiKeyOverride(targetApiKey);
         try {
             return doSyncDefinitionsTo(targetBaseUrl, request);
         } finally {
-            targetApiKeyOverride.remove();
-        }
-    }
-
-    public SyncPreview syncPreview(String targetBaseUrl, String targetApiKey) {
-        targetApiKeyOverride.set(targetApiKey);
-        try {
-            return syncPreview(targetBaseUrl);
-        } finally {
-            targetApiKeyOverride.remove();
+            httpClient.clearTargetApiKeyOverride();
         }
     }
 
@@ -223,7 +89,7 @@ public class InstanceSyncHelper {
 
         // 1. Sync projects
         List<Project> devProjects = projectRepository.findAll();
-        JsonNode targetProjects = httpGet(targetBaseUrl + "/projects");
+        JsonNode targetProjects = httpClient.httpGet(targetBaseUrl + "/projects");
         Map<String, JsonNode> targetProjectsByNamePath = new HashMap<>();
         if (targetProjects != null && targetProjects.isArray()) {
             for (JsonNode sp : targetProjects) {
@@ -262,7 +128,7 @@ public class InstanceSyncHelper {
                     if (project.getConfig() != null && !project.getConfig().isEmpty()) {
                         body.put("config", project.getConfig());
                     }
-                    JsonNode created = httpPost(targetBaseUrl + "/projects", body);
+                    JsonNode created = httpClient.httpPost(targetBaseUrl + "/projects", body);
                     if (created != null) {
                         projectIdMapping.put(project.getId(), created.path("id").asText());
                         projectsSynced++;
@@ -278,7 +144,7 @@ public class InstanceSyncHelper {
         // 2. Sync workflows — use findAllReadOnly() to prevent Hibernate dirty-check flushes
         // from overwriting native SQL updates to stable_synced_at
         List<Workflow> devWorkflows = workflowRepository.findAllReadOnly();
-        JsonNode targetWorkflows = httpGet(targetBaseUrl + "/workflows");
+        JsonNode targetWorkflows = httpClient.httpGet(targetBaseUrl + "/workflows");
         Map<String, JsonNode> targetWorkflowsByNameProject = new HashMap<>();
         if (targetWorkflows != null && targetWorkflows.isArray()) {
             for (JsonNode sw : targetWorkflows) {
@@ -321,7 +187,7 @@ public class InstanceSyncHelper {
                     if (workflow.getMetadata() != null && !workflow.getMetadata().isEmpty()) {
                         updateBody.put("metadata", workflow.getMetadata());
                     }
-                    httpPut(targetBaseUrl + "/workflows/" + targetWorkflowId, updateBody);
+                    httpClient.httpPut(targetBaseUrl + "/workflows/" + targetWorkflowId, updateBody);
                     workflowsSynced++;
                     markStableSynced(workflow.getId());
                     log.info("Updated workflow on target: {}", workflow.getName());
@@ -334,7 +200,7 @@ public class InstanceSyncHelper {
                     importBody.put("blocks", workflow.getBlocks());
                     if (workflow.getInstructions() != null) importBody.put("instructions", workflow.getInstructions());
                     if (workflow.getModel() != null) importBody.put("model", workflow.getModel());
-                    JsonNode created = httpPost(targetBaseUrl + "/workflows/import", importBody);
+                    JsonNode created = httpClient.httpPost(targetBaseUrl + "/workflows/import", importBody);
                     if (created != null && !created.path("id").isMissingNode()) {
                         workflowIdMapping.put(workflow.getId(), created.path("id").asText());
                     }
@@ -350,7 +216,7 @@ public class InstanceSyncHelper {
 
         // 3. Sync custom skills
         List<Skill> customSkills = skillRepository.findByBuiltin(false);
-        JsonNode targetSkills = httpGet(targetBaseUrl + "/skills");
+        JsonNode targetSkills = httpClient.httpGet(targetBaseUrl + "/skills");
         Set<String> targetSkillNames = new HashSet<>();
         if (targetSkills != null && targetSkills.isArray()) {
             for (JsonNode ss : targetSkills) {
@@ -380,7 +246,7 @@ public class InstanceSyncHelper {
                     if (skill.getConfigSchema() != null && !skill.getConfigSchema().isEmpty()) {
                         skillBody.put("configSchema", skill.getConfigSchema());
                     }
-                    httpPost(targetBaseUrl + "/skills/import", skillBody);
+                    httpClient.httpPost(targetBaseUrl + "/skills/import", skillBody);
                     skillsSynced++;
                     log.info("Synced skill: {}", skill.getName());
                 }
@@ -406,7 +272,7 @@ public class InstanceSyncHelper {
         }
 
         List<WorkflowChain> devChains = chainRepository.findAll();
-        JsonNode targetChains = httpGet(targetBaseUrl + "/chains");
+        JsonNode targetChains = httpClient.httpGet(targetBaseUrl + "/chains");
         Map<String, JsonNode> targetChainsByName = new HashMap<>();
         if (targetChains != null && targetChains.isArray()) {
             for (JsonNode tc : targetChains) {
@@ -459,11 +325,11 @@ public class InstanceSyncHelper {
                 JsonNode existingChain = targetChainsByName.get(chain.getName());
                 if (existingChain != null) {
                     String targetChainId = existingChain.path("id").asText();
-                    httpPut(targetBaseUrl + "/chains/" + targetChainId, chainBody);
+                    httpClient.httpPut(targetBaseUrl + "/chains/" + targetChainId, chainBody);
                     chainsSynced++;
                     log.info("Updated chain on target: {}", chain.getName());
                 } else {
-                    httpPost(targetBaseUrl + "/chains", chainBody);
+                    httpClient.httpPost(targetBaseUrl + "/chains", chainBody);
                     chainsSynced++;
                     log.info("Created chain on target: {}", chain.getName());
                 }
@@ -477,7 +343,7 @@ public class InstanceSyncHelper {
         try {
             appSettingsRepository.get("auto-todo-default").ifPresent(value -> {
                 try {
-                    httpPut(targetBaseUrl + "/system/settings/auto-todo-default",
+                    httpClient.httpPut(targetBaseUrl + "/system/settings/auto-todo-default",
                             Map.of("value", value));
                     log.info("Synced auto-todo-default setting: {}", value);
                 } catch (Exception e) {
@@ -494,7 +360,7 @@ public class InstanceSyncHelper {
         try {
             appSettingsRepository.get("auto-repair-default").ifPresent(value -> {
                 try {
-                    httpPut(targetBaseUrl + "/system/settings/auto-repair-default",
+                    httpClient.httpPut(targetBaseUrl + "/system/settings/auto-repair-default",
                             Map.of("value", value));
                     log.info("Synced auto-repair-default setting: {}", value);
                 } catch (Exception e) {
@@ -522,7 +388,7 @@ public class InstanceSyncHelper {
      */
     private String createPreSyncBackup(String targetBaseUrl, List<String> errors) {
         try {
-            JsonNode result = httpPost(
+            JsonNode result = httpClient.httpPost(
                     targetBaseUrl + "/system/backup?reason=pre-sync-definitions",
                     null
             );
@@ -543,114 +409,6 @@ public class InstanceSyncHelper {
         }
     }
 
-    // ── Workflow diff ────────────────────────────────────────
-
-    private WorkflowDiff computeWorkflowDiff(Workflow dev, JsonNode target) {
-        List<String> changedFields = new ArrayList<>();
-
-        String devDesc = dev.getDescription() != null ? dev.getDescription() : "";
-        String targetDesc = target.path("description").asText("");
-        if (!devDesc.equals(targetDesc)) changedFields.add("description");
-
-        String devModel = dev.getModel() != null ? dev.getModel() : "";
-        String targetModel = target.path("model").asText("");
-        String modelBefore = null, modelAfter = null;
-        if (!devModel.equals(targetModel)) {
-            changedFields.add("model");
-            modelBefore = targetModel.isBlank() ? null : targetModel;
-            modelAfter = devModel.isBlank() ? null : devModel;
-        }
-
-        String devInstr = dev.getInstructions() != null ? dev.getInstructions() : "";
-        String targetInstr = target.path("instructions").asText("");
-        if (!devInstr.equals(targetInstr)) changedFields.add("instructions");
-
-        int blocksAdded = 0, blocksRemoved = 0;
-        try {
-            String devBlocksJson = objectMapper.writeValueAsString(dev.getBlocks());
-            String targetBlocksJson = target.path("blocks").toString();
-            if (!objectMapper.readTree(devBlocksJson).equals(objectMapper.readTree(targetBlocksJson))) {
-                changedFields.add("blocks");
-                int devCount = dev.getBlocks() != null ? dev.getBlocks().size() : 0;
-                int targetCount = target.path("blocks").size();
-                if (devCount > targetCount) blocksAdded = devCount - targetCount;
-                else if (targetCount > devCount) blocksRemoved = targetCount - devCount;
-            }
-        } catch (Exception e) {
-            log.warn("Block diff failed for workflow '{}': {}", dev.getName(), e.getMessage());
-            changedFields.add("blocks");
-        }
-
-        return new WorkflowDiff(changedFields, modelBefore, modelAfter, blocksAdded, blocksRemoved);
-    }
-
-    // ── HTTP helpers ──────────────────────────────────────
-
-    public JsonNode httpGet(String url) {
-        try {
-            HttpURLConnection conn = (HttpURLConnection) URI.create(url).toURL().openConnection();
-            conn.setConnectTimeout(10_000);
-            conn.setReadTimeout(30_000);
-            conn.setRequestProperty("Accept", "application/json");
-            addApiKeyHeader(conn);
-            int code = conn.getResponseCode();
-            if (code == 200) {
-                String body = new String(conn.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-                conn.disconnect();
-                return objectMapper.readTree(body);
-            }
-            conn.disconnect();
-            return null;
-        } catch (Exception e) {
-            log.warn("GET {} failed: {}", url, e.getMessage());
-            return null;
-        }
-    }
-
-    public JsonNode httpPost(String url, Object body) {
-        return httpSend("POST", url, body);
-    }
-
-    public JsonNode httpPut(String url, Object body) {
-        return httpSend("PUT", url, body);
-    }
-
-    private JsonNode httpSend(String method, String url, Object body) {
-        try {
-            HttpURLConnection conn = (HttpURLConnection) URI.create(url).toURL().openConnection();
-            conn.setConnectTimeout(10_000);
-            conn.setReadTimeout(30_000);
-            conn.setRequestMethod(method);
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("Accept", "application/json");
-            addApiKeyHeader(conn);
-            conn.setDoOutput(true);
-
-            byte[] jsonBytes = objectMapper.writeValueAsBytes(body);
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(jsonBytes);
-            }
-
-            int code = conn.getResponseCode();
-            if (code >= 200 && code < 300) {
-                String responseBody = new String(conn.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-                conn.disconnect();
-                return responseBody.isEmpty() ? null : objectMapper.readTree(responseBody);
-            } else {
-                String errorBody = "";
-                try {
-                    errorBody = new String(conn.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
-                } catch (Exception ignored) {}
-                conn.disconnect();
-                throw new RuntimeException("HTTP " + code + ": " + errorBody);
-            }
-        } catch (RuntimeException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new RuntimeException(method + " " + url + " failed: " + e.getMessage(), e);
-        }
-    }
-
     /** Updates stable_synced_at via raw JDBC — bypasses Hibernate to avoid @LastModifiedDate. */
     private void markStableSynced(String workflowId) {
         try (Connection conn = dataSource.getConnection();
@@ -662,16 +420,5 @@ public class InstanceSyncHelper {
         } catch (Exception e) {
             log.warn("Failed to mark workflow {} as stable-synced: {}", workflowId, e.getMessage());
         }
-    }
-
-    private void addApiKeyHeader(HttpURLConnection conn) {
-        String apiKey = targetApiKeyOverride.get();
-        if (apiKey == null) {
-            apiKey = apiKeyService.getEffectiveApiKey();
-        }
-        if (apiKey != null && !apiKey.isBlank()) {
-            conn.setRequestProperty(API_KEY_HEADER, apiKey);
-        }
-        conn.setRequestProperty("X-Internal-Sync", "true");
     }
 }

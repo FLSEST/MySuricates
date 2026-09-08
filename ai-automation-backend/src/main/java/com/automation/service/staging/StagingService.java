@@ -30,6 +30,8 @@ public class StagingService {
 
     private final StagingConfig config;
     private final InstanceSyncHelper syncHelper;
+    private final InstanceHttpClient httpClient;
+    private final SyncPreviewService previewService;
     private final ApiKeyService apiKeyService;
     private final DockerContainerManager dockerManager;
 
@@ -84,7 +86,7 @@ public class StagingService {
         if (healthy) {
             try {
                 String stableBaseUrl = deriveStableBaseUrl();
-                JsonNode info = syncHelper.httpGet(stableBaseUrl + "/system/info");
+                JsonNode info = httpClient.httpGet(stableBaseUrl + "/system/info");
                 if (info != null) {
                     stableVersion = info.path("version").asText(null);
                     stableBuildTimestamp = info.path("buildTimestamp").asText(null);
@@ -217,7 +219,7 @@ public class StagingService {
         if (!isHealthy()) {
             throw new IllegalStateException("Stable instance is not running or not healthy. Start it first.");
         }
-        return syncHelper.syncPreview(deriveStableBaseUrl(), readContainerApiKey(config.getContainerName()));
+        return previewService.syncPreview(deriveStableBaseUrl(), readContainerApiKey(config.getContainerName()));
     }
 
     public SyncResult syncDefinitions() {

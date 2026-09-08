@@ -35,6 +35,8 @@ public class TestingService {
 
     private final StagingConfig config;
     private final InstanceSyncHelper syncHelper;
+    private final InstanceHttpClient httpClient;
+    private final SyncPreviewService previewService;
     private final WorkflowRepository workflowRepository;
     private final ApiKeyService apiKeyService;
     private final DockerContainerManager dockerManager;
@@ -77,7 +79,7 @@ public class TestingService {
         String testBuildTimestamp = null;
         if (healthy) {
             try {
-                JsonNode info = withTestApiKey(() -> syncHelper.httpGet(deriveTestBaseUrl() + "/system/info"));
+                JsonNode info = withTestApiKey(() -> httpClient.httpGet(deriveTestBaseUrl() + "/system/info"));
                 if (info != null) {
                     testVersion = info.path("version").asText(null);
                     testBuildTimestamp = info.path("buildTimestamp").asText(null);
@@ -138,7 +140,7 @@ public class TestingService {
         if (testApiKey == null) {
             throw new IllegalStateException("Could not read API key from test container. Is the container running?");
         }
-        return syncHelper.syncPreview(deriveTestBaseUrl(), testApiKey);
+        return previewService.syncPreview(deriveTestBaseUrl(), testApiKey);
     }
 
     public SyncResult syncDefinitions() {
@@ -181,7 +183,7 @@ public class TestingService {
             java.util.List<String> errors = new java.util.ArrayList<>();
 
             // Fetch all workflows from Test
-            JsonNode testWorkflows = syncHelper.httpGet(testBaseUrl + "/workflows");
+            JsonNode testWorkflows = httpClient.httpGet(testBaseUrl + "/workflows");
             if (testWorkflows == null || !testWorkflows.isArray()) {
                 return new SyncResult(0, 0, 0, 0, java.util.List.of("Could not fetch workflows from Test instance"));
             }
@@ -197,7 +199,7 @@ public class TestingService {
                     }
 
                     String testWorkflowId = tw.path("id").asText();
-                    JsonNode fullTestWorkflow = syncHelper.httpGet(testBaseUrl + "/workflows/" + testWorkflowId);
+                    JsonNode fullTestWorkflow = httpClient.httpGet(testBaseUrl + "/workflows/" + testWorkflowId);
                     if (fullTestWorkflow == null) {
                         continue;
                     }
@@ -232,7 +234,7 @@ public class TestingService {
             String baseUrl = deriveTestBaseUrl();
 
             // Find workflow on test by name + project
-            JsonNode workflows = syncHelper.httpGet(baseUrl + "/workflows");
+            JsonNode workflows = httpClient.httpGet(baseUrl + "/workflows");
             if (workflows == null || !workflows.isArray()) {
                 throw new IllegalStateException("Could not fetch workflows from Test instance.");
             }
@@ -255,7 +257,7 @@ public class TestingService {
             Map<String, Object> body = context != null && !context.isEmpty()
                     ? Map.of("context", context)
                     : Map.of();
-            JsonNode result = syncHelper.httpPost(baseUrl + "/workflows/" + testWorkflowId + "/execute", body);
+            JsonNode result = httpClient.httpPost(baseUrl + "/workflows/" + testWorkflowId + "/execute", body);
             if (result == null || !result.has("id")) {
                 throw new IllegalStateException("Failed to start workflow on Test instance.");
             }
@@ -283,7 +285,7 @@ public class TestingService {
             long maxWaitMs = maxWaitSeconds * 1000L;
 
             while (waitedMs < maxWaitMs) {
-                JsonNode run = syncHelper.httpGet(url);
+                JsonNode run = httpClient.httpGet(url);
                 if (run != null) {
                     String status = run.path("status").asText("");
                     if ("COMPLETED".equals(status) || "FAILED".equals(status) || "CANCELLED".equals(status)) {
@@ -310,11 +312,11 @@ public class TestingService {
         if (apiKey == null) {
             log.warn("Could not read API key from test container — requests may fail with 401");
         }
-        syncHelper.setTargetApiKeyOverride(apiKey);
+        httpClient.setTargetApiKeyOverride(apiKey);
         try {
             return action.get();
         } finally {
-            syncHelper.clearTargetApiKeyOverride();
+            httpClient.clearTargetApiKeyOverride();
         }
     }
 

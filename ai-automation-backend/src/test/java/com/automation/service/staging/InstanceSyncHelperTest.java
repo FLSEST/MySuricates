@@ -9,13 +9,13 @@ import com.automation.repository.ProjectRepository;
 import com.automation.repository.SkillRepository;
 import com.automation.repository.WorkflowChainRepository;
 import com.automation.repository.WorkflowRepository;
-import com.automation.service.system.ApiKeyService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -38,7 +38,7 @@ class InstanceSyncHelperTest {
     @Mock private WorkflowRepository workflowRepository;
     @Mock private SkillRepository skillRepository;
     @Mock private WorkflowChainRepository chainRepository;
-    @Mock private ApiKeyService apiKeyService;
+    @Mock private InstanceHttpClient httpClient;
     @Mock private javax.sql.DataSource dataSource;
 
     private ObjectMapper objectMapper = new ObjectMapper();
@@ -48,54 +48,18 @@ class InstanceSyncHelperTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        syncHelper = spy(new InstanceSyncHelper(
+        syncHelper = new InstanceSyncHelper(
                 appSettingsRepository, projectRepository, workflowRepository,
-                skillRepository, chainRepository, apiKeyService, objectMapper, dataSource));
+                skillRepository, chainRepository, httpClient, dataSource);
         lenient().when(chainRepository.findAll()).thenReturn(List.of());
 
         lenient().when(appSettingsRepository.get(anyString())).thenReturn(Optional.empty());
 
         // Default: pre-sync backup succeeds (stubbed globally so existing tests are unaffected).
-        lenient().doReturn(objectMapper.readTree("{\"filename\":\"test-backup.db\",\"sizeBytes\":1024}"))
-                .when(syncHelper).httpPost(contains("/system/backup"), any());
+        lenient().when(httpClient.httpPost(contains("/system/backup"), any())).thenReturn(objectMapper.readTree("{\"filename\":\"test-backup.db\",\"sizeBytes\":1024}"));
     }
 
-    // --- Sync preview ---
 
-    @Test
-    void syncPreview_newProject_markedAsNew() throws Exception {
-        Project proj = Project.builder().id("p1").name("MyProject").path("/project").type(ProjectType.CODE).build();
-        when(projectRepository.findAll()).thenReturn(List.of(proj));
-        when(workflowRepository.findAllReadOnly()).thenReturn(List.of());
-        when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
-
-        // Target has no projects
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/projects");
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/workflows");
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/skills");
-
-        SyncPreview preview = syncHelper.syncPreview(TARGET);
-
-        assertThat(preview.projects()).hasSize(1);
-        assertThat(preview.projects().get(0).action()).isEqualTo("NEW");
-    }
-
-    @Test
-    void syncPreview_existingProject_markedAsSkip() throws Exception {
-        Project proj = Project.builder().id("p1").name("MyProject").path("/project").type(ProjectType.CODE).build();
-        when(projectRepository.findAll()).thenReturn(List.of(proj));
-        when(workflowRepository.findAllReadOnly()).thenReturn(List.of());
-        when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
-
-        doReturn(objectMapper.readTree("[{\"name\":\"MyProject\",\"path\":\"/project\",\"id\":\"tp1\"}]"))
-                .when(syncHelper).httpGet(TARGET + "/projects");
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/workflows");
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/skills");
-
-        SyncPreview preview = syncHelper.syncPreview(TARGET);
-
-        assertThat(preview.projects().get(0).action()).isEqualTo("SKIP");
-    }
 
     // --- Sync projects ---
 
@@ -106,17 +70,17 @@ class InstanceSyncHelperTest {
         when(workflowRepository.findAllReadOnly()).thenReturn(List.of());
         when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
 
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/projects");
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/workflows");
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/skills");
-        doReturn(objectMapper.readTree("{\"id\":\"tp1\"}")).when(syncHelper).httpPost(eq(TARGET + "/projects"), any());
+        when(httpClient.httpGet(TARGET + "/projects")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpGet(TARGET + "/workflows")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpGet(TARGET + "/skills")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpPost(eq(TARGET + "/projects"), any())).thenReturn(objectMapper.readTree("{\"id\":\"tp1\"}"));
 
-        SyncResult result = syncHelper.syncDefinitionsTo(TARGET);
+        SyncResult result = syncHelper.syncDefinitionsTo(TARGET, null, null);
 
         assertThat(result.projectsSynced()).isEqualTo(1);
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
-        verify(syncHelper).httpPost(eq(TARGET + "/projects"), bodyCaptor.capture());
+        verify(httpClient).httpPost(eq(TARGET + "/projects"), bodyCaptor.capture());
         assertThat(bodyCaptor.getValue().get("name")).isEqualTo("NewProj");
         assertThat(bodyCaptor.getValue().get("path")).isEqualTo("/new");
         assertThat(bodyCaptor.getValue().get("type")).isEqualTo("CODE");
@@ -129,12 +93,11 @@ class InstanceSyncHelperTest {
         when(workflowRepository.findAllReadOnly()).thenReturn(List.of());
         when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
 
-        doReturn(objectMapper.readTree("[{\"name\":\"Existing\",\"path\":\"/existing\",\"id\":\"tp1\"}]"))
-                .when(syncHelper).httpGet(TARGET + "/projects");
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/workflows");
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/skills");
+        when(httpClient.httpGet(TARGET + "/projects")).thenReturn(objectMapper.readTree("[{\"name\":\"Existing\",\"path\":\"/existing\",\"id\":\"tp1\"}]"));
+        when(httpClient.httpGet(TARGET + "/workflows")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpGet(TARGET + "/skills")).thenReturn(objectMapper.readTree("[]"));
 
-        SyncResult result = syncHelper.syncDefinitionsTo(TARGET);
+        SyncResult result = syncHelper.syncDefinitionsTo(TARGET, null, null);
 
         assertThat(result.projectsSynced()).isEqualTo(0);
         assertThat(result.skipped()).isEqualTo(1);
@@ -151,18 +114,17 @@ class InstanceSyncHelperTest {
         when(workflowRepository.findAllReadOnly()).thenReturn(List.of(wf));
         when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
 
-        doReturn(objectMapper.readTree("[{\"name\":\"Proj\",\"path\":\"/proj\",\"id\":\"tp1\"}]"))
-                .when(syncHelper).httpGet(TARGET + "/projects");
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/workflows");
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/skills");
-        doReturn(objectMapper.readTree("{\"id\":\"twf1\"}")).when(syncHelper).httpPost(eq(TARGET + "/workflows/import"), any());
+        when(httpClient.httpGet(TARGET + "/projects")).thenReturn(objectMapper.readTree("[{\"name\":\"Proj\",\"path\":\"/proj\",\"id\":\"tp1\"}]"));
+        when(httpClient.httpGet(TARGET + "/workflows")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpGet(TARGET + "/skills")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpPost(eq(TARGET + "/workflows/import"), any())).thenReturn(objectMapper.readTree("{\"id\":\"twf1\"}"));
 
-        SyncResult result = syncHelper.syncDefinitionsTo(TARGET);
+        SyncResult result = syncHelper.syncDefinitionsTo(TARGET, null, null);
 
         assertThat(result.workflowsSynced()).isEqualTo(1);
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> wfBodyCaptor = ArgumentCaptor.forClass(Map.class);
-        verify(syncHelper).httpPost(eq(TARGET + "/workflows/import"), wfBodyCaptor.capture());
+        verify(httpClient).httpPost(eq(TARGET + "/workflows/import"), wfBodyCaptor.capture());
         assertThat(wfBodyCaptor.getValue().get("name")).isEqualTo("NewWF");
         assertThat(wfBodyCaptor.getValue().get("projectId")).isEqualTo("tp1");
     }
@@ -176,19 +138,17 @@ class InstanceSyncHelperTest {
         when(workflowRepository.findAllReadOnly()).thenReturn(List.of(wf));
         when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
 
-        doReturn(objectMapper.readTree("[{\"name\":\"Proj\",\"path\":\"/proj\",\"id\":\"tp1\"}]"))
-                .when(syncHelper).httpGet(TARGET + "/projects");
-        doReturn(objectMapper.readTree("[{\"name\":\"ExistingWF\",\"projectName\":\"Proj\",\"id\":\"twf1\",\"description\":\"old desc\",\"blocks\":[]}]"))
-                .when(syncHelper).httpGet(TARGET + "/workflows");
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/skills");
-        doReturn(null).when(syncHelper).httpPut(contains("/workflows/twf1"), any());
+        when(httpClient.httpGet(TARGET + "/projects")).thenReturn(objectMapper.readTree("[{\"name\":\"Proj\",\"path\":\"/proj\",\"id\":\"tp1\"}]"));
+        when(httpClient.httpGet(TARGET + "/workflows")).thenReturn(objectMapper.readTree("[{\"name\":\"ExistingWF\",\"projectName\":\"Proj\",\"id\":\"twf1\",\"description\":\"old desc\",\"blocks\":[]}]"));
+        when(httpClient.httpGet(TARGET + "/skills")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpPut(contains("/workflows/twf1"), any())).thenReturn(null);
 
-        SyncResult result = syncHelper.syncDefinitionsTo(TARGET);
+        SyncResult result = syncHelper.syncDefinitionsTo(TARGET, null, null);
 
         assertThat(result.workflowsSynced()).isEqualTo(1);
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> updateCaptor = ArgumentCaptor.forClass(Map.class);
-        verify(syncHelper).httpPut(eq(TARGET + "/workflows/twf1"), updateCaptor.capture());
+        verify(httpClient).httpPut(eq(TARGET + "/workflows/twf1"), updateCaptor.capture());
         assertThat(updateCaptor.getValue().get("name")).isEqualTo("ExistingWF");
         assertThat(updateCaptor.getValue().get("description")).isEqualTo("new desc");
     }
@@ -202,11 +162,11 @@ class InstanceSyncHelperTest {
         when(workflowRepository.findAllReadOnly()).thenReturn(List.of());
         when(skillRepository.findByBuiltin(false)).thenReturn(List.of(skill));
 
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/projects");
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/workflows");
-        doReturn(objectMapper.readTree("[{\"name\":\"MySkill\"}]")).when(syncHelper).httpGet(TARGET + "/skills");
+        when(httpClient.httpGet(TARGET + "/projects")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpGet(TARGET + "/workflows")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpGet(TARGET + "/skills")).thenReturn(objectMapper.readTree("[{\"name\":\"MySkill\"}]"));
 
-        SyncResult result = syncHelper.syncDefinitionsTo(TARGET);
+        SyncResult result = syncHelper.syncDefinitionsTo(TARGET, null, null);
 
         assertThat(result.skillsSynced()).isEqualTo(0);
         assertThat(result.skipped()).isEqualTo(1);
@@ -220,12 +180,12 @@ class InstanceSyncHelperTest {
         when(workflowRepository.findAllReadOnly()).thenReturn(List.of());
         when(skillRepository.findByBuiltin(false)).thenReturn(List.of(skill));
 
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/projects");
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/workflows");
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/skills");
-        doReturn(objectMapper.readTree("{\"id\":\"ts1\"}")).when(syncHelper).httpPost(eq(TARGET + "/skills/import"), any());
+        when(httpClient.httpGet(TARGET + "/projects")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpGet(TARGET + "/workflows")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpGet(TARGET + "/skills")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpPost(eq(TARGET + "/skills/import"), any())).thenReturn(objectMapper.readTree("{\"id\":\"ts1\"}"));
 
-        SyncResult result = syncHelper.syncDefinitionsTo(TARGET);
+        SyncResult result = syncHelper.syncDefinitionsTo(TARGET, null, null);
 
         assertThat(result.skillsSynced()).isEqualTo(1);
     }
@@ -241,20 +201,19 @@ class InstanceSyncHelperTest {
         when(workflowRepository.findAllReadOnly()).thenReturn(List.of(wf1, wf2));
         when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
 
-        doReturn(objectMapper.readTree("[{\"name\":\"Proj\",\"path\":\"/proj\",\"id\":\"tp1\"}]"))
-                .when(syncHelper).httpGet(TARGET + "/projects");
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/workflows");
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/skills");
-        doReturn(objectMapper.readTree("{\"id\":\"twf1\"}")).when(syncHelper).httpPost(eq(TARGET + "/workflows/import"), any());
+        when(httpClient.httpGet(TARGET + "/projects")).thenReturn(objectMapper.readTree("[{\"name\":\"Proj\",\"path\":\"/proj\",\"id\":\"tp1\"}]"));
+        when(httpClient.httpGet(TARGET + "/workflows")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpGet(TARGET + "/skills")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpPost(eq(TARGET + "/workflows/import"), any())).thenReturn(objectMapper.readTree("{\"id\":\"twf1\"}"));
 
         var request = new SyncDefinitionsRequest(null, List.of("wf1"), null);
-        SyncResult result = syncHelper.syncDefinitionsTo(TARGET, request);
+        SyncResult result = syncHelper.syncDefinitionsTo(TARGET, null, request);
 
         // Only wf1 synced, wf2 skipped
         assertThat(result.workflowsSynced()).isEqualTo(1);
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
-        verify(syncHelper, times(1)).httpPost(eq(TARGET + "/workflows/import"), bodyCaptor.capture());
+        verify(httpClient, times(1)).httpPost(eq(TARGET + "/workflows/import"), bodyCaptor.capture());
         assertThat(bodyCaptor.getValue().get("name")).isEqualTo("WF1");
     }
 
@@ -269,22 +228,22 @@ class InstanceSyncHelperTest {
         when(workflowRepository.findAllReadOnly()).thenReturn(List.of(wf1, wf2, wf3));
         when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
 
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/projects");
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/workflows");
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/skills");
-        doReturn(objectMapper.readTree("{\"id\":\"tp1\"}")).when(syncHelper).httpPost(eq(TARGET + "/projects"), any());
-        doReturn(objectMapper.readTree("{\"id\":\"twf1\"}")).when(syncHelper).httpPost(eq(TARGET + "/workflows/import"), any());
+        when(httpClient.httpGet(TARGET + "/projects")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpGet(TARGET + "/workflows")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpGet(TARGET + "/skills")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpPost(eq(TARGET + "/projects"), any())).thenReturn(objectMapper.readTree("{\"id\":\"tp1\"}"));
+        when(httpClient.httpPost(eq(TARGET + "/workflows/import"), any())).thenReturn(objectMapper.readTree("{\"id\":\"twf1\"}"));
 
         // Only sync proj1
         var request = new SyncDefinitionsRequest(List.of("p1"), null, null);
-        SyncResult result = syncHelper.syncDefinitionsTo(TARGET, request);
+        SyncResult result = syncHelper.syncDefinitionsTo(TARGET, null, request);
 
         // Only wf1 (proj1) synced — wf2 (proj2) and wf3 (no project) skipped
         assertThat(result.workflowsSynced()).isEqualTo(1);
         assertThat(result.projectsSynced()).isEqualTo(1);
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
-        verify(syncHelper, times(1)).httpPost(eq(TARGET + "/workflows/import"), bodyCaptor.capture());
+        verify(httpClient, times(1)).httpPost(eq(TARGET + "/workflows/import"), bodyCaptor.capture());
         assertThat(bodyCaptor.getValue().get("name")).isEqualTo("WF1");
     }
 
@@ -298,15 +257,15 @@ class InstanceSyncHelperTest {
         when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
 
         // httpGet returns null (target unreachable) — with guard, no non-backup httpPost is called
-        doReturn(null).when(syncHelper).httpGet(anyString());
+        when(httpClient.httpGet(anyString())).thenReturn(null);
 
-        SyncResult result = syncHelper.syncDefinitionsTo(TARGET);
+        SyncResult result = syncHelper.syncDefinitionsTo(TARGET, null, null);
 
         // Should not crash, errors are collected for each entity type
         assertThat(result.errors()).isNotEmpty();
         assertThat(result.projectsSynced()).isEqualTo(0);
         // Pre-sync backup POST is expected (best-effort rollback point) — but no sync POSTs
-        verify(syncHelper, never()).httpPost(not(contains("/system/backup")), any());
+        verify(httpClient, never()).httpPost(not(contains("/system/backup")), any());
     }
 
     @Test
@@ -319,9 +278,9 @@ class InstanceSyncHelperTest {
         when(skillRepository.findByBuiltin(false)).thenReturn(List.of(skill));
 
         // httpGet returns null for all target endpoints
-        doReturn(null).when(syncHelper).httpGet(anyString());
+        when(httpClient.httpGet(anyString())).thenReturn(null);
 
-        SyncResult result = syncHelper.syncDefinitionsTo(TARGET);
+        SyncResult result = syncHelper.syncDefinitionsTo(TARGET, null, null);
 
         // Nothing should be synced — no sync POST calls (backup POST is expected)
         assertThat(result.projectsSynced()).isEqualTo(0);
@@ -329,7 +288,7 @@ class InstanceSyncHelperTest {
         assertThat(result.skillsSynced()).isEqualTo(0);
         assertThat(result.chainsSynced()).isEqualTo(0);
         assertThat(result.errors()).hasSize(4);
-        verify(syncHelper, never()).httpPost(not(contains("/system/backup")), any());
+        verify(httpClient, never()).httpPost(not(contains("/system/backup")), any());
     }
 
     // --- API key override ---
@@ -340,12 +299,25 @@ class InstanceSyncHelperTest {
         when(workflowRepository.findAllReadOnly()).thenReturn(List.of());
         when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
 
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(anyString());
+        when(httpClient.httpGet(anyString())).thenReturn(objectMapper.readTree("[]"));
 
         syncHelper.syncDefinitionsTo(TARGET, "custom-key", null);
 
-        // The override key is set via ThreadLocal — verify httpGet was called (key is in header, not directly testable without real HTTP)
-        verify(syncHelper, atLeast(3)).httpGet(anyString());
+        InOrder inOrder = inOrder(httpClient);
+        inOrder.verify(httpClient).setTargetApiKeyOverride("custom-key");
+        inOrder.verify(httpClient, atLeast(3)).httpGet(anyString());
+        inOrder.verify(httpClient).clearTargetApiKeyOverride();
+    }
+
+    @Test
+    void sync_clearsOverride_evenWhenSyncThrows() {
+        when(projectRepository.findAll()).thenThrow(new IllegalStateException("db down"));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> syncHelper.syncDefinitionsTo(TARGET, "custom-key", null))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(httpClient).setTargetApiKeyOverride("custom-key");
+        verify(httpClient).clearTargetApiKeyOverride();
     }
 
     // --- markStableSynced via DataSource ---
@@ -367,14 +339,12 @@ class InstanceSyncHelperTest {
         when(workflowRepository.findAllReadOnly()).thenReturn(List.of(wf));
         when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
 
-        doReturn(objectMapper.readTree("[{\"name\":\"Proj\",\"path\":\"/proj\",\"id\":\"tp1\"}]"))
-                .when(syncHelper).httpGet(TARGET + "/projects");
-        doReturn(objectMapper.readTree("[{\"name\":\"ExistingWF\",\"projectName\":\"Proj\",\"id\":\"twf1\",\"description\":\"desc\",\"blocks\":[]}]"))
-                .when(syncHelper).httpGet(TARGET + "/workflows");
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/skills");
-        doReturn(null).when(syncHelper).httpPut(anyString(), any());
+        when(httpClient.httpGet(TARGET + "/projects")).thenReturn(objectMapper.readTree("[{\"name\":\"Proj\",\"path\":\"/proj\",\"id\":\"tp1\"}]"));
+        when(httpClient.httpGet(TARGET + "/workflows")).thenReturn(objectMapper.readTree("[{\"name\":\"ExistingWF\",\"projectName\":\"Proj\",\"id\":\"twf1\",\"description\":\"desc\",\"blocks\":[]}]"));
+        when(httpClient.httpGet(TARGET + "/skills")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpPut(anyString(), any())).thenReturn(null);
 
-        SyncResult result = syncHelper.syncDefinitionsTo(TARGET);
+        SyncResult result = syncHelper.syncDefinitionsTo(TARGET, null, null);
 
         assertThat(result.workflowsSynced()).isEqualTo(1);
         verify(dataSource).getConnection();
@@ -399,21 +369,20 @@ class InstanceSyncHelperTest {
         when(workflowRepository.findAllReadOnly()).thenReturn(List.of(wf1, wf2));
         when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
 
-        doReturn(objectMapper.readTree("[{\"name\":\"Proj2\",\"path\":\"/proj2\",\"id\":\"tp2\"}]"))
-                .when(syncHelper).httpGet(TARGET + "/projects");
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/workflows");
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/skills");
-        doReturn(objectMapper.readTree("{\"id\":\"twf2\"}")).when(syncHelper).httpPost(eq(TARGET + "/workflows/import"), any());
+        when(httpClient.httpGet(TARGET + "/projects")).thenReturn(objectMapper.readTree("[{\"name\":\"Proj2\",\"path\":\"/proj2\",\"id\":\"tp2\"}]"));
+        when(httpClient.httpGet(TARGET + "/workflows")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpGet(TARGET + "/skills")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpPost(eq(TARGET + "/workflows/import"), any())).thenReturn(objectMapper.readTree("{\"id\":\"twf2\"}"));
 
         // Request: p1 in projectIds, wf2 (in p2) in workflowIds — p2 must be auto-included
         var request = new SyncDefinitionsRequest(List.of("p1"), List.of("wf2"), null);
-        SyncResult result = syncHelper.syncDefinitionsTo(TARGET, request);
+        SyncResult result = syncHelper.syncDefinitionsTo(TARGET, null, request);
 
         // wf2 is synced (p2 was auto-included); wf1 is not synced (not in workflowIds)
         assertThat(result.workflowsSynced()).isEqualTo(1);
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.forClass(Map.class);
-        verify(syncHelper, times(1)).httpPost(eq(TARGET + "/workflows/import"), bodyCaptor.capture());
+        verify(httpClient, times(1)).httpPost(eq(TARGET + "/workflows/import"), bodyCaptor.capture());
         assertThat(bodyCaptor.getValue().get("name")).isEqualTo("WF2");
     }
 
@@ -431,18 +400,17 @@ class InstanceSyncHelperTest {
         when(workflowRepository.findAllReadOnly()).thenReturn(List.of(wf1, wfNoProject));
         when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
 
-        doReturn(objectMapper.readTree("[{\"name\":\"Proj1\",\"path\":\"/proj1\",\"id\":\"tp1\"}]"))
-                .when(syncHelper).httpGet(TARGET + "/projects");
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/workflows");
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/skills");
+        when(httpClient.httpGet(TARGET + "/projects")).thenReturn(objectMapper.readTree("[{\"name\":\"Proj1\",\"path\":\"/proj1\",\"id\":\"tp1\"}]"));
+        when(httpClient.httpGet(TARGET + "/workflows")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpGet(TARGET + "/skills")).thenReturn(objectMapper.readTree("[]"));
 
         // Request: p1 in projectIds, wf3 (no project) explicitly in workflowIds
         var request = new SyncDefinitionsRequest(List.of("p1"), List.of("wf3"), null);
-        SyncResult result = syncHelper.syncDefinitionsTo(TARGET, request);
+        SyncResult result = syncHelper.syncDefinitionsTo(TARGET, null, request);
 
         // wf3 is skipped: selectedProjectIds filter rejects it because wf3.project == null
         assertThat(result.workflowsSynced()).isEqualTo(0);
-        verify(syncHelper, never()).httpPost(eq(TARGET + "/workflows/import"), any());
+        verify(httpClient, never()).httpPost(eq(TARGET + "/workflows/import"), any());
     }
 
     // --- Pre-sync backup ---
@@ -453,12 +421,12 @@ class InstanceSyncHelperTest {
         when(workflowRepository.findAllReadOnly()).thenReturn(List.of());
         when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
 
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(anyString());
+        when(httpClient.httpGet(anyString())).thenReturn(objectMapper.readTree("[]"));
 
-        SyncResult result = syncHelper.syncDefinitionsTo(TARGET);
+        SyncResult result = syncHelper.syncDefinitionsTo(TARGET, null, null);
 
         // Backup is called with the pre-sync-definitions reason
-        verify(syncHelper).httpPost(eq(TARGET + "/system/backup?reason=pre-sync-definitions"), any());
+        verify(httpClient).httpPost(eq(TARGET + "/system/backup?reason=pre-sync-definitions"), any());
         assertThat(result.preSyncBackup()).isEqualTo("test-backup.db");
         assertThat(result.errors()).isEmpty();
     }
@@ -471,15 +439,14 @@ class InstanceSyncHelperTest {
         when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
 
         // Override the global backup stub to simulate backup failure
-        doThrow(new RuntimeException("backup-target-down"))
-                .when(syncHelper).httpPost(contains("/system/backup"), any());
+        when(httpClient.httpPost(contains("/system/backup"), any())).thenThrow(new RuntimeException("backup-target-down"));
 
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/projects");
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/workflows");
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(TARGET + "/skills");
-        doReturn(objectMapper.readTree("{\"id\":\"tp1\"}")).when(syncHelper).httpPost(eq(TARGET + "/projects"), any());
+        when(httpClient.httpGet(TARGET + "/projects")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpGet(TARGET + "/workflows")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpGet(TARGET + "/skills")).thenReturn(objectMapper.readTree("[]"));
+        when(httpClient.httpPost(eq(TARGET + "/projects"), any())).thenReturn(objectMapper.readTree("{\"id\":\"tp1\"}"));
 
-        SyncResult result = syncHelper.syncDefinitionsTo(TARGET);
+        SyncResult result = syncHelper.syncDefinitionsTo(TARGET, null, null);
 
         // Sync still happens despite backup failure
         assertThat(result.projectsSynced()).isEqualTo(1);
@@ -495,10 +462,10 @@ class InstanceSyncHelperTest {
         when(skillRepository.findByBuiltin(false)).thenReturn(List.of());
 
         // Backup call returns null (e.g., target rejected the request silently)
-        doReturn(null).when(syncHelper).httpPost(contains("/system/backup"), any());
-        doReturn(objectMapper.readTree("[]")).when(syncHelper).httpGet(anyString());
+        when(httpClient.httpPost(contains("/system/backup"), any())).thenReturn(null);
+        when(httpClient.httpGet(anyString())).thenReturn(objectMapper.readTree("[]"));
 
-        SyncResult result = syncHelper.syncDefinitionsTo(TARGET);
+        SyncResult result = syncHelper.syncDefinitionsTo(TARGET, null, null);
 
         assertThat(result.preSyncBackup()).isNull();
         assertThat(result.errors()).anyMatch(e -> e.contains("Pre-sync backup failed"));

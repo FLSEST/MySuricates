@@ -38,6 +38,12 @@ class TestingServiceTest {
     private InstanceSyncHelper instanceSyncHelper;
 
     @Mock
+    private InstanceHttpClient instanceHttpClient;
+
+    @Mock
+    private SyncPreviewService syncPreviewService;
+
+    @Mock
     private WorkflowRepository workflowRepository;
 
     @Mock
@@ -210,12 +216,12 @@ class TestingServiceTest {
         wf.put("name", "My Workflow");
         wf.put("projectName", "Project A");
         workflows.add(wf);
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(workflows);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(workflows);
 
         // Execute response
         ObjectNode execResult = objectMapper.createObjectNode();
         execResult.put("id", "run-123");
-        when(instanceSyncHelper.httpPost(eq("http://localhost:8090/api/v1/workflows/test-wf-1/execute"), any()))
+        when(instanceHttpClient.httpPost(eq("http://localhost:8090/api/v1/workflows/test-wf-1/execute"), any()))
                 .thenReturn(execResult);
 
         String runId = spied.executeWorkflowOnTest("My Workflow", "Project A", Map.of("key", "val"));
@@ -230,7 +236,7 @@ class TestingServiceTest {
         doReturn(true).when(spied).isHealthy();
 
         ArrayNode workflows = objectMapper.createArrayNode();
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(workflows);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(workflows);
 
         assertThatThrownBy(() -> spied.executeWorkflowOnTest("Missing", "Project", Map.of()))
                 .isInstanceOf(IllegalStateException.class)
@@ -255,7 +261,7 @@ class TestingServiceTest {
 
         ObjectNode completedRun = objectMapper.createObjectNode();
         completedRun.put("status", "COMPLETED");
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/executions/run-1"))
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/executions/run-1"))
                 .thenReturn(completedRun);
 
         JsonNode result = testingService.pollTestRun("run-1", 10, 1000);
@@ -269,7 +275,7 @@ class TestingServiceTest {
 
         ObjectNode failedRun = objectMapper.createObjectNode();
         failedRun.put("status", "FAILED");
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/executions/run-1"))
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/executions/run-1"))
                 .thenReturn(failedRun);
 
         JsonNode result = testingService.pollTestRun("run-1", 10, 1000);
@@ -283,7 +289,7 @@ class TestingServiceTest {
 
         ObjectNode cancelledRun = objectMapper.createObjectNode();
         cancelledRun.put("status", "CANCELLED");
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/executions/run-1"))
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/executions/run-1"))
                 .thenReturn(cancelledRun);
 
         JsonNode result = testingService.pollTestRun("run-1", 10, 1000);
@@ -297,7 +303,7 @@ class TestingServiceTest {
 
         ObjectNode runningRun = objectMapper.createObjectNode();
         runningRun.put("status", "RUNNING");
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/executions/run-1"))
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/executions/run-1"))
                 .thenReturn(runningRun);
 
         assertThatThrownBy(() -> testingService.pollTestRun("run-1", 1, 1000))
@@ -311,7 +317,7 @@ class TestingServiceTest {
 
         ObjectNode runningRun = objectMapper.createObjectNode();
         runningRun.put("status", "RUNNING");
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/executions/run-1"))
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/executions/run-1"))
                 .thenReturn(runningRun);
 
         // With intervalMs=200, maxWait=1 — must timeout, NOT infinite loop
@@ -329,7 +335,7 @@ class TestingServiceTest {
         ObjectNode completedRun = objectMapper.createObjectNode();
         completedRun.put("status", "COMPLETED");
 
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/executions/run-1"))
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/executions/run-1"))
                 .thenReturn(runningRun)
                 .thenReturn(runningRun)
                 .thenReturn(completedRun);
@@ -361,13 +367,13 @@ class TestingServiceTest {
         tw.put("name", "Test WF");
         tw.put("projectName", "");
         testWorkflows.add(tw);
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
 
         // Full test workflow details
         ObjectNode fullTw = objectMapper.createObjectNode();
         fullTw.put("instructions", "new instructions from test");
         fullTw.put("model", "claude-opus-4-6");
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/test-wf-1")).thenReturn(fullTw);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows/test-wf-1")).thenReturn(fullTw);
 
         SyncResult result = spied.pullChanges();
 
@@ -393,12 +399,12 @@ class TestingServiceTest {
         tw.put("name", "Test WF");
         tw.put("projectName", "");
         testWorkflows.add(tw);
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
 
         ObjectNode fullTw = objectMapper.createObjectNode();
         fullTw.put("instructions", "same");
         fullTw.put("model", "claude-sonnet-4-6");
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/test-wf-1")).thenReturn(fullTw);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows/test-wf-1")).thenReturn(fullTw);
 
         SyncResult result = spied.pullChanges();
 
@@ -440,7 +446,7 @@ class TestingServiceTest {
         ObjectNode info = objectMapper.createObjectNode();
         info.put("version", "0.3.0");
         info.put("buildTimestamp", "2025-01-15T10:00:00Z");
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/system/info")).thenReturn(info);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/system/info")).thenReturn(info);
 
         var status = spied.getStatus();
 
@@ -471,12 +477,12 @@ class TestingServiceTest {
         tw.put("name", "Deploy");
         tw.put("projectName", "MyProject");
         testWorkflows.add(tw);
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
 
         ObjectNode fullTw = objectMapper.createObjectNode();
         fullTw.put("instructions", "updated");
         fullTw.put("model", "claude-sonnet-4-6");
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/test-wf-1")).thenReturn(fullTw);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows/test-wf-1")).thenReturn(fullTw);
 
         SyncResult result = spied.pullChanges();
 
@@ -502,7 +508,7 @@ class TestingServiceTest {
         tw.put("name", "Deploy");
         tw.put("projectName", "ProjectB");
         testWorkflows.add(tw);
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
 
         SyncResult result = spied.pullChanges();
 
@@ -528,12 +534,12 @@ class TestingServiceTest {
         tw.put("name", "WF");
         tw.put("projectName", "");
         testWorkflows.add(tw);
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
 
         ObjectNode fullTw = objectMapper.createObjectNode();
         fullTw.put("instructions", "new instructions");
         fullTw.put("model", "same-model");
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/t-1")).thenReturn(fullTw);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows/t-1")).thenReturn(fullTw);
 
         SyncResult result = spied.pullChanges();
 
@@ -560,12 +566,12 @@ class TestingServiceTest {
         tw.put("name", "WF");
         tw.put("projectName", "");
         testWorkflows.add(tw);
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
 
         ObjectNode fullTw = objectMapper.createObjectNode();
         fullTw.put("instructions", "same");
         fullTw.put("model", "new-model");
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/t-1")).thenReturn(fullTw);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows/t-1")).thenReturn(fullTw);
 
         SyncResult result = spied.pullChanges();
 
@@ -589,8 +595,8 @@ class TestingServiceTest {
         tw.put("name", "WF");
         tw.put("projectName", "");
         testWorkflows.add(tw);
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/t-1")).thenReturn(null);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows/t-1")).thenReturn(null);
 
         SyncResult result = spied.pullChanges();
 
@@ -619,14 +625,14 @@ class TestingServiceTest {
         tw2.put("id", "t-2"); tw2.put("name", "WF-B"); tw2.put("projectName", "");
         testWorkflows.add(tw1);
         testWorkflows.add(tw2);
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
 
         ObjectNode full1 = objectMapper.createObjectNode();
         full1.put("instructions", "new-A"); full1.put("model", "m1");
         ObjectNode full2 = objectMapper.createObjectNode();
         full2.put("instructions", "same-B"); full2.put("model", "m2");
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/t-1")).thenReturn(full1);
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/t-2")).thenReturn(full2);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows/t-1")).thenReturn(full1);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows/t-2")).thenReturn(full2);
 
         SyncResult result = spied.pullChanges();
 
@@ -656,12 +662,12 @@ class TestingServiceTest {
         tw2.put("id", "t-2"); tw2.put("name", "WF-Bad"); tw2.put("projectName", "");
         testWorkflows.add(tw1);
         testWorkflows.add(tw2);
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
 
         ObjectNode full1 = objectMapper.createObjectNode();
         full1.put("instructions", "new"); full1.put("model", "m");
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/t-1")).thenReturn(full1);
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/t-2"))
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows/t-1")).thenReturn(full1);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows/t-2"))
                 .thenThrow(new RuntimeException("Network error"));
 
         SyncResult result = spied.pullChanges();
@@ -683,7 +689,7 @@ class TestingServiceTest {
         ObjectNode tw = objectMapper.createObjectNode();
         tw.put("id", "t-1"); tw.put("name", "OnlyOnTest"); tw.put("projectName", "");
         testWorkflows.add(tw);
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
 
         SyncResult result = spied.pullChanges();
 
@@ -698,7 +704,7 @@ class TestingServiceTest {
         TestingService spied = spy(testingService);
         doReturn(true).when(spied).isHealthy();
 
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(null);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(null);
 
         SyncResult result = spied.pullChanges();
 
@@ -723,13 +729,13 @@ class TestingServiceTest {
         ObjectNode tw = objectMapper.createObjectNode();
         tw.put("id", "t-1"); tw.put("name", "WF"); tw.put("projectName", "");
         testWorkflows.add(tw);
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
 
         // Test workflow has no instructions field → asText(null) returns null
         ObjectNode fullTw = objectMapper.createObjectNode();
         fullTw.putNull("instructions");
         fullTw.putNull("model");
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/t-1")).thenReturn(fullTw);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows/t-1")).thenReturn(fullTw);
 
         SyncResult result = spied.pullChanges();
 
@@ -759,14 +765,14 @@ class TestingServiceTest {
 
         ObjectNode completedRun = objectMapper.createObjectNode();
         completedRun.put("status", "COMPLETED");
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/executions/run-1"))
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/executions/run-1"))
                 .thenReturn(completedRun);
 
         // Uses the no-arg overload which internally calls pollTestRun(runId, 600, 2000)
         JsonNode result = testingService.pollTestRun("run-1");
 
         assertThat(result.path("status").asText()).isEqualTo("COMPLETED");
-        verify(instanceSyncHelper).httpGet("http://localhost:8090/api/v1/executions/run-1");
+        verify(instanceHttpClient).httpGet("http://localhost:8090/api/v1/executions/run-1");
     }
 
     @Test
@@ -777,14 +783,14 @@ class TestingServiceTest {
         completedRun.put("status", "COMPLETED");
 
         // First call returns null, second returns completed
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/executions/run-1"))
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/executions/run-1"))
                 .thenReturn(null)
                 .thenReturn(completedRun);
 
         JsonNode result = testingService.pollTestRun("run-1", 10, 1000);
 
         assertThat(result.path("status").asText()).isEqualTo("COMPLETED");
-        verify(instanceSyncHelper, times(2)).httpGet("http://localhost:8090/api/v1/executions/run-1");
+        verify(instanceHttpClient, times(2)).httpGet("http://localhost:8090/api/v1/executions/run-1");
     }
 
     @Test
@@ -796,7 +802,7 @@ class TestingServiceTest {
         ObjectNode completedRun = objectMapper.createObjectNode();
         completedRun.put("status", "COMPLETED");
 
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/executions/run-1"))
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/executions/run-1"))
                 .thenReturn(pendingRun)
                 .thenReturn(completedRun);
 
@@ -828,7 +834,7 @@ class TestingServiceTest {
         doReturn(true).when(spied).isContainerRunning();
         doReturn(true).when(spied).isHealthy();
 
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/system/info"))
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/system/info"))
                 .thenThrow(new RuntimeException("Connection refused"));
 
         var status = spied.getStatus();
@@ -846,7 +852,7 @@ class TestingServiceTest {
         doReturn(true).when(spied).isContainerRunning();
         doReturn(true).when(spied).isHealthy();
 
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/system/info")).thenReturn(null);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/system/info")).thenReturn(null);
 
         var status = spied.getStatus();
 
@@ -898,11 +904,11 @@ class TestingServiceTest {
         wf.put("name", "Deploy");
         wf.put("projectName", "");
         workflows.add(wf);
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(workflows);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(workflows);
 
         ObjectNode execResult = objectMapper.createObjectNode();
         execResult.put("id", "run-99");
-        when(instanceSyncHelper.httpPost(eq("http://localhost:8090/api/v1/workflows/t-1/execute"), any()))
+        when(instanceHttpClient.httpPost(eq("http://localhost:8090/api/v1/workflows/t-1/execute"), any()))
                 .thenReturn(execResult);
 
         String runId = spied.executeWorkflowOnTest("Deploy", null, Map.of());
@@ -922,11 +928,11 @@ class TestingServiceTest {
         wf.put("name", "WF");
         wf.put("projectName", "");
         workflows.add(wf);
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(workflows);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(workflows);
 
         ObjectNode execResult = objectMapper.createObjectNode();
         execResult.put("id", "run-42");
-        when(instanceSyncHelper.httpPost(eq("http://localhost:8090/api/v1/workflows/t-1/execute"), eq(Map.of())))
+        when(instanceHttpClient.httpPost(eq("http://localhost:8090/api/v1/workflows/t-1/execute"), eq(Map.of())))
                 .thenReturn(execResult);
 
         String runId = spied.executeWorkflowOnTest("WF", null, null);
@@ -947,18 +953,18 @@ class TestingServiceTest {
         wf2.put("id", "t-2"); wf2.put("name", "Deploy"); wf2.put("projectName", "ProjectB");
         workflows.add(wf1);
         workflows.add(wf2);
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(workflows);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(workflows);
 
         ObjectNode execResult = objectMapper.createObjectNode();
         execResult.put("id", "run-B");
-        when(instanceSyncHelper.httpPost(eq("http://localhost:8090/api/v1/workflows/t-2/execute"), any()))
+        when(instanceHttpClient.httpPost(eq("http://localhost:8090/api/v1/workflows/t-2/execute"), any()))
                 .thenReturn(execResult);
 
         String runId = spied.executeWorkflowOnTest("Deploy", "ProjectB", Map.of());
 
         assertThat(runId).isEqualTo("run-B");
-        verify(instanceSyncHelper).httpPost(eq("http://localhost:8090/api/v1/workflows/t-2/execute"), any());
-        verify(instanceSyncHelper, never()).httpPost(eq("http://localhost:8090/api/v1/workflows/t-1/execute"), any());
+        verify(instanceHttpClient).httpPost(eq("http://localhost:8090/api/v1/workflows/t-2/execute"), any());
+        verify(instanceHttpClient, never()).httpPost(eq("http://localhost:8090/api/v1/workflows/t-1/execute"), any());
     }
 
     @Test
@@ -967,7 +973,7 @@ class TestingServiceTest {
         TestingService spied = spy(testingService);
         doReturn(true).when(spied).isHealthy();
 
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(null);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(null);
 
         assertThatThrownBy(() -> spied.executeWorkflowOnTest("WF", null, Map.of()))
                 .isInstanceOf(IllegalStateException.class)
@@ -984,8 +990,8 @@ class TestingServiceTest {
         ObjectNode wf = objectMapper.createObjectNode();
         wf.put("id", "t-1"); wf.put("name", "WF"); wf.put("projectName", "");
         workflows.add(wf);
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(workflows);
-        when(instanceSyncHelper.httpPost(anyString(), any())).thenReturn(null);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(workflows);
+        when(instanceHttpClient.httpPost(anyString(), any())).thenReturn(null);
 
         assertThatThrownBy(() -> spied.executeWorkflowOnTest("WF", null, Map.of()))
                 .isInstanceOf(IllegalStateException.class)
@@ -1010,11 +1016,11 @@ class TestingServiceTest {
         ObjectNode tw = objectMapper.createObjectNode();
         tw.put("id", "t-1"); tw.put("name", "WF"); tw.put("projectName", "");
         testWorkflows.add(tw);
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
 
         ObjectNode fullTw = objectMapper.createObjectNode();
         fullTw.put("instructions", "updated"); fullTw.put("model", "m");
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/t-1")).thenReturn(fullTw);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows/t-1")).thenReturn(fullTw);
 
         SyncResult result = spied.pullChanges();
 
@@ -1042,11 +1048,11 @@ class TestingServiceTest {
         ObjectNode tw = objectMapper.createObjectNode();
         tw.put("id", "t-1"); tw.put("name", "Deploy"); tw.put("projectName", "Beta");
         testWorkflows.add(tw);
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows")).thenReturn(testWorkflows);
 
         ObjectNode fullTw = objectMapper.createObjectNode();
         fullTw.put("instructions", "new-Beta"); fullTw.put("model", "m");
-        when(instanceSyncHelper.httpGet("http://localhost:8090/api/v1/workflows/t-1")).thenReturn(fullTw);
+        when(instanceHttpClient.httpGet("http://localhost:8090/api/v1/workflows/t-1")).thenReturn(fullTw);
 
         SyncResult result = spied.pullChanges();
 

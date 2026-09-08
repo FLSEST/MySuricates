@@ -31,7 +31,7 @@ class StagingServiceTest {
         syncHelper = mock(InstanceSyncHelper.class);
         apiKeyService = mock(ApiKeyService.class);
         dockerManager = mock(DockerContainerManager.class);
-        service = new StagingService(config, syncHelper, apiKeyService, dockerManager);
+        service = new StagingService(config, syncHelper, mock(InstanceHttpClient.class), mock(SyncPreviewService.class), apiKeyService, dockerManager);
     }
 
     @Test
