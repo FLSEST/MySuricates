@@ -10,8 +10,10 @@ import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.assistant.AssistantActionSuggestionService;
 import com.automation.service.assistant.AssistantChatBroadcaster;
 import com.automation.service.assistant.AssistantContextBuilder;
+import com.automation.service.assistant.AssistantErrorClassifier;
 import com.automation.service.assistant.AssistantFetchService;
 import com.automation.service.assistant.AssistantFetchService.FetchRequest;
+import com.automation.service.assistant.AssistantResponseParser;
 import com.automation.service.assistant.AssistantToolExecutor;
 import com.automation.service.cli.CliSession;
 import com.automation.service.cli.CommandExecutorService;
@@ -67,7 +69,8 @@ class AssistantServiceTest {
         hostClaudeConfig.setAssistantChatTimeoutSeconds(240);
         service = new AssistantService(
                 commandExecutorService, aiProviderRegistry, contextBuilder, fetchService, toolExecutor,
-                broadcaster, appSettingsRepository, hostClaudeConfig, new ObjectMapper(), actionSuggestionService
+                broadcaster, appSettingsRepository, hostClaudeConfig, actionSuggestionService,
+                new AssistantErrorClassifier(hostClaudeConfig), new AssistantResponseParser(new ObjectMapper())
         );
         // Action-suggestion service defaults — disabled unless explicitly stubbed per test
         lenient().when(actionSuggestionService.isEnabled()).thenReturn(false);

@@ -38,7 +38,6 @@ class SourceSizeRatchetTest {
     static final Map<String, Integer> ALLOWLIST = Map.ofEntries(
             entry("com/automation/config/BuiltInSkills.java", 648),
             entry("com/automation/executor/blocks/AgenticBlockExecutor.java", 554),
-            entry("com/automation/service/AssistantService.java", 528),
             entry("com/automation/service/ai/HostClaudeService.java", 479),
             entry("com/automation/service/ai/HostPiService.java", 337),
             entry("com/automation/service/assistant/AssistantActionSuggestionService.java", 427),

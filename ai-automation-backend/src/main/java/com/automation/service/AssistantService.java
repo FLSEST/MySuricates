@@ -6,37 +6,33 @@ import com.automation.dto.AssistantChatResponse;
 import com.automation.dto.AssistantChatResponse.AssistantAction;
 import com.automation.exception.WorkflowExecutionException;
 import com.automation.repository.AppSettingsRepository;
+import com.automation.service.assistant.AssistantActionMerger;
 import com.automation.service.assistant.AssistantActionSuggestionService;
 import com.automation.service.assistant.AssistantChatBroadcaster;
 import com.automation.service.assistant.AssistantContextBuilder;
+import com.automation.service.assistant.AssistantErrorClassifier;
+import com.automation.service.assistant.AssistantErrorClassifier.ErrorKind;
+import com.automation.service.assistant.AssistantFetchPolicy;
 import com.automation.service.assistant.AssistantFetchService;
 import com.automation.service.assistant.AssistantFetchService.FetchRequest;
+import com.automation.service.assistant.AssistantMutationGate;
+import com.automation.service.assistant.AssistantResponseParser;
 import com.automation.service.assistant.AssistantToolExecutor;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.sql.SQLTransientConnectionException;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -45,6 +41,10 @@ import java.util.stream.Collectors;
  * - {@link AssistantContextBuilder} for system/user prompt construction
  * - {@link AssistantFetchService} for dynamic fetch resolution
  * - {@link AssistantToolExecutor} for tool execution (create_todo, create_workflow, etc.)
+ * - {@link AssistantFetchPolicy} / {@link AssistantMutationGate} / {@link AssistantActionMerger}
+ *   for the pure decisions inside the loop
+ * - {@link AssistantResponseParser} for splitting text from the legacy {@code <actions>} block
+ * - {@link AssistantErrorClassifier} for the user-facing error message on failure
  */
 @Service
 @RequiredArgsConstructor
@@ -62,29 +62,6 @@ public class AssistantService {
     private static final int MAX_FETCH_ROUNDS = 3;
     /** Maximum number of distinct fetches per round. Dedup across rounds runs before this limit. */
     private static final int MAX_FETCHES_PER_ROUND = 3;
-    private static final Set<String> AUTO_FETCH_TYPES = Set.of(
-            "run_detail",
-            "step_output",
-            "wish_detail",
-            "workflow_runs",
-            "workflow_detail",
-            "workflow-inputs",
-            "find_workflow",
-            "project_files",
-            "project_file",
-            "docs",
-            "skill",
-            "integration",
-            "chain",
-            "block-spec"
-    );
-    private static final Set<String> MUTATING_ACTION_TYPES = Set.of("run_workflow");
-    private static final Pattern EXPLICIT_MUTATION_VERB =
-            Pattern.compile("(?iu)\\b(?:leg(?:e|en|st)?|erstell(?:e|en|st)?|schreib(?:e|en|st)?|mach(?:e|en|st)?|start(?:e|en|est)?|ausf(?:u|ü)hr(?:e|en|st)?|aktualisier(?:e|en|st)?|(?:ver)?änder(?:e|n|st)?|l(?:o|ö)sch(?:e|en|st)?|entfern(?:e|en|st)?|stopp(?:e|en)?|brich(?:\\s+\\w+){0,2}\\s+ab|markier(?:e|en|st)?)\\b");
-    private static final Pattern EXPLICIT_MUTATION_TARGET =
-            Pattern.compile("(?iu)\\b(?:todo|aufgabe|workflow|chain|run|ausf(?:u|ü)hrung|wish|wunsch|status)\\b");
-    private static final Pattern CONTEXTUAL_RUN_VERB =
-            Pattern.compile("(?iu)\\b(?:start(?:e|en|est)?|ausf(?:u|ü)hr(?:e|en|st)?|erneut(?:\\s+ausf(?:u|ü)hren)?|nochmal(?:\\s+ausf(?:u|ü)hren)?|nochmals(?:\\s+ausf(?:u|ü)hren)?|wiederholen|retry|rerun|abbrechen|stopp(?:e|en)?)\\b");
 
     private static final String DEFAULT_THINKING_PHRASES =
             "{\"de\":[\"Denke nach…\",\"Analysiere…\",\"Überlege kurz…\",\"Einen Moment…\"," +
@@ -100,8 +77,9 @@ public class AssistantService {
     private final AssistantChatBroadcaster broadcaster;
     private final AppSettingsRepository appSettingsRepository;
     private final HostClaudeConfig hostClaudeConfig;
-    private final ObjectMapper objectMapper;
     private final AssistantActionSuggestionService actionSuggestionService;
+    private final AssistantErrorClassifier errorClassifier;
+    private final AssistantResponseParser responseParser;
 
     /** Cached model — loaded at startup, never read during a web request. */
     private volatile String cachedAssistantModel = null;
@@ -150,21 +128,10 @@ public class AssistantService {
             String workingDir = contextBuilder.resolveWorkingDir(req.context());
             String model = cachedAssistantModel;
             String resolvedProvider = aiProviderRegistry.resolve(req.provider()).getId();
-            boolean allowMutatingProposals = hasExplicitMutationIntent(req);
+            boolean allowMutatingProposals = AssistantMutationGate.hasExplicitMutationIntent(req);
 
             broadcaster.broadcastStatus(requestId, "THINKING", null, startNanos);
-            var result = executeOrFail(
-                    HostExecutionRequest.builder()
-                            .projectPath(workingDir)
-                            .command(prompt)
-                            .systemPrompt(systemPrompt)
-                            .providerId(req.provider())
-                            .model(model)
-                            .timeoutSeconds(hostClaudeConfig.getAssistantChatTimeoutSeconds())
-                            .priority(true)
-                            .allowedTools(CHAT_ALLOWED_TOOLS)
-                            .build()
-            );
+            var result = executeOrFail(chatCall(req, workingDir, prompt, systemPrompt, model));
 
             // Demand-driven auto-fetch: up to MAX_FETCH_ROUNDS follow-up calls, each with up to
             // MAX_FETCHES_PER_ROUND distinct fetches. We continue the loop whenever the model
@@ -182,11 +149,11 @@ public class AssistantService {
             for (int fetchRound = 0; fetchRound < MAX_FETCH_ROUNDS; fetchRound++) {
                 String rawOutput = result.output();
                 String nonFetchText = fetchService.stripFetchTags(rawOutput);
-                if (hasSubstantiveAnswer(rawOutput, nonFetchText)) break;
+                if (AssistantFetchPolicy.hasSubstantiveAnswer(rawOutput, nonFetchText)) break;
 
                 List<FetchRequest> fetches = fetchService.parseFetchRequests(rawOutput).stream()
-                        .filter(this::isAutoFetchAllowed)
-                        .filter(f -> seenFetches.add(fetchKey(f)))
+                        .filter(AssistantFetchPolicy::isAutoFetchAllowed)
+                        .filter(f -> seenFetches.add(AssistantFetchPolicy.fetchKey(f)))
                         .limit(MAX_FETCHES_PER_ROUND)
                         .toList();
                 if (fetches.isEmpty()) break;
@@ -199,7 +166,7 @@ public class AssistantService {
                         .collect(Collectors.joining("\n"));
                 log.debug("Assistant fetch round {} — {} fetch(es): {}",
                         fetchRound + 1, fetches.size(),
-                        fetches.stream().map(this::fetchKey).toList());
+                        fetches.stream().map(AssistantFetchPolicy::fetchKey).toList());
                 if (supplemental.isBlank()) break;
 
                 accumulatedSupplemental = accumulatedSupplemental.isBlank()
@@ -212,18 +179,7 @@ public class AssistantService {
                         + "If something truly essential is still missing, name it in 1 sentence and then make "
                         + "at most one more specific <fetch>.]";
                 broadcaster.broadcastStatus(requestId, "THINKING", "Round " + (fetchRound + 1), startNanos);
-                result = executeOrFail(
-                        HostExecutionRequest.builder()
-                                .projectPath(workingDir)
-                                .command(enrichedPrompt)
-                                .systemPrompt(systemPrompt)
-                                .providerId(req.provider())
-                                .model(model)
-                                .timeoutSeconds(hostClaudeConfig.getAssistantChatTimeoutSeconds())
-                                .priority(true)
-                                .allowedTools(CHAT_ALLOWED_TOOLS)
-                                .build()
-                );
+                result = executeOrFail(chatCall(req, workingDir, enrichedPrompt, systemPrompt, model));
             }
 
             // Extract tool proposals (NOT executed — user must confirm via controller endpoint)
@@ -246,7 +202,7 @@ public class AssistantService {
                         + "Please phrase the question more specifically or provide the relevant ID directly.";
             }
 
-            AssistantChatResponse parsed = parseResponse(finalOutput);
+            AssistantChatResponse parsed = responseParser.parse(finalOutput);
 
             // Second call: generate action-button suggestions via the dedicated suggestions-model.
             // Decoupled from the main answer so the primary model stays focused on text quality.
@@ -256,20 +212,35 @@ public class AssistantService {
             AssistantActionSuggestionService.SuggestionResult suggestion =
                     fetchSuggestedActions(req, systemPrompt, parsed.message());
 
-            List<AssistantAction> mergedActions = mergeActions(parsed.actions(), suggestion.actions());
-            List<AssistantAction> filteredActions = filterActions(mergedActions, allowMutatingProposals);
+            List<AssistantAction> mergedActions = AssistantActionMerger.mergeActions(parsed.actions(), suggestion.actions());
+            List<AssistantAction> filteredActions = AssistantMutationGate.filterActions(mergedActions, allowMutatingProposals);
             List<com.automation.service.assistant.PendingTool> mergedPendingTools =
-                    mergePendingTools(extraction.pendingTools(), suggestion.pendingTools());
+                    AssistantActionMerger.mergePendingTools(extraction.pendingTools(), suggestion.pendingTools());
             broadcaster.broadcastStatus(requestId, "COMPLETED", null, startNanos);
             return new AssistantChatResponse(parsed.message(), filteredActions, model, resolvedProvider)
                     .withPendingTools(mergedPendingTools);
 
         } catch (Exception e) {
             log.error("Assistant chat failed", e);
-            ErrorKind kind = classifyError(e);
+            ErrorKind kind = errorClassifier.classify(e);
             broadcaster.broadcastStatus(requestId, "ERROR", kind.code(), startNanos);
             return new AssistantChatResponse(kind.userMessage(), List.of());
         }
+    }
+
+    /** One interactive, read-only CLI call of the chat flow; identical for the first call and every fetch round. */
+    private HostExecutionRequest chatCall(AssistantChatRequest req, String workingDir, String command,
+                                         String systemPrompt, String model) {
+        return HostExecutionRequest.builder()
+                .projectPath(workingDir)
+                .command(command)
+                .systemPrompt(systemPrompt)
+                .providerId(req.provider())
+                .model(model)
+                .timeoutSeconds(hostClaudeConfig.getAssistantChatTimeoutSeconds())
+                .priority(true)
+                .allowedTools(CHAT_ALLOWED_TOOLS)
+                .build();
     }
 
     /**
@@ -286,114 +257,6 @@ public class AssistantService {
                     "Assistant CLI failed (exit " + result.exitCode() + "): " + snippet);
         }
         return result;
-    }
-
-    private record ErrorKind(String code, String userMessage) {}
-
-    private ErrorKind classifyError(Throwable e) {
-        Throwable root = unwrap(e);
-        String msg = root != null && root.getMessage() != null ? root.getMessage() : "";
-
-        if (root instanceof IOException && msg.contains("timed out")) {
-            int timeout = hostClaudeConfig.getAssistantChatTimeoutSeconds();
-            return new ErrorKind("TIMEOUT",
-                    "The response took longer than " + timeout + " seconds. " +
-                    "Try again or phrase the question more briefly. " +
-                    "You can increase the timeout in the settings.");
-        }
-        if (root instanceof SQLTransientConnectionException
-                || msg.contains("Connection is not available")) {
-            return new ErrorKind("POOL_EXHAUSTED",
-                    "The system is currently busy (database pool in use). " +
-                    "Wait a moment and try again.");
-        }
-        // JSON parse failures from tool-call extraction (e.g. Unicode full-width comma in the
-        // model's tool-JSON). Previously these surfaced as "Provider nicht konfiguriert",
-        // which sent users on a wild goose chase.
-        if (root instanceof JsonProcessingException
-                || msg.contains("Unexpected close marker")
-                || msg.contains("was expecting comma")
-                || msg.contains("Unexpected character")) {
-            return new ErrorKind("TOOL_CALL_MALFORMED",
-                    "My tool input was not valid (JSON error). " +
-                    "Phrase the request more simply or without special characters and try again.");
-        }
-        if (msg.toLowerCase().contains("api key")) {
-            return new ErrorKind("PROVIDER_UNAVAILABLE",
-                    "The AI provider is not configured correctly. " +
-                    "Check the settings (API key, model).");
-        }
-        if (msg.contains("Assistant CLI failed (exit ")) {
-            // Surface the CLI exit code so debugging doesn't require digging through logs.
-            int excerptStart = msg.indexOf("(exit ");
-            int excerptEnd = Math.min(msg.length(), excerptStart + 60);
-            String excerpt = excerptStart >= 0 ? msg.substring(excerptStart, excerptEnd) : "";
-            return new ErrorKind("CLI_NON_ZERO_EXIT",
-                    "The AI process ended with an error " + excerpt + ". " +
-                    "Check the API configuration; details are in the server log.");
-        }
-        return new ErrorKind("UNKNOWN",
-                "Sorry, I could not process your request right now. " +
-                "Details are in the server log — please try again.");
-    }
-
-    private Throwable unwrap(Throwable e) {
-        Throwable current = e;
-        for (int i = 0; i < 10 && current != null; i++) {
-            if (current instanceof WorkflowExecutionException && current.getCause() != null) {
-                current = current.getCause();
-                continue;
-            }
-            if (current.getCause() != null && current.getCause() != current) {
-                Throwable cause = current.getCause();
-                if (cause instanceof IOException || cause instanceof SQLTransientConnectionException) {
-                    return cause;
-                }
-            }
-            return current;
-        }
-        return e;
-    }
-
-    private boolean isAutoFetchAllowed(FetchRequest req) {
-        return req != null && AUTO_FETCH_TYPES.contains(req.type());
-    }
-
-    private String fetchKey(FetchRequest req) {
-        return (req.type() == null ? "" : req.type()) + "|" + (req.id() == null ? "" : req.id());
-    }
-
-    /** Threshold at which text outside {@code <fetch>} tags counts as a real answer, not a filler
-     *  announcement. 200 chars is comfortably longer than typical "Ich schaue mir X an…" stalls
-     *  but short enough that a one-sentence factual answer still counts. */
-    private static final int ANSWER_TEXT_MIN_CHARS = 200;
-
-    /** Regex for common announcement openings — catches the stall responses that cost users a
-     *  round-trip without delivering content. Anchored at start, case-insensitive. */
-    private static final Pattern ANNOUNCEMENT_PATTERN = Pattern.compile(
-            "(?is)^\\s*(ich\\s+(schau|hole|lade|pr(ü|u)f|prufe|analysier|check|verifizier)|lade\\s+|einen\\s+moment|moment\\b|kurz\\s+nachladen|sekunde).{0,200}",
-            Pattern.CASE_INSENSITIVE);
-
-    /**
-     * A response counts as a "substantive answer" (→ stop the fetch loop) when the non-fetch
-     * text is long enough to be a real answer OR carries an {@code <actions>} block. Short
-     * announcement-style filler ("Ich schaue mir den Run an…") is explicitly NOT substantive,
-     * even though it's non-blank — otherwise a stripped {@code <fetch>} would leave the user
-     * with nothing but the announcement.
-     */
-    private boolean hasSubstantiveAnswer(String rawOutput, String nonFetchText) {
-        if (nonFetchText == null || nonFetchText.isBlank()) {
-            return false;
-        }
-        if (rawOutput != null && rawOutput.contains("<actions>")) {
-            return true;
-        }
-        String trimmed = nonFetchText.trim();
-        if (trimmed.length() >= ANSWER_TEXT_MIN_CHARS) {
-            return true;
-        }
-        // Short text — treat as announcement filler and continue the fetch loop.
-        return !ANNOUNCEMENT_PATTERN.matcher(trimmed).find() && trimmed.length() >= 40;
     }
 
     /**
@@ -418,111 +281,4 @@ public class AssistantService {
         }
     }
 
-    /**
-     * Merges pending-tools from two sources: tools the main model emitted via {@code <tool>}
-     * tags (extraction.pendingTools()) and tools the suggestion model proposed via
-     * {@code propose_*} actions (suggestion.pendingTools()). Both lists may be empty. Inline
-     * tools are listed first; suggestion-model tools follow. No de-duplication — a duplicate
-     * is unlikely (different code paths trigger them) and the user can reject either.
-     */
-    private List<com.automation.service.assistant.PendingTool> mergePendingTools(
-            List<com.automation.service.assistant.PendingTool> inline,
-            List<com.automation.service.assistant.PendingTool> suggested) {
-        if ((inline == null || inline.isEmpty()) && (suggested == null || suggested.isEmpty())) {
-            return List.of();
-        }
-        List<com.automation.service.assistant.PendingTool> merged = new ArrayList<>();
-        if (inline != null) merged.addAll(inline);
-        if (suggested != null) merged.addAll(suggested);
-        return merged;
-    }
-
-    /**
-     * Merges inline actions (legacy path — main model may still emit {@code <actions>} tags) with
-     * suggestion-model actions. Deduplicated by (type, id) — inline wins on conflict.
-     */
-    private List<AssistantAction> mergeActions(List<AssistantAction> inline, List<AssistantAction> suggested) {
-        if ((inline == null || inline.isEmpty()) && (suggested == null || suggested.isEmpty())) {
-            return List.of();
-        }
-        Map<String, AssistantAction> byKey = new LinkedHashMap<>();
-        if (inline != null) {
-            for (AssistantAction a : inline) {
-                if (a != null && a.type() != null) {
-                    byKey.put(dedupeKey(a), a);
-                }
-            }
-        }
-        if (suggested != null) {
-            for (AssistantAction a : suggested) {
-                if (a != null && a.type() != null) {
-                    byKey.putIfAbsent(dedupeKey(a), a);
-                }
-            }
-        }
-        return new ArrayList<>(byKey.values());
-    }
-
-    private String dedupeKey(AssistantAction a) {
-        return a.type() + "|" + (a.id() == null ? "" : a.id());
-    }
-
-    private List<AssistantAction> filterActions(List<AssistantAction> actions, boolean allowMutatingProposals) {
-        if (actions == null || actions.isEmpty()) {
-            return List.of();
-        }
-        return actions.stream()
-                .filter(action -> action != null)
-                .filter(action -> allowMutatingProposals || !isMutatingActionType(action.type()))
-                .toList();
-    }
-
-    private boolean isMutatingActionType(String type) {
-        return type != null && MUTATING_ACTION_TYPES.contains(type);
-    }
-
-    private boolean hasExplicitMutationIntent(AssistantChatRequest req) {
-        String message = req != null ? req.message() : null;
-        if (message == null || message.isBlank()) {
-            return false;
-        }
-        if (EXPLICIT_MUTATION_VERB.matcher(message).find()
-                && EXPLICIT_MUTATION_TARGET.matcher(message).find()) {
-            return true;
-        }
-
-        String page = req.context() != null ? req.context().page() : null;
-        if (page == null) {
-            return false;
-        }
-        boolean contextualRunPage = "run".equals(page) || "runs".equals(page)
-                || "workflow".equals(page) || "workflows".equals(page);
-        return contextualRunPage && CONTEXTUAL_RUN_VERB.matcher(message).find();
-    }
-
-    // ── Response parsing ─────────────────────────────────────────────────────
-
-    private AssistantChatResponse parseResponse(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return new AssistantChatResponse("(No response received)", List.of());
-        }
-
-        List<AssistantAction> actions = Collections.emptyList();
-        String message = raw.trim();
-
-        int actionsStart = raw.lastIndexOf("<actions>");
-        int actionsEnd = raw.lastIndexOf("</actions>");
-
-        if (actionsStart >= 0 && actionsEnd > actionsStart) {
-            String jsonPart = raw.substring(actionsStart + "<actions>".length(), actionsEnd).trim();
-            message = raw.substring(0, actionsStart).trim();
-            try {
-                actions = objectMapper.readValue(jsonPart, new TypeReference<>() {});
-            } catch (Exception e) {
-                log.warn("Could not parse assistant actions JSON: {}", jsonPart, e);
-            }
-        }
-
-        return new AssistantChatResponse(message, actions);
-    }
 }
