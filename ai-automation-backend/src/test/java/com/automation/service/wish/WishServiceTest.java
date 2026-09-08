@@ -1,13 +1,9 @@
 package com.automation.service.wish;
 
-import com.automation.config.WishConfig;
 import com.automation.dto.request.WishRespondRequest;
 import com.automation.entity.*;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.WishRepository;
-import com.automation.service.ai.AiProviderRegistry;
-import com.automation.service.learning.LearningService;
-import com.automation.service.workflow.WorkflowService;
 import com.automation.service.workflow.WorkflowTemplateService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -18,7 +14,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.util.*;
-import java.util.concurrent.ExecutorService;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,28 +23,18 @@ import static org.mockito.Mockito.*;
 class WishServiceTest {
 
     @Mock private WishRepository wishRepository;
-    @Mock private AiProviderRegistry aiProviderRegistry;
-    @Mock private WorkflowService workflowService;
     @Mock private ProjectRepository projectRepository;
     @Mock private WorkflowTemplateService workflowTemplateService;
-    @Mock private LearningService learningService;
     @Mock private SimpMessagingTemplate messagingTemplate;
-    @Mock private ExecutorService virtualThreadExecutor;
-    @Mock private WishPromptBuilder promptBuilder;
-    @Mock private WishDecomposeService decomposeService;
-    @Mock private WishExecutionService executionService;
+    @Mock private WishFulfillmentLoop fulfillmentLoop;
 
     private WishService wishService;
 
     @BeforeEach
     void setUp() {
-        WishConfig wishConfig = new WishConfig();
         wishService = new WishService(
-                wishConfig,
-                wishRepository, aiProviderRegistry, workflowService,
-                projectRepository, workflowTemplateService, learningService,
-                messagingTemplate, virtualThreadExecutor,
-                promptBuilder, decomposeService, executionService
+                wishRepository, projectRepository, workflowTemplateService,
+                messagingTemplate, fulfillmentLoop
         );
     }
 
@@ -282,7 +267,7 @@ class WishServiceTest {
 
             assertThat(result.getStatus()).isEqualTo(WishStatus.REFINING);
             assertThat(result.getMetadata()).containsEntry("userFeedback", "Add more tests");
-            verify(virtualThreadExecutor).submit(any(Runnable.class));
+            verify(fulfillmentLoop).fulfillAsync(any());
         }
 
         @Test
@@ -348,7 +333,7 @@ class WishServiceTest {
             assertThat(clarifications.get(0)).containsEntry("question", "What framework?");
             assertThat(clarifications.get(0)).containsEntry("answer", "React");
             assertThat(result.getMetadata()).doesNotContainKey("clarificationQuestion");
-            verify(virtualThreadExecutor).submit(any(Runnable.class));
+            verify(fulfillmentLoop).fulfillAsync(any());
         }
 
         @Test
@@ -374,7 +359,7 @@ class WishServiceTest {
                     new WishRespondRequest(WishRespondRequest.WishResponseAction.ACCEPT, null));
 
             assertThat(result.getStatus()).isEqualTo(WishStatus.EXECUTING);
-            verify(virtualThreadExecutor).submit(any(Runnable.class));
+            verify(fulfillmentLoop).fulfillAsync(any());
         }
 
         @Test
@@ -388,7 +373,7 @@ class WishServiceTest {
 
             assertThat(result.getStatus()).isEqualTo(WishStatus.REFINING);
             assertThat(result.getMetadata()).containsEntry("decomposeFeedback", "Use fewer blocks");
-            verify(virtualThreadExecutor).submit(any(Runnable.class));
+            verify(fulfillmentLoop).fulfillAsync(any());
         }
 
         @Test
@@ -444,34 +429,6 @@ class WishServiceTest {
             assertThatThrownBy(() -> wishService.crystallize("w-1"))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("No generated workflows");
-        }
-    }
-
-    // --- Cancel ---
-
-    @Nested
-    class CancelTests {
-
-        @Test
-        void cancel_activeWish_setsCancelledStatus() {
-            Wish wish = createWish("w-1", WishStatus.EXECUTING);
-            when(wishRepository.findById("w-1")).thenReturn(Optional.of(wish));
-            when(wishRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-            wishService.cancel("w-1");
-
-            assertThat(wish.getStatus()).isEqualTo(WishStatus.CANCELLED);
-            verify(wishRepository).save(wish);
-        }
-
-        @Test
-        void cancel_alreadyTerminal_doesNotSave() {
-            Wish wish = createWish("w-1", WishStatus.COMPLETED);
-            when(wishRepository.findById("w-1")).thenReturn(Optional.of(wish));
-
-            wishService.cancel("w-1");
-
-            verify(wishRepository, never()).save(any());
         }
     }
 

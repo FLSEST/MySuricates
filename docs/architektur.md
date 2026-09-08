@@ -89,7 +89,7 @@ com.automation
 │   ├── dialog/          DialogSessionScanner, DialogConversionService, ClaudeJsonlParser
 │   ├── factory/         WorkflowFactoryService, ClaudeWorkflowGenerator, CodexWorkflowGenerator, WorkflowTextGenerator, FactorySetupService
 │   ├── pool/            WorkflowPoolService
-│   ├── wish/            WishService, WishWatchdogService, WishDecomposeService, WishDecomposePromptBuilder, WishExecutionService, WishEvaluatePromptBuilder, WishPromptBuilder, WishPromptHelper, WishJsonUtil, WishStatusHelper, WishStringUtil
+│   ├── wish/            WishService (+ WishFulfillmentLoop, WishEvaluationService), WishWatchdogService, WishDecomposeService, WishDecomposePromptBuilder, WishExecutionService, WishEvaluatePromptBuilder, WishPromptBuilder, WishPromptHelper, WishJsonUtil, WishStatusHelper, WishStringUtil
 │   ├── notification/    NotificationService
 │   ├── trigger/         CompletionTriggerService, TodoTriggerService, TodoFeedbackListener
 │   ├── health/          HealthAutoTodoService
@@ -496,7 +496,9 @@ Vorgefertigte Workflow-Definitionen aus dem `workflow-pool/`-Verzeichnis:
 ## Wishes (Wunsch-System)
 
 Natürlichsprachige Wünsche werden automatisch in Workflows/Chains umgesetzt:
-- `WishService` — erstellt Wish, startet asynchrone Erfüllung
+- `WishService` — erstellt Wish, verarbeitet Nutzer-Antworten (`respond`), kristallisiert zu Templates
+- `WishFulfillmentLoop` — asynchroner Meta-Loop (decompose → execute → evaluate) inkl. Cancel-Flags und Gesamt-Timeout
+- `WishEvaluationService` — Bewertungsphase (KI-Urteil → AWAITING_APPROVAL / REFINING / FAILED)
 - `WishWatchdogService` — überwacht laufende Wishes auf Stale-/Timeout-Zustände
 - Iterativer Prozess: Decomposition → Workflow-/Chain-Generierung → Ausführung → Feedback
 - Unterstützt bis zu `max_iterations` Iterationen für Verbesserungen

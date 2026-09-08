@@ -42,6 +42,7 @@ public class WishWatchdogService {
     private final WishConfig wishConfig;
     private final WishRepository wishRepository;
     private final WishService wishService;
+    private final WishFulfillmentLoop fulfillmentLoop;
     private final WorkflowRunRepository workflowRunRepository;
     private final ChainRunRepository chainRunRepository;
 
@@ -49,12 +50,14 @@ public class WishWatchdogService {
             WishConfig wishConfig,
             WishRepository wishRepository,
             WishService wishService,
+            WishFulfillmentLoop fulfillmentLoop,
             WorkflowRunRepository workflowRunRepository,
             ChainRunRepository chainRunRepository
     ) {
         this.wishConfig = wishConfig;
         this.wishRepository = wishRepository;
         this.wishService = wishService;
+        this.fulfillmentLoop = fulfillmentLoop;
         this.workflowRunRepository = workflowRunRepository;
         this.chainRunRepository = chainRunRepository;
     }
@@ -119,7 +122,7 @@ public class WishWatchdogService {
                 wishRepository.save(wish);
                 wishService.broadcastStatus(wish.getId(), wish);
                 // Re-trigger fulfillment to continue from EVALUATING
-                wishService.fulfillAsync(wish.getId());
+                fulfillmentLoop.fulfillAsync(wish.getId());
                 return;
             }
         }

@@ -89,7 +89,7 @@ com.automation
 │   ├── dialog/          DialogSessionScanner, DialogConversionService, ClaudeJsonlParser
 │   ├── factory/         WorkflowFactoryService, ClaudeWorkflowGenerator, CodexWorkflowGenerator, WorkflowTextGenerator, FactorySetupService
 │   ├── pool/            WorkflowPoolService
-│   ├── wish/            WishService, WishWatchdogService, WishDecomposeService, WishDecomposePromptBuilder, WishExecutionService, WishEvaluatePromptBuilder, WishPromptBuilder, WishPromptHelper, WishJsonUtil, WishStatusHelper, WishStringUtil
+│   ├── wish/            WishService (+ WishFulfillmentLoop, WishEvaluationService), WishWatchdogService, WishDecomposeService, WishDecomposePromptBuilder, WishExecutionService, WishEvaluatePromptBuilder, WishPromptBuilder, WishPromptHelper, WishJsonUtil, WishStatusHelper, WishStringUtil
 │   ├── notification/    NotificationService
 │   ├── trigger/         CompletionTriggerService, TodoTriggerService, TodoFeedbackListener
 │   ├── health/          HealthAutoTodoService
@@ -492,7 +492,9 @@ Pre-built workflow definitions from the `workflow-pool/` directory:
 ## Wishes (Wish System)
 
 Natural language wishes are automatically converted into workflows/chains:
-- `WishService` — creates wish, starts asynchronous fulfillment
+- `WishService` — creates wishes, handles user responses (`respond`), crystallizes into templates
+- `WishFulfillmentLoop` — asynchronous meta-loop (decompose → execute → evaluate) incl. cancel flags and total timeout
+- `WishEvaluationService` — evaluation phase (AI verdict → AWAITING_APPROVAL / REFINING / FAILED)
 - `WishWatchdogService` — monitors running wishes for stale/timeout states
 - Iterative process: Decomposition → Workflow/Chain generation → Execution → Feedback
 - Supports up to `max_iterations` iterations for improvements

@@ -35,6 +35,9 @@ class WishWatchdogServiceTest {
     private WishService wishService;
 
     @Mock
+    private WishFulfillmentLoop fulfillmentLoop;
+
+    @Mock
     private WorkflowRunRepository workflowRunRepository;
 
     @Mock
@@ -45,7 +48,7 @@ class WishWatchdogServiceTest {
     @BeforeEach
     void setUp() {
         watchdogService = new WishWatchdogService(
-                wishConfig, wishRepository, wishService,
+                wishConfig, wishRepository, wishService, fulfillmentLoop,
                 workflowRunRepository, chainRunRepository);
     }
 
@@ -100,7 +103,7 @@ class WishWatchdogServiceTest {
 
             assertThat(wish.getStatus()).isEqualTo(WishStatus.EVALUATING);
             verify(wishRepository).save(wish);
-            verify(wishService).fulfillAsync("w-2");
+            verify(fulfillmentLoop).fulfillAsync("w-2");
         }
 
         @Test
@@ -204,7 +207,7 @@ class WishWatchdogServiceTest {
             watchdogService.recoverOnStartup();
 
             assertThat(wish.getStatus()).isEqualTo(WishStatus.EVALUATING);
-            verify(wishService).fulfillAsync("w-8");
+            verify(fulfillmentLoop).fulfillAsync("w-8");
         }
 
         @Test

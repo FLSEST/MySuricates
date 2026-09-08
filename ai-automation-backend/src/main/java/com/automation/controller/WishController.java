@@ -5,6 +5,7 @@ import com.automation.dto.request.WishRespondRequest;
 import com.automation.dto.response.WishResponse;
 import com.automation.entity.Wish;
 import com.automation.mapper.WishMapper;
+import com.automation.service.wish.WishFulfillmentLoop;
 import com.automation.service.wish.WishService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,12 +22,13 @@ import java.util.Map;
 public class WishController {
 
     private final WishService wishService;
+    private final WishFulfillmentLoop fulfillmentLoop;
     private final WishMapper wishMapper;
 
     @PostMapping
     public ResponseEntity<WishResponse> createWish(@Valid @RequestBody CreateWishRequest request) {
         Wish wish = wishService.create(request.text(), request.projectId(), request.maxIterations(), request.referenceWorkflowIds(), request.autoRefine());
-        wishService.fulfillAsync(wish.getId());
+        fulfillmentLoop.fulfillAsync(wish.getId());
         return ResponseEntity.status(HttpStatus.CREATED).body(wishMapper.toResponse(wish));
     }
 
@@ -42,7 +44,7 @@ public class WishController {
 
     @PostMapping("/{id}/cancel")
     public ResponseEntity<Void> cancelWish(@PathVariable String id) {
-        wishService.cancel(id);
+        fulfillmentLoop.cancel(id);
         return ResponseEntity.ok().build();
     }
 

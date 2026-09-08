@@ -38,6 +38,7 @@ class WishControllerTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @MockitoBean private WishService wishService;
+    @MockitoBean private com.automation.service.wish.WishFulfillmentLoop fulfillmentLoop;
     @MockitoBean private WishMapper wishMapper;
     @MockitoBean private ApiKeyService apiKeyService;
     @MockitoBean private ActivityLogService activityLogService;
@@ -64,7 +65,7 @@ class WishControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value("w-1"));
 
-        verify(wishService).fulfillAsync("w-1");
+        verify(fulfillmentLoop).fulfillAsync("w-1");
     }
 
     @Test
@@ -109,7 +110,7 @@ class WishControllerTest {
         mockMvc.perform(post("/api/v1/wishes/w-1/cancel"))
                 .andExpect(status().isOk());
 
-        verify(wishService).cancel("w-1");
+        verify(fulfillmentLoop).cancel("w-1");
     }
 
     @Test
