@@ -59,7 +59,7 @@ class SourceSizeRatchetTest {
             entry("com/automation/service/learning/LearningService.java", 456),
             entry("com/automation/service/project/ContainerService.java", 374),
             entry("com/automation/service/repair/AutoRepairService.java", 394),
-            entry("com/automation/service/scheduler/SchedulerService.java", 597),
+            entry("com/automation/service/scheduler/SchedulerService.java", 355),
             entry("com/automation/service/staging/InstanceSyncHelper.java", 677),
             entry("com/automation/service/staging/StagingService.java", 426),
             entry("com/automation/service/staging/TestingService.java", 448),

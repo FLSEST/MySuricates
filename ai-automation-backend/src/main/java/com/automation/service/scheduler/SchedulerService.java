@@ -2,7 +2,6 @@ package com.automation.service.scheduler;
 
 import com.automation.config.SchedulerConfig;
 import com.automation.entity.ActivityLog.LogCategory;
-import com.automation.entity.ActivityLog.LogLevel;
 import com.automation.entity.ChainRun;
 import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.ScheduledWorkflow.ScheduleType;
@@ -25,24 +24,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.automation.dto.request.UpdateScheduleRequest;
-import com.automation.dto.response.UpcomingScheduleResponse;
 import com.automation.repository.AppSettingsRepository;
 
 import java.time.Clock;
-import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeParseException;
-import java.time.temporal.TemporalAdjusters;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * Schedule CRUD, maintenance mode and the 60s scheduler tick (due schedules, skip-until window,
+ * suspend/resume catch-up). Calendar projections live in {@link UpcomingRunsCalculator},
+ * skip mechanics in {@link ScheduleSkipPolicy}, field parsing in {@link ScheduleDefinitionParser}.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -59,11 +54,10 @@ public class SchedulerService {
     private final SchedulerConfig schedulerConfig;
     private final SuspendState suspendState;
     private final Clock clock;
+    private final ScheduleDefinitionParser definitionParser;
+    private final ScheduleSkipPolicy skipPolicy;
 
     private static final String MAINTENANCE_MODE_KEY = "scheduler.maintenance-mode";
-
-    /** Last unparseable skip-until value we already warned about, to avoid logging every 60s tick. */
-    private volatile String lastInvalidSkipUntil = null;
 
     /** Wall-clock time of the previous scheduler tick; a large gap signals a system resume. */
     private Instant lastTickAt = null;
@@ -116,7 +110,7 @@ public class SchedulerService {
                                      String scheduleType, Instant scheduledAt,
                                      String delayExpression, Instant endDate, Integer maxRuns,
                                      String conflictBehaviorStr, Boolean catchUpOnResume) {
-        TargetType targetType = parseTargetType(targetTypeStr);
+        TargetType targetType = definitionParser.parseTargetType(targetTypeStr);
 
         // Validate mutual exclusivity
         boolean hasWorkflow = workflowId != null && !workflowId.isBlank();
@@ -132,7 +126,7 @@ public class SchedulerService {
             }
         }
 
-        ScheduleType type = parseScheduleType(scheduleType);
+        ScheduleType type = definitionParser.parseScheduleType(scheduleType);
 
         ScheduledWorkflow.ConflictBehavior conflictBehavior = ScheduledWorkflow.ConflictBehavior.SKIP;
         if (conflictBehaviorStr != null && !conflictBehaviorStr.isBlank()) {
@@ -173,7 +167,7 @@ public class SchedulerService {
             if (delayExpression == null || delayExpression.isBlank()) {
                 throw new IllegalArgumentException("delayExpression is required for DELAYED schedules (e.g. '2h', '30m', '1d')");
             }
-            Instant runAt = Instant.now(clock).plus(parseDelay(delayExpression));
+            Instant runAt = Instant.now(clock).plus(ScheduleDefinitionParser.parseDelay(delayExpression));
             builder.cronExpression("");
             builder.scheduledAt(runAt);
             builder.nextRunAt(runAt);
@@ -186,7 +180,7 @@ public class SchedulerService {
                 throw new IllegalArgumentException("Invalid cron expression: " + cronExpression);
             }
             builder.cronExpression(cronExpression);
-            builder.nextRunAt(calculateNextRun(cronExpression));
+            builder.nextRunAt(definitionParser.calculateNextRun(cronExpression));
         }
 
         ScheduledWorkflow saved = scheduledRepository.save(builder.build());
@@ -216,7 +210,7 @@ public class SchedulerService {
             }
             scheduled.setCronExpression(request.cronExpression());
             if (scheduled.isEnabled()) {
-                scheduled.setNextRunAt(calculateNextRun(request.cronExpression()));
+                scheduled.setNextRunAt(definitionParser.calculateNextRun(request.cronExpression()));
             }
         }
 
@@ -249,7 +243,7 @@ public class SchedulerService {
                 || scheduled.getScheduleType() == ScheduleType.DELAYED) {
             scheduled.setNextRunAt(scheduled.getScheduledAt());
         } else {
-            scheduled.setNextRunAt(calculateNextRun(scheduled.getCronExpression()));
+            scheduled.setNextRunAt(definitionParser.calculateNextRun(scheduled.getCronExpression()));
         }
 
         return scheduledRepository.save(scheduled);
@@ -268,103 +262,6 @@ public class SchedulerService {
         ScheduledWorkflow scheduled = findById(id);
         scheduledRepository.delete(scheduled);
         log.info("Deleted scheduled workflow: {}", id);
-    }
-
-    @Transactional(readOnly = true)
-    public UpcomingScheduleResponse getRemainingToday() {
-        Instant endOfDay = LocalDate.now(clock).plusDays(1)
-                .atStartOfDay(ZoneId.systemDefault()).toInstant();
-        return getUpcomingRuns(endOfDay);
-    }
-
-    @Transactional(readOnly = true)
-    public UpcomingScheduleResponse getRemainingThisWeek() {
-        LocalDate nextMonday = LocalDate.now(clock).with(TemporalAdjusters.next(DayOfWeek.MONDAY));
-        Instant endOfWeek = nextMonday.atStartOfDay(ZoneId.systemDefault()).toInstant();
-        return getUpcomingRuns(endOfWeek);
-    }
-
-    private UpcomingScheduleResponse getUpcomingRuns(Instant until) {
-        Instant now = Instant.now(clock);
-        List<ScheduledWorkflow> enabled = scheduledRepository.findByEnabledTrue();
-        List<UpcomingScheduleResponse.UpcomingRun> upcoming = new ArrayList<>();
-
-        for (ScheduledWorkflow sw : enabled) {
-            String workflowName = null;
-            String projectName = null;
-            String chainId = null;
-            String chainName = null;
-            String targetType = sw.getTargetType().name();
-
-            if (sw.getTargetType() == TargetType.CHAIN && sw.getChain() != null) {
-                chainId = sw.getChain().getId();
-                chainName = sw.getChain().getName();
-            } else if (sw.getWorkflow() != null) {
-                workflowName = sw.getWorkflow().getName();
-                if (sw.getWorkflow().getProject() != null) {
-                    projectName = sw.getWorkflow().getProject().getName();
-                }
-            }
-
-            if (sw.getScheduleType() == ScheduleType.CRON) {
-                int remainingRuns = getRemainingRunLimit(sw);
-                if (remainingRuns == 0) {
-                    continue;
-                }
-                Instant effectiveUntil = getEffectiveUntil(until, sw.getEndDate());
-                CronExpression cron = CronExpression.parse(sw.getCronExpression());
-                LocalDateTime next = cron.next(LocalDateTime.now(clock));
-                int addedForSchedule = 0;
-                while (next != null && addedForSchedule < remainingRuns) {
-                    Instant nextInstant = next.atZone(ZoneId.systemDefault()).toInstant();
-                    if (!nextInstant.isBefore(effectiveUntil)) break;
-                    upcoming.add(new UpcomingScheduleResponse.UpcomingRun(
-                            sw.getId(), workflowName, projectName,
-                            chainId, chainName, targetType, nextInstant));
-                    addedForSchedule++;
-                    next = cron.next(next);
-                }
-            } else if (sw.getScheduleType() == ScheduleType.ONCE
-                    || sw.getScheduleType() == ScheduleType.DELAYED) {
-                if (sw.getScheduledAt() != null
-                        && sw.getScheduledAt().isAfter(now)
-                        && sw.getScheduledAt().isBefore(until)) {
-                    upcoming.add(new UpcomingScheduleResponse.UpcomingRun(
-                            sw.getId(), workflowName, projectName,
-                            chainId, chainName, targetType, sw.getScheduledAt()));
-                }
-            }
-        }
-
-        return new UpcomingScheduleResponse(upcoming.size(), upcoming);
-    }
-
-    private int getRemainingRunLimit(ScheduledWorkflow sw) {
-        if (sw.getMaxRuns() <= 0) {
-            return Integer.MAX_VALUE;
-        }
-        return Math.max(0, sw.getMaxRuns() - sw.getRunCount());
-    }
-
-    private Instant getEffectiveUntil(Instant until, Instant endDate) {
-        if (endDate == null || endDate.isAfter(until)) {
-            return until;
-        }
-        return endDate;
-    }
-
-    public List<Instant> getNextRuns(String cronExpression, int count) {
-        if (!CronExpression.isValidExpression(cronExpression)) {
-            throw new IllegalArgumentException("Invalid cron expression: " + cronExpression);
-        }
-        CronExpression cron = CronExpression.parse(cronExpression);
-        List<Instant> result = new ArrayList<>();
-        LocalDateTime next = cron.next(LocalDateTime.now(clock));
-        while (next != null && result.size() < count) {
-            result.add(next.atZone(ZoneId.systemDefault()).toInstant());
-            next = cron.next(next);
-        }
-        return result;
     }
 
     public boolean isMaintenanceMode() {
@@ -399,13 +296,13 @@ public class SchedulerService {
             return;
         }
 
-        Optional<Instant> skipUntil = parseSkipUntil();
+        Optional<Instant> skipUntil = skipPolicy.parseSkipUntil();
         List<ScheduledWorkflow> dueSchedules = scheduledRepository.findDueSchedules(now);
 
         if (skipUntil.isPresent() && now.isBefore(skipUntil.get())) {
             Instant until = skipUntil.get();
             for (ScheduledWorkflow scheduled : dueSchedules) {
-                skipScheduleUntil(scheduled, until);
+                skipPolicy.skipScheduleUntil(scheduled, until);
             }
             return;
         }
@@ -451,147 +348,8 @@ public class SchedulerService {
                             "SchedulerService", scheduled.getId());
                 }
             } else {
-                skipScheduleForResume(scheduled, now, gapMinutes);
+                skipPolicy.skipScheduleForResume(scheduled, now, gapMinutes);
             }
         }
-    }
-
-    private Optional<Instant> parseSkipUntil() {
-        String raw = schedulerConfig.getSkipUntil();
-        if (raw == null || raw.isBlank()) {
-            lastInvalidSkipUntil = null;
-            return Optional.empty();
-        }
-
-        try {
-            Optional<Instant> parsed = Optional.of(Instant.parse(raw.trim()));
-            lastInvalidSkipUntil = null;
-            return parsed;
-        } catch (DateTimeParseException e) {
-            // Fail open: a misconfigured (unparseable) skip-until must NOT halt the whole scheduler.
-            // Treat it as "no skip" so schedules keep running, and warn once per distinct bad value
-            // (this runs every 60s — logging every tick would spam the log and the ActivityLog/DB).
-            if (!raw.equals(lastInvalidSkipUntil)) {
-                lastInvalidSkipUntil = raw;
-                log.error("Invalid automation.scheduler.skip-until value '{}'; ignoring it and running schedules normally", raw);
-                activityLogService.warn(LogCategory.SCHEDULE,
-                        "Invalid scheduler skip-until value (ignored): " + raw,
-                        "SchedulerService");
-            }
-            return Optional.empty();
-        }
-    }
-
-    /** Skip a schedule forward past a manual skip-until maintenance window. */
-    private void skipScheduleUntil(ScheduledWorkflow scheduled, Instant until) {
-        Map<String, Object> extra = new HashMap<>();
-        extra.put("skipUntil", until.toString());
-        skipSchedule(scheduled, until, "scheduler-skip-until",
-                "Schedule skipped: " + scheduled.getTargetName(), extra);
-    }
-
-    /** Skip a schedule forward because the system resumed after a long suspend/freeze. */
-    private void skipScheduleForResume(ScheduledWorkflow scheduled, Instant now, long gapMinutes) {
-        Map<String, Object> extra = new HashMap<>();
-        extra.put("suspendGapMinutes", gapMinutes);
-        skipSchedule(scheduled, now, "suspend-resume",
-                "Schedule skipped (system suspend/resume): " + scheduled.getTargetName(), extra);
-    }
-
-    /**
-     * Advance a schedule past {@code until} without firing it, and record an ActivityLog entry.
-     * CRON schedules move to their next occurrence after {@code until}; ONCE/DELAYED schedules that
-     * fall inside the window are permanently disabled (their single firing is dropped).
-     */
-    private void skipSchedule(ScheduledWorkflow scheduled, Instant until, String reason,
-                              String message, Map<String, Object> extraMetadata) {
-        Instant previousNextRunAt = scheduled.getNextRunAt();
-
-        if (scheduled.getScheduleType() == ScheduleType.CRON) {
-            CronExpression cron = CronExpression.parse(scheduled.getCronExpression());
-            LocalDateTime cursor = LocalDateTime.ofInstant(until, ZoneId.systemDefault()).minusNanos(1);
-            LocalDateTime next = cron.next(cursor);
-            scheduled.setNextRunAt(next != null ? next.atZone(ZoneId.systemDefault()).toInstant() : null);
-        } else if (scheduled.getScheduleType() == ScheduleType.ONCE
-                || scheduled.getScheduleType() == ScheduleType.DELAYED) {
-            // Intentional: a one-off schedule that falls inside the skip window is permanently
-            // disabled (not deferred). Its single firing is dropped — unlike CRON, which resumes
-            // at the next occurrence after the window.
-            scheduled.setEnabled(false);
-            scheduled.setNextRunAt(null);
-        }
-
-        scheduledRepository.save(scheduled);
-        log.info("Schedule {} skipped ({}) past {}", scheduled.getId(), reason, until);
-
-        Map<String, Object> metadata = new HashMap<>();
-        metadata.put("reason", reason);
-        if (previousNextRunAt != null) {
-            metadata.put("previousNextRunAt", previousNextRunAt.toString());
-        }
-        if (scheduled.getNextRunAt() != null) {
-            metadata.put("nextRunAt", scheduled.getNextRunAt().toString());
-        }
-        if (extraMetadata != null) {
-            metadata.putAll(extraMetadata);
-        }
-
-        activityLogService.log(
-                LogLevel.INFO,
-                LogCategory.SCHEDULE,
-                message,
-                "SchedulerService",
-                scheduled.getId(),
-                metadata
-        );
-    }
-
-    private TargetType parseTargetType(String targetType) {
-        if (targetType == null || targetType.isBlank()) {
-            return TargetType.WORKFLOW;
-        }
-        try {
-            return TargetType.valueOf(targetType.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid target type: " + targetType);
-        }
-    }
-
-    private ScheduleType parseScheduleType(String scheduleType) {
-        if (scheduleType == null || scheduleType.isBlank()) {
-            return ScheduleType.CRON;
-        }
-        try {
-            return ScheduleType.valueOf(scheduleType.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid schedule type: " + scheduleType);
-        }
-    }
-
-    private Instant calculateNextRun(String cronExpression) {
-        CronExpression cron = CronExpression.parse(cronExpression);
-        LocalDateTime next = cron.next(LocalDateTime.now(clock));
-        if (next == null) return null;
-        return next.atZone(ZoneId.systemDefault()).toInstant();
-    }
-
-    /**
-     * Parses a human-readable delay expression into a {@link Duration}.
-     * Supported formats: {@code 30s} (seconds), {@code 10m} (minutes), {@code 2h} (hours), {@code 1d} (days).
-     */
-    static Duration parseDelay(String expr) {
-        if (expr == null || expr.isBlank()) {
-            throw new IllegalArgumentException("Delay expression must not be empty");
-        }
-        String trimmed = expr.trim().toLowerCase();
-        try {
-            if (trimmed.endsWith("s")) return Duration.ofSeconds(Long.parseLong(trimmed.substring(0, trimmed.length() - 1)));
-            if (trimmed.endsWith("m")) return Duration.ofMinutes(Long.parseLong(trimmed.substring(0, trimmed.length() - 1)));
-            if (trimmed.endsWith("h")) return Duration.ofHours(Long.parseLong(trimmed.substring(0, trimmed.length() - 1)));
-            if (trimmed.endsWith("d")) return Duration.ofDays(Long.parseLong(trimmed.substring(0, trimmed.length() - 1)));
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Invalid delay expression: '" + expr + "'. Expected format: 30s, 10m, 2h, 1d");
-        }
-        throw new IllegalArgumentException("Invalid delay expression: '" + expr + "'. Supported suffixes: s, m, h, d");
     }
 }

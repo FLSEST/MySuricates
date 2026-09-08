@@ -17,7 +17,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -82,7 +81,6 @@ class SchedulerServiceTest {
     @Spy
     private Clock clock = Clock.fixed(FIXED_NOW, ZoneId.of("UTC"));
 
-    @InjectMocks
     private SchedulerService schedulerService;
 
     private Workflow testWorkflow;
@@ -91,6 +89,11 @@ class SchedulerServiceTest {
 
     @BeforeEach
     void setUp() {
+        schedulerService = new SchedulerService(scheduledRepository, workflowRepository, workflowChainRepository,
+                workflowRunRepository, chainRunRepository, scheduledExecutor, activityLogService,
+                appSettingsRepository, schedulerConfig, suspendState, clock,
+                new ScheduleDefinitionParser(clock),
+                new ScheduleSkipPolicy(schedulerConfig, scheduledRepository, activityLogService));
         testWorkflow = Workflow.builder()
                 .id("wf-1")
                 .name("Test Workflow")
@@ -583,199 +586,6 @@ class SchedulerServiceTest {
         verify(suspendState, never()).recordResume(any(), anyLong());
     }
 
-    @Test
-    void getRemainingToday_cronSchedule_returnsUpcomingRuns() {
-        // Cron that runs every minute — should have many runs remaining today
-        ScheduledWorkflow everyMinute = ScheduledWorkflow.builder()
-                .id("sched-freq")
-                .workflow(testWorkflow)
-                .cronExpression("0 * * * * *") // every minute (6-field Spring cron)
-                .scheduleType(ScheduleType.CRON)
-                .enabled(true)
-                .build();
-
-        when(scheduledRepository.findByEnabledTrue()).thenReturn(List.of(everyMinute));
-
-        UpcomingScheduleResponse result = schedulerService.getRemainingToday();
-
-        assertThat(result.count()).isGreaterThan(0);
-        assertThat(result.schedules()).isNotEmpty();
-        assertThat(result.schedules().get(0).workflowName()).isEqualTo("Test Workflow");
-    }
-
-    @Test
-    void getRemainingToday_onceSchedule_futureToday_included() {
-        Instant inOneHour = FIXED_NOW.plus(1, ChronoUnit.HOURS);
-        ScheduledWorkflow onceSchedule = ScheduledWorkflow.builder()
-                .id("sched-once-today")
-                .workflow(testWorkflow)
-                .cronExpression("")
-                .scheduleType(ScheduleType.ONCE)
-                .scheduledAt(inOneHour)
-                .enabled(true)
-                .build();
-
-        when(scheduledRepository.findByEnabledTrue()).thenReturn(List.of(onceSchedule));
-
-        UpcomingScheduleResponse result = schedulerService.getRemainingToday();
-
-        assertThat(result.count()).isEqualTo(1);
-        assertThat(result.schedules().get(0).scheduledAt()).isEqualTo(inOneHour);
-    }
-
-    @Test
-    void getRemainingToday_onceSchedule_pastTime_excluded() {
-        Instant oneHourAgo = FIXED_NOW.minus(1, ChronoUnit.HOURS);
-        ScheduledWorkflow pastSchedule = ScheduledWorkflow.builder()
-                .id("sched-past")
-                .workflow(testWorkflow)
-                .cronExpression("")
-                .scheduleType(ScheduleType.ONCE)
-                .scheduledAt(oneHourAgo)
-                .enabled(true)
-                .build();
-
-        when(scheduledRepository.findByEnabledTrue()).thenReturn(List.of(pastSchedule));
-
-        UpcomingScheduleResponse result = schedulerService.getRemainingToday();
-
-        assertThat(result.count()).isZero();
-    }
-
-    @Test
-    void getRemainingToday_noEnabledSchedules_returnsZero() {
-        when(scheduledRepository.findByEnabledTrue()).thenReturn(List.of());
-
-        UpcomingScheduleResponse result = schedulerService.getRemainingToday();
-
-        assertThat(result.count()).isZero();
-        assertThat(result.schedules()).isEmpty();
-    }
-
-    @Test
-    void getRemainingThisWeek_cronSchedule_returnsUpcomingRuns() {
-        // Cron that runs every minute — should have many runs remaining this week
-        ScheduledWorkflow everyMinute = ScheduledWorkflow.builder()
-                .id("sched-freq")
-                .workflow(testWorkflow)
-                .cronExpression("0 * * * * *") // every minute (6-field Spring cron)
-                .scheduleType(ScheduleType.CRON)
-                .enabled(true)
-                .build();
-
-        when(scheduledRepository.findByEnabledTrue()).thenReturn(List.of(everyMinute));
-
-        UpcomingScheduleResponse result = schedulerService.getRemainingThisWeek();
-
-        assertThat(result.count()).isGreaterThan(0);
-        assertThat(result.schedules()).isNotEmpty();
-        assertThat(result.schedules().get(0).workflowName()).isEqualTo("Test Workflow");
-        // Weekly count should be >= daily count
-        UpcomingScheduleResponse todayResult = schedulerService.getRemainingToday();
-        assertThat(result.count()).isGreaterThanOrEqualTo(todayResult.count());
-    }
-
-    @Test
-    void getRemainingThisWeek_cronSchedule_respectsMaxRunsAndRunCount() {
-        ScheduledWorkflow limited = ScheduledWorkflow.builder()
-                .id("sched-limited")
-                .workflow(testWorkflow)
-                .cronExpression("0 */7 * * * *")
-                .scheduleType(ScheduleType.CRON)
-                .enabled(true)
-                .maxRuns(35)
-                .runCount(1)
-                .build();
-
-        when(scheduledRepository.findByEnabledTrue()).thenReturn(List.of(limited));
-
-        UpcomingScheduleResponse result = schedulerService.getRemainingThisWeek();
-
-        assertThat(result.count()).isEqualTo(34);
-        assertThat(result.schedules()).hasSize(34);
-    }
-
-    @Test
-    void getRemainingThisWeek_cronSchedule_excludesExhaustedMaxRuns() {
-        ScheduledWorkflow exhausted = ScheduledWorkflow.builder()
-                .id("sched-exhausted")
-                .workflow(testWorkflow)
-                .cronExpression("0 */7 * * * *")
-                .scheduleType(ScheduleType.CRON)
-                .enabled(true)
-                .maxRuns(35)
-                .runCount(35)
-                .build();
-
-        when(scheduledRepository.findByEnabledTrue()).thenReturn(List.of(exhausted));
-
-        UpcomingScheduleResponse result = schedulerService.getRemainingThisWeek();
-
-        assertThat(result.count()).isZero();
-        assertThat(result.schedules()).isEmpty();
-    }
-
-    @Test
-    void getRemainingThisWeek_cronSchedule_excludesWeekBoundary() {
-        ScheduledWorkflow boundary = ScheduledWorkflow.builder()
-                .id("sched-boundary")
-                .workflow(testWorkflow)
-                .cronExpression("0 0 0 * * MON")
-                .scheduleType(ScheduleType.CRON)
-                .enabled(true)
-                .build();
-
-        when(scheduledRepository.findByEnabledTrue()).thenReturn(List.of(boundary));
-
-        UpcomingScheduleResponse result = schedulerService.getRemainingThisWeek();
-
-        assertThat(result.count()).isZero();
-        assertThat(result.schedules()).isEmpty();
-    }
-
-    @Test
-    void getRemainingThisWeek_cronSchedule_respectsEndDate() {
-        Instant endDate = LocalDateTime.now(clock).plusMinutes(20)
-                .atZone(ZoneId.systemDefault()).toInstant();
-        ScheduledWorkflow ending = ScheduledWorkflow.builder()
-                .id("sched-ending")
-                .workflow(testWorkflow)
-                .cronExpression("0 */5 * * * *")
-                .scheduleType(ScheduleType.CRON)
-                .enabled(true)
-                .endDate(endDate)
-                .build();
-
-        when(scheduledRepository.findByEnabledTrue()).thenReturn(List.of(ending));
-
-        UpcomingScheduleResponse result = schedulerService.getRemainingThisWeek();
-
-        assertThat(result.count()).isEqualTo(3);
-        assertThat(result.schedules()).allMatch(run -> run.scheduledAt().isBefore(endDate));
-    }
-
-    @Test
-    void getRemainingThisWeek_onceSchedule_withinWeek_included() {
-        Instant inTwoDays = FIXED_NOW.plus(2, ChronoUnit.DAYS);
-        ScheduledWorkflow onceSchedule = ScheduledWorkflow.builder()
-                .id("sched-once-week")
-                .workflow(testWorkflow)
-                .cronExpression("")
-                .scheduleType(ScheduleType.ONCE)
-                .scheduledAt(inTwoDays)
-                .enabled(true)
-                .build();
-
-        when(scheduledRepository.findByEnabledTrue()).thenReturn(List.of(onceSchedule));
-
-        UpcomingScheduleResponse result = schedulerService.getRemainingThisWeek();
-
-        // inTwoDays may or may not fall within this week depending on day-of-week,
-        // but it should be included since it's within 7 days and the week boundary
-        // is at most 7 days away
-        assertThat(result.count()).isGreaterThanOrEqualTo(0);
-    }
-
     // --- findByChainId ---
 
     @Test
@@ -938,23 +748,6 @@ class SchedulerServiceTest {
 
     // --- getNextRuns ---
 
-    @Test
-    void getNextRuns_validCron_returnsRequestedCount() {
-        List<Instant> result = schedulerService.getNextRuns("0 0 * * * *", 3);
-
-        assertThat(result).hasSize(3);
-        for (int i = 1; i < result.size(); i++) {
-            assertThat(result.get(i)).isAfter(result.get(i - 1));
-        }
-    }
-
-    @Test
-    void getNextRuns_invalidCron_throws() {
-        assertThatThrownBy(() -> schedulerService.getNextRuns("bad-cron", 5))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Invalid cron expression");
-    }
-
     // --- isMaintenanceMode / setMaintenanceMode ---
 
     @Test
@@ -1051,46 +844,6 @@ class SchedulerServiceTest {
     }
 
     // --- parseDelay ---
-
-    @Test
-    void parseDelay_seconds_parsesCorrectly() {
-        assertThat(SchedulerService.parseDelay("30s")).isEqualTo(Duration.ofSeconds(30));
-    }
-
-    @Test
-    void parseDelay_minutes_parsesCorrectly() {
-        assertThat(SchedulerService.parseDelay("10m")).isEqualTo(Duration.ofMinutes(10));
-    }
-
-    @Test
-    void parseDelay_hours_parsesCorrectly() {
-        assertThat(SchedulerService.parseDelay("2h")).isEqualTo(Duration.ofHours(2));
-    }
-
-    @Test
-    void parseDelay_days_parsesCorrectly() {
-        assertThat(SchedulerService.parseDelay("1d")).isEqualTo(Duration.ofDays(1));
-    }
-
-    @Test
-    void parseDelay_unknownSuffix_throws() {
-        assertThatThrownBy(() -> SchedulerService.parseDelay("5w"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Invalid delay expression");
-    }
-
-    @Test
-    void parseDelay_nonNumericValue_throws() {
-        assertThatThrownBy(() -> SchedulerService.parseDelay("abch"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Invalid delay expression");
-    }
-
-    @Test
-    void parseDelay_emptyString_throws() {
-        assertThatThrownBy(() -> SchedulerService.parseDelay(""))
-                .isInstanceOf(IllegalArgumentException.class);
-    }
 
     // --- enable: DELAYED schedule ---
 
@@ -1223,26 +976,6 @@ class SchedulerServiceTest {
     }
 
     // --- getRemainingToday: DELAYED schedule treated like ONCE ---
-
-    @Test
-    void getRemainingToday_delayedSchedule_futureToday_included() {
-        Instant inOneHour = FIXED_NOW.plus(1, ChronoUnit.HOURS);
-        ScheduledWorkflow delayedSchedule = ScheduledWorkflow.builder()
-                .id("sched-delayed-today")
-                .workflow(testWorkflow)
-                .cronExpression("")
-                .scheduleType(ScheduleType.DELAYED)
-                .scheduledAt(inOneHour)
-                .enabled(true)
-                .build();
-
-        when(scheduledRepository.findByEnabledTrue()).thenReturn(List.of(delayedSchedule));
-
-        UpcomingScheduleResponse result = schedulerService.getRemainingToday();
-
-        assertThat(result.count()).isEqualTo(1);
-        assertThat(result.schedules().get(0).scheduledAt()).isEqualTo(inOneHour);
-    }
 
     // --- checkAndExecuteScheduled: resume emits ActivityLog warn ---
 

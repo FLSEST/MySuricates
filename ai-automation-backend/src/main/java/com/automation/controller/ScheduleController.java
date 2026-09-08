@@ -11,6 +11,7 @@ import com.automation.mapper.ChainMapper;
 import com.automation.mapper.ScheduleMapper;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.service.scheduler.SchedulerService;
+import com.automation.service.scheduler.UpcomingRunsCalculator;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -28,6 +29,7 @@ import java.util.Map;
 public class ScheduleController {
 
     private final SchedulerService schedulerService;
+    private final UpcomingRunsCalculator upcomingRunsCalculator;
     private final ScheduleMapper scheduleMapper;
     private final WorkflowMapper workflowMapper;
     private final ChainMapper chainMapper;
@@ -39,12 +41,12 @@ public class ScheduleController {
 
     @GetMapping("/remaining-today")
     public UpcomingScheduleResponse getRemainingToday() {
-        return schedulerService.getRemainingToday();
+        return upcomingRunsCalculator.getRemainingToday();
     }
 
     @GetMapping("/remaining-this-week")
     public UpcomingScheduleResponse getRemainingThisWeek() {
-        return schedulerService.getRemainingThisWeek();
+        return upcomingRunsCalculator.getRemainingThisWeek();
     }
 
     @GetMapping("/{id}")
@@ -89,7 +91,7 @@ public class ScheduleController {
             return ResponseEntity.badRequest().body(Map.of("error", "cronExpression is required"));
         }
         try {
-            List<Instant> runs = schedulerService.getNextRuns(cronExpression, 5);
+            List<Instant> runs = upcomingRunsCalculator.getNextRuns(cronExpression, 5);
             return ResponseEntity.ok(Map.of("runs", runs));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

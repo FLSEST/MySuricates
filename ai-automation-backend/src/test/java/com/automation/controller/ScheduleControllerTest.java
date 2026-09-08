@@ -49,6 +49,8 @@ class ScheduleControllerTest {
     @MockitoBean
     private SchedulerService schedulerService;
     @MockitoBean
+    private com.automation.service.scheduler.UpcomingRunsCalculator upcomingRunsCalculator;
+    @MockitoBean
     private ActivityLogService activityLogService;
 
 
@@ -260,7 +262,7 @@ class ScheduleControllerTest {
         var run = new UpcomingScheduleResponse.UpcomingRun(
                 "sched-1", "Test Workflow", null, null, null, "WORKFLOW",
                 Instant.parse("2026-02-16T10:00:00Z"));
-        when(schedulerService.getRemainingToday()).thenReturn(new UpcomingScheduleResponse(1, List.of(run)));
+        when(upcomingRunsCalculator.getRemainingToday()).thenReturn(new UpcomingScheduleResponse(1, List.of(run)));
 
         mockMvc.perform(get("/api/v1/schedules/remaining-today"))
                 .andExpect(status().isOk())
@@ -271,7 +273,7 @@ class ScheduleControllerTest {
 
     @Test
     void getRemainingThisWeek_returnsCountAndSchedules() throws Exception {
-        when(schedulerService.getRemainingThisWeek()).thenReturn(new UpcomingScheduleResponse(0, List.of()));
+        when(upcomingRunsCalculator.getRemainingThisWeek()).thenReturn(new UpcomingScheduleResponse(0, List.of()));
 
         mockMvc.perform(get("/api/v1/schedules/remaining-this-week"))
                 .andExpect(status().isOk())
@@ -305,7 +307,7 @@ class ScheduleControllerTest {
     @Test
     void previewCron_validExpression_returnsNextRuns() throws Exception {
         Instant next = Instant.parse("2026-02-16T01:00:00Z");
-        when(schedulerService.getNextRuns("0 0 * * * *", 5)).thenReturn(List.of(next));
+        when(upcomingRunsCalculator.getNextRuns("0 0 * * * *", 5)).thenReturn(List.of(next));
 
         mockMvc.perform(post("/api/v1/schedules/preview")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -317,7 +319,7 @@ class ScheduleControllerTest {
 
     @Test
     void previewCron_invalidExpression_returns400WithError() throws Exception {
-        when(schedulerService.getNextRuns("not-valid", 5))
+        when(upcomingRunsCalculator.getNextRuns("not-valid", 5))
                 .thenThrow(new IllegalArgumentException("Invalid cron expression: not-valid"));
 
         mockMvc.perform(post("/api/v1/schedules/preview")
