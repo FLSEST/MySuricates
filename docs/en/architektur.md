@@ -72,7 +72,7 @@ SQLite (File: data/automation.db)
 com.automation
 ├── controller/          33 REST Controllers
 ├── service/
-│   ├── project/         ProjectService, ContainerService, ProjectContextService, PathValidator, OnboardingProfileService, ProjectOnboardingService
+│   ├── project/         ProjectService, ContainerService (+ DockerContainerGateway, DockerOrphanReconciler), ProjectContextService, PathValidator, OnboardingProfileService, ProjectOnboardingService
 │   ├── workflow/        WorkflowExecutor (+ ExecutionContextFactory, RunCompletionHandler, WorkflowContextDataService), WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService, GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
 │   ├── skill/           SkillService, SkillImportExportService, SkillRegistry, CapabilityRegistry
 │   ├── scheduler/       SchedulerService (+ UpcomingRunsCalculator, ScheduleSkipPolicy, ScheduleDefinitionParser), ScheduledWorkflowExecutor, SuspendState

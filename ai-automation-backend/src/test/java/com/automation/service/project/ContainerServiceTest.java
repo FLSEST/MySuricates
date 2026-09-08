@@ -70,17 +70,20 @@ class ContainerServiceTest {
         // run unchanged and turns commit/rollback into no-ops, which is what
         // the unit test wants.
         lenient().when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
+        DockerContainerGateway docker = new DockerContainerGateway(
+                dockerClient, hostProcessUtils,
+                100_000L,           // cpuQuota
+                4_294_967_296L,     // memoryLimit (4GB)
+                100L                // pidsLimit
+        );
         service = new ContainerService(
-                dockerClient,
                 containerRepository,
                 executionRegistry,
                 activityLogService,
-                hostProcessUtils,
                 pathValidator,
                 transactionManager,
-                100_000L,           // cpuQuota
-                4_294_967_296L,     // memoryLimit (4GB)
-                100L,               // pidsLimit
+                docker,
+                new DockerOrphanReconciler(docker, activityLogService, 60),
                 60,                 // idleTimeoutMinutes
                 "/home/test"        // hostHome
         );
