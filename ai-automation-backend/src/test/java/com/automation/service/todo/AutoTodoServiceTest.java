@@ -70,10 +70,13 @@ class AutoTodoServiceTest {
     @BeforeEach
     void setUp() {
         lenient().when(transactionManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
+        AutoTodoTextBuilder textBuilder = new AutoTodoTextBuilder(stepResultRepository);
         autoTodoService = new AutoTodoService(
-                todoRepository, stepResultRepository, gateStatusResolver,
+                todoRepository, gateStatusResolver,
                 similarityService, projectPathResolver, appSettingsRepository,
-                workflowRunRepository, transactionManager, eventPublisher);
+                transactionManager, eventPublisher, textBuilder,
+                new PendingTodoApprovalService(todoRepository, workflowRunRepository, transactionManager,
+                        eventPublisher, textBuilder));
     }
 
     private static final Map<String, Object> AUTO_TODO_ENABLED_META = Map.of("autoTodo", Map.of("enabled", true));
@@ -746,41 +749,6 @@ class AutoTodoServiceTest {
 
         assertThat(runMetadata).containsKey("pending_todos");
         verify(todoRepository, never()).save(any());
-    }
-
-    @Test
-    void approvePendingTodos_approved_createsTodosFromPendingMap() {
-        Workflow workflow = new Workflow();
-        workflow.setId("wf-1");
-        WorkflowRun run = new WorkflowRun();
-        run.setId("run-app");
-        run.setWorkflow(workflow);
-        Map<String, Object> meta = new HashMap<>();
-        Map<String, Object> pending = new HashMap<>();
-        pending.put("title", "Approved Test Todo");
-        pending.put("priority", "HIGH");
-        pending.put("description", "from pending");
-        pending.put("projectId", "proj-1");
-        pending.put("category", "general");
-        pending.put("tags", "[]");
-        meta.put("pending_todos", List.of(pending));
-        run.setMetadata(meta);
-
-        when(workflowRunRepository.findById("run-app")).thenReturn(Optional.of(run));
-        when(todoRepository.findOpenByCompositeKey(any(), any(), any(), any())).thenReturn(Optional.empty());
-        when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> {
-            Todo t = inv.getArgument(0);
-            t.setId("todo-new");
-            return t;
-        });
-        when(workflowRunRepository.save(any(WorkflowRun.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        autoTodoService.approvePendingTodos("run-app", true);
-
-        ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
-        verify(todoRepository, atLeastOnce()).save(captor.capture());
-        assertThat(captor.getValue().getTitle()).isEqualTo("Approved Test Todo");
-        assertThat(meta).doesNotContainKey("pending_todos");
     }
 
     private WorkflowRunCompletedEvent createEvent(RunStatus status,

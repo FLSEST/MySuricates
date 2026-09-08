@@ -37,7 +37,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import com.automation.service.activitylog.ActivityLogService;
-import com.automation.service.todo.AutoTodoService;
+import com.automation.service.todo.PendingTodoApprovalService;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.workflow.WorkflowService;
 
@@ -54,7 +54,7 @@ class ExecutionControllerTest {
     @MockitoBean
     private ActivityLogService activityLogService;
     @MockitoBean
-    private AutoTodoService autoTodoService;
+    private PendingTodoApprovalService pendingTodoApprovalService;
     @MockitoBean
     private WorkflowService workflowService;
     @MockitoBean
@@ -364,7 +364,7 @@ class ExecutionControllerTest {
                                 """))
                 .andExpect(status().isOk());
 
-        verify(autoTodoService).approvePendingTodos("run-1", true);
+        verify(pendingTodoApprovalService).approvePendingTodos("run-1", true);
     }
 
     @Test
@@ -415,7 +415,7 @@ class ExecutionControllerTest {
                                 """))
                 .andExpect(status().isOk());
 
-        verify(autoTodoService).approvePendingTodos("run-1", false);
+        verify(pendingTodoApprovalService).approvePendingTodos("run-1", false);
     }
 
     @Test

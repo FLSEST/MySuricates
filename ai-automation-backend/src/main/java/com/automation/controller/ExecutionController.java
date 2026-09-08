@@ -3,7 +3,7 @@ package com.automation.controller;
 import com.automation.dto.request.ApproveTodosRequest;
 import com.automation.dto.request.ApproveExecutionRequest;
 import com.automation.dto.request.ExecuteCommandRequest;
-import com.automation.service.todo.AutoTodoService;
+import com.automation.service.todo.PendingTodoApprovalService;
 import com.automation.service.execution.ExecutionQueryService;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.dto.response.PageResponse;
@@ -32,7 +32,7 @@ public class ExecutionController {
     private final WorkflowService workflowService;
     private final ExecutionQueryService executionQueryService;
     private final WorkflowMapper workflowMapper;
-    private final AutoTodoService autoTodoService;
+    private final PendingTodoApprovalService pendingTodoApprovalService;
     private final WorkflowRunRepository workflowRunRepository;
     private final RunDeletionService runDeletionService;
 
@@ -147,7 +147,7 @@ public class ExecutionController {
     public ResponseEntity<Void> approveTodos(
             @PathVariable String id,
             @RequestBody ApproveTodosRequest request) {
-        autoTodoService.approvePendingTodos(id, request.approved());
+        pendingTodoApprovalService.approvePendingTodos(id, request.approved());
         return ResponseEntity.ok().build();
     }
 
