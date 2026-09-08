@@ -508,6 +508,15 @@ class ExecutionSettingsServiceTest {
     }
 
     @Test
+    void validateAndApply_everyKnownKey_hasRuntimeApplier() {
+        ExecutionSettingKeys.BOUNDS.forEach((key, bounds) ->
+                service.validateAndApply(key, String.valueOf(bounds[0])));
+
+        ExecutionSettingKeys.BOUNDS.forEach((key, bounds) ->
+                verify(appSettingsRepository).set(key, String.valueOf(bounds[0])));
+    }
+
+    @Test
     void init_ignoresOutOfBoundsDbValue() {
         when(appSettingsRepository.get("execution-max-concurrent")).thenReturn(Optional.of("999"));
         when(appSettingsRepository.get("claude-max-concurrent-calls")).thenReturn(Optional.empty());
