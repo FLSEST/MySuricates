@@ -16,6 +16,7 @@ import com.automation.service.todo.TodoHygieneService;
 import com.automation.service.todo.TodoOverviewService;
 import com.automation.service.todo.TodoService;
 import com.automation.service.todo.TodoSimilarityService;
+import com.automation.service.todo.TodoTrackerExportService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -31,6 +32,7 @@ import java.util.Map;
 public class TodoController {
 
     private final TodoService todoService;
+    private final TodoTrackerExportService todoTrackerExportService;
     private final TodoOverviewService todoOverviewService;
     private final TodoHygieneService todoHygieneService;
     private final TodoMapper todoMapper;
@@ -80,7 +82,7 @@ public class TodoController {
     @PostMapping("/{id}/export")
     public TodoExportResponse exportTodo(@PathVariable String id,
                                          @RequestBody(required = false) ExportTodoRequest request) {
-        var ref = todoService.exportToTracker(id,
+        var ref = todoTrackerExportService.exportToTracker(id,
                 request != null ? request.provider() : null,
                 request != null ? request.target() : null);
         return new TodoExportResponse(ref.referenceType(), ref.referenceId(), ref.url());

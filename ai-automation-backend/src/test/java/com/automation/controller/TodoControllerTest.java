@@ -45,6 +45,7 @@ class TodoControllerTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @MockitoBean private TodoService todoService;
+    @MockitoBean private com.automation.service.todo.TodoTrackerExportService todoTrackerExportService;
     @MockitoBean private com.automation.service.todo.TodoOverviewService todoOverviewService;
     @MockitoBean private com.automation.service.todo.TodoHygieneService todoHygieneService;
     @MockitoBean
@@ -286,7 +287,7 @@ class TodoControllerTest {
     @Test
     void exportTodo_returnsExportRef() throws Exception {
         var ref = new TaskExportCapable.TaskRef("LINEAR", "ISS-123", "https://linear.app/issue/ISS-123");
-        when(todoService.exportToTracker(eq("t-1"), eq("LINEAR"), eq("team-a"))).thenReturn(ref);
+        when(todoTrackerExportService.exportToTracker(eq("t-1"), eq("LINEAR"), eq("team-a"))).thenReturn(ref);
 
         var body = objectMapper.writeValueAsString(
                 new com.automation.dto.request.ExportTodoRequest("LINEAR", "team-a"));
@@ -303,7 +304,7 @@ class TodoControllerTest {
     @Test
     void exportTodo_withoutBody_usesProjectDefaults() throws Exception {
         var ref = new TaskExportCapable.TaskRef("GITHUB", "gh-42", "https://github.com/issues/42");
-        when(todoService.exportToTracker(eq("t-1"), isNull(), isNull())).thenReturn(ref);
+        when(todoTrackerExportService.exportToTracker(eq("t-1"), isNull(), isNull())).thenReturn(ref);
 
         mockMvc.perform(post("/api/v1/todos/t-1/export"))
                 .andExpect(status().isOk())

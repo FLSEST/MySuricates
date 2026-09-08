@@ -66,7 +66,7 @@ class SourceSizeRatchetTest {
             entry("com/automation/service/staging/StagingService.java", 426),
             entry("com/automation/service/staging/TestingService.java", 448),
             entry("com/automation/service/todo/AutoTodoService.java", 552),
-            entry("com/automation/service/todo/TodoService.java", 497),
+            entry("com/automation/service/todo/TodoService.java", 347),
             entry("com/automation/service/tray/SystemTrayService.java", 415),
             entry("com/automation/service/trigger/TodoTriggerService.java", 383),
             entry("com/automation/service/wish/WishDecomposePromptBuilder.java", 338),
