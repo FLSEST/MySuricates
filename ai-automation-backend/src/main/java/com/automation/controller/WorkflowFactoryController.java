@@ -4,6 +4,7 @@ import com.automation.dto.request.WorkflowFactoryRequest;
 import com.automation.dto.response.WorkflowFactoryResult;
 import com.automation.entity.Workflow;
 import com.automation.mapper.WorkflowMapper;
+import com.automation.service.factory.FactoryTopicCatalog;
 import com.automation.service.factory.WorkflowFactoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -64,6 +65,6 @@ public class WorkflowFactoryController {
      */
     @GetMapping("/topics")
     public List<Map<String, String>> getTopics() {
-        return factoryService.getTopicCategories();
+        return FactoryTopicCatalog.getTopicCategories();
     }
 }

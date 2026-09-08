@@ -10,10 +10,8 @@ import com.automation.entity.Workflow;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ProjectRepository;
 import com.automation.service.staging.TestingService;
-import com.automation.service.workflow.AgentInstructionsService;
 import com.automation.service.workflow.WorkflowService;
 import com.automation.service.workflow.WorkflowTemplateService;
-import com.automation.util.JsonRepairUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,6 +22,12 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.util.*;
 
+/**
+ * The workflow factory pipeline: generate a workflow from a topic, deploy it to the Test
+ * instance, verify, auto-fix on failure and optionally promote it to a template. Prompts come
+ * from {@link FactoryPromptBuilder}, model-output parsing from {@link FactoryResponseParser},
+ * the topic list from {@link FactoryTopicCatalog}.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -36,8 +40,9 @@ public class WorkflowFactoryService {
     private final WorkflowTemplateService templateService;
     private final TestingService testingService;
     private final ProjectRepository projectRepository;
-    private final AgentInstructionsService agentInstructionsService;
     private final ObjectMapper objectMapper;
+    private final FactoryPromptBuilder promptBuilder;
+    private final FactoryResponseParser responseParser;
 
     /**
      * Generates a workflow definition from a topic/description using Claude CLI.
@@ -47,8 +52,8 @@ public class WorkflowFactoryService {
         Project project = projectRepository.findById(request.projectId())
                 .orElseThrow(() -> new ResourceNotFoundException("Project", request.projectId()));
 
-        String prompt = buildGeneratorPrompt(request);
-        String systemPrompt = buildSystemPrompt();
+        String prompt = promptBuilder.buildGeneratorPrompt(request);
+        String systemPrompt = promptBuilder.buildSystemPrompt();
 
         String provider = resolveProvider(request.provider());
         log.info("Factory: generating workflow for topic '{}' (category: {}, provider: {})",
@@ -56,17 +61,17 @@ public class WorkflowFactoryService {
 
         WorkflowTextGenerator generator = getGenerator(provider);
         String responseText = generator.generate(prompt, systemPrompt, factoryConfig.getTimeoutSeconds());
-        JsonNode workflowJson = extractJsonFromResponse(responseText);
+        JsonNode workflowJson = responseParser.extractJsonFromResponse(responseText);
 
         // Build CreateWorkflowRequest from Claude's output
         String name = workflowJson.path("name").asText(request.topic());
         String description = workflowJson.has("description")
                 ? workflowJson.path("description").asText() : request.description();
-        String icon = workflowJson.path("icon").asText("\uD83D\uDD27");
+        String icon = workflowJson.path("icon").asText("🔧");
         String instructions = workflowJson.has("instructions")
                 ? workflowJson.path("instructions").asText(null) : null;
 
-        List<BlockDefinition> blocks = parseBlocks(workflowJson);
+        List<BlockDefinition> blocks = responseParser.parseBlocks(workflowJson);
 
         Map<String, Object> defaultContext = workflowJson.has("defaultContext")
                 ? objectMapper.convertValue(workflowJson.get("defaultContext"), new TypeReference<>() {})
@@ -190,7 +195,7 @@ public class WorkflowFactoryService {
                 }
                 // Also check step outputs for error details
                 if (error == null) {
-                    error = extractStepErrors(run);
+                    error = responseParser.extractStepErrors(run);
                 }
             }
 
@@ -264,22 +269,6 @@ public class WorkflowFactoryService {
         return result;
     }
 
-    /**
-     * Returns available topic categories.
-     */
-    public List<Map<String, String>> getTopicCategories() {
-        return List.of(
-                Map.of("id", "CODE", "name", "Code", "description", "Lint, Test, Review, Refactor, Deploy"),
-                Map.of("id", "CONTENT", "name", "Content", "description", "Blog, Docs, Translation, Email, Social"),
-                Map.of("id", "DATA", "name", "Data", "description", "CSV → Report, Analyse, Pipeline, ETL"),
-                Map.of("id", "RESEARCH", "name", "Research", "description", "Topic Summary, Fact-Check, Compare"),
-                Map.of("id", "TRANSFORM", "name", "Transform", "description", "Format, Convert, Migrate, Merge"),
-                Map.of("id", "DEVOPS", "name", "DevOps", "description", "CI/CD, Monitor, Backup, Update"),
-                Map.of("id", "CREATIVE", "name", "Creative", "description", "Design, Prototype, Generate, Iterate"),
-                Map.of("id", "CUSTOM", "name", "Custom", "description", "Free-form description")
-        );
-    }
-
     // ── Internal helpers ──────────────────────────────────
 
     public record FactoryTestResult(String runId, String status, String error) {}
@@ -292,26 +281,13 @@ public class WorkflowFactoryService {
         String resolvedProvider = resolveProvider(provider);
         String blocksJson = objectMapper.writeValueAsString(workflow.getBlocks());
 
-        String prompt = """
-                A workflow failed during automated testing. Analyze the error and fix the workflow blocks.
-
-                WORKFLOW NAME: %s
-                WORKFLOW DESCRIPTION: %s
-
-                CURRENT BLOCKS (JSON):
-                %s
-
-                ERROR:
-                %s
-
-                Fix the blocks to resolve this error. Output ONLY the corrected blocks array as JSON.
-                Do not wrap in markdown code fences.
-                """.formatted(workflow.getName(), workflow.getDescription(), blocksJson, errorMessage);
+        String prompt = promptBuilder.buildAutoFixPrompt(
+                workflow.getName(), workflow.getDescription(), blocksJson, errorMessage);
 
         WorkflowTextGenerator generator = getGenerator(resolvedProvider);
         String responseText = generator.generate(prompt,
                 "You are a workflow debugging assistant. Output only valid JSON.", 120);
-        List<BlockDefinition> fixedBlocks = parseBlocksFromArray(responseText);
+        List<BlockDefinition> fixedBlocks = responseParser.parseBlocksFromArray(responseText);
 
         if (!fixedBlocks.isEmpty()) {
             workflow.setBlocks(fixedBlocks);
@@ -322,177 +298,6 @@ public class WorkflowFactoryService {
             workflowService.update(workflow.getId(), updateRequest);
             log.info("Factory: auto-fixed workflow '{}' with {} blocks", workflow.getName(), fixedBlocks.size());
         }
-    }
-
-    private String buildSystemPrompt() {
-        StringBuilder sb = new StringBuilder();
-
-        // Inject base agent instructions (includes execution environment info)
-        String agentBase = agentInstructionsService.buildInstructionPrefix(null);
-        if (!agentBase.isBlank()) {
-            sb.append(agentBase).append("\n\n---\n\n");
-        }
-
-        sb.append("""
-                You are a workflow architect for MySuricates, an AI-powered workflow automation platform.
-                You create workflow definitions as JSON.
-
-                Available block types:
-                - simple: AI-powered tasks (analysis, summarization, generation). Config: { "command": "..." }
-                - shell: Execute shell commands. Config: { "command": "...", "container_image": "image:tag" }. See "Ausfuehrungsumgebung" section for available host tools and container images.
-                - retry: Wraps a command with retry logic. Config: { "command": "...", "max_retries": 3, "delay_seconds": 5 }
-                - conditional: Branch based on condition. Config: { "condition": "...", "if_true": "...", "if_false": "..." }
-                - forEach: Loop over items. Config: { "items_expression": "...", "item_variable": "item", "command": "..." }
-                - agentic: Complex multi-step AI task with goal. Config: { "goal": "...", "max_iterations": 5 }
-
-                Rules:
-                - Use {{ variable_name }} syntax for variables
-                - Use {{ previous_output }} to pass data between steps
-                - Shell blocks for concrete commands (npm, git, curl, find, etc.)
-                - Simple blocks for AI tasks (analysis, summarization, generation)
-                - Retry blocks when failures are likely (API calls, network, tests)
-                - Agentic blocks only for complex, multi-step autonomous tasks
-                - Keep workflows practical and focused (3-7 blocks typical)
-                - Follow the "Ausfuehrungsumgebung" rules for shell block container_image
-
-                Output ONLY valid JSON (no markdown fences).
-                """);
-        return sb.toString();
-    }
-
-    private String buildGeneratorPrompt(WorkflowFactoryRequest request) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Create a workflow for the following topic.\n\n");
-        sb.append("TOPIC: ").append(request.topic()).append("\n");
-        if (request.category() != null) {
-            sb.append("CATEGORY: ").append(request.category()).append("\n");
-        }
-        if (request.description() != null) {
-            sb.append("DESCRIPTION: ").append(request.description()).append("\n");
-        }
-        if (request.testInputs() != null && !request.testInputs().isEmpty()) {
-            sb.append("TEST INPUTS: ").append(request.testInputs()).append("\n");
-        }
-        sb.append("""
-
-                Output JSON with this structure:
-                {
-                  "name": "Short workflow name",
-                  "description": "What the workflow does",
-                  "icon": "fitting emoji",
-                  "blocks": [
-                    { "type": "simple|shell|retry|conditional|forEach|agentic", "config": { "command": "..." } }
-                  ],
-                  "defaultContext": { "variable": "default_value" },
-                  "instructions": "Workflow-specific instructions for the AI agent",
-                  "testInputs": { "variable": "test_value" }
-                }
-                """);
-        return sb.toString();
-    }
-
-    private JsonNode extractJsonFromResponse(String response) throws IOException {
-        // Try to find JSON object in the response
-        String trimmed = response.trim();
-
-        // Remove markdown code fences if present
-        if (trimmed.startsWith("```")) {
-            int firstNewline = trimmed.indexOf('\n');
-            int lastFence = trimmed.lastIndexOf("```");
-            if (firstNewline > 0 && lastFence > firstNewline) {
-                trimmed = trimmed.substring(firstNewline + 1, lastFence).trim();
-            }
-        }
-
-        // Find first { and last }
-        int start = trimmed.indexOf('{');
-        int end = trimmed.lastIndexOf('}');
-        if (start >= 0 && end > start) {
-            String json = trimmed.substring(start, end + 1);
-            return JsonRepairUtil.readTreeWithRepair(json);
-        }
-
-        throw new IOException("No valid JSON found in Claude response");
-    }
-
-    private List<BlockDefinition> parseBlocks(JsonNode workflowJson) {
-        List<BlockDefinition> blocks = new ArrayList<>();
-        JsonNode blocksNode = workflowJson.path("blocks");
-        if (blocksNode.isArray()) {
-            for (JsonNode blockNode : blocksNode) {
-                BlockDefinition block = new BlockDefinition();
-                block.setType(blockNode.path("type").asText("simple"));
-                if (blockNode.has("config")) {
-                    Map<String, Object> config = objectMapper.convertValue(
-                            blockNode.get("config"), new TypeReference<>() {});
-                    block.setConfig(config);
-                }
-                if (blockNode.has("requiredCapabilities")) {
-                    List<String> caps = objectMapper.convertValue(
-                            blockNode.get("requiredCapabilities"), new TypeReference<>() {});
-                    block.setRequiredCapabilities(caps);
-                }
-                blocks.add(block);
-            }
-        }
-        return blocks;
-    }
-
-    private List<BlockDefinition> parseBlocksFromArray(String response) {
-        try {
-            String trimmed = response.trim();
-            // Remove markdown code fences
-            if (trimmed.startsWith("```")) {
-                int firstNewline = trimmed.indexOf('\n');
-                int lastFence = trimmed.lastIndexOf("```");
-                if (firstNewline > 0 && lastFence > firstNewline) {
-                    trimmed = trimmed.substring(firstNewline + 1, lastFence).trim();
-                }
-            }
-
-            // Find JSON array or object
-            int arrStart = trimmed.indexOf('[');
-            int objStart = trimmed.indexOf('{');
-
-            if (arrStart >= 0 && (objStart < 0 || arrStart < objStart)) {
-                // Direct array
-                int arrEnd = trimmed.lastIndexOf(']');
-                String json = trimmed.substring(arrStart, arrEnd + 1);
-                JsonNode arrayNode = JsonRepairUtil.readTreeWithRepair(json);
-                List<BlockDefinition> blocks = new ArrayList<>();
-                for (JsonNode blockNode : arrayNode) {
-                    BlockDefinition block = new BlockDefinition();
-                    block.setType(blockNode.path("type").asText("simple"));
-                    if (blockNode.has("config")) {
-                        block.setConfig(objectMapper.convertValue(blockNode.get("config"), new TypeReference<>() {}));
-                    }
-                    blocks.add(block);
-                }
-                return blocks;
-            } else if (objStart >= 0) {
-                // Wrapped in object with "blocks" key
-                JsonNode obj = extractJsonFromResponse(trimmed);
-                return parseBlocks(obj);
-            }
-        } catch (Exception e) {
-            log.warn("Failed to parse blocks from auto-fix response: {}", e.getMessage());
-        }
-        return List.of();
-    }
-
-    private String extractStepErrors(JsonNode run) {
-        JsonNode steps = run.path("steps");
-        if (steps.isArray()) {
-            for (JsonNode step : steps) {
-                if ("FAILED".equals(step.path("status").asText())) {
-                    String error = step.path("error").asText(null);
-                    if (error != null) return error;
-                    String output = step.path("output").asText(null);
-                    if (output != null && output.length() < 500) return output;
-                }
-            }
-        }
-        return null;
     }
 
     private WorkflowTextGenerator getGenerator(String provider) {

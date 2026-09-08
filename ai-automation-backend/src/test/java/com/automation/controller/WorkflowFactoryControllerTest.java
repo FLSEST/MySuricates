@@ -158,15 +158,12 @@ class WorkflowFactoryControllerTest {
 
     @Test
     void getTopics_returnsOk() throws Exception {
-        when(factoryService.getTopicCategories()).thenReturn(List.of(
-                Map.of("category", "devops", "label", "DevOps"),
-                Map.of("category", "security", "label", "Security")
-        ));
-
+        // Static catalog — no service stub needed
         mockMvc.perform(get("/api/v1/factory/topics"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].category").value("devops"))
-                .andExpect(jsonPath("$[1].category").value("security"));
+                .andExpect(jsonPath("$.length()").value(8))
+                .andExpect(jsonPath("$[0].id").value("CODE"))
+                .andExpect(jsonPath("$[7].id").value("CUSTOM"));
     }
 
     private WorkflowResponse createWorkflowResponse() {

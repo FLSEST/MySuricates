@@ -47,7 +47,7 @@ class SourceSizeRatchetTest {
             entry("com/automation/service/dialog/DialogConversionService.java", 329),
             entry("com/automation/service/dialog/DialogSessionScanner.java", 348),
             entry("com/automation/service/export/bpmn/BpmnModelBuilder.java", 521),
-            entry("com/automation/service/factory/WorkflowFactoryService.java", 512),
+            entry("com/automation/service/factory/WorkflowFactoryService.java", 317),
             entry("com/automation/service/integration/IntegrationOAuthService.java", 392),
             entry("com/automation/service/integration/providers/confluence/ConfluenceProvider.java", 315),
             entry("com/automation/service/integration/providers/github/GitHubProvider.java", 452),

@@ -70,7 +70,9 @@ class WorkflowFactoryServiceTest {
         factoryService = new WorkflowFactoryService(
                 claudeGenerator, codexGenerator, factoryConfig,
                 workflowService, templateService, testingService,
-                projectRepository, agentInstructionsService, objectMapper
+                projectRepository, objectMapper,
+                new FactoryPromptBuilder(agentInstructionsService),
+                new FactoryResponseParser(objectMapper)
         );
 
         testProject = Project.builder()
@@ -443,17 +445,6 @@ class WorkflowFactoryServiceTest {
         verify(templateService).createFromWorkflow("wf-1");
     }
 
-    // ── getTopicCategories ─────────────────────────────
-
-    @Test
-    void getTopicCategories_returns8Categories() {
-        List<Map<String, String>> categories = factoryService.getTopicCategories();
-
-        assertThat(categories).hasSize(8);
-        assertThat(categories.stream().map(c -> c.get("id")).toList())
-                .contains("CODE", "CONTENT", "DATA", "RESEARCH", "TRANSFORM", "DEVOPS", "CREATIVE", "CUSTOM");
-    }
-
     // ── verifyAndFix ───────────────────────────────────
 
     @Test
@@ -470,5 +461,64 @@ class WorkflowFactoryServiceTest {
 
         assertThat(result.status()).isEqualTo("PASSED");
         verify(testingService).reportTestResult("Test", "Test Project", "PASSED");
+    }
+
+    // ── autoFixWorkflow (characterization, Audit-TODO 3b0a021c) ────
+
+    private Workflow brokenWorkflow() {
+        return Workflow.builder().id("wf-1").name("Broken").description("desc")
+                .blocks(new java.util.ArrayList<>(List.of(BlockDefinition.builder().type("shell")
+                        .config(new HashMap<>(Map.of("command", "exit 1"))).build())))
+                .build();
+    }
+
+    @Test
+    void autoFixWorkflow_arrayResponse_replacesBlocksAndUpdatesViaService() throws IOException {
+        when(claudeGenerator.generate(anyString(), anyString(), eq(120)))
+                .thenReturn("[{\"type\":\"shell\",\"config\":{\"command\":\"echo fixed\"}}]");
+        Workflow workflow = brokenWorkflow();
+
+        factoryService.autoFixWorkflow(workflow, "exit code 1");
+
+        assertThat(workflow.getBlocks()).hasSize(1);
+        assertThat(workflow.getBlocks().get(0).getConfig()).containsEntry("command", "echo fixed");
+        verify(workflowService).update(eq("wf-1"), argThat(req ->
+                req.blocks() != null && req.blocks().size() == 1
+                        && "echo fixed".equals(req.blocks().get(0).getConfig().get("command"))
+                        && req.name() == null && req.description() == null));
+    }
+
+    @Test
+    void autoFixWorkflow_promptCarriesNameDescriptionBlocksAndError_withDebugSystemPrompt() throws IOException {
+        when(claudeGenerator.generate(anyString(), anyString(), eq(120))).thenReturn("[]");
+
+        factoryService.autoFixWorkflow(brokenWorkflow(), "boom");
+
+        verify(claudeGenerator).generate(
+                argThat(p -> p.contains("WORKFLOW NAME: Broken") && p.contains("WORKFLOW DESCRIPTION: desc")
+                        && p.contains("\"command\":\"exit 1\"") && p.contains("ERROR:\nboom")),
+                eq("You are a workflow debugging assistant. Output only valid JSON."),
+                eq(120));
+    }
+
+    @Test
+    void autoFixWorkflow_unparseableResponse_leavesWorkflowUntouched() throws IOException {
+        when(claudeGenerator.generate(anyString(), anyString(), eq(120))).thenReturn("I cannot help with that.");
+        Workflow workflow = brokenWorkflow();
+
+        factoryService.autoFixWorkflow(workflow, "err");
+
+        assertThat(workflow.getBlocks().get(0).getConfig()).containsEntry("command", "exit 1");
+        verify(workflowService, never()).update(anyString(), any());
+    }
+
+    @Test
+    void autoFixWorkflow_providerOverride_usesCodexGenerator() throws IOException {
+        when(codexGenerator.generate(anyString(), anyString(), eq(120))).thenReturn("[]");
+
+        factoryService.autoFixWorkflow(brokenWorkflow(), "err", "codex");
+
+        verify(codexGenerator).generate(anyString(), anyString(), eq(120));
+        verify(claudeGenerator, never()).generate(anyString(), anyString(), anyInt());
     }
 }
