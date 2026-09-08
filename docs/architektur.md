@@ -96,7 +96,7 @@ com.automation
 │   ├── audit/           AuditResultParser, AuditIngestionService, AuditIngestionListener, AuditCenterService
 │   ├── integration/     IntegrationRegistry, IntegrationOAuthService, IntegrationEncryptionService, IntegrationProvider, OAuthConfig, TaskExportCapable
 │   ├── integration/providers/ 7 Provider in Unterverzeichnissen (confluence/, github/, google/, jira/, taskwarrior/, trello/)
-│   ├── assistant/       AssistantContextBuilder, AssistantChatBroadcaster, AssistantFetchService, AssistantToolExecutor, AssistantActionSuggestionService, AssistantErrorClassifier, AssistantFetchPolicy, AssistantMutationGate, AssistantActionMerger, AssistantResponseParser, PendingTool, PendingToolRegistry, ToolExecutionResult
+│   ├── assistant/       AssistantContextBuilder, AssistantChatBroadcaster, AssistantFetchService, AssistantToolExecutor (+ AssistantTodoTools, AssistantWorkflowTools, AssistantChainTools, AssistantToolPayloads), AssistantActionSuggestionService, AssistantErrorClassifier, AssistantFetchPolicy, AssistantMutationGate, AssistantActionMerger, AssistantResponseParser, PendingTool, PendingToolRegistry, ToolExecutionResult
 │   ├── assistant/context/ AssistantContextSection, BlockTypesIndexSection, ChainsIndexSection, FailedWorkflowsContextSection, IntegrationsIndexSection, RunsContextSection, SchedulesContextSection, SkillsIndexSection, TodosContextSection, WishesContextSection
 │   ├── execution/       ExecutionQueryService, WorkflowDebugService
 │   ├── dlq/             DeadLetterService

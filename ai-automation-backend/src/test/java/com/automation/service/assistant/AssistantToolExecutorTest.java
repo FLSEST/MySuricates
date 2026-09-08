@@ -43,8 +43,11 @@ class AssistantToolExecutorTest {
         registry = new PendingToolRegistry();
         guardrailsConfig = new AssistantGuardrailsConfig();
         ObjectMapper mapper = new ObjectMapper();
-        executor = new AssistantToolExecutor(todoService, workflowService,
-                workflowExecutor, chainService, mapper, registry,
+        executor = new AssistantToolExecutor(
+                new AssistantTodoTools(todoService, mapper),
+                new AssistantWorkflowTools(workflowService, workflowExecutor, mapper),
+                new AssistantChainTools(chainService, mapper),
+                mapper, registry,
                 new AssistantToolValidator(mapper), guardrailsConfig, activityLogService);
     }
 

@@ -2,21 +2,7 @@ package com.automation.service.assistant;
 
 import com.automation.config.AssistantGuardrailsConfig;
 import com.automation.entity.ActivityLog.LogCategory;
-import com.automation.entity.BlockDefinition;
-import com.automation.entity.Todo;
-import com.automation.entity.Workflow;
-import com.automation.dto.request.ChainEntryRequest;
-import com.automation.dto.request.CreateChainRequest;
-import com.automation.dto.request.CreateTodoRequest;
-import com.automation.dto.request.CreateWorkflowRequest;
-import com.automation.dto.request.UpdateTodoStatusRequest;
-import com.automation.dto.request.UpdateWorkflowRequest;
-import com.automation.entity.WorkflowRun;
 import com.automation.service.activitylog.ActivityLogService;
-import com.automation.service.chain.ChainService;
-import com.automation.service.todo.TodoService;
-import com.automation.service.workflow.WorkflowExecutor;
-import com.automation.service.workflow.WorkflowService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +21,9 @@ import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static com.automation.service.assistant.AssistantToolPayloads.sanitizeJson;
+import static com.automation.service.assistant.AssistantToolPayloads.shorten;
+
 /**
  * Parses and executes tool calls embedded in the assistant's response.
  * Tools are encoded as {@code <tool type="...">JSON</tool>} tags.
@@ -46,6 +35,10 @@ import java.util.regex.Pattern;
  * {@code POST /api/v1/assistant/pending-tools/{id}/confirm}, which invokes
  * {@link #executeConfirmed(PendingTool)}. This prevents the LLM from mutating platform state
  * without explicit user approval, independent of prompt compliance.
+ *
+ * <p>The per-tool implementations live in {@link AssistantTodoTools},
+ * {@link AssistantWorkflowTools} and {@link AssistantChainTools}; this class owns extraction,
+ * guardrails (validation + rate limit), dispatch and the audit trail.
  */
 @Component
 @RequiredArgsConstructor
@@ -65,10 +58,9 @@ public class AssistantToolExecutor {
             "create_chain"
     );
 
-    private final TodoService todoService;
-    private final WorkflowService workflowService;
-    private final WorkflowExecutor workflowExecutor;
-    private final ChainService chainService;
+    private final AssistantTodoTools todoTools;
+    private final AssistantWorkflowTools workflowTools;
+    private final AssistantChainTools chainTools;
     private final ObjectMapper objectMapper;
     private final PendingToolRegistry pendingToolRegistry;
     private final AssistantToolValidator toolValidator;
@@ -135,14 +127,14 @@ public class AssistantToolExecutor {
         String rawResult = checkGuardrails(tool.type(), payload);
         if (rawResult == null) {
             rawResult = switch (tool.type()) {
-                case "create_todo"        -> executeCreateTodo(payload);
-                case "update_todo_status" -> executeUpdateTodoStatus(payload);
-                case "create_workflow"    -> executeCreateWorkflow(payload);
-                case "update_workflow"    -> executeUpdateWorkflow(payload);
-                case "delete_workflow"    -> executeDeleteWorkflow(payload);
-                case "start_workflow"     -> executeStartWorkflow(payload);
-                case "cancel_run"         -> executeCancelRun(payload);
-                case "create_chain"       -> executeCreateChain(payload);
+                case "create_todo"        -> todoTools.createTodo(payload);
+                case "update_todo_status" -> todoTools.updateTodoStatus(payload);
+                case "create_workflow"    -> workflowTools.createWorkflow(payload);
+                case "update_workflow"    -> workflowTools.updateWorkflow(payload);
+                case "delete_workflow"    -> workflowTools.deleteWorkflow(payload);
+                case "start_workflow"     -> workflowTools.startWorkflow(payload);
+                case "cancel_run"         -> workflowTools.cancelRun(payload);
+                case "create_chain"       -> chainTools.createChain(payload);
                 default -> "[Unknown tool: " + tool.type() + "]";
             };
         }
@@ -212,255 +204,6 @@ public class AssistantToolExecutor {
         } catch (Exception e) {
             log.debug("describe failed for tool type={} — falling back to type label", type, e);
             return type;
-        }
-    }
-
-    private static String shorten(Object id) {
-        if (id == null) return "?";
-        String s = id.toString();
-        return s.length() > 8 ? s.substring(0, 8) + "…" : s;
-    }
-
-    /**
-     * Normalizes fullwidth Unicode punctuation to ASCII equivalents.
-     * Claude occasionally generates these characters in JSON payloads,
-     * which Jackson's parser rejects.
-     */
-    private static String sanitizeJson(String json) {
-        if (json == null || json.isEmpty()) return json;
-        return json
-                .replace('\uff0c', ',')   // ， → ,
-                .replace('\uff1a', ':')   // ： → :
-                .replace('\uff1b', ';')   // ； → ;
-                .replace('\uff5b', '{')   // ｛ → {
-                .replace('\uff5d', '}')   // ｝ → }
-                .replace('\uff3b', '[')   // ［ → [
-                .replace('\uff3d', ']')   // ］ → ]
-                .replace('\uff02', '"')   // ＂ → "
-                .replace('\u201c', '"')   // " → "
-                .replace('\u201d', '"');  // " → "
-    }
-
-    private String executeCreateTodo(String json) {
-        try {
-            Map<String, Object> params = objectMapper.readValue(json, new TypeReference<>() {});
-            String title = (String) params.get("title");
-            if (title == null || title.isBlank()) return "⚠ Could not create todo: title is missing.";
-
-            String description = (String) params.getOrDefault("description", null);
-            String priorityStr = (String) params.getOrDefault("priority", "MEDIUM");
-            Object tagsObj = params.get("tags");
-            String projectId = (String) params.getOrDefault("projectId", null);
-
-            Todo.Priority priority;
-            try { priority = Todo.Priority.valueOf(priorityStr.toUpperCase()); }
-            catch (Exception e) { priority = Todo.Priority.MEDIUM; }
-
-            List<String> tags = tagsObj instanceof List<?> list
-                    ? list.stream().map(Object::toString).toList()
-                    : List.of();
-
-            var request = new CreateTodoRequest(
-                    title, description, Todo.Status.OPEN, priority, tags,
-                    projectId, null, Todo.Source.AI, "assistant", null, null, null, null, null
-            );
-            Todo created = todoService.create(request);
-            String tagStr = tags.isEmpty() ? "" : ", Tags: " + String.join(", ", tags);
-            String shortId = created.getId().substring(0, Math.min(8, created.getId().length()));
-            return "✓ Todo created: \"" + created.getTitle() + "\" (priority: " + priority + tagStr + ", ID: " + shortId + "…)";
-        } catch (Exception e) {
-            log.warn("Assistant create_todo tool failed. Payload: {}", json, e);
-            return "⚠ Could not create todo: " + e.getMessage();
-        }
-    }
-
-    private String executeUpdateTodoStatus(String json) {
-        try {
-            Map<String, Object> params = objectMapper.readValue(json, new TypeReference<>() {});
-            String id = (String) params.get("id");
-            String statusStr = (String) params.get("status");
-            if (id == null || statusStr == null) return "⚠ update_todo_status: id and status are required fields.";
-
-            Todo.Status status;
-            try { status = Todo.Status.valueOf(statusStr.toUpperCase()); }
-            catch (Exception e) { return "⚠ Invalid status: " + statusStr + ". Allowed: OPEN, IN_PROGRESS, DONE, BACKLOG"; }
-
-            todoService.updateStatus(id, new UpdateTodoStatusRequest(status, null));
-            return "✓ Todo status updated: " + status + " (ID: " + id.substring(0, Math.min(8, id.length())) + "…)";
-        } catch (Exception e) {
-            log.warn("Assistant update_todo_status tool failed. Payload: {}", json, e);
-            return "⚠ Could not update status: " + e.getMessage();
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private String executeCreateWorkflow(String json) {
-        try {
-            Map<String, Object> params = objectMapper.readValue(json, new TypeReference<>() {});
-            String projectId = (String) params.get("projectId");
-            String name = (String) params.get("name");
-            if (projectId == null || projectId.isBlank() || name == null || name.isBlank())
-                return "⚠ create_workflow: projectId and name are required fields.";
-
-            List<BlockDefinition> blocks = params.containsKey("blocks")
-                    ? objectMapper.convertValue(params.get("blocks"), new TypeReference<>() {})
-                    : List.of();
-
-            Map<String, Object> defaultContext = params.containsKey("defaultContext")
-                    ? objectMapper.convertValue(params.get("defaultContext"), new TypeReference<Map<String, Object>>() {})
-                    : null;
-            Map<String, Object> metadata = params.containsKey("metadata")
-                    ? objectMapper.convertValue(params.get("metadata"), new TypeReference<Map<String, Object>>() {})
-                    : null;
-
-            var request = new CreateWorkflowRequest(
-                    projectId, name,
-                    (String) params.getOrDefault("description", null),
-                    (String) params.getOrDefault("icon", "⚡"),
-                    blocks,
-                    null, // activatedSkillIds
-                    (String) params.getOrDefault("instructions", null),
-                    (String) params.getOrDefault("model", null),
-                    null, // provider
-                    null, // templateId
-                    metadata, defaultContext,
-                    null  // version
-            );
-            Workflow created = workflowService.create(request);
-            return "✓ Workflow created: \"" + created.getName() + "\" (ID: " + created.getId() + ")";
-        } catch (Exception e) {
-            log.warn("Assistant create_workflow tool failed. Payload: {}", json, e);
-            return "⚠ Could not create workflow: " + e.getMessage();
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private String executeUpdateWorkflow(String json) {
-        try {
-            Map<String, Object> params = objectMapper.readValue(json, new TypeReference<>() {});
-            String workflowId = (String) params.get("workflowId");
-            if (workflowId == null || workflowId.isBlank())
-                return "⚠ update_workflow: workflowId is a required field.";
-
-            List<BlockDefinition> blocks = params.containsKey("blocks")
-                    ? objectMapper.convertValue(params.get("blocks"), new TypeReference<>() {})
-                    : null;
-            Map<String, Object> defaultContext = params.containsKey("defaultContext")
-                    ? objectMapper.convertValue(params.get("defaultContext"), new TypeReference<Map<String, Object>>() {})
-                    : null;
-            Map<String, Object> metadata = params.containsKey("metadata")
-                    ? objectMapper.convertValue(params.get("metadata"), new TypeReference<Map<String, Object>>() {})
-                    : null;
-
-            var request = new UpdateWorkflowRequest(
-                    (String) params.getOrDefault("name", null),
-                    (String) params.getOrDefault("description", null),
-                    (String) params.getOrDefault("icon", null),
-                    blocks,
-                    (String) params.getOrDefault("instructions", null),
-                    (String) params.getOrDefault("model", null),
-                    null, // provider
-                    metadata, defaultContext
-            );
-            Workflow updated = workflowService.update(workflowId, request);
-            return "✓ Workflow updated: \"" + updated.getName() + "\" (ID: " + workflowId + ")";
-        } catch (Exception e) {
-            log.warn("Assistant update_workflow tool failed. Payload: {}", json, e);
-            return "⚠ Could not update workflow: " + e.getMessage();
-        }
-    }
-
-    private String executeDeleteWorkflow(String json) {
-        try {
-            Map<String, Object> params = objectMapper.readValue(json, new TypeReference<>() {});
-            String workflowId = (String) params.get("workflowId");
-            if (workflowId == null || workflowId.isBlank())
-                return "⚠ delete_workflow: workflowId is a required field.";
-
-            Workflow workflow = workflowService.findById(workflowId);
-            String name = workflow.getName();
-            workflowService.delete(workflowId);
-            return "✓ Workflow deleted: \"" + name + "\" (ID: " + workflowId + ")";
-        } catch (Exception e) {
-            log.warn("Assistant delete_workflow tool failed. Payload: {}", json, e);
-            return "⚠ Could not delete workflow: " + e.getMessage();
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private String executeStartWorkflow(String json) {
-        try {
-            Map<String, Object> params = objectMapper.readValue(json, new TypeReference<>() {});
-            String workflowId = (String) params.get("workflowId");
-            if (workflowId == null || workflowId.isBlank())
-                return "⚠ start_workflow: workflowId is a required field.";
-
-            Workflow workflow = workflowService.findById(workflowId);
-            Map<String, Object> context = params.containsKey("context")
-                    ? objectMapper.convertValue(params.get("context"), new TypeReference<Map<String, Object>>() {})
-                    : Map.of();
-
-            WorkflowRun run = workflowExecutor.execute(workflow, context);
-            String shortId = run.getId().substring(0, Math.min(8, run.getId().length()));
-            return "✓ Workflow started: \"" + workflow.getName() + "\" (Run ID: " + shortId + "…)";
-        } catch (Exception e) {
-            log.warn("Assistant start_workflow tool failed. Payload: {}", json, e);
-            return "⚠ Could not start workflow: " + e.getMessage();
-        }
-    }
-
-    private String executeCancelRun(String json) {
-        try {
-            Map<String, Object> params = objectMapper.readValue(json, new TypeReference<>() {});
-            String runId = (String) params.get("runId");
-            if (runId == null || runId.isBlank())
-                return "⚠ cancel_run: runId is a required field.";
-
-            workflowExecutor.cancelExecution(runId);
-            String shortId = runId.substring(0, Math.min(8, runId.length()));
-            return "✓ Run cancelled (ID: " + shortId + "…)";
-        } catch (Exception e) {
-            log.warn("Assistant cancel_run tool failed. Payload: {}", json, e);
-            return "⚠ Could not cancel run: " + e.getMessage();
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private String executeCreateChain(String json) {
-        try {
-            Map<String, Object> params = objectMapper.readValue(json, new TypeReference<>() {});
-            String name = (String) params.get("name");
-            if (name == null || name.isBlank())
-                return "⚠ create_chain: name is a required field.";
-
-            List<Map<String, Object>> rawEntries = params.containsKey("entries")
-                    ? objectMapper.convertValue(params.get("entries"), new TypeReference<>() {})
-                    : List.of();
-            if (rawEntries.isEmpty())
-                return "⚠ create_chain: entries must not be empty.";
-
-            List<ChainEntryRequest> entries = rawEntries.stream().map(e -> new ChainEntryRequest(
-                    (String) e.get("workflowId"),
-                    (String) e.getOrDefault("label", null),
-                    e.containsKey("sortOrder") ? ((Number) e.get("sortOrder")).intValue() : 0,
-                    e.containsKey("stopOnFailure") ? (Boolean) e.get("stopOnFailure") : null,
-                    e.containsKey("inputContext")
-                            ? objectMapper.convertValue(e.get("inputContext"), new TypeReference<Map<String, Object>>() {})
-                            : null
-            )).toList();
-
-            var request = new CreateChainRequest(
-                    name,
-                    (String) params.getOrDefault("description", null),
-                    (String) params.getOrDefault("icon", "⛓️"),
-                    entries,
-                    params.containsKey("stopOnFailure") ? (Boolean) params.get("stopOnFailure") : true
-            );
-            var created = chainService.create(request);
-            return "✓ Chain created: \"" + created.getName() + "\" with " + entries.size() + " workflows (ID: " + created.getId() + ")";
-        } catch (Exception e) {
-            log.warn("Assistant create_chain tool failed. Payload: {}", json, e);
-            return "⚠ Could not create chain: " + e.getMessage();
         }
     }
 }
