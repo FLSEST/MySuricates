@@ -10,7 +10,6 @@ import com.automation.service.ai.HostClaudeService;
 import com.automation.service.ai.HostClaudeService.ReasoningResult;
 import com.automation.service.cli.ClaudeJsonResponse;
 import com.automation.service.cli.CliSession;
-import com.automation.service.cli.CommandExecutorService;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.repository.WorkflowRunRepository;
@@ -41,9 +40,6 @@ class AgenticBlockExecutorTest {
     private HostClaudeService hostClaude;
 
     @Mock
-    private CommandExecutorService commandExecutor;
-
-    @Mock
     private LearningService learningService;
 
     @Mock
@@ -68,7 +64,10 @@ class AgenticBlockExecutorTest {
         ClaudeAiProvider claudeProvider = new ClaudeAiProvider(hostClaude);
         lenient().when(aiProviderRegistry.resolve(any())).thenReturn(claudeProvider);
 
-        executor = new AgenticBlockExecutor(hostClaude, commandExecutor, learningService, messagingTemplate, runRepository, systemIdentity, aiProviderRegistry);
+        executor = new AgenticBlockExecutor(
+                new AgenticPromptBuilder(learningService, systemIdentity),
+                new AgenticEventBroadcaster(messagingTemplate),
+                runRepository, aiProviderRegistry);
 
         // Default: resolve run-1 -> workflow-1
         Workflow workflow = Workflow.builder().id("workflow-1").build();
@@ -797,5 +796,92 @@ class AgenticBlockExecutorTest {
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
         assertThat(result.getOutput()).contains("claude binary not found in PATH");
+    }
+
+    // ── approval gate (characterization, Audit-TODO a253ad3e) ────────
+
+    private BlockDefinition approvalBlock() {
+        BlockDefinition block = buildBlock("Guarded goal", 3);
+        block.getConfig().put("require_approval", true);
+        return block;
+    }
+
+    private ExecutionContext contextAnswering(java.util.concurrent.CompletableFuture<String>... answers) {
+        ExecutionContext context = spy(buildContext());
+        org.mockito.stubbing.Stubber stub = null;
+        for (var answer : answers) {
+            stub = stub == null ? doReturn(answer) : stub.doReturn(answer);
+        }
+        stub.when(context).requestApproval(any(com.automation.executor.ApprovalRequest.class));
+        return context;
+    }
+
+    private void stubOneActionThenAchieved() throws Exception {
+        when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull()))
+                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Do it\nACTION: rm -rf build\nSUMMARY: Clean"))
+                .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Done"));
+        lenient().when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
+    }
+
+    @Test
+    void approval_yes_executesAction_andRecordsApproved() throws Exception {
+        stubOneActionThenAchieved();
+        when(hostClaude.executeAction(eq("rm -rf build"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull()))
+                .thenReturn(new HostClaudeService.ActionResult("cleaned", 0, null));
+        ExecutionContext context = contextAnswering(java.util.concurrent.CompletableFuture.completedFuture("Yes"));
+
+        StepResult result = executor.execute(approvalBlock(), context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        verify(context, times(1)).requestApproval(argThat(r -> r.getQuestion().equals("Approve action: rm -rf build")
+                && r.getOptions().equals(List.of("Yes", "Yes always", "No")) && r.getBlockId().equals("agentic-0-iter-1")));
+        verify(hostClaude).executeAction(eq("rm -rf build"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull());
+    }
+
+    @Test
+    void approval_yesAlways_disablesGateForFollowingIterations() throws Exception {
+        when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull()))
+                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: a\nACTION: step one\nSUMMARY: s"))
+                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: b\nACTION: step two\nSUMMARY: s"))
+                .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Done"));
+        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull()))
+                .thenReturn(new HostClaudeService.ActionResult("ok", 0, null));
+        lenient().when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
+        ExecutionContext context = contextAnswering(java.util.concurrent.CompletableFuture.completedFuture("Yes always"));
+
+        StepResult result = executor.execute(approvalBlock(), context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        verify(context, times(1)).requestApproval(any(com.automation.executor.ApprovalRequest.class));
+        verify(hostClaude, times(2)).executeAction(anyString(), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull());
+    }
+
+    @Test
+    void approval_no_skipsAction_recordsRejection_andContinuesLoop() throws Exception {
+        stubOneActionThenAchieved();
+        ExecutionContext context = contextAnswering(java.util.concurrent.CompletableFuture.completedFuture("No"));
+
+        StepResult result = executor.execute(approvalBlock(), context);
+
+        assertThat(result.getOutput()).contains("[iteration 1 - REJECTED]: rm -rf build");
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata().get("totalIterations")).isEqualTo(2);
+        verify(hostClaude, never()).executeAction(anyString(), any(), any(), any(), any(), anyBoolean(), any(), any(), any());
+    }
+
+    @Test
+    void approval_futureFails_abortsWithApprovalError() throws Exception {
+        stubOneActionThenAchieved();
+        ExecutionContext context = contextAnswering(
+                java.util.concurrent.CompletableFuture.failedFuture(new IllegalStateException("channel closed")));
+
+        StepResult result = executor.execute(approvalBlock(), context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getOutput()).contains("[iteration 1 - APPROVAL ERROR: ");
+        assertThat(result.getOutput()).contains("channel closed");
+        verify(hostClaude, never()).executeAction(anyString(), any(), any(), any(), any(), anyBoolean(), any(), any(), any());
     }
 }

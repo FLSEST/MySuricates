@@ -116,7 +116,7 @@ com.automation
 ├── repository/          Spring Data Repositories
 ├── mapper/              MapStruct-Mapper (Entity ↔ DTO)
 ├── executor/            Workflow-Ausführungs-Engine
-│   └── blocks/          14 Block-Executors + Agentic-Hilfsklassen
+│   └── blocks/          14 Block-Executors + Agentic-Hilfsklassen (AgenticBlockConfig, AgenticPlan, AgenticSafetyGuard, AgenticTokenTracker, AgenticPromptBuilder, AgenticEventBroadcaster)
 ├── concurrency/         DynamicSemaphore
 ├── config/              Konfigurationsklassen, Seeder (Skill, Template, OnboardingProfile)
 ├── security/            ApiKeyAuthFilter, RateLimitFilter, ActivityLogSizeLimitFilter, WebhookRateLimiter, WebSocketAuthInterceptor
