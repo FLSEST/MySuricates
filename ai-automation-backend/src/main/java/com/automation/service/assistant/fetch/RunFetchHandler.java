@@ -4,7 +4,7 @@ import com.automation.entity.RunStatus;
 import com.automation.entity.StepStatus;
 import com.automation.entity.WorkflowRun;
 import com.automation.repository.WorkflowRunRepository;
-import com.automation.service.assistant.AssistantContextBuilder;
+import com.automation.service.assistant.AssistantFormatUtils;
 import com.automation.util.TruncationUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,18 +22,17 @@ import java.util.List;
 public class RunFetchHandler {
 
     private final WorkflowRunRepository workflowRunRepository;
-    private final AssistantContextBuilder contextBuilder;
 
     public String formatRunDetail(String id) {
         try {
             return workflowRunRepository.findByIdWithSteps(id).map(run -> {
                 var sb = new StringBuilder();
                 sb.append("**Run ").append(id, 0, Math.min(8, id.length())).append("…** — ");
-                sb.append(contextBuilder.runLabel(run)).append(", Status: ").append(run.getStatus());
+                sb.append(AssistantFormatUtils.runLabel(run)).append(", Status: ").append(run.getStatus());
                 if (run.getDurationMs() != null)
                     sb.append(" (").append(run.getDurationMs() / 1000).append("s)");
                 sb.append("\n");
-                String err = contextBuilder.extractError(run);
+                String err = AssistantFormatUtils.extractError(run);
                 if (err != null) sb.append("Run error: ").append(TruncationUtil.smart(err, 200, 400)).append("\n");
                 var steps = run.getSteps();
                 if (!steps.isEmpty()) {
@@ -61,11 +60,11 @@ public class RunFetchHandler {
             sb.append("**Recent runs for workflow ").append(workflowId, 0, Math.min(8, workflowId.length()))
                     .append("…:**\n");
             runs.forEach(r -> {
-                sb.append("  - [").append(contextBuilder.fmt(r.getStartedAt())).append("] ")
-                        .append(r.getStatus()).append(" (link:").append(contextBuilder.runLink(r)).append(")");
+                sb.append("  - [").append(AssistantFormatUtils.fmt(r.getStartedAt())).append("] ")
+                        .append(r.getStatus()).append(" (link:").append(AssistantFormatUtils.runLink(r)).append(")");
                 if (r.getStatus() == RunStatus.FAILED) {
-                    String err = contextBuilder.extractError(r);
-                    if (err != null) sb.append(" — ").append(contextBuilder.truncate(err, 100));
+                    String err = AssistantFormatUtils.extractError(r);
+                    if (err != null) sb.append(" — ").append(AssistantFormatUtils.truncate(err, 100));
                 }
                 sb.append("\n");
             });

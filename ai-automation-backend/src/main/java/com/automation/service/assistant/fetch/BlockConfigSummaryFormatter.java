@@ -1,7 +1,7 @@
 package com.automation.service.assistant.fetch;
 
 import com.automation.repository.WorkflowRepository;
-import com.automation.service.assistant.AssistantContextBuilder;
+import com.automation.service.assistant.AssistantFormatUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -18,20 +18,19 @@ import java.util.Map;
 public class BlockConfigSummaryFormatter {
 
     private final WorkflowRepository workflowRepository;
-    private final AssistantContextBuilder contextBuilder;
 
     @SuppressWarnings("unchecked")
     public void appendBlockConfigSummary(StringBuilder sb, String type, Map<String, Object> cfg) {
         switch (type) {
             case "simple", "agentic" -> {
                 Object prompt = cfg.get("prompt");
-                if (prompt != null) sb.append("     prompt: ").append(contextBuilder.truncate(String.valueOf(prompt).trim(), 200)).append("\n");
+                if (prompt != null) sb.append("     prompt: ").append(AssistantFormatUtils.truncate(String.valueOf(prompt).trim(), 200)).append("\n");
                 Object model = cfg.get("model");
                 if (model != null && !String.valueOf(model).isBlank()) sb.append("     model: ").append(model).append("\n");
             }
             case "shell" -> {
                 Object command = cfg.get("command");
-                if (command != null) sb.append("     command: ").append(contextBuilder.truncate(String.valueOf(command).trim(), 300)).append("\n");
+                if (command != null) sb.append("     command: ").append(AssistantFormatUtils.truncate(String.valueOf(command).trim(), 300)).append("\n");
             }
             case "conditional" -> {
                 Object condition = cfg.get("condition");
@@ -83,7 +82,7 @@ public class BlockConfigSummaryFormatter {
             default -> {
                 cfg.forEach((k, v) -> {
                     if (v != null && !String.valueOf(v).isBlank()) {
-                        sb.append("     ").append(k).append(": ").append(contextBuilder.truncate(String.valueOf(v), 80)).append("\n");
+                        sb.append("     ").append(k).append(": ").append(AssistantFormatUtils.truncate(String.valueOf(v), 80)).append("\n");
                     }
                 });
             }

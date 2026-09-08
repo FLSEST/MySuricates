@@ -2,7 +2,7 @@ package com.automation.service.assistant.fetch;
 
 import com.automation.dto.response.PoolWorkflowEntry;
 import com.automation.entity.BlockDefinition;
-import com.automation.service.assistant.AssistantContextBuilder;
+import com.automation.service.assistant.AssistantFormatUtils;
 import com.automation.service.pool.WorkflowPoolService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +21,6 @@ import java.util.Map;
 public class PoolFetchHandler {
 
     private final WorkflowPoolService workflowPoolService;
-    private final AssistantContextBuilder contextBuilder;
     private final BlockConfigSummaryFormatter blockConfigSummaryFormatter;
 
     public String formatPoolWorkflows() {
@@ -38,7 +37,7 @@ public class PoolFetchHandler {
                 sb.append(")");
                 if (e.tags() != null && !e.tags().isEmpty()) sb.append(" Tags: ").append(String.join(", ", e.tags()));
                 String deDesc = e.description() != null ? e.description().getOrDefault("de", e.description().getOrDefault("en", "")) : "";
-                if (!deDesc.isBlank()) sb.append("\n  ").append(contextBuilder.truncate(deDesc, 120));
+                if (!deDesc.isBlank()) sb.append("\n  ").append(AssistantFormatUtils.truncate(deDesc, 120));
                 sb.append("\n");
             });
             sb.append("\nUse `<fetch type=\"pool_workflow\" id=\"<pool-id>\"/>` for details incl. blocks.\n");
@@ -60,7 +59,7 @@ public class PoolFetchHandler {
             if (!deDesc.isBlank()) sb.append("Description: ").append(deDesc).append("\n");
             if (entry.model() != null) sb.append("Model: ").append(entry.model()).append("\n");
             if (entry.instructions() != null && !entry.instructions().isBlank())
-                sb.append("Instructions: ").append(contextBuilder.truncate(entry.instructions(), 500)).append("\n");
+                sb.append("Instructions: ").append(AssistantFormatUtils.truncate(entry.instructions(), 500)).append("\n");
             if (entry.defaultContext() != null && !entry.defaultContext().isEmpty())
                 sb.append("Default variables: ").append(entry.defaultContext()).append("\n");
             if (entry.blocks() != null && !entry.blocks().isEmpty()) {

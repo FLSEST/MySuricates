@@ -81,7 +81,7 @@ class AssistantServiceTest {
         lenient().when(claudeProvider.getId()).thenReturn("CLAUDE");
         lenient().when(aiProviderRegistry.resolve(any())).thenReturn(claudeProvider);
         // Context builder defaults (lenient — not all tests call chat())
-        lenient().when(contextBuilder.buildSystemPrompt(any(), any())).thenReturn("System prompt");
+        lenient().when(contextBuilder.buildSystemPrompt(any(), any(), any())).thenReturn("System prompt");
         lenient().when(contextBuilder.buildPrompt(any(), anyString())).thenAnswer(inv -> inv.getArgument(1));
         lenient().when(contextBuilder.resolveWorkingDir(any())).thenReturn("/tmp");
         // Fetch service defaults — no fetches

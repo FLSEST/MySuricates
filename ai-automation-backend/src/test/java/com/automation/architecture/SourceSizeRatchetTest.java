@@ -41,7 +41,6 @@ class SourceSizeRatchetTest {
             entry("com/automation/service/ai/HostClaudeService.java", 479),
             entry("com/automation/service/ai/HostPiService.java", 337),
             entry("com/automation/service/assistant/AssistantActionSuggestionService.java", 427),
-            entry("com/automation/service/assistant/AssistantContextBuilder.java", 533),
             entry("com/automation/service/chain/ChainExecutor.java", 348),
             entry("com/automation/service/cli/CommandExecutorService.java", 381),
             entry("com/automation/service/cli/ContainerShellService.java", 359),

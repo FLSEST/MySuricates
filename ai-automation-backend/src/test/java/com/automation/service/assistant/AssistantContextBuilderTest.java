@@ -25,6 +25,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -40,6 +41,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AssistantContextBuilderTest {
@@ -77,12 +79,13 @@ class AssistantContextBuilderTest {
         WorkflowMemoryContextSection workflowMemorySection = new WorkflowMemoryContextSection(workflowMemoryRepository);
         RecentSessionsContextSection recentSessionsSection =
                 new RecentSessionsContextSection(assistantSessionRepository, new ObjectMapper());
-        builder = new AssistantContextBuilder(workflowRunRepository, projectRepository,
-                wishRepository, workflowRepository,
+        builder = new AssistantContextBuilder(projectRepository, workflowRepository,
                 runsSection, todosSection, wishesSection, schedulesSection,
                 skillsSection, integrationsSection, chainsSection, blockTypesSection,
                 failedWorkflowsSection, projectsSection, workflowsSection,
-                workflowMemorySection, recentSessionsSection);
+                workflowMemorySection, recentSessionsSection,
+                new PageContextRenderer(workflowRunRepository, projectRepository, wishRepository,
+                        workflowRepository, new ProjectFileListing()));
     }
 
     @Test
@@ -100,8 +103,6 @@ class AssistantContextBuilderTest {
 
     @Test
     void buildSystemPrompt_nullLanguage_defaultsToGerman() {
-        // Backward-compatible 2-arg overload and null language both fall back to German.
-        assertThat(builder.buildSystemPrompt(null, "base")).contains("Always answer in German.");
         assertThat(builder.buildSystemPrompt(null, "base", null)).contains("Always answer in German.");
     }
 
@@ -172,93 +173,6 @@ class AssistantContextBuilderTest {
         String result = builder.buildPrompt(null, "Frage");
 
         assertThat(result).contains("Frage");
-    }
-
-    @Test
-    void truncate_shortString_unchanged() {
-        assertThat(builder.truncate("short", 100)).isEqualTo("short");
-    }
-
-    @Test
-    void truncate_longString_truncated() {
-        String long_ = "x".repeat(200);
-        String result = builder.truncate(long_, 50);
-        assertThat(result.length()).isLessThan(200);
-        assertThat(result).contains("Output truncated");
-    }
-
-    @Test
-    void truncate_null_returnsEmptyString() {
-        assertThat(builder.truncate(null, 50)).isEmpty();
-    }
-
-    @Test
-    void extractError_withErrorMap_returnsMessage() {
-        WorkflowRun run = WorkflowRun.builder().id("r1")
-                .error(Map.of("message", "Something went wrong")).build();
-        String result = builder.extractError(run);
-        assertThat(result).isEqualTo("Something went wrong");
-    }
-
-    @Test
-    void extractError_emptyError_returnsNull() {
-        WorkflowRun run = WorkflowRun.builder().id("r1").build();
-        String result = builder.extractError(run);
-        assertThat(result).isNull();
-    }
-
-    @Test
-    void fmt_validInstant_formatsCorrectly() {
-        Instant instant = Instant.parse("2026-03-15T14:30:00Z");
-        String result = builder.fmt(instant);
-        assertThat(result).isNotNull();
-        assertThat(result).matches("\\d{2}\\.\\d{2}\\. \\d{2}:\\d{2}");
-    }
-
-    @Test
-    void runLabel_withWorkflow_formatsLabel() {
-        WorkflowRun run = WorkflowRun.builder().id("r1").status(RunStatus.COMPLETED).build();
-        // runLabel accesses lazy-loaded workflow — in test env returns null-safe
-        String result = builder.runLabel(run);
-        assertThat(result).isNotNull();
-    }
-
-    @Test
-    void fmt_nullInstant_returnsDash() {
-        assertThat(builder.fmt(null)).isEqualTo("—");
-    }
-
-    @Test
-    void runLink_noWorkflow_returnsRunPath() {
-        WorkflowRun run = WorkflowRun.builder().id("run-123").build();
-        String result = builder.runLink(run);
-        assertThat(result).isEqualTo("/runs/run-123");
-    }
-
-    @Test
-    void runLabel_noWorkflow_returnsUnbekannt() {
-        WorkflowRun run = WorkflowRun.builder().id("r1").build();
-        String result = builder.runLabel(run);
-        assertThat(result).isEqualTo("Unknown");
-    }
-
-    @Test
-    void extractError_nullErrorMap_returnsNull() {
-        WorkflowRun run = WorkflowRun.builder().id("r1").error(null).build();
-        assertThat(builder.extractError(run)).isNull();
-    }
-
-    @Test
-    void extractError_noMessageKey_returnsNull() {
-        WorkflowRun run = WorkflowRun.builder().id("r1")
-                .error(Map.of("other", "data")).build();
-        assertThat(builder.extractError(run)).isNull();
-    }
-
-    @Test
-    void truncate_exactMaxLength_unchanged() {
-        String exact = "x".repeat(50);
-        assertThat(builder.truncate(exact, 50)).isEqualTo(exact);
     }
 
     @Nested
@@ -344,7 +258,7 @@ class AssistantContextBuilderTest {
             when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
             when(assistantSessionRepository.findTop5ByOrderByStartedAtDesc()).thenReturn(List.of());
 
-            String result = builder.buildSystemPrompt(null, "Du bist MySuricates.");
+            String result = builder.buildSystemPrompt(null, "Du bist MySuricates.", null);
 
             assertThat(result).startsWith("Du bist MySuricates.");
             assertThat(result).contains("My Current State");
@@ -364,7 +278,7 @@ class AssistantContextBuilderTest {
             when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
             when(assistantSessionRepository.findTop5ByOrderByStartedAtDesc()).thenReturn(List.of());
 
-            String result = builder.buildSystemPrompt(null, null);
+            String result = builder.buildSystemPrompt(null, null, null);
 
             assertThat(result).contains("My Current State");
         }
@@ -386,7 +300,7 @@ class AssistantContextBuilderTest {
             when(todoRepository.findAll()).thenReturn(List.of(todo));
 
             // OVERVIEW page → todos in full mode
-            String result = builder.buildSystemPrompt(null, "");
+            String result = builder.buildSystemPrompt(null, "", null);
 
             assertThat(result).contains("Open Todos");
             assertThat(result).contains("Fix Bug");
@@ -399,7 +313,7 @@ class AssistantContextBuilderTest {
             when(workflowRunRepository.findByIdWithSteps("run-1")).thenReturn(Optional.of(run));
 
             var ctx = new AssistantChatRequest.PageContext("runs", "run-1", null);
-            String result = builder.buildSystemPrompt(ctx, "");
+            String result = builder.buildSystemPrompt(ctx, "", null);
 
             assertThat(result).contains("Currently displayed run");
             assertThat(result).contains("Status: RUNNING");
@@ -416,7 +330,7 @@ class AssistantContextBuilderTest {
             when(workflowRunRepository.findByIdWithSteps("run-1")).thenReturn(Optional.of(run));
 
             var ctx = new AssistantChatRequest.PageContext("runs", "legacy-run", null, "wf-1", "run-1", "/workflows/wf-1/run/run-1");
-            String result = builder.buildSystemPrompt(ctx, "");
+            String result = builder.buildSystemPrompt(ctx, "", null);
 
             assertThat(result).contains("Currently displayed run");
             assertThat(result).contains("COMPLETED");
@@ -451,7 +365,7 @@ class AssistantContextBuilderTest {
             when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(wf));
 
             var ctx = new AssistantChatRequest.PageContext("run", "run-1", null, "wf-1", "run-1", "/workflows/wf-1/run/run-1");
-            String result = builder.buildSystemPrompt(ctx, "");
+            String result = builder.buildSystemPrompt(ctx, "", null);
 
             assertThat(result).contains("Failed step 2 (shell)");
             assertThat(result).contains("curl -f https://example.org/deploy");
@@ -472,7 +386,7 @@ class AssistantContextBuilderTest {
             when(workflowRepository.findById("wf-1")).thenReturn(Optional.empty());
 
             var ctx = new AssistantChatRequest.PageContext("run", "run-1", null, "wf-1", "run-1", null);
-            String result = builder.buildSystemPrompt(ctx, "");
+            String result = builder.buildSystemPrompt(ctx, "", null);
 
             assertThat(result).contains("Failed step 1 (shell)");
             assertThat(result).contains("boom: exit code 7");
@@ -497,7 +411,7 @@ class AssistantContextBuilderTest {
             when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(wf));
 
             var ctx = new AssistantChatRequest.PageContext("run", "run-1", null, "wf-1", "run-1", null);
-            String result = builder.buildSystemPrompt(ctx, "");
+            String result = builder.buildSystemPrompt(ctx, "", null);
 
             assertThat(result).contains("Failed step 1 (shell)");
             assertThat(result).contains("fail output");
@@ -538,7 +452,7 @@ class AssistantContextBuilderTest {
                     .build();
             when(assistantSessionRepository.findTop5ByOrderByStartedAtDesc()).thenReturn(List.of(session));
 
-            String result = builder.buildSystemPrompt(null, "Du bist MySuricates.");
+            String result = builder.buildSystemPrompt(null, "Du bist MySuricates.", null);
 
             assertThat(result).contains("**My Projects (2):**");
             assertThat(result).contains("Alpha (ID: p-alpha, 1 workflows)");
@@ -567,7 +481,7 @@ class AssistantContextBuilderTest {
             when(workflowRepository.findAllWithActiveProject()).thenReturn(List.of(betaWorkflow, alphaWorkflow));
 
             var ctx = new AssistantChatRequest.PageContext("workflow", "wf-alpha", null, "wf-alpha", null, "/workflows/wf-alpha");
-            String result = builder.buildSystemPrompt(ctx, "");
+            String result = builder.buildSystemPrompt(ctx, "", null);
 
             assertThat(result).contains("**My Projects (2):**");
             assertThat(result).contains("**My Workflows (2):**");
@@ -592,7 +506,7 @@ class AssistantContextBuilderTest {
             when(wishRepository.findById("wish-1")).thenReturn(Optional.of(activeWish));
 
             var ctx = new AssistantChatRequest.PageContext("wishes", "wish-1", null);
-            String result = builder.buildSystemPrompt(ctx, "");
+            String result = builder.buildSystemPrompt(ctx, "", null);
 
             assertThat(result).contains("**Wishes:** 1 active, 0 failed");
             assertThat(result).contains("Wish details: [EXECUTING] Baue einen Deploy-Workflow, iterations: 2/5");
@@ -606,7 +520,7 @@ class AssistantContextBuilderTest {
                             Instant.parse("2026-06-01T10:01:00Z"), 60000L, null)));
 
             var ctx = new AssistantChatRequest.PageContext("debug", null, null, null, null, "/debug");
-            String result = builder.buildSystemPrompt(ctx, "");
+            String result = builder.buildSystemPrompt(ctx, "", null);
 
             assertThat(result).contains("Broken Workflows (last run failed)");
             assertThat(result).contains("Build Alpha");
@@ -614,6 +528,133 @@ class AssistantContextBuilderTest {
             assertThat(result).contains("boom");
             assertThat(result).contains("run1");
             assertThat(result).contains("run_detail");
+        }
+    }
+
+    /**
+     * Locks which sections appear for which page category, in which order and with which
+     * compact flag — byte-identical prompt structure is the contract for the follow-up
+     * auto-discovery refactoring (TODO b4f0411f). Uses mocked sections so the lock does not
+     * depend on section content.
+     */
+    @Nested
+    class SectionSelection {
+
+        private final RunsContextSection runs = mock(RunsContextSection.class);
+        private final TodosContextSection todos = mock(TodosContextSection.class);
+        private final WishesContextSection wishes = mock(WishesContextSection.class);
+        private final SchedulesContextSection schedules = mock(SchedulesContextSection.class);
+        private final SkillsIndexSection skills = mock(SkillsIndexSection.class);
+        private final IntegrationsIndexSection integrations = mock(IntegrationsIndexSection.class);
+        private final ChainsIndexSection chains = mock(ChainsIndexSection.class);
+        private final BlockTypesIndexSection blockTypes = mock(BlockTypesIndexSection.class);
+        private final FailedWorkflowsContextSection failed = mock(FailedWorkflowsContextSection.class);
+        private final ProjectsContextSection projects = mock(ProjectsContextSection.class);
+        private final WorkflowsIndexSection workflows = mock(WorkflowsIndexSection.class);
+        private final WorkflowMemoryContextSection memory = mock(WorkflowMemoryContextSection.class);
+        private final RecentSessionsContextSection sessions = mock(RecentSessionsContextSection.class);
+
+        private AssistantContextBuilder b;
+
+        @BeforeEach
+        void init() {
+            lenient().when(workflowRepository.findAllWithActiveProject()).thenReturn(List.of());
+            b = new AssistantContextBuilder(projectRepository, workflowRepository,
+                    runs, todos, wishes, schedules, skills, integrations, chains, blockTypes,
+                    failed, projects, workflows, memory, sessions,
+                    new PageContextRenderer(workflowRunRepository, projectRepository, wishRepository,
+                            workflowRepository, new ProjectFileListing()));
+        }
+
+        private Object[] all() {
+            return new Object[]{runs, todos, wishes, schedules, skills, integrations, chains, blockTypes,
+                    failed, projects, workflows, memory, sessions};
+        }
+
+        @Test
+        void overview_allSectionsInFixedOrder_fullMode() {
+            b.buildSystemPrompt(null, "", null);
+
+            InOrder o = inOrder(all());
+            o.verify(runs).append(any(), eq(false));
+            o.verify(todos).append(any(), eq(false));
+            o.verify(wishes).append(any(), eq(false));
+            o.verify(schedules).append(any(), eq(false));
+            o.verify(projects).append(any(), eq(false), any());
+            o.verify(workflows).append(any(), eq(false), any(), isNull());
+            o.verify(skills).append(any(), eq(false));
+            o.verify(integrations).append(any(), eq(false));
+            o.verify(chains).append(any(), eq(false));
+            o.verify(blockTypes).append(any(), eq(false));
+            o.verify(memory).append(any(), anyMap());
+            o.verify(sessions).append(any(), eq(false));
+            verifyNoMoreInteractions(all());
+            verify(workflowRepository).findAllWithActiveProject();
+        }
+
+        @Test
+        void workflowsPage_projectsWorkflowsFull_repertoireCompact() {
+            var ctx = new AssistantChatRequest.PageContext("workflows", null, null);
+            b.buildSystemPrompt(ctx, "", null);
+
+            InOrder o = inOrder(all());
+            o.verify(projects).append(any(), eq(false), any());
+            o.verify(workflows).append(any(), eq(false), any(), eq(ctx));
+            o.verify(skills).append(any(), eq(true));
+            o.verify(integrations).append(any(), eq(true));
+            o.verify(chains).append(any(), eq(true));
+            o.verify(blockTypes).append(any(), eq(true));
+            verifyNoMoreInteractions(all());
+            verify(workflowRepository).findAllWithActiveProject();
+        }
+
+        @Test
+        void tasksPage_todosProjectsWorkflows_allCompact() {
+            var ctx = new AssistantChatRequest.PageContext("todos", null, null);
+            b.buildSystemPrompt(ctx, "", null);
+
+            InOrder o = inOrder(all());
+            o.verify(todos).append(any(), eq(true));
+            o.verify(projects).append(any(), eq(true), any());
+            o.verify(workflows).append(any(), eq(true), any(), eq(ctx));
+            verifyNoMoreInteractions(all());
+            verify(workflowRepository).findAllWithActiveProject();
+        }
+
+        @Test
+        void wishesPage_onlyWishesCompact_noWorkflowLoad() {
+            b.buildSystemPrompt(new AssistantChatRequest.PageContext("wishes", null, null), "", null);
+
+            verify(wishes).append(any(), eq(true));
+            verifyNoMoreInteractions(all());
+            verify(workflowRepository, never()).findAllWithActiveProject();
+        }
+
+        @Test
+        void schedulesPage_onlySchedulesCompact_noWorkflowLoad() {
+            b.buildSystemPrompt(new AssistantChatRequest.PageContext("schedules", null, null), "", null);
+
+            verify(schedules).append(any(), eq(true));
+            verifyNoMoreInteractions(all());
+            verify(workflowRepository, never()).findAllWithActiveProject();
+        }
+
+        @Test
+        void debugPage_onlyFailedWorkflowsFull_noWorkflowLoad() {
+            b.buildSystemPrompt(new AssistantChatRequest.PageContext("debug", null, null), "", null);
+
+            verify(failed).append(any(), eq(false));
+            verifyNoMoreInteractions(all());
+            verify(workflowRepository, never()).findAllWithActiveProject();
+        }
+
+        @Test
+        void runsPage_withOrWithoutRunId_noSections_noWorkflowLoad() {
+            b.buildSystemPrompt(new AssistantChatRequest.PageContext("runs", null, null), "", null);
+            b.buildSystemPrompt(new AssistantChatRequest.PageContext("runs", "r1", null), "", null);
+
+            verifyNoMoreInteractions(all());
+            verify(workflowRepository, never()).findAllWithActiveProject();
         }
     }
 }

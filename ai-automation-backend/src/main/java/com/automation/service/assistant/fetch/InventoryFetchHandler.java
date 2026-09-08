@@ -6,7 +6,7 @@ import com.automation.repository.SkillRepository;
 import com.automation.repository.WishRepository;
 import com.automation.repository.WorkflowChainRepository;
 import com.automation.repository.WorkflowRepository;
-import com.automation.service.assistant.AssistantContextBuilder;
+import com.automation.service.assistant.AssistantFormatUtils;
 import com.automation.service.integration.IntegrationAction;
 import com.automation.service.integration.IntegrationProvider;
 import com.automation.service.integration.IntegrationRegistry;
@@ -32,19 +32,18 @@ public class InventoryFetchHandler {
     private final IntegrationConnectionRepository integrationConnectionRepository;
     private final WorkflowChainRepository workflowChainRepository;
     private final WorkflowRepository workflowRepository;
-    private final AssistantContextBuilder contextBuilder;
 
     public String formatWishDetail(String id) {
         try {
             return wishRepository.findById(id).map(w -> {
                 var sb = new StringBuilder();
                 sb.append("**Wish ").append(id, 0, Math.min(8, id.length())).append("…** — [")
-                        .append(w.getStatus()).append("] ").append(contextBuilder.truncate(w.getOriginalText(), 200))
+                        .append(w.getStatus()).append("] ").append(AssistantFormatUtils.truncate(w.getOriginalText(), 200))
                         .append("\n");
                 sb.append("Iterations: ").append(w.getIterationCount())
                         .append("/").append(w.getMaxIterations()).append("\n");
                 if (w.getError() != null)
-                    sb.append("Error: ").append(contextBuilder.truncate(w.getError(), 300)).append("\n");
+                    sb.append("Error: ").append(AssistantFormatUtils.truncate(w.getError(), 300)).append("\n");
                 return sb.toString();
             }).orElse("Wish " + id + " not found.\n");
         } catch (Exception e) {
@@ -60,10 +59,10 @@ public class InventoryFetchHandler {
                 sb.append("**Skill: ").append(s.getName()).append("** (id: ").append(s.getId()).append(")\n");
                 sb.append("Category: ").append(s.getCategory()).append("\n");
                 if (s.getDescription() != null && !s.getDescription().isBlank()) {
-                    sb.append("Description: ").append(contextBuilder.truncate(s.getDescription().trim(), 200)).append("\n");
+                    sb.append("Description: ").append(AssistantFormatUtils.truncate(s.getDescription().trim(), 200)).append("\n");
                 }
                 if (s.getAiContext() != null && !s.getAiContext().isBlank()) {
-                    sb.append("AI context: ").append(contextBuilder.truncate(s.getAiContext().trim(), 400)).append("\n");
+                    sb.append("AI context: ").append(AssistantFormatUtils.truncate(s.getAiContext().trim(), 400)).append("\n");
                 }
                 var caps = s.getCapabilities();
                 if (caps != null && !caps.isEmpty()) {
@@ -71,7 +70,7 @@ public class InventoryFetchHandler {
                     caps.forEach(c -> {
                         sb.append("  - ").append(c.getName());
                         if (c.getDescription() != null && !c.getDescription().isBlank()) {
-                            sb.append(" — ").append(contextBuilder.truncate(c.getDescription().trim(), 100));
+                            sb.append(" — ").append(AssistantFormatUtils.truncate(c.getDescription().trim(), 100));
                         }
                         sb.append("\n");
                         if (c.getInputSchema() != null && !c.getInputSchema().isEmpty()) {
@@ -102,11 +101,11 @@ public class InventoryFetchHandler {
             var sb = new StringBuilder();
             sb.append("**Integration: ").append(p.getDisplayName()).append("** (id: ").append(p.getProviderId()).append(")\n");
             if (p.getDescription() != null && !p.getDescription().isBlank()) {
-                sb.append("Description: ").append(contextBuilder.truncate(p.getDescription().trim(), 200)).append("\n");
+                sb.append("Description: ").append(AssistantFormatUtils.truncate(p.getDescription().trim(), 200)).append("\n");
             }
             sb.append("Status: ").append(status);
             if (accountInfo != null && !accountInfo.isBlank()) {
-                sb.append(" (").append(contextBuilder.truncate(accountInfo, 80)).append(")");
+                sb.append(" (").append(AssistantFormatUtils.truncate(accountInfo, 80)).append(")");
             }
             sb.append("\n");
             sb.append("OAuth flow required: ").append(p.requiresOAuthFlow() ? "yes" : "no (API key/token)").append("\n");
@@ -116,7 +115,7 @@ public class InventoryFetchHandler {
                 actions.forEach(a -> {
                     sb.append("  - ").append(a.name());
                     if (a.description() != null && !a.description().isBlank()) {
-                        sb.append(" — ").append(contextBuilder.truncate(a.description().trim(), 100));
+                        sb.append(" — ").append(AssistantFormatUtils.truncate(a.description().trim(), 100));
                     }
                     sb.append("\n");
                     if (a.inputSchema() != null && !a.inputSchema().isEmpty()) {
@@ -140,7 +139,7 @@ public class InventoryFetchHandler {
                 var sb = new StringBuilder();
                 sb.append("**Chain: ").append(c.getName()).append("** (id: ").append(c.getId()).append(")\n");
                 if (c.getDescription() != null && !c.getDescription().isBlank()) {
-                    sb.append("Description: ").append(contextBuilder.truncate(c.getDescription().trim(), 200)).append("\n");
+                    sb.append("Description: ").append(AssistantFormatUtils.truncate(c.getDescription().trim(), 200)).append("\n");
                 }
                 sb.append("Stop on failure: ").append(c.isStopOnFailure() ? "yes" : "no").append("\n");
                 var entries = c.getEntries();

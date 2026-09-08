@@ -2,7 +2,7 @@ package com.automation.service.assistant.fetch;
 
 import com.automation.entity.BlockDefinition;
 import com.automation.repository.WorkflowRepository;
-import com.automation.service.assistant.AssistantContextBuilder;
+import com.automation.service.assistant.AssistantFormatUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -21,7 +21,6 @@ import java.util.Map;
 public class WorkflowFetchHandler {
 
     private final WorkflowRepository workflowRepository;
-    private final AssistantContextBuilder contextBuilder;
     private final BlockConfigSummaryFormatter blockConfigSummaryFormatter;
 
     public String formatWorkflowDetail(String workflowId) {
@@ -33,13 +32,13 @@ public class WorkflowFetchHandler {
                 sb.append("**Workflow: ").append(wf.getName()).append("** (").append(projectName).append(")\n");
                 sb.append("Project ID: ").append(projectId).append("\n");
                 if (wf.getDescription() != null && !wf.getDescription().isBlank()) {
-                    sb.append("Description: ").append(contextBuilder.truncate(wf.getDescription().trim(), 150)).append("\n");
+                    sb.append("Description: ").append(AssistantFormatUtils.truncate(wf.getDescription().trim(), 150)).append("\n");
                 }
                 if (wf.getModel() != null && !wf.getModel().isBlank()) {
                     sb.append("Model: ").append(wf.getModel()).append("\n");
                 }
                 if (wf.getInstructions() != null && !wf.getInstructions().isBlank()) {
-                    sb.append("Instructions: ").append(contextBuilder.truncate(wf.getInstructions().trim(), 400)).append("\n");
+                    sb.append("Instructions: ").append(AssistantFormatUtils.truncate(wf.getInstructions().trim(), 400)).append("\n");
                 }
                 var blocks = wf.getBlocks();
                 if (blocks != null && !blocks.isEmpty()) {
@@ -73,7 +72,7 @@ public class WorkflowFetchHandler {
                     sb.append("Model: ").append(wf.getModel()).append("\n");
                 }
                 if (wf.getInstructions() != null && !wf.getInstructions().isBlank()) {
-                    sb.append("Instructions: ").append(contextBuilder.truncate(wf.getInstructions().trim(), 600)).append("\n");
+                    sb.append("Instructions: ").append(AssistantFormatUtils.truncate(wf.getInstructions().trim(), 600)).append("\n");
                 }
                 if (wf.getDefaultContext() != null && !wf.getDefaultContext().isEmpty()) {
                     sb.append("Default inputs: ").append(wf.getDefaultContext()).append("\n");
@@ -88,7 +87,7 @@ public class WorkflowFetchHandler {
                         cfg.forEach((k, v) -> {
                             String valStr = v == null ? "null" : String.valueOf(v);
                             sb.append("       ").append(k).append(": ")
-                              .append(contextBuilder.truncate(valStr, 300)).append("\n");
+                              .append(AssistantFormatUtils.truncate(valStr, 300)).append("\n");
                         });
                     }
                 }
@@ -142,7 +141,7 @@ public class WorkflowFetchHandler {
                     ctx.forEach((k, v) -> {
                         String valStr = v == null ? "null" : String.valueOf(v);
                         sb.append("  - ").append(k).append(" = ")
-                          .append(contextBuilder.truncate(valStr, 100)).append("\n");
+                          .append(AssistantFormatUtils.truncate(valStr, 100)).append("\n");
                     });
                 }
                 return sb.toString();
