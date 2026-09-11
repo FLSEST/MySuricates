@@ -4,28 +4,18 @@ import com.automation.dto.request.CreateTodoRequest;
 import com.automation.dto.request.UpdateTodoRequest;
 import com.automation.dto.request.UpdateTodoStatusRequest;
 import com.automation.dto.response.TodoCountResponse;
-import com.automation.dto.response.TodoResponse;
 import com.automation.entity.Project;
-import com.automation.entity.RunStatus;
 import com.automation.entity.Todo;
-import com.automation.entity.Workflow;
-import com.automation.entity.WorkflowRun;
 import com.automation.exception.ResourceNotFoundException;
-import com.automation.mapper.TodoMapper;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.repository.WorkflowRepository;
-import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.audit.AuditCenterService;
-import com.automation.service.workflow.WorkflowExecutor;
-import com.automation.service.workflow.WorkflowService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
@@ -49,19 +39,7 @@ class TodoServiceTest {
     private WorkflowRepository workflowRepository;
 
     @Mock
-    private WorkflowRunRepository workflowRunRepository;
-
-    @Mock
-    private WorkflowService workflowService;
-
-    @Mock
-    private WorkflowExecutor workflowExecutor;
-
-    @Mock
-    private ObjectProvider<WorkflowExecutor> workflowExecutorProvider;
-
-    @Mock
-    private TodoMapper todoMapper;
+    private TodoResponseAssembler responseAssembler;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -300,47 +278,6 @@ class TodoServiceTest {
         assertThat(result.getStatus()).isEqualTo(Todo.Status.DONE);
         verify(todoRepository).save(todo);
         verify(auditCenterService).markAwaitingVerification("t-1");
-    }
-
-    @Test
-    void resolve_linkedWorkflow_setsTodoInProgressAndStartsRun() {
-        Todo todo = Todo.builder()
-                .id("t-1")
-                .title("Fix this")
-                .status(Todo.Status.OPEN)
-                .priority(Todo.Priority.MEDIUM)
-                .linkedWorkflowId("wf-1")
-                .source(Todo.Source.USER)
-                .build();
-        Workflow workflow = Workflow.builder().id("wf-1").name("Resolver").build();
-        WorkflowRun run = WorkflowRun.builder().id("run-1").status(RunStatus.RUNNING).build();
-
-        when(todoRepository.findById("t-1")).thenReturn(Optional.of(todo));
-        when(workflowService.findByIdEager("wf-1")).thenReturn(workflow);
-        when(workflowExecutorProvider.getObject()).thenReturn(workflowExecutor);
-        when(workflowExecutor.execute(eq(workflow), anyMap(), isNull(), anyMap())).thenReturn(run);
-        when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        WorkflowRun result = todoService.resolve("t-1");
-
-        assertThat(result.getId()).isEqualTo("run-1");
-        assertThat(todo.getStatus()).isEqualTo(Todo.Status.IN_PROGRESS);
-        assertThat(todo.getLastFixRunId()).isEqualTo("run-1");
-        assertThat(todo.getResolutionState()).isEqualTo(Todo.ResolutionState.RUNNING);
-    }
-
-    @Test
-    void resolve_withoutLinkedWorkflow_throws() {
-        Todo todo = Todo.builder()
-                .id("t-1")
-                .title("Unlinked")
-                .status(Todo.Status.OPEN)
-                .build();
-        when(todoRepository.findById("t-1")).thenReturn(Optional.of(todo));
-
-        assertThatThrownBy(() -> todoService.resolve("t-1"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("no linked workflow");
     }
 
     // --- delete ---

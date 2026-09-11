@@ -14,6 +14,7 @@ import com.automation.mapper.TodoMapper;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.service.todo.TodoHygieneService;
 import com.automation.service.todo.TodoOverviewService;
+import com.automation.service.todo.TodoResolutionService;
 import com.automation.service.todo.TodoService;
 import com.automation.service.todo.TodoSimilarityService;
 import com.automation.service.todo.TodoTrackerExportService;
@@ -32,6 +33,7 @@ import java.util.Map;
 public class TodoController {
 
     private final TodoService todoService;
+    private final TodoResolutionService todoResolutionService;
     private final TodoTrackerExportService todoTrackerExportService;
     private final TodoOverviewService todoOverviewService;
     private final TodoHygieneService todoHygieneService;
@@ -76,7 +78,7 @@ public class TodoController {
 
     @PostMapping("/{id}/resolve")
     public com.automation.dto.response.WorkflowRunResponse resolveTodo(@PathVariable String id) {
-        return workflowMapper.toRunResponse(todoService.resolve(id));
+        return workflowMapper.toRunResponse(todoResolutionService.resolve(id));
     }
 
     @PostMapping("/{id}/export")

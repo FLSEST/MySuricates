@@ -45,6 +45,7 @@ class TodoControllerTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @MockitoBean private TodoService todoService;
+    @MockitoBean private com.automation.service.todo.TodoResolutionService todoResolutionService;
     @MockitoBean private com.automation.service.todo.TodoTrackerExportService todoTrackerExportService;
     @MockitoBean private com.automation.service.todo.TodoOverviewService todoOverviewService;
     @MockitoBean private com.automation.service.todo.TodoHygieneService todoHygieneService;
@@ -136,7 +137,7 @@ class TodoControllerTest {
         var run = com.automation.entity.WorkflowRun.builder().id("run-1").build();
         var response = new WorkflowRunResponse("run-1", "wf-1", "Resolver", null, null,
                 com.automation.entity.RunStatus.RUNNING, List.of(), Instant.now(), null, null, null, null, java.util.Map.of(), java.util.Map.of(), null);
-        when(todoService.resolve("t-1")).thenReturn(run);
+        when(todoResolutionService.resolve("t-1")).thenReturn(run);
         when(workflowMapper.toRunResponse(run)).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/todos/t-1/resolve"))
