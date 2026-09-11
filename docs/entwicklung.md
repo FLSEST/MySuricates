@@ -83,6 +83,11 @@ mvn clean package
 # Ergebnis: target/ai-automation-backend-0.7.3-SNAPSHOT.jar
 ```
 
+**Docs im Classpath:** `src/main/resources/docs/` (architektur, WORKFLOW-GUIDE, audit-workflow-protocol,
+assistant-system, vision) ist ein Build-Artefakt — das `maven-resources-plugin` kopiert die Dateien in
+der Phase `generate-resources` aus dem Repo-Root `docs/`. Das Verzeichnis ist git-ignoriert; Änderungen
+gehören ausschließlich nach `docs/`. Der Assistent liest die Kopie zur Laufzeit per `ClassPathResource`.
+
 ### Frontend
 
 ```bash
