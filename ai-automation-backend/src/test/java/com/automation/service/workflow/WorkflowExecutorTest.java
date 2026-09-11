@@ -1487,4 +1487,66 @@ class WorkflowExecutorTest {
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
     }
+
+    // ── Race fixes (TODO 32f86881): rejected submit + unregister ordering ──────────
+
+    @Test
+    void execute_executorRejectsSubmission_marksRunFailedAndThrows() {
+        doThrow(new java.util.concurrent.RejectedExecutionException("shutting down"))
+                .when(virtualThreadExecutor).submit(any(Runnable.class));
+
+        assertThatThrownBy(() -> workflowExecutor.execute(testWorkflow, null))
+                .isInstanceOf(WorkflowExecutionException.class)
+                .hasMessageContaining("run-1");
+
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(saved.getCompletedAt()).isNotNull();
+        assertThat(String.valueOf(saved.getError().get("message"))).contains("rejected");
+        verify(broadcaster).broadcastRunStatus("run-1", RunStatus.FAILED);
+    }
+
+    @Test
+    void executeBlocks_unregistersFromRegistryOnlyAfterFinalSave() {
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(step);
+        List<Boolean> activeWhenTerminalStatusSaved = new ArrayList<>();
+        when(runRepository.save(any(WorkflowRun.class))).thenAnswer(inv -> {
+            WorkflowRun run = inv.getArgument(0);
+            if (run.getId() == null) run.setId("run-1");
+            if (run.getStatus() == RunStatus.COMPLETED) {
+                activeWhenTerminalStatusSaved.add(registry.isRunActive("run-1"));
+            }
+            return run;
+        });
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        assertThat(activeWhenTerminalStatusSaved).isNotEmpty().containsOnly(true);
+        assertThat(registry.isRunActive("run-1")).isFalse();
+    }
+
+    @Test
+    void executeBlocks_unregistersEvenWhenFinalSaveFails() {
+        StepResult step = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(step);
+        when(runRepository.save(any(WorkflowRun.class))).thenAnswer(inv -> {
+            WorkflowRun run = inv.getArgument(0);
+            if (run.getId() == null) run.setId("run-1");
+            if (run.getStatus() == RunStatus.COMPLETED) throw new RuntimeException("db down");
+            return run;
+        });
+
+        try {
+            workflowExecutor.execute(testWorkflow, null);
+        } catch (RuntimeException expected) {
+            // the synchronous test executor propagates the failure — irrelevant here
+        }
+
+        assertThat(registry.isRunActive("run-1")).isFalse();
+    }
 }

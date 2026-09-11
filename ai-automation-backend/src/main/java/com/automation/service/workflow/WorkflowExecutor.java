@@ -56,13 +56,6 @@ public class WorkflowExecutor {
     private final WorkflowExecutionRegistry executionRegistry;
     private final BlockOutputValidator blockOutputValidator;
 
-    private static final java.util.Set<String> SYSTEM_VAR_KEYS = java.util.Set.of(
-            "workflow_run_id", "workflow_id", "workflow_name", "project_id", "project_path",
-            "model", "provider", "effort", "started_at", "run_timestamp",
-            "previous_report", "open_todos",
-            "workflow_version", "workflow_changed_since_last_run"
-    );
-
     // Active execution tracking is delegated to WorkflowExecutionRegistry
 
     /**
@@ -158,7 +151,7 @@ public class WorkflowExecutor {
         activityLogService.info(LogCategory.EXECUTION,
                 "Workflow execution started: " + workflowName,
                 "WorkflowExecutor", runId, workflowId);
-        virtualThreadExecutor.submit(() -> executeBlocks(runId, workflowId, workflowName, wf, contextVars, 0, null));
+        submitExecution(runId, () -> executeBlocks(runId, workflowId, workflowName, wf, contextVars, 0, null));
 
         return run;
     }
@@ -328,7 +321,7 @@ public class WorkflowExecutor {
 
                 // Persist context delta for potential future resume
                 if (step.getStatus() == StepStatus.COMPLETED) {
-                    step.setContextDelta(computeContextDelta(context, run.getInputContext()));
+                    step.setContextDelta(ContextDeltaCalculator.compute(context, run.getInputContext()));
                 }
 
                 // Update container last activity (skip if no container)
@@ -380,41 +373,58 @@ public class WorkflowExecutor {
             if (semaphoreAcquired) {
                 executionSemaphore.release();
             }
-            executionRegistry.unregister(runId);
+            // Unregister last: between unregister and the final save the watchdog would see
+            // DB=RUNNING with an empty registry and flag a false-positive ghost run.
+            try {
+                if (run != null) {
+                    run.setCompletedAt(Instant.now());
+                    run.setDurationMs(
+                            run.getCompletedAt().toEpochMilli() - run.getStartedAt().toEpochMilli()
+                    );
 
-            if (run != null) {
-                run.setCompletedAt(Instant.now());
-                run.setDurationMs(
-                        run.getCompletedAt().toEpochMilli() - run.getStartedAt().toEpochMilli()
-                );
+                    // Merge context runMetadata into WorkflowRun.metadata
+                    if (context != null && !context.getRunMetadata().isEmpty()) {
+                        Map<String, Object> merged = new HashMap<>(run.getMetadata());
+                        merged.putAll(context.getRunMetadata());
+                        run.setMetadata(merged);
+                    }
 
-                // Merge context runMetadata into WorkflowRun.metadata
-                if (context != null && !context.getRunMetadata().isEmpty()) {
-                    Map<String, Object> merged = new HashMap<>(run.getMetadata());
-                    merged.putAll(context.getRunMetadata());
-                    run.setMetadata(merged);
+                    runRepository.save(run);
+
+                    // Broadcast final status
+                    broadcaster.broadcastRunStatus(run.getId(), run.getStatus());
+
+                    // Publish domain event for listeners (e.g. AutoTodoService)
+                    try {
+                        eventPublisher.publishEvent(new WorkflowRunCompletedEvent(
+                                this, run.getId(), workflowId, workflowName,
+                                project != null ? project.getId() : null,
+                                project != null ? project.getPath() : null,
+                                run.getStatus(),
+                                run.getMetadata(), workflowMeta, run.getError()));
+                    } catch (Exception e) {
+                        log.error("Failed to publish WorkflowRunCompletedEvent for run {}: {}", run.getId(), e.getMessage(), e);
+                    }
+                } else {
+                    // run could not be loaded — mark as failed directly
+                    failRun(runId, "Failed to load workflow run from database");
                 }
-
-                runRepository.save(run);
-
-                // Broadcast final status
-                broadcaster.broadcastRunStatus(run.getId(), run.getStatus());
-
-                // Publish domain event for listeners (e.g. AutoTodoService)
-                try {
-                    eventPublisher.publishEvent(new WorkflowRunCompletedEvent(
-                            this, run.getId(), workflowId, workflowName,
-                            project != null ? project.getId() : null,
-                            project != null ? project.getPath() : null,
-                            run.getStatus(),
-                            run.getMetadata(), workflowMeta, run.getError()));
-                } catch (Exception e) {
-                    log.error("Failed to publish WorkflowRunCompletedEvent for run {}: {}", run.getId(), e.getMessage(), e);
-                }
-            } else {
-                // run could not be loaded — mark as failed directly
-                failRun(runId, "Failed to load workflow run from database");
+            } finally {
+                executionRegistry.unregister(runId);
             }
+        }
+    }
+
+    /**
+     * Hands the run to the executor. If the pool rejects it (shutdown in progress), the run would
+     * otherwise stay RUNNING in the DB with no thread ever finishing it — so fail it right away.
+     */
+    private void submitExecution(String runId, Runnable execution) {
+        try {
+            virtualThreadExecutor.submit(execution);
+        } catch (java.util.concurrent.RejectedExecutionException e) {
+            failRun(runId, "Executor rejected the run (shutting down?): " + e.getMessage());
+            throw new WorkflowExecutionException("Executor rejected workflow run " + runId, e);
         }
     }
 
@@ -526,26 +536,9 @@ public class WorkflowExecutor {
                 "Resuming workflow from step " + resumeIdx + ": " + wfName,
                 "WorkflowExecutor", runId, wfId);
 
-        virtualThreadExecutor.submit(() -> executeBlocks(runId, wfId, wfName, wf, contextForResume, resumeIdx, previousOutput));
+        submitExecution(runId, () -> executeBlocks(runId, wfId, wfName, wf, contextForResume, resumeIdx, previousOutput));
 
         return run;
-    }
-
-    /**
-     * Computes the context delta: user-defined variables that are not derivable
-     * from step outputs or system-injected keys.
-     */
-    private Map<String, Object> computeContextDelta(ExecutionContext context, Map<String, Object> inputContext) {
-        Map<String, Object> delta = new HashMap<>(context.getVariables());
-        // Remove auto-set step_N_output variables — derivable from StepResult.output
-        delta.entrySet().removeIf(e -> e.getKey().matches("step_\\d+_output"));
-        // Remove system-injected constants
-        SYSTEM_VAR_KEYS.forEach(delta::remove);
-        // Remove inputContext vars — already stored in WorkflowRun.inputContext
-        if (inputContext != null) {
-            inputContext.keySet().forEach(delta::remove);
-        }
-        return delta.isEmpty() ? null : delta;
     }
 
     // ── Run control (pause/resume/cancel/approval) — status queries such as active run count,
