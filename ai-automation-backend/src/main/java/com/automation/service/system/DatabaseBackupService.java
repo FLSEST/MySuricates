@@ -188,15 +188,13 @@ public class DatabaseBackupService {
     }
 
     /**
-     * {@code PRAGMA auto_vacuum} only takes effect on an empty database or after a full VACUUM; the
-     * Hikari init-sql sets INCREMENTAL, but a database created before that setting silently stays
-     * at NONE and {@link #scheduledIncrementalVacuum()} becomes a no-op. Surface that at startup so
-     * a one-off {@code POST /api/v1/system/vacuum} can convert the file.
+     * {@code PRAGMA auto_vacuum} only takes effect on an empty database or after a full VACUUM, so a
+     * database older than the Hikari init-sql stays at NONE and {@link #scheduledIncrementalVacuum()}
+     * is a no-op. Surface that at startup; a one-off {@code POST /api/v1/system/vacuum} converts the file.
      */
     @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
     public void checkAutoVacuumMode() {
-        // Read the pragma and release the connection BEFORE logging: pool-size=1, and the
-        // ActivityLog write is itself transactional — holding the connection here deadlocks.
+        // Release the single connection BEFORE logging — ActivityLog writes are transactional (pool-size=1).
         int mode;
         try (var conn = dataSource.getConnection(); var stmt = conn.createStatement();
              var rs = stmt.executeQuery("PRAGMA auto_vacuum")) {
