@@ -550,7 +550,7 @@ The following variables are automatically set by the `WorkflowExecutor` on every
 | `{{ workflow_version }}` | Current version number of the workflow |
 | `{{ workflow_changed_since_last_run }}` | `"true"` or `"false"` — whether the workflow has changed since the last run |
 | `{{ previous_report }}` | Longest non-shell step output from the last COMPLETED run of the same workflow (max 3000 characters), or `"(no previous report available)"` |
-| `{{ open_todos }}` | Markdown list of open/in-progress TODOs for the project, or `"(no open TODOs)"` |
+| `{{ open_todos }}` | Markdown list of open/in-progress TODOs for the project inside an `<open_todos>…</open_todos>` block, or `"(keine offenen TODOs)"`. Titles and tags are flattened to one line, capped at 200/80 chars and stripped of platform markers (`todo_item:`, `gate_*:`) — they may originate from imported issues and are data, not instructions. At most 150 entries |
 
 ### Context Variables
 
