@@ -11,6 +11,7 @@ import com.automation.config.TaskCommandConfig;
 import com.automation.config.AssistantGuardrailsConfig;
 import com.automation.config.TodoGhostWatchdogConfig;
 import com.automation.config.TodoHygieneConfig;
+import com.automation.config.RunRetentionConfig;
 import com.automation.config.WishConfig;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.ai.HostClaudeService;
@@ -49,6 +50,7 @@ class ExecutionSettingsServiceTest {
     private SummarizationConfig summarizationConfig;
     private FactoryConfig factoryConfig;
     private WishConfig wishConfig;
+    private RunRetentionConfig runRetentionConfig;
     private ExecutionSettingsService service;
 
     @BeforeEach
@@ -65,13 +67,14 @@ class ExecutionSettingsServiceTest {
         summarizationConfig = new SummarizationConfig();
         factoryConfig = new FactoryConfig();
         wishConfig = new WishConfig();
+        runRetentionConfig = new RunRetentionConfig();
 
         service = new ExecutionSettingsService(
                 appSettingsRepository, executionSemaphore,
                 hostClaudeService, hostClaudeConfig, chainConfig,
                 rateLimitConfig, executionRegistry, containerShellService,
                 schedulerConfig, todoHygieneConfig, todoGhostWatchdogConfig, assistantGuardrailsConfig, taskCommandConfig,
-                summarizationConfig, factoryConfig, wishConfig
+                summarizationConfig, factoryConfig, wishConfig, runRetentionConfig
         );
     }
 

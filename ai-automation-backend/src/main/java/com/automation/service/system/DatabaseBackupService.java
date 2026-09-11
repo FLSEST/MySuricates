@@ -187,6 +187,32 @@ public class DatabaseBackupService {
         return Files.exists(file) ? file : null;
     }
 
+    /**
+     * {@code PRAGMA auto_vacuum} only takes effect on an empty database or after a full VACUUM; the
+     * Hikari init-sql sets INCREMENTAL, but a database created before that setting silently stays
+     * at NONE and {@link #scheduledIncrementalVacuum()} becomes a no-op. Surface that at startup so
+     * a one-off {@code POST /api/v1/system/vacuum} can convert the file.
+     */
+    @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
+    public void checkAutoVacuumMode() {
+        try (var conn = dataSource.getConnection(); var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("PRAGMA auto_vacuum")) {
+            int mode = rs.next() ? rs.getInt(1) : -1;
+            if (mode == 2) {
+                log.info("SQLite auto_vacuum = INCREMENTAL (nightly incremental_vacuum active)");
+                return;
+            }
+            String text = mode == 1 ? "FULL" : mode == 0 ? "NONE" : "unknown(" + mode + ")";
+            activityLogService.warn(LogCategory.SYSTEM,
+                    "SQLite auto_vacuum ist " + text + " statt INCREMENTAL — das nächtliche incremental_vacuum "
+                            + "gibt keinen Platz frei. Einmal POST /api/v1/system/vacuum ausführen (volles VACUUM "
+                            + "übernimmt das Pragma).",
+                    "DatabaseBackupService");
+        } catch (Exception e) {
+            log.debug("auto_vacuum check skipped: {}", e.getMessage());
+        }
+    }
+
     @Scheduled(cron = "0 0 3 * * *")
     public void scheduledIncrementalVacuum() {
         try (var conn = dataSource.getConnection(); var stmt = conn.createStatement()) {

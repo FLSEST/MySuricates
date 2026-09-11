@@ -181,6 +181,8 @@ export interface ExecutionConfig {
   schedulerResumeGraceMinutes: number;
   summarizationTimeoutSeconds: number;
   factoryTimeoutSeconds: number;
+  runRetentionDays?: number;
+  runRetentionMaxPerNight?: number;
   wishTotalTimeoutMinutes?: number;
   wishWorkflowWaitMinutes?: number;
   wishDefaultShellTimeoutSeconds?: number;

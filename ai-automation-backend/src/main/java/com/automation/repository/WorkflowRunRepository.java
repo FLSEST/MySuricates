@@ -182,4 +182,14 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
      */
     @Query("SELECT wr.id FROM WorkflowRun wr WHERE wr.status = 'INTERRUPTED' AND wr.completedAt < :cutoff")
     List<String> findInterruptedRunIdsOlderThan(@Param("cutoff") Instant cutoff);
+
+    /**
+     * Finished runs (given terminal statuses) completed before the cutoff, oldest first, that no
+     * audit report references — the retention candidates. Bounded by the pageable so the nightly
+     * job deletes in small batches instead of holding the single SQLite connection for minutes.
+     */
+    @Query("SELECT wr.id FROM WorkflowRun wr WHERE wr.status IN :statuses AND wr.completedAt < :cutoff " +
+           "AND NOT EXISTS (SELECT 1 FROM AuditReport ar WHERE ar.workflowRunId = wr.id) ORDER BY wr.completedAt ASC")
+    List<String> findTerminalRunIdsOlderThan(@Param("statuses") java.util.Collection<RunStatus> statuses,
+                                             @Param("cutoff") Instant cutoff, Pageable pageable);
 }

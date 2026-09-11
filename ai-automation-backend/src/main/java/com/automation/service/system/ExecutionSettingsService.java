@@ -10,6 +10,7 @@ import com.automation.config.SchedulerConfig;
 import com.automation.config.SummarizationConfig;
 import com.automation.config.TaskCommandConfig;
 import com.automation.config.TodoGhostWatchdogConfig;
+import com.automation.config.RunRetentionConfig;
 import com.automation.config.TodoHygieneConfig;
 import com.automation.config.WishConfig;
 import com.automation.repository.AppSettingsRepository;
@@ -50,6 +51,7 @@ public class ExecutionSettingsService {
     private final SummarizationConfig summarizationConfig;
     private final FactoryConfig factoryConfig;
     private final WishConfig wishConfig;
+    private final RunRetentionConfig runRetentionConfig;
 
     /** Canonical key → runtime setter, in the order the DB overrides are applied at startup. */
     private final Map<String, Consumer<String>> appliers;
@@ -70,7 +72,8 @@ public class ExecutionSettingsService {
             TaskCommandConfig taskCommandConfig,
             SummarizationConfig summarizationConfig,
             FactoryConfig factoryConfig,
-            WishConfig wishConfig) {
+            WishConfig wishConfig,
+            RunRetentionConfig runRetentionConfig) {
         this.appSettingsRepository = appSettingsRepository;
         this.executionSemaphore = executionSemaphore;
         this.hostClaudeService = hostClaudeService;
@@ -87,6 +90,7 @@ public class ExecutionSettingsService {
         this.summarizationConfig = summarizationConfig;
         this.factoryConfig = factoryConfig;
         this.wishConfig = wishConfig;
+        this.runRetentionConfig = runRetentionConfig;
         this.appliers = buildAppliers();
     }
 
@@ -109,6 +113,8 @@ public class ExecutionSettingsService {
         m.put("todo-hygiene-enabled", v -> todoHygieneConfig.setEnabled(Integer.parseInt(v) == 1));
         m.put("todo-stale-days", v -> todoHygieneConfig.setStaleDays(Integer.parseInt(v)));
         m.put("todo-hygiene-max-per-run", v -> todoHygieneConfig.setMaxPerRun(Integer.parseInt(v)));
+        m.put("run-retention-days", v -> runRetentionConfig.setRetentionDays(Integer.parseInt(v)));
+        m.put("run-retention-max-per-night", v -> runRetentionConfig.setMaxPerNight(Integer.parseInt(v)));
         m.put("todo-watchdog-enabled", v -> todoGhostWatchdogConfig.setEnabled(Integer.parseInt(v) == 1));
         m.put("todo-watchdog-stale-hours", v -> todoGhostWatchdogConfig.setStaleHours(Integer.parseInt(v)));
         m.put("assistant-max-actions-per-hour", v -> assistantGuardrailsConfig.setMaxActionsPerHour(Integer.parseInt(v)));
@@ -167,6 +173,8 @@ public class ExecutionSettingsService {
         result.put("todoHygieneEnabled", todoHygieneConfig.isEnabled() ? 1 : 0);
         result.put("todoStaleDays", todoHygieneConfig.getStaleDays());
         result.put("todoHygieneMaxPerRun", todoHygieneConfig.getMaxPerRun());
+        result.put("runRetentionDays", runRetentionConfig.getRetentionDays());
+        result.put("runRetentionMaxPerNight", runRetentionConfig.getMaxPerNight());
         result.put("todoWatchdogEnabled", todoGhostWatchdogConfig.isEnabled() ? 1 : 0);
         result.put("todoWatchdogStaleHours", todoGhostWatchdogConfig.getStaleHours());
         result.put("assistantMaxActionsPerHour", assistantGuardrailsConfig.getMaxActionsPerHour());

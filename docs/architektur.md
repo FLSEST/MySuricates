@@ -66,6 +66,12 @@ Repository (Spring Data JPA)
 SQLite (Datei: data/automation.db)
 ```
 
+### Datenbank-Wartung (SQLite, pool-size=1)
+
+- **Run-Retention** (`RunCleanupService.cleanupTerminalRuns`, täglich 03:15): löscht abgeschlossene Runs (COMPLETED, COMPLETED_WITH_ERRORS, FAILED, CANCELLED) samt `step_results`, die älter als `run-retention-days` sind — älteste zuerst, höchstens `run-retention-max-per-night` pro Nacht, jeder Run in einer eigenen kurzen Transaktion über `RunDeletionService` (räumt DLQ-, TODO- und Wish-Verweise mit). Runs mit Audit-Report bleiben (Query-Ausschluss plus Guard im Service). Runtime-Settings in `ExecutionSettingsService`: `run-retention-days` [0,730] (0 = aus, Default 90), `run-retention-max-per-night` [10,5000] (Default 200). INTERRUPTED-Runs haben ihre eigene, ältere Regel (`cleanupInterruptedRuns`, 03:00).
+- **Backup** (`DatabaseBackupService`, täglich 02:00, `automation.backup.retain-count`): läuft bewusst vor der Retention.
+- **VACUUM**: `PRAGMA auto_vacuum = INCREMENTAL` steht im Hikari-Init-SQL, greift aber nur bei leerer DB oder nach einem vollen `VACUUM`. Der Startup-Check `checkAutoVacuumMode` schreibt eine ActivityLog-WARNING, wenn die Datei noch auf NONE steht — dann einmal `POST /api/v1/system/vacuum` ausführen, danach gibt das nächtliche `incremental_vacuum` (03:00) Platz frei. Direkter `sqlite3`-Zugriff ist tabu (Hibernate-Cache, Single-Writer).
+
 ### Packages
 
 ```

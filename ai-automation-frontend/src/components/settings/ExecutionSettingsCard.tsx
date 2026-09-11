@@ -30,6 +30,8 @@ interface FormState {
   schedulerResumeGraceMinutes: number;
   summarizationTimeoutSeconds: number;
   factoryTimeoutSeconds: number;
+  runRetentionDays: number;
+  runRetentionMaxPerNight: number;
 }
 
 export function ExecutionSettingsCard() {
@@ -51,6 +53,8 @@ export function ExecutionSettingsCard() {
     schedulerResumeGraceMinutes: 5,
     summarizationTimeoutSeconds: 120,
     factoryTimeoutSeconds: 600,
+    runRetentionDays: 90,
+    runRetentionMaxPerNight: 200,
   });
 
   useEffect(() => {
@@ -69,6 +73,8 @@ export function ExecutionSettingsCard() {
         schedulerResumeGraceMinutes: config.schedulerResumeGraceMinutes ?? 5,
         summarizationTimeoutSeconds: config.summarizationTimeoutSeconds ?? 120,
         factoryTimeoutSeconds: config.factoryTimeoutSeconds ?? 600,
+        runRetentionDays: config.runRetentionDays ?? 90,
+        runRetentionMaxPerNight: config.runRetentionMaxPerNight ?? 200,
       });
     }
   }, [config]);
@@ -86,7 +92,9 @@ export function ExecutionSettingsCard() {
     form.schedulerCatchUpOnResume !== ((config.schedulerCatchUpOnResume ?? 1) === 1) ||
     form.schedulerResumeGraceMinutes !== (config.schedulerResumeGraceMinutes ?? 5) ||
     form.summarizationTimeoutSeconds !== (config.summarizationTimeoutSeconds ?? 120) ||
-    form.factoryTimeoutSeconds !== (config.factoryTimeoutSeconds ?? 600)
+    form.factoryTimeoutSeconds !== (config.factoryTimeoutSeconds ?? 600) ||
+    form.runRetentionDays !== (config.runRetentionDays ?? 90) ||
+    form.runRetentionMaxPerNight !== (config.runRetentionMaxPerNight ?? 200)
   );
 
   const fields: FieldConfig[] = [
@@ -101,6 +109,8 @@ export function ExecutionSettingsCard() {
     { key: 'resumeGrace', label: t.settings.schedulerResumeGraceMinutes, hint: t.settings.schedulerResumeGraceMinutesHint, min: 1, max: 60, configKey: 'schedulerResumeGraceMinutes' },
     { key: 'summarizationTimeout', label: t.settings.summarizationTimeoutSeconds, hint: t.settings.summarizationTimeoutSecondsHint, min: 30, max: 600, configKey: 'summarizationTimeoutSeconds' },
     { key: 'factoryTimeout', label: t.settings.factoryTimeoutSeconds, hint: t.settings.factoryTimeoutSecondsHint, min: 60, max: 3600, configKey: 'factoryTimeoutSeconds' },
+    { key: 'runRetentionDays', label: t.settings.runRetentionDays, hint: t.settings.runRetentionDaysHint, min: 0, max: 730, configKey: 'runRetentionDays' },
+    { key: 'runRetentionMaxPerNight', label: t.settings.runRetentionMaxPerNight, hint: t.settings.runRetentionMaxPerNightHint, min: 10, max: 5000, configKey: 'runRetentionMaxPerNight' },
   ];
 
   const handleSave = () => {
@@ -118,6 +128,8 @@ export function ExecutionSettingsCard() {
       schedulerResumeGraceMinutes: form.schedulerResumeGraceMinutes,
       summarizationTimeoutSeconds: form.summarizationTimeoutSeconds,
       factoryTimeoutSeconds: form.factoryTimeoutSeconds,
+      runRetentionDays: form.runRetentionDays,
+      runRetentionMaxPerNight: form.runRetentionMaxPerNight,
     });
   };
 

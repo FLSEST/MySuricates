@@ -245,4 +245,46 @@ class DatabaseBackupServiceTest {
         assertThat(path.toString()).doesNotContain("jdbc:");
         assertThat(path.toString()).doesNotContain("?");
     }
+
+    // ── auto_vacuum startup check ──────────────────────────────────────────────────
+
+    private void stubAutoVacuum(int mode) throws Exception {
+        Connection conn = mock(Connection.class);
+        Statement stmt = mock(Statement.class);
+        java.sql.ResultSet rs = mock(java.sql.ResultSet.class);
+        when(dataSource.getConnection()).thenReturn(conn);
+        when(conn.createStatement()).thenReturn(stmt);
+        when(stmt.executeQuery("PRAGMA auto_vacuum")).thenReturn(rs);
+        when(rs.next()).thenReturn(true);
+        when(rs.getInt(1)).thenReturn(mode);
+    }
+
+    @Test
+    void checkAutoVacuumMode_none_warnsWithVacuumHint() throws Exception {
+        stubAutoVacuum(0);
+
+        service.checkAutoVacuumMode();
+
+        verify(activityLogService).warn(eq(com.automation.entity.ActivityLog.LogCategory.SYSTEM),
+                contains("NONE"), eq("DatabaseBackupService"));
+        verify(activityLogService).warn(any(), contains("/api/v1/system/vacuum"), any());
+    }
+
+    @Test
+    void checkAutoVacuumMode_incremental_staysQuiet() throws Exception {
+        stubAutoVacuum(2);
+
+        service.checkAutoVacuumMode();
+
+        verify(activityLogService, never()).warn(any(), any(), any());
+    }
+
+    @Test
+    void checkAutoVacuumMode_queryFails_isSwallowed() throws Exception {
+        when(dataSource.getConnection()).thenThrow(new java.sql.SQLException("locked"));
+
+        service.checkAutoVacuumMode();
+
+        verify(activityLogService, never()).warn(any(), any(), any());
+    }
 }
