@@ -195,22 +195,26 @@ public class DatabaseBackupService {
      */
     @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
     public void checkAutoVacuumMode() {
+        // Read the pragma and release the connection BEFORE logging: pool-size=1, and the
+        // ActivityLog write is itself transactional — holding the connection here deadlocks.
+        int mode;
         try (var conn = dataSource.getConnection(); var stmt = conn.createStatement();
              var rs = stmt.executeQuery("PRAGMA auto_vacuum")) {
-            int mode = rs.next() ? rs.getInt(1) : -1;
-            if (mode == 2) {
-                log.info("SQLite auto_vacuum = INCREMENTAL (nightly incremental_vacuum active)");
-                return;
-            }
-            String text = mode == 1 ? "FULL" : mode == 0 ? "NONE" : "unknown(" + mode + ")";
-            activityLogService.warn(LogCategory.SYSTEM,
-                    "SQLite auto_vacuum ist " + text + " statt INCREMENTAL — das nächtliche incremental_vacuum "
-                            + "gibt keinen Platz frei. Einmal POST /api/v1/system/vacuum ausführen (volles VACUUM "
-                            + "übernimmt das Pragma).",
-                    "DatabaseBackupService");
+            mode = rs.next() ? rs.getInt(1) : -1;
         } catch (Exception e) {
             log.debug("auto_vacuum check skipped: {}", e.getMessage());
+            return;
         }
+        if (mode == 2) {
+            log.info("SQLite auto_vacuum = INCREMENTAL (nightly incremental_vacuum active)");
+            return;
+        }
+        String text = mode == 1 ? "FULL" : mode == 0 ? "NONE" : "unknown(" + mode + ")";
+        activityLogService.warn(LogCategory.SYSTEM,
+                "SQLite auto_vacuum ist " + text + " statt INCREMENTAL — das nächtliche incremental_vacuum "
+                        + "gibt keinen Platz frei. Einmal POST /api/v1/system/vacuum ausführen (volles VACUUM "
+                        + "übernimmt das Pragma).",
+                "DatabaseBackupService");
     }
 
     @Scheduled(cron = "0 0 3 * * *")
