@@ -1266,7 +1266,7 @@ All 65+ built-in templates with their primary pattern:
 | `auto-fix-typescript` | Multi-Stage + Approval | CODE |
 | `hunt-quality-pipeline` | Multi-Stage Pipeline | CODE |
 | `folder-backup` | Shell Chain | UTILITY |
-| `github-issues-export` | Shell | TEAM |
+| `github-issues-export` | Shell + Approval (preview, redaction) | TEAM |
 | `github-issues-import` | Shell | TEAM |
 | `github-issues-sync` | Shell Chain | TEAM |
 | `github-project-bootstrap` | Shell Chain | CODE |

@@ -1340,7 +1340,7 @@ Alle 65+ eingebauten Templates mit ihrem primaeren Pattern:
 | `auto-fix-typescript` | Mehrstufig + Freigabe | CODE |
 | `hunt-quality-pipeline` | Mehrstufige Pipeline | CODE |
 | `folder-backup` | Shell-Kette | UTILITY |
-| `github-issues-export` | Shell | TEAM |
+| `github-issues-export` | Shell + Freigabe (Vorschau, Redaction) | TEAM |
 | `github-issues-import` | Shell | TEAM |
 | `github-issues-sync` | Shell-Kette | TEAM |
 | `github-project-bootstrap` | Shell-Kette | CODE |
