@@ -1,12 +1,12 @@
 package com.automation.controller;
 
 import com.automation.config.RateLimitConfig;
+import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.entity.RunStatus;
-import com.automation.entity.WorkflowRun;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
-import com.automation.mapper.WorkflowMapper;
+import com.automation.service.execution.ExecutionCommandService;
 import com.automation.service.execution.ExecutionQueryService;
 import com.automation.service.system.ApiKeyService;
 import com.automation.service.workflow.RunDeletionService;
@@ -19,7 +19,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.automation.entity.Workflow;
 import com.automation.executor.ApprovalRequest;
 import org.springframework.http.MediaType;
 
@@ -38,8 +37,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.todo.PendingTodoApprovalService;
-import com.automation.repository.WorkflowRunRepository;
-import com.automation.service.workflow.WorkflowService;
 
 @WebMvcTest(ExecutionController.class)
 @Import(GlobalExceptionHandler.class)
@@ -56,34 +53,31 @@ class ExecutionControllerTest {
     @MockitoBean
     private PendingTodoApprovalService pendingTodoApprovalService;
     @MockitoBean
-    private WorkflowService workflowService;
-    @MockitoBean
-    private WorkflowRunRepository workflowRunRepository;
-    @MockitoBean
     private RunDeletionService runDeletionService;
 
     @MockitoBean
     private ExecutionQueryService executionQueryService;
 
     @MockitoBean
-    private WorkflowMapper workflowMapper;
+    private ExecutionCommandService executionCommandService;
 
     @MockitoBean
     private ApiKeyService apiKeyService;
     @MockitoBean
     private RateLimitConfig rateLimitConfig;
 
+    private static PageResponse<WorkflowRunResponse> emptyPage(int page, int size) {
+        return new PageResponse<>(List.of(), page, size, 0L, 0);
+    }
+
     @Test
     void getExecution_existingId_returnsOk() throws Exception {
-        WorkflowRun run = WorkflowRun.builder()
-                .id("run-1").status(RunStatus.COMPLETED).build();
         WorkflowRunResponse response = new WorkflowRunResponse(
                 "run-1", "wf-1", "Test Workflow", null, null, RunStatus.COMPLETED, List.of(),
                 Instant.now(), Instant.now(), 1000L, null, null, Map.of(), Map.of(), null
         );
 
-        when(executionQueryService.findById("run-1")).thenReturn(run);
-        when(workflowMapper.toRunResponse(run)).thenReturn(response);
+        when(executionQueryService.getExecutionResponse("run-1")).thenReturn(response);
 
         mockMvc.perform(get("/api/v1/executions/run-1"))
                 .andExpect(status().isOk())
@@ -93,7 +87,7 @@ class ExecutionControllerTest {
 
     @Test
     void getExecution_nonExistent_returns404() throws Exception {
-        when(executionQueryService.findById("unknown"))
+        when(executionQueryService.getExecutionResponse("unknown"))
                 .thenThrow(new ResourceNotFoundException("Execution", "unknown"));
 
         mockMvc.perform(get("/api/v1/executions/unknown"))
@@ -154,12 +148,8 @@ class ExecutionControllerTest {
 
     @Test
     void listExecutions_defaultPaging_returnsOk() throws Exception {
-        var page = new org.springframework.data.domain.PageImpl<>(
-                List.<com.automation.entity.WorkflowRun>of(),
-                org.springframework.data.domain.PageRequest.of(0, 50), 0);
-        when(executionQueryService.listExecutions(0, 50, null, null, null, null))
-                .thenReturn(page);
-        when(workflowMapper.toRunResponseList(any())).thenReturn(List.of());
+        when(executionQueryService.listExecutionResponses(0, 50, null, null, null, null))
+                .thenReturn(emptyPage(0, 50));
 
         mockMvc.perform(get("/api/v1/executions"))
                 .andExpect(status().isOk())
@@ -169,12 +159,8 @@ class ExecutionControllerTest {
 
     @Test
     void listExecutions_withStatusFilter_returnsOk() throws Exception {
-        var page = new org.springframework.data.domain.PageImpl<>(
-                List.<com.automation.entity.WorkflowRun>of(),
-                org.springframework.data.domain.PageRequest.of(0, 50), 0);
-        when(executionQueryService.listExecutions(0, 50, "RUNNING", null, null, null))
-                .thenReturn(page);
-        when(workflowMapper.toRunResponseList(any())).thenReturn(List.of());
+        when(executionQueryService.listExecutionResponses(0, 50, "RUNNING", null, null, null))
+                .thenReturn(emptyPage(0, 50));
 
         mockMvc.perform(get("/api/v1/executions").param("status", "RUNNING"))
                 .andExpect(status().isOk());
@@ -182,19 +168,11 @@ class ExecutionControllerTest {
 
     @Test
     void retryExecution_existingRun_returnsOk() throws Exception {
-        var workflow = Workflow.builder().id("wf-1").build();
-        var run = WorkflowRun.builder()
-                .id("run-1").status(RunStatus.FAILED).workflow(workflow)
-                .inputContext(Map.of("key", "val")).build();
-        var newRun = WorkflowRun.builder().id("run-2").status(RunStatus.RUNNING).build();
         var response = new WorkflowRunResponse(
                 "run-2", "wf-1", "Test", null, null, RunStatus.RUNNING, List.of(),
                 Instant.now(), null, null, null, null, Map.of(), Map.of(), null);
 
-        when(executionQueryService.findById("run-1")).thenReturn(run);
-        when(workflowService.findByIdEager("wf-1")).thenReturn(workflow);
-        when(workflowExecutor.execute(workflow, run.getInputContext())).thenReturn(newRun);
-        when(workflowMapper.toRunResponse(newRun)).thenReturn(response);
+        when(executionCommandService.retry("run-1")).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/executions/run-1/retry"))
                 .andExpect(status().isOk())
@@ -204,7 +182,7 @@ class ExecutionControllerTest {
 
     @Test
     void retryExecution_nonExistent_returns404() throws Exception {
-        when(executionQueryService.findById("unknown"))
+        when(executionCommandService.retry("unknown"))
                 .thenThrow(new ResourceNotFoundException("Execution", "unknown"));
 
         mockMvc.perform(post("/api/v1/executions/unknown/retry"))
@@ -213,13 +191,11 @@ class ExecutionControllerTest {
 
     @Test
     void resumeFromStep_returnsOk() throws Exception {
-        var resumedRun = WorkflowRun.builder().id("run-1").status(RunStatus.RUNNING).build();
         var response = new WorkflowRunResponse(
                 "run-1", "wf-1", "Test", null, null, RunStatus.RUNNING, List.of(),
                 Instant.now(), null, null, null, null, Map.of(), Map.of(), null);
 
-        when(workflowExecutor.resumeFromStep("run-1")).thenReturn(resumedRun);
-        when(workflowMapper.toRunResponse(resumedRun)).thenReturn(response);
+        when(executionCommandService.resumeFromStep("run-1")).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/executions/run-1/resume-from-step"))
                 .andExpect(status().isOk())
@@ -399,7 +375,7 @@ class ExecutionControllerTest {
 
     @Test
     void resumeFromStep_nonExistent_returns404() throws Exception {
-        when(workflowExecutor.resumeFromStep("unknown"))
+        when(executionCommandService.resumeFromStep("unknown"))
                 .thenThrow(new ResourceNotFoundException("Execution", "unknown"));
 
         mockMvc.perform(post("/api/v1/executions/unknown/resume-from-step"))
@@ -420,12 +396,8 @@ class ExecutionControllerTest {
 
     @Test
     void listExecutions_withWorkflowIdFilter_returnsOk() throws Exception {
-        var page = new org.springframework.data.domain.PageImpl<>(
-                List.<com.automation.entity.WorkflowRun>of(),
-                org.springframework.data.domain.PageRequest.of(0, 50), 0);
-        when(executionQueryService.listExecutions(0, 50, null, "wf-1", null, null))
-                .thenReturn(page);
-        when(workflowMapper.toRunResponseList(any())).thenReturn(List.of());
+        when(executionQueryService.listExecutionResponses(0, 50, null, "wf-1", null, null))
+                .thenReturn(emptyPage(0, 50));
 
         mockMvc.perform(get("/api/v1/executions").param("workflowId", "wf-1"))
                 .andExpect(status().isOk());
@@ -433,12 +405,8 @@ class ExecutionControllerTest {
 
     @Test
     void listExecutions_withProjectIdFilter_returnsOk() throws Exception {
-        var page = new org.springframework.data.domain.PageImpl<>(
-                List.<com.automation.entity.WorkflowRun>of(),
-                org.springframework.data.domain.PageRequest.of(0, 50), 0);
-        when(executionQueryService.listExecutions(0, 50, null, null, "proj-1", null))
-                .thenReturn(page);
-        when(workflowMapper.toRunResponseList(any())).thenReturn(List.of());
+        when(executionQueryService.listExecutionResponses(0, 50, null, null, "proj-1", null))
+                .thenReturn(emptyPage(0, 50));
 
         mockMvc.perform(get("/api/v1/executions").param("projectId", "proj-1"))
                 .andExpect(status().isOk());
@@ -446,12 +414,8 @@ class ExecutionControllerTest {
 
     @Test
     void listExecutions_customPaging_returnsOk() throws Exception {
-        var page = new org.springframework.data.domain.PageImpl<>(
-                List.<com.automation.entity.WorkflowRun>of(),
-                org.springframework.data.domain.PageRequest.of(2, 10), 0);
-        when(executionQueryService.listExecutions(2, 10, null, null, null, null))
-                .thenReturn(page);
-        when(workflowMapper.toRunResponseList(any())).thenReturn(List.of());
+        when(executionQueryService.listExecutionResponses(2, 10, null, null, null, null))
+                .thenReturn(emptyPage(2, 10));
 
         mockMvc.perform(get("/api/v1/executions").param("page", "2").param("size", "10"))
                 .andExpect(status().isOk())
@@ -460,13 +424,11 @@ class ExecutionControllerTest {
 
     @Test
     void updateNotes_withNotes_returnsOk() throws Exception {
-        var run = WorkflowRun.builder().id("run-1").status(RunStatus.COMPLETED).build();
         var response = new WorkflowRunResponse(
                 "run-1", "wf-1", "Test", null, null, RunStatus.COMPLETED, List.of(),
-                Instant.now(), Instant.now(), null, null, null, Map.of(), Map.of("notes", "my note"), null);
+                Instant.now(), Instant.now(), null, null, null, Map.of("notes", "my note"), Map.of(), null);
 
-        when(executionQueryService.findById("run-1")).thenReturn(run);
-        when(workflowMapper.toRunResponse(run)).thenReturn(response);
+        when(executionCommandService.updateNotes("run-1", "my note")).thenReturn(response);
 
         mockMvc.perform(patch("/api/v1/executions/run-1/notes")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -476,18 +438,16 @@ class ExecutionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("run-1"));
 
-        verify(workflowRunRepository).save(run);
+        verify(executionCommandService).updateNotes("run-1", "my note");
     }
 
     @Test
     void updateNotes_withBlankNotes_removesNote_returnsOk() throws Exception {
-        var run = WorkflowRun.builder().id("run-1").status(RunStatus.COMPLETED).build();
         var response = new WorkflowRunResponse(
                 "run-1", "wf-1", "Test", null, null, RunStatus.COMPLETED, List.of(),
                 Instant.now(), Instant.now(), null, null, null, Map.of(), Map.of(), null);
 
-        when(executionQueryService.findById("run-1")).thenReturn(run);
-        when(workflowMapper.toRunResponse(run)).thenReturn(response);
+        when(executionCommandService.updateNotes("run-1", "")).thenReturn(response);
 
         mockMvc.perform(patch("/api/v1/executions/run-1/notes")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -495,11 +455,13 @@ class ExecutionControllerTest {
                                 {"notes": ""}
                                 """))
                 .andExpect(status().isOk());
+
+        verify(executionCommandService).updateNotes("run-1", "");
     }
 
     @Test
     void updateNotes_nonExistent_returns404() throws Exception {
-        when(executionQueryService.findById("unknown"))
+        when(executionCommandService.updateNotes("unknown", "my note"))
                 .thenThrow(new ResourceNotFoundException("Execution", "unknown"));
 
         mockMvc.perform(patch("/api/v1/executions/unknown/notes")

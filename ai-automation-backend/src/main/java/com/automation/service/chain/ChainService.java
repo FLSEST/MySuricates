@@ -4,10 +4,15 @@ import com.automation.dto.request.ChainEntryRequest;
 import com.automation.dto.request.CreateChainRequest;
 import com.automation.dto.request.UpdateChainRequest;
 import com.automation.entity.ChainEntry;
+import com.automation.entity.ChainRun;
+import com.automation.entity.RunStatus;
 import com.automation.entity.WorkflowChain;
+import com.automation.repository.ChainRunRepository;
 import com.automation.repository.WorkflowChainRepository;
 import com.automation.repository.WorkflowRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -19,6 +24,7 @@ public class ChainService {
 
     private final WorkflowChainRepository chainRepository;
     private final WorkflowRepository workflowRepository;
+    private final ChainRunRepository chainRunRepository;
 
     public List<WorkflowChain> findAll() {
         return chainRepository.findAll();
@@ -69,6 +75,22 @@ public class ChainService {
     public void delete(String id) {
         WorkflowChain chain = findById(id);
         chainRepository.delete(chain);
+    }
+
+    // --- Chain-Runs (Repository-Zugriff bleibt in der Service-Schicht) ---
+
+    public Page<ChainRun> findRunsFiltered(RunStatus status, String search, Pageable pageable) {
+        return chainRunRepository.findFiltered(status, search, pageable);
+    }
+
+    public List<ChainRun> findRunsByChainId(String chainId) {
+        findById(chainId); // verify chain exists
+        return chainRunRepository.findByChainIdOrderByStartedAtDesc(chainId);
+    }
+
+    public ChainRun findRunById(String runId) {
+        return chainRunRepository.findById(runId)
+                .orElseThrow(() -> new NoSuchElementException("Chain run not found: " + runId));
     }
 
     private void validateWorkflowIds(List<ChainEntryRequest> entries) {

@@ -9,7 +9,6 @@ import com.automation.entity.ChainRun;
 import com.automation.entity.RunStatus;
 import com.automation.entity.WorkflowChain;
 import com.automation.mapper.ChainMapper;
-import com.automation.repository.ChainRunRepository;
 import com.automation.service.chain.ChainExecutor;
 import com.automation.service.chain.ChainService;
 import jakarta.validation.Valid;
@@ -23,7 +22,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 
 @RestController
 @RequestMapping("/api/v1/chains")
@@ -33,7 +31,6 @@ public class ChainController {
     private final ChainService chainService;
     private final ChainExecutor chainExecutor;
     private final ChainMapper chainMapper;
-    private final ChainRunRepository chainRunRepository;
 
     @GetMapping
     public List<ChainResponse> listChains() {
@@ -84,7 +81,7 @@ public class ChainController {
                 ? RunStatus.valueOf(status.toUpperCase()) : null;
         String q = (search != null && !search.isBlank()) ? search.trim() : null;
 
-        Page<ChainRun> result = chainRunRepository.findFiltered(runStatus, q, pageable);
+        Page<ChainRun> result = chainService.findRunsFiltered(runStatus, q, pageable);
 
         return new PageResponse<>(
                 chainMapper.toRunResponseList(result.getContent()),
@@ -97,15 +94,12 @@ public class ChainController {
 
     @GetMapping("/{id}/runs")
     public List<ChainRunResponse> listRuns(@PathVariable String id) {
-        chainService.findById(id); // verify chain exists
-        return chainMapper.toRunResponseList(chainRunRepository.findByChainIdOrderByStartedAtDesc(id));
+        return chainMapper.toRunResponseList(chainService.findRunsByChainId(id));
     }
 
     @GetMapping("/{id}/runs/{runId}")
     public ChainRunResponse getRun(@PathVariable String id, @PathVariable String runId) {
-        ChainRun run = chainRunRepository.findById(runId)
-                .orElseThrow(() -> new NoSuchElementException("Chain run not found: " + runId));
-        return chainMapper.toRunResponse(run);
+        return chainMapper.toRunResponse(chainService.findRunById(runId));
     }
 
     @PostMapping("/runs/{runId}/cancel")

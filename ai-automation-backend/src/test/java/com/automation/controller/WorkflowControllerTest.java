@@ -1,13 +1,14 @@
 package com.automation.controller;
 
 import com.automation.config.RateLimitConfig;
+import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.WorkflowResponse;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.entity.*;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.WorkflowMapper;
-import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.execution.ExecutionQueryService;
 import com.automation.service.export.ProcessFormatAdapter;
 import com.automation.service.project.ProjectService;
 import com.automation.service.workflow.WorkflowExecutor;
@@ -23,15 +24,11 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -61,7 +58,7 @@ class WorkflowControllerTest {
     private WorkflowExecutor workflowExecutor;
 
     @MockitoBean
-    private WorkflowRunRepository runRepository;
+    private ExecutionQueryService executionQueryService;
 
     @MockitoBean
     private WorkflowMapper workflowMapper;
@@ -273,9 +270,8 @@ class WorkflowControllerTest {
 
     @Test
     void getWorkflowRuns_returnsOk() throws Exception {
-        Page<WorkflowRun> emptyPage = new PageImpl<>(List.of());
-        when(runRepository.findByWorkflowIdOrderByStartedAtDesc(eq("wf-1"), any(Pageable.class))).thenReturn(emptyPage);
-        when(workflowMapper.toRunResponseList(any())).thenReturn(List.of());
+        when(executionQueryService.listRunsForWorkflow("wf-1", 0, 50))
+                .thenReturn(new PageResponse<>(List.of(), 0, 50, 0L, 0));
 
         mockMvc.perform(get("/api/v1/workflows/wf-1/runs"))
                 .andExpect(status().isOk())
@@ -286,15 +282,12 @@ class WorkflowControllerTest {
 
     @Test
     void getWorkflowRun_existingId_returnsOk() throws Exception {
-        WorkflowRun run = WorkflowRun.builder()
-                .id("run-1").workflow(testWorkflow).status(RunStatus.COMPLETED).build();
         WorkflowRunResponse runResponse = new WorkflowRunResponse(
                 "run-1", "wf-1", "Test Workflow", "Test Project", null, RunStatus.COMPLETED, List.of(),
                 null, null, null, null, null, null, null, null
         );
 
-        when(runRepository.findById("run-1")).thenReturn(Optional.of(run));
-        when(workflowMapper.toRunResponse(run)).thenReturn(runResponse);
+        when(executionQueryService.getRunForWorkflow("run-1")).thenReturn(runResponse);
 
         mockMvc.perform(get("/api/v1/workflows/wf-1/runs/run-1"))
                 .andExpect(status().isOk())

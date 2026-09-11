@@ -4,7 +4,10 @@ import com.automation.dto.request.ChainEntryRequest;
 import com.automation.dto.request.CreateChainRequest;
 import com.automation.dto.request.UpdateChainRequest;
 import com.automation.entity.ChainEntry;
+import com.automation.entity.ChainRun;
+import com.automation.entity.RunStatus;
 import com.automation.entity.WorkflowChain;
+import com.automation.repository.ChainRunRepository;
 import com.automation.repository.WorkflowChainRepository;
 import com.automation.repository.WorkflowRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,6 +35,9 @@ class ChainServiceTest {
 
     @Mock
     private WorkflowRepository workflowRepository;
+
+    @Mock
+    private ChainRunRepository chainRunRepository;
 
     @InjectMocks
     private ChainService chainService;
@@ -328,5 +334,57 @@ class ChainServiceTest {
                 .isInstanceOf(NoSuchElementException.class)
                 .hasMessageContaining("Chain not found: unknown");
         verify(chainRepository, never()).delete(any(WorkflowChain.class));
+    }
+
+    // --- Chain-Runs ---
+
+    @Test
+    void findRunsFiltered_delegatesToRepository() {
+        org.springframework.data.domain.Page<ChainRun> page =
+                new org.springframework.data.domain.PageImpl<>(List.of());
+        org.springframework.data.domain.Pageable pageable =
+                org.springframework.data.domain.PageRequest.of(0, 20);
+        when(chainRunRepository.findFiltered(RunStatus.COMPLETED, "foo", pageable)).thenReturn(page);
+
+        assertThat(chainService.findRunsFiltered(RunStatus.COMPLETED, "foo", pageable)).isEqualTo(page);
+        verify(chainRunRepository).findFiltered(RunStatus.COMPLETED, "foo", pageable);
+    }
+
+    @Test
+    void findRunsByChainId_existingChain_returnsRuns() {
+        ChainRun run = ChainRun.builder().id("run-1").chain(testChain).build();
+        when(chainRepository.findById("chain-1")).thenReturn(Optional.of(testChain));
+        when(chainRunRepository.findByChainIdOrderByStartedAtDesc("chain-1")).thenReturn(List.of(run));
+
+        List<ChainRun> result = chainService.findRunsByChainId("chain-1");
+
+        assertThat(result).containsExactly(run);
+    }
+
+    @Test
+    void findRunsByChainId_missingChain_throwsNoSuchElement() {
+        when(chainRepository.findById("unknown")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> chainService.findRunsByChainId("unknown"))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessageContaining("Chain not found: unknown");
+        verify(chainRunRepository, never()).findByChainIdOrderByStartedAtDesc(any());
+    }
+
+    @Test
+    void findRunById_existingRun_returnsRun() {
+        ChainRun run = ChainRun.builder().id("run-1").chain(testChain).build();
+        when(chainRunRepository.findById("run-1")).thenReturn(Optional.of(run));
+
+        assertThat(chainService.findRunById("run-1")).isEqualTo(run);
+    }
+
+    @Test
+    void findRunById_missingRun_throwsNoSuchElement() {
+        when(chainRunRepository.findById("missing")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> chainService.findRunById("missing"))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessageContaining("Chain run not found: missing");
     }
 }

@@ -2,15 +2,11 @@ package com.automation.controller;
 
 import com.automation.config.RateLimitConfig;
 import com.automation.entity.DeadLetterEntry;
-import com.automation.entity.Workflow;
-import com.automation.entity.WorkflowRun;
 import com.automation.exception.GlobalExceptionHandler;
-import com.automation.repository.WorkflowRepository;
-import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.activitylog.ActivityLogService;
+import com.automation.service.dlq.DeadLetterRetryService;
 import com.automation.service.dlq.DeadLetterService;
 import com.automation.service.system.ApiKeyService;
-import com.automation.service.workflow.WorkflowExecutor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,8 +21,6 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -46,13 +40,7 @@ class DeadLetterControllerTest {
     private DeadLetterService dlqService;
 
     @MockitoBean
-    private WorkflowRunRepository runRepository;
-
-    @MockitoBean
-    private WorkflowRepository workflowRepository;
-
-    @MockitoBean
-    private WorkflowExecutor workflowExecutor;
+    private DeadLetterRetryService dlqRetryService;
 
     @MockitoBean
     private ApiKeyService apiKeyService;
@@ -67,7 +55,7 @@ class DeadLetterControllerTest {
 
     @BeforeEach
     void setUp() {
-        reset(workflowExecutor, workflowRepository, runRepository, dlqService);
+        reset(dlqRetryService, dlqService);
         sampleEntry = DeadLetterEntry.builder()
                 .id("dlq-1")
                 .workflowId("wf-1")
@@ -125,13 +113,7 @@ class DeadLetterControllerTest {
     }
 
     @Test
-    void should_call_executor_when_retrying_with_workflow_and_run() throws Exception {
-        Workflow workflow = new Workflow();
-        workflow.setId("wf-1");
-        WorkflowRun originalRun = new WorkflowRun();
-        originalRun.setId("run-1");
-        originalRun.setInputContext(Map.of("foo", "bar"));
-
+    void should_delegate_retry_to_service_and_return_entry() throws Exception {
         DeadLetterEntry retried = DeadLetterEntry.builder()
                 .id("dlq-1")
                 .workflowId("wf-1")
@@ -141,105 +123,23 @@ class DeadLetterControllerTest {
                 .lastFailureAt(Instant.now())
                 .build();
 
-        when(dlqService.findById("dlq-1")).thenReturn(sampleEntry);
-        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(workflow));
-        when(runRepository.findById("run-1")).thenReturn(Optional.of(originalRun));
-        when(dlqService.markRetried("dlq-1")).thenReturn(retried);
+        when(dlqRetryService.retry("dlq-1")).thenReturn(retried);
 
         mockMvc.perform(post("/api/v1/dlq/dlq-1/retry"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("dlq-1"))
                 .andExpect(jsonPath("$.status").value("RETRIED"));
 
-        verify(workflowExecutor).execute(eq(workflow), eq(Map.of("foo", "bar")));
-        verify(dlqService).markRetried("dlq-1");
+        verify(dlqRetryService).retry("dlq-1");
     }
 
     @Test
-    void should_skip_executor_when_retrying_entry_without_workflow_id() throws Exception {
-        DeadLetterEntry orphan = DeadLetterEntry.builder()
-                .id("dlq-2")
-                .workflowId(null)
-                .workflowRunId("run-2")
-                .retryCount(0)
-                .status(DeadLetterEntry.Status.OPEN)
-                .lastFailureAt(Instant.now())
-                .build();
-        DeadLetterEntry retried = DeadLetterEntry.builder()
-                .id("dlq-2")
-                .retryCount(1)
-                .status(DeadLetterEntry.Status.RETRIED)
-                .lastFailureAt(Instant.now())
-                .build();
+    void should_return_400_when_retrying_unknown_id() throws Exception {
+        when(dlqRetryService.retry("missing"))
+                .thenThrow(new IllegalArgumentException("DLQ entry not found: missing"));
 
-        when(dlqService.findById("dlq-2")).thenReturn(orphan);
-        when(dlqService.markRetried("dlq-2")).thenReturn(retried);
-
-        mockMvc.perform(post("/api/v1/dlq/dlq-2/retry"))
-                .andExpect(status().isOk());
-
-        verifyNoInteractions(workflowExecutor);
-        verify(workflowRepository, never()).findById(any());
-        verify(runRepository, never()).findById(any());
-        verify(dlqService).markRetried("dlq-2");
-    }
-
-    @Test
-    void should_skip_executor_when_retrying_entry_without_run_id() throws Exception {
-        DeadLetterEntry orphan = DeadLetterEntry.builder()
-                .id("dlq-3")
-                .workflowId("wf-3")
-                .workflowRunId(null)
-                .retryCount(0)
-                .status(DeadLetterEntry.Status.OPEN)
-                .lastFailureAt(Instant.now())
-                .build();
-        DeadLetterEntry retried = DeadLetterEntry.builder()
-                .id("dlq-3")
-                .retryCount(1)
-                .status(DeadLetterEntry.Status.RETRIED)
-                .lastFailureAt(Instant.now())
-                .build();
-
-        when(dlqService.findById("dlq-3")).thenReturn(orphan);
-        when(dlqService.markRetried("dlq-3")).thenReturn(retried);
-
-        mockMvc.perform(post("/api/v1/dlq/dlq-3/retry"))
-                .andExpect(status().isOk());
-
-        verify(workflowExecutor, never()).execute(any(), any());
-        verify(dlqService).markRetried("dlq-3");
-    }
-
-    @Test
-    void should_skip_executor_when_workflow_not_found_during_retry() throws Exception {
-        when(dlqService.findById("dlq-1")).thenReturn(sampleEntry);
-        when(workflowRepository.findById("wf-1")).thenReturn(Optional.empty());
-        when(dlqService.markRetried("dlq-1")).thenReturn(sampleEntry);
-
-        mockMvc.perform(post("/api/v1/dlq/dlq-1/retry"))
-                .andExpect(status().isOk());
-
-        verifyNoInteractions(workflowExecutor);
-        verify(runRepository, never()).findById(any());
-        verify(dlqService).markRetried("dlq-1");
-    }
-
-    @Test
-    void should_skip_executor_when_run_not_found_during_retry() throws Exception {
-        Workflow workflow = new Workflow();
-        workflow.setId("wf-1");
-
-        when(dlqService.findById("dlq-1")).thenReturn(sampleEntry);
-        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(workflow));
-        when(runRepository.findById("run-1")).thenReturn(Optional.empty());
-        when(dlqService.markRetried("dlq-1")).thenReturn(sampleEntry);
-
-        mockMvc.perform(post("/api/v1/dlq/dlq-1/retry"))
-                .andExpect(status().isOk());
-
-        verifyNoInteractions(workflowExecutor);
-        verify(dlqService).markRetried("dlq-1");
+        mockMvc.perform(post("/api/v1/dlq/missing/retry"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

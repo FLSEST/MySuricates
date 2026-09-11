@@ -16,9 +16,8 @@ import com.automation.entity.WorkflowRun;
 import com.automation.entity.WorkflowVersion;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.mapper.WorkflowVersionMapper;
-import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.execution.ExecutionQueryService;
 import com.automation.service.project.ProjectService;
-import com.automation.entity.RunStatus;
 import com.automation.service.learning.WorkflowSimilarityService;
 import com.automation.service.export.ProcessFormatAdapter;
 import com.automation.service.repair.AutoRepairService;
@@ -34,7 +33,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -48,7 +46,7 @@ public class WorkflowController {
 
     private final WorkflowService workflowService;
     private final WorkflowExecutor workflowExecutor;
-    private final WorkflowRunRepository runRepository;
+    private final ExecutionQueryService executionQueryService;
     private final ProjectService projectService;
     private final WorkflowMapper workflowMapper;
     private final WorkflowOptimizationService optimizationService;
@@ -100,27 +98,16 @@ public class WorkflowController {
     }
 
     @GetMapping("/{id}/runs")
-    @Transactional(readOnly = true)
     public PageResponse<WorkflowRunResponse> getWorkflowRuns(
             @PathVariable String id,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        var result = runRepository.findByWorkflowIdOrderByStartedAtDesc(id, PageRequest.of(page, size));
-        return new PageResponse<>(
-                workflowMapper.toRunResponseList(result.getContent()),
-                result.getNumber(),
-                result.getSize(),
-                result.getTotalElements(),
-                result.getTotalPages()
-        );
+        return executionQueryService.listRunsForWorkflow(id, page, size);
     }
 
     @GetMapping("/{id}/runs/{runId}")
-    @Transactional(readOnly = true)
     public WorkflowRunResponse getWorkflowRun(@PathVariable String id, @PathVariable String runId) {
-        var run = runRepository.findById(runId)
-                .orElseThrow(() -> new com.automation.exception.ResourceNotFoundException("WorkflowRun", runId));
-        return workflowMapper.toRunResponse(run);
+        return executionQueryService.getRunForWorkflow(runId);
     }
 
     @PostMapping("/{id}/optimize")
@@ -144,7 +131,7 @@ public class WorkflowController {
         Workflow workflow = workflowService.findById(id);
 
         // Check for FAILED runs
-        if (!runRepository.existsByWorkflowIdAndStatus(id, RunStatus.FAILED)) {
+        if (!executionQueryService.hasFailedRuns(id)) {
             return ResponseEntity.badRequest().body(Map.of(
                     "error", "Workflow '" + workflow.getName() + "' has no failed runs"));
         }

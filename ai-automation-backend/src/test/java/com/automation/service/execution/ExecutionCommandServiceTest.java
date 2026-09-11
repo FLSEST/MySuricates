@@ -1,0 +1,106 @@
+package com.automation.service.execution;
+
+import com.automation.dto.response.WorkflowRunResponse;
+import com.automation.entity.RunStatus;
+import com.automation.entity.Workflow;
+import com.automation.entity.WorkflowRun;
+import com.automation.exception.ResourceNotFoundException;
+import com.automation.mapper.WorkflowMapper;
+import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.workflow.WorkflowExecutor;
+import com.automation.service.workflow.WorkflowService;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class ExecutionCommandServiceTest {
+
+    @Mock private ExecutionQueryService executionQueryService;
+    @Mock private WorkflowService workflowService;
+    @Mock private WorkflowExecutor workflowExecutor;
+    @Mock private WorkflowRunRepository runRepository;
+    @Mock private WorkflowMapper workflowMapper;
+    @InjectMocks private ExecutionCommandService service;
+
+    @Test
+    void retry_executesEagerlyLoadedWorkflowWithOriginalInputContext() {
+        Workflow workflow = Workflow.builder().id("wf-1").build();
+        WorkflowRun run = WorkflowRun.builder().id("run-1").workflow(workflow).status(RunStatus.FAILED)
+                .inputContext(Map.of("key", "val")).build();
+        WorkflowRun newRun = WorkflowRun.builder().id("run-2").status(RunStatus.RUNNING).build();
+        WorkflowRunResponse response = mock(WorkflowRunResponse.class);
+        when(executionQueryService.findById("run-1")).thenReturn(run);
+        when(workflowService.findByIdEager("wf-1")).thenReturn(workflow);
+        when(workflowExecutor.execute(workflow, Map.of("key", "val"))).thenReturn(newRun);
+        when(workflowMapper.toRunResponse(newRun)).thenReturn(response);
+
+        assertThat(service.retry("run-1")).isSameAs(response);
+    }
+
+    @Test
+    void retry_unknownRun_propagatesNotFound() {
+        when(executionQueryService.findById("unknown")).thenThrow(new ResourceNotFoundException("WorkflowRun", "unknown"));
+
+        assertThatThrownBy(() -> service.retry("unknown")).isInstanceOf(ResourceNotFoundException.class);
+        verify(workflowExecutor, never()).execute(any(), any());
+    }
+
+    @Test
+    void resumeFromStep_delegatesToExecutorAndMaps() {
+        WorkflowRun resumed = WorkflowRun.builder().id("run-1").status(RunStatus.RUNNING).build();
+        WorkflowRunResponse response = mock(WorkflowRunResponse.class);
+        when(workflowExecutor.resumeFromStep("run-1")).thenReturn(resumed);
+        when(workflowMapper.toRunResponse(resumed)).thenReturn(response);
+
+        assertThat(service.resumeFromStep("run-1")).isSameAs(response);
+    }
+
+    @Test
+    void updateNotes_storesNoteInMetadataAndSaves() {
+        WorkflowRun run = WorkflowRun.builder().id("run-1").metadata(new HashMap<>(Map.of("other", 1))).build();
+        when(executionQueryService.findById("run-1")).thenReturn(run);
+        when(workflowMapper.toRunResponse(run)).thenReturn(mock(WorkflowRunResponse.class));
+
+        service.updateNotes("run-1", "my note");
+
+        assertThat(run.getMetadata()).containsEntry("notes", "my note").containsEntry("other", 1);
+        verify(runRepository).save(run);
+    }
+
+    @Test
+    void updateNotes_blankNote_removesEntry() {
+        WorkflowRun run = WorkflowRun.builder().id("run-1").metadata(new HashMap<>(Map.of("notes", "old"))).build();
+        when(executionQueryService.findById("run-1")).thenReturn(run);
+        when(workflowMapper.toRunResponse(run)).thenReturn(mock(WorkflowRunResponse.class));
+
+        service.updateNotes("run-1", "  ");
+
+        assertThat(run.getMetadata()).doesNotContainKey("notes");
+        verify(runRepository).save(run);
+    }
+
+    @Test
+    void updateNotes_nullMetadata_startsFresh() {
+        WorkflowRun run = WorkflowRun.builder().id("run-1").metadata(null).build();
+        when(executionQueryService.findById("run-1")).thenReturn(run);
+        when(workflowMapper.toRunResponse(run)).thenReturn(mock(WorkflowRunResponse.class));
+
+        service.updateNotes("run-1", "n");
+
+        assertThat(run.getMetadata()).containsEntry("notes", "n");
+    }
+}

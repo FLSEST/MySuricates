@@ -9,7 +9,6 @@ import com.automation.entity.RunStatus;
 import com.automation.entity.WorkflowChain;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.mapper.ChainMapper;
-import com.automation.repository.ChainRunRepository;
 import com.automation.service.chain.ChainExecutor;
 import com.automation.service.chain.ChainService;
 import com.automation.service.system.ApiKeyService;
@@ -26,7 +25,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -53,7 +51,6 @@ class ChainControllerTest {
 
     @MockitoBean private ChainExecutor chainExecutor;
     @MockitoBean private ChainMapper chainMapper;
-    @MockitoBean private ChainRunRepository chainRunRepository;
     @MockitoBean private ApiKeyService apiKeyService;
     @MockitoBean private RateLimitConfig rateLimitConfig;
 
@@ -127,9 +124,7 @@ class ChainControllerTest {
 
     @Test
     void listRuns_returnsForChain() throws Exception {
-        var chain = WorkflowChain.builder().id("c-1").build();
-        when(chainService.findById("c-1")).thenReturn(chain);
-        when(chainRunRepository.findByChainIdOrderByStartedAtDesc("c-1")).thenReturn(List.of());
+        when(chainService.findRunsByChainId("c-1")).thenReturn(List.of());
         when(chainMapper.toRunResponseList(any())).thenReturn(List.of(sampleRun()));
 
         mockMvc.perform(get("/api/v1/chains/c-1/runs"))
@@ -140,7 +135,7 @@ class ChainControllerTest {
     @Test
     void getRun_returnsById() throws Exception {
         var run = ChainRun.builder().id("r-1").chain(WorkflowChain.builder().id("c-1").build()).build();
-        when(chainRunRepository.findById("r-1")).thenReturn(Optional.of(run));
+        when(chainService.findRunById("r-1")).thenReturn(run);
         when(chainMapper.toRunResponse(run)).thenReturn(sampleRun());
 
         mockMvc.perform(get("/api/v1/chains/c-1/runs/r-1"))
@@ -203,7 +198,8 @@ class ChainControllerTest {
 
     @Test
     void getRun_returns404_whenRunMissing() throws Exception {
-        when(chainRunRepository.findById("missing")).thenReturn(Optional.empty());
+        when(chainService.findRunById("missing"))
+                .thenThrow(new java.util.NoSuchElementException("Chain run not found: missing"));
 
         mockMvc.perform(get("/api/v1/chains/c-1/runs/missing"))
                 .andExpect(status().isNotFound());
@@ -213,7 +209,7 @@ class ChainControllerTest {
     void listAllRuns_returnsPagedResponse() throws Exception {
         ChainRun run = mock(ChainRun.class);
         Page<ChainRun> page = new PageImpl<>(List.of(run), Pageable.ofSize(50), 1);
-        when(chainRunRepository.findFiltered(eq(null), eq(null), any(Pageable.class))).thenReturn(page);
+        when(chainService.findRunsFiltered(eq(null), eq(null), any(Pageable.class))).thenReturn(page);
         when(chainMapper.toRunResponseList(any())).thenReturn(List.of(sampleRun()));
 
         mockMvc.perform(get("/api/v1/chains/runs?page=0&size=50"))
@@ -225,14 +221,14 @@ class ChainControllerTest {
     @Test
     void listAllRuns_filtersByStatusAndSearch() throws Exception {
         Page<ChainRun> page = new PageImpl<>(List.of(), Pageable.ofSize(20), 0);
-        when(chainRunRepository.findFiltered(eq(RunStatus.COMPLETED), eq("foo"), any(Pageable.class))).thenReturn(page);
+        when(chainService.findRunsFiltered(eq(RunStatus.COMPLETED), eq("foo"), any(Pageable.class))).thenReturn(page);
         when(chainMapper.toRunResponseList(any())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/v1/chains/runs?page=0&size=20&status=completed&search=foo"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(0));
 
-        verify(chainRunRepository).findFiltered(eq(RunStatus.COMPLETED), eq("foo"), any(Pageable.class));
+        verify(chainService).findRunsFiltered(eq(RunStatus.COMPLETED), eq("foo"), any(Pageable.class));
     }
 
     @Test
@@ -271,7 +267,7 @@ class ChainControllerTest {
 
     @Test
     void listRuns_returns404_whenChainMissing() throws Exception {
-        when(chainService.findById("missing")).thenThrow(new java.util.NoSuchElementException("not found"));
+        when(chainService.findRunsByChainId("missing")).thenThrow(new java.util.NoSuchElementException("not found"));
 
         mockMvc.perform(get("/api/v1/chains/missing/runs"))
                 .andExpect(status().isNotFound());

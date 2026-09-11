@@ -1,10 +1,8 @@
 package com.automation.controller;
 
 import com.automation.entity.DeadLetterEntry;
-import com.automation.repository.WorkflowRepository;
-import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.dlq.DeadLetterRetryService;
 import com.automation.service.dlq.DeadLetterService;
-import com.automation.service.workflow.WorkflowExecutor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -17,9 +15,7 @@ import org.springframework.web.bind.annotation.*;
 public class DeadLetterController {
 
     private final DeadLetterService dlqService;
-    private final WorkflowRunRepository runRepository;
-    private final WorkflowRepository workflowRepository;
-    private final WorkflowExecutor workflowExecutor;
+    private final DeadLetterRetryService dlqRetryService;
 
     @GetMapping
     public Page<DeadLetterEntry> list(
@@ -36,15 +32,7 @@ public class DeadLetterController {
 
     @PostMapping("/{id}/retry")
     public ResponseEntity<DeadLetterEntry> retry(@PathVariable String id) {
-        DeadLetterEntry entry = dlqService.findById(id);
-        if (entry.getWorkflowId() != null && entry.getWorkflowRunId() != null) {
-            // Best-effort: trigger a fresh execution of the original workflow with the
-            // same input context as the failed run (if still available).
-            workflowRepository.findById(entry.getWorkflowId()).ifPresent(workflow ->
-                    runRepository.findById(entry.getWorkflowRunId()).ifPresent(originalRun ->
-                            workflowExecutor.execute(workflow, originalRun.getInputContext())));
-        }
-        return ResponseEntity.ok(dlqService.markRetried(id));
+        return ResponseEntity.ok(dlqRetryService.retry(id));
     }
 
     @DeleteMapping("/{id}")

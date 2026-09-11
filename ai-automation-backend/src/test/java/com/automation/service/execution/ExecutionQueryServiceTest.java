@@ -1,8 +1,11 @@
 package com.automation.service.execution;
 
+import com.automation.dto.response.PageResponse;
+import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.entity.RunStatus;
 import com.automation.entity.WorkflowRun;
 import com.automation.exception.ResourceNotFoundException;
+import com.automation.mapper.WorkflowMapper;
 import com.automation.repository.WorkflowRunRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,6 +19,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,11 +34,20 @@ class ExecutionQueryServiceTest {
     @Mock
     private WorkflowRunRepository runRepository;
 
+    @Mock
+    private WorkflowMapper workflowMapper;
+
     private ExecutionQueryService service;
 
     @BeforeEach
     void setUp() {
-        service = new ExecutionQueryService(runRepository);
+        service = new ExecutionQueryService(runRepository, workflowMapper);
+    }
+
+    private static WorkflowRunResponse sampleResponse(String id) {
+        return new WorkflowRunResponse(
+                id, "wf-1", "Test", null, null, RunStatus.COMPLETED, List.of(),
+                null, null, null, null, null, Map.of(), Map.of(), null);
     }
 
     // --- listExecutions: no filters ---
@@ -205,5 +218,100 @@ class ExecutionQueryServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Execution")
                 .hasMessageContaining("no-such-id");
+    }
+
+    // --- listExecutionResponses ---
+
+    @Test
+    void listExecutionResponses_mapsContentAndPageMetadata() {
+        WorkflowRun run = new WorkflowRun();
+        Page<WorkflowRun> page = new PageImpl<>(List.of(run), PageRequest.of(0, 10), 1);
+        when(runRepository.findFiltered(isNull(), isNull(), isNull(), isNull(), any(Pageable.class))).thenReturn(page);
+        when(workflowMapper.toRunResponseList(List.of(run))).thenReturn(List.of(sampleResponse("run-1")));
+
+        PageResponse<WorkflowRunResponse> result = service.listExecutionResponses(0, 10, null, null, null, null);
+
+        assertThat(result.content()).hasSize(1);
+        assertThat(result.content().get(0).id()).isEqualTo("run-1");
+        assertThat(result.page()).isEqualTo(0);
+        assertThat(result.size()).isEqualTo(10);
+        assertThat(result.totalElements()).isEqualTo(1);
+        assertThat(result.totalPages()).isEqualTo(1);
+    }
+
+    // --- getExecutionResponse ---
+
+    @Test
+    void getExecutionResponse_existingRun_returnsMappedResponse() {
+        WorkflowRun run = new WorkflowRun();
+        run.setId("run-1");
+        when(runRepository.findById("run-1")).thenReturn(Optional.of(run));
+        when(workflowMapper.toRunResponse(run)).thenReturn(sampleResponse("run-1"));
+
+        WorkflowRunResponse result = service.getExecutionResponse("run-1");
+
+        assertThat(result.id()).isEqualTo("run-1");
+    }
+
+    @Test
+    void getExecutionResponse_missing_throwsWithExecutionWording() {
+        when(runRepository.findById("no-such-id")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getExecutionResponse("no-such-id"))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Execution");
+    }
+
+    // --- listRunsForWorkflow ---
+
+    @Test
+    void listRunsForWorkflow_usesPagingAndMaps() {
+        WorkflowRun run = new WorkflowRun();
+        Page<WorkflowRun> page = new PageImpl<>(List.of(run), PageRequest.of(1, 20), 21);
+        when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1", PageRequest.of(1, 20))).thenReturn(page);
+        when(workflowMapper.toRunResponseList(List.of(run))).thenReturn(List.of(sampleResponse("run-1")));
+
+        PageResponse<WorkflowRunResponse> result = service.listRunsForWorkflow("wf-1", 1, 20);
+
+        assertThat(result.content()).hasSize(1);
+        assertThat(result.page()).isEqualTo(1);
+        assertThat(result.size()).isEqualTo(20);
+        assertThat(result.totalElements()).isEqualTo(21);
+        assertThat(result.totalPages()).isEqualTo(2);
+        verify(runRepository).findByWorkflowIdOrderByStartedAtDesc("wf-1", PageRequest.of(1, 20));
+    }
+
+    // --- getRunForWorkflow ---
+
+    @Test
+    void getRunForWorkflow_existingRun_returnsMappedResponse() {
+        WorkflowRun run = new WorkflowRun();
+        run.setId("run-1");
+        when(runRepository.findById("run-1")).thenReturn(Optional.of(run));
+        when(workflowMapper.toRunResponse(run)).thenReturn(sampleResponse("run-1"));
+
+        WorkflowRunResponse result = service.getRunForWorkflow("run-1");
+
+        assertThat(result.id()).isEqualTo("run-1");
+    }
+
+    @Test
+    void getRunForWorkflow_missing_throwsWithWorkflowRunWording() {
+        when(runRepository.findById("no-such-id")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getRunForWorkflow("no-such-id"))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("WorkflowRun")
+                .hasMessageContaining("no-such-id");
+    }
+
+    // --- hasFailedRuns ---
+
+    @Test
+    void hasFailedRuns_delegatesToRepository() {
+        when(runRepository.existsByWorkflowIdAndStatus("wf-1", RunStatus.FAILED)).thenReturn(true);
+
+        assertThat(service.hasFailedRuns("wf-1")).isTrue();
+        verify(runRepository).existsByWorkflowIdAndStatus("wf-1", RunStatus.FAILED);
     }
 }
