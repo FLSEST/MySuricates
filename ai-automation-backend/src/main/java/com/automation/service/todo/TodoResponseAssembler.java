@@ -44,16 +44,21 @@ public class TodoResponseAssembler {
         Map<String, String> workflowNames = namesFor(todos, Todo::getLinkedWorkflowId,
                 ids -> workflowRepository.findAllById(ids).stream().collect(Collectors.toMap(Workflow::getId, Workflow::getName)));
         return todos.stream()
-                .map(todo -> withNames(todo, projectNames.get(todo.getProjectId()), workflowNames.get(todo.getLinkedWorkflowId())))
+                .map(todo -> withNames(todo, nameOf(projectNames, todo.getProjectId()),
+                        nameOf(workflowNames, todo.getLinkedWorkflowId())))
                 .toList();
     }
 
     private static Map<String, String> namesFor(List<Todo> todos, Function<Todo, String> idOf,
                                                 Function<Set<String>, Map<String, String>> loader) {
         Set<String> ids = todos.stream().map(idOf).filter(id -> id != null && !id.isBlank()).collect(Collectors.toSet());
-        // A HashMap (not Map.of()) tolerates the null-key .get(...) lookups in withNames() for
-        // todos that have no projectId/linkedWorkflowId at all.
         return ids.isEmpty() ? new HashMap<>() : loader.apply(ids);
+    }
+
+    // Null-safe lookup: todos without a projectId/linkedWorkflowId must not trigger a map lookup
+    // with a null key.
+    private static String nameOf(Map<String, String> names, String id) {
+        return id == null ? null : names.get(id);
     }
 
     private TodoResponse withNames(Todo todo, String projectName, String linkedWorkflowName) {

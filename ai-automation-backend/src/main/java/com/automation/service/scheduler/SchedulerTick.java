@@ -59,7 +59,8 @@ public class SchedulerTick {
             dueSchedules.forEach(scheduled -> skipPolicy.skipScheduleUntil(scheduled, skipUntil.get()));
             return;
         }
-        dueSchedules.forEach(scheduled -> execute(scheduled, "Schedule execution failed: "));
+        dueSchedules.forEach(scheduled -> execute(scheduled,
+                "Failed to execute scheduled workflow: {}", "Schedule execution failed: "));
     }
 
     /** A tick that fired far later than the fixed 60s rate means the JVM was frozen (e.g. suspend). */
@@ -85,19 +86,19 @@ public class SchedulerTick {
 
         for (ScheduledWorkflow scheduled : dueSchedules) {
             if (scheduled.isCatchUpOnResume() || schedulerConfig.isCatchUpOnResume()) {
-                execute(scheduled, "Schedule catch-up failed: ");
+                execute(scheduled, "Failed to catch up scheduled workflow on resume: {}", "Schedule catch-up failed: ");
             } else {
                 skipPolicy.skipScheduleForResume(scheduled, now, gapMinutes);
             }
         }
     }
 
-    private void execute(ScheduledWorkflow scheduled, String failurePrefix) {
+    private void execute(ScheduledWorkflow scheduled, String logMessage, String activityPrefix) {
         try {
             scheduledExecutor.executeSingleSchedule(scheduled.getId());
         } catch (Exception e) {
-            log.error("Failed to execute scheduled workflow: {}", scheduled.getId(), e);
-            activityLogService.error(LogCategory.SCHEDULE, failurePrefix + e.getMessage(),
+            log.error(logMessage, scheduled.getId(), e);
+            activityLogService.error(LogCategory.SCHEDULE, activityPrefix + e.getMessage(),
                     "SchedulerService", scheduled.getId());
         }
     }

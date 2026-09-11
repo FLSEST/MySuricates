@@ -41,8 +41,12 @@ public class GranularTodoService {
 
     /** One reported finding, parsed from the {@code todo_items} map. */
     record Item(String title, Todo.Priority priority, String tagsJson, String description) {
-        String compositeTag() {
+        static String compositeTag(String title) {
             return "item:" + title.hashCode();
+        }
+
+        String compositeTag() {
+            return compositeTag(title);
         }
     }
 
@@ -50,6 +54,7 @@ public class GranularTodoService {
         return event.getRunMetadata().get("todo_items") instanceof List<?> list && !list.isEmpty();
     }
 
+    /** Call only when {@link #hasItems(WorkflowRunCompletedEvent)} is true — an empty item list closes every open granular TODO of the workflow. */
     public void syncItems(String projectId, WorkflowRunCompletedEvent event, GateResult gate) {
         List<Item> items = parseItems(event, gate);
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
@@ -70,7 +75,7 @@ public class GranularTodoService {
             List<String> tags = new ArrayList<>(map.get("tags") instanceof List<?> tagList
                     ? tagList.stream().map(String::valueOf).toList() : List.of());
             tags.add(TAG_AUTO_WORKFLOW);
-            tags.add("item:" + title.hashCode());
+            tags.add(Item.compositeTag(title));
             if (gate != null && gate.category() != null) {
                 tags.add("category:" + gate.category());
             }

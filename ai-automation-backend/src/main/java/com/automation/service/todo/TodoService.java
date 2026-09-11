@@ -26,7 +26,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -44,14 +43,6 @@ public class TodoService {
     private final TodoResponseAssembler responseAssembler;
     private final ApplicationEventPublisher eventPublisher;
     private final AuditCenterService auditCenterService;
-
-    private static final Comparator<Todo> PRIORITY_COMPARATOR =
-            Comparator.comparingInt((Todo t) -> switch (t.getPriority()) {
-                case CRITICAL -> 0;
-                case HIGH -> 1;
-                case MEDIUM -> 2;
-                case LOW -> 3;
-            }).thenComparing(Todo::getCreatedAt, Comparator.reverseOrder());
 
     @Transactional(readOnly = true)
     public PageResponse<TodoResponse> findAll(int page, int size, String projectId, List<String> status, String priority, String source, String tag, String q) {

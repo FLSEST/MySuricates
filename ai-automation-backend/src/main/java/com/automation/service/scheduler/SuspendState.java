@@ -7,7 +7,7 @@ import java.time.Instant;
 
 /**
  * Shared in-memory signal recording when the application last detected a system resume after a
- * suspend/freeze (e.g. laptop sleep). Written by {@code SchedulerService} (which detects the
+ * suspend/freeze (e.g. laptop sleep). Written by {@code SchedulerTick} (which detects the
  * resume via a large gap between scheduler ticks) and read by {@code GhostRunWatchdogService} to
  * label runs that were orphaned across the suspend as suspend-interrupted rather than generic
  * ghost runs.
