@@ -10,6 +10,7 @@ import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.mapper.ChainMapper;
 import com.automation.mapper.ScheduleMapper;
 import com.automation.mapper.WorkflowMapper;
+import com.automation.service.scheduler.SchedulerMaintenanceMode;
 import com.automation.service.scheduler.SchedulerService;
 import com.automation.service.scheduler.UpcomingRunsCalculator;
 import jakarta.validation.Valid;
@@ -29,6 +30,7 @@ import java.util.Map;
 public class ScheduleController {
 
     private final SchedulerService schedulerService;
+    private final SchedulerMaintenanceMode maintenanceMode;
     private final UpcomingRunsCalculator upcomingRunsCalculator;
     private final ScheduleMapper scheduleMapper;
     private final WorkflowMapper workflowMapper;
@@ -136,13 +138,13 @@ public class ScheduleController {
 
     @GetMapping("/maintenance")
     public Map<String, Object> getMaintenanceMode() {
-        return Map.of("enabled", schedulerService.isMaintenanceMode());
+        return Map.of("enabled", maintenanceMode.isEnabled());
     }
 
     @PostMapping("/maintenance")
     public Map<String, Object> setMaintenanceMode(@RequestBody Map<String, Boolean> body) {
         boolean enabled = Boolean.TRUE.equals(body.get("enabled"));
-        schedulerService.setMaintenanceMode(enabled);
+        maintenanceMode.setEnabled(enabled);
         return Map.of("enabled", enabled);
     }
 }

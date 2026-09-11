@@ -13,6 +13,7 @@ import com.automation.mapper.ChainMapper;
 import com.automation.mapper.ScheduleMapper;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.service.activitylog.ActivityLogService;
+import com.automation.service.scheduler.SchedulerMaintenanceMode;
 import com.automation.service.scheduler.SchedulerService;
 import com.automation.service.system.ApiKeyService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -48,6 +49,8 @@ class ScheduleControllerTest {
 
     @MockitoBean
     private SchedulerService schedulerService;
+    @MockitoBean
+    private SchedulerMaintenanceMode maintenanceMode;
     @MockitoBean
     private com.automation.service.scheduler.UpcomingRunsCalculator upcomingRunsCalculator;
     @MockitoBean
@@ -378,7 +381,7 @@ class ScheduleControllerTest {
 
     @Test
     void getMaintenanceMode_returnsEnabledFalse() throws Exception {
-        when(schedulerService.isMaintenanceMode()).thenReturn(false);
+        when(maintenanceMode.isEnabled()).thenReturn(false);
 
         mockMvc.perform(get("/api/v1/schedules/maintenance"))
                 .andExpect(status().isOk())
@@ -387,7 +390,7 @@ class ScheduleControllerTest {
 
     @Test
     void setMaintenanceMode_enablesAndReturnsEnabled() throws Exception {
-        doNothing().when(schedulerService).setMaintenanceMode(true);
+        doNothing().when(maintenanceMode).setEnabled(true);
 
         mockMvc.perform(post("/api/v1/schedules/maintenance")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -395,6 +398,6 @@ class ScheduleControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.enabled").value(true));
 
-        verify(schedulerService).setMaintenanceMode(true);
+        verify(maintenanceMode).setEnabled(true);
     }
 }
