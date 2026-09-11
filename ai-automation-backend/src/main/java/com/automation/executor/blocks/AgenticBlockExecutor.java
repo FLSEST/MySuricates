@@ -160,7 +160,7 @@ public class AgenticBlockExecutor implements BlockExecutor {
 
             // === Optional APPROVAL gate ===
             if (approvalRequired && !plan.getAction().isEmpty()) {
-                String approvalResult = handleApproval(context, stepIndex, iteration, plan, iterData, fullOutput);
+                String approvalResult = handleApproval(context, stepIndex, iteration, plan, iterData, fullOutput, history);
                 if ("break".equals(approvalResult)) break;
                 if ("continue".equals(approvalResult)) {
                     tokenTracker.trackIteration(iterData);
@@ -336,7 +336,7 @@ public class AgenticBlockExecutor implements BlockExecutor {
      */
     private String handleApproval(ExecutionContext context, int stepIndex, int iteration,
                                    AgenticPlan plan, Map<String, Object> iterData,
-                                   StringBuilder fullOutput) {
+                                   StringBuilder fullOutput, List<Turn> history) {
         events.broadcast(context.getWorkflowRunId(), stepIndex,
                 "agentic_approval_required",
                 Map.of("iteration", iteration,
@@ -374,8 +374,8 @@ public class AgenticBlockExecutor implements BlockExecutor {
         }
 
         if ("No".equalsIgnoreCase(answer)) {
-            context.getWorkflowRunId(); // keep reference valid
-            var history = new ArrayList<Turn>();
+            // The rejection must reach the shared conversation, otherwise the next
+            // REASON call re-proposes the same action (TODO 67512633).
             history.add(new Turn("user",
                     "The user rejected this action. Propose an alternative approach."));
             iterData.put("approval", "rejected");

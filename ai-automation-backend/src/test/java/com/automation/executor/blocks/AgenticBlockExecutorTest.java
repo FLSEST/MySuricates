@@ -800,6 +800,9 @@ class AgenticBlockExecutorTest {
 
     // ── approval gate (characterization, Audit-TODO a253ad3e) ────────
 
+    private static final HostClaudeService.Turn REJECTION_TURN = new HostClaudeService.Turn(
+            "user", "The user rejected this action. Propose an alternative approach.");
+
     private BlockDefinition approvalBlock() {
         BlockDefinition block = buildBlock("Guarded goal", 3);
         block.getConfig().put("require_approval", true);
@@ -837,6 +840,7 @@ class AgenticBlockExecutorTest {
         verify(context, times(1)).requestApproval(argThat(r -> r.getQuestion().equals("Approve action: rm -rf build")
                 && r.getOptions().equals(List.of("Yes", "Yes always", "No")) && r.getBlockId().equals("agentic-0-iter-1")));
         verify(hostClaude).executeAction(eq("rm -rf build"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull());
+        verify(hostClaude, never()).buildConversationPrompt(anyString(), argThat(h -> h.contains(REJECTION_TURN)));
     }
 
     @Test
@@ -869,6 +873,30 @@ class AgenticBlockExecutorTest {
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         assertThat(result.getMetadata().get("totalIterations")).isEqualTo(2);
         verify(hostClaude, never()).executeAction(anyString(), any(), any(), any(), any(), anyBoolean(), any(), any(), any());
+    }
+
+    @Test
+    void approval_no_appendsRejectionTurn_beforeNextReasoning() throws Exception {
+        // TODO 67512633: the rejection used to land in a throwaway list and never reached the model.
+        // The executor mutates one history instance, so snapshot it per REASON call.
+        List<List<HostClaudeService.Turn>> snapshots = new java.util.ArrayList<>();
+        when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenAnswer(inv -> {
+            snapshots.add(List.copyOf(inv.<List<HostClaudeService.Turn>>getArgument(1)));
+            return "prompt";
+        });
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull()))
+                .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Do it\nACTION: rm -rf build\nSUMMARY: Clean"))
+                .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Done"));
+        lenient().when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
+        ExecutionContext context = contextAnswering(java.util.concurrent.CompletableFuture.completedFuture("No"));
+
+        StepResult result = executor.execute(approvalBlock(), context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(snapshots).hasSize(2);
+        assertThat(snapshots.get(0)).doesNotContain(REJECTION_TURN);
+        assertThat(snapshots.get(1)).last().isEqualTo(REJECTION_TURN);
+        assertThat(snapshots.get(1)).containsOnlyOnce(REJECTION_TURN);
     }
 
     @Test
