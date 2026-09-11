@@ -903,6 +903,16 @@ Das Modell wird auf Workflow-Ebene gesetzt (`workflow.model`-Feld) oder auf null
 
 **Immer Opus fuer Analyse-Workflows verwenden.** Sonnet halluziniert Findings (z.B. falsche SQL-Injection-Schwachstellen melden). Fuer Code-Analyse, Security-Audits und Architektur-Reviews ist Praezision wichtiger als Geschwindigkeit.
 
+### Provider-Regel: Codex ist read-only
+
+`"provider": "CODEX"` ruft `codex exec` immer mit `--sandbox read-only` auf (`HostCodexService`). Bloecke, die
+Dateien schreiben sollen (simple/agentic/foreach mit Datei-Output), melden trotzdem COMPLETED — die Dateien
+fehlen aber (stiller Fehlschlag). Deshalb:
+
+- **CODEX nur fuer Analyse/Extraktion ohne Datei-Writes** (Reports in `previous_output`, Klassifikation).
+- **Schreibende Codex-Workflows ueber Pi:** `"provider": "PI"`, `"model": "openai-codex/gpt-5.5"` — der
+  ACT-Pfad von Pi hat read/write/edit/bash-Tools und kann schreiben (Beispiel: `pi-smoke-test`).
+
 ### Modell setzen
 
 Via API:
