@@ -200,21 +200,27 @@ public class ContainerService {
                 "ContainerService", project.getId());
     }
 
+    // NOT @Transactional: docker.isRunning() is a Docker inspect (network
+    // round-trip). Same shape as stopContainer: short read burst, Docker call
+    // outside any transaction, short write burst — the single pooled
+    // connection must never wait on Docker.
     public String getDockerContainerId(Project project) {
-        var containerOpt = containerRepository.findByProjectId(project.getId());
-        if (containerOpt.isPresent()) {
-            Container container = containerOpt.get();
-            if (container.getStatus() == ContainerStatus.RUNNING) {
-                if (docker.isRunning(container.getDockerContainerId())) {
-                    return container.getDockerContainerId();
-                }
-                // Docker container is gone — correct stale DB status
-                log.warn("Container {} for project {} is marked RUNNING but Docker reports it is not running. Updating status.",
-                        container.getDockerContainerId(), project.getId());
-                container.setStatus(ContainerStatus.STOPPED);
-                container.setStoppedAt(Instant.now());
-                containerRepository.save(container);
+        Container container = readOnlyTransactionTemplate.execute(status ->
+                containerRepository.findByProjectId(project.getId()).orElse(null));
+        if (container != null && container.getStatus() == ContainerStatus.RUNNING) {
+            if (docker.isRunning(container.getDockerContainerId())) {
+                return container.getDockerContainerId();
             }
+            // Docker container is gone — correct stale DB status
+            log.warn("Container {} for project {} is marked RUNNING but Docker reports it is not running. Updating status.",
+                    container.getDockerContainerId(), project.getId());
+            final String entityId = container.getId();
+            transactionTemplate.executeWithoutResult(status ->
+                    containerRepository.findById(entityId).ifPresent(c -> {
+                        c.setStatus(ContainerStatus.STOPPED);
+                        c.setStoppedAt(Instant.now());
+                        containerRepository.save(c);
+                    }));
         }
         throw new ContainerException("No running container for project: " + project.getId());
     }

@@ -14,6 +14,7 @@ import com.github.dockerjava.api.command.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -245,6 +246,12 @@ class ContainerServiceTest {
         String id = service.getDockerContainerId(testProject);
 
         assertThat(id).isEqualTo("docker-running");
+        // Read burst committed before the Docker inspect; no write burst on the happy path.
+        InOrder inOrder = inOrder(transactionManager, dockerClient);
+        inOrder.verify(transactionManager).commit(transactionStatus);
+        inOrder.verify(dockerClient).inspectContainerCmd("docker-running");
+        verify(transactionManager, times(1)).getTransaction(any());
+        verify(containerRepository, never()).save(any());
     }
 
     @Test
@@ -256,6 +263,7 @@ class ContainerServiceTest {
                 .status(ContainerStatus.RUNNING)
                 .build();
         when(containerRepository.findByProjectId("project-1")).thenReturn(Optional.of(container));
+        when(containerRepository.findById("c1")).thenReturn(Optional.of(container));
         stubDockerInspectNotRunning("docker-gone");
         when(containerRepository.save(any(Container.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -263,6 +271,16 @@ class ContainerServiceTest {
                 .isInstanceOf(ContainerException.class);
 
         assertThat(container.getStatus()).isEqualTo(ContainerStatus.STOPPED);
+        assertThat(container.getStoppedAt()).isNotNull();
+        // Read burst → Docker inspect outside any transaction → separate write burst (re-loaded by id).
+        InOrder inOrder = inOrder(transactionManager, dockerClient, containerRepository);
+        inOrder.verify(transactionManager).getTransaction(any());
+        inOrder.verify(transactionManager).commit(transactionStatus);
+        inOrder.verify(dockerClient).inspectContainerCmd("docker-gone");
+        inOrder.verify(transactionManager).getTransaction(any());
+        inOrder.verify(containerRepository).findById("c1");
+        inOrder.verify(containerRepository).save(container);
+        inOrder.verify(transactionManager).commit(transactionStatus);
     }
 
     @Test
