@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:sqlite:/app/data/automation.db?journal_mode=WAL&busy_timeout=10000
+    url: jdbc:sqlite:/app/data/automation.db?journal_mode=WAL&busy_timeout=10000&foreign_keys=true
 
 server:
   port: 9091

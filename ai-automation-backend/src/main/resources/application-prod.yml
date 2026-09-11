@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:sqlite:${AUTOMATION_DB_PATH:/var/lib/automation/automation.db}
+    url: jdbc:sqlite:${AUTOMATION_DB_PATH:/var/lib/automation/automation.db}?journal_mode=WAL&busy_timeout=10000&foreign_keys=true
 
   jpa:
     show-sql: false

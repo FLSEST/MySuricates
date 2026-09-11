@@ -5,7 +5,7 @@ spring:
     # never share one SQLite file — two WAL writer processes corrupt it (SQLITE_BUSY_SNAPSHOT
     # → SQLITE_CORRUPT, seen 2026-07-09). The fallback path only applies when the listener
     # did not run (e.g. exotic runners); the pre-test clean in pom.xml keeps it fresh.
-    url: jdbc:sqlite:${integration.db.path:/tmp/autotrigger-integrationtest.db}?journal_mode=WAL&busy_timeout=10000
+    url: jdbc:sqlite:${integration.db.path:/tmp/autotrigger-integrationtest.db}?journal_mode=WAL&busy_timeout=10000&foreign_keys=true
     driver-class-name: org.sqlite.JDBC
     hikari:
       # SQLite supports only one writer — integration tests MUST mirror prod (pool-size=1).
@@ -15,7 +15,7 @@ spring:
       maximum-pool-size: 1
       minimum-idle: 1
       connection-test-query: SELECT 1
-      connection-init-sql: "PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 30000;"
+      connection-init-sql: "PRAGMA auto_vacuum = INCREMENTAL"
 
   jpa:
     database-platform: org.hibernate.community.dialect.SQLiteDialect
@@ -31,7 +31,7 @@ spring:
     # Use the same file-based URL as the datasource. File DBs persist across
     # DataSource lifetimes (unlike in-memory), so Flyway can use its own
     # non-pooled DataSource without the DB vanishing before HikariCP connects.
-    url: jdbc:sqlite:${integration.db.path:/tmp/autotrigger-integrationtest.db}?journal_mode=WAL&busy_timeout=10000
+    url: jdbc:sqlite:${integration.db.path:/tmp/autotrigger-integrationtest.db}?journal_mode=WAL&busy_timeout=10000&foreign_keys=true
     driver-class-name: org.sqlite.JDBC
 
 automation:

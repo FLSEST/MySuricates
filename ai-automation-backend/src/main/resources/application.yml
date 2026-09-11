@@ -3,7 +3,7 @@ spring:
     name: ai-automation-backend
 
   datasource:
-    url: jdbc:sqlite:${AUTOMATION_DB_PATH:./data/automation.db}?journal_mode=WAL&busy_timeout=10000
+    url: jdbc:sqlite:${AUTOMATION_DB_PATH:./data/automation.db}?journal_mode=WAL&busy_timeout=10000&foreign_keys=true
     driver-class-name: org.sqlite.JDBC
     hikari:
       maximum-pool-size: 1  # SQLite supports only one writer at a time — pool=1 serializes via Hikari queue instead of SQLite locks (avoids SQLITE_BUSY under concurrent workflow runs)
@@ -11,7 +11,11 @@ spring:
       connection-timeout: 120000  # 120s (default: 30s) — safety net for pool-size=1 contention during concurrent workflow runs
       leak-detection-threshold: 60000  # 60s — logs a WARNING + stack trace when a connection is held this long. (Was temporarily 2s while diagnosing the residual pool exhaustion fa741274; root cause — getDashboard fetching step TEXT blobs — fixed in 65fd5eee, so the 2s diagnostic magnifier is no longer needed.)
       connection-test-query: SELECT 1
-      connection-init-sql: "PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 30000; PRAGMA auto_vacuum = INCREMENTAL;"
+      # ONE statement only: sqlite-jdbc executes just the first statement of a multi-statement string
+      # (verified 2026-09-11 — foreign_keys/busy_timeout therefore live in the JDBC URL above).
+      # auto_vacuum has no URL form; it only takes effect on an empty DB or after a full VACUUM on
+      # a connection that has it set — DatabaseBackupService.checkAutoVacuumMode warns until then.
+      connection-init-sql: "PRAGMA auto_vacuum = INCREMENTAL"
 
   jpa:
     database-platform: org.hibernate.community.dialect.SQLiteDialect
@@ -31,7 +35,7 @@ spring:
     mixed: true
     # Flyway 10+ uses two connections (migration + lock monitor). With HikariCP pool-size=1
     # this deadlocks. Giving Flyway its own non-pooled DataSource fixes the issue.
-    url: jdbc:sqlite:${AUTOMATION_DB_PATH:./data/automation.db}?journal_mode=WAL&busy_timeout=10000
+    url: jdbc:sqlite:${AUTOMATION_DB_PATH:./data/automation.db}?journal_mode=WAL&busy_timeout=10000&foreign_keys=true
     driver-class-name: org.sqlite.JDBC
 
   threads:
