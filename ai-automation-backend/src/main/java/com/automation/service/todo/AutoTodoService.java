@@ -5,7 +5,6 @@ import com.automation.entity.Project;
 import com.automation.entity.Todo;
 import com.automation.event.TodoCreatedEvent;
 import com.automation.event.WorkflowRunCompletedEvent;
-import com.automation.mapper.TodoMapper;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.service.todo.GateStatusResolver.GateResult;
@@ -18,16 +17,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 /**
  * Reacts to completed workflow runs: decides mode (auto / track / approval), resolves the target
- * projects and creates, updates or closes the gate todo and the granular finding todos.
- * Text building lives in {@link AutoTodoTextBuilder}, approval mode in
- * {@link PendingTodoApprovalService}.
+ * projects and creates, updates or closes the gate todo. Text building lives in
+ * {@link AutoTodoTextBuilder}, approval mode in {@link PendingTodoApprovalService}, the granular
+ * finding todos in {@link GranularTodoService}.
  */
 @Service
 @RequiredArgsConstructor
@@ -41,13 +39,13 @@ public class AutoTodoService {
 
     private final TodoRepository todoRepository;
     private final GateStatusResolver gateStatusResolver;
-    private final TodoSimilarityService similarityService;
     private final ProjectPathResolver projectPathResolver;
     private final AppSettingsRepository appSettingsRepository;
     private final PlatformTransactionManager transactionManager;
     private final ApplicationEventPublisher eventPublisher;
     private final AutoTodoTextBuilder textBuilder;
     private final PendingTodoApprovalService approvalService;
+    private final GranularTodoService granularTodoService;
 
     @Async
     @EventListener
@@ -84,8 +82,8 @@ public class AutoTodoService {
 
     private void handleAutoMode(WorkflowRunCompletedEvent event, GateResult gate, List<String> targetProjectIds) {
         for (String projectId : targetProjectIds) {
-            if (hasGranularTodos(event)) {
-                createGranularTodos(projectId, event, gate);
+            if (granularTodoService.hasItems(event)) {
+                granularTodoService.syncItems(projectId, event, gate);
             }
             switch (gate.status()) {
                 case GREEN -> closeOpenTodos(projectId, event);
@@ -102,132 +100,11 @@ public class AutoTodoService {
             case GREEN -> Todo.Priority.LOW;
         };
         for (String projectId : targetProjectIds) {
-            if (hasGranularTodos(event)) {
-                createGranularTodos(projectId, event, gate);
+            if (granularTodoService.hasItems(event)) {
+                granularTodoService.syncItems(projectId, event, gate);
             }
             upsertTodo(projectId, event, gate, priority);
         }
-    }
-
-    private boolean hasGranularTodos(WorkflowRunCompletedEvent event) {
-        Object items = event.getRunMetadata().get("todo_items");
-        return items instanceof List<?> list && !list.isEmpty();
-    }
-
-    private void createGranularTodos(String projectId, WorkflowRunCompletedEvent event, GateResult gate) {
-        Object items = event.getRunMetadata().get("todo_items");
-        if (!(items instanceof List<?> list)) return;
-
-        TransactionTemplate tx = new TransactionTemplate(transactionManager);
-        List<String> currentTitles = new ArrayList<>();
-
-        for (Object item : list) {
-            if (!(item instanceof Map<?, ?> map)) continue;
-
-            String title = String.valueOf(map.get("title"));
-            String priorityStr = String.valueOf(map.get("priority"));
-            List<String> itemTags = map.get("tags") instanceof List<?> tagList
-                    ? tagList.stream().map(String::valueOf).toList()
-                    : List.of();
-
-            currentTitles.add(title);
-
-            Todo.Priority priority;
-            try {
-                priority = Todo.Priority.valueOf(priorityStr);
-            } catch (IllegalArgumentException e) {
-                priority = Todo.Priority.MEDIUM;
-            }
-
-            String compositeTag = "item:" + title.hashCode();
-            List<String> tags = new ArrayList<>(itemTags);
-            tags.add(TAG_AUTO_WORKFLOW);
-            tags.add(compositeTag);
-            if (gate != null && gate.category() != null) {
-                tags.add("category:" + gate.category());
-            }
-            String tagsJson = TodoMapper.listToJson(tags);
-
-            String itemDescription = map.get("description") != null
-                    ? String.valueOf(map.get("description")) : null;
-            String fullDescription = textBuilder.buildGranularDescription(itemDescription, event);
-
-            // TX 1: check for existing todo by composite key
-            Optional<Todo> existing = tx.execute(status ->
-                    todoRepository.findOpenByCompositeKey(projectId, REFERENCE_TYPE, event.getWorkflowId(), compositeTag));
-
-            if (existing != null && existing.isPresent()) {
-                // TX 2: update existing in place
-                Todo.Priority finalPriority = priority;
-                tx.execute(status -> {
-                    Todo todo = existing.get();
-                    todo.setDescription(fullDescription);
-                    todo.setWorkflowRunId(event.getRunId());
-                    todo.setPriority(finalPriority);
-                    todo.setTags(tagsJson);
-                    todoRepository.save(todo);
-                    return null;
-                });
-                log.debug("Auto-todo (granular) updated: {}", title);
-            } else {
-                // NO TX: AI similarity check — connection is free for other operations
-                List<TodoSimilarityService.SimilarTodo> similar =
-                        similarityService.findSimilar(projectId, title, null);
-
-                // TX 3: persist — granular items are ALWAYS created as their own todo.
-                // Exact dedup already happened via composite key above. A similarity
-                // match (SAME or RELATED) only links via relatedTodoId, never merges:
-                // merging swallowed the TodoCreatedEvent, so TodoTriggers never fired
-                // and the items of one batch collapsed into a single todo.
-                Todo.Priority finalPriority = priority;
-                tx.execute(status -> {
-                    TodoSimilarityService.SimilarTodo linkMatch = similar.stream()
-                            .filter(s -> s.similarity() == TodoSimilarityService.Similarity.SAME
-                                    || s.similarity() == TodoSimilarityService.Similarity.RELATED)
-                            .findFirst().orElse(null);
-
-                    Todo todo = Todo.builder()
-                            .title(title)
-                            .description(fullDescription)
-                            .status(Todo.Status.OPEN)
-                            .priority(finalPriority)
-                            .tags(tagsJson)
-                            .projectId(projectId)
-                            .source(Todo.Source.WORKFLOW)
-                            .sourceAgent(SOURCE_AGENT)
-                            .workflowRunId(event.getRunId())
-                            .referenceType(REFERENCE_TYPE)
-                            .referenceId(event.getWorkflowId())
-                            .relatedTodoId(linkMatch != null ? linkMatch.todo().getId() : null)
-                            .build();
-                    Todo saved = todoRepository.save(todo);
-                    eventPublisher.publishEvent(new TodoCreatedEvent(AutoTodoService.this, saved));
-                    log.info("Auto-todo (granular) created: {}{}", title,
-                            linkMatch != null ? " (related to: " + linkMatch.todo().getTitle() + ")" : "");
-                    return null;
-                });
-            }
-        }
-
-        // TX 4: close granular todos from previous runs that are no longer in the findings
-        tx.execute(status -> {
-            List<Todo> openTodos = todoRepository.findByProjectIdAndSourceAndReferenceTypeAndReferenceIdAndStatusNot(
-                    projectId, Todo.Source.WORKFLOW, REFERENCE_TYPE, event.getWorkflowId(), Todo.Status.DONE);
-            for (Todo todo : openTodos) {
-                if (todo.getTags() != null && todo.getTags().contains("item:")
-                        && todo.getTags().contains(TAG_AUTO_WORKFLOW)) {
-                    String todoTitle = todo.getTitle();
-                    if (!currentTitles.contains(todoTitle)) {
-                        todo.setStatus(Todo.Status.DONE);
-                        todoRepository.save(todo);
-                        log.info("Auto-todo (granular) closed — no longer in findings: {}", todoTitle);
-                    }
-                }
-            }
-            return null;
-        });
-
-        log.info("Auto-todo (granular): created/updated {} items for workflow {}", currentTitles.size(), event.getWorkflowName());
     }
 
     private void handleApprovalMode(WorkflowRunCompletedEvent event, GateResult gate, List<String> targetProjectIds) {
