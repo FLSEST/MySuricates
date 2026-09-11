@@ -11,10 +11,10 @@ import com.automation.service.integration.IntegrationOAuthService;
 import com.automation.service.integration.IntegrationProvider;
 import com.automation.service.integration.IntegrationRegistry;
 import com.automation.service.integration.TaskExportCapable;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,9 +27,14 @@ import java.util.Map;
  *
  * <p>Extracted from {@code TodoService} (Audit-TODO 671add26). Does <b>not</b> own todo CRUD;
  * it only reads the todo, talks to the tracker and writes the export link back.
+ *
+ * <p>Deliberately not {@code @Transactional}: the OAuth token refresh and the tracker call are
+ * HTTP round-trips (up to 10 s each). With HikariCP pool-size 1 they must never hold the single
+ * connection, so the export runs as read burst → HTTP outside any transaction → write burst
+ * (TODO f510b330). A token refresh triggered on the way is committed on its own and survives a
+ * failing tracker call.
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class TodoTrackerExportService {
 
@@ -37,16 +42,54 @@ public class TodoTrackerExportService {
     private final ProjectRepository projectRepository;
     private final IntegrationRegistry integrationRegistry;
     private final IntegrationOAuthService integrationOAuthService;
+    private final TransactionTemplate readOnlyTransactionTemplate;
+    private final TransactionTemplate transactionTemplate;
 
-    @Transactional
+    public TodoTrackerExportService(TodoRepository todoRepository,
+                                    ProjectRepository projectRepository,
+                                    IntegrationRegistry integrationRegistry,
+                                    IntegrationOAuthService integrationOAuthService,
+                                    PlatformTransactionManager transactionManager) {
+        this.todoRepository = todoRepository;
+        this.projectRepository = projectRepository;
+        this.integrationRegistry = integrationRegistry;
+        this.integrationOAuthService = integrationOAuthService;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.readOnlyTransactionTemplate = new TransactionTemplate(transactionManager);
+        this.readOnlyTransactionTemplate.setReadOnly(true);
+    }
+
+    /** Everything the tracker call needs, copied out of the read burst (no entity crosses the boundary). */
+    private record ExportPlan(TaskExportCapable.TaskRef existing, String providerId,
+                              TaskExportCapable taskProvider, TaskExportCapable.TaskExportInput input) {
+        static ExportPlan alreadyExported(TaskExportCapable.TaskRef existing) {
+            return new ExportPlan(existing, null, null, null);
+        }
+    }
+
     public TaskExportCapable.TaskRef exportToTracker(String id, String providerOverride, String targetOverride) {
+        ExportPlan plan = readOnlyTransactionTemplate.execute(status ->
+                planExport(id, providerOverride, targetOverride));
+        if (plan.existing() != null) {
+            return plan.existing();
+        }
+
+        // Outside any transaction: may refresh the OAuth token (HTTP + own DB write) and calls the tracker (HTTP).
+        String token = integrationOAuthService.getValidAccessToken(plan.providerId());
+        TaskExportCapable.TaskRef ref = plan.taskProvider().createTask(plan.input(), token);
+
+        return transactionTemplate.execute(status -> writeBackExportLink(id, plan.providerId(), ref));
+    }
+
+    /** Read burst: loads the todo, resolves provider/target and validates — no network I/O. */
+    private ExportPlan planExport(String id, String providerOverride, String targetOverride) {
         Todo todo = todoRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Todo", id));
 
         // Idempotent: schon an einen Tracker exportiert -> bestehenden Export-Link zurueckgeben, kein Duplikat.
         // (Bewusst NUR exported_*; referenceType bleibt fuer interne/Origin-Korrelation reserviert.)
         if (isNotBlank(todo.getExportedProvider()) && isNotBlank(todo.getExportedRef())) {
-            return new TaskExportCapable.TaskRef(todo.getExportedProvider(), todo.getExportedRef(), todo.getExportedUrl());
+            return ExportPlan.alreadyExported(existingRef(todo));
         }
 
         Map<String, Object> taskExport = readTaskExportConfig(todo.getProjectId());
@@ -77,18 +120,31 @@ public class TodoTrackerExportService {
                     "Kein Ziel für '" + providerId + "' konfiguriert (project.config.taskExport.target)");
         }
 
-        String token = integrationOAuthService.getValidAccessToken(providerId);
         var input = new TaskExportCapable.TaskExportInput(
                 todo.getTitle(), todo.getDescription(), parseTags(todo.getTags()), target);
-        TaskExportCapable.TaskRef ref = taskProvider.createTask(input, token);
+        return new ExportPlan(null, providerId, taskProvider, input);
+    }
 
-        // Export-Link getrennt von referenceType ablegen (kein Ueberschreiben interner Marker).
+    /** Write burst: re-loads the todo and stores the export link (kept separate from referenceType). */
+    private TaskExportCapable.TaskRef writeBackExportLink(String id, String providerId, TaskExportCapable.TaskRef ref) {
+        Todo todo = todoRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Todo", id));
+        if (isNotBlank(todo.getExportedProvider()) && isNotBlank(todo.getExportedRef())) {
+            // Exported concurrently while our tracker call was in flight: keep the first link.
+            log.warn("Todo {} was exported to {} {} concurrently; keeping that link, {} {} stays unlinked",
+                    todo.getId(), todo.getExportedProvider(), todo.getExportedRef(), ref.referenceType(), ref.referenceId());
+            return existingRef(todo);
+        }
         todo.setExportedProvider(ref.referenceType());
         todo.setExportedRef(ref.referenceId());
         todo.setExportedUrl(ref.url());
         todoRepository.save(todo);
         log.info("Exported todo {} ({}) to {} -> {}", todo.getId(), todo.getTitle(), providerId, ref.referenceId());
         return ref;
+    }
+
+    private static TaskExportCapable.TaskRef existingRef(Todo todo) {
+        return new TaskExportCapable.TaskRef(todo.getExportedProvider(), todo.getExportedRef(), todo.getExportedUrl());
     }
 
     @SuppressWarnings("unchecked")
