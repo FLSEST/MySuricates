@@ -185,4 +185,34 @@ class ExecutionContextFactoryTest {
         verify(workflowMemoryService).writeActiveMemoryToProject("wf-1", "/p");
         verify(projectContextService).writeProjectContextToProject("ctx", "/p");
     }
+
+
+    @Test
+    void create_untrustedKeys_markVariablesUntrusted() {
+        ExecutionContext ctx = factory.create(seed(Map.of(
+                "action", "deploy",
+                "env", "test",
+                ExecutionContext.UNTRUSTED_KEYS_VARIABLE, java.util.List.of("action"))));
+
+        assertThat(ctx.isUntrusted("action")).isTrue();
+        assertThat(ctx.isUntrusted("env")).isFalse();
+        assertThat(ctx.resolveShellTemplate("run {{ action }} {{ env }}", false)).isEqualTo("run 'deploy' test");
+    }
+
+    @Test
+    void create_untrustedSystemVariable_isOverwrittenByTrustedSystemValue() {
+        ExecutionContext ctx = factory.create(seed(Map.of(
+                "project_path", "/evil",
+                ExecutionContext.UNTRUSTED_KEYS_VARIABLE, java.util.List.of("project_path"))));
+
+        assertThat(ctx.getVariable("project_path")).isEqualTo("/p");
+        assertThat(ctx.isUntrusted("project_path")).isFalse();
+    }
+
+    @Test
+    void create_withoutUntrustedKeys_marksNothing() {
+        ExecutionContext ctx = factory.create(seed(Map.of("foo", "bar")));
+
+        assertThat(ctx.getUntrustedVariables()).isEmpty();
+    }
 }

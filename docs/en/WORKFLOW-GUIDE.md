@@ -124,7 +124,7 @@ Executes a shell command on the host or inside a Docker container.
 | `command` | string | **required** | Shell command(s) to execute |
 | `container_image` | string | null | Docker image (see execution environment) |
 | `timeout_seconds` | int | 300 | Execution timeout |
-| `shell_escape_variables` | bool | false | POSIX-safe escape of template variables (single quotes) |
+| `shell_escape_variables` | bool | false | POSIX-safe escape of **all** template variables (single quotes). Variables from webhook payloads (incl. `git_*`) are **always** escaped, regardless of this option |
 | `mount_docker_socket` | bool | false | Mount Docker socket into the container (only effective when `container_image` is set) |
 | `mounts` | list | `[]` | Additional Docker volume mounts in format `host:container[:ro\|rw]` (only effective when `container_image` is set) |
 
@@ -133,6 +133,13 @@ Executes a shell command on the host or inside a Docker container.
 > Python code. Pass values on the shell line and read them from the environment instead:
 > `PROJECT_ID={{ project_id }} python3 - <<'PY'` … `os.environ['PROJECT_ID']`, block option
 > `"shell_escape_variables": true`. Shell blocks receive no other environment variables.
+
+> **Untrusted variables:** Everything a webhook caller supplies (payload fields and the derived
+> `git_*` fields) is single-quoted in shell commands (`shell`, `foreach`, `while`, `retry` in shell
+> mode) — even without `shell_escape_variables`. Write such placeholders **unquoted**
+> (`git checkout {{ git_branch }}`, not `"{{ git_branch }}"`), otherwise the quotes double up.
+> Values from `defaultContext`, system variables and block outputs (`previous_output`,
+> `block.<name>.output`) are still substituted raw.
 
 ```json
 {

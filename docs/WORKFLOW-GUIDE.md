@@ -124,7 +124,7 @@ Fuehrt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 | `command` | string | **erforderlich** | Shell-Befehl(e) zur Ausfuehrung |
 | `container_image` | string | null | Docker-Image (siehe Ausfuehrungsumgebung) |
 | `timeout_seconds` | int | 300 | Ausfuehrungs-Timeout |
-| `shell_escape_variables` | bool | false | Template-Variablen POSIX-sicher escapen (Single-Quotes) |
+| `shell_escape_variables` | bool | false | **Alle** Template-Variablen POSIX-sicher escapen (Single-Quotes). Variablen aus Webhook-Payloads (inkl. `git_*`) werden **immer** escaped, unabhaengig von dieser Option |
 | `mount_docker_socket` | bool | false | Docker-Socket in den Container mounten (nur wirksam wenn `container_image` gesetzt) |
 | `mounts` | list | `[]` | Zusaetzliche Docker-Volume-Mounts im Format `host:container[:ro\|rw]` (nur wirksam wenn `container_image` gesetzt) |
 
@@ -133,6 +133,13 @@ Fuehrt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 > Werte deshalb auf der Shell-Zeile übergeben und im Skript aus der Umgebung lesen:
 > `PROJECT_ID={{ project_id }} python3 - <<'PY'` … `os.environ['PROJECT_ID']`, Block-Option
 > `"shell_escape_variables": true`. Shell-Blöcke erhalten sonst keine Umgebungsvariablen.
+
+> **Nicht vertrauenswuerdige Variablen:** Alles, was ein Webhook-Aufrufer liefert (Payload-Felder und
+> die daraus abgeleiteten `git_*`-Felder), landet in Shell-Befehlen (`shell`, `foreach`, `while`, `retry`
+> im Shell-Modus) grundsaetzlich in Single-Quotes — auch ohne `shell_escape_variables`. Solche
+> Platzhalter deshalb **unquoted** schreiben (`git checkout {{ git_branch }}`, nicht `"{{ git_branch }}"`),
+> sonst stehen die Quotes doppelt. Werte aus `defaultContext`, System-Variablen und Block-Ausgaben
+> (`previous_output`, `block.<name>.output`) bleiben unveraendert roh.
 
 ```json
 {

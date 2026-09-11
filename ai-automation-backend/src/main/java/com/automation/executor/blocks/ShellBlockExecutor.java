@@ -34,10 +34,9 @@ public class ShellBlockExecutor implements BlockExecutor {
             throw new WorkflowExecutionException("Shell block requires a 'command' in config");
         }
 
+        // Untrusted variables (webhook payloads) are always escaped; shell_escape_variables escapes everything.
         boolean escapeVariables = Boolean.TRUE.equals(config.get("shell_escape_variables"));
-        String command = escapeVariables
-                ? context.resolveTemplateShellSafe(rawCommand.toString())
-                : context.resolveTemplate(rawCommand.toString());
+        String command = context.resolveShellTemplate(rawCommand.toString(), escapeVariables);
         int timeout = ((Number) config.getOrDefault("timeout_seconds", SHELL_TIMEOUT_SECONDS)).intValue();
 
         StepResult step = new StepResult();

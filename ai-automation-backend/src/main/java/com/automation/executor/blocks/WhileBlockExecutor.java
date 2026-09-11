@@ -33,6 +33,7 @@ public class WhileBlockExecutor implements BlockExecutor {
         int maxIterations = ((Number) config.getOrDefault("max_iterations", MAX_ITERATIONS)).intValue();
         String executionMode = (String) config.getOrDefault("execution_mode", "claude");
         boolean isShell = "shell".equals(executionMode);
+        boolean escapeVariables = Boolean.TRUE.equals(config.get("shell_escape_variables"));
         int shellTimeout = ((Number) config.getOrDefault("timeout_seconds", SHELL_TIMEOUT_SECONDS)).intValue();
         Integer claudeTimeout = config.containsKey("timeout_seconds")
                 ? ((Number) config.get("timeout_seconds")).intValue()
@@ -49,7 +50,9 @@ public class WhileBlockExecutor implements BlockExecutor {
         while (iteration < maxIterations && !context.shouldStop()) {
             // Check condition
             if (conditionCommand != null) {
-                String resolvedCondition = context.resolveTemplate(conditionCommand);
+                String resolvedCondition = isShell
+                        ? context.resolveShellTemplate(conditionCommand, escapeVariables)
+                        : context.resolveTemplate(conditionCommand);
                 if (isShell) {
                     // In shell mode, use exit code: 0 = true (continue), non-zero = false (stop)
                     int exitCode = commandExecutor.executeShellCommandOnHost(
@@ -75,7 +78,9 @@ public class WhileBlockExecutor implements BlockExecutor {
                 }
             }
 
-            String resolvedCommand = context.resolveTemplate(command);
+            String resolvedCommand = isShell
+                    ? context.resolveShellTemplate(command, escapeVariables)
+                    : context.resolveTemplate(command);
             StepResult stepResult;
             if (isShell) {
                 stepResult = commandExecutor.executeStepAsShell(

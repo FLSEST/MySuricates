@@ -244,4 +244,34 @@ class WebhookServiceTest {
         assertThatThrownBy(() -> webhookService.trigger("invalid", null, HttpHeaders.EMPTY))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
+
+
+    @Test
+    void trigger_marksPayloadAndGitFieldsAsUntrusted() {
+        testWebhook.setDefaultContext(new HashMap<>(Map.of("env", "test")));
+        when(webhookRepository.findBySecretToken("abc123token")).thenReturn(Optional.of(testWebhook));
+        when(gitPayloadParser.parse(any(), any())).thenReturn(Map.of("git_branch", "main", "env", "ignored"));
+        when(workflowExecutor.execute(any(), any())).thenReturn(WorkflowRun.builder().id("run-1").build());
+
+        webhookService.trigger("abc123token", Map.of("action", "deploy"), HttpHeaders.EMPTY);
+
+        verify(workflowExecutor).execute(eq(testWorkflow), argThat(ctx -> {
+            Object untrusted = ctx.get(com.automation.executor.ExecutionContext.UNTRUSTED_KEYS_VARIABLE);
+            return untrusted instanceof java.util.List<?> keys
+                    && keys.containsAll(java.util.List.of("action", "git_branch", "env"))
+                    && "test".equals(ctx.get("env"));
+        }));
+    }
+
+    @Test
+    void trigger_reservedPayloadKey_isRejected() {
+        when(webhookRepository.findBySecretToken("abc123token")).thenReturn(Optional.of(testWebhook));
+
+        assertThatThrownBy(() -> webhookService.trigger("abc123token",
+                Map.of(com.automation.executor.ExecutionContext.UNTRUSTED_KEYS_VARIABLE, java.util.List.of()), HttpHeaders.EMPTY))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("reserved");
+
+        verify(workflowExecutor, never()).execute(any(), any());
+    }
 }

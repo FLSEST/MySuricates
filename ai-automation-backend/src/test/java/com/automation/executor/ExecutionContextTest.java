@@ -343,4 +343,119 @@ class ExecutionContextTest {
         String result = context.resolveTemplate("[{{ block.foo.output }}]");
         assertThat(result).isEqualTo("[]");
     }
+
+
+    // ── resolveShellTemplate: untrusted variables are always escaped ─────────────
+
+    @Test
+    void resolveShellTemplate_trustedVariable_isSubstitutedRaw() {
+        context.setVariable("path", "/tmp/a b");
+
+        assertThat(context.resolveShellTemplate("ls {{ path }}", false)).isEqualTo("ls /tmp/a b");
+    }
+
+    @Test
+    void resolveShellTemplate_untrustedVariable_isSingleQuoted() {
+        context.setUntrustedVariable("branch", "main; rm -rf /");
+
+        assertThat(context.resolveShellTemplate("git checkout {{ branch }}", false))
+                .isEqualTo("git checkout 'main; rm -rf /'");
+    }
+
+    @Test
+    void resolveShellTemplate_untrustedVariable_commandSubstitutionStaysInert() {
+        context.setUntrustedVariable("msg", "$(curl evil)`id`");
+        context.setVariable("dir", "/repo");
+
+        assertThat(context.resolveShellTemplate("cd {{ dir }} && echo {{msg}}", false))
+                .isEqualTo("cd /repo && echo '$(curl evil)`id`'");
+    }
+
+    @Test
+    void resolveShellTemplate_untrustedValue_singleQuoteCannotBreakOut() {
+        context.setUntrustedVariable("v", "x'; id; echo '");
+
+        assertThat(context.resolveShellTemplate("echo {{ v }}", false))
+                .isEqualTo("echo 'x'\\''; id; echo '\\'''");
+    }
+
+    @Test
+    void resolveShellTemplate_untrustedValue_isNeverReExpanded() {
+        context.setVariable("secret", "it's raw $(danger)");
+        context.setUntrustedVariable("payload", "{{ secret }}; id");
+
+        String resolved = context.resolveShellTemplate("echo {{ payload }}", false);
+
+        assertThat(resolved).isEqualTo("echo '{{ secret }}; id'");
+        assertThat(resolved).doesNotContain("danger");
+    }
+
+    @Test
+    void resolveShellTemplate_trustedValueReferencingUntrusted_staysUnexpanded() {
+        context.setUntrustedVariable("author", "'; id; '");
+        context.setVariable("greeting", "Hello {{ author }}");
+
+        assertThat(context.resolveShellTemplate("echo {{ greeting }}", false))
+                .isEqualTo("echo Hello {{ author }}");
+    }
+
+    @Test
+    void resolveShellTemplate_previousOutputAndBlockOutput_stayRaw() {
+        context.setPreviousOutput("a | b");
+        context.setBlockOutput("scan", "x && y");
+        context.setUntrustedVariable("u", "z");
+
+        assertThat(context.resolveShellTemplate("{{ previous_output }} {{ block.scan.output }} {{ u }}", false))
+                .isEqualTo("a | b x && y 'z'");
+    }
+
+    @Test
+    void resolveShellTemplate_escapeAll_quotesEverything() {
+        context.setVariable("path", "/tmp/a b");
+        context.setUntrustedVariable("u", "z");
+
+        assertThat(context.resolveShellTemplate("ls {{ path }} {{ u }}", true)).isEqualTo("ls '/tmp/a b' 'z'");
+    }
+
+    @Test
+    void resolveShellTemplate_noUntrustedVariables_isIdenticalToResolveTemplate() {
+        context.setVariable("a", "1 $x");
+        context.setPreviousOutput("p");
+
+        String template = "{{ a }} {{a}} {{ previous_output }} {{ missing }}";
+        assertThat(context.resolveShellTemplate(template, false)).isEqualTo(context.resolveTemplate(template));
+    }
+
+    @Test
+    void resolveShellTemplate_nullTemplate_returnsNull() {
+        context.setUntrustedVariable("u", "z");
+
+        assertThat(context.resolveShellTemplate(null, false)).isNull();
+    }
+
+    @Test
+    void resolveTemplate_untrustedVariable_isSubstitutedRawForNonShellUse() {
+        context.setUntrustedVariable("u", "a'b");
+
+        assertThat(context.resolveTemplate("say {{ u }}")).isEqualTo("say a'b");
+    }
+
+    @Test
+    void setVariable_clearsUntrustedMark() {
+        context.setUntrustedVariable("project_path", "/evil");
+        assertThat(context.isUntrusted("project_path")).isTrue();
+
+        context.setVariable("project_path", "/real");
+
+        assertThat(context.isUntrusted("project_path")).isFalse();
+        assertThat(context.resolveShellTemplate("cd {{ project_path }}", false)).isEqualTo("cd /real");
+    }
+
+    @Test
+    void getUntrustedVariables_returnsCopy() {
+        context.setUntrustedVariable("u", "z");
+
+        assertThat(context.getUntrustedVariables()).containsExactly("u");
+        assertThat(context.getUntrustedVariables()).isNotSameAs(context.getUntrustedVariables());
+    }
 }

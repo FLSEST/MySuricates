@@ -25,12 +25,16 @@ public class RetryBlockExecutor implements BlockExecutor {
     @Override
     public StepResult execute(BlockDefinition block, ExecutionContext context) {
         Map<String, Object> config = block.getConfig();
-        String command = context.resolveTemplate((String) config.get("command"));
         int maxRetries = ((Number) config.getOrDefault("max_retries", 3)).intValue();
         int delaySeconds = ((Number) config.getOrDefault("delay", 5)).intValue();
         boolean exponentialBackoff = Boolean.TRUE.equals(config.get("exponential_backoff"));
         String executionMode = (String) config.getOrDefault("execution_mode", "claude");
         boolean isShell = "shell".equals(executionMode);
+        boolean escapeVariables = Boolean.TRUE.equals(config.get("shell_escape_variables"));
+        String rawCommand = (String) config.get("command");
+        String command = isShell
+                ? context.resolveShellTemplate(rawCommand, escapeVariables)
+                : context.resolveTemplate(rawCommand);
         int shellTimeout = ((Number) config.getOrDefault("timeout_seconds", SHELL_TIMEOUT_SECONDS)).intValue();
         Integer claudeTimeout = config.containsKey("timeout_seconds")
                 ? ((Number) config.get("timeout_seconds")).intValue()

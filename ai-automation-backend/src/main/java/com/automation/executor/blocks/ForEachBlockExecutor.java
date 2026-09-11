@@ -36,6 +36,7 @@ public class ForEachBlockExecutor implements BlockExecutor {
         String command = (String) config.get("command");
         String executionMode = (String) config.getOrDefault("execution_mode", "claude");
         boolean isShell = "shell".equals(executionMode);
+        boolean escapeVariables = Boolean.TRUE.equals(config.get("shell_escape_variables"));
         boolean continueOnError = Boolean.parseBoolean(String.valueOf(config.getOrDefault("continue_on_error", "false")));
         int shellTimeout = ((Number) config.getOrDefault("timeout_seconds", SHELL_TIMEOUT_SECONDS)).intValue();
         Integer claudeTimeout = config.containsKey("timeout_seconds")
@@ -47,7 +48,7 @@ public class ForEachBlockExecutor implements BlockExecutor {
         String itemsSource = (String) config.getOrDefault("items_source", "list");
 
         if ("command".equals(itemsSource)) {
-            String itemsCommand = context.resolveTemplate((String) config.get("items_command"));
+            String itemsCommand = context.resolveShellTemplate((String) config.get("items_command"), escapeVariables);
             // items_command always runs as shell — it collects iteration targets, not AI work
             String output = commandExecutor.executeShellCommandOnHost(
                     context.getProjectPath(), itemsCommand, shellTimeout).output();
@@ -87,7 +88,9 @@ public class ForEachBlockExecutor implements BlockExecutor {
             ));
 
             context.setVariable(variableName, item);
-            String resolvedCommand = context.resolveTemplate(command);
+            String resolvedCommand = isShell
+                    ? context.resolveShellTemplate(command, escapeVariables)
+                    : context.resolveTemplate(command);
 
             StepResult itemResult;
             if (isShell) {

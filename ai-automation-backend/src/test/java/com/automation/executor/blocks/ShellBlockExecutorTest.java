@@ -344,4 +344,38 @@ class ShellBlockExecutorTest {
         verify(contextSpy).registerProcess(mockProcess);
         verify(contextSpy).clearProcess();
     }
+
+
+    @Test
+    void execute_untrustedVariable_isEscapedWithoutOptIn() {
+        context.setUntrustedVariable("branch", "main; rm -rf /");
+        when(shellService.execute(eq("git checkout 'main; rm -rf /'"), eq("/test/project"), eq(300), any()))
+                .thenReturn(new ShellResult("ok", 0, 10));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("shell")
+                .config(new HashMap<>(Map.of("command", "git checkout {{ branch }}")))
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getInput()).isEqualTo("git checkout 'main; rm -rf /'");
+    }
+
+    @Test
+    void execute_trustedVariable_staysRawWithoutOptIn() {
+        context.setVariable("branch", "main");
+        when(shellService.execute(eq("git checkout main"), eq("/test/project"), eq(300), any()))
+                .thenReturn(new ShellResult("ok", 0, 10));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("shell")
+                .config(new HashMap<>(Map.of("command", "git checkout {{ branch }}")))
+                .build();
+
+        executor.execute(block, context);
+
+        verify(shellService).execute(eq("git checkout main"), eq("/test/project"), eq(300), any());
+    }
 }

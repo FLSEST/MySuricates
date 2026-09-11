@@ -136,7 +136,7 @@ com.automation
 | `ExecutionController` | `/api/v1/executions` | Liste, Detail, Pause, Resume, Resume-from-Step, Cancel, Retry, Approve, Approval-Check, Todos-Approve, Notes, Command |
 | `SkillController` | `/api/v1/skills` | CRUD, Capabilities, Export/Import |
 | `ScheduleController` | `/api/v1/schedules` | CRUD, Enable/Disable, Runs, Calendar, Preview, Remaining-Stats, Chain-Schedules, Maintenance |
-| `WebhookController` | `/api/v1/webhooks` | CRUD, Enable/Disable; Trigger via `/api/v1/webhook/trigger/{token}` |
+| `WebhookController` | `/api/v1/webhooks` | CRUD, Enable/Disable; Trigger via `/api/v1/webhook/trigger/{token}` (öffentlich, nur Token-geschützt — Payload-Felder werden als `__untrusted_keys` markiert und in Shell-Blöcken immer escaped, siehe `ExecutionContext.resolveShellTemplate`) |
 | `ChainController` | `/api/v1/chains` | CRUD, Ausführung, Runs, Cancel |
 | `ChainTemplateController` | `/api/v1/chain-templates` | Liste, Abrufen, Installieren als Chain |
 | `WorkflowTemplateController` | `/api/v1/workflow-templates` | CRUD, Aus-Workflow erstellen |

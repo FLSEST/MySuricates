@@ -327,4 +327,49 @@ class RetryBlockExecutorTest {
         // Each retry must send a request - verify count proves no shared mutable state blocks retries
         verify(commandExecutor, times(3)).executeStepOnHost(any(HostExecutionRequest.class));
     }
+
+
+    @Test
+    void execute_shellMode_untrustedVariable_isEscaped() {
+        context.setUntrustedVariable("pkg", "left-pad; id");
+        StepResult success = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(commandExecutor.executeStepAsShell(eq("/test/project"), any(), anyInt(), eq(300)))
+                .thenReturn(success);
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("retry")
+                .config(new HashMap<>(Map.of(
+                        "command", "npm install {{ pkg }}",
+                        "max_retries", 1,
+                        "delay", 0,
+                        "execution_mode", "shell"
+                )))
+                .build();
+
+        executor.execute(block, context);
+
+        org.mockito.ArgumentCaptor<BlockDefinition> captor = org.mockito.ArgumentCaptor.forClass(BlockDefinition.class);
+        verify(commandExecutor).executeStepAsShell(eq("/test/project"), captor.capture(), anyInt(), eq(300));
+        assertThat(captor.getValue().getConfig().get("command")).isEqualTo("npm install 'left-pad; id'");
+    }
+
+    @Test
+    void execute_claudeMode_untrustedVariable_staysRawInPrompt() {
+        context.setUntrustedVariable("pkg", "left-pad; id");
+        StepResult success = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(success);
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("retry")
+                .config(new HashMap<>(Map.of("command", "Review {{ pkg }}", "max_retries", 0, "delay", 0)))
+                .build();
+
+        executor.execute(block, context);
+
+        org.mockito.ArgumentCaptor<HostExecutionRequest> captor = org.mockito.ArgumentCaptor.forClass(HostExecutionRequest.class);
+        verify(commandExecutor).executeStepOnHost(captor.capture());
+        assertThat(captor.getValue().block().getConfig().get("command")).isEqualTo("Review left-pad; id");
+    }
 }

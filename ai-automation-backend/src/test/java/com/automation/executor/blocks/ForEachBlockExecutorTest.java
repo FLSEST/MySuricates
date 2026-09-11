@@ -527,4 +527,30 @@ class ForEachBlockExecutorTest {
         assertThat(capturedItems.get(2)).isNotEqualTo(capturedItems.get(1));
         verify(commandExecutor, times(3)).executeStepOnHost(any(HostExecutionRequest.class));
     }
+
+
+    @Test
+    void execute_shellMode_untrustedVariable_isEscapedInItemsCommandAndCommand() {
+        context.setUntrustedVariable("dir", "src; id");
+        when(commandExecutor.executeShellCommandOnHost("/test/project", "ls 'src; id'", 300))
+                .thenReturn(new CliSession.CommandResult("a.txt", 0));
+        StepResult stepResult = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(commandExecutor.executeStepAsShell(eq("/test/project"), any(), anyInt(), eq(300)))
+                .thenReturn(stepResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("items_source", "command");
+        config.put("items_command", "ls {{ dir }}");
+        config.put("command", "cat {{ dir }}/{{ item }}");
+        config.put("execution_mode", "shell");
+        BlockDefinition block = BlockDefinition.builder().type("foreach").config(config).build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        org.mockito.ArgumentCaptor<BlockDefinition> captor = org.mockito.ArgumentCaptor.forClass(BlockDefinition.class);
+        verify(commandExecutor).executeStepAsShell(eq("/test/project"), captor.capture(), anyInt(), eq(300));
+        assertThat(captor.getValue().getConfig().get("command")).isEqualTo("cat 'src; id'/a.txt");
+    }
 }

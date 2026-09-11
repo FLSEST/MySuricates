@@ -7,6 +7,7 @@ import com.automation.entity.WorkflowRun;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.WebhookTriggerRepository;
 import com.automation.repository.WorkflowRepository;
+import com.automation.executor.ExecutionContext;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.workflow.WorkflowExecutor;
 import lombok.RequiredArgsConstructor;
@@ -114,16 +115,29 @@ public class WebhookService {
 
         // Merge default context with payload (payload overrides)
         Map<String, Object> context = new HashMap<>(webhook.getDefaultContext());
+        // Everything the caller controls is untrusted: shell blocks always escape these variables
+        // (the trigger endpoint is public — only the token guards it).
+        Set<String> untrustedKeys = new LinkedHashSet<>();
         if (payload != null) {
             if (payload.size() > 50) {
                 throw new IllegalArgumentException("Webhook payload exceeds maximum of 50 fields");
             }
+            for (String key : payload.keySet()) {
+                if (key == null || key.startsWith("__")) {
+                    throw new IllegalArgumentException("Webhook payload keys starting with '__' are reserved");
+                }
+            }
             context.putAll(payload);
+            untrustedKeys.addAll(payload.keySet());
         }
 
         // Extract git_* fields from recognized Git provider payloads (non-overriding)
         Map<String, Object> gitFields = gitPayloadParser.parse(payload, headers != null ? headers : HttpHeaders.EMPTY);
         gitFields.forEach(context::putIfAbsent);
+        untrustedKeys.addAll(gitFields.keySet());
+        if (!untrustedKeys.isEmpty()) {
+            context.put(ExecutionContext.UNTRUSTED_KEYS_VARIABLE, List.copyOf(untrustedKeys));
+        }
 
         // Load workflow with eagerly initialized activatedSkills — webhook.getWorkflow()
         // comes from an EAGER relationship but leaves the LAZY ManyToMany uninitialized,

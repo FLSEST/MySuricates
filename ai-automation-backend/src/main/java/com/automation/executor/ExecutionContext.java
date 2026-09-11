@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -44,6 +45,16 @@ public class ExecutionContext {
 
     @Builder.Default
     private final Map<String, Object> variables = new HashMap<>();
+
+    /**
+     * Reserved input-context key: a list of variable names that were supplied by an untrusted
+     * external source (e.g. a webhook payload). Set by the trigger, read by ExecutionContextFactory,
+     * persisted with the run's input context so it survives resume and sub-workflow hand-over.
+     */
+    public static final String UNTRUSTED_KEYS_VARIABLE = "__untrusted_keys";
+
+    /** Variables from untrusted sources — always shell-escaped when they land in a shell command. */
+    private final Set<String> untrustedVariables = ConcurrentHashMap.newKeySet();
 
     /** Named block outputs keyed by block name. Resolved via {{ block.<name>.output }}. */
     @Builder.Default
@@ -95,8 +106,24 @@ public class ExecutionContext {
         runMetadata.put(key, value);
     }
 
+    /** Sets a trusted variable (workflow defaults, system values, block-internal values). Clears any taint. */
     public void setVariable(String name, Object value) {
         variables.put(name, value);
+        untrustedVariables.remove(name);
+    }
+
+    /** Sets a variable that came from an untrusted external source (webhook payload etc.). */
+    public void setUntrustedVariable(String name, Object value) {
+        variables.put(name, value);
+        untrustedVariables.add(name);
+    }
+
+    public boolean isUntrusted(String name) {
+        return untrustedVariables.contains(name);
+    }
+
+    public Set<String> getUntrustedVariables() {
+        return Set.copyOf(untrustedVariables);
     }
 
     public Object getVariable(String name) {
@@ -133,57 +160,29 @@ public class ExecutionContext {
     }
 
     public String resolveTemplate(String template) {
-        if (template == null) return null;
-
-        String resolved = template;
-        resolved = resolved.replace("{{ previous_output }}", previousOutput != null ? previousOutput : "");
-        resolved = resolved.replace("{{previous_output}}", previousOutput != null ? previousOutput : "");
-
-        for (Map.Entry<String, String> entry : blockOutputs.entrySet()) {
-            String value = entry.getValue() == null ? "" : entry.getValue();
-            resolved = resolved.replace("{{ block." + entry.getKey() + ".output }}", value);
-            resolved = resolved.replace("{{block." + entry.getKey() + ".output}}", value);
-        }
-
-        for (Map.Entry<String, Object> entry : variables.entrySet()) {
-            resolved = resolved.replace("{{ " + entry.getKey() + " }}", String.valueOf(entry.getValue()));
-            resolved = resolved.replace("{{" + entry.getKey() + "}}", String.valueOf(entry.getValue()));
-        }
-
-        return resolved;
+        return TemplateResolver.resolve(template, previousOutput, blockOutputs, variables);
     }
 
     /**
-     * Resolves template placeholders with shell-safe escaping.
-     * Each variable value is wrapped in POSIX single quotes with internal
-     * single quotes escaped as '\'' to prevent shell injection.
+     * Resolves template placeholders with shell-safe escaping: every value is wrapped in POSIX
+     * single quotes (internal quotes escaped as '\''). See {@link TemplateResolver#resolveShellSafe}.
      */
     public String resolveTemplateShellSafe(String template) {
-        if (template == null) return null;
+        return TemplateResolver.resolveShellSafe(template, previousOutput, blockOutputs, variables);
+    }
 
-        String resolved = template;
-        String safePreviousOutput = shellEscape(previousOutput != null ? previousOutput : "");
-        resolved = resolved.replace("{{ previous_output }}", safePreviousOutput);
-        resolved = resolved.replace("{{previous_output}}", safePreviousOutput);
-
-        for (Map.Entry<String, String> entry : blockOutputs.entrySet()) {
-            String safeValue = shellEscape(entry.getValue() == null ? "" : entry.getValue());
-            resolved = resolved.replace("{{ block." + entry.getKey() + ".output }}", safeValue);
-            resolved = resolved.replace("{{block." + entry.getKey() + ".output}}", safeValue);
-        }
-
-        for (Map.Entry<String, Object> entry : variables.entrySet()) {
-            String safeValue = shellEscape(String.valueOf(entry.getValue()));
-            resolved = resolved.replace("{{ " + entry.getKey() + " }}", safeValue);
-            resolved = resolved.replace("{{" + entry.getKey() + "}}", safeValue);
-        }
-
-        return resolved;
+    /**
+     * Resolves a template that becomes a shell command line. With {@code escapeAll} every
+     * placeholder is single-quoted; otherwise only variables marked untrusted are, trusted values
+     * stay raw. See {@link TemplateResolver#resolveShell}.
+     */
+    public String resolveShellTemplate(String template, boolean escapeAll) {
+        if (escapeAll) return resolveTemplateShellSafe(template);
+        return TemplateResolver.resolveShell(template, previousOutput, blockOutputs, variables, untrustedVariables);
     }
 
     static String shellEscape(String value) {
-        if (value == null) return "''";
-        return "'" + value.replace("'", "'\\''") + "'";
+        return TemplateResolver.shellEscape(value);
     }
 
     public boolean shouldStop() {

@@ -135,7 +135,7 @@ com.automation
 | `ExecutionController` | `/api/v1/executions` | List, detail, pause, resume, resume-from-step, cancel, retry, approve, approval-check, todos-approve, notes, command |
 | `SkillController` | `/api/v1/skills` | CRUD, capabilities, export/import |
 | `ScheduleController` | `/api/v1/schedules` | CRUD, enable/disable, runs, calendar, preview, remaining-stats, chain-schedules, maintenance |
-| `WebhookController` | `/api/v1/webhooks` | CRUD, enable/disable; trigger via `/api/v1/webhook/trigger/{token}` |
+| `WebhookController` | `/api/v1/webhooks` | CRUD, enable/disable; trigger via `/api/v1/webhook/trigger/{token}` (public, token-only — payload fields are flagged as `__untrusted_keys` and always escaped in shell blocks, see `ExecutionContext.resolveShellTemplate`) |
 | `ChainController` | `/api/v1/chains` | CRUD, execution, runs, cancel |
 | `ChainTemplateController` | `/api/v1/chain-templates` | List, get, install as chain |
 | `WorkflowTemplateController` | `/api/v1/workflow-templates` | CRUD, create from workflow |

@@ -514,4 +514,32 @@ class WhileBlockExecutorTest {
         verify(commandExecutor).executeStepOnHost(
                 argThat(req -> req.providerId() == null));
     }
+
+
+    @Test
+    void execute_shellMode_untrustedVariable_isEscapedInConditionAndCommand() {
+        context.setUntrustedVariable("target", "x; id");
+        Map<String, Object> config = new HashMap<>();
+        config.put("command", "build {{ target }}");
+        config.put("condition_command", "check {{ target }}");
+        config.put("max_iterations", 5);
+        config.put("execution_mode", "shell");
+        config.put("timeout_seconds", 60);
+        BlockDefinition block = BlockDefinition.builder().type("while").config(config).build();
+
+        when(commandExecutor.executeShellCommandOnHost(eq("/tmp/project"), eq("check 'x; id'"), eq(60)))
+                .thenReturn(new CliSession.CommandResult("", 0))
+                .thenReturn(new CliSession.CommandResult("", 1));
+        StepResult step = new StepResult();
+        step.setStepIndex(0);
+        step.setOutput("ok");
+        step.setStatus(StepStatus.COMPLETED);
+        when(commandExecutor.executeStepAsShell(eq("/tmp/project"), any(), anyInt(), eq(60))).thenReturn(step);
+
+        executor.execute(block, context);
+
+        org.mockito.ArgumentCaptor<BlockDefinition> captor = org.mockito.ArgumentCaptor.forClass(BlockDefinition.class);
+        verify(commandExecutor).executeStepAsShell(eq("/tmp/project"), captor.capture(), anyInt(), eq(60));
+        assertThat(captor.getValue().getConfig().get("command")).isEqualTo("build 'x; id'");
+    }
 }

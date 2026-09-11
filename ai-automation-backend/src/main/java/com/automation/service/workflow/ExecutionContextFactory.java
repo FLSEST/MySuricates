@@ -14,6 +14,9 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Collection;
 
 /**
  * Builds the {@link ExecutionContext} for a workflow run — input variables, previous-output seed,
@@ -61,7 +64,14 @@ public class ExecutionContextFactory {
                 .workflowRunId(runId)
                 .build();
         context.setProjectPath(project.getPath());
-        inputContext.forEach(context::setVariable);
+        Set<String> untrustedKeys = untrustedKeys(inputContext);
+        inputContext.forEach((name, value) -> {
+            if (untrustedKeys.contains(name)) {
+                context.setUntrustedVariable(name, value);
+            } else {
+                context.setVariable(name, value);
+            }
+        });
         if (resumePreviousOutput != null) {
             context.setPreviousOutput(resumePreviousOutput);
         } else if (inputContext.get("previous_output") != null) {
@@ -149,5 +159,17 @@ public class ExecutionContextFactory {
 
         // Write project AI context to .claude/rules/ for executing agent
         projectContextService.writeProjectContextToProject(project.getAiContext(), project.getPath());
+    }
+    /** Variable names flagged as untrusted by the trigger (see {@link ExecutionContext#UNTRUSTED_KEYS_VARIABLE}). */
+    static Set<String> untrustedKeys(Map<String, Object> inputContext) {
+        Object raw = inputContext.get(ExecutionContext.UNTRUSTED_KEYS_VARIABLE);
+        if (raw instanceof Collection<?> names) {
+            Set<String> keys = new HashSet<>();
+            for (Object name : names) {
+                if (name != null) keys.add(String.valueOf(name));
+            }
+            return keys;
+        }
+        return Set.of();
     }
 }
