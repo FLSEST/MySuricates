@@ -489,6 +489,21 @@ class WorkflowFactoryServiceTest {
     }
 
     @Test
+    void autoFixWorkflow_arrayResponse_keepsRequiredCapabilities() throws IOException {
+        // TODO ba5df025: auto-fix replaces the block list wholesale, so capabilities must survive the round-trip.
+        when(claudeGenerator.generate(anyString(), anyString(), eq(120)))
+                .thenReturn("[{\"type\":\"agentic\",\"config\":{\"goal\":\"fix\"},\"requiredCapabilities\":[\"docker\",\"web\"]}]");
+        Workflow workflow = brokenWorkflow();
+
+        factoryService.autoFixWorkflow(workflow, "exit code 1");
+
+        assertThat(workflow.getBlocks().get(0).getRequiredCapabilities()).containsExactly("docker", "web");
+        verify(workflowService).update(eq("wf-1"), argThat(req ->
+                req.blocks() != null && req.blocks().size() == 1
+                        && List.of("docker", "web").equals(req.blocks().get(0).getRequiredCapabilities())));
+    }
+
+    @Test
     void autoFixWorkflow_promptCarriesNameDescriptionBlocksAndError_withDebugSystemPrompt() throws IOException {
         when(claudeGenerator.generate(anyString(), anyString(), eq(120))).thenReturn("[]");
 

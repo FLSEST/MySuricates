@@ -19,9 +19,9 @@ import java.util.Map;
  * (with or without markdown fences), its block list, the auto-fix block array, and the error
  * of a failed test run.
  *
- * <p>Extracted from {@code WorkflowFactoryService} (Audit-TODO 3b0a021c). Behaviour is kept
- * as-is, including that {@link #parseBlocksFromArray} does not map {@code requiredCapabilities}
- * (tracked separately as TODO ba5df025).
+ * <p>Extracted from {@code WorkflowFactoryService} (Audit-TODO 3b0a021c). Both block entry
+ * points share {@link #toBlockDefinition}, so a direct array and a {@code {"blocks": [...]}}
+ * envelope map the same fields (TODO ba5df025).
  */
 @Service
 @RequiredArgsConstructor
@@ -32,16 +32,7 @@ public class FactoryResponseParser {
 
     public JsonNode extractJsonFromResponse(String response) throws IOException {
         // Try to find JSON object in the response
-        String trimmed = response.trim();
-
-        // Remove markdown code fences if present
-        if (trimmed.startsWith("```")) {
-            int firstNewline = trimmed.indexOf('\n');
-            int lastFence = trimmed.lastIndexOf("```");
-            if (firstNewline > 0 && lastFence > firstNewline) {
-                trimmed = trimmed.substring(firstNewline + 1, lastFence).trim();
-            }
-        }
+        String trimmed = stripFences(response.trim());
 
         // Find first { and last }
         int start = trimmed.indexOf('{');
@@ -59,35 +50,44 @@ public class FactoryResponseParser {
         JsonNode blocksNode = workflowJson.path("blocks");
         if (blocksNode.isArray()) {
             for (JsonNode blockNode : blocksNode) {
-                BlockDefinition block = new BlockDefinition();
-                block.setType(blockNode.path("type").asText("simple"));
-                if (blockNode.has("config")) {
-                    Map<String, Object> config = objectMapper.convertValue(
-                            blockNode.get("config"), new TypeReference<>() {});
-                    block.setConfig(config);
-                }
-                if (blockNode.has("requiredCapabilities")) {
-                    List<String> caps = objectMapper.convertValue(
-                            blockNode.get("requiredCapabilities"), new TypeReference<>() {});
-                    block.setRequiredCapabilities(caps);
-                }
-                blocks.add(block);
+                blocks.add(toBlockDefinition(blockNode));
             }
         }
         return blocks;
     }
 
+    /** Maps one block node: type (default {@code simple}), config and requiredCapabilities. */
+    private BlockDefinition toBlockDefinition(JsonNode blockNode) {
+        BlockDefinition block = new BlockDefinition();
+        block.setType(blockNode.path("type").asText("simple"));
+        if (blockNode.has("config")) {
+            Map<String, Object> config = objectMapper.convertValue(
+                    blockNode.get("config"), new TypeReference<>() {});
+            block.setConfig(config);
+        }
+        if (blockNode.has("requiredCapabilities")) {
+            List<String> caps = objectMapper.convertValue(
+                    blockNode.get("requiredCapabilities"), new TypeReference<>() {});
+            block.setRequiredCapabilities(caps);
+        }
+        return block;
+    }
+
+    /** Removes a surrounding markdown code fence (```lang ... ```), if present. */
+    private static String stripFences(String trimmed) {
+        if (trimmed.startsWith("```")) {
+            int firstNewline = trimmed.indexOf('\n');
+            int lastFence = trimmed.lastIndexOf("```");
+            if (firstNewline > 0 && lastFence > firstNewline) {
+                return trimmed.substring(firstNewline + 1, lastFence).trim();
+            }
+        }
+        return trimmed;
+    }
+
     public List<BlockDefinition> parseBlocksFromArray(String response) {
         try {
-            String trimmed = response.trim();
-            // Remove markdown code fences
-            if (trimmed.startsWith("```")) {
-                int firstNewline = trimmed.indexOf('\n');
-                int lastFence = trimmed.lastIndexOf("```");
-                if (firstNewline > 0 && lastFence > firstNewline) {
-                    trimmed = trimmed.substring(firstNewline + 1, lastFence).trim();
-                }
-            }
+            String trimmed = stripFences(response.trim());
 
             // Find JSON array or object
             int arrStart = trimmed.indexOf('[');
@@ -100,12 +100,7 @@ public class FactoryResponseParser {
                 JsonNode arrayNode = JsonRepairUtil.readTreeWithRepair(json);
                 List<BlockDefinition> blocks = new ArrayList<>();
                 for (JsonNode blockNode : arrayNode) {
-                    BlockDefinition block = new BlockDefinition();
-                    block.setType(blockNode.path("type").asText("simple"));
-                    if (blockNode.has("config")) {
-                        block.setConfig(objectMapper.convertValue(blockNode.get("config"), new TypeReference<>() {}));
-                    }
-                    blocks.add(block);
+                    blocks.add(toBlockDefinition(blockNode));
                 }
                 return blocks;
             } else if (objStart >= 0) {

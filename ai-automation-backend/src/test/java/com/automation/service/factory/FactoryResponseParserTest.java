@@ -59,15 +59,33 @@ class FactoryResponseParserTest {
     }
 
     @Test
-    void parseBlocksFromArray_directArray_mapsTypeAndConfig_butNotRequiredCapabilities() {
-        // Current behaviour (documented, tracked as TODO ba5df025): requiredCapabilities is dropped here.
+    void parseBlocksFromArray_directArray_mapsTypeConfigAndRequiredCapabilities() {
+        // TODO ba5df025: the direct-array branch used to drop requiredCapabilities.
         List<BlockDefinition> blocks = parser.parseBlocksFromArray(
                 "[{\"type\":\"shell\",\"config\":{\"command\":\"ls\"},\"requiredCapabilities\":[\"docker\"]}]");
 
         assertThat(blocks).hasSize(1);
         assertThat(blocks.get(0).getType()).isEqualTo("shell");
         assertThat(blocks.get(0).getConfig()).isEqualTo(Map.of("command", "ls"));
-        assertThat(blocks.get(0).getRequiredCapabilities()).isNullOrEmpty();
+        assertThat(blocks.get(0).getRequiredCapabilities()).containsExactly("docker");
+    }
+
+    @Test
+    void parseBlocksFromArray_directArray_sameMappingAsParseBlocks() throws Exception {
+        String block = "{\"type\":\"agentic\",\"config\":{\"goal\":\"x\"},\"requiredCapabilities\":[\"web\",\"docker\"]}";
+        String bare = "{\"config\":{\"command\":\"y\"}}";
+
+        List<BlockDefinition> fromArray = parser.parseBlocksFromArray("[" + block + "," + bare + "]");
+        List<BlockDefinition> fromObject = parser.parseBlocks(mapper.readTree("{\"blocks\":[" + block + "," + bare + "]}"));
+
+        assertThat(fromArray).hasSize(2);
+        for (int i = 0; i < 2; i++) {
+            assertThat(fromArray.get(i).getType()).isEqualTo(fromObject.get(i).getType());
+            assertThat(fromArray.get(i).getConfig()).isEqualTo(fromObject.get(i).getConfig());
+            assertThat(fromArray.get(i).getRequiredCapabilities()).isEqualTo(fromObject.get(i).getRequiredCapabilities());
+        }
+        assertThat(fromArray.get(1).getType()).isEqualTo("simple");
+        assertThat(fromArray.get(1).getRequiredCapabilities()).isNullOrEmpty();
     }
 
     @Test
