@@ -557,12 +557,22 @@ class SchedulerServiceTest {
 
     @Test
     void create_invalidScheduleType_throws() {
-        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(testWorkflow));
-
         assertThatThrownBy(() -> schedulerService.create(
                 "wf-1", null, null, "0 0 * * * *", "Test", null, "INVALID_TYPE", null, null, null, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Invalid schedule type");
+    }
+
+    @Test
+    void create_unresolvableWorkflowAndInvalidScheduleType_typeCheckWinsBeforeTargetLookup() {
+        // Precedence: schedule-type parsing happens before the target repository lookup, so an
+        // unresolvable workflowId never reaches the repository when the type is already invalid.
+        assertThatThrownBy(() -> schedulerService.create(
+                "unknown-wf", null, null, "0 0 * * * *", "Test", null, "INVALID_TYPE", null, null, null, null, null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid schedule type");
+
+        verify(workflowRepository, never()).findById(any());
     }
 
     // --- create: catchUpOnResume is persisted ---

@@ -94,6 +94,9 @@ public class SchedulerService {
                                      String delayExpression, Instant endDate, Integer maxRuns,
                                      String conflictBehaviorStr, Boolean catchUpOnResume) {
         TargetType targetType = definitionParser.parseTargetType(targetTypeStr);
+        requireTarget(targetType, workflowId, chainId);
+
+        ScheduleType type = definitionParser.parseScheduleType(scheduleType);
 
         ScheduledWorkflow.ConflictBehavior conflictBehavior = ScheduledWorkflow.ConflictBehavior.SKIP;
         if (conflictBehaviorStr != null && !conflictBehaviorStr.isBlank()) {
@@ -107,15 +110,14 @@ public class SchedulerService {
                 .description(description)
                 .inputContext(inputContext != null ? inputContext : Map.of())
                 .enabled(true)
+                .scheduleType(type)
                 .endDate(endDate)
                 .maxRuns(maxRuns != null ? maxRuns : 0)
                 .conflictBehavior(conflictBehavior)
                 .catchUpOnResume(catchUpOnResume != null && catchUpOnResume);
 
-        applyTarget(builder, targetType, workflowId, chainId);
+        resolveTarget(builder, targetType, workflowId, chainId);
 
-        ScheduleType type = definitionParser.parseScheduleType(scheduleType);
-        builder.scheduleType(type);
         applyTiming(builder, type, cronExpression, scheduledAt, delayExpression);
 
         ScheduledWorkflow saved = scheduledRepository.save(builder.build());
@@ -199,18 +201,24 @@ public class SchedulerService {
         log.info("Deleted scheduled workflow: {}", id);
     }
 
-    private void applyTarget(ScheduledWorkflow.ScheduledWorkflowBuilder builder, TargetType targetType,
-                             String workflowId, String chainId) {
+    private void requireTarget(TargetType targetType, String workflowId, String chainId) {
         if (targetType == TargetType.CHAIN) {
             if (chainId == null || chainId.isBlank()) {
                 throw new IllegalArgumentException("chainId is required for CHAIN schedules");
             }
-            builder.chain(workflowChainRepository.findById(chainId)
-                    .orElseThrow(() -> new ResourceNotFoundException("WorkflowChain", chainId)));
         } else {
             if (workflowId == null || workflowId.isBlank()) {
                 throw new IllegalArgumentException("workflowId is required for WORKFLOW schedules");
             }
+        }
+    }
+
+    private void resolveTarget(ScheduledWorkflow.ScheduledWorkflowBuilder builder, TargetType targetType,
+                               String workflowId, String chainId) {
+        if (targetType == TargetType.CHAIN) {
+            builder.chain(workflowChainRepository.findById(chainId)
+                    .orElseThrow(() -> new ResourceNotFoundException("WorkflowChain", chainId)));
+        } else {
             builder.workflow(workflowRepository.findById(workflowId)
                     .orElseThrow(() -> new ResourceNotFoundException("Workflow", workflowId)));
         }
