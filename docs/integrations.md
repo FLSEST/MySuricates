@@ -121,6 +121,15 @@ Hinweise:
 - **Trello** nutzt keinen Token-Tausch. Client-ID = API-Key, Client-Secret = Token; beide
   werden als `apiKey|token` kombiniert gespeichert und in jeden Request als Query-Parameter
   (`key=…&token=…`) gehängt.
+- **GitHub (PAT)** braucht keinen OAuth-Flow: der Token wird beim Speichern per `GET /user`
+  validiert und seine Scopes aus dem Antwort-Header `X-OAuth-Scopes` an der Verbindung
+  gespeichert (`fetchGrantedScopes`, klassische Tokens). Fine-grained PATs liefern keinen
+  Scope-Header — die Verbindung hat dann `scopes = null` (unbekannt), was **nicht** als
+  „keine Scopes" gilt. Die schreibenden Actions `create_issue`, `update_issue`, `add_comment`
+  verlangen `repo`; fehlt er bei bekannten Scopes, zeigt die UI die Warnung „Berechtigung fehlt"
+  (nur Hinweis, die Ausführung wird nicht blockiert). Least-Privilege: fine-grained PAT nur für
+  die benötigten Repositories mit *Issues: Read and write* anlegen statt eines klassischen
+  Tokens mit vollem `repo`.
 
 ---
 

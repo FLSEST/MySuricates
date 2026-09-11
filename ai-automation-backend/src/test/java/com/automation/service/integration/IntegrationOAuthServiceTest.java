@@ -589,4 +589,54 @@ class IntegrationOAuthServiceTest {
         }
         return values;
     }
+
+    // ── PAT scopes (TODO 62705e0b) ─────────────────────────────────────────────────
+
+    private IntegrationOAuthService serviceForPat(String scopesFromProvider) {
+        IntegrationOAuthService service = new IntegrationOAuthService(
+                connectionRepository, encryptionService, registry, objectMapper);
+        when(registry.getProvider("github")).thenReturn(provider);
+        when(provider.requiresOAuthFlow()).thenReturn(false);
+        when(provider.fetchAccountInfo("x|ghp_token")).thenReturn("{\"login\":\"flo\"}");
+        when(provider.fetchGrantedScopes("x|ghp_token")).thenReturn(scopesFromProvider);
+        when(connectionRepository.findByProviderId("github")).thenReturn(Optional.empty());
+        when(encryptionService.encrypt(any())).thenReturn("enc");
+        when(connectionRepository.save(any(IntegrationConnection.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        return service;
+    }
+
+    @Test
+    void saveCredentials_pat_persistsGrantedScopesReportedByProvider() {
+        IntegrationConnection saved = serviceForPat("repo read:org").saveCredentials("github", "x", "ghp_token");
+
+        assertThat(saved.getStatus()).isEqualTo(ConnectionStatus.CONNECTED);
+        assertThat(saved.getScopes()).isEqualTo("repo read:org");
+    }
+
+    @Test
+    void saveCredentials_pat_unknownScopesStayNull() {
+        IntegrationConnection saved = serviceForPat(null).saveCredentials("github", "x", "ghp_token");
+
+        assertThat(saved.getStatus()).isEqualTo(ConnectionStatus.CONNECTED);
+        assertThat(saved.getScopes()).isNull();
+    }
+
+    @Test
+    void saveCredentials_pat_validationFailure_doesNotAskForScopes() {
+        IntegrationOAuthService service = new IntegrationOAuthService(
+                connectionRepository, encryptionService, registry, objectMapper);
+        when(registry.getProvider("github")).thenReturn(provider);
+        when(provider.requiresOAuthFlow()).thenReturn(false);
+        when(provider.fetchAccountInfo("x|bad")).thenReturn(null);
+        when(connectionRepository.findByProviderId("github")).thenReturn(Optional.empty());
+        when(encryptionService.encrypt(any())).thenReturn("enc");
+        when(connectionRepository.save(any(IntegrationConnection.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        IntegrationConnection saved = service.saveCredentials("github", "x", "bad");
+
+        assertThat(saved.getStatus()).isEqualTo(ConnectionStatus.DISCONNECTED);
+        verify(provider, never()).fetchGrantedScopes(any());
+    }
 }

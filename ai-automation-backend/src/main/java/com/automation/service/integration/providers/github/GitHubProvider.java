@@ -118,76 +118,33 @@ public class GitHubProvider implements IntegrationProvider, TaskExportCapable {
         return null;
     }
 
+    /**
+     * Classic PATs report their scopes in the {@code X-OAuth-Scopes} header of any API response;
+     * fine-grained PATs send none, which we surface as {@code null} (unknown), never as "no scopes".
+     */
+    @Override
+    public String fetchGrantedScopes(String combinedToken) {
+        try {
+            HttpRequest request = requestBuilder(BASE_URL + "/user", extractToken(combinedToken)).GET().build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            checkResponse(response);
+            return parseScopeHeader(response.headers().firstValue("X-OAuth-Scopes").orElse(null));
+        } catch (Exception e) {
+            log.warn("Failed to read GitHub token scopes: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /** "repo, read:org" → "repo read:org"; blank/absent → null (unknown). */
+    static String parseScopeHeader(String header) {
+        if (header == null || header.isBlank()) return null;
+        String joined = String.join(" ", header.split("\\s*,\\s*")).trim();
+        return joined.isEmpty() ? null : joined;
+    }
+
     @Override
     public List<IntegrationAction> getAvailableActions() {
-        return List.of(
-                new IntegrationAction("list_repos", "Zugängliche Repositories auflisten",
-                        Map.of(
-                                "type", "object",
-                                "properties", Map.of(
-                                        "perPage", Map.of("type", "integer", "default", 30, "description", "Max. Ergebnisse pro Seite"),
-                                        "page", Map.of("type", "integer", "default", 1, "description", "Seitennummer")
-                                )
-                        )),
-                new IntegrationAction("list_issues", "Issues eines Repositories auflisten",
-                        Map.of(
-                                "type", "object",
-                                "properties", Map.of(
-                                        "repo", Map.of("type", "string", "description", "Repository als 'owner/repo'"),
-                                        "state", Map.of("type", "string", "default", "open", "description", "Status: open, closed, all"),
-                                        "labels", Map.of("type", "string", "description", "Labels (kommagetrennt)"),
-                                        "since", Map.of("type", "string", "description", "Nur seit Zeitpunkt geänderte (ISO 8601)"),
-                                        "perPage", Map.of("type", "integer", "default", 50, "description", "Max. Ergebnisse pro Seite"),
-                                        "page", Map.of("type", "integer", "default", 1, "description", "Seitennummer")
-                                ),
-                                "required", List.of("repo")
-                        )),
-                new IntegrationAction("get_issue", "Ein einzelnes Issue abrufen",
-                        Map.of(
-                                "type", "object",
-                                "properties", Map.of(
-                                        "repo", Map.of("type", "string", "description", "Repository als 'owner/repo'"),
-                                        "number", Map.of("type", "integer", "description", "Issue-Nummer")
-                                ),
-                                "required", List.of("repo", "number")
-                        )),
-                new IntegrationAction("create_issue", "Ein neues Issue erstellen",
-                        Map.of(
-                                "type", "object",
-                                "properties", Map.of(
-                                        "repo", Map.of("type", "string", "description", "Repository als 'owner/repo'"),
-                                        "title", Map.of("type", "string", "description", "Titel des Issues"),
-                                        "body", Map.of("type", "string", "description", "Beschreibung (Markdown)"),
-                                        "labels", Map.of("type", "string", "description", "Labels (kommagetrennt)"),
-                                        "assignees", Map.of("type", "string", "description", "Bearbeiter (Benutzernamen, kommagetrennt)")
-                                ),
-                                "required", List.of("repo", "title")
-                        )),
-                new IntegrationAction("update_issue", "Ein Issue aktualisieren (inkl. öffnen/schliessen)",
-                        Map.of(
-                                "type", "object",
-                                "properties", Map.of(
-                                        "repo", Map.of("type", "string", "description", "Repository als 'owner/repo'"),
-                                        "number", Map.of("type", "integer", "description", "Issue-Nummer"),
-                                        "title", Map.of("type", "string", "description", "Neuer Titel"),
-                                        "body", Map.of("type", "string", "description", "Neue Beschreibung (Markdown)"),
-                                        "state", Map.of("type", "string", "description", "Status: open, closed"),
-                                        "labels", Map.of("type", "string", "description", "Labels (kommagetrennt, ersetzt bestehende)"),
-                                        "assignees", Map.of("type", "string", "description", "Bearbeiter (kommagetrennt, ersetzt bestehende)")
-                                ),
-                                "required", List.of("repo", "number")
-                        )),
-                new IntegrationAction("add_comment", "Einen Kommentar zu einem Issue hinzufügen",
-                        Map.of(
-                                "type", "object",
-                                "properties", Map.of(
-                                        "repo", Map.of("type", "string", "description", "Repository als 'owner/repo'"),
-                                        "number", Map.of("type", "integer", "description", "Issue-Nummer"),
-                                        "body", Map.of("type", "string", "description", "Kommentartext (Markdown)")
-                                ),
-                                "required", List.of("repo", "number", "body")
-                        ))
-        );
+        return GitHubActionCatalog.actions();
     }
 
     @Override

@@ -116,10 +116,10 @@ public class IntegrationController {
     public List<IntegrationActionResponse> getActions(@PathVariable String providerId) {
         IntegrationProvider provider = registry.getProvider(providerId);
         var connection = oAuthService.getConnection(providerId).orElse(null);
-        Set<String> grantedScopes = parseScopes(connection != null ? connection.getScopes() : null);
+        String scopes = connection != null ? connection.getScopes() : null;
         return provider.getAvailableActions().stream()
                 .map(a -> new IntegrationActionResponse(a.name(), a.description(), a.inputSchema(),
-                        a.requiredScopes().isEmpty() || grantedScopes.containsAll(a.requiredScopes())))
+                        isActionAvailable(a, scopes)))
                 .toList();
     }
 
@@ -165,12 +165,13 @@ public class IntegrationController {
             }
         }
 
-        Set<String> grantedScopes = parseScopes(connection != null ? connection.getScopes() : null);
+        String scopes = connection != null ? connection.getScopes() : null;
+        Set<String> grantedScopes = parseScopes(scopes);
         var config = provider.getOAuthConfig();
 
         List<IntegrationActionResponse> actions = provider.getAvailableActions().stream()
                 .map(a -> new IntegrationActionResponse(a.name(), a.description(), a.inputSchema(),
-                        a.requiredScopes().isEmpty() || grantedScopes.containsAll(a.requiredScopes())))
+                        isActionAvailable(a, scopes)))
                 .toList();
 
         List<IntegrationProviderResponse.ScopeOptionResponse> optionalScopes = config.optionalScopes().stream()
@@ -193,6 +194,16 @@ public class IntegrationController {
                 actions,
                 provider instanceof com.automation.service.integration.TaskExportCapable
         );
+    }
+
+    /**
+     * An action counts as available when it needs no scopes, when the connection's scopes are
+     * unknown ({@code null}: fine-grained PAT, provider without scope reporting — we cannot prove
+     * a gap), or when every required scope was granted. Advisory only: execution is not blocked.
+     */
+    static boolean isActionAvailable(com.automation.service.integration.IntegrationAction action, String scopes) {
+        if (action.requiredScopes().isEmpty() || scopes == null) return true;
+        return parseScopes(scopes).containsAll(action.requiredScopes());
     }
 
     private static Set<String> parseScopes(String scopes) {

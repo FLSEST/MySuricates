@@ -36,6 +36,15 @@ public interface IntegrationProvider {
     }
 
     /** Whether this provider uses the OAuth2 authorization code flow. False = direct API key/token auth. */
+    /**
+     * Effective scopes of a credential-based connection (PAT/API key), space-separated, or
+     * {@code null} when the provider cannot tell (e.g. GitHub fine-grained tokens send no scope
+     * header). {@code null} means "unknown" — callers must not treat it as "no scopes".
+     */
+    default String fetchGrantedScopes(String accessToken) {
+        return null;
+    }
+
     default boolean requiresOAuthFlow() {
         return true;
     }

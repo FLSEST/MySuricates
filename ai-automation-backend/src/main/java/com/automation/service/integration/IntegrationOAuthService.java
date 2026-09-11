@@ -41,9 +41,7 @@ public class IntegrationOAuthService {
     /** Pending OAuth states for CSRF protection: state → providerId */
     private final ConcurrentHashMap<String, String> pendingStates = new ConcurrentHashMap<>();
 
-    /**
-     * Save OAuth client credentials (encrypted) for a provider.
-     */
+    /** Save OAuth client credentials (encrypted) for a provider; PAT connections are validated and their scopes recorded. */
     @Transactional
     public IntegrationConnection saveCredentials(String providerId, String clientId, String clientSecret) {
         IntegrationProvider provider = registry.getProvider(providerId);
@@ -58,17 +56,18 @@ public class IntegrationOAuthService {
         if (!provider.requiresOAuthFlow()) {
             String combinedToken = clientId + "|" + clientSecret;
             connection.setAccessTokenEncrypted(encryptionService.encrypt(combinedToken));
+            String accountInfo = null;
             try {
-                String accountInfo = provider.fetchAccountInfo(combinedToken);
-                if (accountInfo != null) {
-                    connection.setAccountInfo(accountInfo);
-                    connection.setStatus(ConnectionStatus.CONNECTED);
-                } else {
-                    log.warn("Credential validation returned no account info for provider {}", providerId);
-                    connection.setStatus(ConnectionStatus.DISCONNECTED);
-                }
+                accountInfo = provider.fetchAccountInfo(combinedToken);
             } catch (Exception e) {
                 log.warn("Credential validation failed for provider {}: {}", providerId, e.getMessage());
+            }
+            if (accountInfo != null) {
+                connection.setAccountInfo(accountInfo);
+                connection.setStatus(ConnectionStatus.CONNECTED);
+                connection.setScopes(provider.fetchGrantedScopes(combinedToken)); // null = unknown
+            } else {
+                log.warn("Credential validation returned no account info for provider {}", providerId);
                 connection.setStatus(ConnectionStatus.DISCONNECTED);
             }
         }

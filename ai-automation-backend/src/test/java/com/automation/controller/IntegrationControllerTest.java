@@ -11,6 +11,8 @@ import com.automation.service.integration.IntegrationRegistry;
 import com.automation.service.integration.OAuthConfig;
 import com.automation.service.system.ApiKeyService;
 import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -249,5 +251,34 @@ class IntegrationControllerTest {
                 new IntegrationAction("list_events", "List events", Map.of(), List.of("calendar.read"))
         ));
         return provider;
+    }
+
+    // ── isActionAvailable (PAT scopes, TODO 62705e0b) ──────────────────────────────
+
+    private static com.automation.service.integration.IntegrationAction action(java.util.List<String> required) {
+        return new com.automation.service.integration.IntegrationAction("create_issue", "desc", java.util.Map.of(), required);
+    }
+
+    @Test
+    void isActionAvailable_noRequiredScopes_alwaysAvailable() {
+        assertThat(IntegrationController.isActionAvailable(action(java.util.List.of()), null)).isTrue();
+        assertThat(IntegrationController.isActionAvailable(action(java.util.List.of()), "")).isTrue();
+    }
+
+    @Test
+    void isActionAvailable_unknownScopes_isNotReportedAsMissing() {
+        // fine-grained PAT or provider without scope reporting: we cannot prove a gap
+        assertThat(IntegrationController.isActionAvailable(action(java.util.List.of("repo")), null)).isTrue();
+    }
+
+    @Test
+    void isActionAvailable_grantedScopesCoverRequirement() {
+        assertThat(IntegrationController.isActionAvailable(action(java.util.List.of("repo")), "repo read:org")).isTrue();
+    }
+
+    @Test
+    void isActionAvailable_knownScopesWithoutRequirement_isFlagged() {
+        assertThat(IntegrationController.isActionAvailable(action(java.util.List.of("repo")), "public_repo read:org")).isFalse();
+        assertThat(IntegrationController.isActionAvailable(action(java.util.List.of("repo")), "")).isFalse();
     }
 }
