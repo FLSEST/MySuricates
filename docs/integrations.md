@@ -129,7 +129,8 @@ Hinweise:
   verlangen `repo`; fehlt er bei bekannten Scopes, zeigt die UI die Warnung „Berechtigung fehlt"
   (nur Hinweis, die Ausführung wird nicht blockiert). Least-Privilege: fine-grained PAT nur für
   die benötigten Repositories mit *Issues: Read and write* anlegen statt eines klassischen
-  Tokens mit vollem `repo`.
+  Tokens mit vollem `repo`. Intern aufgeteilt: HTTP über `GitHubHttpClient`, Parameter-Parsing
+  in `GitHubParams`.
 
 ---
 

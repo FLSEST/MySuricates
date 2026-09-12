@@ -10,18 +10,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.net.URI;
-import java.net.URLEncoder;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import static com.automation.service.integration.providers.github.GitHubParams.*;
 
 /**
  * GitHub integration provider — manages GitHub Issues via the REST API.
@@ -47,16 +42,12 @@ import java.util.Map;
 public class GitHubProvider implements IntegrationProvider, TaskExportCapable {
 
     private static final String BASE_URL = "https://api.github.com";
-    private static final String API_VERSION = "2022-11-28";
     private static final String ALLOWLIST_KEY = "github.repo-allowlist";
 
     private final ObjectMapper objectMapper;
     private final AppSettingsRepository appSettingsRepository;
+    private final GitHubHttpClient http;
     private volatile boolean warnedNoAllowlist;
-
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .build();
 
     @Override
     public String getProviderId() {
@@ -103,7 +94,7 @@ public class GitHubProvider implements IntegrationProvider, TaskExportCapable {
     public String fetchAccountInfo(String combinedToken) {
         try {
             String token = extractToken(combinedToken);
-            Object user = httpGet(BASE_URL + "/user", token, Object.class);
+            Object user = http.get(BASE_URL + "/user", token, Object.class);
             if (user instanceof Map<?, ?> u) {
                 Object login = u.get("login");
                 Object name = u.get("name");
@@ -125,9 +116,7 @@ public class GitHubProvider implements IntegrationProvider, TaskExportCapable {
     @Override
     public String fetchGrantedScopes(String combinedToken) {
         try {
-            HttpRequest request = requestBuilder(BASE_URL + "/user", extractToken(combinedToken)).GET().build();
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            checkResponse(response);
+            HttpResponse<String> response = http.getRaw(BASE_URL + "/user", extractToken(combinedToken));
             return parseScopeHeader(response.headers().firstValue("X-OAuth-Scopes").orElse(null));
         } catch (Exception e) {
             log.warn("Failed to read GitHub token scopes: {}", e.getMessage());
@@ -167,7 +156,7 @@ public class GitHubProvider implements IntegrationProvider, TaskExportCapable {
         int perPage = paramInt(params, "perPage", 30);
         int page = paramInt(params, "page", 1);
         String url = BASE_URL + "/user/repos?per_page=" + perPage + "&page=" + page + "&sort=updated";
-        return httpGet(url, token, Object.class);
+        return http.get(url, token, Object.class);
     }
 
     private Object listIssues(Map<String, Object> params, String token) {
@@ -187,13 +176,13 @@ public class GitHubProvider implements IntegrationProvider, TaskExportCapable {
         if (params.containsKey("since")) {
             url.append("&since=").append(urlEncode(params.get("since").toString()));
         }
-        return httpGet(url.toString(), token, Object.class);
+        return http.get(url.toString(), token, Object.class);
     }
 
     private Object getIssue(Map<String, Object> params, String token) {
         String[] repo = requireAllowedRepo(params);
         String number = requireParam(params, "number");
-        return httpGet(issueUrl(repo, number), token, Object.class);
+        return http.get(issueUrl(repo, number), token, Object.class);
     }
 
     private Object createIssue(Map<String, Object> params, String token) {
@@ -207,7 +196,7 @@ public class GitHubProvider implements IntegrationProvider, TaskExportCapable {
         if (params.containsKey("assignees")) body.put("assignees", csv(params.get("assignees")));
 
         String url = BASE_URL + "/repos/" + urlEncode(repo[0]) + "/" + urlEncode(repo[1]) + "/issues";
-        return httpPost(url, body, token, Object.class);
+        return http.post(url, body, token, Object.class);
     }
 
     private Object updateIssue(Map<String, Object> params, String token) {
@@ -221,7 +210,7 @@ public class GitHubProvider implements IntegrationProvider, TaskExportCapable {
         if (params.containsKey("labels")) body.put("labels", csv(params.get("labels")));
         if (params.containsKey("assignees")) body.put("assignees", csv(params.get("assignees")));
 
-        return httpPatch(issueUrl(repo, number), body, token, Object.class);
+        return http.patch(issueUrl(repo, number), body, token, Object.class);
     }
 
     private Object addComment(Map<String, Object> params, String token) {
@@ -229,7 +218,7 @@ public class GitHubProvider implements IntegrationProvider, TaskExportCapable {
         String number = requireParam(params, "number");
         String comment = requireParam(params, "body");
         String url = issueUrl(repo, number) + "/comments";
-        return httpPost(url, Map.of("body", comment), token, Object.class);
+        return http.post(url, Map.of("body", comment), token, Object.class);
     }
 
     private String issueUrl(String[] repo, String number) {
@@ -249,7 +238,7 @@ public class GitHubProvider implements IntegrationProvider, TaskExportCapable {
         if (input.labels() != null && !input.labels().isEmpty()) body.put("labels", input.labels());
 
         String url = BASE_URL + "/repos/" + urlEncode(repo[0]) + "/" + urlEncode(repo[1]) + "/issues";
-        Object created = httpPost(url, body, token, Object.class);
+        Object created = http.post(url, body, token, Object.class);
         if (!(created instanceof Map<?, ?> issue) || issue.get("number") == null) {
             throw new IllegalStateException("GitHub issue creation returned no number");
         }
@@ -262,7 +251,7 @@ public class GitHubProvider implements IntegrationProvider, TaskExportCapable {
     @Override
     public List<TaskTarget> listTargets(String accessToken) {
         String token = extractToken(accessToken);
-        Object repos = httpGet(BASE_URL + "/user/repos?per_page=100&sort=updated", token, Object.class);
+        Object repos = http.get(BASE_URL + "/user/repos?per_page=100&sort=updated", token, Object.class);
         List<TaskTarget> out = new ArrayList<>();
         if (repos instanceof List<?> list) {
             for (Object o : list) {
@@ -275,77 +264,7 @@ public class GitHubProvider implements IntegrationProvider, TaskExportCapable {
         return out;
     }
 
-    // --- HTTP helpers ---
-
-    private <T> T httpGet(String url, String token, Class<T> responseType) {
-        return send(requestBuilder(url, token).GET().build(), responseType);
-    }
-
-    private <T> T httpPost(String url, Object body, String token, Class<T> responseType) {
-        return send(requestBuilder(url, token)
-                .POST(HttpRequest.BodyPublishers.ofString(writeJson(body))).build(), responseType);
-    }
-
-    private <T> T httpPatch(String url, Object body, String token, Class<T> responseType) {
-        return send(requestBuilder(url, token)
-                .method("PATCH", HttpRequest.BodyPublishers.ofString(writeJson(body))).build(), responseType);
-    }
-
-    private HttpRequest.Builder requestBuilder(String url, String token) {
-        return HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .header("Authorization", "Bearer " + token)
-                .header("Accept", "application/vnd.github+json")
-                .header("X-GitHub-Api-Version", API_VERSION)
-                .header("Content-Type", "application/json")
-                .timeout(Duration.ofSeconds(15));
-    }
-
-    private <T> T send(HttpRequest request, Class<T> responseType) {
-        try {
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            checkResponse(response);
-            return objectMapper.readValue(response.body(), responseType);
-        } catch (IllegalStateException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new IllegalStateException("GitHub API request failed: " + e.getMessage(), e);
-        }
-    }
-
-    private void checkResponse(HttpResponse<String> response) {
-        if (response.statusCode() == 401) {
-            throw new IllegalStateException("GitHub authentication failed — check the Personal Access Token");
-        }
-        if (response.statusCode() >= 400) {
-            throw new IllegalStateException("GitHub API error " + response.statusCode() + ": " + response.body());
-        }
-    }
-
-    private String writeJson(Object body) {
-        try {
-            return objectMapper.writeValueAsString(body);
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to serialize GitHub request body: " + e.getMessage(), e);
-        }
-    }
-
-    // --- Parameter helpers ---
-
-    /** Extracts the PAT from the framework's "username|token" credential format. */
-    private static String extractToken(String combined) {
-        if (combined == null) return null;
-        int idx = combined.indexOf('|');
-        return idx >= 0 ? combined.substring(idx + 1) : combined;
-    }
-
-    private static String[] splitRepo(String repo) {
-        String[] parts = repo.split("/", 2);
-        if (parts.length != 2 || parts[0].isBlank() || parts[1].isBlank()) {
-            throw new IllegalArgumentException("Parameter 'repo' must be in the form 'owner/repo'");
-        }
-        return parts;
-    }
+    // --- Repo allowlist ---
 
     private String[] requireAllowedRepo(Map<String, Object> params) {
         return allowedRepo(requireParam(params, "repo"));
@@ -355,7 +274,7 @@ public class GitHubProvider implements IntegrationProvider, TaskExportCapable {
     private String[] allowedRepo(String repoParam) {
         String[] repo = splitRepo(repoParam);
         List<String> allowlist = appSettingsRepository.get(ALLOWLIST_KEY)
-                .map(GitHubProvider::csv)
+                .map(GitHubParams::csv)
                 .orElse(List.of());
         if (allowlist.isEmpty()) {
             if (!warnedNoAllowlist) {
@@ -374,36 +293,5 @@ public class GitHubProvider implements IntegrationProvider, TaskExportCapable {
                     "Repository '" + repo[0] + "/" + repo[1] + "' is not covered by the '" + ALLOWLIST_KEY + "' setting");
         }
         return repo;
-    }
-
-    private static List<String> csv(Object value) {
-        List<String> result = new ArrayList<>();
-        for (String s : Arrays.asList(value.toString().split(","))) {
-            String trimmed = s.trim();
-            if (!trimmed.isEmpty()) result.add(trimmed);
-        }
-        return result;
-    }
-
-    private static String paramString(Map<String, Object> params, String key, String defaultValue) {
-        Object val = params.get(key);
-        return val != null ? val.toString() : defaultValue;
-    }
-
-    private static int paramInt(Map<String, Object> params, String key, int defaultValue) {
-        Object val = params.get(key);
-        if (val instanceof Number n) return n.intValue();
-        if (val instanceof String s && !s.isBlank()) return Integer.parseInt(s);
-        return defaultValue;
-    }
-
-    private static String requireParam(Map<String, Object> params, String key) {
-        Object val = params.get(key);
-        if (val == null) throw new IllegalArgumentException("Required parameter missing: " + key);
-        return val.toString();
-    }
-
-    private static String urlEncode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 }

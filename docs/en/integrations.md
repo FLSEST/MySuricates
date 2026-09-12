@@ -130,6 +130,7 @@ Notes:
   missing from known scopes the UI shows the "permission missing" warning (advisory only,
   execution is not blocked). Least privilege: create a fine-grained PAT limited to the needed
   repositories with *Issues: Read and write* instead of a classic token with full `repo`.
+  Split internally: HTTP via `GitHubHttpClient`, parameter parsing in `GitHubParams`.
 
 ---
 
