@@ -25,13 +25,20 @@ import org.springframework.context.ApplicationEventPublisher;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import com.automation.concurrency.DynamicSemaphore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import org.mockito.ArgumentCaptor;
@@ -98,6 +105,12 @@ class WorkflowExecutorTest {
 
     private WorkflowExecutor workflowExecutor;
     private WorkflowExecutionRegistry registry;
+
+    /**
+     * Real threads for the concurrency tests. Torn down with shutdownNow() — never close(), which
+     * would block forever if an assertion failed while a run is still parked on the semaphore.
+     */
+    private ExecutorService realThreads;
 
     private Workflow testWorkflow;
     private Project testProject;
@@ -166,6 +179,15 @@ class WorkflowExecutorTest {
                     .id("run-1").workflow(testWorkflow).status(RunStatus.RUNNING).startedAt(java.time.Instant.now()).build();
             return Optional.of(run);
         });
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void stopRealThreads() throws InterruptedException {
+        if (realThreads != null) {
+            realThreads.shutdownNow();
+            realThreads.awaitTermination(5, TimeUnit.SECONDS);
+            realThreads = null;
+        }
     }
 
     /** Captures the last WorkflowRun passed to runRepository.save() */
@@ -1113,6 +1135,16 @@ class WorkflowExecutorTest {
 
     /** Helper: re-build the executor with a custom BlockExecutor list and semaphore. */
     private WorkflowExecutor buildExecutor(List<BlockExecutor> executors, DynamicSemaphore semaphore) {
+        return buildExecutor(executors, semaphore, new WorkflowExecutionRegistry(), virtualThreadExecutor);
+    }
+
+    /**
+     * Helper for the concurrency tests: the run really executes on its own (virtual) thread and the
+     * test keeps a handle on the registry, so it can cancel a run while the thread is still parked.
+     */
+    private WorkflowExecutor buildExecutor(List<BlockExecutor> executors, DynamicSemaphore semaphore,
+                                           WorkflowExecutionRegistry executionRegistry,
+                                           ExecutorService threads) {
         return new WorkflowExecutor(
                 executors,
                 containerService,
@@ -1122,7 +1154,7 @@ class WorkflowExecutorTest {
                 containerRepository,
                 skillRepository,
                 broadcaster,
-                virtualThreadExecutor,
+                threads,
                 semaphore,
                 new ExecutionContextFactory(workflowVersionService, runRepository, systemIdentity,
                         new WorkflowContextDataService(runRepository, stepResultRepository, todoRepository),
@@ -1130,7 +1162,7 @@ class WorkflowExecutorTest {
                 activityLogService,
                 eventPublisher,
                 new RunCompletionHandler(templateVerificationService, activityLogService, deadLetterService),
-                new WorkflowExecutionRegistry(),
+                executionRegistry,
                 new BlockOutputValidator()
         );
     }
@@ -1526,6 +1558,295 @@ class WorkflowExecutorTest {
 
         assertThat(activeWhenTerminalStatusSaved).isNotEmpty().containsOnly(true);
         assertThat(registry.isRunActive("run-1")).isFalse();
+    }
+
+    // ── Container activity touch (TODO cd1685ff) ──────────────────────────────────
+
+    @Test
+    void execute_withContainer_touchesContainerActivityWithoutLoadingTheEntity() {
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build());
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        // A single JPQL update per step — not find + detached merge, which would drag the
+        // eagerly mapped Project/Container graph through a second transaction.
+        verify(containerRepository, times(2)).touchActivity(eq("docker-container-1"), any(Instant.class));
+        verify(containerRepository, never()).findByDockerContainerId(anyString());
+        verify(containerRepository, never()).save(any());
+    }
+
+    @Test
+    void execute_containerActivityUpdateFails_doesNotFailTheRun() {
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build());
+        when(containerRepository.touchActivity(anyString(), any(Instant.class)))
+                .thenThrow(new RuntimeException("db down"));
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        assertThat(captureLastSavedRun().getStatus()).isEqualTo(RunStatus.COMPLETED);
+    }
+
+    // ── Cancel before thread registration (TODO 45d09d19) ──────────────────────────
+    // A run is observable in the DB (RUNNING) the moment execute() returns, but it used to
+    // become *controllable* only after the execution thread had passed the semaphore and the
+    // container start. A cancel inside that window hit the ghost branch and was then overrun
+    // by the thread that kept going. These tests pin the window shut from both ends.
+
+    /** Stateful run stub: save() keeps the instance, findById() hands the same one back. */
+    private AtomicReference<WorkflowRun> statefulRunRepository() {
+        AtomicReference<WorkflowRun> stored = new AtomicReference<>();
+        when(runRepository.save(any(WorkflowRun.class))).thenAnswer(inv -> {
+            WorkflowRun run = inv.getArgument(0);
+            if (run.getId() == null) run.setId("run-1");
+            stored.set(run);
+            return run;
+        });
+        when(runRepository.findById("run-1")).thenAnswer(inv -> Optional.ofNullable(stored.get()));
+        return stored;
+    }
+
+    /** Polls the stateful stub until the run leaves RUNNING (no Awaitility dependency). */
+    private WorkflowRun awaitTerminalStatus(AtomicReference<WorkflowRun> stored) {
+        long deadline = System.nanoTime() + java.time.Duration.ofSeconds(5).toNanos();
+        RunStatus last = null;
+        while (System.nanoTime() < deadline) {
+            WorkflowRun current = stored.get();
+            last = current == null ? null : current.getStatus();
+            if (last != null && last != RunStatus.RUNNING) {
+                return current;
+            }
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError("interrupted while waiting for a terminal run status", e);
+            }
+        }
+        throw new AssertionError("run did not reach a terminal status within 5s; last status was " + last);
+    }
+
+    private static void awaitLatch(CountDownLatch latch, String what) {
+        try {
+            assertThat(latch.await(5, TimeUnit.SECONDS)).as(what).isTrue();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("interrupted while waiting for " + what, e);
+        }
+    }
+
+    @Test
+    void cancelExecution_duringRunInitialisation_isHonoured() {
+        // The run row is listable from the first save on, so a second observer can cancel while
+        // execute() is still assembling the snapshot / writing the input context. That cancel must
+        // not fall through to the ghost branch and then be overrun by the execution thread.
+        AtomicReference<WorkflowRun> stored = statefulRunRepository();
+        // Would let the run finish COMPLETED if the cancel were dropped — never reached once it isn't.
+        lenient().when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build());
+        AtomicBoolean cancelled = new AtomicBoolean();
+        doAnswer(inv -> {
+            if (cancelled.compareAndSet(false, true)) {
+                workflowExecutor.cancelExecution("run-1");
+            }
+            return null;
+        }).when(activityLogService).info(any(), anyString(), anyString(), anyString(), anyString());
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        assertThat(stored.get().getStatus()).isEqualTo(RunStatus.CANCELLED);
+        assertThat(stored.get().getError()).isNullOrEmpty();
+        verify(simpleBlockExecutor, never()).execute(any(), any());
+        verify(containerService, never()).getDockerContainerId(any());
+        verify(stepResultRepository, never()).save(any());
+        assertThat(registry.isRunActive("run-1")).isFalse();
+    }
+
+    @Test
+    void execute_initialisationFails_leavesNoActiveRunBehind() {
+        // Registering before the init work means the init-failure path has to clean up again —
+        // otherwise the run stays "active" forever and the ghost watchdog skips it on purpose.
+        AtomicInteger saves = new AtomicInteger();
+        when(runRepository.save(any(WorkflowRun.class))).thenAnswer(inv -> {
+            WorkflowRun run = inv.getArgument(0);
+            if (run.getId() == null) run.setId("run-1");
+            if (saves.incrementAndGet() == 2) throw new IllegalStateException("db down");
+            return run;
+        });
+
+        assertThatThrownBy(() -> workflowExecutor.execute(testWorkflow, Map.of("k", "v")))
+                .isInstanceOf(WorkflowExecutionException.class);
+
+        assertThat(registry.isRunActive("run-1")).isFalse();
+        assertThat(registry.getActiveRunCount()).isZero();
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(String.valueOf(saved.getError().get("message")))
+                .contains("Failed to initialize workflow data");
+    }
+
+    @Test
+    void execute_activityLogFailsDuringInit_marksRunFailedAndUnregisters() {
+        doThrow(new RuntimeException("activity log down"))
+                .when(activityLogService).info(any(), anyString(), anyString(), anyString(), anyString());
+
+        assertThatThrownBy(() -> workflowExecutor.execute(testWorkflow, null))
+                .isInstanceOf(WorkflowExecutionException.class);
+
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(String.valueOf(saved.getError().get("message"))).contains("activity log down");
+        assertThat(registry.isRunActive("run-1")).isFalse();
+        verify(simpleBlockExecutor, never()).execute(any(), any());
+    }
+
+    @Test
+    void execute_errorDuringInit_unregistersAndPropagatesTheError() {
+        // An Error must not be swallowed and must not leave the run registered — the watchdog
+        // protects registered runs on purpose, so the run would hang RUNNING until a restart.
+        doThrow(new NoClassDefFoundError("boom"))
+                .when(activityLogService).info(any(), anyString(), anyString(), anyString(), anyString());
+
+        assertThatThrownBy(() -> workflowExecutor.execute(testWorkflow, null))
+                .isInstanceOf(NoClassDefFoundError.class);
+
+        assertThat(captureLastSavedRun().getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(registry.isRunActive("run-1")).isFalse();
+        assertThat(registry.getActiveRunCount()).isZero();
+    }
+
+    @Test
+    void execute_submitThrowsError_unregistersAndPropagatesTheError() {
+        // Same hole one step later: the submit itself can fail with an Error.
+        doThrow(new NoClassDefFoundError("pool gone")).when(virtualThreadExecutor).submit(any(Runnable.class));
+
+        assertThatThrownBy(() -> workflowExecutor.execute(testWorkflow, null))
+                .isInstanceOf(NoClassDefFoundError.class);
+
+        assertThat(captureLastSavedRun().getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(registry.isRunActive("run-1")).isFalse();
+    }
+
+    @Test
+    void cancelExecution_beforeThreadStarts_isHonoured() throws Exception {
+        DynamicSemaphore singleSlot = new DynamicSemaphore(1);
+        singleSlot.acquire(); // the only slot is taken — the run parks in acquire()
+        WorkflowExecutionRegistry liveRegistry = new WorkflowExecutionRegistry();
+        AtomicReference<WorkflowRun> stored = statefulRunRepository();
+
+        realThreads = Executors.newVirtualThreadPerTaskExecutor();
+        WorkflowExecutor executor =
+                buildExecutor(List.of(simpleBlockExecutor), singleSlot, liveRegistry, realThreads);
+
+        executor.execute(testWorkflow, null);
+        executor.cancelExecution("run-1");
+        singleSlot.release();
+
+        WorkflowRun finished = awaitTerminalStatus(stored);
+        assertThat(finished.getStatus()).isEqualTo(RunStatus.CANCELLED);
+        // The ghost branch would have stamped a "no active execution thread" error onto the run.
+        assertThat(finished.getError()).isNullOrEmpty();
+
+        verify(simpleBlockExecutor, never()).execute(any(), any());
+        verify(containerService, never()).getDockerContainerId(any());
+        verify(stepResultRepository, never()).save(any());
+        assertThat(liveRegistry.isRunActive("run-1")).isFalse();
+        assertThat(singleSlot.availablePermits()).isEqualTo(1);
+    }
+
+    @Test
+    void executeAdHocCommand_runStillQueued_throws() throws Exception {
+        DynamicSemaphore singleSlot = new DynamicSemaphore(1);
+        singleSlot.acquire(); // the run never gets past acquire() during the assertion
+        WorkflowExecutionRegistry liveRegistry = new WorkflowExecutionRegistry();
+        AtomicReference<WorkflowRun> stored = statefulRunRepository();
+
+        realThreads = Executors.newVirtualThreadPerTaskExecutor();
+        WorkflowExecutor executor =
+                buildExecutor(List.of(simpleBlockExecutor), singleSlot, liveRegistry, realThreads);
+        executor.execute(testWorkflow, null);
+
+        // The provisional context makes the run cancellable, but there is no container and no
+        // project cwd yet — an ad-hoc command must still be refused, not run on the host.
+        assertThatThrownBy(() -> executor.executeAdHocCommand("run-1", "echo hello"))
+                .isInstanceOf(WorkflowExecutionException.class);
+
+        executor.cancelExecution("run-1");
+        singleSlot.release();
+        awaitTerminalStatus(stored);
+
+        verify(commandExecutorService, never()).executeCommand(any(), anyString(), anyString());
+    }
+
+    @Test
+    void cancelExecution_duringContainerStart_isHonoured() throws Exception {
+        CountDownLatch containerStartEntered = new CountDownLatch(1);
+        CountDownLatch containerStartMayFinish = new CountDownLatch(1);
+        when(containerService.getDockerContainerId(any())).thenAnswer(inv -> {
+            containerStartEntered.countDown();
+            awaitLatch(containerStartMayFinish, "release of the container start");
+            return "docker-container-1";
+        });
+        WorkflowExecutionRegistry liveRegistry = new WorkflowExecutionRegistry();
+        AtomicReference<WorkflowRun> stored = statefulRunRepository();
+
+        realThreads = Executors.newVirtualThreadPerTaskExecutor();
+        WorkflowExecutor executor = buildExecutor(
+                List.of(simpleBlockExecutor), new DynamicSemaphore(1), liveRegistry, realThreads);
+
+        executor.execute(testWorkflow, null);
+        awaitLatch(containerStartEntered, "the run to reach the container start");
+        executor.cancelExecution("run-1");
+        containerStartMayFinish.countDown();
+
+        assertThat(awaitTerminalStatus(stored).getStatus()).isEqualTo(RunStatus.CANCELLED);
+
+        verify(containerService, times(1)).getDockerContainerId(any());
+        verify(simpleBlockExecutor, never()).execute(any(), any());
+        assertThat(liveRegistry.isRunActive("run-1")).isFalse();
+    }
+
+    /**
+     * The permit is taken before the container start, so a run parked there holds one. As long as
+     * the run was not registered until *after* the container start, the watchdog saw 0 active runs
+     * with 0 available permits and "reconciled" the live permit away — inflating the semaphore.
+     */
+    @Test
+    void watchdog_doesNotReleasePermit_whileRunIsStartingContainer() throws Exception {
+        CountDownLatch containerStartEntered = new CountDownLatch(1);
+        CountDownLatch containerStartMayFinish = new CountDownLatch(1);
+        when(containerService.getDockerContainerId(any())).thenAnswer(inv -> {
+            containerStartEntered.countDown();
+            awaitLatch(containerStartMayFinish, "release of the container start");
+            return "docker-container-1";
+        });
+        when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of());
+        DynamicSemaphore singleSlot = new DynamicSemaphore(1);
+        WorkflowExecutionRegistry liveRegistry = new WorkflowExecutionRegistry();
+        AtomicReference<WorkflowRun> stored = statefulRunRepository();
+        GhostRunWatchdogService watchdog = new GhostRunWatchdogService(
+                runRepository, liveRegistry, singleSlot, broadcaster, activityLogService,
+                mock(com.automation.service.scheduler.SuspendState.class));
+
+        realThreads = Executors.newVirtualThreadPerTaskExecutor();
+        WorkflowExecutor executor =
+                buildExecutor(List.of(simpleBlockExecutor), singleSlot, liveRegistry, realThreads);
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build());
+
+        executor.execute(testWorkflow, null);
+        awaitLatch(containerStartEntered, "the run to reach the container start");
+        assertThat(singleSlot.availablePermits()).isZero();
+
+        watchdog.detectGhostRuns();
+
+        assertThat(singleSlot.availablePermits())
+                .as("the parked run holds the permit — the watchdog must not hand out a second one")
+                .isZero();
+        containerStartMayFinish.countDown();
+        awaitTerminalStatus(stored);
+        assertThat(singleSlot.availablePermits()).isEqualTo(1);
     }
 
     @Test

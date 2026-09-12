@@ -187,6 +187,10 @@ Die Workflow-Engine führt Blöcke sequenziell aus. Claude CLI läuft **immer au
 7. Nach Abschluss wertet `RunCompletionHandler` Gate-Status und TODO-Marker aus (alle Block-Outputs), verbucht Template-Verification, Activity-Log und DLQ
 8. `WorkflowRunCompletedEvent` wird gefeuert → `AutoTodoService` reagiert
 
+**Steuerbarkeit ab Schritt 1:** Noch vor dem Submit registriert der `WorkflowExecutor` einen provisorischen `ExecutionContext` in der `WorkflowExecutionRegistry`. Ein Cancel greift damit auch, solange der Run noch auf einen Semaphore-Slot oder den Container-Start wartet — der Ausführungs-Thread übernimmt beim Tausch gegen den echten Context dessen Cancel-/Pause-Flag. Folge: `getActiveRunCount()` zählt auch wartende Runs, wodurch `GhostRunWatchdogService` den Permit eines startenden Runs nicht mehr als Leak freigibt.
+
+**Container-Zeile:** `ContainerService.createAndStartContainer` aktualisiert eine vorhandene `containers`-Zeile (Upsert) statt sie zu löschen und neu anzulegen — die Löschung wurde über die Cascade `Project.container` beim Flush wieder aufgehoben, sodass der folgende INSERT an `UNIQUE(containers.project_id)` scheiterte. Der Projekt-Lock bleibt dauerhaft in der Map (Entfernen unter Konkurrenz erzeugt einen zweiten Monitor), und `lastActivityAt` wird per JPQL-Update (`ContainerRepository.touchActivity`) statt per detached Merge gesetzt.
+
 ### Block-Typen (14 gesamt)
 
 | Typ | Executor | Beschreibung |

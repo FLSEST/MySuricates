@@ -28,6 +28,9 @@ class ContainerRepositoryTest {
     @Autowired
     private ProjectRepository projectRepository;
 
+    @Autowired
+    private jakarta.persistence.EntityManager entityManager;
+
     @BeforeEach
     void cleanUp() {
         containerRepository.deleteAll();
@@ -115,5 +118,36 @@ class ContainerRepositoryTest {
         List<Container> found = containerRepository.findByStatus(ContainerStatus.STOPPED);
 
         assertThat(found).isEmpty();
+    }
+
+    @Test
+    void touchActivity_updates_last_activity_of_matching_container_only() {
+        Project p1 = saveProject("Touch A");
+        Project p2 = saveProject("Touch B");
+        Instant before = Instant.now().minusSeconds(3600);
+        Container touched = saveContainer(p1, "docker-touch", ContainerStatus.RUNNING);
+        Container untouched = saveContainer(p2, "docker-other", ContainerStatus.RUNNING);
+        touched.setLastActivityAt(before);
+        untouched.setLastActivityAt(before);
+        containerRepository.saveAllAndFlush(List.of(touched, untouched));
+
+        Instant now = Instant.now();
+        int updated = containerRepository.touchActivity("docker-touch", now);
+        entityManager.clear();
+
+        assertThat(updated).isEqualTo(1);
+        assertThat(containerRepository.findByDockerContainerId("docker-touch"))
+                .get()
+                .extracting(Container::getLastActivityAt)
+                .isEqualTo(now);
+        assertThat(containerRepository.findByDockerContainerId("docker-other"))
+                .get()
+                .extracting(Container::getLastActivityAt)
+                .isEqualTo(before);
+    }
+
+    @Test
+    void touchActivity_unknown_docker_id_updates_nothing() {
+        assertThat(containerRepository.touchActivity("missing-docker-id", Instant.now())).isZero();
     }
 }

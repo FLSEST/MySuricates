@@ -173,4 +173,146 @@ class WorkflowExecutionRegistryTest {
     void getPendingApproval_unknownRun_returnsNull() {
         assertThat(registry.getPendingApproval("nonexistent")).isNull();
     }
+
+    // ── Cancel before thread registration (TODO 45d09d19) ─────────────────────
+    // register() hands back the previous context so the executor can carry a
+    // cancel/pause flag over from the provisional context; cancel() flags both
+    // sides of a concurrent swap.
+
+    @Test
+    void register_returnsPreviousContext() {
+        ExecutionContext provisional = buildContext(null, "run-1");
+        ExecutionContext real = buildContext("c1", "run-1");
+
+        assertThat(registry.register("run-1", provisional)).isNull();
+        assertThat(registry.register("run-1", real)).isSameAs(provisional);
+        assertThat(registry.get("run-1")).isSameAs(real);
+    }
+
+    @Test
+    void cancel_returnsFalseWhenUnknown() {
+        assertThat(registry.cancel("nonexistent")).isFalse();
+    }
+
+    @Test
+    void cancel_flagsContextAndReturnsTrue() {
+        ExecutionContext ctx = buildContext("c1", "run-1");
+        registry.register("run-1", ctx);
+
+        assertThat(registry.cancel("run-1")).isTrue();
+        assertThat(ctx.shouldStop()).isTrue();
+    }
+
+    @Test
+    void registerProvisional_registersCancellablePlaceholder() {
+        registry.registerProvisional("run-1");
+
+        assertThat(registry.isRunActive("run-1")).isTrue();
+        assertThat(registry.getActiveRunCount()).isEqualTo(1);
+        // Controllable, but not usable for anything that needs a container or the project cwd.
+        assertThat(registry.getStartedContext("run-1")).isNull();
+        assertThat(registry.cancelRequested("run-1")).isFalse();
+
+        assertThat(registry.cancel("run-1")).isTrue();
+        assertThat(registry.cancelRequested("run-1")).isTrue();
+    }
+
+    @Test
+    void registerProvisional_marksQueued_promoteClearsIt() {
+        registry.registerProvisional("run-1");
+        assertThat(registry.getStartedContext("run-1")).isNull();
+
+        ExecutionContext real = buildContext("c1", "run-1");
+        registry.promote("run-1", real);
+        assertThat(registry.getStartedContext("run-1")).isSameAs(real);
+
+        // A second run of the same id (retry after unregister) must start queued again.
+        registry.unregister("run-1");
+        registry.registerProvisional("run-1");
+        assertThat(registry.getStartedContext("run-1")).isNull();
+    }
+
+    @Test
+    void unregister_clearsQueuedState() {
+        registry.registerProvisional("run-1");
+        registry.unregister("run-1");
+
+        assertThat(registry.isRunActive("run-1")).isFalse();
+        // No stale queued entry: a context registered afterwards counts as started.
+        ExecutionContext real = buildContext("c1", "run-1");
+        registry.promote("run-1", real);
+        assertThat(registry.getStartedContext("run-1")).isSameAs(real);
+    }
+
+    @Test
+    void cancelRequested_unknownRun_isFalse() {
+        assertThat(registry.cancelRequested("nonexistent")).isFalse();
+    }
+
+    @Test
+    void promote_carriesCancelFlagToTheRealContext() {
+        registry.registerProvisional("run-1");
+        registry.cancel("run-1");
+        ExecutionContext real = buildContext("c1", "run-1");
+
+        registry.promote("run-1", real);
+
+        assertThat(real.shouldStop()).isTrue();
+        assertThat(registry.get("run-1")).isSameAs(real);
+        assertThat(registry.getStartedContext("run-1")).isSameAs(real);
+    }
+
+    @Test
+    void promote_carriesPauseFlagToTheRealContext() {
+        registry.registerProvisional("run-1");
+        registry.pauseExecution("run-1");
+        ExecutionContext real = buildContext("c1", "run-1");
+
+        registry.promote("run-1", real);
+
+        assertThat(real.isPaused()).isTrue();
+        assertThat(real.shouldStop()).isFalse();
+    }
+
+    @Test
+    void promote_withoutProvisional_leavesTheContextUntouched() {
+        ExecutionContext real = buildContext("c1", "run-1");
+
+        registry.promote("run-1", real);
+
+        assertThat(real.shouldStop()).isFalse();
+        assertThat(real.isPaused()).isFalse();
+        assertThat(registry.get("run-1")).isSameAs(real);
+    }
+
+    @Test
+    void getStartedContext_unknownRun_returnsNull() {
+        assertThat(registry.getStartedContext("nonexistent")).isNull();
+    }
+
+    @Test
+    void cancel_flagsBothContextsWhenSwappedConcurrently() {
+        ExecutionContext provisional = buildContext(null, "run-1");
+        ExecutionContext real = buildContext("c1", "run-1");
+        // Simulates the interleaving where the executor swaps the provisional context for the
+        // real one between cancel()'s two map reads: both must end up cancelled.
+        WorkflowExecutionRegistry swapping = new WorkflowExecutionRegistry() {
+            private boolean swapped;
+
+            @Override
+            public ExecutionContext get(String runId) {
+                ExecutionContext current = super.get(runId);
+                if (!swapped) {
+                    swapped = true;
+                    register(runId, real);
+                }
+                return current;
+            }
+        };
+        swapping.register("run-1", provisional);
+
+        assertThat(swapping.cancel("run-1")).isTrue();
+        assertThat(provisional.shouldStop()).isTrue();
+        assertThat(real.shouldStop()).isTrue();
+    }
 }

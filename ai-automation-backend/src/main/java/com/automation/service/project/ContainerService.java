@@ -46,9 +46,13 @@ public class ContainerService {
 
     // Per-project lock to serialize concurrent container creation for the same
     // project. Without this, two parallel workflow runs both pass the
-    // findByProjectId check, both call Docker create, and the second INSERT
-    // fails with UNIQUE constraint on containers.project_id (leaving an
-    // orphan Docker container behind).
+    // findByProjectId check, both call Docker create, and the second one
+    // clobbers the first container (leaving an orphan Docker container behind).
+    //
+    // Entries are never removed: dropping a lock while a thread still holds it
+    // lets the next caller create a *fresh* monitor for the same project and run
+    // in parallel with it — exactly the race this map exists to prevent. The map
+    // is bounded by the number of projects, so it cannot grow unbounded.
     private final ConcurrentHashMap<String, Object> projectLocks = new ConcurrentHashMap<>();
 
     public ContainerService(
@@ -80,15 +84,10 @@ public class ContainerService {
     // the whole Docker call, blocking every other request and causing the
     // browser-side "Failed to fetch" the user reported. Instead we run the
     // Docker work outside any transaction and use TransactionTemplate for the
-    // short DB bursts (find existing / delete stale row / insert new row).
+    // short DB bursts (find existing row / upsert it).
     public Container createAndStartContainer(Project project) {
-        Object lock = projectLocks.computeIfAbsent(project.getId(), k -> new Object());
-        try {
-            synchronized (lock) {
-                return doCreateAndStart(project);
-            }
-        } finally {
-            projectLocks.remove(project.getId(), lock);
+        synchronized (projectLocks.computeIfAbsent(project.getId(), k -> new Object())) {
+            return doCreateAndStart(project);
         }
     }
 
@@ -128,38 +127,37 @@ public class ContainerService {
             docker.remove(oldDockerContainerId);
         }
 
-        // Step 4 (short Tx): drop the old DB row so the new save does not hit
-        // the UNIQUE(containers.project_id) constraint.
-        if (oldEntityId != null) {
-            final String entityId = oldEntityId;
-            transactionTemplate.executeWithoutResult(status -> {
-                containerRepository.deleteById(entityId);
-                containerRepository.flush();
-            });
-        }
-
         String imageName = DockerContainerGateway.imageFor(project.getType());
         String containerName = "automation-" + project.getId();
 
-        // Step 5 (no Tx): clear any leftover Docker container with the same name.
+        // Step 4 (no Tx): clear any leftover Docker container with the same name.
         docker.remove(containerName);
 
         try {
-            // Step 6 (no Tx): create + start the Docker container — the slow
+            // Step 5 (no Tx): create + start the Docker container — the slow
             // operation we are explicitly keeping out of a transaction.
             String dockerContainerId = docker.createAndStart(project, imageName, containerName, hostHome);
 
-            // Step 7 (short Tx): persist the new Container row.
+            // Step 6 (short Tx): upsert the Container row — reuse the stale row instead of
+            // deleting it first. A delete+insert cannot work here: loading the Container
+            // eagerly pulls in its Project, whose `container` association cascades PERSIST,
+            // so Hibernate un-schedules the deletion again during flush (no DELETE is ever
+            // issued). The row survived and the following INSERT hit
+            // UNIQUE(containers.project_id). Updating the existing row sidesteps the
+            // constraint entirely — there is at most one row per project by definition.
+            final String reuseId = oldEntityId;
             Container saved = transactionTemplate.execute(status -> {
-                Container container = Container.builder()
-                        .project(project)
-                        .dockerContainerId(dockerContainerId)
-                        .imageName(imageName)
-                        .status(ContainerStatus.RUNNING)
-                        .mounts(Map.of("workspace", project.getPath()))
-                        .startedAt(Instant.now())
-                        .lastActivityAt(Instant.now())
-                        .build();
+                Container container = reuseId != null
+                        ? containerRepository.findById(reuseId)
+                                .orElseGet(() -> Container.builder().project(project).build())
+                        : Container.builder().project(project).build();
+                container.setDockerContainerId(dockerContainerId);
+                container.setImageName(imageName);
+                container.setStatus(ContainerStatus.RUNNING);
+                container.setMounts(Map.of("workspace", project.getPath()));
+                container.setStartedAt(Instant.now());
+                container.setLastActivityAt(Instant.now());
+                container.setStoppedAt(null);
                 return containerRepository.save(container);
             });
             project.setContainer(saved);
