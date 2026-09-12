@@ -122,7 +122,7 @@ Fuehrt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 | Config-Schluessel | Typ | Default | Beschreibung |
 |---|---|---|---|
 | `command` | string | **erforderlich** | Shell-Befehl(e) zur Ausfuehrung |
-| `container_image` | string | null | Docker-Image (siehe Ausfuehrungsumgebung) |
+| `container_image` | string | null | Docker-Image (siehe Ausfuehrungsumgebung; Server kann per Allowlist einschraenken) |
 | `timeout_seconds` | int | 300 | Ausfuehrungs-Timeout |
 | `shell_escape_variables` | bool | false | **Alle** Template-Variablen POSIX-sicher escapen (Single-Quotes). Variablen aus Webhook-Payloads (inkl. `git_*`) werden **immer** escaped, unabhaengig von dieser Option |
 | `mount_docker_socket` | bool | false | Docker-Socket in den Container mounten (nur wirksam wenn `container_image` gesetzt) |
@@ -985,6 +985,10 @@ Fuer Shell-Bloecke die mehr Tools benoetigen, `container_image` setzen:
 - Braucht ein Befehl pip, go, docker, gh oder andere spezialisierte Tools -> `container_image` setzen
 - Container mounten das Projektverzeichnis nach `/workspace`
 - Claude CLI laeuft immer auf dem Host (nicht in Containern), um Nested-Session-Erkennung zu vermeiden
+- Der Server kann `container_image` per Allowlist einschraenken (`automation.execution.allowed-container-images` /
+  `AUTOMATION_ALLOWED_CONTAINER_IMAGES`). Leer (Default) erlaubt jedes Image. Ist ein Image nicht gelistet,
+  scheitert der Block sichtbar mit Exit-Code 125 und einem SECURITY-Eintrag im Activity-Log, statt still
+  auszufuehren.
 
 ### Beispiel: Shell-Block mit Container
 

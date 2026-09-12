@@ -347,11 +347,23 @@ These two are easily confused:
    **backend container** (`/var/run/docker.sock`). This is independent of point 1 and gives the
    application full control over Docker on the host.
 
+### Container Image Allowlist
+
+`AUTOMATION_ALLOWED_CONTAINER_IMAGES` (default empty = any image allowed, logged once as a WARNING
+at startup) restricts which `container_image` a shell block may request. The check sits centrally
+in `ContainerShellService.execute` — both callers (`ShellBlockExecutor`, `CommandExecutorService`)
+get it automatically. An image that is not listed fails with exit code 125 and a SECURITY entry in
+the activity log instead of simply starting. An entry matches by exact equality, as a
+registry/namespace prefix (ends with `/`), or, when it has no tag, against any tag of the image.
+Same pattern as `AUTOMATION_ALLOWED_MOUNT_PREFIXES`.
+
 ### What follows from this
 
 - Only run it on a network you trust; for remote access put a VPN in front instead of opening the port.
 - Set your own API key and verify it is not empty.
 - Remove the Docker socket mount from the compose file if you do not need container blocks.
+- In production, set `AUTOMATION_ALLOWED_CONTAINER_IMAGES` to the images you actually need instead
+  of staying on the empty default (= all images allowed).
 - Do not run workflows from an untrusted source unread — they run with your privileges.
 
 ## Three-Environment Setup

@@ -122,7 +122,7 @@ Executes a shell command on the host or inside a Docker container.
 | Config Key | Type | Default | Description |
 |---|---|---|---|
 | `command` | string | **required** | Shell command(s) to execute |
-| `container_image` | string | null | Docker image (see execution environment) |
+| `container_image` | string | null | Docker image (see execution environment; the server may restrict this via an allowlist) |
 | `timeout_seconds` | int | 300 | Execution timeout |
 | `shell_escape_variables` | bool | false | POSIX-safe escape of **all** template variables (single quotes). Variables from webhook payloads (incl. `git_*`) are **always** escaped, regardless of this option |
 | `mount_docker_socket` | bool | false | Mount Docker socket into the container (only effective when `container_image` is set) |
@@ -905,6 +905,9 @@ For shell blocks that need more tools, set `container_image`:
 - If a command needs pip, go, docker, gh, or other specialized tools -> set `container_image`
 - Containers mount the project directory to `/workspace`
 - Claude CLI always runs on the host (not in containers) to avoid nested session detection
+- The server can restrict `container_image` via an allowlist (`automation.execution.allowed-container-images` /
+  `AUTOMATION_ALLOWED_CONTAINER_IMAGES`). Empty (default) allows any image. If an image is not listed, the
+  block fails visibly with exit code 125 and a SECURITY entry in the activity log instead of running silently.
 
 ### Example: Shell Block with Container
 
