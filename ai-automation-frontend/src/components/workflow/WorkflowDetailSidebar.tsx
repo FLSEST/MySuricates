@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { Plus, Pencil, Zap, Clock, FileText, Bot, Trash2, StickyNote } from 'lucide-react';
 import { Card, CardHeader, Button, Input, Select } from '../ui';
+import { ModelField } from '../shared/ModelField';
 import { StatusBadge } from '../shared/StatusBadge';
 import { GateStatusBadge } from '../shared/GateStatusBadge';
 import { Pagination } from '../shared/Pagination';
 import { WorkflowMemoryPanel } from './WorkflowMemoryPanel';
 import { useUpdateWorkflow, useWorkflowRuns } from '../../hooks/useWorkflows';
-import { useAiProviders, usePiCatalog } from '../../hooks/useSystem';
+import { useAiProviders } from '../../hooks/useSystem';
 import { useT } from '../../i18n';
 import { formatDuration } from '../../utils/formatTime';
-import { modelOptionsForProvider, isFreeTextModelProvider } from '../../utils/aiProviderModels';
 import type { Workflow, WorkflowRun } from '../../types';
 
 interface WorkflowDetailSidebarProps {
@@ -34,33 +34,12 @@ export function WorkflowDetailSidebar({
   const t = useT();
   const updateWorkflow = useUpdateWorkflow();
   const { data: aiProviders } = useAiProviders();
-  const isPi = isFreeTextModelProvider(workflow.provider);
   const activeProvider = workflow.provider || aiProviders?.default || '';
   // Show the effort control unless the active provider explicitly declares no support
   // (Codex). Missing capabilities (older backend) fall back to showing it.
   const supportsEffort = aiProviders?.capabilities?.[activeProvider]?.supportsEffort !== false;
-  const { data: piCatalog } = usePiCatalog();
   const [runPage, setRunPage] = useState(0);
   const { data: runs } = useWorkflowRuns(workflow.id, runPage, RUN_PAGE_SIZE);
-
-  // For PI: filter the static preset list down to backends the user actually has
-  // configured locally (auth.json or custom models.json). Avoids offering options
-  // that would fail at runtime with "No API key found for …".
-  const piPresets = isPi
-    ? (() => {
-        const allowed = new Set<string>([
-          ...(piCatalog?.authenticatedProviders ?? []),
-          ...(piCatalog?.customProviders ?? []),
-        ]);
-        const all = modelOptionsForProvider('PI').filter((opt) => opt.value !== '');
-        return allowed.size > 0
-          ? all.filter((opt) => {
-              const backend = opt.value.split('/')[0] ?? '';
-              return allowed.has(backend);
-            })
-          : all;
-      })()
-    : [];
 
   return (
     <div className="space-y-4">
@@ -136,58 +115,12 @@ export function WorkflowDetailSidebar({
 
       <Card>
         <CardHeader title={t.workflows.model} />
-        {isPi ? (
-          <>
-            <Input
-              list="pi-model-suggestions"
-              value={workflow.model || ''}
-              onChange={(e) => {
-                updateWorkflow.mutate({ id: workflow.id, data: { model: e.target.value } });
-              }}
-              placeholder="<backend>/<model-id>  z.B. anthropic/claude-sonnet-4-6"
-            />
-            <datalist id="pi-model-suggestions">
-              {piPresets.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </datalist>
-            {piCatalog && piCatalog.installed && (
-              <div className="text-xs text-text-tertiary mt-2 space-y-1">
-                {piCatalog.authenticatedProviders.length > 0 && (
-                  <p>
-                    Authentifiziert: <span className="font-mono">{piCatalog.authenticatedProviders.join(', ')}</span>
-                  </p>
-                )}
-                {piCatalog.customProviders.length > 0 && (
-                  <p>
-                    Custom (~/.pi/agent/models.json): <span className="font-mono">{piCatalog.customProviders.join(', ')}</span>
-                  </p>
-                )}
-                {piCatalog.defaultProvider && (
-                  <p>
-                    pi-Default: <span className="font-mono">{piCatalog.defaultProvider}{piCatalog.defaultModel ? `/${piCatalog.defaultModel}` : ''}</span> (wird genutzt wenn das Feld leer bleibt)
-                  </p>
-                )}
-              </div>
-            )}
-            {piCatalog && !piCatalog.installed && (
-              <p className="text-xs text-warning mt-2">
-                pi nicht gefunden in ~/.pi/agent — bitte einmalig <code className="font-mono">pi /login</code> ausführen.
-              </p>
-            )}
-          </>
-        ) : (
-          <Select
-            value={workflow.model || ''}
-            onChange={(e) => {
-              updateWorkflow.mutate({ id: workflow.id, data: { model: e.target.value } });
-            }}
-            options={modelOptionsForProvider(workflow.provider || aiProviders?.default).map((opt) => ({
-              value: opt.value,
-              label: opt.value === '' ? t.workflows.modelDefault : opt.label,
-            }))}
-          />
-        )}
+        <ModelField
+          providerId={activeProvider || 'CLAUDE'}
+          value={workflow.model || ''}
+          onChange={(model) => updateWorkflow.mutate({ id: workflow.id, data: { model } })}
+          showPiHints={activeProvider === 'PI'}
+        />
         <p className="text-xs text-text-tertiary mt-2 flex items-center gap-1.5">
           <Bot className="w-3.5 h-3.5" />
           {t.workflows.modelHint}

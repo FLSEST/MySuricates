@@ -12,7 +12,7 @@
   "category" : "CODE",
   "sortOrder" : 56,
   "version" : "1.0.0",
-  "model" : "claude-sonnet-4-6",
+  "model" : "sonnet",
   "instructions" : "Implementiert genau EIN Feature im Ziel-Projekt. Hard rule: claim NIE Erfolg ohne grünen factory test. Tests fixen statt verstecken. Niemals Bibliotheken erfinden — wenn etwas fehlt, package.json erweitern.",
   "blocks" : [ {
     "type" : "shell",

@@ -845,9 +845,9 @@ The model is set at the workflow level (`workflow.model` field) or left as null 
 
 | Model | Use Case | Strengths | Weaknesses |
 |---|---|---|---|
-| `claude-opus-4-6` | Analysis, audits, security reviews | Precision, fewer hallucinations, deep reasoning | Slower, more expensive |
-| `claude-sonnet-4-6` | Code generation, routine tasks | Fast, good enough for most tasks | Can hallucinate findings in analyses |
-| `claude-haiku-4-5` | Simple classification, extraction | Very fast, inexpensive | Limited reasoning depth |
+| `opus` | Analysis, audits, security reviews | Precision, fewer hallucinations, deep reasoning | Slower, more expensive |
+| `sonnet` | Code generation, routine tasks | Fast, good enough for most tasks | Can hallucinate findings in analyses |
+| `haiku` | Simple classification, extraction | Very fast, inexpensive | Limited reasoning depth |
 
 ### Critical Rule
 
@@ -868,7 +868,7 @@ missing (silent failure). Therefore:
 Via API:
 ```json
 {
-  "model": "claude-opus-4-6"
+  "model": "opus"
 }
 ```
 

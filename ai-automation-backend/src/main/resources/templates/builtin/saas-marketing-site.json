@@ -12,7 +12,7 @@
   "category" : "CONTENT",
   "sortOrder" : 58,
   "version" : "1.0.0",
-  "model" : "claude-sonnet-4-6",
+  "model" : "sonnet",
   "instructions" : "Erstellt eine Marketing-Landing-Page für die generierte App. Tonalität und Zielgruppe aus der Spec übernehmen. Anti-AI-Tells beachten (kein 'unleash', 'leverage', 'seamless').",
   "blocks" : [ {
     "type" : "simple",

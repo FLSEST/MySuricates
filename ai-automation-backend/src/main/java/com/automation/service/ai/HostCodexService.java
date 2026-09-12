@@ -70,10 +70,18 @@ public class HostCodexService {
      * When readOnly is true, adds --sandbox read-only to prevent file writes (analysis mode).
      */
     public String execute(String prompt, Path workingDirectory, int timeoutSeconds, boolean readOnly) throws IOException {
+        return execute(prompt, workingDirectory, timeoutSeconds, readOnly, null);
+    }
+
+    /**
+     * Executes a one-shot codex prompt with a custom timeout, sandbox mode and model.
+     * A blank {@code model} lets codex pick its configured default (~/.codex/config.toml).
+     */
+    public String execute(String prompt, Path workingDirectory, int timeoutSeconds, boolean readOnly, String model) throws IOException {
         Path outputFile = Files.createTempFile("codex-result-", ".txt");
 
         try {
-            List<String> cmd = buildCommand(workingDirectory, outputFile, readOnly);
+            List<String> cmd = buildCommand(workingDirectory, outputFile, readOnly, model);
 
             ProcessBuilder pb = new ProcessBuilder(cmd);
             pb.redirectErrorStream(true);
@@ -149,6 +157,14 @@ public class HostCodexService {
      * When readOnly is true, adds --sandbox read-only to prevent file writes (like Claude's -p).
      */
     List<String> buildCommand(Path workingDirectory, Path outputFile, boolean readOnly) {
+        return buildCommand(workingDirectory, outputFile, readOnly, null);
+    }
+
+    /**
+     * Builds the codex command. Uses "-" as prompt placeholder to read from stdin.
+     * When readOnly is true, adds --sandbox read-only; a non-blank model adds {@code -m <model>}.
+     */
+    List<String> buildCommand(Path workingDirectory, Path outputFile, boolean readOnly, String model) {
         List<String> cmd = new ArrayList<>(List.of(
                 "codex", "exec", "-",
                 "--skip-git-repo-check",
@@ -158,6 +174,11 @@ public class HostCodexService {
         if (readOnly) {
             cmd.add("--sandbox");
             cmd.add("read-only");
+        }
+
+        if (model != null && !model.isBlank()) {
+            cmd.add("-m");
+            cmd.add(model.trim());
         }
 
         if (workingDirectory != null) {

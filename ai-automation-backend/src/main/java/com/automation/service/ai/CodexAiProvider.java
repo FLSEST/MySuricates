@@ -12,7 +12,8 @@ import java.util.List;
 /**
  * AI provider backed by the OpenAI Codex CLI on the host.
  * Adapts limitations: no system prompt (merged into user prompt),
- * no token tracking (estimated), no model selection.
+ * no token tracking (estimated), no effort flag. The model is passed via {@code -m};
+ * available slugs come from {@code CodexModelCatalogSource}.
  */
 @Component
 @RequiredArgsConstructor
@@ -29,14 +30,11 @@ public class CodexAiProvider implements AiProvider {
 
     @Override
     public AiProviderCapabilities getCapabilities() {
-        return AiProviderCapabilities.minimal();
+        return AiProviderCapabilities.codex();
     }
 
     @Override
     public ReasoningResult reason(ReasoningRequest request) throws IOException {
-        if (request.model() != null && !request.model().isBlank()) {
-            log.debug("Codex provider ignores model '{}' (supportsModelSelection=false)", request.model());
-        }
         // Merge system prompt into user prompt since Codex doesn't support --system-prompt
         // Reasoning is always read-only (analysis only, no file writes)
         String fullPrompt = mergeSystemPrompt(request.systemPrompt(), request.prompt(), true);
@@ -45,7 +43,7 @@ public class CodexAiProvider implements AiProvider {
                 ? request.timeoutSeconds()
                 : summarizationConfig.getTimeoutSeconds();
 
-        String output = hostCodexService.execute(fullPrompt, workDir, timeout, true);
+        String output = hostCodexService.execute(fullPrompt, workDir, timeout, true, request.model());
 
         return new ReasoningResult(
                 output,
@@ -70,7 +68,7 @@ public class CodexAiProvider implements AiProvider {
         }
 
         try {
-            String output = hostCodexService.execute(fullPrompt, workDir, timeout, readOnly);
+            String output = hostCodexService.execute(fullPrompt, workDir, timeout, readOnly, request.model());
             return new ActionResult(output, 0, AiResponseMetadata.estimated(fullPrompt, output));
         } catch (IOException e) {
             // Codex CLI exit code > 0 throws IOException — map to non-zero exit

@@ -41,7 +41,7 @@ describe('useAssistantChat', () => {
   it('sends a chat message', async () => {
     server.use(
       http.post('/api/v1/assistant/chat', () =>
-        HttpResponse.json({ message: 'Hello!', actions: [], model: 'claude-sonnet-4-6' })),
+        HttpResponse.json({ message: 'Hello!', actions: [], model: 'sonnet' })),
     );
     const { result } = renderHook(() => useAssistantChat(), { wrapper: createWrapper() });
     await act(async () => {

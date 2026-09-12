@@ -14,7 +14,7 @@ import java.util.List;
  * var request = HostExecutionRequest.builder()
  *     .projectPath("/workspace/project")
  *     .command("Review the code")
- *     .model("claude-opus-4-6")
+ *     .model("opus")
  *     .systemPrompt("You are a code reviewer")
  *     .timeoutSeconds(300)
  *     .build();
@@ -35,7 +35,7 @@ public record HostExecutionRequest(
         /** Step index for step result tracking. Only used with block. */
         Integer stepIndex,
 
-        /** Claude model (e.g. claude-opus-4-6). Optional. */
+        /** Model for the provider CLI: an alias such as {@code opus}/{@code sonnet} (Claude, always newest), a concrete id like {@code claude-opus-5}, {@code <backend>/<model>} for pi, or a codex slug. Optional. */
         String model,
 
         /** System prompt / instruction prefix. Optional. */

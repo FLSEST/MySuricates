@@ -154,6 +154,29 @@ export const handlers = [
   http.get(`${BASE}/system/ai-providers`, () =>
     HttpResponse.json({ providers: ['CLAUDE', 'CODEX'], default: 'CLAUDE' }),
   ),
+  http.get(`${BASE}/system/ai-providers/:id/models`, ({ params }) =>
+    HttpResponse.json({
+      providerId: String(params.id).toUpperCase(),
+      available: true,
+      source: 'static-aliases',
+      fetchedAt: '2026-09-12T10:00:00Z',
+      reason: null,
+      models: [
+        { value: 'opus', label: 'opus (latest Opus)' },
+        { value: 'sonnet', label: 'sonnet (latest Sonnet)' },
+      ],
+    }),
+  ),
+  http.post(`${BASE}/system/ai-providers/:id/models/refresh`, ({ params }) =>
+    HttpResponse.json({
+      providerId: String(params.id).toUpperCase(),
+      available: true,
+      source: 'static-aliases',
+      fetchedAt: '2026-09-12T10:05:00Z',
+      reason: null,
+      models: [{ value: 'opus', label: 'opus (latest Opus)' }],
+    }),
+  ),
   http.get(`${BASE}/system/execution-config`, () =>
     HttpResponse.json({ executionMaxConcurrent: 5, claudeMaxConcurrentCalls: 5, claudeReservedForInteractive: 1, claudeTimeoutSeconds: 300, claudeInterCallDelayMs: 0, chainWorkflowTimeoutMinutes: 30, assistantChatTimeoutSeconds: 240, activeRuns: 0 }),
   ),
@@ -164,13 +187,13 @@ export const handlers = [
     HttpResponse.json({ key: 'test', value: 'val' }),
   ),
   http.get(`${BASE}/system/settings/assistant-model`, () =>
-    HttpResponse.json({ value: 'claude-sonnet-4-6' }),
+    HttpResponse.json({ value: 'sonnet' }),
   ),
   http.get(`${BASE}/system/settings/auto-repair-mode`, () =>
     HttpResponse.json({ value: 'auto' }),
   ),
   http.get(`${BASE}/system/settings/suggestions-model`, () =>
-    HttpResponse.json({ value: 'claude-haiku-4-5' }),
+    HttpResponse.json({ value: 'haiku' }),
   ),
   http.get(`${BASE}/system/settings/assistant-thinking-phrases`, () =>
     HttpResponse.json({ value: '["Thinking..."]' }),

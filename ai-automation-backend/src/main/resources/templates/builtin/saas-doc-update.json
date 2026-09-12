@@ -12,7 +12,7 @@
   "category" : "DOCS",
   "sortOrder" : 61,
   "version" : "1.0.0",
-  "model" : "claude-haiku-4-5-20251001",
+  "model" : "haiku",
   "instructions" : "Doku-Update für eine generierte App. Knapp halten — keine Bullet-Listen mit AI-Floskeln. README beschreibt Setup, Run, Architektur. CHANGELOG hat Datum + Liste der Features in diesem Run.",
   "blocks" : [ {
     "type" : "agentic",

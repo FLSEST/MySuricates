@@ -37,6 +37,7 @@ class ExecutionSettingsServiceTest {
     @Mock private HostClaudeService hostClaudeService;
     @Mock private WorkflowExecutionRegistry executionRegistry;
     @Mock private ContainerShellService containerShellService;
+    @Mock private com.automation.service.ai.catalog.ModelCatalogService modelCatalogService;
 
     private DynamicSemaphore executionSemaphore;
     private HostClaudeConfig hostClaudeConfig;
@@ -74,7 +75,7 @@ class ExecutionSettingsServiceTest {
                 hostClaudeService, hostClaudeConfig, chainConfig,
                 rateLimitConfig, executionRegistry, containerShellService,
                 schedulerConfig, todoHygieneConfig, todoGhostWatchdogConfig, assistantGuardrailsConfig, taskCommandConfig,
-                summarizationConfig, factoryConfig, wishConfig, runRetentionConfig
+                summarizationConfig, factoryConfig, wishConfig, runRetentionConfig, modelCatalogService
         );
     }
 

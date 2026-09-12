@@ -12,7 +12,7 @@
   "category" : "CODE",
   "sortOrder" : 60,
   "version" : "1.0.0",
-  "model" : "claude-sonnet-4-6",
+  "model" : "sonnet",
   "instructions" : "Wird automatisch von TodoTrigger ausgeführt. Hard rules: max 3 Versuche pro Issue (Trigger steuert das), nie Tests deaktivieren, nie Symptome maskieren. Bei Unsicherheit Fix abbrechen — TodoTrigger eskaliert dann auf manuelle Review.",
   "blocks" : [ {
     "type" : "shell",

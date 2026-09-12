@@ -103,15 +103,18 @@ public class WishPromptHelper {
         return score;
     }
 
+    /** CLI alias — always the newest Opus; analysis work needs its precision (Sonnet hallucinates findings). */
+    static final String ANALYSIS_MODEL = "opus";
+
     public String inferModelFromBlocks(List<BlockDefinition> blocks, String description) {
         if (description != null && ANALYSIS_PATTERN.matcher(description).find()) {
-            return "claude-opus-4-6";
+            return ANALYSIS_MODEL;
         }
         for (BlockDefinition block : blocks) {
             if ("agentic".equals(block.getType()) && block.getConfig() != null) {
                 String goal = (String) block.getConfig().getOrDefault("goal", "");
                 if (ANALYSIS_PATTERN.matcher(goal).find()) {
-                    return "claude-opus-4-6";
+                    return ANALYSIS_MODEL;
                 }
             }
         }

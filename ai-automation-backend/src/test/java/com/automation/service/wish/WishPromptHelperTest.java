@@ -217,17 +217,17 @@ class WishPromptHelperTest {
         @Test
         void analysisInDescription_returnsOpus() {
             String result = helper.inferModelFromBlocks(List.of(), "Security Analysis");
-            assertThat(result).isEqualTo("claude-opus-4-6");
+            assertThat(result).isEqualTo("opus");
         }
 
         @Test
         void auditInDescription_returnsOpus() {
-            assertThat(helper.inferModelFromBlocks(List.of(), "Code Audit")).isEqualTo("claude-opus-4-6");
+            assertThat(helper.inferModelFromBlocks(List.of(), "Code Audit")).isEqualTo("opus");
         }
 
         @Test
         void reviewInDescription_returnsOpus() {
-            assertThat(helper.inferModelFromBlocks(List.of(), "Architecture Review")).isEqualTo("claude-opus-4-6");
+            assertThat(helper.inferModelFromBlocks(List.of(), "Architecture Review")).isEqualTo("opus");
         }
 
         @Test
@@ -242,7 +242,7 @@ class WishPromptHelperTest {
                     .config(Map.of("goal", "Evaluate code quality"))
                     .build();
 
-            assertThat(helper.inferModelFromBlocks(List.of(block), "Build pipeline")).isEqualTo("claude-opus-4-6");
+            assertThat(helper.inferModelFromBlocks(List.of(block), "Build pipeline")).isEqualTo("opus");
         }
 
         @Test

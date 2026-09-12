@@ -47,6 +47,25 @@ class HostCodexServiceTest {
     }
 
     @Test
+    void buildCommand_withModel_addsMFlag() {
+        Path outputFile = Path.of("/tmp/result.txt");
+
+        List<String> cmd = service.buildCommand(null, outputFile, true, " gpt-5.5 ");
+
+        assertThat(cmd).containsSequence("-m", "gpt-5.5");
+        assertThat(cmd).containsSequence("--sandbox", "read-only");
+    }
+
+    @Test
+    void buildCommand_blankOrNullModel_noMFlag() {
+        Path outputFile = Path.of("/tmp/result.txt");
+
+        assertThat(service.buildCommand(null, outputFile, false, "   ")).doesNotContain("-m");
+        assertThat(service.buildCommand(null, outputFile, false, null)).doesNotContain("-m");
+        assertThat(service.buildCommand(null, outputFile, false)).doesNotContain("-m");
+    }
+
+    @Test
     void buildCommand_stdinMode_usesDashAsPromptPlaceholder() {
         Path outputFile = Path.of("/tmp/result.txt");
         Path workDir = Path.of("/home/user/project");

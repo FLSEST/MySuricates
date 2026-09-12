@@ -220,7 +220,7 @@ public class WishDecomposePromptBuilder {
                 11. Reference existing workflows via sub-workflow blocks instead of duplicating logic — check "Reusable Components" for workflows from ALL projects, not just the current one
                 12. Workflows from other projects can be reused as sub-workflows — use their ID in the `workflow_id` config field
                 13. User-selected "Referenced Workflows" should be prioritized for reuse when they match the task
-                14. Set `model` for each workflow: Use "claude-opus-4-6" for analysis, audits, architecture reviews, security scans, and complex reasoning tasks. Use null for standard automation workflows
+                14. Set `model` for each workflow: Use "opus" (alias for the newest Opus model) for analysis, audits, architecture reviews, security scans, and complex reasoning tasks. Use null for standard automation workflows
 
                 ## Timeout Guidelines
 
@@ -240,7 +240,7 @@ public class WishDecomposePromptBuilder {
                     {
                       "name": "Workflow Name",
                       "description": "What this workflow does",
-                      "model": "claude-opus-4-6 | claude-sonnet-4-6 | null",
+                      "model": "opus | sonnet | null",
                       "blocks": [
                         {"type": "shell", "config": {"command": "npm run lint"}},
                         {"type": "agentic", "config": {"goal": "Fix all lint errors", "max_iterations": 5}}

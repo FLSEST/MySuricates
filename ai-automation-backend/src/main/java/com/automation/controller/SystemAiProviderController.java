@@ -3,11 +3,15 @@ package com.automation.controller;
 import com.automation.dto.response.SystemCapabilitiesResponse;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.ai.PiCatalogService;
+import com.automation.service.ai.catalog.ModelCatalog;
+import com.automation.service.ai.catalog.ModelCatalogService;
 import com.automation.service.assistant.context.BlockTypesIndexSection;
 import com.automation.service.system.SystemIdentityService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.method.HandlerMethod;
@@ -27,6 +31,7 @@ public class SystemAiProviderController {
 
     private final AiProviderRegistry aiProviderRegistry;
     private final PiCatalogService piCatalogService;
+    private final ModelCatalogService modelCatalogService;
     private final SystemIdentityService systemIdentity;
     private final RequestMappingHandlerMapping requestMappingHandlerMapping;
 
@@ -114,5 +119,20 @@ public class SystemAiProviderController {
     @GetMapping("/ai-providers/PI/catalog")
     public PiCatalogService.PiCatalog piCatalog() {
         return piCatalogService.getCatalog();
+    }
+
+    /**
+     * Models the provider offers on this host, discovered from the CLI / its local caches and
+     * served from a TTL cache. Never fails because of a missing CLI — see {@link ModelCatalog#available()}.
+     */
+    @GetMapping("/ai-providers/{id}/models")
+    public ModelCatalog models(@PathVariable String id) {
+        return modelCatalogService.getCatalog(id, false);
+    }
+
+    /** Bypasses the cache and probes the host now. */
+    @PostMapping("/ai-providers/{id}/models/refresh")
+    public ModelCatalog refreshModels(@PathVariable String id) {
+        return modelCatalogService.getCatalog(id, true);
     }
 }

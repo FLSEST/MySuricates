@@ -12,7 +12,7 @@
   "category" : "BUSINESS",
   "sortOrder" : 54,
   "version" : "1.0.0",
-  "model" : "claude-opus-4-6",
+  "model" : "opus",
   "instructions" : "Du bist die erste Stufe der SaaS-Factory-Pipeline. Aus einer spec.md erzeugst du einen strukturierten Build-Plan inklusive Stack-Empfehlung. Sei explizit über Annahmen, formuliere offene Fragen statt schweigend zu raten. Pflicht: respektiere constraints.must_avoid hart.",
   "defaultContext" : {
     "spec_path" : ""
