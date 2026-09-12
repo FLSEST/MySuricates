@@ -153,7 +153,11 @@ Für HTTPS auf https://localhost:3000 (selbst-signiert, z. B. für PWA-Install o
 ./scripts/generate-dev-cert.sh
 ```
 
-Erzeugt `certs/dev.{crt,key,p12}`. Vite serviert dann automatisch HTTPS; der Browser warnt einmalig
+Erzeugt `certs/dev.{crt,key,p12}`. Der PKCS12-Keystore wird mit dem Dev-Passwort `mysuricates`
+angelegt — demselben Wert, den `application.yml` als Default von `AUTOMATION_SSL_PASSWORD` fuehrt.
+Das ist ein bekannter Entwicklungs-Default fuer ein selbst-signiertes Zertifikat, kein Geheimnis.
+Wer HTTPS auch im Backend nutzt, setzt `AUTOMATION_SSL_ENABLED=true` und vergibt ueber
+`AUTOMATION_SSL_PASSWORD` einen eigenen Wert; das Skript nimmt ihn aus der Umgebung entgegen. Vite serviert dann automatisch HTTPS; der Browser warnt einmalig
 wegen des selbst-signierten Zertifikats. Ohne dieses Skript bleibt es bei HTTP — völlig ausreichend
 für die lokale Nutzung.
 

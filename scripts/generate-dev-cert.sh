@@ -11,6 +11,10 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 CERT_DIR="$PROJECT_DIR/certs"
 mkdir -p "$CERT_DIR"
 
+# Keystore-Passwort: eigener Wert per AUTOMATION_SSL_PASSWORD, sonst der Dev-Default,
+# den application.yml fuer server.ssl.key-store-password ebenfalls verwendet.
+KEYSTORE_PASSWORD="${AUTOMATION_SSL_PASSWORD:-mysuricates}"
+
 # Detect Tailscale hostname and IP
 TS_HOSTNAME="${1:-}"
 TS_IP=""
@@ -52,7 +56,7 @@ openssl pkcs12 -export \
   -inkey "$CERT_DIR/dev.key" \
   -out "$CERT_DIR/dev.p12" \
   -name mysuricates \
-  -passout pass:mysuricates \
+  -passout "pass:$KEYSTORE_PASSWORD" \
   2>/dev/null
 
 chmod 600 "$CERT_DIR/dev.key" "$CERT_DIR/dev.p12"
@@ -61,7 +65,14 @@ echo ""
 echo "Certificates generated in $CERT_DIR/"
 echo "  dev.crt  — Certificate (Vite, Browser-Import)"
 echo "  dev.key  — Private Key (Vite)"
-echo "  dev.p12  — PKCS12 Keystore (Spring Boot), password: mysuricates"
+echo "  dev.p12  — PKCS12 Keystore (Spring Boot)"
+echo ""
+if [ -n "${AUTOMATION_SSL_PASSWORD:-}" ]; then
+  echo "Keystore-Passwort: aus AUTOMATION_SSL_PASSWORD uebernommen."
+else
+  echo "Keystore-Passwort: Dev-Default aus application.yml (siehe docs/GETTING-STARTED.md,"
+  echo "Abschnitt 7). Fuer einen eigenen Wert AUTOMATION_SSL_PASSWORD setzen und neu erzeugen."
+fi
 echo ""
 if [ -n "$TS_HOSTNAME" ]; then
   echo "Tailscale: https://$TS_HOSTNAME:3000 (dev) / :9090 (backend)"
