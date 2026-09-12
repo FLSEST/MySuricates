@@ -407,6 +407,27 @@ Workflows can accumulate knowledge across runs:
 - **WorkflowTemplateSeeder:** Creates 66 built-in templates on startup (idempotent, updates on version bump)
 - Template definitions as JSON under `src/main/resources/templates/builtin/`
 
+## Dependency advisories (frontend)
+
+`npm audit` in the frontend reported twenty vulnerabilities on 2026-09-12. After the update seven
+remain, all without a fix available inside the declared version ranges.
+
+**Cleared:** the runtime chain first. `dompurify` arrived via `@monaco-editor/react` →
+`monaco-editor` and sat at 3.4.12, the upper edge of the vulnerable range (GHSA-55q2-fjhq-7xh7,
+XSS through a detached subtree). A plain update does not move it because an `overrides` entry pins
+the version — that entry is now `^3.4.13`, installed is 3.4.15. Then `npm audit fix` without
+`--force` for everything else in range.
+
+**Deliberately open:**
+
+| Package | Why it stays |
+|---|---|
+| `cypress` and its transitives (`@cypress/request`, `uuid`, `extract-zip`, `qs`) | The fix is Cypress 15, a major bump. Pure test tooling, it does not run in the shipped frontend or in CI. Separate task. |
+| `react-router-dom` / `react-router` | Open redirect via backslash in `<Link>` and `useNavigate` (up to 7.17.0). The fix is react-router-dom 7, a framework migration. **The reachable path is closed at the source instead:** the assistant renders LLM text as markdown and used to pass any `href` starting with `/` to `navigate()` — `/\evil.example` would have left the app. `isInternalAppPath()` in `src/components/assistantPanelUtils.ts` rejects protocol-relative and backslash paths, with a test. |
+
+Re-check with `npm audit`; after the cleanup `npm run build`, `npm test` and `npx tsc --noEmit`
+are green and `npm run lint` is unchanged at 0 errors.
+
 ## Known Limitations
 
 ### SQLite

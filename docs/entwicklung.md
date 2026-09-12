@@ -410,6 +410,28 @@ Workflows können Wissen über Runs hinweg akkumulieren:
 - **WorkflowTemplateSeeder:** Legt 66 Built-in-Templates beim Start an (idempotent, Update bei Version-Bump)
 - Template-Definitionen als JSON unter `src/main/resources/templates/builtin/`
 
+## Abhaengigkeits-Meldungen (Frontend)
+
+`npm audit` im Frontend meldete am 2026-09-12 zwanzig Schwachstellen. Nach dem Update sind es
+sieben, alle ohne verfuegbaren Fix innerhalb der deklarierten Versionsbereiche.
+
+**Abgetragen:** die Laufzeit-Kette zuerst. `dompurify` kam ueber
+`@monaco-editor/react` → `monaco-editor` und stand auf 3.4.12, dem oberen Rand des
+verwundbaren Bereichs (GHSA-55q2-fjhq-7xh7, XSS ueber einen abgehaengten Teilbaum). Ein blankes
+Update bewegt es nicht, weil ein `overrides`-Eintrag die Version pinnt — der Eintrag steht jetzt
+auf `^3.4.13`, installiert ist 3.4.15. Danach `npm audit fix` ohne `--force` fuer alles Weitere
+in Range.
+
+**Bewusst offen:**
+
+| Paket | Warum es bleibt |
+|---|---|
+| `cypress` und seine Transitiven (`@cypress/request`, `uuid`, `extract-zip`, `qs`) | Der Fix ist Cypress 15, ein Major-Sprung. Reines Testwerkzeug, laeuft nicht im ausgelieferten Frontend und nicht in der CI. Eigener Vorgang. |
+| `react-router-dom` / `react-router` | Open Redirect ueber Backslash in `<Link>` und `useNavigate` (bis 7.17.0). Der Fix ist react-router-dom 7, eine Framework-Migration. **Der erreichbare Pfad ist stattdessen an der Quelle geschlossen:** der Assistent rendert LLM-Text als Markdown und reichte bisher jedes `href`, das mit `/` beginnt, an `navigate()` weiter — `/\evil.example` haette die App verlassen. `isInternalAppPath()` in `src/components/assistantPanelUtils.ts` weist protokollrelative und Backslash-Pfade ab, mit Test. |
+
+Nachprüfen mit `npm audit`; nach dem Abtragen sind `npm run build`, `npm test` und
+`npx tsc --noEmit` gruen und `npm run lint` unveraendert bei 0 Fehlern.
+
 ## Bekannte Einschränkungen
 
 ### SQLite

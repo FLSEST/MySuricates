@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import { Play, Eye, Sparkles, ChevronDown, ChevronUp, RefreshCw, CheckCheck, XCircle, MessageCircle, Check, X, Loader2, ShieldAlert } from 'lucide-react';
 import { CopyButton } from '../shared/CopyButton';
 import { MeerkatIcon } from '../layout/Sidebar';
-import { formatAssistantTime, formatAssistantResponseTime } from '../assistantPanelUtils';
+import { formatAssistantTime, formatAssistantResponseTime, isInternalAppPath } from '../assistantPanelUtils';
 import { useT } from '../../i18n';
 import { apiErrorMessage } from '../../api/client';
 import type { ChatMessage, AssistantAction, PendingTool, ToolExecutionResult } from '../../hooks/useAssistant';
@@ -172,7 +172,7 @@ function MarkdownLink({ href, children, onNavigate }: {
   children?: React.ReactNode;
   onNavigate: (path: string) => void;
 }) {
-  if (href?.startsWith('/')) {
+  if (isInternalAppPath(href)) {
     return (
       <button
         onClick={() => onNavigate(href)}
