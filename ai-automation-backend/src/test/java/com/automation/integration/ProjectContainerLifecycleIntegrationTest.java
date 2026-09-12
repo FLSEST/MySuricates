@@ -142,4 +142,39 @@ class ProjectContainerLifecycleIntegrationTest {
         assertThat(projectRepository.findById(project.getId()).orElseThrow().getStatus())
                 .isEqualTo(ProjectStatus.STOPPED);
     }
+
+    /**
+     * Deleting (= archiving) a running project must not hold a transaction around the Docker
+     * stop either (TODO 0db2b2c9) — same lock-order inversion as start/stop.
+     */
+    @Test
+    void delete_stopsContainerOutsideTransaction() {
+        Project project = persistedProject(ProjectStatus.RUNNING);
+        AtomicReference<Boolean> txDuringStop = new AtomicReference<>();
+        doAnswer(inv -> {
+            txDuringStop.set(TransactionSynchronizationManager.isActualTransactionActive());
+            return null;
+        }).when(containerService).stopContainer(any());
+
+        projectService.delete(project.getId());
+
+        assertThat(txDuringStop.get()).isFalse();
+        assertThat(projectRepository.findById(project.getId()).orElseThrow().getArchivedAt()).isNotNull();
+    }
+
+    /**
+     * Archive first, Docker afterwards: a failing Docker stop must not roll the archive back.
+     * A stale container is reaped by DockerOrphanReconciler / idle cleanup, whereas a project
+     * the user already deleted reappearing un-archived would be the worse outcome.
+     */
+    @Test
+    void delete_dockerStopFails_projectStaysArchived() {
+        Project project = persistedProject(ProjectStatus.RUNNING);
+        doThrow(new IllegalStateException("Docker not available"))
+                .when(containerService).stopContainer(any());
+
+        projectService.delete(project.getId());
+
+        assertThat(projectRepository.findById(project.getId()).orElseThrow().getArchivedAt()).isNotNull();
+    }
 }
