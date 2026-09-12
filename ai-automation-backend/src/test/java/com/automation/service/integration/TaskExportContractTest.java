@@ -1,6 +1,7 @@
 package com.automation.service.integration;
 
 import com.automation.repository.AppSettingsRepository;
+import com.automation.service.integration.providers.github.GitHubHttpClient;
 import com.automation.service.integration.providers.github.GitHubProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -27,7 +28,7 @@ class TaskExportContractTest {
         AppSettingsRepository appSettings = mock(AppSettingsRepository.class);
         when(appSettings.get(anyString())).thenReturn(Optional.empty());
         return List.of(
-                new GitHubProvider(new ObjectMapper(), appSettings)
+                new GitHubProvider(new ObjectMapper(), appSettings, mock(GitHubHttpClient.class))
                 // + new JiraProvider(...), new TrelloProvider(...) once they implement TaskExportCapable
         );
     }
