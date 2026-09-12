@@ -123,7 +123,8 @@ Hinweise:
   `cloudId`-Cache pro Access-Token bleibt im Provider.
 - **Trello** nutzt keinen Token-Tausch. Client-ID = API-Key, Client-Secret = Token; beide
   werden als `apiKey|token` kombiniert gespeichert und in jeden Request als Query-Parameter
-  (`key=…&token=…`) gehängt.
+  (`key=…&token=…`) gehängt. Intern aufgeteilt: HTTP über `TrelloHttpClient`, Parameter-Parsing
+  in `TrelloParams`, Action-Katalog in `TrelloActionCatalog`.
 - **GitHub (PAT)** braucht keinen OAuth-Flow: der Token wird beim Speichern per `GET /user`
   validiert und seine Scopes aus dem Antwort-Header `X-OAuth-Scopes` an der Verbindung
   gespeichert (`fetchGrantedScopes`, klassische Tokens). Fine-grained PATs liefern keinen

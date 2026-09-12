@@ -124,7 +124,8 @@ Notes:
   `cloudId` cache stays on the provider.
 - **Trello** does not use a token exchange. Client ID = API key, client secret = token; both
   are stored combined as `apiKey|token` and appended to every request as query parameters
-  (`key=…&token=…`).
+  (`key=…&token=…`). Split internally: HTTP via `TrelloHttpClient`, parameter parsing in
+  `TrelloParams`, action catalog in `TrelloActionCatalog`.
 - **GitHub (PAT)** needs no OAuth flow: the token is validated via `GET /user` when saved and
   its scopes are taken from the `X-OAuth-Scopes` response header and stored on the connection
   (`fetchGrantedScopes`, classic tokens). Fine-grained PATs send no scope header — the

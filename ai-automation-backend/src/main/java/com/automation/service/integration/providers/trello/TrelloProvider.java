@@ -8,15 +8,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.net.URI;
-import java.net.URLEncoder;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+
+import static com.automation.service.integration.providers.trello.TrelloParams.*;
 
 @Component
 @RequiredArgsConstructor
@@ -26,10 +22,7 @@ public class TrelloProvider implements IntegrationProvider {
     private static final String BASE_URL = "https://api.trello.com/1";
 
     private final ObjectMapper objectMapper;
-
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .build();
+    private final TrelloHttpClient http;
 
     @Override
     public String getProviderId() {
@@ -73,13 +66,7 @@ public class TrelloProvider implements IntegrationProvider {
             String authParams = buildAuthParams(combinedToken);
             String url = BASE_URL + "/members/me?" + authParams;
 
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .GET()
-                    .timeout(Duration.ofSeconds(15))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = http.getRaw(url);
             if (response.statusCode() == 401) {
                 throw new IllegalStateException("Trello authentication failed — check API key and token");
             }
@@ -100,98 +87,7 @@ public class TrelloProvider implements IntegrationProvider {
 
     @Override
     public List<IntegrationAction> getAvailableActions() {
-        return List.of(
-                new IntegrationAction("list_boards", "Alle Boards des Benutzers abrufen",
-                        Map.of(
-                                "type", "object",
-                                "properties", Map.of(
-                                        "filter", Map.of("type", "string", "default", "open", "description", "Filter: open, closed, all")
-                                )
-                        )),
-                new IntegrationAction("get_board_lists", "Listen eines Boards abrufen",
-                        Map.of(
-                                "type", "object",
-                                "properties", Map.of(
-                                        "boardId", Map.of("type", "string", "description", "Board-ID"),
-                                        "filter", Map.of("type", "string", "default", "open", "description", "Filter: open, closed, all")
-                                ),
-                                "required", List.of("boardId")
-                        )),
-                new IntegrationAction("get_list_cards", "Karten einer Liste abrufen",
-                        Map.of(
-                                "type", "object",
-                                "properties", Map.of(
-                                        "listId", Map.of("type", "string", "description", "Listen-ID")
-                                ),
-                                "required", List.of("listId")
-                        )),
-                new IntegrationAction("get_card", "Eine einzelne Karte abrufen",
-                        Map.of(
-                                "type", "object",
-                                "properties", Map.of(
-                                        "cardId", Map.of("type", "string", "description", "Karten-ID")
-                                ),
-                                "required", List.of("cardId")
-                        )),
-                new IntegrationAction("create_card", "Eine neue Karte erstellen",
-                        Map.of(
-                                "type", "object",
-                                "properties", Map.of(
-                                        "idList", Map.of("type", "string", "description", "Ziel-Listen-ID"),
-                                        "name", Map.of("type", "string", "description", "Titel der Karte"),
-                                        "desc", Map.of("type", "string", "description", "Beschreibung"),
-                                        "due", Map.of("type", "string", "description", "Fälligkeitsdatum (ISO 8601)"),
-                                        "idMembers", Map.of("type", "string", "description", "Mitglieder-IDs (kommagetrennt)"),
-                                        "idLabels", Map.of("type", "string", "description", "Label-IDs (kommagetrennt)"),
-                                        "pos", Map.of("type", "string", "default", "bottom", "description", "Position: top, bottom oder Zahl")
-                                ),
-                                "required", List.of("idList", "name")
-                        )),
-                new IntegrationAction("update_card", "Eine Karte aktualisieren oder verschieben",
-                        Map.of(
-                                "type", "object",
-                                "properties", Map.of(
-                                        "cardId", Map.of("type", "string", "description", "Karten-ID"),
-                                        "name", Map.of("type", "string", "description", "Neuer Titel"),
-                                        "desc", Map.of("type", "string", "description", "Neue Beschreibung"),
-                                        "due", Map.of("type", "string", "description", "Fälligkeitsdatum (ISO 8601)"),
-                                        "dueComplete", Map.of("type", "boolean", "description", "Fälligkeit erledigt"),
-                                        "idList", Map.of("type", "string", "description", "Ziel-Listen-ID (verschiebt die Karte)"),
-                                        "idBoard", Map.of("type", "string", "description", "Ziel-Board-ID (verschiebt die Karte)"),
-                                        "closed", Map.of("type", "boolean", "description", "Karte archivieren"),
-                                        "pos", Map.of("type", "string", "description", "Position: top, bottom oder Zahl")
-                                ),
-                                "required", List.of("cardId")
-                        )),
-                new IntegrationAction("delete_card", "Eine Karte dauerhaft löschen",
-                        Map.of(
-                                "type", "object",
-                                "properties", Map.of(
-                                        "cardId", Map.of("type", "string", "description", "Karten-ID")
-                                ),
-                                "required", List.of("cardId")
-                        )),
-                new IntegrationAction("add_comment", "Einen Kommentar zu einer Karte hinzufügen",
-                        Map.of(
-                                "type", "object",
-                                "properties", Map.of(
-                                        "cardId", Map.of("type", "string", "description", "Karten-ID"),
-                                        "text", Map.of("type", "string", "description", "Kommentartext")
-                                ),
-                                "required", List.of("cardId", "text")
-                        )),
-                new IntegrationAction("search", "Boards und Karten durchsuchen",
-                        Map.of(
-                                "type", "object",
-                                "properties", Map.of(
-                                        "query", Map.of("type", "string", "description", "Suchbegriff"),
-                                        "modelTypes", Map.of("type", "string", "default", "cards,boards", "description", "Typen: cards, boards (kommagetrennt)"),
-                                        "cards_limit", Map.of("type", "integer", "default", 10, "description", "Max. Karten"),
-                                        "boards_limit", Map.of("type", "integer", "default", 5, "description", "Max. Boards")
-                                ),
-                                "required", List.of("query")
-                        ))
-        );
+        return TrelloActionCatalog.actions();
     }
 
     @Override
@@ -213,26 +109,26 @@ public class TrelloProvider implements IntegrationProvider {
     private Object listBoards(Map<String, Object> params, String accessToken) {
         String filter = paramString(params, "filter", "open");
         String url = BASE_URL + "/members/me/boards?" + buildAuthParams(accessToken) + "&filter=" + urlEncode(filter);
-        return httpGet(url, TrelloBoard[].class);
+        return http.get(url, TrelloBoard[].class);
     }
 
     private Object getBoardLists(Map<String, Object> params, String accessToken) {
         String boardId = requireParam(params, "boardId");
         String filter = paramString(params, "filter", "open");
         String url = BASE_URL + "/boards/" + urlEncode(boardId) + "/lists?" + buildAuthParams(accessToken) + "&filter=" + urlEncode(filter);
-        return httpGet(url, TrelloList[].class);
+        return http.get(url, TrelloList[].class);
     }
 
     private Object getListCards(Map<String, Object> params, String accessToken) {
         String listId = requireParam(params, "listId");
         String url = BASE_URL + "/lists/" + urlEncode(listId) + "/cards?" + buildAuthParams(accessToken);
-        return httpGet(url, TrelloCard[].class);
+        return http.get(url, TrelloCard[].class);
     }
 
     private Object getCard(Map<String, Object> params, String accessToken) {
         String cardId = requireParam(params, "cardId");
         String url = BASE_URL + "/cards/" + urlEncode(cardId) + "?" + buildAuthParams(accessToken);
-        return httpGet(url, TrelloCard.class);
+        return http.get(url, TrelloCard.class);
     }
 
     private Object createCard(Map<String, Object> params, String accessToken) {
@@ -248,7 +144,7 @@ public class TrelloProvider implements IntegrationProvider {
         if (params.containsKey("idLabels")) url.append("&idLabels=").append(urlEncode(paramString(params, "idLabels", "")));
         url.append("&pos=").append(urlEncode(paramString(params, "pos", "bottom")));
 
-        return httpPost(url.toString(), TrelloCard.class);
+        return http.post(url.toString(), TrelloCard.class);
     }
 
     private Object updateCard(Map<String, Object> params, String accessToken) {
@@ -263,13 +159,13 @@ public class TrelloProvider implements IntegrationProvider {
         if (params.containsKey("dueComplete")) url.append("&dueComplete=").append(params.get("dueComplete"));
         if (params.containsKey("closed")) url.append("&closed=").append(params.get("closed"));
 
-        return httpPut(url.toString(), TrelloCard.class);
+        return http.put(url.toString(), TrelloCard.class);
     }
 
     private Object deleteCard(Map<String, Object> params, String accessToken) {
         String cardId = requireParam(params, "cardId");
         String url = BASE_URL + "/cards/" + urlEncode(cardId) + "?" + buildAuthParams(accessToken);
-        httpDelete(url);
+        http.delete(url);
         return Map.of("deleted", true, "cardId", cardId);
     }
 
@@ -277,7 +173,7 @@ public class TrelloProvider implements IntegrationProvider {
         String cardId = requireParam(params, "cardId");
         String text = requireParam(params, "text");
         String url = BASE_URL + "/cards/" + urlEncode(cardId) + "/actions/comments?" + buildAuthParams(accessToken) + "&text=" + urlEncode(text);
-        return httpPost(url, TrelloComment.class);
+        return http.post(url, TrelloComment.class);
     }
 
     private Object search(Map<String, Object> params, String accessToken) {
@@ -292,7 +188,7 @@ public class TrelloProvider implements IntegrationProvider {
                 + "&cards_limit=" + cardsLimit
                 + "&boards_limit=" + boardsLimit;
 
-        return httpGet(url, TrelloSearchResult.class);
+        return http.get(url, TrelloSearchResult.class);
     }
 
     // --- Auth helper ---
@@ -303,110 +199,5 @@ public class TrelloProvider implements IntegrationProvider {
             throw new IllegalStateException("Invalid Trello credentials. Expected 'apiKey|token' format.");
         }
         return "key=" + urlEncode(parts[0]) + "&token=" + urlEncode(parts[1]);
-    }
-
-    // --- HTTP helpers (no Authorization header — auth via query params) ---
-
-    private <T> T httpGet(String url, Class<T> responseType) {
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .GET()
-                    .timeout(Duration.ofSeconds(15))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            checkResponse(response);
-            return objectMapper.readValue(response.body(), responseType);
-        } catch (IllegalStateException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new IllegalStateException("Trello API request failed: " + e.getMessage(), e);
-        }
-    }
-
-    private <T> T httpPost(String url, Class<T> responseType) {
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .POST(HttpRequest.BodyPublishers.noBody())
-                    .timeout(Duration.ofSeconds(15))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            checkResponse(response);
-            return objectMapper.readValue(response.body(), responseType);
-        } catch (IllegalStateException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new IllegalStateException("Trello API request failed: " + e.getMessage(), e);
-        }
-    }
-
-    private <T> T httpPut(String url, Class<T> responseType) {
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .PUT(HttpRequest.BodyPublishers.noBody())
-                    .timeout(Duration.ofSeconds(15))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            checkResponse(response);
-            return objectMapper.readValue(response.body(), responseType);
-        } catch (IllegalStateException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new IllegalStateException("Trello API request failed: " + e.getMessage(), e);
-        }
-    }
-
-    private void httpDelete(String url) {
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .DELETE()
-                    .timeout(Duration.ofSeconds(15))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 204 && response.statusCode() != 200) {
-                checkResponse(response);
-            }
-        } catch (IllegalStateException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new IllegalStateException("Trello API request failed: " + e.getMessage(), e);
-        }
-    }
-
-    private void checkResponse(HttpResponse<String> response) {
-        if (response.statusCode() >= 400) {
-            throw new IllegalStateException("Trello API error " + response.statusCode() + ": " + response.body());
-        }
-    }
-
-    // --- Parameter helpers ---
-
-    private static String paramString(Map<String, Object> params, String key, String defaultValue) {
-        Object val = params.get(key);
-        return val != null ? val.toString() : defaultValue;
-    }
-
-    private static int paramInt(Map<String, Object> params, String key, int defaultValue) {
-        Object val = params.get(key);
-        if (val instanceof Number n) return n.intValue();
-        if (val instanceof String s) return Integer.parseInt(s);
-        return defaultValue;
-    }
-
-    private static String requireParam(Map<String, Object> params, String key) {
-        Object val = params.get(key);
-        if (val == null) throw new IllegalArgumentException("Required parameter missing: " + key);
-        return val.toString();
-    }
-
-    private static String urlEncode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 }
