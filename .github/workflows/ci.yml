@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run public-hygiene gate
-        run: bash scripts/ci/public-hygiene.sh
+        run: bash scripts/ci/public-hygiene.sh --tracked
 
   gitleaks:
     name: Gitleaks Secret Scan

@@ -1,42 +1,46 @@
 {
-  "id" : "pool-neutrality-audit",
-  "icon" : "🧪",
-  "name" : {
-    "en" : "Pool Neutrality Audit",
-    "de" : "Pool-Neutralitäts-Audit"
+  "id": "pool-neutrality-audit",
+  "icon": "🧪",
+  "name": {
+    "en": "Pool Neutrality Audit",
+    "de": "Pool-Neutralitäts-Audit"
   },
-  "description" : {
-    "en" : "Scan the workflow pool for system bindings (hard-coded paths, hosts, UUIDs, tool assumptions) and produce a Markdown report with fix suggestions",
-    "de" : "Prüft alle Workflows im Workflow-Pool auf System-Bindung (harte Pfade, Hosts, UUIDs, Tool-Annahmen) und erzeugt einen Markdown-Report mit Fix-Vorschlägen"
+  "description": {
+    "en": "Scan the workflow pool for system bindings (hard-coded paths, hosts, UUIDs, tool assumptions) and produce a Markdown report with fix suggestions The deterministic pattern catalogue lives in scripts/ci/pool-neutrality.sh and is shared with the hygiene gate.",
+    "de": "Prüft alle Workflows im Workflow-Pool auf System-Bindung (harte Pfade, Hosts, UUIDs, Tool-Annahmen) und erzeugt einen Markdown-Report mit Fix-Vorschlägen Der deterministische Musterkatalog liegt in scripts/ci/pool-neutrality.sh und wird mit dem Hygiene-Gate geteilt."
   },
-  "category" : "QUALITY",
-  "sortOrder" : 53,
-  "version" : "1.0.0",
-  "model" : "claude-opus-4-6",
-  "instructions" : "Du bist ein Qualitäts-Auditor für Workflow-Definitionen. Sei präzise, konservativ und belegfokussiert. Keine Halluzinationen, nur belegte Bindungen. Nutze nur Read-Tool und nur im Pool-Verzeichnis.",
-  "blocks" : [ {
-    "type" : "shell",
-    "config" : {
-      "label" : "Static Lint: Regex-Scan über Pool-JSONs",
-      "timeout_seconds" : 120,
-      "command" : "set -euo pipefail\ncd \"{{ project_path }}\"\nPOOL_DIR=\"workflow-pool\"\n\nif [ ! -d \"$POOL_DIR\" ]; then\n  echo \"FEHLER: Pool-Verzeichnis $POOL_DIR nicht gefunden. Dieser Workflow ist für das MySuricates-Repo gedacht.\"\n  exit 1\nfi\n\necho \"# Static Lint Report — Workflow Pool Neutrality\"\necho \"\"\necho \"Pool directory: \\`$POOL_DIR\\`\"\ntotal=$(ls \"$POOL_DIR\"/*.json 2>/dev/null | wc -l)\necho \"Total workflows: $total\"\necho \"\"\n\nbound=0\nneutral=0\nBOUND_LIST=\"\"\n\nfor f in \"$POOL_DIR\"/*.json; do\n  name=$(basename \"$f\")\n  findings=\"\"\n\n  m=$(grep -nE \"/home/[a-zA-Z_-]+/|/Users/[a-zA-Z_-]+/|/opt/[a-zA-Z]+|/var/(log|lib|opt)\" \"$f\" || true)\n  if [ -n \"$m\" ]; then findings+=\"  [PATH-ABS] hard-coded absolute path:\"$'\\n'\"$(echo \"$m\" | sed 's/^/    /')\"$'\\n'; fi\n\n  m=$(grep -nE '[A-Z]:\\\\\\\\[a-zA-Z]' \"$f\" || true)\n  if [ -n \"$m\" ]; then findings+=\"  [PATH-WIN] Windows path:\"$'\\n'\"$(echo \"$m\" | sed 's/^/    /')\"$'\\n'; fi\n\n  m=$(grep -nE '~/[a-zA-Z]' \"$f\" || true)\n  if [ -n \"$m\" ]; then findings+=\"  [PATH-HOME] tilde-home path:\"$'\\n'\"$(echo \"$m\" | sed 's/^/    /')\"$'\\n'; fi\n\n  m=$(grep -nE '(192\\.168\\.|10\\.[0-9]+\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.)' \"$f\" || true)\n  if [ -n \"$m\" ]; then findings+=\"  [HOST-LAN] private LAN IP:\"$'\\n'\"$(echo \"$m\" | sed 's/^/    /')\"$'\\n'; fi\n\n  m=$(grep -nE '/flo/|\"flo\"|: flo|flo@' \"$f\" || true)\n  if [ -n \"$m\" ]; then findings+=\"  [USER] explicit username:\"$'\\n'\"$(echo \"$m\" | sed 's/^/    /')\"$'\\n'; fi\n\n  m=$(grep -nE '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}' \"$f\" || true)\n  if [ -n \"$m\" ]; then findings+=\"  [EMAIL] email address:\"$'\\n'\"$(echo \"$m\" | sed 's/^/    /')\"$'\\n'; fi\n\n  m=$(grep -nE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' \"$f\" || true)\n  if [ -n \"$m\" ]; then findings+=\"  [UUID] raw UUID:\"$'\\n'\"$(echo \"$m\" | sed 's/^/    /')\"$'\\n'; fi\n\n  m=$(grep -nE '/usr/local/bin/[a-zA-Z]|/usr/bin/[a-zA-Z]' \"$f\" || true)\n  if [ -n \"$m\" ]; then findings+=\"  [BINARY] absolute binary path:\"$'\\n'\"$(echo \"$m\" | sed 's/^/    /')\"$'\\n'; fi\n\n  if [ -n \"$findings\" ]; then\n    bound=$((bound+1))\n    BOUND_LIST+=\"$name \"\n    echo \"## ❌ $name\"\n    printf \"%b\" \"$findings\"\n    echo \"\"\n  else\n    neutral=$((neutral+1))\n  fi\ndone\n\necho \"---\"\necho \"\"\necho \"## Static Lint Summary\"\necho \"- With findings: **$bound**\"\necho \"- Clean: **$neutral**\"\necho \"\"\necho \"## Files with static findings\"\necho \"$BOUND_LIST\" | tr \" \" \"\\n\" | grep -v \"^$\" | sed \"s/^/- /\"\necho \"\"\necho \"## All pool files (for semantic pass)\"\nls -1 \"$POOL_DIR\"/*.json | xargs -n1 basename | sed \"s/^/- /\"\n"
+  "category": "QUALITY",
+  "sortOrder": 53,
+  "version": "1.1.0",
+  "model": "claude-opus-4-6",
+  "instructions": "Du bist ein Qualitäts-Auditor für Workflow-Definitionen. Sei präzise, konservativ und belegfokussiert. Keine Halluzinationen, nur belegte Bindungen. Nutze nur Read-Tool und nur im Pool-Verzeichnis.",
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "label": "Static Lint: Regex-Scan über Pool-JSONs",
+        "timeout_seconds": 120,
+        "command": "set -uo pipefail\ncd \"{{ project_path }}\"\nPOOL_DIR=\"workflow-pool\"\nSCANNER=\"scripts/ci/pool-neutrality.sh\"\n\nif [ ! -d \"$POOL_DIR\" ]; then\n  echo \"FEHLER: Pool-Verzeichnis $POOL_DIR nicht gefunden. Dieser Workflow ist fuer das MySuricates-Repo gedacht.\"\n  exit 1\nfi\nif [ ! -f \"$SCANNER\" ]; then\n  echo \"FEHLER: $SCANNER fehlt. Der Musterkatalog liegt seit Template-Version 1.1.0 dort und\"\n  echo \"wird von Gate und Audit gemeinsam genutzt, statt hier ein zweites Mal zu stehen.\"\n  exit 1\nfi\n\necho \"# Static Lint Report — Workflow Pool Neutrality\"\necho \"\"\necho \"Pool directory: \\`$POOL_DIR\\`\"\necho \"Scanner: \\`$SCANNER\\` (gemeinsame Quelle mit dem Hygiene-Gate)\"\necho \"\"\n\n# --all: auch ignorierte Definitionen, denn hier wird der Pool einer laufenden\n# Instanz geprueft, nicht nur der getrackte Release-Bestand.\nOUT=\"$(bash \"$SCANNER\" --all \"$POOL_DIR\" 2>&1)\"\nRC=$?\n\necho \"## Deterministische Befunde\"\necho \"\"\nif [ \"$RC\" -eq 0 ]; then\n  echo \"$OUT\"\nelse\n  echo \"| Datei | Kategorie | Befund |\"\n  echo \"|---|---|---|\"\n  printf '%s\\n' \"$OUT\" | awk -F'\\t' 'NF==3 {printf \"| `%s` | %s | %s |\\n\", $1, $2, $3}'\n  echo \"\"\n  printf '%s\\n' \"$OUT\" | grep -E '^Pool-Neutralitaet' || true\nfi\necho \"\"\n"
+      },
+      "requiredCapabilities": []
     },
-    "requiredCapabilities" : [ ]
-  }, {
-    "type" : "simple",
-    "config" : {
-      "label" : "Semantische Analyse (Opus)",
-      "timeout_seconds" : 600,
-      "command" : "Du prüfst Workflow-Pool-Dateien auf subtile System-Bindungen, die ein Regex-Linter nicht fängt.\n\nPool-Verzeichnis: `{{ project_path }}/workflow-pool/`\n\nStatic-Lint-Output aus dem vorherigen Schritt:\n---\n{{ previous_output }}\n---\n\nDeine Aufgabe: Lies jede `*.json`-Datei im Pool-Verzeichnis (nutze dein Read-Tool) und prüfe auf **subtile** Bindungen, die der Regex-Scan nicht findet:\n\n1. **Tool-Annahmen**: `flutter`, `mvn`, `npm`, `gradle`, `docker`, `git`, spezifische CLIs ohne Verfügbarkeitscheck oder Variablen-Parameter\n2. **Projekt-Struktur-Annahmen**: Datei erwartet implizit `pom.xml`, `package.json`, `.git`, bestimmte Ordner-Layouts\n3. **Sprach-Defaults**: Hart codierte Sprache in Prompts, obwohl der Workflow sprach-neutral sein sollte\n4. **Workflow-/Skill-Referenzen by Name**: Verweist auf andere Workflows/Skills per Literal-Name statt Variable\n5. **Integration-Abhängigkeiten**: Erwartet Gmail/Slack/Jira ohne das im Workflow zu dokumentieren oder als Capability zu deklarieren\n6. **Kontext-Variablen-Lücken**: User-/Projekt-spezifische Daten eingebettet, die eigentlich Variablen sein müssten\n\n**Format pro Datei mit Findings:**\n\n## <filename>.json\n- [KATEGORIE] <kurze Beschreibung> (severity: high|medium|low) — Zeile/Snippet: `<code>`\n- ...\n\n**Dateien ohne semantische Bindungen**: Liste sie am Ende unter `## Semantisch sauber` (nur Dateinamen, eine pro Zeile).\n\nWichtig:\n- Sei konservativ: Nur klare Bindungen listen, keine spekulativen Vorwürfe\n- Nutze ausschließlich dein Read-Tool auf Pfaden unter `{{ project_path }}/workflow-pool/`\n- Keine Web-Zugriffe, keine DB-Zugriffe\n"
+    {
+      "type": "simple",
+      "config": {
+        "label": "Semantische Analyse (Opus)",
+        "timeout_seconds": 600,
+        "command": "Du prüfst Workflow-Pool-Dateien auf subtile System-Bindungen, die ein Regex-Linter nicht fängt.\n\nPool-Verzeichnis: `{{ project_path }}/workflow-pool/`\n\nStatic-Lint-Output aus dem vorherigen Schritt:\n---\n{{ previous_output }}\n---\n\nDeine Aufgabe: Lies jede `*.json`-Datei im Pool-Verzeichnis (nutze dein Read-Tool) und prüfe auf **subtile** Bindungen, die der Regex-Scan nicht findet:\n\n1. **Tool-Annahmen**: `flutter`, `mvn`, `npm`, `gradle`, `docker`, `git`, spezifische CLIs ohne Verfügbarkeitscheck oder Variablen-Parameter\n2. **Projekt-Struktur-Annahmen**: Datei erwartet implizit `pom.xml`, `package.json`, `.git`, bestimmte Ordner-Layouts\n3. **Sprach-Defaults**: Hart codierte Sprache in Prompts, obwohl der Workflow sprach-neutral sein sollte\n4. **Workflow-/Skill-Referenzen by Name**: Verweist auf andere Workflows/Skills per Literal-Name statt Variable\n5. **Integration-Abhängigkeiten**: Erwartet Gmail/Slack/Jira ohne das im Workflow zu dokumentieren oder als Capability zu deklarieren\n6. **Kontext-Variablen-Lücken**: User-/Projekt-spezifische Daten eingebettet, die eigentlich Variablen sein müssten\n\n**Format pro Datei mit Findings:**\n\n## <filename>.json\n- [KATEGORIE] <kurze Beschreibung> (severity: high|medium|low) — Zeile/Snippet: `<code>`\n- ...\n\n**Dateien ohne semantische Bindungen**: Liste sie am Ende unter `## Semantisch sauber` (nur Dateinamen, eine pro Zeile).\n\nWichtig:\n- Sei konservativ: Nur klare Bindungen listen, keine spekulativen Vorwürfe\n- Nutze ausschließlich dein Read-Tool auf Pfaden unter `{{ project_path }}/workflow-pool/`\n- Keine Web-Zugriffe, keine DB-Zugriffe\n"
+      },
+      "requiredCapabilities": []
     },
-    "requiredCapabilities" : [ ]
-  }, {
-    "type" : "simple",
-    "config" : {
-      "label" : "Gesamt-Report (Opus)",
-      "timeout_seconds" : 600,
-      "command" : "Du erstellst den finalen Neutralitäts-Report für den Workflow-Pool.\n\n**Static-Lint (Schritt 1)** ist Teil des Kontexts. **Semantische Analyse (Schritt 2)** ist:\n---\n{{ previous_output }}\n---\n\nErstelle einen Markdown-Report in genau dieser Struktur:\n\n# Workflow-Pool Neutrality Report\n\n## Zusammenfassung\n- Geprüfte Workflows: <N>\n- ✅ Neutral: <N>\n- ⚠️ Grenzfälle: <N>\n- ❌ Gebunden: <N>\n\n## Ergebnisse pro Workflow\n\nSortiere nach Severity (gebunden → borderline → neutral). Pro Workflow:\n\n### <status-emoji> <filename>.json\n- **Status**: neutral / borderline / bound\n- **Findings**:\n  - <Kategorie>: <Beschreibung>\n- **Fix-Vorschlag**: <konkreter Umbau>\n\nNeutrale Workflows nur als Liste am Ende:\n\n## Neutrale Workflows\n- <filename>\n- ...\n\n**Regeln:**\n- Merge Static + Semantic für jede Datei\n- Status-Logik: `bound` = mindestens eine high-severity finding; `borderline` = nur medium/low oder nur semantische Hinweise; `neutral` = keine Findings\n- Kein Filler-Text, keine Einleitung, kein Schlusswort — nur der Report\n- Fix-Vorschlag muss spezifisch sein, nicht generisch\n"
-    },
-    "requiredCapabilities" : [ ]
-  } ]
+    {
+      "type": "simple",
+      "config": {
+        "label": "Gesamt-Report (Opus)",
+        "timeout_seconds": 600,
+        "command": "Du erstellst den finalen Neutralitäts-Report für den Workflow-Pool.\n\n**Static-Lint (Schritt 1)** ist Teil des Kontexts. **Semantische Analyse (Schritt 2)** ist:\n---\n{{ previous_output }}\n---\n\nErstelle einen Markdown-Report in genau dieser Struktur:\n\n# Workflow-Pool Neutrality Report\n\n## Zusammenfassung\n- Geprüfte Workflows: <N>\n- ✅ Neutral: <N>\n- ⚠️ Grenzfälle: <N>\n- ❌ Gebunden: <N>\n\n## Ergebnisse pro Workflow\n\nSortiere nach Severity (gebunden → borderline → neutral). Pro Workflow:\n\n### <status-emoji> <filename>.json\n- **Status**: neutral / borderline / bound\n- **Findings**:\n  - <Kategorie>: <Beschreibung>\n- **Fix-Vorschlag**: <konkreter Umbau>\n\nNeutrale Workflows nur als Liste am Ende:\n\n## Neutrale Workflows\n- <filename>\n- ...\n\n**Regeln:**\n- Merge Static + Semantic für jede Datei\n- Status-Logik: `bound` = mindestens eine high-severity finding; `borderline` = nur medium/low oder nur semantische Hinweise; `neutral` = keine Findings\n- Kein Filler-Text, keine Einleitung, kein Schlusswort — nur der Report\n- Fix-Vorschlag muss spezifisch sein, nicht generisch\n"
+      },
+      "requiredCapabilities": []
+    }
+  ]
 }

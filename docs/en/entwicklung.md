@@ -407,6 +407,41 @@ Workflows can accumulate knowledge across runs:
 - **WorkflowTemplateSeeder:** Creates 66 built-in templates on startup (idempotent, updates on version bump)
 - Template definitions as JSON under `src/main/resources/templates/builtin/`
 
+## Hygiene gate
+
+`scripts/ci/public-hygiene.sh` checks what would end up in a public repository. The rules —
+forbidden literals, backup-file patterns, allowlist path, thresholds — live in
+`scripts/lib/hygiene-rules.sh` and are read by both CI and the pre-commit hook.
+
+| Mode | Who | Checks | Behaviour |
+|---|---|---|---|
+| `--tracked` (default) | CI | tracked files | error |
+| `--worktree` | local | additionally files that are neither tracked nor ignored | warning |
+| `--staged` | pre-commit hook | staged changes only | error |
+
+What is checked:
+
+1. **Tracked but ignored.** Formerly a hand-maintained list of ten directory names, now
+   `git ls-files --cached --ignored --exclude-standard`, which covers every future ignore rule
+   automatically. Deliberate exceptions live with a reason in `scripts/ci/hygiene-allowlist.txt` —
+   paths only, never pattern literals, so the allowlist itself gives nothing away.
+2. **Forbidden literals** in tracked files, or in added lines for the staged mode.
+3. **Pool neutrality** via `scripts/ci/pool-neutrality.sh`. The built-in template
+   `pool-neutrality-audit` runs the same script (with `--all`, because it audits the pool of a
+   running instance rather than the tracked release set).
+4. **Repository weight**: two tracked paths with an identical blob checksum from 256 KiB up are an
+   error; a single tracked file above 5 MiB is a warning.
+5. **Stray backup files** (`--worktree` only): neither tracked nor ignored. The same find is an
+   error once it is staged.
+
+`scripts/install-hooks.sh` installs the hook via `core.hooksPath` (and runs as part of `setup.sh`).
+
+### When the gate fires
+
+Do not reach for the bypass. `git commit --no-verify` exists, but a hit is almost always real: a
+blanket `git add` picked up something that does not belong in the repository. Look at what is
+staged first.
+
 ## Dependency advisories (frontend)
 
 `npm audit` in the frontend reported twenty vulnerabilities on 2026-09-12. After the update seven

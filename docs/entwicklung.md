@@ -410,6 +410,42 @@ Workflows können Wissen über Runs hinweg akkumulieren:
 - **WorkflowTemplateSeeder:** Legt 66 Built-in-Templates beim Start an (idempotent, Update bei Version-Bump)
 - Template-Definitionen als JSON unter `src/main/resources/templates/builtin/`
 
+## Hygiene-Gate
+
+`scripts/ci/public-hygiene.sh` prueft, was in ein oeffentliches Repository geriete. Die Regeln —
+verbotene Literale, Sicherungsdatei-Muster, Allowlist-Pfad, Schwellwerte — stehen in
+`scripts/lib/hygiene-rules.sh` und werden von der CI und vom pre-commit-Hook gemeinsam gelesen.
+
+| Modus | Wer | Prueft | Verhalten |
+|---|---|---|---|
+| `--tracked` (Default) | CI | getrackter Bestand | Fehler |
+| `--worktree` | lokal | zusaetzlich Dateien, die weder getrackt noch ignoriert sind | Warnung |
+| `--staged` | pre-commit-Hook | nur gestagte Aenderungen | Fehler |
+
+Geprueft wird:
+
+1. **Getrackt, aber ignoriert.** Frueher eine handgepflegte Liste von zehn Verzeichnisnamen, jetzt
+   `git ls-files --cached --ignored --exclude-standard`. Damit ist jede kuenftige Ignore-Regel
+   automatisch abgedeckt. Bewusste Ausnahmen stehen mit Begruendung in
+   `scripts/ci/hygiene-allowlist.txt` — nur Pfade, nie Musterliterale, damit die Allowlist selbst
+   nichts preisgibt.
+2. **Verbotene Literale** in getrackten Dateien bzw. in hinzugefuegten Zeilen.
+3. **Pool-Neutralitaet** ueber `scripts/ci/pool-neutrality.sh`. Dasselbe Skript nutzt das
+   Built-in-Template `pool-neutrality-audit` (dort mit `--all`, weil es den Pool einer laufenden
+   Instanz prueft und nicht nur den getrackten Release-Bestand).
+4. **Repo-Gewicht**: zwei getrackte Pfade mit identischer Blob-Pruefsumme ab 256 KiB sind ein
+   Fehler, eine einzelne getrackte Datei ueber 5 MiB eine Warnung.
+5. **Streunende Sicherungsdateien** (nur `--worktree`): weder getrackt noch ignoriert. Beim Stagen
+   ist derselbe Fund ein Fehler.
+
+Den Hook installiert `scripts/install-hooks.sh` ueber `core.hooksPath` (laeuft in `setup.sh` mit).
+
+### Wenn das Gate anschlaegt
+
+Kein Bypass per Reflex. `git commit --no-verify` existiert, aber ein Treffer ist fast immer echt:
+ein pauschales `git add` hat etwas mitgenommen, das nicht ins Repository gehoert. Erst schauen,
+was gestaged ist.
+
 ## Abhaengigkeits-Meldungen (Frontend)
 
 `npm audit` im Frontend meldete am 2026-09-12 zwanzig Schwachstellen. Nach dem Update sind es

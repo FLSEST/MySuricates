@@ -1,0 +1,14 @@
+# Bewusste Ausnahmen vom Hygiene-Gate.
+#
+# Nur Pfade, nie Musterliterale — die Allowlist selbst soll nichts preisgeben.
+# Ein Eintrag ohne Begruendung ist keiner: die Zeile darueber sagt, warum.
+#
+# Format: ein Repo-relativer Pfad pro Zeile, Kommentare mit #.
+
+# Tray-Icons der Desktop-Integration. Sie fallen nur unter die pauschale
+# *.png-Regel fuer Screenshots und sind bewusst getrackt — ohne sie hat die
+# laufende Anwendung kein Icon.
+ai-automation-backend/src/main/resources/tray/tray-gray.png
+ai-automation-backend/src/main/resources/tray/tray-green.png
+ai-automation-backend/src/main/resources/tray/tray-red.png
+ai-automation-backend/src/main/resources/tray/tray-yellow.png
