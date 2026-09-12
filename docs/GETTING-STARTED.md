@@ -161,6 +161,11 @@ Wer HTTPS auch im Backend nutzt, setzt `AUTOMATION_SSL_ENABLED=true` und vergibt
 wegen des selbst-signierten Zertifikats. Ohne dieses Skript bleibt es bei HTTP — völlig ausreichend
 für die lokale Nutzung.
 
+`config/SslPasswordGuard` prüft das beim Start des Backends: Ist `AUTOMATION_SSL_ENABLED=true`
+gesetzt und `AUTOMATION_SSL_PASSWORD` noch der Dev-Default `mysuricates`, bricht der Boot mit einer
+`IllegalStateException` ab. Damit läuft niemals ein HTTPS-Server mit dem aus dem Repo bekannten
+Passwort — SSL aus mit dem Default bleibt weiterhin erlaubt.
+
 ---
 
 ## 8. Troubleshooting
