@@ -460,7 +460,7 @@ Claude-Code-Sessions können ebenfalls als Vorlage für Workflows dienen:
 
 - Skills werden in der `skills`-DB-Tabelle gespeichert, nicht in Frontend oder In-Memory-Beans hardcodiert
 - **19 Built-in Skills** werden beim Start durch `SkillSeeder` eingespielt (idempotent)
-- Skill-Definitionen liegen in `BuiltInSkills.java` (`config/`-Package)
+- Skill-Definitionen liegen in `BuiltInSkills` (Reihenfolge) und `BuiltIn<Kategorie>Skills` (`config/`-Package)
 - Built-in Skills haben stabile IDs (z.B. `builtin-code-review`, `builtin-test-generator`)
 - `SkillSeeder` registriert alle Skills auch im In-Memory `SkillRegistry` für Capability-Lookups
 - `SkillRegistry` hängt nicht mehr von `SkillProvider`-Beans ab — Seeder übernimmt die Registrierung
