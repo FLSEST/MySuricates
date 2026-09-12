@@ -20,21 +20,14 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-/**
- * Executes shell commands in ephemeral Docker containers via "docker run --rm".
- * Same ShellResult return type as ShellCommandService for easy interchangeability.
- */
+/** Executes shell commands in ephemeral Docker containers via "docker run --rm". */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class ContainerShellService {
 
-    /**
-     * Mount paths that are always rejected (regardless of allow-extra-mounts).
-     * Matched against both host- and container-side of each bind-mount: a segment
-     * is rejected if it equals one of these or starts with "<path>/" — so e.g.
-     * "/etc/passwd" is rejected because it's a child of "/etc".
-     */
+    /** Mount paths always rejected regardless of allow-extra-mounts; a segment matches if it
+     * equals one of these or starts with "<path>/" (so "/etc/passwd" matches "/etc"). */
     static final Set<String> FORBIDDEN_MOUNT_PATHS = Set.of(
             "/var/run/docker.sock",
             "/",
@@ -46,6 +39,7 @@ public class ContainerShellService {
 
     private final HostProcessUtils hostProcessUtils;
     private final ActivityLogService activityLogService;
+    private final ContainerImageAllowlist imageAllowlist;
 
     @Value("${automation.execution.allow-docker-socket-mount:false}")
     private boolean allowDockerSocketMount;
@@ -99,15 +93,7 @@ public class ContainerShellService {
         }
     }
 
-    /**
-     * Execute a command inside an ephemeral container.
-     *
-     * @param command            Shell command to run
-     * @param projectPath        Host path to mount as /workspace
-     * @param timeoutSeconds     Timeout for the entire docker run
-     * @param containerImage     Docker image name (e.g. "automation-agent-devops:latest")
-     * @param mountDockerSocket  Whether to mount /var/run/docker.sock
-     */
+    /** Execute a command inside an ephemeral container. */
     public ShellResult execute(String command, String projectPath, int timeoutSeconds,
                                String containerImage, boolean mountDockerSocket) {
         return execute(command, projectPath, timeoutSeconds, containerImage, mountDockerSocket, List.of());
@@ -115,13 +101,18 @@ public class ContainerShellService {
 
     /**
      * Execute a command inside an ephemeral container with additional bind-mounts.
-     *
-     * @param extraMounts  Extra bind-mounts in docker-volume syntax "host:container[:ro|rw]".
-     *                     Template variables must already be resolved by the caller.
+     * {@code extraMounts} use docker-volume syntax "host:container[:ro|rw]"; template
+     * variables must already be resolved by the caller.
      */
     public ShellResult execute(String command, String projectPath, int timeoutSeconds,
                                String containerImage, boolean mountDockerSocket,
                                List<String> extraMounts) {
+        if (!imageAllowlist.isAllowed(containerImage)) {
+            String msg = "Container image not allowed by automation.execution.allowed-container-images: " + containerImage;
+            activityLogService.warn(LogCategory.SECURITY, msg, "ContainerShellService", null);
+            return new ShellResult(msg, 126, 0);
+        }
+
         long start = System.currentTimeMillis();
 
         boolean effectiveMount = mountDockerSocket && allowDockerSocketMount;

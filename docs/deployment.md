@@ -350,11 +350,23 @@ Die beiden werden leicht verwechselt:
    **Backend-Container** (`/var/run/docker.sock`). Das ist unabhaengig von Punkt 1 und gibt der
    Anwendung volle Kontrolle ueber Docker auf dem Host.
 
+### Container-Image-Allowlist
+
+`AUTOMATION_ALLOWED_CONTAINER_IMAGES` (Default leer = jedes Image erlaubt, einmaliges WARN beim
+Start) schraenkt ein, welches `container_image` ein Shell-Block anfordern darf. Die Pruefung sitzt
+zentral in `ContainerShellService.execute` — beide Aufrufer (`ShellBlockExecutor`,
+`CommandExecutorService`) laufen automatisch mit. Ein nicht gelistetes Image scheitert mit
+Exit-Code 126 und einem SECURITY-Eintrag im Activity-Log, statt einfach zu starten. Ein Eintrag
+matcht per Gleichheit, als Registry-/Namespace-Praefix (endet mit `/`), oder — ohne Tag — gegen
+jeden Tag des Images. Analoges Muster zu `AUTOMATION_ALLOWED_MOUNT_PREFIXES`.
+
 ### Daraus folgt
 
 - Nur in einem Netz betreiben, dem du vertraust; fuer Fernzugriff ein VPN davorsetzen statt den Port zu oeffnen.
 - Einen eigenen API-Key setzen und pruefen, dass er nicht leer ist.
 - Den Docker-Socket-Mount aus der Compose-Datei nehmen, wenn keine Container-Bloecke gebraucht werden.
+- In Produktivumgebungen `AUTOMATION_ALLOWED_CONTAINER_IMAGES` auf die tatsaechlich benoetigten
+  Images setzen, statt auf dem leeren Default (= alle Images erlaubt) zu bleiben.
 - Keine Workflows aus fremder Quelle ungelesen ausfuehren — sie laufen mit deinen Rechten.
 
 ## Drei-Umgebungs-Setup

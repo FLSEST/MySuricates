@@ -141,6 +141,12 @@ automation:
     # When set, the host side of every extra mount must start with one of these prefixes.
     # Supports leading "~" (= $HOME). Example: "~/Entwicklung,~/dokumente"
     allowed-mount-prefixes: ${AUTOMATION_ALLOWED_MOUNT_PREFIXES:}
+    # Comma-separated allowlist of Docker images a shell block may request via `container_image`.
+    # When empty (default), any image is allowed (logged once as a WARNING at startup). An entry
+    # matches by exact equality, as a registry/namespace prefix when it ends with "/", or, when it
+    # has no tag, against the image's bare name or any of its tags.
+    # Example: "automation-agent-devops:latest,automation-agent-python,ghcr.io/myorg/"
+    allowed-container-images: ${AUTOMATION_ALLOWED_CONTAINER_IMAGES:}
     # Ghost-Run-Watchdog: maximal tolerierte Zeit zwischen save(RUNNING) und register().
     # Muss laenger sein als der laengste legitime Semaphore-Wait + Container-Init.
     ghost-watchdog-stale-minutes: ${AUTOMATION_GHOST_WATCHDOG_STALE:30}

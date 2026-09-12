@@ -20,12 +20,14 @@ class ContainerShellServiceTest {
 
     @Mock private HostProcessUtils hostProcessUtils;
     @Mock private ActivityLogService activityLogService;
+    @Mock private ContainerImageAllowlist imageAllowlist;
 
     private ContainerShellService service;
 
     @BeforeEach
     void setUp() {
-        service = new ContainerShellService(hostProcessUtils, activityLogService);
+        lenient().when(imageAllowlist.isAllowed(anyString())).thenReturn(true);
+        service = new ContainerShellService(hostProcessUtils, activityLogService, imageAllowlist);
         ReflectionTestUtils.setField(service, "allowDockerSocketMount", false);
         ReflectionTestUtils.setField(service, "allowExtraMounts", false);
     }
@@ -40,6 +42,21 @@ class ContainerShellServiceTest {
         // docker run will likely fail in test env, but we verify no exception
         assertThat(result).isNotNull();
         assertThat(result.exitCode()).isNotNull();
+    }
+
+    @Test
+    void execute_imageNotAllowed_returnsRejectionAndSkipsDocker() {
+        when(imageAllowlist.isAllowed("forbidden-image:latest")).thenReturn(false);
+
+        ShellCommandService.ShellResult result = service.execute(
+                "echo hi", "/tmp", 10, "forbidden-image:latest", false);
+
+        assertThat(result.exitCode()).isEqualTo(126);
+        assertThat(result.output()).contains("forbidden-image:latest")
+                .contains("automation.execution.allowed-container-images");
+        verify(activityLogService).warn(any(),
+                contains("Container image not allowed"), anyString(), isNull());
+        verifyNoInteractions(hostProcessUtils);
     }
 
     @Test
