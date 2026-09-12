@@ -35,9 +35,15 @@ class GitHubHttpClientTest {
 
     private void respond(String path, int status, String body, AtomicReference<String> capturedAuth,
                          AtomicReference<String> capturedBody) {
+        respond(path, status, body, capturedAuth, capturedBody, null);
+    }
+
+    private void respond(String path, int status, String body, AtomicReference<String> capturedAuth,
+                         AtomicReference<String> capturedBody, AtomicReference<String> capturedMethod) {
         server.createContext(path, ex -> {
             if (capturedAuth != null) capturedAuth.set(ex.getRequestHeaders().getFirst("Authorization"));
             if (capturedBody != null) capturedBody.set(new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            if (capturedMethod != null) capturedMethod.set(ex.getRequestMethod());
             ex.getResponseHeaders().add("X-OAuth-Scopes", "repo, read:org");
             byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
             ex.sendResponseHeaders(status, bytes.length);
@@ -67,6 +73,19 @@ class GitHubHttpClientTest {
 
         assertThat(body.get()).isEqualTo("{\"title\":\"T\"}");
         assertThat(((Map<?, ?>) created).get("number")).isEqualTo(7);
+    }
+
+    @Test
+    void patch_serialisesBody() {
+        AtomicReference<String> body = new AtomicReference<>();
+        AtomicReference<String> method = new AtomicReference<>();
+        respond("/issues/1", 200, "{\"number\":1}", null, body, method);
+
+        Object updated = client.patch(base + "/issues/1", Map.of("title", "T"), "ghp_x", Object.class);
+
+        assertThat(body.get()).isEqualTo("{\"title\":\"T\"}");
+        assertThat(method.get()).isEqualTo("PATCH");
+        assertThat(((Map<?, ?>) updated).get("number")).isEqualTo(1);
     }
 
     @Test

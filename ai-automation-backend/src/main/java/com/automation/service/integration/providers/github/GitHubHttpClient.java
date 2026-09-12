@@ -39,7 +39,11 @@ public class GitHubHttpClient {
                 .method("PATCH", HttpRequest.BodyPublishers.ofString(writeJson(body))).build(), responseType);
     }
 
-    /** Checked response including headers (e.g. {@code X-OAuth-Scopes}); errors map like {@link #get}. */
+    /**
+     * Checked response including headers (e.g. {@code X-OAuth-Scopes}); errors map like {@link #get}.
+     * Transport failures are wrapped like the other calls, so callers logging the message see the
+     * "GitHub API request failed" prefix.
+     */
     public HttpResponse<String> getRaw(String url, String token) {
         try {
             HttpResponse<String> response = httpClient.send(
