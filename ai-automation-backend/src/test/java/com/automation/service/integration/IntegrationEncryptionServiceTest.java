@@ -92,6 +92,20 @@ class IntegrationEncryptionServiceTest {
         verify(appSettingsRepository, never()).set(anyString(), anyString());
     }
 
+    /**
+     * Regression guard for the 2026-08-06 bug: the integration test profile did not pin
+     * {@code automation.integration.key-file}, so init() generated a key straight into the
+     * developer's real {@code ~/.autotrigger/}. Here the constructor is given an explicit
+     * @TempDir path (as production config now also resolves to a per-JVM temp path in tests),
+     * so the generate-branch must write there — never under the real user.home.
+     */
+    @Test
+    void init_generatesKeyAtConfiguredPath_notInHome() {
+        assertThat(keyFile).isRegularFile();
+        assertThat(keyFile.toAbsolutePath().toString())
+                .doesNotStartWith(System.getProperty("user.home"));
+    }
+
     @Test
     void keyFileIsOwnerOnly() throws Exception {
         Set<PosixFilePermission> perms = Files.getPosixFilePermissions(keyFile);
