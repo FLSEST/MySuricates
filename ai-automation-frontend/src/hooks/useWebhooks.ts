@@ -41,6 +41,20 @@ export function useToggleWebhook() {
   });
 }
 
+export function useRegenerateWebhookToken() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
+  return useMutation({
+    mutationFn: (id: string) => api.post<WebhookTrigger>(`/webhooks/${id}/regenerate-token`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['webhooks'] });
+      toast.success(t.toast.webhookTokenRegenerated);
+    },
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.webhookTokenRegenerateFailed)),
+  });
+}
+
 export function useDeleteWebhook() {
   const qc = useQueryClient();
   const toast = useToast();

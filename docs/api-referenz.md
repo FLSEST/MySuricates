@@ -1122,6 +1122,12 @@ Wartungsmodus ein-/ausschalten. Im Wartungsmodus werden keine geplanten Ausführ
 
 ## Webhooks
 
+Der geheime Token wird nur direkt nach dem Erstellen (`POST /api/v1/webhooks`) oder Neu-Erzeugen
+(`POST /api/v1/webhooks/{id}/regenerate-token`) im Klartext zurückgegeben (`tokenVisible: true`).
+In jeder anderen Management-Response (List, Get, Enable, Disable) ist er maskiert: nur die ersten
+8 Zeichen plus `…` (U+2026), und `webhookUrl` verwendet denselben maskierten Token. Der volle Token
+muss beim Erstellen/Regenerieren sofort gesichert werden — er lässt sich danach nicht mehr abrufen.
+
 ### `GET /api/v1/webhooks`
 
 Alle Webhooks auflisten.
@@ -1134,8 +1140,9 @@ Alle Webhooks auflisten.
     "id": "uuid",
     "workflowId": "uuid",
     "workflowName": "Deploy Pipeline",
-    "secretToken": "abc123...",
-    "webhookUrl": "http://localhost:9090/api/v1/webhook/trigger/abc123...",
+    "secretToken": "abc123de…",
+    "tokenVisible": false,
+    "webhookUrl": "http://localhost:9090/api/v1/webhook/trigger/abc123de…",
     "enabled": true,
     "description": "GitHub Push Hook",
     "defaultContext": {},
@@ -1150,13 +1157,13 @@ Alle Webhooks auflisten.
 
 Einzelnen Webhook abrufen.
 
-**Response:** `WebhookTriggerResponse`
+**Response:** `WebhookTriggerResponse` (Token maskiert, `tokenVisible: false`)
 
 ### `GET /api/v1/webhooks/workflow/{workflowId}`
 
 Webhooks eines bestimmten Workflows.
 
-**Response:** `WebhookTriggerResponse[]`
+**Response:** `WebhookTriggerResponse[]` (Token maskiert, `tokenVisible: false`)
 
 ### `POST /api/v1/webhooks`
 
@@ -1178,19 +1185,27 @@ Neuen Webhook erstellen (Token wird automatisch generiert).
 | `description` | String | Nein |
 | `defaultContext` | Object | Nein |
 
-**Response:** `201` mit `WebhookTriggerResponse`
+**Response:** `201` mit `WebhookTriggerResponse` — Token voll sichtbar, `tokenVisible: true`
 
 ### `POST /api/v1/webhooks/{id}/enable`
 
 Webhook aktivieren.
 
-**Response:** `WebhookTriggerResponse`
+**Response:** `WebhookTriggerResponse` (Token maskiert, `tokenVisible: false`)
 
 ### `POST /api/v1/webhooks/{id}/disable`
 
 Webhook deaktivieren.
 
-**Response:** `WebhookTriggerResponse`
+**Response:** `WebhookTriggerResponse` (Token maskiert, `tokenVisible: false`)
+
+### `POST /api/v1/webhooks/{id}/regenerate-token`
+
+Erzeugt einen neuen geheimen Token für den Webhook. Der bisherige Token wird sofort ungültig;
+`lastTriggeredAt` und `triggerCount` bleiben unverändert. Protokolliert einen `SECURITY`-Eintrag
+im ActivityLog.
+
+**Response:** `WebhookTriggerResponse` — neuer Token voll sichtbar, `tokenVisible: true`
 
 ### `DELETE /api/v1/webhooks/{id}`
 

@@ -1,5 +1,6 @@
 package com.automation.service.webhook;
 
+import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.WebhookTrigger;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
@@ -176,6 +177,47 @@ class WebhookServiceTest {
         webhookService.delete("wh-1");
 
         verify(webhookRepository).delete(testWebhook);
+    }
+
+    // --- regenerateToken ---
+
+    @Test
+    void regenerateToken_generatesNewTokenAndPersists() {
+        when(webhookRepository.findById("wh-1")).thenReturn(Optional.of(testWebhook));
+        when(webhookRepository.save(any(WebhookTrigger.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        WebhookTrigger result = webhookService.regenerateToken("wh-1");
+
+        assertThat(result.getSecretToken())
+                .isNotBlank()
+                .hasSize(43) // Base64url-encoded 256-bit token, no padding
+                .isNotEqualTo("abc123token");
+        verify(webhookRepository).save(testWebhook);
+        verify(activityLogService).warn(eq(LogCategory.SECURITY), contains("regenerated"), eq("WebhookService"), eq("wh-1"));
+    }
+
+    @Test
+    void regenerateToken_preservesTriggerCountAndLastTriggeredAt() {
+        Instant lastTriggered = Instant.parse("2026-01-01T00:00:00Z");
+        testWebhook.setTriggerCount(7);
+        testWebhook.setLastTriggeredAt(lastTriggered);
+        when(webhookRepository.findById("wh-1")).thenReturn(Optional.of(testWebhook));
+        when(webhookRepository.save(any(WebhookTrigger.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        WebhookTrigger result = webhookService.regenerateToken("wh-1");
+
+        assertThat(result.getTriggerCount()).isEqualTo(7);
+        assertThat(result.getLastTriggeredAt()).isEqualTo(lastTriggered);
+    }
+
+    @Test
+    void regenerateToken_nonExistentId_throwsException() {
+        when(webhookRepository.findById("unknown")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> webhookService.regenerateToken("unknown"))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verify(webhookRepository, never()).save(any());
     }
 
     // --- trigger ---

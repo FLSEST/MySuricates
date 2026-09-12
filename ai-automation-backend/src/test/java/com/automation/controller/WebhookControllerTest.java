@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.hamcrest.Matchers.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -92,7 +93,7 @@ class WebhookControllerTest {
 
         testResponse = new WebhookTriggerResponse(
                 "wh-1", "wf-1", "Test Workflow",
-                "abc123def456ghi789jkl012mno345pq", null,
+                "abc123def456ghi789jkl012mno345pq", null, false,
                 true, "Test webhook", new HashMap<>(),
                 testWebhook.getLastTriggeredAt(), 5, testWebhook.getCreatedAt()
         );
@@ -112,6 +113,19 @@ class WebhookControllerTest {
     }
 
     @Test
+    void listWebhooks_masksSecretTokenAndUrl() throws Exception {
+        when(webhookService.findAll()).thenReturn(List.of(testWebhook));
+
+        mockMvc.perform(get("/api/v1/webhooks"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].secretToken").value("abc123de…"))
+                .andExpect(jsonPath("$[0].tokenVisible").value(false))
+                .andExpect(jsonPath("$[0].webhookUrl", containsString("abc123de…")))
+                .andExpect(jsonPath("$[0].webhookUrl",
+                        not(containsString("abc123def456ghi789jkl012mno345pq"))));
+    }
+
+    @Test
     void getWebhook_existingId_returnsOk() throws Exception {
         when(webhookService.findById("wh-1")).thenReturn(testWebhook);
 
@@ -119,6 +133,18 @@ class WebhookControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("wh-1"))
                 .andExpect(jsonPath("$.workflowId").value("wf-1"));
+    }
+
+    @Test
+    void getWebhook_masksSecretTokenAndUrl() throws Exception {
+        when(webhookService.findById("wh-1")).thenReturn(testWebhook);
+
+        mockMvc.perform(get("/api/v1/webhooks/wh-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.secretToken").value("abc123de…"))
+                .andExpect(jsonPath("$.tokenVisible").value(false))
+                .andExpect(jsonPath("$.webhookUrl",
+                        not(containsString("abc123def456ghi789jkl012mno345pq"))));
     }
 
     @Test
@@ -158,6 +184,26 @@ class WebhookControllerTest {
     }
 
     @Test
+    void createWebhook_revealsFullTokenAndSetsTokenVisible() throws Exception {
+        when(webhookService.create(any(), any(), any())).thenReturn(testWebhook);
+
+        String body = """
+                {
+                    "workflowId": "wf-1",
+                    "description": "My webhook"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/webhooks")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.secretToken").value("abc123def456ghi789jkl012mno345pq"))
+                .andExpect(jsonPath("$.tokenVisible").value(true))
+                .andExpect(jsonPath("$.webhookUrl", containsString("abc123def456ghi789jkl012mno345pq")));
+    }
+
+    @Test
     void createWebhook_missingWorkflowId_returns400() throws Exception {
         String body = """
                 {
@@ -188,7 +234,7 @@ class WebhookControllerTest {
 
         WebhookTriggerResponse disabledResponse = new WebhookTriggerResponse(
                 "wh-1", "wf-1", "Test Workflow",
-                "abc123def456ghi789jkl012mno345pq", null,
+                "abc123def456ghi789jkl012mno345pq", null, false,
                 false, "Test webhook", new HashMap<>(),
                 testWebhook.getLastTriggeredAt(), 5, testWebhook.getCreatedAt()
         );
@@ -207,6 +253,32 @@ class WebhookControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(webhookService).delete("wh-1");
+    }
+
+    @Test
+    void regenerateToken_returnsFullNewTokenAndTokenVisible() throws Exception {
+        WebhookTrigger regenerated = WebhookTrigger.builder()
+                .id("wh-1")
+                .workflow(testWorkflow)
+                .secretToken("zzz999NEWTOKENvalue1234567890ABCDEF")
+                .enabled(true)
+                .description("Test webhook")
+                .defaultContext(new HashMap<>())
+                .triggerCount(5)
+                .lastTriggeredAt(testWebhook.getLastTriggeredAt())
+                .createdAt(testWebhook.getCreatedAt())
+                .build();
+        when(webhookService.regenerateToken("wh-1")).thenReturn(regenerated);
+
+        mockMvc.perform(post("/api/v1/webhooks/wh-1/regenerate-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.secretToken").value("zzz999NEWTOKENvalue1234567890ABCDEF"))
+                .andExpect(jsonPath("$.tokenVisible").value(true))
+                .andExpect(jsonPath("$.secretToken",
+                        not(equalTo("abc123def456ghi789jkl012mno345pq"))))
+                .andExpect(jsonPath("$.webhookUrl", containsString("zzz999NEWTOKENvalue1234567890ABCDEF")));
+
+        verify(webhookService).regenerateToken("wh-1");
     }
 
     @Test

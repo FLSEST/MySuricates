@@ -3,7 +3,7 @@ import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type ReactNode, createElement } from 'react';
 import { server } from '../../test/server';
-import { useWebhooks, useCreateWebhook, useDeleteWebhook } from '../useWebhooks';
+import { useWebhooks, useCreateWebhook, useDeleteWebhook, useRegenerateWebhookToken } from '../useWebhooks';
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
 afterEach(() => server.resetHandlers());
@@ -47,5 +47,17 @@ describe('useDeleteWebhook', () => {
       result.current.mutate('wh1');
     });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  });
+});
+
+describe('useRegenerateWebhookToken', () => {
+  it('regenerates a webhook token and reveals it in full', async () => {
+    const { result } = renderHook(() => useRegenerateWebhookToken(), { wrapper: createWrapper() });
+    await act(async () => {
+      result.current.mutate('wh1');
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data!.tokenVisible).toBe(true);
+    expect(result.current.data!.secretToken).toBe('zzz999NEWTOKENvalue1234567890ABCDEF');
   });
 });

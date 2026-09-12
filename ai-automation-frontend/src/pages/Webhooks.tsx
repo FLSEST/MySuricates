@@ -1,10 +1,16 @@
 import { useState } from 'react';
-import { Webhook, Plus, Trash2 } from 'lucide-react';
+import { Webhook, Plus, Trash2, RefreshCw } from 'lucide-react';
 import { Card, Button, Input, Select, Modal, Spinner, Table, Toggle, Badge } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
 import { CopyButton } from '../components/shared/CopyButton';
-import { useWebhooks, useCreateWebhook, useToggleWebhook, useDeleteWebhook } from '../hooks/useWebhooks';
+import {
+  useWebhooks,
+  useCreateWebhook,
+  useToggleWebhook,
+  useDeleteWebhook,
+  useRegenerateWebhookToken,
+} from '../hooks/useWebhooks';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { useT } from '../i18n';
 import type { WebhookTrigger, CreateWebhookRequest } from '../types';
@@ -16,16 +22,28 @@ export function Webhooks() {
   const createWebhook = useCreateWebhook();
   const toggleWebhook = useToggleWebhook();
   const deleteWebhook = useDeleteWebhook();
+  const regenerateToken = useRegenerateWebhookToken();
 
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<CreateWebhookRequest>({ workflowId: '' });
+  // Holds the freshly created/regenerated webhook while its token is still visible in full —
+  // the token is never revealed again after this one-time modal is closed.
+  const [revealedWebhook, setRevealedWebhook] = useState<WebhookTrigger | null>(null);
 
   const handleCreate = () => {
     createWebhook.mutate(form, {
-      onSuccess: () => {
+      onSuccess: (webhook) => {
         setShowCreate(false);
         setForm({ workflowId: '' });
+        setRevealedWebhook(webhook);
       },
+    });
+  };
+
+  const handleRegenerate = (w: WebhookTrigger) => {
+    if (!window.confirm(t.webhooks.regenerateConfirm)) return;
+    regenerateToken.mutate(w.id, {
+      onSuccess: (webhook) => setRevealedWebhook(webhook),
     });
   };
 
@@ -53,24 +71,16 @@ export function Webhooks() {
       key: 'url',
       header: t.webhooks.triggerUrl,
       render: (w: WebhookTrigger) => (
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="font-mono text-xs text-text-secondary truncate max-w-[300px]">
-            {w.webhookUrl}
-          </span>
-          <CopyButton text={w.webhookUrl} />
-        </div>
+        <span className="font-mono text-xs text-text-secondary truncate max-w-[300px] block">
+          {w.webhookUrl}
+        </span>
       ),
     },
     {
       key: 'token',
       header: t.webhooks.token,
       render: (w: WebhookTrigger) => (
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-xs text-text-tertiary">
-            {w.secretToken.slice(0, 8)}...
-          </span>
-          <CopyButton text={w.secretToken} />
-        </div>
+        <span className="font-mono text-xs text-text-tertiary">{w.secretToken}</span>
       ),
     },
     {
@@ -96,18 +106,31 @@ export function Webhooks() {
       key: 'actions',
       header: '',
       render: (w: WebhookTrigger) => (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            deleteWebhook.mutate(w.id);
-          }}
-          className="p-1.5 rounded-lg text-text-tertiary hover:text-danger transition-colors"
-          aria-label={t.common.delete}
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRegenerate(w);
+            }}
+            className="p-1.5 rounded-lg text-text-tertiary hover:text-accent transition-colors"
+            aria-label={t.webhooks.regenerate}
+            title={t.webhooks.regenerate}
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              deleteWebhook.mutate(w.id);
+            }}
+            className="p-1.5 rounded-lg text-text-tertiary hover:text-danger transition-colors"
+            aria-label={t.common.delete}
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
       ),
-      width: '48px',
+      width: '80px',
     },
   ];
 
@@ -183,6 +206,44 @@ export function Webhooks() {
             placeholder="GitHub push event handler"
           />
         </div>
+      </Modal>
+
+      {/* One-time token reveal modal — shown right after create/regenerate, never again */}
+      <Modal
+        open={revealedWebhook !== null}
+        onClose={() => setRevealedWebhook(null)}
+        title={t.webhooks.tokenShownOnce}
+        footer={
+          <Button onClick={() => setRevealedWebhook(null)}>{t.common.close}</Button>
+        }
+      >
+        {revealedWebhook && (
+          <div className="space-y-4">
+            <p className="text-sm text-text-secondary">{t.webhooks.tokenShownOnceHint}</p>
+            <div>
+              <label className="block text-xs font-medium text-text-tertiary mb-1">
+                {t.webhooks.triggerUrl}
+              </label>
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="font-mono text-xs text-text break-all">
+                  {revealedWebhook.webhookUrl}
+                </span>
+                <CopyButton text={revealedWebhook.webhookUrl} />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-text-tertiary mb-1">
+                {t.webhooks.token}
+              </label>
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="font-mono text-xs text-text break-all">
+                  {revealedWebhook.secretToken}
+                </span>
+                <CopyButton text={revealedWebhook.secretToken} />
+              </div>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

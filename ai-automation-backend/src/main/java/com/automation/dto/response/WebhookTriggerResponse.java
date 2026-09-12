@@ -9,6 +9,7 @@ public record WebhookTriggerResponse(
         String workflowName,
         String secretToken,
         String webhookUrl,
+        boolean tokenVisible,
         boolean enabled,
         String description,
         Map<String, Object> defaultContext,
