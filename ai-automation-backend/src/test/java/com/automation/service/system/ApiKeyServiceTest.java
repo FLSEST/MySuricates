@@ -1,5 +1,9 @@
 package com.automation.service.system;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.automation.repository.AppSettingsRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -8,8 +12,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 
@@ -79,6 +85,34 @@ class ApiKeyServiceTest {
         service.init();
 
         verify(settingsRepo).set(eq("api-key"), any(String.class));
+    }
+
+    @Test
+    void init_generatedKey_logsOnlyMaskedSuffixAndPreservesStoredKey() throws Exception {
+        when(settingsRepo.get("api-key")).thenReturn(Optional.empty());
+        Logger logger = (Logger) LoggerFactory.getLogger(ApiKeyService.class);
+        Level previousLevel = logger.getLevel();
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        logger.setLevel(Level.INFO);
+        try {
+            service.init();
+
+            String key = service.getEffectiveApiKey();
+            String messages = String.join("\n", appender.list.stream()
+                    .map(ILoggingEvent::getFormattedMessage).toList());
+            assertThat(messages)
+                    .contains("****" + key.substring(key.length() - 4))
+                    .doesNotContain(key)
+                    .doesNotContain(key.substring(0, key.length() - 4));
+            verify(settingsRepo).set("api-key", key);
+            assertThat(Files.readString(tempHome.resolve(".autotrigger/api-key"))).isEqualTo(key);
+        } finally {
+            logger.detachAppender(appender);
+            logger.setLevel(previousLevel);
+            appender.stop();
+        }
     }
 
     @Test

@@ -51,7 +51,7 @@ public class ApiKeyService {
                 settingsRepo.set("api-key", generated);
                 cachedApiKey = generated;
                 log.warn("========================================");
-                log.warn("  AUTO-GENERATED API KEY: {}", generated);
+                log.warn("  AUTO-GENERATED API KEY: ****{}", generated.substring(generated.length() - 4));
                 log.warn("  Set AUTOMATION_API_KEY env var to use your own.");
                 log.warn("========================================");
             }
