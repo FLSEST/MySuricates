@@ -151,7 +151,7 @@ class ProjectServiceTest {
     }
 
     @Test
-    void delete_runningProject_stopsContainerFirst() {
+    void delete_runningProject_archivesThenStopsContainer() {
         testProject.setStatus(ProjectStatus.RUNNING);
         when(projectRepository.findById("proj-1")).thenReturn(Optional.of(testProject));
 

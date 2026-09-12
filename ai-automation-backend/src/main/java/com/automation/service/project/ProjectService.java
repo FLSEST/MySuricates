@@ -149,6 +149,8 @@ public class ProjectService {
                 containerService.stopContainer(project);
             } catch (Exception e) {
                 log.error("Failed to stop container for archived project: {}", id, e);
+                activityLogService.error(LogCategory.CONTAINER,
+                        "Failed to stop container for archived project: " + id, "ProjectService", id);
             }
         }
     }

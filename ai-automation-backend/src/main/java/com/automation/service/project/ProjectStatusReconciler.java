@@ -28,8 +28,10 @@ import java.util.List;
  * <p>Deliberately DB-only: the container row decides the outcome (RUNNING row ⇒ RUNNING, otherwise
  * STOPPED) and no Docker call is made inside the transaction — with HikariCP pool-size 1 a Docker
  * inspect under an open transaction would pin the single connection during startup. A row that
- * lies about Docker is corrected on the next {@code ContainerService.getDockerContainerId} /
- * idle cleanup pass.
+ * lies about Docker is corrected on the next {@code ContainerService.getDockerContainerId} pass
+ * (container row only) or by {@code cleanupIdleContainers} (which also flips the project); if the
+ * former runs first, the project stays RUNNING until the user stops it — which the UI offers,
+ * unlike STARTING.
  */
 @Component
 @Slf4j
