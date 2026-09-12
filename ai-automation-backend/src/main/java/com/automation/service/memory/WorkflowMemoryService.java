@@ -10,11 +10,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,19 +33,25 @@ public class WorkflowMemoryService {
     private final ClaudeSummarizer claudeSummarizer;
     private final CodexSummarizer codexSummarizer;
     private final ObjectMapper objectMapper;
+    private final TransactionTemplate transactionTemplate;
+    private final TransactionTemplate readOnlyTransactionTemplate;
 
     public WorkflowMemoryService(WorkflowMemoryRepository memoryRepository,
                                   WorkflowRunRepository runRepository,
                                   ConversationPreprocessor preprocessor,
                                   ClaudeSummarizer claudeSummarizer,
                                   CodexSummarizer codexSummarizer,
-                                  ObjectMapper objectMapper) {
+                                  ObjectMapper objectMapper,
+                                  PlatformTransactionManager transactionManager) {
         this.memoryRepository = memoryRepository;
         this.runRepository = runRepository;
         this.preprocessor = preprocessor;
         this.claudeSummarizer = claudeSummarizer;
         this.codexSummarizer = codexSummarizer;
         this.objectMapper = objectMapper;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.readOnlyTransactionTemplate = new TransactionTemplate(transactionManager);
+        this.readOnlyTransactionTemplate.setReadOnly(true);
     }
 
     public List<WorkflowMemory> findByWorkflowId(String workflowId) {
@@ -51,10 +60,46 @@ public class WorkflowMemoryService {
 
     /**
      * Extracts knowledge from workflow runs and stores it as a new memory version.
+     *
+     * <p>Deliberately not {@code @Transactional}: {@code summarizer.summarize()} calls out to
+     * the Claude/Codex CLI on the host and takes seconds to minutes. With HikariCP pool-size 1
+     * an enclosing transaction would pin the single connection for that whole call, starving
+     * every other DB access in the app. Same shape as {@code ProjectService#startContainer}: a
+     * short read burst (runs + steps) → AI call outside any transaction → a short write burst
+     * (save).
      */
-    @Transactional
     public WorkflowMemory extractKnowledge(String workflowId, List<String> runIds, String provider) throws IOException {
-        // Load runs
+        RunsReadBurst burst = readOnlyTransactionTemplate.execute(status -> loadRunsAndSteps(workflowId, runIds));
+
+        // Preprocess
+        String preprocessed = preprocessor.preprocess(burst.steps());
+        log.info("Preprocessed {} steps from {} runs into {} chars",
+                burst.steps().size(), burst.sourceRunIds().size(), preprocessed.length());
+
+        // Summarize
+        KnowledgeSummarizer summarizer = getSummarizer(provider);
+        KnowledgeSummarizer.SummarizationResult result = summarizer.summarize(preprocessed);
+
+        WorkflowMemory memory = WorkflowMemory.builder()
+                .workflowId(workflowId)
+                .title(result.title())
+                .content(result.content())
+                .tags(toJson(result.tags()))
+                .sourceRunIds(toJson(burst.sourceRunIds()))
+                .provider(provider.toUpperCase())
+                .active(false)
+                .build();
+
+        return transactionTemplate.execute(status -> memoryRepository.save(memory));
+    }
+
+    /**
+     * Read burst for {@link #extractKnowledge}: loads runs, materializes the lazy
+     * {@code steps} collection into a plain list (OSIV is disabled, so the caller must not
+     * touch it after the transaction closes), and collects run ids — all inside one short
+     * transaction, before the slow AI call.
+     */
+    private RunsReadBurst loadRunsAndSteps(String workflowId, List<String> runIds) {
         List<WorkflowRun> runs;
         if (runIds != null && !runIds.isEmpty()) {
             runs = runIds.stream()
@@ -70,51 +115,38 @@ public class WorkflowMemoryService {
             runs = runs.subList(0, Math.min(10, runs.size()));
         }
 
-        // Collect all step results
-        List<StepResult> allSteps = runs.stream()
+        // Materialize the lazy steps collection into a new list before leaving the transaction
+        List<StepResult> allSteps = new ArrayList<>(runs.stream()
                 .flatMap(run -> run.getSteps().stream())
-                .toList();
+                .toList());
 
         if (allSteps.isEmpty()) {
             throw new IllegalStateException("No step results found in selected runs");
         }
 
-        // Preprocess
-        String preprocessed = preprocessor.preprocess(allSteps);
-        log.info("Preprocessed {} steps from {} runs into {} chars", allSteps.size(), runs.size(), preprocessed.length());
+        List<String> sourceRunIds = new ArrayList<>(runs.stream().map(WorkflowRun::getId).toList());
+        return new RunsReadBurst(allSteps, sourceRunIds);
+    }
 
-        // Summarize
-        KnowledgeSummarizer summarizer = getSummarizer(provider);
-        KnowledgeSummarizer.SummarizationResult result = summarizer.summarize(preprocessed);
-
-        // Store
-        List<String> sourceRunIdsList = runs.stream().map(WorkflowRun::getId).toList();
-
-        WorkflowMemory memory = WorkflowMemory.builder()
-                .workflowId(workflowId)
-                .title(result.title())
-                .content(result.content())
-                .tags(toJson(result.tags()))
-                .sourceRunIds(toJson(sourceRunIdsList))
-                .provider(provider.toUpperCase())
-                .active(false)
-                .build();
-
-        return memoryRepository.save(memory);
+    private record RunsReadBurst(List<StepResult> steps, List<String> sourceRunIds) {
     }
 
     /**
      * Extracts knowledge and automatically activates the result.
      * Used by auto-memory extraction after successful runs.
+     *
+     * <p>Not {@code @Transactional} either: it calls {@link #extractKnowledge}, which already
+     * spans the slow AI call outside any transaction — see there.
      */
-    @Transactional
     public WorkflowMemory extractAndActivate(String workflowId, String provider) throws IOException {
         WorkflowMemory memory = extractKnowledge(workflowId, null, provider);
-        memoryRepository.deactivateAllForWorkflow(workflowId);
-        memory.setActive(true);
-        memoryRepository.save(memory);
-        log.info("Auto-extracted and activated memory '{}' for workflow {}", memory.getTitle(), workflowId);
-        return memory;
+        return transactionTemplate.execute(status -> {
+            memoryRepository.deactivateAllForWorkflow(workflowId);
+            memory.setActive(true);
+            WorkflowMemory saved = memoryRepository.save(memory);
+            log.info("Auto-extracted and activated memory '{}' for workflow {}", saved.getTitle(), workflowId);
+            return saved;
+        });
     }
 
     /**

@@ -14,6 +14,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -34,6 +36,8 @@ class WorkflowMemoryServiceTest {
     @Mock private ConversationPreprocessor preprocessor;
     @Mock private ClaudeSummarizer claudeSummarizer;
     @Mock private CodexSummarizer codexSummarizer;
+    @Mock private PlatformTransactionManager transactionManager;
+    @Mock private TransactionStatus transactionStatus;
 
     private WorkflowMemoryService service;
 
@@ -42,9 +46,12 @@ class WorkflowMemoryServiceTest {
 
     @BeforeEach
     void setUp() {
+        // TransactionTemplate.execute() asks the manager for a status, runs the callback,
+        // then commits — a mock status lets the callback run and makes commit/rollback no-ops.
+        lenient().when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
         service = new WorkflowMemoryService(
                 memoryRepository, runRepository, preprocessor,
-                claudeSummarizer, codexSummarizer, new ObjectMapper());
+                claudeSummarizer, codexSummarizer, new ObjectMapper(), transactionManager);
     }
 
     @Test
