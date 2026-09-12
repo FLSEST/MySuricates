@@ -13,6 +13,9 @@ import { DecomposeApprovalPanel } from './DecomposeApprovalPanel';
 import { ExecutionLogsPanel } from './ExecutionLogsPanel';
 import { IterationDiffSection } from './IterationDiffSection';
 import { CrystallizeButton } from './CrystallizeButton';
+import { ExecutionStepCard } from '../workflow/ExecutionStepCard';
+import { PathLinkedOutput } from '../shared/PathLinkedOutput';
+import { useWorkflowRuns } from '../../hooks/useWorkflows';
 
 export function WishDetail({ wishId, onCancel, onDelete }: {
   wishId: string;
@@ -22,11 +25,15 @@ export function WishDetail({ wishId, onCancel, onDelete }: {
   const t = useT();
   const navigate = useNavigate();
   const { data: wish } = useWish(wishId);
+  const { data: generatedRuns } = useWorkflowRuns(wish?.generatedWorkflowIds?.[0] ?? '');
   const respond = useRespondToWish();
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const isTerminal = (s: WishStatus) => s === 'COMPLETED' || s === 'FAILED' || s === 'CANCELLED';
   const isPaused = (s: WishStatus) => s === 'AWAITING_APPROVAL' || s === 'AWAITING_CLARIFICATION' || s === 'AWAITING_DECOMPOSE_APPROVAL';
+  const runHref = (runId: string, workflowId?: string) => wish?.generatedChainId
+    ? `/chains/${wish.generatedChainId}/run/${runId}`
+    : workflowId ? `/workflows/${workflowId}/run/${runId}` : `/runs/${runId}`;
 
   if (!wish) return <Card className="p-8 text-center"><Spinner /></Card>;
 
@@ -281,7 +288,7 @@ export function WishDetail({ wishId, onCancel, onDelete }: {
                       {runId && (
                         <div
                           className="text-xs text-accent cursor-pointer hover:underline flex items-center gap-1"
-                          onClick={() => navigate(`/runs`)}
+                          onClick={() => navigate(runHref(runId, workflowIds?.[0]))}
                         >
                           Run: {runId.slice(0, 8)}...
                           <ExternalLink className="w-3 h-3" />
@@ -329,6 +336,19 @@ export function WishDetail({ wishId, onCancel, onDelete }: {
       )}
 
       {/* Result */}
+      {generatedRuns?.content?.find(run => run.id === wish.currentRunId)?.steps?.length ? (
+        <Card>
+          <div className="p-4 space-y-2">
+            <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wide mb-3">
+              {t.wishes.executionResults}
+            </h3>
+            {generatedRuns.content.find(run => run.id === wish.currentRunId)?.steps.map(step => (
+              <ExecutionStepCard key={step.id} step={step} />
+            ))}
+          </div>
+        </Card>
+      ) : null}
+
       {(wish.resultSummary || wish.error) && (
         <Card>
           <div className="p-4">
@@ -336,10 +356,10 @@ export function WishDetail({ wishId, onCancel, onDelete }: {
               {t.wishes.result}
             </h3>
             {wish.resultSummary && (
-              <p className="text-sm text-text-primary">{wish.resultSummary}</p>
+              <p className="text-sm text-text-primary"><PathLinkedOutput text={wish.resultSummary} /></p>
             )}
             {wish.error && (
-              <p className="text-sm text-danger mt-2">{wish.error}</p>
+              <p className="text-sm text-danger mt-2"><PathLinkedOutput text={wish.error} /></p>
             )}
           </div>
         </Card>

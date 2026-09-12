@@ -1478,6 +1478,7 @@ export const en = {
     noLogs: 'Logs will appear when execution starts.',
     retry: 'Retry',
     iterationHistory: 'Iteration History',
+    executionResults: 'Execution Results',
     noHistory: 'No iterations yet.',
     historyPhase: 'Phase',
     historyDecomposition: 'Decomposition',
