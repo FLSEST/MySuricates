@@ -164,6 +164,11 @@ Vite then serves HTTPS automatically; the browser warns once
 about the self-signed certificate. Without this script it stays on HTTP — perfectly sufficient for
 local use.
 
+`config/SslPasswordGuard` checks this at backend startup: if `AUTOMATION_SSL_ENABLED=true` is set
+and `AUTOMATION_SSL_PASSWORD` is still the dev default `mysuricates`, boot aborts with an
+`IllegalStateException`. This ensures an HTTPS server never runs with the password anyone can read
+in the repo — SSL off with the default password remains allowed.
+
 ---
 
 ## 8. Troubleshooting
