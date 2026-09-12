@@ -90,7 +90,7 @@ class PendingTodoApprovalServiceTest {
         Map<String, Object> meta = run.getMetadata();
 
         when(workflowRunRepository.findById("run-app")).thenReturn(Optional.of(run));
-        when(todoRepository.findOpenByCompositeKey(any(), any(), any(), any())).thenReturn(Optional.empty());
+        when(todoRepository.findOpenGateByCompositeKey(any(), any(), any(), any())).thenReturn(Optional.empty());
         when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> {
             Todo t = inv.getArgument(0);
             t.setId("todo-new");
@@ -138,7 +138,7 @@ class PendingTodoApprovalServiceTest {
         WorkflowRun run = runWithPending(pending("MEDIUM", "general"));
         Todo existing = Todo.builder().id("t-old").title("Old title").priority(Todo.Priority.LOW).build();
         when(workflowRunRepository.findById("run-app")).thenReturn(Optional.of(run));
-        when(todoRepository.findOpenByCompositeKey("proj-1", "workflow_run", "wf-1", "category:general"))
+        when(todoRepository.findOpenGateByCompositeKey("proj-1", "workflow_run", "wf-1", "category:general"))
                 .thenReturn(Optional.of(existing));
 
         approvalService.approvePendingTodos("run-app", true);
@@ -163,12 +163,12 @@ class PendingTodoApprovalServiceTest {
     @Test
     void approvePendingTodos_missingCategory_usesLiteralNullTag() {
         when(workflowRunRepository.findById("run-app")).thenReturn(Optional.of(runWithPending(pending("HIGH", null))));
-        when(todoRepository.findOpenByCompositeKey(any(), any(), any(), any())).thenReturn(Optional.empty());
+        when(todoRepository.findOpenGateByCompositeKey(any(), any(), any(), any())).thenReturn(Optional.empty());
         when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
 
         approvalService.approvePendingTodos("run-app", true);
 
-        verify(todoRepository).findOpenByCompositeKey("proj-1", "workflow_run", "wf-1", "category:null");
+        verify(todoRepository).findOpenGateByCompositeKey("proj-1", "workflow_run", "wf-1", "category:null");
     }
 
     @Test

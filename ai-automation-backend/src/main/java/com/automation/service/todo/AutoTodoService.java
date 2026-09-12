@@ -201,7 +201,7 @@ public class AutoTodoService {
         tx.execute(status -> {
             String categoryTag = "category:" + gate.category();
 
-            Optional<Todo> existing = todoRepository.findOpenByCompositeKey(
+            Optional<Todo> existing = todoRepository.findOpenGateByCompositeKey(
                     projectId, REFERENCE_TYPE, event.getWorkflowId(), categoryTag);
 
             if (existing.isPresent()) {

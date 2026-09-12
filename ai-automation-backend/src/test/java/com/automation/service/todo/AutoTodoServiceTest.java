@@ -105,7 +105,7 @@ class AutoTodoServiceTest {
                 Map.of("gate_status", "RED"), AUTO_TODO_ENABLED_META);
         when(gateStatusResolver.resolve(event))
                 .thenReturn(new GateResult(GateStatus.RED, "lint-failure", "3 ESLint errors"));
-        when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
+        when(todoRepository.findOpenGateByCompositeKey(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(Optional.empty());
         when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -129,7 +129,7 @@ class AutoTodoServiceTest {
                 Map.of("gate_status", "YELLOW"), AUTO_TODO_ENABLED_META);
         when(gateStatusResolver.resolve(event))
                 .thenReturn(new GateResult(GateStatus.YELLOW, "test-warning", "2 flaky tests"));
-        when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
+        when(todoRepository.findOpenGateByCompositeKey(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(Optional.empty());
         when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -208,7 +208,7 @@ class AutoTodoServiceTest {
         when(gateStatusResolver.resolve(event))
                 .thenReturn(new GateResult(GateStatus.RED, "backend-test-failure",
                         "1 Failure + 159 Errors (ApplicationContext-Startup-Crash)"));
-        when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
+        when(todoRepository.findOpenGateByCompositeKey(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(Optional.empty());
         when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -242,7 +242,7 @@ class AutoTodoServiceTest {
                 Map.of(), AUTO_TODO_ENABLED_META);
         when(gateStatusResolver.resolve(event))
                 .thenReturn(new GateResult(GateStatus.RED, "execution-failure", null));
-        when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
+        when(todoRepository.findOpenGateByCompositeKey(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(Optional.empty());
         when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -275,7 +275,7 @@ class AutoTodoServiceTest {
                 .status(Todo.Status.OPEN)
                 .priority(Todo.Priority.HIGH)
                 .build();
-        when(todoRepository.findOpenByCompositeKey("proj-1", "workflow_run", "wf-1", "category:lint-failure"))
+        when(todoRepository.findOpenGateByCompositeKey("proj-1", "workflow_run", "wf-1", "category:lint-failure"))
                 .thenReturn(Optional.of(existingTodo));
         when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -296,7 +296,7 @@ class AutoTodoServiceTest {
         when(appSettingsRepository.get("auto-todo-default")).thenReturn(Optional.of("true"));
         when(gateStatusResolver.resolve(event))
                 .thenReturn(new GateResult(GateStatus.RED, "execution-failure", "Process exited with code 1"));
-        when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
+        when(todoRepository.findOpenGateByCompositeKey(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(Optional.empty());
         when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -332,7 +332,7 @@ class AutoTodoServiceTest {
         WorkflowRunCompletedEvent event = createEvent(RunStatus.COMPLETED, Map.of(), AUTO_TODO_TRACK_META);
         when(gateStatusResolver.resolve(event))
                 .thenReturn(new GateResult(GateStatus.GREEN, "test-coverage", "Coverage 65%"));
-        when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
+        when(todoRepository.findOpenGateByCompositeKey(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(Optional.empty());
         when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -351,7 +351,7 @@ class AutoTodoServiceTest {
                 Map.of("gate_status", "YELLOW"), AUTO_TODO_TRACK_META);
         when(gateStatusResolver.resolve(event))
                 .thenReturn(new GateResult(GateStatus.YELLOW, "architecture", "3 HIGH findings"));
-        when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
+        when(todoRepository.findOpenGateByCompositeKey(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(Optional.empty());
         when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -369,7 +369,7 @@ class AutoTodoServiceTest {
                 Map.of("gate_status", "RED"), AUTO_TODO_TRACK_META);
         when(gateStatusResolver.resolve(event))
                 .thenReturn(new GateResult(GateStatus.RED, "security", "Critical vulnerability"));
-        when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
+        when(todoRepository.findOpenGateByCompositeKey(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(Optional.empty());
         when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -386,7 +386,7 @@ class AutoTodoServiceTest {
         WorkflowRunCompletedEvent event = createEvent(RunStatus.COMPLETED, Map.of(), AUTO_TODO_TRACK_META);
         when(gateStatusResolver.resolve(event))
                 .thenReturn(new GateResult(GateStatus.GREEN, "test-coverage", "All good"));
-        when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
+        when(todoRepository.findOpenGateByCompositeKey(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(Optional.empty());
         when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -405,7 +405,7 @@ class AutoTodoServiceTest {
         when(gateStatusResolver.resolve(event))
                 .thenReturn(new GateResult(GateStatus.YELLOW, "quality", "Warnings"));
         when(granularTodoService.hasItems(any())).thenReturn(true);
-        when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
+        when(todoRepository.findOpenGateByCompositeKey(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(Optional.empty());
         when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
