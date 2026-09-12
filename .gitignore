@@ -28,7 +28,9 @@ ai-automation-frontend/dist/
 ai-automation-frontend/tsconfig.tsbuildinfo
 ai-automation-frontend/cypress/screenshots/
 ai-automation-frontend/playwright/results/
-ai-automation-frontend/playwright/showcase/results/
+# Showcase-Aufnahmen: 27,6 MiB, von nichts im Repo referenziert. Sie liegen lokal
+# weiter, gehoeren aber nicht in den getrackten Baum (Entscheidung 2026-09-12).
+ai-automation-frontend/playwright/showcase/
 ai-automation-frontend/playwright/report/
 ai-automation-frontend/playwright/.auth/
 ai-automation-frontend/test-results/
