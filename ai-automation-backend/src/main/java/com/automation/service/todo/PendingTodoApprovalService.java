@@ -92,7 +92,7 @@ public class PendingTodoApprovalService {
         String category = String.valueOf(todoMap.get("category"));
         String tagsJson = todoMap.containsKey("tags") ? String.valueOf(todoMap.get("tags")) : "[]";
 
-        Optional<Todo> existing = todoRepository.findOpenByCompositeKey(
+        Optional<Todo> existing = todoRepository.findOpenGateByCompositeKey(
                 projectId, AutoTodoService.REFERENCE_TYPE, run.getWorkflow().getId(), "category:" + category);
 
         if (existing.isPresent()) {

@@ -34,14 +34,29 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
     TodoCountResponse countGroupedByStatus();
 
     /**
-     * Find an open auto-todo by composite key (projectId + source=WORKFLOW + referenceType + referenceId + category tag).
-     * Used for deduplication: at most 1 open todo per category per workflow per project.
+     * Find an open auto-todo by a tag composite key (for example, an item tag).
+     * Gate writers must use {@link #findOpenGateByCompositeKey} to exclude granular findings.
      */
     @Query("SELECT t FROM Todo t WHERE t.projectId = :projectId "
          + "AND t.source = 'WORKFLOW' AND t.referenceType = :refType "
          + "AND t.referenceId = :refId AND t.status <> 'DONE' "
          + "AND t.tags LIKE %:categoryTag%")
     Optional<Todo> findOpenByCompositeKey(
+            @Param("projectId") String projectId,
+            @Param("refType") String referenceType,
+            @Param("refId") String referenceId,
+            @Param("categoryTag") String categoryTag);
+
+    /**
+     * Find a gate TODO without matching an item TODO that shares its category.
+     * Match the complete JSON tag literally: category prefixes and LIKE wildcards are not keys.
+     */
+    @Query("SELECT t FROM Todo t WHERE t.projectId = :projectId "
+         + "AND t.source = 'WORKFLOW' AND t.referenceType = :refType "
+         + "AND t.referenceId = :refId AND t.status <> 'DONE' "
+         + "AND LOCATE(CONCAT('\"', :categoryTag, '\"'), t.tags) > 0 "
+         + "AND LOCATE('\"gate:', t.tags) > 0 AND LOCATE('\"item:', t.tags) = 0")
+    Optional<Todo> findOpenGateByCompositeKey(
             @Param("projectId") String projectId,
             @Param("refType") String referenceType,
             @Param("refId") String referenceId,
