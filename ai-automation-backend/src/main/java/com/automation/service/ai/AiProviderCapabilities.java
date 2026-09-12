@@ -19,8 +19,13 @@ public record AiProviderCapabilities(
         return new AiProviderCapabilities(true, true, true, true, true, true, true, true);
     }
 
-    /** Minimal capabilities (Codex). */
+    /** Nothing supported — baseline for providers that only take a prompt. */
     public static AiProviderCapabilities minimal() {
         return new AiProviderCapabilities(false, false, false, false, false, false, false, false);
+    }
+
+    /** Codex CLI: prompt-only, but {@code -m <model>} is honoured. */
+    public static AiProviderCapabilities codex() {
+        return new AiProviderCapabilities(false, true, false, false, false, false, false, false);
     }
 }

@@ -35,6 +35,18 @@ class AiProviderCapabilitiesTest {
     }
 
     @Test
+    void codex_should_onlySupportModelSelection() {
+        AiProviderCapabilities caps = AiProviderCapabilities.codex();
+
+        assertThat(caps.supportsModelSelection()).isTrue();
+        assertThat(caps.supportsSystemPrompt()).isFalse();
+        assertThat(caps.supportsEffort()).isFalse();
+        assertThat(caps.tokenTracking()).isFalse();
+        assertThat(caps).isNotEqualTo(AiProviderCapabilities.minimal());
+        assertThat(caps).isNotEqualTo(AiProviderCapabilities.full());
+    }
+
+    @Test
     void full_should_notEqualMinimal() {
         assertThat(AiProviderCapabilities.full()).isNotEqualTo(AiProviderCapabilities.minimal());
     }
