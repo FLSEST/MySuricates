@@ -38,8 +38,9 @@ public class IntegrationOAuthService {
             .connectTimeout(Duration.ofSeconds(10))
             .build();
 
-    /** Pending OAuth states for CSRF protection: state → providerId */
-    private final ConcurrentHashMap<String, String> pendingStates = new ConcurrentHashMap<>();
+    /** Bind the notification origin to the server-generated OAuth state. */
+    private record PendingAuthorization(String providerId, String callbackOrigin) {}
+    private final ConcurrentHashMap<String, PendingAuthorization> pendingStates = new ConcurrentHashMap<>();
 
     /** Save OAuth client credentials (encrypted) for a provider; PAT connections are validated and their scopes recorded. */
     @Transactional
@@ -98,6 +99,11 @@ public class IntegrationOAuthService {
      * Generate an OAuth2 authorization URL for the given provider.
      */
     public String getAuthorizationUrl(String providerId, String redirectUri, java.util.List<String> additionalScopes) {
+        return getAuthorizationUrl(providerId, redirectUri, additionalScopes, null);
+    }
+
+    public String getAuthorizationUrl(String providerId, String redirectUri,
+                                      java.util.List<String> additionalScopes, String callbackOrigin) {
         IntegrationProvider provider = registry.getProvider(providerId);
         OAuthConfig config = provider.getOAuthConfig();
 
@@ -107,28 +113,9 @@ public class IntegrationOAuthService {
         }
 
         String state = generateState();
-        pendingStates.put(state, providerId);
+        pendingStates.put(state, new PendingAuthorization(providerId, callbackOrigin));
 
-        java.util.List<String> allScopes = new java.util.ArrayList<>(config.defaultScopes());
-        if (additionalScopes != null) {
-            additionalScopes.stream()
-                    .filter(config.optionalScopes()::contains)
-                    .forEach(allScopes::add);
-        }
-        String scopes = String.join(" ", allScopes);
-
-        StringBuilder url = new StringBuilder(config.authorizationUrl())
-                .append("?client_id=").append(urlEncode(clientId))
-                .append("&redirect_uri=").append(urlEncode(redirectUri))
-                .append("&response_type=code")
-                .append("&scope=").append(urlEncode(scopes))
-                .append("&state=").append(urlEncode(state));
-
-        for (var entry : config.extraAuthParams().entrySet()) {
-            url.append("&").append(urlEncode(entry.getKey())).append("=").append(urlEncode(entry.getValue()));
-        }
-
-        return url.toString();
+        return OAuthAuthorizationUrl.build(config, clientId, redirectUri, additionalScopes, state);
     }
 
     /**
@@ -136,10 +123,11 @@ public class IntegrationOAuthService {
      */
     @Transactional
     public IntegrationConnection handleCallback(String code, String state, String redirectUri) {
-        String providerId = pendingStates.remove(state);
-        if (providerId == null) {
+        PendingAuthorization pending = pendingStates.remove(state);
+        if (pending == null) {
             throw new IllegalArgumentException("Invalid or expired OAuth state");
         }
+        String providerId = pending.providerId();
 
         IntegrationProvider provider = registry.getProvider(providerId);
         OAuthConfig config = provider.getOAuthConfig();
@@ -169,9 +157,14 @@ public class IntegrationOAuthService {
         return connectionRepository.save(connection);
     }
 
-    /**
-     * Get a valid access token, refreshing if necessary.
-     */
+    /** Read before consuming the state in handleCallback; never supplied by the callback request. */
+    public String getCallbackOrigin(String state) {
+        PendingAuthorization pending = pendingStates.get(state);
+        if (pending == null) throw new IllegalArgumentException("Invalid or expired OAuth state");
+        return pending.callbackOrigin();
+    }
+
+    /** Get a valid access token, refreshing if necessary. */
     public String getValidAccessToken(String providerId) {
         IntegrationConnection connection = connectionRepository.findByProviderId(providerId)
                 .orElseThrow(() -> new IllegalStateException("No connection for provider: " + providerId));

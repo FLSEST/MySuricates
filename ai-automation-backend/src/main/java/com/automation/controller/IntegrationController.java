@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,6 +30,9 @@ public class IntegrationController {
     private final IntegrationOAuthService oAuthService;
     private final ObjectMapper objectMapper;
 
+    @Value("${automation.cors.allowed-origins:http://localhost:3000,http://localhost:5173}")
+    private String allowedOrigins;
+
     @GetMapping
     public List<IntegrationProviderResponse> listProviders() {
         return registry.getAllProviders().stream()
@@ -45,10 +49,14 @@ public class IntegrationController {
     public Map<String, String> getAuthorizationUrl(
             @PathVariable String providerId,
             @RequestParam(required = false) List<String> scopes,
+            @RequestParam(required = false) String frontendOrigin,
             HttpServletRequest request) {
         String redirectUri = buildCallbackUrl(providerId, request);
-        String authUrl = oAuthService.getAuthorizationUrl(providerId, redirectUri, scopes);
-        return Map.of("authorizationUrl", authUrl);
+        String origin = OAuthCallbackPage.validateOrigin(frontendOrigin, redirectUri, allowedOrigins);
+        String authUrl = oAuthService.getAuthorizationUrl(providerId, redirectUri, scopes, origin);
+        java.net.URI callback = java.net.URI.create(redirectUri);
+        return Map.of("authorizationUrl", authUrl,
+                "callbackOrigin", callback.getScheme() + "://" + callback.getRawAuthority());
     }
 
     /**
@@ -64,23 +72,11 @@ public class IntegrationController {
             HttpServletRequest request) {
 
         String redirectUri = buildCallbackUrl(providerId, request);
+        String callbackOrigin = oAuthService.getCallbackOrigin(state);
         IntegrationConnection connection = oAuthService.handleCallback(code, state, redirectUri);
         log.info("OAuth callback successful for provider: {}", providerId);
 
-        String html = """
-                <!DOCTYPE html>
-                <html><body>
-                <script>
-                    window.opener.postMessage({ type: 'oauth-callback', provider: '%s', status: 'connected' }, '*');
-                    window.close();
-                </script>
-                <p>Verbindung hergestellt. Dieses Fenster schließt sich automatisch.</p>
-                </body></html>
-                """.formatted(providerId);
-
-        return ResponseEntity.ok()
-                .header("Content-Type", "text/html")
-                .body(html);
+        return OAuthCallbackPage.render(connection.getProviderId(), callbackOrigin);
     }
 
     @PostMapping("/{providerId}/credentials")

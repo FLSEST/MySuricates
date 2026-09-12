@@ -36,9 +36,10 @@ export function useConnectIntegration() {
 
   return useMutation({
     mutationFn: async ({ providerId, scopes }: { providerId: string; scopes?: string[] }) => {
-      const params = scopes?.length ? `?scopes=${scopes.map(encodeURIComponent).join('&scopes=')}` : '';
-      const { authorizationUrl } = await api.get<{ authorizationUrl: string }>(
-        `/integrations/${providerId}/connect${params}`
+      const params = new URLSearchParams({ frontendOrigin: window.location.origin });
+      scopes?.forEach(scope => params.append('scopes', scope));
+      const { authorizationUrl, callbackOrigin } = await api.get<{ authorizationUrl: string; callbackOrigin?: string }>(
+        `/integrations/${providerId}/connect?${params}`
       );
 
       return new Promise<void>((resolve, reject) => {
@@ -49,7 +50,12 @@ export function useConnectIntegration() {
         }
 
         const handler = (event: MessageEvent) => {
-          if (event.data?.type === 'oauth-callback') {
+          if (event.origin === (callbackOrigin ?? window.location.origin)
+              && event.source === popup
+              && event.data?.type === 'oauth-callback'
+              && event.data.provider === providerId
+              && event.data.status === 'connected') {
+            clearInterval(pollTimer);
             window.removeEventListener('message', handler);
             resolve();
           }

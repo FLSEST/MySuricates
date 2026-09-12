@@ -95,7 +95,8 @@ describe('useConnectIntegration', () => {
     await waitFor(() => expect(openSpy).toHaveBeenCalled());
 
     // Simulate the OAuth popup posting the callback message
-    window.dispatchEvent(new MessageEvent('message', { data: { type: 'oauth-callback' } }));
+    window.dispatchEvent(new MessageEvent('message', { origin: window.location.origin, source: fakePopup,
+      data: { type: 'oauth-callback', provider: 'github', status: 'connected' } }));
 
     await mutationPromise;
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
@@ -169,8 +170,39 @@ describe('useConnectIntegration', () => {
     await waitFor(() => expect(receivedUrl).toContain('scopes=repo'));
     expect(receivedUrl).toContain('scopes=user%3Aemail');
 
-    window.dispatchEvent(new MessageEvent('message', { data: { type: 'oauth-callback' } }));
+    expect(new URL(receivedUrl).searchParams.get('frontendOrigin')).toBe(window.location.origin);
+    window.dispatchEvent(new MessageEvent('message', { origin: window.location.origin, source: fakePopup,
+      data: { type: 'oauth-callback', provider: 'github', status: 'connected' } }));
     await mutationPromise;
+  });
+
+  it('ignores forged messages and accepts the expected backend popup on a separate origin', async () => {
+    server.use(http.get(`${apiBase}/integrations/github/connect`, () => HttpResponse.json({
+      authorizationUrl: 'https://github.com/oauth/authorize', callbackOrigin: 'http://localhost:9090',
+    })));
+    const popup = { closed: false } as Window;
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(popup);
+    const { result } = renderHook(() => useConnectIntegration(), { wrapper: createWrapper() });
+    let done = false;
+    let pending: Promise<unknown>;
+    act(() => { pending = result.current.mutateAsync({ providerId: 'github' }).then(() => { done = true; }); });
+    await waitFor(() => expect(openSpy).toHaveBeenCalled());
+    const valid = { origin: 'http://localhost:9090', source: popup,
+      data: { type: 'oauth-callback', provider: 'github', status: 'connected' } };
+    for (const invalid of [
+      { ...valid, origin: 'https://evil.example' },
+      { ...valid, source: window },
+      { ...valid, data: { ...valid.data, provider: 'jira' } },
+      { ...valid, data: { ...valid.data, status: 'failed' } },
+    ]) {
+      await act(async () => { window.dispatchEvent(new MessageEvent('message', invalid)); });
+      expect(done).toBe(false);
+    }
+    await act(async () => {
+      window.dispatchEvent(new MessageEvent('message', valid));
+      await pending;
+    });
+    expect(done).toBe(true);
   });
 });
 

@@ -82,7 +82,7 @@ class IntegrationControllerTest {
         when(oAuthService.getAuthorizationUrl(
                 eq("google-calendar"),
                 eq("http://localhost/api/v1/integrations/google-calendar/callback"),
-                eq(List.of("calendar.write"))))
+                eq(List.of("calendar.write")), eq("http://localhost")))
                 .thenReturn("https://auth.example/authorize");
 
         mockMvc.perform(get("/api/v1/integrations/google-calendar/connect")
@@ -93,6 +93,7 @@ class IntegrationControllerTest {
 
     @Test
     void handleCallback_returnsHtmlPageWithProviderName() throws Exception {
+        when(oAuthService.getCallbackOrigin("state-1")).thenReturn("https://localhost:3000");
         when(oAuthService.handleCallback("code-1", "state-1",
                 "http://localhost/api/v1/integrations/google-calendar/callback"))
                 .thenReturn(IntegrationConnection.builder().providerId("google-calendar").build());
@@ -103,7 +104,28 @@ class IntegrationControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("google-calendar")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("oauth-callback")));
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("oauth-callback")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("data-origin=\"https://localhost:3000\"")));
+    }
+
+    @Test
+    void getAuthorizationUrl_bindsAllowedFrontendOriginToStateAndReportsCallbackOrigin() throws Exception {
+        when(oAuthService.getAuthorizationUrl(eq("google-calendar"), any(), eq(null), eq("http://localhost:3000")))
+                .thenReturn("https://auth.example/authorize");
+        mockMvc.perform(get("/api/v1/integrations/google-calendar/connect")
+                        .param("frontendOrigin", "http://localhost:3000"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.callbackOrigin").value("http://localhost"));
+        verify(oAuthService).getAuthorizationUrl("google-calendar",
+                "http://localhost/api/v1/integrations/google-calendar/callback", null, "http://localhost:3000");
+    }
+
+    @Test
+    void getAuthorizationUrl_rejectsUntrustedFrontendOrigin() throws Exception {
+        mockMvc.perform(get("/api/v1/integrations/google-calendar/connect")
+                        .param("frontendOrigin", "https://evil.example"))
+                .andExpect(status().isBadRequest());
+        org.mockito.Mockito.verifyNoInteractions(oAuthService);
     }
 
     @Test
