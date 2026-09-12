@@ -73,29 +73,13 @@ scripts/seed-workflows.sh
 __pycache__/
 *.pyc
 
-# Private workflow templates (project-specific, not generic platform demos)
-# Hinweis: Diese Aufzaehlung nennt Dateinamen im Klartext und soll durch eine
-# Konvention ersetzt werden (siehe TODO 6cf6049d). Bis dahin hier ergaenzen.
-/workflow-pool/add_prospects.py
-/workflow-pool/app-build-gate.json
-/workflow-pool/backend-build-gate.json
-/workflow-pool/bahnhof-hunt-sync-deploy.json
-/workflow-pool/bilingual-narrative-song.json
-/workflow-pool/grammatik-uebungs-generator.json
-/workflow-pool/hunt-data-quality-gate.json
-/workflow-pool/job-rav-pending.json
-/workflow-pool/job-shortlist-generator.json
-/workflow-pool/job-shortlist-template.html
-/workflow-pool/job_dashboard_server.py
-/workflow-pool/kreuzwort-generator.json
-/workflow-pool/lehrplan-extraktor.json
-/workflow-pool/lehrplan-extraktor-bw.json
-/workflow-pool/lehrplan-extraktor-niedersachsen.json
-/workflow-pool/lehrplan-extraktor-nrw.json
-/workflow-pool/lernapp-generator.json
-/workflow-pool/lernapp-test-monitor.json
-/workflow-pool/lernpaket-batch-generator.json
-/workflow-pool/schulbuch-themen-generator.json
-/workflow-pool/uebungs-generator.json
-/workflow-pool/urlaubs-scout.json
-/workflow-pool/web-build-gate.json
+# Private Workflow-Definitionen
+#
+# Die Dateinamen stehen bewusst NICHT hier: eine Klartext-Aufzaehlung macht die Namen
+# privater Workflows oeffentlich, obwohl die Dateien selbst ignoriert sind. Sie liegen
+# stattdessen lokal in .git/info/exclude, das nicht Teil des Repositorys ist.
+#
+# Ein Unterverzeichnis scheidet als Konvention aus: WorkflowPoolService liest
+# workflow-pool/ flach, ein Unterordner nimmt die Definitionen aus dem Pool.
+#
+# Eine neue private Definition also in .git/info/exclude eintragen, nicht hier.
