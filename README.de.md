@@ -34,19 +34,20 @@ die wiederkehrende Lehre.
 
 ## Was da steht
 
-Stand 2026-09-12, Commit-Zaehler und Zeilen aus dem Arbeitsbaum, Testzahlen aus einem
-verifizierten Lauf am 2026-09-11 (Commit `a4a06843`):
+Stand 2026-09-12. Commit-Zaehler und Zeilen aus dem Arbeitsbaum, Testzahlen aus einem Lauf
+an diesem Tag in einem isolierten Worktree:
 
 | | |
 |---|---|
 | Entstanden seit | 2026-02-15, 1 014 Commits, ein Autor |
 | Backend | Java 21 / Spring Boot 3.4, rund 52 000 Zeilen, 38 REST-Controller, 68 Flyway-Migrationen |
 | Frontend | React 19 / TypeScript, rund 48 000 Zeilen |
-| Tests | Backend 6 597 (0 Fehler, 1 uebersprungen), Frontend 493 |
+| Tests | Backend 7 633 (0 Fehler, 1 uebersprungen), Frontend 496 |
 | Bausteine | 17 Block-Typen, 66 Workflow-Templates, 19 Built-in Skills, 7 Integrations-Provider |
 
-Die Testzahlen sind ein datierter Befund, kein Dauerzustand: die CI prueft derzeit Hygiene, Secrets
-und den Frontend-Build, nicht die beiden Testsuiten.
+Die Testzahlen sind ein datierter Befund. Dass sie es bleiben, prueft seit dem 2026-09-12 die CI:
+sie faehrt beide Suiten bei jedem Push, zusaetzlich zu Hygiene-Gate und Secret-Scan. Ein externer
+CI-Lauf steht noch aus, weil das Repository bisher nicht gepusht wurde.
 
 ## Reifegrad und bekannte Schulden
 

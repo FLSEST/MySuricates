@@ -29,8 +29,28 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  backend:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ai-automation-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: temurin
+          cache: maven
+      # Surefire fuehrt Unit- und Integrationstests gemeinsam aus. Die Integrationstests
+      # aktivieren das Spring-Profil "integration" per @ActiveProfiles; ein eigenes
+      # Maven-Profil dafuer gibt es nicht. Jede Test-JVM bekommt ihre eigene SQLite-Datei
+      # (IntegrationTestDbSessionListener), der Pool bleibt bei einer Verbindung.
+      - name: Run backend tests
+        run: ./mvnw -B --no-transfer-progress test
+
   frontend:
-    name: Frontend Lint + Build
+    name: Frontend Lint + Test + Build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -44,4 +64,5 @@ jobs:
           cache-dependency-path: ai-automation-frontend/package-lock.json
       - run: npm ci
       - run: npm run lint
+      - run: npm test
       - run: npm run build

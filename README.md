@@ -23,17 +23,17 @@ The most honest answer after seven months: the mechanisms hold, but they need gu
 
 ## What is there
 
-Status as of 2026-09-12, commit count and line counts from the working tree, test numbers from a verified run on 2026-09-11 (commit `a4a06843`):
+Status as of 2026-09-12. Commit count and line counts from the working tree, test numbers from a run on that day in an isolated worktree:
 
 | | |
 |---|---|
 | Created since | 2026-02-15, 1 014 commits, one author |
 | Backend | Java 21 / Spring Boot 3.4, roughly 52 000 lines, 38 REST controllers, 68 Flyway migrations |
 | Frontend | React 19 / TypeScript, roughly 48 000 lines |
-| Tests | Backend 6 597 (0 failures, 1 skipped), Frontend 493 |
+| Tests | Backend 7 633 (0 failures, 1 skipped), Frontend 496 |
 | Building blocks | 17 block types, 66 workflow templates, 19 built-in skills, 7 integration providers |
 
-The test numbers are a dated finding, not a permanent state: CI currently checks hygiene, secrets, and the frontend build, not the two test suites.
+The test numbers are a dated finding. Keeping them true is CI's job since 2026-09-12: it runs both suites on every push, in addition to the hygiene gate and the secret scan. An external CI run is still pending because the repository has not been pushed yet.
 
 ## Maturity and known debt
 
