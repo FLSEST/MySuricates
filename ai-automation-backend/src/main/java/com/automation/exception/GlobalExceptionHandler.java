@@ -1,7 +1,9 @@
 package com.automation.exception;
 
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.validation.FieldError;
@@ -9,6 +11,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -116,6 +119,27 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         log.warn("Invalid value for request parameter '{}': {}", ex.getName(), ex.getValue());
         return respond(ErrorCode.INVALID_ARGUMENT, "Invalid value for parameter '" + ex.getName() + "'");
+    }
+
+    // Unknown API path: ResourceHttpRequestHandler's "/**" fallback throws this instead of matching
+    // any @RequestMapping. Without an explicit handler it falls into handleGeneral and answers 500
+    // INTERNAL_ERROR with a logged stack trace, even though it's a routine 404 (client typo, unbuilt
+    // feature, stale bookmark) — see TODO c8f122ac.
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(HttpServletRequest request) {
+        String message = "No endpoint: " + request.getMethod() + " " + request.getRequestURI();
+        log.debug(message);
+        return respond(ErrorCode.RESOURCE_NOT_FOUND, message);
+    }
+
+    // Known path, wrong HTTP verb (e.g. GET on a POST-only endpoint). Also fell into handleGeneral
+    // as 500 before this handler existed.
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex,
+                                                                   HttpServletRequest request) {
+        String message = "Method not allowed: " + ex.getMethod() + " " + request.getRequestURI();
+        log.debug(message);
+        return respond(ErrorCode.METHOD_NOT_ALLOWED, message);
     }
 
     @ExceptionHandler(Exception.class)

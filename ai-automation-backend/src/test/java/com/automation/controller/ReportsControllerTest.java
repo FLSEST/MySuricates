@@ -180,7 +180,10 @@ class ReportsControllerTest {
 
     @Test
     void getReport_slashInName_returnsError() throws Exception {
+        // "sub/file.md" doesn't match the single-segment {name} path variable, so this falls
+        // into Spring's NoResourceFoundException fallback. TODO c8f122ac fixed that path to
+        // answer 404 (routine "no such endpoint") instead of the previous 500 INTERNAL_ERROR.
         mockMvc.perform(get("/api/v1/reports/sub/file.md"))
-                .andExpect(status().is5xxServerError());
+                .andExpect(status().isNotFound());
     }
 }

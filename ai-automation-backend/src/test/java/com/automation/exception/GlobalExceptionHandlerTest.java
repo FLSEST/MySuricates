@@ -1,17 +1,23 @@
 package com.automation.exception;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.core.MethodParameter;
 
 import java.util.NoSuchElementException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class GlobalExceptionHandlerTest {
 
@@ -162,6 +168,35 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getCode()).isEqualTo("INVALID_ARGUMENT");
         assertThat(response.getBody().getError()).isEqualTo("Missing required parameter: projectId");
+    }
+
+    @Test
+    void handleNoResourceFound_returnsNotFoundStatus() {
+        var ex = new NoResourceFoundException(HttpMethod.POST, "api/v1/projects/x/container/start");
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getRequestURI()).thenReturn("/api/v1/projects/x/container/start");
+
+        ResponseEntity<ErrorResponse> response = handler.handleNoResourceFound(request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getCode()).isEqualTo("RESOURCE_NOT_FOUND");
+        assertThat(response.getBody().getError()).isEqualTo("No endpoint: POST /api/v1/projects/x/container/start");
+    }
+
+    @Test
+    void handleMethodNotSupported_returnsMethodNotAllowedStatus() {
+        var ex = new HttpRequestMethodNotSupportedException("GET", java.util.List.of("POST"));
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getRequestURI()).thenReturn("/api/v1/workflows/abc-123/execute");
+
+        ResponseEntity<ErrorResponse> response = handler.handleMethodNotSupported(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getCode()).isEqualTo("METHOD_NOT_ALLOWED");
+        assertThat(response.getBody().getError()).isEqualTo("Method not allowed: GET /api/v1/workflows/abc-123/execute");
     }
 
     @Test

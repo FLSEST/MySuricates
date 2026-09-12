@@ -15,7 +15,7 @@ class ErrorCodeTest {
 
     @Test
     void should_containAllExpectedValues_when_enumValuesQueried() {
-        assertThat(ErrorCode.values()).hasSize(14)
+        assertThat(ErrorCode.values()).hasSize(15)
                 .containsExactly(
                         ErrorCode.RESOURCE_NOT_FOUND,
                         ErrorCode.VALIDATION_FAILED,
@@ -30,6 +30,7 @@ class ErrorCodeTest {
                         ErrorCode.SERVICE_UNAVAILABLE,
                         ErrorCode.TOKEN_BUDGET_EXCEEDED,
                         ErrorCode.OPERATION_TIMEOUT,
+                        ErrorCode.METHOD_NOT_ALLOWED,
                         ErrorCode.INTERNAL_ERROR
                 );
     }
@@ -60,6 +61,7 @@ class ErrorCodeTest {
         assertThat(ErrorCode.VALIDATION_FAILED.getHttpStatus().is4xxClientError()).isTrue();
         assertThat(ErrorCode.INVALID_ARGUMENT.getHttpStatus().is4xxClientError()).isTrue();
         assertThat(ErrorCode.STATE_CONFLICT.getHttpStatus().is4xxClientError()).isTrue();
+        assertThat(ErrorCode.METHOD_NOT_ALLOWED.getHttpStatus().is4xxClientError()).isTrue();
         assertThat(ErrorCode.NO_TASK_TARGET.getHttpStatus().is4xxClientError()).isTrue();
         assertThat(ErrorCode.PROVIDER_NOT_CONNECTED.getHttpStatus().is4xxClientError()).isTrue();
         assertThat(ErrorCode.PROVIDER_NOT_TASK_CAPABLE.getHttpStatus().is4xxClientError()).isTrue();
@@ -91,6 +93,7 @@ class ErrorCodeTest {
                 Arguments.of(ErrorCode.SERVICE_UNAVAILABLE, HttpStatus.SERVICE_UNAVAILABLE, "Service unavailable"),
                 Arguments.of(ErrorCode.TOKEN_BUDGET_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS, "Token budget exceeded"),
                 Arguments.of(ErrorCode.OPERATION_TIMEOUT, HttpStatus.GATEWAY_TIMEOUT, "Operation timed out"),
+                Arguments.of(ErrorCode.METHOD_NOT_ALLOWED, HttpStatus.METHOD_NOT_ALLOWED, "Method not allowed"),
                 Arguments.of(ErrorCode.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error")
         );
     }
