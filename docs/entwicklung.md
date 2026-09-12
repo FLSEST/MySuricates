@@ -452,8 +452,9 @@ was gestaged ist.
 
 ## Abhaengigkeits-Meldungen (Frontend)
 
-`npm audit` im Frontend meldete am 2026-09-12 zwanzig Schwachstellen. Nach dem Update sind es
-sieben, alle ohne verfuegbaren Fix innerhalb der deklarierten Versionsbereiche.
+`npm audit` im Frontend meldet nach den Updates vom 2026-09-12 **0 Schwachstellen**.
+Nach einer ersten Reduktion von zwanzig auf sieben wurden auch die beiden notwendigen
+Major-Upgrades durchgefuehrt.
 
 **Abgetragen:** die Laufzeit-Kette zuerst. `dompurify` kam ueber
 `@monaco-editor/react` → `monaco-editor` und stand auf 3.4.12, dem oberen Rand des
@@ -462,15 +463,16 @@ Update bewegt es nicht, weil ein `overrides`-Eintrag die Version pinnt — der E
 auf `^3.4.13`, installiert ist 3.4.15. Danach `npm audit fix` ohne `--force` fuer alles Weitere
 in Range.
 
-**Bewusst offen:**
+**Weitere Updates:**
 
-| Paket | Warum es bleibt |
+| Paket | Aktualisierung |
 |---|---|
-| `cypress` und seine Transitiven (`@cypress/request`, `uuid`, `extract-zip`, `qs`) | Der Fix ist Cypress 15, ein Major-Sprung. Reines Testwerkzeug, laeuft nicht im ausgelieferten Frontend und nicht in der CI. Eigener Vorgang. |
-| `react-router-dom` / `react-router` | Open Redirect ueber Backslash in `<Link>` und `useNavigate` (bis 7.17.0). Der Fix ist react-router-dom 7, eine Framework-Migration. **Der erreichbare Pfad ist stattdessen an der Quelle geschlossen:** der Assistent rendert LLM-Text als Markdown und reichte bisher jedes `href`, das mit `/` beginnt, an `navigate()` weiter — `/\evil.example` haette die App verlassen. `isInternalAppPath()` in `src/components/assistantPanelUtils.ts` weist protokollrelative und Backslash-Pfade ab, mit Test. |
+| `cypress` und seine Transitiven | Cypress 15.21.1 ersetzt die verwundbaren Abhaengigkeiten von Cypress 13; auch `qs` ist aktualisiert. |
+| `react-router-dom` / `react-router` | Version 7.18.3 behebt die gemeldeten Router-Befunde. Der bestehende Schutz `isInternalAppPath()` gegen protokollrelative und Backslash-Pfade bleibt bestehen. |
 
-Nachprüfen mit `npm audit`; nach dem Abtragen sind `npm run build`, `npm test` und
-`npx tsc --noEmit` gruen und `npm run lint` unveraendert bei 0 Fehlern.
+Nachpruefen mit `npm audit`, `npm test` und `npm run build` (einschliesslich TypeScript-Pruefung).
+Fuer Cypress 15 gelten Node.js 20/22/24+ und unter Linux glibc >= 2.31;
+siehe [Cypress-Migrationshinweise](https://www.cypress.io/blog/cypress-15-made-simple-upgrade-paths-from-13-and-14).
 
 ## Bekannte Einschränkungen
 
