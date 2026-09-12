@@ -160,7 +160,9 @@ automation.security.rate-limit.enabled: true
 automation.tailscale.enabled: true
 ```
 
-- API-Key-Authentifizierung aktiv (Key wird beim ersten Start auto-generiert)
+- API-Key-Authentifizierung aktiv (Key wird beim ersten Start auto-generiert, sofern
+  `AUTOMATION_API_KEY` leer ist — er steht danach im Log, in `~/.autotrigger/api-key` und in der
+  Tabelle `app_settings`)
 - Rate Limiting aktiv (120 req/min, konfigurierbar in Settings → Execution)
 - SQLite unter `./data/automation.db`
 
@@ -169,7 +171,7 @@ automation.tailscale.enabled: true
 ```bash
 # docker-compose.yml Umgebung
 AUTOMATION_SECURITY_ENABLED=true
-AUTOMATION_API_KEY=<sicherer-key>
+AUTOMATION_API_KEY=<sicherer-key>   # Pflicht: die Compose-Datei liefert keinen Default mit
 AUTOMATION_TAILSCALE_ENABLED=true    # optional
 AUTOMATION_RATE_LIMIT_ENABLED=true   # optional
 ```

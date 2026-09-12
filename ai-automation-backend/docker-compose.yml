@@ -14,7 +14,10 @@ services:
       - AUTOMATION_DB_PATH=/app/data/automation.db
       - DOCKER_HOST=unix:///var/run/docker.sock
       - AUTOMATION_SECURITY_ENABLED=true
-      - AUTOMATION_API_KEY=changeme
+      # Leer lassen -> das Backend erzeugt beim ersten Start einen Schluessel und gibt ihn
+      # im Log aus (docker compose logs backend | grep -i 'API KEY'). Eigenen Wert setzen:
+      # AUTOMATION_API_KEY=... exportieren oder in eine .env neben dieser Datei schreiben.
+      - AUTOMATION_API_KEY=${AUTOMATION_API_KEY:-}
       - AUTOMATION_TAILSCALE_ENABLED=false
     restart: unless-stopped
     healthcheck:
