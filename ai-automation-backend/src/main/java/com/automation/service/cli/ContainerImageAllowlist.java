@@ -35,7 +35,7 @@ public class ContainerImageAllowlist {
     void init() {
         if (allowedImagesRaw == null || allowedImagesRaw.isBlank()) {
             this.entries = List.of();
-            log.warn("Container image allowlist empty — any image allowed");
+            log.info("Container image allowlist empty — any image allowed");
             return;
         }
         List<String> parsed = new ArrayList<>();
@@ -51,15 +51,16 @@ public class ContainerImageAllowlist {
     /**
      * True if {@code image} is allowed: an empty allowlist allows everything; otherwise an entry
      * matches by exact equality, as a registry/namespace prefix when it ends with "/", or, for a
-     * tag-free entry, against the image's bare name or any of its tags.
+     * tag-free entry, against the image's bare name or any of its tags. An image starting with
+     * "-" is rejected regardless of the allowlist — {@code docker run} would read it as a flag.
      */
     public boolean isAllowed(String image) {
+        if (image == null || image.isBlank() || image.startsWith("-")) {
+            return false;
+        }
         List<String> current = entries;
         if (current.isEmpty()) {
             return true;
-        }
-        if (image == null || image.isBlank()) {
-            return false;
         }
         for (String entry : current) {
             if (matches(entry, image)) {

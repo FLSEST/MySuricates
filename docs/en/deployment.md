@@ -349,13 +349,14 @@ These two are easily confused:
 
 ### Container Image Allowlist
 
-`AUTOMATION_ALLOWED_CONTAINER_IMAGES` (default empty = any image allowed, logged once as a WARNING
-at startup) restricts which `container_image` a shell block may request. The check sits centrally
-in `ContainerShellService.execute` — both callers (`ShellBlockExecutor`, `CommandExecutorService`)
-get it automatically. An image that is not listed fails with exit code 125 and a SECURITY entry in
-the activity log instead of simply starting. An entry matches by exact equality, as a
-registry/namespace prefix (ends with `/`), or, when it has no tag, against any tag of the image.
-Same pattern as `AUTOMATION_ALLOWED_MOUNT_PREFIXES`.
+`AUTOMATION_ALLOWED_CONTAINER_IMAGES` (default empty = any image allowed, logged once as an INFO
+message at startup) restricts which `container_image` a shell block may request. The check sits
+centrally in `ContainerShellService.execute` — both callers (`ShellBlockExecutor`,
+`CommandExecutorService`) get it automatically. An image that is not listed fails with exit code
+125 and a SECURITY entry in the activity log instead of simply starting. An entry matches by exact
+equality, as a registry/namespace prefix (ends with `/`), or, when it has no tag, against any tag
+of the image. An image starting with `-` is always rejected (regardless of the allowlist) —
+`docker run` would otherwise read it as a flag. Same pattern as `AUTOMATION_ALLOWED_MOUNT_PREFIXES`.
 
 ### What follows from this
 

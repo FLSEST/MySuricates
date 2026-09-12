@@ -27,6 +27,7 @@ public class ExecutionContext {
     @Setter
     private String projectPath;
 
+    /** taint-neutral — für Block-Ergebnisse {@link #recordOutput}, für aus Output abgeleitete Variablen {@link #setDerivedVariable} verwenden; nur für Resume-Seeding/Tests. */
     @Setter
     private String previousOutput;
 
@@ -196,7 +197,7 @@ public class ExecutionContext {
         return effort;
     }
 
-    /** Stores a block's output under its declared name for {{ block.<name>.output }} resolution. */
+    /** Stores a block's output under its declared name for {{ block.<name>.output }} resolution. Taint-neutral — für Block-Ergebnisse {@link #recordOutput}, für aus Output abgeleitete Variablen {@link #setDerivedVariable} verwenden; nur für Resume-Seeding/Tests. */
     public void setBlockOutput(String blockName, String output) {
         if (blockName == null || blockName.isBlank()) return;
         blockOutputs.put(blockName, output == null ? "" : output);

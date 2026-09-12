@@ -684,6 +684,33 @@ class IntegrationOAuthServiceTest {
         verify(connectionRepository, never()).save(any());
     }
 
+    @Test
+    void handleCallback_withoutAccessTokenInResponse_throwsInsteadOfNpe() throws Exception {
+        // A 200 that carries no access_token used to NPE inside tokenResponse.get(...).asText().
+        server = startJsonServer(200, "{}");
+        IntegrationOAuthService service = newService();
+        IntegrationConnection connection = IntegrationConnection.builder()
+                .providerId("google-calendar")
+                .clientIdEncrypted("enc-client-id")
+                .clientSecretEncrypted("enc-client-secret")
+                .build();
+
+        when(registry.getProvider("google-calendar")).thenReturn(provider);
+        when(provider.getOAuthConfig()).thenReturn(googleConfig(null));
+        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.of(connection));
+        when(encryptionService.decrypt("enc-client-id")).thenReturn("client-id");
+        when(encryptionService.decrypt("enc-client-secret")).thenReturn("client-secret");
+
+        String authorizationUrl = service.getAuthorizationUrl(
+                "google-calendar", "http://localhost/callback", List.of());
+        String state = parseQuery(URI.create(authorizationUrl)).get("state");
+
+        assertThatThrownBy(() -> service.handleCallback("code-123", state, "http://localhost/callback"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Token exchange failed for google-calendar (no access_token in response)");
+        verify(connectionRepository, never()).save(any());
+    }
+
     private IntegrationConnection connectedGoogleConnection() {
         return IntegrationConnection.builder()
                 .providerId("google-calendar")

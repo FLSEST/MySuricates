@@ -32,6 +32,7 @@ public class OAuthStateRegistry {
 
     public static final Duration TTL = Duration.ofMinutes(10);
     static final int MAX_PENDING = 1000;
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     /** Binds provider and notification origin to the server-generated OAuth state. */
     public record PendingAuthorization(String providerId, String callbackOrigin, Instant expiresAt) {
@@ -81,7 +82,7 @@ public class OAuthStateRegistry {
 
     private static String generateState() {
         byte[] bytes = new byte[32];
-        new SecureRandom().nextBytes(bytes);
+        SECURE_RANDOM.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 

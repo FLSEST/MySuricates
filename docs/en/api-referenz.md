@@ -1118,6 +1118,10 @@ other management response (list, get, enable, disable) masks it: only the first 
 `…` (U+2026), and `webhookUrl` uses that same masked token. Save the full token immediately after
 creating/regenerating — it cannot be retrieved again afterwards.
 
+**Upgrade note:** existing webhook tokens are no longer readable in full after this update. To
+recover, call `POST /api/v1/webhooks/{id}/regenerate-token` and reconfigure the external caller
+(e.g. the GitHub webhook settings) with the new token.
+
 ### `GET /api/v1/webhooks`
 
 List all webhooks.

@@ -352,13 +352,15 @@ Die beiden werden leicht verwechselt:
 
 ### Container-Image-Allowlist
 
-`AUTOMATION_ALLOWED_CONTAINER_IMAGES` (Default leer = jedes Image erlaubt, einmaliges WARN beim
+`AUTOMATION_ALLOWED_CONTAINER_IMAGES` (Default leer = jedes Image erlaubt, einmaliges INFO beim
 Start) schraenkt ein, welches `container_image` ein Shell-Block anfordern darf. Die Pruefung sitzt
 zentral in `ContainerShellService.execute` — beide Aufrufer (`ShellBlockExecutor`,
 `CommandExecutorService`) laufen automatisch mit. Ein nicht gelistetes Image scheitert mit
 Exit-Code 125 und einem SECURITY-Eintrag im Activity-Log, statt einfach zu starten. Ein Eintrag
 matcht per Gleichheit, als Registry-/Namespace-Praefix (endet mit `/`), oder — ohne Tag — gegen
-jeden Tag des Images. Analoges Muster zu `AUTOMATION_ALLOWED_MOUNT_PREFIXES`.
+jeden Tag des Images. Ein Image, das mit `-` beginnt, wird immer abgelehnt (unabhaengig von der
+Allowlist) — `docker run` wuerde es sonst als Flag lesen. Analoges Muster zu
+`AUTOMATION_ALLOWED_MOUNT_PREFIXES`.
 
 ### Daraus folgt
 

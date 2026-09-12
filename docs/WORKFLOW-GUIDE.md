@@ -153,6 +153,12 @@ Fuehrt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 > **unquoted** schreiben. In Runs ohne untrusted Input (Schedule, manueller Start, TodoTrigger,
 > Chain) bleiben alle Block-Ausgaben unveraendert roh.
 
+> **Achtung `{{ previous_report }}` / `{{ open_todos }}`:** Diese aus dem VORHERIGEN Run injizierten
+> Werte werden von der run-level Taint-Propagation oben NICHT erfasst (sie stammen nicht aus dem
+> aktuellen Run und tragen keinen `__untrusted_*`-Marker) und sind in Shell-Bloecken trotzdem wie
+> fremde/unvertrauenswuerdige Daten zu behandeln — also ebenfalls unquoted schreiben oder explizit
+> escapen (offenes TODO 1e77e717).
+
 ```json
 {
   "type": "shell",
