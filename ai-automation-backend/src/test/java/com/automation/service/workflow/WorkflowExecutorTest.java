@@ -133,7 +133,6 @@ class WorkflowExecutorTest {
                 commandExecutorService,
                 runRepository,
                 stepResultRepository,
-                containerRepository,
                 skillRepository,
                 broadcaster,
                 virtualThreadExecutor,
@@ -142,10 +141,12 @@ class WorkflowExecutorTest {
                         new WorkflowContextDataService(runRepository, stepResultRepository, todoRepository),
                         agentInstructionsService, commandExecutorService, workflowMemoryService, projectContextService),
                 activityLogService,
-                eventPublisher,
                 new RunCompletionHandler(templateVerificationService, activityLogService, deadLetterService),
                 registry,
-                new BlockOutputValidator()
+                new BlockSkillContext(commandExecutorService),
+                new BlockStepRunner(stepResultRepository, broadcaster, new BlockOutputValidator(),
+                        activityLogService, containerRepository),
+                new RunFinalizer(runRepository, broadcaster, eventPublisher)
         );
 
         testProject = Project.builder()
@@ -1151,7 +1152,6 @@ class WorkflowExecutorTest {
                 commandExecutorService,
                 runRepository,
                 stepResultRepository,
-                containerRepository,
                 skillRepository,
                 broadcaster,
                 threads,
@@ -1160,10 +1160,12 @@ class WorkflowExecutorTest {
                         new WorkflowContextDataService(runRepository, stepResultRepository, todoRepository),
                         agentInstructionsService, commandExecutorService, workflowMemoryService, projectContextService),
                 activityLogService,
-                eventPublisher,
                 new RunCompletionHandler(templateVerificationService, activityLogService, deadLetterService),
                 executionRegistry,
-                new BlockOutputValidator()
+                new BlockSkillContext(commandExecutorService),
+                new BlockStepRunner(stepResultRepository, broadcaster, new BlockOutputValidator(),
+                        activityLogService, containerRepository),
+                new RunFinalizer(runRepository, broadcaster, eventPublisher)
         );
     }
 

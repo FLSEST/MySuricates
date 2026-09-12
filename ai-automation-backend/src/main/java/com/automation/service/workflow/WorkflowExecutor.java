@@ -2,13 +2,11 @@ package com.automation.service.workflow;
 
 import com.automation.entity.*;
 import com.automation.entity.ActivityLog.LogCategory;
-import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.exception.WorkflowExecutionException;
 import com.automation.executor.ApprovalRequest;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
-import com.automation.repository.ContainerRepository;
 import com.automation.repository.SkillRepository;
 import com.automation.repository.StepResultRepository;
 import com.automation.repository.WorkflowRunRepository;
@@ -19,7 +17,6 @@ import com.automation.util.TruncationUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
@@ -44,17 +41,17 @@ public class WorkflowExecutor {
     private final CommandExecutorService commandExecutorService;
     private final WorkflowRunRepository runRepository;
     private final StepResultRepository stepResultRepository;
-    private final ContainerRepository containerRepository;
     private final SkillRepository skillRepository;
     private final ExecutionBroadcaster broadcaster;
     private final ExecutorService virtualThreadExecutor;
     private final DynamicSemaphore executionSemaphore;
     private final ExecutionContextFactory executionContextFactory;
     private final ActivityLogService activityLogService;
-    private final ApplicationEventPublisher eventPublisher;
     private final RunCompletionHandler completionHandler;
     private final WorkflowExecutionRegistry executionRegistry;
-    private final BlockOutputValidator blockOutputValidator;
+    private final BlockSkillContext skillContext;
+    private final BlockStepRunner stepRunner;
+    private final RunFinalizer finalizer;
 
     // Active execution tracking is delegated to WorkflowExecutionRegistry
 
@@ -209,40 +206,10 @@ public class WorkflowExecutor {
                     break;
                 }
 
-                if (context.isPaused() && !context.shouldStop()) {
-                    run.setStatus(RunStatus.PAUSED);
-                    runRepository.save(run);
-                    broadcaster.broadcastRunStatus(run.getId(), RunStatus.PAUSED);
-                    while (context.isPaused() && !context.shouldStop()) {
-                        try {
-                            Thread.sleep(500);
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                            break;
-                        }
-                    }
-                    if (!context.shouldStop()) {
-                        run.setStatus(RunStatus.RUNNING);
-                        runRepository.save(run);
-                        broadcaster.broadcastRunStatus(run.getId(), RunStatus.RUNNING);
-                    }
-                }
+                waitWhilePaused(run, context);
 
                 // Per-block skill context: merge block-level skills with workflow-level skills
-                boolean hasBlockSkills = block.getSkillIds() != null && !block.getSkillIds().isEmpty();
-                if (hasBlockSkills) {
-                    List<Skill> merged = new ArrayList<>(skills);
-                    Set<String> existingIds = skills.stream().map(Skill::getId).collect(Collectors.toSet());
-                    for (String id : block.getSkillIds()) {
-                        if (!existingIds.contains(id)) {
-                            Skill extra = blockSkillLookup.get(id);
-                            if (extra != null) {
-                                merged.add(extra);
-                            }
-                        }
-                    }
-                    commandExecutorService.writeSkillContextToProject(project.getPath(), merged);
-                }
+                boolean hasBlockSkills = skillContext.applyForBlock(block, project, skills, blockSkillLookup);
 
                 BlockExecutor executor = findExecutor(block.getType());
 
@@ -253,91 +220,17 @@ public class WorkflowExecutor {
                 if (stepIndex < skipToStepIndex) {
                     // Restore baseline skill context if this block had extra skills
                     if (hasBlockSkills) {
-                        commandExecutorService.writeSkillContextToProject(project.getPath(), skills);
+                        skillContext.restore(project, skills);
                     }
                     continue;
                 }
 
-                StepResult step = new StepResult();
-                step.setStepIndex(stepIndex);
-                step.setStartedAt(Instant.now());
-                step.setStatus(StepStatus.RUNNING);
-                step.setMetadata(Map.of("blockType", block.getType()));
-                step.setWorkflowRun(run);
-                run.getSteps().add(step);
-                stepResultRepository.save(step);
-                broadcaster.broadcastStepResult(run.getId(), step);
-
-                // Execute the block — with optional output validation + retry
-                StepResult result = executor.execute(block, context);
-                int validationAttempts = 0;
-                int maxValidationAttempts = blockOutputValidator.maxRetries(block);
-                while (result.getStatus() == StepStatus.COMPLETED && validationAttempts < maxValidationAttempts) {
-                    var validation = blockOutputValidator.validate(block, result.getOutput());
-                    if (validation.passed()) break;
-                    if (!blockOutputValidator.shouldRetry(block)) {
-                        log.warn("Block {} output validation failed without retry: {}", step.getStepIndex(), validation.reason());
-                        result.setStatus(StepStatus.FAILED);
-                        String existing = result.getOutput() == null ? "" : result.getOutput();
-                        result.setOutput(existing + "\n[VALIDATION] " + validation.reason());
-                        break;
-                    }
-                    validationAttempts++;
-                    log.info("Block {} output validation failed (attempt {}/{}): {}",
-                            step.getStepIndex(), validationAttempts, maxValidationAttempts, validation.reason());
-                    activityLogService.warn(LogCategory.EXECUTION,
-                            "Block " + step.getStepIndex() + " validation failed (attempt " + validationAttempts + "/" + maxValidationAttempts + "): " + validation.reason(),
-                            "WorkflowExecutor", run.getId());
-                    result = executor.execute(block, context);
-                }
-                if (result.getStatus() == StepStatus.COMPLETED) {
-                    var finalCheck = blockOutputValidator.validate(block, result.getOutput());
-                    if (!finalCheck.passed()) {
-                        log.warn("Block {} output validation failed after {} retries: {}",
-                                step.getStepIndex(), validationAttempts, finalCheck.reason());
-                        result.setStatus(StepStatus.FAILED);
-                        String existing = result.getOutput() == null ? "" : result.getOutput();
-                        result.setOutput(existing + "\n[VALIDATION] failed after " + validationAttempts + " retries: " + finalCheck.reason());
-                    }
-                }
-
-                // Update the persisted step with the actual results
-                step.setInput(result.getInput());
-                step.setOutput(result.getOutput());
-                step.setStatus(result.getStatus());
-                step.setCompletedAt(result.getCompletedAt());
-                step.setDurationMs(result.getDurationMs());
-                Map<String, Object> stepMetadata = result.getMetadata() != null
-                        ? new HashMap<>(result.getMetadata())
-                        : new HashMap<>();
-                stepMetadata.put("blockType", block.getType());
-                if (block.getName() != null && !block.getName().isBlank()) {
-                    stepMetadata.put("blockName", block.getName());
-                }
-                step.setMetadata(stepMetadata);
-                context.setPreviousOutput(step.getOutput());
-                context.setVariable("step_" + step.getStepIndex() + "_output",
-                        step.getOutput() != null ? step.getOutput() : "");
-                if (block.getName() != null && !block.getName().isBlank()) {
-                    context.setBlockOutput(block.getName(), step.getOutput());
-                }
-
-                // Persist context delta for potential future resume
-                if (step.getStatus() == StepStatus.COMPLETED) {
-                    step.setContextDelta(ContextDeltaCalculator.compute(context, run.getInputContext()));
-                }
-
-                // Update container last activity (skip if no container)
-                if (containerId != null) {
-                    updateContainerActivity(containerId);
-                }
-
-                broadcaster.broadcastStepResult(run.getId(), step);
-                stepResultRepository.save(step);
+                StepResult step = stepRunner.startStep(run, stepIndex, block);
+                stepRunner.runStep(step, block, executor, context, run, containerId);
 
                 // Restore baseline skill context after a block with extra skills
                 if (hasBlockSkills) {
-                    commandExecutorService.writeSkillContextToProject(project.getPath(), skills);
+                    skillContext.restore(project, skills);
                 }
 
                 if (step.getStatus() == StepStatus.FAILED && block.shouldStopOnFailure()) {
@@ -379,40 +272,38 @@ public class WorkflowExecutor {
             // DB=RUNNING with an empty registry and flag a false-positive ghost run.
             try {
                 if (run != null) {
-                    run.setCompletedAt(Instant.now());
-                    run.setDurationMs(
-                            run.getCompletedAt().toEpochMilli() - run.getStartedAt().toEpochMilli()
-                    );
-
-                    // Merge context runMetadata into WorkflowRun.metadata
-                    if (context != null && !context.getRunMetadata().isEmpty()) {
-                        Map<String, Object> merged = new HashMap<>(run.getMetadata());
-                        merged.putAll(context.getRunMetadata());
-                        run.setMetadata(merged);
-                    }
-
-                    runRepository.save(run);
-
-                    // Broadcast final status
-                    broadcaster.broadcastRunStatus(run.getId(), run.getStatus());
-
-                    // Publish domain event for listeners (e.g. AutoTodoService)
-                    try {
-                        eventPublisher.publishEvent(new WorkflowRunCompletedEvent(
-                                this, run.getId(), workflowId, workflowName,
-                                project != null ? project.getId() : null,
-                                project != null ? project.getPath() : null,
-                                run.getStatus(),
-                                run.getMetadata(), workflowMeta, run.getError()));
-                    } catch (Exception e) {
-                        log.error("Failed to publish WorkflowRunCompletedEvent for run {}: {}", run.getId(), e.getMessage(), e);
-                    }
+                    finalizer.finish(run, context, workflowId, workflowName, project, workflowMeta);
                 } else {
                     // run could not be loaded — mark as failed directly
                     failRun(runId, "Failed to load workflow run from database");
                 }
             } finally {
                 executionRegistry.unregister(runId);
+            }
+        }
+    }
+
+    /**
+     * Parks the block loop while the run is paused: PAUSED is persisted and broadcast once, then the
+     * thread polls until the run is resumed or cancelled and announces RUNNING again.
+     */
+    private void waitWhilePaused(WorkflowRun run, ExecutionContext context) {
+        if (context.isPaused() && !context.shouldStop()) {
+            run.setStatus(RunStatus.PAUSED);
+            runRepository.save(run);
+            broadcaster.broadcastRunStatus(run.getId(), RunStatus.PAUSED);
+            while (context.isPaused() && !context.shouldStop()) {
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+            if (!context.shouldStop()) {
+                run.setStatus(RunStatus.RUNNING);
+                runRepository.save(run);
+                broadcaster.broadcastRunStatus(run.getId(), RunStatus.RUNNING);
             }
         }
     }
@@ -644,15 +535,6 @@ public class WorkflowExecutor {
             broadcaster.broadcastLogMessage(runId, "container_skipped",
                     Map.of("message", "Container konnte nicht gestartet werden, Ausführung erfolgt auf dem Host"));
             return null;
-        }
-    }
-
-    // One JPQL UPDATE: find + save would detach, merge and drag the eager Project/Container graph.
-    private void updateContainerActivity(String containerId) {
-        try {
-            containerRepository.touchActivity(containerId, Instant.now());
-        } catch (Exception e) {
-            log.debug("Failed to update container activity: {}", e.getMessage());
         }
     }
 }
