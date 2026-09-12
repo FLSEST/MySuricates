@@ -449,7 +449,21 @@ public class WorkflowExecutor {
      * hold) a permit and must not be mistaken for a leak.
      */
     private void registerProvisionalContext(String runId) {
-        executionRegistry.register(runId, ExecutionContext.builder().workflowRunId(runId).build());
+        ExecutionContext provisional = ExecutionContext.builder().workflowRunId(runId).build();
+        provisional.setVariable(QUEUED_CONTEXT_MARKER, Boolean.TRUE);
+        executionRegistry.register(runId, provisional);
+    }
+
+    /**
+     * Marks the provisional context from {@link #registerProvisionalContext}. Control operations
+     * (cancel, pause) work on it by design; anything that needs a container or the project's
+     * working directory must not. Never seen by a block — the real context replaces it before the
+     * first one runs.
+     */
+    private static final String QUEUED_CONTEXT_MARKER = "__run_not_started";
+
+    private static boolean isNotStartedYet(ExecutionContext context) {
+        return Boolean.TRUE.equals(context.getVariable(QUEUED_CONTEXT_MARKER));
     }
 
     /**
@@ -630,7 +644,9 @@ public class WorkflowExecutor {
 
     public String executeAdHocCommand(String runId, String command) {
         ExecutionContext context = executionRegistry.get(runId);
-        if (context == null) {
+        if (context == null || isNotStartedYet(context)) {
+            // A queued run is registered (so it stays cancellable) but has no container and no
+            // project cwd yet — running the command anyway would execute it in the wrong place.
             throw new WorkflowExecutionException("No active execution found for run: " + runId);
         }
         log.info("Executing ad-hoc command in run {}: {}", runId, command);

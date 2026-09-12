@@ -104,6 +104,12 @@ class WorkflowExecutorTest {
     private WorkflowExecutor workflowExecutor;
     private WorkflowExecutionRegistry registry;
 
+    /**
+     * Real threads for the concurrency tests. Torn down with shutdownNow() — never close(), which
+     * would block forever if an assertion failed while a run is still parked on the semaphore.
+     */
+    private ExecutorService realThreads;
+
     private Workflow testWorkflow;
     private Project testProject;
 
@@ -171,6 +177,15 @@ class WorkflowExecutorTest {
                     .id("run-1").workflow(testWorkflow).status(RunStatus.RUNNING).startedAt(java.time.Instant.now()).build();
             return Optional.of(run);
         });
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void stopRealThreads() throws InterruptedException {
+        if (realThreads != null) {
+            realThreads.shutdownNow();
+            realThreads.awaitTermination(5, TimeUnit.SECONDS);
+            realThreads = null;
+        }
     }
 
     /** Captures the last WorkflowRun passed to runRepository.save() */
@@ -1626,25 +1641,48 @@ class WorkflowExecutorTest {
         WorkflowExecutionRegistry liveRegistry = new WorkflowExecutionRegistry();
         AtomicReference<WorkflowRun> stored = statefulRunRepository();
 
-        try (ExecutorService threads = Executors.newVirtualThreadPerTaskExecutor()) {
-            WorkflowExecutor executor =
-                    buildExecutor(List.of(simpleBlockExecutor), singleSlot, liveRegistry, threads);
+        realThreads = Executors.newVirtualThreadPerTaskExecutor();
+        WorkflowExecutor executor =
+                buildExecutor(List.of(simpleBlockExecutor), singleSlot, liveRegistry, realThreads);
 
-            executor.execute(testWorkflow, null);
-            executor.cancelExecution("run-1");
-            singleSlot.release();
+        executor.execute(testWorkflow, null);
+        executor.cancelExecution("run-1");
+        singleSlot.release();
 
-            WorkflowRun finished = awaitTerminalStatus(stored);
-            assertThat(finished.getStatus()).isEqualTo(RunStatus.CANCELLED);
-            // The ghost branch would have stamped a "no active execution thread" error onto the run.
-            assertThat(finished.getError()).isNullOrEmpty();
-        }
+        WorkflowRun finished = awaitTerminalStatus(stored);
+        assertThat(finished.getStatus()).isEqualTo(RunStatus.CANCELLED);
+        // The ghost branch would have stamped a "no active execution thread" error onto the run.
+        assertThat(finished.getError()).isNullOrEmpty();
 
         verify(simpleBlockExecutor, never()).execute(any(), any());
         verify(containerService, never()).getDockerContainerId(any());
         verify(stepResultRepository, never()).save(any());
         assertThat(liveRegistry.isRunActive("run-1")).isFalse();
         assertThat(singleSlot.availablePermits()).isEqualTo(1);
+    }
+
+    @Test
+    void executeAdHocCommand_runStillQueued_throws() throws Exception {
+        DynamicSemaphore singleSlot = new DynamicSemaphore(1);
+        singleSlot.acquire(); // the run never gets past acquire() during the assertion
+        WorkflowExecutionRegistry liveRegistry = new WorkflowExecutionRegistry();
+        AtomicReference<WorkflowRun> stored = statefulRunRepository();
+
+        realThreads = Executors.newVirtualThreadPerTaskExecutor();
+        WorkflowExecutor executor =
+                buildExecutor(List.of(simpleBlockExecutor), singleSlot, liveRegistry, realThreads);
+        executor.execute(testWorkflow, null);
+
+        // The provisional context makes the run cancellable, but there is no container and no
+        // project cwd yet — an ad-hoc command must still be refused, not run on the host.
+        assertThatThrownBy(() -> executor.executeAdHocCommand("run-1", "echo hello"))
+                .isInstanceOf(WorkflowExecutionException.class);
+
+        executor.cancelExecution("run-1");
+        singleSlot.release();
+        awaitTerminalStatus(stored);
+
+        verify(commandExecutorService, never()).executeCommand(any(), anyString(), anyString());
     }
 
     @Test
@@ -1659,17 +1697,16 @@ class WorkflowExecutorTest {
         WorkflowExecutionRegistry liveRegistry = new WorkflowExecutionRegistry();
         AtomicReference<WorkflowRun> stored = statefulRunRepository();
 
-        try (ExecutorService threads = Executors.newVirtualThreadPerTaskExecutor()) {
-            WorkflowExecutor executor = buildExecutor(
-                    List.of(simpleBlockExecutor), new DynamicSemaphore(1), liveRegistry, threads);
+        realThreads = Executors.newVirtualThreadPerTaskExecutor();
+        WorkflowExecutor executor = buildExecutor(
+                List.of(simpleBlockExecutor), new DynamicSemaphore(1), liveRegistry, realThreads);
 
-            executor.execute(testWorkflow, null);
-            awaitLatch(containerStartEntered, "the run to reach the container start");
-            executor.cancelExecution("run-1");
-            containerStartMayFinish.countDown();
+        executor.execute(testWorkflow, null);
+        awaitLatch(containerStartEntered, "the run to reach the container start");
+        executor.cancelExecution("run-1");
+        containerStartMayFinish.countDown();
 
-            assertThat(awaitTerminalStatus(stored).getStatus()).isEqualTo(RunStatus.CANCELLED);
-        }
+        assertThat(awaitTerminalStatus(stored).getStatus()).isEqualTo(RunStatus.CANCELLED);
 
         verify(containerService, times(1)).getDockerContainerId(any());
         verify(simpleBlockExecutor, never()).execute(any(), any());
@@ -1698,24 +1735,23 @@ class WorkflowExecutorTest {
                 runRepository, liveRegistry, singleSlot, broadcaster, activityLogService,
                 mock(com.automation.service.scheduler.SuspendState.class));
 
-        try (ExecutorService threads = Executors.newVirtualThreadPerTaskExecutor()) {
-            WorkflowExecutor executor =
-                    buildExecutor(List.of(simpleBlockExecutor), singleSlot, liveRegistry, threads);
-            when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
-                    .thenReturn(StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build());
+        realThreads = Executors.newVirtualThreadPerTaskExecutor();
+        WorkflowExecutor executor =
+                buildExecutor(List.of(simpleBlockExecutor), singleSlot, liveRegistry, realThreads);
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build());
 
-            executor.execute(testWorkflow, null);
-            awaitLatch(containerStartEntered, "the run to reach the container start");
-            assertThat(singleSlot.availablePermits()).isZero();
+        executor.execute(testWorkflow, null);
+        awaitLatch(containerStartEntered, "the run to reach the container start");
+        assertThat(singleSlot.availablePermits()).isZero();
 
-            watchdog.detectGhostRuns();
+        watchdog.detectGhostRuns();
 
-            assertThat(singleSlot.availablePermits())
-                    .as("the parked run holds the permit — the watchdog must not hand out a second one")
-                    .isZero();
-            containerStartMayFinish.countDown();
-            awaitTerminalStatus(stored);
-        }
+        assertThat(singleSlot.availablePermits())
+                .as("the parked run holds the permit — the watchdog must not hand out a second one")
+                .isZero();
+        containerStartMayFinish.countDown();
+        awaitTerminalStatus(stored);
         assertThat(singleSlot.availablePermits()).isEqualTo(1);
     }
 
