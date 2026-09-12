@@ -14,6 +14,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
 
 import java.time.Instant;
 import java.util.List;
@@ -40,6 +42,12 @@ class ProjectServiceTest {
     @Mock
     private ActivityLogService activityLogService;
 
+    @Mock
+    private PlatformTransactionManager transactionManager;
+
+    @Mock
+    private TransactionStatus transactionStatus;
+
     @InjectMocks
     private ProjectService projectService;
 
@@ -47,6 +55,9 @@ class ProjectServiceTest {
 
     @BeforeEach
     void setUp() {
+        // TransactionTemplate.execute() asks the manager for a status, runs the callback,
+        // then commits — a mock status lets the callback run and makes commit/rollback no-ops.
+        lenient().when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
         testProject = Project.builder()
                 .id("proj-1")
                 .name("Test Project")

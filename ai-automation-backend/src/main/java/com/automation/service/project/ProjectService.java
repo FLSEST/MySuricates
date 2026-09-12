@@ -9,17 +9,17 @@ import com.automation.entity.ProjectType;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ProjectRepository;
 import com.automation.service.activitylog.ActivityLogService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class ProjectService {
 
@@ -27,6 +27,22 @@ public class ProjectService {
     private final ContainerService containerService;
     private final PathValidator pathValidator;
     private final ActivityLogService activityLogService;
+    private final TransactionTemplate transactionTemplate;
+    private final TransactionTemplate readOnlyTransactionTemplate;
+
+    public ProjectService(ProjectRepository projectRepository,
+                          ContainerService containerService,
+                          PathValidator pathValidator,
+                          ActivityLogService activityLogService,
+                          PlatformTransactionManager transactionManager) {
+        this.projectRepository = projectRepository;
+        this.containerService = containerService;
+        this.pathValidator = pathValidator;
+        this.activityLogService = activityLogService;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.readOnlyTransactionTemplate = new TransactionTemplate(transactionManager);
+        this.readOnlyTransactionTemplate.setReadOnly(true);
+    }
 
     @Transactional(readOnly = true)
     public List<Project> findAll() {
@@ -135,29 +151,51 @@ public class ProjectService {
         return saved;
     }
 
-    @Transactional
+    /**
+     * Deliberately not {@code @Transactional}: {@link ContainerService#createAndStartContainer}
+     * takes the per-project monitor and runs a 5–15 s Docker create inside it. With HikariCP
+     * pool-size 1 an enclosing transaction would pin the single connection for that whole time,
+     * so a workflow run that already holds the monitor blocks on the pool until
+     * connection-timeout (120 s) — a lock-order inversion between monitor and connection
+     * (TODO b3c88eeb). Same shape as ContainerService: short write burst (STARTING) → Docker
+     * outside any transaction → short write burst (RUNNING/ERROR).
+     */
     public Project startContainer(String id) {
-        Project project = findById(id);
-        project.setStatus(ProjectStatus.STARTING);
-        projectRepository.save(project);
+        Project project = transactionTemplate.execute(status -> {
+            Project p = findById(id);
+            p.setStatus(ProjectStatus.STARTING);
+            return projectRepository.save(p);
+        });
 
+        ProjectStatus outcome = ProjectStatus.RUNNING;
         try {
             containerService.createAndStartContainer(project);
-            project.setStatus(ProjectStatus.RUNNING);
         } catch (Exception e) {
             log.error("Failed to start container for project: {}", id, e);
-            project.setStatus(ProjectStatus.ERROR);
+            outcome = ProjectStatus.ERROR;
         }
 
-        return projectRepository.save(project);
+        return saveStatus(id, outcome);
     }
 
-    @Transactional
+    /** Not {@code @Transactional} either: the Docker stop+remove is multi-second — see {@link #startContainer}. */
     public Project stopContainer(String id) {
-        Project project = findById(id);
+        Project project = readOnlyTransactionTemplate.execute(status -> findById(id));
         containerService.stopContainer(project);
-        project.setStatus(ProjectStatus.STOPPED);
-        return projectRepository.save(project);
+        return saveStatus(id, ProjectStatus.STOPPED);
+    }
+
+    /**
+     * Write burst after the Docker call: reloads the project by id (the instance handed to
+     * ContainerService is detached, and the eagerly mapped {@code container} association is
+     * picked up by the fresh load) and persists the new status.
+     */
+    private Project saveStatus(String id, ProjectStatus status) {
+        return transactionTemplate.execute(txStatus -> {
+            Project p = findById(id);
+            p.setStatus(status);
+            return projectRepository.save(p);
+        });
     }
 
     @Transactional

@@ -189,6 +189,8 @@ Die Workflow-Engine führt Blöcke sequenziell aus. Claude CLI läuft **immer au
 
 **Steuerbarkeit ab Schritt 1:** Noch vor dem Submit registriert der `WorkflowExecutor` einen provisorischen `ExecutionContext` in der `WorkflowExecutionRegistry`. Ein Cancel greift damit auch, solange der Run noch auf einen Semaphore-Slot oder den Container-Start wartet — der Ausführungs-Thread übernimmt beim Tausch gegen den echten Context dessen Cancel-/Pause-Flag. Folge: `getActiveRunCount()` zählt auch wartende Runs, wodurch `GhostRunWatchdogService` den Permit eines startenden Runs nicht mehr als Leak freigibt.
 
+**Container-Start/-Stop ohne Transaktion:** `ProjectService.startContainer`/`stopContainer` sind bewusst **nicht** `@Transactional`: der Docker-Aufruf liegt zwischen zwei kurzen `TransactionTemplate`-Bursts (STARTING → Docker außerhalb jeder Transaktion → RUNNING/ERROR), weil `ContainerService` dabei den Projekt-Monitor hält — eine umschließende Transaktion würde die einzige Connection über den ganzen 5–15-s-Docker-Start pinnen und einen parallelen Workflow-Run (der den Monitor zuerst nimmt) in den 120-s-Connection-Timeout laufen lassen (Lock-Order-Inversion Monitor ↔ Connection).
+
 **Container-Zeile:** `ContainerService.createAndStartContainer` aktualisiert eine vorhandene `containers`-Zeile (Upsert) statt sie zu löschen und neu anzulegen — die Löschung wurde über die Cascade `Project.container` beim Flush wieder aufgehoben, sodass der folgende INSERT an `UNIQUE(containers.project_id)` scheiterte. Der Projekt-Lock bleibt dauerhaft in der Map (Entfernen unter Konkurrenz erzeugt einen zweiten Monitor), und `lastActivityAt` wird per JPQL-Update (`ContainerRepository.touchActivity`) statt per detached Merge gesetzt.
 
 ### Block-Typen (14 gesamt)
