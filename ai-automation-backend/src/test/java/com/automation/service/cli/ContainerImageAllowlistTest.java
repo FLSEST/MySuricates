@@ -86,6 +86,24 @@ class ContainerImageAllowlistTest {
     }
 
     @Test
+    void isAllowed_imageStartingWithDash_isRejectedEvenWithEmptyAllowlist() {
+        // "-foo" would be read by `docker run` as a flag, not an image argument.
+        ContainerImageAllowlist allowlist = newAllowlist();
+        allowlist.setEntries(List.of());
+
+        assertThat(allowlist.isAllowed("-rm")).isFalse();
+        assertThat(allowlist.isAllowed("--privileged")).isFalse();
+    }
+
+    @Test
+    void isAllowed_imageStartingWithDash_isRejectedEvenWhenAllowlisted() {
+        ContainerImageAllowlist allowlist = newAllowlist();
+        allowlist.setEntries(List.of("-rm"));
+
+        assertThat(allowlist.isAllowed("-rm")).isFalse();
+    }
+
+    @Test
     void init_blankRaw_resultsInAllowAll() {
         ContainerImageAllowlist allowlist = newAllowlist();
         ReflectionTestUtils.setField(allowlist, "allowedImagesRaw", "");

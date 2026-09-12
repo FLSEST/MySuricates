@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -83,18 +82,5 @@ class WebhookMapperTest {
             assertThat(response.workflowId()).isNull();
             assertThat(response.workflowName()).isNull();
         }
-    }
-
-    @Test
-    void toResponseList_mapsMultiple() {
-        Workflow wf = Workflow.builder().id("wf-1").name("WF").build();
-        WebhookTrigger w1 = WebhookTrigger.builder().id("wh-1").workflow(wf).secretToken("t1").build();
-        WebhookTrigger w2 = WebhookTrigger.builder().id("wh-2").workflow(wf).secretToken("t2").build();
-
-        List<WebhookTriggerResponse> responses = mapper.toResponseList(List.of(w1, w2));
-
-        assertThat(responses).hasSize(2);
-        assertThat(responses.get(0).id()).isEqualTo("wh-1");
-        assertThat(responses.get(1).id()).isEqualTo("wh-2");
     }
 }

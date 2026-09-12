@@ -126,7 +126,10 @@ public class IntegrationOAuthService {
         JsonNode tokenResponse = tokenClient.exchangeCodeForTokens(
                 providerId, config, code, clientId, clientSecret, redirectUri);
 
-        String accessToken = tokenResponse.get("access_token").asText();
+        String accessToken = tokenResponse.path("access_token").asText(null);
+        if (accessToken == null) {
+            throw new IllegalStateException("Token exchange failed for " + providerId + " (no access_token in response)");
+        }
         String refreshToken = tokenResponse.has("refresh_token") ? tokenResponse.get("refresh_token").asText() : null;
         int expiresIn = tokenResponse.has("expires_in") ? tokenResponse.get("expires_in").asInt() : 3600;
         String grantedScopes = tokenResponse.has("scope") ? tokenResponse.get("scope").asText() : String.join(" ", config.defaultScopes());
@@ -207,11 +210,8 @@ public class IntegrationOAuthService {
         log.info("Disconnected integration (kept credentials): {}", providerId);
     }
 
-    /**
-     * Delete the connection row entirely (app credentials included); reconnect requires re-entering them.
-     *
-     * <p>Same burst-then-revoke shape as {@link #disconnect} — deliberately not {@code @Transactional}.
-     */
+    /** Delete the connection row entirely (app credentials included); reconnect requires re-entering them.
+     * Same burst-then-revoke shape as {@link #disconnect} — deliberately not {@code @Transactional}. */
     public void deleteCredentials(String providerId) {
         String token = transactionTemplate.execute(status ->
                 connectionRepository.findByProviderId(providerId).map(connection -> {

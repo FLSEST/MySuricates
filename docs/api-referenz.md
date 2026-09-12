@@ -1128,6 +1128,10 @@ In jeder anderen Management-Response (List, Get, Enable, Disable) ist er maskier
 8 Zeichen plus `…` (U+2026), und `webhookUrl` verwendet denselben maskierten Token. Der volle Token
 muss beim Erstellen/Regenerieren sofort gesichert werden — er lässt sich danach nicht mehr abrufen.
 
+**Upgrade-Hinweis:** Bestehende Webhook-Tokens sind nach diesem Update nicht mehr im Klartext
+abrufbar. Wiederherstellung: `POST /api/v1/webhooks/{id}/regenerate-token` aufrufen und den neuen
+Token beim externen Aufrufer (z. B. GitHub-Webhook-Konfiguration) neu hinterlegen.
+
 ### `GET /api/v1/webhooks`
 
 Alle Webhooks auflisten.

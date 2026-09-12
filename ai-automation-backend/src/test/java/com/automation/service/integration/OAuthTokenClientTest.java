@@ -126,6 +126,67 @@ class OAuthTokenClientTest {
                 .hasMessageNotContaining("html");
     }
 
+    @Test
+    void redactForLog_formEncoded_masksAllSensitiveKeysButKeepsOthers() {
+        String body = "grant_type=authorization_code&code=auth-code-1&client_id=abc-123"
+                + "&client_secret=super-secret&refresh_token=refresh-xyz&access_token=access-xyz";
+
+        String redacted = OAuthTokenClient.redactForLog(body);
+
+        assertThat(redacted)
+                .contains("client_secret=***")
+                .contains("refresh_token=***")
+                .contains("access_token=***")
+                .contains("code=***")
+                .contains("client_id=abc-123")
+                .doesNotContain("super-secret")
+                .doesNotContain("refresh-xyz")
+                .doesNotContain("access-xyz")
+                .doesNotContain("auth-code-1");
+    }
+
+    @Test
+    void redactForLog_json_masksAllSensitiveFieldsButKeepsOthers() {
+        String body = "{\"error\":\"invalid_client\",\"client_secret\":\"super-secret\","
+                + "\"refresh_token\":\"refresh-xyz\",\"access_token\":\"access-xyz\",\"code\":\"auth-code-1\"}";
+
+        String redacted = OAuthTokenClient.redactForLog(body);
+
+        assertThat(redacted)
+                .contains("\"client_secret\":\"***\"")
+                .contains("\"refresh_token\":\"***\"")
+                .contains("\"access_token\":\"***\"")
+                .contains("\"code\":\"***\"")
+                .contains("\"error\":\"invalid_client\"")
+                .doesNotContain("super-secret")
+                .doesNotContain("refresh-xyz")
+                .doesNotContain("access-xyz")
+                .doesNotContain("auth-code-1");
+    }
+
+    @Test
+    void redactForLog_doesNotMatchKeyNamesThatMerelyContainASensitiveWord() {
+        String body = "postal_code=12345&authorization_code=abc&nickname=code-master";
+
+        String redacted = OAuthTokenClient.redactForLog(body);
+
+        assertThat(redacted).isEqualTo(body);
+    }
+
+    @Test
+    void redactForLog_truncatesLongBodyTo300Characters() {
+        String longBody = "x".repeat(500);
+
+        String redacted = OAuthTokenClient.redactForLog(longBody);
+
+        assertThat(redacted).hasSize(300);
+    }
+
+    @Test
+    void redactForLog_null_returnsNull() {
+        assertThat(OAuthTokenClient.redactForLog(null)).isNull();
+    }
+
     private OAuthConfig config(String revocationUrl) {
         return tokenConfig("/token").withRevocationUrl(revocationUrl);
     }

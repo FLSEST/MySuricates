@@ -153,6 +153,11 @@ Executes a shell command on the host or inside a Docker container.
 > untrusted input (schedule, manual start, TodoTrigger, chain) every block output is substituted
 > raw exactly as before.
 
+> **Careful with `{{ previous_report }}` / `{{ open_todos }}`:** these values are injected from the
+> PREVIOUS run and are NOT covered by the run-level taint propagation above (they don't come from
+> the current run and carry no `__untrusted_*` marker) — treat them like foreign/untrusted data in
+> shell blocks anyway: write them unquoted too, or escape them explicitly (open TODO 1e77e717).
+
 ```json
 {
   "type": "shell",

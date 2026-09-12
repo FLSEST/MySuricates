@@ -72,6 +72,8 @@ if [ -n "${AUTOMATION_SSL_PASSWORD:-}" ]; then
 else
   echo "Keystore-Passwort: Dev-Default aus application.yml (siehe docs/GETTING-STARTED.md,"
   echo "Abschnitt 7). Fuer einen eigenen Wert AUTOMATION_SSL_PASSWORD setzen und neu erzeugen."
+  echo "Achtung: Mit diesem Dev-Default verweigert das Backend den Start, sobald"
+  echo "AUTOMATION_SSL_ENABLED=true gesetzt ist — vorher AUTOMATION_SSL_PASSWORD setzen."
 fi
 echo ""
 if [ -n "$TS_HOSTNAME" ]; then

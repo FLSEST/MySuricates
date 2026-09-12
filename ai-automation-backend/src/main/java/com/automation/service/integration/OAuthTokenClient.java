@@ -12,6 +12,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.regex.Pattern;
 
 /**
  * All outbound HTTP of the OAuth2 flow: token exchange, refresh and revocation.
@@ -22,13 +23,20 @@ import java.time.Duration;
  * <p>Exception messages carry the provider id and the HTTP status but <b>never</b> the provider's
  * response body: {@code GlobalExceptionHandler} passes an {@link IllegalStateException} message
  * straight to the API client as a 409, and a token endpoint's error body can quote the request
- * (including client secrets) back at us.
+ * (including client secrets) back at us. The body is still logged at WARN for diagnostics, but
+ * only through {@link #redactForLog}, which masks {@code client_secret}/{@code refresh_token}/
+ * {@code access_token}/{@code code} values (form- and JSON-encoded) and truncates the result.
  */
 @Component
 @Slf4j
 public class OAuthTokenClient {
 
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
+    static final int MAX_LOG_BODY_LENGTH = 300;
+    private static final Pattern SENSITIVE_FORM_PARAM =
+            Pattern.compile("\\b(client_secret|refresh_token|access_token|code)=[^&\"\\s]*");
+    private static final Pattern SENSITIVE_JSON_FIELD =
+            Pattern.compile("\"(client_secret|refresh_token|access_token|code)\"\\s*:\\s*\"[^\"]*\"");
 
     private final ObjectMapper objectMapper;
 
@@ -78,6 +86,9 @@ public class OAuthTokenClient {
             } else {
                 log.info("Revoked access token for provider {}", providerId);
             }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("Token revocation interrupted for {}: {}", providerId, e.getMessage());
         } catch (Exception e) {
             log.warn("Token revocation failed for {}: {}", providerId, e.getMessage());
         }
@@ -87,12 +98,16 @@ public class OAuthTokenClient {
         HttpResponse<String> response;
         try {
             response = postForm(tokenUrl, body);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("{} for {}", failure, providerId, e);
+            throw new IllegalStateException(failure + " for " + providerId, e);
         } catch (Exception e) {
             log.error("{} for {}", failure, providerId, e);
             throw new IllegalStateException(failure + " for " + providerId, e);
         }
         if (response.statusCode() != 200) {
-            log.error("{} for {}: HTTP {} {}", failure, providerId, response.statusCode(), response.body());
+            log.warn("{} for {}: HTTP {} {}", failure, providerId, response.statusCode(), redactForLog(response.body()));
             throw new IllegalStateException(failure + " for " + providerId + " (HTTP " + response.statusCode() + ")");
         }
         try {
@@ -115,5 +130,17 @@ public class OAuthTokenClient {
 
     private static String urlEncode(String value) {
         return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Masks OAuth secret/token values ({@code key=value} form params and {@code "key":"value"}
+     * JSON fields) in a provider response body before it is logged, then truncates the result to
+     * {@value #MAX_LOG_BODY_LENGTH} characters. Null-safe.
+     */
+    static String redactForLog(String body) {
+        if (body == null) return null;
+        String redacted = SENSITIVE_FORM_PARAM.matcher(body).replaceAll("$1=***");
+        redacted = SENSITIVE_JSON_FIELD.matcher(redacted).replaceAll("\"$1\":\"***\"");
+        return redacted.length() > MAX_LOG_BODY_LENGTH ? redacted.substring(0, MAX_LOG_BODY_LENGTH) : redacted;
     }
 }
