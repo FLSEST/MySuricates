@@ -1,0 +1,57 @@
+package com.automation.service.integration.providers.jira;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
+
+/** Parameter parsing shared by the Jira actions — pure functions, no I/O. */
+final class JiraParams {
+
+    private JiraParams() {}
+
+    static String paramString(Map<String, Object> params, String key, String defaultValue) {
+        Object val = params.get(key);
+        return val != null ? val.toString() : defaultValue;
+    }
+
+    /**
+     * Unlike {@code GitHubParams.paramInt}, a blank string is not special-cased here: passing one
+     * lets {@link Integer#parseInt} throw {@link NumberFormatException}, matching the behavior of
+     * the pre-split {@code JiraProvider}.
+     */
+    static int paramInt(Map<String, Object> params, String key, int defaultValue) {
+        Object val = params.get(key);
+        if (val instanceof Number n) return n.intValue();
+        if (val instanceof String s) return Integer.parseInt(s);
+        return defaultValue;
+    }
+
+    static String requireParam(Map<String, Object> params, String key) {
+        Object val = params.get(key);
+        if (val == null) throw new IllegalArgumentException("Required parameter missing: " + key);
+        return val.toString();
+    }
+
+    static String urlEncode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Wraps plain text as a minimal Atlassian Document Format (ADF) node — the format Jira's v3
+     * API requires for rich-text fields such as issue descriptions and comments.
+     */
+    static Map<String, Object> buildAdfText(String text) {
+        return Map.of(
+                "type", "doc",
+                "version", 1,
+                "content", List.of(Map.of(
+                        "type", "paragraph",
+                        "content", List.of(Map.of(
+                                "type", "text",
+                                "text", text
+                        ))
+                ))
+        );
+    }
+}

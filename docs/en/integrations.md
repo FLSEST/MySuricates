@@ -119,6 +119,9 @@ Notes:
 - **Atlassian** (Jira/Confluence) sets `audience=api.atlassian.com` + `prompt=consent` and
   uses the 3LO flow; after the token exchange the `cloudId` is resolved to build the base URL.
   `write:jira-work` is an optional scope for Jira (only needed for writes).
+  Split internally: action catalog in `JiraActionCatalog`, HTTP via `JiraHttpClient` (no
+  `Accept` header, no 401 special case), parameter parsing in `JiraParams`; the per-token
+  `cloudId` cache stays on the provider.
 - **Trello** does not use a token exchange. Client ID = API key, client secret = token; both
   are stored combined as `apiKey|token` and appended to every request as query parameters
   (`key=…&token=…`).
