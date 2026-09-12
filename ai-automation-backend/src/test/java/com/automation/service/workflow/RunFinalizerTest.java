@@ -105,7 +105,7 @@ class RunFinalizerTest {
 
     @Test
     void finish_eventPublishFails_isLoggedNotThrown() {
-        doThrow(new RuntimeException("listener exploded")).when(eventPublisher).publishEvent(any(Object.class));
+        doThrow(new RuntimeException("listener exploded")).when(eventPublisher).publishEvent(any(WorkflowRunCompletedEvent.class));
 
         assertThatCode(() -> finalizer.finish(run, null, "wf-1", "Workflow", project, Map.of()))
                 .doesNotThrowAnyException();

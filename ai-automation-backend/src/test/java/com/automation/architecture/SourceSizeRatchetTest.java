@@ -59,7 +59,7 @@ class SourceSizeRatchetTest {
             entry("com/automation/service/tray/SystemTrayService.java", 415),
             entry("com/automation/service/trigger/TodoTriggerService.java", 383),
             entry("com/automation/service/wish/WishDecomposePromptBuilder.java", 338),
-            entry("com/automation/service/workflow/WorkflowExecutor.java", 662)
+            entry("com/automation/service/workflow/WorkflowExecutor.java", 540)
     );
 
     @Test
