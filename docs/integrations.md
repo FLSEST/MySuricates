@@ -119,7 +119,7 @@ Hinweise:
   nutzt den 3LO-Flow; nach dem Token-Tausch wird die `cloudId` aufgelöst, um die Base-URL zu
   bilden. `write:jira-work` ist bei Jira ein optionaler Scope (nur nötig zum Schreiben).
   Intern aufgeteilt: Actions-Katalog in `JiraActionCatalog`, HTTP über `JiraHttpClient`
-  (kein `Accept`-Header, kein 401-Sonderfall), Parameter-Parsing in `JiraParams`; die
+  (kein `Accept`-Header, kein 401-Sonderfall), Parameter-Parsing in `JiraParams`; der
   `cloudId`-Cache pro Access-Token bleibt im Provider.
 - **Trello** nutzt keinen Token-Tausch. Client-ID = API-Key, Client-Secret = Token; beide
   werden als `apiKey|token` kombiniert gespeichert und in jeden Request als Query-Parameter

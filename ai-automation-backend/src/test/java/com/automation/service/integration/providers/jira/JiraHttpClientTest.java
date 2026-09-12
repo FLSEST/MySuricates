@@ -88,7 +88,7 @@ class JiraHttpClientTest {
 
     @Test
     void get_200_doesNotThrow() {
-        respond("/x", 200, "{}");
+        respond("/x", 200, "{}"); // valid JSON: get() also parses the body, so "OK" would fail for the wrong reason
         assertThatNoException().isThrownBy(() -> client.get(base + "/x", "t", Object.class));
     }
 

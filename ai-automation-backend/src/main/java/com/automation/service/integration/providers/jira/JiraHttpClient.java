@@ -101,7 +101,7 @@ public class JiraHttpClient {
      * which passes a 10 s request timeout (the other methods hardcode 15 s). Its non-200/empty-body
      * handling lives in {@code JiraProvider.resolveCloudId} — that method must not throw, only log
      * and fall back to {@code null} — so this method neither checks the status code nor parses the
-     * body.
+     * body. Transport failures are wrapped like the other calls ("Jira API request failed" prefix).
      */
     public HttpResponse<String> getRaw(String url, String token, Duration timeout) {
         try {

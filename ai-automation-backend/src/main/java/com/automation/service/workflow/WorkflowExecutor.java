@@ -95,6 +95,7 @@ public class WorkflowExecutor {
         return execute(workflow, inputContext, null, null);
     }
 
+    /** Asynchronous: returns the RUNNING run immediately; the blocks execute on a virtual thread. */
     public WorkflowRun execute(Workflow workflow, Map<String, Object> inputContext,
                                String triggeredByScheduleId, Map<String, Object> initialRunMetadata) {
         WorkflowRun run = WorkflowRun.builder()

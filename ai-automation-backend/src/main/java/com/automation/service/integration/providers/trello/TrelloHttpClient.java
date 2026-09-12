@@ -70,6 +70,8 @@ public class TrelloHttpClient {
     /**
      * Raw, unchecked GET for {@code TrelloProvider.fetchAccountInfo}: no error mapping and no
      * 401 special case — that response inspection and its log texts stay in the provider.
+     * Transport failures are wrapped like the other calls, so the provider's warn log shows the
+     * "Trello API request failed" prefix.
      */
     public HttpResponse<String> getRaw(String url) {
         try {

@@ -176,7 +176,7 @@ class ContainerServiceTest {
     }
 
     @Test
-    void createAndStart_existingStale_removesAndCreatesNew() {
+    void createAndStart_existingStale_reusesRowWithNewDockerId() {
         Container stale = Container.builder()
                 .id("c1")
                 .project(testProject)

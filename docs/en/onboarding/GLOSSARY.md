@@ -29,7 +29,7 @@ JSON object describing a single step in a workflow. Consists of `type` (block ty
 Interface that every block type must implement. Defines `execute(BlockDefinition, ExecutionContext)` and `supports(String type)`.
 
 **Built-in Skills**
-16 predefined skills that are seeded automatically at startup (e.g. `builtin-code-review`, `builtin-test-generator`). Defined in `BuiltInSkills.java`.
+16 predefined skills that are seeded automatically at startup (e.g. `builtin-code-review`, `builtin-test-generator`). Defined in `BuiltInSkills.java` (order) and `BuiltIn<Category>Skills.java` (contents).
 
 **Built-in Templates**
 28 predefined workflow templates that are seeded at startup. Defined in `BuiltInTemplates.java`. Cannot be deleted.
