@@ -1,11 +1,13 @@
 package com.automation.service.integration;
 
+import com.automation.service.integration.providers.trello.TrelloHttpClient;
 import com.automation.service.integration.providers.trello.TrelloProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.mock;
 
 class TrelloProviderTest {
 
@@ -13,7 +15,7 @@ class TrelloProviderTest {
 
     @BeforeEach
     void setUp() {
-        provider = new TrelloProvider(new ObjectMapper());
+        provider = new TrelloProvider(new ObjectMapper(), mock(TrelloHttpClient.class));
     }
 
     @Test
