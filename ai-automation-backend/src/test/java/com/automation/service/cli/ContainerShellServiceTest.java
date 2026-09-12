@@ -51,7 +51,7 @@ class ContainerShellServiceTest {
         ShellCommandService.ShellResult result = service.execute(
                 "echo hi", "/tmp", 10, "forbidden-image:latest", false);
 
-        assertThat(result.exitCode()).isEqualTo(126);
+        assertThat(result.exitCode()).isEqualTo(125);
         assertThat(result.output()).contains("forbidden-image:latest")
                 .contains("automation.execution.allowed-container-images");
         verify(activityLogService).warn(any(),

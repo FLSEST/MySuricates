@@ -110,7 +110,7 @@ public class ContainerShellService {
         if (!imageAllowlist.isAllowed(containerImage)) {
             String msg = "Container image not allowed by automation.execution.allowed-container-images: " + containerImage;
             activityLogService.warn(LogCategory.SECURITY, msg, "ContainerShellService", null);
-            return new ShellResult(msg, 126, 0);
+            return new ShellResult(msg, 125, 0);
         }
 
         long start = System.currentTimeMillis();

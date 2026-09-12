@@ -356,7 +356,7 @@ Die beiden werden leicht verwechselt:
 Start) schraenkt ein, welches `container_image` ein Shell-Block anfordern darf. Die Pruefung sitzt
 zentral in `ContainerShellService.execute` — beide Aufrufer (`ShellBlockExecutor`,
 `CommandExecutorService`) laufen automatisch mit. Ein nicht gelistetes Image scheitert mit
-Exit-Code 126 und einem SECURITY-Eintrag im Activity-Log, statt einfach zu starten. Ein Eintrag
+Exit-Code 125 und einem SECURITY-Eintrag im Activity-Log, statt einfach zu starten. Ein Eintrag
 matcht per Gleichheit, als Registry-/Namespace-Praefix (endet mit `/`), oder — ohne Tag — gegen
 jeden Tag des Images. Analoges Muster zu `AUTOMATION_ALLOWED_MOUNT_PREFIXES`.
 

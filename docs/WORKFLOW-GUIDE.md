@@ -987,7 +987,7 @@ Fuer Shell-Bloecke die mehr Tools benoetigen, `container_image` setzen:
 - Claude CLI laeuft immer auf dem Host (nicht in Containern), um Nested-Session-Erkennung zu vermeiden
 - Der Server kann `container_image` per Allowlist einschraenken (`automation.execution.allowed-container-images` /
   `AUTOMATION_ALLOWED_CONTAINER_IMAGES`). Leer (Default) erlaubt jedes Image. Ist ein Image nicht gelistet,
-  scheitert der Block sichtbar mit Exit-Code 126 und einem SECURITY-Eintrag im Activity-Log, statt still
+  scheitert der Block sichtbar mit Exit-Code 125 und einem SECURITY-Eintrag im Activity-Log, statt still
   auszufuehren.
 
 ### Beispiel: Shell-Block mit Container

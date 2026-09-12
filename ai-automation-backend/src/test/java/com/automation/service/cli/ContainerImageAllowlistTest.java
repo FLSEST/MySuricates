@@ -54,6 +54,28 @@ class ContainerImageAllowlistTest {
     }
 
     @Test
+    void isAllowed_tagFreeEntryWithRegistryPort_matchesBareNameAndAnyTagNotSubstringImage() {
+        // Regression: a registry host may itself contain ":" (a port), so "has a tag" must be
+        // decided from the last path segment only, not from entry.contains(":").
+        ContainerImageAllowlist allowlist = newAllowlist();
+        allowlist.setEntries(List.of("localhost:5000/myimage"));
+
+        assertThat(allowlist.isAllowed("localhost:5000/myimage")).isTrue();
+        assertThat(allowlist.isAllowed("localhost:5000/myimage:v2")).isTrue();
+        assertThat(allowlist.isAllowed("localhost:5000/myimage-extra:v2")).isFalse();
+    }
+
+    @Test
+    void isAllowed_taggedEntryWithRegistryPort_matchesOnlyExactly() {
+        ContainerImageAllowlist allowlist = newAllowlist();
+        allowlist.setEntries(List.of("localhost:5000/myimage:v1"));
+
+        assertThat(allowlist.isAllowed("localhost:5000/myimage:v1")).isTrue();
+        assertThat(allowlist.isAllowed("localhost:5000/myimage:v2")).isFalse();
+        assertThat(allowlist.isAllowed("localhost:5000/myimage")).isFalse();
+    }
+
+    @Test
     void isAllowed_nullOrBlankImage_isRejectedWhenAllowlistConfigured() {
         ContainerImageAllowlist allowlist = newAllowlist();
         allowlist.setEntries(List.of("safe-image"));
