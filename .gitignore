@@ -73,6 +73,8 @@ __pycache__/
 *.pyc
 
 # Private workflow templates (project-specific, not generic platform demos)
+# Hinweis: Diese Aufzaehlung nennt Dateinamen im Klartext und soll durch eine
+# Konvention ersetzt werden (siehe TODO 6cf6049d). Bis dahin hier ergaenzen.
 /workflow-pool/add_prospects.py
 /workflow-pool/app-build-gate.json
 /workflow-pool/backend-build-gate.json
@@ -94,4 +96,5 @@ __pycache__/
 /workflow-pool/lernpaket-batch-generator.json
 /workflow-pool/schulbuch-themen-generator.json
 /workflow-pool/uebungs-generator.json
+/workflow-pool/urlaubs-scout.json
 /workflow-pool/web-build-gate.json
