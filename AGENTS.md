@@ -118,7 +118,7 @@ Response: 201 Created
       "type": "simple",
       "config": {
         "description": "Ergebnis analysieren",
-        "prompt": "Analysiere die Dateiliste: {{ previous_output }}"
+        "command": "Analysiere die Dateiliste: {{ previous_output }}"
       }
     }
   ],
@@ -134,20 +134,26 @@ Response: 201 Created
 
 | Typ | Config-Felder | Beschreibung |
 |-----|--------------|--------------|
-| `simple` | `description`, `prompt` | Claude-Aufruf |
+| `simple` | `description`, `command`, `timeout_seconds?`, `effort?` | AI-Aufruf (`command` ist der Prompt, Pflichtfeld) |
 | `shell` | `description`, `command`, `on_failure?` | Shell-Befehl auf Host |
 | `agentic` | `description`, `goal`, `max_iterations`, `max_total_tokens`, `iteration_timeout_seconds`, `total_timeout_seconds`, `max_repeated_actions`, `require_approval` | Goal→Reason→Act→Observe Loop |
-| `conditional` | `description`, `condition`, `then_blocks`, `else_blocks` | Verzweigung |
-| `foreach` | `description`, `collection`, `item_variable`, `blocks` | Iteration (Achtung: lowercase!) |
-| `while` | `description`, `condition`, `blocks`, `max_iterations` | Schleife |
-| `retry` | `description`, `blocks`, `max_retries`, `delay_seconds` | Wiederholung bei Fehler |
+| `conditional` | `description`, `condition`, `then_command`, `else_command`, `execution_mode?`, `timeout_seconds?` | Verzweigung |
+| `foreach` | `description`, `command`, `items` \| `items_command`, `items_source?`, `variable_name?`, `continue_on_error?`, `execution_mode?` | Iteration (Achtung: lowercase!) |
+| `while` | `description`, `command`, `condition_command`, `max_iterations?`, `execution_mode?` | Schleife |
+| `retry` | `description`, `command`, `max_retries?`, `delay?`, `exponential_backoff?`, `execution_mode?` | Wiederholung bei Fehler (`delay` in Sekunden) |
 | `switch` | `description`, `expression`, `cases`, `default` | Multi-Way-Branching |
-| `approval` | `description`, `prompt`, `options` | Warten auf Genehmigung |
+| `approval` | `description`, `question`, `options?`, `mode?`, `auto_answer?`, `on_no?`, `variable_name?`, `timeout_minutes?` | Warten auf Genehmigung |
 | `sub-workflow` | `description`, `workflow_id` | Verschachtelter Workflow (max 5 Ebenen) |
-| `skill-capability` | `description`, `capability`, `input` | Skill-Ausführung |
+| `skill-capability` | `description`, `capability`, `input?`, `params?`, `allow_writes?` | Skill-Ausführung (ohne `allow_writes` nur lesend) |
 | `human-input` | `description`, `prompt`, `input_type`, `variable_name`, `options`, `timeout_minutes` | User-Eingabe |
-| `integration` | `description`, `provider`, `action`, `params` | Integration-Provider-Aktion (Google Calendar, Gmail, Jira, Confluence, Trello) |
+| `integration` | `description`, `provider`, `action`, `params?` | Integration-Provider-Aktion (Google Calendar, Gmail, Jira, Confluence, Trello, GitHub, Taskwarrior) |
 | `document` | `description`, `file_path`, `fail_on_empty?`, `min_characters?`, `variable_name?` | Text-Extraktion aus Dokumenten via Tika (PDF mit Text-Layer, DOCX, …) — kein OCR |
+| `todo-create` | `description`, `title`, `priority?`, `tags?`, `project_id?`, `source?`, `source_agent?`, `variable_name?` | TODO anlegen (`variable_name` default `todo_id`) |
+| `todo-update` | `description`, `id`, `title?`, `description?`, `priority?`, `tags?` | TODO ändern |
+| `todo-close` | `description`, `id` | TODO auf DONE setzen |
+
+Mit `?` markierte Felder sind optional. `on_failure` (`stop` \| `continue`, default `stop`) gilt für **jeden** Blocktyp.
+`effort` (`low` \| `medium` \| `high` \| `xhigh`) gilt für jeden Block, der die AI aufruft, und überschreibt die Workflow-Einstellung.
 
 ### 2. Chain erstellen
 
