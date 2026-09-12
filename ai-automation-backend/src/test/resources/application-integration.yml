@@ -45,6 +45,14 @@ automation:
   host-claude:
     timeout-seconds: 10
     max-concurrent-calls: 1
+  integration:
+    # integration.key.path is set per test JVM by IntegrationTestDbSessionListener (same
+    # mechanism as integration.db.path above) so that IntegrationEncryptionService.init()
+    # never falls through to its production default (${user.home}/.autotrigger/...) and
+    # generates/writes a key into the developer's real home directory (happened
+    # 2026-08-06, shadowing the real key on every test run). The fallback path only
+    # applies when the listener did not run (e.g. exotic runners).
+    key-file: ${integration.key.path:${java.io.tmpdir}/autotrigger-integrationtest.key}
 
 server:
   port: 0
