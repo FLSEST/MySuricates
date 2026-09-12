@@ -22,6 +22,67 @@ public class WorkflowExecutionRegistry {
     private final Map<String, ExecutionContext> activeExecutions = new ConcurrentHashMap<>();
 
     /**
+     * Marks the placeholder context from {@link #registerProvisional}. Control operations (cancel,
+     * pause) work on it by design; anything that needs a container or the project's working
+     * directory must not — see {@link #getStartedContext}. A block never sees the marker, the real
+     * context replaces the placeholder before the first one runs.
+     */
+    private static final String NOT_STARTED_MARKER = "__run_not_started";
+
+    /**
+     * Registers a placeholder context for a run that is about to be submitted. Without it a run is
+     * observable (DB status RUNNING) but not controllable for as long as the execution thread needs
+     * to get through the semaphore and the container start — a cancel arriving in that window took
+     * {@code WorkflowExecutor}'s ghost branch and was then overrun by the thread that kept going.
+     *
+     * <p>Side effect (intended): {@link #getActiveRunCount()} now counts queued runs too, which is
+     * what {@code GhostRunWatchdogService.reconcilePermits} needs — a run parked in
+     * {@code executionSemaphore.acquire()} or in the container start holds (or is about to hold) a
+     * permit and must not be mistaken for a leak.
+     */
+    public void registerProvisional(String runId) {
+        ExecutionContext provisional = ExecutionContext.builder().workflowRunId(runId).build();
+        provisional.setVariable(NOT_STARTED_MARKER, Boolean.TRUE);
+        register(runId, provisional);
+    }
+
+    /** True when a cancel already arrived — checked by the execution thread before it does any work. */
+    public boolean cancelRequested(String runId) {
+        ExecutionContext context = activeExecutions.get(runId);
+        return context != null && context.shouldStop();
+    }
+
+    /**
+     * Swaps the provisional context for the real one and carries over any control flag that arrived
+     * in between. {@link #cancel} double-checks from the other side, so a cancel racing this put
+     * lands on the real context either way.
+     */
+    public void promote(String runId, ExecutionContext context) {
+        ExecutionContext previous = register(runId, context);
+        if (previous == null) {
+            return;
+        }
+        if (previous.shouldStop()) {
+            context.cancel();
+        }
+        if (previous.isPaused()) {
+            context.pause();
+        }
+    }
+
+    /**
+     * The context of a run whose execution thread has taken over — {@code null} while the run is
+     * still queued (or unknown). Use this wherever a container id or the project working directory
+     * is needed; {@link #get} also returns the placeholder.
+     */
+    public ExecutionContext getStartedContext(String runId) {
+        ExecutionContext context = activeExecutions.get(runId);
+        return context == null || Boolean.TRUE.equals(context.getVariable(NOT_STARTED_MARKER))
+                ? null
+                : context;
+    }
+
+    /**
      * Registers the context for a run and returns the context that was registered before, or
      * {@code null} when this is the first one. {@link WorkflowExecutor} uses the return value to
      * carry a cancel/pause flag over from the provisional context it registers before the

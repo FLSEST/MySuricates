@@ -204,6 +204,66 @@ class WorkflowExecutionRegistryTest {
     }
 
     @Test
+    void registerProvisional_registersCancellablePlaceholder() {
+        registry.registerProvisional("run-1");
+
+        assertThat(registry.isRunActive("run-1")).isTrue();
+        assertThat(registry.getActiveRunCount()).isEqualTo(1);
+        // Controllable, but not usable for anything that needs a container or the project cwd.
+        assertThat(registry.getStartedContext("run-1")).isNull();
+        assertThat(registry.cancelRequested("run-1")).isFalse();
+
+        assertThat(registry.cancel("run-1")).isTrue();
+        assertThat(registry.cancelRequested("run-1")).isTrue();
+    }
+
+    @Test
+    void cancelRequested_unknownRun_isFalse() {
+        assertThat(registry.cancelRequested("nonexistent")).isFalse();
+    }
+
+    @Test
+    void promote_carriesCancelFlagToTheRealContext() {
+        registry.registerProvisional("run-1");
+        registry.cancel("run-1");
+        ExecutionContext real = buildContext("c1", "run-1");
+
+        registry.promote("run-1", real);
+
+        assertThat(real.shouldStop()).isTrue();
+        assertThat(registry.get("run-1")).isSameAs(real);
+        assertThat(registry.getStartedContext("run-1")).isSameAs(real);
+    }
+
+    @Test
+    void promote_carriesPauseFlagToTheRealContext() {
+        registry.registerProvisional("run-1");
+        registry.pauseExecution("run-1");
+        ExecutionContext real = buildContext("c1", "run-1");
+
+        registry.promote("run-1", real);
+
+        assertThat(real.isPaused()).isTrue();
+        assertThat(real.shouldStop()).isFalse();
+    }
+
+    @Test
+    void promote_withoutProvisional_leavesTheContextUntouched() {
+        ExecutionContext real = buildContext("c1", "run-1");
+
+        registry.promote("run-1", real);
+
+        assertThat(real.shouldStop()).isFalse();
+        assertThat(real.isPaused()).isFalse();
+        assertThat(registry.get("run-1")).isSameAs(real);
+    }
+
+    @Test
+    void getStartedContext_unknownRun_returnsNull() {
+        assertThat(registry.getStartedContext("nonexistent")).isNull();
+    }
+
+    @Test
     void cancel_flagsBothContextsWhenSwappedConcurrently() {
         ExecutionContext provisional = buildContext(null, "run-1");
         ExecutionContext real = buildContext("c1", "run-1");
