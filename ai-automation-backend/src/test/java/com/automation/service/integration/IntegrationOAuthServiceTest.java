@@ -337,6 +337,82 @@ class IntegrationOAuthServiceTest {
     }
 
     @Test
+    void getValidAccessToken_credentialLessProvider_noConnection_returnsNull() {
+        IntegrationOAuthService service = new IntegrationOAuthService(
+                connectionRepository, encryptionService, registry, objectMapper);
+
+        when(registry.getProvider("taskwarrior")).thenReturn(provider);
+        when(connectionRepository.findByProviderId("taskwarrior")).thenReturn(Optional.empty());
+        when(provider.requiresCredentials()).thenReturn(false);
+
+        String token = service.getValidAccessToken("taskwarrior");
+
+        assertThat(token).isNull();
+    }
+
+    @Test
+    void getValidAccessToken_credentialLessProvider_decryptFails_returnsNull() {
+        IntegrationOAuthService service = new IntegrationOAuthService(
+                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationConnection connection = IntegrationConnection.builder()
+                .providerId("taskwarrior")
+                .status(ConnectionStatus.CONNECTED)
+                .accessTokenEncrypted("enc-broken")
+                .build();
+
+        when(connectionRepository.findByProviderId("taskwarrior")).thenReturn(Optional.of(connection));
+        when(registry.getProvider("taskwarrior")).thenReturn(provider);
+        when(provider.requiresOAuthFlow()).thenReturn(false);
+        when(provider.requiresCredentials()).thenReturn(false);
+        when(encryptionService.decrypt("enc-broken")).thenThrow(new IllegalStateException("Failed to decrypt token"));
+
+        String token = service.getValidAccessToken("taskwarrior");
+
+        assertThat(token).isNull();
+    }
+
+    @Test
+    void getValidAccessToken_credentialLessProvider_decryptOk_returnsToken() {
+        IntegrationOAuthService service = new IntegrationOAuthService(
+                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationConnection connection = IntegrationConnection.builder()
+                .providerId("taskwarrior")
+                .status(ConnectionStatus.CONNECTED)
+                .accessTokenEncrypted("enc-access")
+                .build();
+
+        when(connectionRepository.findByProviderId("taskwarrior")).thenReturn(Optional.of(connection));
+        when(registry.getProvider("taskwarrior")).thenReturn(provider);
+        when(provider.requiresOAuthFlow()).thenReturn(false);
+        when(encryptionService.decrypt("enc-access")).thenReturn("/data|/rc");
+
+        String token = service.getValidAccessToken("taskwarrior");
+
+        assertThat(token).isEqualTo("/data|/rc");
+    }
+
+    @Test
+    void getValidAccessToken_credentialProvider_decryptFails_stillThrows() {
+        IntegrationOAuthService service = new IntegrationOAuthService(
+                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationConnection connection = IntegrationConnection.builder()
+                .providerId("github")
+                .status(ConnectionStatus.CONNECTED)
+                .accessTokenEncrypted("enc-broken")
+                .build();
+
+        when(connectionRepository.findByProviderId("github")).thenReturn(Optional.of(connection));
+        when(registry.getProvider("github")).thenReturn(provider);
+        when(provider.requiresOAuthFlow()).thenReturn(false);
+        when(provider.requiresCredentials()).thenReturn(true);
+        when(encryptionService.decrypt("enc-broken")).thenThrow(new IllegalStateException("Failed to decrypt token"));
+
+        assertThatThrownBy(() -> service.getValidAccessToken("github"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Failed to decrypt token");
+    }
+
+    @Test
     void disconnect_forNonOAuthProviderClearsTokensWithoutRevocation() {
         IntegrationOAuthService service = new IntegrationOAuthService(
                 connectionRepository, encryptionService, registry, objectMapper);

@@ -77,9 +77,7 @@ public class IntegrationOAuthService {
         return connectionRepository.save(connection);
     }
 
-    /**
-     * Check if a provider has credentials configured (DB or env var).
-     */
+    /** Check if a provider has credentials configured (DB or env var). */
     public boolean isProviderConfigured(String providerId) {
         IntegrationProvider provider = registry.getProvider(providerId);
         OAuthConfig config = provider.getOAuthConfig();
@@ -95,9 +93,7 @@ public class IntegrationOAuthService {
                 && System.getenv(config.clientSecretEnvVar()) != null;
     }
 
-    /**
-     * Generate an OAuth2 authorization URL for the given provider.
-     */
+    /** Generate an OAuth2 authorization URL for the given provider. */
     public String getAuthorizationUrl(String providerId, String redirectUri, java.util.List<String> additionalScopes) {
         return getAuthorizationUrl(providerId, redirectUri, additionalScopes, null);
     }
@@ -118,9 +114,7 @@ public class IntegrationOAuthService {
         return OAuthAuthorizationUrl.build(config, clientId, redirectUri, additionalScopes, state);
     }
 
-    /**
-     * Handle the OAuth2 callback: exchange code for tokens and store them.
-     */
+    /** Handle the OAuth2 callback: exchange code for tokens and store them. */
     @Transactional
     public IntegrationConnection handleCallback(String code, String state, String redirectUri) {
         PendingAuthorization pending = pendingStates.remove(state);
@@ -164,19 +158,29 @@ public class IntegrationOAuthService {
         return pending.callbackOrigin();
     }
 
-    /** Get a valid access token, refreshing if necessary. */
+    /** Get a valid access token, refreshing if necessary; null for a credential-less provider with none stored. */
     public String getValidAccessToken(String providerId) {
-        IntegrationConnection connection = connectionRepository.findByProviderId(providerId)
-                .orElseThrow(() -> new IllegalStateException("No connection for provider: " + providerId));
+        IntegrationProvider provider = registry.getProvider(providerId);
+        IntegrationConnection connection = connectionRepository.findByProviderId(providerId).orElse(null);
+        if (connection == null) {
+            if (provider.requiresCredentials()) throw new IllegalStateException("No connection for provider: " + providerId);
+            log.debug("Provider {} requires no credentials — proceeding without token", providerId);
+            return null;
+        }
 
         if (connection.getStatus() == ConnectionStatus.DISCONNECTED) {
             throw new IllegalStateException("Provider " + providerId + " is not connected");
         }
 
         // Non-OAuth providers use stored credentials directly (no expiry/refresh)
-        IntegrationProvider provider = registry.getProvider(providerId);
         if (!provider.requiresOAuthFlow()) {
-            return encryptionService.decrypt(connection.getAccessTokenEncrypted());
+            try {
+                return encryptionService.decrypt(connection.getAccessTokenEncrypted());
+            } catch (IllegalStateException e) {
+                if (provider.requiresCredentials()) throw e;
+                log.debug("Provider {} requires no credentials — proceeding without token", providerId);
+                return null;
+            }
         }
 
         if (connection.getTokenExpiry() != null && connection.getTokenExpiry().isAfter(Instant.now().plusSeconds(300))) {
@@ -215,10 +219,7 @@ public class IntegrationOAuthService {
         log.info("Disconnected integration (kept credentials): {}", providerId);
     }
 
-    /**
-     * Delete the connection row entirely, including any stored app credentials.
-     * Requires the user to re-enter clientId/clientSecret on reconnect.
-     */
+    /** Delete the connection row entirely (app credentials included); reconnect requires re-entering them. */
     @Transactional
     public void deleteCredentials(String providerId) {
         connectionRepository.findByProviderId(providerId).ifPresent(connection -> {
@@ -236,9 +237,7 @@ public class IntegrationOAuthService {
         log.info("Deleted integration credentials: {}", providerId);
     }
 
-    /**
-     * Get the current connection status for a provider.
-     */
+    /** Get the current connection status for a provider. */
     public Optional<IntegrationConnection> getConnection(String providerId) {
         return connectionRepository.findByProviderId(providerId);
     }
