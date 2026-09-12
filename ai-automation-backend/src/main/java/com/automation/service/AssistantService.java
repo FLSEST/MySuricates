@@ -94,7 +94,7 @@ public class AssistantService {
             appSettingsRepository.set("assistant-thinking-phrases", DEFAULT_THINKING_PHRASES);
         }
         if (appSettingsRepository.get("assistant-model").filter(m -> !m.isBlank()).isEmpty()) {
-            appSettingsRepository.set("assistant-model", "claude-sonnet-4-6");
+            appSettingsRepository.set("assistant-model", "sonnet");
         }
         cachedAssistantModel = appSettingsRepository.get("assistant-model")
                 .filter(m -> !m.isBlank()).orElse(null);

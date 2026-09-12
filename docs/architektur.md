@@ -362,7 +362,7 @@ Kontext-sensitiver Chat-Assistent für die Plattform. Siehe auch: [assistant-sys
 - `AssistantController` — `POST /api/v1/assistant/chat`, `GET /sessions`, `GET /sessions/{id}`, `DELETE /sessions/{id}`, `POST /pending-tools/{id}/confirm`, `POST /pending-tools/{id}/reject`
 - `PageSuggestionController` — `GET /api/v1/assistant/suggestions?page=...`, `POST /api/v1/assistant/suggestions/refresh?page=...`
 - Sessions werden nach jedem Chat-Aufruf persistiert; `AssistantSessionUpdatedEvent` triggert Page-Suggestion-Refresh
-- Standard-Modell: `claude-sonnet-4-6`
+- Standard-Modell: `sonnet` (CLI-Alias, neuestes Sonnet)
 
 ## Workflow Memory
 
@@ -416,7 +416,8 @@ Blöcke können über das `skillIds`-Feld eigene Skills mitbringen, die additiv 
 
 ## Model Selection
 
-- `workflow.model`-Feld (z.B. `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5`)
+- `workflow.model`-Feld: CLI-Alias (`opus`, `sonnet`, `haiku`, `fable` — immer das neueste Modell) oder konkrete ID (`claude-opus-5`); pi `<backend>/<model>`, codex Slug
+- Vorschlagsliste: `GET /api/v1/system/ai-providers/{id}/models` — `ModelCatalogService` mit einer `ModelCatalogSource` je Provider (Claude: Aliase, PI: `pi --offline --list-models`, CODEX: `~/.codex/models_cache.json` bzw. `codex debug models --bundled`), TTL-Cache (Setting `model-catalog-ttl-seconds`), `POST .../models/refresh`
 - Wird via `--model`-Flag an die Claude CLI auf dem Host übergeben
 - REASON und ACT eines Agentic-Laufs verwenden dasselbe Workflow-Modell (`ReasoningRequest.model` bzw. `ActionRequest.model`); ohne konfiguriertes Modell fällt der Provider auf seinen Default zurück
 

@@ -12,7 +12,7 @@
   "category": "QUALITY",
   "sortOrder": 53,
   "version": "1.1.0",
-  "model": "claude-opus-4-6",
+  "model": "opus",
   "instructions": "Du bist ein Qualitäts-Auditor für Workflow-Definitionen. Sei präzise, konservativ und belegfokussiert. Keine Halluzinationen, nur belegte Bindungen. Nutze nur Read-Tool und nur im Pool-Verzeichnis.",
   "blocks": [
     {

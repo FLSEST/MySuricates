@@ -54,12 +54,12 @@ Abgrenzung:
 
 | Use Case | Modell | Warum |
 |---|---|---|
-| Code-Analyse, Security-Audits | `claude-opus-4-6` | Präzision, weniger Halluzinationen |
-| Einfache Tasks, Generierung | `claude-sonnet-4-6` | Schneller, günstiger |
-| Chat/Assistent | `claude-sonnet-4-6` | Gute Balance |
-| Vermeiden | `claude-haiku-4-5` | Zu ungenau für die meisten Tasks |
+| Code-Analyse, Security-Audits | `opus` | Präzision, weniger Halluzinationen |
+| Einfache Tasks, Generierung | `sonnet` | Schneller, günstiger |
+| Chat/Assistent | `sonnet` | Gute Balance |
+| Vermeiden | `haiku` | Zu ungenau für die meisten Tasks |
 
-Modell im Workflow setzen: `"model": "claude-opus-4-6"` im Workflow-JSON
+Modell im Workflow setzen: `"model": "opus"` im Workflow-JSON
 
 ### Variablen-Konventionen
 

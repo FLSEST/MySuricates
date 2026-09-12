@@ -12,7 +12,7 @@
   "category": "CODE",
   "sortOrder": 41,
   "version": "1.0.0",
-  "model": "claude-sonnet-4-6",
+  "model": "sonnet",
   "instructions": "Identifiziert ungetestete Klassen, berechnet Coverage-Ratio und priorisiert Test-Luecken nach Kritikalitaet.",
   "blocks": [
     {

@@ -300,7 +300,7 @@ class AssistantActionSuggestionServiceTest {
         // Verify a write call against the repository to set the default
         org.mockito.Mockito.verify(appSettingsRepository).set(
                 org.mockito.ArgumentMatchers.eq("suggestions-model"),
-                org.mockito.ArgumentMatchers.eq("claude-sonnet-4-6"));
+                org.mockito.ArgumentMatchers.eq("sonnet"));
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

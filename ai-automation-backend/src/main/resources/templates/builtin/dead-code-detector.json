@@ -12,7 +12,7 @@
   "category": "CODE",
   "sortOrder": 37,
   "version": "1.1.0",
-  "model": "claude-sonnet-4-6",
+  "model": "sonnet",
   "instructions": "Findet ungenutzten Code: verwaiste Exports, tote Dateien, ungenutzte Dependencies, tote Code-Pfade.",
   "blocks": [
     {

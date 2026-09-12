@@ -174,7 +174,7 @@ class WishPromptBuilderTest {
         @Test
         void analysisInDescription_returnsOpus() {
             String model = builder.inferModelFromBlocks(List.of(), "Security analysis of the codebase");
-            assertThat(model).isEqualTo("claude-opus-4-6");
+            assertThat(model).isEqualTo("opus");
         }
 
         @Test
@@ -184,7 +184,7 @@ class WishPromptBuilderTest {
                     .config(Map.of("goal", "audit dependencies for vulnerabilities"))
                     .build();
             String model = builder.inferModelFromBlocks(List.of(block), "Check deps");
-            assertThat(model).isEqualTo("claude-opus-4-6");
+            assertThat(model).isEqualTo("opus");
         }
 
         @Test
@@ -227,7 +227,7 @@ class WishPromptBuilderTest {
                     .type("agentic")
                     .config(Map.of("goal", "evaluate code quality"))
                     .build();
-            assertThat(builder.inferModelFromBlocks(List.of(block), null)).isEqualTo("claude-opus-4-6");
+            assertThat(builder.inferModelFromBlocks(List.of(block), null)).isEqualTo("opus");
         }
 
         @Test
@@ -236,7 +236,7 @@ class WishPromptBuilderTest {
                     "tech debt radar", "coverage report", "security check", "architecture assessment")) {
                 assertThat(builder.inferModelFromBlocks(List.of(), keyword))
                         .as("Should match: %s", keyword)
-                        .isEqualTo("claude-opus-4-6");
+                        .isEqualTo("opus");
             }
         }
 
@@ -246,7 +246,7 @@ class WishPromptBuilderTest {
             BlockDefinition block = BlockDefinition.builder()
                     .type("agentic").config(Map.of("goal", "deploy app")).build();
             assertThat(builder.inferModelFromBlocks(List.of(block), "Security audit"))
-                    .isEqualTo("claude-opus-4-6");
+                    .isEqualTo("opus");
         }
     }
 

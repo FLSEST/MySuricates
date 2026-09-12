@@ -895,9 +895,15 @@ Das Modell wird auf Workflow-Ebene gesetzt (`workflow.model`-Feld) oder auf null
 
 | Modell | Anwendungsfall | Staerken | Schwaechen |
 |---|---|---|---|
-| `claude-opus-4-6` | Analyse, Audits, Security-Reviews | Praezision, weniger Halluzinationen, tiefes Reasoning | Langsamer, teurer |
-| `claude-sonnet-4-6` | Code-Generierung, Routine-Aufgaben | Schnell, gut genug fuer die meisten Aufgaben | Kann Findings in Analysen halluzinieren |
-| `claude-haiku-4-5` | Einfache Klassifikation, Extraktion | Sehr schnell, guenstig | Begrenzte Reasoning-Tiefe |
+| `opus` | Analyse, Audits, Security-Reviews | Praezision, weniger Halluzinationen, tiefes Reasoning | Langsamer, teurer |
+| `sonnet` | Code-Generierung, Routine-Aufgaben | Schnell, gut genug fuer die meisten Aufgaben | Kann Findings in Analysen halluzinieren |
+| `haiku` | Einfache Klassifikation, Extraktion | Sehr schnell, guenstig | Begrenzte Reasoning-Tiefe |
+| `fable` | Schwerste Reasoning-/Agentic-Aufgaben | Staerkstes Modell | Teuerste Stufe |
+
+Die Werte sind **CLI-Aliase** der Claude CLI und zeigen immer auf das neueste Modell ihrer Familie — sie
+veralten nicht. Eine konkrete ID (z. B. `claude-opus-5`) kann im Modell-Feld frei eingetippt werden, wenn
+ein Workflow auf eine Version gepinnt werden soll. Die Vorschlagsliste im UI kommt aus
+`GET /api/v1/system/ai-providers/{id}/models` (pi: `pi --list-models`, codex: lokaler Modell-Cache).
 
 ### Kritische Regel
 
@@ -918,7 +924,7 @@ fehlen aber (stiller Fehlschlag). Deshalb:
 Via API:
 ```json
 {
-  "model": "claude-opus-4-6"
+  "model": "opus"
 }
 ```
 

@@ -925,11 +925,11 @@ class AssistantServiceTest {
     void seedSettings_seedsDefaultModel_whenBlank() {
         when(appSettingsRepository.get("assistant-thinking-phrases")).thenReturn(Optional.of("{\"de\":[]}"));
         when(appSettingsRepository.get("assistant-model"))
-                .thenReturn(Optional.of(" "), Optional.of("claude-sonnet-4-6"));
+                .thenReturn(Optional.of(" "), Optional.of("sonnet"));
 
         service.seedSettings();
 
-        verify(appSettingsRepository).set("assistant-model", "claude-sonnet-4-6");
+        verify(appSettingsRepository).set("assistant-model", "sonnet");
     }
 
     // ── Chat context building ────────────────────────────────────────────────

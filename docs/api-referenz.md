@@ -1970,7 +1970,7 @@ Dashboard-Daten mit Statistiken.
     { "provider": "CLAUDE", "runCount": 150, "totalTokens": 240000, "totalCostUsd": 11.0, "successRate": 90.0 }
   ],
   "modelStats": [
-    { "model": "claude-sonnet-4-6", "stepCount": 200, "totalTokens": 180000, "totalCostUsd": 8.5 }
+    { "model": "sonnet", "stepCount": 200, "totalTokens": 180000, "totalCostUsd": 8.5 }
   ],
   "gateStatusSummary": [
     { "status": "GREEN", "count": 10 }
@@ -2520,7 +2520,7 @@ Chat-Nachricht an den KI-Assistenten senden.
       "payload": null
     }
   ],
-  "model": "claude-sonnet-4-6",
+  "model": "sonnet",
   "provider": "CLAUDE",
   "responseTimeMs": 1234,
   "pendingTools": [

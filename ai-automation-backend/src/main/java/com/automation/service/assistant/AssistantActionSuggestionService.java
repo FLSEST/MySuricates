@@ -137,7 +137,7 @@ public class AssistantActionSuggestionService {
     /** Default model for the suggestion call. Sonnet is fast enough for the 30s window and
      *  produces noticeably better proposals than the CLI's local default (typically Haiku).
      *  Per memory rule: never Haiku for chat/assistant. */
-    private static final String DEFAULT_SUGGESTIONS_MODEL = "claude-sonnet-4-6";
+    private static final String DEFAULT_SUGGESTIONS_MODEL = "sonnet";
 
     @PostConstruct
     public void init() {

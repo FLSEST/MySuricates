@@ -125,7 +125,7 @@ Response: 201 Created
   "defaultContext": {
     "base_dir": "/your/project/path"
   },
-  "model": "claude-sonnet-4-6",
+  "model": "sonnet",
   "instructions": "Optionale workflow-spezifische Instruktionen"
 }
 ```

@@ -461,7 +461,7 @@ erDiagram
 | `icon` | TEXT | | Emoji |
 | `blocks` | TEXT | | JSON: list of BlockDefinitions |
 | `instructions` | TEXT | | Workflow-specific agent instructions (V13) |
-| `model` | TEXT | | Claude model override (V13), e.g. `claude-opus-4-6` |
+| `model` | TEXT | | Claude model override (V13), e.g. `opus` |
 | `provider` | TEXT | | AI provider override (V34), e.g. `CLAUDE`, `CODEX` |
 | `default_context` | TEXT | DEFAULT '{}' | JSON: default context variables (V23) |
 | `template_id` | TEXT | FK -> workflow_templates, ON DELETE SET NULL | Source template (V19) |

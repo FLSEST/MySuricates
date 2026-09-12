@@ -20,7 +20,7 @@ The Assistant system consists of four areas:
 - Main class for chat logic (`service/AssistantService.java`)
 - Prepares the context (current page, workflow data, etc.)
 - Calls Claude CLI on the host (`HostClaudeService`)
-- Default model: `claude-sonnet-4-6` (seeded into `app_settings` on startup, cached in `cachedAssistantModel`)
+- Default model: `sonnet` (seeded into `app_settings` on startup, cached in `cachedAssistantModel`)
 - Allowed CLI tools: `Read`, `Grep`, `Glob`, `WebFetch` (`CHAT_ALLOWED_TOOLS`)
 - Auto-fetch loop: up to **3 rounds** with **3 fetches** per round (`MAX_FETCH_ROUNDS`, `MAX_FETCHES_PER_ROUND`)
 - Detects explicit mutation intent via regex (German verbs + target nouns) — only then are mutating actions passed through
@@ -44,7 +44,7 @@ The Assistant system consists of four areas:
 - `refreshSuggestions(page)` — generates via Claude (uses last 10 sessions for the page) and saves
 - `onSessionUpdated(AssistantSessionUpdatedEvent)` — `@Async @EventListener`, triggers throttled refresh
 - Throttle: **600 seconds** (10 min.) per page, timeout: **60 seconds**, max. **4** suggestions
-- Dedicated model: `suggestions-model` setting (default: `claude-sonnet-4-6`)
+- Dedicated model: `suggestions-model` setting (default: `sonnet`)
 - Defaults for 13 pages: `run`, `workflow`, `workflows`, `runs`, `todos`, `project`, `projects`, `schedules`, `activity`, `insights`, `wishes`, `factory`, `chains`
 
 ### AssistantSessionUpdatedEvent
@@ -58,7 +58,7 @@ The Assistant system consists of four areas:
 
 - Generates context-sensitive action suggestions in parallel with chat (`service/assistant/AssistantActionSuggestionService.java`)
 - Timeout: **30 seconds**, max. **4** actions
-- Model: `suggestions-model` setting (default: `claude-sonnet-4-6`)
+- Model: `suggestions-model` setting (default: `sonnet`)
 - Navigation types: `show_run`, `show_workflow`, `start_wish`, `ask_choice`, `run_workflow`
 - Propose types (converted to PendingTools): `propose_create_todo`, `propose_cancel_run`, `propose_rerun_workflow`, `propose_update_todo_status`
 - Prompt contains page context (max 6000 characters), workflow index (top 40), last 5 runs
@@ -111,7 +111,7 @@ Response (`AssistantChatResponse`):
 {
   "message": "The workflow failed because...",
   "actions": [],
-  "model": "claude-sonnet-4-6",
+  "model": "sonnet",
   "provider": "CLAUDE",
   "responseTimeMs": 3200,
   "pendingTools": []
@@ -317,11 +317,11 @@ All implement `AssistantContextSection` with `append(StringBuilder sb, boolean c
 
 ## Model Selection
 
-- **Chat model** (`assistant-model` setting): Default `claude-sonnet-4-6`, cached in `AssistantService.cachedAssistantModel`
-- **Suggestions model** (`suggestions-model` setting): Default `claude-sonnet-4-6`, used by `PageSuggestionService` and `AssistantActionSuggestionService`
+- **Chat model** (`assistant-model` setting): Default `sonnet`, cached in `AssistantService.cachedAssistantModel`
+- **Suggestions model** (`suggestions-model` setting): Default `sonnet`, used by `PageSuggestionService` and `AssistantActionSuggestionService`
 - Both models are seeded into `app_settings` on startup and can be changed at runtime via the Settings API (`refreshCachedModel()`)
-- Haiku (`claude-haiku-4-5`) is too imprecise for assistant tasks
-- Opus (`claude-opus-4-6`) is too slow for interactive chats
+- Haiku (`haiku`) is too imprecise for assistant tasks
+- Opus (`opus`) is too slow for interactive chats
 
 ## Frontend Integration
 
