@@ -91,6 +91,8 @@ public class SubWorkflowBlockExecutor implements BlockExecutor {
             List<String> newParentIds = new ArrayList<>(parentIds);
             newParentIds.add(workflowId);
             childContext.put("__parent_workflow_ids", newParentIds);
+            // Taint travels into the child run: its shell blocks escape the same values
+            childContext.putAll(context.exportTaint());
 
             // Execute sub-workflow
             WorkflowRun subRun = workflowExecutor.execute(subWorkflow, childContext);

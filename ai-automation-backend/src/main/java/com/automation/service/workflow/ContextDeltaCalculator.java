@@ -29,6 +29,9 @@ final class ContextDeltaCalculator {
         if (inputContext != null) {
             inputContext.keySet().forEach(delta::remove);
         }
+        // The run's taint travels with the delta (resume rebuilds its input context from these),
+        // after the removals above because the reserved keys are input-context keys themselves.
+        delta.putAll(context.exportTaint());
         return delta.isEmpty() ? null : delta;
     }
 }

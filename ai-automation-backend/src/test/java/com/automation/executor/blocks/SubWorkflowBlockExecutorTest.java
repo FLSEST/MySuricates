@@ -206,4 +206,57 @@ class SubWorkflowBlockExecutorTest {
         assertThat(childContext).containsEntry("previous_output", "prev-output");
         assertThat((List<String>) childContext.get("__parent_workflow_ids")).contains("sub-wf-1");
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void execute_taintedParent_handsTheTaintToTheChild() {
+        context.setUntrustedVariable("branch", "main; id");
+        context.recordOutput("scan", "out");
+
+        Workflow subWorkflow = Workflow.builder().id("sub-wf-1").name("Sub Workflow").build();
+        when(workflowService.findById("sub-wf-1")).thenReturn(subWorkflow);
+        WorkflowRun subRun = WorkflowRun.builder()
+                .id("sub-run-1").workflow(subWorkflow).status(RunStatus.COMPLETED).build();
+        when(workflowExecutor.execute(eq(subWorkflow), any(Map.class))).thenReturn(subRun);
+        when(runRepository.findById("sub-run-1")).thenReturn(Optional.of(subRun));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("sub-workflow")
+                .config(new HashMap<>(Map.of("workflow_id", "sub-wf-1")))
+                .build();
+
+        executor.execute(block, context);
+
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(workflowExecutor).execute(eq(subWorkflow), captor.capture());
+        assertThat(captor.getValue())
+                .containsEntry(ExecutionContext.UNTRUSTED_KEYS_VARIABLE, List.of("branch"))
+                .containsEntry(ExecutionContext.UNTRUSTED_OUTPUTS_VARIABLE,
+                        List.of(ExecutionContext.PREVIOUS_OUTPUT_NAME, "scan"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void execute_cleanParent_handsNoTaintKeysToTheChild() {
+        context.recordOutput("scan", "out");
+
+        Workflow subWorkflow = Workflow.builder().id("sub-wf-1").name("Sub Workflow").build();
+        when(workflowService.findById("sub-wf-1")).thenReturn(subWorkflow);
+        WorkflowRun subRun = WorkflowRun.builder()
+                .id("sub-run-1").workflow(subWorkflow).status(RunStatus.COMPLETED).build();
+        when(workflowExecutor.execute(eq(subWorkflow), any(Map.class))).thenReturn(subRun);
+        when(runRepository.findById("sub-run-1")).thenReturn(Optional.of(subRun));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("sub-workflow")
+                .config(new HashMap<>(Map.of("workflow_id", "sub-wf-1")))
+                .build();
+
+        executor.execute(block, context);
+
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(workflowExecutor).execute(eq(subWorkflow), captor.capture());
+        assertThat(captor.getValue()).doesNotContainKeys(
+                ExecutionContext.UNTRUSTED_KEYS_VARIABLE, ExecutionContext.UNTRUSTED_OUTPUTS_VARIABLE);
+    }
 }

@@ -542,4 +542,28 @@ class WhileBlockExecutorTest {
         verify(commandExecutor).executeStepAsShell(eq("/tmp/project"), captor.capture(), anyInt(), eq(60));
         assertThat(captor.getValue().getConfig().get("command")).isEqualTo("build 'x; id'");
     }
+
+    @Test
+    void execute_shellMode_taintedIterationOutput_isEscapedInTheNextIteration() {
+        context.setUntrustedVariable("u", "z");   // webhook payload — the run is tainted
+        Map<String, Object> config = new HashMap<>();
+        config.put("command", "echo {{ previous_output }}");
+        config.put("max_iterations", 2);
+        config.put("execution_mode", "shell");
+        config.put("timeout_seconds", 60);
+        BlockDefinition block = BlockDefinition.builder().type("while").config(config).build();
+
+        StepResult step = new StepResult();
+        step.setStepIndex(0);
+        step.setOutput("x; id");
+        step.setStatus(StepStatus.COMPLETED);
+        when(commandExecutor.executeStepAsShell(eq("/tmp/project"), any(), anyInt(), eq(60))).thenReturn(step);
+
+        executor.execute(block, context);
+
+        org.mockito.ArgumentCaptor<BlockDefinition> captor = org.mockito.ArgumentCaptor.forClass(BlockDefinition.class);
+        verify(commandExecutor, times(2)).executeStepAsShell(eq("/tmp/project"), captor.capture(), anyInt(), eq(60));
+        assertThat(captor.getAllValues().get(0).getConfig().get("command")).isEqualTo("echo ");
+        assertThat(captor.getAllValues().get(1).getConfig().get("command")).isEqualTo("echo 'x; id'");
+    }
 }

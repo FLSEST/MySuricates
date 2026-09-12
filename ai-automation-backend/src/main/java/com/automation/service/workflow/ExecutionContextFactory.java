@@ -64,7 +64,7 @@ public class ExecutionContextFactory {
                 .workflowRunId(runId)
                 .build();
         context.setProjectPath(project.getPath());
-        Set<String> untrustedKeys = untrustedKeys(inputContext);
+        Set<String> untrustedKeys = reservedNames(inputContext, ExecutionContext.UNTRUSTED_KEYS_VARIABLE);
         inputContext.forEach((name, value) -> {
             if (untrustedKeys.contains(name)) {
                 context.setUntrustedVariable(name, value);
@@ -72,6 +72,9 @@ public class ExecutionContextFactory {
                 context.setVariable(name, value);
             }
         });
+        // Outputs tainted in an earlier segment of this run (resume) or in the parent (sub-workflow)
+        reservedNames(inputContext, ExecutionContext.UNTRUSTED_OUTPUTS_VARIABLE)
+                .forEach(context::markOutputUntrusted);
         if (resumePreviousOutput != null) {
             context.setPreviousOutput(resumePreviousOutput);
         } else if (inputContext.get("previous_output") != null) {
@@ -160,9 +163,13 @@ public class ExecutionContextFactory {
         // Write project AI context to .claude/rules/ for executing agent
         projectContextService.writeProjectContextToProject(project.getAiContext(), project.getPath());
     }
-    /** Variable names flagged as untrusted by the trigger (see {@link ExecutionContext#UNTRUSTED_KEYS_VARIABLE}). */
-    static Set<String> untrustedKeys(Map<String, Object> inputContext) {
-        Object raw = inputContext.get(ExecutionContext.UNTRUSTED_KEYS_VARIABLE);
+    /**
+     * Names behind a reserved taint key of the input context — {@link ExecutionContext#UNTRUSTED_KEYS_VARIABLE}
+     * (untrusted variables, flagged by the trigger) or {@link ExecutionContext#UNTRUSTED_OUTPUTS_VARIABLE}
+     * (outputs tainted earlier in the run). Anything but a list of names means "none".
+     */
+    static Set<String> reservedNames(Map<String, Object> inputContext, String key) {
+        Object raw = inputContext.get(key);
         if (raw instanceof Collection<?> names) {
             Set<String> keys = new HashSet<>();
             for (Object name : names) {

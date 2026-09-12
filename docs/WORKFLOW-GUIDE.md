@@ -124,7 +124,7 @@ Fuehrt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 | `command` | string | **erforderlich** | Shell-Befehl(e) zur Ausfuehrung |
 | `container_image` | string | null | Docker-Image (siehe Ausfuehrungsumgebung; Server kann per Allowlist einschraenken) |
 | `timeout_seconds` | int | 300 | Ausfuehrungs-Timeout |
-| `shell_escape_variables` | bool | false | **Alle** Template-Variablen POSIX-sicher escapen (Single-Quotes). Variablen aus Webhook-Payloads (inkl. `git_*`) werden **immer** escaped, unabhaengig von dieser Option |
+| `shell_escape_variables` | bool | false | **Alle** Template-Variablen POSIX-sicher escapen (Single-Quotes). Variablen aus Webhook-Payloads (inkl. `git_*`) und die daraus abgeleiteten Block-Ausgaben werden **immer** escaped, unabhaengig von dieser Option |
 | `mount_docker_socket` | bool | false | Docker-Socket in den Container mounten (nur wirksam wenn `container_image` gesetzt) |
 | `mounts` | list | `[]` | Zusaetzliche Docker-Volume-Mounts im Format `host:container[:ro\|rw]` (nur wirksam wenn `container_image` gesetzt) |
 
@@ -138,8 +138,20 @@ Fuehrt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 > die daraus abgeleiteten `git_*`-Felder), landet in Shell-Befehlen (`shell`, `foreach`, `while`, `retry`
 > im Shell-Modus) grundsaetzlich in Single-Quotes — auch ohne `shell_escape_variables`. Solche
 > Platzhalter deshalb **unquoted** schreiben (`git checkout {{ git_branch }}`, nicht `"{{ git_branch }}"`),
-> sonst stehen die Quotes doppelt. Werte aus `defaultContext`, System-Variablen und Block-Ausgaben
-> (`previous_output`, `block.<name>.output`) bleiben unveraendert roh.
+> sonst stehen die Quotes doppelt. **Und das ist nicht nur Kosmetik: in eigenen Quotes ist das
+> Escaping wirkungslos.** Beim Wert `x; id` wird `PREV='{{ previous_output }}'` zu
+> `PREV=''x; id''` — die Shell fuehrt das als `PREV=x` **und danach** `id` aus. Einen untrusted
+> oder getainteten Platzhalter deshalb nie in Quotes setzen, sondern immer ohne Quotes schreiben
+> (`PREV={{ previous_output }}`). Werte aus `defaultContext` und System-Variablen bleiben roh.
+
+> **Taint-Propagation auf Block-Ausgaben:** In einem webhook-getriggerten Run — und in jedem daraus
+> gestarteten Sub-Workflow sowie nach einem Resume — werden auch `{{ previous_output }}`,
+> `{{ block.<name>.output }}`, `{{ step_N_output }}` und die Items eines `items_command`
+> single-quoted. Grund: ein Block kann die Payload in seine Ausgabe tragen, ohne den Platzhalter
+> ueberhaupt zu nennen (Datei lesen, API aufrufen). Der Taint entsteht, sobald der Run irgendeinen
+> untrusted Input traegt, und bleibt bis zum Ende des Runs bestehen. Diese Platzhalter also ebenfalls
+> **unquoted** schreiben. In Runs ohne untrusted Input (Schedule, manueller Start, TodoTrigger,
+> Chain) bleiben alle Block-Ausgaben unveraendert roh.
 
 ```json
 {

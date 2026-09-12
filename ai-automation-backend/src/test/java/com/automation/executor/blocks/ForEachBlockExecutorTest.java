@@ -551,6 +551,29 @@ class ForEachBlockExecutorTest {
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         org.mockito.ArgumentCaptor<BlockDefinition> captor = org.mockito.ArgumentCaptor.forClass(BlockDefinition.class);
         verify(commandExecutor).executeStepAsShell(eq("/test/project"), captor.capture(), anyInt(), eq(300));
-        assertThat(captor.getValue().getConfig().get("command")).isEqualTo("cat 'src; id'/a.txt");
+        assertThat(captor.getValue().getConfig().get("command")).isEqualTo("cat 'src; id'/'a.txt'");
+    }
+
+    @Test
+    void execute_shellMode_staticItems_stayRawInATaintedRun() {
+        context.setUntrustedVariable("dir", "src");   // run is tainted, but the items are static
+        StepResult stepResult = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(commandExecutor.executeStepAsShell(eq("/test/project"), any(), anyInt(), eq(300)))
+                .thenReturn(stepResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("items_source", "list");
+        config.put("items", List.of("a.txt"));
+        config.put("command", "cat {{ item }}");
+        config.put("execution_mode", "shell");
+        BlockDefinition block = BlockDefinition.builder().type("foreach").config(config).build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        org.mockito.ArgumentCaptor<BlockDefinition> captor = org.mockito.ArgumentCaptor.forClass(BlockDefinition.class);
+        verify(commandExecutor).executeStepAsShell(eq("/test/project"), captor.capture(), anyInt(), eq(300));
+        assertThat(captor.getValue().getConfig().get("command")).isEqualTo("cat a.txt");
     }
 }

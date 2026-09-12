@@ -215,4 +215,40 @@ class ExecutionContextFactoryTest {
 
         assertThat(ctx.getUntrustedVariables()).isEmpty();
     }
+
+    @Test
+    void create_untrustedOutputs_taintPreviousOutputAndNamedBlockOutput() {
+        ExecutionContext ctx = factory.create(seed(Map.of(
+                        ExecutionContext.UNTRUSTED_OUTPUTS_VARIABLE,
+                        java.util.List.of(ExecutionContext.PREVIOUS_OUTPUT_NAME, "scan")),
+                null, "", "", "", "x; id"));
+        ctx.setBlockOutput("scan", "y && z");
+
+        assertThat(ctx.hasUntrustedInput()).isTrue();
+        assertThat(ctx.resolveShellTemplate("echo {{ previous_output }} {{ block.scan.output }}", false))
+                .isEqualTo("echo 'x; id' 'y && z'");
+    }
+
+    @Test
+    void create_untrustedOutputsWithUntrustedKeys_roundTripsAnExportedTaint() {
+        ExecutionContext source = ExecutionContext.builder().workflowRunId("run-0").build();
+        source.setUntrustedVariable("branch", "main; id");
+        source.recordOutput("scan", "out");
+        Map<String, Object> input = new java.util.HashMap<>(source.exportTaint());
+        input.put("branch", "main; id");
+
+        ExecutionContext ctx = factory.create(seed(input, null, "", "", "", "out"));
+
+        assertThat(ctx.isUntrusted("branch")).isTrue();
+        assertThat(ctx.resolveShellTemplate("echo {{ branch }} {{ previous_output }}", false))
+                .isEqualTo("echo 'main; id' 'out'");
+    }
+
+    @Test
+    void create_withoutUntrustedOutputs_previousOutputStaysRaw() {
+        ExecutionContext ctx = factory.create(seed(Map.of("foo", "bar"), null, "", "", "", "a | b"));
+
+        assertThat(ctx.hasUntrustedInput()).isFalse();
+        assertThat(ctx.resolveShellTemplate("echo {{ previous_output }}", false)).isEqualTo("echo a | b");
+    }
 }

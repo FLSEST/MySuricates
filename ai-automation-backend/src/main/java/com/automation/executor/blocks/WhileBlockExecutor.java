@@ -110,7 +110,8 @@ public class WhileBlockExecutor implements BlockExecutor {
             outputs.append("[iteration ").append(iteration + 1).append("]: ")
                     .append(stepResult.getOutput()).append("\n");
 
-            context.setPreviousOutput(stepResult.getOutput());
+            // recordOutput: in a tainted run the iteration output is shell-escaped downstream
+            context.recordOutput(null, stepResult.getOutput());
 
             if (stepResult.getStatus() == StepStatus.FAILED) {
                 aggregateResult.setStatus(StepStatus.FAILED);

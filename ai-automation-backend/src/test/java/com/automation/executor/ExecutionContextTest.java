@@ -458,4 +458,129 @@ class ExecutionContextTest {
         assertThat(context.getUntrustedVariables()).containsExactly("u");
         assertThat(context.getUntrustedVariables()).isNotSameAs(context.getUntrustedVariables());
     }
+
+    // ── Taint propagation: outputs derived from untrusted input ─────────────────
+
+    @Test
+    void recordOutput_cleanRun_previousOutputAndBlockOutputStayRaw() {
+        context.recordOutput("scan", "a | b");
+
+        assertThat(context.hasUntrustedInput()).isFalse();
+        assertThat(context.resolveShellTemplate("{{ previous_output }} {{ block.scan.output }}", false))
+                .isEqualTo("a | b a | b");
+        assertThat(context.exportTaint()).isEmpty();
+    }
+
+    @Test
+    void recordOutput_untrustedVariableInRun_taintsPreviousOutputAndBlockOutput() {
+        context.setUntrustedVariable("branch", "main");
+        context.recordOutput("scan", "x; id");
+
+        assertThat(context.hasUntrustedInput()).isTrue();
+        assertThat(context.resolveShellTemplate("echo {{ previous_output }} {{ block.scan.output }}", false))
+                .isEqualTo("echo 'x; id' 'x; id'");
+    }
+
+    @Test
+    void recordOutput_taintedOutput_singleQuoteCannotBreakOut() {
+        context.setUntrustedVariable("u", "z");
+        context.recordOutput("scan", "x'; id; echo '");
+
+        assertThat(context.resolveShellTemplate("echo {{ block.scan.output }}", false))
+                .isEqualTo("echo 'x'\\''; id; echo '\\'''");
+    }
+
+    @Test
+    void recordOutput_taintedOutput_isNeverReExpanded() {
+        context.setVariable("secret", "it's raw $(danger)");
+        context.setUntrustedVariable("u", "z");
+        context.recordOutput(null, "{{ secret }}; id");
+
+        String resolved = context.resolveShellTemplate("echo {{ previous_output }}", false);
+
+        assertThat(resolved).isEqualTo("echo '{{ secret }}; id'");
+        assertThat(resolved).doesNotContain("danger");
+    }
+
+    @Test
+    void recordOutput_taintStaysStickyAfterTheUntrustedVariableIsOverwritten() {
+        context.setUntrustedVariable("u", "z");
+        context.recordOutput("first", "tainted");
+        context.setVariable("u", "clean");   // no untrusted variable left, but the run stays tainted
+
+        assertThat(context.hasUntrustedInput()).isTrue();
+        context.recordOutput("second", "also tainted");
+
+        assertThat(context.resolveShellTemplate(
+                "{{ block.first.output }} {{ block.second.output }} {{ previous_output }}", false))
+                .isEqualTo("'tainted' 'also tainted' 'also tainted'");
+    }
+
+    @Test
+    void recordOutput_unnamedBlock_taintsOnlyPreviousOutput() {
+        context.setUntrustedVariable("u", "z");
+        context.setBlockOutput("scan", "raw && stays");
+        context.recordOutput(null, "x; id");
+
+        assertThat(context.resolveShellTemplate("{{ previous_output }} {{ block.scan.output }}", false))
+                .isEqualTo("'x; id' raw && stays");
+    }
+
+    @Test
+    void recordOutput_taintedOutput_staysRawForNonShellUse() {
+        context.setUntrustedVariable("u", "z");
+        context.recordOutput("scan", "a'b");
+
+        assertThat(context.resolveTemplate("{{ previous_output }} {{ block.scan.output }}"))
+                .isEqualTo("a'b a'b");
+    }
+
+    @Test
+    void markOutputUntrusted_unknownBlockName_leavesPlaceholder() {
+        context.markOutputUntrusted("missing");
+
+        assertThat(context.resolveShellTemplate("[{{ block.missing.output }}]", false))
+                .isEqualTo("[{{ block.missing.output }}]");
+    }
+
+    @Test
+    void markOutputUntrusted_previousOutput_escapesTheSeededOutput() {
+        context.setPreviousOutput("x; id");
+        context.markOutputUntrusted(ExecutionContext.PREVIOUS_OUTPUT_NAME);
+
+        assertThat(context.hasUntrustedInput()).isTrue();
+        assertThat(context.resolveShellTemplate("echo {{ previous_output }}", false)).isEqualTo("echo 'x; id'");
+    }
+
+    @Test
+    void setDerivedVariable_isEscapedOnlyInATaintedRun() {
+        context.setDerivedVariable("step_0_output", "a | b");
+        assertThat(context.resolveShellTemplate("{{ step_0_output }}", false)).isEqualTo("a | b");
+
+        context.setUntrustedVariable("u", "z");
+        context.setDerivedVariable("step_1_output", "c; id");
+        assertThat(context.resolveShellTemplate("{{ step_1_output }}", false)).isEqualTo("'c; id'");
+    }
+
+    @Test
+    void exportTaint_cleanRun_isEmpty() {
+        context.setVariable("a", "1");
+        context.recordOutput("b", "2");
+        context.setDerivedVariable("step_0_output", "3");
+
+        assertThat(context.exportTaint()).isEmpty();
+    }
+
+    @Test
+    void exportTaint_taintedRun_listsUntrustedVariablesAndOutputs() {
+        context.setUntrustedVariable("branch", "main");
+        context.recordOutput("scan", "out");
+        context.setDerivedVariable("step_0_output", "out");
+
+        assertThat(context.exportTaint())
+                .containsEntry(ExecutionContext.UNTRUSTED_KEYS_VARIABLE,
+                        java.util.List.of("branch", "step_0_output"))
+                .containsEntry(ExecutionContext.UNTRUSTED_OUTPUTS_VARIABLE,
+                        java.util.List.of(ExecutionContext.PREVIOUS_OUTPUT_NAME, "scan"));
+    }
 }

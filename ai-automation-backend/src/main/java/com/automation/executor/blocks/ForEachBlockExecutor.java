@@ -46,8 +46,9 @@ public class ForEachBlockExecutor implements BlockExecutor {
         // Get items from list or command output
         List<String> items;
         String itemsSource = (String) config.getOrDefault("items_source", "list");
+        boolean itemsFromCommand = "command".equals(itemsSource);
 
-        if ("command".equals(itemsSource)) {
+        if (itemsFromCommand) {
             String itemsCommand = context.resolveShellTemplate((String) config.get("items_command"), escapeVariables);
             // items_command always runs as shell — it collects iteration targets, not AI work
             String output = commandExecutor.executeShellCommandOnHost(
@@ -87,7 +88,9 @@ public class ForEachBlockExecutor implements BlockExecutor {
                     "totalItems", totalItems
             ));
 
-            context.setVariable(variableName, item);
+            // Items collected by items_command inherit the run's taint; static items are trusted
+            if (itemsFromCommand) context.setDerivedVariable(variableName, item);
+            else context.setVariable(variableName, item);
             String resolvedCommand = isShell
                     ? context.resolveShellTemplate(command, escapeVariables)
                     : context.resolveTemplate(command);

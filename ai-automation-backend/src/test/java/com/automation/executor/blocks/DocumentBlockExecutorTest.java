@@ -211,4 +211,49 @@ class DocumentBlockExecutorTest {
         assertThat(result.getCompletedAt()).isNotNull();
         assertThat(result.getDurationMs()).isNotNull();
     }
+
+    @Test
+    void execute_variableName_inTaintedRun_isMarkedUntrusted() {
+        // Review I1: the extracted document content is file content — in a run that carries
+        // untrusted input (webhook payload, possibly even the file_path itself) it must inherit
+        // the taint, so a later shell block single-quotes it.
+        context.setUntrustedVariable("doc", "doc.txt");
+        when(extractionService.extract(eq("doc.txt"), eq("/project")))
+                .thenReturn(new ExtractionResult("x; id", "text/plain",
+                        5L, "/project/doc.txt", null, null));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("document")
+                .config(new HashMap<>(Map.of(
+                        "file_path", "{{ doc }}",
+                        "variable_name", "extracted"
+                )))
+                .build();
+
+        executor.execute(block, context);
+
+        assertThat(context.isUntrusted("extracted")).isTrue();
+        assertThat(context.resolveShellTemplate("echo {{ extracted }}", false)).isEqualTo("echo 'x; id'");
+    }
+
+    @Test
+    void execute_variableName_inCleanRun_staysTrusted() {
+        when(extractionService.extract(eq("doc.txt"), eq("/project")))
+                .thenReturn(new ExtractionResult("a | b", "text/plain",
+                        5L, "/project/doc.txt", null, null));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("document")
+                .config(new HashMap<>(Map.of(
+                        "file_path", "doc.txt",
+                        "variable_name", "extracted"
+                )))
+                .build();
+
+        executor.execute(block, context);
+
+        assertThat(context.isUntrusted("extracted")).isFalse();
+        assertThat(context.hasUntrustedInput()).isFalse();
+        assertThat(context.resolveShellTemplate("echo {{ extracted }}", false)).isEqualTo("echo a | b");
+    }
 }
