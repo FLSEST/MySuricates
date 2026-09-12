@@ -3,7 +3,6 @@ package com.automation.executor.blocks;
 import com.automation.entity.BlockDefinition;
 import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
-import com.automation.executor.ApprovalRequest;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
 import com.automation.service.ai.AiProvider;
@@ -16,8 +15,6 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
 import static com.automation.config.ExecutionDefaults.*;
 import static com.automation.executor.blocks.AgenticPromptBuilder.truncate;
@@ -27,7 +24,9 @@ import static com.automation.executor.blocks.AgenticPromptBuilder.truncate;
  * repeated actions), an optional approval gate and live WebSocket events. Prompt/context
  * construction lives in {@link AgenticPromptBuilder}, event publishing in
  * {@link AgenticEventBroadcaster}; config, plan parsing, safety and token tracking in the
- * sibling {@code Agentic*} helpers.
+ * sibling {@code Agentic*} helpers. The approval gate, the ACT phase, and the post-action
+ * stop rules live in {@link AgenticApprovalGate}, {@link AgenticActionRunner} and
+ * {@link AgenticStopRules} respectively.
  */
 @Component
 @RequiredArgsConstructor
@@ -38,6 +37,9 @@ public class AgenticBlockExecutor implements BlockExecutor {
     private final AgenticEventBroadcaster events;
     private final WorkflowRunRepository runRepository;
     private final AiProviderRegistry aiProviderRegistry;
+    private final AgenticApprovalGate approvalGate;
+    private final AgenticActionRunner actionRunner;
+    private final AgenticStopRules stopRules;
 
     @Override
     public boolean supports(String blockType) {
@@ -160,13 +162,13 @@ public class AgenticBlockExecutor implements BlockExecutor {
 
             // === Optional APPROVAL gate ===
             if (approvalRequired && !plan.getAction().isEmpty()) {
-                String approvalResult = handleApproval(context, stepIndex, iteration, plan, iterData, fullOutput, history);
-                if ("break".equals(approvalResult)) break;
-                if ("continue".equals(approvalResult)) {
+                AgenticApprovalGate.Decision decision = approvalGate.ask(context, stepIndex, iteration, plan, iterData, fullOutput, history);
+                if (decision == AgenticApprovalGate.Decision.STOP) break;
+                if (decision == AgenticApprovalGate.Decision.RETRY_ITERATION) {
                     tokenTracker.trackIteration(iterData);
                     continue;
                 }
-                if ("disable_approval".equals(approvalResult)) {
+                if (decision == AgenticApprovalGate.Decision.PROCEED_AND_DISABLE) {
                     approvalRequired = false;
                 }
             }
@@ -180,43 +182,11 @@ public class AgenticBlockExecutor implements BlockExecutor {
                 continue;
             }
 
-            // Compress oversized actions before sending to ACT phase
-            String action = plan.getAction();
-            if (action.length() > AGENTIC_ACTION_COMPRESS_THRESHOLD) {
-                log.warn("Agentic iteration {}: ACTION too long ({} chars), compressing", iteration, action.length());
-                events.broadcast(context.getWorkflowRunId(), stepIndex,
-                        "agentic_action_compressed",
-                        Map.of("iteration", iteration, "originalLength", action.length()));
-                try {
-                    action = promptBuilder.compressAction(action, provider, context.getModel());
-                    log.info("Agentic iteration {}: ACTION compressed {} → {} chars",
-                            iteration, plan.getAction().length(), action.length());
-                } catch (Exception e) {
-                    log.error("Agentic iteration {}: compression failed, truncating: {}", iteration, e.getMessage());
-                    action = action.substring(0, AGENTIC_ACTION_COMPRESS_THRESHOLD)
-                            + "\n\n[TRUNCATED: original was " + plan.getAction().length() + " chars]";
-                }
-            }
-
-            events.broadcast(context.getWorkflowRunId(), stepIndex,
-                    "agentic_acting", Map.of("iteration", iteration,
-                            "action", truncate(action, TRUNCATE_MEDIUM)));
-
-            String actionOutput;
-            int exitCode;
-            try {
-                AiProvider.ActionResult actResult = provider.executeAction(
-                        new AiProvider.ActionRequest(action, context.getModel(),
-                                context.getInstructionPrefix(), context.getProjectPath(),
-                                cfg.claudeTimeout(), false, false, null, null, effort));
-                actionOutput = actResult.text() != null ? actResult.text() : "";
-                exitCode = actResult.exitCode();
-                tokenTracker.captureActMeta(iterData, actResult.metadata(), action, actionOutput, iteration);
-            } catch (Exception e) {
-                log.error("Host Claude ACT phase failed at iteration {}: {}", iteration, e.getMessage(), e);
-                actionOutput = "Execution error: " + e.getMessage();
-                exitCode = -1;
-            }
+            AgenticActionRunner.ActOutcome act = actionRunner.run(context, stepIndex, iteration, plan.getAction(),
+                    provider, effort, cfg, tokenTracker, iterData);
+            String action = act.action();
+            String actionOutput = act.output();
+            int exitCode = act.exitCode();
 
             // Track tokens and check for blind iterations
             tokenTracker.trackIteration(iterData);
@@ -262,39 +232,9 @@ public class AgenticBlockExecutor implements BlockExecutor {
             long iterMs = Instant.now().toEpochMilli() - iterStart.toEpochMilli();
             iterData.put("durationMs", iterMs);
 
-            // Iteration timeout check
-            String iterTimeoutReason = safetyGuard.checkIterationTimeout(iterStart);
-            if (iterTimeoutReason != null) {
-                stopReason = iterTimeoutReason;
-                events.broadcast(context.getWorkflowRunId(), stepIndex,
-                        "agentic_iteration_timeout", Map.of("iteration", iteration));
-                fullOutput.append("[iteration ").append(iteration).append(" - TIMEOUT]\n");
-                break;
-            }
-
-            // Token budget check
-            String budgetReason = tokenTracker.checkBudget(cfg.maxTotalTokens());
-            if (budgetReason != null) {
-                stopReason = budgetReason;
-                int totalTokens = tokenTracker.getRunningTotalTokens();
-                events.broadcast(context.getWorkflowRunId(), stepIndex,
-                        "agentic_token_budget_exceeded",
-                        Map.of("iteration", iteration, "totalTokens", totalTokens,
-                                "budget", cfg.maxTotalTokens()));
-                fullOutput.append("[TOKEN BUDGET EXCEEDED: ").append(totalTokens)
-                        .append("/").append(cfg.maxTotalTokens()).append(" tokens]\n");
-                break;
-            }
-
-            // Repeated action check
-            String repeatReason = safetyGuard.trackAndCheckRepeatedAction(action);
-            if (repeatReason != null) {
-                stopReason = repeatReason;
-                events.broadcast(context.getWorkflowRunId(), stepIndex,
-                        "agentic_repeated_actions",
-                        Map.of("iteration", iteration, "repeatedCount", cfg.maxRepeatedActions()));
-                fullOutput.append("[ABORTED: Same action repeated ")
-                        .append(cfg.maxRepeatedActions()).append(" times]\n");
+            String stop = stopRules.afterAct(context, stepIndex, iteration, iterStart, action, cfg, tokenTracker, safetyGuard, fullOutput);
+            if (stop != null) {
+                stopReason = stop;
                 break;
             }
 
@@ -327,67 +267,5 @@ public class AgenticBlockExecutor implements BlockExecutor {
                         "durationMs", result.getDurationMs()));
 
         return result;
-    }
-
-    /**
-     * Handles the optional approval gate.
-     * @return "break" to break the loop, "continue" to skip to next iteration,
-     *         "disable_approval" if "Yes always" was chosen, or null to proceed normally
-     */
-    private String handleApproval(ExecutionContext context, int stepIndex, int iteration,
-                                   AgenticPlan plan, Map<String, Object> iterData,
-                                   StringBuilder fullOutput, List<Turn> history) {
-        events.broadcast(context.getWorkflowRunId(), stepIndex,
-                "agentic_approval_required",
-                Map.of("iteration", iteration,
-                        "action", plan.getAction(),
-                        "rationale", truncate(plan.getRationale(), TRUNCATE_MEDIUM)));
-
-        CompletableFuture<String> future = context.requestApproval(
-                ApprovalRequest.builder()
-                        .blockId("agentic-" + stepIndex + "-iter-" + iteration)
-                        .question("Approve action: " + truncate(plan.getAction(), TRUNCATE_SHORT))
-                        .options(List.of("Yes", "Yes always", "No"))
-                        .stepIndex(stepIndex)
-                        .build());
-
-        String answer;
-        try {
-            answer = future.get(30, TimeUnit.MINUTES);
-        } catch (java.util.concurrent.TimeoutException e) {
-            iterData.put("result", "approval_timeout");
-            fullOutput.append("[iteration ").append(iteration)
-                    .append(" - APPROVAL TIMEOUT]\n");
-            return "break";
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            iterData.put("result", "approval_interrupted");
-            fullOutput.append("[iteration ").append(iteration)
-                    .append(" - INTERRUPTED]\n");
-            return "break";
-        } catch (Exception e) {
-            log.warn("Approval gate failed at iteration {}: {}", iteration, e.getMessage());
-            iterData.put("result", "approval_error");
-            fullOutput.append("[iteration ").append(iteration)
-                    .append(" - APPROVAL ERROR: ").append(e.getMessage()).append("]\n");
-            return "break";
-        }
-
-        if ("No".equalsIgnoreCase(answer)) {
-            // The rejection must reach the shared conversation, otherwise the next
-            // REASON call re-proposes the same action (TODO 67512633).
-            history.add(new Turn("user",
-                    "The user rejected this action. Propose an alternative approach."));
-            iterData.put("approval", "rejected");
-            fullOutput.append("[iteration ").append(iteration)
-                    .append(" - REJECTED]: ").append(plan.getAction()).append("\n");
-            return "continue";
-        }
-        if ("Yes always".equalsIgnoreCase(answer)) {
-            iterData.put("approval", "approved");
-            return "disable_approval";
-        }
-        iterData.put("approval", "approved");
-        return null;
     }
 }
