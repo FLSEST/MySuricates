@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { WorkflowDetailSidebar } from '../WorkflowDetailSidebar';
 import { useI18nStore } from '../../../i18n';
 import { useUpdateWorkflow, useWorkflowRuns } from '../../../hooks/useWorkflows';
-import { useAiProviders, usePiCatalog } from '../../../hooks/useSystem';
+import { useAiProviders, usePiCatalog, useProviderModels, useRefreshProviderModels } from '../../../hooks/useSystem';
 import type { Workflow } from '../../../types';
 
 const mockMutate = vi.fn();
@@ -16,7 +16,15 @@ vi.mock('../../../hooks/useWorkflows', () => ({
 vi.mock('../../../hooks/useSystem', () => ({
   useAiProviders: vi.fn(),
   usePiCatalog: vi.fn(),
+  useProviderModels: vi.fn(),
+  useRefreshProviderModels: vi.fn(),
 }));
+
+const mockRefresh = vi.fn();
+
+function catalog(providerId: string, models: Array<{ value: string; label: string }>) {
+  return { providerId, available: true, source: 'test', fetchedAt: null, reason: null, models };
+}
 
 vi.mock('../WorkflowMemoryPanel', () => ({
   WorkflowMemoryPanel: () => null,
@@ -73,6 +81,15 @@ describe('WorkflowDetailSidebar', () => {
         defaultModel: null,
       },
     } as any);
+    mockRefresh.mockClear();
+    vi.mocked(useRefreshProviderModels).mockReturnValue({ mutate: mockRefresh, isPending: false } as any);
+    vi.mocked(useProviderModels).mockImplementation(((providerId: string) => ({
+      data:
+        providerId === 'PI'
+          ? catalog('PI', [{ value: 'openai-codex/gpt-5.5', label: 'openai-codex · gpt-5.5' }])
+          : catalog(providerId, [{ value: 'opus', label: 'opus (latest Opus)' }, { value: 'sonnet', label: 'sonnet (latest Sonnet)' }]),
+      isLoading: false,
+    })) as any);
   });
 
   it('renders without crashing given a minimal workflow', () => {
@@ -105,10 +122,58 @@ describe('WorkflowDetailSidebar', () => {
     render(
       <WorkflowDetailSidebar workflow={buildWorkflow({ provider: 'PI' })} {...defaultProps} />
     );
-    // datalist for pi suggestions is rendered
-    expect(document.getElementById('pi-model-suggestions')).not.toBeNull();
+    // datalist for pi suggestions is rendered with the host-discovered models
+    const list = document.getElementById('pi-model-suggestions');
+    expect(list).not.toBeNull();
+    expect(list!.querySelectorAll('option')).toHaveLength(1);
+    expect(list!.querySelector('option')!.getAttribute('value')).toBe('openai-codex/gpt-5.5');
     // placeholder text confirms it is a free-text input, not a select
-    expect(screen.getByPlaceholderText(/anthropic\/claude/)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/<backend>\/<model-id>/)).toBeInTheDocument();
+  });
+
+  it('renders the model field as free-text input with a catalog datalist for CLAUDE too', () => {
+    render(<WorkflowDetailSidebar workflow={buildWorkflow({ provider: 'CLAUDE' })} {...defaultProps} />);
+    const list = document.getElementById('claude-model-suggestions');
+    expect(list).not.toBeNull();
+    expect(Array.from(list!.querySelectorAll('option')).map((o) => o.getAttribute('value'))).toEqual(['opus', 'sonnet']);
+    expect(useProviderModels).toHaveBeenCalledWith('CLAUDE');
+  });
+
+  it('commits a typed model on blur and shows a hint when it is not in the catalog', () => {
+    render(<WorkflowDetailSidebar workflow={buildWorkflow({ provider: 'CLAUDE', model: 'claude-opus-5' })} {...defaultProps} />);
+    expect(screen.getByText(/Not in the suggestion list/)).toBeInTheDocument();
+
+    const input = screen.getByPlaceholderText(/Empty = provider default/);
+    fireEvent.change(input, { target: { value: 'claude-sonnet-5' } });
+    fireEvent.blur(input);
+    expect(mockMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'wf-1', data: { model: 'claude-sonnet-5' } })
+    );
+  });
+
+  it('commits immediately when a catalog entry is picked', () => {
+    render(<WorkflowDetailSidebar workflow={buildWorkflow({ provider: 'CLAUDE' })} {...defaultProps} />);
+    const input = screen.getByPlaceholderText(/Empty = provider default/);
+    fireEvent.change(input, { target: { value: 'sonnet' } });
+    expect(mockMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'wf-1', data: { model: 'sonnet' } })
+    );
+  });
+
+  it('shows the catalog reason and no suggestions when the catalog is unavailable', () => {
+    vi.mocked(useProviderModels).mockReturnValue({
+      data: { providerId: 'CODEX', available: false, source: 'codex-cli', fetchedAt: null, reason: 'codex not installed', models: [] },
+      isLoading: false,
+    } as any);
+    render(<WorkflowDetailSidebar workflow={buildWorkflow({ provider: 'CODEX' })} {...defaultProps} />);
+    expect(screen.getByText(/codex not installed/)).toBeInTheDocument();
+    expect(document.getElementById('codex-model-suggestions')!.querySelectorAll('option')).toHaveLength(0);
+  });
+
+  it('refresh button triggers the catalog refresh mutation', () => {
+    render(<WorkflowDetailSidebar workflow={buildWorkflow({ provider: 'CLAUDE' })} {...defaultProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /Reload model catalog/ }));
+    expect(mockRefresh).toHaveBeenCalledWith('CLAUDE');
   });
 
   it('shows pi /login warning when pi catalog reports not installed', () => {

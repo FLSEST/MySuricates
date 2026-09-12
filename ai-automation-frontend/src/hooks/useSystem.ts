@@ -80,11 +80,52 @@ export interface PiCatalog {
   defaultModel: string | null;
 }
 
-export function usePiCatalog() {
+export function usePiCatalog(enabled = true) {
   return useQuery({
     queryKey: ['system', 'ai-providers', 'PI', 'catalog'],
     queryFn: () => api.get<PiCatalog>('/system/ai-providers/PI/catalog'),
     staleTime: 60_000, // pi config rarely changes mid-session
+    enabled,
+  });
+}
+
+/** One selectable model from the host-discovered catalog. */
+export interface ModelOption {
+  value: string;
+  label: string;
+  description?: string | null;
+  contextWindow?: number | null;
+  supportsThinking?: boolean | null;
+}
+
+/** Models a provider offers on this host; `available=false` means the probe failed (see `reason`). */
+export interface ModelCatalog {
+  providerId: string;
+  available: boolean;
+  source: string;
+  fetchedAt: string | null;
+  reason: string | null;
+  models: ModelOption[];
+}
+
+const providerModelsKey = (providerId: string) => ['system', 'ai-providers', providerId.toUpperCase(), 'models'];
+
+export function useProviderModels(providerId: string | null | undefined) {
+  const id = (providerId ?? '').toUpperCase();
+  return useQuery({
+    queryKey: providerModelsKey(id || 'NONE'),
+    queryFn: () => api.get<ModelCatalog>(`/system/ai-providers/${id}/models`),
+    enabled: id !== '',
+    staleTime: 60_000, // backend caches per its own TTL; avoid refetch storms on re-render
+  });
+}
+
+export function useRefreshProviderModels() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (providerId: string) =>
+      api.post<ModelCatalog>(`/system/ai-providers/${providerId.toUpperCase()}/models/refresh`),
+    onSuccess: (data, providerId) => qc.setQueryData(providerModelsKey(providerId), data),
   });
 }
 
@@ -187,6 +228,7 @@ export interface ExecutionConfig {
   wishWorkflowWaitMinutes?: number;
   wishDefaultShellTimeoutSeconds?: number;
   wishDefaultAgenticTotalTimeoutSeconds?: number;
+  modelCatalogTtlSeconds?: number;
   activeRuns: number;
 }
 

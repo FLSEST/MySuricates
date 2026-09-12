@@ -16,6 +16,8 @@ import {
   useEnableRemoteAccess,
   useDisableRemoteAccess,
   usePiCatalog,
+  useProviderModels,
+  useRefreshProviderModels,
   useAssistantModelSetting,
   useAutoRepairModeSetting,
   useSuggestionsModelSetting,
@@ -225,7 +227,7 @@ describe('usePiCatalog', () => {
       authenticatedProviders: ['anthropic'],
       customProviders: [],
       defaultProvider: 'anthropic',
-      defaultModel: 'claude-sonnet-4-6',
+      defaultModel: 'sonnet',
     };
     server.use(
       http.get(`${apiBase}/system/ai-providers/PI/catalog`, () =>
@@ -239,7 +241,7 @@ describe('usePiCatalog', () => {
     expect(result.current.data!.authenticatedProviders).toEqual(['anthropic']);
     expect(result.current.data!.customProviders).toEqual([]);
     expect(result.current.data!.defaultProvider).toBe('anthropic');
-    expect(result.current.data!.defaultModel).toBe('claude-sonnet-4-6');
+    expect(result.current.data!.defaultModel).toBe('sonnet');
   });
 
   it('exposes error when request fails', async () => {
@@ -254,17 +256,63 @@ describe('usePiCatalog', () => {
   });
 });
 
+describe('useProviderModels', () => {
+  it('fetches the catalog for the given provider (uppercased)', async () => {
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useProviderModels('claude'), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data!.providerId).toBe('CLAUDE');
+    expect(result.current.data!.available).toBe(true);
+    expect(result.current.data!.models.map((m) => m.value)).toEqual(['opus', 'sonnet']);
+  });
+
+  it('is disabled without a provider', () => {
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useProviderModels(null), { wrapper: Wrapper });
+    expect(result.current.fetchStatus).toBe('idle');
+    expect(result.current.data).toBeUndefined();
+  });
+
+  it('surfaces an unavailable catalog as data, not as an error', async () => {
+    server.use(
+      http.get(`${apiBase}/system/ai-providers/CODEX/models`, () =>
+        HttpResponse.json({ providerId: 'CODEX', available: false, source: 'codex-cli', fetchedAt: null, reason: 'codex missing', models: [] }),
+      ),
+    );
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useProviderModels('CODEX'), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data!.available).toBe(false);
+    expect(result.current.data!.reason).toBe('codex missing');
+  });
+});
+
+describe('useRefreshProviderModels', () => {
+  it('posts a refresh and writes the result into the query cache', async () => {
+    const { Wrapper, client } = createWrapper();
+    // gcTime is 0 in this wrapper, so an unobserved cache entry is dropped immediately — assert the write itself.
+    const setQueryData = vi.spyOn(client, 'setQueryData');
+    const { result } = renderHook(() => useRefreshProviderModels(), { wrapper: Wrapper });
+    result.current.mutate('pi');
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(setQueryData).toHaveBeenCalledWith(
+      ['system', 'ai-providers', 'PI', 'models'],
+      expect.objectContaining({ providerId: 'PI', fetchedAt: '2026-09-12T10:05:00Z' }),
+    );
+  });
+});
+
 describe('useAssistantModelSetting', () => {
   it('returns model value from settings', async () => {
     server.use(
       http.get(`${apiBase}/system/settings/assistant-model`, () =>
-        HttpResponse.json({ value: 'claude-sonnet-4-6' }),
+        HttpResponse.json({ value: 'sonnet' }),
       ),
     );
     const { Wrapper } = createWrapper();
     const { result } = renderHook(() => useAssistantModelSetting(), { wrapper: Wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toBe('claude-sonnet-4-6');
+    expect(result.current.data).toBe('sonnet');
   });
 
   it('returns empty string when value is null', async () => {
@@ -310,13 +358,13 @@ describe('useSuggestionsModelSetting', () => {
   it('returns model value from settings', async () => {
     server.use(
       http.get(`${apiBase}/system/settings/suggestions-model`, () =>
-        HttpResponse.json({ value: 'claude-haiku-4-5' }),
+        HttpResponse.json({ value: 'haiku' }),
       ),
     );
     const { Wrapper } = createWrapper();
     const { result } = renderHook(() => useSuggestionsModelSetting(), { wrapper: Wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toBe('claude-haiku-4-5');
+    expect(result.current.data).toBe('haiku');
   });
 
   it('returns empty string when value is null', async () => {

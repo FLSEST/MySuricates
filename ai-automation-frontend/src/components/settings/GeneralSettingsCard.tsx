@@ -4,7 +4,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useI18nStore, type Locale } from '../../i18n';
 import { useT } from '../../i18n';
 import { useUpdateSystemSetting, useAiProviders, useAssistantModelSetting, useSuggestionsModelSetting, useAutoRepairModeSetting } from '../../hooks/useSystem';
-import { modelOptionsForProvider } from '../../utils/aiProviderModels';
+import { ModelField } from '../shared/ModelField';
 import { Globe, Bot, Sparkles } from 'lucide-react';
 
 export function GeneralSettingsCard() {
@@ -101,13 +101,15 @@ export function GeneralSettingsCard() {
               <p className="text-xs text-text-tertiary">{t.settings.assistantModelHint}</p>
             </div>
           </div>
-          <Select
+          <ModelField
+            className="w-72 max-w-full"
+            idSuffix="-assistant"
+            providerId={defaultAiProvider || aiProviders?.default || 'CLAUDE'}
             value={assistantModel}
-            onChange={(e) => {
-              setAssistantModel(e.target.value);
-              updateSetting.mutate({ key: 'assistant-model', value: e.target.value });
+            onChange={(model) => {
+              setAssistantModel(model);
+              updateSetting.mutate({ key: 'assistant-model', value: model });
             }}
-            options={modelOptionsForProvider(defaultAiProvider || aiProviders?.default || 'CLAUDE')}
           />
         </div>
 
@@ -137,13 +139,15 @@ export function GeneralSettingsCard() {
                 <p className="text-xs text-text-tertiary">{t.settings.suggestionsModelHint}</p>
               </div>
             </div>
-            <Select
+            <ModelField
+              className="w-72 max-w-full"
+              idSuffix="-suggestions"
+              providerId={defaultAiProvider || aiProviders?.default || 'CLAUDE'}
               value={suggestionsModel}
-              onChange={(e) => {
-                setSuggestionsModel(e.target.value);
-                updateSetting.mutate({ key: 'suggestions-model', value: e.target.value });
+              onChange={(model) => {
+                setSuggestionsModel(model);
+                updateSetting.mutate({ key: 'suggestions-model', value: model });
               }}
-              options={modelOptionsForProvider(defaultAiProvider || aiProviders?.default || 'CLAUDE')}
             />
           </div>
         )}
