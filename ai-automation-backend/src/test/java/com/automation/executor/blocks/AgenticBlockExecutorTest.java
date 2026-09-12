@@ -64,10 +64,10 @@ class AgenticBlockExecutorTest {
         ClaudeAiProvider claudeProvider = new ClaudeAiProvider(hostClaude);
         lenient().when(aiProviderRegistry.resolve(any())).thenReturn(claudeProvider);
 
-        executor = new AgenticBlockExecutor(
-                new AgenticPromptBuilder(learningService, systemIdentity),
-                new AgenticEventBroadcaster(messagingTemplate),
-                runRepository, aiProviderRegistry);
+        AgenticPromptBuilder promptBuilder = new AgenticPromptBuilder(learningService, systemIdentity);
+        AgenticEventBroadcaster events = new AgenticEventBroadcaster(messagingTemplate);
+        executor = new AgenticBlockExecutor(promptBuilder, events, runRepository, aiProviderRegistry,
+                new AgenticApprovalGate(events), new AgenticActionRunner(promptBuilder, events), new AgenticStopRules(events));
 
         // Default: resolve run-1 -> workflow-1
         Workflow workflow = Workflow.builder().id("workflow-1").build();
