@@ -172,6 +172,10 @@ Für `requiresOAuthFlow() == false` sind die Credentials selbst die Authentifizi
 `saveCredentials` kombiniert sie zu `clientId|clientSecret`, ruft `fetchAccountInfo()` zur
 Validierung auf und setzt bei Erfolg direkt `CONNECTED`. Es gibt keinen Ablauf und kein
 Refresh — `getValidAccessToken()` gibt das gespeicherte Credential unverändert zurück.
+Für einen Provider mit `requiresCredentials() == false` (aktuell nur Taskwarrior) gibt
+`getValidAccessToken()` `null` statt einer Exception zurück, wenn keine Connection-Zeile
+existiert oder die Entschlüsselung fehlschlägt — Provider ohne Pflicht-Credentials dürfen
+ohne Token laufen.
 
 ---
 

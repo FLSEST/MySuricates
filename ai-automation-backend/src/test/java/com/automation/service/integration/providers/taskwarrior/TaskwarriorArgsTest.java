@@ -60,4 +60,9 @@ class TaskwarriorArgsTest {
         Map<String, String> env = TaskwarriorArgs.envFrom("/data|/rc");
         assertThat(env).containsEntry("TASKDATA", "/data").containsEntry("TASKRC", "/rc");
     }
+
+    @Test
+    void envFrom_null_returnsEmptyEnv() {
+        assertThat(TaskwarriorArgs.envFrom(null)).isEmpty();
+    }
 }

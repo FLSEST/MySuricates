@@ -172,6 +172,9 @@ For `requiresOAuthFlow() == false` the credentials themselves are the authentica
 `saveCredentials` combines them as `clientId|clientSecret`, calls `fetchAccountInfo()` for
 validation, and on success sets the status directly to `CONNECTED`. There is no expiry and no
 refresh — `getValidAccessToken()` returns the stored credential unchanged.
+For a provider with `requiresCredentials() == false` (currently only Taskwarrior),
+`getValidAccessToken()` returns `null` instead of throwing when no connection row exists or
+decryption fails — providers that need no credentials are allowed to run without a token.
 
 ---
 
