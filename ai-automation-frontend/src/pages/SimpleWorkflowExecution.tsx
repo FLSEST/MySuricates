@@ -9,6 +9,7 @@ import { ErrorState } from '../components/shared/ErrorState';
 import { ApprovalDialog } from '../components/shared/ApprovalDialog';
 import { HumanInputDialog } from '../components/shared/HumanInputDialog';
 import { PathLinkedOutput } from '../components/shared/PathLinkedOutput';
+import { ExecutionRerunButton } from '../components/workflow/ExecutionRerunButton';
 import {
   useWorkflow, useWorkflowRuns,
   usePauseExecution, useResumeExecution, useCancelExecution, useSubmitApproval,
@@ -195,6 +196,7 @@ export function SimpleWorkflowExecution() {
             {new Date(run.startedAt).toLocaleString()} · {t.workflows.execution.duration}: {formatDuration(run.durationMs)}
           </p>
         </div>
+        <ExecutionRerunButton run={run} />
         {isRunning && (
           <div className="flex items-center gap-2 shrink-0">
             {run.status === 'RUNNING' && (
