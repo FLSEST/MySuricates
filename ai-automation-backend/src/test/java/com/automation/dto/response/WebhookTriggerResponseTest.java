@@ -20,6 +20,7 @@ class WebhookTriggerResponseTest {
                 "secret-token-xyz",
                 "https://example.com/api/v1/webhooks/wh-1",
                 true,
+                true,
                 "Triggers daily report",
                 Map.of("env", "prod", "level", 5),
                 LAST_TRIGGERED_AT,
@@ -50,7 +51,7 @@ class WebhookTriggerResponseTest {
     @Test
     void should_returnDisabled_when_enabledIsFalse() {
         var response = new WebhookTriggerResponse(
-                "wh-2", "wf-1", "Name", "tok", "url",
+                "wh-2", "wf-1", "Name", "tok", "url", true,
                 false, null, Map.of(), null, 0L, CREATED_AT
         );
 
@@ -60,7 +61,7 @@ class WebhookTriggerResponseTest {
     @Test
     void should_acceptNullOptionalFields_when_constructedWithNulls() {
         var response = new WebhookTriggerResponse(
-                null, null, null, null, null,
+                null, null, null, null, null, false,
                 false, null, null, null, 0L, null
         );
 
@@ -74,12 +75,13 @@ class WebhookTriggerResponseTest {
         assertThat(response.lastTriggeredAt()).isNull();
         assertThat(response.createdAt()).isNull();
         assertThat(response.triggerCount()).isZero();
+        assertThat(response.tokenVisible()).isFalse();
     }
 
     @Test
     void should_returnEmptyMap_when_defaultContextIsEmpty() {
         var response = new WebhookTriggerResponse(
-                "id", "wf", "n", "t", "u",
+                "id", "wf", "n", "t", "u", true,
                 true, "desc", Map.of(), CREATED_AT, 0L, CREATED_AT
         );
 
@@ -89,11 +91,21 @@ class WebhookTriggerResponseTest {
     @Test
     void should_returnHighTriggerCount_when_largeValueProvided() {
         var response = new WebhookTriggerResponse(
-                "id", "wf", "n", "t", "u",
+                "id", "wf", "n", "t", "u", true,
                 true, "desc", Map.of(), CREATED_AT, Long.MAX_VALUE, CREATED_AT
         );
 
         assertThat(response.triggerCount()).isEqualTo(Long.MAX_VALUE);
+    }
+
+    @Test
+    void should_returnTokenVisible_when_setTrue() {
+        var response = new WebhookTriggerResponse(
+                "wh-1", "wf-1", "Name", "full-token", "url", true,
+                true, "desc", Map.of(), CREATED_AT, 0L, CREATED_AT
+        );
+
+        assertThat(response.tokenVisible()).isTrue();
     }
 
     // --- Record equality ---
@@ -109,8 +121,8 @@ class WebhookTriggerResponseTest {
 
     @Test
     void should_beEqual_when_bothHaveAllNulls() {
-        var a = new WebhookTriggerResponse(null, null, null, null, null, false, null, null, null, 0L, null);
-        var b = new WebhookTriggerResponse(null, null, null, null, null, false, null, null, null, 0L, null);
+        var a = new WebhookTriggerResponse(null, null, null, null, null, false, false, null, null, null, 0L, null);
+        var b = new WebhookTriggerResponse(null, null, null, null, null, false, false, null, null, null, 0L, null);
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -121,7 +133,7 @@ class WebhookTriggerResponseTest {
         var a = sample();
         var b = new WebhookTriggerResponse(
                 "different-id", "wf-42", "My Workflow", "secret-token-xyz",
-                "https://example.com/api/v1/webhooks/wh-1", true, "Triggers daily report",
+                "https://example.com/api/v1/webhooks/wh-1", true, true, "Triggers daily report",
                 Map.of("env", "prod", "level", 5), LAST_TRIGGERED_AT, 7L, CREATED_AT
         );
 
@@ -133,7 +145,7 @@ class WebhookTriggerResponseTest {
         var a = sample();
         var b = new WebhookTriggerResponse(
                 "wh-1", "wf-42", "My Workflow", "secret-token-xyz",
-                "https://example.com/api/v1/webhooks/wh-1", true, "Triggers daily report",
+                "https://example.com/api/v1/webhooks/wh-1", true, true, "Triggers daily report",
                 Map.of("env", "prod", "level", 5), LAST_TRIGGERED_AT, 999L, CREATED_AT
         );
 
@@ -157,7 +169,7 @@ class WebhookTriggerResponseTest {
         var s = sample().toString();
 
         assertThat(s).contains("id", "workflowId", "workflowName", "secretToken",
-                "webhookUrl", "enabled", "description", "defaultContext",
+                "webhookUrl", "tokenVisible", "enabled", "description", "defaultContext",
                 "lastTriggeredAt", "triggerCount", "createdAt");
     }
 

@@ -439,6 +439,7 @@ export interface WebhookTrigger {
   workflowId: string;
   workflowName: string;
   secretToken: string;
+  tokenVisible: boolean;
   description: string;
   defaultContext: Record<string, unknown>;
   enabled: boolean;

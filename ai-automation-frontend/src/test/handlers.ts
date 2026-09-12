@@ -220,6 +220,19 @@ export const handlers = [
   http.post(`${BASE}/webhooks/:id/disable`, () =>
     HttpResponse.json({ id: 'wh1', enabled: false }),
   ),
+  http.post(`${BASE}/webhooks/:id/regenerate-token`, () =>
+    HttpResponse.json({
+      id: 'wh1',
+      workflowId: 'w1',
+      name: 'Test Webhook',
+      path: '/hook1',
+      enabled: true,
+      secretToken: 'zzz999NEWTOKENvalue1234567890ABCDEF',
+      tokenVisible: true,
+      webhookUrl: 'http://localhost:9090/api/v1/webhook/trigger/zzz999NEWTOKENvalue1234567890ABCDEF',
+      createdAt: '2025-01-01T00:00:00Z',
+    }),
+  ),
   http.delete(`${BASE}/webhooks/:id`, () => new HttpResponse(null, { status: 204 })),
 
   // Todo Triggers

@@ -56,13 +56,9 @@ public class WebhookService {
         Workflow workflow = workflowRepository.findById(workflowId)
                 .orElseThrow(() -> new ResourceNotFoundException("Workflow", workflowId));
 
-        byte[] tokenBytes = new byte[32];
-        SECURE_RANDOM.nextBytes(tokenBytes);
-        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
-
         WebhookTrigger webhook = WebhookTrigger.builder()
                 .workflow(workflow)
-                .secretToken(token)
+                .secretToken(generateToken())
                 .description(description)
                 .defaultContext(defaultContext != null ? defaultContext : new HashMap<>())
                 .enabled(true)
@@ -74,6 +70,29 @@ public class WebhookService {
                 saved.getId(), workflowId);
         activityLogService.info(LogCategory.WEBHOOK, "Webhook created for workflow: " + workflow.getName(), "WebhookService", saved.getId());
         return saved;
+    }
+
+    /**
+     * Rotates the secret token of an existing webhook. The new token is only ever
+     * revealed in this call's response — every other read masks it. Trigger stats
+     * ({@code lastTriggeredAt}, {@code triggerCount}) are left untouched.
+     */
+    @Transactional
+    public WebhookTrigger regenerateToken(String id) {
+        WebhookTrigger webhook = findById(id);
+        webhook.setSecretToken(generateToken());
+        WebhookTrigger saved = webhookRepository.save(webhook);
+        log.info("Regenerated webhook token: {}", id);
+        activityLogService.warn(LogCategory.SECURITY,
+                "Webhook token regenerated for workflow: " + webhook.getWorkflow().getName(),
+                "WebhookService", id);
+        return saved;
+    }
+
+    private static String generateToken() {
+        byte[] tokenBytes = new byte[32];
+        SECURE_RANDOM.nextBytes(tokenBytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
     }
 
     @Transactional

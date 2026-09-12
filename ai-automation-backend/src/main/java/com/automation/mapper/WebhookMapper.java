@@ -13,6 +13,7 @@ public interface WebhookMapper {
     @Mapping(source = "workflow.id", target = "workflowId")
     @Mapping(source = "workflow.name", target = "workflowName")
     @Mapping(target = "webhookUrl", ignore = true)
+    @Mapping(target = "tokenVisible", ignore = true)
     WebhookTriggerResponse toResponse(WebhookTrigger webhook);
 
     List<WebhookTriggerResponse> toResponseList(List<WebhookTrigger> webhooks);
