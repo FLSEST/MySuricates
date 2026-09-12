@@ -25,6 +25,9 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -222,6 +225,124 @@ class ContainerServiceTest {
         assertThat(result.getId()).isNull(); // new row, id assigned by the DB
         assertThat(result.getDockerContainerId()).isEqualTo("docker-new");
         assertThat(result.getProject()).isSameAs(testProject);
+    }
+
+    /**
+     * The per-project lock must never be dropped from the map while a thread still holds it:
+     * the next caller would then create a fresh lock object and run createAndStart concurrently
+     * for the same project — exactly the UNIQUE(project_id) race the lock exists to prevent.
+     *
+     * <p>Interleaving forced here: T1 is inside, T2 blocks on the monitor, T1 completes (and with
+     * the old code removes the map entry while T2 is inside), then T3 arrives.
+     */
+    @Test
+    void createAndStart_lockIsNotDroppedWhileContended() throws Exception {
+        AtomicInteger concurrent = new AtomicInteger();
+        AtomicInteger maxConcurrent = new AtomicInteger();
+        CountDownLatch firstInside = new CountDownLatch(1);
+        CountDownLatch releaseFirst = new CountDownLatch(1);
+        CountDownLatch secondInside = new CountDownLatch(1);
+        CountDownLatch releaseRest = new CountDownLatch(1);
+
+        when(containerRepository.findByProjectId("project-1")).thenReturn(Optional.empty());
+        when(containerRepository.save(any(Container.class))).thenAnswer(inv -> inv.getArgument(0));
+        stubDockerRemoveCommands();
+        stubDockerCreateAndStartBlocking("docker-parallel", () -> {
+            maxConcurrent.accumulateAndGet(concurrent.incrementAndGet(), Math::max);
+            try {
+                if (firstInside.getCount() > 0) {
+                    firstInside.countDown();
+                    awaitLatch(releaseFirst);
+                } else {
+                    secondInside.countDown();
+                    awaitLatch(releaseRest);
+                }
+            } finally {
+                concurrent.decrementAndGet();
+            }
+        });
+
+        Thread t1 = startCreateAndStart();
+        assertThat(firstInside.await(5, TimeUnit.SECONDS)).as("T1 inside").isTrue();
+
+        Thread t2 = startCreateAndStart();
+        awaitBlockedOnMonitor(t2, true);
+
+        releaseFirst.countDown();
+        t1.join(5_000);
+        assertThat(secondInside.await(5, TimeUnit.SECONDS)).as("T2 inside").isTrue();
+
+        // T3 arrives after T1 finished — the old code had dropped the lock in the meantime.
+        Thread t3 = startCreateAndStart();
+        boolean thirdWaitedForTheLock = awaitBlockedOnMonitor(t3, false);
+
+        releaseRest.countDown();
+        t2.join(5_000);
+        t3.join(5_000);
+
+        assertThat(maxConcurrent.get())
+                .as("createAndStart must never run twice in parallel for the same project")
+                .isEqualTo(1);
+        assertThat(thirdWaitedForTheLock)
+                .as("T3 must queue on the existing project lock, not create a fresh one")
+                .isTrue();
+    }
+
+    private Thread startCreateAndStart() {
+        Thread thread = new Thread(() -> service.createAndStartContainer(testProject));
+        thread.setDaemon(true);
+        thread.start();
+        return thread;
+    }
+
+    /**
+     * Polls (no Awaitility dependency) until the thread parks on a monitor. {@code required}
+     * distinguishes the test setup (T2 must queue for the interleaving to happen) from the
+     * behaviour under test (T3 should queue — reported, not thrown, so the concurrency
+     * assertion gets to speak first).
+     */
+    private static boolean awaitBlockedOnMonitor(Thread thread, boolean required) {
+        long deadline = System.nanoTime() + java.time.Duration.ofSeconds(2).toNanos();
+        while (System.nanoTime() < deadline) {
+            if (thread.getState() == Thread.State.BLOCKED) return true;
+            Thread.onSpinWait();
+        }
+        if (required) {
+            throw new AssertionError("thread never blocked on the project lock; state=" + thread.getState());
+        }
+        return false;
+    }
+
+    private static void awaitLatch(CountDownLatch latch) {
+        try {
+            if (!latch.await(5, TimeUnit.SECONDS)) {
+                throw new AssertionError("latch was not released within 5s");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("interrupted while waiting for a latch", e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void stubDockerCreateAndStartBlocking(String responseId, Runnable insideCreate) {
+        CreateContainerResponse createResponse = mock(CreateContainerResponse.class);
+        when(createResponse.getId()).thenReturn(responseId);
+
+        CreateContainerCmd createCmd = mock(CreateContainerCmd.class, RETURNS_DEEP_STUBS);
+        when(createCmd.withName(anyString())).thenReturn(createCmd);
+        when(createCmd.withHostConfig(any())).thenReturn(createCmd);
+        when(createCmd.withUser(anyString())).thenReturn(createCmd);
+        when(createCmd.withWorkingDir(anyString())).thenReturn(createCmd);
+        when(createCmd.withCmd(any(String[].class))).thenReturn(createCmd);
+        when(createCmd.exec()).thenAnswer(inv -> {
+            insideCreate.run();
+            return createResponse;
+        });
+        when(dockerClient.createContainerCmd(anyString())).thenReturn(createCmd);
+
+        StartContainerCmd startCmd = mock(StartContainerCmd.class);
+        when(dockerClient.startContainerCmd(responseId)).thenReturn(startCmd);
     }
 
     @Test

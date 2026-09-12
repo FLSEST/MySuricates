@@ -46,9 +46,13 @@ public class ContainerService {
 
     // Per-project lock to serialize concurrent container creation for the same
     // project. Without this, two parallel workflow runs both pass the
-    // findByProjectId check, both call Docker create, and the second INSERT
-    // fails with UNIQUE constraint on containers.project_id (leaving an
-    // orphan Docker container behind).
+    // findByProjectId check, both call Docker create, and the second one
+    // clobbers the first container (leaving an orphan Docker container behind).
+    //
+    // Entries are never removed: dropping a lock while a thread still holds it
+    // lets the next caller create a *fresh* monitor for the same project and run
+    // in parallel with it — exactly the race this map exists to prevent. The map
+    // is bounded by the number of projects, so it cannot grow unbounded.
     private final ConcurrentHashMap<String, Object> projectLocks = new ConcurrentHashMap<>();
 
     public ContainerService(
@@ -82,13 +86,8 @@ public class ContainerService {
     // Docker work outside any transaction and use TransactionTemplate for the
     // short DB bursts (find existing row / upsert it).
     public Container createAndStartContainer(Project project) {
-        Object lock = projectLocks.computeIfAbsent(project.getId(), k -> new Object());
-        try {
-            synchronized (lock) {
-                return doCreateAndStart(project);
-            }
-        } finally {
-            projectLocks.remove(project.getId(), lock);
+        synchronized (projectLocks.computeIfAbsent(project.getId(), k -> new Object())) {
+            return doCreateAndStart(project);
         }
     }
 
