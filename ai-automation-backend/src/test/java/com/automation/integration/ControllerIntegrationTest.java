@@ -88,6 +88,20 @@ class ControllerIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    // TODO c8f122ac: unknown paths used to fall into GlobalExceptionHandler's generic
+    // Exception.class catch-all (NoResourceFoundException wasn't handled explicitly), answering
+    // 500 INTERNAL_ERROR with a logged stack trace instead of a routine 404.
+    @Test
+    void unknownApiPath_returns404NotFound() throws Exception {
+        mockMvc.perform(get("/api/v1/does-not-exist"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+
+        mockMvc.perform(post("/api/v1/projects/x/container/start"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+    }
+
     @Test
     void todoCrud_createAndUpdateStatus() throws Exception {
         String body = objectMapper.writeValueAsString(Map.of(
