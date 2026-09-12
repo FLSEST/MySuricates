@@ -178,9 +178,40 @@ class ContainerServiceTest {
                 .id("c1")
                 .project(testProject)
                 .dockerContainerId("docker-stale")
+                .status(ContainerStatus.STOPPED)
+                .stoppedAt(Instant.now())
+                .build();
+        when(containerRepository.findByProjectId("project-1")).thenReturn(Optional.of(stale));
+        when(containerRepository.findById("c1")).thenReturn(Optional.of(stale));
+        stubDockerRemoveCommands();
+        stubDockerCreateAndStart("docker-new");
+        when(containerRepository.save(any(Container.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Container result = service.createAndStartContainer(testProject);
+
+        // Upsert, not delete+insert: the row keeps its identity, so the UNIQUE(project_id)
+        // constraint can never be hit by a second INSERT for the same project.
+        assertThat(result.getId()).isEqualTo("c1");
+        assertThat(result.getDockerContainerId()).isEqualTo("docker-new");
+        assertThat(result.getStatus()).isEqualTo(ContainerStatus.RUNNING);
+        assertThat(result.getStoppedAt()).isNull();
+        assertThat(result.getStartedAt()).isNotNull();
+        assertThat(result.getLastActivityAt()).isNotNull();
+        assertThat(result.getMounts()).containsEntry("workspace", "/test/project");
+        verify(containerRepository).save(result);
+        verify(containerRepository, never()).deleteById(any());
+    }
+
+    @Test
+    void createAndStart_staleRowVanishedMeanwhile_insertsFreshRow() {
+        Container stale = Container.builder()
+                .id("c1")
+                .project(testProject)
+                .dockerContainerId("docker-stale")
                 .status(ContainerStatus.RUNNING)
                 .build();
         when(containerRepository.findByProjectId("project-1")).thenReturn(Optional.of(stale));
+        when(containerRepository.findById("c1")).thenReturn(Optional.empty());
         stubDockerInspectNotRunning("docker-stale");
         stubDockerRemoveCommands();
         stubDockerCreateAndStart("docker-new");
@@ -188,8 +219,9 @@ class ContainerServiceTest {
 
         Container result = service.createAndStartContainer(testProject);
 
+        assertThat(result.getId()).isNull(); // new row, id assigned by the DB
         assertThat(result.getDockerContainerId()).isEqualTo("docker-new");
-        verify(containerRepository).deleteById("c1");
+        assertThat(result.getProject()).isSameAs(testProject);
     }
 
     @Test
