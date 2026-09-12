@@ -372,4 +372,30 @@ class RetryBlockExecutorTest {
         verify(commandExecutor).executeStepOnHost(captor.capture());
         assertThat(captor.getValue().block().getConfig().get("command")).isEqualTo("Review left-pad; id");
     }
+
+    @Test
+    void execute_shellMode_taintedPreviousOutput_isEscaped() {
+        context.setUntrustedVariable("u", "z");   // webhook payload — the run is tainted
+        context.recordOutput(null, "pkg; id");
+        StepResult success = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(commandExecutor.executeStepAsShell(eq("/test/project"), any(), anyInt(), eq(300)))
+                .thenReturn(success);
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("retry")
+                .config(new HashMap<>(Map.of(
+                        "command", "npm install {{ previous_output }}",
+                        "max_retries", 1,
+                        "delay", 0,
+                        "execution_mode", "shell"
+                )))
+                .build();
+
+        executor.execute(block, context);
+
+        org.mockito.ArgumentCaptor<BlockDefinition> captor = org.mockito.ArgumentCaptor.forClass(BlockDefinition.class);
+        verify(commandExecutor).executeStepAsShell(eq("/test/project"), captor.capture(), anyInt(), eq(300));
+        assertThat(captor.getValue().getConfig().get("command")).isEqualTo("npm install 'pkg; id'");
+    }
 }

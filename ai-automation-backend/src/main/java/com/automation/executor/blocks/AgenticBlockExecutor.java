@@ -221,7 +221,8 @@ public class AgenticBlockExecutor implements BlockExecutor {
                             + "\n\nAnalyze this result. Has the goal been achieved? "
                             + "If not, what should we do next?"));
 
-            context.setPreviousOutput(actionOutput);
+            // recordOutput: in a tainted run the action output is shell-escaped downstream
+            context.recordOutput(null, actionOutput);
 
             fullOutput.append("[iteration ").append(iteration).append("]\n")
                     .append("  Reasoning: ").append(truncate(plan.getRationale(), TRUNCATE_SHORT)).append("\n")

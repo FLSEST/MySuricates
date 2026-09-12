@@ -246,4 +246,50 @@ class BlockStepRunnerTest {
         assertThat(run.getSteps()).hasSize(2);
         assertThat(run.getSteps().get(1)).isSameAs(step);
     }
+
+    // ── runStep: taint propagation (webhook-triggered runs) ────────────────
+
+    @Test
+    void runStep_taintedRun_marksOutputAndStepVariableUntrusted() {
+        BlockDefinition block = block("report", null);
+        when(blockExecutor.execute(eq(block), any())).thenReturn(result(StepStatus.COMPLETED, "x; id"));
+        context.setUntrustedVariable("branch", "main");
+        StepResult step = runner.startStep(run, 1, block);
+
+        runner.runStep(step, block, blockExecutor, context, run, null);
+
+        assertThat(context.isUntrusted("step_1_output")).isTrue();
+        assertThat(context.resolveShellTemplate(
+                "{{ previous_output }} {{ block.report.output }} {{ step_1_output }}", false))
+                .isEqualTo("'x; id' 'x; id' 'x; id'");
+    }
+
+    @Test
+    void runStep_taintedRun_contextDeltaCarriesTheTaint() {
+        BlockDefinition block = block("report", null);
+        when(blockExecutor.execute(eq(block), any())).thenReturn(result(StepStatus.COMPLETED, "x; id"));
+        context.setUntrustedVariable("branch", "main; id");
+        run.setInputContext(new HashMap<>(Map.of("branch", "main; id")));
+        StepResult step = runner.startStep(run, 0, block);
+
+        runner.runStep(step, block, blockExecutor, context, run, null);
+
+        assertThat(step.getContextDelta())
+                .containsEntry(ExecutionContext.UNTRUSTED_KEYS_VARIABLE, List.of("branch", "step_0_output"))
+                .containsEntry(ExecutionContext.UNTRUSTED_OUTPUTS_VARIABLE, List.of("previous_output", "report"));
+    }
+
+    @Test
+    void runStep_cleanRun_addsNoTaintToContextOrDelta() {
+        BlockDefinition block = block("report", null);
+        when(blockExecutor.execute(eq(block), any())).thenReturn(result(StepStatus.COMPLETED, "a | b"));
+        StepResult step = runner.startStep(run, 0, block);
+
+        runner.runStep(step, block, blockExecutor, context, run, null);
+
+        assertThat(context.hasUntrustedInput()).isFalse();
+        assertThat(context.resolveShellTemplate("{{ previous_output }} {{ step_0_output }}", false))
+                .isEqualTo("a | b a | b");
+        assertThat(step.getContextDelta()).isNull();
+    }
 }

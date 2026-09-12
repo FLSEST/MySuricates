@@ -124,7 +124,7 @@ Executes a shell command on the host or inside a Docker container.
 | `command` | string | **required** | Shell command(s) to execute |
 | `container_image` | string | null | Docker image (see execution environment; the server may restrict this via an allowlist) |
 | `timeout_seconds` | int | 300 | Execution timeout |
-| `shell_escape_variables` | bool | false | POSIX-safe escape of **all** template variables (single quotes). Variables from webhook payloads (incl. `git_*`) are **always** escaped, regardless of this option |
+| `shell_escape_variables` | bool | false | POSIX-safe escape of **all** template variables (single quotes). Variables from webhook payloads (incl. `git_*`) and the block outputs derived from them are **always** escaped, regardless of this option |
 | `mount_docker_socket` | bool | false | Mount Docker socket into the container (only effective when `container_image` is set) |
 | `mounts` | list | `[]` | Additional Docker volume mounts in format `host:container[:ro\|rw]` (only effective when `container_image` is set) |
 
@@ -138,8 +138,16 @@ Executes a shell command on the host or inside a Docker container.
 > `git_*` fields) is single-quoted in shell commands (`shell`, `foreach`, `while`, `retry` in shell
 > mode) — even without `shell_escape_variables`. Write such placeholders **unquoted**
 > (`git checkout {{ git_branch }}`, not `"{{ git_branch }}"`), otherwise the quotes double up.
-> Values from `defaultContext`, system variables and block outputs (`previous_output`,
-> `block.<name>.output`) are still substituted raw.
+> Values from `defaultContext` and system variables are still substituted raw.
+
+> **Taint propagation onto block outputs:** in a webhook-triggered run — and in every sub-workflow
+> it starts as well as after a resume — `{{ previous_output }}`, `{{ block.<name>.output }}`,
+> `{{ step_N_output }}` and the items of an `items_command` are single-quoted too. The reason: a
+> block can carry the payload into its output without naming the placeholder at all (reading a
+> file, calling an API). The taint appears as soon as the run holds any untrusted input and stays
+> for the rest of the run. So write these placeholders **unquoted** as well. In runs without
+> untrusted input (schedule, manual start, TodoTrigger, chain) every block output is substituted
+> raw exactly as before.
 
 ```json
 {

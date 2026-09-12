@@ -105,12 +105,11 @@ public class BlockStepRunner {
             stepMetadata.put("blockName", block.getName());
         }
         step.setMetadata(stepMetadata);
-        context.setPreviousOutput(step.getOutput());
-        context.setVariable("step_" + step.getStepIndex() + "_output",
+        // recordOutput/setDerivedVariable, not the plain setters: in a run that carries untrusted
+        // input (webhook payload) the output is tainted and gets shell-escaped downstream.
+        context.recordOutput(block.getName(), step.getOutput());
+        context.setDerivedVariable("step_" + step.getStepIndex() + "_output",
                 step.getOutput() != null ? step.getOutput() : "");
-        if (block.getName() != null && !block.getName().isBlank()) {
-            context.setBlockOutput(block.getName(), step.getOutput());
-        }
 
         // Persist context delta for potential future resume
         if (step.getStatus() == StepStatus.COMPLETED) {

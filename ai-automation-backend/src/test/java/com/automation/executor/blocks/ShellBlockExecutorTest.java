@@ -378,4 +378,36 @@ class ShellBlockExecutorTest {
 
         verify(shellService).execute(eq("git checkout main"), eq("/test/project"), eq(300), any());
     }
+
+    @Test
+    void execute_taintedPreviousOutput_isEscapedWithoutOptIn() {
+        context.setUntrustedVariable("branch", "main");   // webhook payload — the run is tainted
+        context.recordOutput("scan", "x; id");
+        when(shellService.execute(eq("echo 'x; id'"), eq("/test/project"), eq(300), any()))
+                .thenReturn(new ShellResult("ok", 0, 10));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("shell")
+                .config(new HashMap<>(Map.of("command", "echo {{ previous_output }}")))
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getInput()).isEqualTo("echo 'x; id'");
+    }
+
+    @Test
+    void execute_cleanRun_blockOutputStaysRaw() {
+        context.recordOutput("scan", "a | b");
+        when(shellService.execute(eq("echo a | b"), eq("/test/project"), eq(300), any()))
+                .thenReturn(new ShellResult("ok", 0, 10));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("shell")
+                .config(new HashMap<>(Map.of("command", "echo {{ block.scan.output }}")))
+                .build();
+
+        assertThat(executor.execute(block, context).getInput()).isEqualTo("echo a | b");
+    }
 }

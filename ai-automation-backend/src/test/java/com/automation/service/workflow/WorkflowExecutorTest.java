@@ -1872,4 +1872,90 @@ class WorkflowExecutorTest {
 
         assertThat(registry.isRunActive("run-1")).isFalse();
     }
+
+    // --- Taint propagation end-to-end (Finding 8) -------------------------------------------------
+
+    @Test
+    void execute_webhookRun_blockOutputsAreEscapedInLaterShellTemplates() {
+        AtomicInteger calls = new AtomicInteger();
+        List<String> resolved = new ArrayList<>();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenAnswer(inv -> {
+                    ExecutionContext ctx = inv.getArgument(1);
+                    resolved.add(ctx.resolveShellTemplate(
+                            "echo {{ previous_output }} {{ step_0_output }} {{ branch }}", false));
+                    return StepResult.builder().stepIndex(calls.getAndIncrement())
+                            .status(StepStatus.COMPLETED).output("x; id").build();
+                });
+
+        workflowExecutor.execute(testWorkflow, new HashMap<>(Map.of(
+                "branch", "main; id",
+                ExecutionContext.UNTRUSTED_KEYS_VARIABLE, List.of("branch"))));
+
+        // block 1 sees only the untrusted variable escaped, block 2 also the tainted output
+        assertThat(resolved.get(0)).isEqualTo("echo  {{ step_0_output }} 'main; id'");
+        assertThat(resolved.get(1)).isEqualTo("echo 'x; id' 'x; id' 'main; id'");
+    }
+
+    @Test
+    void execute_webhookRun_contextDeltaCarriesTheTaintForResume() {
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("x; id").build());
+
+        workflowExecutor.execute(testWorkflow, new HashMap<>(Map.of(
+                "branch", "main; id",
+                ExecutionContext.UNTRUSTED_KEYS_VARIABLE, List.of("branch"))));
+
+        ArgumentCaptor<StepResult> steps = ArgumentCaptor.forClass(StepResult.class);
+        verify(stepResultRepository, atLeastOnce()).save(steps.capture());
+        Map<String, Object> delta = steps.getAllValues().stream()
+                .map(StepResult::getContextDelta).filter(java.util.Objects::nonNull)
+                .reduce((first, second) -> second).orElseThrow();
+        assertThat(delta)
+                .containsEntry(ExecutionContext.UNTRUSTED_OUTPUTS_VARIABLE,
+                        List.of(ExecutionContext.PREVIOUS_OUTPUT_NAME))
+                .containsEntry(ExecutionContext.UNTRUSTED_KEYS_VARIABLE,
+                        List.of("branch", "step_0_output", "step_1_output"));
+    }
+
+    @Test
+    void execute_ordinaryRun_persistsNoTaintKeys() {
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("a | b").build());
+
+        workflowExecutor.execute(testWorkflow, new HashMap<>(Map.of("branch", "main")));
+
+        ArgumentCaptor<StepResult> steps = ArgumentCaptor.forClass(StepResult.class);
+        verify(stepResultRepository, atLeastOnce()).save(steps.capture());
+        assertThat(steps.getAllValues()).allSatisfy(step -> assertThat(step.getContextDelta())
+                .satisfiesAnyOf(delta -> assertThat(delta).isNull(),
+                        delta -> assertThat(delta).doesNotContainKeys(
+                                ExecutionContext.UNTRUSTED_KEYS_VARIABLE,
+                                ExecutionContext.UNTRUSTED_OUTPUTS_VARIABLE)));
+    }
+
+    @Test
+    void resumeFromStep_importedTaint_keepsTheReconstructedOutputEscaped() {
+        Map<String, Object> inputContext = Map.of(
+                ExecutionContext.UNTRUSTED_OUTPUTS_VARIABLE, List.of(ExecutionContext.PREVIOUS_OUTPUT_NAME),
+                ExecutionContext.UNTRUSTED_KEYS_VARIABLE, List.of("step_0_output"));
+        WorkflowRun interrupted = WorkflowRun.builder().id("run-1").workflow(testWorkflow).workflowName("Test Workflow")
+                .status(RunStatus.INTERRUPTED).startedAt(Instant.now()).inputContext(inputContext).build();
+        WorkflowRun running = WorkflowRun.builder().id("run-1").workflow(testWorkflow).workflowName("Test Workflow")
+                .status(RunStatus.RUNNING).startedAt(Instant.now()).build();
+        when(runRepository.findById("run-1")).thenReturn(Optional.of(interrupted)).thenReturn(Optional.of(running));
+        StepResult done = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("x; id").build();
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-1")).thenReturn(List.of(done));
+        List<String> resolved = new ArrayList<>();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenAnswer(inv -> {
+                    resolved.add(((ExecutionContext) inv.getArgument(1))
+                            .resolveShellTemplate("echo {{ previous_output }} {{ step_0_output }}", false));
+                    return StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED).output("done").build();
+                });
+
+        workflowExecutor.resumeFromStep("run-1");
+
+        assertThat(resolved).containsExactly("echo 'x; id' 'x; id'");
+    }
 }
