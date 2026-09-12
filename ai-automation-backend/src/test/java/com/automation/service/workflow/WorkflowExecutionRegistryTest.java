@@ -173,4 +173,59 @@ class WorkflowExecutionRegistryTest {
     void getPendingApproval_unknownRun_returnsNull() {
         assertThat(registry.getPendingApproval("nonexistent")).isNull();
     }
+
+    // ── Cancel before thread registration (TODO 45d09d19) ─────────────────────
+    // register() hands back the previous context so the executor can carry a
+    // cancel/pause flag over from the provisional context; cancel() flags both
+    // sides of a concurrent swap.
+
+    @Test
+    void register_returnsPreviousContext() {
+        ExecutionContext provisional = buildContext(null, "run-1");
+        ExecutionContext real = buildContext("c1", "run-1");
+
+        assertThat(registry.register("run-1", provisional)).isNull();
+        assertThat(registry.register("run-1", real)).isSameAs(provisional);
+        assertThat(registry.get("run-1")).isSameAs(real);
+    }
+
+    @Test
+    void cancel_returnsFalseWhenUnknown() {
+        assertThat(registry.cancel("nonexistent")).isFalse();
+    }
+
+    @Test
+    void cancel_flagsContextAndReturnsTrue() {
+        ExecutionContext ctx = buildContext("c1", "run-1");
+        registry.register("run-1", ctx);
+
+        assertThat(registry.cancel("run-1")).isTrue();
+        assertThat(ctx.shouldStop()).isTrue();
+    }
+
+    @Test
+    void cancel_flagsBothContextsWhenSwappedConcurrently() {
+        ExecutionContext provisional = buildContext(null, "run-1");
+        ExecutionContext real = buildContext("c1", "run-1");
+        // Simulates the interleaving where the executor swaps the provisional context for the
+        // real one between cancel()'s two map reads: both must end up cancelled.
+        WorkflowExecutionRegistry swapping = new WorkflowExecutionRegistry() {
+            private boolean swapped;
+
+            @Override
+            public ExecutionContext get(String runId) {
+                ExecutionContext current = super.get(runId);
+                if (!swapped) {
+                    swapped = true;
+                    register(runId, real);
+                }
+                return current;
+            }
+        };
+        swapping.register("run-1", provisional);
+
+        assertThat(swapping.cancel("run-1")).isTrue();
+        assertThat(provisional.shouldStop()).isTrue();
+        assertThat(real.shouldStop()).isTrue();
+    }
 }

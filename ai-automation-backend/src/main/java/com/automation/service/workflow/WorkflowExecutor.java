@@ -151,6 +151,7 @@ public class WorkflowExecutor {
         activityLogService.info(LogCategory.EXECUTION,
                 "Workflow execution started: " + workflowName,
                 "WorkflowExecutor", runId, workflowId);
+        registerProvisionalContext(runId);
         submitExecution(runId, () -> executeBlocks(runId, workflowId, workflowName, wf, contextVars, 0, null));
 
         return run;
@@ -190,13 +191,33 @@ public class WorkflowExecutor {
                 run.setSteps(new ArrayList<>(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc(runId)));
             }
 
+            // Cancelled while the run was still queued (see registerProvisionalContext): stop before
+            // anything expensive happens. The finally block saves CANCELLED, broadcasts, publishes
+            // the completion event and unregisters — no container, no steps, no completion handler.
+            ExecutionContext queued = executionRegistry.get(runId);
+            if (queued != null && queued.shouldStop()) {
+                run.setStatus(RunStatus.CANCELLED);
+                return;
+            }
+
             String containerId = ensureContainerRunning(project, runId);
 
             context = executionContextFactory.create(new ExecutionContextFactory.ContextSeed(
                     runId, workflowId, workflowName, project, containerId, inputContext,
                     instructions, model, provider, effort, resumePreviousOutput));
 
-            executionRegistry.register(runId, context);
+            // Swap the provisional context for the real one and carry over any control flag that
+            // arrived in between. WorkflowExecutionRegistry.cancel() double-checks from the other
+            // side, so a cancel racing this put lands on the real context either way.
+            ExecutionContext previous = executionRegistry.register(runId, context);
+            if (previous != null) {
+                if (previous.shouldStop()) {
+                    context.cancel();
+                }
+                if (previous.isPaused()) {
+                    context.pause();
+                }
+            }
 
             executionContextFactory.writeProjectContextFiles(project, workflowId, skills);
 
@@ -416,6 +437,22 @@ public class WorkflowExecutor {
     }
 
     /**
+     * Registers a placeholder context for a run that is about to be submitted. Without it the run
+     * would be observable (DB status RUNNING) but not controllable for as long as the execution
+     * thread needs to get through the semaphore and the container start — a cancel arriving in
+     * that window took the ghost branch and was then overrun by the thread that kept going.
+     * The execution thread swaps this context for the real one and carries any flag over.
+     *
+     * <p>Side effect (intended): {@link WorkflowExecutionRegistry#getActiveRunCount()} now counts
+     * queued runs too, which is what {@code GhostRunWatchdogService.reconcilePermits} needs — a run
+     * parked in {@code executionSemaphore.acquire()} or in the container start holds (or is about to
+     * hold) a permit and must not be mistaken for a leak.
+     */
+    private void registerProvisionalContext(String runId) {
+        executionRegistry.register(runId, ExecutionContext.builder().workflowRunId(runId).build());
+    }
+
+    /**
      * Hands the run to the executor. If the pool rejects it (shutdown in progress), the run would
      * otherwise stay RUNNING in the DB with no thread ever finishing it — so fail it right away.
      */
@@ -423,6 +460,9 @@ public class WorkflowExecutor {
         try {
             virtualThreadExecutor.submit(execution);
         } catch (java.util.concurrent.RejectedExecutionException e) {
+            // No thread will ever reach executeBlocks' finally block, so drop the provisional
+            // context here — otherwise the run stays "active" in the registry forever.
+            executionRegistry.unregister(runId);
             failRun(runId, "Executor rejected the run (shutting down?): " + e.getMessage());
             throw new WorkflowExecutionException("Executor rejected workflow run " + runId, e);
         }
@@ -536,6 +576,7 @@ public class WorkflowExecutor {
                 "Resuming workflow from step " + resumeIdx + ": " + wfName,
                 "WorkflowExecutor", runId, wfId);
 
+        registerProvisionalContext(runId);
         submitExecution(runId, () -> executeBlocks(runId, wfId, wfName, wf, contextForResume, resumeIdx, previousOutput));
 
         return run;
@@ -553,9 +594,9 @@ public class WorkflowExecutor {
     }
 
     public void cancelExecution(String runId) {
-        ExecutionContext context = executionRegistry.get(runId);
-        if (context != null) {
-            context.cancel();
+        // Registered covers both the running and the still-queued case (provisional context), so
+        // only a run with no context at all falls through to the ghost branch.
+        if (executionRegistry.cancel(runId)) {
             log.info("Cancelled execution: {}", runId);
         } else {
             // Ghost run: no active thread, but possibly still RUNNING in the DB
