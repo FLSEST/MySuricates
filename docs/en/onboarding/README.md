@@ -1,16 +1,18 @@
 <!-- last-sync: 2026-06-29 from: docs/onboarding/README.md -->
 
-# AutoPilot - Developer Onboarding
+# MySuricates - Developer Onboarding
 
 ## Welcome!
 
-Welcome to the **AutoPilot** project (also known as AI Automation Platform). This document gives you a quick overview of the project, its purpose, and the technologies used.
+Welcome to **MySuricates**. This document gives you a quick overview of the project, its purpose, and the technologies used.
+
+> **About the names:** The product is called **MySuricates**. The git directory is historically named `autotrigger`, and **AutoPilot** is the name of the project under which MySuricates tracks its own workflows and TODOs. All three refer to the same thing from different angles.
 
 ---
 
 ## Project Overview
 
-AutoPilot is an **AI-driven workflow automation platform** with a visual interface. It enables you to define, execute, and monitor complex automation flows — driven by a combination of deterministic blocks and AI-assisted (agentic) executions.
+MySuricates is an **AI-driven workflow automation platform** with a visual interface. It enables you to define, execute, and monitor complex automation flows — driven by a combination of deterministic blocks and AI-assisted (agentic) executions.
 
 ### Core Features
 

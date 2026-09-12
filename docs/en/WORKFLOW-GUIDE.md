@@ -63,7 +63,7 @@ Access in block configs with `{{ filepath }}` or `{{ language }}`.
 
 ## 2. Block Type Reference
 
-MySuricates supports 14 block types. Each block has a `type` and a `config` map.
+MySuricates supports 17 block types. Each block has a `type` and a `config` map.
 
 ### Common Block Properties
 

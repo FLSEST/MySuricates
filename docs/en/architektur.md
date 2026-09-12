@@ -122,7 +122,7 @@ com.automation
 ├── repository/          Spring Data Repositories
 ├── mapper/              MapStruct Mappers (Entity ↔ DTO)
 ├── executor/            Workflow Execution Engine
-│   └── blocks/          14 Block Executors + Agentic helper classes (AgenticBlockConfig, AgenticPlan, AgenticSafetyGuard, AgenticTokenTracker, AgenticPromptBuilder, AgenticEventBroadcaster, AgenticApprovalGate, AgenticActionRunner, AgenticStopRules)
+│   └── blocks/          17 Block Executors + Agentic helper classes (AgenticBlockConfig, AgenticPlan, AgenticSafetyGuard, AgenticTokenTracker, AgenticPromptBuilder, AgenticEventBroadcaster, AgenticApprovalGate, AgenticActionRunner, AgenticStopRules)
 ├── concurrency/         DynamicSemaphore
 ├── config/              Configuration classes, Seeders (Skill, Template, OnboardingProfile)
 ├── security/            ApiKeyAuthFilter, RateLimitFilter, ActivityLogSizeLimitFilter, WebhookRateLimiter, WebSocketAuthInterceptor
@@ -789,7 +789,7 @@ The DB migrations (`src/main/resources/db/migration/`) document the feature time
 ```
 autotrigger/
 ├── CLAUDE.md                          ← Project instructions for Claude Code
-├── VISION.md                          ← Product vision
+├── VISION.md                          ← Pointer to docs/vision.md
 ├── docs/                              ← These documentation files
 ├── workflow-pool/                     ← Pre-built workflow definitions (JSON)
 ├── scripts/

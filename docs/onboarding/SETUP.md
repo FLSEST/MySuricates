@@ -82,10 +82,10 @@ mvn spring-boot:run
 ```
 
 Das Backend startet auf **http://localhost:9090**. Beim ersten Start:
-- Flyway fuehrt alle 19 Migrationen aus
+- Flyway fuehrt alle 68 Migrationen aus
 - SQLite-Datenbank wird unter `data/automation.db` erstellt
-- 16 Built-in Skills werden geseedet
-- 28 Workflow-Templates werden geseedet
+- 19 Built-in Skills werden geseedet
+- 66 Workflow-Templates werden geseedet
 
 ### 2.4 Health-Check
 

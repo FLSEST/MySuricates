@@ -2,7 +2,7 @@
 
 # Architecture
 
-This document describes the system architecture, data flow, and core concepts of the AutoPilot platform.
+This document describes the system architecture, data flow, and core concepts of the MySuricates platform.
 
 ---
 

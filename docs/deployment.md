@@ -127,12 +127,18 @@ Test-Instanz auf Port 8090 (nutzt `docker/Dockerfile.stable` als Build-Basis):
 | `AUTOMATION_RATE_LIMIT_ENABLED` | `true` | Rate Limiting aktivieren (auch zur Laufzeit in Settings → Execution konfigurierbar) |
 | `AUTOMATION_RATE_LIMIT_RPM` | `120` | Requests pro Minute (auch zur Laufzeit konfigurierbar, 10–10.000) |
 | `AUTOMATION_TAILSCALE_ENABLED` | `true` | Tailscale Remote-Access |
+| `AUTOMATION_HOST_CLAUDE_TIMEOUT` | `300` | Globaler Claude-CLI-Timeout in Sekunden (in `application.yml` deklariert) |
 | `AUTOMATION_HOST_CLAUDE_MAX_TOKENS` | (leer) | Optionales per-Call Token-Limit für Claude CLI |
-| `AUTOMATION_HOST_CLAUDE_TIMEOUT_SECONDS` | `300` | Globaler Claude-CLI-Timeout in Sekunden |
 | `AUTOMATION_SSL_ENABLED` | `false` | SSL/TLS aktivieren |
 | `AUTOMATION_SSL_KEYSTORE` | `./certs/dev.p12` | Pfad zum PKCS12-Keystore |
 | `AUTOMATION_SSL_PASSWORD` | `mysuricates` | Keystore-Passwort |
 | `DOCKER_HOST` | `unix:///var/run/docker.sock` | Docker Socket Pfad |
+
+> **Warum manche Variablen nicht in `application.yml` stehen:** Die `automation.*`-Konfiguration wird
+> ueber `@ConfigurationProperties` gebunden. Spring bindet dabei jede Property zusaetzlich direkt aus
+> der passenden Umgebungsvariablen — `AUTOMATION_HOST_CLAUDE_MAX_TOKENS` setzt also
+> `automation.host-claude.max-tokens`, auch wenn dort kein `${...}`-Platzhalter steht.
+> Umgebungsvariablen haben dabei Vorrang vor den Werten aus `application.yml`.
 
 ### Container-Limits (application.yml)
 

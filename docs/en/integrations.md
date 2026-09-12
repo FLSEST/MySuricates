@@ -339,4 +339,4 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
 
 - Data model of the `integration_connections` table: [datenmodell.md](datenmodell.md)
 - Block types and workflow structure: [WORKFLOW-GUIDE.md](WORKFLOW-GUIDE.md)
-- Summary in the project instructions: [../CLAUDE.md](../CLAUDE.md) (section "Integration / Plugin System")
+- Summary in the project instructions: [CLAUDE.md](../../CLAUDE.md) (section "Integration / Plugin System")

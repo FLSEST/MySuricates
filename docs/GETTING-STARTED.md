@@ -74,7 +74,7 @@ erreichbar sind. Danach im Browser öffnen:
 Logs liegen unter `~/.local/state/autotrigger-dev/{backend,frontend}.log`.
 
 > Ohne Dev-Zertifikat läuft das Frontend auf **HTTP**. Wer HTTPS will (z. B. für PWA-Installation),
-> siehe Abschnitt 6.
+> siehe Abschnitt 7.
 
 ---
 

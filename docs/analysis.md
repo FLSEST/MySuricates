@@ -3,6 +3,9 @@
 # Documentation Gap Analysis — All Six Docs
 
 > Generated: 2026-03-28, based on actual codebase state (v0.6.2)
+>
+> **Historische Momentaufnahme.** Der Stand von damals ist nicht der heutige; einzelne Befunde
+> sind inzwischen erledigt und unten entsprechend markiert.
 
 ---
 
@@ -22,6 +25,9 @@ The docs/vision.md is missing 4 features that already exist in VISION.md (root):
 ### Sync Issue
 - docs/vision.md and VISION.md (root) should have identical content but they've drifted apart
 - Root VISION.md is more up-to-date
+
+**Erledigt am 2026-09-12:** Die Dreifachpflege ist aufgeloest — `docs/vision.md` ist die Quelle,
+`VISION.md` im Wurzelverzeichnis nur noch ein Verweis darauf.
 
 ---
 

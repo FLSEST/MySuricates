@@ -76,7 +76,7 @@ both are reachable. Then open in a browser:
 Logs are written to `~/.local/state/autotrigger-dev/{backend,frontend}.log`.
 
 > Without a dev certificate, the frontend runs on **HTTP**. For HTTPS (e.g. for PWA installation),
-> see Section 6.
+> see Section 7.
 
 ---
 

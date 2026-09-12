@@ -127,12 +127,18 @@ Test instance on port 8090 (uses `docker/Dockerfile.stable` as build base):
 | `AUTOMATION_RATE_LIMIT_ENABLED` | `true` | Enable rate limiting (also configurable at runtime in Settings → Execution) |
 | `AUTOMATION_RATE_LIMIT_RPM` | `120` | Requests per minute (also configurable at runtime, 10–10,000) |
 | `AUTOMATION_TAILSCALE_ENABLED` | `true` | Tailscale remote access |
+| `AUTOMATION_HOST_CLAUDE_TIMEOUT` | `300` | Global Claude CLI timeout in seconds (declared in `application.yml`) |
 | `AUTOMATION_HOST_CLAUDE_MAX_TOKENS` | (empty) | Optional per-call token limit for Claude CLI |
-| `AUTOMATION_HOST_CLAUDE_TIMEOUT_SECONDS` | `300` | Global Claude CLI timeout in seconds |
 | `AUTOMATION_SSL_ENABLED` | `false` | Enable SSL/TLS |
 | `AUTOMATION_SSL_KEYSTORE` | `./certs/dev.p12` | Path to PKCS12 keystore |
 | `AUTOMATION_SSL_PASSWORD` | `mysuricates` | Keystore password |
 | `DOCKER_HOST` | `unix:///var/run/docker.sock` | Docker socket path |
+
+> **Why some variables do not appear in `application.yml`:** The `automation.*` configuration is bound
+> via `@ConfigurationProperties`. Spring additionally binds every property straight from the matching
+> environment variable — so `AUTOMATION_HOST_CLAUDE_MAX_TOKENS` sets `automation.host-claude.max-tokens`
+> even though no `${...}` placeholder exists for it. Environment variables take precedence over the
+> values from `application.yml`.
 
 ### Container Limits (application.yml)
 

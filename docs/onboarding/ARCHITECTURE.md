@@ -1,6 +1,6 @@
 # Architektur
 
-Dieses Dokument beschreibt die Systemarchitektur, den Datenfluss und die zentralen Konzepte der AutoPilot-Plattform.
+Dieses Dokument beschreibt die Systemarchitektur, den Datenfluss und die zentralen Konzepte der MySuricates-Plattform.
 
 ---
 

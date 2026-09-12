@@ -25,6 +25,9 @@ The docs/vision.md is missing 4 features that already exist in VISION.md (root):
 - docs/vision.md and VISION.md (root) should have identical content but they've drifted apart
 - Root VISION.md is more up-to-date
 
+**Resolved on 2026-09-12:** The triple maintenance is gone — `docs/vision.md` is the source,
+root `VISION.md` is now only a pointer to it.
+
 ---
 
 ## 2. frontend.md
