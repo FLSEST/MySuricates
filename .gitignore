@@ -66,7 +66,16 @@ ai-automation-backend/src/main/resources/docs/
 docs/public/generated/
 screenshots/raw/
 
-*.txt.bak
+# Sicherungsdateien jeder Art, auch mit Zeitstempel-Suffix. Vorher deckte nur
+# *.txt.bak ab; job-shortlist-template.html.bak-<zeitstempel> fiel durch und
+# waere bei einem pauschalen 'git add' mitgegangen.
+*.bak
+*.bak-*
+*.orig
+*.old
+*.save
+*.rej
+*~
 
 # Personal seed scripts (use seed-workflows.example.sh as template)
 scripts/seed-workflows.sh
