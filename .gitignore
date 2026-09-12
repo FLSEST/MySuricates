@@ -28,6 +28,7 @@ ai-automation-frontend/dist/
 ai-automation-frontend/tsconfig.tsbuildinfo
 ai-automation-frontend/cypress/screenshots/
 ai-automation-frontend/playwright/results/
+ai-automation-frontend/playwright/showcase/results/
 ai-automation-frontend/playwright/report/
 ai-automation-frontend/playwright/.auth/
 ai-automation-frontend/test-results/
