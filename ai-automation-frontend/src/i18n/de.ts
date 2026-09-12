@@ -1475,6 +1475,7 @@ export const de: TranslationKeys = {
     noLogs: 'Logs erscheinen wenn die Ausführung startet.',
     retry: 'Erneut versuchen',
     iterationHistory: 'Iteration-History',
+    executionResults: 'Ausführungsergebnisse',
     noHistory: 'Noch keine Iterationen.',
     historyPhase: 'Phase',
     historyDecomposition: 'Zerlegung',
