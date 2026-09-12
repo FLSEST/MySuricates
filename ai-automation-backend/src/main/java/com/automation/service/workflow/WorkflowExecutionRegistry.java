@@ -22,12 +22,15 @@ public class WorkflowExecutionRegistry {
     private final Map<String, ExecutionContext> activeExecutions = new ConcurrentHashMap<>();
 
     /**
-     * Marks the placeholder context from {@link #registerProvisional}. Control operations (cancel,
-     * pause) work on it by design; anything that needs a container or the project's working
-     * directory must not — see {@link #getStartedContext}. A block never sees the marker, the real
-     * context replaces the placeholder before the first one runs.
+     * Runs whose placeholder context is registered but whose execution thread has not taken over
+     * yet. Control operations (cancel, pause) work on such a run by design; anything that needs a
+     * container or the project working directory must not — see {@link #getStartedContext}.
+     *
+     * <p>Kept here rather than as a flag on the context: {@code ExecutionContext.variables} is a
+     * plain {@link java.util.HashMap} that block executors mutate from the execution thread, so
+     * reading it from a request thread would be a data race.
      */
-    private static final String NOT_STARTED_MARKER = "__run_not_started";
+    private final Set<String> queued = ConcurrentHashMap.newKeySet();
 
     /**
      * Registers a placeholder context for a run that is about to be submitted. Without it a run is
@@ -41,9 +44,9 @@ public class WorkflowExecutionRegistry {
      * permit and must not be mistaken for a leak.
      */
     public void registerProvisional(String runId) {
-        ExecutionContext provisional = ExecutionContext.builder().workflowRunId(runId).build();
-        provisional.setVariable(NOT_STARTED_MARKER, Boolean.TRUE);
-        register(runId, provisional);
+        // Mark before publishing the context: never let getStartedContext hand out the placeholder.
+        queued.add(runId);
+        register(runId, ExecutionContext.builder().workflowRunId(runId).build());
     }
 
     /** True when a cancel already arrived — checked by the execution thread before it does any work. */
@@ -59,15 +62,17 @@ public class WorkflowExecutionRegistry {
      */
     public void promote(String runId, ExecutionContext context) {
         ExecutionContext previous = register(runId, context);
-        if (previous == null) {
-            return;
+        if (previous != null) {
+            if (previous.shouldStop()) {
+                context.cancel();
+            }
+            if (previous.isPaused()) {
+                context.pause();
+            }
         }
-        if (previous.shouldStop()) {
-            context.cancel();
-        }
-        if (previous.isPaused()) {
-            context.pause();
-        }
+        // Unmark last: until the flags are carried over, getStartedContext keeps returning null.
+        // The overlap can only hide the real context, never expose the placeholder.
+        queued.remove(runId);
     }
 
     /**
@@ -77,23 +82,22 @@ public class WorkflowExecutionRegistry {
      */
     public ExecutionContext getStartedContext(String runId) {
         ExecutionContext context = activeExecutions.get(runId);
-        return context == null || Boolean.TRUE.equals(context.getVariable(NOT_STARTED_MARKER))
-                ? null
-                : context;
+        return context == null || queued.contains(runId) ? null : context;
     }
 
     /**
      * Registers the context for a run and returns the context that was registered before, or
-     * {@code null} when this is the first one. {@link WorkflowExecutor} uses the return value to
-     * carry a cancel/pause flag over from the provisional context it registers before the
-     * execution thread starts.
+     * {@code null} when this is the first one. Package-private on purpose: callers go through
+     * {@link #registerProvisional} or {@link #promote} so the cancel/pause carry-over and the
+     * queued bookkeeping can never be bypassed.
      */
-    public ExecutionContext register(String runId, ExecutionContext context) {
+    ExecutionContext register(String runId, ExecutionContext context) {
         return activeExecutions.put(runId, context);
     }
 
     public void unregister(String runId) {
         activeExecutions.remove(runId);
+        queued.remove(runId);
     }
 
     public ExecutionContext get(String runId) {
@@ -139,6 +143,8 @@ public class WorkflowExecutionRegistry {
      * already-swapped-out provisional context is harmless (nobody reads it any more).
      */
     public boolean cancel(String runId) {
+        // Reads via this class's own get() on purpose — the deterministic interleaving test
+        // overrides it to swap the context between the two reads.
         ExecutionContext first = get(runId);
         if (first == null) {
             return false;

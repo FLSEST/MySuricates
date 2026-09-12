@@ -29,6 +29,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import com.automation.concurrency.DynamicSemaphore;
 
@@ -1632,6 +1634,56 @@ class WorkflowExecutorTest {
             Thread.currentThread().interrupt();
             throw new AssertionError("interrupted while waiting for " + what, e);
         }
+    }
+
+    @Test
+    void cancelExecution_duringRunInitialisation_isHonoured() {
+        // The run row is listable from the first save on, so a second observer can cancel while
+        // execute() is still assembling the snapshot / writing the input context. That cancel must
+        // not fall through to the ghost branch and then be overrun by the execution thread.
+        AtomicReference<WorkflowRun> stored = statefulRunRepository();
+        // Would let the run finish COMPLETED if the cancel were dropped — never reached once it isn't.
+        lenient().when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build());
+        AtomicBoolean cancelled = new AtomicBoolean();
+        doAnswer(inv -> {
+            if (cancelled.compareAndSet(false, true)) {
+                workflowExecutor.cancelExecution("run-1");
+            }
+            return null;
+        }).when(activityLogService).info(any(), anyString(), anyString(), anyString(), anyString());
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        assertThat(stored.get().getStatus()).isEqualTo(RunStatus.CANCELLED);
+        assertThat(stored.get().getError()).isNullOrEmpty();
+        verify(simpleBlockExecutor, never()).execute(any(), any());
+        verify(containerService, never()).getDockerContainerId(any());
+        verify(stepResultRepository, never()).save(any());
+        assertThat(registry.isRunActive("run-1")).isFalse();
+    }
+
+    @Test
+    void execute_initialisationFails_leavesNoActiveRunBehind() {
+        // Registering before the init work means the init-failure path has to clean up again —
+        // otherwise the run stays "active" forever and the ghost watchdog skips it on purpose.
+        AtomicInteger saves = new AtomicInteger();
+        when(runRepository.save(any(WorkflowRun.class))).thenAnswer(inv -> {
+            WorkflowRun run = inv.getArgument(0);
+            if (run.getId() == null) run.setId("run-1");
+            if (saves.incrementAndGet() == 2) throw new IllegalStateException("db down");
+            return run;
+        });
+
+        assertThatThrownBy(() -> workflowExecutor.execute(testWorkflow, Map.of("k", "v")))
+                .isInstanceOf(WorkflowExecutionException.class);
+
+        assertThat(registry.isRunActive("run-1")).isFalse();
+        assertThat(registry.getActiveRunCount()).isZero();
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(String.valueOf(saved.getError().get("message")))
+                .contains("Failed to initialize workflow data");
     }
 
     @Test

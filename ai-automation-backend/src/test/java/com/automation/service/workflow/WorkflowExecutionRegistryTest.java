@@ -218,6 +218,33 @@ class WorkflowExecutionRegistryTest {
     }
 
     @Test
+    void registerProvisional_marksQueued_promoteClearsIt() {
+        registry.registerProvisional("run-1");
+        assertThat(registry.getStartedContext("run-1")).isNull();
+
+        ExecutionContext real = buildContext("c1", "run-1");
+        registry.promote("run-1", real);
+        assertThat(registry.getStartedContext("run-1")).isSameAs(real);
+
+        // A second run of the same id (retry after unregister) must start queued again.
+        registry.unregister("run-1");
+        registry.registerProvisional("run-1");
+        assertThat(registry.getStartedContext("run-1")).isNull();
+    }
+
+    @Test
+    void unregister_clearsQueuedState() {
+        registry.registerProvisional("run-1");
+        registry.unregister("run-1");
+
+        assertThat(registry.isRunActive("run-1")).isFalse();
+        // No stale queued entry: a context registered afterwards counts as started.
+        ExecutionContext real = buildContext("c1", "run-1");
+        registry.promote("run-1", real);
+        assertThat(registry.getStartedContext("run-1")).isSameAs(real);
+    }
+
+    @Test
     void cancelRequested_unknownRun_isFalse() {
         assertThat(registry.cancelRequested("nonexistent")).isFalse();
     }

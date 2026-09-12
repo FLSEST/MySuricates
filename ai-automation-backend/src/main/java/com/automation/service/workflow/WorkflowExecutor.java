@@ -114,6 +114,7 @@ public class WorkflowExecutor {
             run.setMetadata(new HashMap<>(initialRunMetadata));
         }
         run = runRepository.save(run);
+        executionRegistry.registerProvisional(run.getId()); // listable ⇒ cancellable, no ghost branch
 
         // Eagerly initialize lazy collections before leaving the transaction/session.
         // Wrapped in try-catch: if a LazyInitializationException or similar occurs here
@@ -135,7 +136,10 @@ public class WorkflowExecutor {
                 run.setInputContext(new HashMap<>(contextVars));
                 runRepository.save(run);
             }
+            activityLogService.info(LogCategory.EXECUTION, "Workflow execution started: " + workflow.getName(),
+                    "WorkflowExecutor", run.getId(), workflow.getId());
         } catch (Exception e) {
+            executionRegistry.unregister(run.getId()); // nothing will ever run for this id
             log.error("Failed to initialize workflow data for run {}: {}", run.getId(), e.getMessage(), e);
             run.setStatus(RunStatus.FAILED);
             run.setCompletedAt(Instant.now());
@@ -148,10 +152,6 @@ public class WorkflowExecutor {
         final String runId = run.getId();
         final String workflowId = workflow.getId();
         final String workflowName = workflow.getName();
-        activityLogService.info(LogCategory.EXECUTION,
-                "Workflow execution started: " + workflowName,
-                "WorkflowExecutor", runId, workflowId);
-        executionRegistry.registerProvisional(runId);
         submitExecution(runId, () -> executeBlocks(runId, workflowId, workflowName, wf, contextVars, 0, null));
 
         return run;
@@ -529,21 +529,22 @@ public class WorkflowExecutor {
             throw new WorkflowExecutionException("Failed to load workflow data for resume: " + e.getMessage(), e);
         }
 
+        // Announce first: a failing log write leaves the run INTERRUPTED, not RUNNING-with-nobody.
+        activityLogService.info(LogCategory.EXECUTION,
+                "Resuming workflow from step " + resumeFromIndex + ": " + workflow.getName(),
+                "WorkflowExecutor", runId, workflow.getId());
+
         // Reset run to RUNNING
         run.setStatus(RunStatus.RUNNING);
         run.setError(null);
         run.setCompletedAt(null);
         runRepository.save(run);
+        executionRegistry.registerProvisional(runId); // controllable as soon as it is RUNNING
         broadcaster.broadcastRunStatus(runId, RunStatus.RUNNING);
 
         final String wfId = workflow.getId();
         final String wfName = workflow.getName();
         final int resumeIdx = resumeFromIndex;
-        activityLogService.info(LogCategory.EXECUTION,
-                "Resuming workflow from step " + resumeIdx + ": " + wfName,
-                "WorkflowExecutor", runId, wfId);
-
-        executionRegistry.registerProvisional(runId);
         submitExecution(runId, () -> executeBlocks(runId, wfId, wfName, wf, contextForResume, resumeIdx, previousOutput));
 
         return run;
@@ -649,8 +650,7 @@ public class WorkflowExecutor {
         }
     }
 
-    // A single JPQL UPDATE: outside a transaction, find + save would detach the entity, turn the
-    // save into a merge and pull the eager Project/Container graph along — three trips for one.
+    // One JPQL UPDATE: find + save would detach, merge and drag the eager Project/Container graph.
     private void updateContainerActivity(String containerId) {
         try {
             containerRepository.touchActivity(containerId, Instant.now());
