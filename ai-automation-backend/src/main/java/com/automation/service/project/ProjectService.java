@@ -120,19 +120,37 @@ public class ProjectService {
         projectRepository.save(project);
     }
 
-    @Transactional
+    /**
+     * Archives the project and stops its container afterwards. Deliberately not
+     * {@code @Transactional}: {@link ContainerService#stopContainer} does a multi-second Docker
+     * stop+remove, so an enclosing transaction would pin the single pooled connection for that
+     * whole time — the same lock-order inversion between per-project monitor and connection that
+     * {@link #startContainer} avoids (TODO b3c88eeb / 0db2b2c9).
+     *
+     * <p>The order is a deliberate trade-off: the archive burst commits <em>first</em>, the Docker
+     * stop runs outside any transaction afterwards. If Docker fails, the project stays archived
+     * and only a stale container is left behind — {@code DockerOrphanReconciler} and the idle
+     * cleanup reap it. A project the user already deleted popping back up un-archived would be
+     * the worse outcome.
+     */
     public void delete(String id) {
-        Project project = projectRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Project", id));
+        Project project = transactionTemplate.execute(status -> {
+            Project p = projectRepository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("Project", id));
+            p.setArchivedAt(Instant.now());
+            projectRepository.save(p);
+            log.info("Archived project: {} ({})", p.getName(), p.getId());
+            activityLogService.warn(LogCategory.SYSTEM, "Project archived: " + p.getName(), "ProjectService", p.getId());
+            return p;
+        });
 
         if (project.getStatus() == ProjectStatus.RUNNING) {
-            containerService.stopContainer(project);
+            try {
+                containerService.stopContainer(project);
+            } catch (Exception e) {
+                log.error("Failed to stop container for archived project: {}", id, e);
+            }
         }
-
-        project.setArchivedAt(Instant.now());
-        projectRepository.save(project);
-        log.info("Archived project: {} ({})", project.getName(), project.getId());
-        activityLogService.warn(LogCategory.SYSTEM, "Project archived: " + project.getName(), "ProjectService", project.getId());
     }
 
     @Transactional(readOnly = true)
