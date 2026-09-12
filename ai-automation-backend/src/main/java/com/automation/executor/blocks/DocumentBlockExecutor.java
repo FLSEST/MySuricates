@@ -68,7 +68,9 @@ public class DocumentBlockExecutor implements BlockExecutor {
             boolean belowThreshold = text.length() < minCharacters;
 
             if (variableName != null) {
-                context.setVariable(variableName, text);
+                // Extracted file content inherits the run's taint (the file_path itself can come
+                // from an untrusted payload) — see ExecutionContext.setDerivedVariable
+                context.setDerivedVariable(variableName, text);
             }
 
             step.setOutput(text);

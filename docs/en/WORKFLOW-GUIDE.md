@@ -138,7 +138,11 @@ Executes a shell command on the host or inside a Docker container.
 > `git_*` fields) is single-quoted in shell commands (`shell`, `foreach`, `while`, `retry` in shell
 > mode) — even without `shell_escape_variables`. Write such placeholders **unquoted**
 > (`git checkout {{ git_branch }}`, not `"{{ git_branch }}"`), otherwise the quotes double up.
-> Values from `defaultContext` and system variables are still substituted raw.
+> **And that is not merely cosmetic: inside your own quotes the escaping is void.** With the value
+> `x; id`, `PREV='{{ previous_output }}'` becomes `PREV=''x; id''` — the shell runs that as
+> `PREV=x` **followed by** `id`. So never put an untrusted or tainted placeholder in quotes; always
+> write it bare (`PREV={{ previous_output }}`). Values from `defaultContext` and system variables
+> are still substituted raw.
 
 > **Taint propagation onto block outputs:** in a webhook-triggered run — and in every sub-workflow
 > it starts as well as after a resume — `{{ previous_output }}`, `{{ block.<name>.output }}`,

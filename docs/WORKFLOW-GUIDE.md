@@ -138,7 +138,11 @@ Fuehrt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 > die daraus abgeleiteten `git_*`-Felder), landet in Shell-Befehlen (`shell`, `foreach`, `while`, `retry`
 > im Shell-Modus) grundsaetzlich in Single-Quotes — auch ohne `shell_escape_variables`. Solche
 > Platzhalter deshalb **unquoted** schreiben (`git checkout {{ git_branch }}`, nicht `"{{ git_branch }}"`),
-> sonst stehen die Quotes doppelt. Werte aus `defaultContext` und System-Variablen bleiben roh.
+> sonst stehen die Quotes doppelt. **Und das ist nicht nur Kosmetik: in eigenen Quotes ist das
+> Escaping wirkungslos.** Beim Wert `x; id` wird `PREV='{{ previous_output }}'` zu
+> `PREV=''x; id''` — die Shell fuehrt das als `PREV=x` **und danach** `id` aus. Einen untrusted
+> oder getainteten Platzhalter deshalb nie in Quotes setzen, sondern immer ohne Quotes schreiben
+> (`PREV={{ previous_output }}`). Werte aus `defaultContext` und System-Variablen bleiben roh.
 
 > **Taint-Propagation auf Block-Ausgaben:** In einem webhook-getriggerten Run — und in jedem daraus
 > gestarteten Sub-Workflow sowie nach einem Resume — werden auch `{{ previous_output }}`,
