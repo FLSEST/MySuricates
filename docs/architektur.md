@@ -107,6 +107,7 @@ com.automation
 │   ├── execution/       ExecutionQueryService (Lesen + DTO-Mapping), ExecutionCommandService (Retry, Resume, Notizen), WorkflowDebugService
 │   ├── dlq/             DeadLetterService, DeadLetterRetryService
 │   ├── document/        DocumentExtractionService, DocumentExtractionException
+│   ├── export/bpmn/     BpmnModelBuilder (Kette/Einzel-Task/Schleife) + BpmnNodeFactory (Ids, Platzierung, Kanten, Command-Tasks), BpmnGatewayBuilder (conditional/switch: Split/Rows/Merge), BpmnEdgeRouter (rechtwinkliges Waypoint-Routing), BpmnBlockText (Labels, Doku, Config-Helfer), BpmnSegment (Teil-Graph), BpmnXmlRenderer, BpmnExportAdapter, BpmnModel, BpmnNames
 │   ├── search/          SemanticWorkflowSearchService
 │   ├── watchdog/        ConnectionPoolWatchdogService
 │   ├── repair/          AutoRepairService
