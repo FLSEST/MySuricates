@@ -140,6 +140,19 @@ Test-Instanz auf Port 8090 (nutzt `docker/Dockerfile.stable` als Build-Basis):
 > `automation.host-claude.max-tokens`, auch wenn dort kein `${...}`-Platzhalter steht.
 > Umgebungsvariablen haben dabei Vorrang vor den Werten aus `application.yml`.
 
+### Vorlage und Ladeweg
+
+`ai-automation-backend/.env.example` listet alle Variablen mit ihren tatsaechlichen Defaults,
+gruppiert nach Thema. **Spring Boot laedt eine `.env` nicht von selbst** — es gibt keine
+dotenv-Abhaengigkeit im Projekt und kein `env_file:` in den Compose-Dateien. Die Vorlage ist eine
+Referenz, keine Auto-Konfiguration.
+
+| Start | So kommen die Werte an |
+|---|---|
+| Host | `cp .env.example .env`, anpassen, dann `set -a; . ./.env; set +a` vor dem Start — oder die Variablen direkt exportieren |
+| Compose | Eine `.env` neben der Compose-Datei ersetzt nur `${VAR}` **in** der Compose-Datei. Im Container ankommt nur, was unter `environment:` steht |
+| Spring-Override | Alternativ `ai-automation-backend/config/application.yml` (git-ignoriert) — Spring liest ein `config/`-Verzeichnis neben dem Arbeitsverzeichnis automatisch |
+
 ### Container-Limits (application.yml)
 
 | Property | Standard | Beschreibung |

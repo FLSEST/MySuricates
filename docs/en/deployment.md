@@ -140,6 +140,18 @@ Test instance on port 8090 (uses `docker/Dockerfile.stable` as build base):
 > even though no `${...}` placeholder exists for it. Environment variables take precedence over the
 > values from `application.yml`.
 
+### Template and loading path
+
+`ai-automation-backend/.env.example` lists every variable with its actual default, grouped by topic.
+**Spring Boot does not load a `.env` on its own** — there is no dotenv dependency in the project and
+no `env_file:` in the compose files. The template is a reference, not auto-configuration.
+
+| Start | How the values arrive |
+|---|---|
+| Host | `cp .env.example .env`, adjust, then `set -a; . ./.env; set +a` before starting — or export the variables directly |
+| Compose | A `.env` next to the compose file only substitutes `${VAR}` **inside** the compose file. Only what is listed under `environment:` reaches the container |
+| Spring override | Alternatively `ai-automation-backend/config/application.yml` (git-ignored) — Spring picks up a `config/` directory next to the working directory automatically |
+
 ### Container Limits (application.yml)
 
 | Property | Default | Description |
