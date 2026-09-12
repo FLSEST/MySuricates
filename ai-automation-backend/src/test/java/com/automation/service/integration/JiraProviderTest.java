@@ -65,6 +65,8 @@ class JiraProviderTest {
         assertThat(config.clientIdEnvVar()).isEqualTo("JIRA_CLIENT_ID");
         assertThat(config.clientSecretEnvVar()).isEqualTo("JIRA_CLIENT_SECRET");
         assertThat(config.extraAuthParams()).containsEntry("audience", "api.atlassian.com");
+        // Atlassian 3LO publishes no revocation endpoint — revocation is skipped, not guessed.
+        assertThat(config.revocationUrl()).isNull();
     }
 
     @Test

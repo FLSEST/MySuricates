@@ -35,6 +35,7 @@ class GoogleGmailProviderTest {
         assertThat(config.defaultScopes()).containsExactly("https://www.googleapis.com/auth/gmail.readonly");
         assertThat(config.clientIdEnvVar()).isEqualTo("GOOGLE_CLIENT_ID");
         assertThat(config.clientSecretEnvVar()).isEqualTo("GOOGLE_CLIENT_SECRET");
+        assertThat(config.revocationUrl()).isEqualTo(OAuthConfig.GOOGLE_REVOCATION_URL);
     }
 
     @Test

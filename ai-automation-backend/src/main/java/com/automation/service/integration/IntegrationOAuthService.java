@@ -3,44 +3,41 @@ package com.automation.service.integration;
 import com.automation.entity.IntegrationConnection;
 import com.automation.entity.IntegrationConnection.ConnectionStatus;
 import com.automation.repository.IntegrationConnectionRepository;
+import com.automation.service.integration.OAuthStateRegistry.PendingAuthorization;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
-import java.net.URI;
-import java.net.URLEncoder;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
-import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class IntegrationOAuthService {
 
     private final IntegrationConnectionRepository connectionRepository;
     private final IntegrationEncryptionService encryptionService;
     private final IntegrationRegistry registry;
-    private final ObjectMapper objectMapper;
+    private final OAuthTokenClient tokenClient;
+    private final OAuthStateRegistry stateRegistry;
+    private final TransactionTemplate transactionTemplate;
 
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .build();
-
-    /** Bind the notification origin to the server-generated OAuth state. */
-    private record PendingAuthorization(String providerId, String callbackOrigin) {}
-    private final ConcurrentHashMap<String, PendingAuthorization> pendingStates = new ConcurrentHashMap<>();
+    public IntegrationOAuthService(IntegrationConnectionRepository connectionRepository,
+                                   IntegrationEncryptionService encryptionService,
+                                   IntegrationRegistry registry,
+                                   OAuthTokenClient tokenClient,
+                                   OAuthStateRegistry stateRegistry,
+                                   PlatformTransactionManager transactionManager) {
+        this.connectionRepository = connectionRepository;
+        this.encryptionService = encryptionService;
+        this.registry = registry;
+        this.tokenClient = tokenClient;
+        this.stateRegistry = stateRegistry;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+    }
 
     /** Save OAuth client credentials (encrypted) for a provider; PAT connections are validated and their scopes recorded. */
     @Transactional
@@ -108,8 +105,7 @@ public class IntegrationOAuthService {
             throw new IllegalStateException("No client credentials configured for provider: " + providerId);
         }
 
-        String state = generateState();
-        pendingStates.put(state, new PendingAuthorization(providerId, callbackOrigin));
+        String state = stateRegistry.register(providerId, callbackOrigin);
 
         return OAuthAuthorizationUrl.build(config, clientId, redirectUri, additionalScopes, state);
     }
@@ -117,10 +113,8 @@ public class IntegrationOAuthService {
     /** Handle the OAuth2 callback: exchange code for tokens and store them. */
     @Transactional
     public IntegrationConnection handleCallback(String code, String state, String redirectUri) {
-        PendingAuthorization pending = pendingStates.remove(state);
-        if (pending == null) {
-            throw new IllegalArgumentException("Invalid or expired OAuth state");
-        }
+        PendingAuthorization pending = stateRegistry.consume(state)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid or expired OAuth state"));
         String providerId = pending.providerId();
 
         IntegrationProvider provider = registry.getProvider(providerId);
@@ -129,7 +123,8 @@ public class IntegrationOAuthService {
         String clientId = resolveClientId(providerId, config);
         String clientSecret = resolveClientSecret(providerId, config);
 
-        JsonNode tokenResponse = exchangeCodeForTokens(config.tokenUrl(), code, clientId, clientSecret, redirectUri);
+        JsonNode tokenResponse = tokenClient.exchangeCodeForTokens(
+                providerId, config, code, clientId, clientSecret, redirectUri);
 
         String accessToken = tokenResponse.get("access_token").asText();
         String refreshToken = tokenResponse.has("refresh_token") ? tokenResponse.get("refresh_token").asText() : null;
@@ -153,9 +148,9 @@ public class IntegrationOAuthService {
 
     /** Read before consuming the state in handleCallback; never supplied by the callback request. */
     public String getCallbackOrigin(String state) {
-        PendingAuthorization pending = pendingStates.get(state);
-        if (pending == null) throw new IllegalArgumentException("Invalid or expired OAuth state");
-        return pending.callbackOrigin();
+        return stateRegistry.peek(state)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid or expired OAuth state"))
+                .callbackOrigin();
     }
 
     /** Get a valid access token, refreshing if necessary; null for a credential-less provider with none stored. */
@@ -191,49 +186,40 @@ public class IntegrationOAuthService {
     }
 
     /**
-     * Disconnect a provider: revoke the active token and clear all token-related fields.
+     * Disconnect a provider: clear all token-related fields, then revoke the token at the provider.
      * App credentials (clientId / clientSecret) are kept so a reconnect doesn't require
      * re-entering them. Use {@link #deleteCredentials} for full removal of the row.
+     *
+     * <p>Deliberately <b>not</b> {@code @Transactional}: the revocation is an HTTP round-trip with
+     * a 10 s timeout, and with HikariCP pool-size 1 an enclosing transaction would pin the single
+     * connection for that whole time. Short {@link TransactionTemplate} write burst first, revoke
+     * afterwards — so a failing or hanging provider cannot leave the row "revoked but CONNECTED".
      */
-    @Transactional
     public void disconnect(String providerId) {
-        connectionRepository.findByProviderId(providerId).ifPresent(connection -> {
-            IntegrationProvider provider = registry.getProvider(providerId);
-            // Only revoke tokens for OAuth providers (non-OAuth tokens like Trello API keys can't be revoked server-side)
-            if (provider.requiresOAuthFlow() && connection.getAccessTokenEncrypted() != null) {
-                try {
-                    String accessToken = encryptionService.decrypt(connection.getAccessTokenEncrypted());
-                    revokeToken(accessToken);
-                } catch (Exception e) {
-                    log.warn("Failed to revoke token for {}: {}", providerId, e.getMessage());
-                }
-            }
-            connection.setAccessTokenEncrypted(null);
-            connection.setRefreshTokenEncrypted(null);
-            connection.setTokenExpiry(null);
-            connection.setScopes(null);
-            connection.setAccountInfo(null);
-            connection.setStatus(ConnectionStatus.DISCONNECTED);
-            connectionRepository.save(connection);
-        });
+        String token = transactionTemplate.execute(status ->
+                connectionRepository.findByProviderId(providerId).map(connection -> {
+                    String revocable = revocableToken(providerId, connection);
+                    clearTokens(connection);
+                    connectionRepository.save(connection);
+                    return revocable;
+                }).orElse(null));
+        revoke(providerId, token);
         log.info("Disconnected integration (kept credentials): {}", providerId);
     }
 
-    /** Delete the connection row entirely (app credentials included); reconnect requires re-entering them. */
-    @Transactional
+    /**
+     * Delete the connection row entirely (app credentials included); reconnect requires re-entering them.
+     *
+     * <p>Same burst-then-revoke shape as {@link #disconnect} — deliberately not {@code @Transactional}.
+     */
     public void deleteCredentials(String providerId) {
-        connectionRepository.findByProviderId(providerId).ifPresent(connection -> {
-            IntegrationProvider provider = registry.getProvider(providerId);
-            if (provider.requiresOAuthFlow() && connection.getAccessTokenEncrypted() != null) {
-                try {
-                    String accessToken = encryptionService.decrypt(connection.getAccessTokenEncrypted());
-                    revokeToken(accessToken);
-                } catch (Exception e) {
-                    log.warn("Failed to revoke token for {}: {}", providerId, e.getMessage());
-                }
-            }
-            connectionRepository.delete(connection);
-        });
+        String token = transactionTemplate.execute(status ->
+                connectionRepository.findByProviderId(providerId).map(connection -> {
+                    String revocable = revocableToken(providerId, connection);
+                    connectionRepository.delete(connection);
+                    return revocable;
+                }).orElse(null));
+        revoke(providerId, token);
         log.info("Deleted integration credentials: {}", providerId);
     }
 
@@ -242,94 +228,82 @@ public class IntegrationOAuthService {
         return connectionRepository.findByProviderId(providerId);
     }
 
-    private String refreshAccessToken(IntegrationConnection connection) {
-        String refreshToken = encryptionService.decrypt(connection.getRefreshTokenEncrypted());
-        if (refreshToken == null) {
-            connection.setStatus(ConnectionStatus.EXPIRED);
-            connectionRepository.save(connection);
-            throw new IllegalStateException("No refresh token available for provider: " + connection.getProviderId());
+    /**
+     * The decrypted access token if it can be revoked server-side, else {@code null}
+     * (non-OAuth tokens like Trello API keys cannot, and neither can an undecryptable one).
+     */
+    private String revocableToken(String providerId, IntegrationConnection connection) {
+        IntegrationProvider provider = registry.getProvider(providerId);
+        if (!provider.requiresOAuthFlow() || connection.getAccessTokenEncrypted() == null) {
+            return null;
         }
-
-        IntegrationProvider provider = registry.getProvider(connection.getProviderId());
-        OAuthConfig config = provider.getOAuthConfig();
-        String clientId = resolveClientId(connection.getProviderId(), config);
-        String clientSecret = resolveClientSecret(connection.getProviderId(), config);
-
         try {
-            String body = "grant_type=refresh_token"
-                    + "&refresh_token=" + urlEncode(refreshToken)
-                    + "&client_id=" + urlEncode(clientId)
-                    + "&client_secret=" + urlEncode(clientSecret);
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(config.tokenUrl()))
-                    .header("Content-Type", "application/x-www-form-urlencoded")
-                    .POST(HttpRequest.BodyPublishers.ofString(body))
-                    .timeout(Duration.ofSeconds(10))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            JsonNode json = objectMapper.readTree(response.body());
-
-            if (response.statusCode() != 200) {
-                log.error("Token refresh failed for {}: {} {}", connection.getProviderId(), response.statusCode(), response.body());
-                connection.setStatus(ConnectionStatus.EXPIRED);
-                connectionRepository.save(connection);
-                throw new IllegalStateException("Token refresh failed: " + response.body());
-            }
-
-            String newAccessToken = json.get("access_token").asText();
-            int expiresIn = json.has("expires_in") ? json.get("expires_in").asInt() : 3600;
-
-            connection.setAccessTokenEncrypted(encryptionService.encrypt(newAccessToken));
-            connection.setTokenExpiry(Instant.now().plusSeconds(expiresIn));
-            connection.setStatus(ConnectionStatus.CONNECTED);
-
-            if (json.has("refresh_token")) {
-                connection.setRefreshTokenEncrypted(encryptionService.encrypt(json.get("refresh_token").asText()));
-            }
-
-            connectionRepository.save(connection);
-            log.debug("Refreshed access token for {}", connection.getProviderId());
-            return newAccessToken;
-
-        } catch (IllegalStateException e) {
-            throw e;
+            return encryptionService.decrypt(connection.getAccessTokenEncrypted());
         } catch (Exception e) {
-            log.error("Failed to refresh token for {}", connection.getProviderId(), e);
-            connection.setStatus(ConnectionStatus.EXPIRED);
-            connectionRepository.save(connection);
-            throw new IllegalStateException("Token refresh failed", e);
+            log.warn("Cannot decrypt access token of {} for revocation: {}", providerId, e.getMessage());
+            return null;
         }
     }
 
-    private JsonNode exchangeCodeForTokens(String tokenUrl, String code, String clientId, String clientSecret, String redirectUri) {
-        try {
-            String body = "grant_type=authorization_code"
-                    + "&code=" + urlEncode(code)
-                    + "&client_id=" + urlEncode(clientId)
-                    + "&client_secret=" + urlEncode(clientSecret)
-                    + "&redirect_uri=" + urlEncode(redirectUri);
+    /** Revoke at the provider — outside any transaction, and never fatal. */
+    private void revoke(String providerId, String token) {
+        if (token == null) return;
+        tokenClient.revoke(providerId, registry.getProvider(providerId).getOAuthConfig(), token);
+    }
 
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(tokenUrl))
-                    .header("Content-Type", "application/x-www-form-urlencoded")
-                    .POST(HttpRequest.BodyPublishers.ofString(body))
-                    .timeout(Duration.ofSeconds(10))
-                    .build();
+    private static void clearTokens(IntegrationConnection connection) {
+        connection.setAccessTokenEncrypted(null);
+        connection.setRefreshTokenEncrypted(null);
+        connection.setTokenExpiry(null);
+        connection.setScopes(null);
+        connection.setAccountInfo(null);
+        connection.setStatus(ConnectionStatus.DISCONNECTED);
+    }
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() != 200) {
-                throw new IllegalStateException("Token exchange failed: " + response.body());
-            }
-
-            return objectMapper.readTree(response.body());
-        } catch (IllegalStateException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to exchange authorization code", e);
+    private String refreshAccessToken(IntegrationConnection connection) {
+        String providerId = connection.getProviderId();
+        String refreshToken = encryptionService.decrypt(connection.getRefreshTokenEncrypted());
+        if (refreshToken == null) {
+            markExpired(connection);
+            throw new IllegalStateException("No refresh token available for provider: " + providerId);
         }
+
+        OAuthConfig config = registry.getProvider(providerId).getOAuthConfig();
+        String clientId = resolveClientId(providerId, config);
+        String clientSecret = resolveClientSecret(providerId, config);
+
+        JsonNode json;
+        try {
+            json = tokenClient.refreshAccessToken(providerId, config, refreshToken, clientId, clientSecret);
+        } catch (IllegalStateException e) {
+            markExpired(connection);
+            throw e;
+        }
+
+        String newAccessToken = json.path("access_token").asText(null);
+        if (newAccessToken == null) {
+            markExpired(connection);
+            throw new IllegalStateException("Token refresh failed for " + providerId + " (no access_token in response)");
+        }
+
+        int expiresIn = json.has("expires_in") ? json.get("expires_in").asInt() : 3600;
+
+        connection.setAccessTokenEncrypted(encryptionService.encrypt(newAccessToken));
+        connection.setTokenExpiry(Instant.now().plusSeconds(expiresIn));
+        connection.setStatus(ConnectionStatus.CONNECTED);
+
+        if (json.has("refresh_token")) {
+            connection.setRefreshTokenEncrypted(encryptionService.encrypt(json.get("refresh_token").asText()));
+        }
+
+        connectionRepository.save(connection);
+        log.debug("Refreshed access token for {}", providerId);
+        return newAccessToken;
+    }
+
+    private void markExpired(IntegrationConnection connection) {
+        connection.setStatus(ConnectionStatus.EXPIRED);
+        connectionRepository.save(connection);
     }
 
     private String fetchAccountInfo(String providerId, String accessToken) {
@@ -340,29 +314,6 @@ public class IntegrationOAuthService {
             log.warn("Failed to fetch account info for {}: {}", providerId, e.getMessage());
         }
         return null;
-    }
-
-    private void revokeToken(String token) {
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create("https://oauth2.googleapis.com/revoke?token=" + urlEncode(token)))
-                    .POST(HttpRequest.BodyPublishers.noBody())
-                    .timeout(Duration.ofSeconds(10))
-                    .build();
-            httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        } catch (Exception e) {
-            log.warn("Token revocation failed: {}", e.getMessage());
-        }
-    }
-
-    private static String generateState() {
-        byte[] bytes = new byte[32];
-        new SecureRandom().nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-    }
-
-    private static String urlEncode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
     /** Resolve client ID: DB first, then env var fallback */

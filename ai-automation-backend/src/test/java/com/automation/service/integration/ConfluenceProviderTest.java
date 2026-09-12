@@ -41,6 +41,8 @@ class ConfluenceProviderTest {
         assertThat(config.clientIdEnvVar()).isEqualTo("CONFLUENCE_CLIENT_ID");
         assertThat(config.clientSecretEnvVar()).isEqualTo("CONFLUENCE_CLIENT_SECRET");
         assertThat(config.extraAuthParams()).containsEntry("audience", "api.atlassian.com");
+        // Atlassian 3LO publishes no revocation endpoint — revocation is skipped, not guessed.
+        assertThat(config.revocationUrl()).isNull();
     }
 
     @Test

@@ -9,7 +9,55 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class OAuthConfigTest {
 
-    // --- Canonical constructor (all 7 fields) ---
+    // --- Canonical constructor (all 8 fields) ---
+
+    @Test
+    void should_setRevocationUrl_when_constructedWithCanonicalConstructor() {
+        var config = new OAuthConfig(
+                "https://auth.example.com/authorize",
+                "https://auth.example.com/token",
+                List.of("read"),
+                List.of("admin"),
+                "CLIENT_ID",
+                "CLIENT_SECRET",
+                Map.of("access_type", "offline"),
+                "https://auth.example.com/revoke"
+        );
+
+        assertThat(config.revocationUrl()).isEqualTo("https://auth.example.com/revoke");
+        assertThat(config.optionalScopes()).containsExactly("admin");
+    }
+
+    @Test
+    void should_leaveRevocationUrlNull_when_constructedWithShorterConstructors() {
+        var canonicalWithoutRevocation = new OAuthConfig(
+                "https://auth.example.com/authorize", "https://auth.example.com/token",
+                List.of("read"), List.of("admin"), "CLIENT_ID", "CLIENT_SECRET", Map.of());
+        var withoutOptionalScopes = new OAuthConfig(
+                "https://auth.example.com/authorize", "https://auth.example.com/token",
+                List.of("read"), "CLIENT_ID", "CLIENT_SECRET", Map.of());
+        var minimal = new OAuthConfig(
+                "https://auth.example.com/authorize", "https://auth.example.com/token",
+                List.of("read"), "CLIENT_ID", "CLIENT_SECRET");
+
+        assertThat(canonicalWithoutRevocation.revocationUrl()).isNull();
+        assertThat(withoutOptionalScopes.revocationUrl()).isNull();
+        assertThat(minimal.revocationUrl()).isNull();
+    }
+
+    @Test
+    void should_copyEveryOtherField_when_withRevocationUrlIsApplied() {
+        var base = new OAuthConfig(
+                "https://auth.example.com/authorize", "https://auth.example.com/token",
+                List.of("read"), List.of("admin"), "CLIENT_ID", "CLIENT_SECRET",
+                Map.of("prompt", "consent"));
+
+        var withRevocation = base.withRevocationUrl(OAuthConfig.GOOGLE_REVOCATION_URL);
+
+        assertThat(OAuthConfig.GOOGLE_REVOCATION_URL).isEqualTo("https://oauth2.googleapis.com/revoke");
+        assertThat(withRevocation.revocationUrl()).isEqualTo(OAuthConfig.GOOGLE_REVOCATION_URL);
+        assertThat(withRevocation.withRevocationUrl(null)).isEqualTo(base);
+    }
 
     @Test
     void should_setAllFields_when_constructedWithCanonicalConstructor() {
