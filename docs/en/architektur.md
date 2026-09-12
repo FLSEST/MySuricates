@@ -456,7 +456,7 @@ Claude Code sessions can also serve as templates for workflows:
 
 - Skills are stored in the `skills` DB table, not hardcoded in frontend or in-memory beans
 - **19 built-in skills** are seeded at startup by `SkillSeeder` (idempotent)
-- Skill definitions are in `BuiltInSkills.java` (`config/` package)
+- Skill definitions are in `BuiltInSkills` (order) and `BuiltIn<Category>Skills` (`config/` package)
 - Built-in skills have stable IDs (e.g. `builtin-code-review`, `builtin-test-generator`)
 - `SkillSeeder` also registers all skills in the in-memory `SkillRegistry` for capability lookups
 - `SkillRegistry` no longer depends on `SkillProvider` beans — the seeder handles registration
