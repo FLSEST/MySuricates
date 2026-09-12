@@ -193,6 +193,8 @@ Die Workflow-Engine führt Blöcke sequenziell aus. Claude CLI läuft **immer au
 
 Dasselbe Muster gilt für `WorkflowMemoryService.extractKnowledge`/`extractAndActivate` (Security-Finding 4, analog zu `ebd508c5`): der KI-Summarization-Call (`ClaudeSummarizer`/`CodexSummarizer`, Sekunden bis Minuten) läuft außerhalb jeder Transaktion, zwischen einem lesenden `TransactionTemplate`-Burst (Runs laden, lazy `steps`-Collection in eine neue Liste materialisieren — OSIV ist aus —, Run-IDs sammeln) und einem schreibenden Burst (`WorkflowMemory` speichern bzw. `deactivateAllForWorkflow` + Aktivierung). `activate`/`update`/`delete` bleiben kurze `@Transactional`-Methoden.
 
+**Integration trennen ohne Transaktion:** `IntegrationOAuthService.disconnect`/`deleteCredentials` folgen demselben Burst-Muster: kurzer `TransactionTemplate`-Burst (Token-Felder leeren bzw. Zeile löschen) → Token-Revocation beim Provider außerhalb jeder Transaktion. Der HTTP-Aufruf hat 10 s Timeout und würde in einer `@Transactional`-Methode die einzige Connection so lange halten; „persist first" verhindert zusätzlich den Zustand „beim Provider widerrufen, lokal aber noch `CONNECTED`".
+
 **Container-Zeile:** `ContainerService.createAndStartContainer` aktualisiert eine vorhandene `containers`-Zeile (Upsert) statt sie zu löschen und neu anzulegen — die Löschung wurde über die Cascade `Project.container` beim Flush wieder aufgehoben, sodass der folgende INSERT an `UNIQUE(containers.project_id)` scheiterte. Der Projekt-Lock bleibt dauerhaft in der Map (Entfernen unter Konkurrenz erzeugt einen zweiten Monitor), und `lastActivityAt` wird per JPQL-Update (`ContainerRepository.touchActivity`) statt per detached Merge gesetzt.
 
 ### Block-Typen (14 gesamt)

@@ -7,10 +7,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -26,6 +29,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -43,9 +47,22 @@ class IntegrationOAuthServiceTest {
     @Mock private IntegrationEncryptionService encryptionService;
     @Mock private IntegrationRegistry registry;
     @Mock private IntegrationProvider provider;
+    @Mock private PlatformTransactionManager transactionManager;
+    @Mock private TransactionStatus transactionStatus;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private HttpServer server;
+
+    /** What the loopback server saw on /revoke; null means revocation never went out. */
+    private record RevokeRequest(String method, String contentType, String rawQuery, String body) {}
+    private final AtomicReference<RevokeRequest> revokeRequest = new AtomicReference<>();
+
+    @BeforeEach
+    void stubTransactionManager() {
+        // TransactionTemplate.execute() asks the manager for a status, runs the callback,
+        // then commits — a mock status lets the callback run and makes commit/rollback no-ops.
+        lenient().when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
+    }
 
     @AfterEach
     void tearDown() {
@@ -55,10 +72,14 @@ class IntegrationOAuthServiceTest {
         }
     }
 
+    private IntegrationOAuthService newService() {
+        return new IntegrationOAuthService(connectionRepository, encryptionService, registry,
+                new OAuthTokenClient(objectMapper), new OAuthStateRegistry(), transactionManager);
+    }
+
     @Test
     void saveCredentials_forNonOAuthProvider_marksConnectionConnectedWhenValidationSucceeds() {
-        IntegrationOAuthService service = new IntegrationOAuthService(
-                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationOAuthService service = newService();
         IntegrationConnection existing = IntegrationConnection.builder()
                 .providerId("trello")
                 .build();
@@ -84,8 +105,7 @@ class IntegrationOAuthServiceTest {
 
     @Test
     void getAuthorizationUrl_includesDefaultOptionalScopesAndExtraParams() {
-        IntegrationOAuthService service = new IntegrationOAuthService(
-                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationOAuthService service = newService();
         IntegrationConnection connection = IntegrationConnection.builder()
                 .providerId("google-calendar")
                 .clientIdEncrypted("enc-client-id")
@@ -126,8 +146,7 @@ class IntegrationOAuthServiceTest {
         server = startJsonServer(200, """
                 {"access_token":"access-1","refresh_token":"refresh-1","expires_in":7200,"scope":"calendar.read calendar.write"}
                 """);
-        IntegrationOAuthService service = new IntegrationOAuthService(
-                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationOAuthService service = newService();
         IntegrationConnection connection = IntegrationConnection.builder()
                 .providerId("google-calendar")
                 .clientIdEncrypted("enc-client-id")
@@ -174,8 +193,7 @@ class IntegrationOAuthServiceTest {
 
     @Test
     void handleCallback_withUnknownStateThrows() {
-        IntegrationOAuthService service = new IntegrationOAuthService(
-                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationOAuthService service = newService();
 
         assertThatThrownBy(() -> service.handleCallback("code", "missing-state", "http://localhost/callback"))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -184,8 +202,7 @@ class IntegrationOAuthServiceTest {
 
     @Test
     void getValidAccessToken_returnsStoredTokenForNonOAuthProvider() {
-        IntegrationOAuthService service = new IntegrationOAuthService(
-                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationOAuthService service = newService();
         IntegrationConnection connection = IntegrationConnection.builder()
                 .providerId("trello")
                 .status(ConnectionStatus.CONNECTED)
@@ -204,8 +221,7 @@ class IntegrationOAuthServiceTest {
 
     @Test
     void getValidAccessToken_marksConnectionExpiredWhenRefreshTokenIsMissing() {
-        IntegrationOAuthService service = new IntegrationOAuthService(
-                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationOAuthService service = newService();
         IntegrationConnection connection = IntegrationConnection.builder()
                 .providerId("google-calendar")
                 .status(ConnectionStatus.CONNECTED)
@@ -232,8 +248,7 @@ class IntegrationOAuthServiceTest {
         server = startJsonServer(200, """
                 {"access_token":"new-access","refresh_token":"new-refresh","expires_in":1800}
                 """);
-        IntegrationOAuthService service = new IntegrationOAuthService(
-                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationOAuthService service = newService();
         IntegrationConnection connection = IntegrationConnection.builder()
                 .providerId("google-calendar")
                 .status(ConnectionStatus.CONNECTED)
@@ -277,8 +292,7 @@ class IntegrationOAuthServiceTest {
         server = startJsonServer(400, """
                 {"error":"invalid_grant","error_description":"Token has been expired or revoked."}
                 """);
-        IntegrationOAuthService service = new IntegrationOAuthService(
-                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationOAuthService service = newService();
         IntegrationConnection connection = IntegrationConnection.builder()
                 .providerId("google-calendar")
                 .status(ConnectionStatus.CONNECTED)
@@ -306,9 +320,84 @@ class IntegrationOAuthServiceTest {
         when(connectionRepository.save(any(IntegrationConnection.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
+        // The provider body reaches the client verbatim via GlobalExceptionHandler (409) — it must
+        // carry the status only, never the provider's error payload.
         assertThatThrownBy(() -> service.getValidAccessToken("google-calendar"))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Token refresh failed");
+                .hasMessageContaining("Token refresh failed")
+                .hasMessageContaining("(HTTP 400)")
+                .hasMessageNotContaining("invalid_grant")
+                .hasMessageNotContaining("Token has been expired or revoked");
+
+        assertThat(connection.getStatus()).isEqualTo(ConnectionStatus.EXPIRED);
+        verify(connectionRepository).save(connection);
+    }
+
+    @Test
+    void getValidAccessToken_refreshResponseWithoutAccessToken_marksConnectionExpired() throws Exception {
+        // A 200 that carries no access_token used to NPE inside the old catch-all (which then set
+        // EXPIRED). Without an explicit guard the connection would stay CONNECTED with a stale
+        // token and every following call would retry the same dead refresh.
+        server = startJsonServer(200, "{}");
+        IntegrationOAuthService service = newService();
+        IntegrationConnection connection = IntegrationConnection.builder()
+                .providerId("google-calendar")
+                .status(ConnectionStatus.CONNECTED)
+                .clientIdEncrypted("enc-client-id")
+                .clientSecretEncrypted("enc-client-secret")
+                .accessTokenEncrypted("enc-old-access")
+                .refreshTokenEncrypted("enc-old-refresh")
+                .tokenExpiry(Instant.now().minusSeconds(60))
+                .build();
+
+        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.of(connection));
+        when(registry.getProvider("google-calendar")).thenReturn(provider);
+        when(provider.requiresOAuthFlow()).thenReturn(true);
+        when(provider.getOAuthConfig()).thenReturn(googleConfig(null));
+        when(encryptionService.decrypt("enc-old-refresh")).thenReturn("refresh-123");
+        when(encryptionService.decrypt("enc-client-id")).thenReturn("client-id");
+        when(encryptionService.decrypt("enc-client-secret")).thenReturn("client-secret");
+        when(connectionRepository.save(any(IntegrationConnection.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThatThrownBy(() -> service.getValidAccessToken("google-calendar"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Token refresh failed for google-calendar (no access_token in response)");
+
+        assertThat(connection.getStatus()).isEqualTo(ConnectionStatus.EXPIRED);
+        assertThat(connection.getAccessTokenEncrypted()).as("the stale token is not overwritten")
+                .isEqualTo("enc-old-access");
+        verify(connectionRepository).save(connection);
+    }
+
+    @Test
+    void getValidAccessToken_refreshResponseWithMalformedBody_hidesBodyAndMarksExpired() throws Exception {
+        server = startJsonServer(200, "<html><body>client_secret=s3cr3t</body></html>");
+        IntegrationOAuthService service = newService();
+        IntegrationConnection connection = IntegrationConnection.builder()
+                .providerId("google-calendar")
+                .status(ConnectionStatus.CONNECTED)
+                .clientIdEncrypted("enc-client-id")
+                .clientSecretEncrypted("enc-client-secret")
+                .accessTokenEncrypted("enc-old-access")
+                .refreshTokenEncrypted("enc-old-refresh")
+                .tokenExpiry(Instant.now().minusSeconds(60))
+                .build();
+
+        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.of(connection));
+        when(registry.getProvider("google-calendar")).thenReturn(provider);
+        when(provider.requiresOAuthFlow()).thenReturn(true);
+        when(provider.getOAuthConfig()).thenReturn(googleConfig(null));
+        when(encryptionService.decrypt("enc-old-refresh")).thenReturn("refresh-123");
+        when(encryptionService.decrypt("enc-client-id")).thenReturn("client-id");
+        when(encryptionService.decrypt("enc-client-secret")).thenReturn("client-secret");
+        when(connectionRepository.save(any(IntegrationConnection.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThatThrownBy(() -> service.getValidAccessToken("google-calendar"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Token refresh failed for google-calendar (malformed response)")
+                .hasMessageNotContaining("s3cr3t");
 
         assertThat(connection.getStatus()).isEqualTo(ConnectionStatus.EXPIRED);
         verify(connectionRepository).save(connection);
@@ -316,8 +405,7 @@ class IntegrationOAuthServiceTest {
 
     @Test
     void getValidAccessToken_returnsCachedTokenWhenNotExpired() {
-        IntegrationOAuthService service = new IntegrationOAuthService(
-                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationOAuthService service = newService();
         IntegrationConnection connection = IntegrationConnection.builder()
                 .providerId("google-calendar")
                 .status(ConnectionStatus.CONNECTED)
@@ -338,8 +426,7 @@ class IntegrationOAuthServiceTest {
 
     @Test
     void getValidAccessToken_credentialLessProvider_noConnection_returnsNull() {
-        IntegrationOAuthService service = new IntegrationOAuthService(
-                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationOAuthService service = newService();
 
         when(registry.getProvider("taskwarrior")).thenReturn(provider);
         when(connectionRepository.findByProviderId("taskwarrior")).thenReturn(Optional.empty());
@@ -352,8 +439,7 @@ class IntegrationOAuthServiceTest {
 
     @Test
     void getValidAccessToken_credentialLessProvider_decryptFails_returnsNull() {
-        IntegrationOAuthService service = new IntegrationOAuthService(
-                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationOAuthService service = newService();
         IntegrationConnection connection = IntegrationConnection.builder()
                 .providerId("taskwarrior")
                 .status(ConnectionStatus.CONNECTED)
@@ -373,8 +459,7 @@ class IntegrationOAuthServiceTest {
 
     @Test
     void getValidAccessToken_credentialLessProvider_decryptOk_returnsToken() {
-        IntegrationOAuthService service = new IntegrationOAuthService(
-                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationOAuthService service = newService();
         IntegrationConnection connection = IntegrationConnection.builder()
                 .providerId("taskwarrior")
                 .status(ConnectionStatus.CONNECTED)
@@ -393,8 +478,7 @@ class IntegrationOAuthServiceTest {
 
     @Test
     void getValidAccessToken_credentialProvider_decryptFails_stillThrows() {
-        IntegrationOAuthService service = new IntegrationOAuthService(
-                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationOAuthService service = newService();
         IntegrationConnection connection = IntegrationConnection.builder()
                 .providerId("github")
                 .status(ConnectionStatus.CONNECTED)
@@ -414,8 +498,7 @@ class IntegrationOAuthServiceTest {
 
     @Test
     void disconnect_forNonOAuthProviderClearsTokensWithoutRevocation() {
-        IntegrationOAuthService service = new IntegrationOAuthService(
-                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationOAuthService service = newService();
         IntegrationConnection connection = IntegrationConnection.builder()
                 .providerId("trello")
                 .status(ConnectionStatus.CONNECTED)
@@ -440,8 +523,7 @@ class IntegrationOAuthServiceTest {
 
     @Test
     void disconnect_completesEvenWhenRevocationFails() {
-        IntegrationOAuthService service = new IntegrationOAuthService(
-                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationOAuthService service = newService();
         IntegrationConnection connection = IntegrationConnection.builder()
                 .providerId("google-calendar")
                 .status(ConnectionStatus.CONNECTED)
@@ -468,8 +550,7 @@ class IntegrationOAuthServiceTest {
 
     @Test
     void disconnect_noConnection_isNoop() {
-        IntegrationOAuthService service = new IntegrationOAuthService(
-                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationOAuthService service = newService();
         when(connectionRepository.findByProviderId("trello")).thenReturn(Optional.empty());
 
         service.disconnect("trello");
@@ -480,8 +561,7 @@ class IntegrationOAuthServiceTest {
 
     @Test
     void deleteCredentials_removesEntireRow() {
-        IntegrationOAuthService service = new IntegrationOAuthService(
-                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationOAuthService service = newService();
         IntegrationConnection connection = IntegrationConnection.builder()
                 .providerId("trello")
                 .status(ConnectionStatus.CONNECTED)
@@ -499,9 +579,135 @@ class IntegrationOAuthServiceTest {
     }
 
     @Test
+    void disconnect_revokesGoogleTokenViaPostBody() throws Exception {
+        server = startJsonServer(200, "{}");
+        IntegrationOAuthService service = newService();
+        IntegrationConnection connection = connectedGoogleConnection();
+
+        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.of(connection));
+        when(registry.getProvider("google-calendar")).thenReturn(provider);
+        when(provider.requiresOAuthFlow()).thenReturn(true);
+        when(provider.getOAuthConfig()).thenReturn(googleConfig(serverUrl("/revoke")));
+        when(encryptionService.decrypt("enc-access")).thenReturn("access-token-1");
+        when(connectionRepository.save(any(IntegrationConnection.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.disconnect("google-calendar");
+
+        RevokeRequest revoke = revokeRequest.get();
+        assertThat(revoke).isNotNull();
+        assertThat(revoke.method()).isEqualTo("POST");
+        assertThat(revoke.contentType()).isEqualTo("application/x-www-form-urlencoded");
+        assertThat(revoke.body()).isEqualTo("token=access-token-1");
+        assertThat(revoke.rawQuery()).as("token must not leak into the query string").isNull();
+        assertThat(connection.getAccessTokenEncrypted()).isNull();
+        assertThat(connection.getRefreshTokenEncrypted()).isNull();
+        assertThat(connection.getStatus()).isEqualTo(ConnectionStatus.DISCONNECTED);
+        assertThat(connection.getClientIdEncrypted()).isEqualTo("enc-client-id");
+        verify(connectionRepository).save(connection);
+    }
+
+    @Test
+    void deleteCredentials_deletesRowAndRevokesToken() throws Exception {
+        server = startJsonServer(200, "{}");
+        IntegrationOAuthService service = newService();
+        IntegrationConnection connection = connectedGoogleConnection();
+
+        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.of(connection));
+        when(registry.getProvider("google-calendar")).thenReturn(provider);
+        when(provider.requiresOAuthFlow()).thenReturn(true);
+        when(provider.getOAuthConfig()).thenReturn(googleConfig(serverUrl("/revoke")));
+        when(encryptionService.decrypt("enc-access")).thenReturn("access-token-1");
+
+        service.deleteCredentials("google-calendar");
+
+        verify(connectionRepository).delete(connection);
+        assertThat(revokeRequest.get()).isNotNull();
+        assertThat(revokeRequest.get().body()).isEqualTo("token=access-token-1");
+    }
+
+    @Test
+    void disconnect_withoutRevocationUrl_skipsHttp() throws Exception {
+        server = startJsonServer(200, "{}");
+        IntegrationOAuthService service = newService();
+        IntegrationConnection connection = IntegrationConnection.builder()
+                .providerId("jira")
+                .status(ConnectionStatus.CONNECTED)
+                .accessTokenEncrypted("enc-access")
+                .clientIdEncrypted("enc-client-id")
+                .build();
+
+        when(connectionRepository.findByProviderId("jira")).thenReturn(Optional.of(connection));
+        when(registry.getProvider("jira")).thenReturn(provider);
+        when(provider.requiresOAuthFlow()).thenReturn(true);
+        // Atlassian 3LO has no documented revocation endpoint → revocationUrl stays null.
+        when(provider.getOAuthConfig()).thenReturn(googleConfig(null));
+        when(encryptionService.decrypt("enc-access")).thenReturn("access-token-1");
+        when(connectionRepository.save(any(IntegrationConnection.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.disconnect("jira");
+
+        assertThat(revokeRequest.get()).isNull();
+        assertThat(connection.getAccessTokenEncrypted()).isNull();
+        assertThat(connection.getStatus()).isEqualTo(ConnectionStatus.DISCONNECTED);
+    }
+
+    @Test
+    void handleCallback_exchangeFailure_hidesProviderBody() throws Exception {
+        server = startJsonServer(400, """
+                {"error":"invalid_client","error_description":"client_secret=s3cr3t is wrong"}
+                """);
+        IntegrationOAuthService service = newService();
+        IntegrationConnection connection = IntegrationConnection.builder()
+                .providerId("google-calendar")
+                .clientIdEncrypted("enc-client-id")
+                .clientSecretEncrypted("enc-client-secret")
+                .build();
+
+        when(registry.getProvider("google-calendar")).thenReturn(provider);
+        when(provider.getOAuthConfig()).thenReturn(googleConfig(null));
+        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.of(connection));
+        when(encryptionService.decrypt("enc-client-id")).thenReturn("client-id");
+        when(encryptionService.decrypt("enc-client-secret")).thenReturn("client-secret");
+
+        String authorizationUrl = service.getAuthorizationUrl(
+                "google-calendar", "http://localhost/callback", List.of());
+        String state = parseQuery(URI.create(authorizationUrl)).get("state");
+
+        // GlobalExceptionHandler turns this into a 409 carrying the message verbatim.
+        assertThatThrownBy(() -> service.handleCallback("code-123", state, "http://localhost/callback"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Token exchange failed for google-calendar (HTTP 400)")
+                .hasMessageNotContaining("s3cr3t")
+                .hasMessageNotContaining("invalid_client");
+        verify(connectionRepository, never()).save(any());
+    }
+
+    private IntegrationConnection connectedGoogleConnection() {
+        return IntegrationConnection.builder()
+                .providerId("google-calendar")
+                .status(ConnectionStatus.CONNECTED)
+                .accessTokenEncrypted("enc-access")
+                .refreshTokenEncrypted("enc-refresh")
+                .clientIdEncrypted("enc-client-id")
+                .clientSecretEncrypted("enc-client-secret")
+                .build();
+    }
+
+    private OAuthConfig googleConfig(String revocationUrl) {
+        return new OAuthConfig(
+                "https://auth.example/authorize",
+                serverUrl("/token"),
+                List.of("calendar.read"),
+                "GOOGLE_CLIENT_ID",
+                "GOOGLE_CLIENT_SECRET"
+        ).withRevocationUrl(revocationUrl);
+    }
+
+    @Test
     void getAuthorizationUrl_throwsWhenProviderNotConfigured() {
-        IntegrationOAuthService service = new IntegrationOAuthService(
-                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationOAuthService service = newService();
 
         when(registry.getProvider("google-calendar")).thenReturn(provider);
         when(provider.getOAuthConfig()).thenReturn(new OAuthConfig(
@@ -521,8 +727,7 @@ class IntegrationOAuthServiceTest {
 
     @Test
     void isProviderConfigured_returnsTrueWhenCredentialsExist() {
-        IntegrationOAuthService service = new IntegrationOAuthService(
-                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationOAuthService service = newService();
         IntegrationConnection connection = IntegrationConnection.builder()
                 .providerId("google-calendar")
                 .clientIdEncrypted("enc-client-id")
@@ -544,8 +749,7 @@ class IntegrationOAuthServiceTest {
 
     @Test
     void isProviderConfigured_returnsFalseWhenNoConnection() {
-        IntegrationOAuthService service = new IntegrationOAuthService(
-                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationOAuthService service = newService();
 
         when(registry.getProvider("google-calendar")).thenReturn(provider);
         when(provider.getOAuthConfig()).thenReturn(new OAuthConfig(
@@ -562,8 +766,7 @@ class IntegrationOAuthServiceTest {
 
     @Test
     void getConnection_returnsEmptyWhenNoConnectionExists() {
-        IntegrationOAuthService service = new IntegrationOAuthService(
-                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationOAuthService service = newService();
 
         when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.empty());
 
@@ -580,8 +783,7 @@ class IntegrationOAuthServiceTest {
         server = startJsonServer(200, """
                 {"access_token":"new-access","expires_in":1800}
                 """);
-        IntegrationOAuthService service = new IntegrationOAuthService(
-                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationOAuthService service = newService();
         IntegrationConnection connection = IntegrationConnection.builder()
                 .providerId("google-calendar")
                 .status(ConnectionStatus.CONNECTED)
@@ -634,6 +836,14 @@ class IntegrationOAuthServiceTest {
     private HttpServer startJsonServer(int statusCode, String responseBody) throws IOException {
         HttpServer httpServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         httpServer.createContext("/token", exchange -> respond(exchange, statusCode, responseBody));
+        httpServer.createContext("/revoke", exchange -> {
+            revokeRequest.set(new RevokeRequest(
+                    exchange.getRequestMethod(),
+                    exchange.getRequestHeaders().getFirst("Content-Type"),
+                    exchange.getRequestURI().getRawQuery(),
+                    new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
+            respond(exchange, 200, "{}");
+        });
         httpServer.start();
         return httpServer;
     }
@@ -671,8 +881,7 @@ class IntegrationOAuthServiceTest {
     // ── PAT scopes (TODO 62705e0b) ─────────────────────────────────────────────────
 
     private IntegrationOAuthService serviceForPat(String scopesFromProvider) {
-        IntegrationOAuthService service = new IntegrationOAuthService(
-                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationOAuthService service = newService();
         when(registry.getProvider("github")).thenReturn(provider);
         when(provider.requiresOAuthFlow()).thenReturn(false);
         when(provider.fetchAccountInfo("x|ghp_token")).thenReturn("{\"login\":\"flo\"}");
@@ -702,8 +911,7 @@ class IntegrationOAuthServiceTest {
 
     @Test
     void saveCredentials_pat_validationFailure_doesNotAskForScopes() {
-        IntegrationOAuthService service = new IntegrationOAuthService(
-                connectionRepository, encryptionService, registry, objectMapper);
+        IntegrationOAuthService service = newService();
         when(registry.getProvider("github")).thenReturn(provider);
         when(provider.requiresOAuthFlow()).thenReturn(false);
         when(provider.fetchAccountInfo("x|bad")).thenReturn(null);

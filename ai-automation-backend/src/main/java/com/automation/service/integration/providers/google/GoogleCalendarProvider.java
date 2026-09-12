@@ -65,7 +65,7 @@ public class GoogleCalendarProvider implements IntegrationProvider {
                 "GOOGLE_CLIENT_ID",
                 "GOOGLE_CLIENT_SECRET",
                 Map.of("access_type", "offline", "prompt", "consent")
-        );
+        ).withRevocationUrl(OAuthConfig.GOOGLE_REVOCATION_URL);
     }
 
     @Override

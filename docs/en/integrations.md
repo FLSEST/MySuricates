@@ -20,9 +20,11 @@ integrations page (`/integrations`) users connect their accounts via OAuth2 or A
 |---|---|---|
 | `IntegrationProvider` | `service/integration/` | Interface: provider ID, OAuth config, actions, `executeAction()` |
 | `IntegrationAction` | `service/integration/` | Record: one action (name, description, input schema, required scopes) |
-| `OAuthConfig` | `service/integration/` | Record: OAuth2 endpoints, scopes, env var names, extra auth parameters |
+| `OAuthConfig` | `service/integration/` | Record: OAuth2 endpoints (including the optional revoke endpoint), scopes, env var names, extra auth parameters |
 | `IntegrationRegistry` | `service/integration/` | Collects all providers via Spring DI (`List<IntegrationProvider>` → `ConcurrentHashMap`) |
 | `IntegrationOAuthService` | `service/integration/` | Generic OAuth2 flow: auth URL, callback, token refresh, encrypted storage |
+| `OAuthTokenClient` | `service/integration/` | Outbound HTTP of the OAuth flow: code exchange, refresh, revocation (RFC 7009) |
+| `OAuthStateRegistry` | `service/integration/` | CSRF `state` of running authorizations — 10-minute TTL, max. 1000 entries |
 | `IntegrationEncryptionService` | `service/integration/` | AES-256-GCM encryption for tokens and client credentials |
 | `IntegrationBlockExecutor` | `executor/blocks/` | Block type `integration` — dispatches to provider, resolves template variables in params |
 | `IntegrationController` | `controller/` | REST API under `/api/v1/integrations` |
@@ -84,9 +86,14 @@ record OAuthConfig(
     List<String> optionalScopes,        // only added on request (default List.of())
     String clientIdEnvVar,              // env var fallback for the client ID
     String clientSecretEnvVar,          // env var fallback for the client secret
-    Map<String,String> extraAuthParams  // additional authorize parameters (e.g. access_type=offline)
+    Map<String,String> extraAuthParams, // additional authorize parameters (e.g. access_type=offline)
+    String revocationUrl                // RFC 7009 revoke endpoint (null = provider has none)
 )
 ```
+
+`revocationUrl` is the 8th component and optional — the shorter constructors set it to `null`.
+For Google there is the constant `OAuthConfig.GOOGLE_REVOCATION_URL` plus the wither
+`withRevocationUrl(url)`, so a provider config stays a single constructor call.
 
 ---
 
@@ -146,7 +153,10 @@ Implemented in `IntegrationOAuthService`:
    encrypts client ID and secret and stores them in `integration_connections`.
 2. **Generate authorize URL** — `getAuthorizationUrl(providerId, redirectUri, additionalScopes)`
    - resolves the client ID (DB first, then env var),
-   - generates a random `state` (32 bytes, `SecureRandom`) and stores it as CSRF protection,
+   - generates a random `state` (32 bytes, `SecureRandom`) and stores it in the
+     `OAuthStateRegistry` as CSRF protection — **10-minute TTL**, at most **1000** open
+     authorizations (beyond that `409 Too many pending OAuth authorizations — retry later`;
+     deliberately no eviction of the oldest entry),
    - appends `defaultScopes` + permitted `optionalScopes` as well as all `extraAuthParams`.
 3. **User consents** and is redirected back to the redirect URI.
 4. **Process callback** — `handleCallback(code, state, redirectUri)`
@@ -158,13 +168,27 @@ Implemented in `IntegrationOAuthService`:
    automatically refreshes it when it expires in **less than 300 seconds**
    (`grant_type=refresh_token`). If the refresh token is missing, the status is set to `EXPIRED`.
 6. **Disconnect** —
-   - `disconnect(providerId)` revokes the token (for OAuth providers) and deletes all
-     token fields, but **retains** client credentials → reconnect without re-entering them.
-   - `deleteCredentials(providerId)` removes the entire row including client credentials.
+   - `disconnect(providerId)` deletes all token fields and then revokes the token at the
+     provider, but **retains** client credentials → reconnect without re-entering them.
+   - `deleteCredentials(providerId)` removes the entire row including client credentials and
+     revokes afterwards.
+   - Both are deliberately **not** `@Transactional`: the row is written in a short
+     `TransactionTemplate` burst and the revoke runs **afterwards**, outside any transaction.
+     HTTP with a 10 s timeout inside a transaction would pin the single HikariCP connection
+     (pool-size 1) for that whole time; "persist first" also rules out the state "revoked at the
+     provider but still `CONNECTED` locally".
 
-> **Token revocation** is currently wired to the Google revoke endpoint
-> (`oauth2.googleapis.com/revoke`); for other OAuth providers, revocation is therefore a best-effort no-op,
-> but the local token is always deleted regardless.
+> **Token revocation** goes through `OAuthConfig.revocationUrl` (RFC 7009: `POST` with
+> `token=<access-token>` in the form body, never in the query string). Google uses
+> `https://oauth2.googleapis.com/revoke`; Atlassian 3LO (Jira, Confluence) publishes no revoke
+> endpoint → `revocationUrl = null` and the call is skipped with an info log. A failed revoke
+> never aborts the disconnect; the local token is deleted regardless.
+
+> **Error messages** from code exchange and refresh carry only the provider ID and the HTTP
+> status (e.g. "Token exchange failed for google-calendar (HTTP 400)"). The provider's response
+> body goes to the log only: `GlobalExceptionHandler` passes the exception message on to the API
+> client as a `409`, and token endpoints happily quote parts of the request (client secret
+> included) back at us on failure.
 
 ### Direct Auth Flow (providers without OAuth, e.g. Trello)
 
