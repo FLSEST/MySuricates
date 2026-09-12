@@ -19,11 +19,12 @@ import { ConversionSuggestion } from '../components/shared/ConversionSuggestion'
 import {
   useWorkflow, useWorkflowRuns, useWorkflowBpmn,
   usePauseExecution, useResumeExecution, useCancelExecution, useRunCommand, useSubmitApproval,
-  useRetryExecution, useApproveTodos, useResumeFromStep, useUpdateRunNotes, useDeleteRun,
+  useApproveTodos, useResumeFromStep, useUpdateRunNotes, useDeleteRun,
 } from '../hooks/useWorkflows';
 import { type RunStatus, type DiagramSelection } from '../components/workflow/BpmnDiagramView';
 import { ExecutionDiagramPanel } from '../components/workflow/ExecutionDiagramPanel';
 import { ExecutionStepCard } from '../components/workflow/ExecutionStepCard';
+import { ExecutionRerunButton } from '../components/workflow/ExecutionRerunButton';
 import { useCreateTodo } from '../hooks/useTodos';
 import { useExecutionWebSocket } from '../hooks/useWebSocket';
 import { useRateRun } from '../hooks/useLearning';
@@ -48,7 +49,6 @@ export function WorkflowExecution() {
   const pauseExecution = usePauseExecution();
   const resumeExecution = useResumeExecution();
   const cancelExecution = useCancelExecution();
-  const retryExecution = useRetryExecution();
   const deleteRun = useDeleteRun();
   const resumeFromStep = useResumeFromStep();
   const runCommand = useRunCommand();
@@ -240,16 +240,9 @@ export function WorkflowExecution() {
                 {t.workflows.execution.resumeFromStep}
               </Button>
             )}
-            <Button
-              variant="secondary" size="sm"
-              icon={<Play className="w-4 h-4" />}
-              onClick={() => retryExecution.mutate(runId!)}
-              loading={retryExecution.isPending}
-            >
-              {t.workflows.execution.retry}
-            </Button>
           </div>
         )}
+        <ExecutionRerunButton run={run} />
         {!isRunning && (
           <Button
             variant="secondary" size="sm"

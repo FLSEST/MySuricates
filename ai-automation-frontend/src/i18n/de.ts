@@ -480,6 +480,7 @@ export const de: TranslationKeys = {
       expandOutput: 'Ausgabe vergrößern',
       createTodo: 'Todo erstellen',
       resumeFromStep: 'Ab letztem Schritt fortsetzen',
+      rerun: 'Nochmals ausführen',
       interrupted: 'Unterbrochen',
       logs: 'Live-Logs',
       steps: 'Schritte',

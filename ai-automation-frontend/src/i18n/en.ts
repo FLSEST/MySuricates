@@ -478,6 +478,7 @@ export const en = {
       expandOutput: 'Expand output',
       createTodo: 'Create Todo',
       resumeFromStep: 'Resume from last step',
+      rerun: 'Run again',
       interrupted: 'Interrupted',
       logs: 'Live Logs',
       steps: 'Steps',
