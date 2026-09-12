@@ -437,6 +437,10 @@ Geprueft wird:
    Fehler, eine einzelne getrackte Datei ueber 5 MiB eine Warnung.
 5. **Streunende Sicherungsdateien** (nur `--worktree`): weder getrackt noch ignoriert. Beim Stagen
    ist derselbe Fund ein Fehler.
+6. **`.gitignore` verraet keine privaten Dateinamen.** Die Datei ist getrackt und geht mit der
+   Veroeffentlichung mit — auch ihre Kommentare. Nennt sie einen Namen, der in `.git/info/exclude`
+   steht, ist das ein Verstoss. In der CI gibt es die exclude-Datei nicht, dort faellt die Pruefung
+   still aus.
 
 Den Hook installiert `scripts/install-hooks.sh` ueber `core.hooksPath` (laeuft in `setup.sh` mit).
 

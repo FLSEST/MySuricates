@@ -67,8 +67,11 @@ docs/public/generated/
 screenshots/raw/
 
 # Sicherungsdateien jeder Art, auch mit Zeitstempel-Suffix. Vorher deckte nur
-# *.txt.bak ab; job-shortlist-template.html.bak-<zeitstempel> fiel durch und
-# waere bei einem pauschalen 'git add' mitgegangen.
+# *.txt.bak ab, sodass eine Sicherung mit angehaengtem Zeitstempel durchfiel und
+# bei einem pauschalen 'git add' mitgegangen waere.
+#
+# Wie unten bei den privaten Workflow-Definitionen gilt auch hier: keine
+# konkreten Dateinamen in dieser Datei. Sie wird mitveroeffentlicht.
 *.bak
 *.bak-*
 *.orig

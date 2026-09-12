@@ -433,6 +433,9 @@ What is checked:
    error; a single tracked file above 5 MiB is a warning.
 5. **Stray backup files** (`--worktree` only): neither tracked nor ignored. The same find is an
    error once it is staged.
+6. **`.gitignore` gives away no private filenames.** The file is tracked and ships with the
+   publication — comments included. If it names something listed in `.git/info/exclude`, that is a
+   violation. CI has no exclude file, so the check simply does not fire there.
 
 `scripts/install-hooks.sh` installs the hook via `core.hooksPath` (and runs as part of `setup.sh`).
 

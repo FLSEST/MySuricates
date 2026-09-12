@@ -199,6 +199,34 @@ check_worktree_strays() {
   done < <(git ls-files --others --exclude-standard 2>/dev/null || true)
 }
 
+
+# ---------------------------------------------------------------------------
+# Check 6 — .gitignore verraet keine privaten Dateinamen
+#
+# .gitignore ist getrackt und geht mit der Veroeffentlichung mit. Was dort steht,
+# wird oeffentlich — auch in Kommentaren. Private Definitionen gehoeren deshalb
+# nach .git/info/exclude, das lokal bleibt.
+#
+# Diese Pruefung nimmt jeden Eintrag aus .git/info/exclude und schaut, ob sein
+# Dateiname irgendwo in .gitignore auftaucht. In der CI gibt es die exclude-Datei
+# nicht; dann faellt die Pruefung still aus.
+# ---------------------------------------------------------------------------
+check_gitignore_leaks() {
+  local exclude=".git/info/exclude"
+  [ -f "$exclude" ] || return 0
+  [ -f ".gitignore" ] || return 0
+  local entry base line
+  while IFS= read -r entry; do
+    case "$entry" in ''|'#'*) continue ;; esac
+    base="$(basename "${entry%/}")"
+    # Muster wie *.bak oder sehr kurze Namen taugen nicht als Signal.
+    case "$base" in *'*'*|*'?'*|*'['*) continue ;; esac
+    [ "${#base}" -lt 6 ] && continue
+    line="$(grep -nF -- "$base" .gitignore | head -1 | cut -d: -f1)"
+    [ -n "$line" ] && annotate ".gitignore" "$line" "nennt '$base' — der Name steht in $exclude und wird durch .gitignore oeffentlich"
+  done < "$exclude"
+}
+
 # ---------------------------------------------------------------------------
 # Lauf
 # ---------------------------------------------------------------------------
@@ -218,6 +246,7 @@ else
       BIG) warn     "$path" 1 "$desc ($((size / 1024 / 1024)) MiB) — gehoert das ins Repository?" ;;
     esac
   done < <(check_weight)
+  check_gitignore_leaks
   [ "$MODE" = "worktree" ] && check_worktree_strays
 fi
 
