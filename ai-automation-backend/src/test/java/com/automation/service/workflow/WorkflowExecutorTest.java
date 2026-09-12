@@ -36,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import org.mockito.ArgumentCaptor;
@@ -1540,6 +1541,34 @@ class WorkflowExecutorTest {
 
         assertThat(activeWhenTerminalStatusSaved).isNotEmpty().containsOnly(true);
         assertThat(registry.isRunActive("run-1")).isFalse();
+    }
+
+    // ── Container activity touch (TODO cd1685ff) ──────────────────────────────────
+
+    @Test
+    void execute_withContainer_touchesContainerActivityWithoutLoadingTheEntity() {
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build());
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        // A single JPQL update per step — not find + detached merge, which would drag the
+        // eagerly mapped Project/Container graph through a second transaction.
+        verify(containerRepository, times(2)).touchActivity(eq("docker-container-1"), any(Instant.class));
+        verify(containerRepository, never()).findByDockerContainerId(anyString());
+        verify(containerRepository, never()).save(any());
+    }
+
+    @Test
+    void execute_containerActivityUpdateFails_doesNotFailTheRun() {
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build());
+        when(containerRepository.touchActivity(anyString(), any(Instant.class)))
+                .thenThrow(new RuntimeException("db down"));
+
+        workflowExecutor.execute(testWorkflow, null);
+
+        assertThat(captureLastSavedRun().getStatus()).isEqualTo(RunStatus.COMPLETED);
     }
 
     // ── Cancel before thread registration (TODO 45d09d19) ──────────────────────────

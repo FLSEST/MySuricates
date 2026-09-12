@@ -3,8 +3,13 @@ package com.automation.repository;
 import com.automation.entity.Container;
 import com.automation.entity.ContainerStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,4 +21,17 @@ public interface ContainerRepository extends JpaRepository<Container, String> {
     Optional<Container> findByDockerContainerId(String dockerContainerId);
 
     List<Container> findByStatus(ContainerStatus status);
+
+    /**
+     * Stamps the container's last activity in a single UPDATE. Called once per workflow step from
+     * outside any transaction — loading the entity and saving it back would detach it, force a
+     * merge (SELECT + UPDATE) and drag the eagerly mapped Project/Container graph along, all on
+     * the single SQLite connection.
+     *
+     * @return the number of rows updated (0 when the Docker container id is unknown)
+     */
+    @Modifying
+    @Transactional
+    @Query("update Container c set c.lastActivityAt = :now where c.dockerContainerId = :id")
+    int touchActivity(@Param("id") String dockerContainerId, @Param("now") Instant now);
 }

@@ -683,12 +683,15 @@ public class WorkflowExecutor {
         }
     }
 
+    /**
+     * Stamps the container's last activity after every step. A single JPQL UPDATE: this runs
+     * outside any transaction, so find + save would detach the entity, turn the save into a merge
+     * (SELECT + UPDATE) and pull the eagerly mapped Project/Container graph along — three round
+     * trips on the single SQLite connection where one suffices.
+     */
     private void updateContainerActivity(String containerId) {
         try {
-            containerRepository.findByDockerContainerId(containerId).ifPresent(container -> {
-                container.setLastActivityAt(Instant.now());
-                containerRepository.save(container);
-            });
+            containerRepository.touchActivity(containerId, Instant.now());
         } catch (Exception e) {
             log.debug("Failed to update container activity: {}", e.getMessage());
         }
