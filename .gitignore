@@ -28,7 +28,9 @@ ai-automation-frontend/dist/
 ai-automation-frontend/tsconfig.tsbuildinfo
 ai-automation-frontend/cypress/screenshots/
 ai-automation-frontend/playwright/results/
-ai-automation-frontend/playwright/showcase/results/
+# Showcase-Aufnahmen: 27,6 MiB, von nichts im Repo referenziert. Sie liegen lokal
+# weiter, gehoeren aber nicht in den getrackten Baum (Entscheidung 2026-09-12).
+ai-automation-frontend/playwright/showcase/
 ai-automation-frontend/playwright/report/
 ai-automation-frontend/playwright/.auth/
 ai-automation-frontend/test-results/
@@ -64,7 +66,19 @@ ai-automation-backend/src/main/resources/docs/
 docs/public/generated/
 screenshots/raw/
 
-*.txt.bak
+# Sicherungsdateien jeder Art, auch mit Zeitstempel-Suffix. Vorher deckte nur
+# *.txt.bak ab, sodass eine Sicherung mit angehaengtem Zeitstempel durchfiel und
+# bei einem pauschalen 'git add' mitgegangen waere.
+#
+# Wie unten bei den privaten Workflow-Definitionen gilt auch hier: keine
+# konkreten Dateinamen in dieser Datei. Sie wird mitveroeffentlicht.
+*.bak
+*.bak-*
+*.orig
+*.old
+*.save
+*.rej
+*~
 
 # Personal seed scripts (use seed-workflows.example.sh as template)
 scripts/seed-workflows.sh
