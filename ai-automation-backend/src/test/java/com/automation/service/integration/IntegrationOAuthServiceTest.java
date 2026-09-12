@@ -334,6 +334,76 @@ class IntegrationOAuthServiceTest {
     }
 
     @Test
+    void getValidAccessToken_refreshResponseWithoutAccessToken_marksConnectionExpired() throws Exception {
+        // A 200 that carries no access_token used to NPE inside the old catch-all (which then set
+        // EXPIRED). Without an explicit guard the connection would stay CONNECTED with a stale
+        // token and every following call would retry the same dead refresh.
+        server = startJsonServer(200, "{}");
+        IntegrationOAuthService service = newService();
+        IntegrationConnection connection = IntegrationConnection.builder()
+                .providerId("google-calendar")
+                .status(ConnectionStatus.CONNECTED)
+                .clientIdEncrypted("enc-client-id")
+                .clientSecretEncrypted("enc-client-secret")
+                .accessTokenEncrypted("enc-old-access")
+                .refreshTokenEncrypted("enc-old-refresh")
+                .tokenExpiry(Instant.now().minusSeconds(60))
+                .build();
+
+        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.of(connection));
+        when(registry.getProvider("google-calendar")).thenReturn(provider);
+        when(provider.requiresOAuthFlow()).thenReturn(true);
+        when(provider.getOAuthConfig()).thenReturn(googleConfig(null));
+        when(encryptionService.decrypt("enc-old-refresh")).thenReturn("refresh-123");
+        when(encryptionService.decrypt("enc-client-id")).thenReturn("client-id");
+        when(encryptionService.decrypt("enc-client-secret")).thenReturn("client-secret");
+        when(connectionRepository.save(any(IntegrationConnection.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThatThrownBy(() -> service.getValidAccessToken("google-calendar"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Token refresh failed for google-calendar (no access_token in response)");
+
+        assertThat(connection.getStatus()).isEqualTo(ConnectionStatus.EXPIRED);
+        assertThat(connection.getAccessTokenEncrypted()).as("the stale token is not overwritten")
+                .isEqualTo("enc-old-access");
+        verify(connectionRepository).save(connection);
+    }
+
+    @Test
+    void getValidAccessToken_refreshResponseWithMalformedBody_hidesBodyAndMarksExpired() throws Exception {
+        server = startJsonServer(200, "<html><body>client_secret=s3cr3t</body></html>");
+        IntegrationOAuthService service = newService();
+        IntegrationConnection connection = IntegrationConnection.builder()
+                .providerId("google-calendar")
+                .status(ConnectionStatus.CONNECTED)
+                .clientIdEncrypted("enc-client-id")
+                .clientSecretEncrypted("enc-client-secret")
+                .accessTokenEncrypted("enc-old-access")
+                .refreshTokenEncrypted("enc-old-refresh")
+                .tokenExpiry(Instant.now().minusSeconds(60))
+                .build();
+
+        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.of(connection));
+        when(registry.getProvider("google-calendar")).thenReturn(provider);
+        when(provider.requiresOAuthFlow()).thenReturn(true);
+        when(provider.getOAuthConfig()).thenReturn(googleConfig(null));
+        when(encryptionService.decrypt("enc-old-refresh")).thenReturn("refresh-123");
+        when(encryptionService.decrypt("enc-client-id")).thenReturn("client-id");
+        when(encryptionService.decrypt("enc-client-secret")).thenReturn("client-secret");
+        when(connectionRepository.save(any(IntegrationConnection.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThatThrownBy(() -> service.getValidAccessToken("google-calendar"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Token refresh failed for google-calendar (malformed response)")
+                .hasMessageNotContaining("s3cr3t");
+
+        assertThat(connection.getStatus()).isEqualTo(ConnectionStatus.EXPIRED);
+        verify(connectionRepository).save(connection);
+    }
+
+    @Test
     void getValidAccessToken_returnsCachedTokenWhenNotExpired() {
         IntegrationOAuthService service = newService();
         IntegrationConnection connection = IntegrationConnection.builder()

@@ -28,6 +28,8 @@ class OAuthTokenClientTest {
 
     private static final String TOKEN_ERROR_BODY =
             "{\"error\":\"invalid_client\",\"error_description\":\"client_secret=s3cr3t is wrong\"}";
+    /** A 200 that is not JSON at all — e.g. a captive portal or a reverse-proxy error page. */
+    private static final String MALFORMED_OK_BODY = "<html><body>client_secret=s3cr3t</body></html>";
 
     private final OAuthTokenClient client = new OAuthTokenClient(new ObjectMapper());
 
@@ -51,6 +53,7 @@ class OAuthTokenClientTest {
             respond(exchange, revokeStatus.get(), "{}");
         });
         server.createContext("/token", exchange -> respond(exchange, 400, TOKEN_ERROR_BODY));
+        server.createContext("/token-malformed", exchange -> respond(exchange, 200, MALFORMED_OK_BODY));
         server.start();
     }
 
@@ -103,10 +106,33 @@ class OAuthTokenClientTest {
                 .hasMessage("Token refresh failed for google-calendar (HTTP 400)");
     }
 
+    @Test
+    void exchange_malformed200Body_messageSaysMalformedAndHidesBody() {
+        assertThatThrownBy(() -> client.exchangeCodeForTokens(
+                "google-calendar", tokenConfig("/token-malformed"), "code-1", "client-id", "client-secret", "http://localhost/cb"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Token exchange failed for google-calendar (malformed response)")
+                .hasMessageNotContaining("s3cr3t")
+                .hasMessageNotContaining("html");
+    }
+
+    @Test
+    void refresh_malformed200Body_messageSaysMalformedAndHidesBody() {
+        assertThatThrownBy(() -> client.refreshAccessToken(
+                "google-calendar", tokenConfig("/token-malformed"), "refresh-1", "client-id", "client-secret"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Token refresh failed for google-calendar (malformed response)")
+                .hasMessageNotContaining("s3cr3t")
+                .hasMessageNotContaining("html");
+    }
+
     private OAuthConfig config(String revocationUrl) {
-        return new OAuthConfig("https://auth.example/authorize", url("/token"),
-                List.of("calendar.read"), "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET")
-                .withRevocationUrl(revocationUrl);
+        return tokenConfig("/token").withRevocationUrl(revocationUrl);
+    }
+
+    private OAuthConfig tokenConfig(String tokenPath) {
+        return new OAuthConfig("https://auth.example/authorize", url(tokenPath),
+                List.of("calendar.read"), "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET");
     }
 
     private String url(String path) {
