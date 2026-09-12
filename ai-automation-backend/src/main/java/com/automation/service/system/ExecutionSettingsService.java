@@ -15,6 +15,7 @@ import com.automation.config.TodoHygieneConfig;
 import com.automation.config.WishConfig;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.ai.HostClaudeService;
+import com.automation.service.ai.catalog.ModelCatalogService;
 import com.automation.service.cli.ContainerShellService;
 import com.automation.service.workflow.WorkflowExecutionRegistry;
 import jakarta.annotation.PostConstruct;
@@ -52,6 +53,7 @@ public class ExecutionSettingsService {
     private final FactoryConfig factoryConfig;
     private final WishConfig wishConfig;
     private final RunRetentionConfig runRetentionConfig;
+    private final ModelCatalogService modelCatalogService;
 
     /** Canonical key → runtime setter, in the order the DB overrides are applied at startup. */
     private final Map<String, Consumer<String>> appliers;
@@ -73,7 +75,8 @@ public class ExecutionSettingsService {
             SummarizationConfig summarizationConfig,
             FactoryConfig factoryConfig,
             WishConfig wishConfig,
-            RunRetentionConfig runRetentionConfig) {
+            RunRetentionConfig runRetentionConfig,
+            ModelCatalogService modelCatalogService) {
         this.appSettingsRepository = appSettingsRepository;
         this.executionSemaphore = executionSemaphore;
         this.hostClaudeService = hostClaudeService;
@@ -91,6 +94,7 @@ public class ExecutionSettingsService {
         this.factoryConfig = factoryConfig;
         this.wishConfig = wishConfig;
         this.runRetentionConfig = runRetentionConfig;
+        this.modelCatalogService = modelCatalogService;
         this.appliers = buildAppliers();
     }
 
@@ -126,6 +130,7 @@ public class ExecutionSettingsService {
         m.put("wish-workflow-wait-minutes", v -> wishConfig.setWorkflowWaitMinutes(Integer.parseInt(v)));
         m.put("wish-default-shell-timeout-seconds", v -> wishConfig.setDefaultShellTimeoutSeconds(Integer.parseInt(v)));
         m.put("wish-default-agentic-total-timeout-seconds", v -> wishConfig.setDefaultAgenticTotalTimeoutSeconds(Integer.parseInt(v)));
+        m.put("model-catalog-ttl-seconds", v -> modelCatalogService.setTtlSeconds(Integer.parseInt(v)));
         return m;
     }
 
@@ -186,6 +191,7 @@ public class ExecutionSettingsService {
         result.put("wishWorkflowWaitMinutes", wishConfig.getWorkflowWaitMinutes());
         result.put("wishDefaultShellTimeoutSeconds", wishConfig.getDefaultShellTimeoutSeconds());
         result.put("wishDefaultAgenticTotalTimeoutSeconds", wishConfig.getDefaultAgenticTotalTimeoutSeconds());
+        result.put("modelCatalogTtlSeconds", modelCatalogService.getTtlSeconds());
         result.put("activeRuns", executionRegistry.getActiveRunCount());
         return result;
     }

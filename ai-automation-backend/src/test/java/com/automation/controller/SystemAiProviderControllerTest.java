@@ -5,6 +5,8 @@ import com.automation.exception.GlobalExceptionHandler;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.ai.PiCatalogService;
+import com.automation.service.ai.catalog.ModelCatalog;
+import com.automation.service.ai.catalog.ModelCatalogService;
 import com.automation.service.system.ApiKeyService;
 import com.automation.service.system.SystemIdentityService;
 import org.junit.jupiter.api.Test;
@@ -15,9 +17,13 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Instant;
+import java.util.List;
+
 import static org.hamcrest.Matchers.hasItem;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(SystemAiProviderController.class)
@@ -33,6 +39,9 @@ class SystemAiProviderControllerTest {
 
     @MockitoBean
     private PiCatalogService piCatalogService;
+
+    @MockitoBean
+    private ModelCatalogService modelCatalogService;
 
     @MockitoBean
     private SystemIdentityService systemIdentity;
@@ -71,5 +80,50 @@ class SystemAiProviderControllerTest {
                 .andExpect(jsonPath("$.routes[*].path", hasItem("/api/v1/system/capabilities")))
                 .andExpect(jsonPath("$.blockTypes[*].type", hasItem("shell")))
                 .andExpect(jsonPath("$.generatedAt").exists());
+    }
+
+    @Test
+    void models_returnsCatalogForProvider() throws Exception {
+        when(modelCatalogService.getCatalog("PI", false)).thenReturn(ModelCatalog.available(
+                "PI", "pi-cli", Instant.parse("2026-09-12T10:00:00Z"),
+                List.of(ModelCatalog.ModelOption.of("openai-codex/gpt-5.5", "openai-codex · gpt-5.5"))));
+
+        mockMvc.perform(get("/api/v1/system/ai-providers/PI/models"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.providerId").value("PI"))
+                .andExpect(jsonPath("$.available").value(true))
+                .andExpect(jsonPath("$.source").value("pi-cli"))
+                .andExpect(jsonPath("$.models[0].value").value("openai-codex/gpt-5.5"));
+    }
+
+    @Test
+    void models_unavailableCatalog_stillReturns200WithReason() throws Exception {
+        when(modelCatalogService.getCatalog("CODEX", false))
+                .thenReturn(ModelCatalog.unavailable("CODEX", "codex-cli", "codex not installed"));
+
+        mockMvc.perform(get("/api/v1/system/ai-providers/CODEX/models"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.available").value(false))
+                .andExpect(jsonPath("$.reason").value("codex not installed"))
+                .andExpect(jsonPath("$.models").isEmpty());
+    }
+
+    @Test
+    void refreshModels_postForcesRefresh() throws Exception {
+        when(modelCatalogService.getCatalog("CLAUDE", true)).thenReturn(ModelCatalog.available(
+                "CLAUDE", "static-aliases", Instant.now(), List.of(ModelCatalog.ModelOption.of("opus", "opus"))));
+
+        mockMvc.perform(post("/api/v1/system/ai-providers/CLAUDE/models/refresh"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.models[0].value").value("opus"));
+    }
+
+    @Test
+    void models_unknownProvider_returns404() throws Exception {
+        when(modelCatalogService.getCatalog("GEMINI", false))
+                .thenThrow(new com.automation.exception.ResourceNotFoundException("AiProvider", "GEMINI"));
+
+        mockMvc.perform(get("/api/v1/system/ai-providers/GEMINI/models"))
+                .andExpect(status().isNotFound());
     }
 }

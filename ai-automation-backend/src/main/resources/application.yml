@@ -111,6 +111,9 @@ automation:
     reserved-for-interactive: ${AUTOMATION_HOST_PI_RESERVED_INTERACTIVE:1}
     default-backend-provider: ${AUTOMATION_HOST_PI_BACKEND:anthropic}
     default-thinking-level: ${AUTOMATION_HOST_PI_THINKING:medium}
+  model-catalog:
+    ttl-seconds: ${AUTOMATION_MODEL_CATALOG_TTL:600}              # Cache für host-entdeckte Modell-Listen (pi/codex); Laufzeit-Setting model-catalog-ttl-seconds
+    probe-timeout-seconds: ${AUTOMATION_MODEL_CATALOG_PROBE_TIMEOUT:15}
   task-command:
     timeout-seconds: ${AUTOMATION_TASK_COMMAND_TIMEOUT:60}    # Timeout für einen `task`-CLI-Aufruf (Taskwarrior-Integration)
   todo-trigger:
