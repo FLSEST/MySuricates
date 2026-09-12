@@ -58,11 +58,6 @@ public class WorkflowExecutor {
 
     // Active execution tracking is delegated to WorkflowExecutionRegistry
 
-    /**
-     * Starts workflow execution asynchronously.
-     * Creates a WorkflowRun with RUNNING status and returns it immediately.
-     * The actual block execution happens in a background virtual thread.
-     */
     /** Detached copy of everything the async loop needs — taken while the JPA session is open. */
     private record WorkflowSnapshot(Project project, List<BlockDefinition> blocks, List<Skill> skills,
                                     String instructions, String model, String provider, String effort,
@@ -70,9 +65,8 @@ public class WorkflowExecutor {
                                     Map<String, Skill> blockSkillLookup) {}
 
     /**
-     * Eagerly copies the lazy workflow graph and pre-resolves per-block skill IDs to entities
-     * (single DB query). Must run while the JPA session is open; callers wrap it in try/catch
-     * so a LazyInitializationException fails the run instead of leaving a ghost.
+     * Eagerly copies the lazy workflow graph and pre-resolves per-block skill IDs to entities (one
+     * DB query). Must run while the JPA session is open; callers catch so a failure fails the run.
      */
     private WorkflowSnapshot snapshot(Workflow workflow) {
         List<BlockDefinition> blocks = List.copyOf(workflow.getBlocks());
@@ -116,10 +110,8 @@ public class WorkflowExecutor {
         run = runRepository.save(run);
         executionRegistry.registerProvisional(run.getId()); // listable ⇒ cancellable, no ghost branch
 
-        // Eagerly initialize lazy collections before leaving the transaction/session.
-        // Wrapped in try-catch: if a LazyInitializationException or similar occurs here
-        // (e.g. when called from a scheduled executor without an active JPA session),
-        // the run is immediately marked as FAILED instead of being stuck as a ghost run.
+        // Eagerly initialize lazy collections before leaving the transaction/session. A
+        // LazyInitializationException here fails the run instead of leaving a ghost behind.
         final WorkflowSnapshot wf;
         final Map<String, Object> contextVars;
         try {
@@ -138,14 +130,18 @@ public class WorkflowExecutor {
             }
             activityLogService.info(LogCategory.EXECUTION, "Workflow execution started: " + workflow.getName(),
                     "WorkflowExecutor", run.getId(), workflow.getId());
-        } catch (Exception e) {
+        } catch (Throwable t) {
+            // Throwable, not Exception (same reason as the block loop below): an Error slipping
+            // past here would leave the provisional registration behind, and the watchdog protects
+            // registered runs on purpose — the run would hang RUNNING until the next restart.
             executionRegistry.unregister(run.getId()); // nothing will ever run for this id
-            log.error("Failed to initialize workflow data for run {}: {}", run.getId(), e.getMessage(), e);
+            log.error("Failed to initialize workflow data for run {}: {}", run.getId(), t.getMessage(), t);
             run.setStatus(RunStatus.FAILED);
             run.setCompletedAt(Instant.now());
-            run.setError(Map.of("message", "Failed to initialize workflow data: " + e.getMessage()));
+            run.setError(Map.of("message", "Failed to initialize workflow data: " + t.getMessage()));
             runRepository.save(run);
-            throw new WorkflowExecutionException("Failed to initialize workflow '" + workflow.getName() + "' for execution", e);
+            if (t instanceof Error error) throw error; // never swallow an Error
+            throw new WorkflowExecutionException("Failed to initialize workflow '" + workflow.getName() + "' for execution", t);
         }
 
         // Execute asynchronously — return the run immediately
@@ -361,10 +357,9 @@ public class WorkflowExecutor {
             failRun(runId, "Interrupted while waiting for execution slot");
             return;
         } catch (Throwable t) {
-            // Throwable, not Exception: an Error (e.g. NoClassDefFoundError when a build
-            // rewrites target/classes under the running JVM) would otherwise slip past every
-            // handler, leave the run at RUNNING and only surface as an anonymous ghost run
-            // 30 minutes later. See docs/plans/2026-07-27-ghost-run-root-cause-fixes.md
+            // Throwable, not Exception: an Error (NoClassDefFoundError from a build rewriting
+            // target/classes) would leave the run at RUNNING and surface as an anonymous ghost run
+            // 30 min later. See docs/plans/2026-07-27-ghost-run-root-cause-fixes.md
             String detail = t.getMessage() != null ? t.getMessage() : t.getClass().getName();
             String message = t.getClass().getSimpleName() + ": " + detail;
             log.error("Workflow execution failed: {}", runId, t);
@@ -428,17 +423,19 @@ public class WorkflowExecutor {
     private void submitExecution(String runId, Runnable execution) {
         try {
             virtualThreadExecutor.submit(execution);
-        } catch (java.util.concurrent.RejectedExecutionException e) {
+        } catch (Throwable t) {
             executionRegistry.unregister(runId); // no thread will reach executeBlocks' finally
-            failRun(runId, "Executor rejected the run (shutting down?): " + e.getMessage());
-            throw new WorkflowExecutionException("Executor rejected workflow run " + runId, e);
+            boolean rejected = t instanceof java.util.concurrent.RejectedExecutionException;
+            failRun(runId, (rejected ? "Executor rejected the run (shutting down?): " : "Could not submit the run: ")
+                    + t.getMessage());
+            if (rejected) {
+                throw new WorkflowExecutionException("Executor rejected workflow run " + runId, t);
+            }
+            throw t;
         }
     }
 
-    /**
-     * Marks a run as FAILED directly. Used when the run object couldn't be loaded
-     * in the execution thread, or for cleanup of zombie runs.
-     */
+    /** FAILED directly — the run object could not be loaded, or a zombie run is being cleaned up. */
     private void failRun(String runId, String message) {
         try {
             WorkflowRun r = runRepository.findById(runId).orElse(null);
@@ -456,10 +453,7 @@ public class WorkflowExecutor {
         }
     }
 
-    /**
-     * Cleans up zombie runs on startup — any runs stuck in RUNNING status
-     * from a previous application lifecycle.
-     */
+    /** Cleans up runs stuck in RUNNING/PAUSED from a previous application lifecycle. */
     @EventListener(ApplicationReadyEvent.class)
     public void cleanupZombieRuns() {
         // Collect all runs that were in-flight when the application was last shut down
@@ -481,10 +475,7 @@ public class WorkflowExecutor {
                 "WorkflowExecutor");
     }
 
-    /**
-     * Resumes an INTERRUPTED workflow run from the last successfully completed step.
-     * If no steps completed, falls back to a full retry.
-     */
+    /** Resumes an INTERRUPTED run after its last completed step; no completed step ⇒ full retry. */
     public WorkflowRun resumeFromStep(String runId) {
         WorkflowRun run = runRepository.findById(runId)
                 .orElseThrow(() -> new ResourceNotFoundException("WorkflowRun", runId));
@@ -539,13 +530,18 @@ public class WorkflowExecutor {
         run.setError(null);
         run.setCompletedAt(null);
         runRepository.save(run);
-        executionRegistry.registerProvisional(runId); // controllable as soon as it is RUNNING
-        broadcaster.broadcastRunStatus(runId, RunStatus.RUNNING);
 
         final String wfId = workflow.getId();
         final String wfName = workflow.getName();
         final int resumeIdx = resumeFromIndex;
-        submitExecution(runId, () -> executeBlocks(runId, wfId, wfName, wf, contextForResume, resumeIdx, previousOutput));
+        executionRegistry.registerProvisional(runId); // controllable as soon as it is RUNNING
+        try {
+            broadcaster.broadcastRunStatus(runId, RunStatus.RUNNING);
+            submitExecution(runId, () -> executeBlocks(runId, wfId, wfName, wf, contextForResume, resumeIdx, previousOutput));
+        } catch (Throwable t) {
+            executionRegistry.unregister(runId); // no thread took over — do not leave it registered
+            throw t;
+        }
 
         return run;
     }

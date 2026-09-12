@@ -31,7 +31,9 @@ public interface ContainerRepository extends JpaRepository<Container, String> {
      * <p>Callers must be non-transactional (as {@code WorkflowExecutor} is): the update bypasses
      * the persistence context, so a transactional caller holding the same {@code Container} would
      * keep reading a stale {@code lastActivityAt}. Deliberately no {@code clearAutomatically} —
-     * that would detach every other entity the caller is working with.
+     * that would detach every other entity the caller is working with. A future transactional
+     * caller should isolate the write instead ({@code REQUIRES_NEW} or a short
+     * {@code TransactionTemplate} burst) and re-read the container afterwards.
      *
      * @return the number of rows updated (0 when the Docker container id is unknown)
      */

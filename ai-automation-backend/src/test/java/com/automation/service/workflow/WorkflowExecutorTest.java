@@ -1687,6 +1687,48 @@ class WorkflowExecutorTest {
     }
 
     @Test
+    void execute_activityLogFailsDuringInit_marksRunFailedAndUnregisters() {
+        doThrow(new RuntimeException("activity log down"))
+                .when(activityLogService).info(any(), anyString(), anyString(), anyString(), anyString());
+
+        assertThatThrownBy(() -> workflowExecutor.execute(testWorkflow, null))
+                .isInstanceOf(WorkflowExecutionException.class);
+
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(String.valueOf(saved.getError().get("message"))).contains("activity log down");
+        assertThat(registry.isRunActive("run-1")).isFalse();
+        verify(simpleBlockExecutor, never()).execute(any(), any());
+    }
+
+    @Test
+    void execute_errorDuringInit_unregistersAndPropagatesTheError() {
+        // An Error must not be swallowed and must not leave the run registered — the watchdog
+        // protects registered runs on purpose, so the run would hang RUNNING until a restart.
+        doThrow(new NoClassDefFoundError("boom"))
+                .when(activityLogService).info(any(), anyString(), anyString(), anyString(), anyString());
+
+        assertThatThrownBy(() -> workflowExecutor.execute(testWorkflow, null))
+                .isInstanceOf(NoClassDefFoundError.class);
+
+        assertThat(captureLastSavedRun().getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(registry.isRunActive("run-1")).isFalse();
+        assertThat(registry.getActiveRunCount()).isZero();
+    }
+
+    @Test
+    void execute_submitThrowsError_unregistersAndPropagatesTheError() {
+        // Same hole one step later: the submit itself can fail with an Error.
+        doThrow(new NoClassDefFoundError("pool gone")).when(virtualThreadExecutor).submit(any(Runnable.class));
+
+        assertThatThrownBy(() -> workflowExecutor.execute(testWorkflow, null))
+                .isInstanceOf(NoClassDefFoundError.class);
+
+        assertThat(captureLastSavedRun().getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(registry.isRunActive("run-1")).isFalse();
+    }
+
+    @Test
     void cancelExecution_beforeThreadStarts_isHonoured() throws Exception {
         DynamicSemaphore singleSlot = new DynamicSemaphore(1);
         singleSlot.acquire(); // the only slot is taken — the run parks in acquire()
