@@ -107,7 +107,7 @@ class IntegrationOAuthServiceTest {
         String url = service.getAuthorizationUrl(
                 "google-calendar",
                 "http://localhost/api/v1/integrations/google-calendar/callback",
-                List.of("calendar.write", "not-allowed")
+                List.of("calendar.write", "not-allowed"), "https://localhost:3000"
         );
 
         Map<String, String> params = parseQuery(URI.create(url));
@@ -118,6 +118,7 @@ class IntegrationOAuthServiceTest {
         assertThat(params.get("scope")).isEqualTo("calendar.read calendar.write");
         assertThat(params.get("access_type")).isEqualTo("offline");
         assertThat(params.get("state")).isNotBlank();
+        assertThat(service.getCallbackOrigin(params.get("state"))).isEqualTo("https://localhost:3000");
     }
 
     @Test
@@ -168,6 +169,7 @@ class IntegrationOAuthServiceTest {
         assertThat(saved.getScopes()).isEqualTo("calendar.read calendar.write");
         assertThat(saved.getAccountInfo()).contains("user@example.com");
         assertThat(saved.getTokenExpiry()).isAfter(Instant.now().plusSeconds(7100));
+        assertThatThrownBy(() -> service.getCallbackOrigin(state)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
