@@ -18,7 +18,7 @@ import java.time.Duration;
 @RequiredArgsConstructor
 public class GitHubHttpClient {
 
-    static final String API_VERSION = "2022-11-28";
+    private static final String API_VERSION = "2022-11-28";
 
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient = HttpClient.newBuilder()

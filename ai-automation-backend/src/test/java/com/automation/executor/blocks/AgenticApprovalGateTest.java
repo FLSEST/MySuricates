@@ -92,11 +92,8 @@ class AgenticApprovalGateTest {
 
     @Test
     void futureTimesOut_returnsStop_andAppendsTimeoutLine() {
-        // A future that never completes triggers CompletableFuture.get(30, MINUTES) to throw
-        // TimeoutException immediately once cancelled — simulate via an already-cancelled future,
-        // which get() reports as CancellationException (caught by the generic Exception branch)
-        // is not the timeout path, so use a real short timeout instead via a subclass-free trick:
-        // a future whose get(timeout, unit) always throws TimeoutException.
+        // A future whose get(timeout, unit) always throws TimeoutException — exercises the gate's
+        // timeout branch without waiting 30 minutes.
         CompletableFuture<String> neverCompletes = new CompletableFuture<>() {
             @Override
             public String get(long timeout, java.util.concurrent.TimeUnit unit)
