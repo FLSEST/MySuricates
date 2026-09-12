@@ -265,6 +265,83 @@ networks:
     driver: bridge
 ```
 
+## Vertrauensmodell und Netzwerk-Exposition
+
+MySuricates ist fuer den **lokalen Betrieb durch eine vertrauenswuerdige Person** gebaut. Es ist kein
+gehaertetes Mehrbenutzersystem und sollte nicht unveraendert oeffentlich erreichbar betrieben werden.
+Dieser Abschnitt beschreibt das bestehende Modell, damit vor dem Start klar ist, was erreichbar ist.
+
+### Was ein Workflow darf
+
+Shell-Bloecke und KI-Aufrufe laufen standardmaessig **auf dem Host mit den Rechten des startenden
+Benutzers** — nicht in einem Container. Container-Ausfuehrung ist opt-in pro Shell-Block
+(`container_image`). Ein Workflow kann damit alles, was der Benutzer kann: Dateien lesen und
+schreiben, Prozesse starten, ins Netz gehen.
+
+Die Claude CLI wird ausserdem mit `automation.cli.skip-permissions` = **`true`** aufgerufen
+(`AUTOMATION_CLI_SKIP_PERMISSIONS`). Sie fragt also nicht vor Werkzeugnutzung nach. Ausnahme: wird
+einem Aufruf eine Werkzeug-Whitelist mitgegeben, entfaellt das Flag und die CLI erzwingt die Liste —
+so arbeiten `skill-capability`-Bloecke ohne `allow_writes` nur lesend.
+
+### Wo gelauscht wird
+
+Weder Backend noch Frontend binden auf Loopback. `server.address` ist nirgends gesetzt, das Backend
+lauscht also auf allen Interfaces; Vite laeuft mit `host: true`. Der Compose-Dienst veroeffentlicht
+`9090:9090` ohne Host-IP-Praefix, also auf allen Adressen — und Dockers Portfreigabe umgeht dabei
+die ueblichen Host-Firewall-Regeln.
+
+CORS erlaubt per Default neben `localhost` auch Tailscale-Muster (`100.*` und `*.tail*.ts.net`).
+**CORS ist keine Zugriffskontrolle** — es steuert nur, welche Herkunft ein Browser akzeptiert, und
+haelt niemanden von einem direkten Aufruf ab. Ein vorhandener Tailscale-Zugang macht die Anwendung
+nicht zu einem abgesicherten System.
+
+### Was ohne API-Key erreichbar ist
+
+Authentifiziert wird ueber den Header `X-API-Key`, und zwar fuer `/api/**` und `/actuator/**`.
+Ausgenommen sind:
+
+| Pfad | Zweck |
+|---|---|
+| `/api/v1/system/health`, `/system/info`, `/system/auth-status` | Statusabfragen vor dem Login |
+| `/api/v1/system/integration-snippet` | Einbettbares Snippet |
+| `/actuator/health` | Healthcheck fuer Docker |
+| `/ws/**` | WebSocket-Handshake (der Key wird dort als Query-Parameter geprueft) |
+| `/api/v1/webhook/trigger/**` | Oeffentlicher Webhook-Eingang |
+| `/api/v1/integrations/*/callback` | OAuth-Rueckleitungen |
+
+Alles ausserhalb von `/api/**` und `/actuator/**` ist ebenfalls offen (`anyRequest().permitAll()`) —
+das betrifft das ausgelieferte Frontend und jeden nicht gemappten Pfad.
+
+**Wichtig:** Ist kein API-Key gesetzt oder `automation.security.enabled=false`, gilt *jede* Anfrage
+als authentifiziert. Ein leerer Schluessel schaltet die Authentifizierung also vollstaendig ab, statt
+sie zu verschaerfen.
+
+### Webhooks
+
+Der Trigger-Endpunkt wird allein durch ein Token im Pfad geschuetzt (32 Zufallsbytes aus
+`SecureRandom`). Es gibt keine Signaturpruefung und keinen Replay-Schutz. Als Gegengewicht gilt ein
+fest verdrahtetes Limit von 10 Anfragen pro Minute und IP — unabhaengig vom globalen Rate-Limit-
+Schalter —, die Nutzlast ist auf 50 Felder begrenzt, und alle vom Aufrufer stammenden Werte werden
+als nicht vertrauenswuerdig markiert und in Shell-Bloecken immer escaped.
+
+### Docker-Rechte — zwei getrennte Ebenen
+
+Die beiden werden leicht verwechselt:
+
+1. **`AUTOMATION_ALLOW_DOCKER_SOCKET_MOUNT`** (Default `false`) ist ein serverseitiger Schalter dafuer,
+   ob ein Shell-Block mit `mount_docker_socket: true` den Socket in einen **erzeugten Agent-Container**
+   bekommt. Wird es verweigert, landet ein SECURITY-Eintrag im Activity-Log.
+2. **Die ausgelieferte `docker-compose.yml`** mountet den Host-Docker-Socket dagegen direkt in den
+   **Backend-Container** (`/var/run/docker.sock`). Das ist unabhaengig von Punkt 1 und gibt der
+   Anwendung volle Kontrolle ueber Docker auf dem Host.
+
+### Daraus folgt
+
+- Nur in einem Netz betreiben, dem du vertraust; fuer Fernzugriff ein VPN davorsetzen statt den Port zu oeffnen.
+- Einen eigenen API-Key setzen und pruefen, dass er nicht leer ist.
+- Den Docker-Socket-Mount aus der Compose-Datei nehmen, wenn keine Container-Bloecke gebraucht werden.
+- Keine Workflows aus fremder Quelle ungelesen ausfuehren — sie laufen mit deinen Rechten.
+
 ## Drei-Umgebungs-Setup
 
 Das Projekt unterstützt drei parallele Umgebungen:

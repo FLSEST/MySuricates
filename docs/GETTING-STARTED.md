@@ -8,6 +8,14 @@ einfacher und zuverlässiger, weil der `claude` CLI ohnehin auf dem Host läuft,
 nötig ist und Datenbank/Migrationen ohne Volume-Mapping funktionieren. **Docker ist optional**
 und wird nur für Container-Execution-Workflow-Blöcke gebraucht.
 
+> **Bevor du startest — das Vertrauensmodell in drei Sätzen.** Shell-Blöcke und KI-Aufrufe laufen
+> auf dem Host mit *deinen* Rechten, nicht in einem Container; die Claude CLI fragt dabei
+> standardmäßig nicht vor Werkzeugnutzung nach. Backend und Frontend lauschen auf allen
+> Netzwerk-Interfaces, und einige Endpunkte (Healthchecks, WebSocket-Handshake, Webhook-Eingang,
+> OAuth-Rückleitungen) brauchen keinen API-Key. MySuricates ist für den lokalen Betrieb durch eine
+> vertrauenswürdige Person gebaut — für Fernzugriff gehört ein VPN davor, kein offener Port.
+> Vollständig: [Vertrauensmodell und Netzwerk-Exposition](deployment.md#vertrauensmodell-und-netzwerk-exposition).
+
 ---
 
 ## 1. Was du brauchst

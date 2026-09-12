@@ -265,6 +265,82 @@ networks:
     driver: bridge
 ```
 
+## Trust Model and Network Exposure
+
+MySuricates is built for **local operation by a single trusted person**. It is not a hardened
+multi-user system and should not be exposed publicly as-is. This section documents the existing
+model so you know what is reachable before you start it.
+
+### What a workflow is allowed to do
+
+Shell blocks and AI calls run **on the host with the privileges of the user who started the
+backend** — not in a container. Container execution is opt-in per shell block (`container_image`).
+A workflow can therefore do anything that user can: read and write files, start processes, reach
+the network.
+
+The Claude CLI is also invoked with `automation.cli.skip-permissions` = **`true`**
+(`AUTOMATION_CLI_SKIP_PERMISSIONS`), so it does not prompt before using a tool. The exception: when
+a call carries an explicit tool whitelist, the flag is dropped and the CLI enforces the list — this
+is how `skill-capability` blocks without `allow_writes` stay read-only.
+
+### Where it listens
+
+Neither backend nor frontend binds to loopback. `server.address` is set nowhere, so the backend
+listens on all interfaces; Vite runs with `host: true`. The compose service publishes `9090:9090`
+without a host-IP prefix, i.e. on every address — and Docker's port publishing bypasses most host
+firewall rules while doing so.
+
+By default CORS allows Tailscale patterns (`100.*` and `*.tail*.ts.net`) next to `localhost`.
+**CORS is not access control** — it only governs which origin a browser accepts and stops nobody
+from calling the API directly. Having Tailscale in front does not make the application a secured
+system.
+
+### What is reachable without an API key
+
+Authentication uses the `X-API-Key` header and covers `/api/**` and `/actuator/**`. Exempt are:
+
+| Path | Purpose |
+|---|---|
+| `/api/v1/system/health`, `/system/info`, `/system/auth-status` | Status checks before login |
+| `/api/v1/system/integration-snippet` | Embeddable snippet |
+| `/actuator/health` | Docker healthcheck |
+| `/ws/**` | WebSocket handshake (the key is checked there as a query parameter) |
+| `/api/v1/webhook/trigger/**` | Public webhook entry point |
+| `/api/v1/integrations/*/callback` | OAuth callbacks |
+
+Everything outside `/api/**` and `/actuator/**` is open as well (`anyRequest().permitAll()`) — that
+covers the bundled frontend and any unmapped path.
+
+**Important:** if no API key is configured, or `automation.security.enabled=false`, *every* request
+counts as authenticated. An empty key therefore switches authentication off entirely rather than
+tightening it.
+
+### Webhooks
+
+The trigger endpoint is guarded solely by a token in the path (32 random bytes from `SecureRandom`).
+There is no signature verification and no replay protection. As a counterweight, a hard-wired limit
+of 10 requests per minute and IP applies — independent of the global rate-limit switch — the payload
+is capped at 50 fields, and every caller-supplied value is marked untrusted and always escaped in
+shell blocks.
+
+### Docker privileges — two separate layers
+
+These two are easily confused:
+
+1. **`AUTOMATION_ALLOW_DOCKER_SOCKET_MOUNT`** (default `false`) is a server-side switch for whether a
+   shell block with `mount_docker_socket: true` gets the socket inside a **spawned agent container**.
+   A denial is written to the activity log as a SECURITY entry.
+2. **The shipped `docker-compose.yml`** instead mounts the host Docker socket straight into the
+   **backend container** (`/var/run/docker.sock`). This is independent of point 1 and gives the
+   application full control over Docker on the host.
+
+### What follows from this
+
+- Only run it on a network you trust; for remote access put a VPN in front instead of opening the port.
+- Set your own API key and verify it is not empty.
+- Remove the Docker socket mount from the compose file if you do not need container blocks.
+- Do not run workflows from an untrusted source unread — they run with your privileges.
+
 ## Three-Environment Setup
 
 The project supports three parallel environments:
