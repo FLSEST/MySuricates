@@ -28,6 +28,11 @@ public interface ContainerRepository extends JpaRepository<Container, String> {
      * merge (SELECT + UPDATE) and drag the eagerly mapped Project/Container graph along, all on
      * the single SQLite connection.
      *
+     * <p>Callers must be non-transactional (as {@code WorkflowExecutor} is): the update bypasses
+     * the persistence context, so a transactional caller holding the same {@code Container} would
+     * keep reading a stale {@code lastActivityAt}. Deliberately no {@code clearAutomatically} —
+     * that would detach every other entity the caller is working with.
+     *
      * @return the number of rows updated (0 when the Docker container id is unknown)
      */
     @Modifying
