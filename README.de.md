@@ -1,33 +1,111 @@
 **Deutsch** | [English](README.md)
 
-# AI Automation Platform
+# MySuricates
 
-Eine Self-Hosted-Plattform zur Automatisierung von AI-gesteuerten Workflows. Projekte werden in isolierten Docker-Containern ausgeführt und über ein React-Frontend verwaltet.
+Ein Forschungsprojekt zur Frage, wie weit sich Softwareentwicklung mit KI-Agenten kontrolliert
+betreiben laesst — und ein lauffaehiges System, an dem sich das beobachten laesst.
+
+MySuricates ist eine lokale Workflow-Plattform: Workflows bestehen aus Bloecken, die entweder
+deterministisch sind (Shell, Verzweigung, Schleife) oder eine KI aufrufen. Aus dieser Mischung ist
+ein Regelkreis entstanden, der Befunde ueber die eigene Codebasis erzeugt, daraus TODOs macht,
+Fix-Workflows anstoesst und das Ergebnis wieder prueft. Der Code ist weitgehend in KI-Sitzungen
+entstanden, ein Teil davon ueber diesen Regelkreis selbst.
+
+**Was das nicht ist:** kein Produkt, kein Dienst, kein Support, keine Stabilitaetszusage. Die
+Architekturschulden sind bekannt und werden im System selbst als Audit-Befunde gefuehrt — siehe
+[Reifegrad](#reifegrad-und-bekannte-schulden).
+
+## Die Fragen dahinter
+
+Vier Mechanismen sind gebaut, um jeweils eine Frage zu untersuchen. Gebaut heisst hier: sie laufen.
+Es heisst nicht, dass die Frage beantwortet ist.
+
+| Frage | Mechanismus im Code |
+|---|---|
+| Kann ein System den eigenen Verbesserungsbedarf feststellen und abarbeiten, ohne dass jemand den Anstoss gibt? | **Self-Improvement-Loop**: Audit-Workflow → Gate-Bewertung → automatisch erzeugtes TODO → `TodoTrigger` startet einen Fix-Workflow → Verifikation. Drei Schichten verhindern, dass der Loop sich selbst nachlaeuft. |
+| Was muss ein Agent ueber ein Projekt wissen, und woher kommt dieses Wissen, wenn niemand es aufschreibt? | **Workflow-Memory**: aus abgeschlossenen Runs wird Wissen extrahiert und vor dem naechsten Lauf als Kontext eingespielt. |
+| Wie behaelt man die Kontrolle ueber einen Agenten, der mehrere Schritte selbst plant? | **Agentische Bloecke** trennen Reason und Act und laufen gegen harte Budgets: Iterationen, Zeit, kumulierte Tokens, Wiederholungserkennung. |
+| Kann man die Qualitaet einer KI-Ausgabe maschinell bewerten, statt sie zu lesen? | **Gates**: Bloecke geben `gate_status: GREEN\|YELLOW\|RED` aus. RED erzeugt ein TODO, YELLOW faerbt den Run. Die Bewertung steckt im Workflow, nicht in der Plattform. |
+
+Die ehrlichste Antwort nach sieben Monaten: die Mechanismen tragen, aber sie brauchen Leitplanken,
+und die Leitplanken sind der eigentliche Ertrag. Ein Gate, das nur ein Sprachmodell fragt, ob etwas
+gut ist, liefert zuverlaessig Befunde — auch erfundene. Deterministische Messung vor KI-Bewertung ist
+die wiederkehrende Lehre.
+
+## Was da steht
+
+Stand 2026-09-12, Commit-Zaehler und Zeilen aus dem Arbeitsbaum, Testzahlen aus einem
+verifizierten Lauf am 2026-09-11 (Commit `a4a06843`):
+
+| | |
+|---|---|
+| Entstanden seit | 2026-02-15, 1 014 Commits, ein Autor |
+| Backend | Java 21 / Spring Boot 3.4, rund 52 000 Zeilen, 38 REST-Controller, 68 Flyway-Migrationen |
+| Frontend | React 19 / TypeScript, rund 48 000 Zeilen |
+| Tests | Backend 6 597 (0 Fehler, 1 uebersprungen), Frontend 493 |
+| Bausteine | 17 Block-Typen, 66 Workflow-Templates, 19 Built-in Skills, 7 Integrations-Provider |
+
+Die Testzahlen sind ein datierter Befund, kein Dauerzustand: die CI prueft derzeit Hygiene, Secrets
+und den Frontend-Build, nicht die beiden Testsuiten.
+
+## Reifegrad und bekannte Schulden
+
+Experimentell. Das System laeuft taeglich auf einem Rechner und hat dabei rund 2 400 Runs
+hinter sich — es ist nie unter Last, nie mit mehreren Benutzern und nie ausserhalb eines
+vertrauenswuerdigen Netzes betrieben worden.
+
+Die Schulden sind nicht versteckt, sondern gezaehlt. Das Audit Center fuehrt aktuell **89 Befunde**:
+26 offen (davon 1 kritisch, 4 hoch), 25 warten auf Verifikation, 38 sind erledigt. Inhaltlich fast
+durchgehend Struktur: zu grosse und zu stark gekoppelte Services und UI-Komponenten, unscharfe
+Controller-Repository-Grenzen, Speicher- und Retention-Themen. Wie diese Befunde entstehen und was
+die Statusse bedeuten, steht im
+[Audit-Workflow-Protokoll](docs/audit-workflow-protocol.md).
+
+Bekannte harte Grenzen:
+
+- **SQLite mit genau einer Verbindung.** Der Connection-Pool ist bewusst auf 1 gesetzt, weil SQLite
+  nur einen Schreiber kennt. Das serialisiert alle Datenbankzugriffe und begrenzt die Parallelitaet.
+- **Keine Mandantenfaehigkeit.** Ein API-Key, ein Benutzer, keine Rollen.
+- **Die KI-Aufrufe haengen an lokal installierten CLIs** (`claude`, `codex`, `pi`) samt deren
+  Anmeldung — es gibt keinen API-Schluessel-Pfad als Alternative.
+
+## Bevor du es startest
+
+Shell-Bloecke und KI-Aufrufe laufen **auf dem Host mit deinen Rechten**, nicht in einem Container;
+die Claude CLI fragt dabei standardmaessig nicht vor Werkzeugnutzung nach. Backend und Frontend
+lauschen auf allen Netzwerk-Interfaces, und einige Endpunkte brauchen keinen API-Key. MySuricates
+ist fuer den lokalen Betrieb durch eine vertrauenswuerdige Person gebaut — fuer Fernzugriff gehoert
+ein VPN davor, kein offener Port. Vollstaendig:
+[Vertrauensmodell und Netzwerk-Exposition](docs/deployment.md#vertrauensmodell-und-netzwerk-exposition).
 
 ## Tech-Stack
 
 | Komponente | Technologie |
 |---|---|
 | Backend | Spring Boot 3.4, Java 21 |
-| Frontend | React 19, TypeScript, Vite 5 |
+| Frontend | React 19, TypeScript, Vite 7 |
 | Datenbank | SQLite (WAL-Modus) + Flyway |
-| Container | Docker (Java Docker Client 3.3.4) |
-| Styling | Tailwind CSS 3.4, CSS-Variablen |
+| Container | Docker (Java Docker Client 3.4.1) — optional, nur fuer Container-Bloecke |
+| Styling | Tailwind CSS 4.2, CSS-Variablen |
 | State | Zustand 4.4 + TanStack Query 5 |
-| WebSocket | STOMP über SockJS |
+| WebSocket | STOMP ueber SockJS |
 | Sicherheit | API-Key-Auth, Rate Limiting |
 | i18n | Deutsch / Englisch |
 | PWA | Vite PWA Plugin |
-| Integrationen | Google Calendar, Gmail, Jira, Confluence, Trello |
+| Integrationen | Google Calendar, Gmail, Jira, Confluence, Trello, GitHub, Taskwarrior |
+
+Ausgefuehrt wird **auf dem Host**: Shell-Bloecke ueber die Shell des Benutzers, KI-Bloecke ueber die
+installierte CLI. Docker ist optional und wird nur gebraucht, wenn ein Shell-Block ausdruecklich ein
+`container_image` setzt.
 
 ## Quickstart
 
 > Neuer Rechner (Linux), evtl. ohne Java/Node/Docker? → **[docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)**
-> führt Schritt für Schritt durch das Setup. Kurzform: `git clone … && cd autotrigger && ./scripts/setup.sh`.
+> fuehrt Schritt fuer Schritt durch das Setup. Kurzform: `git clone … && cd autotrigger && ./scripts/setup.sh`.
 
 ```bash
 # 1. Repository klonen
-git clone <repository-url>
+git clone <repository-url> autotrigger
 cd autotrigger
 
 # 2. Backend bauen und starten
@@ -40,19 +118,14 @@ cd ai-automation-frontend
 npm install
 npm run dev
 
-# 4. Öffnen
+# 4. Oeffnen
 # Frontend: http://localhost:3000
 # Backend API: http://localhost:9090/api/v1
 ```
 
-Alternativ mit Docker:
-
-```bash
-cd ai-automation-backend
-mvn clean package -DskipTests
-docker compose up --build
-# → http://localhost:9090
-```
+Alternativ laeuft das Backend im Container — dann bitte vorher den Abschnitt
+[Deployment](docs/deployment.md) lesen: die Compose-Datei bindet den Host-Docker-Socket ein und
+erwartet einen selbst gesetzten API-Schluessel.
 
 <!-- Screenshot-Platzhalter -->
 <!-- ![Dashboard](docs/screenshots/dashboard.png) -->
@@ -62,16 +135,19 @@ docker compose up --build
 | Dokument | Inhalt |
 |---|---|
 | [Getting Started](docs/GETTING-STARTED.md) | Erstinstallation auf einem neuen Linux-Rechner (Bootstrap-Skript, Prereqs, KI-Setup) |
-| [Architektur](docs/architektur.md) | Systemübersicht, Schichten, Datenfluss, Sicherheit |
+| [Architektur](docs/architektur.md) | Systemuebersicht, Schichten, Datenfluss, Sicherheit |
 | [API-Referenz](docs/api-referenz.md) | Alle REST-Endpunkte mit Request/Response |
 | [Datenmodell](docs/datenmodell.md) | Entities, DB-Schema, Migrationen |
 | [Frontend](docs/frontend.md) | Seiten, Komponenten, Hooks, Design-System |
-| [Deployment](docs/deployment.md) | Docker, Konfiguration, Umgebungsvariablen |
+| [Deployment](docs/deployment.md) | Docker, Konfiguration, Umgebungsvariablen, Vertrauensmodell |
 | [Entwicklung](docs/entwicklung.md) | Lokales Setup, Build, Tests, Konventionen |
 | [Integrations](docs/integrations.md) | Plugin-System, OAuth, Provider-Referenz |
 | [Workflow-Guide](docs/WORKFLOW-GUIDE.md) | Block-Typen, Patterns, Timeouts |
 | [Assistant](docs/assistant-system.md) | Chat-Assistent, Sessions, Suggestions |
-| [Vision](VISION.md) | Produktvision und Roadmap |
+| [Audit-Protokoll](docs/audit-workflow-protocol.md) | Wie Befunde entstehen, Gate-Status, TODO-Verknuepfung |
+| [Vision](docs/vision.md) | Produktvision und Roadmap |
+
+Fuer Agenten, die die REST-API direkt ansprechen, ist [AGENTS.md](AGENTS.md) der Einstieg.
 
 ## Todo-Workflow-Verknuepfung
 
