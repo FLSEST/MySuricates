@@ -142,9 +142,11 @@ export function ExecutionSettingsCard() {
     );
   }
 
-  const activeRuns = config?.activeRuns ?? 0;
+  // activeRuns counts running + queued; show what actually occupies a slot and the queue separately
+  const queuedRuns = config?.queuedRuns ?? 0;
+  const runningRuns = Math.max(0, (config?.activeRuns ?? 0) - queuedRuns);
   const maxRuns = config?.executionMaxConcurrent ?? 10;
-  const usagePercent = Math.min(100, Math.round((activeRuns / maxRuns) * 100));
+  const usagePercent = Math.min(100, Math.round((runningRuns / maxRuns) * 100));
 
   return (
     <Card>
@@ -156,7 +158,12 @@ export function ExecutionSettingsCard() {
           <div className="flex-1">
             <div className="flex items-center justify-between mb-1">
               <p className="text-sm font-medium text-text">{t.settings.executionActiveRuns}</p>
-              <span className="text-sm font-mono text-text-secondary">{activeRuns} / {maxRuns}</span>
+              <span className="text-sm font-mono text-text-secondary">
+                {runningRuns} / {maxRuns}
+                {queuedRuns > 0 && (
+                  <span className="text-text-tertiary"> (+{queuedRuns} {t.settings.executionQueuedRuns})</span>
+                )}
+              </span>
             </div>
             <div className="h-1.5 bg-surface-hover rounded-full overflow-hidden">
               <div

@@ -178,7 +178,7 @@ export const handlers = [
     }),
   ),
   http.get(`${BASE}/system/execution-config`, () =>
-    HttpResponse.json({ executionMaxConcurrent: 5, claudeMaxConcurrentCalls: 5, claudeReservedForInteractive: 1, claudeTimeoutSeconds: 300, claudeInterCallDelayMs: 0, chainWorkflowTimeoutMinutes: 30, assistantChatTimeoutSeconds: 240, activeRuns: 0 }),
+    HttpResponse.json({ executionMaxConcurrent: 5, claudeMaxConcurrentCalls: 5, claudeReservedForInteractive: 1, claudeTimeoutSeconds: 300, claudeInterCallDelayMs: 0, chainWorkflowTimeoutMinutes: 30, assistantChatTimeoutSeconds: 240, activeRuns: 0, queuedRuns: 0 }),
   ),
   http.put(`${BASE}/system/execution-config`, () =>
     HttpResponse.json({ executionMaxConcurrent: 5, claudeMaxConcurrentCalls: 5, claudeReservedForInteractive: 1, claudeTimeoutSeconds: 300, claudeInterCallDelayMs: 0, chainWorkflowTimeoutMinutes: 30, assistantChatTimeoutSeconds: 240, activeRuns: 0 }),

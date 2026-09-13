@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Webhook, Plus, Trash2, RefreshCw } from 'lucide-react';
-import { Card, Button, Input, Select, Modal, Spinner, Table, Toggle, Badge } from '../components/ui';
+import { Card, Button, Input, Select, Modal, ModalFooter, Spinner, Table, Toggle, Badge } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
 import { CopyButton } from '../components/shared/CopyButton';
@@ -29,6 +29,10 @@ export function Webhooks() {
   // Holds the freshly created/regenerated webhook while its token is still visible in full —
   // the token is never revealed again after this one-time modal is closed.
   const [revealedWebhook, setRevealedWebhook] = useState<WebhookTrigger | null>(null);
+  // Pending destructive action awaiting confirmation in the project Modal (no window.confirm).
+  const [confirmAction, setConfirmAction] = useState<
+    { kind: 'regenerate' | 'delete'; webhook: WebhookTrigger } | null
+  >(null);
 
   const handleCreate = () => {
     createWebhook.mutate(form, {
@@ -40,11 +44,19 @@ export function Webhooks() {
     });
   };
 
-  const handleRegenerate = (w: WebhookTrigger) => {
-    if (!window.confirm(t.webhooks.regenerateConfirm)) return;
-    regenerateToken.mutate(w.id, {
-      onSuccess: (webhook) => setRevealedWebhook(webhook),
-    });
+  const runConfirmedAction = () => {
+    if (!confirmAction) return;
+    const { kind, webhook } = confirmAction;
+    if (kind === 'regenerate') {
+      regenerateToken.mutate(webhook.id, {
+        onSuccess: (regenerated) => {
+          setConfirmAction(null);
+          setRevealedWebhook(regenerated);
+        },
+      });
+    } else {
+      deleteWebhook.mutate(webhook.id, { onSuccess: () => setConfirmAction(null) });
+    }
   };
 
   if (isLoading) {
@@ -80,7 +92,12 @@ export function Webhooks() {
       key: 'token',
       header: t.webhooks.token,
       render: (w: WebhookTrigger) => (
-        <span className="font-mono text-xs text-text-tertiary">{w.secretToken}</span>
+        <span
+          className="font-mono text-xs text-text-tertiary"
+          title={w.tokenVisible ? undefined : t.webhooks.tokenMaskedHint}
+        >
+          {w.secretToken}
+        </span>
       ),
     },
     {
@@ -110,7 +127,7 @@ export function Webhooks() {
           <button
             onClick={(e) => {
               e.stopPropagation();
-              handleRegenerate(w);
+              setConfirmAction({ kind: 'regenerate', webhook: w });
             }}
             className="p-1.5 rounded-lg text-text-tertiary hover:text-accent transition-colors"
             aria-label={t.webhooks.regenerate}
@@ -121,7 +138,7 @@ export function Webhooks() {
           <button
             onClick={(e) => {
               e.stopPropagation();
-              deleteWebhook.mutate(w.id);
+              setConfirmAction({ kind: 'delete', webhook: w });
             }}
             className="p-1.5 rounded-lg text-text-tertiary hover:text-danger transition-colors"
             aria-label={t.common.delete}
@@ -206,6 +223,31 @@ export function Webhooks() {
             placeholder="GitHub push event handler"
           />
         </div>
+      </Modal>
+
+      {/* Confirmation for regenerate / delete */}
+      <Modal
+        open={confirmAction !== null}
+        onClose={() => setConfirmAction(null)}
+        title={confirmAction?.kind === 'delete' ? t.common.delete : t.webhooks.regenerate}
+        size="sm"
+        footer={
+          <ModalFooter
+            onCancel={() => setConfirmAction(null)}
+            onAction={runConfirmedAction}
+            cancelLabel={t.common.cancel}
+            actionLabel={confirmAction?.kind === 'delete' ? t.common.delete : t.webhooks.regenerate}
+            actionVariant="danger"
+            actionLoading={regenerateToken.isPending || deleteWebhook.isPending}
+          />
+        }
+      >
+        <p className="text-sm text-text-secondary">
+          {confirmAction?.kind === 'delete' ? t.webhooks.deleteConfirm : t.webhooks.regenerateConfirm}
+        </p>
+        {confirmAction && (
+          <p className="text-xs font-mono text-text-tertiary mt-3 break-all">{confirmAction.webhook.webhookUrl}</p>
+        )}
       </Modal>
 
       {/* One-time token reveal modal — shown right after create/regenerate, never again */}

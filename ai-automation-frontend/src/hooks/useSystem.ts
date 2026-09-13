@@ -229,7 +229,10 @@ export interface ExecutionConfig {
   wishDefaultShellTimeoutSeconds?: number;
   wishDefaultAgenticTotalTimeoutSeconds?: number;
   modelCatalogTtlSeconds?: number;
+  /** running + queued (a queued run already holds or is about to hold a permit) */
   activeRuns: number;
+  /** subset of activeRuns still waiting for a permit or container */
+  queuedRuns?: number;
 }
 
 export function useExecutionConfig() {
