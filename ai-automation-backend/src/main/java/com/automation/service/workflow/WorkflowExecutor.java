@@ -265,26 +265,18 @@ public class WorkflowExecutor {
                     "Workflow execution error: " + message,
                     "WorkflowExecutor", runId, workflowId);
         } finally {
-            // Order matters (TODO 7bb17b13): the permit is released only after the terminal save.
-            // Releasing first let a queued run start while this one was still writing its final
-            // row on the single SQLite connection, and activeRuns briefly exceeded the limit.
-            // Unregister last: between unregister and the final save the watchdog would see
-            // DB=RUNNING with an empty registry and flag a false-positive ghost run.
+            // Order (TODO 7bb17b13): terminal save -> unregister -> release permit. Releasing first let a
+            // queued run start while this one still wrote its final row on the single SQLite connection;
+            // unregistering before the save let the watchdog flag a false-positive ghost run.
             try {
                 if (run != null) {
                     finalizer.finish(run, context, workflowId, workflowName, project, workflowMeta);
                 } else {
-                    // run could not be loaded — mark as failed directly
-                    failRun(runId, "Failed to load workflow run from database");
+                    failRun(runId, "Failed to load workflow run from database");   // run could not be loaded
                 }
             } finally {
-                try {
-                    executionRegistry.unregister(runId);
-                } finally {
-                    if (semaphoreAcquired) {
-                        executionSemaphore.release();
-                    }
-                }
+                try { executionRegistry.unregister(runId); }
+                finally { if (semaphoreAcquired) executionSemaphore.release(); }
             }
         }
     }
