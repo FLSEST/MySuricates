@@ -107,7 +107,7 @@ com.automation
 │   ├── execution/       ExecutionQueryService (Lesen + DTO-Mapping), ExecutionCommandService (Retry, Resume, Notizen), WorkflowDebugService
 │   ├── dlq/             DeadLetterService, DeadLetterRetryService
 │   ├── document/        DocumentExtractionService, DocumentExtractionException
-│   ├── export/bpmn/     BpmnModelBuilder (Kette/Einzel-Task/Schleife) + BpmnNodeFactory (Ids, Platzierung, Kanten, Command-Tasks), BpmnGatewayBuilder (conditional/switch: Split/Rows/Merge), BpmnEdgeRouter (rechtwinkliges Waypoint-Routing), BpmnBlockText (Labels, Doku, Config-Helfer), BpmnSegment (Teil-Graph), BpmnXmlRenderer, BpmnExportAdapter, BpmnModel, BpmnNames
+│   ├── export/bpmn/     BpmnModelBuilder (Kette/Einzel-Task/Schleife) + BpmnNodeFactory (Ids, Platzierung, Kanten, Command-Tasks), BpmnGatewayBuilder (conditional/switch: Split/Rows/Merge), BpmnEdgeRouter (rechtwinkliges Waypoint-Routing), BpmnBlockText (Labels, Doku, Config-Helfer), BpmnSegment (Teil-Graph), BpmnXmlRenderer, BpmnExportAdapter, BpmnModel, BpmnNames; Import (Roundtrip): BpmnImportAdapter (liest `mysuricates:blockConfig` der direkten `<process>`-Kinder zurück, lehnt Fremd-BPMN ab), BpmnDom (XXE-gehärtetes JDK-DOM-Parsen), BpmnImportException → 400; Interfaces `export/ProcessFormatAdapter` (Export) + `export/ProcessFormatImporter` (Import, Ergebnis `ImportedWorkflow`)
 │   ├── search/          SemanticWorkflowSearchService
 │   ├── watchdog/        ConnectionPoolWatchdogService
 │   ├── repair/          AutoRepairService
@@ -140,6 +140,7 @@ com.automation
 |---|---|---|
 | `ProjectController` | `/api/v1/projects` | CRUD, Archivierung, Container-Lifecycle, Kontext-Generierung |
 | `WorkflowController` | `/api/v1/workflows` | CRUD, Ausführung, Runs, Export/Import, Skills, Optimize, Similar, Repair, Versions |
+| `WorkflowImportController` | `/api/v1/workflows/import` | BPMN-Import (`POST /bpmn?projectId=…`, Body = BPMN-XML) → neuer Workflow (201); Fremd-BPMN/kaputtes XML/zu groß → 400 |
 | `ExecutionController` | `/api/v1/executions` | Liste, Detail, Pause, Resume, Resume-from-Step, Cancel, Retry, Approve, Approval-Check, Todos-Approve, Notes, Command |
 | `SkillController` | `/api/v1/skills` | CRUD, Capabilities, Export/Import |
 | `ScheduleController` | `/api/v1/schedules` | CRUD, Enable/Disable, Runs, Calendar, Preview, Remaining-Stats, Chain-Schedules, Maintenance |

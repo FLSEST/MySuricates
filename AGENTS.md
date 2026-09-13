@@ -334,6 +334,12 @@ GET /api/v1/workflows?projectId=<uuid>
 GET /api/v1/workflows/{id}/export/bpmn
 # → File-Download (.bpmn, Camunda-Modeler-kompatibel)
 
+# BPMN-Export als NEUEN Workflow reimportieren (Roundtrip; nur eigene Exporte mit mysuricates:blockConfig)
+POST /api/v1/workflows/import/bpmn?projectId=<uuid>
+Content-Type: application/xml   # Body = BPMN-XML (max. 2 MiB)
+# → 201 + Workflow (Name aus <process name>, Blöcke exakt wie exportiert: Typ, Name, Config)
+# → 400 {"code":"INVALID_ARGUMENT","error":"…"} bei Fremd-BPMN (ohne Erweiterung), kaputtem XML, DOCTYPE/XXE, zu großer Datei
+
 # System-Backup erstellen
 GET /api/v1/system/backup
 # → File-Download
