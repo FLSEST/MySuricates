@@ -3,6 +3,7 @@ package com.automation.service.integration.providers.jira;
 import com.automation.service.integration.IntegrationAction;
 import com.automation.service.integration.IntegrationProvider;
 import com.automation.service.integration.OAuthConfig;
+import com.automation.service.integration.TaskExportCapable;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -21,15 +22,17 @@ import static com.automation.service.integration.providers.jira.JiraParams.*;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class JiraProvider implements IntegrationProvider {
+public class JiraProvider implements IntegrationProvider, TaskExportCapable {
 
     private static final String ATLASSIAN_API = "https://api.atlassian.com";
 
     private final ObjectMapper objectMapper;
     private final JiraHttpClient http;
 
-    /** Cache cloudId per access token to avoid resolving on every action */
-    private final ConcurrentHashMap<String, String> cloudIdCache = new ConcurrentHashMap<>();
+    /** Cache the accessible site (cloudId + browse URL) per access token to avoid resolving on every action */
+    private final ConcurrentHashMap<String, JiraSite> siteCache = new ConcurrentHashMap<>();
+
+    private record JiraSite(String cloudId, String siteUrl) {}
 
     @Override
     public String getProviderId() {
@@ -67,8 +70,9 @@ public class JiraProvider implements IntegrationProvider {
     @Override
     public String fetchAccountInfo(String accessToken) {
         try {
-            String cloudId = resolveCloudId(accessToken);
-            if (cloudId == null) return null;
+            JiraSite site = resolveSite(accessToken);
+            if (site == null) return null;
+            String cloudId = site.cloudId();
 
             String baseUrl = buildBaseUrl(cloudId);
             JiraUser user = http.get(baseUrl + "/myself", accessToken, JiraUser.class);
@@ -207,22 +211,40 @@ public class JiraProvider implements IntegrationProvider {
         return Map.of("transitioned", true, "issueKey", issueKey, "transitionId", transitionId);
     }
 
+    // --- TaskExportCapable (integrations-agnostischer Single-TODO-Export, target = Project-Key) ---
+
+    @Override
+    public TaskRef createTask(TaskExportInput input, String accessToken) {
+        String projectKey = JiraTaskExporter.requireProjectKey(input.target());
+        JiraSite site = requireSite(accessToken);
+        return JiraTaskExporter.createTask(http, buildBaseUrl(site.cloudId()), site.siteUrl(), projectKey, input, accessToken);
+    }
+
+    @Override
+    public List<TaskTarget> listTargets(String accessToken) {
+        return JiraTaskExporter.listTargets(http, resolveBaseUrl(accessToken), accessToken);
+    }
+
     // --- Cloud ID resolution ---
 
     private String resolveBaseUrl(String accessToken) {
-        String cloudId = resolveCloudId(accessToken);
-        if (cloudId == null) {
+        return buildBaseUrl(requireSite(accessToken).cloudId());
+    }
+
+    private JiraSite requireSite(String accessToken) {
+        JiraSite site = resolveSite(accessToken);
+        if (site == null) {
             throw new IllegalStateException("Could not resolve Jira Cloud ID. Is the Jira site accessible?");
         }
-        return buildBaseUrl(cloudId);
+        return site;
     }
 
     private String buildBaseUrl(String cloudId) {
         return ATLASSIAN_API + "/ex/jira/" + cloudId + "/rest/api/3";
     }
 
-    private String resolveCloudId(String accessToken) {
-        return cloudIdCache.computeIfAbsent(accessToken, token -> {
+    private JiraSite resolveSite(String accessToken) {
+        return siteCache.computeIfAbsent(accessToken, token -> {
             try {
                 HttpResponse<String> response = http.getRaw(
                         ATLASSIAN_API + "/oauth/token/accessible-resources", token, Duration.ofSeconds(10));
@@ -233,7 +255,8 @@ public class JiraProvider implements IntegrationProvider {
 
                 JsonNode resources = objectMapper.readTree(response.body());
                 if (resources.isArray() && !resources.isEmpty()) {
-                    return resources.get(0).get("id").asText();
+                    JsonNode first = resources.get(0);
+                    return new JiraSite(first.get("id").asText(), first.hasNonNull("url") ? first.get("url").asText() : null);
                 }
                 log.warn("No accessible Jira resources found");
                 return null;

@@ -3,12 +3,14 @@ package com.automation.service.integration.providers.trello;
 import com.automation.service.integration.IntegrationAction;
 import com.automation.service.integration.IntegrationProvider;
 import com.automation.service.integration.OAuthConfig;
+import com.automation.service.integration.TaskExportCapable;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.net.http.HttpResponse;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -17,7 +19,7 @@ import static com.automation.service.integration.providers.trello.TrelloParams.*
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class TrelloProvider implements IntegrationProvider {
+public class TrelloProvider implements IntegrationProvider, TaskExportCapable {
 
     private static final String BASE_URL = "https://api.trello.com/1";
 
@@ -189,6 +191,46 @@ public class TrelloProvider implements IntegrationProvider {
                 + "&boards_limit=" + boardsLimit;
 
         return http.get(url, TrelloSearchResult.class);
+    }
+
+    // --- TaskExportCapable (integrations-agnostischer Single-TODO-Export, target = Listen-ID) ---
+
+    @Override
+    public TaskRef createTask(TaskExportInput input, String accessToken) {
+        if (input.target() == null || input.target().isBlank()) {
+            throw new IllegalArgumentException("Trello export needs a list id as target");   // before any request
+        }
+        String name = input.title() != null && !input.title().isBlank() ? input.title() : "TODO";
+        StringBuilder url = new StringBuilder(BASE_URL + "/cards?" + buildAuthParams(accessToken));
+        url.append("&idList=").append(urlEncode(input.target().trim()));
+        url.append("&name=").append(urlEncode(name));
+        if (input.body() != null && !input.body().isBlank()) url.append("&desc=").append(urlEncode(input.body()));
+        url.append("&pos=bottom");
+        // labels are not mapped: Trello expects label ids, MySuricates tags are free text
+
+        TrelloCard card = http.post(url.toString(), TrelloCard.class);
+        if (card == null || card.id() == null) {
+            throw new IllegalStateException("Trello card creation returned no id");
+        }
+        return new TaskRef("trello", card.id(), card.shortUrl() != null ? card.shortUrl() : card.url());
+    }
+
+    /** Every open list of every open board, labelled "Board / Liste". */
+    @Override
+    public List<TaskTarget> listTargets(String accessToken) {
+        String auth = buildAuthParams(accessToken);
+        TrelloBoard[] boards = http.get(BASE_URL + "/members/me/boards?" + auth + "&filter=open", TrelloBoard[].class);
+        List<TaskTarget> out = new ArrayList<>();
+        if (boards == null) return out;
+        for (TrelloBoard board : boards) {
+            TrelloList[] lists = http.get(BASE_URL + "/boards/" + urlEncode(board.id()) + "/lists?" + auth + "&filter=open",
+                    TrelloList[].class);
+            if (lists == null) continue;
+            for (TrelloList list : lists) {
+                out.add(new TaskTarget(list.id(), board.name() + " / " + list.name()));
+            }
+        }
+        return out;
     }
 
     // --- Auth helper ---

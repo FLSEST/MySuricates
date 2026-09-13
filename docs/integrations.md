@@ -107,6 +107,11 @@ Für Google gibt es die Konstante `OAuthConfig.GOOGLE_REVOCATION_URL` und den Wi
 | Trello | `trello` | API-Key + Token (kein OAuth-Flow) | `providers/trello/` | `list_boards`, `get_board_lists`, `get_list_cards`, `get_card`, `create_card`, `update_card`, `delete_card`, `add_comment`, `search` |
 | Taskwarrior | `taskwarrior` | Lokales CLI (kein OAuth, optional TASKDATA/TASKRC) | `providers/taskwarrior/` | `list_tasks`, `get_task`, `add_task`, `complete_task`, `modify_task`, `annotate_task`, `delete_task`, `list_projects`, `sync_task` |
 
+**Task-Export (TODO → Tracker, `TaskExportCapable`):** GitHub (Issue, Target `owner/repo`), Jira (Issue vom
+Typ Task, Target = Project-Key, Labels ohne Leerzeichen; Browse-URL aus den accessible-resources) und Trello
+(Karte, Target = Listen-ID, `listTargets` liefert „Board / Liste"; Tags werden nicht als Labels übertragen, weil
+Trello Label-IDs erwartet). Erkennung per `instanceof`, Contract-Test `TaskExportContractTest`.
+
 > **Taskwarrior ist ein Sonderfall:** kein HTTP-Dienst, sondern das lokale `task`-CLI. `executeAction()` ruft `task` per `ProcessBuilder` (Argument-Array, kein `bash -c`) auf dem Backend-Host auf — via `service/cli/TaskCommandService.java` + `util/HostProcessUtils.drain()`. Setzt voraus, dass `task` auf dem Host installiert ist; sonst bleibt die Verbindung „Setup required". Timeout runtime-konfigurierbar über `ExecutionSettingsService` (`task-command-timeout-seconds`). Sicherheit: Filter-Token mit `rc.`-Overrides oder Taskwarrior-Kommandos (z.B. `execute`) werden abgelehnt, IDs validiert, Freitext landet hinter `--`. Intern aufgeteilt: Action-Liste in `TaskwarriorActionCatalog`, Argument-Aufbau und Validierung in `TaskwarriorArgs`.
 
 ### OAuth-Endpunkte & Scopes je Provider
