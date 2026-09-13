@@ -123,6 +123,8 @@ class SystemControllerTest {
                 .andExpect(jsonPath("$.version").value("0.2.3"))
                 .andExpect(jsonPath("$.buildType").value("SNAPSHOT"))
                 .andExpect(jsonPath("$.java").exists())
+                .andExpect(jsonPath("$.runtimeMode").value(
+                        org.hamcrest.Matchers.oneOf("jar", "classes-dir")))
                 .andExpect(jsonPath("$.tailscale").value("DISABLED"))
                 .andExpect(jsonPath("$.environment").value("Dev"));
     }

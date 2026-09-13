@@ -1,5 +1,6 @@
 package com.automation.service.activitylog;
 
+import com.automation.config.RuntimeClasspathGuard;
 import com.automation.entity.ActivityLog.LogCategory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +36,7 @@ public class ActivityLogLifecycleListener {
         var javaVersion = System.getProperty("java.version");
         var profiles = String.join(", ", environment.getActiveProfiles());
         var workingDir = System.getProperty("user.dir");
+        var runtimeMode = RuntimeClasspathGuard.mode(System.getProperty("java.class.path"));
 
         log.info("========================================================");
         log.info("  MySuricates STARTED");
@@ -44,11 +46,19 @@ public class ActivityLogLifecycleListener {
         log.info("  CPUs:           {}", runtime.availableProcessors());
         log.info("  Profiles:       {}", profiles.isEmpty() ? "default" : profiles);
         log.info("  Working Dir:    {}", workingDir);
+        log.info("  Runtime:        {}", runtimeMode);
         log.info("========================================================");
 
         var details = String.format("PID=%d, Java=%s, Heap=%dMB/%dMB, Profiles=%s",
                 pid, javaVersion, heapInit, heapMax, profiles.isEmpty() ? "default" : profiles);
         activityLogService.info(LogCategory.SYSTEM, "MySuricates server started — " + details, "System");
+
+        if (RuntimeClasspathGuard.MODE_CLASSES_DIR.equals(runtimeMode)) {
+            var warning = "Server runs from target/classes (escape hatch set): any IDE or Maven build in this "
+                    + "checkout can kill it with NoClassDefFoundError — restart via scripts/start-autotrigger-dev.sh";
+            log.warn(warning);
+            activityLogService.warn(LogCategory.SYSTEM, warning, "System");
+        }
     }
 
     @EventListener(ContextClosedEvent.class)

@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RuntimeClasspathGuard;
 import com.automation.service.system.SystemIdentityService;
 import com.automation.service.system.TailscaleService;
 import com.github.dockerjava.api.DockerClient;
@@ -111,6 +112,7 @@ public class SystemController {
         result.put("buildType", systemIdentity.getBuildType());
         result.put("buildTimestamp", systemIdentity.getBuildTimestamp());
         result.put("java", System.getProperty("java.version"));
+        result.put("runtimeMode", RuntimeClasspathGuard.mode(System.getProperty("java.class.path")));
         result.put("tailscale", tailscaleService.isConfigEnabled() ? "CONFIGURED" : "DISABLED");
         result.put("environment", environment);
         return result;
