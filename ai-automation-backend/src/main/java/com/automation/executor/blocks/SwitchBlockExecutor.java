@@ -206,9 +206,9 @@ public class SwitchBlockExecutor implements BlockExecutor {
                                     .build())
                             .stepIndex(context.nextStepIndex())
                             .systemPrompt(context.getInstructionPrefix())
-                            .model(context.getModel())
+                            .model(context.modelFor(nestedBlock))
                             .timeoutSeconds(claudeTimeout)
-                            .providerId(context.getProvider())
+                            .providerId(context.providerFor(nestedBlock))
                             .effort(context.effortFor(nestedBlock))
                             .build()
             );

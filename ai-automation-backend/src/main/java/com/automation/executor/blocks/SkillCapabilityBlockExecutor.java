@@ -122,10 +122,10 @@ public class SkillCapabilityBlockExecutor implements BlockExecutor {
             HostExecutionRequest.HostExecutionRequestBuilder reqBuilder = HostExecutionRequest.builder()
                     .projectPath(context.getProjectPath())
                     .command(userPrompt.toString())
-                    .model(context.getModel())
+                    .model(context.modelFor(block))
                     .systemPrompt(composedSystemPrompt)
                     .timeoutSeconds(claudeTimeout)
-                    .providerId(context.getProvider())
+                    .providerId(context.providerFor(block))
                     .effort(context.effortFor(block));
 
             // Defense-in-depth: when the workflow author has not explicitly opted in to writes,

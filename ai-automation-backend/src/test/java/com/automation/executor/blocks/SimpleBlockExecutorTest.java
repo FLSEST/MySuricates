@@ -204,4 +204,64 @@ class SimpleBlockExecutorTest {
 
         assertThat(captor.getValue().systemPrompt()).isEqualTo("You are a test agent");
     }
+
+    @Test
+    void execute_blockLevelProviderAndModel_overrideWorkflowLevel() {
+        context.setProvider("CODEX");
+        context.setModel("gpt-5");
+        StepResult expected = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        ArgumentCaptor<HostExecutionRequest> captor = ArgumentCaptor.forClass(HostExecutionRequest.class);
+        when(commandExecutor.executeStepOnHost(captor.capture())).thenReturn(expected);
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("simple")
+                .config(new HashMap<>(Map.of("command", "test", "provider", "PI", "model", "anthropic/opus")))
+                .build();
+
+        executor.execute(block, context);
+
+        assertThat(captor.getValue().providerId()).isEqualTo("PI");
+        assertThat(captor.getValue().model()).isEqualTo("anthropic/opus");
+    }
+
+    @Test
+    void execute_blockProviderOnly_doesNotCarryWorkflowModelToOtherProvider() {
+        context.setProvider("CLAUDE");
+        context.setModel("opus");
+        StepResult expected = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        ArgumentCaptor<HostExecutionRequest> captor = ArgumentCaptor.forClass(HostExecutionRequest.class);
+        when(commandExecutor.executeStepOnHost(captor.capture())).thenReturn(expected);
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("simple")
+                .config(new HashMap<>(Map.of("command", "test", "provider", "PI")))
+                .build();
+
+        executor.execute(block, context);
+
+        assertThat(captor.getValue().providerId()).isEqualTo("PI");
+        assertThat(captor.getValue().model()).isNull();
+    }
+
+    @Test
+    void execute_blockModelOnly_keepsWorkflowProvider() {
+        context.setProvider("CLAUDE");
+        context.setModel("sonnet");
+        StepResult expected = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        ArgumentCaptor<HostExecutionRequest> captor = ArgumentCaptor.forClass(HostExecutionRequest.class);
+        when(commandExecutor.executeStepOnHost(captor.capture())).thenReturn(expected);
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("simple")
+                .config(new HashMap<>(Map.of("command", "test", "model", "opus")))
+                .build();
+
+        executor.execute(block, context);
+
+        assertThat(captor.getValue().providerId()).isEqualTo("CLAUDE");
+        assertThat(captor.getValue().model()).isEqualTo("opus");
+    }
 }

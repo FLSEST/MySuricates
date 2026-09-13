@@ -51,7 +51,7 @@ class AgenticActionRunnerTest {
         when(provider.executeAction(any())).thenThrow(new IOException("boom"));
 
         AgenticActionRunner.ActOutcome outcome = runner.run(context, 0, 1, "do it",
-                provider, null, cfg, new AgenticTokenTracker(), iterData());
+                provider, null, null, cfg, new AgenticTokenTracker(), iterData());
 
         assertThat(outcome.output()).isEqualTo("Execution error: boom");
         assertThat(outcome.exitCode()).isEqualTo(-1);
@@ -69,7 +69,7 @@ class AgenticActionRunnerTest {
                 .thenReturn(new AiProvider.ActionResult("done", 0, null));
 
         AgenticActionRunner.ActOutcome outcome = runner.run(context, 0, 1, oversized,
-                provider, null, cfg, new AgenticTokenTracker(), iterData());
+                provider, null, null, cfg, new AgenticTokenTracker(), iterData());
 
         verify(promptBuilder).compressAction(oversized, provider, context.getModel());
         assertThat(outcome.action()).isEqualTo("compressed action");
@@ -90,7 +90,7 @@ class AgenticActionRunnerTest {
                 .thenReturn(new AiProvider.ActionResult("done", 0, null));
 
         AgenticActionRunner.ActOutcome outcome = runner.run(context, 0, 1, oversized,
-                provider, null, cfg, new AgenticTokenTracker(), iterData());
+                provider, null, null, cfg, new AgenticTokenTracker(), iterData());
 
         assertThat(outcome.action()).startsWith("y".repeat(AGENTIC_ACTION_COMPRESS_THRESHOLD));
         assertThat(outcome.action()).contains("[TRUNCATED: original was " + oversized.length() + " chars]");

@@ -583,4 +583,55 @@ class ExecutionContextTest {
                 .containsEntry(ExecutionContext.UNTRUSTED_OUTPUTS_VARIABLE,
                         java.util.List.of(ExecutionContext.PREVIOUS_OUTPUT_NAME, "scan"));
     }
+
+    @Test
+    void providerFor_blockConfigOverridesWorkflowProvider() {
+        context.setProvider("CODEX");
+        var block = com.automation.entity.BlockDefinition.builder()
+                .type("simple")
+                .config(new java.util.HashMap<>(java.util.Map.of("command", "x", "provider", "PI")))
+                .build();
+
+        assertThat(context.providerFor(block)).isEqualTo("PI");
+    }
+
+    @Test
+    void providerFor_fallsBackToWorkflowProvider_whenBlockHasNone() {
+        context.setProvider("CODEX");
+        var block = com.automation.entity.BlockDefinition.builder()
+                .type("simple")
+                .config(new java.util.HashMap<>(java.util.Map.of("command", "x")))
+                .build();
+
+        assertThat(context.providerFor(block)).isEqualTo("CODEX");
+        assertThat(context.providerFor(null)).isEqualTo("CODEX");
+    }
+
+    @Test
+    void modelFor_blockConfigOverridesWorkflowModel() {
+        context.setModel("sonnet");
+        var block = com.automation.entity.BlockDefinition.builder()
+                .type("simple")
+                .config(new java.util.HashMap<>(java.util.Map.of("command", "x", "model", "opus")))
+                .build();
+
+        assertThat(context.modelFor(block)).isEqualTo("opus");
+    }
+
+    @Test
+    void modelFor_workflowModelNotInherited_whenBlockSwitchesProvider() {
+        context.setProvider("CLAUDE");
+        context.setModel("sonnet");
+        var sameProvider = com.automation.entity.BlockDefinition.builder()
+                .type("simple")
+                .config(new java.util.HashMap<>(java.util.Map.of("command", "x")))
+                .build();
+        var otherProvider = com.automation.entity.BlockDefinition.builder()
+                .type("simple")
+                .config(new java.util.HashMap<>(java.util.Map.of("command", "x", "provider", "PI")))
+                .build();
+
+        assertThat(context.modelFor(sameProvider)).isEqualTo("sonnet");
+        assertThat(context.modelFor(otherProvider)).isNull();
+    }
 }

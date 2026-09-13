@@ -65,8 +65,9 @@ public class WhileBlockExecutor implements BlockExecutor {
                             HostExecutionRequest.builder()
                                     .projectPath(context.getProjectPath())
                                     .command(resolvedCondition)
+                                    .model(context.modelFor(block))
                                     .timeoutSeconds(claudeTimeout)
-                                    .providerId(context.getProvider())
+                                    .providerId(context.providerFor(block))
                                     .effort(context.effortFor(block))
                                     .build()
                     ).output();
@@ -99,9 +100,9 @@ public class WhileBlockExecutor implements BlockExecutor {
                                         .build())
                                 .stepIndex(context.nextStepIndex())
                                 .systemPrompt(context.getInstructionPrefix())
-                                .model(context.getModel())
+                                .model(context.modelFor(block))
                                 .timeoutSeconds(claudeTimeout)
-                                .providerId(context.getProvider())
+                                .providerId(context.providerFor(block))
                                 .effort(context.effortFor(block))
                                 .build()
                 );

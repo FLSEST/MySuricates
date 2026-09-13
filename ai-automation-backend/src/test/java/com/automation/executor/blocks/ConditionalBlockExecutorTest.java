@@ -430,4 +430,34 @@ class ConditionalBlockExecutorTest {
         assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
         assertThat(result.getOutput()).contains("error");
     }
+
+    @Test
+    void execute_blockLevelProviderAndModel_overrideWorkflowLevel_forConditionAndBranch() {
+        context.setProvider("CODEX");
+        context.setModel("gpt-5");
+        when(commandExecutor.executeOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(new CliSession.EnrichedCommandResult("true", 0, null));
+        StepResult thenResult = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("ok").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(thenResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("condition", "x == 1");
+        config.put("then_command", "do something");
+        config.put("provider", "PI");
+        config.put("model", "anthropic/opus");
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("conditional")
+                .config(config)
+                .build();
+
+        executor.execute(block, context);
+
+        verify(commandExecutor).executeOnHost(argThat(req ->
+                "PI".equals(req.providerId()) && "anthropic/opus".equals(req.model())));
+        verify(commandExecutor).executeStepOnHost(argThat(req ->
+                "PI".equals(req.providerId()) && "anthropic/opus".equals(req.model())));
+    }
 }

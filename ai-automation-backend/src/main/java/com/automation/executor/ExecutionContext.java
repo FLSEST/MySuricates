@@ -1,11 +1,9 @@
 package com.automation.executor;
 
 import com.automation.entity.BlockDefinition;
-import com.automation.service.ai.ReasoningEffort;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
-import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -18,7 +16,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @Getter
 @Builder
-@Slf4j
 public class ExecutionContext {
 
     private final String containerId;
@@ -178,23 +175,19 @@ public class ExecutionContext {
         return variables.get(name);
     }
 
-    /**
-     * Effort level for a block: block config {@code "effort"} wins over the workflow-level
-     * effort. Invalid block values are ignored (with a warning), not escalated — the run
-     * proceeds with the workflow effort or provider default.
-     */
+    /** AI provider for a block: block config {@code "provider"} > workflow provider > null (system default). See {@link BlockAiSettings}. */
+    public String providerFor(BlockDefinition block) {
+        return BlockAiSettings.providerFor(block, provider);
+    }
+
+    /** Model for a block: block config {@code "model"} > workflow model (same provider only) > null. See {@link BlockAiSettings}. */
+    public String modelFor(BlockDefinition block) {
+        return BlockAiSettings.modelFor(block, provider, model);
+    }
+
+    /** Effort for a block: block config {@code "effort"} > workflow effort > null; invalid block values are ignored. See {@link BlockAiSettings}. */
     public String effortFor(BlockDefinition block) {
-        if (block != null && block.getConfig() != null) {
-            Object raw = block.getConfig().get("effort");
-            if (raw instanceof String s && !s.isBlank()) {
-                var parsed = ReasoningEffort.parse(s);
-                if (parsed.isPresent()) {
-                    return parsed.get().cliValue();
-                }
-                log.warn("Ignoring invalid block effort '{}' (valid: low, medium, high, xhigh)", s);
-            }
-        }
-        return effort;
+        return BlockAiSettings.effortFor(block, effort);
     }
 
     /** Stores a block's output under its declared name for {{ block.<name>.output }} resolution. Taint-neutral — für Block-Ergebnisse {@link #recordOutput}, für aus Output abgeleitete Variablen {@link #setDerivedVariable} verwenden; nur für Resume-Seeding/Tests. */

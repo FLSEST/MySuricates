@@ -295,6 +295,12 @@ export const en = {
     blockConfig: 'Configuration (JSON)',
     blockSkills: 'Block Skills',
     blockSkillsHint: 'Additional skills activated for this block only (added to workflow-level skills).',
+    blockAiOverride: 'AI provider and model for this block',
+    blockAiOverrideHint: 'Overrides the workflow setting for this block only (config keys provider/model). Empty = workflow setting, then system default.',
+    blockProvider: 'Provider',
+    blockProviderInherit: 'Same as workflow',
+    blockModel: 'Model',
+    blockAiOverrideInvalidJson: 'Config is not valid JSON – provider/model can be set once it is fixed.',
     blockTypes: {
       simple: 'Simple Command',
       shell: 'Shell Command',

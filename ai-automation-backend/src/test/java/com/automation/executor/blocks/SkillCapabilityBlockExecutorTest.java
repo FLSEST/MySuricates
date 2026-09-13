@@ -374,4 +374,28 @@ class SkillCapabilityBlockExecutorTest {
                 .build();
         s.getCapabilities().add(c);
     }
+
+    @Test
+    void execute_blockLevelProviderAndModel_overrideWorkflowLevel() {
+        context.setProvider("CODEX");
+        context.setModel("gpt-5");
+        when(commandExecutor.executeOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(new CliSession.EnrichedCommandResult("ok", 0, null));
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("capability", "summarize");
+        config.put("input", "text");
+        config.put("provider", "PI");
+        config.put("model", "anthropic/opus");
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("skill-capability")
+                .config(config)
+                .build();
+
+        executor.execute(block, context);
+
+        verify(commandExecutor).executeOnHost(argThat(req ->
+                "PI".equals(req.providerId()) && "anthropic/opus".equals(req.model())));
+    }
 }

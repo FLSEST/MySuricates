@@ -65,9 +65,10 @@ public class AgenticBlockExecutor implements BlockExecutor {
                 learningContext, context.getInstructionPrefix());
 
         // Resolve AI provider
-        AiProvider provider = aiProviderRegistry.resolve(context.getProvider());
+        AiProvider provider = aiProviderRegistry.resolve(context.providerFor(block));
+        String model = context.modelFor(block);
         String effort = context.effortFor(block);
-        log.info("Agentic block using AI provider: {}", provider.getId());
+        log.info("Agentic block using AI provider: {} (model: {})", provider.getId(), model);
 
         // Initialize state
         List<Turn> history = new ArrayList<>();
@@ -119,7 +120,7 @@ public class AgenticBlockExecutor implements BlockExecutor {
             try {
                 String conversationPrompt = provider.buildConversationPrompt(systemPrompt, history);
                 AiProvider.ReasoningResult reasonResult = provider.reason(
-                        new AiProvider.ReasoningRequest(conversationPrompt, systemPrompt, context.getModel(),
+                        new AiProvider.ReasoningRequest(conversationPrompt, systemPrompt, model,
                                 null, null, cfg.claudeTimeout(), effort));
                 reasoning = reasonResult.text();
                 tokenTracker.captureReasonMeta(iterData, reasonResult.metadata(), conversationPrompt, reasoning, iteration);
@@ -183,7 +184,7 @@ public class AgenticBlockExecutor implements BlockExecutor {
             }
 
             AgenticActionRunner.ActOutcome act = actionRunner.run(context, stepIndex, iteration, plan.getAction(),
-                    provider, effort, cfg, tokenTracker, iterData);
+                    provider, model, effort, cfg, tokenTracker, iterData);
             String action = act.action();
             String actionOutput = act.output();
             int exitCode = act.exitCode();
@@ -254,9 +255,11 @@ public class AgenticBlockExecutor implements BlockExecutor {
                 .status(goalAchieved ? StepStatus.COMPLETED : StepStatus.FAILED)
                 .build();
 
-        result.setMetadata(tokenTracker.buildFinalMetadata(
+        Map<String, Object> metadata = tokenTracker.buildFinalMetadata(
                 cfg.goal(), cfg.successCriteria(), iteration, goalAchieved, stopReason,
-                context.getModel(), provider.getId()));
+                model, provider.getId());
+        metadata.put("aiRequest", aiRequestMetadata(provider.getId(), model, effort));
+        result.setMetadata(metadata);
 
         context.setVariable("agentic_goal_achieved", goalAchieved);
         context.setVariable("agentic_iterations", iteration);
@@ -268,5 +271,14 @@ public class AgenticBlockExecutor implements BlockExecutor {
                         "durationMs", result.getDurationMs()));
 
         return result;
+    }
+
+    /** Same shape as the {@code aiRequest} step metadata of host steps: the settings actually used. */
+    private static Map<String, Object> aiRequestMetadata(String providerId, String model, String effort) {
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("provider", providerId);
+        if (model != null && !model.isBlank()) params.put("model", model);
+        if (effort != null && !effort.isBlank()) params.put("effort", effort);
+        return params;
     }
 }

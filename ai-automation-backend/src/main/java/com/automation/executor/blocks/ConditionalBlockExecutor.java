@@ -52,8 +52,9 @@ public class ConditionalBlockExecutor implements BlockExecutor {
                     HostExecutionRequest.builder()
                             .projectPath(context.getProjectPath())
                             .command("Evaluate this condition and respond with ONLY the word TRUE or FALSE, nothing else: " + condition)
+                            .model(context.modelFor(block))
                             .timeoutSeconds(claudeTimeout)
-                            .providerId(context.getProvider())
+                            .providerId(context.providerFor(block))
                             .effort(context.effortFor(block))
                             .build()
             ).output();
@@ -87,9 +88,9 @@ public class ConditionalBlockExecutor implements BlockExecutor {
                                         .build())
                                 .stepIndex(context.nextStepIndex())
                                 .systemPrompt(context.getInstructionPrefix())
-                                .model(context.getModel())
+                                .model(context.modelFor(block))
                                 .timeoutSeconds(claudeTimeout)
-                                .providerId(context.getProvider())
+                                .providerId(context.providerFor(block))
                                 .effort(context.effortFor(block))
                                 .build()
                 );

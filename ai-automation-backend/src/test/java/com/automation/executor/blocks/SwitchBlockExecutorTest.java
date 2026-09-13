@@ -681,4 +681,35 @@ class SwitchBlockExecutorTest {
         assertThat(secondResult.getOutput()).isEqualTo("branch-B-output");
         assertThat(secondResult.getOutput()).doesNotContain("branch-A-output");
     }
+
+    @Test
+    void execute_nestedBlockProviderAndModel_overrideWorkflowLevel() {
+        context.setProvider("CODEX");
+        context.setModel("gpt-5");
+        context.setVariable("action", "run");
+
+        StepResult blockResult = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("done").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(blockResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "${action}");
+        config.put("cases", List.of(
+                Map.of("value", "run", "blocks", List.of(
+                        Map.of("type", "simple", "config", Map.of(
+                                "command", "do work", "provider", "PI", "model", "anthropic/opus"))
+                ))
+        ));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("switch")
+                .config(config)
+                .build();
+
+        executor.execute(block, context);
+
+        verify(commandExecutor).executeStepOnHost(argThat(req ->
+                "PI".equals(req.providerId()) && "anthropic/opus".equals(req.model())));
+    }
 }

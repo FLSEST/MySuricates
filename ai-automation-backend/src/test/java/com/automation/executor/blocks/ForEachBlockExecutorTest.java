@@ -576,4 +576,31 @@ class ForEachBlockExecutorTest {
         verify(commandExecutor).executeStepAsShell(eq("/test/project"), captor.capture(), anyInt(), eq(300));
         assertThat(captor.getValue().getConfig().get("command")).isEqualTo("cat a.txt");
     }
+
+    @Test
+    void execute_blockLevelProviderAndModel_overrideWorkflowLevel() {
+        context.setProvider("CODEX");
+        context.setModel("gpt-5");
+        StepResult stepResult = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(stepResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("items_source", "list");
+        config.put("items", List.of("a"));
+        config.put("command", "process {{ item }}");
+        config.put("provider", "PI");
+        config.put("model", "anthropic/opus");
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("foreach")
+                .config(config)
+                .build();
+
+        executor.execute(block, context);
+
+        verify(commandExecutor).executeStepOnHost(argThat(req ->
+                "PI".equals(req.providerId()) && "anthropic/opus".equals(req.model())));
+    }
 }

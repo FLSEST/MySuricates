@@ -1,6 +1,7 @@
 import { Button, Input, Select, Modal, ModalFooter } from '../ui';
 import { MonacoEditor } from '../shared/MonacoEditor';
 import { ExecuteDialog } from './ExecuteDialog';
+import { BlockAiOverrideFields } from './BlockAiOverrideFields';
 import { useT } from '../../i18n';
 import { BLOCK_TYPES } from '../../types';
 import type {
@@ -255,6 +256,13 @@ export function WorkflowDetailModals({
               ]}
             />
           )}
+          <BlockAiOverrideFields
+            blockType={newBlock.type}
+            configJson={newBlock.config}
+            onConfigChange={(config) => setNewBlock({ ...newBlock, config })}
+            workflowProvider={workflow.provider}
+            idSuffix="-new-block"
+          />
           <div>
             <label className="block text-sm font-medium text-text mb-1.5">{t.workflows.blockConfig}</label>
             <MonacoEditor
@@ -334,6 +342,13 @@ export function WorkflowDetailModals({
               ]}
             />
           )}
+          <BlockAiOverrideFields
+            blockType={editBlock.type}
+            configJson={editBlock.config}
+            onConfigChange={(config) => setEditBlock({ ...editBlock, config })}
+            workflowProvider={workflow.provider}
+            idSuffix="-edit-block"
+          />
           <div>
             <label className="block text-sm font-medium text-text mb-1.5">{t.workflows.blockConfig}</label>
             <MonacoEditor

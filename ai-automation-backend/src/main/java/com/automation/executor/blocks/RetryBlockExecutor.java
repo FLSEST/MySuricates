@@ -78,9 +78,9 @@ public class RetryBlockExecutor implements BlockExecutor {
                                         .build())
                                 .stepIndex(context.nextStepIndex())
                                 .systemPrompt(context.getInstructionPrefix())
-                                .model(context.getModel())
+                                .model(context.modelFor(block))
                                 .timeoutSeconds(claudeTimeout)
-                                .providerId(context.getProvider())
+                                .providerId(context.providerFor(block))
                                 .effort(context.effortFor(block))
                                 .build()
                 );

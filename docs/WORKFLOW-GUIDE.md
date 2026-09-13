@@ -72,6 +72,9 @@ Jeder Block unterstuetzt neben seinen typspezifischen Config-Feldern auch diese 
 | Config-Schluessel | Typ | Default | Beschreibung |
 |---|---|---|---|
 | `on_failure` | string | `"stop"` | Verhalten bei Fehler: `"stop"` (Workflow beenden) oder `"continue"` (mit naechstem Block fortfahren) |
+| `provider` | string | null | **Nur KI-faehige Bloecke** (`simple`, `agentic`, `skill-capability` sowie der Inline-`command` von `retry`, `foreach`, `while`, `conditional`, `switch`): KI-Anbieter nur fuer diesen Block (`CLAUDE`, `PI`, `CODEX`). Praezedenz Block > Workflow > System-Default. Beim `integration`-Block bezeichnet `provider` dagegen den Integrations-Provider (`google-calendar`, …). |
+| `model` | string | null | **Nur KI-faehige Bloecke**: Modell nur fuer diesen Block (CLI-Alias `opus`/`sonnet`, konkrete ID oder pi `<backend>/<model>`). Praezedenz Block > Workflow > Provider-Default. Setzt ein Block einen *anderen* `provider` als der Workflow, wird das Workflow-Modell nicht vererbt (Modell-IDs sind anbieterspezifisch). |
+| `effort` | string | null | **Nur KI-faehige Bloecke**: Denkaufwand `low`/`medium`/`high`/`xhigh` nur fuer diesen Block, siehe [Reasoning-Effort](#reasoning-effort-denkaufwand). |
 
 Zusaetzlich unterstuetzt jeder Block ein optionales Top-Level-Feld (nicht in `config`):
 
@@ -973,6 +976,25 @@ Zusaetzlich zum Modell kann pro Workflow ein einheitlicher Effort-Level gesetzt 
 ```
 
 Faustregel: `high`/`xhigh` fuer Analyse-/Audit-Bloecke, `low` fuer mechanische Transformationen. Der gesetzte Effort ist im Step-Metadata (`aiRequest.effort`) der Run-Details sichtbar.
+
+### Provider und Modell pro Block
+
+Nach demselben Muster wie `effort` koennen KI-faehige Bloecke (`simple`, `agentic`, `skill-capability` und der Inline-`command` von `retry`, `foreach`, `while`, `conditional`, `switch`) den Anbieter und das Modell nur fuer sich selbst festlegen — Config-Schluessel `"provider"` und `"model"`. Aufloesung: **Block > Workflow > System-Default** (`AiProviderRegistry.resolve()` bzw. Provider-Default-Modell). Ohne Block-Schluessel verhalten sich bestehende Workflows unveraendert.
+
+```json
+[
+  { "type": "shell",  "config": { "command": "git diff --stat HEAD~1" } },
+  { "type": "simple", "config": { "command": "Fasse den Diff zusammen:\n\n{{ previous_output }}", "model": "haiku" } },
+  { "type": "simple", "config": { "command": "Bewerte die Architektur-Risiken ...", "provider": "PI", "model": "anthropic/opus", "effort": "high" } }
+]
+```
+
+Regeln:
+- Ein Block, der nur `provider` setzt, uebernimmt das Workflow-Modell **nicht**, wenn der Anbieter vom Workflow-Anbieter abweicht — Modell-IDs sind anbieterspezifisch (`opus` vs. `anthropic/opus`). Bei gleichem Anbieter (oder ohne `provider`) gilt das Workflow-Modell weiter.
+- Verschachtelte Bloecke (z. B. `blocks` in `switch`) tragen ihre eigenen Schluessel; der Wrapper-Block vererbt seine Werte nicht an Kind-Bloecke.
+- Der `integration`-Block nutzt `provider` fuer den Integrations-Provider und ist kein KI-Block — dort wirkt kein Override.
+- Im Block-Editor der UI erscheinen die Felder „KI-Anbieter und Modell fuer diesen Block" nur bei KI-faehigen Block-Typen; die Modell-Vorschlaege kommen vom Host-Katalog des gewaehlten Anbieters (`GET /api/v1/system/ai-providers/{id}/models`), Freitext bleibt erlaubt.
+- Die tatsaechlich verwendeten Werte stehen im Step-Metadata der Run-Details: `aiRequest.provider`, `aiRequest.model`, `aiRequest.effort` (fuer `agentic` zusaetzlich top-level `provider`/`model`).
 
 ---
 

@@ -912,4 +912,54 @@ class AgenticBlockExecutorTest {
         assertThat(result.getOutput()).contains("channel closed");
         verify(hostClaude, never()).executeAction(anyString(), any(), any(), any(), any(), anyBoolean(), any(), any(), any());
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void execute_blockLevelProviderAndModel_overrideWorkflowLevel_andAppearInMetadata() throws Exception {
+        when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), eq("opus"), isNull(), isNull(), isNull(), isNull()))
+                .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: done\nACTION:\nSUMMARY: ok"));
+        when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
+
+        ExecutionContext context = buildContext();
+        context.setProvider("CODEX");
+        context.setModel("gpt-5");
+        BlockDefinition block = buildBlock("Test goal");
+        block.getConfig().put("provider", "CLAUDE");
+        block.getConfig().put("model", "opus");
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        verify(aiProviderRegistry).resolve("CLAUDE");
+        Map<String, Object> aiRequest = (Map<String, Object>) result.getMetadata().get("aiRequest");
+        assertThat(aiRequest)
+                .containsEntry("provider", "CLAUDE")
+                .containsEntry("model", "opus")
+                .doesNotContainKey("effort");
+        assertThat(result.getMetadata()).containsEntry("model", "opus");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void execute_withoutBlockOverride_usesWorkflowProviderAndModel() throws Exception {
+        when(hostClaude.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
+        when(hostClaude.reasonStructured(eq("prompt"), anyString(), eq("sonnet"), isNull(), isNull(), isNull(), eq("high")))
+                .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: done\nACTION:\nSUMMARY: ok"));
+        when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
+
+        ExecutionContext context = buildContext();
+        context.setProvider("CLAUDE");
+        context.setModel("sonnet");
+        context.setEffort("high");
+
+        StepResult result = executor.execute(buildBlock("Test goal"), context);
+
+        verify(aiProviderRegistry).resolve("CLAUDE");
+        Map<String, Object> aiRequest = (Map<String, Object>) result.getMetadata().get("aiRequest");
+        assertThat(aiRequest)
+                .containsEntry("provider", "CLAUDE")
+                .containsEntry("model", "sonnet")
+                .containsEntry("effort", "high");
+    }
 }

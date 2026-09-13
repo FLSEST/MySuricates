@@ -24,16 +24,16 @@ public class AgenticActionRunner {
     private final AgenticEventBroadcaster events;
 
     public ActOutcome run(ExecutionContext context, int stepIndex, int iteration, String plannedAction,
-                          AiProvider provider, String effort, AgenticBlockConfig cfg,
+                          AiProvider provider, String model, String effort, AgenticBlockConfig cfg,
                           AgenticTokenTracker tokenTracker, Map<String, Object> iterData) {
-        String action = compressIfNeeded(context, stepIndex, iteration, plannedAction, provider);
+        String action = compressIfNeeded(context, stepIndex, iteration, plannedAction, provider, model);
 
         events.broadcast(context.getWorkflowRunId(), stepIndex,
                 "agentic_acting", Map.of("iteration", iteration, "action", truncate(action, TRUNCATE_MEDIUM)));
 
         try {
             AiProvider.ActionResult actResult = provider.executeAction(
-                    new AiProvider.ActionRequest(action, context.getModel(),
+                    new AiProvider.ActionRequest(action, model,
                             context.getInstructionPrefix(), context.getProjectPath(),
                             cfg.claudeTimeout(), false, false, null, null, effort));
             String output = actResult.text() != null ? actResult.text() : "";
@@ -46,7 +46,7 @@ public class AgenticActionRunner {
     }
 
     private String compressIfNeeded(ExecutionContext context, int stepIndex, int iteration,
-                                    String action, AiProvider provider) {
+                                    String action, AiProvider provider, String model) {
         if (action.length() <= AGENTIC_ACTION_COMPRESS_THRESHOLD) {
             return action;
         }
@@ -54,7 +54,7 @@ public class AgenticActionRunner {
         events.broadcast(context.getWorkflowRunId(), stepIndex, "agentic_action_compressed",
                 Map.of("iteration", iteration, "originalLength", action.length()));
         try {
-            String compressed = promptBuilder.compressAction(action, provider, context.getModel());
+            String compressed = promptBuilder.compressAction(action, provider, model);
             log.info("Agentic iteration {}: ACTION compressed {} → {} chars", iteration, action.length(), compressed.length());
             return compressed;
         } catch (Exception e) {

@@ -297,6 +297,12 @@ export const de: TranslationKeys = {
     blockConfig: 'Konfiguration (JSON)',
     blockSkills: 'Block-Skills',
     blockSkillsHint: 'Zusätzliche Skills, die nur für diesen Block aktiviert werden (ergänzend zu Workflow-Skills).',
+    blockAiOverride: 'KI-Anbieter und Modell für diesen Block',
+    blockAiOverrideHint: 'Überschreibt die Workflow-Einstellung nur für diesen Block (Config-Schlüssel provider/model). Leer = Workflow-Einstellung, dann System-Standard.',
+    blockProvider: 'Anbieter',
+    blockProviderInherit: 'Wie Workflow',
+    blockModel: 'Modell',
+    blockAiOverrideInvalidJson: 'Config ist kein gültiges JSON – Anbieter/Modell können erst nach Korrektur gesetzt werden.',
     blockTypes: {
       simple: 'Einfacher Befehl',
       shell: 'Shell-Befehl',

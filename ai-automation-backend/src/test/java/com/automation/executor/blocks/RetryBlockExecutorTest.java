@@ -398,4 +398,30 @@ class RetryBlockExecutorTest {
         verify(commandExecutor).executeStepAsShell(eq("/test/project"), captor.capture(), anyInt(), eq(300));
         assertThat(captor.getValue().getConfig().get("command")).isEqualTo("npm install 'pkg; id'");
     }
+
+    @Test
+    void execute_blockLevelProviderAndModel_overrideWorkflowLevel() {
+        context.setProvider("CODEX");
+        context.setModel("gpt-5");
+        StepResult success = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(success);
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("retry")
+                .config(new HashMap<>(Map.of(
+                        "command", "npm test",
+                        "max_retries", 1,
+                        "delay", 0,
+                        "provider", "PI",
+                        "model", "anthropic/opus"
+                )))
+                .build();
+
+        executor.execute(block, context);
+
+        verify(commandExecutor).executeStepOnHost(argThat(req ->
+                "PI".equals(req.providerId()) && "anthropic/opus".equals(req.model())));
+    }
 }

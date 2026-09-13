@@ -566,4 +566,37 @@ class WhileBlockExecutorTest {
         assertThat(captor.getAllValues().get(0).getConfig().get("command")).isEqualTo("echo ");
         assertThat(captor.getAllValues().get(1).getConfig().get("command")).isEqualTo("echo 'x; id'");
     }
+
+    @Test
+    void execute_blockLevelProviderAndModel_overrideWorkflowLevel_forConditionAndBody() {
+        context.setProvider("CODEX");
+        context.setModel("gpt-5");
+        Map<String, Object> config = new HashMap<>();
+        config.put("command", "analyze");
+        config.put("condition_command", "check");
+        config.put("max_iterations", 1);
+        config.put("execution_mode", "claude");
+        config.put("provider", "PI");
+        config.put("model", "anthropic/opus");
+
+        BlockDefinition block = BlockDefinition.builder().type("while").config(config).build();
+
+        when(commandExecutor.executeOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(new CliSession.EnrichedCommandResult("true", 0, null))
+                .thenReturn(new CliSession.EnrichedCommandResult("false", 0, null));
+
+        StepResult step = new StepResult();
+        step.setStepIndex(0);
+        step.setOutput("ok");
+        step.setStatus(StepStatus.COMPLETED);
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(step);
+
+        executor.execute(block, context);
+
+        verify(commandExecutor, atLeastOnce()).executeOnHost(argThat(req ->
+                "PI".equals(req.providerId()) && "anthropic/opus".equals(req.model())));
+        verify(commandExecutor).executeStepOnHost(argThat(req ->
+                "PI".equals(req.providerId()) && "anthropic/opus".equals(req.model())));
+    }
 }
