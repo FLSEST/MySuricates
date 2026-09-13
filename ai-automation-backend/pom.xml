@@ -295,4 +295,27 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!--
+            IDE builds (VS Code Java / Eclipse via m2e) must never write into target/:
+            the dev backend and Maven share that directory, and the Eclipse compiler
+            emits different synthetic classes (no $1 switch-map classes) plus error
+            stubs ("Unresolved compilation problems") that poison the running JVM and
+            the next `mvn test`. m2e sets the property m2e.version on import, the Maven
+            CLI never does — so this profile redirects only IDE builds to target-ide/.
+            Incident: 2026-09-13 (three dead scheduled runs, 498 false test errors).
+        -->
+        <profile>
+            <id>ide-eclipse-output</id>
+            <activation>
+                <property>
+                    <name>m2e.version</name>
+                </property>
+            </activation>
+            <build>
+                <directory>${project.basedir}/target-ide</directory>
+            </build>
+        </profile>
+    </profiles>
 </project>
