@@ -19,7 +19,6 @@ const subscriptions: SubscribeRecord[] = [];
 const mockActivate = vi.fn();
 const mockDeactivate = vi.fn();
 
-let connectedFlag = false;
 
 vi.mock('@stomp/stompjs', () => {
   class MockClient {
@@ -34,12 +33,10 @@ vi.mock('@stomp/stompjs', () => {
       // Invoke factory so the SockJS constructor runs and lastWsUrl is captured
       if (capturedWebSocketFactory) capturedWebSocketFactory();
       this.connected = true;
-      connectedFlag = true;
       if (onConnectCb) onConnectCb();
     });
     deactivate = mockDeactivate.mockImplementation(() => {
       this.connected = false;
-      connectedFlag = false;
       if (onDisconnectCb) onDisconnectCb();
     });
     subscribe = vi.fn().mockImplementation(
@@ -77,7 +74,6 @@ beforeEach(() => {
   lastWsUrl = null;
   capturedWebSocketFactory = undefined;
   subscriptions.length = 0;
-  connectedFlag = false;
   mockActivate.mockClear();
   mockDeactivate.mockClear();
   // reset api key

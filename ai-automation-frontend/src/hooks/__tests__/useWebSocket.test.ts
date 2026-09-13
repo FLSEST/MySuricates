@@ -5,7 +5,6 @@ import { type ReactNode, createElement } from 'react';
 
 // Capture STOMP callbacks for manual message injection
 let onConnectCb: (() => void) | null = null;
-let onDisconnectCb: (() => void) | null = null;
 let subscribeCb: ((msg: { body: string }) => void) | null = null;
 const mockDeactivate = vi.fn();
 const mockActivate = vi.fn();
@@ -14,7 +13,6 @@ vi.mock('@stomp/stompjs', () => {
   class MockClient {
     constructor(config: Record<string, unknown>) {
       onConnectCb = config.onConnect as () => void;
-      onDisconnectCb = config.onDisconnect as () => void;
     }
     activate = mockActivate.mockImplementation(() => {
       if (onConnectCb) onConnectCb();
@@ -50,7 +48,6 @@ function sendMessage(msg: Record<string, unknown>) {
 describe('useExecutionWebSocket', () => {
   beforeEach(() => {
     onConnectCb = null;
-    onDisconnectCb = null;
     subscribeCb = null;
     mockActivate.mockClear();
     mockDeactivate.mockClear();

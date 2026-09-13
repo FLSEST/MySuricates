@@ -73,7 +73,7 @@ export function useWorkflowContext(): PaletteContextHandle {
 
   const useResults = (query: string) => {
     const q = query.trim();
-    const localMatches = useMemo(() => (q ? fuse.search(q).slice(0, 10) : []), [q]); // eslint-disable-line react-hooks/exhaustive-deps
+    const localMatches = useMemo(() => (q ? fuse.search(q).slice(0, 10) : []), [q]);
 
     const semantic = useQuery({
       queryKey: ['search', 'semantic', q],
@@ -94,7 +94,7 @@ export function useWorkflowContext(): PaletteContextHandle {
         })
         .filter((i): i is PaletteItem => i !== null);
       return [...localItems, ...semanticItems];
-    }, [localMatches, semantic.data]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [localMatches, semantic.data]);
 
     return { items, loading: semantic.isLoading };
   };

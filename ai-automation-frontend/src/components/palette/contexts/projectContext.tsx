@@ -53,7 +53,7 @@ export function useProjectContext(): PaletteContextHandle {
     const items = useMemo(() => {
       if (!q) return [];
       return fuse.search(q).slice(0, 10).map((r) => toItem(r.item, mapFuseMatches(r.matches)));
-    }, [q]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [q]);
     return { items, loading: isLoading };
   };
 

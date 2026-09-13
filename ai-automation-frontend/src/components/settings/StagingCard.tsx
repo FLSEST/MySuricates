@@ -7,9 +7,9 @@ import { useStagingSyncPreview } from '../../hooks/useStaging';
 import type { StagingStatus, SyncResult, SyncDefinitionsRequest } from '../../types';
 import { Container, Play, Square, Upload, ExternalLink, X, RefreshCw, ListChecks } from 'lucide-react';
 
-const PROMOTE_PHASES = ['STOPPING', 'BUILDING_BACKEND', 'BUILDING_FRONTEND', 'BUILDING_IMAGE', 'STARTING'] as const;
+type PromotePhase = 'STOPPING' | 'BUILDING_BACKEND' | 'BUILDING_FRONTEND' | 'BUILDING_IMAGE' | 'STARTING';
 
-type PhaseKey = `stagingPhase${typeof PROMOTE_PHASES[number]}`;
+type PhaseKey = `stagingPhase${PromotePhase}`;
 
 interface StagingCardProps {
   staging: StagingStatus | undefined;
