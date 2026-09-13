@@ -25,25 +25,36 @@ import java.nio.file.Path;
  * {@code app_settings}, generated a fresh key straight into the developer's real
  * {@code ~/.autotrigger/}, shadowing the real key on every test run.
  *
+ * <p>Root cause (2026-09-13) for the backup directory: {@code automation.backup.directory}
+ * defaults to {@code ${user.home}/.autotrigger/backups/dev} with backups enabled, and the
+ * integration profile overrode neither — so every {@code @SpringBootTest} context wrote a
+ * startup backup of its throwaway test DB into the developer's real dev backup directory and
+ * rotated genuine backups away (retain-count 30).
+ *
  * <p>Registered via {@code META-INF/services/org.junit.platform.launcher.LauncherSessionListener},
  * so it runs once per test JVM before any Spring context starts. It publishes per-process
- * unique paths as the {@code integration.db.path} and {@code integration.key.path} system
- * properties, which {@code application-integration.yml} resolves in the datasource/Flyway URLs
- * and the integration-encryption key-file location respectively. On session close it deletes
- * the DB files (including {@code -wal}/{@code -shm}) and the key file, so no stale files survive
- * for the next run. Externally provided values for either property are respected and left
- * untouched (each is independent — one being external does not suppress the other).
+ * unique paths as the {@code integration.db.path}, {@code integration.key.path} and
+ * {@code integration.backup.dir} system properties, which {@code application-integration.yml}
+ * resolves in the datasource/Flyway URLs, the integration-encryption key-file location and the
+ * backup directory respectively. On session close it deletes the DB files (including
+ * {@code -wal}/{@code -shm}), the key file and the backup directory, so no stale files survive
+ * for the next run. Externally provided values for any property are respected and left
+ * untouched (each is independent — one being external does not suppress the others).
  */
 public class IntegrationTestDbSessionListener implements LauncherSessionListener {
 
     static final String DB_PROPERTY = "integration.db.path";
     static final String KEY_PROPERTY = "integration.key.path";
+    static final String BACKUP_DIR_PROPERTY = "integration.backup.dir";
 
     /** Path owned by this listener; null when the property was set externally. */
     private Path ownedDbPath;
 
     /** Path owned by this listener; null when the property was set externally. */
     private Path ownedKeyPath;
+
+    /** Directory owned by this listener; null when the property was set externally. */
+    private Path ownedBackupDir;
 
     @Override
     public void launcherSessionOpened(LauncherSession session) {
@@ -60,6 +71,11 @@ public class IntegrationTestDbSessionListener implements LauncherSessionListener
             ownedKeyPath = Path.of(tmpDir, "autotrigger-it-key-" + pid + "-" + nanos + ".key");
             System.setProperty(KEY_PROPERTY, ownedKeyPath.toString());
         }
+
+        if (System.getProperty(BACKUP_DIR_PROPERTY) == null) {
+            ownedBackupDir = Path.of(tmpDir, "autotrigger-it-backups-" + pid + "-" + nanos);
+            System.setProperty(BACKUP_DIR_PROPERTY, ownedBackupDir.toString());
+        }
     }
 
     @Override
@@ -74,6 +90,25 @@ public class IntegrationTestDbSessionListener implements LauncherSessionListener
             deleteIfExists(ownedKeyPath);
             System.clearProperty(KEY_PROPERTY);
             ownedKeyPath = null;
+        }
+
+        if (ownedBackupDir != null) {
+            deleteRecursively(ownedBackupDir);
+            System.clearProperty(BACKUP_DIR_PROPERTY);
+            ownedBackupDir = null;
+        }
+    }
+
+    private static void deleteRecursively(Path dir) {
+        if (!Files.exists(dir)) {
+            return;
+        }
+        try (var walk = Files.walk(dir)) {
+            // Deepest entries first so directories are empty when their turn comes
+            walk.sorted(java.util.Comparator.reverseOrder()).forEach(IntegrationTestDbSessionListener::deleteIfExists);
+        } catch (IOException e) {
+            System.err.println("IntegrationTestDbSessionListener: could not walk "
+                    + dir + ": " + e.getMessage());
         }
     }
 

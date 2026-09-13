@@ -14,20 +14,24 @@ class IntegrationTestDbSessionListenerTest {
 
     private static final String DB_PROPERTY = "integration.db.path";
     private static final String KEY_PROPERTY = "integration.key.path";
+    private static final String BACKUP_DIR_PROPERTY = "integration.backup.dir";
 
     private String previousDbValue;
     private String previousKeyValue;
+    private String previousBackupDirValue;
 
     @BeforeEach
     void savePropertyState() {
         previousDbValue = System.getProperty(DB_PROPERTY);
         previousKeyValue = System.getProperty(KEY_PROPERTY);
+        previousBackupDirValue = System.getProperty(BACKUP_DIR_PROPERTY);
     }
 
     @AfterEach
     void restorePropertyState() {
         restore(DB_PROPERTY, previousDbValue);
         restore(KEY_PROPERTY, previousKeyValue);
+        restore(BACKUP_DIR_PROPERTY, previousBackupDirValue);
     }
 
     private static void restore(String property, String previousValue) {
@@ -129,6 +133,65 @@ class IntegrationTestDbSessionListenerTest {
 
         assertThat(Files.exists(key)).as("key file removed").isFalse();
         assertThat(System.getProperty(KEY_PROPERTY)).isNull();
+    }
+
+    @Test
+    void sessionOpened_setsPerProcessUniqueBackupDir() {
+        System.clearProperty(BACKUP_DIR_PROPERTY);
+        IntegrationTestDbSessionListener listener = new IntegrationTestDbSessionListener();
+
+        listener.launcherSessionOpened(null);
+
+        String path = System.getProperty(BACKUP_DIR_PROPERTY);
+        assertThat(path)
+                .isNotNull()
+                .contains("autotrigger-it-backups-")
+                .contains(String.valueOf(ProcessHandle.current().pid()));
+        // Must never point into the developer's real ~/.autotrigger/backups
+        assertThat(path).doesNotContain(System.getProperty("user.home"));
+
+        listener.launcherSessionClosed(null);
+    }
+
+    @Test
+    void sessionOpened_respectsExternallySetBackupDir() {
+        System.setProperty(BACKUP_DIR_PROPERTY, "/tmp/externally-managed-backups");
+        IntegrationTestDbSessionListener listener = new IntegrationTestDbSessionListener();
+
+        listener.launcherSessionOpened(null);
+        assertThat(System.getProperty(BACKUP_DIR_PROPERTY)).isEqualTo("/tmp/externally-managed-backups");
+
+        listener.launcherSessionClosed(null);
+        assertThat(System.getProperty(BACKUP_DIR_PROPERTY)).isEqualTo("/tmp/externally-managed-backups");
+    }
+
+    @Test
+    void sessionClosed_deletesBackupDirRecursivelyAndClearsProperty() throws IOException {
+        System.clearProperty(BACKUP_DIR_PROPERTY);
+        IntegrationTestDbSessionListener listener = new IntegrationTestDbSessionListener();
+        listener.launcherSessionOpened(null);
+
+        Path dir = Path.of(System.getProperty(BACKUP_DIR_PROPERTY));
+        Files.createDirectories(dir);
+        Files.writeString(dir.resolve("mysuricates-backup-2026-01-01_00-00-00.db"), "db");
+        Files.writeString(dir.resolve("mysuricates-backup-2026-01-01_00-00-00.db-wal"), "wal");
+
+        listener.launcherSessionClosed(null);
+
+        assertThat(Files.exists(dir)).as("backup dir removed with contents").isFalse();
+        assertThat(System.getProperty(BACKUP_DIR_PROPERTY)).isNull();
+    }
+
+    @Test
+    void sessionClosed_missingBackupDirIsNotAnError() {
+        System.clearProperty(BACKUP_DIR_PROPERTY);
+        IntegrationTestDbSessionListener listener = new IntegrationTestDbSessionListener();
+        listener.launcherSessionOpened(null);
+
+        // A context that never started the backup service leaves no directory behind
+        listener.launcherSessionClosed(null);
+
+        assertThat(System.getProperty(BACKUP_DIR_PROPERTY)).isNull();
     }
 
     @Test

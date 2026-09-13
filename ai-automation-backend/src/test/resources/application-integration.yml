@@ -45,6 +45,14 @@ automation:
   host-claude:
     timeout-seconds: 10
     max-concurrent-calls: 1
+  backup:
+    # Without this override every @SpringBootTest context wrote a startup backup of its
+    # throwaway test DB into the developer's real ${user.home}/.autotrigger/backups/dev and
+    # rotated genuine backups away (retain-count 30). integration.backup.dir is set per test
+    # JVM by IntegrationTestDbSessionListener (deleted on session close); the fallback path
+    # only applies when the listener did not run (e.g. exotic runners).
+    enabled: false
+    directory: ${integration.backup.dir:${java.io.tmpdir}/autotrigger-integrationtest-backups}
   integration:
     # integration.key.path is set per test JVM by IntegrationTestDbSessionListener (same
     # mechanism as integration.db.path above) so that IntegrationEncryptionService.init()

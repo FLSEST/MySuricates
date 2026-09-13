@@ -107,7 +107,7 @@ class DatabaseBackupServiceTest {
     @Test
     void rotateBackups_deletesAssociatedWalAndShm() throws Exception {
         for (int i = 0; i < 4; i++) {
-            Path f = backupDir.resolve("backup-" + i + ".db");
+            Path f = backupDir.resolve("mysuricates-backup-2025-01-0" + (i + 1) + "_02-00-00.db");
             Files.writeString(f, "data");
             Files.writeString(Path.of(f + "-wal"), "wal");
             Files.writeString(Path.of(f + "-shm"), "shm");
@@ -119,6 +119,65 @@ class DatabaseBackupServiceTest {
         // 1 should have been deleted (4 - retainCount 3 = 1)
         long dbCount = Files.list(backupDir).filter(p -> p.toString().endsWith(".db")).count();
         assertThat(dbCount).isEqualTo(3);
+    }
+
+    @Test
+    void rotateBackups_ignoresFilesOutsideOwnNamingScheme() throws Exception {
+        // Foreign .db files in the backup directory (manual copies, other instances, other
+        // naming schemes) must never be rotated away — only our own timestamped backups count.
+        Files.writeString(backupDir.resolve("manual-copy.db"), "manual");
+        Files.writeString(backupDir.resolve("mysuricates-backup-before-migration.db"), "manual");
+        Files.writeString(backupDir.resolve("mysuricates.db"), "manual");
+        Thread.sleep(50);
+        for (int i = 0; i < 5; i++) {
+            Files.writeString(backupDir.resolve("mysuricates-backup-2025-02-0" + (i + 1) + "_02-00-00.db"), "own " + i);
+            Thread.sleep(50);
+        }
+
+        int deleted = service.rotateBackups();
+
+        // 5 own backups, retain 3 → exactly the 2 oldest OWN files go
+        assertThat(deleted).isEqualTo(2);
+        assertThat(backupDir.resolve("manual-copy.db")).exists();
+        assertThat(backupDir.resolve("mysuricates-backup-before-migration.db")).exists();
+        assertThat(backupDir.resolve("mysuricates.db")).exists();
+        assertThat(backupDir.resolve("mysuricates-backup-2025-02-01_02-00-00.db")).doesNotExist();
+        assertThat(backupDir.resolve("mysuricates-backup-2025-02-02_02-00-00.db")).doesNotExist();
+        assertThat(backupDir.resolve("mysuricates-backup-2025-02-03_02-00-00.db")).exists();
+        // Foreign files stay visible in the listing (operators must still see them)
+        assertThat(service.listBackups()).hasSize(6);
+    }
+
+    @Test
+    void rotateBackups_foreignFilesDoNotCountTowardsRetainLimit() throws Exception {
+        for (int i = 0; i < 10; i++) {
+            Files.writeString(backupDir.resolve("foreign-" + i + ".db"), "x");
+        }
+        Files.writeString(backupDir.resolve("mysuricates-backup-2025-03-01_02-00-00.db"), "own");
+
+        int deleted = service.rotateBackups();
+
+        assertThat(deleted).isZero();
+        assertThat(Files.list(backupDir).count()).isEqualTo(11);
+    }
+
+    @Test
+    void isOwnBackupFile_matchesOnlyTimestampedScheme() {
+        assertThat(BackupFileNaming.isOwnBackupFile(Path.of("mysuricates-backup-2026-09-13_16-01-05.db"))).isTrue();
+        assertThat(BackupFileNaming.isOwnBackupFile(Path.of("/x/y/mysuricates-backup-2026-09-13_16-01-05.db"))).isTrue();
+        assertThat(BackupFileNaming.isOwnBackupFile(Path.of("mysuricates-backup-2026-09-13_16-01-05.db-wal"))).isFalse();
+        assertThat(BackupFileNaming.isOwnBackupFile(Path.of("mysuricates-backup-2026-09-13.db"))).isFalse();
+        assertThat(BackupFileNaming.isOwnBackupFile(Path.of("Mysuricates-backup-2026-09-13_16-01-05.db"))).isFalse();
+        assertThat(BackupFileNaming.isOwnBackupFile(Path.of("backup.db"))).isFalse();
+    }
+
+    @Test
+    void createBackup_producesFileMatchingOwnScheme() throws IOException {
+        Path backup = service.createBackup();
+
+        assertThat(BackupFileNaming.isOwnBackupFile(backup))
+                .as("what createBackup writes must be what rotateBackups recognises")
+                .isTrue();
     }
 
     @Test

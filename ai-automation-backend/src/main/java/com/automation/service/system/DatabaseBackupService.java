@@ -19,7 +19,6 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -75,8 +74,7 @@ public class DatabaseBackupService {
             log.warn("WAL checkpoint before backup failed: {}", e.getMessage());
         }
 
-        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
-        String filename = "mysuricates-backup-" + timestamp + ".db";
+        String filename = BackupFileNaming.filenameFor(LocalDateTime.now());
         Path backupDir = Path.of(backupConfig.getDirectory());
         Path backupPath = backupDir.resolve(filename);
 
@@ -113,12 +111,12 @@ public class DatabaseBackupService {
         return backup;
     }
 
-    /**
-     * Deletes oldest backups exceeding the retain count.
-     */
+    /** Deletes the oldest backups exceeding the retain count; only our own naming scheme counts ({@link BackupFileNaming}). */
     public int rotateBackups() throws IOException {
         Path backupDir = Path.of(backupConfig.getDirectory());
-        List<Path> backups = listBackupFiles(backupDir);
+        List<Path> backups = new ArrayList<>(listBackupFiles(backupDir).stream()
+                .filter(BackupFileNaming::isOwnBackupFile)
+                .toList());
 
         int deleted = 0;
         if (backups.size() > backupConfig.getRetainCount()) {
