@@ -35,7 +35,7 @@ acurl() {
 check_api() {
   if ! curl -sf "${BASE_URL}/system/health" > /dev/null 2>&1; then
     error "AutoPilot API not reachable at ${BASE_URL}"
-    error "Start the backend first: cd ai-automation-backend && mvn spring-boot:run"
+    error "Start the backend first: scripts/start-autotrigger-dev.sh"
     exit 1
   fi
   ok "API reachable at ${BASE_URL}"

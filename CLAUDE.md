@@ -100,7 +100,7 @@ BEVOR eine Änderung als fertig gilt oder committet wird, MÜSSEN alle relevante
 
 ## PFLICHT: Laufende Workflows vor Backend-Neustart prüfen
 
-BEVOR du das Backend neu startest (z. B. `mvn spring-boot:run`, Prozess killen, oder Port 9090 neu binden), MUSST du prüfen, ob noch Workflow-Runs laufen:
+BEVOR du das Backend neu startest (Prozess killen, Port 9090 neu binden), MUSST du prüfen, ob noch Workflow-Runs laufen. `scripts/start-autotrigger-dev.sh restart` macht diese Prüfung selbst und bricht bei laufenden Runs ab; für andere Wege:
 
 ```bash
 curl -s http://localhost:9090/api/v1/executions?status=RUNNING -H "X-API-Key: <key>" | python3 -c "import sys,json; data=json.load(sys.stdin); runs=data.get('content',data) if isinstance(data,dict) else data; count=len(runs) if isinstance(runs,list) else data.get('totalElements',0); print(f'{count} laufende Runs') if count else print('Keine laufenden Runs')"
@@ -181,7 +181,8 @@ AI-powered workflow automation platform with a skill system, Docker-based execut
 # Backend:  cd ai-automation-backend
 mvn clean package          # Build JAR
 mvn test                   # Run all tests
-mvn spring-boot:run        # Dev server (port 9090)
+# Dev server (port 9090): NIE `mvn spring-boot:run` (blockiert durch RuntimeClasspathGuard) —
+# ../scripts/start-autotrigger-dev.sh [start|restart|stop] startet aus einer JAR-Kopie
 
 # Frontend: cd ai-automation-frontend
 npm run dev                # Dev server (port 3000, proxies /api → :9090)
@@ -230,6 +231,7 @@ See [AGENTS.md](AGENTS.md) for a complete REST API reference (workflow/chain CRU
 
 ## Architecture Overview
 
+- **Dev backend runs from a JAR copy**, never from `target/classes`: `scripts/start-autotrigger-dev.sh restart` builds, copies to `~/.local/state/autotrigger-dev/runtime/` and starts `java -jar`. IDE builds (VS Code Java/m2e) go to `target-ide/` via the pom profile `ide-eclipse-output`. Rationale and the guard: [docs/entwicklung.md](docs/entwicklung.md) → „Builds neben dem laufenden Dev-Backend".
 - **All Claude CLI execution happens on the host** (not inside Docker containers) — `HostClaudeService.executeAction()` runs `claude -p` with `ProcessBuilder.directory(projectPath)`. `CLAUDE_CODE`/`CLAUDECODE` env vars removed to prevent nested-session errors.
 - **Provider routing**: All block executors pass `context.getProvider()` as `providerId` via `HostExecutionRequest.builder()`. Setting `"provider": "CODEX"` in workflow JSON applies to every non-shell block. `AiProviderRegistry.resolve()` falls back to the configured default provider.
 - **Soft-Delete**: Workflows use `@SQLRestriction("deleted_at IS NULL")`. Projects use `archived_at` with repository filter methods (not `@SQLRestriction`, because it would break eager-loaded `Workflow.project`).

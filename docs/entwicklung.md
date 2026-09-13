@@ -21,18 +21,16 @@ neuen Rechner siehe **[GETTING-STARTED.md](GETTING-STARTED.md)** (inkl. `scripts
 ### Backend starten
 
 ```bash
-cd ai-automation-backend
-
-# Dependencies laden und kompilieren
-mvn clean compile
-
-# Starten (Port 9090)
-mvn spring-boot:run
-
-# Alternativ: JAR bauen und ausführen
-mvn clean package -DskipTests
-java -jar target/ai-automation-backend-0.7.3-SNAPSHOT.jar
+# Aus dem Repo-Root — baut ein Fat-JAR, kopiert es nach ~/.local/state/autotrigger-dev/runtime/
+# und startet es von dort (Port 9090). Idempotent; startet auch das Frontend.
+scripts/start-autotrigger-dev.sh            # start
+scripts/start-autotrigger-dev.sh restart    # Code-Änderungen übernehmen: stop → JAR bauen → start
+scripts/start-autotrigger-dev.sh stop
 ```
+
+`mvn spring-boot:run` ist **absichtlich blockiert**: Das Backend bricht beim Start aus `target/classes`
+mit einer Meldung ab (`RuntimeClasspathGuard`), siehe [Builds neben dem laufenden Dev-Backend](#builds-neben-dem-laufenden-dev-backend).
+Escape-Hatch für Sonderfälle: `-Dautomation.runtime.allow-classes-dir=true`.
 
 Das Backend erstellt automatisch `data/automation.db` beim ersten Start und führt Flyway-Migrationen aus.
 
@@ -54,7 +52,7 @@ Der Vite-Dev-Server proxied automatisch `/api/*` und `/ws/*` an `localhost:9090`
 
 Terminal 1 (Backend):
 ```bash
-cd ai-automation-backend && mvn spring-boot:run
+scripts/start-autotrigger-dev.sh
 ```
 
 Terminal 2 (Frontend):
@@ -114,16 +112,32 @@ docker compose --profile build-only build
 
 ## Builds neben dem laufenden Dev-Backend
 
-Das Dev-Backend (`mvn spring-boot:run`) läuft mit `-cp target/classes` — einem **Verzeichnis**,
-nicht einer JAR. Die JVM lädt Klassen über ihre gesamte Lebensdauer lazy von Platte nach.
+Das Dev-Backend läuft aus einer **JAR-Kopie** unter `~/.local/state/autotrigger-dev/runtime/current.jar`
+(`scripts/start-autotrigger-dev.sh`), nicht aus `target/classes`. Grund: Eine JVM mit `-cp target/classes`
+lädt Klassen über ihre gesamte Lebensdauer lazy von Platte. Jeder Build, der dieses Verzeichnis umschreibt,
+zieht ihr die Klassen unter den Füßen weg → `NoClassDefFoundError`, sticky (die JVM cached den
+Resolution-Fehler), nur ein Neustart heilt ihn. Schreiber gab es drei: Maven aus Workflows/Sessions
+(2026-07-27: elf tote Runs), `staging.sh` und die **IDE** — VS Codes Java-Erweiterung (Eclipse-Compiler)
+hat am 2026-09-13 über Nacht die javac-Hilfsklassen für Enum-Switches gelöscht (drei tote Scheduled Runs)
+und morgens MapStruct-Implementierungen durch Fehler-Stubs ersetzt (498 falsche Test-Errors).
 
-Ein zweiter Maven-Lauf im selben Checkout schreibt `target/classes` neu und zieht der laufenden
-JVM die Klassen unter den Füßen weg → `NoClassDefFoundError`. Der Fehler ist **sticky** (der
-Classloader cached das Load-Failure), nur ein Neustart heilt ihn. Am 2026-07-27 sind so elf
-Workflow-Runs gestorben (siehe `docs/plans/2026-07-27-ghost-run-root-cause-fixes.md`).
+Drei Schutzschichten, alle mechanisch:
 
-**Regel:** Kein `mvn` und kein `npm run build` im Haupt-Checkout, solange das Dev-Backend läuft.
-Stattdessen:
+1. **JAR-Kopie** — `restart` baut `mvn clean package -DskipTests`, kopiert das JAR in den State-Ordner
+   (Name `backend-<zeit>-<sha>[-dirty].jar`, die letzten zwei bleiben) und startet `java -jar` mit
+   cwd `ai-automation-backend` (`./data/automation.db` bleibt). `restart` prüft vorher über die API,
+   ob Workflow-Runs laufen, und bricht dann ab (`--force` übersteuert).
+2. **IDE-Profil** — `pom.xml`-Profil `ide-eclipse-output` (aktiv nur, wenn m2e die Property
+   `m2e.version` setzt) legt den IDE-Build nach `target-ide/`. VS Code/Eclipse schreiben damit nie in
+   `target/`. Prüfen: `mvn help:evaluate -Dexpression=project.build.directory -DforceStdout -Dm2e.version=1.0`.
+3. **Fail-fast** — `RuntimeClasspathGuard` in `AiAutomationApplication.main` beendet einen Start aus
+   `target/classes` mit Exit 2. `/api/v1/system/info` zeigt `runtimeMode` (`jar` | `classes-dir`);
+   im Escape-Hatch-Fall (`-Dautomation.runtime.allow-classes-dir=true` bzw.
+   `AUTOMATION_ALLOW_CLASSES_DIR=true`) warnt das ActivityLog beim Start.
+
+Damit sind `mvn test`, `mvn clean` und `npm run build` im Haupt-Checkout für das laufende Backend
+harmlos. **Für Workflows bleibt der QA-Worktree der richtige Ort**, weil zwei gleichzeitige Maven-Läufe
+im selben `target/` (z. B. Scheduled Run + Claude-Session) einander falsche Ergebnisse produzieren:
 
 ```bash
 WT=$(scripts/qa-worktree.sh prepare)   # legt/synct ~/.mysuricates/qa-worktree/autotrigger auf HEAD
@@ -132,9 +146,8 @@ cd "$WT/ai-automation-backend" && mvn test
 
 Der Worktree ist detached auf `HEAD` des Haupt-Checkouts und bleibt zwischen Läufen bestehen
 (`target/` und `node_modules/` werden wiederverwendet). **Uncommittete Änderungen sind darin nicht
-enthalten** — was dort läuft, testet den committeten Stand. Der Workflow „AutoPilot Backend Quality
-Gate" nutzt genau diesen Worktree. Dieselbe Regel gilt für `./scripts/staging.sh test-promote`,
-das im Haupt-Checkout ein `mvn clean` ausführt.
+enthalten** — was dort läuft, testet den committeten Stand. Die Workflows „AutoPilot Backend Quality
+Gate" und „self-care-platform-health" nutzen genau diesen Worktree.
 
 ## Tests
 

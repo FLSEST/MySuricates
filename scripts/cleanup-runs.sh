@@ -252,7 +252,7 @@ do_backup() {
         log "Backup created successfully → ~/.autotrigger/backups/"
     elif [[ "$http_code" == "000" ]]; then
         err "Backend not reachable at $BASE_URL"
-        err "Start with: cd ai-automation-backend && mvn spring-boot:run"
+        err "Start with: scripts/start-autotrigger-dev.sh"
         exit 1
     else
         err "Backup API returned HTTP $http_code — aborting."
