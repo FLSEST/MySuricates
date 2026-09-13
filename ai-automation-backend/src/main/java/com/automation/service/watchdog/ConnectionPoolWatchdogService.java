@@ -14,7 +14,6 @@ import javax.sql.DataSource;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * Monitors the HikariCP connection pool for exhaustion (stuck connections).
@@ -33,6 +32,7 @@ public class ConnectionPoolWatchdogService {
     private final ActivityLogService activityLogService;
     private final SimpMessagingTemplate messagingTemplate;
     private final HikariDataSource hikariDataSource;
+    private final ThreadDumpCollector threadDumpCollector = new ThreadDumpCollector();
 
     @Value("${automation.watchdog.dump-stacks-on-exhaustion:true}")
     private boolean dumpStacksOnExhaustion;
@@ -157,51 +157,16 @@ public class ConnectionPoolWatchdogService {
         }
     }
 
+    /**
+     * Workflow runs execute on virtual threads, which {@code Thread.getAllStackTraces()} omits —
+     * the old dump only ever showed the waiter. {@link ThreadDumpCollector} includes them.
+     */
     private void dumpRelevantThreadStacks() {
         try {
-            String dump = Thread.getAllStackTraces().entrySet().stream()
-                    .filter(e -> isInteresting(e.getValue()))
-                    .map(e -> formatThreadStack(e.getKey(), e.getValue()))
-                    .collect(Collectors.joining("\n"));
-            if (dump.isBlank()) {
-                log.warn("Pool exhaustion thread-dump: no threads matched filter (com.automation/hibernate/sqlite/hikari).");
-            } else {
-                log.warn("Pool exhaustion thread-dump (filtered):\n{}", dump);
-            }
+            log.warn("Pool exhaustion thread-dump (filtered, likely holders first):\n{}", threadDumpCollector.collect());
         } catch (Exception e) {
             log.debug("Thread-dump failed: {}", e.getMessage());
         }
-    }
-
-    private static boolean isInteresting(StackTraceElement[] stack) {
-        for (StackTraceElement el : stack) {
-            String cn = el.getClassName();
-            if (cn.startsWith("com.automation.")
-                    || cn.startsWith("org.hibernate.")
-                    || cn.startsWith("org.sqlite.")
-                    || cn.startsWith("com.zaxxer.hikari.")) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static String formatThreadStack(Thread t, StackTraceElement[] stack) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("  Thread \"").append(t.getName())
-                .append("\" id=").append(t.getId())
-                .append(" state=").append(t.getState());
-        // Show enough frames that the com.automation caller is visible. With
-        // Hibernate/Spring Data JPA, the caller frame is often 30-50 deep
-        // below all the SQM/AST plumbing.
-        int limit = Math.min(stack.length, 80);
-        for (int i = 0; i < limit; i++) {
-            sb.append("\n    at ").append(stack[i]);
-        }
-        if (stack.length > limit) {
-            sb.append("\n    ... ").append(stack.length - limit).append(" more");
-        }
-        return sb.toString();
     }
 
     private static HikariDataSource unwrapHikariDataSource(DataSource dataSource) {
