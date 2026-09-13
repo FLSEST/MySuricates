@@ -306,7 +306,7 @@ start_backend() {
 
   if [[ "${REBUILD}" -eq 1 || ! -f "${CURRENT_JAR}" ]]; then
     build_backend_jar
-  else
+  elif [[ "${COMMAND}" != "restart" ]]; then
     echo "Verwende vorhandenes Runtime-JAR: $(readlink -f "${CURRENT_JAR}") (neu bauen: restart oder --rebuild)"
   fi
 
