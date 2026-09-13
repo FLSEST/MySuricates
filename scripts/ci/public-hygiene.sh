@@ -19,11 +19,18 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
+# Repo-Wurzel aus dem Skriptpfad, nicht aus git: in Worktrees exportiert git GIT_DIR an
+# Hooks, und `git -C scripts/ci rev-parse --show-toplevel` liefert dann scripts/ci.
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 
+RULES_FILE="$REPO_ROOT/scripts/lib/hygiene-rules.sh"
+if [ ! -f "$RULES_FILE" ]; then
+  echo "Public-Hygiene-Gate: Regeldatei fehlt: $RULES_FILE" >&2
+  exit 2
+fi
 # shellcheck source=../lib/hygiene-rules.sh
-. "$REPO_ROOT/scripts/lib/hygiene-rules.sh"
+. "$RULES_FILE"
 
 MODE="tracked"
 case "${1:-}" in
