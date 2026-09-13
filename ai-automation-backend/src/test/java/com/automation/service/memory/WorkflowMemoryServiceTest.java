@@ -80,6 +80,37 @@ class WorkflowMemoryServiceTest {
     }
 
     @Test
+    void extractAndActivate_deactivatesOthersAndActivatesNewMemory() throws IOException {
+        StepResult step = StepResult.builder()
+                .stepIndex(0).input("test").output("output").status(StepStatus.COMPLETED)
+                .metadata(new HashMap<>()).build();
+        WorkflowRun run = WorkflowRun.builder().id("run-1").steps(List.of(step)).build();
+        when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of(run));
+        when(preprocessor.preprocess(any())).thenReturn("preprocessed");
+        when(claudeSummarizer.summarize("preprocessed")).thenReturn(
+                new KnowledgeSummarizer.SummarizationResult("Title", "Content", List.of("tag1")));
+        when(memoryRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        WorkflowMemory result = service.extractAndActivate("wf-1", "CLAUDE");
+
+        assertThat(result.isActive()).isTrue();
+        assertThat(result.getTitle()).isEqualTo("Title");
+        verify(memoryRepository).deactivateAllForWorkflow("wf-1");
+        verify(memoryRepository, times(2)).save(any(WorkflowMemory.class));
+    }
+
+    @Test
+    void extractKnowledge_unknownRunId_throwsEntityNotFound_beforeSummarizing() {
+        when(runRepository.findById("missing")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.extractKnowledge("wf-1", List.of("missing"), "CLAUDE"))
+                .isInstanceOf(jakarta.persistence.EntityNotFoundException.class)
+                .hasMessageContaining("missing");
+        verifyNoInteractions(claudeSummarizer);
+        verify(memoryRepository, never()).save(any());
+    }
+
+    @Test
     void extractKnowledge_withSpecificRunIds() throws IOException {
         StepResult step = StepResult.builder()
                 .stepIndex(0).input("x").output("y").status(StepStatus.COMPLETED)

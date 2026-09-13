@@ -56,6 +56,40 @@ class OAuthStateRegistryTest {
         String state = injectExpired("google-calendar");
 
         assertThat(registry.peek(state)).isEmpty();
+        assertThat(registry.size()).as("peek drops the expired entry instead of leaving it for the sweeper").isZero();
+    }
+
+    @Test
+    void register_underConcurrency_neverExceedsCapacity() throws Exception {
+        for (int i = 0; i < OAuthStateRegistry.MAX_PENDING - 1; i++) {
+            registry.register("google-calendar", null);
+        }
+        int threads = 16;
+        var start = new java.util.concurrent.CountDownLatch(1);
+        var successes = new java.util.concurrent.atomic.AtomicInteger();
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(threads);
+        try {
+            var futures = new java.util.ArrayList<java.util.concurrent.Future<?>>();
+            for (int i = 0; i < threads; i++) {
+                futures.add(pool.submit(() -> {
+                    start.await();
+                    try {
+                        registry.register("google-calendar", null);
+                        successes.incrementAndGet();
+                    } catch (IllegalStateException expected) {
+                        // capacity reached
+                    }
+                    return null;
+                }));
+            }
+            start.countDown();
+            for (var f : futures) f.get(10, java.util.concurrent.TimeUnit.SECONDS);
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(successes.get()).as("exactly one free slot").isEqualTo(1);
+        assertThat(registry.size()).isEqualTo(OAuthStateRegistry.MAX_PENDING);
     }
 
     @Test

@@ -27,7 +27,14 @@ public class SslPasswordGuard {
 
     @PostConstruct
     public void checkPassword() {
-        if (sslEnabled && DEV_DEFAULT_PASSWORD.equals(keyStorePassword)) {
+        if (!sslEnabled) {
+            return;
+        }
+        if (keyStorePassword == null || keyStorePassword.isBlank()) {
+            throw new IllegalStateException(
+                    "AUTOMATION_SSL_ENABLED=true requires AUTOMATION_SSL_PASSWORD (keystore password is empty)");
+        }
+        if (DEV_DEFAULT_PASSWORD.equals(keyStorePassword)) {
             throw new IllegalStateException(
                     "AUTOMATION_SSL_ENABLED=true requires a non-default AUTOMATION_SSL_PASSWORD "
                             + "(dev default 'mysuricates' refused)");

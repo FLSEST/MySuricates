@@ -142,6 +142,8 @@ public class WorkflowMemoryService {
         WorkflowMemory memory = extractKnowledge(workflowId, null, provider);
         return transactionTemplate.execute(status -> {
             memoryRepository.deactivateAllForWorkflow(workflowId);
+            // `memory` is detached here (saved in the previous burst); mutating it and calling save()
+            // merges the change — no reload needed because nothing else touched the row in between.
             memory.setActive(true);
             WorkflowMemory saved = memoryRepository.save(memory);
             log.info("Auto-extracted and activated memory '{}' for workflow {}", saved.getTitle(), workflowId);

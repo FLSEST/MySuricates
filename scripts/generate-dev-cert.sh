@@ -14,6 +14,12 @@ mkdir -p "$CERT_DIR"
 # Keystore-Passwort: eigener Wert per AUTOMATION_SSL_PASSWORD, sonst der Dev-Default,
 # den application.yml fuer server.ssl.key-store-password ebenfalls verwendet.
 KEYSTORE_PASSWORD="${AUTOMATION_SSL_PASSWORD:-mysuricates}"
+# Mit aktiviertem SSL verweigert das Backend den Dev-Default (SslPasswordGuard) — dann hier
+# schon abbrechen statt ein Zertifikat zu erzeugen, das der Server nicht laden wird.
+if [ "${AUTOMATION_SSL_ENABLED:-false}" = "true" ] && [ "$KEYSTORE_PASSWORD" = "mysuricates" ]; then
+  echo "AUTOMATION_SSL_ENABLED=true erfordert ein eigenes AUTOMATION_SSL_PASSWORD (Dev-Default 'mysuricates' wird vom Backend abgelehnt)." >&2
+  exit 1
+fi
 
 # Detect Tailscale hostname and IP
 TS_HOSTNAME="${1:-}"

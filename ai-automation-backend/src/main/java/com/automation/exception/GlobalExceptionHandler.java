@@ -1,5 +1,6 @@
 package com.automation.exception;
 
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -147,6 +148,14 @@ public class GlobalExceptionHandler {
             builder.header(HttpHeaders.ALLOW, String.join(", ", supported));
         }
         return builder.body(ErrorResponse.of(ErrorCode.METHOD_NOT_ALLOWED, message));
+    }
+
+    // Repositories/services that look up by id with EntityNotFoundException (e.g. an unknown run id
+    // passed to the memory extraction) were answered with 500 — it is a client error.
+    @ExceptionHandler(EntityNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleEntityNotFound(EntityNotFoundException ex) {
+        log.debug("Entity not found: {}", ex.getMessage());
+        return respond(ErrorCode.RESOURCE_NOT_FOUND, ex.getMessage() != null ? ex.getMessage() : "Entity not found");
     }
 
     @ExceptionHandler(Exception.class)

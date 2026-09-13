@@ -43,8 +43,14 @@ public class OAuthStateRegistry {
 
     private final ConcurrentHashMap<String, PendingAuthorization> pending = new ConcurrentHashMap<>();
 
-    /** Generates a fresh state, binds it to the provider + origin and returns it. */
-    public String register(String providerId, String callbackOrigin) {
+    /**
+     * Generates a fresh state, binds it to the provider + origin and returns it.
+     *
+     * <p>Synchronized: purge → capacity check → put must be one step, otherwise concurrent
+     * registrations can push the map past {@link #MAX_PENDING}. Registrations are rare (one per
+     * OAuth connect click), so a monitor costs nothing.
+     */
+    public synchronized String register(String providerId, String callbackOrigin) {
         cleanupExpired();
         if (pending.size() >= MAX_PENDING) {
             throw new IllegalStateException("Too many pending OAuth authorizations — retry later");
@@ -68,7 +74,11 @@ public class OAuthStateRegistry {
     /** Reads without consuming — the callback origin is needed before the state is spent. */
     public Optional<PendingAuthorization> peek(String state) {
         PendingAuthorization authorization = pending.get(state);
-        if (authorization == null || authorization.isExpired()) return Optional.empty();
+        if (authorization == null) return Optional.empty();
+        if (authorization.isExpired()) {
+            pending.remove(state, authorization);   // expired entries never become valid again
+            return Optional.empty();
+        }
         return Optional.of(authorization);
     }
 

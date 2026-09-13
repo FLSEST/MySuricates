@@ -64,12 +64,13 @@ class OAuthTokenClientTest {
 
     @Test
     void revoke_sendsFormBody() {
-        client.revoke("google-calendar", config(url("/revoke")), "access-token-1");
+        // '+', '/' and '=' are legal in tokens and must be form-encoded, not sent raw
+        client.revoke("google-calendar", config(url("/revoke")), "acc+ess/token=1");
 
         assertThat(revokeCalls).hasValue(1);
         assertThat(revokeMethod).hasValue("POST");
         assertThat(revokeContentType).hasValue("application/x-www-form-urlencoded");
-        assertThat(revokeBody).hasValue("token=access-token-1");
+        assertThat(revokeBody).hasValue("token=acc%2Bess%2Ftoken%3D1");
         assertThat(revokeQuery.get()).as("token must not leak into the query string").isNull();
     }
 

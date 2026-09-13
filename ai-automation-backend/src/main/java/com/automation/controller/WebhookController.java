@@ -34,20 +34,20 @@ public class WebhookController {
     @GetMapping("/api/v1/webhooks")
     public List<WebhookTriggerResponse> listWebhooks(HttpServletRequest request) {
         return webhookService.findAll().stream()
-                .map(w -> toResponseWithUrl(w, request, false))
+                .map(w -> toResponseWithUrl(w, request, TokenVisibility.MASK))
                 .toList();
     }
 
     @GetMapping("/api/v1/webhooks/{id}")
     public WebhookTriggerResponse getWebhook(@PathVariable String id, HttpServletRequest request) {
-        return toResponseWithUrl(webhookService.findById(id), request, false);
+        return toResponseWithUrl(webhookService.findById(id), request, TokenVisibility.MASK);
     }
 
     @GetMapping("/api/v1/webhooks/workflow/{workflowId}")
     public List<WebhookTriggerResponse> getByWorkflow(
             @PathVariable String workflowId, HttpServletRequest request) {
         return webhookService.findByWorkflowId(workflowId).stream()
-                .map(w -> toResponseWithUrl(w, request, false))
+                .map(w -> toResponseWithUrl(w, request, TokenVisibility.MASK))
                 .toList();
     }
 
@@ -55,17 +55,17 @@ public class WebhookController {
     public ResponseEntity<WebhookTriggerResponse> createWebhook(
             @Valid @RequestBody CreateWebhookRequest req, HttpServletRequest request) {
         var webhook = webhookService.create(req.workflowId(), req.description(), req.defaultContext());
-        return ResponseEntity.status(HttpStatus.CREATED).body(toResponseWithUrl(webhook, request, true));
+        return ResponseEntity.status(HttpStatus.CREATED).body(toResponseWithUrl(webhook, request, TokenVisibility.REVEAL));
     }
 
     @PostMapping("/api/v1/webhooks/{id}/enable")
     public WebhookTriggerResponse enableWebhook(@PathVariable String id, HttpServletRequest request) {
-        return toResponseWithUrl(webhookService.enable(id), request, false);
+        return toResponseWithUrl(webhookService.enable(id), request, TokenVisibility.MASK);
     }
 
     @PostMapping("/api/v1/webhooks/{id}/disable")
     public WebhookTriggerResponse disableWebhook(@PathVariable String id, HttpServletRequest request) {
-        return toResponseWithUrl(webhookService.disable(id), request, false);
+        return toResponseWithUrl(webhookService.disable(id), request, TokenVisibility.MASK);
     }
 
     /**
@@ -75,7 +75,7 @@ public class WebhookController {
      */
     @PostMapping("/api/v1/webhooks/{id}/regenerate-token")
     public WebhookTriggerResponse regenerateToken(@PathVariable String id, HttpServletRequest request) {
-        return toResponseWithUrl(webhookService.regenerateToken(id), request, true);
+        return toResponseWithUrl(webhookService.regenerateToken(id), request, TokenVisibility.REVEAL);
     }
 
     @DeleteMapping("/api/v1/webhooks/{id}")
@@ -106,11 +106,17 @@ public class WebhookController {
      * 8 characters, since the full token is a bearer credential for the public trigger
      * endpoint.
      */
-    private WebhookTriggerResponse toResponseWithUrl(WebhookTrigger w, HttpServletRequest request, boolean reveal) {
+    /** Whether a management response carries the full bearer token or its masked prefix. */
+    enum TokenVisibility { REVEAL, MASK }
+
+    private WebhookTriggerResponse toResponseWithUrl(WebhookTrigger w, HttpServletRequest request,
+                                                     TokenVisibility visibility) {
         WebhookTriggerResponse mapped = webhookMapper.toResponse(w);
         String baseUrl = request.getScheme() + "://" + request.getServerName()
                 + ":" + request.getServerPort();
-        String displayToken = reveal ? w.getSecretToken() : maskToken(w.getSecretToken());
+        boolean reveal = visibility == TokenVisibility.REVEAL;
+        String token = w.getSecretToken() != null ? w.getSecretToken() : "";
+        String displayToken = reveal ? token : maskToken(token);
         String webhookUrl = baseUrl + "/api/v1/webhook/trigger/" + displayToken;
 
         return new WebhookTriggerResponse(
@@ -122,8 +128,8 @@ public class WebhookController {
     }
 
     private static String maskToken(String token) {
-        if (token == null) {
-            return null;
+        if (token == null || token.isEmpty()) {
+            return "";   // never let a "null" literal end up in the URL
         }
         int visibleLength = Math.min(8, token.length());
         return token.substring(0, visibleLength) + "…";

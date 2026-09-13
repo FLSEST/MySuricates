@@ -224,7 +224,21 @@ class WebhookControllerTest {
 
         mockMvc.perform(post("/api/v1/webhooks/wh-1/enable"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.enabled").value(true));
+                .andExpect(jsonPath("$.enabled").value(true))
+                .andExpect(jsonPath("$.tokenVisible").value(false))
+                .andExpect(jsonPath("$.secretToken").value("abc123de…"))
+                .andExpect(jsonPath("$.webhookUrl", not(containsString("abc123def456ghi789jkl012mno345pq"))));
+    }
+
+    @Test
+    void getWebhook_withoutToken_doesNotRenderNullIntoUrl() throws Exception {
+        testWebhook.setSecretToken(null);
+        when(webhookService.findById("wh-1")).thenReturn(testWebhook);
+
+        mockMvc.perform(get("/api/v1/webhooks/wh-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.secretToken").value(""))
+                .andExpect(jsonPath("$.webhookUrl", not(containsString("null"))));
     }
 
     @Test
@@ -242,7 +256,9 @@ class WebhookControllerTest {
 
         mockMvc.perform(post("/api/v1/webhooks/wh-1/disable"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.enabled").value(false));
+                .andExpect(jsonPath("$.enabled").value(false))
+                .andExpect(jsonPath("$.tokenVisible").value(false))
+                .andExpect(jsonPath("$.secretToken").value("abc123de…"));
     }
 
     @Test

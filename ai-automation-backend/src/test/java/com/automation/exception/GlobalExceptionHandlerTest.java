@@ -185,6 +185,17 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void handleEntityNotFound_returnsNotFoundWithMessage() {
+        ResponseEntity<ErrorResponse> response = handler.handleEntityNotFound(
+                new jakarta.persistence.EntityNotFoundException("Run not found: run-x"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getCode()).isEqualTo("RESOURCE_NOT_FOUND");
+        assertThat(response.getBody().getError()).isEqualTo("Run not found: run-x");
+    }
+
+    @Test
     void handleMethodNotSupported_returnsMethodNotAllowedStatus() {
         var ex = new HttpRequestMethodNotSupportedException("GET", java.util.List.of("POST"));
         HttpServletRequest request = mock(HttpServletRequest.class);

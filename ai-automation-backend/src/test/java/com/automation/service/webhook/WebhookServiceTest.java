@@ -197,6 +197,21 @@ class WebhookServiceTest {
     }
 
     @Test
+    void trigger_withOldTokenAfterRegenerate_isRejected() {
+        String oldToken = testWebhook.getSecretToken();
+        when(webhookRepository.findById("wh-1")).thenReturn(Optional.of(testWebhook));
+        when(webhookRepository.save(any(WebhookTrigger.class))).thenAnswer(inv -> inv.getArgument(0));
+        // repository answers by the token currently stored on the entity, like the real query would
+        when(webhookRepository.findBySecretToken(any())).thenAnswer(inv ->
+                inv.getArgument(0).equals(testWebhook.getSecretToken()) ? Optional.of(testWebhook) : Optional.empty());
+
+        webhookService.regenerateToken("wh-1");
+
+        assertThatThrownBy(() -> webhookService.trigger(oldToken, Map.of(), new org.springframework.http.HttpHeaders()))
+                .isInstanceOf(com.automation.exception.ResourceNotFoundException.class);
+    }
+
+    @Test
     void regenerateToken_preservesTriggerCountAndLastTriggeredAt() {
         Instant lastTriggered = Instant.parse("2026-01-01T00:00:00Z");
         testWebhook.setTriggerCount(7);

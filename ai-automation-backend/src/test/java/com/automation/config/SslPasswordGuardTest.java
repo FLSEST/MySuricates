@@ -2,7 +2,6 @@ package com.automation.config;
 
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -34,7 +33,22 @@ class SslPasswordGuardTest {
     void should_notThrow_when_sslDisabledAndPasswordIsDevDefault() {
         SslPasswordGuard guard = new SslPasswordGuard(false, "mysuricates");
 
-        assertThat(guard).isNotNull();
-        guard.checkPassword();
+        assertThatCode(guard::checkPassword).doesNotThrowAnyException();
+    }
+
+    @Test
+    void should_throw_when_sslEnabledAndPasswordIsBlank() {
+        assertThatThrownBy(() -> new SslPasswordGuard(true, "").checkPassword())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("empty");
+        assertThatThrownBy(() -> new SslPasswordGuard(true, "   ").checkPassword())
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> new SslPasswordGuard(true, null).checkPassword())
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void should_notThrow_when_sslDisabledAndPasswordIsBlank() {
+        assertThatCode(() -> new SslPasswordGuard(false, "").checkPassword()).doesNotThrowAnyException();
     }
 }

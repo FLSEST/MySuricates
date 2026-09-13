@@ -68,6 +68,7 @@ public class WorkflowService {
     public Workflow create(CreateWorkflowRequest request) {
         Project project = projectRepository.findById(request.projectId())
                 .orElseThrow(() -> new ResourceNotFoundException("Project", request.projectId()));
+        BlockNameRules.rejectReservedNames(request.blocks());
 
         Workflow workflow = Workflow.builder()
                 .project(project)
@@ -126,6 +127,7 @@ public class WorkflowService {
             workflow.setIcon(request.icon());
         }
         if (request.blocks() != null) {
+            BlockNameRules.rejectReservedNames(request.blocks());
             workflow.setBlocks(request.blocks());
         }
         if (request.instructions() != null) {
