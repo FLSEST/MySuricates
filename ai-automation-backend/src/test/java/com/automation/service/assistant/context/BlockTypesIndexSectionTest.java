@@ -46,6 +46,9 @@ class BlockTypesIndexSectionTest {
                 .contains("[human-input]")
                 .contains("[integration]")
                 .contains("[document]")
+                .contains("[todo-create]")
+                .contains("[todo-update]")
+                .contains("[todo-close]")
                 .contains("<fetch type=\"block-spec\"");
     }
 

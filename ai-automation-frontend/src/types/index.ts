@@ -210,7 +210,17 @@ export interface UpdateWorkflowRequest {
   category?: string;
 }
 
-export type BlockType = 'simple' | 'shell' | 'retry' | 'foreach' | 'while' | 'conditional' | 'switch' | 'skill-capability' | 'approval' | 'agentic' | 'sub-workflow' | 'human-input' | 'document';
+/**
+ * All block types the backend registers (one per BlockExecutor). Guarded on both sides:
+ * backend `BlockTypeListsGuardTest` (executors vs. lists), frontend `types/__tests__/blockTypes.test.ts`.
+ */
+export const BLOCK_TYPES = [
+  'simple', 'shell', 'retry', 'foreach', 'while', 'conditional', 'switch',
+  'skill-capability', 'approval', 'agentic', 'sub-workflow', 'human-input',
+  'integration', 'document', 'todo-create', 'todo-update', 'todo-close',
+] as const;
+
+export type BlockType = (typeof BLOCK_TYPES)[number];
 
 export interface BlockDefinition {
   type: BlockType;

@@ -9,6 +9,10 @@ public class BlockTypesIndexSection implements AssistantContextSection {
 
     public record BlockTypeEntry(String type, String summary) {}
 
+    /**
+     * One entry per registered {@link com.automation.executor.BlockExecutor}. Guarded by
+     * {@code BlockTypeListsGuardTest}: a new executor without an entry here fails the build.
+     */
     public static final List<BlockTypeEntry> BLOCK_TYPES = List.of(
             new BlockTypeEntry("simple", "AI prompt with a single response (Claude/Codex), uses workflow model"),
             new BlockTypeEntry("shell", "Run shell command (no API access, no DB access)"),
@@ -23,7 +27,10 @@ public class BlockTypesIndexSection implements AssistantContextSection {
             new BlockTypeEntry("skill-capability", "Runs a capability of a skill (declarative)"),
             new BlockTypeEntry("human-input", "Requests value(s) from user, pauses until answer"),
             new BlockTypeEntry("integration", "Action of an integration provider (e.g. github:create_issue)"),
-            new BlockTypeEntry("document", "OCR/document processing (PDF, images)")
+            new BlockTypeEntry("document", "OCR/document processing (PDF, images)"),
+            new BlockTypeEntry("todo-create", "Creates a TODO natively (title, priority, tags), stores its id in a variable"),
+            new BlockTypeEntry("todo-update", "Updates fields of an existing TODO by id (title, description, priority, tags)"),
+            new BlockTypeEntry("todo-close", "Sets an existing TODO to DONE by id")
     );
 
     @Override

@@ -21,6 +21,10 @@ const blockTypeVariant: Record<BlockType, BadgeVariant> = {
   conditional: 'default',
   switch: 'default',
   document: 'accent',
+  integration: 'accent',
+  'todo-create': 'default',
+  'todo-update': 'default',
+  'todo-close': 'default',
 };
 
 interface SortableBlockProps {

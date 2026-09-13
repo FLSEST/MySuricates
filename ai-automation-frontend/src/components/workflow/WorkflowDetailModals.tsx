@@ -2,11 +2,10 @@ import { Button, Input, Select, Modal, ModalFooter } from '../ui';
 import { MonacoEditor } from '../shared/MonacoEditor';
 import { ExecuteDialog } from './ExecuteDialog';
 import { useT } from '../../i18n';
+import { BLOCK_TYPES } from '../../types';
 import type {
   BlockType, Workflow, OptimizeResult, Project,
 } from '../../types';
-
-const BLOCK_TYPES: BlockType[] = ['simple', 'shell', 'retry', 'foreach', 'while', 'conditional', 'switch', 'skill-capability', 'approval', 'human-input', 'agentic', 'sub-workflow', 'document'];
 
 interface AvailableSkill {
   id: string;
@@ -233,6 +232,10 @@ export function WorkflowDetailModals({
                 'sub-workflow': { workflow_id: '' },
                 switch: { expression: '', cases: [{ value: 'default', blocks: [] }] },
                 document: { file_path: '', variable_name: 'extracted_text', fail_on_empty: false, min_characters: 1 },
+                integration: { provider: '', action: '', params: {} },
+                'todo-create': { title: '', description: '', priority: 'MEDIUM', tags: [], variable_name: 'todo_id' },
+                'todo-update': { id: '{{ todo_id }}', title: '', description: '' },
+                'todo-close': { id: '{{ todo_id }}' },
               };
               setNewBlock({ ...newBlock, type, config: JSON.stringify(defaultConfig[type], null, 2) });
             }}
