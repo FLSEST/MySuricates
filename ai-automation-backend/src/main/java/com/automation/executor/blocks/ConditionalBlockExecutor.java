@@ -26,11 +26,16 @@ public class ConditionalBlockExecutor implements BlockExecutor {
     @Override
     public StepResult execute(BlockDefinition block, ExecutionContext context) {
         Map<String, Object> config = block.getConfig();
-        String condition = context.resolveTemplate((String) config.get("condition"));
-        String thenCommand = (String) config.get("then_command");
-        String elseCommand = (String) config.get("else_command");
         String executionMode = (String) config.getOrDefault("execution_mode", "claude");
         boolean isShell = "shell".equals(executionMode);
+        // Shell-Modus: gleiche Regel wie Shell/While/Retry — untrusted Werte immer single-quoted,
+        // alle Werte bei shell_escape_variables. Claude-Modus bleibt roh (Prompt, keine Shell).
+        boolean escapeVariables = Boolean.TRUE.equals(config.get("shell_escape_variables"));
+        String condition = isShell
+                ? context.resolveShellTemplate((String) config.get("condition"), escapeVariables)
+                : context.resolveTemplate((String) config.get("condition"));
+        String thenCommand = (String) config.get("then_command");
+        String elseCommand = (String) config.get("else_command");
         int shellTimeout = ((Number) config.getOrDefault("timeout_seconds", SHELL_TIMEOUT_SECONDS)).intValue();
         Integer claudeTimeout = config.containsKey("timeout_seconds")
                 ? ((Number) config.get("timeout_seconds")).intValue()
@@ -66,7 +71,9 @@ public class ConditionalBlockExecutor implements BlockExecutor {
         result.setInput("if (" + condition + ") → " + conditionMet);
 
         if (commandToExecute != null) {
-            String resolved = context.resolveTemplate(commandToExecute);
+            String resolved = isShell
+                    ? context.resolveShellTemplate(commandToExecute, escapeVariables)
+                    : context.resolveTemplate(commandToExecute);
             StepResult stepResult;
             if (isShell) {
                 stepResult = commandExecutor.executeStepAsShell(

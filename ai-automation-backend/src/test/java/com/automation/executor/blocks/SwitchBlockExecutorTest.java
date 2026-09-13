@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.HashMap;
@@ -711,5 +712,24 @@ class SwitchBlockExecutorTest {
 
         verify(commandExecutor).executeStepOnHost(argThat(req ->
                 "PI".equals(req.providerId()) && "anthropic/opus".equals(req.model())));
+    }
+
+    @Test
+    void execute_nestedShellBlock_untrustedVariable_isSingleQuoted() {
+        context.setUntrustedVariable("payload", "x; id");
+        context.setVariable("status", "success");
+        when(commandExecutor.executeStepAsShell(anyString(), any(BlockDefinition.class), anyInt(), anyInt()))
+                .thenReturn(StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED).output("ok").build());
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "${status}");
+        config.put("cases", List.of(Map.of("value", "success", "blocks", List.of(
+                Map.of("type", "shell", "config", Map.of("command", "echo {{ payload }}"))))));
+
+        executor.execute(BlockDefinition.builder().type("switch").config(config).build(), context);
+
+        ArgumentCaptor<BlockDefinition> captor = ArgumentCaptor.forClass(BlockDefinition.class);
+        verify(commandExecutor).executeStepAsShell(anyString(), captor.capture(), anyInt(), anyInt());
+        assertThat(captor.getValue().getConfig().get("command")).isEqualTo("echo 'x; id'");
     }
 }

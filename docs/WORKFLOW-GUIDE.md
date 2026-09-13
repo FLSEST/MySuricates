@@ -138,8 +138,8 @@ Fuehrt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 > `"shell_escape_variables": true`. Shell-Blöcke erhalten sonst keine Umgebungsvariablen.
 
 > **Nicht vertrauenswuerdige Variablen:** Alles, was ein Webhook-Aufrufer liefert (Payload-Felder und
-> die daraus abgeleiteten `git_*`-Felder), landet in Shell-Befehlen (`shell`, `foreach`, `while`, `retry`
-> im Shell-Modus) grundsaetzlich in Single-Quotes — auch ohne `shell_escape_variables`. Solche
+> die daraus abgeleiteten `git_*`-Felder), landet in Shell-Befehlen (`shell`, `foreach`, `while`, `retry`,
+> `conditional` und in `switch` verschachtelte Bloecke, jeweils im Shell-Modus) grundsaetzlich in Single-Quotes — auch ohne `shell_escape_variables`. Solche
 > Platzhalter deshalb **unquoted** schreiben (`git checkout {{ git_branch }}`, nicht `"{{ git_branch }}"`),
 > sonst stehen die Quotes doppelt. **Und das ist nicht nur Kosmetik: in eigenen Quotes ist das
 > Escaping wirkungslos.** Beim Wert `x; id` wird `PREV='{{ previous_output }}'` zu

@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.HashMap;
@@ -459,5 +460,60 @@ class ConditionalBlockExecutorTest {
                 "PI".equals(req.providerId()) && "anthropic/opus".equals(req.model())));
         verify(commandExecutor).executeStepOnHost(argThat(req ->
                 "PI".equals(req.providerId()) && "anthropic/opus".equals(req.model())));
+    }
+
+    @Test
+    void execute_shellMode_untrustedVariableInCondition_isSingleQuoted() {
+        context.setUntrustedVariable("branch", "main; id");
+        when(commandExecutor.executeShellCommandOnHost(eq("/test/project"), eq("test 'main; id' = main"), anyInt()))
+                .thenReturn(new CliSession.CommandResult("", 1));
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("execution_mode", "shell");
+        config.put("condition", "test {{ branch }} = main");
+        config.put("then_command", "echo then");
+
+        StepResult result = executor.execute(BlockDefinition.builder().type("conditional").config(config).build(), context);
+
+        assertThat(result.getInput()).contains("false");
+        verify(commandExecutor).executeShellCommandOnHost(eq("/test/project"), eq("test 'main; id' = main"), anyInt());
+    }
+
+    @Test
+    void execute_shellMode_escapeOption_quotesPreviousOutputInConditionAndBranch() {
+        context.recordOutput("audit", "line one\nVERIFICATION_PASSED");
+        when(commandExecutor.executeShellCommandOnHost(eq("/test/project"),
+                eq("echo 'line one\nVERIFICATION_PASSED' | grep -q VERIFICATION_PASSED"), anyInt()))
+                .thenReturn(new CliSession.CommandResult("", 0));
+        when(commandExecutor.executeStepAsShell(anyString(), any(BlockDefinition.class), anyInt(), anyInt()))
+                .thenReturn(StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED).output("ok").build());
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("execution_mode", "shell");
+        config.put("shell_escape_variables", true);
+        config.put("condition", "echo {{ previous_output }} | grep -q VERIFICATION_PASSED");
+        config.put("then_command", "printf %s {{ previous_output }}");
+
+        executor.execute(BlockDefinition.builder().type("conditional").config(config).build(), context);
+
+        ArgumentCaptor<BlockDefinition> captor = ArgumentCaptor.forClass(BlockDefinition.class);
+        verify(commandExecutor).executeStepAsShell(anyString(), captor.capture(), anyInt(), anyInt());
+        assertThat(captor.getValue().getConfig().get("command"))
+                .isEqualTo("printf %s 'line one\nVERIFICATION_PASSED'");
+    }
+
+    @Test
+    void execute_claudeMode_untrustedVariable_staysRawInPrompt() {
+        context.setUntrustedVariable("branch", "main; id");
+        when(commandExecutor.executeOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(new CliSession.EnrichedCommandResult("FALSE", 0, null));
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("condition", "branch is {{ branch }}");
+        config.put("then_command", "deploy");
+
+        executor.execute(BlockDefinition.builder().type("conditional").config(config).build(), context);
+
+        verify(commandExecutor).executeOnHost(argThat(req -> req.command().contains("branch is main; id")));
     }
 }
