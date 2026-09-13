@@ -1362,6 +1362,13 @@ export const en = {
     diagnoseTitle: 'Ask the assistant why this run failed',
     diagnosePrompt: 'Workflow "{name}" failed on its last run.\n- Status: {status}\n- Failed step: {step}\n- Error: {error}\n- Run ID: {runId}\n\nPlease analyse the root cause and suggest a concrete fix.',
   },
+  auditCenter: {
+    acceptedCount: 'of which {count} accepted',
+    acceptedAt: 'Accepted on',
+    reviewDue: 'review due on',
+    evidenceSnapshot: 'Evidence snapshot at acceptance',
+    dispositionNote: 'Disposition note',
+  },
   cockpit: {
     title: 'Cockpit',
     subtitle: 'Cross-project overview of all todos',

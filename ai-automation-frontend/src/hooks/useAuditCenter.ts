@@ -67,6 +67,8 @@ export interface AuditFinding {
   regressionCount: number;
   resolvedAt: string | null;
   dispositionNote: string | null;
+  dispositionEvidence: string | null;
+  dispositionAt: string | null;
   todos: Array<{ id: string; title: string; status: string; managed: boolean }>;
 }
 

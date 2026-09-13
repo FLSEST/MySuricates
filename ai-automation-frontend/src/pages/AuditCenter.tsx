@@ -14,7 +14,7 @@ import {
   useAuditFinding, useAuditFindings, useAuditReports, useAudits, useCreateAuditTodo, useLinkAuditTodo,
   useUpdateAuditFinding,
 } from '../hooks/useAuditCenter';
-import { useI18nStore } from '../i18n';
+import { useI18nStore, useT } from '../i18n';
 import { formatDateTime, formatRelativeTime } from '../utils/formatTime';
 import { todoDeepLink } from '../utils/todoLinks';
 
@@ -104,7 +104,7 @@ function AuditOverview({ audits, loading, projectNames, locale, onOpen }: {
           </span>
           <GateBadge status={audit.gateStatus} />
           <Trend trend={audit.trend} />
-          <FindingCounts counts={audit.openFindingsBySeverity} />
+          <FindingCounts counts={audit.openFindingsBySeverity} accepted={audit.findingsByStatus.ACCEPTED_RISK ?? 0} />
           <span className="text-xs text-text-secondary">
             {formatRelativeTime(audit.generatedAt, locale)}
             {audit.stale && <span className="block text-warning">veraltet</span>}
@@ -153,7 +153,7 @@ function AuditDetail({ audit, tab, setTab, locale, projectName, requestedFinding
         {reports.isLoading || findings.isLoading ? <CenteredLoading /> : null}
         {tab === 'report' && latest && <ReportContent report={latest} />}
         {tab === 'history' && <ReportHistory reports={reports.data?.content ?? []} locale={locale} workflowId={audit.workflowId} />}
-        {tab === 'findings' && <Findings findings={findings.data?.content ?? []} requestedFinding={requestedFinding} workflowId={audit.workflowId} />}
+        {tab === 'findings' && <Findings findings={findings.data?.content ?? []} requestedFinding={requestedFinding} workflowId={audit.workflowId} locale={locale} />}
       </div>
     </div>
   );
@@ -186,7 +186,7 @@ function ReportHistory({ reports, locale, workflowId }: { reports: AuditReport[]
   </div>;
 }
 
-function Findings({ findings, requestedFinding, workflowId }: { findings: AuditFinding[]; requestedFinding: string | null; workflowId: string }) {
+function Findings({ findings, requestedFinding, workflowId, locale }: { findings: AuditFinding[]; requestedFinding: string | null; workflowId: string; locale: string }) {
   const update = useUpdateAuditFinding();
   const createTodo = useCreateAuditTodo();
   const linkTodo = useLinkAuditTodo();
@@ -202,6 +202,7 @@ function Findings({ findings, requestedFinding, workflowId }: { findings: AuditF
             <div className="flex items-center gap-2 flex-wrap"><SeverityBadge severity={finding.severity} /><FindingStatus status={finding.status} /><h3 className="font-medium text-text">{finding.title}</h3></div>
             <p className="text-sm text-text-secondary mt-2">{finding.description}</p>
             {finding.evidence && <pre className="text-xs text-text-secondary font-mono whitespace-pre-wrap mt-3 border-l-2 border-border pl-3">{finding.evidence}</pre>}
+            <Disposition finding={finding} locale={locale} />
             <div className="flex items-center gap-3 mt-3 text-xs text-text-tertiary flex-wrap">
               <span>{finding.ruleKey} · {finding.subject}</span>
               <span>{finding.occurrenceCount}× gesehen</span>
@@ -267,9 +268,33 @@ function Trend({ trend }: { trend: AuditSummary['trend'] }) {
   const color = trend === 'IMPROVED' ? 'text-success' : trend === 'REGRESSED' ? 'text-danger' : 'text-text-tertiary';
   return <span className={`inline-flex items-center gap-1 text-xs ${color}`}><Icon className="w-3.5 h-3.5" />{trend}</span>;
 }
-function FindingCounts({ counts }: { counts: Record<string, number> }) {
+function FindingCounts({ counts, accepted }: { counts: Record<string, number>; accepted: number }) {
+  const t = useT();
   const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
-  return <span className="text-sm text-text"><strong>{total}</strong><span className="text-xs text-text-tertiary ml-1">({counts.CRITICAL ?? 0} kritisch, {counts.HIGH ?? 0} hoch)</span></span>;
+  return <span className="text-sm text-text">
+    <strong>{total}</strong><span className="text-xs text-text-tertiary ml-1">({counts.CRITICAL ?? 0} kritisch, {counts.HIGH ?? 0} hoch)</span>
+    {accepted > 0 && <span className="block text-xs text-text-tertiary" data-testid="accepted-count">{t.auditCenter.acceptedCount.replace('{count}', String(accepted))}</span>}
+  </span>;
+}
+
+const REVIEW_INTERVAL_MS = 180 * 24 * 60 * 60 * 1000;
+
+function Disposition({ finding, locale }: { finding: AuditFinding; locale: string }) {
+  const t = useT();
+  if (!finding.dispositionAt && !finding.dispositionEvidence && !finding.dispositionNote) return null;
+  const formatDay = (value: string | Date) => new Date(value).toLocaleDateString(locale === 'de' ? 'de-DE' : 'en-US', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const reviewDue = finding.dispositionAt ? new Date(new Date(finding.dispositionAt).getTime() + REVIEW_INTERVAL_MS) : null;
+  return <div className="mt-3 text-xs text-text-tertiary border-l-2 border-warning/60 pl-3 space-y-1" data-testid="disposition">
+    {finding.dispositionAt && <p>
+      {t.auditCenter.acceptedAt} {formatDay(finding.dispositionAt)}
+      {finding.status === 'ACCEPTED_RISK' && reviewDue && <> · {t.auditCenter.reviewDue} {formatDay(reviewDue)}</>}
+    </p>}
+    {finding.dispositionNote && <p className="whitespace-pre-wrap text-text-secondary">{t.auditCenter.dispositionNote}: {finding.dispositionNote}</p>}
+    {finding.dispositionEvidence && <details>
+      <summary className="cursor-pointer">{t.auditCenter.evidenceSnapshot}</summary>
+      <pre className="font-mono whitespace-pre-wrap mt-1">{finding.dispositionEvidence}</pre>
+    </details>}
+  </div>;
 }
 function NavButton({ active, disabled, onClick, icon, children }: { active: boolean; disabled?: boolean; onClick: () => void; icon: React.ReactNode; children: React.ReactNode }) {
   return <button disabled={disabled} onClick={onClick} className={`inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-md disabled:opacity-40 ${active ? 'bg-surface-overlay text-text' : 'text-text-secondary hover:text-text'}`}>{icon}{children}</button>;

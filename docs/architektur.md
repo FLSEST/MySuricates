@@ -319,6 +319,24 @@ Automatische Verkettung von Workflows auf Basis von Abschluss-Ereignissen:
 - Trigger verknüpfen einen Source-Workflow (Auslöser) mit einem Target-Workflow (wird nach Abschluss gestartet)
 - API: List, Get, Create, Enable/Disable, Delete; Filter by Source- oder Target-Workflow-ID
 
+## Audit Center — Findings, Akzeptanz und Verfall (V68/V69)
+
+Audit-Workflows (Metadata `audit.enabled=true`, `key`, `category`, `reportBlock`) liefern im Report-Block einen Envelope `<!-- mysuricates:audit-result:v1 {…} -->`, den `AuditResultParser` zerlegt. `AuditIngestionService.ingest` (auf `WorkflowRunCompletedEvent`) speichert pro Run einen `AuditReport` (VALID/INVALID) und gleicht die Findings per Fingerprint (SHA-256 über projectId/auditKey/ruleKey/subject) ab:
+
+- **Neu** → `OPEN`; **wieder da** nach `RESOLVED` → `OPEN` + `regressionCount`; `AWAITING_VERIFICATION` → `OPEN`; **nicht mehr im Snapshot** → `RESOLVED` (nur OPEN/AWAITING_VERIFICATION). Terminale Status `ACCEPTED_RISK` und `DISMISSED` werden bei Abwesenheit nicht angefasst.
+- **Verwaltete TODOs**: nur für `CRITICAL`/`HIGH`-Findings im Status `OPEN` (`ensureManagedTodo`, Tag `audit`, `auto:workflow`, `TodoCreatedEvent` → TodoTrigger). Akzeptierte/verworfene Risiken und Wiedervorlagen lösen keinen Fix-Loop aus. `reconcileManagedTodos` schließt das TODO, sobald alle verknüpften Findings terminal sind, und öffnet es beim Wiederauftauchen.
+- **Gate-Status** kommt aus den Run-Metadaten des Workflows (`gate_status`), nicht aus den Findings; `AuditSummary.openFindingsBySeverity` zählt nur nicht-terminale Findings, `findingsByStatus` liefert Akzeptierte getrennt (Audit Center: „davon N akzeptiert").
+
+**Risiko-Akzeptanz** (`PATCH /api/v1/audit-findings/{id}` mit `status=ACCEPTED_RISK`, `dispositionNote`) — Regeln in `AuditAcceptancePolicy`, Zahlen-Parser `EvidenceMetrics`:
+
+| Regel | Verhalten |
+|---|---|
+| Beweis-Snapshot | Beim Akzeptieren friert `AuditCenterService.updateFinding` den aktuellen `evidence`-Text als `disposition_evidence` und den Zeitpunkt als `disposition_at` ein (V69). Beides bleibt bei späteren Statuswechseln zur Nachvollziehbarkeit erhalten; erneutes Akzeptieren setzt beides neu. |
+| Verschlechterung | Taucht das Finding erneut auf, vergleicht die Ingestion messbare Werte der neuen Evidence mit dem Snapshot — `EvidenceMetrics.parse` erkennt `Zahl + Einheit` (`LOC`/`lines`/`Zeilen`, `deps`, `KB`/`MB`/`GB`, `ms`, `%`, `files`, `classes`, `methods`, `tests`, `warnings`, `errors`, `issues`, `vulnerabilities`; Synonyme werden zusammengeführt, pro Einheit zählt der größte Wert). Liegt ein gemeinsamer Schlüssel > 10 % über dem Snapshot, wird das Finding wieder `OPEN`, die Notiz um `Verschlechtert: 320 LOC → 400 LOC` ergänzt; der Snapshot bleibt. Ohne vergleichbare Zahlen (einseitig oder gar keine) keine Wiedereröffnung. |
+| Verfall | Ist die Akzeptanz beim Wiederauftauchen älter als 180 Tage (`disposition_at`, Fallback `resolved_at` für Alt-Akzeptanzen), geht das Finding auf `AWAITING_VERIFICATION` mit Notiz `Wiedervorlage nach 180 Tagen` — ohne verwaltetes TODO. Das passiert genau einmal: danach gelten die normalen Regeln (nächster Ingest: da → `OPEN`, weg → `RESOLVED`); erst ein erneutes Akzeptieren startet eine neue Frist. Verschlechterung hat Vorrang vor Verfall. |
+
+Das Audit Center zeigt pro Finding Akzeptanz-Datum, Wiedervorlage-Datum (+180 Tage), Dispositions-Notiz und den Snapshot (aufklappbar). Tests: `AuditAcceptancePolicyTest`, `EvidenceMetricsTest`, `AuditIngestionServiceTest`, `AuditControllerTest`, Frontend `AuditCenter.test.tsx`.
+
 ## Todo Triggers — Self-Improvement Loop (V51/V52)
 
 Automatische Ausführung von Fix-Workflows wenn TODOs erstellt werden — schliesst den Self-Improvement-Loop:
@@ -801,6 +819,7 @@ Die DB-Migrationen (`src/main/resources/db/migration/`) dokumentieren die Featur
 | V66 | Todo-Export-Link |
 | V67 | Aufwandsschätzung auf Workflows |
 | V68 | Audit-Reports, Findings, Occurrences und TODO-Verknüpfungen |
+| V69 | Beweis-Snapshot und Akzeptanz-Zeitpunkt auf Audit-Findings (`disposition_evidence`, `disposition_at`) |
 
 ## Verzeichnisstruktur
 
