@@ -32,7 +32,8 @@ public class JiraProvider implements IntegrationProvider, TaskExportCapable {
     /** Cache the accessible site (cloudId + browse URL) per access token to avoid resolving on every action */
     private final ConcurrentHashMap<String, JiraSite> siteCache = new ConcurrentHashMap<>();
 
-    private record JiraSite(String cloudId, String siteUrl) {}
+    /** Package-visible so tests can seed the cache without a network round-trip. */
+    record JiraSite(String cloudId, String siteUrl) {}
 
     @Override
     public String getProviderId() {
@@ -241,6 +242,12 @@ public class JiraProvider implements IntegrationProvider, TaskExportCapable {
 
     private String buildBaseUrl(String cloudId) {
         return ATLASSIAN_API + "/ex/jira/" + cloudId + "/rest/api/3";
+    }
+
+    /** Cloud id of the first accessible site, or {@code null}; kept as the historical seam for tests. */
+    private String resolveCloudId(String accessToken) {
+        JiraSite site = resolveSite(accessToken);
+        return site == null ? null : site.cloudId();
     }
 
     private JiraSite resolveSite(String accessToken) {

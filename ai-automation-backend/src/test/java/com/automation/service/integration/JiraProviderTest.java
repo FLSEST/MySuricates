@@ -31,11 +31,19 @@ class JiraProviderTest {
     void setUp() throws Exception {
         http = mock(JiraHttpClient.class);
         provider = new JiraProvider(new ObjectMapper(), http);
-        Field cacheField = JiraProvider.class.getDeclaredField("cloudIdCache");
+        Field cacheField = JiraProvider.class.getDeclaredField("siteCache");
         cacheField.setAccessible(true);
         @SuppressWarnings("unchecked")
-        Map<String, String> cache = (Map<String, String>) cacheField.get(provider);
-        cache.put("token", "cloud-id-123");
+        Map<String, Object> cache = (Map<String, Object>) cacheField.get(provider);
+        cache.put("token", newSite("cloud-id-123"));
+    }
+
+    /** JiraProvider.JiraSite is package-private in providers.jira — build it reflectively. */
+    private static Object newSite(String cloudId) throws Exception {
+        Class<?> site = Class.forName("com.automation.service.integration.providers.jira.JiraProvider$JiraSite");
+        var ctor = site.getDeclaredConstructor(String.class, String.class);
+        ctor.setAccessible(true);
+        return ctor.newInstance(cloudId, null);
     }
 
     // --- Existing tests (unchanged) ---
@@ -290,9 +298,9 @@ class JiraProviderTest {
     @Test
     @SuppressWarnings("unchecked")
     void resolveCloudId_cacheMiss_callsAccessibleResources() throws Exception {
-        Field cacheField = JiraProvider.class.getDeclaredField("cloudIdCache");
+        Field cacheField = JiraProvider.class.getDeclaredField("siteCache");
         cacheField.setAccessible(true);
-        Map<String, String> cache = (Map<String, String>) cacheField.get(provider);
+        Map<String, Object> cache = (Map<String, Object>) cacheField.get(provider);
         cache.remove("token");
 
         HttpResponse<String> resp = mockRawResponse(200,
