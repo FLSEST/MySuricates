@@ -8,7 +8,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
@@ -24,6 +23,7 @@ public class IntegrationOAuthService {
     private final OAuthTokenClient tokenClient;
     private final OAuthStateRegistry stateRegistry;
     private final TransactionTemplate transactionTemplate;
+    private final IntegrationOAuthConnectFlow connectFlow;
 
     public IntegrationOAuthService(IntegrationConnectionRepository connectionRepository,
                                    IntegrationEncryptionService encryptionService,
@@ -37,41 +37,17 @@ public class IntegrationOAuthService {
         this.tokenClient = tokenClient;
         this.stateRegistry = stateRegistry;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.connectFlow = new IntegrationOAuthConnectFlow(
+                connectionRepository, encryptionService, registry, tokenClient, this.transactionTemplate);
     }
 
-    /** Save OAuth client credentials (encrypted) for a provider; PAT connections are validated and their scopes recorded. */
-    @Transactional
+    /**
+     * Save OAuth client credentials (encrypted) for a provider; PAT connections are validated and
+     * their scopes recorded. Provider HTTP runs outside any transaction — see
+     * {@link IntegrationOAuthConnectFlow}; deliberately not {@code @Transactional}.
+     */
     public IntegrationConnection saveCredentials(String providerId, String clientId, String clientSecret) {
-        IntegrationProvider provider = registry.getProvider(providerId);
-
-        IntegrationConnection connection = connectionRepository.findByProviderId(providerId)
-                .orElse(IntegrationConnection.builder().providerId(providerId).build());
-
-        connection.setClientIdEncrypted(encryptionService.encrypt(clientId));
-        connection.setClientSecretEncrypted(encryptionService.encrypt(clientSecret));
-
-        // Non-OAuth providers: credentials ARE the auth — validate before connecting
-        if (!provider.requiresOAuthFlow()) {
-            String combinedToken = clientId + "|" + clientSecret;
-            connection.setAccessTokenEncrypted(encryptionService.encrypt(combinedToken));
-            String accountInfo = null;
-            try {
-                accountInfo = provider.fetchAccountInfo(combinedToken);
-            } catch (Exception e) {
-                log.warn("Credential validation failed for provider {}: {}", providerId, e.getMessage());
-            }
-            if (accountInfo != null) {
-                connection.setAccountInfo(accountInfo);
-                connection.setStatus(ConnectionStatus.CONNECTED);
-                connection.setScopes(provider.fetchGrantedScopes(combinedToken)); // null = unknown
-            } else {
-                log.warn("Credential validation returned no account info for provider {}", providerId);
-                connection.setStatus(ConnectionStatus.DISCONNECTED);
-            }
-        }
-
-        log.info("Saved client credentials for provider: {}", providerId);
-        return connectionRepository.save(connection);
+        return connectFlow.saveCredentials(providerId, clientId, clientSecret);
     }
 
     /** Check if a provider has credentials configured (DB or env var). */
@@ -100,7 +76,7 @@ public class IntegrationOAuthService {
         IntegrationProvider provider = registry.getProvider(providerId);
         OAuthConfig config = provider.getOAuthConfig();
 
-        String clientId = resolveClientId(providerId, config);
+        String clientId = connectFlow.resolveClientId(providerId, config);
         if (clientId == null) {
             throw new IllegalStateException("No client credentials configured for provider: " + providerId);
         }
@@ -110,43 +86,15 @@ public class IntegrationOAuthService {
         return OAuthAuthorizationUrl.build(config, clientId, redirectUri, additionalScopes, state);
     }
 
-    /** Handle the OAuth2 callback: exchange code for tokens and store them. */
-    @Transactional
+    /**
+     * Handle the OAuth2 callback: exchange code for tokens and store them. The exchange and the
+     * account-info lookup are provider HTTP and run outside any transaction — see
+     * {@link IntegrationOAuthConnectFlow}; deliberately not {@code @Transactional}.
+     */
     public IntegrationConnection handleCallback(String code, String state, String redirectUri) {
         PendingAuthorization pending = stateRegistry.consume(state)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid or expired OAuth state"));
-        String providerId = pending.providerId();
-
-        IntegrationProvider provider = registry.getProvider(providerId);
-        OAuthConfig config = provider.getOAuthConfig();
-
-        String clientId = resolveClientId(providerId, config);
-        String clientSecret = resolveClientSecret(providerId, config);
-
-        JsonNode tokenResponse = tokenClient.exchangeCodeForTokens(
-                providerId, config, code, clientId, clientSecret, redirectUri);
-
-        String accessToken = tokenResponse.path("access_token").asText(null);
-        if (accessToken == null) {
-            throw new IllegalStateException("Token exchange failed for " + providerId + " (no access_token in response)");
-        }
-        String refreshToken = tokenResponse.has("refresh_token") ? tokenResponse.get("refresh_token").asText() : null;
-        int expiresIn = tokenResponse.has("expires_in") ? tokenResponse.get("expires_in").asInt() : 3600;
-        String grantedScopes = tokenResponse.has("scope") ? tokenResponse.get("scope").asText() : String.join(" ", config.defaultScopes());
-
-        String accountInfo = fetchAccountInfo(providerId, accessToken);
-
-        IntegrationConnection connection = connectionRepository.findByProviderId(providerId)
-                .orElse(IntegrationConnection.builder().providerId(providerId).build());
-
-        connection.setStatus(ConnectionStatus.CONNECTED);
-        connection.setAccessTokenEncrypted(encryptionService.encrypt(accessToken));
-        connection.setRefreshTokenEncrypted(refreshToken != null ? encryptionService.encrypt(refreshToken) : connection.getRefreshTokenEncrypted());
-        connection.setTokenExpiry(Instant.now().plusSeconds(expiresIn));
-        connection.setScopes(grantedScopes);
-        connection.setAccountInfo(accountInfo);
-
-        return connectionRepository.save(connection);
+        return connectFlow.handleCallback(pending.providerId(), code, redirectUri);
     }
 
     /** Read before consuming the state in handleCallback; never supplied by the callback request. */
@@ -269,8 +217,8 @@ public class IntegrationOAuthService {
         }
 
         OAuthConfig config = registry.getProvider(providerId).getOAuthConfig();
-        String clientId = resolveClientId(providerId, config);
-        String clientSecret = resolveClientSecret(providerId, config);
+        String clientId = connectFlow.resolveClientId(providerId, config);
+        String clientSecret = connectFlow.resolveClientSecret(providerId, config);
 
         JsonNode json;
         try {
@@ -306,29 +254,4 @@ public class IntegrationOAuthService {
         connectionRepository.save(connection);
     }
 
-    private String fetchAccountInfo(String providerId, String accessToken) {
-        try {
-            IntegrationProvider provider = registry.getProvider(providerId);
-            return provider.fetchAccountInfo(accessToken);
-        } catch (Exception e) {
-            log.warn("Failed to fetch account info for {}: {}", providerId, e.getMessage());
-        }
-        return null;
-    }
-
-    /** Resolve client ID: DB first, then env var fallback */
-    private String resolveClientId(String providerId, OAuthConfig config) {
-        return connectionRepository.findByProviderId(providerId)
-                .filter(c -> c.getClientIdEncrypted() != null)
-                .map(c -> encryptionService.decrypt(c.getClientIdEncrypted()))
-                .orElseGet(() -> System.getenv(config.clientIdEnvVar()));
-    }
-
-    /** Resolve client secret: DB first, then env var fallback */
-    private String resolveClientSecret(String providerId, OAuthConfig config) {
-        return connectionRepository.findByProviderId(providerId)
-                .filter(c -> c.getClientSecretEncrypted() != null)
-                .map(c -> encryptionService.decrypt(c.getClientSecretEncrypted()))
-                .orElseGet(() -> System.getenv(config.clientSecretEnvVar()));
-    }
 }
