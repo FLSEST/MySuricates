@@ -1,19 +1,39 @@
 #!/usr/bin/env bash
+# start-autotrigger-dev.sh — startet/stoppt das Dev-Backend (:9090) und den Vite-Dev-Server (:3000).
+#
+#   scripts/start-autotrigger-dev.sh [start] [--rebuild] [--show-key]   # idempotent, Default
+#   scripts/start-autotrigger-dev.sh stop                                # nur Backend
+#   scripts/start-autotrigger-dev.sh restart [--force]                   # Backend: stop -> JAR bauen -> start
+#
+# Das Backend laeuft NICHT aus target/classes (mvn spring-boot:run), sondern aus einer JAR-Kopie unter
+# ${STATE_DIR}/runtime/current.jar. Grund: Eine JVM mit -cp target/classes liest Klassen lebenslang lazy
+# von Platte; jeder Maven-Lauf im Haupt-Checkout und jeder IDE-Build (VS Code Java / Eclipse-Compiler)
+# schreibt das Verzeichnis um und toetet die laufende JVM spaeter mit NoClassDefFoundError
+# (Vorfaelle 2026-07-27 und 2026-09-13). Aus der Kopie kann kein Build mehr etwas wegziehen.
+# `restart` prueft vorher ueber die API, ob Workflow-Runs laufen (CLAUDE.md-Regel), und bricht dann ab.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
-# --show-key: API-Key voll anzeigen (Default: maskiert, nur letzte 4 Zeichen).
+COMMAND="start"
 SHOW_KEY=0
+FORCE=0
+REBUILD=0
 for arg in "$@"; do
   case "$arg" in
-    --show-key) SHOW_KEY=1 ;;
+    start|stop|restart) COMMAND="$arg" ;;
+    --show-key) SHOW_KEY=1 ;;   # API-Key voll anzeigen (Default: maskiert, nur letzte 4 Zeichen)
+    --force) FORCE=1 ;;         # restart trotz laufender Workflow-Runs
+    --rebuild) REBUILD=1 ;;     # start: JAR neu bauen, auch wenn schon eins liegt
+    -h|--help) sed -n '2,12p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) ;; # andere Argumente ignorieren
   esac
 done
 
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/autotrigger-dev"
+RUNTIME_DIR="${STATE_DIR}/runtime"
+KEEP_JARS="${AUTOTRIGGER_DEV_KEEP_JARS:-2}"
 mkdir -p "${STATE_DIR}"
 
 BACKEND_DIR="${REPO_ROOT}/ai-automation-backend"
@@ -30,18 +50,29 @@ BACKEND_PID_FILE="${STATE_DIR}/backend.pid"
 FRONTEND_PID_FILE="${STATE_DIR}/frontend.pid"
 BACKEND_LOG="${STATE_DIR}/backend.log"
 FRONTEND_LOG="${STATE_DIR}/frontend.log"
+CURRENT_JAR="${RUNTIME_DIR}/current.jar"
 
 # Kommandozeilen-Muster, an denen eine PID-Datei als "gehoert wirklich uns" erkannt
-# wird — Backend startet als Maven-Launcher (java ... spring-boot:run), Frontend als
-# `npm run dev` (spaeter node/vite).
+# wird — Backend ist `java -jar .../current.jar` (aeltere PID-Dateien zeigen noch auf
+# einen Maven-Launcher), Frontend `npm run dev` (spaeter node/vite).
 BACKEND_PROCESS_PATTERN='(mvn|maven|spring-boot|java)'
 FRONTEND_PROCESS_PATTERN='(npm|node|vite)'
 
-BACKEND_READY_URL="http://localhost:9090/api/v1/system/info"
+BACKEND_PORT=9090
+API_BASE="${MYSURICATES_API_BASE:-http://localhost:${BACKEND_PORT}/api/v1}"
+BACKEND_READY_URL="${API_BASE}/system/info"
 # Vite serves HTTPS only when certs/dev.crt exists, otherwise plain HTTP.
 # Probe both schemes so a fresh clone (no certs -> HTTP) is detected correctly.
 FRONTEND_HTTPS_URL="https://localhost:3000"
 FRONTEND_HTTP_URL="http://localhost:3000"
+
+# JVM-Flags wie frueher im spring-boot-maven-plugin (pom.xml), plus Tiered-Stop fuer schnellen Start.
+BACKEND_JVM_OPTS=(
+  -XX:TieredStopAtLevel=1
+  -XX:+HeapDumpOnOutOfMemoryError
+  -XX:HeapDumpPath=./data/logs/
+  -XX:ErrorFile=./data/logs/hs_err_pid%p.log
+)
 
 require_command() {
   local command_name="$1"
@@ -165,22 +196,169 @@ wait_for_frontend() {
   return 1
 }
 
+# ---------------------------------------------------------------------------
+# Run-Waechter: laufende Workflow-Runs vor einem Neustart erkennen.
+# ---------------------------------------------------------------------------
+
+api_key() {
+  if [[ -n "${MYSURICATES_API_KEY:-}" ]]; then
+    echo "${MYSURICATES_API_KEY}"
+  elif [[ -f "${HOME}/.mysuricates/api-key" ]]; then
+    cat "${HOME}/.mysuricates/api-key"
+  elif [[ -f "${HOME}/.autotrigger/api-key" ]]; then
+    cat "${HOME}/.autotrigger/api-key"
+  fi
+}
+
+# Anzahl laufender Runs; leer, wenn nicht ermittelbar (Backend down, kein Key).
+running_runs_count() {
+  local key body
+  key="$(api_key)"
+  [[ -n "${key}" ]] || return 0
+  body="$(curl -fsS --max-time 5 -H "X-API-Key: ${key}" \
+    "${API_BASE}/executions?status=RUNNING&size=1" 2>/dev/null)" || return 0
+  python3 -c '
+import sys, json
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+if isinstance(d, dict):
+    n = d.get("totalElements")
+    if n is None:
+        c = d.get("content", [])
+        n = len(c) if isinstance(c, list) else 0
+else:
+    n = len(d)
+print(int(n))' <<< "${body}"
+}
+
+# Exit 3, wenn Runs laufen und --force fehlt. Unbekannt (Backend down) => weiter.
+refuse_restart_if_runs_active() {
+  local count
+  count="$(running_runs_count)"
+  if [[ -z "${count}" ]]; then
+    echo "Laufende Runs nicht ermittelbar (Backend down oder kein API-Key) — fahre fort."
+    return 0
+  fi
+  if [[ "${count}" -gt 0 && "${FORCE}" -ne 1 ]]; then
+    echo "Es laufen noch ${count} Workflow-Run(s). Neustart abgebrochen — warten oder --force." >&2
+    return 3
+  fi
+  if [[ "${count}" -gt 0 ]]; then
+    echo "WARNUNG: ${count} laufende Run(s) werden durch --force abgebrochen."
+  else
+    echo "Keine laufenden Runs."
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# JAR-Runtime: bauen, in den State-Ordner kopieren, rotieren.
+# ---------------------------------------------------------------------------
+
+# "<YYYYmmdd-HHMMSS>-<shortsha>[-dirty]" — dirty = uncommittete Aenderungen an getrackten Dateien.
+runtime_jar_label() {
+  local sha="nogit" dirty=""
+  if git -C "${REPO_ROOT}" rev-parse --short HEAD >/dev/null 2>&1; then
+    sha="$(git -C "${REPO_ROOT}" rev-parse --short HEAD)"
+    if [[ -n "$(git -C "${REPO_ROOT}" status --porcelain --untracked-files=no 2>/dev/null)" ]]; then
+      dirty="-dirty"
+    fi
+  fi
+  echo "$(date +%Y%m%d-%H%M%S)-${sha}${dirty}"
+}
+
+# Kopiert ein gebautes JAR nach RUNTIME_DIR, setzt current.jar und behaelt KEEP_JARS Stueck.
+install_runtime_jar() {
+  local jar="$1" target
+  [[ -f "${jar}" ]] || { echo "JAR nicht gefunden: ${jar}" >&2; return 1; }
+  mkdir -p "${RUNTIME_DIR}"
+  target="${RUNTIME_DIR}/backend-$(runtime_jar_label).jar"
+  cp -f "${jar}" "${target}"
+  ln -sfn "${target}" "${CURRENT_JAR}"
+  # Rotation: neueste KEEP_JARS behalten (current.jar zeigt auf die neueste).
+  ls -1t "${RUNTIME_DIR}"/backend-*.jar 2>/dev/null | tail -n +"$((KEEP_JARS + 1))" | xargs -r rm -f --
+  echo "${target}"
+}
+
+# Fat-JAR im Backend-Verzeichnis bauen (clean: heilt auch ein von IDE-Builds korrumpiertes target/).
+build_backend_jar() {
+  local jar
+  echo "Baue Backend-JAR (mvn clean package -DskipTests) ..."
+  (cd "${BACKEND_DIR}" && "${MVN_CMD}" -q clean package -DskipTests)
+  jar="$(find "${BACKEND_DIR}/target" -maxdepth 1 -name 'ai-automation-backend-*.jar' ! -name '*.original' | head -1)"
+  [[ -n "${jar}" ]] || { echo "Kein Fat-JAR unter ${BACKEND_DIR}/target gefunden." >&2; return 1; }
+  echo "Runtime-JAR: $(install_runtime_jar "${jar}")"
+}
+
+# ---------------------------------------------------------------------------
+# Backend / Frontend
+# ---------------------------------------------------------------------------
+
 start_backend() {
   discard_stale_pid_file "${BACKEND_PID_FILE}" "${BACKEND_PROCESS_PATTERN}" "Backend"
 
   if pid_belongs_to_service "${BACKEND_PID_FILE}" "${BACKEND_PROCESS_PATTERN}" \
     || endpoint_is_ready "${BACKEND_READY_URL}"; then
-    echo "Backend laeuft bereits auf http://localhost:9090"
+    echo "Backend laeuft bereits auf http://localhost:${BACKEND_PORT}"
     return 0
   fi
 
+  if [[ "${REBUILD}" -eq 1 || ! -f "${CURRENT_JAR}" ]]; then
+    build_backend_jar
+  else
+    echo "Verwende vorhandenes Runtime-JAR: $(readlink -f "${CURRENT_JAR}") (neu bauen: restart oder --rebuild)"
+  fi
+
   rm -f "${BACKEND_PID_FILE}"
-  echo "Starte Backend ..."
+  echo "Starte Backend (java -jar) ..."
   (
-    cd "${BACKEND_DIR}"
-    nohup "${MVN_CMD}" spring-boot:run > "${BACKEND_LOG}" 2>&1 &
+    cd "${BACKEND_DIR}"   # cwd bleibt das Backend-Verzeichnis: ./data/automation.db, user.dir-Nutzer
+    nohup java "${BACKEND_JVM_OPTS[@]}" ${AUTOTRIGGER_DEV_JVM_OPTS:-} -jar "${CURRENT_JAR}" \
+      > "${BACKEND_LOG}" 2>&1 &
     echo "$!" > "${BACKEND_PID_FILE}"
   )
+}
+
+# Stoppt das Backend aus der PID-Datei (inkl. Kind-JVM eines alten Maven-Launchers).
+stop_backend() {
+  local pid kids
+  discard_stale_pid_file "${BACKEND_PID_FILE}" "${BACKEND_PROCESS_PATTERN}" "Backend"
+
+  if ! pid_belongs_to_service "${BACKEND_PID_FILE}" "${BACKEND_PROCESS_PATTERN}"; then
+    if endpoint_is_ready "${BACKEND_READY_URL}"; then
+      echo "Backend antwortet auf :${BACKEND_PORT}, aber keine gueltige PID-Datei (${BACKEND_PID_FILE})." >&2
+      echo "Fremd gestartet? PID(s): $(lsof -ti "tcp:${BACKEND_PORT}" -sTCP:LISTEN 2>/dev/null | tr '\n' ' ')— bitte manuell beenden." >&2
+      return 1
+    fi
+    echo "Backend laeuft nicht."
+    return 0
+  fi
+
+  pid="$(read_pid "${BACKEND_PID_FILE}")"
+  kids="$(pgrep -P "${pid}" 2>/dev/null | tr '\n' ' ' || true)"
+  if [[ -f "${BACKEND_LOG}" ]]; then
+    mv -f "${BACKEND_LOG}" "${BACKEND_LOG}.before-restart-$(date +%Y%m%d-%H%M)"
+  fi
+  echo "Stoppe Backend (PID ${pid}${kids:+, Kinder ${kids}}) ..."
+  # shellcheck disable=SC2086
+  kill -TERM "${pid}" ${kids} 2>/dev/null || true
+  for ((i = 1; i <= 30; i += 1)); do
+    kill -0 "${pid}" 2>/dev/null || break
+    sleep 1
+  done
+  if kill -0 "${pid}" 2>/dev/null; then
+    echo "Backend reagiert nicht auf SIGTERM — SIGKILL."
+    # shellcheck disable=SC2086
+    kill -KILL "${pid}" ${kids} 2>/dev/null || true
+    sleep 2
+  fi
+  rm -f "${BACKEND_PID_FILE}"
+  for ((i = 1; i <= 10; i += 1)); do
+    endpoint_is_ready "${BACKEND_READY_URL}" || break
+    sleep 1
+  done
+  echo "Backend gestoppt."
 }
 
 start_frontend() {
@@ -236,45 +414,64 @@ print_api_key() {
   echo "  Quelle: ${src}"
 }
 
-if [[ "${MVN_CMD}" == "mvn" ]]; then
-  require_command mvn   # kein Wrapper vorhanden -> System-Maven nötig
-fi
-require_command npm
-require_command curl
-
-echo "Autotrigger Dev Starter"
-echo "Repo: ${REPO_ROOT}"
-
-start_backend
-start_frontend
-
-backend_ok=0
-frontend_ok=0
-
-if wait_for_endpoint "Backend" "${BACKEND_READY_URL}" 90; then
-  backend_ok=1
-fi
-
-if wait_for_frontend 90; then
-  frontend_ok=1
-fi
-
-echo
-echo "URLs:"
-echo "  Frontend: $(resolved_frontend_url)"
-echo "  Backend:  http://localhost:9090/api/v1"
-if [[ "${backend_ok}" -eq 1 ]]; then
-  print_api_key
-fi
-print_logs_hint
-
-if [[ "${backend_ok}" -eq 1 && "${frontend_ok}" -eq 1 ]]; then
+report_and_exit() {
+  local backend_ok="$1" frontend_ok="$2"
   echo
-  echo "Autotrigger Dev ist gestartet."
-  exit 0
-fi
+  echo "URLs:"
+  echo "  Frontend: $(resolved_frontend_url)"
+  echo "  Backend:  http://localhost:${BACKEND_PORT}/api/v1"
+  if [[ "${backend_ok}" -eq 1 ]]; then
+    print_api_key
+  fi
+  print_logs_hint
 
-echo
-echo "Mindestens ein Dienst ist nicht sauber gestartet." >&2
-print_logs_hint >&2
-exit 1
+  if [[ "${backend_ok}" -eq 1 && "${frontend_ok}" -eq 1 ]]; then
+    echo
+    echo "Autotrigger Dev ist gestartet."
+    exit 0
+  fi
+
+  echo
+  echo "Mindestens ein Dienst ist nicht sauber gestartet." >&2
+  print_logs_hint >&2
+  exit 1
+}
+
+main() {
+  require_command curl
+  require_command python3
+  echo "Autotrigger Dev Starter (${COMMAND})"
+  echo "Repo: ${REPO_ROOT}"
+
+  case "${COMMAND}" in
+    stop)
+      stop_backend
+      ;;
+    restart)
+      if [[ "${MVN_CMD}" == "mvn" ]]; then require_command mvn; fi
+      refuse_restart_if_runs_active
+      stop_backend
+      build_backend_jar
+      start_backend
+      local ok=0
+      if wait_for_endpoint "Backend" "${BACKEND_READY_URL}" 120; then ok=1; fi
+      print_logs_hint
+      [[ "${ok}" -eq 1 ]] || exit 1
+      echo "Backend neu gestartet aus $(readlink -f "${CURRENT_JAR}")."
+      ;;
+    start)
+      if [[ "${MVN_CMD}" == "mvn" ]]; then require_command mvn; fi
+      require_command npm
+      start_backend
+      start_frontend
+      local backend_ok=0 frontend_ok=0
+      if wait_for_endpoint "Backend" "${BACKEND_READY_URL}" 120; then backend_ok=1; fi
+      if wait_for_frontend 90; then frontend_ok=1; fi
+      report_and_exit "${backend_ok}" "${frontend_ok}"
+      ;;
+  esac
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi
