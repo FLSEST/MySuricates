@@ -421,7 +421,10 @@ export function DialogImport() {
   }, [otherSessionsRaw, knownProjectPaths]);
 
   // Sessions für die Anzeige (gefiltert)
-  const currentSessions = isOtherSelected ? otherSessions : (projectSessions ?? []);
+  const currentSessions = useMemo(
+    () => (isOtherSelected ? otherSessions : (projectSessions ?? [])),
+    [isOtherSelected, otherSessions, projectSessions],
+  );
   const currentLoading = isOtherSelected ? otherLoading : sessionsLoading;
 
   const filteredSessions = useMemo(() => {

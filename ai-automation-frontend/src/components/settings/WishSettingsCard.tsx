@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useSyncedState } from '../../hooks/useSyncedState';
 import { Card, CardHeader, Button } from '../ui';
 import { useT } from '../../i18n';
 import { useExecutionConfig, useUpdateExecutionConfig } from '../../hooks/useSystem';
@@ -26,23 +26,20 @@ export function WishSettingsCard() {
   const { data: config, isLoading } = useExecutionConfig();
   const updateConfig = useUpdateExecutionConfig();
 
-  const [form, setForm] = useState<FormState>({
-    wishTotalTimeoutMinutes: 120,
-    wishWorkflowWaitMinutes: 30,
-    wishDefaultShellTimeoutSeconds: 600,
-    wishDefaultAgenticTotalTimeoutSeconds: 3600,
-  });
-
-  useEffect(() => {
-    if (config) {
-      setForm({
-        wishTotalTimeoutMinutes: config.wishTotalTimeoutMinutes ?? 120,
-        wishWorkflowWaitMinutes: config.wishWorkflowWaitMinutes ?? 30,
-        wishDefaultShellTimeoutSeconds: config.wishDefaultShellTimeoutSeconds ?? 600,
-        wishDefaultAgenticTotalTimeoutSeconds: config.wishDefaultAgenticTotalTimeoutSeconds ?? 3600,
-      });
-    }
-  }, [config]);
+  // Form follows the server config; local edits survive until a new config object arrives.
+  const [form, setForm] = useSyncedState<FormState, typeof config>(
+    config, (c, prev) => (c ? {
+      wishTotalTimeoutMinutes: c.wishTotalTimeoutMinutes ?? 120,
+      wishWorkflowWaitMinutes: c.wishWorkflowWaitMinutes ?? 30,
+      wishDefaultShellTimeoutSeconds: c.wishDefaultShellTimeoutSeconds ?? 600,
+      wishDefaultAgenticTotalTimeoutSeconds: c.wishDefaultAgenticTotalTimeoutSeconds ?? 3600,
+    } : prev ?? {
+      wishTotalTimeoutMinutes: 120,
+      wishWorkflowWaitMinutes: 30,
+      wishDefaultShellTimeoutSeconds: 600,
+      wishDefaultAgenticTotalTimeoutSeconds: 3600,
+    }),
+  );
 
   const hasChanges = config && (
     form.wishTotalTimeoutMinutes !== (config.wishTotalTimeoutMinutes ?? 120) ||

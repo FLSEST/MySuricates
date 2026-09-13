@@ -167,7 +167,7 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string)
       client.deactivate();
       clientRef.current = null;
     };
-  }, [runId]);
+  }, [runId, appendLog]);
 
   const clearLogs = useCallback(() => setLogs([]), []);
 

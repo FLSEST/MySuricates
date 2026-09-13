@@ -70,10 +70,6 @@ export function TagInput({ tags, onChange, suggestions = [], label, hint, placeh
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [input]);
-
   return (
     <div className="space-y-1.5" ref={containerRef}>
       {label && <label className="block text-sm font-medium text-text-secondary">{label}</label>}
@@ -102,7 +98,7 @@ export function TagInput({ tags, onChange, suggestions = [], label, hint, placeh
             type="text"
             className={`w-full bg-transparent outline-hidden text-text placeholder:text-text-tertiary ${compact ? 'text-xs' : 'text-sm'}`}
             value={input}
-            onChange={(e) => { setInput(e.target.value); setShowSuggestions(true); }}
+            onChange={(e) => { setInput(e.target.value); setShowSuggestions(true); setSelectedIndex(0); }}
             onFocus={() => setShowSuggestions(true)}
             onKeyDown={handleKeyDown}
             placeholder={tags.length === 0 ? placeholder : ''}

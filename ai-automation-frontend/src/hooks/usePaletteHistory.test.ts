@@ -185,6 +185,26 @@ describe('usePaletteHistory', () => {
   });
 
   describe('contextId change', () => {
+    it('should_swap_lists_in_place_when_contextId_prop_changes', () => {
+      localStorage.setItem('workflows-recents', JSON.stringify(['w']));
+      localStorage.setItem('workflows-pins', JSON.stringify(['wp']));
+      localStorage.setItem('palette-recents-chains', JSON.stringify(['c']));
+
+      const { result, rerender } = renderHook(({ ctx }) => usePaletteHistory(ctx), {
+        initialProps: { ctx: 'workflow' },
+      });
+      expect(result.current.recents).toEqual(['w']);
+
+      rerender({ ctx: 'chains' });
+      expect(result.current.recents).toEqual(['c']);
+      expect(result.current.pins).toEqual([]);
+      // the old context's storage must not be overwritten with the new context's lists
+      expect(JSON.parse(localStorage.getItem('workflows-recents') || '[]')).toEqual(['w']);
+      expect(JSON.parse(localStorage.getItem('workflows-pins') || '[]')).toEqual(['wp']);
+      // and the new context's storage must not receive the old context's lists
+      expect(JSON.parse(localStorage.getItem('palette-recents-chains') || '[]')).toEqual(['c']);
+    });
+
     it('should_re_hydrate_when_contextId_changes', () => {
       // The hook relies on React key-prop remount for contextId changes (see hook comment).
       // Simulate this by unmounting and remounting with the new contextId.

@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useSyncedState } from '../../hooks/useSyncedState';
 import { useT } from '../../i18n';
 import { useOnboardingStatus, useEnableOnboarding, useDisableOnboarding, useRefreshOnboarding, useOnboardingPreview } from '../../hooks/useProjects';
 import { useOnboardingProfiles, type OnboardingProfile } from '../../hooks/useOnboardingProfiles';
@@ -27,18 +28,16 @@ export function OnboardingCard({ projectId }: OnboardingCardProps) {
   const { data: previewData, refetch: fetchPreview } = useOnboardingPreview(projectId);
 
   const [showPreview, setShowPreview] = useState(false);
-  const [selectedFormat, setSelectedFormat] = useState('CLAUDE_RULES');
-  const [selectedProfileIds, setSelectedProfileIds] = useState<string[]>([]);
+  // Form state follows the server status; local edits survive until the status object changes.
+  const [selectedFormat, setSelectedFormat] = useSyncedState<string, typeof status>(
+    status, (s, prev) => (s ? s.format || 'CLAUDE_RULES' : prev ?? 'CLAUDE_RULES'),
+  );
+  const [selectedProfileIds, setSelectedProfileIds] = useSyncedState<string[], typeof status>(
+    status, (s, prev) => (s ? s.profileIds || [] : prev ?? []),
+  );
 
   const enabled = status?.enabled ?? false;
   const availableProfiles = profiles?.filter(p => p.type === 'PROFILE') ?? [];
-
-  useEffect(() => {
-    if (status) {
-      setSelectedFormat(status.format || 'CLAUDE_RULES');
-      setSelectedProfileIds(status.profileIds || []);
-    }
-  }, [status]);
 
   const handleToggle = () => {
     if (enabled) {

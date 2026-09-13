@@ -32,9 +32,11 @@ export function useAssistantWebSocket(
   const clientRef = useRef<Client | null>(null);
   const statusSubRef = useRef<{ unsubscribe: () => void } | null>(null);
 
-  // Connect once when either ID is available
+  // Connect once when either ID is available (and reconnect only when going from no IDs to
+  // having IDs — the concrete IDs are handled by the subscription effects below)
+  const hasIds = !!requestId || !!sessionId;
   useEffect(() => {
-    if (!requestId && !sessionId) return;
+    if (!hasIds) return;
 
     // Reuse existing client if connected
     if (clientRef.current?.connected) return;
@@ -58,7 +60,7 @@ export function useAssistantWebSocket(
       clientRef.current = null;
       setConnected(false);
     };
-  }, [!!requestId || !!sessionId]); // reconnect only when going from no-IDs to having IDs
+  }, [hasIds]);
 
   // Subscribe to status updates for current requestId
   useEffect(() => {

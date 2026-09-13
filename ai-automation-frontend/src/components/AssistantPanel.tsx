@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { X, Send, Clock, Plus, Square } from 'lucide-react';
@@ -51,7 +51,7 @@ export function AssistantPanel() {
   const heightDragInfo = useRef<{ startY: number; startHeight: number } | null>(null);
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null;
-  const messages = activeSession?.messages ?? [];
+  const messages = useMemo(() => activeSession?.messages ?? [], [activeSession]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -65,9 +65,13 @@ export function AssistantPanel() {
     }
   }, [open, showHistory]);
 
-  // Consume pendingInput from store (set by Header SuggestionButton)
+  // Consume pendingInput from store (set by Header SuggestionButton). This is a handshake with
+  // an external store: the message is copied into local state and then acknowledged
+  // (setPendingInput(null)). Doing that during render would write to the Zustand store while
+  // rendering, so the effect stays.
   useEffect(() => {
     if (open && pendingInput) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot handoff from the assistant store
       setInput(pendingInput);
       setPendingInput(null);
       setTimeout(() => inputRef.current?.focus(), 50);

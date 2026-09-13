@@ -1,4 +1,5 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
+import { useSyncedState } from '../../hooks/useSyncedState';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
@@ -70,8 +71,12 @@ export function TerminalPanel({ runId }: TerminalPanelProps) {
   const termRef = useRef<Terminal | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
-  const [status, setStatus] = useState<ConnectionStatus>('connecting');
+  // A new runId mounts a new socket, so the status starts over at 'connecting' (reset during
+  // render instead of inside the connect effect).
+  const [status, setStatus] = useSyncedState<ConnectionStatus, string>(runId, () => 'connecting');
 
+  // Opens the socket for the current runId; the caller is responsible for the 'connecting' status
+  // (initial/reset state on mount, explicit set in handleReconnect).
   const connect = useCallback(() => {
     if (!termRef.current) return;
 
@@ -79,7 +84,6 @@ export function TerminalPanel({ runId }: TerminalPanelProps) {
     const apiKey = useSettingsStore.getState().apiKey;
     const wsUrl = `${protocol}//${window.location.host}/ws/terminal/${runId}${apiKey ? `?apiKey=${encodeURIComponent(apiKey)}` : ''}`;
 
-    setStatus('connecting');
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
@@ -104,7 +108,7 @@ export function TerminalPanel({ runId }: TerminalPanelProps) {
     ws.onerror = () => {
       setStatus('error');
     };
-  }, [runId]);
+  }, [runId, setStatus]);
 
   useEffect(() => {
     if (!terminalRef.current) return;
@@ -113,7 +117,8 @@ export function TerminalPanel({ runId }: TerminalPanelProps) {
       cursorBlink: true,
       fontSize: 14,
       fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, monospace",
-      theme: mode === 'dark' ? DARK_THEME : LIGHT_THEME,
+      // theme is applied by the theme effect below (runs right after this one on mount, and on
+      // every mode change) so the terminal is not re-created when the theme switches
       scrollback: 5000,
       convertEol: true,
     });
@@ -171,6 +176,7 @@ export function TerminalPanel({ runId }: TerminalPanelProps) {
   const handleReconnect = () => {
     wsRef.current?.close();
     termRef.current?.clear();
+    setStatus('connecting');
     connect();
   };
 

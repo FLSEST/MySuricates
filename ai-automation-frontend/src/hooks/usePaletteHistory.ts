@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
+import { useSyncedState } from './useSyncedState';
 
 const MAX_RECENTS = 10;
 const MAX_PINS = 8;
@@ -41,15 +42,11 @@ export function usePaletteHistory(contextId: string) {
   const rKey = recentsKey(contextId);
   const pKey = pinsKey(contextId);
 
-  const [recents, setRecents] = useState<string[]>(() => loadList(rKey));
-  const [pins, setPins] = useState<string[]>(() => loadList(pKey));
-
-  // When context changes, swap the lists (initial mount covers this via useState init;
-  // a later context change will re-mount via React key, so this is defensive only).
-  useEffect(() => {
-    setRecents(loadList(rKey));
-    setPins(loadList(pKey));
-  }, [rKey, pKey]);
+  // Lists are loaded for the current keys; when the context (and thus the key) changes, they are
+  // swapped during render, before the persistence effects below can write the old list under
+  // the new key. (Callers usually re-mount via React key anyway, so this is defensive.)
+  const [recents, setRecents] = useSyncedState<string[], string>(rKey, loadList);
+  const [pins, setPins] = useSyncedState<string[], string>(pKey, loadList);
 
   useEffect(() => {
     const handler = () => {
@@ -60,7 +57,7 @@ export function usePaletteHistory(contextId: string) {
     };
     window.addEventListener(EVENT_NAME, handler);
     return () => window.removeEventListener(EVENT_NAME, handler);
-  }, [rKey, pKey]);
+  }, [rKey, pKey, setRecents, setPins]);
 
   useEffect(() => {
     saveList(rKey, recents);
@@ -77,13 +74,13 @@ export function usePaletteHistory(contextId: string) {
       if (prev[0] === id) return prev;
       return [id, ...prev.filter((x) => x !== id)].slice(0, MAX_RECENTS);
     });
-  }, []);
+  }, [setRecents]);
 
   const togglePin = useCallback((id: string) => {
     setPins((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [id, ...prev].slice(0, MAX_PINS),
     );
-  }, []);
+  }, [setPins]);
 
   const isPinned = useCallback((id: string) => pins.includes(id), [pins]);
 

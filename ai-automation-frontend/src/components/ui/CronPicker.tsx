@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSyncedState } from '../../hooks/useSyncedState';
 import { Input } from './Input';
 import { useT } from '../../i18n';
 import { useCronPreview } from '../../hooks/useSchedules';
@@ -74,16 +75,10 @@ function stateToCron(state: CronState): string {
 
 export function CronPicker({ value, onChange, label }: CronPickerProps) {
   const t = useT();
-  const [state, setState] = useState<CronState>(() => parseCronToState(value));
-  const [rawValue, setRawValue] = useState(value);
+  // Both follow the external value: re-derived whenever `value` changes, editable in between
+  const [state, setState] = useSyncedState(value, parseCronToState);
+  const [rawValue, setRawValue] = useSyncedState(value, (v) => v);
   const [debouncedCron, setDebouncedCron] = useState(value);
-
-  // Sync from external value changes
-  useEffect(() => {
-    const parsed = parseCronToState(value);
-    setState(parsed);
-    setRawValue(value);
-  }, [value]);
 
   // Debounce cron for preview API call
   useEffect(() => {

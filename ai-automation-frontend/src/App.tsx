@@ -66,16 +66,16 @@ function ActivityRoute() {
 function RunRedirect() {
   const { runId } = useParams<{ runId: string }>();
   const [workflowId, setWorkflowId] = useState<string | null>(null);
-  const [error, setError] = useState(false);
+  const [fetchFailed, setFetchFailed] = useState(false);
 
   useEffect(() => {
-    if (!runId) { setError(true); return; }
+    if (!runId) return;
     api.get<{ workflowId: string }>(`/executions/${runId}`)
       .then(run => setWorkflowId(run.workflowId))
-      .catch(() => setError(true));
+      .catch(() => setFetchFailed(true));
   }, [runId]);
 
-  if (error) return <Navigate to="/runs" replace />;
+  if (!runId || fetchFailed) return <Navigate to="/runs" replace />;
   if (workflowId) return <Navigate to={`/workflows/${workflowId}/run/${runId}`} replace />;
   return null;
 }

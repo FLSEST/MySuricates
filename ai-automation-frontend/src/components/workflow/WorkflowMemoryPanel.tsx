@@ -34,15 +34,13 @@ export function WorkflowMemoryPanel({ workflowId, runs }: Props) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
-    if (!extractMemory.isPending) {
-      setElapsedSeconds(0);
-      return;
-    }
+    if (!extractMemory.isPending) return;
     const interval = setInterval(() => setElapsedSeconds((s) => s + 1), 1000);
     return () => clearInterval(interval);
   }, [extractMemory.isPending]);
 
   const handleExtract = () => {
+    setElapsedSeconds(0);
     extractMemory.mutate(
       { runIds: selectedRunIds.length > 0 ? selectedRunIds : undefined, provider },
       {

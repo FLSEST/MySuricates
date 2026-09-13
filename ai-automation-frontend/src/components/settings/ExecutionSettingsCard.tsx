@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useSyncedState } from '../../hooks/useSyncedState';
 import { Card, CardHeader, Button, Toggle } from '../ui';
 import { useT } from '../../i18n';
 import { useExecutionConfig, useUpdateExecutionConfig } from '../../hooks/useSystem';
@@ -34,50 +34,53 @@ interface FormState {
   runRetentionMaxPerNight: number;
 }
 
+const DEFAULT_FORM: FormState = {
+  executionMaxConcurrent: 10,
+  claudeMaxConcurrentCalls: 5,
+  claudeReservedForInteractive: 1,
+  claudeTimeoutSeconds: 300,
+  claudeInterCallDelayMs: 0,
+  chainWorkflowTimeoutMinutes: 180,
+  rateLimitEnabled: true,
+  rateLimitRequestsPerMinute: 120,
+  assistantChatTimeoutSeconds: 240,
+  schedulerCatchUpOnResume: true,
+  schedulerResumeGraceMinutes: 5,
+  summarizationTimeoutSeconds: 120,
+  factoryTimeoutSeconds: 600,
+  runRetentionDays: 90,
+  runRetentionMaxPerNight: 200,
+};
+
+function toFormState(config: NonNullable<ReturnType<typeof useExecutionConfig>['data']>): FormState {
+  return {
+    executionMaxConcurrent: config.executionMaxConcurrent,
+    claudeMaxConcurrentCalls: config.claudeMaxConcurrentCalls,
+    claudeReservedForInteractive: config.claudeReservedForInteractive ?? 1,
+    claudeTimeoutSeconds: config.claudeTimeoutSeconds,
+    claudeInterCallDelayMs: config.claudeInterCallDelayMs,
+    chainWorkflowTimeoutMinutes: config.chainWorkflowTimeoutMinutes,
+    rateLimitEnabled: config.rateLimitEnabled === 1,
+    rateLimitRequestsPerMinute: config.rateLimitRequestsPerMinute,
+    assistantChatTimeoutSeconds: config.assistantChatTimeoutSeconds ?? 240,
+    schedulerCatchUpOnResume: (config.schedulerCatchUpOnResume ?? 1) === 1,
+    schedulerResumeGraceMinutes: config.schedulerResumeGraceMinutes ?? 5,
+    summarizationTimeoutSeconds: config.summarizationTimeoutSeconds ?? 120,
+    factoryTimeoutSeconds: config.factoryTimeoutSeconds ?? 600,
+    runRetentionDays: config.runRetentionDays ?? 90,
+    runRetentionMaxPerNight: config.runRetentionMaxPerNight ?? 200,
+  };
+}
+
 export function ExecutionSettingsCard() {
   const t = useT();
   const { data: config, isLoading } = useExecutionConfig();
   const updateConfig = useUpdateExecutionConfig();
 
-  const [form, setForm] = useState<FormState>({
-    executionMaxConcurrent: 10,
-    claudeMaxConcurrentCalls: 5,
-    claudeReservedForInteractive: 1,
-    claudeTimeoutSeconds: 300,
-    claudeInterCallDelayMs: 0,
-    chainWorkflowTimeoutMinutes: 180,
-    rateLimitEnabled: true,
-    rateLimitRequestsPerMinute: 120,
-    assistantChatTimeoutSeconds: 240,
-    schedulerCatchUpOnResume: true,
-    schedulerResumeGraceMinutes: 5,
-    summarizationTimeoutSeconds: 120,
-    factoryTimeoutSeconds: 600,
-    runRetentionDays: 90,
-    runRetentionMaxPerNight: 200,
-  });
-
-  useEffect(() => {
-    if (config) {
-      setForm({
-        executionMaxConcurrent: config.executionMaxConcurrent,
-        claudeMaxConcurrentCalls: config.claudeMaxConcurrentCalls,
-        claudeReservedForInteractive: config.claudeReservedForInteractive ?? 1,
-        claudeTimeoutSeconds: config.claudeTimeoutSeconds,
-        claudeInterCallDelayMs: config.claudeInterCallDelayMs,
-        chainWorkflowTimeoutMinutes: config.chainWorkflowTimeoutMinutes,
-        rateLimitEnabled: config.rateLimitEnabled === 1,
-        rateLimitRequestsPerMinute: config.rateLimitRequestsPerMinute,
-        assistantChatTimeoutSeconds: config.assistantChatTimeoutSeconds ?? 240,
-        schedulerCatchUpOnResume: (config.schedulerCatchUpOnResume ?? 1) === 1,
-        schedulerResumeGraceMinutes: config.schedulerResumeGraceMinutes ?? 5,
-        summarizationTimeoutSeconds: config.summarizationTimeoutSeconds ?? 120,
-        factoryTimeoutSeconds: config.factoryTimeoutSeconds ?? 600,
-        runRetentionDays: config.runRetentionDays ?? 90,
-        runRetentionMaxPerNight: config.runRetentionMaxPerNight ?? 200,
-      });
-    }
-  }, [config]);
+  // Form follows the server config; local edits survive until a new config object arrives.
+  const [form, setForm] = useSyncedState<FormState, typeof config>(
+    config, (c, prev) => (c ? toFormState(c) : prev ?? DEFAULT_FORM),
+  );
 
   const hasChanges = config && (
     form.executionMaxConcurrent !== config.executionMaxConcurrent ||

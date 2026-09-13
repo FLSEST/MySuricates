@@ -122,16 +122,10 @@ export function WorkflowExecution() {
     window.setTimeout(() => setStepHighlight(null), 1800);
   };
 
-  // Clear recovered dialogs when run is no longer active
-  useEffect(() => {
-    if (run && !isRunning) {
-      setRecoveredApproval(null);
-      setRecoveredHumanInput(null);
-    }
-  }, [run, isRunning]);
-
-  const activeApproval = pendingApproval ?? recoveredApproval;
-  const activeHumanInput = pendingHumanInput ?? recoveredHumanInput;
+  // Recovered dialogs only apply while the run is still active
+  const runFinished = !!run && !isRunning;
+  const activeApproval = pendingApproval ?? (runFinished ? null : recoveredApproval);
+  const activeHumanInput = pendingHumanInput ?? (runFinished ? null : recoveredHumanInput);
 
   const handleRate = (rating: number) => {
     rateRun.mutate({ runId: runId!, rating, workflowId: id! });

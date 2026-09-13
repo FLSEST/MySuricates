@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useSyncedState } from '../../hooks/useSyncedState';
 import { Link } from 'react-router-dom';
 import { ExternalLink } from 'lucide-react';
 import { Modal, Button, Input, Select, TagInput } from '../ui';
@@ -44,9 +44,9 @@ export function TodoEditModal({
   exportLoading,
 }: TodoEditModalProps) {
   const t = useT();
-  const [exportProvider, setExportProvider] = useState('');
-  const [exportTarget, setExportTarget] = useState('');
-  useEffect(() => { setExportProvider(''); setExportTarget(''); }, [editTodo?.id]);
+  // Export fields start empty for every todo that is opened (reset when the todo id changes)
+  const [exportProvider, setExportProvider] = useSyncedState(editTodo?.id, () => '');
+  const [exportTarget, setExportTarget] = useSyncedState(editTodo?.id, () => '');
 
   const taskSinks = integrations.filter((p) => p.supportsTaskExport && p.status === 'CONNECTED');
   const exportProject = projects.find((p) => p.id === (editForm.projectId ?? editTodo?.projectId ?? ''));
