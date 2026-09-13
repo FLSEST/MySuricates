@@ -72,7 +72,7 @@ Execution happens **on the host**: shell blocks via the user's shell, AI blocks 
 ## Quickstart
 
 > New machine (Linux), possibly without Java/Node/Docker? → **[docs/GETTING-STARTED.md](docs/en/GETTING-STARTED.md)**
-> walks through the setup step by step. Short version: `git clone … && cd autotrigger && ./scripts/setup.sh`.
+> walks through the setup step by step. Short version: `git clone <repository-url> autotrigger && cd autotrigger && ./scripts/setup.sh`.
 
 ```bash
 # 1. Repository klonen

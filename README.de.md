@@ -102,7 +102,7 @@ installierte CLI. Docker ist optional und wird nur gebraucht, wenn ein Shell-Blo
 ## Quickstart
 
 > Neuer Rechner (Linux), evtl. ohne Java/Node/Docker? → **[docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)**
-> fuehrt Schritt fuer Schritt durch das Setup. Kurzform: `git clone … && cd autotrigger && ./scripts/setup.sh`.
+> fuehrt Schritt fuer Schritt durch das Setup. Kurzform: `git clone <repository-url> autotrigger && cd autotrigger && ./scripts/setup.sh`.
 
 ```bash
 # 1. Repository klonen
