@@ -34,9 +34,10 @@
     {
       "type": "conditional",
       "config": {
+        "shell_escape_variables": true,
         "else_command": "echo 'Keine kritischen Dokumentationsfehler gefunden.'",
         "execution_mode": "shell",
-        "condition": "echo '{{ previous_output }}' | grep -qi 'CRITICAL'",
+        "condition": "echo {{ previous_output }} | grep -qi 'CRITICAL'",
         "then_command": "echo 'WARNUNG: Kritische Dokumentationsfehler gefunden! Falsche Build-Befehle oder Anleitungen koennen Nutzer direkt beeintraechtigen.'"
       },
       "requiredCapabilities": []

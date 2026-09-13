@@ -141,8 +141,16 @@ Executes a shell command on the host or inside a Docker container.
 > **And that is not merely cosmetic: inside your own quotes the escaping is void.** With the value
 > `x; id`, `PREV='{{ previous_output }}'` becomes `PREV=''x; id''` — the shell runs that as
 > `PREV=x` **followed by** `id`. So never put an untrusted or tainted placeholder in quotes; always
-> write it bare (`PREV={{ previous_output }}`). Values from `defaultContext` and system variables
-> are still substituted raw.
+> write it bare (`PREV={{ previous_output }}`) **and set `"shell_escape_variables": true` on the
+> block** — without taint the value is substituted raw otherwise, and a multi-line output breaks the
+> command. Bare plus the escape option is the only form that is right in both cases; the test
+> `TemplateHygieneGateTest` enforces it for built-in templates and the pool. Values from
+> `defaultContext` and system variables stay raw without the option.
+>
+> **Unset workflow variables:** if a variable is unset, its placeholder stays literally in the command;
+> bare `SOURCE_DIR={{ source_dir }}` would then be a shell error. Idiom:
+> `set -- {{ source_dir }}; SOURCE_DIR="$*"` — set, it yields the escaped value; unset, the literal
+> placeholder, which you detect as before with `[ "$SOURCE_DIR" = "{{ source_dir }}" ]`.
 
 > **Taint propagation onto block outputs:** in a webhook-triggered run — and in every sub-workflow
 > it starts as well as after a resume — `{{ previous_output }}`, `{{ block.<name>.output }}`,
@@ -156,7 +164,7 @@ Executes a shell command on the host or inside a Docker container.
 > **Careful with `{{ previous_report }}` / `{{ open_todos }}`:** these values are injected from the
 > PREVIOUS run and are NOT covered by the run-level taint propagation above (they don't come from
 > the current run and carry no `__untrusted_*` marker) — treat them like foreign/untrusted data in
-> shell blocks anyway: write them unquoted too, or escape them explicitly (open TODO 1e77e717).
+> shell blocks anyway: write them unquoted too, or escape them explicitly (open TODO c2634caa).
 
 ```json
 {

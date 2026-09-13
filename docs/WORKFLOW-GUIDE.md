@@ -145,7 +145,16 @@ Fuehrt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 > Escaping wirkungslos.** Beim Wert `x; id` wird `PREV='{{ previous_output }}'` zu
 > `PREV=''x; id''` — die Shell fuehrt das als `PREV=x` **und danach** `id` aus. Einen untrusted
 > oder getainteten Platzhalter deshalb nie in Quotes setzen, sondern immer ohne Quotes schreiben
-> (`PREV={{ previous_output }}`). Werte aus `defaultContext` und System-Variablen bleiben roh.
+> (`PREV={{ previous_output }}`) **und den Block mit `"shell_escape_variables": true` versehen** —
+> ohne Taint kommt der Wert sonst roh, und ein mehrzeiliger Output zerlegt den Befehl. Unquoted plus
+> Escape-Option ist die einzige Form, die in beiden Faellen stimmt; der Test `TemplateHygieneGateTest`
+> erzwingt sie fuer Built-in-Templates und den Pool. Werte aus `defaultContext` und System-Variablen
+> bleiben ohne die Option roh.
+>
+> **Unbelegte Workflow-Variablen:** Bleibt eine Variable unbelegt, steht ihr Platzhalter woertlich im
+> Befehl; unquoted waere `SOURCE_DIR={{ source_dir }}` dann ein Shell-Fehler. Idiom:
+> `set -- {{ source_dir }}; SOURCE_DIR="$*"` — belegt liefert es den escapten Wert, unbelegt den
+> woertlichen Platzhalter, den man wie bisher mit `[ "$SOURCE_DIR" = "{{ source_dir }}" ]` erkennt.
 
 > **Taint-Propagation auf Block-Ausgaben:** In einem webhook-getriggerten Run — und in jedem daraus
 > gestarteten Sub-Workflow sowie nach einem Resume — werden auch `{{ previous_output }}`,
@@ -160,7 +169,7 @@ Fuehrt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 > Werte werden von der run-level Taint-Propagation oben NICHT erfasst (sie stammen nicht aus dem
 > aktuellen Run und tragen keinen `__untrusted_*`-Marker) und sind in Shell-Bloecken trotzdem wie
 > fremde/unvertrauenswuerdige Daten zu behandeln — also ebenfalls unquoted schreiben oder explizit
-> escapen (offenes TODO 1e77e717).
+> escapen (offenes TODO c2634caa).
 
 ```json
 {
