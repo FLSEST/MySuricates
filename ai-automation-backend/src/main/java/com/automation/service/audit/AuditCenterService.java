@@ -30,6 +30,7 @@ public class AuditCenterService {
     private final AuditFindingOccurrenceRepository occurrenceRepository;
     private final AuditFindingTodoRepository findingTodoRepository;
     private final TodoRepository todoRepository;
+    private final AuditAcceptancePolicy acceptancePolicy;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
@@ -115,8 +116,10 @@ public class AuditCenterService {
     public AuditFindingResponse updateFinding(String id, AuditFindingStatus status, String dispositionNote) {
         AuditFinding finding = requireFinding(id);
         if (status != null) {
+            Instant now = Instant.now();
             finding.setStatus(status);
-            finding.setResolvedAt(status.isTerminal() ? Instant.now() : null);
+            finding.setResolvedAt(status.isTerminal() ? now : null);
+            if (status == AuditFindingStatus.ACCEPTED_RISK) acceptancePolicy.accept(finding, now);
         }
         if (dispositionNote != null) finding.setDispositionNote(dispositionNote);
         finding = findingRepository.save(finding);
@@ -216,7 +219,8 @@ public class AuditCenterService {
                 finding.getRuleKey(), finding.getSubject(), finding.getSeverity(), finding.getTitle(), finding.getDescription(),
                 finding.getEvidence(), TodoMapper.jsonToList(finding.getTags()), finding.getStatus(), finding.getFirstSeenRunId(),
                 finding.getLastSeenRunId(), finding.getFirstSeenAt(), finding.getLastSeenAt(), finding.getOccurrenceCount(),
-                finding.getRegressionCount(), finding.getResolvedAt(), finding.getDispositionNote(), links);
+                finding.getRegressionCount(), finding.getResolvedAt(), finding.getDispositionNote(),
+                finding.getDispositionEvidence(), finding.getDispositionAt(), links);
     }
 
     private AuditFinding requireFinding(String id) {
@@ -266,6 +270,7 @@ public class AuditCenterService {
                                        String description, String evidence, List<String> tags, AuditFindingStatus status,
                                        String firstSeenRunId, String lastSeenRunId, Instant firstSeenAt, Instant lastSeenAt,
                                        int occurrenceCount, int regressionCount, Instant resolvedAt,
-                                       String dispositionNote, List<TodoLink> todos) {}
+                                       String dispositionNote, String dispositionEvidence, Instant dispositionAt,
+                                       List<TodoLink> todos) {}
     public record TodoLink(String id, String title, Todo.Status status, boolean managed) {}
 }

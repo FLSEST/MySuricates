@@ -68,6 +68,12 @@ public class AuditFinding {
     private Instant resolvedAt;
     @Column(name = "disposition_note", columnDefinition = "text")
     private String dispositionNote;
+    /** Evidence-Text zum Zeitpunkt der Risiko-Akzeptanz — Vergleichsbasis der Verschlechterungsregel. */
+    @Column(name = "disposition_evidence", columnDefinition = "text")
+    private String dispositionEvidence;
+    /** Zeitpunkt der Risiko-Akzeptanz — Basis des 180-Tage-Verfalls. */
+    @Column(name = "disposition_at")
+    private Instant dispositionAt;
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;

@@ -4,7 +4,14 @@ import com.automation.config.RateLimitConfig;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.service.activitylog.ActivityLogService;
+import com.automation.entity.AuditFindingStatus;
+import com.automation.entity.AuditSeverity;
 import com.automation.service.audit.AuditCenterService;
+import com.automation.service.audit.AuditCenterService.AuditFindingResponse;
+import org.springframework.http.MediaType;
+
+import java.time.Instant;
+import java.util.List;
 import com.automation.service.system.ApiKeyService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,9 +22,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -66,5 +75,23 @@ class AuditControllerTest {
         mockMvc.perform(get("/api/v1/audit-findings").param("severity", "BOGUS"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"));
+    }
+
+    @Test
+    void updateFinding_acceptedRisk_exposesDispositionSnapshotAndTimestamp() throws Exception {
+        Instant acceptedAt = Instant.parse("2026-09-13T10:00:00Z");
+        when(auditCenterService.updateFinding(eq("f1"), eq(AuditFindingStatus.ACCEPTED_RISK), eq("Split geplant")))
+                .thenReturn(new AuditFindingResponse("f1", "proj-1", "mysuricates.health", "fp", "size.class", "Big.java",
+                        AuditSeverity.HIGH, "Big.java ist zu gross", null, "Big.java: 320 LOC", List.of(),
+                        AuditFindingStatus.ACCEPTED_RISK, "run-0", "run-1", acceptedAt, acceptedAt, 2, 0, acceptedAt,
+                        "Split geplant", "Big.java: 320 LOC", acceptedAt, List.of()));
+
+        mockMvc.perform(patch("/api/v1/audit-findings/f1").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"ACCEPTED_RISK\",\"dispositionNote\":\"Split geplant\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACCEPTED_RISK"))
+                .andExpect(jsonPath("$.dispositionNote").value("Split geplant"))
+                .andExpect(jsonPath("$.dispositionEvidence").value("Big.java: 320 LOC"))
+                .andExpect(jsonPath("$.dispositionAt").value("2026-09-13T10:00:00Z"));
     }
 }

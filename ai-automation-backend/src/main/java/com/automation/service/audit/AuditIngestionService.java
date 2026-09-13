@@ -32,6 +32,7 @@ public class AuditIngestionService {
     private final AuditFindingTodoRepository findingTodoRepository;
     private final TodoRepository todoRepository;
     private final AuditResultParser parser;
+    private final AuditAcceptancePolicy acceptancePolicy;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
@@ -109,6 +110,10 @@ public class AuditIngestionService {
                     finding.setStatus(AuditFindingStatus.OPEN);
                     finding.setResolvedAt(null);
                 }
+                AuditAcceptancePolicy.Outcome outcome = acceptancePolicy.reassess(finding, item.evidence(), observedAt);
+                if (outcome != AuditAcceptancePolicy.Outcome.UNCHANGED) {
+                    log.info("Accepted audit finding {} ({}) re-assessed: {}", finding.getId(), finding.getTitle(), outcome);
+                }
             }
             finding.setSeverity(item.severity());
             finding.setTitle(item.title());
@@ -128,7 +133,10 @@ public class AuditIngestionService {
                         .title(item.title()).description(item.description()).evidence(item.evidence())
                         .tags(TodoMapper.listToJson(item.tags())).observedAt(observedAt).build());
             }
-            if (item.severity() == AuditSeverity.CRITICAL || item.severity() == AuditSeverity.HIGH) {
+            // Nur offene Findings bekommen ein verwaltetes TODO: akzeptierte/verworfene Risiken und
+            // Wiedervorlagen (AWAITING_VERIFICATION nach Verfall) loesen keinen Fix-Loop aus.
+            if ((item.severity() == AuditSeverity.CRITICAL || item.severity() == AuditSeverity.HIGH)
+                    && finding.getStatus() == AuditFindingStatus.OPEN) {
                 ensureManagedTodo(finding, report);
             }
         }
