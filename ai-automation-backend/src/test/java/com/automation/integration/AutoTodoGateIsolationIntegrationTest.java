@@ -53,7 +53,8 @@ class AutoTodoGateIsolationIntegrationTest {
         var granular = new GranularTodoService(todos, mock(TodoSimilarityService.class), transactions, publisher, text);
         approvals = new PendingTodoApprovalService(todos, runs, transactions, publisher, text);
         autoTodos = new AutoTodoService(todos, resolver, mock(ProjectPathResolver.class),
-                mock(AppSettingsRepository.class), transactions, publisher, text, approvals, granular);
+                mock(AppSettingsRepository.class), transactions, publisher, text, approvals, granular,
+                mock(com.automation.service.activitylog.ActivityLogService.class));
     }
 
     @ParameterizedTest

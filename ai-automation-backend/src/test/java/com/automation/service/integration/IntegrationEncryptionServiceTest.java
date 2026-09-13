@@ -93,11 +93,11 @@ class IntegrationEncryptionServiceTest {
     }
 
     /**
-     * Regression guard for the 2026-08-06 bug: the integration test profile did not pin
-     * {@code automation.integration.key-file}, so init() generated a key straight into the
-     * developer's real {@code ~/.autotrigger/}. Here the constructor is given an explicit
-     * @TempDir path (as production config now also resolves to a per-JVM temp path in tests),
-     * so the generate-branch must write there — never under the real user.home.
+     * Checks only the generate-branch of {@code init()}: given an explicit {@code @TempDir} path the
+     * key is written there. It does <em>not</em> guard the 2026-08-06 incident (integration profile
+     * without a pinned {@code automation.integration.key-file}, key generated into the developer's
+     * real {@code ~/.autotrigger/}) — that regression guard is
+     * {@code IntegrationEncryptionServiceGuardTest}, which boots the real profile.
      */
     @Test
     void init_generatesKeyAtConfiguredPath_notInHome() {

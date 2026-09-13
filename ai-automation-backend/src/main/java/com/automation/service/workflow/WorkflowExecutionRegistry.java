@@ -108,6 +108,11 @@ public class WorkflowExecutionRegistry {
         return activeExecutions.size();
     }
 
+    /** Runs registered but still waiting for a permit or a container (subset of {@link #getActiveRunCount()}). */
+    public int getQueuedRunCount() {
+        return queued.size();
+    }
+
     public boolean isRunActive(String runId) {
         return activeExecutions.containsKey(runId);
     }

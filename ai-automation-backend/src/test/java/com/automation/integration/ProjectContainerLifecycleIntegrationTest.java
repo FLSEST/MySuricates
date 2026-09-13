@@ -53,7 +53,12 @@ class ProjectContainerLifecycleIntegrationTest {
     @AfterEach
     void cleanUp() {
         for (int i = cleanup.size() - 1; i >= 0; i--) {
-            try { cleanup.get(i).run(); } catch (Exception ignored) { /* already gone */ }
+            try {
+                cleanup.get(i).run();
+            } catch (Exception e) {
+                // Expected when the row/container is already gone; anything else is worth a line.
+                System.err.println("[cleanup] " + e.getClass().getSimpleName() + ": " + e.getMessage());
+            }
         }
         cleanup.clear();
     }

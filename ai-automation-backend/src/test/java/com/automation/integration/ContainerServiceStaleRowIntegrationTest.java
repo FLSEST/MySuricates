@@ -80,7 +80,7 @@ class ContainerServiceStaleRowIntegrationTest {
                 .startedAt(Instant.now())
                 .lastActivityAt(Instant.now())
                 .build());
-        entityManager.clear();
+        entityManager.clear();   // drop the seeded row from the 1st-level cache: the service must hit the DB
 
         when(docker.isRunning(GONE_DOCKER_ID)).thenReturn(false);
         when(docker.createAndStart(any(Project.class), anyString(), anyString(), anyString()))
@@ -89,8 +89,11 @@ class ContainerServiceStaleRowIntegrationTest {
 
     @AfterEach
     void cleanup() {
-        containerRepository.deleteAll();
+        // Project first: its REMOVE cascade takes the container row with it. Deleting the
+        // container row first leaves the (eagerly loaded) Project pointing at a removed entity,
+        // which Hibernate rejects on flush now that Project.container no longer cascades PERSIST.
         projectRepository.deleteAll();
+        containerRepository.deleteAll();
     }
 
     @Test
@@ -102,7 +105,7 @@ class ContainerServiceStaleRowIntegrationTest {
         assertThatCode(() -> containerService.createAndStartContainer(project))
                 .doesNotThrowAnyException();
 
-        entityManager.clear();
+        entityManager.clear();   // read back what was committed, not what the cache remembers
         List<Container> rows = containerRepository.findAll().stream()
                 .filter(c -> c.getProject() != null && project.getId().equals(c.getProject().getId()))
                 .toList();

@@ -54,7 +54,13 @@ public class Project {
     @Column(name = "ai_context", columnDefinition = "text")
     private String aiContext;
 
-    @OneToOne(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
+    // No PERSIST cascade and no orphanRemoval (TODO c2af1a67): the container row is written
+    // explicitly by ContainerService (upsert); the PERSIST cascade un-scheduled a pending delete
+    // on flush and produced the UNIQUE(containers.project_id) bug cd1685ff. MERGE stays so that a
+    // Project referencing a detached Container can be merged without TransientObjectException;
+    // REMOVE stays so that deleting a Project in the same persistence context as its (already
+    // removed) Container flushes cleanly — the schema cascades the delete anyway (V2).
+    @OneToOne(mappedBy = "project", cascade = {CascadeType.MERGE, CascadeType.REMOVE})
     private Container container;
 
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)

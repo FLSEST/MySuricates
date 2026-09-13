@@ -1278,6 +1278,30 @@ class WorkflowExecutorTest {
         assertThat(singleSlot.availablePermits()).isEqualTo(1);
     }
 
+    @Test
+    void execute_releasesPermitOnlyAfterTerminalSave() {
+        // TODO 7bb17b13: a queued run must not get the slot while this run still writes its
+        // terminal row on the single SQLite connection.
+        DynamicSemaphore singleSlot = new DynamicSemaphore(1);
+        WorkflowExecutor executor = buildExecutor(List.of(simpleBlockExecutor), singleSlot);
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build());
+        java.util.concurrent.atomic.AtomicInteger permitsAtTerminalSave = new java.util.concurrent.atomic.AtomicInteger(-1);
+        when(runRepository.save(any(WorkflowRun.class))).thenAnswer(inv -> {
+            WorkflowRun saved = inv.getArgument(0);
+            if (saved.getId() == null) saved.setId("run-1");
+            if (saved.getStatus() != RunStatus.RUNNING) {
+                permitsAtTerminalSave.set(singleSlot.availablePermits());
+            }
+            return saved;
+        });
+
+        executor.execute(testWorkflow, null);
+
+        assertThat(permitsAtTerminalSave.get()).as("permit still held during the terminal save").isZero();
+        assertThat(singleSlot.availablePermits()).as("permit released afterwards").isEqualTo(1);
+    }
+
     // --- Group C: Registry cleanup (WorkflowExecutor.java:485) ---------------
 
     @Test
@@ -1609,9 +1633,16 @@ class WorkflowExecutorTest {
         return stored;
     }
 
+    /**
+     * Upper bound for condition polling / latches. Generous on purpose (TODO 7c8e57c3): under a
+     * load average of 30+ with several parallel Maven runs the 5 s bound tripped once; a
+     * condition-based wait only costs the time it really needs, so the bound may be large.
+     */
+    private static final long AWAIT_SECONDS = 30;
+
     /** Polls the stateful stub until the run leaves RUNNING (no Awaitility dependency). */
     private WorkflowRun awaitTerminalStatus(AtomicReference<WorkflowRun> stored) {
-        long deadline = System.nanoTime() + java.time.Duration.ofSeconds(5).toNanos();
+        long deadline = System.nanoTime() + java.time.Duration.ofSeconds(AWAIT_SECONDS).toNanos();
         RunStatus last = null;
         while (System.nanoTime() < deadline) {
             WorkflowRun current = stored.get();
@@ -1626,12 +1657,12 @@ class WorkflowExecutorTest {
                 throw new AssertionError("interrupted while waiting for a terminal run status", e);
             }
         }
-        throw new AssertionError("run did not reach a terminal status within 5s; last status was " + last);
+        throw new AssertionError("run did not reach a terminal status within " + AWAIT_SECONDS + "s; last status was " + last);
     }
 
     private static void awaitLatch(CountDownLatch latch, String what) {
         try {
-            assertThat(latch.await(5, TimeUnit.SECONDS)).as(what).isTrue();
+            assertThat(latch.await(AWAIT_SECONDS, TimeUnit.SECONDS)).as(what).isTrue();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new AssertionError("interrupted while waiting for " + what, e);

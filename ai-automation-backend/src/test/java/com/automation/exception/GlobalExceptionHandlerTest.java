@@ -172,7 +172,6 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void handleNoResourceFound_returnsNotFoundStatus() {
-        var ex = new NoResourceFoundException(HttpMethod.POST, "api/v1/projects/x/container/start");
         HttpServletRequest request = mock(HttpServletRequest.class);
         when(request.getMethod()).thenReturn("POST");
         when(request.getRequestURI()).thenReturn("/api/v1/projects/x/container/start");
@@ -197,6 +196,7 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getCode()).isEqualTo("METHOD_NOT_ALLOWED");
         assertThat(response.getBody().getError()).isEqualTo("Method not allowed: GET /api/v1/workflows/abc-123/execute");
+        assertThat(response.getHeaders().getFirst(org.springframework.http.HttpHeaders.ALLOW)).isEqualTo("POST");
     }
 
     @Test

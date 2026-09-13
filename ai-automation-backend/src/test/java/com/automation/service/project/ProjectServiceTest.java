@@ -160,6 +160,7 @@ class ProjectServiceTest {
         verify(containerService).stopContainer(testProject);
         verify(projectRepository).save(testProject);
         assertThat(testProject.getArchivedAt()).isNotNull();
+        assertThat(testProject.getStatus()).as("archived project must not stay RUNNING").isEqualTo(ProjectStatus.STOPPED);
     }
 
     @Test
@@ -171,6 +172,7 @@ class ProjectServiceTest {
         verify(containerService, never()).stopContainer(any());
         verify(projectRepository).save(testProject);
         assertThat(testProject.getArchivedAt()).isNotNull();
+        assertThat(testProject.getStatus()).isEqualTo(ProjectStatus.STOPPED);
     }
 
     @Test

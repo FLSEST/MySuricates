@@ -265,9 +265,9 @@ public class WorkflowExecutor {
                     "Workflow execution error: " + message,
                     "WorkflowExecutor", runId, workflowId);
         } finally {
-            if (semaphoreAcquired) {
-                executionSemaphore.release();
-            }
+            // Order matters (TODO 7bb17b13): the permit is released only after the terminal save.
+            // Releasing first let a queued run start while this one was still writing its final
+            // row on the single SQLite connection, and activeRuns briefly exceeded the limit.
             // Unregister last: between unregister and the final save the watchdog would see
             // DB=RUNNING with an empty registry and flag a false-positive ghost run.
             try {
@@ -278,7 +278,13 @@ public class WorkflowExecutor {
                     failRun(runId, "Failed to load workflow run from database");
                 }
             } finally {
-                executionRegistry.unregister(runId);
+                try {
+                    executionRegistry.unregister(runId);
+                } finally {
+                    if (semaphoreAcquired) {
+                        executionSemaphore.release();
+                    }
+                }
             }
         }
     }

@@ -1,5 +1,6 @@
 package com.automation.service.todo;
 
+import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.GateStatus;
 import com.automation.entity.Project;
 import com.automation.entity.Todo;
@@ -7,6 +8,7 @@ import com.automation.event.TodoCreatedEvent;
 import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.repository.TodoRepository;
+import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.todo.GateStatusResolver.GateResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,10 +48,29 @@ public class AutoTodoService {
     private final AutoTodoTextBuilder textBuilder;
     private final PendingTodoApprovalService approvalService;
     private final GranularTodoService granularTodoService;
+    private final ActivityLogService activityLogService;
 
+    /**
+     * Runs async, so an escaping exception only reaches the {@code AsyncUncaughtExceptionHandler}
+     * and the incident todo is silently missing (2026-09-13: three failed runs, no todo, because the
+     * resolver itself died with a NoClassDefFoundError). Every failure is therefore logged and
+     * recorded in the activity log with the run id (TODO 3a4d238c).
+     */
     @Async
     @EventListener
     public void onWorkflowRunCompleted(WorkflowRunCompletedEvent event) {
+        try {
+            handleRunCompleted(event);
+        } catch (Throwable t) {
+            String detail = t.getMessage() != null ? t.getMessage() : t.getClass().getName();
+            log.error("Auto-todo failed for run {} (workflow {}): {}", event.getRunId(), event.getWorkflowName(), detail, t);
+            activityLogService.error(LogCategory.SYSTEM,
+                    "Auto-TODO für Run " + event.getRunId() + " fehlgeschlagen: " + t.getClass().getSimpleName() + ": " + detail,
+                    "AutoTodoService", event.getRunId(), event.getWorkflowId());
+        }
+    }
+
+    private void handleRunCompleted(WorkflowRunCompletedEvent event) {
         // Loop prevention: skip TODO creation for fix-attempt runs triggered by TodoTrigger
         Object todoTriggerRun = event.getRunMetadata().get("todoTriggerRun");
         if (Boolean.TRUE.equals(todoTriggerRun)) {

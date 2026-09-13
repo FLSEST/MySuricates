@@ -2,6 +2,7 @@ package com.automation.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -139,7 +140,13 @@ public class GlobalExceptionHandler {
                                                                    HttpServletRequest request) {
         String message = "Method not allowed: " + ex.getMethod() + " " + request.getRequestURI();
         log.debug(message);
-        return respond(ErrorCode.METHOD_NOT_ALLOWED, message);
+        // RFC 9110 §15.5.6: a 405 must carry the allowed methods.
+        String[] supported = ex.getSupportedMethods();
+        ResponseEntity.BodyBuilder builder = ResponseEntity.status(ErrorCode.METHOD_NOT_ALLOWED.getHttpStatus());
+        if (supported != null && supported.length > 0) {
+            builder.header(HttpHeaders.ALLOW, String.join(", ", supported));
+        }
+        return builder.body(ErrorResponse.of(ErrorCode.METHOD_NOT_ALLOWED, message));
     }
 
     @ExceptionHandler(Exception.class)

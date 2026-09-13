@@ -192,7 +192,8 @@ public class ExecutionSettingsService {
         result.put("wishDefaultShellTimeoutSeconds", wishConfig.getDefaultShellTimeoutSeconds());
         result.put("wishDefaultAgenticTotalTimeoutSeconds", wishConfig.getDefaultAgenticTotalTimeoutSeconds());
         result.put("modelCatalogTtlSeconds", modelCatalogService.getTtlSeconds());
-        result.put("activeRuns", executionRegistry.getActiveRunCount());
+        result.put("activeRuns", executionRegistry.getActiveRunCount());   // running + queued
+        result.put("queuedRuns", executionRegistry.getQueuedRunCount());
         return result;
     }
 

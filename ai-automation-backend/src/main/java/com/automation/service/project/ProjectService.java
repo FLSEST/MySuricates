@@ -134,17 +134,23 @@ public class ProjectService {
      * the worse outcome.
      */
     public void delete(String id) {
-        Project project = transactionTemplate.execute(status -> {
+        record Archived(Project project, boolean wasRunning) {}
+        Archived archived = transactionTemplate.execute(status -> {
             Project p = projectRepository.findById(id)
                     .orElseThrow(() -> new ResourceNotFoundException("Project", id));
+            boolean wasRunning = p.getStatus() == ProjectStatus.RUNNING;
             p.setArchivedAt(Instant.now());
+            // An archived project has no container after this call (stopped below, or reaped by the
+            // reconciler if Docker fails); restore() must not bring it back as RUNNING without one.
+            p.setStatus(ProjectStatus.STOPPED);
             projectRepository.save(p);
             log.info("Archived project: {} ({})", p.getName(), p.getId());
             activityLogService.warn(LogCategory.SYSTEM, "Project archived: " + p.getName(), "ProjectService", p.getId());
-            return p;
+            return new Archived(p, wasRunning);
         });
 
-        if (project.getStatus() == ProjectStatus.RUNNING) {
+        if (archived.wasRunning()) {
+            Project project = archived.project();
             try {
                 containerService.stopContainer(project);
             } catch (Exception e) {

@@ -52,7 +52,8 @@ public class ContainerService {
     // Entries are never removed: dropping a lock while a thread still holds it
     // lets the next caller create a *fresh* monitor for the same project and run
     // in parallel with it — exactly the race this map exists to prevent. The map
-    // is bounded by the number of projects, so it cannot grow unbounded.
+    // holds one entry per project id seen since startup (deleted or archived
+    // projects included), so it is bounded by that count, not by live projects.
     private final ConcurrentHashMap<String, Object> projectLocks = new ConcurrentHashMap<>();
 
     public ContainerService(

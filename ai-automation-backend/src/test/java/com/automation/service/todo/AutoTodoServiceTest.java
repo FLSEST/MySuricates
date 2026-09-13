@@ -62,6 +62,9 @@ class AutoTodoServiceTest {
     @Mock
     private GranularTodoService granularTodoService;
 
+    @Mock
+    private com.automation.service.activitylog.ActivityLogService activityLogService;
+
     private AutoTodoService autoTodoService;
 
     @BeforeEach
@@ -74,7 +77,21 @@ class AutoTodoServiceTest {
                 transactionManager, eventPublisher, textBuilder,
                 new PendingTodoApprovalService(todoRepository, workflowRunRepository, transactionManager,
                         eventPublisher, textBuilder),
-                granularTodoService);
+                granularTodoService, activityLogService);
+    }
+
+    @Test
+    void resolverThrows_isRecordedInActivityLog_andDoesNotPropagate() {
+        // 2026-09-13: the resolver died with NoClassDefFoundError and the incident todo vanished silently.
+        WorkflowRunCompletedEvent event = createEvent(RunStatus.FAILED, Map.of(), AUTO_TODO_ENABLED_META);
+        when(gateStatusResolver.resolve(event)).thenThrow(new NoClassDefFoundError("GateStatusResolver$1"));
+
+        org.assertj.core.api.Assertions.assertThatCode(() -> autoTodoService.onWorkflowRunCompleted(event))
+                .doesNotThrowAnyException();
+
+        verify(activityLogService).error(eq(com.automation.entity.ActivityLog.LogCategory.SYSTEM),
+                contains(event.getRunId()), eq("AutoTodoService"), eq(event.getRunId()), any());
+        verifyNoInteractions(todoRepository);
     }
 
     private static final Map<String, Object> AUTO_TODO_ENABLED_META = Map.of("autoTodo", Map.of("enabled", true));
