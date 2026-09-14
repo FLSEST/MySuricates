@@ -1393,10 +1393,16 @@ export interface ModuleInfo {
   /** e.g. AUTOMATION_MODULES_WEBHOOKS */
   envVar: string;
   description: string;
+  /** State from the startup configuration alone */
+  configured?: boolean;
+  /** A settings-UI switch decides the state (only with automation.modules.ui-editable) */
+  overridden?: boolean;
 }
 
 export interface SystemModules {
   preset: ModulePreset;
+  /** automation.modules.ui-editable: feature modules can be switched in the settings */
+  uiEditable: boolean;
   modules: ModuleInfo[];
 }
 

@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { PackageX } from 'lucide-react';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ConfigSnippet } from '../components/settings/ConfigSnippet';
-import { useModuleInfo } from '../hooks/useModules';
+import { useModuleInfo, useSystemModules } from '../hooks/useModules';
 import { useT } from '../i18n';
 import { envSnippet, yamlSnippet } from '../utils/moduleSnippets';
 import type { ModuleName } from '../types';
@@ -11,7 +11,10 @@ import type { ModuleName } from '../types';
 export function ModuleDisabled({ module }: { module: ModuleName }) {
   const t = useT();
   const info = useModuleInfo(module);
+  const { data } = useSystemModules();
   const property = info?.property ?? `automation.modules.${module}`;
+  // With automation.modules.ui-editable the settings switch is the quicker way
+  const switchable = !!data?.uiEditable && info?.kind !== 'hardening';
 
   return (
     <EmptyState
@@ -20,6 +23,7 @@ export function ModuleDisabled({ module }: { module: ModuleName }) {
       description={t.modules.disabledPageText}
       action={
         <div className="text-left space-y-3 max-w-md">
+          {switchable && <p className="text-sm text-text" data-testid="module-disabled-ui-hint">{t.modules.disabledPageUiHint}</p>}
           <p className="text-sm text-text-secondary">{t.modules.disabledPageHowTo}</p>
           <ConfigSnippet label={t.modules.yaml} text={yamlSnippet(property, true)} />
           {info?.envVar && <ConfigSnippet label={t.modules.env} text={envSnippet(info.envVar, true)} />}

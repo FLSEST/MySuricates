@@ -28,4 +28,14 @@ describe('ModuleDisabled', () => {
     expect(await screen.findByText('AUTOMATION_MODULES_REMOTE_ACCESS=true')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'All modules' })).toHaveAttribute('href', '/settings#modules');
   });
+
+  it('points to the settings switch when modules are UI-editable', async () => {
+    server.use(
+      http.get('/api/v1/system/capabilities', () => HttpResponse.json(modulesFixture('core', ['webhooks'], true))),
+    );
+
+    renderWithProviders(<ModuleDisabled module="webhooks" />);
+
+    expect(await screen.findByTestId('module-disabled-ui-hint')).toHaveTextContent('Settings → Modules & hardening');
+  });
 });

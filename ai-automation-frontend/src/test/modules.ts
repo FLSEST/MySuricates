@@ -32,14 +32,21 @@ function envName(prefix: string, name: string) {
   return `${prefix.replace(/\./g, '_')}_${name.replace(/-/g, '_')}`.toUpperCase();
 }
 
-/** Capabilities fixture mirroring the backend catalog; `disabled` lists modules reported off. */
-export function modulesFixture(preset: ModulePreset = 'full', disabled: ModuleName[] = []): SystemModules {
+/**
+ * Capabilities fixture mirroring the backend catalog; `disabled` lists modules reported off.
+ * Carries both the cache shape (`uiEditable`) and the capabilities field (`modulesUiEditable`).
+ */
+export function modulesFixture(
+  preset: ModulePreset = 'full', disabled: ModuleName[] = [], uiEditable = false,
+): SystemModules & { modulesUiEditable: boolean } {
   const off = new Set(disabled);
   const modules: ModuleInfo[] = [
     ...FEATURES.map((f) => ({
       ...f,
       kind: 'feature' as const,
       enabled: !off.has(f.name),
+      configured: !off.has(f.name),
+      overridden: false,
       property: `automation.modules.${f.name}`,
       envVar: envName('automation.modules', f.name),
       description: `${f.name} description`,
@@ -56,5 +63,5 @@ export function modulesFixture(preset: ModulePreset = 'full', disabled: ModuleNa
       description: `${h.name} description`,
     })),
   ];
-  return { preset, modules };
+  return { preset, uiEditable, modulesUiEditable: uiEditable, modules };
 }

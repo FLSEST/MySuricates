@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
-import { screen, within, fireEvent } from '@testing-library/react';
+import { screen, within, fireEvent, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../test/server';
 import { renderWithProviders } from '../../../test/utils';
@@ -15,9 +15,9 @@ beforeEach(() => {
   useI18nStore.setState({ locale: 'en' });
 });
 
-function serve(disabled: Parameters<typeof modulesFixture>[1]) {
+function serve(disabled: Parameters<typeof modulesFixture>[1], uiEditable = false) {
   server.use(
-    http.get('/api/v1/system/capabilities', () => HttpResponse.json(modulesFixture('core', disabled))),
+    http.get('/api/v1/system/capabilities', () => HttpResponse.json(modulesFixture('core', disabled, uiEditable))),
   );
 }
 
@@ -31,6 +31,16 @@ describe('ModulesCard', () => {
     expect(screen.getByText('Workflow hardening')).toBeInTheDocument();
     expect(screen.queryByRole('switch')).not.toBeInTheDocument();
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+  });
+
+  it('explains how to allow switching here and why hardening never is', async () => {
+    serve([]);
+    renderWithProviders(<ModulesCard />);
+
+    expect(await screen.findByTestId('hardening-note')).toHaveTextContent('protects your workflows against someone who holds the API key');
+    expect(screen.getByText(/allow switching here/)).toBeInTheDocument();
+    expect(screen.getByText(/ui-editable: true/)).toBeInTheDocument();
+    expect(screen.getByText(/anyone with the API key could then turn on webhooks/)).toBeInTheDocument();
   });
 
   it('offers the enable snippet for a disabled module', async () => {
@@ -58,5 +68,48 @@ describe('ModulesCard', () => {
     expect(within(row).getByText('Disable')).toBeInTheDocument();
     expect(within(row).getByText('Requires: Chains')).toBeInTheDocument();
     expect(within(row).getByText('AUTOMATION_MODULES_WISHES=false')).toBeInTheDocument();
+  });
+
+  describe('with automation.modules.ui-editable', () => {
+    it('offers a switch per feature module only and applies the result immediately', async () => {
+      serve(['webhooks'], true);
+      let body: unknown;
+      server.use(http.put('/api/v1/system/modules/webhooks', async ({ request }) => {
+        body = await request.json();
+        const next = modulesFixture('core', [], true);
+        next.modules = next.modules.map((m) => (m.name === 'webhooks' ? { ...m, configured: false, overridden: true } : m));
+        return HttpResponse.json(next);
+      }));
+      renderWithProviders(<ModulesCard />);
+
+      expect(await screen.findByTestId('modules-ui-editable')).toBeInTheDocument();
+      expect(within(screen.getByTestId('module-provenance')).queryByRole('switch')).not.toBeInTheDocument();
+      const row = screen.getByTestId('module-webhooks');
+      fireEvent.click(within(row).getByRole('switch', { name: 'Switch Webhooks' }));
+
+      await waitFor(() => expect(within(screen.getByTestId('module-webhooks')).getByText('changed here')).toBeInTheDocument());
+      expect(body).toEqual({ enabled: true });
+      expect(within(screen.getByTestId('module-webhooks')).getByRole('switch')).toHaveAttribute('aria-checked', 'true');
+    });
+
+    it('resets an override to the configuration', async () => {
+      const fixture = modulesFixture('core', [], true);
+      fixture.modules = fixture.modules.map((m) => (m.name === 'chains' ? { ...m, configured: false, overridden: true } : m));
+      server.use(http.get('/api/v1/system/capabilities', () => HttpResponse.json(fixture)));
+      let resets = 0;
+      server.use(http.delete('/api/v1/system/modules/chains/override', () => {
+        resets += 1;
+        return HttpResponse.json(modulesFixture('core', ['chains'], true));
+      }));
+      renderWithProviders(<ModulesCard />);
+
+      const row = await screen.findByTestId('module-chains');
+      await waitFor(() => expect(within(row).getByText('changed here')).toBeInTheDocument());
+      fireEvent.click(within(row).getByRole('button', { expanded: false }));
+      expect(within(row).getByText('Configuration: Off')).toBeInTheDocument();
+      fireEvent.click(within(row).getByRole('button', { name: 'Reset to configuration' }));
+
+      await waitFor(() => expect(resets).toBe(1));
+    });
   });
 });
