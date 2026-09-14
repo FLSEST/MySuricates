@@ -2,11 +2,17 @@ package com.automation.service.ai;
 
 import com.automation.config.CliPermissionsConfig;
 import com.automation.config.HostClaudeConfig;
+import com.automation.service.live.LiveOutput;
 import com.automation.service.system.ApiKeyService;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.ObjectProvider;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -572,5 +578,75 @@ class HostClaudeServiceTest {
         service.injectApiKeyEnv(pb);
 
         assertThat(pb.environment()).doesNotContainKey("AUTOMATION_API_KEY");
+    }
+
+    // --- live output ---
+
+    private static HostClaudeService serviceReplaying(Path streamJson, int timeoutSeconds, String trailingShell) {
+        HostClaudeConfig config = new HostClaudeConfig();
+        config.setTimeoutSeconds(timeoutSeconds);
+        config.setMaxTokens(null);
+        CliPermissionsConfig perms = new CliPermissionsConfig();
+        perms.setSkipPermissions(false);
+        perms.setAllowedTools(List.of());
+        // Read the prompt from stdin first, otherwise writing it can fail with a broken pipe.
+        List<String> replay = List.of("/bin/sh", "-c", "cat >/dev/null; cat \"$1\"" + trailingShell, "sh", streamJson.toString());
+        return new HostClaudeService(config, perms) {
+            @Override
+            List<String> buildActionCommand(String prompt, String model, String systemPrompt,
+                                            List<String> callAllowedTools, List<String> callDisallowedTools,
+                                            String effort) {
+                return replay;
+            }
+        };
+    }
+
+    @Test
+    void executeAction_streamsFormattedEventsIntoTheBoundSink_resultIdenticalToUnbound(@TempDir Path dir) throws IOException {
+        Path stream = Files.writeString(dir.resolve("stream.jsonl"), """
+                {"type":"system","subtype":"init","model":"claude-opus-5","tools":["Bash"]}
+                {"type":"assistant","message":{"model":"claude-opus-5","content":[{"type":"text","text":"Ich starte die Tests."},{"type":"tool_use","name":"Bash","input":{"command":"mvn test"}}]}}
+                {"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"BUILD SUCCESS"}]}}
+                {"type":"result","subtype":"success","result":"Alles grün.","num_turns":2,"total_cost_usd":0.012,"duration_ms":4000}
+                """);
+        HostClaudeService service = serviceReplaying(stream, 30, "");
+        List<String> lines = new ArrayList<>();
+
+        HostClaudeService.ActionResult unbound = service.executeAction("prompt", null, null, null);
+        HostClaudeService.ActionResult bound = LiveOutput.bind((kind, text) -> lines.add(kind + ":" + text), () -> {
+            try {
+                return service.executeAction("prompt", null, null, null);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
+
+        assertThat(bound).isEqualTo(unbound);
+        assertThat(bound.text()).isEqualTo("Alles grün.");
+        assertThat(bound.parsed().toolUses()).hasSize(1);
+        assertThat(lines).containsExactly(
+                "SYSTEM:session · claude-opus-5 · 1 tool",
+                "TEXT:Ich starte die Tests.",
+                "TOOL:Bash: mvn test",
+                "TOOL_RESULT:↳ 13 B",
+                "RESULT:✓ 2 turns · $0.012 · 4s");
+    }
+
+    @Test
+    void executeAction_deliversLinesEmittedBeforeATimeout(@TempDir Path dir) throws IOException {
+        Path stream = Files.writeString(dir.resolve("stream.jsonl"), """
+                {"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"pom.xml"}}]}}
+                """);
+        HostClaudeService service = serviceReplaying(stream, 1, "; sleep 30");
+        List<String> lines = new ArrayList<>();
+
+        assertThatThrownBy(() -> LiveOutput.bind((kind, text) -> lines.add(kind + ":" + text), () -> {
+            try {
+                return service.executeAction("prompt", null, null, null);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        })).hasRootCauseMessage("Host Claude action timed out after 1 seconds");
+        assertThat(lines).containsExactly("TOOL:Read: pom.xml");
     }
 }

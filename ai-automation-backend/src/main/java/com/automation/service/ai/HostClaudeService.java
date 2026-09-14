@@ -1,10 +1,14 @@
 package com.automation.service.ai;
 
+import com.automation.concurrency.DynamicSemaphore;
 import com.automation.config.CliPermissionsConfig;
 import com.automation.config.HostClaudeConfig;
 import com.automation.service.cli.ClaudeJsonResponse;
 import com.automation.service.cli.ClaudeOutputParser;
+import com.automation.service.cli.ClaudeStreamEventFormatter;
+import com.automation.service.live.LiveOutput;
 import com.automation.service.system.ApiKeyService;
+import com.automation.util.ProcessDrain;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,10 +20,6 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import com.automation.concurrency.DynamicSemaphore;
-import com.automation.util.LineListener;
-import com.automation.util.ProcessDrain;
-
 import java.util.concurrent.atomic.AtomicLong;
 
 @Service
@@ -204,7 +204,7 @@ public class HostClaudeService {
             writePromptToStdin(proc, prompt);
 
             int effectiveTimeout = timeoutSeconds != null ? timeoutSeconds : config.getTimeoutSeconds();
-            String rawOutput = ProcessDrain.drain(proc, effectiveTimeout, label, LineListener.NONE);
+            String rawOutput = ProcessDrain.drain(proc, effectiveTimeout, label, ClaudeStreamEventFormatter.listener(LiveOutput.current()));
 
             int exitCode = proc.exitValue();
             if (exitCode != 0) {
