@@ -32,25 +32,26 @@ const BLOCK_TYPE_ICONS: Record<BlockType, ReactNode> = {
   'todo-close': <ListChecks className={ICON} />,
 };
 
+// Theme tokens only, so every theme applies: AI takes the accent, the rest stays neutral in graded
+// contrast (human > deterministic > unknown); icon and label carry the distinction on top.
 const KIND_STYLES: Record<StepKind, { stripe: string; chip: string; icon: ReactNode }> = {
   ai: {
-    stripe: 'border-l-purple-500 dark:border-l-purple-400',
-    chip: 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-500/20 dark:text-purple-200 dark:border-purple-400/40',
+    stripe: 'border-l-accent',
+    chip: 'bg-accent-subtle text-accent border-accent/30',
     icon: <Bot className={ICON} />,
   },
   deterministic: {
-    stripe: 'border-l-stone-400 dark:border-l-stone-500',
-    chip: 'bg-stone-100 text-stone-700 border-stone-300 dark:bg-stone-500/20 dark:text-stone-200 dark:border-stone-400/40',
+    stripe: 'border-l-border-strong',
+    chip: 'bg-surface-raised text-text-secondary border-border-strong',
     icon: <Cog className={ICON} />,
   },
-  // Sky rather than amber: amber is the accent/warning colour (e.g. the `requested=` pill).
   human: {
-    stripe: 'border-l-sky-500 dark:border-l-sky-400',
-    chip: 'bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-500/20 dark:text-sky-200 dark:border-sky-400/40',
+    stripe: 'border-l-text-secondary',
+    chip: 'bg-surface-hover text-text border-text-secondary/50',
     icon: <User className={ICON} />,
   },
   unknown: {
-    stripe: 'border-dashed border-l-stone-300 dark:border-l-stone-600',
+    stripe: 'border-dashed border-l-border',
     chip: 'bg-surface-raised text-text-tertiary border-border border-dashed',
     icon: <CircleHelp className={ICON} />,
   },

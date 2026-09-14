@@ -6,7 +6,6 @@ import {
 import { Badge } from '../ui';
 import { PathLinkedOutput } from './PathLinkedOutput';
 import { useT } from '../../i18n';
-/* Badge used in IterationCard, custom span for agentic badge in main card */
 import type { StepResult, AgenticState, AgenticIteration } from '../../types';
 import { StepCardFrame, StepCardHeader } from '../workflow/StepCardChrome';
 
@@ -15,7 +14,7 @@ function IterationCard({ iter }: { iter: AgenticIteration }) {
   const t = useT();
 
   const phaseIcon = {
-    reasoning: <Brain className="w-4 h-4 text-purple-500 animate-pulse" />,
+    reasoning: <Brain className="w-4 h-4 text-accent animate-pulse" />,
     acting: <Terminal className="w-4 h-4 text-blue-500 animate-pulse" />,
     acted: iter.exitCode === 0
       ? <CheckCircle2 className="w-4 h-4 text-success" />
@@ -136,10 +135,12 @@ export function AgenticStepCard({ step, agenticState }: AgenticStepCardProps) {
           step={step}
           className="mb-2"
           badge={
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700/30">
-              <Brain className="w-3 h-3" />
-              {t.workflows.execution.agentic.title}
-            </span>
+            <Badge>
+              <span className="inline-flex items-center gap-1">
+                <Brain className="w-3 h-3" />
+                {t.workflows.execution.agentic.title}
+              </span>
+            </Badge>
           }
         />
 
