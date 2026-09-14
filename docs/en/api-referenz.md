@@ -802,6 +802,30 @@ Check whether an approval or human input is pending.
 }
 ```
 
+### `GET /api/v1/executions/{id}/live-log`
+
+Buffered live lines of a run for replay after a reload or late open (memory only, until 10 minutes after the run ends).
+Query: `afterSeq` (default `-1` = everything). Without a buffer `200` with `available: false`.
+
+**Response:**
+
+```json
+{
+  "runId": "run-uuid",
+  "bufferId": "buffer-uuid",
+  "available": true,
+  "firstSeq": 0,
+  "lastSeq": 2,
+  "skipped": 0,
+  "lines": [
+    { "seq": 1, "stepIndex": 0, "kind": "tool", "text": "Bash: mvn test", "ts": 1757844005000 },
+    { "seq": 2, "stepIndex": 0, "kind": "tool_result", "text": "↳ 1.2 KB", "ts": 1757844009000 }
+  ]
+}
+```
+
+`kind`: `line` (raw line), `text`, `tool`, `tool_result`, `tool_error`, `result`, `system`.
+
 ### `POST /api/v1/executions/{id}/todos/approve`
 
 Approve or reject auto-generated TODOs of a run.
@@ -3232,15 +3256,27 @@ Protocol: STOMP
 
 ### Message Format (Execution Logs)
 
+JSON objects distinguished by `type`. Step messages (placeholder at start and finished step) have no `type`:
+
+```json
+{ "stepIndex": 1, "status": "COMPLETED", "input": "...", "output": "...", "durationMs": 4200, "blockType": "shell", "blockName": "Build" }
+```
+
+Other types: `status`, `approval_required`/`approval_resolved`, `human_input_required`/`human_input_resolved`,
+`agentic_*`, `foreach_item_started`/`foreach_item_completed`, `container_starting`/`container_started`/`container_skipped`,
+`command` and `live_output` — output of running blocks, batched at most every 250 ms:
+
 ```json
 {
-  "timestamp": "2025-01-15T10:00:05Z",
-  "level": "INFO",
-  "message": "Executing step 1: Review code..."
+  "type": "live_output",
+  "runId": "run-uuid",
+  "bufferId": "buffer-uuid",
+  "lines": [{ "seq": 41, "stepIndex": 1, "kind": "line", "text": "[INFO] BUILD SUCCESS", "ts": 1757844005000 }],
+  "skipped": 0
 }
 ```
 
-Level: `INFO`, `WARN`, `ERROR`, `DEBUG`
+`seq` is gap-free per `bufferId`; gaps mean skipped lines. Replay: `GET /api/v1/executions/{id}/live-log`.
 
 ### Terminal WebSocket
 

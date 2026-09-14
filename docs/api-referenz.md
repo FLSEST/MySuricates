@@ -813,6 +813,30 @@ Prüfen ob ein Approval oder Human-Input ansteht.
 }
 ```
 
+### `GET /api/v1/executions/{id}/live-log`
+
+Gepufferte Live-Zeilen eines Laufs für das Replay nach Reload oder spätem Öffnen (nur im Speicher, bis 10 Minuten nach
+Laufende). Query: `afterSeq` (Default `-1` = alles). Ohne Puffer `200` mit `available: false`.
+
+**Response:**
+
+```json
+{
+  "runId": "run-uuid",
+  "bufferId": "buffer-uuid",
+  "available": true,
+  "firstSeq": 0,
+  "lastSeq": 2,
+  "skipped": 0,
+  "lines": [
+    { "seq": 1, "stepIndex": 0, "kind": "tool", "text": "Bash: mvn test", "ts": 1757844005000 },
+    { "seq": 2, "stepIndex": 0, "kind": "tool_result", "text": "↳ 1.2 KB", "ts": 1757844009000 }
+  ]
+}
+```
+
+`kind`: `line` (Rohzeile), `text`, `tool`, `tool_result`, `tool_error`, `result`, `system`.
+
 ### `POST /api/v1/executions/{id}/todos/approve`
 
 Auto-generierte TODOs eines Runs genehmigen oder ablehnen.
@@ -3246,15 +3270,27 @@ Protokoll: STOMP
 
 ### Nachrichtenformat (Execution-Logs)
 
+JSON-Objekte, unterschieden über `type`. Step-Nachrichten (Placeholder beim Start und fertiger Step) haben kein `type`:
+
+```json
+{ "stepIndex": 1, "status": "COMPLETED", "input": "...", "output": "...", "durationMs": 4200, "blockType": "shell", "blockName": "Build" }
+```
+
+Weitere Typen: `status`, `approval_required`/`approval_resolved`, `human_input_required`/`human_input_resolved`,
+`agentic_*`, `foreach_item_started`/`foreach_item_completed`, `container_starting`/`container_started`/`container_skipped`,
+`command` und `live_output` — Ausgabe laufender Blöcke, gebündelt höchstens alle 250 ms:
+
 ```json
 {
-  "timestamp": "2025-01-15T10:00:05Z",
-  "level": "INFO",
-  "message": "Executing step 1: Review code..."
+  "type": "live_output",
+  "runId": "run-uuid",
+  "bufferId": "buffer-uuid",
+  "lines": [{ "seq": 41, "stepIndex": 1, "kind": "line", "text": "[INFO] BUILD SUCCESS", "ts": 1757844005000 }],
+  "skipped": 0
 }
 ```
 
-Level: `INFO`, `WARN`, `ERROR`, `DEBUG`
+`seq` ist pro `bufferId` lückenlos; Lücken bedeuten übersprungene Zeilen. Nachladen: `GET /api/v1/executions/{id}/live-log`.
 
 ### Terminal-WebSocket
 

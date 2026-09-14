@@ -745,7 +745,27 @@ Response (DTO) → React Query Cache → UI Update
   - `/topic/wishes/{wishId}/status` — Wish status updates
   - `/topic/assistant/{requestId}/status` — Assistant chat status (per request)
   - `/topic/assistant/{sessionId}/events` — Assistant push events (per session)
-- **Message format:** `{ timestamp, level, message }`
+- **Messages on `/topic/executions/{runId}/logs`:** JSON objects distinguished by `type` —
+  step messages (no `type`: `stepIndex`, `status`, `input`, `output`, `durationMs`, `blockType`, `blockName`),
+  `status`, `approval_*`, `human_input_*`, `agentic_*`, `foreach_item_*`, `container_*`, `command` and `live_output`
+- **Live output of running blocks:** shell, container, pi and codex processes deliver their output line by line;
+  Claude `stream-json` is condensed into short lines (tool call, truncated text, tool result size, closing summary
+  with turns/cost/duration).
+  - **Mechanism:** for the duration of a step (including validation retries and nested blocks) `BlockStepRunner` binds a
+    sink via `ThreadLocal` (`service/live/LiveOutput`, deliberately not inheritable — sub-workflows stream into their own
+    run). The process runners read it on the calling thread and split the pipe into lines via `util/ProcessOutputTee`;
+    the collected step output stays byte-identical. Callers outside workflows (assistant, tagging, search) are unbound
+    and stream nothing.
+  - **Transport:** `RunLiveLogService` keeps a ring per run (default 1000 lines) and sends at most every 250 ms one batch
+    `{ type: "live_output", runId, bufferId, lines: [{ seq, stepIndex, kind, text, ts }], skipped }`; it flushes
+    synchronously before the final step message. `kind`: `line`, `text`, `tool`, `tool_result`, `tool_error`, `result`,
+    `system`. Line and character caps apply per batch (newest lines win, the rest counts as `skipped`).
+    `setPreservePublishOrder(true)` keeps the order per session.
+  - **Replay:** `GET /api/v1/executions/{id}/live-log?afterSeq=-1` returns the buffer; the frontend loads it on
+    (re)connect and de-duplicates by `bufferId` + `seq`. Buffers live in memory only and expire 10 minutes after the run
+    ends (also without a completion event, via the check against `WorkflowExecutionRegistry`), at most 20 runs.
+  - **Configuration:** `automation.live-log.*` (`enabled`, `max-line-length`, `buffer-lines`, `flush-interval-ms`,
+    `max-lines-per-flush`, `max-chars-per-flush`, `retention-minutes`, `max-buffered-runs`); read at startup only.
 - **Terminal WebSocket:** `/ws/terminal/**` for real-time container access (raw WebSocket via `RawWebSocketConfig`, handler: `TerminalWebSocketHandler`)
 
 ## Security

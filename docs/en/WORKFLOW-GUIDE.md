@@ -915,6 +915,17 @@ Shell blocks without `container_image` run on the host. Available tools:
 
 Anything else (pip packages, go, docker-cli, gh, trivy, specialized tools) is **NOT** available.
 
+### Live Output While Watching a Run
+
+While a block runs, its output appears line by line in the live logs of the execution page: shell and container blocks
+with stdout/stderr (merged), Claude blocks as tool calls, truncated text and a closing line, pi/codex as raw lines —
+also for blocks inside `foreach`/`while`/`retry` (under the index of the outer step). Notes:
+
+- Progress bars using `\r` only show their latest state; very long lines are truncated.
+- Programs that buffer their output (e.g. `python3` without `-u`) only show up when they flush — use `python3 -u` or
+  `PYTHONUNBUFFERED=1` for live output.
+- The step output (`{{ block.<name>.output }}`, step card) is unaffected and still contains the complete output.
+
 ### Container Images
 
 For shell blocks that need more tools, set `container_image`:

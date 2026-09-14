@@ -195,7 +195,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 | Komponente | Beschreibung |
 |---|---|
 | `StatusBadge` | Mappt Status-Strings auf Badge-Varianten |
-| `LogViewer` | Log-Anzeige mit Level-Farben und Auto-Scroll |
+| `LogViewer` | Log-Anzeige im Terminal-Look: Level-Farben, Icons pro Live-Zeilenart, Step-Badge, Auto-Scroll nur solange man am Ende ist (sonst „Zu den neuesten Zeilen“) |
 | `MonacoEditor` | JSON-Editor (Monaco, Dark Theme) |
 | `ErrorState` | Fehlermeldung mit Icon |
 | `EmptyState` | Leerer Zustand mit Beschreibung |
@@ -616,8 +616,8 @@ Generischer Hook für persistierten State via `localStorage`.
 ### `useWebSocket.ts`
 
 ```typescript
-useExecutionWebSocket(runId: string | null, workflowId?: string) → {
-  logs: Array<{ timestamp, level, message }>,
+useExecutionWebSocket(runId: string | null, workflowId?: string, options?: { liveOutput?: boolean }) → {
+  logs: ExecutionLogEntry[],   // { id, timestamp, level, message, kind?, stepIndex?, stepLabel?, skipped? }
   connected: boolean,
   clearLogs: () => void,
   pendingApproval: PendingApproval | null,
@@ -627,7 +627,7 @@ useExecutionWebSocket(runId: string | null, workflowId?: string) → {
 }
 ```
 
-Verbindet sich über SockJS/STOMP mit dem Backend und empfängt Live-Logs, Approval-Prompts, Human-Input-Prompts, Agentic-States und ForEach-States.
+Verbindet sich über SockJS/STOMP mit dem Backend und empfängt Live-Logs, Approval-Prompts, Human-Input-Prompts, Agentic-States und ForEach-States. Mit `liveOutput` (Default `true`) kommen `live_output`-Batches dazu; beim (Re-)Connect lädt der Hook den Puffer über `GET /executions/{id}/live-log` nach und dedupliziert über `bufferId` + `seq` (Lücken werden als Marker angezeigt). Die Abbildung Nachricht → Eintrag liegt rein funktional in `hooks/executionLogEntries.ts`.
 
 ### `useToast.ts`
 

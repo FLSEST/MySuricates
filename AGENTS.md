@@ -273,6 +273,7 @@ Headers: X-API-Key: <key>
 | Wiederholen | `POST /api/v1/executions/{id}/retry` |
 | Genehmigen | `POST /api/v1/executions/{id}/approve` — Body: `{"answer": "Yes"}` |
 | Genehmigung prüfen | `GET /api/v1/executions/{id}/approval` |
+| Live-Output nachladen | `GET /api/v1/executions/{id}/live-log?afterSeq=-1` — gepufferte Zeilen laufender/kürzlich beendeter Runs |
 
 ### 8. Workflow-Versionen
 
