@@ -52,6 +52,25 @@ check "exit 2"                              '[ "$RC" -eq 2 ]'
 check "meldet fehlende Regeldatei"          'grep -q "hygiene-rules.sh" <<<"$OUT"'
 check "meldet kein OK"                      '! grep -q "Public-Hygiene-Gate OK" <<<"$OUT"'
 
+echo "5) Symlink mit absolutem Ziel wird beim Commit abgelehnt"
+make_repo "$TMP/links"
+( cd "$TMP/links" && ln -s /etc/hostname bad-link && git add bad-link )
+OUT=$(cd "$TMP/links" && $GIT commit -q -m link 2>&1); RC=$?
+check "commit mit absolutem Symlink abgelehnt" '[ "$RC" -ne 0 ]'
+check "Gate nennt den Symlink"                 'grep -q "bad-link.*Symlink zeigt aus dem Repository hinaus" <<<"$OUT"'
+
+echo "6) Relativer Symlink innerhalb des Repos ist erlaubt"
+( cd "$TMP/links" && git reset -q && rm -f bad-link && mkdir -p sub target-dir && ln -s ../target-dir sub/ok-link && git add sub/ok-link )
+OUT=$(cd "$TMP/links" && $GIT commit -q -m oklink 2>&1); RC=$?
+check "commit mit relativem Symlink erlaubt"   '[ "$RC" -eq 0 ]'
+
+echo "7) Relativer Symlink, der aus dem Repo hinausfuehrt, faellt im Bestand auf"
+( cd "$TMP/links" && ln -s ../../outside escape-link && git add escape-link && $GIT commit -q --no-verify -m escape )
+OUT=$(cd "$TMP/links" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "--tracked meldet Verstoss (exit 1)"     '[ "$RC" -eq 1 ]'
+check "Gate nennt escape-link"                 'grep -q "escape-link" <<<"$OUT"'
+check "sub/ok-link bleibt unbeanstandet"       '! grep -q "ok-link" <<<"$OUT"'
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

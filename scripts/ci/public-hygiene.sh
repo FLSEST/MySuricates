@@ -235,6 +235,56 @@ check_gitignore_leaks() {
 }
 
 # ---------------------------------------------------------------------------
+# Check 7 — Symlinks, die aus dem Repository hinausfuehren
+#
+# git grep liest keine Symlink-Blobs; ein getrackter Link mit absolutem Ziel
+# (z. B. unter dem Entwickler-Home) rutscht an Check 2 vorbei. Ausserdem zeigt
+# so ein Link in jedem Clone, Worktree und Run-Snapshot auf den Original-
+# Checkout statt in den eigenen Baum. Erlaubt sind nur relative Ziele, die
+# innerhalb des Repositories bleiben.
+# Ausgabe: LINK<TAB>pfad<TAB>ziel — je Verstoss eine Zeile.
+# ---------------------------------------------------------------------------
+check_symlinks() {
+  python3 - "$MODE" <<'PY'
+import subprocess, sys, posixpath
+mode = sys.argv[1]
+links = []  # (pfad, blob-referenz)
+if mode == "staged":
+    raw = subprocess.run(['git', 'diff', '--cached', '--raw', '--diff-filter=AM', '-z'],
+                         capture_output=True, text=True).stdout
+    fields = raw.split('\0')
+    i = 0
+    while i + 1 < len(fields) and fields[i]:
+        meta, path = fields[i], fields[i + 1]
+        i += 2
+        parts = meta.lstrip(':').split()
+        if len(parts) >= 2 and parts[1] == '120000':
+            links.append((path, ':' + path))
+else:
+    ls = subprocess.run(['git', 'ls-files', '-s', '-z'], capture_output=True, text=True).stdout
+    for entry in ls.split('\0'):
+        meta, _, path = entry.partition('\t')
+        parts = meta.split()
+        if len(parts) >= 2 and parts[0] == '120000':
+            links.append((path, parts[1]))
+for path, ref in links:
+    target = subprocess.run(['git', 'cat-file', '-p', ref], capture_output=True, text=True).stdout
+    resolved = posixpath.normpath(posixpath.join(posixpath.dirname(path), target))
+    if target.startswith('/') or resolved == '..' or resolved.startswith('../'):
+        print(f"LINK\t{path}\t{target}")
+PY
+}
+
+# Verstoesse aus check_symlinks als Fehler melden.
+report_symlinks() {
+  local kind path target
+  while IFS=$'\t' read -r kind path target; do
+    [ "${kind:-}" = "LINK" ] || continue
+    annotate "$path" 1 "Symlink zeigt aus dem Repository hinaus: '${target}' — nur relative Ziele innerhalb des Repos"
+  done < <(check_symlinks)
+}
+
+# ---------------------------------------------------------------------------
 # Lauf
 # ---------------------------------------------------------------------------
 echo "Public-Hygiene-Gate (${MODE})"
@@ -242,6 +292,7 @@ echo "Public-Hygiene-Gate (${MODE})"
 if [ "$MODE" = "staged" ]; then
   check_staged_files
   check_patterns_staged
+  report_symlinks
 else
   check_tracked_but_ignored
   check_patterns_tracked
@@ -254,6 +305,7 @@ else
     esac
   done < <(check_weight)
   check_gitignore_leaks
+  report_symlinks
   [ "$MODE" = "worktree" ] && check_worktree_strays
 fi
 

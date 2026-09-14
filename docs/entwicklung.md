@@ -458,6 +458,12 @@ Geprueft wird:
    Veroeffentlichung mit — auch ihre Kommentare. Nennt sie einen Namen, der in `.git/info/exclude`
    steht, ist das ein Verstoss. In der CI gibt es die exclude-Datei nicht, dort faellt die Pruefung
    still aus.
+7. **Symlinks, die aus dem Repository hinausfuehren.** Getrackte (bzw. gestagte) Links mit absolutem
+   Ziel oder mit einem relativen Ziel oberhalb der Repo-Wurzel sind ein Fehler. `git grep` liest keine
+   Symlink-Blobs, deshalb faengt Check 2 einen Entwickler-Pfad im Linkziel nicht; ausserdem zeigt so ein
+   Link in jedem Clone, Worktree und Run-Snapshot auf den Original-Checkout statt in den eigenen Baum.
+   Beispiel: `ai-automation-backend/workflow-pool` muss auf `../workflow-pool` zeigen, weil das Backend
+   mit cwd `ai-automation-backend/` laeuft und den Pool relativ aufloest.
 
 Den Hook installiert `scripts/install-hooks.sh` ueber `core.hooksPath` (laeuft in `setup.sh` mit).
 
