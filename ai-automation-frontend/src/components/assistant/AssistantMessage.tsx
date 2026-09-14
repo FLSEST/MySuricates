@@ -145,7 +145,7 @@ function PendingToolCard({ tool, sessionId, existingResult }: {
             onClick={runConfirm}
             disabled={pending}
             className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium
-                       bg-accent text-white hover:bg-accent-hover transition-colors disabled:opacity-60"
+                       bg-accent text-text-inverse hover:bg-accent-hover transition-colors disabled:opacity-60"
           >
             {confirm.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
             {confirm.isPending ? t.assistant.pendingToolExecuting : t.assistant.pendingToolConfirm}
@@ -238,7 +238,7 @@ export function MessageBubble({ msg, sessionId, onClose, onSend, onExecute, onRe
         {/* Bubble */}
         <div className={`relative px-3 py-2 rounded-2xl text-sm leading-relaxed
                          ${isUser
-                           ? 'bg-accent text-white rounded-tr-sm whitespace-pre-wrap'
+                           ? 'bg-accent text-text-inverse rounded-tr-sm whitespace-pre-wrap'
                            : msg.isError
                              ? 'bg-[var(--color-assistant-raised)] border border-danger/50 text-text rounded-tl-sm'
                              : 'bg-[var(--color-assistant-raised)] border border-[var(--color-assistant-border)] text-text rounded-tl-sm'

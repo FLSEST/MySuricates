@@ -124,7 +124,7 @@ export function Schedules() {
             {(chainsModule ? (['ALL', 'WORKFLOW', 'CHAIN'] as const) : (['ALL', 'WORKFLOW'] as const)).map(v => (
               <button key={v} onClick={() => filters.setTargetTypeFilter(v)}
                 className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                  filters.targetTypeFilter === v ? 'bg-accent text-white' : 'text-text-secondary hover:text-text hover:bg-surface-raised'
+                  filters.targetTypeFilter === v ? 'bg-accent text-text-inverse' : 'text-text-secondary hover:text-text hover:bg-surface-raised'
                 }`}>
                 {v === 'ALL' ? t.common.all : v === 'WORKFLOW' ? 'Workflow' : 'Chain'}
               </button>

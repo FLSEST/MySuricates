@@ -76,7 +76,7 @@ export function CollectForm({ state, onChange, onSubmit, onCancel, loading, t }:
         <button
           type="submit"
           disabled={loading}
-          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-accent rounded-md hover:bg-accent/90 disabled:opacity-50"
+          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-text-inverse bg-accent rounded-md hover:bg-accent/90 disabled:opacity-50"
         >
           <Play className="w-3.5 h-3.5" />
           {t.commandPalette.collectStart}

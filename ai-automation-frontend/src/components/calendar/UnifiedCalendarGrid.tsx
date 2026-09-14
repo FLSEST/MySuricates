@@ -195,7 +195,7 @@ export function UnifiedCalendarGrid() {
                 className={`
                   inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors
                   ${viewMode === mode
-                    ? 'bg-accent text-white'
+                    ? 'bg-accent text-text-inverse'
                     : 'text-text-secondary hover:bg-surface-hover'
                   }
                 `}
@@ -342,7 +342,7 @@ function MonthGrid({
                 <>
                   <span className={`
                     text-sm font-medium inline-flex items-center justify-center w-6 h-6 rounded-full
-                    ${isToday ? 'bg-accent text-white' : 'text-text'}
+                    ${isToday ? 'bg-accent text-text-inverse' : 'text-text'}
                   `}>
                     {day}
                   </span>

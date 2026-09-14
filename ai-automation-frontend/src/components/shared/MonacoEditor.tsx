@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
-import { useThemeStore } from '../../stores/themeStore';
+import { useThemeAppearance } from '../../stores/themeStore';
 
 interface MonacoEditorProps {
   value: string;
@@ -43,7 +43,7 @@ export function MonacoEditor({
   revealText,
   revealNonce = 0,
 }: MonacoEditorProps) {
-  const mode = useThemeStore((s) => s.mode);
+  const appearance = useThemeAppearance();
   const editorRef = useRef<MonacoEditorInstance | null>(null);
 
   const doReveal = () => {
@@ -88,7 +88,7 @@ export function MonacoEditor({
       <Editor
         height={height}
         language={language}
-        theme={mode === 'dark' ? 'vs-dark' : 'light'}
+        theme={appearance === 'dark' ? 'vs-dark' : 'light'}
         value={value}
         onChange={(val) => onChange?.(val ?? '')}
         onMount={handleMount}

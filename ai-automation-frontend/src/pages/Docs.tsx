@@ -37,7 +37,7 @@ export function Docs() {
               onClick={() => setLang('de')}
               className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
                 lang === 'de'
-                  ? 'bg-accent text-white'
+                  ? 'bg-accent text-text-inverse'
                   : 'text-text-secondary hover:text-text hover:bg-surface-raised'
               }`}
             >
@@ -47,7 +47,7 @@ export function Docs() {
               onClick={() => setLang('en')}
               className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
                 lang === 'en'
-                  ? 'bg-accent text-white'
+                  ? 'bg-accent text-text-inverse'
                   : 'text-text-secondary hover:text-text hover:bg-surface-raised'
               }`}
             >

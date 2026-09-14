@@ -85,7 +85,7 @@ export function TemplateSelector({ onSelect, onPoolSelect }: TemplateSelectorPro
                 onClick={() => setSelectedCategory(null)}
                 className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
                   !selectedCategory
-                    ? 'bg-accent text-white'
+                    ? 'bg-accent text-text-inverse'
                     : 'bg-surface-raised text-text-secondary hover:text-text'
                 }`}
               >
@@ -97,7 +97,7 @@ export function TemplateSelector({ onSelect, onPoolSelect }: TemplateSelectorPro
                   onClick={() => setSelectedCategory(selectedCategory === cat ? null : cat)}
                   className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
                     selectedCategory === cat
-                      ? 'bg-accent text-white'
+                      ? 'bg-accent text-text-inverse'
                       : 'bg-surface-raised text-text-secondary hover:text-text'
                   }`}
                 >

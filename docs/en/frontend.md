@@ -162,7 +162,7 @@ The switching is handled by route wrapper components (e.g. `DashboardRoute`, `Wo
 ### Settings (`/settings`)
 
 - General: Language (EN/DE), Advanced Mode
-- Appearance: Theme toggle (light/dark), color selection
+- Appearance (own collapsible section): theme picker (18 themes based on well-known palettes, grouped dark/light), custom colors per theme
 - Security: API key input (masked)
 - Remote access: Tailscale status + enable/disable
 - Execution: Claude concurrency, reserved-for-interactive, timeouts
@@ -284,7 +284,8 @@ The theme is controlled via CSS custom properties (`src/theme/tokens.ts` for JS 
 
 No `tailwind.config.js` — configuration is done via `@theme inline` and `@custom-variant` directly in `src/index.css` (Tailwind CSS v4).
 
-- **Dark Mode:** `class`-based via `@custom-variant dark (&:is(.dark *))` (toggled via Zustand store)
+- **Themes:** colors are CSS variables (`src/theme/tokens.ts`); the values per theme live in the registry `src/theme/themes.ts` (`{ id, name, appearance, tokens }`). `themes.test.ts` checks the WCAG contrast of every theme (text, accent/status colors as text, `text-inverse` on `bg-accent`) — new themes must pass it. On `bg-accent` always use `text-text-inverse`, not `text-white`.
+- **Dark Mode:** `class`-based via `@custom-variant dark (&:is(.dark *))`; the `.dark` class follows the active theme's `appearance` (as do Monaco and xterm via `useThemeAppearance()`)
 - **Plugin:** `@tailwindcss/typography` via `@plugin`
 - **Fonts:**
   - Sans: Plus Jakarta Sans (system-UI fallback)
@@ -309,7 +310,7 @@ No `tailwind.config.js` — configuration is done via `@theme inline` and `@cust
 | Store | State | Persistence |
 |---|---|---|
 | `useSidebarStore` | `collapsed`, `mobileOpen`, `toggle()`, `setCollapsed()`, `setMobileOpen()` | `localStorage: sidebar-state` (only `collapsed`) |
-| `useThemeStore` | `mode: 'light'\|'dark'`, `overrides`, `setMode()`, `toggleMode()`, `setOverride()`, `resetOverrides()`, `apply()` | `localStorage: theme-settings` |
+| `useThemeStore` | `themeId`, `lastLightThemeId`, `lastDarkThemeId`, `overrides` (per theme id), `setTheme()`, `toggleAppearance()`, `setOverride()`, `resetOverrides()`, `apply()` | `localStorage: theme-settings` (version 1; migrates the old `mode` format) |
 | `useSettingsStore` | `apiKey`, `advancedMode`, `simpleMode`, `autoTodoDefault`, `autoRepairDefault`, `autoRepairMode`, `defaultAiProvider`, `assistantModel`, `suggestionsModel`, `suggestionsEnabled`, `sidebarItemOrder`, `sidebarHiddenItems`, `pinnedWorkflowIds`, `simpleOnboardingSeen` | `localStorage: app-settings` |
 | `useAssistantStore` | `open`, `sessions[]`, `activeSessionId`, `showHistory`, `panelWidth`, `panelHeight`, `pendingInput`, `pendingContext` | `localStorage: assistant-sessions` (sessions, panel size) |
 | `useI18nStore` | `locale: 'en'\|'de'`, `setLocale()` | `localStorage: i18n-locale` |

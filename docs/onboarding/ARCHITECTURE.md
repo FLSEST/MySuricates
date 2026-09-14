@@ -119,7 +119,7 @@ App.tsx (Router)
 
 **Zustand Stores:**
 - `settingsStore` — API-Key, Advanced Mode (persistiert in localStorage)
-- `themeStore` — Dark/Light Mode, System-Farben
+- `themeStore` — aktives Theme (Registry `theme/themes.ts`), eigene Farben pro Theme
 - `sidebarStore` — Sidebar offen/geschlossen
 - `toastStore` — Benachrichtigungs-Queue
 

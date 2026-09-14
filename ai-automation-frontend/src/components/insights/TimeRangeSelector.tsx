@@ -19,7 +19,7 @@ export function TimeRangeSelector({ value, onChange }: TimeRangeSelectorProps) {
           onClick={() => onChange(d)}
           className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
             value === d
-              ? 'bg-accent text-white'
+              ? 'bg-accent text-text-inverse'
               : 'text-text-secondary hover:text-text hover:bg-surface-raised'
           }`}
         >

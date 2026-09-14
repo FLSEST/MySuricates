@@ -111,7 +111,7 @@ export function SimpleHome() {
             <button
               type="submit"
               aria-label={t.simple.home.assistantLabel}
-              className="w-8 h-8 rounded-lg bg-accent text-white flex items-center justify-center shrink-0 hover:opacity-90 transition-opacity"
+              className="w-8 h-8 rounded-lg bg-accent text-text-inverse flex items-center justify-center shrink-0 hover:opacity-90 transition-opacity"
             >
               <ArrowUp className="w-4 h-4" />
             </button>

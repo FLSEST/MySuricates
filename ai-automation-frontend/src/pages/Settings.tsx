@@ -57,6 +57,7 @@ export function Settings() {
 
   const sections: NavSection[] = [
     { id: 'general', label: t.settings.settingsNavGeneral, visible: true },
+    { id: 'appearance', label: t.settings.appearance, visible: true },
     { id: 'execution', label: t.settings.settingsNavExecution, visible: !simpleMode },
     { id: 'infrastructure', label: t.settings.settingsNavInfrastructure, visible: !simpleMode },
     { id: 'environments', label: t.settings.settingsNavEnvironments, visible: advancedMode && stagingModule },
@@ -77,8 +78,11 @@ export function Settings() {
         <div className="flex-1 min-w-0 space-y-10">
           <SettingsSection id="general" title={t.settings.settingsNavGeneral}>
             <GeneralSettingsCard />
-            <AppearanceCard />
             <SecurityCard />
+          </SettingsSection>
+
+          <SettingsSection id="appearance" title={t.settings.appearance} collapsible open={!!openSections['appearance']} onToggle={() => toggleSection('appearance')}>
+            <AppearanceCard />
           </SettingsSection>
 
           {!simpleMode && (

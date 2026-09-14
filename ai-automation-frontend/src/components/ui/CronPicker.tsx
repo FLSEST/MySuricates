@@ -125,7 +125,7 @@ export function CronPicker({ value, onChange, label }: CronPickerProps) {
             onClick={() => updateState({ frequency: key })}
             className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
               state.frequency === key
-                ? 'bg-accent text-white'
+                ? 'bg-accent text-text-inverse'
                 : 'bg-surface text-text-secondary hover:bg-surface-raised'
             }`}
           >
@@ -179,7 +179,7 @@ export function CronPicker({ value, onChange, label }: CronPickerProps) {
                       onClick={() => toggleWeekday(cronValue)}
                       className={`w-10 h-10 rounded-lg text-xs font-medium transition-colors ${
                         isSelected
-                          ? 'bg-accent text-white'
+                          ? 'bg-accent text-text-inverse'
                           : 'bg-surface border border-border text-text-secondary hover:bg-surface-raised'
                       }`}
                     >

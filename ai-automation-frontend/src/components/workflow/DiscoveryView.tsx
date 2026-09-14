@@ -179,7 +179,7 @@ function CategoryChip({ label, active, onClick, count }: CategoryChipProps) {
       onClick={onClick}
       className={`text-xs px-2.5 py-1 rounded-full transition-colors ${
         active
-          ? 'bg-accent text-white'
+          ? 'bg-accent text-text-inverse'
           : 'bg-surface-raised text-text-secondary hover:bg-surface-raised/70'
       }`}
     >

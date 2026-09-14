@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Moon, Sun, Globe, Menu, Sparkles, Search } from 'lucide-react';
-import { useThemeStore } from '../../stores/themeStore';
+import { useThemeStore, useThemeAppearance } from '../../stores/themeStore';
 import { useI18nStore, type Locale } from '../../i18n';
 import { useT } from '../../i18n';
 import { useSidebarStore } from '../../stores/sidebarStore';
@@ -105,7 +105,8 @@ function SuggestionButton() {
 
 export function Header() {
   const t = useT();
-  const { mode, toggleMode } = useThemeStore();
+  const appearance = useThemeAppearance();
+  const toggleAppearance = useThemeStore((s) => s.toggleAppearance);
   const { locale, setLocale } = useI18nStore();
   const setMobileOpen = useSidebarStore((s) => s.setMobileOpen);
   const isMobile = useIsMobile();
@@ -146,12 +147,12 @@ export function Header() {
 
         {/* Theme toggle */}
         <button
-          onClick={toggleMode}
+          onClick={toggleAppearance}
           className="p-2 rounded-lg text-text-secondary hover:text-text hover:bg-surface-raised transition-colors"
-          title={mode === 'dark' ? t.settings.switchToLight : t.settings.switchToDark}
-          aria-label={mode === 'dark' ? t.settings.switchToLight : t.settings.switchToDark}
+          title={appearance === 'dark' ? t.settings.switchToLight : t.settings.switchToDark}
+          aria-label={appearance === 'dark' ? t.settings.switchToLight : t.settings.switchToDark}
         >
-          {mode === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          {appearance === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
       </div>
     </header>

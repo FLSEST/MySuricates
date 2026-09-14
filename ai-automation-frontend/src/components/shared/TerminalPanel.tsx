@@ -4,7 +4,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
-import { useThemeStore } from '../../stores/themeStore';
+import { useThemeAppearance } from '../../stores/themeStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useT } from '../../i18n';
 import { RefreshCw } from 'lucide-react';
@@ -66,7 +66,7 @@ interface TerminalPanelProps {
 
 export function TerminalPanel({ runId }: TerminalPanelProps) {
   const t = useT();
-  const mode = useThemeStore((s) => s.mode);
+  const appearance = useThemeAppearance();
   const terminalRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -118,7 +118,7 @@ export function TerminalPanel({ runId }: TerminalPanelProps) {
       fontSize: 14,
       fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, monospace",
       // theme is applied by the theme effect below (runs right after this one on mount, and on
-      // every mode change) so the terminal is not re-created when the theme switches
+      // every appearance change) so the terminal is not re-created when the theme switches
       scrollback: 5000,
       convertEol: true,
     });
@@ -169,9 +169,9 @@ export function TerminalPanel({ runId }: TerminalPanelProps) {
   // Update theme when it changes
   useEffect(() => {
     if (termRef.current) {
-      termRef.current.options.theme = mode === 'dark' ? DARK_THEME : LIGHT_THEME;
+      termRef.current.options.theme = appearance === 'dark' ? DARK_THEME : LIGHT_THEME;
     }
-  }, [mode]);
+  }, [appearance]);
 
   const handleReconnect = () => {
     wsRef.current?.close();

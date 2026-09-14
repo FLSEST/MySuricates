@@ -162,7 +162,7 @@ export function CalendarView() {
                   <>
                     <span className={`
                       text-sm font-medium inline-flex items-center justify-center w-6 h-6 rounded-full
-                      ${isToday ? 'bg-accent text-white' : 'text-text'}
+                      ${isToday ? 'bg-accent text-text-inverse' : 'text-text'}
                     `}>
                       {day}
                     </span>

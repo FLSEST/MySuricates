@@ -277,7 +277,7 @@ export function AssistantPanel() {
                     flex items-center justify-center transition-all duration-200
                     ${open
                       ? 'bg-[var(--color-assistant-raised)] border border-[var(--color-assistant-border)] text-text-secondary'
-                      : 'bg-accent text-white hover:scale-110 hover:shadow-accent/30 hover:shadow-xl'
+                      : 'bg-accent text-text-inverse hover:scale-110 hover:shadow-accent/30 hover:shadow-xl'
                     }`}
       >
         {open
@@ -452,7 +452,7 @@ export function AssistantPanel() {
                 <button
                   onClick={handleSend}
                   disabled={!input.trim()}
-                  className="shrink-0 w-7 h-7 rounded-lg bg-accent text-white flex items-center justify-center
+                  className="shrink-0 w-7 h-7 rounded-lg bg-accent text-text-inverse flex items-center justify-center
                              disabled:opacity-40 hover:bg-accent-hover transition-colors"
                 >
                   <Send className="w-3.5 h-3.5" />

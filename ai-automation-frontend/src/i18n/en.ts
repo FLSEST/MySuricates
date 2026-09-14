@@ -944,6 +944,7 @@ export const en = {
     syncDiffDescription: 'description',
     language: 'Language',
     colors: 'Custom Colors',
+    colorsHint: 'Applies to the active theme only.',
     accentColor: 'Accent Color',
     tailscale: 'Tailscale',
     tailscaleEnable: 'Enable Remote Access',

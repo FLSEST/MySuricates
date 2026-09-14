@@ -64,7 +64,7 @@ export function DeadLetterQueue() {
             onClick={() => { setStatusFilter(s); setPage(0); }}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               statusFilter === s
-                ? 'bg-accent text-white'
+                ? 'bg-accent text-text-inverse'
                 : 'bg-surface-raised text-text-secondary hover:bg-surface'
             }`}
           >

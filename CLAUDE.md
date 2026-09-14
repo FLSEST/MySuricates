@@ -226,7 +226,7 @@ See [AGENTS.md](AGENTS.md) for a complete REST API reference (workflow/chain CRU
 - **Frontend state**: Zustand for client state (settings, theme, sidebar), TanStack Query for server state
 - **API client**: Singleton `api` instance in `src/api/client.ts` — all hooks use this. `apiErrorMessage(err, fallback)` extracts the error message from API responses for toast display — use this in all `onError` handlers instead of generic i18n strings
 - **i18n**: German (`de.ts`) and English (`en.ts`), both must be updated together
-- **Styling**: TailwindCSS utility classes, dark mode support via theme store
+- **Styling**: TailwindCSS utility classes — prefer the color tokens (`bg-surface`, `text-accent`, `text-danger`, …) over fixed Tailwind palette classes so themes apply. Themes live in `src/theme/themes.ts` (contrast-checked by `themes.test.ts`); on `bg-accent` use `text-text-inverse`, not `text-white`
 - **PWA**: Vite PWA plugin configured, app name "MySuricates"
 - **WebSocket**: Backend sends real-time updates via `/ws`, frontend connects via `useWebSocket` hook
 

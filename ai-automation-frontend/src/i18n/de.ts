@@ -895,6 +895,7 @@ export const de: TranslationKeys = {
     themeDark: 'Dunkel',
     language: 'Sprache',
     colors: 'Eigene Farben',
+    colorsHint: 'Gilt nur für das aktive Theme.',
     accentColor: 'Akzentfarbe',
     tailscale: 'Tailscale',
     tailscaleEnable: 'Fernzugriff aktivieren',
