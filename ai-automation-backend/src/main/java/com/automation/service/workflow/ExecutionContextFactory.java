@@ -2,6 +2,8 @@ package com.automation.service.workflow;
 
 import com.automation.entity.Project;
 import com.automation.entity.Skill;
+import com.automation.entity.TriggerSource;
+import com.automation.entity.WorkflowRun;
 import com.automation.executor.ExecutionContext;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.cli.CommandExecutorService;
@@ -44,7 +46,8 @@ public class ExecutionContextFactory {
     /** Everything executeBlocks knows before the loop starts. */
     public record ContextSeed(String runId, String workflowId, String workflowName, Project project,
                               String containerId, Map<String, Object> inputContext, String instructions,
-                              String model, String provider, String effort, String resumePreviousOutput) {}
+                              String model, String provider, String effort, String resumePreviousOutput,
+                              String definitionHash, TriggerSource triggerSource) {}
 
     public ExecutionContext create(ContextSeed seed) {
         String runId = seed.runId();
@@ -109,14 +112,22 @@ public class ExecutionContextFactory {
         context.setVariable("home_dir", System.getProperty("user.home", ""));
         context.setVariable("user", System.getProperty("user.name", ""));
 
+        // Provenance: which definition runs and what started it (empty when provenance is off / unknown)
+        context.setVariable("workflow_definition_hash", seed.definitionHash() != null ? seed.definitionHash() : "");
+        context.setVariable("trigger_source", seed.triggerSource() != null ? seed.triggerSource().name() : "");
+
         // Inject workflow version info for delta-based quality workflows
         int versionCount = workflowVersionService.getVersionCount(workflowId);
         context.setVariable("workflow_version", String.valueOf(versionCount > 0 ? versionCount : 0));
         try {
             var latestVersion = workflowVersionService.findLatest(workflowId);
-            if (latestVersion.isPresent()) {
-                var lastSuccessfulRun = runRepository
-                        .findTopByWorkflowIdAndStatusOrderByStartedAtDesc(workflowId, com.automation.entity.RunStatus.COMPLETED);
+            var lastSuccessfulRun = runRepository
+                    .findTopByWorkflowIdAndStatusOrderByStartedAtDesc(workflowId, com.automation.entity.RunStatus.COMPLETED);
+            String lastHash = lastSuccessfulRun.map(WorkflowRun::getDefinitionHash).orElse(null);
+            if (seed.definitionHash() != null && lastHash != null) {
+                // Exact: compare what ran last time with what runs now
+                context.setVariable("workflow_changed_since_last_run", String.valueOf(!seed.definitionHash().equals(lastHash)));
+            } else if (latestVersion.isPresent()) {
                 boolean changedSinceLastRun = lastSuccessfulRun
                         .map(r -> r.getCompletedAt() != null && latestVersion.get().getCreatedAt().isAfter(r.getCompletedAt()))
                         .orElse(true);

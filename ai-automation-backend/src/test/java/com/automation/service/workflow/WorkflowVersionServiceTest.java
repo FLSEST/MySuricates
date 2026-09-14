@@ -38,7 +38,7 @@ class WorkflowVersionServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new WorkflowVersionService(versionRepository, objectMapper);
+        service = new WorkflowVersionService(versionRepository, objectMapper, new WorkflowDefinitionHasher());
     }
 
     @Nested
@@ -194,7 +194,7 @@ class WorkflowVersionServiceTest {
         void serializationFailure_swallowedButReturnsVersion() throws Exception {
             ObjectMapper failingMapper = mock(ObjectMapper.class);
             when(failingMapper.writeValueAsString(any())).thenThrow(new JsonProcessingException("boom") {});
-            WorkflowVersionService failingService = new WorkflowVersionService(versionRepository, failingMapper);
+            WorkflowVersionService failingService = new WorkflowVersionService(versionRepository, failingMapper, new WorkflowDefinitionHasher());
 
             Workflow workflow = Workflow.builder().id("wf-1")
                     .blocks(List.of()).instructions("old").build();

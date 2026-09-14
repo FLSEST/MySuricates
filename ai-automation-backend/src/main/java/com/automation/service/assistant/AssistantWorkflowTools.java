@@ -3,6 +3,7 @@ package com.automation.service.assistant;
 import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.dto.request.UpdateWorkflowRequest;
 import com.automation.entity.BlockDefinition;
+import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.service.workflow.WorkflowExecutor;
@@ -138,7 +139,7 @@ public class AssistantWorkflowTools {
                     ? objectMapper.convertValue(params.get("context"), new TypeReference<Map<String, Object>>() {})
                     : Map.of();
 
-            WorkflowRun run = workflowExecutor.execute(workflow, context);
+            WorkflowRun run = workflowExecutor.execute(workflow, context, TriggerSource.ASSISTANT);
             String shortId = run.getId().substring(0, Math.min(8, run.getId().length()));
             return "✓ Workflow started: \"" + workflow.getName() + "\" (Run ID: " + shortId + "…)";
         } catch (Exception e) {

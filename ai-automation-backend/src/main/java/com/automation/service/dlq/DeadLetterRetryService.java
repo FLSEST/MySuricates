@@ -1,6 +1,7 @@
 package com.automation.service.dlq;
 
 import com.automation.entity.DeadLetterEntry;
+import com.automation.entity.TriggerSource;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.workflow.WorkflowExecutor;
@@ -26,7 +27,7 @@ public class DeadLetterRetryService {
         if (entry.getWorkflowId() != null && entry.getWorkflowRunId() != null) {
             workflowRepository.findById(entry.getWorkflowId()).ifPresent(workflow ->
                     runRepository.findById(entry.getWorkflowRunId()).ifPresent(originalRun ->
-                            workflowExecutor.execute(workflow, originalRun.getInputContext())));
+                            workflowExecutor.execute(workflow, originalRun.getInputContext(), TriggerSource.RETRY)));
         }
         return dlqService.markRetried(entryId);
     }

@@ -41,6 +41,10 @@ public class WorkflowVersion {
     @Column(name = "change_message")
     private String changeMessage;
 
+    /** SHA-256 of {@link #snapshot} in canonical form (see WorkflowDefinitionHasher). */
+    @Column(name = "definition_hash")
+    private String definitionHash;
+
     @Column(name = "created_at", nullable = false)
     @Builder.Default
     private Instant createdAt = Instant.now();

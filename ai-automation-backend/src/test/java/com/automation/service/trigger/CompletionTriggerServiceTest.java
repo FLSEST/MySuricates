@@ -3,6 +3,7 @@ package com.automation.service.trigger;
 import com.automation.dto.request.CreateCompletionTriggerRequest;
 import com.automation.entity.CompletionTrigger;
 import com.automation.entity.RunStatus;
+import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
 import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.exception.ResourceNotFoundException;
@@ -164,7 +165,7 @@ class CompletionTriggerServiceTest {
 
         service.onWorkflowRunCompleted(event);
 
-        verify(workflowExecutor).execute(eq(targetWf), any());
+        verify(workflowExecutor).execute(eq(targetWf), any(), eq(TriggerSource.COMPLETION_TRIGGER));
     }
 
     @Test
@@ -180,7 +181,7 @@ class CompletionTriggerServiceTest {
 
         service.onWorkflowRunCompleted(event);
 
-        verify(workflowExecutor, never()).execute(any(), any());
+        verify(workflowExecutor, never()).execute(any(), any(), eq(TriggerSource.COMPLETION_TRIGGER));
     }
 
     @Test
@@ -197,7 +198,7 @@ class CompletionTriggerServiceTest {
 
         service.onWorkflowRunCompleted(event);
 
-        verify(workflowExecutor).execute(eq(targetWf), any());
+        verify(workflowExecutor).execute(eq(targetWf), any(), eq(TriggerSource.COMPLETION_TRIGGER));
     }
 
     @Test
@@ -214,7 +215,7 @@ class CompletionTriggerServiceTest {
 
         service.onWorkflowRunCompleted(event);
 
-        verify(workflowExecutor).execute(eq(targetWf), any());
+        verify(workflowExecutor).execute(eq(targetWf), any(), eq(TriggerSource.COMPLETION_TRIGGER));
     }
 
     @Test
@@ -230,7 +231,7 @@ class CompletionTriggerServiceTest {
 
         service.onWorkflowRunCompleted(event);
 
-        verify(workflowExecutor, never()).execute(any(), any());
+        verify(workflowExecutor, never()).execute(any(), any(), eq(TriggerSource.COMPLETION_TRIGGER));
     }
 
     @Test
@@ -249,7 +250,7 @@ class CompletionTriggerServiceTest {
         service.onWorkflowRunCompleted(event);
 
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(workflowExecutor).execute(eq(targetWf), captor.capture());
+        verify(workflowExecutor).execute(eq(targetWf), captor.capture(), eq(TriggerSource.COMPLETION_TRIGGER));
 
         Map<String, Object> context = captor.getValue();
         assertThat(context).containsEntry("completion_trigger_source_run_id", "run-1");
@@ -264,7 +265,7 @@ class CompletionTriggerServiceTest {
                 .triggerOnSuccess(true).triggerAlways(false)
                 .enabled(true).build();
         when(repository.findBySourceWorkflowIdAndEnabledTrue("wf-src")).thenReturn(List.of(trigger));
-        when(workflowExecutor.execute(any(), any())).thenThrow(new RuntimeException("boom"));
+        when(workflowExecutor.execute(any(), any(), eq(TriggerSource.COMPLETION_TRIGGER))).thenThrow(new RuntimeException("boom"));
 
         var event = new WorkflowRunCompletedEvent(this, "run-1", "wf-src", "Source",
                 null, null, RunStatus.COMPLETED, Map.of(), Map.of(), null);

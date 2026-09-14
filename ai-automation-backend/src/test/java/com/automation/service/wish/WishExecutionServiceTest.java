@@ -86,14 +86,14 @@ class WishExecutionServiceTest {
             Workflow workflow = Workflow.builder().id("wf-1").build();
             WorkflowRun run = WorkflowRun.builder().id("run-1").status(RunStatus.COMPLETED).build();
             when(workflowService.findByIdEager("wf-1")).thenReturn(workflow);
-            when(workflowExecutor.execute(eq(workflow), any())).thenReturn(run);
+            when(workflowExecutor.execute(eq(workflow), any(), eq(TriggerSource.WISH))).thenReturn(run);
             when(wishRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             when(wishRepository.findById("w-1")).thenReturn(Optional.of(wish));
 
             service.execute(wish, neverCancelled);
 
             assertThat(wish.getCurrentRunId()).isEqualTo("run-1");
-            verify(workflowExecutor).execute(eq(workflow), any());
+            verify(workflowExecutor).execute(eq(workflow), any(), eq(TriggerSource.WISH));
             assertThat(wish.getStatus()).isEqualTo(WishStatus.EVALUATING);
         }
     }
@@ -110,7 +110,7 @@ class WishExecutionServiceTest {
 
             assertThat(wish.getStatus()).isEqualTo(WishStatus.FAILED);
             assertThat(wish.getError()).contains("No workflows");
-            verify(workflowExecutor, never()).execute(any(), any());
+            verify(workflowExecutor, never()).execute(any(), any(), eq(TriggerSource.WISH));
         }
     }
 
@@ -123,7 +123,7 @@ class WishExecutionServiceTest {
             Workflow workflow = Workflow.builder().id("wf-1").build();
             WorkflowRun run = WorkflowRun.builder().id("run-1").status(RunStatus.RUNNING).build();
             when(workflowService.findByIdEager("wf-1")).thenReturn(workflow);
-            when(workflowExecutor.execute(eq(workflow), any())).thenReturn(run);
+            when(workflowExecutor.execute(eq(workflow), any(), eq(TriggerSource.WISH))).thenReturn(run);
             when(wishRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             when(wishRepository.findById("w-1")).thenReturn(Optional.of(wish));
 

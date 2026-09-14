@@ -3,6 +3,7 @@ package com.automation.service.assistant;
 import com.automation.config.AssistantGuardrailsConfig;
 import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.Todo;
+import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowChain;
 import com.automation.entity.WorkflowRun;
@@ -168,7 +169,7 @@ class AssistantToolExecutorTest {
         Workflow wf = Workflow.builder().id("wf-1").name("My WF").build();
         when(workflowService.findById("wf-1")).thenReturn(wf);
         WorkflowRun run = WorkflowRun.builder().id("run-12345678").build();
-        when(workflowExecutor.execute(eq(wf), any())).thenReturn(run);
+        when(workflowExecutor.execute(eq(wf), any(), eq(TriggerSource.ASSISTANT))).thenReturn(run);
 
         String input = "<tool type=\"start_workflow\">{\"workflowId\": \"wf-1\"}</tool>";
         String result = runAllTools(input);
@@ -373,13 +374,13 @@ class AssistantToolExecutorTest {
         Workflow wf = Workflow.builder().id("wf-1").name("WF").build();
         when(workflowService.findById("wf-1")).thenReturn(wf);
         WorkflowRun run = WorkflowRun.builder().id("run-12345678").build();
-        when(workflowExecutor.execute(eq(wf), any())).thenReturn(run);
+        when(workflowExecutor.execute(eq(wf), any(), eq(TriggerSource.ASSISTANT))).thenReturn(run);
 
         String input = "<tool type=\"start_workflow\">{\"workflowId\": \"wf-1\", \"context\": {\"key\": \"val\"}}</tool>";
         String result = runAllTools(input);
 
         assertThat(result).contains("✓");
-        verify(workflowExecutor).execute(eq(wf), argThat(ctx -> "val".equals(ctx.get("key"))));
+        verify(workflowExecutor).execute(eq(wf), argThat(ctx -> "val".equals(ctx.get("key"))), eq(TriggerSource.ASSISTANT));
     }
 
     @Test
@@ -508,7 +509,7 @@ class AssistantToolExecutorTest {
     void executeTools_startWorkflow_executorException_returnsError() {
         Workflow workflow = Workflow.builder().id("wf-1").name("Deploy").build();
         when(workflowService.findById("wf-1")).thenReturn(workflow);
-        when(workflowExecutor.execute(eq(workflow), any())).thenThrow(new RuntimeException("queue offline"));
+        when(workflowExecutor.execute(eq(workflow), any(), eq(TriggerSource.ASSISTANT))).thenThrow(new RuntimeException("queue offline"));
 
         String input = "<tool type=\"start_workflow\">{\"workflowId\": \"wf-1\"}</tool>";
         String result = runAllTools(input);

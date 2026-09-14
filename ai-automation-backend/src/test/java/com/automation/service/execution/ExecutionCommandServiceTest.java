@@ -2,6 +2,7 @@ package com.automation.service.execution;
 
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.entity.RunStatus;
+import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.exception.ResourceNotFoundException;
@@ -18,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.mockito.ArgumentMatchers.eq;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -45,7 +47,7 @@ class ExecutionCommandServiceTest {
         WorkflowRunResponse response = mock(WorkflowRunResponse.class);
         when(executionQueryService.findById("run-1")).thenReturn(run);
         when(workflowService.findByIdEager("wf-1")).thenReturn(workflow);
-        when(workflowExecutor.execute(workflow, Map.of("key", "val"))).thenReturn(newRun);
+        when(workflowExecutor.execute(workflow, Map.of("key", "val"), TriggerSource.RETRY)).thenReturn(newRun);
         when(workflowMapper.toRunResponse(newRun)).thenReturn(response);
 
         assertThat(service.retry("run-1")).isSameAs(response);
@@ -56,7 +58,7 @@ class ExecutionCommandServiceTest {
         when(executionQueryService.findById("unknown")).thenThrow(new ResourceNotFoundException("WorkflowRun", "unknown"));
 
         assertThatThrownBy(() -> service.retry("unknown")).isInstanceOf(ResourceNotFoundException.class);
-        verify(workflowExecutor, never()).execute(any(), any());
+        verify(workflowExecutor, never()).execute(any(), any(), eq(TriggerSource.RETRY));
     }
 
     @Test

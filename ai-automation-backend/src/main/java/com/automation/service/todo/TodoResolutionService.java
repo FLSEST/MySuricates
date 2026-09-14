@@ -2,6 +2,7 @@ package com.automation.service.todo;
 
 import com.automation.entity.RunStatus;
 import com.automation.entity.Todo;
+import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.repository.TodoRepository;
@@ -39,7 +40,7 @@ public class TodoResolutionService {
 
         Workflow workflow = workflowService.findByIdEager(todo.getLinkedWorkflowId());
         WorkflowRun run = workflowExecutorProvider.getObject()
-                .execute(workflow, contextFor(todo), null, runMetadataFor(todo, workflow));
+                .execute(workflow, contextFor(todo), null, runMetadataFor(todo, workflow), TriggerSource.TODO_RESOLUTION);
 
         todo.setStatus(Todo.Status.IN_PROGRESS);
         todo.setLastFixRunId(run.getId());

@@ -1,6 +1,7 @@
 package com.automation.service.execution;
 
 import com.automation.dto.response.WorkflowRunResponse;
+import com.automation.entity.TriggerSource;
 import com.automation.entity.WorkflowRun;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.repository.WorkflowRunRepository;
@@ -34,7 +35,7 @@ public class ExecutionCommandService {
     public WorkflowRunResponse retry(String runId) {
         WorkflowRun run = executionQueryService.findById(runId);
         var workflow = workflowService.findByIdEager(run.getWorkflow().getId());
-        return workflowMapper.toRunResponse(workflowExecutor.execute(workflow, run.getInputContext()));
+        return workflowMapper.toRunResponse(workflowExecutor.execute(workflow, run.getInputContext(), TriggerSource.RETRY));
     }
 
     @Transactional

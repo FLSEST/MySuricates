@@ -3,6 +3,7 @@ package com.automation.service.scheduler;
 import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.ChainRun;
 import com.automation.entity.RunStatus;
+import com.automation.entity.TriggerSource;
 import com.automation.entity.WorkflowRun;
 import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.ScheduledWorkflow.ScheduleType;
@@ -106,7 +107,8 @@ public class ScheduledWorkflowExecutor {
                 ChainRun run = chainExecutor.execute(scheduled.getChain(), scheduled.getInputContext(), scheduleId);
                 return Optional.ofNullable(run).map(r -> new ScheduledRunRef(r.getId(), TargetType.CHAIN));
             } else if (scheduled.getWorkflow() != null) {
-                WorkflowRun run = workflowExecutor.execute(scheduled.getWorkflow(), scheduled.getInputContext(), scheduleId, null);
+                WorkflowRun run = workflowExecutor.execute(scheduled.getWorkflow(), scheduled.getInputContext(), scheduleId, null,
+                        TriggerSource.SCHEDULE);
                 return Optional.ofNullable(run).map(r -> new ScheduledRunRef(r.getId(), TargetType.WORKFLOW));
             } else {
                 log.error("Schedule {} has no valid target", scheduled.getId());

@@ -4,6 +4,7 @@ import com.automation.entity.RunStatus;
 import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.ScheduledWorkflow.ScheduleType;
 import com.automation.entity.ScheduledWorkflow.TargetType;
+import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowChain;
 import com.automation.modules.ModuleRegistry;
@@ -94,7 +95,7 @@ class ScheduledWorkflowExecutorTest {
 
         executor.executeSingleSchedule("sched-cron");
 
-        verify(workflowExecutor).execute(eq(testWorkflow), eq(Map.of()), any(String.class), isNull());
+        verify(workflowExecutor).execute(eq(testWorkflow), eq(Map.of()), any(String.class), isNull(), eq(TriggerSource.SCHEDULE));
         assertThat(scheduled.getLastRunAt()).isNotNull();
         assertThat(scheduled.getNextRunAt()).isNotNull();
         assertThat(scheduled.isEnabled()).isTrue();
@@ -121,7 +122,7 @@ class ScheduledWorkflowExecutorTest {
 
         executor.executeSingleSchedule("sched-once");
 
-        verify(workflowExecutor).execute(eq(testWorkflow), eq(Map.of()), any(String.class), isNull());
+        verify(workflowExecutor).execute(eq(testWorkflow), eq(Map.of()), any(String.class), isNull(), eq(TriggerSource.SCHEDULE));
         assertThat(scheduled.getLastRunAt()).isNotNull();
         assertThat(scheduled.getNextRunAt()).isNull();
         assertThat(scheduled.isEnabled()).isFalse();
@@ -142,7 +143,7 @@ class ScheduledWorkflowExecutorTest {
 
         executor.executeSingleSchedule("sched-future");
 
-        verify(workflowExecutor, never()).execute(any(), any());
+        verify(workflowExecutor, never()).execute(any(), any(), eq(TriggerSource.SCHEDULE));
     }
 
     @Test
@@ -160,7 +161,7 @@ class ScheduledWorkflowExecutorTest {
 
         executor.executeSingleSchedule("sched-disabled");
 
-        verify(workflowExecutor, never()).execute(any(), any());
+        verify(workflowExecutor, never()).execute(any(), any(), eq(TriggerSource.SCHEDULE));
     }
 
     @Test
@@ -169,7 +170,7 @@ class ScheduledWorkflowExecutorTest {
 
         executor.executeSingleSchedule("unknown");
 
-        verify(workflowExecutor, never()).execute(any(), any());
+        verify(workflowExecutor, never()).execute(any(), any(), eq(TriggerSource.SCHEDULE));
     }
 
     @Test
@@ -189,7 +190,7 @@ class ScheduledWorkflowExecutorTest {
 
         executor.executeSingleSchedule("sched-ghost");
 
-        verify(workflowExecutor, never()).execute(any(), any());
+        verify(workflowExecutor, never()).execute(any(), any(), eq(TriggerSource.SCHEDULE));
     }
 
     @Test
@@ -260,7 +261,7 @@ class ScheduledWorkflowExecutorTest {
         when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(workflowRunRepository.existsByWorkflowIdAndStatus(eq("wf-1"), eq(RunStatus.RUNNING))).thenReturn(false);
         doThrow(new RuntimeException("LazyInitializationException: no Session"))
-                .when(workflowExecutor).execute(any(), any());
+                .when(workflowExecutor).execute(any(), any(), eq(TriggerSource.SCHEDULE));
 
         // Should not throw out of executeSingleSchedule — error is caught by checkAndExecuteScheduled
         try {
@@ -359,7 +360,7 @@ class ScheduledWorkflowExecutorTest {
         when(scheduledRepository.findById("sched-ref")).thenReturn(Optional.of(scheduled));
         when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(workflowRunRepository.existsByWorkflowIdAndStatus(eq("wf-1"), eq(RunStatus.RUNNING))).thenReturn(false);
-        when(workflowExecutor.execute(eq(testWorkflow), any(), eq("sched-ref"), isNull()))
+        when(workflowExecutor.execute(eq(testWorkflow), any(), eq("sched-ref"), isNull(), eq(TriggerSource.SCHEDULE)))
                 .thenReturn(com.automation.entity.WorkflowRun.builder().id("run-42").build());
 
         Optional<ScheduledWorkflowExecutor.ScheduledRunRef> ref = executor.executeSingleSchedule("sched-ref");
@@ -379,7 +380,7 @@ class ScheduledWorkflowExecutorTest {
         when(workflowRunRepository.existsByWorkflowIdAndStatus(eq("wf-1"), eq(RunStatus.RUNNING))).thenReturn(true);
 
         assertThat(executor.executeSingleSchedule("sched-busy")).isEmpty();
-        verify(workflowExecutor, never()).execute(any(), any(), any(), any());
+        verify(workflowExecutor, never()).execute(any(), any(), any(), any(), eq(TriggerSource.SCHEDULE));
     }
 
     @Test

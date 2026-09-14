@@ -3,6 +3,7 @@ package com.automation.service.trigger;
 import com.automation.dto.request.CreateCompletionTriggerRequest;
 import com.automation.entity.CompletionTrigger;
 import com.automation.entity.RunStatus;
+import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
 import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.exception.ResourceNotFoundException;
@@ -119,7 +120,7 @@ public class CompletionTriggerService {
                 // trigger.getTargetWorkflow() comes from an EAGER relationship but
                 // leaves the LAZY ManyToMany uninitialized.
                 Workflow targetWorkflow = workflowService.findByIdEager(trigger.getTargetWorkflow().getId());
-                workflowExecutor.execute(targetWorkflow, context);
+                workflowExecutor.execute(targetWorkflow, context, TriggerSource.COMPLETION_TRIGGER);
                 trigger.setLastTriggeredAt(Instant.now());
                 trigger.setTriggerCount(trigger.getTriggerCount() + 1);
                 repository.save(trigger);

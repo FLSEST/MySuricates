@@ -7,6 +7,7 @@ import com.automation.entity.ProjectType;
 import com.automation.entity.RunStatus;
 import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
+import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.repository.ProjectRepository;
@@ -286,7 +287,7 @@ class WorkflowExecutorDeterministicIntegrationTest {
     }
 
     private WorkflowRun executeAndWait(Workflow workflow, Map<String, Object> context) {
-        WorkflowRun started = workflowExecutor.execute(workflow, context);
+        WorkflowRun started = workflowExecutor.execute(workflow, context, TriggerSource.MANUAL);
         Instant deadline = Instant.now().plus(Duration.ofSeconds(20));
         RunStatus lastStatus = started.getStatus();
         while (Instant.now().isBefore(deadline)) {

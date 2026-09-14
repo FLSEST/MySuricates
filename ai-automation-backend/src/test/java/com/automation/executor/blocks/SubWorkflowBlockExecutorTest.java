@@ -126,7 +126,7 @@ class SubWorkflowBlockExecutorTest {
                 .build();
         subRun.getSteps().add(subStep);
 
-        when(workflowExecutor.execute(eq(subWorkflow), any(Map.class))).thenReturn(subRun);
+        when(workflowExecutor.execute(eq(subWorkflow), any(Map.class), eq(TriggerSource.SUB_WORKFLOW))).thenReturn(subRun);
         when(runRepository.findById("sub-run-1")).thenReturn(Optional.of(subRun));
         when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("sub-run-1"))
                 .thenReturn(List.of(subStep));
@@ -158,7 +158,7 @@ class SubWorkflowBlockExecutorTest {
                 .status(RunStatus.FAILED)
                 .build();
 
-        when(workflowExecutor.execute(eq(subWorkflow), any(Map.class))).thenReturn(subRun);
+        when(workflowExecutor.execute(eq(subWorkflow), any(Map.class), eq(TriggerSource.SUB_WORKFLOW))).thenReturn(subRun);
         when(runRepository.findById("sub-run-1")).thenReturn(Optional.of(subRun));
 
         BlockDefinition block = BlockDefinition.builder()
@@ -188,7 +188,7 @@ class SubWorkflowBlockExecutorTest {
                 .workflow(subWorkflow)
                 .status(RunStatus.COMPLETED)
                 .build();
-        when(workflowExecutor.execute(eq(subWorkflow), any(Map.class))).thenReturn(subRun);
+        when(workflowExecutor.execute(eq(subWorkflow), any(Map.class), eq(TriggerSource.SUB_WORKFLOW))).thenReturn(subRun);
         when(runRepository.findById("sub-run-1")).thenReturn(Optional.of(subRun));
 
         BlockDefinition block = BlockDefinition.builder()
@@ -199,7 +199,7 @@ class SubWorkflowBlockExecutorTest {
         executor.execute(block, context);
 
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(workflowExecutor).execute(eq(subWorkflow), captor.capture());
+        verify(workflowExecutor).execute(eq(subWorkflow), captor.capture(), eq(TriggerSource.SUB_WORKFLOW));
 
         Map<String, Object> childContext = captor.getValue();
         assertThat(childContext).containsEntry("my_var", "my_value");
@@ -217,7 +217,7 @@ class SubWorkflowBlockExecutorTest {
         when(workflowService.findById("sub-wf-1")).thenReturn(subWorkflow);
         WorkflowRun subRun = WorkflowRun.builder()
                 .id("sub-run-1").workflow(subWorkflow).status(RunStatus.COMPLETED).build();
-        when(workflowExecutor.execute(eq(subWorkflow), any(Map.class))).thenReturn(subRun);
+        when(workflowExecutor.execute(eq(subWorkflow), any(Map.class), eq(TriggerSource.SUB_WORKFLOW))).thenReturn(subRun);
         when(runRepository.findById("sub-run-1")).thenReturn(Optional.of(subRun));
 
         BlockDefinition block = BlockDefinition.builder()
@@ -228,7 +228,7 @@ class SubWorkflowBlockExecutorTest {
         executor.execute(block, context);
 
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(workflowExecutor).execute(eq(subWorkflow), captor.capture());
+        verify(workflowExecutor).execute(eq(subWorkflow), captor.capture(), eq(TriggerSource.SUB_WORKFLOW));
         assertThat(captor.getValue())
                 .containsEntry(ExecutionContext.UNTRUSTED_KEYS_VARIABLE, List.of("branch"))
                 .containsEntry(ExecutionContext.UNTRUSTED_OUTPUTS_VARIABLE,
@@ -244,7 +244,7 @@ class SubWorkflowBlockExecutorTest {
         when(workflowService.findById("sub-wf-1")).thenReturn(subWorkflow);
         WorkflowRun subRun = WorkflowRun.builder()
                 .id("sub-run-1").workflow(subWorkflow).status(RunStatus.COMPLETED).build();
-        when(workflowExecutor.execute(eq(subWorkflow), any(Map.class))).thenReturn(subRun);
+        when(workflowExecutor.execute(eq(subWorkflow), any(Map.class), eq(TriggerSource.SUB_WORKFLOW))).thenReturn(subRun);
         when(runRepository.findById("sub-run-1")).thenReturn(Optional.of(subRun));
 
         BlockDefinition block = BlockDefinition.builder()
@@ -255,7 +255,7 @@ class SubWorkflowBlockExecutorTest {
         executor.execute(block, context);
 
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(workflowExecutor).execute(eq(subWorkflow), captor.capture());
+        verify(workflowExecutor).execute(eq(subWorkflow), captor.capture(), eq(TriggerSource.SUB_WORKFLOW));
         assertThat(captor.getValue()).doesNotContainKeys(
                 ExecutionContext.UNTRUSTED_KEYS_VARIABLE, ExecutionContext.UNTRUSTED_OUTPUTS_VARIABLE);
     }

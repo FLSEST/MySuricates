@@ -6,6 +6,7 @@ import com.automation.exception.ContainerException;
 import com.automation.exception.WorkflowExecutionException;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
+import com.automation.modules.ModuleRegistry;
 import com.automation.repository.ContainerRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.activitylog.ActivityLogService;
@@ -150,7 +151,8 @@ class WorkflowExecutorTest {
                 new BlockStepRunner(stepResultRepository, broadcaster, new BlockOutputValidator(),
                         activityLogService, containerRepository),
                 new RunFinalizer(runRepository, broadcaster, eventPublisher),
-                runWorkspaceService
+                runWorkspaceService,
+                new RunAdmission(ModuleRegistry.allEnabled(), new WorkflowDefinitionHasher(), workflowVersionService)
         );
 
         testProject = Project.builder()
@@ -210,7 +212,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenReturn(step);
 
-        WorkflowRun result = workflowExecutor.execute(testWorkflow, null);
+        WorkflowRun result = workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         // execute() returns immediately with RUNNING status
         assertThat(result.getStatus()).isEqualTo(RunStatus.RUNNING);
@@ -223,12 +225,27 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenReturn(step);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
         assertThat(saved.getCompletedAt()).isNotNull();
         assertThat(saved.getDurationMs()).isNotNull();
+    }
+
+    @Test
+    void execute_recordsTriggerSourceAndDefinitionHashOnTheRun() {
+        StepResult step = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class))).thenReturn(step);
+
+        workflowExecutor.execute(testWorkflow, null, null, null, TriggerSource.SCHEDULE);
+
+        // The run row is created (first save) before the async loop reloads it
+        ArgumentCaptor<WorkflowRun> captor = ArgumentCaptor.forClass(WorkflowRun.class);
+        verify(runRepository, atLeastOnce()).save(captor.capture());
+        WorkflowRun created = captor.getAllValues().getFirst();
+        assertThat(created.getTriggerSource()).isEqualTo(TriggerSource.SCHEDULE);
+        assertThat(created.getDefinitionHash()).isEqualTo(new WorkflowDefinitionHasher().hash(testWorkflow));
     }
 
     @Test
@@ -238,7 +255,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenReturn(failed);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
@@ -265,7 +282,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenReturn(failed, success);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
@@ -279,7 +296,7 @@ class WorkflowExecutorTest {
         )));
         when(simpleBlockExecutor.supports("unknown-type")).thenReturn(false);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
@@ -294,7 +311,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenThrow(new NoClassDefFoundError("com/automation/service/todo/GateStatusResolver$1"));
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
@@ -312,7 +329,7 @@ class WorkflowExecutorTest {
                 .thenReturn(step);
 
         Map<String, Object> inputContext = Map.of("branch", "main", "env", "production");
-        workflowExecutor.execute(testWorkflow, inputContext);
+        workflowExecutor.execute(testWorkflow, inputContext, TriggerSource.MANUAL);
 
         verify(simpleBlockExecutor, times(2)).execute(any(), any());
     }
@@ -325,7 +342,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), ctxCaptor.capture()))
                 .thenReturn(step);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         ExecutionContext ctx = ctxCaptor.getValue();
         assertThat(ctx.getVariable("project_path")).isEqualTo("/workspace/test");
@@ -362,7 +379,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), ctxCaptor.capture()))
                 .thenReturn(step);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         String openTodos = (String) ctxCaptor.getValue().getVariable("open_todos");
         assertThat(openTodos)
@@ -390,7 +407,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), ctxCaptor.capture()))
                 .thenReturn(step);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         String openTodos = (String) ctxCaptor.getValue().getVariable("open_todos");
         // No tag-bracket when tags are null: "- def-id [MEDIUM] Plain TODO"
@@ -407,7 +424,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), ctxCaptor.capture()))
                 .thenReturn(step);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         assertThat(ctxCaptor.getValue().getVariable("open_todos"))
                 .isEqualTo("(keine offenen TODOs)");
@@ -421,7 +438,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), ctxCaptor.capture()))
                 .thenReturn(step);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         ExecutionContext ctx = ctxCaptor.getValue();
         assertThat(ctx.getVariable("api_key"))
@@ -441,7 +458,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), ctxCaptor.capture()))
                 .thenReturn(step);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         ExecutionContext ctx = ctxCaptor.getValue();
         Object ts = ctx.getVariable("run_timestamp");
@@ -463,7 +480,7 @@ class WorkflowExecutorTest {
                 .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
         when(simpleBlockExecutor.execute(any(), any())).thenReturn(step);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         verify(commandExecutorService).writeSkillContextToProject(
                 eq("/workspace/test"), eq(testWorkflow.getActivatedSkills()));
@@ -492,7 +509,7 @@ class WorkflowExecutorTest {
                 .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
         when(simpleBlockExecutor.execute(any(), any())).thenReturn(step);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         // Verify: baseline write + merged write for block 1 + restore after block 1
         ArgumentCaptor<List<Skill>> skillCaptor = ArgumentCaptor.forClass(List.class);
@@ -513,7 +530,7 @@ class WorkflowExecutorTest {
                 .stepIndex(0).status(StepStatus.COMPLETED).output("ok").durationMs(100L).build();
         when(simpleBlockExecutor.execute(any(), any())).thenReturn(step);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         verify(broadcaster, atLeastOnce()).broadcastStepResult(anyString(), any(StepResult.class));
     }
@@ -524,7 +541,7 @@ class WorkflowExecutorTest {
                 .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
         when(simpleBlockExecutor.execute(any(), any())).thenReturn(step);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         workflowExecutor.pauseExecution("non-existent-run");
         workflowExecutor.resumeExecution("non-existent-run");
@@ -553,7 +570,7 @@ class WorkflowExecutorTest {
                     return step;
                 });
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
     }
 
     @Test
@@ -579,7 +596,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenReturn(step);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         // Container was auto-started
         verify(containerService).createAndStartContainer(testProject);
@@ -603,7 +620,7 @@ class WorkflowExecutorTest {
                 .thenReturn(step);
 
         Map<String, Object> inputContext = Map.of("branch", "develop");
-        workflowExecutor.execute(testWorkflow, inputContext);
+        workflowExecutor.execute(testWorkflow, inputContext, TriggerSource.MANUAL);
 
         // Verify merged context: branch=develop (overridden) + env=prod (default)
         ExecutionContext captured = ctxCaptor.getValue();
@@ -621,7 +638,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), ctxCaptor.capture()))
                 .thenReturn(step);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         // Verify default context was applied
         ExecutionContext captured = ctxCaptor.getValue();
@@ -642,7 +659,7 @@ class WorkflowExecutorTest {
                 BlockDefinition.builder().type("simple").config(new HashMap<>(Map.of("command", "analyze"))).build()
         )));
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         ArgumentCaptor<WorkflowRunCompletedEvent> eventCaptor = ArgumentCaptor.forClass(WorkflowRunCompletedEvent.class);
         verify(eventPublisher).publishEvent(eventCaptor.capture());
@@ -661,7 +678,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenReturn(step);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         ArgumentCaptor<WorkflowRunCompletedEvent> eventCaptor = ArgumentCaptor.forClass(WorkflowRunCompletedEvent.class);
         verify(eventPublisher).publishEvent(eventCaptor.capture());
@@ -678,7 +695,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenReturn(step);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         ArgumentCaptor<WorkflowRunCompletedEvent> eventCaptor = ArgumentCaptor.forClass(WorkflowRunCompletedEvent.class);
         verify(eventPublisher).publishEvent(eventCaptor.capture());
@@ -800,7 +817,7 @@ class WorkflowExecutorTest {
             ((ExecutionContext) inv.getArgument(1)).cancel();
             return StepResult.builder().stepIndex(0).status(StepStatus.FAILED).output("terminated").build();
         });
-        workflowExecutor.execute(testWorkflow, Map.of());
+        workflowExecutor.execute(testWorkflow, Map.of(), TriggerSource.MANUAL);
         assertThat(captureLastSavedRun().getStatus()).isEqualTo(RunStatus.CANCELLED);
     }
 
@@ -817,7 +834,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenReturn(step);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         // Workflow completed despite no container
         WorkflowRun saved = captureLastSavedRun();
@@ -833,7 +850,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenReturn(step);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         verify(templateVerificationService).recordSuccessfulRun(
                 eq("wf-1"), eq("template-1"), eq("proj-1"), eq("run-1"));
@@ -847,7 +864,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenReturn(step);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         verify(templateVerificationService, never()).recordSuccessfulRun(any(), any(), any(), any());
     }
@@ -863,7 +880,7 @@ class WorkflowExecutorTest {
         doThrow(new RuntimeException("DB error"))
                 .when(templateVerificationService).recordSuccessfulRun(any(), any(), any(), any());
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         // Workflow should still complete despite template verification failure
         WorkflowRun saved = captureLastSavedRun();
@@ -885,7 +902,7 @@ class WorkflowExecutorTest {
                     return step;
                 });
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         // After execution completes, active count should be 0 again
         assertThat(registry.getActiveRunCount()).isEqualTo(0);
@@ -906,7 +923,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenReturn(step);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         verify(workflowMemoryService).writeActiveMemoryToProject("wf-1", "/workspace/test");
         verify(projectContextService).writeProjectContextToProject(any(), eq("/workspace/test"));
@@ -923,7 +940,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), ctxCaptor.capture()))
                 .thenReturn(step1, step2);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         // After both blocks, context should have step output variables
         ExecutionContext ctx = ctxCaptor.getValue();
@@ -938,7 +955,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenReturn(failed);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         ArgumentCaptor<WorkflowRunCompletedEvent> eventCaptor = ArgumentCaptor.forClass(WorkflowRunCompletedEvent.class);
         verify(eventPublisher).publishEvent(eventCaptor.capture());
@@ -955,7 +972,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenReturn(failed);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun saved = captureLastSavedRun();
         String message = (String) saved.getError().get("message");
@@ -968,7 +985,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenThrow(new RuntimeException("Unexpected failure"));
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
@@ -988,7 +1005,7 @@ class WorkflowExecutorTest {
                 BlockDefinition.builder().type("simple").config(new HashMap<>(Map.of("command", "check"))).build()
         )));
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
@@ -1009,7 +1026,7 @@ class WorkflowExecutorTest {
                 BlockDefinition.builder().type("simple").config(new HashMap<>(Map.of("command", "lint"))).build()
         )));
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         verify(activityLogService).warn(eq(ActivityLog.LogCategory.EXECUTION),
                 contains("completed with warnings"), eq("WorkflowExecutor"), eq("run-1"), eq("wf-1"));
@@ -1028,7 +1045,7 @@ class WorkflowExecutorTest {
                 BlockDefinition.builder().type("simple").config(new HashMap<>(Map.of("command", "check"))).build()
         )));
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
@@ -1048,7 +1065,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenReturn(greenStep, yellowStep);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
@@ -1075,7 +1092,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenReturn(greenStep, yellowStep);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun saved = captureLastSavedRun();
         Map<String, Object> summary = (Map<String, Object>) saved.getMetadata().get("gate_summary");
@@ -1103,7 +1120,7 @@ class WorkflowExecutorTest {
                 BlockDefinition.builder().type("simple").config(new HashMap<>(Map.of("command", "scan"))).build()
         )));
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun saved = captureLastSavedRun();
         // RED gate: run still COMPLETED (not FAILED), gate info in metadata
@@ -1118,7 +1135,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenReturn(step);
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getMetadata()).containsEntry("system", "MySuricates");
@@ -1137,7 +1154,7 @@ class WorkflowExecutorTest {
                 });
 
         // Act
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         // Assert: only first block ran, run was saved with CANCELLED
         verify(simpleBlockExecutor, times(1)).execute(any(BlockDefinition.class), any(ExecutionContext.class));
@@ -1206,7 +1223,8 @@ class WorkflowExecutorTest {
                 new BlockStepRunner(stepResultRepository, broadcaster, new BlockOutputValidator(),
                         activityLogService, containerRepository),
                 new RunFinalizer(runRepository, broadcaster, eventPublisher),
-                runWorkspaceService
+                runWorkspaceService,
+                new RunAdmission(ModuleRegistry.allEnabled(), new WorkflowDefinitionHasher(), workflowVersionService)
         );
     }
 
@@ -1217,7 +1235,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenThrow(new WorkflowExecutionException("custom block failure"));
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
@@ -1230,7 +1248,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenThrow(new RuntimeException());
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
@@ -1245,7 +1263,7 @@ class WorkflowExecutorTest {
                 .thenReturn(ok)
                 .thenThrow(new RuntimeException("second block crashed"));
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun savedRun = captureLastSavedRun();
         assertThat(savedRun.getStatus()).isEqualTo(RunStatus.FAILED);
@@ -1264,7 +1282,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenThrow(new RuntimeException("boom"));
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         // Both broadcaster and eventPublisher must fire from the finally block
         verify(broadcaster).broadcastRunStatus("run-1", RunStatus.FAILED);
@@ -1282,7 +1300,7 @@ class WorkflowExecutorTest {
         doThrow(new InterruptedException("simulated")).when(mockSemaphore).acquire();
         WorkflowExecutor executor = buildExecutor(List.of(simpleBlockExecutor), mockSemaphore);
 
-        executor.execute(testWorkflow, null);
+        executor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         ArgumentCaptor<WorkflowRun> captor = ArgumentCaptor.forClass(WorkflowRun.class);
         verify(runRepository, atLeastOnce()).save(captor.capture());
@@ -1308,10 +1326,10 @@ class WorkflowExecutorTest {
                 .thenThrow(new RuntimeException("first run boom"))
                 .thenReturn(StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build());
 
-        executor.execute(testWorkflow, null);
+        executor.execute(testWorkflow, null, TriggerSource.MANUAL);
         // If the semaphore wasn't released, this second execute() would block forever
         // (synchronous virtualThreadExecutor + acquire() in same thread).
-        executor.execute(testWorkflow, null);
+        executor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         // Verify both attempts ran the block executor (1× thrown, then 2 successful blocks)
         verify(simpleBlockExecutor, atLeast(2)).execute(any(), any());
@@ -1337,7 +1355,7 @@ class WorkflowExecutorTest {
             return saved;
         });
 
-        executor.execute(testWorkflow, null);
+        executor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         assertThat(permitsAtTerminalSave.get()).as("permit still held during the terminal save").isZero();
         assertThat(singleSlot.availablePermits()).as("permit released afterwards").isEqualTo(1);
@@ -1350,7 +1368,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenThrow(new RuntimeException("crash"));
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         assertThat(registry.isRunActive("run-1")).isFalse();
         assertThat(registry.getActiveRunCount()).isZero();
@@ -1378,7 +1396,7 @@ class WorkflowExecutorTest {
                         .config(new HashMap<>(Map.of("workflow_id", "child-wf"))).build()
         )));
 
-        executor.execute(testWorkflow, null);
+        executor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
@@ -1403,7 +1421,7 @@ class WorkflowExecutorTest {
                         .config(new HashMap<>(Map.of("workflow_id", "child-wf"))).build()
         )));
 
-        executor.execute(testWorkflow, null);
+        executor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
@@ -1422,7 +1440,7 @@ class WorkflowExecutorTest {
                         .id("run-1").workflow(testWorkflow).status(RunStatus.RUNNING)
                         .startedAt(Instant.now()).build()));
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         ArgumentCaptor<WorkflowRun> captor = ArgumentCaptor.forClass(WorkflowRun.class);
         verify(runRepository, atLeastOnce()).save(captor.capture());
@@ -1446,7 +1464,7 @@ class WorkflowExecutorTest {
                 .when(eventPublisher).publishEvent(any(WorkflowRunCompletedEvent.class));
 
         // Should not throw — the publish is wrapped in try/catch (Z. 506–515)
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
@@ -1469,7 +1487,7 @@ class WorkflowExecutorTest {
         )));
 
         WorkflowExecutor exec = buildExecutor(List.of(shellExec), new DynamicSemaphore(10));
-        exec.execute(testWorkflow, null);
+        exec.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
@@ -1490,7 +1508,7 @@ class WorkflowExecutorTest {
         )));
 
         WorkflowExecutor exec = buildExecutor(List.of(agenticExec), new DynamicSemaphore(10));
-        exec.execute(testWorkflow, null);
+        exec.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
@@ -1511,7 +1529,7 @@ class WorkflowExecutorTest {
         )));
 
         WorkflowExecutor exec = buildExecutor(List.of(foreachExec), new DynamicSemaphore(10));
-        exec.execute(testWorkflow, null);
+        exec.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
@@ -1532,7 +1550,7 @@ class WorkflowExecutorTest {
         )));
 
         WorkflowExecutor exec = buildExecutor(List.of(conditionalExec), new DynamicSemaphore(10));
-        exec.execute(testWorkflow, null);
+        exec.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
@@ -1546,7 +1564,7 @@ class WorkflowExecutorTest {
                         .config(new HashMap<>()).build()
         )));
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
@@ -1560,7 +1578,7 @@ class WorkflowExecutorTest {
                 .thenThrow(new RuntimeException("Timeout after 30s"));
 
         WorkflowExecutor exec = buildExecutor(List.of(flaky), new DynamicSemaphore(10));
-        exec.execute(testWorkflow, null);
+        exec.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
@@ -1581,7 +1599,7 @@ class WorkflowExecutorTest {
         )));
 
         WorkflowExecutor exec = buildExecutor(List.of(foreachExec), new DynamicSemaphore(10));
-        exec.execute(testWorkflow, null);
+        exec.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
@@ -1594,7 +1612,7 @@ class WorkflowExecutorTest {
         doThrow(new java.util.concurrent.RejectedExecutionException("shutting down"))
                 .when(virtualThreadExecutor).submit(any(Runnable.class));
 
-        assertThatThrownBy(() -> workflowExecutor.execute(testWorkflow, null))
+        assertThatThrownBy(() -> workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL))
                 .isInstanceOf(WorkflowExecutionException.class)
                 .hasMessageContaining("run-1");
 
@@ -1621,7 +1639,7 @@ class WorkflowExecutorTest {
             return run;
         });
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         assertThat(activeWhenTerminalStatusSaved).isNotEmpty().containsOnly(true);
         assertThat(registry.isRunActive("run-1")).isFalse();
@@ -1634,7 +1652,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenReturn(StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build());
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         // A single JPQL update per step — not find + detached merge, which would drag the
         // eagerly mapped Project/Container graph through a second transaction.
@@ -1650,7 +1668,7 @@ class WorkflowExecutorTest {
         when(containerRepository.touchActivity(anyString(), any(Instant.class)))
                 .thenThrow(new RuntimeException("db down"));
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         assertThat(captureLastSavedRun().getStatus()).isEqualTo(RunStatus.COMPLETED);
     }
@@ -1727,7 +1745,7 @@ class WorkflowExecutorTest {
             return null;
         }).when(activityLogService).info(any(), anyString(), anyString(), anyString(), anyString());
 
-        workflowExecutor.execute(testWorkflow, null);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         assertThat(stored.get().getStatus()).isEqualTo(RunStatus.CANCELLED);
         assertThat(stored.get().getError()).isNullOrEmpty();
@@ -1749,7 +1767,7 @@ class WorkflowExecutorTest {
             return run;
         });
 
-        assertThatThrownBy(() -> workflowExecutor.execute(testWorkflow, Map.of("k", "v")))
+        assertThatThrownBy(() -> workflowExecutor.execute(testWorkflow, Map.of("k", "v"), TriggerSource.MANUAL))
                 .isInstanceOf(WorkflowExecutionException.class);
 
         assertThat(registry.isRunActive("run-1")).isFalse();
@@ -1765,7 +1783,7 @@ class WorkflowExecutorTest {
         doThrow(new RuntimeException("activity log down"))
                 .when(activityLogService).info(any(), anyString(), anyString(), anyString(), anyString());
 
-        assertThatThrownBy(() -> workflowExecutor.execute(testWorkflow, null))
+        assertThatThrownBy(() -> workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL))
                 .isInstanceOf(WorkflowExecutionException.class);
 
         WorkflowRun saved = captureLastSavedRun();
@@ -1782,7 +1800,7 @@ class WorkflowExecutorTest {
         doThrow(new NoClassDefFoundError("boom"))
                 .when(activityLogService).info(any(), anyString(), anyString(), anyString(), anyString());
 
-        assertThatThrownBy(() -> workflowExecutor.execute(testWorkflow, null))
+        assertThatThrownBy(() -> workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL))
                 .isInstanceOf(NoClassDefFoundError.class);
 
         assertThat(captureLastSavedRun().getStatus()).isEqualTo(RunStatus.FAILED);
@@ -1795,7 +1813,7 @@ class WorkflowExecutorTest {
         // Same hole one step later: the submit itself can fail with an Error.
         doThrow(new NoClassDefFoundError("pool gone")).when(virtualThreadExecutor).submit(any(Runnable.class));
 
-        assertThatThrownBy(() -> workflowExecutor.execute(testWorkflow, null))
+        assertThatThrownBy(() -> workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL))
                 .isInstanceOf(NoClassDefFoundError.class);
 
         assertThat(captureLastSavedRun().getStatus()).isEqualTo(RunStatus.FAILED);
@@ -1813,7 +1831,7 @@ class WorkflowExecutorTest {
         WorkflowExecutor executor =
                 buildExecutor(List.of(simpleBlockExecutor), singleSlot, liveRegistry, realThreads);
 
-        executor.execute(testWorkflow, null);
+        executor.execute(testWorkflow, null, TriggerSource.MANUAL);
         executor.cancelExecution("run-1");
         singleSlot.release();
 
@@ -1839,7 +1857,7 @@ class WorkflowExecutorTest {
         realThreads = Executors.newVirtualThreadPerTaskExecutor();
         WorkflowExecutor executor =
                 buildExecutor(List.of(simpleBlockExecutor), singleSlot, liveRegistry, realThreads);
-        executor.execute(testWorkflow, null);
+        executor.execute(testWorkflow, null, TriggerSource.MANUAL);
 
         // The provisional context makes the run cancellable, but there is no container and no
         // project cwd yet — an ad-hoc command must still be refused, not run on the host.
@@ -1869,7 +1887,7 @@ class WorkflowExecutorTest {
         WorkflowExecutor executor = buildExecutor(
                 List.of(simpleBlockExecutor), new DynamicSemaphore(1), liveRegistry, realThreads);
 
-        executor.execute(testWorkflow, null);
+        executor.execute(testWorkflow, null, TriggerSource.MANUAL);
         awaitLatch(containerStartEntered, "the run to reach the container start");
         executor.cancelExecution("run-1");
         containerStartMayFinish.countDown();
@@ -1909,7 +1927,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenReturn(StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build());
 
-        executor.execute(testWorkflow, null);
+        executor.execute(testWorkflow, null, TriggerSource.MANUAL);
         awaitLatch(containerStartEntered, "the run to reach the container start");
         assertThat(singleSlot.availablePermits()).isZero();
 
@@ -1937,7 +1955,7 @@ class WorkflowExecutorTest {
         });
 
         try {
-            workflowExecutor.execute(testWorkflow, null);
+            workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
         } catch (RuntimeException expected) {
             // the synchronous test executor propagates the failure — irrelevant here
         }
@@ -1962,7 +1980,7 @@ class WorkflowExecutorTest {
 
         workflowExecutor.execute(testWorkflow, new HashMap<>(Map.of(
                 "branch", "main; id",
-                ExecutionContext.UNTRUSTED_KEYS_VARIABLE, List.of("branch"))));
+                ExecutionContext.UNTRUSTED_KEYS_VARIABLE, List.of("branch"))), TriggerSource.MANUAL);
 
         // block 1 sees only the untrusted variable escaped, block 2 also the tainted output
         assertThat(resolved.get(0)).isEqualTo("echo  {{ step_0_output }} 'main; id'");
@@ -1976,7 +1994,7 @@ class WorkflowExecutorTest {
 
         workflowExecutor.execute(testWorkflow, new HashMap<>(Map.of(
                 "branch", "main; id",
-                ExecutionContext.UNTRUSTED_KEYS_VARIABLE, List.of("branch"))));
+                ExecutionContext.UNTRUSTED_KEYS_VARIABLE, List.of("branch"))), TriggerSource.MANUAL);
 
         ArgumentCaptor<StepResult> steps = ArgumentCaptor.forClass(StepResult.class);
         verify(stepResultRepository, atLeastOnce()).save(steps.capture());
@@ -1995,7 +2013,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenReturn(StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("a | b").build());
 
-        workflowExecutor.execute(testWorkflow, new HashMap<>(Map.of("branch", "main")));
+        workflowExecutor.execute(testWorkflow, new HashMap<>(Map.of("branch", "main")), TriggerSource.MANUAL);
 
         ArgumentCaptor<StepResult> steps = ArgumentCaptor.forClass(StepResult.class);
         verify(stepResultRepository, atLeastOnce()).save(steps.capture());

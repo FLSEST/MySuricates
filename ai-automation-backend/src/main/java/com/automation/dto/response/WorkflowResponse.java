@@ -35,8 +35,50 @@ public record WorkflowResponse(
         String category,
         Instant tagsGeneratedAt,
         boolean tagsUserEdited,
-        String effort
+        String effort,
+        /** SHA-256 of the current definition (single-workflow responses with provenance on; null in lists). */
+        String definitionHash
 ) {
+    /** Backwards-compat constructor for call-sites written before definition hashes existed. */
+    public WorkflowResponse(
+            String id,
+            String projectId,
+            String projectName,
+            String projectSubtitle,
+            String projectDescription,
+            String name,
+            String description,
+            String icon,
+            List<BlockDefinition> blocks,
+            String version,
+            Map<String, Object> metadata,
+            List<String> activatedSkillIds,
+            List<String> activatedSkillNames,
+            long runCount,
+            String instructions,
+            String model,
+            String provider,
+            String templateId,
+            Map<String, Object> defaultContext,
+            String testStatus,
+            Instant lastTestedAt,
+            Instant createdAt,
+            Instant updatedAt,
+            Instant stableSyncedAt,
+            List<String> tags,
+            String category,
+            Instant tagsGeneratedAt,
+            boolean tagsUserEdited,
+            String effort
+    ) {
+        this(id, projectId, projectName, projectSubtitle, projectDescription,
+                name, description, icon, blocks, version, metadata,
+                activatedSkillIds, activatedSkillNames, runCount,
+                instructions, model, provider, templateId, defaultContext,
+                testStatus, lastTestedAt, createdAt, updatedAt, stableSyncedAt,
+                tags, category, tagsGeneratedAt, tagsUserEdited, effort, null);
+    }
+
     /** Backwards-compat constructor for call-sites written before effort support existed. */
     public WorkflowResponse(
             String id,
@@ -73,7 +115,7 @@ public record WorkflowResponse(
                 activatedSkillIds, activatedSkillNames, runCount,
                 instructions, model, provider, templateId, defaultContext,
                 testStatus, lastTestedAt, createdAt, updatedAt, stableSyncedAt,
-                tags, category, tagsGeneratedAt, tagsUserEdited, null);
+                tags, category, tagsGeneratedAt, tagsUserEdited, null, null);
     }
 
     /** Backwards-compat constructor for call-sites written before tag support existed. */

@@ -6,7 +6,10 @@ import com.automation.dto.response.StepResultResponse;
 import com.automation.entity.StepResult;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.ModuleRegistry;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.workflow.WorkflowDefinitionHasher;
 import org.mapstruct.Context;
 import org.mapstruct.IterableMapping;
 import org.mapstruct.Mapper;
@@ -24,6 +27,20 @@ public abstract class WorkflowMapper {
     @Autowired
     protected WorkflowRunRepository workflowRunRepository;
 
+    // Optional: controller slices that import the mapper without the module system still work
+    @Autowired(required = false)
+    protected WorkflowDefinitionHasher definitionHasher;
+
+    @Autowired(required = false)
+    protected ModuleRegistry modules;
+
+    protected String definitionHashOf(Workflow workflow) {
+        if (definitionHasher == null || modules == null || !modules.isEnabled(ModuleCatalog.PROVENANCE)) {
+            return null; // mapper used outside Spring (tests) or provenance off
+        }
+        return definitionHasher.hash(workflow);
+    }
+
     @Mapping(source = "project.id", target = "projectId")
     @Mapping(source = "project.name", target = "projectName")
     @Mapping(source = "project.subtitle", target = "projectSubtitle")
@@ -31,6 +48,7 @@ public abstract class WorkflowMapper {
     @Mapping(target = "runCount", expression = "java(workflowRunRepository.countByWorkflowId(workflow.getId()))")
     @Mapping(target = "activatedSkillIds", expression = "java(workflow.getActivatedSkills().stream().map(s -> s.getId()).toList())")
     @Mapping(target = "activatedSkillNames", expression = "java(workflow.getActivatedSkills().stream().map(s -> s.getName()).toList())")
+    @Mapping(target = "definitionHash", expression = "java(definitionHashOf(workflow))")
     @Named("single")
     public abstract WorkflowResponse toResponse(Workflow workflow);
 
@@ -46,6 +64,7 @@ public abstract class WorkflowMapper {
     @Mapping(target = "runCount", expression = "java(runCounts.getOrDefault(workflow.getId(), 0L))")
     @Mapping(target = "activatedSkillIds", expression = "java(workflow.getActivatedSkills().stream().map(s -> s.getId()).toList())")
     @Mapping(target = "activatedSkillNames", expression = "java(workflow.getActivatedSkills().stream().map(s -> s.getName()).toList())")
+    @Mapping(target = "definitionHash", ignore = true) // lists stay cheap; the detail response carries the hash
     @Named("withRunCounts")
     public abstract WorkflowResponse toResponse(Workflow workflow, @Context Map<String, Long> runCounts);
 

@@ -273,7 +273,7 @@ public class TodoTriggerService {
         runMeta.put("todoId", todo.getId());
 
         Workflow target = workflowService.findByIdEager(trigger.getTargetWorkflow().getId());
-        WorkflowRun run = workflowExecutor.execute(target, context, null, runMeta);
+        WorkflowRun run = workflowExecutor.execute(target, context, null, runMeta, com.automation.entity.TriggerSource.TODO_TRIGGER);
 
         // Update todo with fix attempt tracking
         todo.setFixAttempts(todo.getFixAttempts() + 1);

@@ -270,7 +270,7 @@ public class AutoRepairService {
                         ? new HashMap<>(workflow.getDefaultContext()) : new HashMap<>();
                 Map<String, Object> repairMeta = Map.of("autoRepairAttempt", true);
 
-                WorkflowRun run = workflowExecutor.execute(workflow, context, null, repairMeta);
+                WorkflowRun run = workflowExecutor.execute(workflow, context, null, repairMeta, com.automation.entity.TriggerSource.AUTO_REPAIR);
                 WorkflowRun completed = waitForRunCompletion(run.getId(), timeoutSeconds);
 
                 if (completed != null && completed.getStatus() == RunStatus.COMPLETED) {

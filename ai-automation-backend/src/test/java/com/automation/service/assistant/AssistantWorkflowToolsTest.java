@@ -2,6 +2,7 @@ package com.automation.service.assistant;
 
 import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.dto.request.UpdateWorkflowRequest;
+import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.service.workflow.WorkflowExecutor;
@@ -106,23 +107,23 @@ class AssistantWorkflowToolsTest {
     void startWorkflow_exactSuccessLine_withShortRunId_andContext() {
         Workflow wf = Workflow.builder().id("wf-1").name("Daily").build();
         when(workflowService.findById("wf-1")).thenReturn(wf);
-        when(workflowExecutor.execute(eq(wf), any())).thenReturn(WorkflowRun.builder().id("run-123456789").build());
+        when(workflowExecutor.execute(eq(wf), any(), eq(TriggerSource.ASSISTANT))).thenReturn(WorkflowRun.builder().id("run-123456789").build());
 
         String r = tools.startWorkflow("{\"workflowId\":\"wf-1\",\"context\":{\"k\":\"v\"}}");
 
         assertThat(r).isEqualTo("✓ Workflow started: \"Daily\" (Run ID: run-1234…)");
-        verify(workflowExecutor).execute(wf, Map.of("k", "v"));
+        verify(workflowExecutor).execute(wf, Map.of("k", "v"), TriggerSource.ASSISTANT);
     }
 
     @Test
     void startWorkflow_noContext_passesEmptyMap() {
         Workflow wf = Workflow.builder().id("wf-1").name("Daily").build();
         when(workflowService.findById("wf-1")).thenReturn(wf);
-        when(workflowExecutor.execute(eq(wf), any())).thenReturn(WorkflowRun.builder().id("r").build());
+        when(workflowExecutor.execute(eq(wf), any(), eq(TriggerSource.ASSISTANT))).thenReturn(WorkflowRun.builder().id("r").build());
 
         tools.startWorkflow("{\"workflowId\":\"wf-1\"}");
 
-        verify(workflowExecutor).execute(wf, Map.of());
+        verify(workflowExecutor).execute(wf, Map.of(), TriggerSource.ASSISTANT);
     }
 
     @Test
@@ -133,7 +134,7 @@ class AssistantWorkflowToolsTest {
     @Test
     void startWorkflow_executorThrows_errorLine() {
         when(workflowService.findById("wf-1")).thenReturn(Workflow.builder().id("wf-1").name("D").build());
-        when(workflowExecutor.execute(any(), any())).thenThrow(new IllegalStateException("busy"));
+        when(workflowExecutor.execute(any(), any(), eq(TriggerSource.ASSISTANT))).thenThrow(new IllegalStateException("busy"));
 
         assertThat(tools.startWorkflow("{\"workflowId\":\"wf-1\"}")).isEqualTo("⚠ Could not start workflow: busy");
     }

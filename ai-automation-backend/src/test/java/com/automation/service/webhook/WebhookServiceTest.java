@@ -1,6 +1,7 @@
 package com.automation.service.webhook;
 
 import com.automation.entity.ActivityLog.LogCategory;
+import com.automation.entity.TriggerSource;
 import com.automation.entity.WebhookTrigger;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
@@ -241,7 +242,7 @@ class WebhookServiceTest {
     void trigger_enabledWebhook_executesWorkflowAndMergesContext() {
         when(webhookRepository.findBySecretToken("abc123token")).thenReturn(Optional.of(testWebhook));
         WorkflowRun expectedRun = WorkflowRun.builder().id("run-1").build();
-        when(workflowExecutor.execute(any(), any())).thenReturn(expectedRun);
+        when(workflowExecutor.execute(any(), any(), eq(TriggerSource.WEBHOOK))).thenReturn(expectedRun);
 
         Map<String, Object> payload = Map.of("action", "deploy");
         WorkflowRun result = webhookService.trigger("abc123token", payload, HttpHeaders.EMPTY);
@@ -251,7 +252,7 @@ class WebhookServiceTest {
         // Verify merged context: default ("env"="test") + payload ("action"="deploy")
         verify(workflowExecutor).execute(eq(testWorkflow), argThat(ctx ->
                 ctx.containsKey("env") && ctx.containsKey("action")
-        ));
+        ), eq(TriggerSource.WEBHOOK));
 
         // Verify atomic increment was called
         verify(webhookRepository).incrementTriggerCount(eq("wh-1"), any(Instant.class));
@@ -261,25 +262,25 @@ class WebhookServiceTest {
     void trigger_payloadOverridesDefaultContext() {
         testWebhook.setDefaultContext(new HashMap<>(Map.of("env", "test", "debug", "false")));
         when(webhookRepository.findBySecretToken("abc123token")).thenReturn(Optional.of(testWebhook));
-        when(workflowExecutor.execute(any(), any())).thenReturn(WorkflowRun.builder().id("run-1").build());
+        when(workflowExecutor.execute(any(), any(), eq(TriggerSource.WEBHOOK))).thenReturn(WorkflowRun.builder().id("run-1").build());
 
         webhookService.trigger("abc123token", Map.of("env", "prod"), HttpHeaders.EMPTY);
 
         verify(workflowExecutor).execute(eq(testWorkflow), argThat(ctx ->
                 "prod".equals(ctx.get("env")) && "false".equals(ctx.get("debug"))
-        ));
+        ), eq(TriggerSource.WEBHOOK));
     }
 
     @Test
     void trigger_nullPayload_usesDefaultContextOnly() {
         when(webhookRepository.findBySecretToken("abc123token")).thenReturn(Optional.of(testWebhook));
-        when(workflowExecutor.execute(any(), any())).thenReturn(WorkflowRun.builder().id("run-1").build());
+        when(workflowExecutor.execute(any(), any(), eq(TriggerSource.WEBHOOK))).thenReturn(WorkflowRun.builder().id("run-1").build());
 
         webhookService.trigger("abc123token", null, HttpHeaders.EMPTY);
 
         verify(workflowExecutor).execute(eq(testWorkflow), argThat(ctx ->
                 ctx.containsKey("env") && ctx.size() == 1
-        ));
+        ), eq(TriggerSource.WEBHOOK));
     }
 
     @Test
@@ -291,7 +292,7 @@ class WebhookServiceTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("disabled");
 
-        verify(workflowExecutor, never()).execute(any(), any());
+        verify(workflowExecutor, never()).execute(any(), any(), eq(TriggerSource.WEBHOOK));
     }
 
     @Test
@@ -308,7 +309,7 @@ class WebhookServiceTest {
         testWebhook.setDefaultContext(new HashMap<>(Map.of("env", "test")));
         when(webhookRepository.findBySecretToken("abc123token")).thenReturn(Optional.of(testWebhook));
         when(gitPayloadParser.parse(any(), any())).thenReturn(Map.of("git_branch", "main", "env", "ignored"));
-        when(workflowExecutor.execute(any(), any())).thenReturn(WorkflowRun.builder().id("run-1").build());
+        when(workflowExecutor.execute(any(), any(), eq(TriggerSource.WEBHOOK))).thenReturn(WorkflowRun.builder().id("run-1").build());
 
         webhookService.trigger("abc123token", Map.of("action", "deploy"), HttpHeaders.EMPTY);
 
@@ -317,7 +318,7 @@ class WebhookServiceTest {
             return untrusted instanceof java.util.List<?> keys
                     && keys.containsAll(java.util.List.of("action", "git_branch", "env"))
                     && "test".equals(ctx.get("env"));
-        }));
+        }), eq(TriggerSource.WEBHOOK));
     }
 
     @Test
@@ -329,6 +330,6 @@ class WebhookServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("reserved");
 
-        verify(workflowExecutor, never()).execute(any(), any());
+        verify(workflowExecutor, never()).execute(any(), any(), eq(TriggerSource.WEBHOOK));
     }
 }

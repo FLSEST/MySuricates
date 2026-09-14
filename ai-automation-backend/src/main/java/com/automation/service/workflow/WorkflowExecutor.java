@@ -53,6 +53,7 @@ public class WorkflowExecutor {
     private final BlockStepRunner stepRunner;
     private final RunFinalizer finalizer;
     private final RunWorkspaceService workspaces;
+    private final RunAdmission admission;
 
     // Active execution tracking is delegated to WorkflowExecutionRegistry
 
@@ -89,19 +90,21 @@ public class WorkflowExecutor {
                 RunWorkspaceService.policy(workflow.getMetadata(), blocks), workflow.getTemplateId(), blockSkillLookup);
     }
 
-    public WorkflowRun execute(Workflow workflow, Map<String, Object> inputContext) {
-        return execute(workflow, inputContext, null, null);
+    public WorkflowRun execute(Workflow workflow, Map<String, Object> inputContext, TriggerSource triggerSource) {
+        return execute(workflow, inputContext, null, null, triggerSource);
     }
 
     /** Asynchronous: returns the RUNNING run immediately; the blocks execute on a virtual thread. */
-    public WorkflowRun execute(Workflow workflow, Map<String, Object> inputContext,
-                               String triggeredByScheduleId, Map<String, Object> initialRunMetadata) {
+    public WorkflowRun execute(Workflow workflow, Map<String, Object> inputContext, String triggeredByScheduleId,
+                               Map<String, Object> initialRunMetadata, TriggerSource triggerSource) {
+        RunAdmission.Ticket ticket = admission.admit(workflow, triggerSource, inputContext); // before any run row exists
         WorkflowRun run = WorkflowRun.builder()
                 .workflow(workflow)
                 .workflowName(workflow.getName())
                 .status(RunStatus.RUNNING)
                 .startedAt(Instant.now())
                 .triggeredByScheduleId(triggeredByScheduleId)
+                .triggerSource(triggerSource).definitionHash(ticket.definitionHash()).definitionVersionId(ticket.definitionVersionId())
                 .build();
         if (initialRunMetadata != null && !initialRunMetadata.isEmpty()) {
             run.setMetadata(new HashMap<>(initialRunMetadata));
@@ -199,7 +202,7 @@ public class WorkflowExecutor {
 
             context = executionContextFactory.create(new ExecutionContextFactory.ContextSeed(
                     runId, workflowId, workflowName, project, containerId, inputContext,
-                    instructions, model, provider, effort, resumePreviousOutput));
+                    instructions, model, provider, effort, resumePreviousOutput, run.getDefinitionHash(), run.getTriggerSource()));
 
             executionRegistry.promote(runId, context);
             Project executionProject = isolated
@@ -400,7 +403,7 @@ public class WorkflowExecutor {
 
         if (completedSteps.isEmpty() && !run.getMetadata().containsKey("workspace")) {
             log.info("Resume requested for run {} but no completed steps found — falling back to full retry", runId);
-            return execute(run.getWorkflow(), run.getInputContext());
+            return execute(run.getWorkflow(), run.getInputContext(), TriggerSource.RESUME);
         }
 
         int resumeFromIndex = completedSteps.isEmpty() ? 0 : completedSteps.getLast().getStepIndex() + 1;
@@ -433,7 +436,9 @@ public class WorkflowExecutor {
                 "Resuming workflow from step " + resumeFromIndex + ": " + workflow.getName(),
                 "WorkflowExecutor", runId, workflow.getId());
 
-        // Reset run to RUNNING
+        // Reset run to RUNNING — the resumed segment runs today's definition, so provenance is re-taken
+        RunAdmission.Ticket ticket = admission.admit(workflow, TriggerSource.RESUME, contextForResume);
+        run.setTriggerSource(TriggerSource.RESUME); run.setDefinitionHash(ticket.definitionHash()); run.setDefinitionVersionId(ticket.definitionVersionId());
         run.setStatus(RunStatus.RUNNING);
         run.setError(null);
         run.setCompletedAt(null);

@@ -1,6 +1,7 @@
 package com.automation.service.dlq;
 
 import com.automation.entity.DeadLetterEntry;
+import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.repository.WorkflowRepository;
@@ -15,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.mockito.ArgumentMatchers.eq;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -43,7 +45,7 @@ class DeadLetterRetryServiceTest {
 
         DeadLetterEntry result = service.retry("dlq-1");
 
-        verify(workflowExecutor).execute(workflow, Map.of("k", "v"));
+        verify(workflowExecutor).execute(workflow, Map.of("k", "v"), TriggerSource.RETRY);
         assertThat(result.getStatus()).isEqualTo(DeadLetterEntry.Status.RETRIED);
     }
 
@@ -55,7 +57,7 @@ class DeadLetterRetryServiceTest {
 
         service.retry("dlq-2");
 
-        verify(workflowExecutor, never()).execute(any(), any());
+        verify(workflowExecutor, never()).execute(any(), any(), eq(TriggerSource.RETRY));
         verify(dlqService).markRetried("dlq-2");
     }
 
@@ -69,7 +71,7 @@ class DeadLetterRetryServiceTest {
 
         service.retry("dlq-3");
 
-        verify(workflowExecutor, never()).execute(any(), any());
+        verify(workflowExecutor, never()).execute(any(), any(), eq(TriggerSource.RETRY));
         verify(dlqService).markRetried("dlq-3");
     }
 }

@@ -95,7 +95,7 @@ public class SubWorkflowBlockExecutor implements BlockExecutor {
             childContext.putAll(context.exportTaint());
 
             // Execute sub-workflow
-            WorkflowRun subRun = workflowExecutor.execute(subWorkflow, childContext);
+            WorkflowRun subRun = workflowExecutor.execute(subWorkflow, childContext, TriggerSource.SUB_WORKFLOW);
 
             // Poll for completion
             WorkflowRun completed = waitForCompletion(subRun.getId());

@@ -2,6 +2,7 @@ package com.automation.service.todo;
 
 import com.automation.entity.RunStatus;
 import com.automation.entity.Todo;
+import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.repository.TodoRepository;
@@ -52,7 +53,7 @@ class TodoResolutionServiceTest {
         when(todoService.findById("t-1")).thenReturn(todo);
         when(workflowService.findByIdEager("wf-1")).thenReturn(workflow);
         when(workflowExecutorProvider.getObject()).thenReturn(workflowExecutor);
-        when(workflowExecutor.execute(eq(workflow), anyMap(), isNull(), anyMap())).thenReturn(run);
+        when(workflowExecutor.execute(eq(workflow), anyMap(), isNull(), anyMap(), eq(TriggerSource.TODO_RESOLUTION))).thenReturn(run);
         when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
 
         WorkflowRun result = resolutionService.resolve("t-1");

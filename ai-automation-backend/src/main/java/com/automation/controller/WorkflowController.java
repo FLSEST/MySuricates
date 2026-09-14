@@ -11,6 +11,7 @@ import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.WorkflowResponse;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.dto.response.WorkflowVersionResponse;
+import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.entity.WorkflowVersion;
@@ -94,7 +95,7 @@ public class WorkflowController {
         Workflow workflow = workflowService.findByIdEager(id);
         Map<String, Object> context = request != null ? request.context() : Map.of();
 
-        WorkflowRun run = workflowExecutor.execute(workflow, context);
+        WorkflowRun run = workflowExecutor.execute(workflow, context, TriggerSource.MANUAL);
 
         return ResponseEntity.ok(workflowMapper.toRunResponse(run));
     }

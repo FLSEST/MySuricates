@@ -21,6 +21,7 @@ public class WorkflowVersionService {
 
     private final WorkflowVersionRepository versionRepository;
     private final ObjectMapper objectMapper;
+    private final WorkflowDefinitionHasher hasher;
 
     /**
      * Creates a snapshot of the workflow's current state BEFORE an update.
@@ -60,6 +61,12 @@ public class WorkflowVersionService {
         return versionRepository.countByWorkflowId(workflowId);
     }
 
+    /** Newest version row whose snapshot has exactly this definition hash. */
+    public Optional<String> findVersionIdByHash(String workflowId, String definitionHash) {
+        return versionRepository.findTopByWorkflowIdAndDefinitionHashOrderByVersionNumberDesc(workflowId, definitionHash)
+                .map(WorkflowVersion::getId);
+    }
+
     private void saveSnapshot(String workflowId, int versionNumber,
                               WorkflowSnapshot snapshot, String changeSource, String changeMessage) {
         try {
@@ -70,6 +77,7 @@ public class WorkflowVersionService {
                     .snapshot(json)
                     .changeSource(changeSource)
                     .changeMessage(changeMessage)
+                    .definitionHash(hasher.hash(snapshot))
                     .build();
             versionRepository.save(version);
             log.info("Saved workflow version {} for workflow {} (source: {})",

@@ -185,7 +185,7 @@ class WorkflowVersionTest {
         WorkflowVersion version = new WorkflowVersion(
                 "ver-1", "wf-100", 3,
                 "{\"blocks\":[]}", "api",
-                "Initial version", created
+                "Initial version", null, created
         );
 
         assertThat(version.getId()).isEqualTo("ver-1");

@@ -233,7 +233,7 @@ class WorkflowControllerTest {
         );
 
         when(workflowService.findByIdEager("wf-1")).thenReturn(testWorkflow);
-        when(workflowExecutor.execute(eq(testWorkflow), any())).thenReturn(run);
+        when(workflowExecutor.execute(eq(testWorkflow), any(), eq(TriggerSource.MANUAL))).thenReturn(run);
         when(workflowMapper.toRunResponse(run)).thenReturn(runResponse);
 
         String body = """
@@ -260,7 +260,7 @@ class WorkflowControllerTest {
         );
 
         when(workflowService.findByIdEager("wf-1")).thenReturn(testWorkflow);
-        when(workflowExecutor.execute(eq(testWorkflow), any())).thenReturn(run);
+        when(workflowExecutor.execute(eq(testWorkflow), any(), eq(TriggerSource.MANUAL))).thenReturn(run);
         when(workflowMapper.toRunResponse(run)).thenReturn(runResponse);
 
         mockMvc.perform(post("/api/v1/workflows/wf-1/execute")

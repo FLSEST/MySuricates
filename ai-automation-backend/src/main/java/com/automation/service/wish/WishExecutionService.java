@@ -72,7 +72,7 @@ public class WishExecutionService {
         } else if (!wish.getGeneratedWorkflowIds().isEmpty()) {
             String wfId = wish.getGeneratedWorkflowIds().get(0);
             Workflow workflow = workflowService.findByIdEager(wfId);
-            WorkflowRun workflowRun = workflowExecutor.execute(workflow, Map.of());
+            WorkflowRun workflowRun = workflowExecutor.execute(workflow, Map.of(), TriggerSource.WISH);
             wish.setCurrentRunId(workflowRun.getId());
             WishStatusHelper.updateCurrentIterationEntry(wish, "runId", workflowRun.getId());
             wishRepository.save(wish);

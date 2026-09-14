@@ -3,6 +3,7 @@ package com.automation.service.workflow;
 import com.automation.entity.Project;
 import com.automation.entity.RunStatus;
 import com.automation.entity.Skill;
+import com.automation.entity.TriggerSource;
 import com.automation.entity.WorkflowRun;
 import com.automation.entity.WorkflowVersion;
 import com.automation.executor.ExecutionContext;
@@ -59,7 +60,7 @@ class ExecutionContextFactoryTest {
     private ExecutionContextFactory.ContextSeed seed(Map<String, Object> input, String instructions,
                                                     String model, String provider, String effort, String resume) {
         return new ExecutionContextFactory.ContextSeed("run-1", "wf-1", "Demo", project, "docker-1",
-                input, instructions, model, provider, effort, resume);
+                input, instructions, model, provider, effort, resume, null, null);
     }
 
     private ExecutionContextFactory.ContextSeed seed(Map<String, Object> input) {
@@ -133,6 +134,43 @@ class ExecutionContextFactoryTest {
                 .thenReturn(Optional.of(last));
 
         assertThat(factory.create(seed(Map.of())).getVariable("workflow_changed_since_last_run")).isEqualTo("false");
+    }
+
+    @Test
+    void create_injectsDefinitionHashAndTriggerSource() {
+        ExecutionContext ctx = factory.create(new ExecutionContextFactory.ContextSeed("run-1", "wf-1", "Demo", project,
+                "docker-1", Map.of("trigger_source", "SPOOFED"), null, "", "", "", null, "abc123", TriggerSource.WEBHOOK));
+
+        assertThat(ctx.getVariable("workflow_definition_hash")).isEqualTo("abc123");
+        assertThat(ctx.getVariable("trigger_source")).isEqualTo("WEBHOOK");
+    }
+
+    @Test
+    void create_withoutProvenance_leavesVariablesEmpty() {
+        ExecutionContext ctx = factory.create(seed(Map.of()));
+
+        assertThat(ctx.getVariable("workflow_definition_hash")).isEqualTo("");
+        assertThat(ctx.getVariable("trigger_source")).isEqualTo("");
+    }
+
+    @Test
+    void create_changedSinceLastRun_comparesDefinitionHashesWhenBothKnown() {
+        // version timestamp says "unchanged", but the executed definitions differ → hashes win
+        WorkflowVersion v = mock(WorkflowVersion.class);
+        lenient().when(v.getCreatedAt()).thenReturn(Instant.parse("2026-07-01T10:00:00Z"));
+        lenient().when(workflowVersionService.findLatest("wf-1")).thenReturn(Optional.of(v));
+        WorkflowRun last = WorkflowRun.builder().completedAt(Instant.parse("2026-08-01T10:00:00Z"))
+                .definitionHash("old-hash").build();
+        when(runRepository.findTopByWorkflowIdAndStatusOrderByStartedAtDesc("wf-1", RunStatus.COMPLETED))
+                .thenReturn(Optional.of(last));
+
+        ExecutionContext changed = factory.create(new ExecutionContextFactory.ContextSeed("run-1", "wf-1", "Demo", project,
+                "docker-1", Map.of(), null, "", "", "", null, "new-hash", TriggerSource.MANUAL));
+        ExecutionContext same = factory.create(new ExecutionContextFactory.ContextSeed("run-2", "wf-1", "Demo", project,
+                "docker-1", Map.of(), null, "", "", "", null, "old-hash", TriggerSource.MANUAL));
+
+        assertThat(changed.getVariable("workflow_changed_since_last_run")).isEqualTo("true");
+        assertThat(same.getVariable("workflow_changed_since_last_run")).isEqualTo("false");
     }
 
     @Test

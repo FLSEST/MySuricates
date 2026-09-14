@@ -185,8 +185,8 @@ class ChainExecutorTest {
 
         WorkflowRun wfRun1 = WorkflowRun.builder().id("wfr-1").status(RunStatus.RUNNING).build();
         WorkflowRun wfRun2 = WorkflowRun.builder().id("wfr-2").status(RunStatus.RUNNING).build();
-        when(workflowExecutor.execute(eq(wf1), any())).thenReturn(wfRun1);
-        when(workflowExecutor.execute(eq(wf2), any())).thenReturn(wfRun2);
+        when(workflowExecutor.execute(eq(wf1), any(), eq(TriggerSource.CHAIN))).thenReturn(wfRun1);
+        when(workflowExecutor.execute(eq(wf2), any(), eq(TriggerSource.CHAIN))).thenReturn(wfRun2);
 
         WorkflowRun completedRun1 = WorkflowRun.builder().id("wfr-1").status(RunStatus.COMPLETED).build();
         WorkflowRun completedRun2 = WorkflowRun.builder().id("wfr-2").status(RunStatus.COMPLETED).build();
@@ -216,7 +216,7 @@ class ChainExecutorTest {
         when(workflowService.findByIdEager("wf-1")).thenReturn(wf1);
 
         WorkflowRun wfRun1 = WorkflowRun.builder().id("wfr-1").status(RunStatus.RUNNING).build();
-        when(workflowExecutor.execute(eq(wf1), any())).thenReturn(wfRun1);
+        when(workflowExecutor.execute(eq(wf1), any(), eq(TriggerSource.CHAIN))).thenReturn(wfRun1);
 
         WorkflowRun failedRun = WorkflowRun.builder().id("wfr-1").status(RunStatus.FAILED).build();
         when(workflowRunRepository.findById("wfr-1")).thenReturn(Optional.of(failedRun));
@@ -250,8 +250,8 @@ class ChainExecutorTest {
 
         WorkflowRun wfRun1 = WorkflowRun.builder().id("wfr-1").status(RunStatus.RUNNING).build();
         WorkflowRun wfRun2 = WorkflowRun.builder().id("wfr-2").status(RunStatus.RUNNING).build();
-        when(workflowExecutor.execute(eq(wf1), any())).thenReturn(wfRun1);
-        when(workflowExecutor.execute(eq(wf2), any())).thenReturn(wfRun2);
+        when(workflowExecutor.execute(eq(wf1), any(), eq(TriggerSource.CHAIN))).thenReturn(wfRun1);
+        when(workflowExecutor.execute(eq(wf2), any(), eq(TriggerSource.CHAIN))).thenReturn(wfRun2);
 
         WorkflowRun failedRun = WorkflowRun.builder().id("wfr-1").status(RunStatus.FAILED).build();
         WorkflowRun completedRun = WorkflowRun.builder().id("wfr-2").status(RunStatus.COMPLETED).build();
@@ -318,8 +318,8 @@ class ChainExecutorTest {
 
         WorkflowRun wfRun1 = WorkflowRun.builder().id("wfr-1").status(RunStatus.RUNNING).build();
         WorkflowRun wfRun2 = WorkflowRun.builder().id("wfr-2").status(RunStatus.RUNNING).build();
-        when(workflowExecutor.execute(eq(wf1), any())).thenReturn(wfRun1);
-        when(workflowExecutor.execute(eq(wf2), any())).thenReturn(wfRun2);
+        when(workflowExecutor.execute(eq(wf1), any(), eq(TriggerSource.CHAIN))).thenReturn(wfRun1);
+        when(workflowExecutor.execute(eq(wf2), any(), eq(TriggerSource.CHAIN))).thenReturn(wfRun2);
 
         WorkflowRun completedRun1 = WorkflowRun.builder().id("wfr-1").status(RunStatus.COMPLETED).build();
         WorkflowRun completedRun2 = WorkflowRun.builder().id("wfr-2").status(RunStatus.COMPLETED).build();
@@ -336,7 +336,7 @@ class ChainExecutorTest {
         // Capture the context passed to second workflow
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> contextCaptor = ArgumentCaptor.forClass(Map.class);
-        verify(workflowExecutor, times(2)).execute(any(Workflow.class), contextCaptor.capture());
+        verify(workflowExecutor, times(2)).execute(any(Workflow.class), contextCaptor.capture(), eq(TriggerSource.CHAIN));
 
         // First entry: no prior output → placeholder must resolve to "" (not leak literally)
         Map<String, Object> firstContext = contextCaptor.getAllValues().get(0);
@@ -362,7 +362,7 @@ class ChainExecutorTest {
         )));
 
         WorkflowRun wfRun = WorkflowRun.builder().id("wfr-1").status(RunStatus.RUNNING).build();
-        when(workflowExecutor.execute(eq(wf1), any())).thenReturn(wfRun);
+        when(workflowExecutor.execute(eq(wf1), any(), eq(TriggerSource.CHAIN))).thenReturn(wfRun);
 
         WorkflowRun completedRun = WorkflowRun.builder().id("wfr-1").status(RunStatus.COMPLETED).build();
         when(workflowRunRepository.findById("wfr-1")).thenReturn(Optional.of(completedRun));
@@ -396,7 +396,7 @@ class ChainExecutorTest {
         )));
 
         WorkflowRun wfRun = WorkflowRun.builder().id("wfr-1").status(RunStatus.RUNNING).build();
-        when(workflowExecutor.execute(eq(wf1), any())).thenReturn(wfRun);
+        when(workflowExecutor.execute(eq(wf1), any(), eq(TriggerSource.CHAIN))).thenReturn(wfRun);
 
         WorkflowRun warningRun = WorkflowRun.builder().id("wfr-1").status(RunStatus.COMPLETED_WITH_ERRORS).build();
         when(workflowRunRepository.findById("wfr-1")).thenReturn(Optional.of(warningRun));
@@ -431,8 +431,8 @@ class ChainExecutorTest {
 
         WorkflowRun wfRun1 = WorkflowRun.builder().id("wfr-1").status(RunStatus.RUNNING).build();
         WorkflowRun wfRun2 = WorkflowRun.builder().id("wfr-2").status(RunStatus.RUNNING).build();
-        when(workflowExecutor.execute(eq(wf1), any())).thenReturn(wfRun1);
-        when(workflowExecutor.execute(eq(wf2), any())).thenReturn(wfRun2);
+        when(workflowExecutor.execute(eq(wf1), any(), eq(TriggerSource.CHAIN))).thenReturn(wfRun1);
+        when(workflowExecutor.execute(eq(wf2), any(), eq(TriggerSource.CHAIN))).thenReturn(wfRun2);
 
         // First fails, second succeeds
         WorkflowRun failedRun = WorkflowRun.builder().id("wfr-1").status(RunStatus.FAILED).build();

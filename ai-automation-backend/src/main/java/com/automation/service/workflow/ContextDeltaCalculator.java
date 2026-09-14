@@ -15,7 +15,7 @@ final class ContextDeltaCalculator {
     static final Set<String> SYSTEM_VAR_KEYS = Set.of("workflow_run_id", "workflow_id", "workflow_name", "project_id", "project_path",
             "model", "provider", "effort", "started_at", "run_timestamp",
             "previous_report", "open_todos",
-            "workflow_version", "workflow_changed_since_last_run");
+            "workflow_version", "workflow_changed_since_last_run", "workflow_definition_hash", "trigger_source");
 
     private ContextDeltaCalculator() {}
 

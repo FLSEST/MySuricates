@@ -73,6 +73,18 @@ public class WorkflowRun {
     @Column(name = "triggered_by_schedule_id")
     private String triggeredByScheduleId;
 
+    /** SHA-256 of the executed workflow definition — provenance (automation.hardening.provenance). */
+    @Column(name = "definition_hash")
+    private String definitionHash;
+
+    /** Version row whose snapshot has {@link #definitionHash}, if any. */
+    @Column(name = "definition_version_id")
+    private String definitionVersionId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "trigger_source")
+    private TriggerSource triggerSource;
+
     public void addStep(StepResult step) {
         step.setWorkflowRun(this);
         if (step.getStepIndex() <= 0) {

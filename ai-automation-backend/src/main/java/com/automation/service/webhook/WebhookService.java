@@ -1,6 +1,7 @@
 package com.automation.service.webhook;
 
 import com.automation.entity.ActivityLog.LogCategory;
+import com.automation.entity.TriggerSource;
 import com.automation.entity.WebhookTrigger;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
@@ -162,7 +163,7 @@ public class WebhookService {
         // comes from an EAGER relationship but leaves the LAZY ManyToMany uninitialized,
         // which causes LazyInitializationException in WorkflowExecutor.execute().
         Workflow workflow = workflowService.findByIdEager(webhook.getWorkflow().getId());
-        WorkflowRun run = workflowExecutor.execute(workflow, context);
+        WorkflowRun run = workflowExecutor.execute(workflow, context, TriggerSource.WEBHOOK);
 
         webhookRepository.incrementTriggerCount(webhook.getId(), Instant.now());
 

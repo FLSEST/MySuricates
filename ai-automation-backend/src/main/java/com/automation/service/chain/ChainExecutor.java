@@ -163,7 +163,7 @@ public class ChainExecutor {
                 broadcastStatus(runId, run);
 
                 try {
-                    WorkflowRun workflowRun = workflowExecutor.execute(workflow, context);
+                    WorkflowRun workflowRun = workflowExecutor.execute(workflow, context, TriggerSource.CHAIN);
                     runEntry.setWorkflowRunId(workflowRun.getId());
                     chainRunRepository.save(run);
                     broadcastStatus(runId, run);

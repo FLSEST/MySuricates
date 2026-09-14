@@ -1,6 +1,7 @@
 package com.automation.service.repair;
 
 import com.automation.entity.RunStatus;
+import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.event.WorkflowRunCompletedEvent;
@@ -110,7 +111,7 @@ class AutoRepairServiceTest {
         // Local repair: autoFix + execute + wait
         var completedRun = WorkflowRun.builder().status(RunStatus.COMPLETED).build();
         completedRun.setId("repair-run-1");
-        when(workflowExecutor.execute(any(Workflow.class), anyMap(), isNull(), anyMap())).thenReturn(completedRun);
+        when(workflowExecutor.execute(any(Workflow.class), anyMap(), isNull(), anyMap(), eq(TriggerSource.AUTO_REPAIR))).thenReturn(completedRun);
         when(workflowRunRepository.findById("repair-run-1")).thenReturn(Optional.of(completedRun));
 
         var event = createEvent(RunStatus.FAILED, Map.of(),
@@ -118,7 +119,7 @@ class AutoRepairServiceTest {
         service.onWorkflowRunCompleted(event);
 
         verify(workflowFactoryService).autoFixWorkflow(any(Workflow.class), anyString());
-        verify(workflowExecutor).execute(any(Workflow.class), anyMap(), isNull(), anyMap());
+        verify(workflowExecutor).execute(any(Workflow.class), anyMap(), isNull(), anyMap(), eq(TriggerSource.AUTO_REPAIR));
     }
 
     @Test
@@ -128,7 +129,7 @@ class AutoRepairServiceTest {
 
         var completedRun = WorkflowRun.builder().status(RunStatus.COMPLETED).build();
         completedRun.setId("repair-run-1");
-        when(workflowExecutor.execute(any(Workflow.class), anyMap(), isNull(), anyMap())).thenReturn(completedRun);
+        when(workflowExecutor.execute(any(Workflow.class), anyMap(), isNull(), anyMap(), eq(TriggerSource.AUTO_REPAIR))).thenReturn(completedRun);
         when(workflowRunRepository.findById("repair-run-1")).thenReturn(Optional.of(completedRun));
 
         var event = createEvent(RunStatus.FAILED, Map.of(),
@@ -136,7 +137,7 @@ class AutoRepairServiceTest {
         service.onWorkflowRunCompleted(event);
 
         verify(workflowFactoryService).autoFixWorkflow(any(Workflow.class), anyString());
-        verify(workflowExecutor).execute(any(Workflow.class), anyMap(), isNull(), anyMap());
+        verify(workflowExecutor).execute(any(Workflow.class), anyMap(), isNull(), anyMap(), eq(TriggerSource.AUTO_REPAIR));
         verify(workflowFactoryService, never()).verifyAndFix(anyString(), anyInt());
     }
 
@@ -274,7 +275,7 @@ class AutoRepairServiceTest {
 
         var completedRun = WorkflowRun.builder().status(RunStatus.COMPLETED).build();
         completedRun.setId("run-1");
-        when(workflowExecutor.execute(any(Workflow.class), anyMap(), isNull(), anyMap())).thenReturn(completedRun);
+        when(workflowExecutor.execute(any(Workflow.class), anyMap(), isNull(), anyMap(), eq(TriggerSource.AUTO_REPAIR))).thenReturn(completedRun);
         when(workflowRunRepository.findById("run-1")).thenReturn(Optional.of(completedRun));
 
         FactoryTestResult result = service.repairLocally("wf-1", "some error", 2, 600);
@@ -296,7 +297,7 @@ class AutoRepairServiceTest {
         var passedRun = WorkflowRun.builder().status(RunStatus.COMPLETED).build();
         passedRun.setId("run-pass");
 
-        when(workflowExecutor.execute(any(Workflow.class), anyMap(), isNull(), anyMap()))
+        when(workflowExecutor.execute(any(Workflow.class), anyMap(), isNull(), anyMap(), eq(TriggerSource.AUTO_REPAIR)))
                 .thenReturn(failedRun)
                 .thenReturn(passedRun);
         when(workflowRunRepository.findById("run-fail")).thenReturn(Optional.of(failedRun));
@@ -317,7 +318,7 @@ class AutoRepairServiceTest {
         failedRun.setId("run-fail");
         failedRun.setError(Map.of("message", "still broken"));
 
-        when(workflowExecutor.execute(any(Workflow.class), anyMap(), isNull(), anyMap())).thenReturn(failedRun);
+        when(workflowExecutor.execute(any(Workflow.class), anyMap(), isNull(), anyMap(), eq(TriggerSource.AUTO_REPAIR))).thenReturn(failedRun);
         when(workflowRunRepository.findById("run-fail")).thenReturn(Optional.of(failedRun));
 
         FactoryTestResult result = service.repairLocally("wf-1", "original error", 2, 600);
@@ -334,13 +335,13 @@ class AutoRepairServiceTest {
 
         var completedRun = WorkflowRun.builder().status(RunStatus.COMPLETED).build();
         completedRun.setId("run-1");
-        when(workflowExecutor.execute(any(Workflow.class), anyMap(), isNull(), anyMap())).thenReturn(completedRun);
+        when(workflowExecutor.execute(any(Workflow.class), anyMap(), isNull(), anyMap(), eq(TriggerSource.AUTO_REPAIR))).thenReturn(completedRun);
         when(workflowRunRepository.findById("run-1")).thenReturn(Optional.of(completedRun));
 
         service.repairLocally("wf-1", "error", 1, 600);
 
         verify(workflowExecutor).execute(any(Workflow.class), anyMap(), isNull(), argThat(meta ->
-                Boolean.TRUE.equals(meta.get("autoRepairAttempt"))));
+                Boolean.TRUE.equals(meta.get("autoRepairAttempt"))), eq(TriggerSource.AUTO_REPAIR));
     }
 
     // ── Helpers ──────────────────────────────

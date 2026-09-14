@@ -5,6 +5,7 @@ import com.automation.dto.request.CreateTodoTriggerRequest;
 import com.automation.entity.Todo;
 import com.automation.entity.TodoTrigger;
 import com.automation.entity.RunStatus;
+import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.event.TodoCreatedEvent;
@@ -250,13 +251,13 @@ class TodoTriggerServiceTest {
 
             when(workflowService.findByIdEager("wf-fix")).thenReturn(targetWf);
             WorkflowRun run = WorkflowRun.builder().id("run-2").build();
-            when(workflowExecutor.execute(eq(targetWf), anyMap(), isNull(), anyMap())).thenReturn(run);
+            when(workflowExecutor.execute(eq(targetWf), anyMap(), isNull(), anyMap(), eq(TriggerSource.TODO_TRIGGER))).thenReturn(run);
             when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             service.processBacklog();
 
-            verify(workflowExecutor).execute(eq(targetWf), anyMap(), isNull(), anyMap());
+            verify(workflowExecutor).execute(eq(targetWf), anyMap(), isNull(), anyMap(), eq(TriggerSource.TODO_TRIGGER));
             assertThat(todo.getFixAttempts()).isEqualTo(2);
             // The old unscoped global query must not be used anymore
             verify(todoRepository, never()).findBacklogCandidates(anyInt(), any());
@@ -359,13 +360,13 @@ class TodoTriggerServiceTest {
 
             when(workflowService.findByIdEager("wf-fix")).thenReturn(targetWf);
             WorkflowRun run = WorkflowRun.builder().id("run-1").build();
-            when(workflowExecutor.execute(eq(targetWf), anyMap(), isNull(), anyMap())).thenReturn(run);
+            when(workflowExecutor.execute(eq(targetWf), anyMap(), isNull(), anyMap(), eq(TriggerSource.TODO_TRIGGER))).thenReturn(run);
             when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             service.onTodoCreated(new TodoCreatedEvent(this, todo));
 
-            verify(workflowExecutor).execute(eq(targetWf), anyMap(), isNull(), anyMap());
+            verify(workflowExecutor).execute(eq(targetWf), anyMap(), isNull(), anyMap(), eq(TriggerSource.TODO_TRIGGER));
             assertThat(todo.getFixAttempts()).isEqualTo(1);
             assertThat(todo.getLastFixRunId()).isEqualTo("run-1");
         }
@@ -462,7 +463,7 @@ class TodoTriggerServiceTest {
 
             when(workflowService.findByIdEager("wf-fix")).thenReturn(targetWf);
             WorkflowRun run = WorkflowRun.builder().id("run-1").build();
-            when(workflowExecutor.execute(eq(targetWf), anyMap(), isNull(), anyMap())).thenReturn(run);
+            when(workflowExecutor.execute(eq(targetWf), anyMap(), isNull(), anyMap(), eq(TriggerSource.TODO_TRIGGER))).thenReturn(run);
             when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -470,7 +471,7 @@ class TodoTriggerServiceTest {
 
             @SuppressWarnings("unchecked")
             ArgumentCaptor<Map<String, Object>> contextCaptor = ArgumentCaptor.forClass(Map.class);
-            verify(workflowExecutor).execute(eq(targetWf), contextCaptor.capture(), isNull(), anyMap());
+            verify(workflowExecutor).execute(eq(targetWf), contextCaptor.capture(), isNull(), anyMap(), eq(TriggerSource.TODO_TRIGGER));
 
             Map<String, Object> context = contextCaptor.getValue();
             assertThat(context).containsEntry("todo_id", "todo-1");
