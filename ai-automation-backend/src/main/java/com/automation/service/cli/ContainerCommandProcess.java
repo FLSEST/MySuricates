@@ -1,5 +1,9 @@
 package com.automation.service.cli;
 
+import com.automation.service.live.LiveOutput;
+import com.automation.util.LineListener;
+import com.automation.util.ProcessOutputTee;
+
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,13 +23,16 @@ final class ContainerCommandProcess {
         arguments.addAll(2, List.of("--name", name));
         Process process = null;
         var output = new ByteArrayOutputStream();
+        LineListener live = LiveOutput.current().rawLines();
         int exit = 1;
         try {
             if (cancelled.getAsBoolean()) return result("Cancelled before container start", 130, started);
             process = new ProcessBuilder(arguments).redirectErrorStream(true).start();
             Process child = process;
             Thread reader = Thread.ofVirtual().start(() -> {
-                try (var stream = child.getInputStream()) { stream.transferTo(output); }
+                try (var stream = child.getInputStream(); var tee = ProcessOutputTee.wrap(output, live)) {
+                    stream.transferTo(tee);
+                }
                 catch (java.io.IOException ignored) { /* process terminated */ }
             });
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeout);

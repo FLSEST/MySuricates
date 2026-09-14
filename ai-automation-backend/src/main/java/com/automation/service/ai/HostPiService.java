@@ -2,7 +2,7 @@ package com.automation.service.ai;
 
 import com.automation.concurrency.DynamicSemaphore;
 import com.automation.config.HostPiConfig;
-import com.automation.util.LineListener;
+import com.automation.service.live.LiveOutput;
 import com.automation.util.ProcessDrain;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -238,7 +238,7 @@ public class HostPiService {
             writePromptToStdin(proc, prompt);
 
             int effectiveTimeout = timeoutSeconds != null ? timeoutSeconds : config.getTimeoutSeconds();
-            String rawOutput = ProcessDrain.drain(proc, effectiveTimeout, label, LineListener.NONE);
+            String rawOutput = ProcessDrain.drain(proc, effectiveTimeout, label, LiveOutput.current().rawLines());
 
             int exitCode = proc.exitValue();
             if (exitCode != 0) {

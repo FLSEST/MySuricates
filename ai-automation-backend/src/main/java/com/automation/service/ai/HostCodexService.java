@@ -1,7 +1,10 @@
 package com.automation.service.ai;
 
 import com.automation.config.SummarizationConfig;
+import com.automation.service.live.LiveOutput;
 import com.automation.service.system.ApiKeyService;
+import com.automation.util.LineListener;
+import com.automation.util.ProcessDrain;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -105,11 +108,12 @@ public class HostCodexService {
             }
 
             try {
-                // Drain stdout/stderr to prevent buffer deadlock
+                // Drain stdout/stderr to prevent buffer deadlock; lines stream into the live log
+                LineListener live = LiveOutput.current().rawLines();
                 CompletableFuture<byte[]> outputFuture = CompletableFuture.supplyAsync(() -> {
-                    try { return proc.getInputStream().readAllBytes(); }
+                    try { return ProcessDrain.readAll(proc.getInputStream(), live); }
                     catch (IOException e) { return new byte[0]; }
-                });
+                }, ProcessDrain.READERS);
 
                 boolean finished = proc.waitFor(timeoutSeconds, TimeUnit.SECONDS);
                 if (!finished) {

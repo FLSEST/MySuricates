@@ -1,5 +1,8 @@
 package com.automation.service.cli;
 
+import com.automation.service.live.LiveOutput;
+import com.automation.util.LineListener;
+import com.automation.util.ProcessOutputTee;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -7,6 +10,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -48,12 +52,14 @@ public class ShellCommandService {
                 processCallback.accept(proc);
             }
 
-            // Read output in background thread to prevent pipe deadlock
+            // Read output in background thread to prevent pipe deadlock; lines stream into the live log
             ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
             Process running = proc;
+            LineListener live = LiveOutput.current().rawLines();
             Thread reader = Thread.ofVirtual().start(() -> {
-                try (InputStream is = running.getInputStream()) {
-                    is.transferTo(outputBuffer);
+                try (InputStream is = running.getInputStream();
+                     OutputStream tee = ProcessOutputTee.wrap(outputBuffer, live)) {
+                    is.transferTo(tee);
                 } catch (IOException ignored) {
                     // Process destroyed — expected on timeout or cancel
                 }
