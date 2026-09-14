@@ -75,6 +75,9 @@ is left untouched):
 | `research` | core + chains, assistant, insights, workflow memory, audit center, BPMN |
 | `full` | everything, including integrations, webhooks, remote access, terminal, staging |
 
+Ready-made templates for everything off or everything on: `ai-automation-backend/config-examples/application-minimal.yml`
+and `application-maximal.yml` (see [deployment.md](deployment.md#configurations-minimal-and-maximal)).
+
 To unlock single modules later, add e.g. `automation.modules.webhooks: true` to the same file and
 restart the backend. **Settings → Modules & hardening** lists every module with its maturity and a
 ready-made snippet. Switching modules directly in the UI only works if the file contains

@@ -143,6 +143,39 @@ Test instance on port 8090 (uses `docker/Dockerfile.stable` as build base):
 > even though no `${...}` placeholder exists for it. Environment variables take precedence over the
 > values from `application.yml`.
 
+### Configurations: minimal and maximal
+
+Two commented templates for modules and hardening live in `ai-automation-backend/config-examples/`. Copy one to `ai-automation-backend/config/application.yml` (or merge its blocks into it) and restart the backend; `ConfigExamplesTest` keeps both valid as the catalog grows.
+
+| Template | Modules | Settings switches | Hardening |
+|---|---|---|---|
+| [`application-minimal.yml`](../../ai-automation-backend/config-examples/application-minimal.yml) | core only (`core`) | off | all off |
+| [`application-maximal.yml`](../../ai-automation-backend/config-examples/application-maximal.yml) | all (`full`) | on | all on |
+
+The public default sits in between: `core`, settings switches off, only `provenance` on. For Docker/Compose, the same values as environment variables:
+
+```bash
+# Minimal: platform core only, every option off
+AUTOMATION_MODULES_PRESET=core
+AUTOMATION_MODULES_UI_EDITABLE=false
+AUTOMATION_HARDENING_PROVENANCE=false
+AUTOMATION_HARDENING_SEALING=false
+AUTOMATION_HARDENING_REQUIRE_SEALED_FOR_UNATTENDED=false
+AUTOMATION_HARDENING_WEBHOOK_SIGNATURES=false
+```
+
+```bash
+# Maximal: every module and every hardening switch on (not for publicly reachable instances)
+AUTOMATION_MODULES_PRESET=full
+AUTOMATION_MODULES_UI_EDITABLE=true
+AUTOMATION_HARDENING_PROVENANCE=true
+AUTOMATION_HARDENING_SEALING=true
+AUTOMATION_HARDENING_REQUIRE_SEALED_FOR_UNATTENDED=true   # seal workflows first, see below
+AUTOMATION_HARDENING_WEBHOOK_SIGNATURES=true
+```
+
+> **Before "maximal":** `require-sealed-for-unattended` refuses every unattended run of an unsealed workflow (schedules, webhooks, TODO/completion triggers, auto-repair, wishes — also through chains and sub-workflows). Seal the affected workflows first, or keep this one switch `false`. With `full` and `ui-editable`, anyone holding the API key can also turn on modules with network, credential and host access — only on instances that are not publicly reachable.
+
 ### Template and loading path
 
 `ai-automation-backend/.env.example` lists every variable with its actual default, grouped by topic.

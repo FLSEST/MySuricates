@@ -68,7 +68,7 @@ automation:
     sealing: true       # Härtungs-Flags sind vom Preset unabhängig
 ```
 
-Env-Form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_HARDENING_<NAME>` (Bindestriche als `_`, z. B. `AUTOMATION_MODULES_REMOTE_ACCESS=true`). Stable- und Test-Profil setzen `full`; `scripts/setup.sh` schreibt das gewählte Preset nach `ai-automation-backend/config/application.yml`.
+Env-Form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_HARDENING_<NAME>` (Bindestriche als `_`, z. B. `AUTOMATION_MODULES_REMOTE_ACCESS=true`). Stable- und Test-Profil setzen `full`; `scripts/setup.sh` schreibt das gewählte Preset nach `ai-automation-backend/config/application.yml`. Vorlagen „minimal“ und „maximal“: `ai-automation-backend/config-examples/`, erklärt in [deployment.md](deployment.md#konfigurationen-minimal-und-maximal).
 
 **Katalog** (einzige Quelle: `modules/ModuleCatalog`):
 

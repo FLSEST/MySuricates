@@ -1,0 +1,27 @@
+# MySuricates — MINIMAL configuration: platform core only, every option off.
+#
+# Usage: copy to ai-automation-backend/config/application.yml (or merge the blocks into it) and
+# restart the backend. That file is read in addition to the built-in application.yml and takes
+# precedence. Environment-variable form: docs/deployment.md → "Configurations: minimal and maximal".
+#
+# Core (always on): workflows, runs, projects, TODOs with TodoTrigger, schedules, activity log/DLQ,
+# gates, workflow pool, templates, docs, settings.
+#
+# Difference to the public default: only provenance (definition hash on every run) is off here;
+# the default has it on.
+
+automation:
+  modules:
+    # core = no optional module (research = + research modules, full = all)
+    preset: core
+    # Modules cannot be switched in the settings — only here, followed by a restart.
+    ui-editable: false
+  hardening:
+    # No definition hash or version id on runs (the trigger source is still recorded).
+    provenance: false
+    # No seal endpoints. Workflows sealed earlier stay protected.
+    sealing: false
+    # Unattended runs (schedules, webhooks, triggers) also start unsealed workflows.
+    require-sealed-for-unattended: false
+    # Webhook signing secrets cannot be set. Secrets set earlier stay in force.
+    webhook-signatures: false

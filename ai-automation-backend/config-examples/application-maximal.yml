@@ -1,0 +1,30 @@
+# MySuricates — MAXIMAL configuration: every module and every hardening switch on.
+#
+# Usage: copy to ai-automation-backend/config/application.yml (or merge the blocks into it) and
+# restart the backend. That file is read in addition to the built-in application.yml and takes
+# precedence. Environment-variable form: docs/deployment.md → "Configurations: minimal and maximal".
+#
+# WARNING — only for instances that are not publicly reachable:
+#   - full enables modules with network, credential and host access (webhooks with a public
+#     trigger endpoint, integrations with OAuth tokens, remote access via Tailscale, run terminal,
+#     stable/test instances).
+#   - ui-editable lets anyone holding the API key switch these modules on in the settings.
+#   - require-sealed-for-unattended stops every unattended run of an unsealed workflow (schedules,
+#     webhooks, TODO/completion triggers, auto-repair, wishes — also through chains and
+#     sub-workflows). Seal your workflows first, or set this one switch to false.
+
+automation:
+  modules:
+    # full = every optional module (list and maturity: Settings → Modules & hardening)
+    preset: full
+    # Feature modules can also be switched in the settings; applies immediately, wins over this file.
+    ui-editable: true
+  hardening:
+    # Definition hash (SHA-256) and matching version id on every run.
+    provenance: true
+    # Seal workflows: locked definition, runs only while unchanged. Requires provenance.
+    sealing: true
+    # Unattended runs only for sealed workflows. Requires sealing.
+    require-sealed-for-unattended: true
+    # HMAC-SHA256 signing secret per webhook (header X-Signature). Requires the webhooks module.
+    webhook-signatures: true

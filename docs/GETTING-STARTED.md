@@ -73,6 +73,9 @@ vorhandene Datei bleibt unangetastet):
 | `research` | Kern + Chains, Assistent, Insights, Workflow-Memory, Audit Center, BPMN |
 | `full` | alles, auch Integrationen, Webhooks, Remote Access, Terminal, Staging |
 
+Fertige Vorlagen für alles aus bzw. alles an: `ai-automation-backend/config-examples/application-minimal.yml`
+und `application-maximal.yml` (siehe [deployment.md](deployment.md#konfigurationen-minimal-und-maximal)).
+
 Später einzelne Module freischalten: in derselben Datei z. B. `automation.modules.webhooks: true`
 ergänzen und das Backend neu starten. Welche Module es gibt, mit Reifegrad und fertigem Snippet,
 zeigt **Settings → Module & Härtung**. Umschalten direkt in der Oberfläche geht nur, wenn die Datei

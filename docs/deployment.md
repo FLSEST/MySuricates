@@ -143,6 +143,39 @@ Test-Instanz auf Port 8090 (nutzt `docker/Dockerfile.stable` als Build-Basis):
 > `automation.host-claude.max-tokens`, auch wenn dort kein `${...}`-Platzhalter steht.
 > Umgebungsvariablen haben dabei Vorrang vor den Werten aus `application.yml`.
 
+### Konfigurationen: minimal und maximal
+
+Zwei kommentierte Vorlagen für Module und Härtung liegen in `ai-automation-backend/config-examples/`. Zum Verwenden nach `ai-automation-backend/config/application.yml` kopieren (oder die Blöcke dort ergänzen) und das Backend neu starten; `ConfigExamplesTest` hält beide gültig, wenn der Katalog wächst.
+
+| Vorlage | Module | Settings-Schalter | Härtung |
+|---|---|---|---|
+| [`application-minimal.yml`](../ai-automation-backend/config-examples/application-minimal.yml) | nur Kern (`core`) | aus | alles aus |
+| [`application-maximal.yml`](../ai-automation-backend/config-examples/application-maximal.yml) | alle (`full`) | an | alles an |
+
+Der öffentliche Default liegt dazwischen: `core`, Settings-Schalter aus, nur `provenance` an. Für Docker/Compose dieselben Werte als Umgebungsvariablen:
+
+```bash
+# Minimal: platform core only, every option off
+AUTOMATION_MODULES_PRESET=core
+AUTOMATION_MODULES_UI_EDITABLE=false
+AUTOMATION_HARDENING_PROVENANCE=false
+AUTOMATION_HARDENING_SEALING=false
+AUTOMATION_HARDENING_REQUIRE_SEALED_FOR_UNATTENDED=false
+AUTOMATION_HARDENING_WEBHOOK_SIGNATURES=false
+```
+
+```bash
+# Maximal: every module and every hardening switch on (not for publicly reachable instances)
+AUTOMATION_MODULES_PRESET=full
+AUTOMATION_MODULES_UI_EDITABLE=true
+AUTOMATION_HARDENING_PROVENANCE=true
+AUTOMATION_HARDENING_SEALING=true
+AUTOMATION_HARDENING_REQUIRE_SEALED_FOR_UNATTENDED=true   # seal workflows first, see below
+AUTOMATION_HARDENING_WEBHOOK_SIGNATURES=true
+```
+
+> **Vor „maximal“:** `require-sealed-for-unattended` lehnt jeden unbeaufsichtigten Run eines unversiegelten Workflows ab (Schedules, Webhooks, TODO-/Completion-Trigger, Auto-Repair, Wishes — auch über Chains und Sub-Workflows). Erst die betroffenen Workflows versiegeln oder diesen einen Schalter auf `false` lassen. Mit `full` und `ui-editable` kann außerdem jeder mit API-Key Module mit Netzwerk-, Zugangsdaten- und Host-Zugriff einschalten — nur auf nicht öffentlich erreichbaren Instanzen.
+
 ### Vorlage und Ladeweg
 
 `ai-automation-backend/.env.example` listet alle Variablen mit ihren tatsaechlichen Defaults,
