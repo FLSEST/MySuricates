@@ -1,9 +1,12 @@
 package com.automation.service.ai;
 
 import com.automation.config.HostPiConfig;
+import com.automation.service.live.LiveOutput;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -296,5 +299,36 @@ class HostPiServiceTest {
         assertThatThrownBy(() -> service.reason("test", null, null, null, null, 2))
                 .isInstanceOf(IOException.class)
                 .hasMessageContaining("timed out after 2 seconds");
+    }
+
+    // --- live output ---
+
+    @Test
+    void executeAction_streamsRawLinesIntoTheBoundLiveSink_resultUnchanged() throws IOException {
+        HostPiConfig config = new HostPiConfig();
+        config.setDefaultBackendProvider("anthropic");
+        config.setDefaultThinkingLevel("medium");
+        HostPiService service = new HostPiService(config) {
+            @Override
+            List<String> buildActionCommand(String model, String systemPrompt,
+                                             List<String> allowedTools, List<String> disallowedTools,
+                                             String effort) {
+                return List.of("/bin/sh", "-c", "cat >/dev/null; echo 'Denke nach'; echo 'Fertig.'");
+            }
+        };
+        List<String> lines = new ArrayList<>();
+
+        HostPiService.ActionResult unbound = service.executeAction("p", null, null, null, 10, false, null, null);
+        HostPiService.ActionResult bound = LiveOutput.bind((kind, text) -> lines.add(kind + ":" + text), () -> {
+            try {
+                return service.executeAction("p", null, null, null, 10, false, null, null);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
+
+        assertThat(bound).isEqualTo(unbound);
+        assertThat(bound.text()).isEqualTo("Denke nach\nFertig.");
+        assertThat(lines).containsExactly("LINE:Denke nach", "LINE:Fertig.");
     }
 }

@@ -1022,6 +1022,18 @@ Shell-Bloecke ohne `container_image` laufen auf dem Host. Verfuegbare Tools:
 
 Alles andere (pip-Pakete, go, docker-cli, gh, trivy, spezialisierte Tools) ist **NICHT** verfuegbar.
 
+### Live-Output beim Beobachten eines Runs
+
+Waehrend ein Block laeuft, erscheinen seine Ausgaben zeilenweise in den Live-Logs der Ausfuehrungsseite: Shell- und
+Container-Bloecke mit stdout/stderr (zusammengefuehrt), Claude-Bloecke als Tool-Aufrufe, gekuerzter Text und
+Abschluss-Zeile, Pi/Codex als Rohzeilen — auch fuer Bloecke innerhalb von `foreach`/`while`/`retry` (unter dem Index des
+aeusseren Steps). Hinweise:
+
+- Fortschrittsbalken mit `\r` zeigen nur den jeweils letzten Stand; sehr lange Zeilen werden gekuerzt.
+- Programme, die ihre Ausgabe puffern (z. B. `python3` ohne `-u`), erscheinen erst beim Flush — fuer Live-Ausgabe
+  `python3 -u` oder `PYTHONUNBUFFERED=1` verwenden.
+- Der Step-Output (`{{ block.<name>.output }}`, Step-Karte) ist davon unberuehrt und enthaelt wie bisher die komplette Ausgabe.
+
 ### Container-Images
 
 Fuer Shell-Bloecke die mehr Tools benoetigen, `container_image` setzen:

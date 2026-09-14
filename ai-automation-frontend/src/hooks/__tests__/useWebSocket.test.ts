@@ -30,14 +30,29 @@ vi.mock('sockjs-client', () => ({
   default: vi.fn(),
 }));
 
+const mockApiGet = vi.fn();
+vi.mock('../../api/client', () => ({
+  api: { get: (...args: unknown[]) => mockApiGet(...args) },
+}));
+
 import { useExecutionWebSocket } from '../useWebSocket';
+
+let lastQueryClient: QueryClient | null = null;
 
 function createWrapper() {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
+  lastQueryClient = qc;
   return ({ children }: { children: ReactNode }) =>
     createElement(QueryClientProvider, { client: qc }, children);
+}
+
+function liveBatch(bufferId: string, seqs: number[], stepIndex = 0, kind = 'line') {
+  return {
+    type: 'live_output', runId: 'run-1', bufferId, skipped: 0,
+    lines: seqs.map((seq) => ({ seq, stepIndex, kind, text: `line ${seq}`, ts: 1_700_000_000_000 + seq })),
+  };
 }
 
 function sendMessage(msg: Record<string, unknown>) {
@@ -51,6 +66,8 @@ describe('useExecutionWebSocket', () => {
     subscribeCb = null;
     mockActivate.mockClear();
     mockDeactivate.mockClear();
+    mockApiGet.mockReset();
+    mockApiGet.mockResolvedValue({ runId: 'run-1', bufferId: null, available: false, firstSeq: 0, lastSeq: -1, skipped: 0, lines: [] });
   });
 
   // --- Connection lifecycle ---
@@ -302,5 +319,142 @@ describe('useExecutionWebSocket', () => {
     // Verify error-level log for failed item
     const errorLog = result.current.logs.find(l => l.level === 'ERROR');
     expect(errorLog).toBeDefined();
+  });
+
+  // --- Live output ---
+
+  it('appends a live batch in one update with stable ids and kinds', async () => {
+    const { result } = renderHook(() => useExecutionWebSocket('run-1', 'wf-1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.connected).toBe(true));
+    await waitFor(() => expect(mockApiGet).toHaveBeenCalled());
+
+    act(() => sendMessage({ ...liveBatch('buf-1', [0, 1], 2, 'tool') }));
+
+    await waitFor(() => expect(result.current.logs).toHaveLength(2));
+    expect(result.current.logs.map((l) => l.id)).toEqual(['live-buf-1-0', 'live-buf-1-1']);
+    expect(result.current.logs[0]).toMatchObject({ kind: 'tool', stepIndex: 2, message: 'line 0', stepLabel: 'Step 3' });
+  });
+
+  it('ignores duplicate seqs and resets de-duplication when the bufferId changes', async () => {
+    const { result } = renderHook(() => useExecutionWebSocket('run-1', 'wf-1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(mockApiGet).toHaveBeenCalled());
+
+    act(() => sendMessage(liveBatch('buf-1', [0, 1, 2])));
+    act(() => sendMessage(liveBatch('buf-1', [1, 2, 3])));
+    act(() => sendMessage(liveBatch('buf-2', [0])));
+
+    await waitFor(() => expect(result.current.logs.map((l) => l.id)).toEqual(
+      ['live-buf-1-0', 'live-buf-1-1', 'live-buf-1-2', 'live-buf-1-3', 'live-buf-2-0']));
+  });
+
+  it('replays buffered lines on connect and queues live batches until the replay is done', async () => {
+    let resolveReplay: (value: unknown) => void = () => {};
+    mockApiGet.mockReturnValue(new Promise((resolve) => { resolveReplay = resolve; }));
+    const { result } = renderHook(() => useExecutionWebSocket('run-1', 'wf-1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(mockApiGet).toHaveBeenCalledWith('/executions/run-1/live-log?afterSeq=-1'));
+
+    act(() => sendMessage(liveBatch('buf-1', [3, 4])));
+    expect(result.current.logs).toHaveLength(0);
+
+    await act(async () => {
+      resolveReplay({ runId: 'run-1', bufferId: 'buf-1', available: true, firstSeq: 0, lastSeq: 3, skipped: 0,
+        lines: liveBatch('buf-1', [0, 1, 2, 3]).lines });
+    });
+
+    await waitFor(() => expect(result.current.logs.map((l) => l.message)).toEqual(
+      ['line 0', 'line 1', 'line 2', 'line 3', 'line 4']));
+  });
+
+  it('labels replayed lines with the step names from the snapshot', async () => {
+    mockApiGet.mockResolvedValue({ runId: 'run-1', bufferId: 'buf-1', available: true, firstSeq: 0, lastSeq: 0, skipped: 0,
+      stepNames: { '0': 'Build' }, lines: liveBatch('buf-1', [0], 0).lines });
+    const { result } = renderHook(() => useExecutionWebSocket('run-1', 'wf-1'), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.logs).toHaveLength(1));
+    expect(result.current.logs[0].stepLabel).toBe('Step 1 · Build');
+  });
+
+  it('keeps working when the replay request fails', async () => {
+    mockApiGet.mockRejectedValue(new Error('offline'));
+    const { result } = renderHook(() => useExecutionWebSocket('run-1', 'wf-1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(mockApiGet).toHaveBeenCalled());
+
+    await act(async () => { await Promise.resolve(); });
+    act(() => sendMessage(liveBatch('buf-1', [0])));
+
+    await waitFor(() => expect(result.current.logs).toHaveLength(1));
+  });
+
+  it('inserts a skipped marker for missing seqs', async () => {
+    const { result } = renderHook(() => useExecutionWebSocket('run-1', 'wf-1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(mockApiGet).toHaveBeenCalled());
+
+    act(() => sendMessage(liveBatch('buf-1', [0])));
+    act(() => sendMessage(liveBatch('buf-1', [5, 6])));
+
+    await waitFor(() => expect(result.current.logs).toHaveLength(4));
+    expect(result.current.logs[1]).toMatchObject({ skipped: 4, level: 'WARN' });
+  });
+
+  it('does not invalidate run queries for live batches, but does for step and forEach messages', async () => {
+    const { result } = renderHook(() => useExecutionWebSocket('run-1', 'wf-1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.connected).toBe(true));
+    const invalidate = vi.spyOn(lastQueryClient!, 'invalidateQueries');
+
+    act(() => sendMessage(liveBatch('buf-1', [0, 1])));
+    expect(invalidate).not.toHaveBeenCalled();
+
+    act(() => sendMessage({ stepIndex: 0, status: 'RUNNING', input: '', output: '', durationMs: 0 }));
+    act(() => sendMessage({ type: 'foreach_item_started', stepIndex: 1, itemIndex: 0, item: 'a', totalItems: 1 }));
+    act(() => sendMessage({ type: 'command', runId: 'run-1', input: 'ls', output: 'x' }));
+    expect(invalidate).toHaveBeenCalledTimes(2);
+  });
+
+  it('labels steps with their block name and closes live steps with status and duration only', async () => {
+    const { result } = renderHook(() => useExecutionWebSocket('run-1', 'wf-1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(mockApiGet).toHaveBeenCalled());
+
+    act(() => sendMessage({ stepIndex: 1, status: 'RUNNING', input: '', output: '', durationMs: 0, blockType: 'shell', blockName: 'Build' }));
+    act(() => sendMessage(liveBatch('buf-1', [0], 1)));
+    act(() => sendMessage({ stepIndex: 1, status: 'COMPLETED', input: 'mvn', output: 'huge output', durationMs: 65_000, blockName: 'Build' }));
+
+    await waitFor(() => expect(result.current.logs.map((l) => l.message)).toEqual(
+      ['[Step 2 · Build] started', 'line 0', '[Step 2 · Build] COMPLETED (1m 5s)']));
+    expect(result.current.logs[1].stepLabel).toBe('Step 2 · Build');
+  });
+
+  it('renders command and container messages instead of "[Step undefined]"', async () => {
+    const { result } = renderHook(() => useExecutionWebSocket('run-1', 'wf-1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.connected).toBe(true));
+
+    act(() => sendMessage({ type: 'container_skipped', runId: 'run-1', message: 'Host fallback' }));
+    act(() => sendMessage({ type: 'command', runId: 'run-1', input: 'ls', output: 'a.txt' }));
+
+    await waitFor(() => expect(result.current.logs.map((l) => l.message)).toEqual(
+      ['[Container] Host fallback', '$ ls\na.txt']));
+    expect(result.current.logs[0].level).toBe('WARN');
+  });
+
+  it('does not replay or stream when liveOutput is off', async () => {
+    const { result } = renderHook(() => useExecutionWebSocket('run-1', 'wf-1', { liveOutput: false }), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.connected).toBe(true));
+
+    act(() => sendMessage(liveBatch('buf-1', [0])));
+
+    expect(mockApiGet).not.toHaveBeenCalled();
+    expect(result.current.logs).toHaveLength(0);
+  });
+
+  it('clears the logs when the runId changes', async () => {
+    const { result, rerender } = renderHook(({ id }) => useExecutionWebSocket(id, 'wf-1'), {
+      wrapper: createWrapper(), initialProps: { id: 'run-1' },
+    });
+    await waitFor(() => expect(mockApiGet).toHaveBeenCalled());
+    act(() => sendMessage(liveBatch('buf-1', [0])));
+    await waitFor(() => expect(result.current.logs).toHaveLength(1));
+
+    rerender({ id: 'run-2' });
+
+    await waitFor(() => expect(result.current.logs).toHaveLength(0));
   });
 });

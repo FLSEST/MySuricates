@@ -169,13 +169,13 @@ export function CalendarView() {
                     {dayEvents.length > 0 && (
                       <div className="flex gap-1 mt-1 flex-wrap">
                         {scheduledCount > 0 && (
-                          <span className="inline-block w-2 h-2 rounded-full bg-blue-500" title={`${scheduledCount} scheduled`} />
+                          <span className="inline-block w-2 h-2 rounded-full bg-info" title={`${scheduledCount} scheduled`} />
                         )}
                         {successCount > 0 && (
-                          <span className="inline-block w-2 h-2 rounded-full bg-green-500" title={`${successCount} successful`} />
+                          <span className="inline-block w-2 h-2 rounded-full bg-success" title={`${successCount} successful`} />
                         )}
                         {failedCount > 0 && (
-                          <span className="inline-block w-2 h-2 rounded-full bg-red-500" title={`${failedCount} failed`} />
+                          <span className="inline-block w-2 h-2 rounded-full bg-danger" title={`${failedCount} failed`} />
                         )}
                       </div>
                     )}
@@ -190,15 +190,15 @@ export function CalendarView() {
       {/* Legend */}
       <div className="flex items-center gap-4 text-xs text-text-secondary">
         <span className="flex items-center gap-1.5">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-500" />
+          <span className="inline-block w-2.5 h-2.5 rounded-full bg-info" />
           {t.schedules.scheduledAt.replace(' At', '').replace(' fuer', '')}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-500" />
+          <span className="inline-block w-2.5 h-2.5 rounded-full bg-success" />
           {t.workflows.execution.completed}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500" />
+          <span className="inline-block w-2.5 h-2.5 rounded-full bg-danger" />
           {t.workflows.execution.failed}
         </span>
       </div>
@@ -216,9 +216,9 @@ export function CalendarView() {
               {selectedEvents.map((ev) => (
                 <div key={ev.id} className="flex items-center gap-3 p-2 rounded-lg bg-surface-secondary">
                   <span className={`w-2 h-2 rounded-full shrink-0 ${
-                    ev.type === 'scheduled' ? 'bg-blue-500' :
-                    ev.status === 'COMPLETED' ? 'bg-green-500' :
-                    ev.status === 'FAILED' ? 'bg-red-500' : 'bg-gray-400'
+                    ev.type === 'scheduled' ? 'bg-info' :
+                    ev.status === 'COMPLETED' ? 'bg-success' :
+                    ev.status === 'FAILED' ? 'bg-danger' : 'bg-text-tertiary'
                   }`} />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-text truncate">{ev.title}</p>

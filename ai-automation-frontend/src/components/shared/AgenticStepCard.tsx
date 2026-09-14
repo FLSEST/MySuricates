@@ -14,8 +14,8 @@ function IterationCard({ iter }: { iter: AgenticIteration }) {
   const t = useT();
 
   const phaseIcon = {
-    reasoning: <Brain className="w-4 h-4 text-accent animate-pulse" />,
-    acting: <Terminal className="w-4 h-4 text-blue-500 animate-pulse" />,
+    reasoning: <Brain className="w-4 h-4 text-ai animate-pulse" />,
+    acting: <Terminal className="w-4 h-4 text-info animate-pulse" />,
     acted: iter.exitCode === 0
       ? <CheckCircle2 className="w-4 h-4 text-success" />
       : <AlertCircle className="w-4 h-4 text-danger" />,

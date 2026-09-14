@@ -792,7 +792,27 @@ Response (DTO) → React Query Cache → UI-Update
   - `/topic/wishes/{wishId}/status` — Wish-Status-Updates
   - `/topic/assistant/{requestId}/status` — Assistenten-Chat-Status (pro Request)
   - `/topic/assistant/{sessionId}/events` — Assistenten-Push-Events (pro Session)
-- **Nachrichtenformat:** `{ timestamp, level, message }`
+- **Nachrichten auf `/topic/executions/{runId}/logs`:** JSON-Objekte, unterschieden über `type` —
+  Step-Nachrichten (ohne `type`: `stepIndex`, `status`, `input`, `output`, `durationMs`, `blockType`, `blockName`),
+  `status`, `approval_*`, `human_input_*`, `agentic_*`, `foreach_item_*`, `container_*`, `command` und `live_output`
+- **Live-Output laufender Blöcke:** Shell-, Container-, Pi- und Codex-Prozesse liefern ihre Ausgabe zeilenweise,
+  Claude-`stream-json` wird zu kurzen Zeilen aufbereitet (Tool-Aufruf, gekürzter Text, Größe des Tool-Ergebnisses,
+  Abschluss mit Turns/Kosten/Dauer).
+  - **Mechanik:** `BlockStepRunner` bindet für die Dauer eines Steps (inkl. Validation-Retries und verschachtelter Blöcke)
+    einen Sink per `ThreadLocal` (`service/live/LiveOutput`, bewusst nicht vererbbar — Sub-Workflows streamen in ihren
+    eigenen Run). Die Prozess-Runner lesen ihn auf dem aufrufenden Thread und teilen die Pipe über
+    `util/ProcessOutputTee` in Zeilen; der gesammelte Step-Output bleibt byte-identisch. Aufrufer außerhalb von Workflows
+    (Assistent, Tagging, Suche) sind ungebunden und streamen nichts.
+  - **Transport:** `RunLiveLogService` sammelt pro Run in einem Ring (Standard 1000 Zeilen) und sendet höchstens alle
+    250 ms einen Batch `{ type: "live_output", runId, bufferId, lines: [{ seq, stepIndex, kind, text, ts }], skipped }`;
+    vor der finalen Step-Nachricht wird synchron geflusht. `kind`: `line`, `text`, `tool`, `tool_result`, `tool_error`,
+    `result`, `system`. Pro Batch gelten Zeilen- und Zeichen-Caps (neueste Zeilen gewinnen, Rest zählt als `skipped`).
+    `setPreservePublishOrder(true)` hält die Reihenfolge pro Session.
+  - **Replay:** `GET /api/v1/executions/{id}/live-log?afterSeq=-1` liefert den Puffer; das Frontend lädt ihn beim
+    (Re-)Connect und dedupliziert über `bufferId` + `seq`. Puffer leben nur im Speicher und verfallen 10 Minuten nach
+    Run-Ende (auch ohne Completion-Event über den Abgleich mit `WorkflowExecutionRegistry`), maximal 20 Runs.
+  - **Konfiguration:** `automation.live-log.*` (`enabled`, `max-line-length`, `buffer-lines`, `flush-interval-ms`,
+    `max-lines-per-flush`, `max-chars-per-flush`, `retention-minutes`, `max-buffered-runs`); nur beim Start gelesen.
 - **Terminal-WebSocket:** `/ws/terminal/**` für Echtzeit-Container-Zugriff (Raw WebSocket via `RawWebSocketConfig`, Handler: `TerminalWebSocketHandler`)
 
 ## Sicherheit

@@ -10,6 +10,7 @@ import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.executor.ApprovalRequest;
 import com.automation.service.workflow.RunDeletionService;
+import com.automation.service.workflow.RunLiveLogService;
 import com.automation.service.workflow.WorkflowExecutor;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ public class ExecutionController {
     private final ExecutionCommandService executionCommandService;
     private final PendingTodoApprovalService pendingTodoApprovalService;
     private final RunDeletionService runDeletionService;
+    private final RunLiveLogService runLiveLogService;
 
     @GetMapping
     public PageResponse<WorkflowRunResponse> listExecutions(
@@ -44,6 +46,16 @@ public class ExecutionController {
     @GetMapping("/{id}")
     public ResponseEntity<WorkflowRunResponse> getExecution(@PathVariable String id) {
         return ResponseEntity.ok(executionQueryService.getExecutionResponse(id));
+    }
+
+    /**
+     * Gepufferte Live-Zeilen eines Laufs (nur im Speicher, bis ~10 min nach Laufende) fuer das Replay
+     * nach einem Reload. {@code available=false} statt 404, wenn nichts gepuffert ist.
+     */
+    @GetMapping("/{id}/live-log")
+    public RunLiveLogService.Snapshot getLiveLog(@PathVariable String id,
+                                                 @RequestParam(defaultValue = "-1") long afterSeq) {
+        return runLiveLogService.snapshot(id, afterSeq);
     }
 
     /**

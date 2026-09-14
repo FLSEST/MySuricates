@@ -195,7 +195,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 | Component | Description |
 |---|---|
 | `StatusBadge` | Maps status strings to badge variants |
-| `LogViewer` | Log display with level colors and auto-scroll |
+| `LogViewer` | Terminal-style log display: level colors, icons per live line kind, step badge, auto-scroll only while scrolled to the bottom (otherwise "Jump to latest") |
 | `MonacoEditor` | JSON editor (Monaco, dark theme) |
 | `ErrorState` | Error message with icon |
 | `EmptyState` | Empty state with description |
@@ -616,8 +616,8 @@ Generic hook for persisted state via `localStorage`.
 ### `useWebSocket.ts`
 
 ```typescript
-useExecutionWebSocket(runId: string | null, workflowId?: string) → {
-  logs: Array<{ timestamp, level, message }>,
+useExecutionWebSocket(runId: string | null, workflowId?: string, options?: { liveOutput?: boolean }) → {
+  logs: ExecutionLogEntry[],   // { id, timestamp, level, message, kind?, stepIndex?, stepLabel?, skipped? }
   connected: boolean,
   clearLogs: () => void,
   pendingApproval: PendingApproval | null,
@@ -627,7 +627,7 @@ useExecutionWebSocket(runId: string | null, workflowId?: string) → {
 }
 ```
 
-Connects to the backend via SockJS/STOMP and receives live logs, approval prompts, human input prompts, agentic states, and ForEach states.
+Connects to the backend via SockJS/STOMP and receives live logs, approval prompts, human input prompts, agentic states, and ForEach states. With `liveOutput` (default `true`) `live_output` batches are added; on (re)connect the hook loads the buffer via `GET /executions/{id}/live-log` and de-duplicates by `bufferId` + `seq` (gaps are shown as a marker). The message → entry mapping lives, purely functional, in `hooks/executionLogEntries.ts`.
 
 ### `useToast.ts`
 

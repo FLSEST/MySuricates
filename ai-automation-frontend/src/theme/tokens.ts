@@ -28,6 +28,12 @@ export interface ThemeTokens {
   '--color-warning-subtle': string;
   '--color-danger': string;
   '--color-danger-subtle': string;
+  '--color-ai': string;
+  '--color-ai-subtle': string;
+  '--color-human': string;
+  '--color-human-subtle': string;
+  '--color-info': string;
+  '--color-info-subtle': string;
   '--color-sidebar': string;
   '--color-sidebar-border': string;
   '--color-sidebar-hover': string;

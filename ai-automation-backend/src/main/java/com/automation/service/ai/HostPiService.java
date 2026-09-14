@@ -2,20 +2,17 @@ package com.automation.service.ai;
 
 import com.automation.concurrency.DynamicSemaphore;
 import com.automation.config.HostPiConfig;
+import com.automation.service.live.LiveOutput;
+import com.automation.util.ProcessDrain;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -241,7 +238,7 @@ public class HostPiService {
             writePromptToStdin(proc, prompt);
 
             int effectiveTimeout = timeoutSeconds != null ? timeoutSeconds : config.getTimeoutSeconds();
-            String rawOutput = drainProcess(proc, effectiveTimeout, label);
+            String rawOutput = ProcessDrain.drain(proc, effectiveTimeout, label, LiveOutput.current().rawLines());
 
             int exitCode = proc.exitValue();
             if (exitCode != 0) {
@@ -286,41 +283,6 @@ public class HostPiService {
             }
         }
         lastCallTimestamp.set(System.currentTimeMillis());
-    }
-
-    private String drainProcess(Process proc, int timeoutSeconds, String label) throws IOException {
-        InputStream stdout = proc.getInputStream();
-        CompletableFuture<byte[]> outputFuture = CompletableFuture.supplyAsync(() -> {
-            try { return stdout.readAllBytes(); }
-            catch (IOException e) { return new byte[0]; }
-        });
-
-        try {
-            boolean finished = proc.waitFor(timeoutSeconds, TimeUnit.SECONDS);
-            if (!finished) {
-                proc.destroyForcibly();
-                proc.waitFor(5, TimeUnit.SECONDS);
-                outputFuture.cancel(true);
-                closeQuietly(stdout);
-                throw new IOException(label + " timed out after " + timeoutSeconds + " seconds");
-            }
-            return new String(outputFuture.get(5, TimeUnit.SECONDS)).trim();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            proc.destroyForcibly();
-            outputFuture.cancel(true);
-            closeQuietly(stdout);
-            throw new IOException(label + " interrupted");
-        } catch (ExecutionException | TimeoutException e) {
-            proc.destroyForcibly();
-            outputFuture.cancel(true);
-            closeQuietly(stdout);
-            throw new IOException("Failed to read " + label + " output", e);
-        }
-    }
-
-    private void closeQuietly(InputStream stream) {
-        try { stream.close(); } catch (IOException ignored) { /* already destroyed */ }
     }
 
     private void writePromptToStdin(Process proc, String prompt) throws IOException {

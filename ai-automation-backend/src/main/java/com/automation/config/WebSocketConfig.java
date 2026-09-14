@@ -23,6 +23,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void configureMessageBroker(MessageBrokerRegistry config) {
         config.enableSimpleBroker("/topic");
         config.setApplicationDestinationPrefixes("/app");
+        // Live-log batches carry sequence numbers; clients de-duplicate by them, so messages to a
+        // session must keep their publish order (the outbound channel is a thread pool otherwise).
+        config.setPreservePublishOrder(true);
     }
 
     @Override

@@ -59,6 +59,24 @@ class ExecutionBroadcasterTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void broadcastStepResult_includesBlockLabelsFromMetadata_whenPresent() {
+        StepResult labelled = StepResult.builder().stepIndex(1).status(StepStatus.RUNNING)
+                .metadata(new HashMap<>(Map.of("blockType", "shell", "blockName", "Build", "tokens", 3))).build();
+        StepResult unlabelled = StepResult.builder().stepIndex(2).status(StepStatus.RUNNING)
+                .metadata(new HashMap<>(Map.of("blockName", "  "))).build();
+
+        broadcaster.broadcastStepResult(RUN_ID, labelled);
+        broadcaster.broadcastStepResult(RUN_ID, unlabelled);
+
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(messagingTemplate, times(2)).convertAndSend(eq(EXPECTED_TOPIC), captor.capture());
+        assertThat(captor.getAllValues().get(0))
+                .containsEntry("blockType", "shell").containsEntry("blockName", "Build").doesNotContainKey("tokens");
+        assertThat(captor.getAllValues().get(1)).doesNotContainKeys("blockType", "blockName");
+    }
+
+    @Test
     void broadcastStepResult_nullFieldsDefaultToEmptyAndZero() {
         StepResult step = StepResult.builder()
                 .stepIndex(0)

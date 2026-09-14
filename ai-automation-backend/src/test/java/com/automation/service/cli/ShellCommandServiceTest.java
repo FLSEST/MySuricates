@@ -1,5 +1,7 @@
 package com.automation.service.cli;
 
+import com.automation.service.live.LiveOutput;
+import com.automation.service.live.LiveOutputSink;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -7,6 +9,11 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -73,5 +80,49 @@ class ShellCommandServiceTest {
 
         assertThat(result.exitCode()).isZero();
         assertThat(result.output().trim()).isEqualTo("abc");
+    }
+
+    // --- live output ---
+
+    @Test
+    void execute_streamsLinesIntoTheBoundLiveSink_whileTheCommandRuns() throws InterruptedException {
+        List<String> lines = new CopyOnWriteArrayList<>();
+        CountDownLatch firstLine = new CountDownLatch(1);
+        LiveOutputSink sink = (kind, text) -> {
+            lines.add(kind + ":" + text);
+            firstLine.countDown();
+        };
+        AtomicReference<ShellCommandService.ShellResult> result = new AtomicReference<>();
+
+        Thread run = Thread.ofVirtual().start(() -> result.set(LiveOutput.bind(sink,
+                () -> service.execute("echo eins; sleep 2; echo zwei >&2", null, 30))));
+
+        assertThat(firstLine.await(1500, TimeUnit.MILLISECONDS)).as("line before the command finished").isTrue();
+        run.join(10_000);
+        assertThat(lines).containsExactly("LINE:eins", "LINE:zwei");
+        assertThat(result.get().output()).isEqualTo("eins\nzwei");
+    }
+
+    @Test
+    void execute_outputIsIdenticalWithAndWithoutLiveSink() {
+        String command = "printf 'a\\r\\nb\\n\\n  c  \\n'";
+        ShellCommandService.ShellResult plain = service.execute(command, null, 30);
+        ShellCommandService.ShellResult streamed = LiveOutput.bind((kind, text) -> {},
+                () -> service.execute(command, null, 30));
+
+        assertThat(streamed.output()).isEqualTo(plain.output());
+        assertThat(streamed.exitCode()).isEqualTo(plain.exitCode());
+    }
+
+    @Test
+    void execute_timeout_stillDeliversThePartialLine() {
+        List<String> lines = new CopyOnWriteArrayList<>();
+
+        ShellCommandService.ShellResult result = LiveOutput.bind((kind, text) -> lines.add(text),
+                () -> service.execute("printf 'halbe Zeile'; sleep 60", null, 1));
+
+        assertThat(result.exitCode()).isEqualTo(124);
+        assertThat(result.output()).contains("halbe Zeile").contains("timed out");
+        assertThat(lines).containsExactly("halbe Zeile");
     }
 }

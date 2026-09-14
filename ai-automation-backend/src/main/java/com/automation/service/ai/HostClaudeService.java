@@ -1,10 +1,14 @@
 package com.automation.service.ai;
 
+import com.automation.concurrency.DynamicSemaphore;
 import com.automation.config.CliPermissionsConfig;
 import com.automation.config.HostClaudeConfig;
 import com.automation.service.cli.ClaudeJsonResponse;
 import com.automation.service.cli.ClaudeOutputParser;
+import com.automation.service.cli.ClaudeStreamEventFormatter;
+import com.automation.service.live.LiveOutput;
 import com.automation.service.system.ApiKeyService;
+import com.automation.util.ProcessDrain;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,17 +16,10 @@ import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import com.automation.concurrency.DynamicSemaphore;
-
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Service
@@ -207,7 +204,7 @@ public class HostClaudeService {
             writePromptToStdin(proc, prompt);
 
             int effectiveTimeout = timeoutSeconds != null ? timeoutSeconds : config.getTimeoutSeconds();
-            String rawOutput = drainProcess(proc, effectiveTimeout, label);
+            String rawOutput = ProcessDrain.drain(proc, effectiveTimeout, label, ClaudeStreamEventFormatter.listener(LiveOutput.current()));
 
             int exitCode = proc.exitValue();
             if (exitCode != 0) {
@@ -405,46 +402,6 @@ public class HostClaudeService {
             }
         }
         lastCallTimestamp.set(System.currentTimeMillis());
-    }
-
-    /**
-     * Drains process stdout, waits for completion with timeout, and ensures all streams
-     * are closed — even on timeout or interruption.
-     */
-    private String drainProcess(Process proc, int timeoutSeconds, String label) throws IOException {
-        InputStream stdout = proc.getInputStream();
-        CompletableFuture<byte[]> outputFuture = CompletableFuture.supplyAsync(() -> {
-            try { return stdout.readAllBytes(); }
-            catch (IOException e) { return new byte[0]; }
-        });
-
-        try {
-            boolean finished = proc.waitFor(timeoutSeconds, TimeUnit.SECONDS);
-            if (!finished) {
-                proc.destroyForcibly();
-                proc.waitFor(5, TimeUnit.SECONDS);
-                outputFuture.cancel(true);
-                closeQuietly(stdout);
-                throw new IOException(label + " timed out after " + timeoutSeconds + " seconds");
-            }
-
-            return new String(outputFuture.get(5, TimeUnit.SECONDS)).trim();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            proc.destroyForcibly();
-            outputFuture.cancel(true);
-            closeQuietly(stdout);
-            throw new IOException(label + " interrupted");
-        } catch (ExecutionException | TimeoutException e) {
-            proc.destroyForcibly();
-            outputFuture.cancel(true);
-            closeQuietly(stdout);
-            throw new IOException("Failed to read " + label + " output", e);
-        }
-    }
-
-    private void closeQuietly(InputStream stream) {
-        try { stream.close(); } catch (IOException ignored) { /* already destroyed */ }
     }
 
     /**

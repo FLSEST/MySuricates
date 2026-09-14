@@ -1,12 +1,16 @@
 package com.automation.service.ai;
 
 import com.automation.config.SummarizationConfig;
+import com.automation.service.live.LiveOutput;
 import com.automation.service.system.ApiKeyService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -165,5 +169,33 @@ class HostCodexServiceTest {
         svc.injectApiKeyEnv(pb);
 
         assertThat(pb.environment()).doesNotContainKey("AUTOMATION_API_KEY");
+    }
+
+    // --- live output ---
+
+    @Test
+    void execute_streamsProgressLinesIntoTheBoundLiveSink_resultStillFromOutputFile() {
+        SummarizationConfig config = new SummarizationConfig();
+        config.setTimeoutSeconds(30);
+        HostCodexService svc = new HostCodexService(config) {
+            @Override
+            List<String> buildCommand(Path workingDirectory, Path outputFile, boolean readOnly, String model) {
+                return List.of("/bin/sh", "-c",
+                        "cat >/dev/null; echo 'thinking…'; echo 'running tests'; printf 'final answer' > \"$1\"",
+                        "sh", outputFile.toString());
+            }
+        };
+        List<String> lines = new ArrayList<>();
+
+        String result = LiveOutput.bind((kind, text) -> lines.add(kind + ":" + text), () -> {
+            try {
+                return svc.execute("prompt", null, 30, true, null);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
+
+        assertThat(result).isEqualTo("final answer");
+        assertThat(lines).containsExactly("LINE:thinking…", "LINE:running tests");
     }
 }

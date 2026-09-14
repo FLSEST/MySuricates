@@ -19,9 +19,9 @@ import type { WorkflowFactoryResult } from '../types';
 
 function StatusIcon({ status }: { status: string }) {
   switch (status) {
-    case 'VERIFIED': return <CheckCircle2 className="w-5 h-5 text-emerald-500" />;
-    case 'FAILED': return <XCircle className="w-5 h-5 text-red-500" />;
-    case 'CREATED': return <Clock className="w-5 h-5 text-blue-500" />;
+    case 'VERIFIED': return <CheckCircle2 className="w-5 h-5 text-success" />;
+    case 'FAILED': return <XCircle className="w-5 h-5 text-danger" />;
+    case 'CREATED': return <Clock className="w-5 h-5 text-info" />;
     case 'PROMOTED': return <Award className="w-5 h-5 text-amber-500" />;
     case 'EXPORTED': return <Package className="w-5 h-5 text-violet-500" />;
     default: return <Spinner size="sm" />;

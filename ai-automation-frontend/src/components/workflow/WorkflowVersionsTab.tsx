@@ -24,21 +24,21 @@ const SOURCE_ICONS: Record<string, typeof User> = {
 };
 
 const SOURCE_COLORS: Record<string, string> = {
-  user: 'bg-blue-500/20 text-blue-400',
-  ai: 'bg-purple-500/20 text-purple-400',
+  user: 'bg-human-subtle text-human',
+  ai: 'bg-ai-subtle text-ai',
   'pool-install': 'bg-amber-500/20 text-amber-400',
   import: 'bg-green-500/20 text-green-400',
-  api: 'bg-cyan-500/20 text-cyan-400',
-  system: 'bg-gray-500/20 text-gray-400',
-  assistant: 'bg-purple-500/20 text-purple-400',
-  factory: 'bg-purple-500/20 text-purple-400',
-  wish: 'bg-purple-500/20 text-purple-400',
+  api: 'bg-info-subtle text-info',
+  system: 'bg-surface-hover text-text-secondary',
+  assistant: 'bg-ai-subtle text-ai',
+  factory: 'bg-ai-subtle text-ai',
+  wish: 'bg-ai-subtle text-ai',
   dialog: 'bg-green-500/20 text-green-400',
-  conversion: 'bg-purple-500/20 text-purple-400',
+  conversion: 'bg-ai-subtle text-ai',
   'chain-template': 'bg-green-500/20 text-green-400',
   'bpmn-import': 'bg-green-500/20 text-green-400',
-  restore: 'bg-blue-500/20 text-blue-400',
-  untracked: 'bg-amber-500/20 text-amber-400',
+  restore: 'bg-info-subtle text-info',
+  untracked: 'bg-warning-subtle text-warning',
 };
 
 export default function WorkflowVersionsTab({ workflowId, currentHash }: { workflowId: string; currentHash?: string | null }) {

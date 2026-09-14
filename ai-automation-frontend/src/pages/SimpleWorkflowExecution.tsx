@@ -79,7 +79,7 @@ export function SimpleWorkflowExecution() {
 
   const { data: workflow } = useWorkflow(id!);
   const { data: runs, error: runsError, refetch: refetchRuns } = useWorkflowRuns(id!);
-  const { connected, pendingApproval, pendingHumanInput } = useExecutionWebSocket(runId!, id);
+  const { connected, pendingApproval, pendingHumanInput } = useExecutionWebSocket(runId!, id, { liveOutput: false });
   const pauseExecution = usePauseExecution();
   const resumeExecution = useResumeExecution();
   const cancelExecution = useCancelExecution();
