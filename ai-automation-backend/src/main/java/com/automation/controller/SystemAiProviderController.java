@@ -1,6 +1,8 @@
 package com.automation.controller;
 
 import com.automation.dto.response.SystemCapabilitiesResponse;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.ModuleRegistry;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.ai.PiCatalogService;
 import com.automation.service.ai.catalog.ModelCatalog;
@@ -21,6 +23,7 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /** AI-Provider- und Capability-Auskunft unter /api/v1/system. */
@@ -34,6 +37,7 @@ public class SystemAiProviderController {
     private final ModelCatalogService modelCatalogService;
     private final SystemIdentityService systemIdentity;
     private final RequestMappingHandlerMapping requestMappingHandlerMapping;
+    private final ModuleRegistry moduleRegistry;
 
     @Value("${automation.environment:Dev}")
     private String environment;
@@ -70,8 +74,30 @@ public class SystemAiProviderController {
                 environment,
                 routes,
                 blockTypes,
+                moduleRegistry.preset().key(),
+                moduleRegistry.describe().stream().map(SystemAiProviderController::moduleCapability).toList(),
                 Instant.now()
         );
+    }
+
+    private static SystemCapabilitiesResponse.ModuleCapabilityResponse moduleCapability(ModuleRegistry.ModuleStatus status) {
+        ModuleCatalog m = status.module();
+        return new SystemCapabilitiesResponse.ModuleCapabilityResponse(
+                m.key(),
+                apiKey(m.kind()),
+                status.enabled(),
+                apiKey(m.tier()),
+                apiKey(m.maturity()),
+                m.risks().stream().map(SystemAiProviderController::apiKey).sorted().toList(),
+                m.requires().stream().map(ModuleCatalog::key).toList(),
+                m.property(),
+                m.envVar(),
+                m.description());
+    }
+
+    /** HOST_ACCESS → host-access */
+    private static String apiKey(Enum<?> value) {
+        return value.name().toLowerCase(Locale.ROOT).replace('_', '-');
     }
 
     private List<SystemCapabilitiesResponse.RouteCapabilityResponse> routeCapabilities(

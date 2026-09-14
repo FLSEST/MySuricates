@@ -2,6 +2,8 @@ package com.automation.controller;
 
 import com.automation.config.RateLimitConfig;
 import com.automation.exception.GlobalExceptionHandler;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.ModuleRegistry;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.ai.PiCatalogService;
@@ -13,12 +15,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import static org.hamcrest.Matchers.hasItem;
 import static org.mockito.Mockito.when;
@@ -55,6 +60,15 @@ class SystemAiProviderControllerTest {
     @MockitoBean
     private RateLimitConfig rateLimitConfig;
 
+    /** Real registry, not a mock: preset research with webhooks switched on by override. */
+    @TestConfiguration
+    static class Modules {
+        @Bean
+        ModuleRegistry moduleRegistry() {
+            return ModuleRegistry.of(Map.of("preset", "research", "webhooks", "true"), Map.of());
+        }
+    }
+
     @Test
     void aiProviders_returnsProviderList() throws Exception {
         when(aiProviderRegistry.getAvailableProviderIds())
@@ -80,6 +94,24 @@ class SystemAiProviderControllerTest {
                 .andExpect(jsonPath("$.routes[*].path", hasItem("/api/v1/system/capabilities")))
                 .andExpect(jsonPath("$.blockTypes[*].type", hasItem("shell")))
                 .andExpect(jsonPath("$.generatedAt").exists());
+    }
+
+    @Test
+    void capabilities_listsModulesWithStartupDecision() throws Exception {
+        mockMvc.perform(get("/api/v1/system/capabilities"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.preset").value("research"))
+                .andExpect(jsonPath("$.modules.length()").value(ModuleCatalog.values().length))
+                .andExpect(jsonPath("$.modules[?(@.name=='chains')].enabled").value(true))
+                .andExpect(jsonPath("$.modules[?(@.name=='webhooks')].enabled").value(true))
+                .andExpect(jsonPath("$.modules[?(@.name=='webhooks')].risks[0]").value("network"))
+                .andExpect(jsonPath("$.modules[?(@.name=='webhooks')].envVar").value("AUTOMATION_MODULES_WEBHOOKS"))
+                .andExpect(jsonPath("$.modules[?(@.name=='terminal')].risks[0]").value("host-access"))
+                .andExpect(jsonPath("$.modules[?(@.name=='wishes')].enabled").value(false))
+                .andExpect(jsonPath("$.modules[?(@.name=='wishes')].requires[0]").value("chains"))
+                .andExpect(jsonPath("$.modules[?(@.name=='provenance')].kind").value("hardening"))
+                .andExpect(jsonPath("$.modules[?(@.name=='provenance')].enabled").value(true))
+                .andExpect(jsonPath("$.modules[?(@.name=='sealing')].property").value("automation.hardening.sealing"));
     }
 
     @Test

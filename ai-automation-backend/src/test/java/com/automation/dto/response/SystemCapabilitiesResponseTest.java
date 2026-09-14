@@ -1,6 +1,7 @@
 package com.automation.dto.response;
 
 import com.automation.dto.response.SystemCapabilitiesResponse.BlockTypeCapabilityResponse;
+import com.automation.dto.response.SystemCapabilitiesResponse.ModuleCapabilityResponse;
 import com.automation.dto.response.SystemCapabilitiesResponse.RouteCapabilityResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -34,6 +35,12 @@ class SystemCapabilitiesResponseTest {
         return new BlockTypeCapabilityResponse("shell", "Executes shell commands");
     }
 
+    private static ModuleCapabilityResponse sampleModule() {
+        return new ModuleCapabilityResponse("webhooks", "feature", false, "advanced", "stable",
+                List.of("network"), List.of(), "automation.modules.webhooks", "AUTOMATION_MODULES_WEBHOOKS",
+                "Inbound webhook triggers");
+    }
+
     private static SystemCapabilitiesResponse sample() {
         return new SystemCapabilitiesResponse(
                 "v1",
@@ -42,6 +49,8 @@ class SystemCapabilitiesResponseTest {
                 "production",
                 List.of(sampleRoute()),
                 List.of(sampleBlockType()),
+                "core",
+                List.of(sampleModule()),
                 GENERATED_AT
         );
     }
@@ -59,6 +68,8 @@ class SystemCapabilitiesResponseTest {
             assertThat(r.environment()).isEqualTo("production");
             assertThat(r.routes()).containsExactly(sampleRoute());
             assertThat(r.blockTypes()).containsExactly(sampleBlockType());
+            assertThat(r.preset()).isEqualTo("core");
+            assertThat(r.modules()).containsExactly(sampleModule());
             assertThat(r.generatedAt()).isEqualTo(GENERATED_AT);
         }
 
@@ -84,7 +95,7 @@ class SystemCapabilitiesResponseTest {
         void should_accept_empty_capability_lists_when_constructed() {
             SystemCapabilitiesResponse r = new SystemCapabilitiesResponse(
                     "v1", "0.7.3", "release", "production",
-                    List.of(), List.of(), GENERATED_AT
+                    List.of(), List.of(), "core", List.of(), GENERATED_AT
             );
 
             assertThat(r.routes()).isEmpty();
@@ -94,7 +105,7 @@ class SystemCapabilitiesResponseTest {
         @Test
         void should_tolerate_null_values_when_constructed_with_nulls() {
             SystemCapabilitiesResponse r = new SystemCapabilitiesResponse(
-                    null, null, null, null, null, null, null
+                    null, null, null, null, null, null, null, null, null
             );
 
             assertThat(r.apiVersion()).isNull();
@@ -120,7 +131,7 @@ class SystemCapabilitiesResponseTest {
         void should_not_be_equal_when_a_field_differs() {
             SystemCapabilitiesResponse other = new SystemCapabilitiesResponse(
                     "v2", "0.7.3", "release", "production",
-                    List.of(sampleRoute()), List.of(sampleBlockType()), GENERATED_AT
+                    List.of(sampleRoute()), List.of(sampleBlockType()), "core", List.of(sampleModule()), GENERATED_AT
             );
 
             assertThat(sample()).isNotEqualTo(other);
@@ -154,6 +165,9 @@ class SystemCapabilitiesResponseTest {
             assertThat(json).contains("\"handler\":\"executeWorkflow\"");
             assertThat(json).contains("\"type\":\"shell\"");
             assertThat(json).contains("\"summary\":\"Executes shell commands\"");
+            assertThat(json).contains("\"preset\":\"core\"");
+            assertThat(json).contains("\"name\":\"webhooks\"");
+            assertThat(json).contains("\"envVar\":\"AUTOMATION_MODULES_WEBHOOKS\"");
             assertThat(json).contains("\"generatedAt\":\"2026-07-03T10:00:00Z\"");
         }
 
@@ -161,7 +175,7 @@ class SystemCapabilitiesResponseTest {
         void should_serialize_empty_arrays_when_capability_lists_are_empty() throws Exception {
             SystemCapabilitiesResponse r = new SystemCapabilitiesResponse(
                     "v1", "0.7.3", "release", "production",
-                    List.of(), List.of(), GENERATED_AT
+                    List.of(), List.of(), "core", List.of(), GENERATED_AT
             );
 
             String json = MAPPER.writeValueAsString(r);
