@@ -615,7 +615,9 @@ Folgende Variablen werden vom `WorkflowExecutor` automatisch bei jedem Run geset
 | `{{ home_dir }}` | Home-Verzeichnis des JVM-Benutzers |
 | `{{ user }}` | Betriebssystem-Benutzername |
 | `{{ workflow_version }}` | Aktuelle Versionsnummer des Workflows |
-| `{{ workflow_changed_since_last_run }}` | `"true"` oder `"false"` — ob sich der Workflow seit dem letzten Run geaendert hat |
+| `{{ workflow_changed_since_last_run }}` | `"true"` oder `"false"` — ob sich die Definition seit dem letzten erfolgreichen Run geaendert hat (Hash-Vergleich; ohne Hash ueber Zeitstempel) |
+| `{{ workflow_definition_hash }}` | SHA-256 der ausgefuehrten Definition (leer, wenn `automation.hardening.provenance` aus ist) |
+| `{{ trigger_source }}` | Ausloeser des Runs: `MANUAL`, `RETRY`, `RESUME`, `SCHEDULE`, `WEBHOOK`, `TODO_TRIGGER`, `TODO_RESOLUTION`, `COMPLETION_TRIGGER`, `CHAIN`, `SUB_WORKFLOW`, `ASSISTANT`, `AUTO_REPAIR`, `WISH` |
 | `{{ previous_report }}` | Laengster Non-Shell-Step-Output des letzten COMPLETED-Runs desselben Workflows (max. 3000 Zeichen), oder `"(kein vorheriger Report vorhanden)"` |
 | `{{ open_todos }}` | Markdown-Liste offener/in-Bearbeitung-TODOs des Projekts in einem `<open_todos>…</open_todos>`-Block, oder `"(keine offenen TODOs)"`. Titel und Tags sind auf eine Zeile geglaettet, auf 200/80 Zeichen gekuerzt und von Plattform-Markern (`todo_item:`, `gate_*:`) befreit — sie koennen aus importierten Issues stammen und gelten als Daten, nicht als Anweisung. Maximal 150 Eintraege |
 

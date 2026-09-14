@@ -29,12 +29,17 @@ Das Feld `details` wird nur bei Bedarf mitgeliefert (`@JsonInclude(NON_NULL)`).
 | Code | HTTP-Status |
 |---|---|
 | `RESOURCE_NOT_FOUND` | 404 |
+| `MODULE_DISABLED` | 404 |
 | `VALIDATION_FAILED` | 400 |
 | `INVALID_ARGUMENT` | 400 |
 | `WORKFLOW_EXECUTION_FAILED` | 500 |
 | `CONTAINER_ERROR` | 500 |
 | `STAGING_ERROR` | 500 |
 | `STATE_CONFLICT` | 409 |
+| `WORKFLOW_SEALED` | 409 |
+| `WORKFLOW_TAMPERED` | 409 |
+| `UNATTENDED_REQUIRES_SEAL` | 403 |
+| `WEBHOOK_SIGNATURE_INVALID` | 401 |
 | `NO_TASK_TARGET` | 400 |
 | `PROVIDER_NOT_CONNECTED` | 409 |
 | `PROVIDER_NOT_TASK_CAPABLE` | 400 |
@@ -317,6 +322,8 @@ Workflow aktualisieren.
 
 **Response:** `WorkflowResponse`
 
+Die Herkunft der Änderung (`changeSource` der neuen Version) bestimmt der Server. Versiegelte Workflows: Definitionsänderungen → `409 WORKFLOW_SEALED`, Umbenennen bleibt möglich.
+
 ### `DELETE /api/v1/workflows/{id}`
 
 Workflow löschen.
@@ -449,9 +456,14 @@ Workflow ausführen.
   "error": {},
   "metadata": {},
   "inputContext": {},
-  "triggeredByScheduleId": null
+  "triggeredByScheduleId": null,
+  "triggerSource": "MANUAL",
+  "definitionHash": "3f1c…e9",
+  "definitionVersionId": "version-uuid"
 }
 ```
+
+`definitionHash`/`definitionVersionId` sind `null`, wenn `automation.hardening.provenance` aus ist. Abgelehnte Starts erzeugen keinen Run: `409 WORKFLOW_TAMPERED` (versiegelte Definition verändert), `403 UNATTENDED_REQUIRES_SEAL` (nur bei unbeaufsichtigten Auslösern).
 
 ### `GET /api/v1/workflows/{id}/runs`
 
@@ -547,6 +559,21 @@ Einzelne Version abrufen.
 Workflow auf eine frühere Version zurücksetzen.
 
 **Response:** `WorkflowResponse`
+
+### `POST /api/v1/workflows/{id}/seal`
+
+Workflow versiegeln (Schalter `automation.hardening.sealing`, sonst `404 MODULE_DISABLED`). Hält den aktuellen
+Definitions-Hash fest; danach lehnt der Workflow Definitionsänderungen und Löschen ab (`409 WORKFLOW_SEALED`) und startet
+nicht, wenn die Definition vom Siegel abweicht (`409 WORKFLOW_TAMPERED`). Idempotent; protokolliert einen
+`SECURITY`-Eintrag.
+
+**Response:** `WorkflowResponse` mit `sealed: true`, `sealedHash`, `sealedAt`
+
+### `POST /api/v1/workflows/{id}/unseal`
+
+Siegel lösen (gleicher Schalter). Protokolliert einen `SECURITY`-Eintrag mit dem bisherigen Hash.
+
+**Response:** `WorkflowResponse` mit `sealed: false`
 
 ---
 
@@ -1153,7 +1180,8 @@ Alle Webhooks auflisten.
     "defaultContext": {},
     "lastTriggeredAt": null,
     "triggerCount": 0,
-    "createdAt": "2025-01-15T10:00:00Z"
+    "createdAt": "2025-01-15T10:00:00Z",
+    "signatureRequired": false
   }
 ]
 ```
@@ -1212,6 +1240,20 @@ im ActivityLog.
 
 **Response:** `WebhookTriggerResponse` — neuer Token voll sichtbar, `tokenVisible: true`
 
+### `POST /api/v1/webhooks/{id}/secret`
+
+Signatur-Secret setzen oder erneuern (Schalter `automation.hardening.webhook-signatures`, sonst `404 MODULE_DISABLED`).
+Das Secret wird nur in dieser Response gezeigt und verschlüsselt gespeichert; ab jetzt brauchen Trigger-Aufrufe eine
+Signatur. Protokolliert einen `SECURITY`-Eintrag.
+
+**Response:** `{ "secret": "<64 hex>", "header": "X-Signature" }`
+
+### `DELETE /api/v1/webhooks/{id}/secret`
+
+Signatur-Secret entfernen (gleicher Schalter).
+
+**Response:** `204 No Content`
+
 ### `DELETE /api/v1/webhooks/{id}`
 
 Webhook löschen.
@@ -1232,6 +1274,19 @@ Webhook auslösen. **Kein API-Key nötig.**
 ```
 
 Der Payload wird mit dem `defaultContext` des Webhooks gemergt und als Kontext an die Workflow-Ausführung übergeben.
+Er muss ein JSON-Objekt sein (sonst `400`); Schlüssel mit `__`-Präfix sind reserviert.
+
+**Signatur:** Hat der Webhook ein Signatur-Secret (`signatureRequired: true`), braucht der Aufruf den Header
+`X-Signature: sha256=<hex>` (alternativ `X-Hub-Signature-256`) mit dem HMAC-SHA256 der rohen Request-Bytes — sonst
+`401 WEBHOOK_SIGNATURE_INVALID`:
+
+```bash
+SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" | cut -d' ' -f2)
+curl -X POST "$URL" -H 'Content-Type: application/json' -H "X-Signature: sha256=$SIG" -d "$BODY"
+```
+
+Mit `automation.hardening.require-sealed-for-unattended` startet ein Webhook nur versiegelte Workflows (sonst
+`403 UNATTENDED_REQUIRES_SEAL`).
 
 **Response:** `WorkflowRunResponse`
 

@@ -27,12 +27,17 @@ The `details` field is only included when needed (`@JsonInclude(NON_NULL)`).
 | Code | HTTP Status |
 |---|---|
 | `RESOURCE_NOT_FOUND` | 404 |
+| `MODULE_DISABLED` | 404 |
 | `VALIDATION_FAILED` | 400 |
 | `INVALID_ARGUMENT` | 400 |
 | `WORKFLOW_EXECUTION_FAILED` | 500 |
 | `CONTAINER_ERROR` | 500 |
 | `STAGING_ERROR` | 500 |
 | `STATE_CONFLICT` | 409 |
+| `WORKFLOW_SEALED` | 409 |
+| `WORKFLOW_TAMPERED` | 409 |
+| `UNATTENDED_REQUIRES_SEAL` | 403 |
+| `WEBHOOK_SIGNATURE_INVALID` | 401 |
 | `NO_TASK_TARGET` | 400 |
 | `PROVIDER_NOT_CONNECTED` | 409 |
 | `PROVIDER_NOT_TASK_CAPABLE` | 400 |
@@ -315,6 +320,8 @@ Update a workflow.
 
 **Response:** `WorkflowResponse`
 
+The server decides the change's origin (`changeSource` of the new version). Sealed workflows: definition changes → `409 WORKFLOW_SEALED`, renaming still works.
+
 ### `DELETE /api/v1/workflows/{id}`
 
 Delete a workflow.
@@ -439,9 +446,14 @@ Execute a workflow.
   "error": {},
   "metadata": {},
   "inputContext": {},
-  "triggeredByScheduleId": null
+  "triggeredByScheduleId": null,
+  "triggerSource": "MANUAL",
+  "definitionHash": "3f1c…e9",
+  "definitionVersionId": "version-uuid"
 }
 ```
+
+`definitionHash`/`definitionVersionId` are `null` when `automation.hardening.provenance` is off. Refused starts create no run: `409 WORKFLOW_TAMPERED` (sealed definition modified), `403 UNATTENDED_REQUIRES_SEAL` (unattended triggers only).
 
 ### `GET /api/v1/workflows/{id}/runs`
 
@@ -537,6 +549,20 @@ Retrieve a single version.
 Restore a workflow to a previous version.
 
 **Response:** `WorkflowResponse`
+
+### `POST /api/v1/workflows/{id}/seal`
+
+Seal a workflow (switch `automation.hardening.sealing`, otherwise `404 MODULE_DISABLED`). Records the current definition
+hash; afterwards the workflow rejects definition changes and deletion (`409 WORKFLOW_SEALED`) and does not start when the
+definition no longer matches the seal (`409 WORKFLOW_TAMPERED`). Idempotent; logs a `SECURITY` entry.
+
+**Response:** `WorkflowResponse` with `sealed: true`, `sealedHash`, `sealedAt`
+
+### `POST /api/v1/workflows/{id}/unseal`
+
+Remove the seal (same switch). Logs a `SECURITY` entry with the previous hash.
+
+**Response:** `WorkflowResponse` with `sealed: false`
 
 ---
 
@@ -1143,7 +1169,8 @@ List all webhooks.
     "defaultContext": {},
     "lastTriggeredAt": null,
     "triggerCount": 0,
-    "createdAt": "2025-01-15T10:00:00Z"
+    "createdAt": "2025-01-15T10:00:00Z",
+    "signatureRequired": false
   }
 ]
 ```
@@ -1202,6 +1229,20 @@ ActivityLog.
 
 **Response:** `WebhookTriggerResponse` — new token shown in full, `tokenVisible: true`
 
+### `POST /api/v1/webhooks/{id}/secret`
+
+Set or rotate the signing secret (switch `automation.hardening.webhook-signatures`, otherwise `404 MODULE_DISABLED`).
+The secret appears only in this response and is stored encrypted; from now on trigger calls need a signature. Logs a
+`SECURITY` entry.
+
+**Response:** `{ "secret": "<64 hex>", "header": "X-Signature" }`
+
+### `DELETE /api/v1/webhooks/{id}/secret`
+
+Remove the signing secret (same switch).
+
+**Response:** `204 No Content`
+
 ### `DELETE /api/v1/webhooks/{id}`
 
 Delete a webhook.
@@ -1222,6 +1263,19 @@ Trigger a webhook. **No API key required.**
 ```
 
 The payload is merged with the webhook's `defaultContext` and passed as context to the workflow execution.
+It must be a JSON object (otherwise `400`); keys prefixed with `__` are reserved.
+
+**Signature:** If the webhook has a signing secret (`signatureRequired: true`), the call needs the header
+`X-Signature: sha256=<hex>` (or `X-Hub-Signature-256`) carrying the HMAC-SHA256 of the raw request bytes — otherwise
+`401 WEBHOOK_SIGNATURE_INVALID`:
+
+```bash
+SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" | cut -d' ' -f2)
+curl -X POST "$URL" -H 'Content-Type: application/json' -H "X-Signature: sha256=$SIG" -d "$BODY"
+```
+
+With `automation.hardening.require-sealed-for-unattended` a webhook only starts sealed workflows (otherwise
+`403 UNATTENDED_REQUIRES_SEAL`).
 
 **Response:** `WorkflowRunResponse`
 

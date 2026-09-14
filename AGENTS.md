@@ -291,7 +291,20 @@ POST /api/v1/workflows/{id}/versions/{versionId}/restore
 - Versionen werden automatisch bei jedem Update erstellt (nur bei Änderung an Blocks, Instructions, Model, Provider, Metadata, DefaultContext, Skills)
 - Jede Version beschreibt den Zustand **nach** einer Änderung und trägt `definitionHash` (SHA-256 der Definition). `changeSource` bestimmt der Server, nicht der Request: `user`, `assistant`, `factory` (auch Auto-Repair), `wish`, `dialog`, `conversion`, `chain-template`, `pool-install`, `import`, `bpmn-import`, `restore`, `untracked` (Stand ohne Version, z. B. Altbestand oder Änderung am Service vorbei). Ältere Zeilen können noch `ai`/`api` tragen.
 - Kosmetische Änderungen (Name, Beschreibung, Icon) erzeugen keine Version
-- Context-Variablen in Workflows: `{{ workflow_version }}` (Versionsnummer), `{{ workflow_changed_since_last_run }}` (true/false)
+- Context-Variablen in Workflows: `{{ workflow_version }}` (Versionsnummer), `{{ workflow_changed_since_last_run }}` (true/false), `{{ workflow_definition_hash }}`, `{{ trigger_source }}`
+
+**Härtung (optional, `automation.hardening.*`):**
+
+```bash
+POST /api/v1/workflows/{id}/seal      # Definition sperren (Schalter sealing)
+POST /api/v1/workflows/{id}/unseal
+POST /api/v1/webhooks/{id}/secret     # Signatur-Secret, einmalig sichtbar (Schalter webhook-signatures)
+DELETE /api/v1/webhooks/{id}/secret
+```
+
+- Versiegelt: PUT/DELETE mit Definitionsänderung → `409 WORKFLOW_SEALED`; manipulierte Definition startet nicht → `409 WORKFLOW_TAMPERED`
+- `require-sealed-for-unattended`: Schedules, Webhooks, TODO-/Completion-Trigger, Auto-Repair und Wishes (auch über Chains/Sub-Workflows) starten nur versiegelte Workflows → sonst `403 UNATTENDED_REQUIRES_SEAL`
+- Runs tragen `triggerSource`, `definitionHash`, `definitionVersionId`
 
 ### 9. Test-Instanz
 

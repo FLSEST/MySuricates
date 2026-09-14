@@ -86,6 +86,35 @@ Env-Form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_
 - `ControllerModuleGateTest` erzwingt, dass jeder Controller einem Modul zugeordnet oder bewusst als Kern gelistet ist.
 - `GET /api/v1/system/capabilities` liefert `preset` und `modules[]`; das Frontend blendet damit Navigation, Routen (Seite „Modul deaktiviert“ mit Snippet) und Widgets aus. **Settings → Module & Härtung** zeigt alles nur lesend mit YAML-/Env-Snippet.
 
+## Workflow-Härtung (optional)
+
+Vier Schalter unter `automation.hardening.*` — derselbe Mechanismus wie bei den Modulen (nur Startkonfiguration, vom Preset unabhängig, **Settings → Module & Härtung** zeigt sie lesend). Die Herkunft von Änderungen ist kein Schalter, sondern immer an.
+
+| Schalter | Default | Braucht | Wirkung |
+|---|---|---|---|
+| `provenance` | an | — | Jeder Run speichert `definition_hash`, `definition_version_id` und `trigger_source` |
+| `sealing` | aus | `provenance` | Workflows versiegeln (`POST /api/v1/workflows/{id}/seal`, `…/unseal`) |
+| `require-sealed-for-unattended` | aus | `sealing` | Unbeaufsichtigte Runs starten nur versiegelte Workflows |
+| `webhook-signatures` | aus | Modul `webhooks` | Signatur-Secret pro Webhook (HMAC-SHA256) |
+
+**Definitions-Hash** — `WorkflowDefinitionHasher` hasht den `WorkflowSnapshot` (blocks, instructions, model, provider, effort, metadata, defaultContext, sortierte Skill-IDs) als kanonisches JSON (sortierte Schlüssel, leere Werte weggelassen) mit einem eigenen `ObjectMapper`, damit Jackson-Customizing den Hash nie verändert. Name, Beschreibung, Icon und Tags sind Etiketten und fließen nicht ein. Alte Versionszeilen bekommen ihren Hash beim Start (`WorkflowVersionHashBackfillService`). Kontextvariablen: `{{ workflow_definition_hash }}`, `{{ trigger_source }}`.
+
+**Run-Zulassung** — Jeder Run-Auslöser ruft `WorkflowExecutor.execute(…, TriggerSource)` und geht damit durch `RunAdmission`, bevor eine Run-Zeile existiert. Regeln in dieser Reihenfolge: (1) ein versiegelter Workflow muss seinem Siegel entsprechen, (2) mit `require-sealed-for-unattended` braucht ein unbeaufsichtigter Run einen versiegelten Workflow. Ein abgelehnter Run hinterlässt **keine Run-Zeile und keinen DLQ-Eintrag**, nur einen `SECURITY`-Eintrag im Activity-Log; REST-Aufrufer bekommen den Fehlercode.
+
+**Herkunft von Änderungen (immer an)** — Alle Schreiber von Definitionsfeldern gehen durch `WorkflowService` → `WorkflowMutationGateway`. Jede Änderung schreibt eine Versionszeile mit dem Zustand **nach** der Änderung (Nummer = MAX+1) und einem `changeSource`, den der aufrufende Server-Code bestimmt, nie der Request (`user`, `assistant`, `factory`, `wish`, `dialog`, `conversion`, `chain-template`, `pool-install`, `import`, `bpmn-import`, `restore`). Passt der Hash der neuesten Zeile nicht zum aktuellen Stand (Altbestand, Änderung am Service vorbei), wird dieser Stand zuerst als `untracked` gesichert. Reine Etiketten-Änderungen erzeugen keine Version. `WorkflowWriterAllowlistTest` legt fest, wer `WorkflowRepository.save` sonst noch aufrufen darf.
+
+**Versiegeln** — `seal` hält den aktuellen Hash in `sealed_hash` fest (mit `sealed_at` und einem WARN-`SECURITY`-Eintrag). Versiegelte Workflows lehnen Definitionsänderungen und Löschen mit **409 `WORKFLOW_SEALED`** ab; Umbenennen bleibt möglich. Weicht die Definition beim Start vom Siegel ab (etwa nach einer Änderung direkt in der Datenbank) oder lässt sie sich nicht prüfen, startet der Run nicht: **409 `WORKFLOW_TAMPERED`**, ERROR-`SECURITY`-Eintrag mit erwartetem und tatsächlichem Hash. Beide Prüfungen gelten unabhängig vom Schalter — `sealing` regelt nur Setzen und Lösen, Ausschalten ist kein stilles Entsiegeln.
+
+**Unbeaufsichtigte Runs** — `TriggerSource` teilt die Auslöser ein:
+
+| Beaufsichtigt | Unbeaufsichtigt | Erbt vom Auslöser |
+|---|---|---|
+| `MANUAL`, `RETRY`, `RESUME`, `TODO_RESOLUTION`, `ASSISTANT` | `SCHEDULE`, `WEBHOOK`, `TODO_TRIGGER`, `COMPLETION_TRIGGER`, `AUTO_REPAIR`, `WISH` | `CHAIN`, `SUB_WORKFLOW` |
+
+Chains und Sub-Workflows geben die Herkunft ihres Auslösers im reservierten Kontextschlüssel `__parent_trigger_source` weiter: `ChainExecutor` setzt ihn für jeden Eintrag selbst (Eingaben können ihn nicht vorgeben), `SubWorkflowBlockExecutor` reicht die effektive Herkunft des Eltern-Runs durch, und Webhook-Payloads dürfen keine `__`-Schlüssel enthalten. Fehlt der Schlüssel oder ist er unlesbar, gilt der Run als unbeaufsichtigt. Abgelehnt wird mit **403 `UNATTENDED_REQUIRES_SEAL`**. Mit diesem Schalter sind Auto-Repair und Wishes faktisch aus: Sie laufen unbeaufsichtigt und müssten versiegelte Workflows ändern.
+
+**Webhook-Signaturen** — `POST /api/v1/webhooks/{id}/secret` erzeugt ein Secret (32 Zufallsbytes, hex), zeigt es genau einmal und speichert es AES-GCM-verschlüsselt (`IntegrationEncryptionService`, Schlüssel außerhalb der Datenbank) in `webhook_triggers.signing_secret_enc`; `DELETE …/secret` entfernt es. Hat ein Webhook ein Secret, prüft `WebhookSignatureVerifier` vor dem JSON-Parsen den Header `X-Signature: sha256=<hex>` (alternativ `X-Hub-Signature-256`, das Format von GitHub und Gitea) als HMAC-SHA256 über die rohen Request-Bytes, Vergleich in konstanter Zeit — sonst **401 `WEBHOOK_SIGNATURE_INVALID`**. Wie beim Siegel bleibt ein gespeichertes Secret wirksam, wenn der Schalter später aus ist. Responses verraten nur `signatureRequired`.
+
 ## Backend-Architektur
 
 ### Schichtenmodell
@@ -787,6 +816,7 @@ Response (DTO) → React Query Cache → UI-Update
 - **Runtime-konfigurierbar:** Settings → Execution → API-Ratenbegrenzung (Toggle + RPM-Wert)
 - **Env-Override:** `AUTOMATION_RATE_LIMIT_ENABLED` / `AUTOMATION_RATE_LIMIT_RPM`
 - **Webhook Rate Limiter:** `WebhookRateLimiter` — separater Per-IP-Limiter für `/api/v1/webhook/trigger/**`, immer aktiv
+- **Webhook-Signaturen (optional):** HMAC-SHA256 pro Webhook, siehe [Workflow-Härtung](#workflow-härtung-optional)
 
 ### Request-Size-Limit
 
