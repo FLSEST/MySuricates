@@ -60,7 +60,22 @@ Optionen:
 ```bash
 ./scripts/setup.sh --install   # fehlende Tools per apt automatisch installieren (sonst: Hinweise ausgeben)
 ./scripts/setup.sh --start     # nach erfolgreichem Setup direkt starten
+./scripts/setup.sh --preset research   # Modul-Preset ohne Rückfrage wählen
 ```
+
+**Module:** Beim ersten Lauf fragt das Skript, welche optionalen Module die Instanz beim Start
+aktiviert, und schreibt die Wahl nach `ai-automation-backend/config/application.yml` (eine
+vorhandene Datei bleibt unangetastet):
+
+| Preset | Enthält |
+|---|---|
+| `core` (Default) | nur den Kern: Workflows, Runs, Projekte, TODOs, Schedules, Gates |
+| `research` | Kern + Chains, Assistent, Insights, Workflow-Memory, Audit Center, BPMN |
+| `full` | alles, auch Integrationen, Webhooks, Remote Access, Terminal, Staging |
+
+Später einzelne Module freischalten: in derselben Datei z. B. `automation.modules.webhooks: true`
+ergänzen und das Backend neu starten. Welche Module es gibt, mit Reifegrad und fertigem Snippet,
+zeigt **Settings → Module & Härtung**. Umschalten in der Oberfläche ist bewusst nicht möglich.
 
 Fehlt ein Pflicht-Tool, bricht das Skript mit einer klaren Liste + Install-Befehlen ab. Nach dem
 Installieren einfach `./scripts/setup.sh` erneut ausführen.

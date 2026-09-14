@@ -1753,9 +1753,25 @@ Verfügbare KI-Provider und Standard-Provider abfragen.
 
 ### `GET /api/v1/system/capabilities`
 
-System-Capabilities abrufen (API-Version, App-Version, verfügbare Routen und Block-Typen).
+System-Capabilities abrufen (API-Version, App-Version, verfügbare Routen und Block-Typen) sowie den beim Start festgelegten Modulstatus.
 
-**Response:** `SystemCapabilitiesResponse`
+**Response:** `SystemCapabilitiesResponse` — Auszug der Modul-Felder:
+
+```json
+{
+  "preset": "core",
+  "modules": [
+    {
+      "name": "webhooks", "kind": "feature", "enabled": false,
+      "tier": "advanced", "maturity": "stable", "risks": ["network"], "requires": [],
+      "property": "automation.modules.webhooks", "envVar": "AUTOMATION_MODULES_WEBHOOKS",
+      "description": "Inbound webhook triggers that start workflows from outside."
+    }
+  ]
+}
+```
+
+Nur lesend — Module lassen sich nicht per API umschalten. Endpunkte deaktivierter Module antworten mit `404` und `{"code": "MODULE_DISABLED"}`.
 
 ### `GET /api/v1/system/ai-providers/PI/catalog`
 

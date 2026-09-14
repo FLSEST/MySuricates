@@ -52,6 +52,40 @@ Stable (:9091) and Test (:8090) run as separate Docker containers.
 
 Dev automatically starts Stable and Test on boot if a snapshot is available (configurable via `automation.staging.auto-start` and `automation.staging.test-auto-start`).
 
+## Module System (startup configuration)
+
+Besides the always-on core (workflows, runs, projects, TODOs with TodoTrigger, schedules, activity/DLQ, gates, pool, templates, docs, settings) there are **optional modules**. They are decided **at startup only** and deliberately **cannot be switched via REST**: enabling a module requires write access to the host configuration and a restart. A leaked API key therefore cannot re-enable network, credential or host-access features.
+
+**Configuration** — preset plus per-module override, the override wins:
+
+```yaml
+automation:
+  modules:
+    preset: core        # core (default) | research | full
+    webhooks: true      # additionally enable a single module
+  hardening:
+    sealing: true       # hardening flags are independent of the preset
+```
+
+Environment form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_HARDENING_<NAME>` (dashes as `_`, e.g. `AUTOMATION_MODULES_REMOTE_ACCESS=true`). The stable and test profiles use `full`; `scripts/setup.sh` writes the chosen preset to `ai-automation-backend/config/application.yml`.
+
+**Catalog** (single source: `modules/ModuleCatalog`):
+
+| Tier | Modules | Maturity |
+|---|---|---|
+| `research` | `chains`, `assistant`, `learning` (analytics endpoints; dashboard data stays core), `memory`, `audit`, `bpmn` | chains stable, others experimental |
+| `advanced` (outward-facing) | `integrations` (incl. TODO tracker export, calendar adapters), `webhooks`, `remote-access` (Tailscale), `terminal` (run terminal over WebSocket), `staging` | stable / staging experimental |
+| `advanced` (low use) | `conversion`, `dialog-import` (requires conversion), `onboarding-profiles`, `skills`, `debug`, `factory` (incl. auto-repair), `wishes` (requires chains) | legacy / experimental |
+| `hardening` | `provenance` (on by default), `sealing`, `require-sealed-for-unattended`, `webhook-signatures` | experimental |
+
+**Enforcement**
+
+- `@RequiresModule` on controller classes or single handlers; `ModuleGuardInterceptor` (a `MappedInterceptor` bean so `@WebMvcTest` slices need no registry) answers **404 `MODULE_DISABLED`** for disabled modules — including the public webhook trigger.
+- Background paths ask `ModuleRegistry` directly: `integration`/`skill-capability` blocks fail with a clear message, `/ws/terminal` is not registered, auto-memory, audit ingestion, staging health checks and chain schedules do not run, auto-repair is bound via `@EventListener(condition = ModuleConditions.FACTORY)`.
+- Unknown module names, invalid values and unmet dependencies (`requires`) **fail the startup** — nothing enables itself.
+- `ControllerModuleGateTest` enforces that every controller belongs to a module or is consciously listed as core.
+- `GET /api/v1/system/capabilities` returns `preset` and `modules[]`; the frontend uses it to hide navigation, routes (a "module disabled" page with a snippet) and widgets. **Settings → Modules & hardening** shows everything read-only with YAML/env snippets.
+
 ## Backend Architecture
 
 ### Layer Model

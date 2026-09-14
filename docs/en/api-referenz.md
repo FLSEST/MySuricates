@@ -1743,9 +1743,25 @@ Query available AI providers and default provider.
 
 ### `GET /api/v1/system/capabilities`
 
-Retrieve system capabilities (API version, app version, available routes and block types).
+Retrieve system capabilities (API version, app version, available routes and block types) and the module status decided at startup.
 
-**Response:** `SystemCapabilitiesResponse`
+**Response:** `SystemCapabilitiesResponse` — module fields excerpt:
+
+```json
+{
+  "preset": "core",
+  "modules": [
+    {
+      "name": "webhooks", "kind": "feature", "enabled": false,
+      "tier": "advanced", "maturity": "stable", "risks": ["network"], "requires": [],
+      "property": "automation.modules.webhooks", "envVar": "AUTOMATION_MODULES_WEBHOOKS",
+      "description": "Inbound webhook triggers that start workflows from outside."
+    }
+  ]
+}
+```
+
+Read-only — modules cannot be switched via the API. Endpoints of disabled modules answer `404` with `{"code": "MODULE_DISABLED"}`.
 
 ### `GET /api/v1/system/ai-providers/PI/catalog`
 

@@ -323,7 +323,7 @@ Backend → ProcessBuilder → claude (Host-Prozess)
 |---|---|---|
 | API-Key Auth | `AUTOMATION_SECURITY_ENABLED` | `true` |
 | Rate Limiting | `AUTOMATION_RATE_LIMIT_ENABLED` | `true` (auch in Settings → Execution konfigurierbar) |
-| Tailscale | `AUTOMATION_TAILSCALE_ENABLED` | `false` |
+| Optionale Module | `AUTOMATION_MODULES_PRESET` | `core` (Fernzugriff: `AUTOMATION_MODULES_REMOTE_ACCESS`) |
 | Trusted Proxies | `AUTOMATION_TRUSTED_PROXIES` | `127.0.0.1,::1` |
 
 Der API-Key wird im Header `X-API-Key` uebergeben. Im Frontend wird er im `settingsStore` (localStorage) gespeichert und automatisch bei jedem Request hinzugefuegt.

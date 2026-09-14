@@ -52,6 +52,40 @@ Stable (:9091) und Test (:8090) laufen als separate Docker-Container.
 
 Dev startet Stable und Test bei Boot automatisch, wenn ein Snapshot vorhanden ist (konfigurierbar via `automation.staging.auto-start` bzw. `automation.staging.test-auto-start`).
 
+## Module-System (Startkonfiguration)
+
+Neben dem immer aktiven Kern (Workflows, Runs, Projekte, TODOs mit TodoTrigger, Schedules, Activity/DLQ, Gates, Pool, Templates, Docs, Settings) gibt es **optionale Module**. Sie werden **nur beim Start** festgelegt und sind bewusst **nicht per REST umschaltbar**: Wer ein Modul einschalten will, braucht Schreibzugriff auf die Konfiguration des Hosts und einen Neustart. Ein geleakter API-Key kann damit keine Netzwerk-, Zugangsdaten- oder Host-Zugriffs-Funktion reaktivieren.
+
+**Konfiguration** — Preset plus Einzel-Override, Override schlägt Preset:
+
+```yaml
+automation:
+  modules:
+    preset: core        # core (Default) | research | full
+    webhooks: true      # einzelnes Modul zusätzlich an
+  hardening:
+    sealing: true       # Härtungs-Flags sind vom Preset unabhängig
+```
+
+Env-Form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_HARDENING_<NAME>` (Bindestriche als `_`, z. B. `AUTOMATION_MODULES_REMOTE_ACCESS=true`). Stable- und Test-Profil setzen `full`; `scripts/setup.sh` schreibt das gewählte Preset nach `ai-automation-backend/config/application.yml`.
+
+**Katalog** (einzige Quelle: `modules/ModuleCatalog`):
+
+| Stufe | Module | Reifegrad |
+|---|---|---|
+| `research` | `chains`, `assistant`, `learning` (Analyse-Endpunkte; Dashboard-Daten bleiben Kern), `memory`, `audit`, `bpmn` | chains stabil, Rest experimentell |
+| `advanced` (nach außen) | `integrations` (inkl. TODO-Tracker-Export, Kalender-Adapter), `webhooks`, `remote-access` (Tailscale), `terminal` (Run-Terminal per WebSocket), `staging` | stabil / staging experimentell |
+| `advanced` (wenig genutzt) | `conversion`, `dialog-import` (benötigt conversion), `onboarding-profiles`, `skills`, `debug`, `factory` (inkl. Auto-Repair), `wishes` (benötigt chains) | Altlast / experimentell |
+| `hardening` | `provenance` (Default an), `sealing`, `require-sealed-for-unattended`, `webhook-signatures` | experimentell |
+
+**Durchsetzung**
+
+- `@RequiresModule` an Controller-Klassen oder einzelnen Handlern; `ModuleGuardInterceptor` (als `MappedInterceptor`-Bean, damit `@WebMvcTest`-Slices keine Registry brauchen) antwortet für deaktivierte Module mit **404 `MODULE_DISABLED`** — auch am öffentlichen Webhook-Trigger.
+- Hintergrundpfade prüfen `ModuleRegistry` direkt: `integration`-/`skill-capability`-Blöcke schlagen mit klarer Meldung fehl, `/ws/terminal` wird nicht registriert, Auto-Memory, Audit-Ingestion, Staging-Health-Checks und Chain-Schedules laufen nicht, Auto-Repair hängt per `@EventListener(condition = ModuleConditions.FACTORY)` am Modul.
+- Unbekannte Modulnamen, ungültige Werte und unerfüllte Abhängigkeiten (`requires`) **brechen den Start ab** — nichts schaltet sich selbst ein.
+- `ControllerModuleGateTest` erzwingt, dass jeder Controller einem Modul zugeordnet oder bewusst als Kern gelistet ist.
+- `GET /api/v1/system/capabilities` liefert `preset` und `modules[]`; das Frontend blendet damit Navigation, Routen (Seite „Modul deaktiviert“ mit Snippet) und Widgets aus. **Settings → Module & Härtung** zeigt alles nur lesend mit YAML-/Env-Snippet.
+
 ## Backend-Architektur
 
 ### Schichtenmodell

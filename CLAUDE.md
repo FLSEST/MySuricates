@@ -241,6 +241,13 @@ See [AGENTS.md](AGENTS.md) for a complete REST API reference (workflow/chain CRU
 
 For full architecture documentation: [docs/architektur.md](docs/architektur.md)
 
+## Optional Modules (startup configuration)
+
+- Peripheral features are **modules** decided at startup only: `automation.modules.preset` (`core` default | `research` | `full`) + per-module override `automation.modules.<name>`, hardening flags under `automation.hardening.*`. Never make them switchable via REST — that is the point (a leaked API key must not re-enable network/credential/host features). Catalog: `modules/ModuleCatalog`.
+- **New controller ⇒** annotate `@RequiresModule(ModuleCatalog.X)` (class or handler) or add it consciously to `CORE_CONTROLLERS` in `ControllerModuleGateTest`. Background paths of a module (jobs, listeners, block executors) check `ModuleRegistry` themselves; for ratchet-pinned classes use `@EventListener(condition = ModuleConditions.X)`.
+- Dev instance: `ai-automation-backend/config/application.yml` must contain `automation.modules.preset: full`, otherwise the dev backend starts with the public `core` preset. Integration tests run `full` (`application-integration.yml`); disable single modules per test via `@TestPropertySource`.
+- Frontend: `useModuleEnabled(name)` (`hooks/useModules.ts`) gates queries in hooks and widgets in core pages; module pages are wrapped in `ModuleRoute` (`App.tsx`), nav items carry `module`.
+
 ## Execution Config
 
 - **Agent Instructions**: Two-level injection — base instructions (`src/main/resources/agent-instructions.md`, all workflows) + per-workflow instructions (`workflow.instructions` column, editable in UI). Block execution uses `--append-system-prompt`, agentic REASON uses `--system-prompt`.

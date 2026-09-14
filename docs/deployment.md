@@ -126,7 +126,9 @@ Test-Instanz auf Port 8090 (nutzt `docker/Dockerfile.stable` als Build-Basis):
 | `AUTOMATION_API_KEY` | (leer) | API-Key für Authentifizierung |
 | `AUTOMATION_RATE_LIMIT_ENABLED` | `true` | Rate Limiting aktivieren (auch zur Laufzeit in Settings → Execution konfigurierbar) |
 | `AUTOMATION_RATE_LIMIT_RPM` | `120` | Requests pro Minute (auch zur Laufzeit konfigurierbar, 10–10.000) |
-| `AUTOMATION_TAILSCALE_ENABLED` | `true` | Tailscale Remote-Access |
+| `AUTOMATION_MODULES_PRESET` | `core` | Optionale Module beim Start: `core`, `research` oder `full` (siehe [Module-System](architektur.md#module-system-startkonfiguration)) |
+| `AUTOMATION_MODULES_<NAME>` | (Preset) | Einzelnes Modul an/aus, z. B. `AUTOMATION_MODULES_REMOTE_ACCESS=true` — schlägt das Preset |
+| `AUTOMATION_HARDENING_<NAME>` | `provenance`: `true`, Rest `false` | Härtungs-Flags `PROVENANCE`, `SEALING`, `REQUIRE_SEALED_FOR_UNATTENDED`, `WEBHOOK_SIGNATURES` |
 | `AUTOMATION_HOST_CLAUDE_TIMEOUT` | `300` | Globaler Claude-CLI-Timeout in Sekunden (in `application.yml` deklariert) |
 | `AUTOMATION_HOST_CLAUDE_MAX_TOKENS` | (leer) | Optionales per-Call Token-Limit für Claude CLI |
 | `AUTOMATION_SSL_ENABLED` | `false` | SSL/TLS aktivieren |
@@ -170,7 +172,7 @@ Referenz, keine Auto-Konfiguration.
 # application.yml Defaults
 automation.security.enabled: true
 automation.security.rate-limit.enabled: true
-automation.tailscale.enabled: true
+automation.modules.preset: core   # optionale Module, siehe Module-System
 ```
 
 - API-Key-Authentifizierung aktiv (Key wird beim ersten Start auto-generiert, sofern
@@ -185,7 +187,7 @@ automation.tailscale.enabled: true
 # docker-compose.yml Umgebung
 AUTOMATION_SECURITY_ENABLED=true
 AUTOMATION_API_KEY=<sicherer-key>   # Pflicht: die Compose-Datei liefert keinen Default mit
-AUTOMATION_TAILSCALE_ENABLED=true    # optional
+AUTOMATION_MODULES_PRESET=core       # optional: research | full; Fernzugriff: AUTOMATION_MODULES_REMOTE_ACCESS=true
 AUTOMATION_RATE_LIMIT_ENABLED=true   # optional
 ```
 
@@ -212,7 +214,7 @@ Das Backend kann über Tailscale von außerhalb des lokalen Netzwerks erreichbar
 ### Voraussetzungen
 
 - Tailscale CLI im Container installiert (Dockerfile.backend enthält dies)
-- `AUTOMATION_TAILSCALE_ENABLED=true` (Standard in application.yml, in docker-compose.yml auf `false` gesetzt)
+- Modul `remote-access` eingeschaltet (`AUTOMATION_MODULES_REMOTE_ACCESS=true` oder Preset `full`) — im öffentlichen Default `core` ist es aus; ohne Modul antworten die `/system/remote-access/*`-Endpunkte mit 404 `MODULE_DISABLED`
 
 ### Aktivierung
 
