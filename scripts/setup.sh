@@ -99,11 +99,11 @@ hint_for() {
     maven:zypper) echo "sudo zypper install -y maven" ;;
     maven:*)      echo "Maven 3.9+ installieren — https://maven.apache.org/download.cgi" ;;
 
-    node:apt)    echo "curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt-get install -y nodejs" ;;
-    node:dnf)    echo "sudo dnf install -y nodejs npm   # bei <20: NodeSource-Repo nutzen" ;;
+    node:apt)    echo "curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash - && sudo apt-get install -y nodejs" ;;
+    node:dnf)    echo "sudo dnf install -y nodejs npm   # bei <20.19: NodeSource-Repo nutzen" ;;
     node:pacman) echo "sudo pacman -S --noconfirm nodejs npm" ;;
     node:zypper) echo "sudo zypper install -y nodejs20 npm20" ;;
-    node:*)      echo "Node.js 20.19+ (oder 22.12+/24+) installieren — https://nodejs.org (oder nvm)" ;;
+    node:*)      echo "Node.js 24 (oder 20.19+/22.12+) installieren — https://nodejs.org (oder nvm)" ;;
 
     git:apt)    echo "sudo apt-get install -y git" ;;
     git:dnf)    echo "sudo dnf install -y git" ;;
@@ -130,7 +130,7 @@ apt_install_for() {
   case "$1" in
     java)   echo "sudo apt-get install -y openjdk-21-jdk" ;;
     maven)  echo "sudo apt-get install -y maven" ;;
-    node)   echo "curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt-get install -y nodejs" ;;
+    node)   echo "curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash - && sudo apt-get install -y nodejs" ;;
     git)    echo "sudo apt-get install -y git" ;;
     curl)   echo "sudo apt-get install -y curl" ;;
     *) echo "" ;;
@@ -230,7 +230,7 @@ if have npm; then
   if [[ "$NPM_MAJOR" =~ ^[0-9]+$ ]] && [ "$NPM_MAJOR" -ge 10 ]; then
     ok "npm ${NPM_VER}"
   else
-    warn "npm ${NPM_VER:-?} gefunden, empfohlen 10+ (kommt i. d. R. mit Node 20)"
+    warn "npm ${NPM_VER:-?} gefunden, empfohlen 10+ (kommt i. d. R. mit Node 20+)"
   fi
 else
   : # npm fehlt -> wird mit Node mitgemeldet

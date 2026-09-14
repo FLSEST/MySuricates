@@ -193,7 +193,8 @@ describe('useEnableRemoteAccess', () => {
     await act(async () => {
       await result.current.mutateAsync();
     });
-    expect(result.current.isSuccess).toBe(true);
+    // TanStack benachrichtigt Beobachter per setTimeout(0) — der Status kann nach act noch fehlen
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(invalidateSpy).toHaveBeenCalledWith(
       expect.objectContaining({ queryKey: ['system', 'remote-access'] }),
     );
@@ -213,7 +214,8 @@ describe('useDisableRemoteAccess', () => {
     await act(async () => {
       await result.current.mutateAsync();
     });
-    expect(result.current.isSuccess).toBe(true);
+    // TanStack benachrichtigt Beobachter per setTimeout(0) — der Status kann nach act noch fehlen
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(invalidateSpy).toHaveBeenCalledWith(
       expect.objectContaining({ queryKey: ['system', 'remote-access'] }),
     );
