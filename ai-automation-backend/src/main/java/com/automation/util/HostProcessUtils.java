@@ -5,11 +5,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 /**
  * Shared utilities for host process execution:
@@ -62,38 +58,6 @@ public class HostProcessUtils {
      * @throws IOException on timeout, interruption, or stream failure
      */
     public String drain(Process proc, int timeoutSeconds, String label) throws IOException {
-        InputStream stdout = proc.getInputStream();
-        CompletableFuture<byte[]> outputFuture = CompletableFuture.supplyAsync(() -> {
-            try { return stdout.readAllBytes(); }
-            catch (IOException e) { return new byte[0]; }
-        });
-
-        try {
-            boolean finished = proc.waitFor(timeoutSeconds, TimeUnit.SECONDS);
-            if (!finished) {
-                proc.destroyForcibly();
-                proc.waitFor(5, TimeUnit.SECONDS);
-                outputFuture.cancel(true);
-                closeQuietly(stdout);
-                throw new IOException(label + " timed out after " + timeoutSeconds + " seconds");
-            }
-
-            return new String(outputFuture.get(5, TimeUnit.SECONDS)).trim();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            proc.destroyForcibly();
-            outputFuture.cancel(true);
-            closeQuietly(stdout);
-            throw new IOException(label + " interrupted");
-        } catch (ExecutionException | TimeoutException e) {
-            proc.destroyForcibly();
-            outputFuture.cancel(true);
-            closeQuietly(stdout);
-            throw new IOException("Failed to read " + label + " output", e);
-        }
-    }
-
-    private void closeQuietly(InputStream stream) {
-        try { stream.close(); } catch (IOException ignored) { /* already destroyed */ }
+        return ProcessDrain.drain(proc, timeoutSeconds, label, LineListener.NONE);
     }
 }
