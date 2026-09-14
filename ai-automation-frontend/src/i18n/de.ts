@@ -222,6 +222,7 @@ export const de: TranslationKeys = {
     hideWidget: 'Ausblenden',
     showWidget: 'Einblenden',
     widgetNoData: 'Derzeit keine Daten – erscheint wieder, sobald welche da sind.',
+    widgetFailed: 'Dieses Widget konnte nicht angezeigt werden.',
   },
   projects: {
     title: 'Projekte',

@@ -18,6 +18,7 @@ import { EyeOff, GripVertical, Plus } from 'lucide-react';
 import { useT } from '../../i18n';
 import type { ResolvedWidget } from '../../hooks/useDashboardLayout';
 import { WIDGET_SIZE_CLASSES } from './widgetRegistry';
+import { WidgetFrame } from './WidgetFrame';
 
 interface DashboardGridProps {
   widgets: ResolvedWidget[];
@@ -34,6 +35,7 @@ function widgetSizeClasses({ def, placement }: ResolvedWidget): string {
 }
 
 export function DashboardGrid({ widgets, editMode, onMove, onHide }: DashboardGridProps) {
+  const t = useT();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -47,7 +49,9 @@ export function DashboardGrid({ widgets, editMode, onMove, onHide }: DashboardGr
           // empty:hidden collapses widgets that render nothing (no data yet).
           return (
             <div key={widget.def.id} data-widget-id={widget.def.id} className={`${SLOT_CLASSES} ${widgetSizeClasses(widget)} empty:hidden`}>
-              <Widget />
+              <WidgetFrame label={widget.def.label(t)}>
+                <Widget />
+              </WidgetFrame>
             </div>
           );
         })}
@@ -91,7 +95,9 @@ function SortableWidget({ widget, onHide }: { widget: ResolvedWidget; onHide: (i
     >
       {/* Content stays visible but inert — no navigation while arranging. */}
       <div className="peer grid grid-cols-1 select-none" inert>
-        <Widget />
+        <WidgetFrame label={label}>
+          <Widget />
+        </WidgetFrame>
       </div>
       <div className="hidden peer-empty:flex min-h-20 flex-col justify-center rounded-xl border border-border bg-surface-raised px-4 py-3">
         <p className="text-sm font-medium text-text-secondary truncate">{label}</p>
