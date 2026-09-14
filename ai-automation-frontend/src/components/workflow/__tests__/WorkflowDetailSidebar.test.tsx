@@ -30,6 +30,11 @@ vi.mock('../WorkflowMemoryPanel', () => ({
   WorkflowMemoryPanel: () => null,
 }));
 
+// Rendered without a QueryClient: every optional module counts as enabled here.
+vi.mock('../../../hooks/useModules', () => ({
+  useModuleEnabled: () => true,
+}));
+
 function buildWorkflow(overrides: Partial<Workflow> = {}): Workflow {
   return {
     id: 'wf-1',

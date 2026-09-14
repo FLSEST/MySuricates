@@ -3,12 +3,14 @@ import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
 import type { WorkflowMemory, ExtractMemoryRequest } from '../types';
+import { useModuleEnabled } from './useModules';
 
 export function useWorkflowMemories(workflowId: string) {
+  const moduleEnabled = useModuleEnabled('memory');
   return useQuery({
     queryKey: ['workflow-memory', workflowId],
     queryFn: () => api.get<WorkflowMemory[]>(`/workflows/${workflowId}/memory`),
-    enabled: !!workflowId,
+    enabled: moduleEnabled && !!workflowId,
   });
 }
 

@@ -5,6 +5,7 @@ import { BpmnImportButton } from './BpmnImportButton';
 import type { WorkflowExportData } from '../../types';
 import type { TranslationKeys } from '../../i18n';
 import { useToast } from '../../hooks/useToast';
+import { useModuleEnabled } from '../../hooks/useModules';
 
 interface WorkflowListHeaderProps {
   t: TranslationKeys;
@@ -15,6 +16,7 @@ interface WorkflowListHeaderProps {
 export function WorkflowListHeader({ t, onOpenCreate, onImportReady }: WorkflowListHeaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
+  const bpmnModule = useModuleEnabled('bpmn');
 
   return (
     <div className="flex items-center justify-between mb-4">
@@ -30,7 +32,7 @@ export function WorkflowListHeader({ t, onOpenCreate, onImportReady }: WorkflowL
         >
           {t.common.import}
         </Button>
-        <BpmnImportButton />
+        {bpmnModule && <BpmnImportButton />}
         <Button icon={<Plus className="w-4 h-4" />} onClick={onOpenCreate}>
           {t.workflows.create}
         </Button>

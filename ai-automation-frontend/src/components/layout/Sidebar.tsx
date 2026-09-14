@@ -24,7 +24,10 @@ import { useSidebarStore } from '../../stores/sidebarStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useSystemInfo } from '../../hooks/useSystem';
+import { useSystemModules } from '../../hooks/useModules';
 import { useT } from '../../i18n';
+import type { TranslationKeys } from '../../i18n/en';
+import type { FeatureModuleName } from '../../types';
 import { HealthIndicator } from './HealthIndicator';
 import { SortableNavItem } from './SortableNavItem';
 
@@ -101,28 +104,36 @@ export function MeerkatIcon({ className, size = 24 }: { className?: string; size
   );
 }
 
-const navItems = [
-  { to: '/', icon: LayoutDashboard, labelKey: 'dashboard' as const },
-  { to: '/projects', icon: FolderKanban, labelKey: 'projects' as const },
-  { to: '/wishes', icon: Sparkles, labelKey: 'wishes' as const },
-  { to: '/workflows', icon: GitBranch, labelKey: 'workflows' as const },
-  { to: '/factory', icon: Factory, labelKey: 'factory' as const },
-  { to: '/dialogs', icon: MessageCircle, labelKey: 'dialogs' as const },
-  { to: '/chains', icon: Link2, labelKey: 'chains' as const },
-  { to: '/runs', icon: History, labelKey: 'runs' as const },
-  { to: '/debug', icon: Bug, labelKey: 'debug' as const },
-  { to: '/skills', icon: Zap, labelKey: 'skills' as const },
-  { to: '/schedules', icon: Calendar, labelKey: 'schedules' as const },
-  { to: '/calendar', icon: CalendarDays, labelKey: 'calendar' as const },
-  { to: '/webhooks', icon: Webhook, labelKey: 'webhooks' as const },
-  { to: '/integrations', icon: Plug, labelKey: 'integrations' as const },
-  { to: '/cockpit', icon: LayoutGrid, labelKey: 'cockpit' as const },
-  { to: '/todos', icon: CheckSquare, labelKey: 'todos' as const },
-  { to: '/activity', icon: ScrollText, labelKey: 'activityLog' as const },
-  { to: '/insights', icon: BarChart2, labelKey: 'insights' as const },
-  { to: '/onboarding-profiles', icon: BookMarked, labelKey: 'onboardingProfiles' as const },
-  { to: '/docs', icon: BookOpen, labelKey: 'docs' as const },
-  { to: '/reports', icon: ClipboardList, labelKey: 'reports' as const },
+interface NavItemDef {
+  to: string;
+  icon: typeof LayoutDashboard;
+  labelKey: keyof TranslationKeys['nav'];
+  /** Optional module the page belongs to; hidden when the backend reports it disabled. */
+  module?: FeatureModuleName;
+}
+
+const navItems: NavItemDef[] = [
+  { to: '/', icon: LayoutDashboard, labelKey: 'dashboard' },
+  { to: '/projects', icon: FolderKanban, labelKey: 'projects' },
+  { to: '/wishes', icon: Sparkles, labelKey: 'wishes', module: 'wishes' },
+  { to: '/workflows', icon: GitBranch, labelKey: 'workflows' },
+  { to: '/factory', icon: Factory, labelKey: 'factory', module: 'factory' },
+  { to: '/dialogs', icon: MessageCircle, labelKey: 'dialogs', module: 'dialog-import' },
+  { to: '/chains', icon: Link2, labelKey: 'chains', module: 'chains' },
+  { to: '/runs', icon: History, labelKey: 'runs' },
+  { to: '/debug', icon: Bug, labelKey: 'debug', module: 'debug' },
+  { to: '/skills', icon: Zap, labelKey: 'skills', module: 'skills' },
+  { to: '/schedules', icon: Calendar, labelKey: 'schedules' },
+  { to: '/calendar', icon: CalendarDays, labelKey: 'calendar' },
+  { to: '/webhooks', icon: Webhook, labelKey: 'webhooks', module: 'webhooks' },
+  { to: '/integrations', icon: Plug, labelKey: 'integrations', module: 'integrations' },
+  { to: '/cockpit', icon: LayoutGrid, labelKey: 'cockpit' },
+  { to: '/todos', icon: CheckSquare, labelKey: 'todos' },
+  { to: '/activity', icon: ScrollText, labelKey: 'activityLog' },
+  { to: '/insights', icon: BarChart2, labelKey: 'insights', module: 'learning' },
+  { to: '/onboarding-profiles', icon: BookMarked, labelKey: 'onboardingProfiles', module: 'onboarding-profiles' },
+  { to: '/docs', icon: BookOpen, labelKey: 'docs' },
+  { to: '/reports', icon: ClipboardList, labelKey: 'reports', module: 'audit' },
 ];
 
 export function Sidebar() {
@@ -130,8 +141,15 @@ export function Sidebar() {
   const { simpleMode, setSimpleMode, sidebarItemOrder, sidebarHiddenItems, setSidebarItemOrder, setSidebarHiddenItems } = useSettingsStore();
   const isMobile = useIsMobile();
   const { data: systemInfo } = useSystemInfo();
+  const { data: systemModules } = useSystemModules();
   const t = useT();
   const [editMode, setEditMode] = useState(false);
+
+  // Pages of disabled modules vanish entirely — also from edit mode and the "add back" list.
+  const disabledModules = new Set(
+    (systemModules?.modules ?? []).filter((m) => !m.enabled).map((m) => m.name),
+  );
+  const availableNavItems = navItems.filter((item) => !item.module || !disabledModules.has(item.module));
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -144,7 +162,7 @@ export function Sidebar() {
     '/workflows': 'myWorkflows',
     '/runs': 'results',
   };
-  const navItemsWithLabels = navItems.map((item) => {
+  const navItemsWithLabels = availableNavItems.map((item) => {
     const simpleKey = simpleMode ? SIMPLE_LABEL_KEYS[item.to] : undefined;
     return {
       ...item,

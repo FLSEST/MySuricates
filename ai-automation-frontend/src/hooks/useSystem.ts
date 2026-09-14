@@ -3,6 +3,7 @@ import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT, useI18nStore } from '../i18n';
 import type { SystemHealth, SystemInfo, RemoteAccessStatus, BrowseDirectoryResponse, BackupInfo } from '../types';
+import { useModuleEnabled } from './useModules';
 
 export function useSystemHealth() {
   return useQuery({
@@ -20,9 +21,11 @@ export function useSystemInfo() {
 }
 
 export function useRemoteAccessStatus() {
+  const moduleEnabled = useModuleEnabled('remote-access');
   return useQuery({
     queryKey: ['system', 'remote-access'],
     queryFn: () => api.get<RemoteAccessStatus>('/system/remote-access/status'),
+    enabled: moduleEnabled,
   });
 }
 

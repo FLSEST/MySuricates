@@ -17,6 +17,7 @@ import { Section } from './Section';
 import { AssistantRow } from './AssistantRow';
 import { CollectForm, type CollectingState } from './CollectForm';
 import { useDebounced } from './useDebounced';
+import { useModuleEnabled } from '../../hooks/useModules';
 
 const CONTEXT_ORDER: PaletteContextId[] = ['workflow', 'run', 'project'];
 
@@ -117,6 +118,7 @@ function InnerPalette({ context, onClose, query, setQuery, contextId, cycleConte
   const { recents, pins, pushRecent, togglePin, isPinned } = usePaletteHistory(context.id);
   const setAssistantInput = useAssistantStore((s) => s.setPendingInput);
   const setAssistantOpen = useAssistantStore((s) => s.setOpen);
+  const assistantModule = useModuleEnabled('assistant');
 
   const debouncedQuery = useDebounced(query, 250);
 
@@ -133,7 +135,7 @@ function InnerPalette({ context, onClose, query, setQuery, contextId, cycleConte
   const isEmptyQuery = query.trim().length === 0;
   // Assistant escape-hatch row appears at the bottom once the query has substance;
   // threshold matches Fuse's minMatchCharLength so we don't offer it for stray keystrokes.
-  const hasAssistantRow = query.trim().length >= 2;
+  const hasAssistantRow = assistantModule && query.trim().length >= 2;
   const assistantIdx = hasAssistantRow ? results.length : -1;
   const totalItems = isEmptyQuery
     ? pinnedItems.length + recentItems.length

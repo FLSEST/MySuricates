@@ -5,6 +5,7 @@ import { useT } from '../i18n';
 import { downloadJSON } from '../utils/downloadFile';
 import type { Workflow, WorkflowRun, CreateWorkflowRequest, UpdateWorkflowRequest, WorkflowExportData, PageResponse } from '../types';
 import { TERMINAL_RUN_STATUSES } from '../types';
+import { useModuleEnabled } from './useModules';
 
 interface WorkflowApiResponse {
   id: string;
@@ -91,10 +92,11 @@ export interface SimilarWorkflow {
 }
 
 export function useWorkflowBpmn(id: string, enabled = true) {
+  const moduleEnabled = useModuleEnabled('bpmn');
   return useQuery({
     queryKey: ['workflows', id, 'bpmn'],
     queryFn: () => fetchWorkflowBpmn(id),
-    enabled: !!id && enabled,
+    enabled: moduleEnabled && !!id && enabled,
     staleTime: 30_000,
   });
 }

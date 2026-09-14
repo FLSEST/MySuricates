@@ -28,6 +28,7 @@ import { ExecutionRerunButton } from '../components/workflow/ExecutionRerunButto
 import { useCreateTodo } from '../hooks/useTodos';
 import { useExecutionWebSocket } from '../hooks/useWebSocket';
 import { useRateRun } from '../hooks/useLearning';
+import { useModuleEnabled } from '../hooks/useModules';
 import { useToast } from '../hooks/useToast';
 import { useT } from '../i18n';
 import { formatDuration } from '../utils/formatTime';
@@ -45,6 +46,9 @@ export function WorkflowExecution() {
   const { data: runs, error: runsError, refetch: refetchRuns } = useWorkflowRuns(id!);
   const { logs, connected, pendingApproval, pendingHumanInput, agenticStates, forEachStates } = useExecutionWebSocket(runId!, id);
   const toast = useToast();
+  const learningModule = useModuleEnabled('learning');
+  const terminalModule = useModuleEnabled('terminal');
+  const conversionModule = useModuleEnabled('conversion');
   const rateRun = useRateRun();
   const pauseExecution = usePauseExecution();
   const resumeExecution = useResumeExecution();
@@ -450,19 +454,21 @@ export function WorkflowExecution() {
                 {t.workflows.execution.command}
               </span>
             </button>
-            <button
-              onClick={() => setContainerTab('terminal')}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                containerTab === 'terminal'
-                  ? 'border-accent text-accent'
-                  : 'border-transparent text-text-secondary hover:text-text'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <TerminalSquare className="w-4 h-4" />
-                {t.workflows.execution.terminal.title}
-              </span>
-            </button>
+            {terminalModule && (
+              <button
+                onClick={() => setContainerTab('terminal')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  containerTab === 'terminal'
+                    ? 'border-accent text-accent'
+                    : 'border-transparent text-text-secondary hover:text-text'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <TerminalSquare className="w-4 h-4" />
+                  {t.workflows.execution.terminal.title}
+                </span>
+              </button>
+            )}
           </div>
 
           {containerTab === 'command' && (
@@ -496,7 +502,7 @@ export function WorkflowExecution() {
             </div>
           )}
 
-          {containerTab === 'terminal' && (
+          {containerTab === 'terminal' && terminalModule && (
             <Suspense fallback={<Spinner text={t.common.loading} />}>
               <TerminalPanel runId={runId!} />
             </Suspense>
@@ -505,12 +511,12 @@ export function WorkflowExecution() {
       )}
 
       {/* Execution Insights */}
-      {!isRunning && run.steps.length > 0 && (
+      {!isRunning && run.steps.length > 0 && learningModule && (
         <InsightsPanel runId={runId!} />
       )}
 
       {/* Agentic-to-Workflow Conversion */}
-      {run.status === 'COMPLETED' && run.steps.some(s => s.blockType === 'agentic') && (
+      {run.status === 'COMPLETED' && conversionModule && run.steps.some(s => s.blockType === 'agentic') && (
         <ConversionSuggestion runId={runId!} />
       )}
 

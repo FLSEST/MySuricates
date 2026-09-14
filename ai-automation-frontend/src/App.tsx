@@ -1,10 +1,13 @@
-import { lazy, useEffect, useState } from 'react';
+import { lazy, useEffect, useState, type ReactNode } from 'react';
 import { createBrowserRouter, RouterProvider, useParams, Navigate } from 'react-router-dom';
 import { Layout } from './components/layout/Layout';
 import { RouteErrorFallback } from './components/shared/RouteErrorFallback';
 import { ToastContainer } from './components/ui/ToastContainer';
 import { useSettingsStore } from './stores/settingsStore';
+import { useModuleEnabled } from './hooks/useModules';
+import { ModuleDisabled } from './pages/ModuleDisabled';
 import { api } from './api/client';
+import type { FeatureModuleName } from './types';
 
 const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
 const SimpleHome = lazy(() => import('./pages/SimpleHome').then(m => ({ default: m.SimpleHome })));
@@ -62,6 +65,12 @@ function ActivityRoute() {
   return simpleMode ? <SimpleActivity /> : <ActivityLog />;
 }
 
+/** Renders the page only when its module is enabled on this backend; otherwise explains how to enable it. */
+function ModuleRoute({ module, children }: { module: FeatureModuleName; children: ReactNode }) {
+  const enabled = useModuleEnabled(module);
+  return enabled ? <>{children}</> : <ModuleDisabled module={module} />;
+}
+
 /** Redirects /runs/:runId to /workflows/:workflowId/run/:runId */
 function RunRedirect() {
   const { runId } = useParams<{ runId: string }>();
@@ -115,30 +124,30 @@ const router = createBrowserRouter([
       { index: true, element: <DashboardRoute /> },
       { path: 'projects', element: <ProjectsRoute /> },
       { path: 'projects/:id', element: <ProjectDetail /> },
-      { path: 'wishes', element: <Wishes /> },
+      { path: 'wishes', element: <ModuleRoute module="wishes"><Wishes /></ModuleRoute> },
       { path: 'workflows', element: <WorkflowsRoute /> },
       { path: 'workflows/:id', element: <WorkflowDetailRoute /> },
       { path: 'workflows/:id/run/:runId', element: <WorkflowExecutionRoute /> },
-      { path: 'factory', element: <WorkflowFactory /> },
-      { path: 'dialogs', element: <DialogImport /> },
-      { path: 'chains', element: <Chains /> },
-      { path: 'chains/:id/run/:runId', element: <ChainExecution /> },
+      { path: 'factory', element: <ModuleRoute module="factory"><WorkflowFactory /></ModuleRoute> },
+      { path: 'dialogs', element: <ModuleRoute module="dialog-import"><DialogImport /></ModuleRoute> },
+      { path: 'chains', element: <ModuleRoute module="chains"><Chains /></ModuleRoute> },
+      { path: 'chains/:id/run/:runId', element: <ModuleRoute module="chains"><ChainExecution /></ModuleRoute> },
       { path: 'runs', element: <RunsRoute /> },
       { path: 'runs/:runId', element: <RunRedirect /> },
-      { path: 'skills', element: <Skills /> },
+      { path: 'skills', element: <ModuleRoute module="skills"><Skills /></ModuleRoute> },
       { path: 'schedules', element: <SchedulesRoute /> },
       { path: 'calendar', element: <CalendarPage /> },
-      { path: 'webhooks', element: <Webhooks /> },
-      { path: 'integrations', element: <Integrations /> },
+      { path: 'webhooks', element: <ModuleRoute module="webhooks"><Webhooks /></ModuleRoute> },
+      { path: 'integrations', element: <ModuleRoute module="integrations"><Integrations /></ModuleRoute> },
       { path: 'cockpit', element: <ProjectCockpit /> },
       { path: 'todos', element: <TodosRoute /> },
       { path: 'activity', element: <ActivityRoute /> },
       { path: 'dlq', element: <DeadLetterQueue /> },
-      { path: 'debug', element: <WorkflowDebug /> },
+      { path: 'debug', element: <ModuleRoute module="debug"><WorkflowDebug /></ModuleRoute> },
       { path: 'docs', element: <Docs /> },
-      { path: 'reports', element: <Reports /> },
-      { path: 'insights', element: <Insights /> },
-      { path: 'onboarding-profiles', element: <OnboardingProfiles /> },
+      { path: 'reports', element: <ModuleRoute module="audit"><Reports /></ModuleRoute> },
+      { path: 'insights', element: <ModuleRoute module="learning"><Insights /></ModuleRoute> },
+      { path: 'onboarding-profiles', element: <ModuleRoute module="onboarding-profiles"><OnboardingProfiles /></ModuleRoute> },
       { path: 'settings', element: <Settings /> },
     ],
   },

@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw';
+import { modulesFixture } from './modules';
 
 const BASE = '/api/v1';
 
@@ -136,6 +137,9 @@ export const handlers = [
   ),
 
   // System
+  http.get(`${BASE}/system/capabilities`, () =>
+    HttpResponse.json({ apiVersion: 'v1', routes: [], blockTypes: [], ...modulesFixture('full') }),
+  ),
   http.get(`${BASE}/system/health`, () =>
     HttpResponse.json({ status: 'UP', components: {} }),
   ),

@@ -7,6 +7,7 @@ import { exportWorkflow } from '../../hooks/useWorkflows';
 import { fetchWorkflowBpmn } from '../../api/client';
 import { downloadBlob } from '../../utils/downloadFile';
 import { useToast } from '../../hooks/useToast';
+import { useModuleEnabled } from '../../hooks/useModules';
 
 interface WorkflowDetailHeaderProps {
   workflow: Workflow;
@@ -40,6 +41,8 @@ export function WorkflowDetailHeader({
   hasFailedRuns,
 }: WorkflowDetailHeaderProps) {
   const toast = useToast();
+  const factoryModule = useModuleEnabled('factory');
+  const bpmnModule = useModuleEnabled('bpmn');
 
   const handleBpmnExport = async () => {
     try {
@@ -70,7 +73,7 @@ export function WorkflowDetailHeader({
         )}
       </div>
       <div className="flex items-center gap-2">
-        {hasFailedRuns && (
+        {hasFailedRuns && factoryModule && (
           <Button
             variant="secondary"
             size="sm"
@@ -117,14 +120,16 @@ export function WorkflowDetailHeader({
           title={t.workflows.exportWorkflow}
           aria-label={t.workflows.exportWorkflow}
         />
-        <Button
-          variant="ghost"
-          size="sm"
-          icon={<FileCode2 className="w-4 h-4" />}
-          onClick={handleBpmnExport}
-          title={t.workflows.exportBpmn}
-          aria-label={t.workflows.exportBpmn}
-        />
+        {bpmnModule && (
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<FileCode2 className="w-4 h-4" />}
+            onClick={handleBpmnExport}
+            title={t.workflows.exportBpmn}
+            aria-label={t.workflows.exportBpmn}
+          />
+        )}
         <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4" />} onClick={onDelete} title={t.common.delete} aria-label={t.common.delete} />
       </div>
     </div>

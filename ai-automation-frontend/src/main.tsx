@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App } from './App';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
+import { isModuleDisabledError } from './hooks/useModules';
 import { useThemeStore } from './stores/themeStore';
 import { installGlobalErrorHandlers } from './utils/errorReporter';
 import './index.css';
@@ -18,6 +19,8 @@ const queryClient = new QueryClient({
       retry: (failureCount, error) => {
         // Never retry rate limit errors — retries make the problem worse
         if (error && typeof error === 'object' && 'status' in error && (error as { status: number }).status === 429) return false;
+        // A disabled module stays disabled until the backend restarts
+        if (isModuleDisabledError(error)) return false;
         return failureCount < 1;
       },
       refetchOnWindowFocus: false,

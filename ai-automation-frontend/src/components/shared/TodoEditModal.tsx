@@ -4,6 +4,7 @@ import { ExternalLink } from 'lucide-react';
 import { Modal, Button, Input, Select, TagInput } from '../ui';
 import { useT } from '../../i18n';
 import { useTaskTargets } from '../../hooks/useIntegrations';
+import { useModuleEnabled } from '../../hooks/useModules';
 import { ProviderIcon } from './ProviderIcon';
 import type { Todo, TodoStatus, TodoPriority, UpdateTodoRequest, Project, Workflow, IntegrationProviderInfo } from '../../types';
 
@@ -44,6 +45,7 @@ export function TodoEditModal({
   exportLoading,
 }: TodoEditModalProps) {
   const t = useT();
+  const integrationsModule = useModuleEnabled('integrations');
   // Export fields start empty for every todo that is opened (reset when the todo id changes)
   const [exportProvider, setExportProvider] = useSyncedState(editTodo?.id, () => '');
   const [exportTarget, setExportTarget] = useSyncedState(editTodo?.id, () => '');
@@ -185,7 +187,7 @@ export function TodoEditModal({
         />
 
         {/* Übertragung / Verknüpfungen */}
-        {editTodo && (
+        {editTodo && integrationsModule && (
           <div className="pt-3 border-t border-border space-y-2">
             <label className="block text-sm font-medium text-text-secondary">{t.todos.exportSection}</label>
             {editTodo.exportedProvider ? (

@@ -10,6 +10,7 @@ import { ErrorState } from '../components/shared/ErrorState';
 import { useAllRuns, useDeleteRun, useWorkflows } from '../hooks/useWorkflows';
 import { useProjects } from '../hooks/useProjects';
 import { useAllChainRuns } from '../hooks/useChains';
+import { useModuleEnabled } from '../hooks/useModules';
 import { useT, useI18nStore } from '../i18n';
 import { formatDuration, formatDateTime } from '../utils/formatTime';
 import type { WorkflowRun, ChainRun } from '../types';
@@ -21,7 +22,10 @@ export function Runs() {
   const locale = useI18nStore((s) => s.locale);
   const navigate = useNavigate();
 
-  const [viewMode, setViewMode] = usePersistedState<ViewMode>('runs-view-mode', 'workflows');
+  const [persistedViewMode, setViewMode] = usePersistedState<ViewMode>('runs-view-mode', 'workflows');
+  const chainsModule = useModuleEnabled('chains');
+  // A remembered chains tab must not survive the chains module being switched off
+  const viewMode: ViewMode = chainsModule ? persistedViewMode : 'workflows';
 
   // Workflow filters
   const [statusFilter, setStatusFilter] = usePersistedState('runs-status-filter', '');
@@ -228,9 +232,11 @@ export function Runs() {
         <button className={tabClass(viewMode === 'workflows')} onClick={() => handleTabChange('workflows')}>
           {t.runs.tabWorkflows}
         </button>
-        <button className={tabClass(viewMode === 'chains')} onClick={() => handleTabChange('chains')}>
-          {t.runs.tabChains}
-        </button>
+        {chainsModule && (
+          <button className={tabClass(viewMode === 'chains')} onClick={() => handleTabChange('chains')}>
+            {t.runs.tabChains}
+          </button>
+        )}
       </div>
 
       {viewMode === 'workflows' ? (

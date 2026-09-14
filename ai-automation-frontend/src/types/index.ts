@@ -1337,6 +1337,43 @@ export interface DialogWorkflowSuggestion {
   available: boolean;
 }
 
+// ── Modules (startup configuration, read-only) ──────────
+
+export type FeatureModuleName =
+  | 'chains' | 'assistant' | 'learning' | 'memory' | 'audit' | 'bpmn'
+  | 'integrations' | 'webhooks' | 'remote-access' | 'terminal' | 'staging'
+  | 'conversion' | 'dialog-import' | 'onboarding-profiles' | 'skills' | 'debug' | 'factory' | 'wishes';
+
+export type HardeningModuleName =
+  | 'provenance' | 'sealing' | 'require-sealed-for-unattended' | 'webhook-signatures';
+
+export type ModuleName = FeatureModuleName | HardeningModuleName;
+
+export type ModulePreset = 'core' | 'research' | 'full';
+export type ModuleTier = 'research' | 'advanced' | 'hardening';
+export type ModuleMaturity = 'stable' | 'experimental' | 'legacy';
+export type ModuleRisk = 'credentials' | 'network' | 'host-access';
+
+export interface ModuleInfo {
+  name: ModuleName;
+  kind: 'feature' | 'hardening';
+  enabled: boolean;
+  tier: ModuleTier;
+  maturity: ModuleMaturity;
+  risks: ModuleRisk[];
+  requires: ModuleName[];
+  /** e.g. automation.modules.webhooks */
+  property: string;
+  /** e.g. AUTOMATION_MODULES_WEBHOOKS */
+  envVar: string;
+  description: string;
+}
+
+export interface SystemModules {
+  preset: ModulePreset;
+  modules: ModuleInfo[];
+}
+
 // ── API Error ────────────────────────────────────────────
 
 export interface ApiError {

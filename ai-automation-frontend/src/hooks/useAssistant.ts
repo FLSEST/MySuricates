@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
+import { useModuleEnabled } from './useModules';
 
 export interface AssistantHistoryEntry {
   role: 'user' | 'assistant';
@@ -98,10 +99,12 @@ export function useRejectPendingTool() {
 }
 
 export function useAssistantSuggestions(page: string) {
+  const moduleEnabled = useModuleEnabled('assistant');
   return useQuery({
     queryKey: ['assistant-suggestions', page],
     queryFn: () => api.get<string[]>(`/assistant/suggestions?page=${encodeURIComponent(page)}`),
     staleTime: 5 * 60 * 1000,
+    enabled: moduleEnabled,
   });
 }
 
@@ -134,11 +137,12 @@ export interface AssistantSessionDetail {
 }
 
 export function useAssistantSessions(enabled = true) {
+  const moduleEnabled = useModuleEnabled('assistant');
   return useQuery({
     queryKey: ['assistant-sessions-api'],
     queryFn: () => api.get<AssistantSessionSummary[]>('/assistant/sessions'),
     staleTime: 30_000,
-    enabled,
+    enabled: moduleEnabled && enabled,
   });
 }
 

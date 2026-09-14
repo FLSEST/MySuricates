@@ -12,6 +12,7 @@ import {
   useDeleteWorkflow, useExecuteWorkflow, useOptimizeWorkflow, useRepairWorkflow, useCreateWorkflow,
 } from '../hooks/useWorkflows';
 import { useSkills, useActivateSkills, useDeactivateSkill } from '../hooks/useSkills';
+import { useModuleEnabled } from '../hooks/useModules';
 import { useProjects } from '../hooks/useProjects';
 import { SortableBlockList } from '../components/workflow/SortableBlockList';
 import { WorkflowDetailHeader } from '../components/workflow/WorkflowDetailHeader';
@@ -38,6 +39,7 @@ export function WorkflowDetail() {
   const executeWorkflow = useExecuteWorkflow();
   const optimizeWorkflow = useOptimizeWorkflow();
   const repairWorkflow = useRepairWorkflow();
+  const bpmnModule = useModuleEnabled('bpmn');
   const createWorkflow = useCreateWorkflow();
   const activateSkills = useActivateSkills();
   const deactivateSkill = useDeactivateSkill();
@@ -329,16 +331,18 @@ export function WorkflowDetail() {
               <History className="w-3.5 h-3.5" />
               {t.workflows.versionsTab}
             </button>
-            <button
-              onClick={() => setActiveTab('diagram')}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'diagram'
-                  ? 'border-accent text-accent'
-                  : 'border-transparent text-text-secondary hover:text-text hover:border-border'
-              }`}
-            >
-              {t.workflows.diagramTab}
-            </button>
+            {bpmnModule && (
+              <button
+                onClick={() => setActiveTab('diagram')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'diagram'
+                    ? 'border-accent text-accent'
+                    : 'border-transparent text-text-secondary hover:text-text hover:border-border'
+                }`}
+              >
+                {t.workflows.diagramTab}
+              </button>
+            )}
           </div>
 
           {activeTab === 'blocks' && (
@@ -379,7 +383,7 @@ export function WorkflowDetail() {
             </Suspense>
           )}
 
-          {activeTab === 'diagram' && id && (
+          {activeTab === 'diagram' && bpmnModule && id && (
             <Suspense fallback={<div className="p-6 text-sm text-text-secondary">{t.common.loading}</div>}>
               <WorkflowDiagramTab
                 workflowId={id}

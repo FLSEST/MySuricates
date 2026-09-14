@@ -1,8 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import type { StagingStatus, SyncResult, SyncPreview, SyncDefinitionsRequest } from '../types';
+import { useModuleEnabled } from './useModules';
 
 export function useStagingStatus() {
+  const moduleEnabled = useModuleEnabled('staging');
   return useQuery({
     queryKey: ['staging', 'status'],
     queryFn: () => api.get<StagingStatus>('/staging/status'),
@@ -11,6 +13,7 @@ export function useStagingStatus() {
       if (phase && phase !== 'IDLE' && phase !== 'ERROR') return 1_000;
       return 15_000;
     },
+    enabled: moduleEnabled,
   });
 }
 

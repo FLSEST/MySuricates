@@ -32,6 +32,8 @@ interface ScheduleFormModalProps {
   showVariables: boolean;
   workflows?: Workflow[];
   chains?: WorkflowChain[];
+  /** False when the backend runs without the chains module: only workflows can be scheduled. */
+  chainsEnabled?: boolean;
   isLoading: boolean;
   isFormValid: boolean;
   onClose: () => void;
@@ -51,6 +53,7 @@ export function ScheduleFormModal({
   showVariables,
   workflows,
   chains,
+  chainsEnabled = true,
   isLoading,
   isFormValid,
   onClose,
@@ -108,17 +111,19 @@ export function ScheduleFormModal({
               >
                 {t.schedules.targetWorkflow}
               </button>
-              <button
-                type="button"
-                onClick={() => onFormChange({ ...form, targetType: 'CHAIN', workflowId: '' })}
-                className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  form.targetType === 'CHAIN'
-                    ? 'bg-surface text-text shadow-xs'
-                    : 'text-text-secondary hover:text-text'
-                }`}
-              >
-                {t.schedules.targetChain}
-              </button>
+              {chainsEnabled && (
+                <button
+                  type="button"
+                  onClick={() => onFormChange({ ...form, targetType: 'CHAIN', workflowId: '' })}
+                  className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    form.targetType === 'CHAIN'
+                      ? 'bg-surface text-text shadow-xs'
+                      : 'text-text-secondary hover:text-text'
+                  }`}
+                >
+                  {t.schedules.targetChain}
+                </button>
+              )}
             </div>
           )}
         </div>

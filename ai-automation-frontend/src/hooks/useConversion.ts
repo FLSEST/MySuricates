@@ -1,12 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import type { WorkflowSuggestion, Workflow } from '../types';
+import { useModuleEnabled } from './useModules';
 
 export function useConversionSuggestion(runId: string, enabled = true) {
+  const moduleEnabled = useModuleEnabled('conversion');
   return useQuery({
     queryKey: ['conversion', 'suggest', runId],
     queryFn: () => api.get<WorkflowSuggestion>(`/conversions/runs/${runId}/suggest`),
-    enabled: !!runId && enabled,
+    enabled: moduleEnabled && !!runId && enabled,
     retry: false,
   });
 }

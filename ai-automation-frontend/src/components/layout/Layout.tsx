@@ -9,6 +9,7 @@ import { CommandPalette } from '../palette/CommandPalette';
 import { Spinner } from '../ui';
 import { useSidebarStore } from '../../stores/sidebarStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { useModuleEnabled } from '../../hooks/useModules';
 
 export function Layout() {
   const collapsed = useSidebarStore((s) => s.collapsed);
@@ -16,6 +17,7 @@ export function Layout() {
   const setMobileOpen = useSidebarStore((s) => s.setMobileOpen);
   const isMobile = useIsMobile();
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const assistantModule = useModuleEnabled('assistant');
 
   useEffect(() => {
     const keyHandler = (e: KeyboardEvent) => {
@@ -59,7 +61,7 @@ export function Layout() {
           </main>
         </div>
       </div>
-      <AssistantPanel />
+      {assistantModule && <AssistantPanel />}
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </ApiKeyGuard>
   );

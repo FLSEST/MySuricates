@@ -15,6 +15,7 @@ import {
 } from '../hooks/useProjects';
 import { OnboardingCard } from '../components/project/OnboardingCard';
 import { useWorkflows } from '../hooks/useWorkflows';
+import { useModuleEnabled } from '../hooks/useModules';
 import { useT } from '../i18n';
 import type { ProjectType } from '../types';
 
@@ -27,6 +28,7 @@ export function ProjectDetail() {
 
   const { data: project, isLoading, error, refetch } = useProject(id!);
   const { data: workflows } = useWorkflows();
+  const onboardingModule = useModuleEnabled('onboarding-profiles');
   const updateProject = useUpdateProject();
   const archiveProject = useArchiveProject();
   const restoreProject = useRestoreProject();
@@ -228,7 +230,7 @@ export function ProjectDetail() {
       </Card>
 
       {/* MySuricates Integration */}
-      <OnboardingCard projectId={project.id} />
+      {onboardingModule && <OnboardingCard projectId={project.id} />}
 
       {/* Workflows in project */}
       <Card padding={false}>

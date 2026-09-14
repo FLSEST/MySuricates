@@ -17,11 +17,16 @@ import { ExecutionSettingsCard } from '../components/settings/ExecutionSettingsC
 import { WishSettingsCard } from '../components/settings/WishSettingsCard';
 import { SettingsNav, type NavSection } from '../components/settings/SettingsNav';
 import { SettingsSection } from '../components/settings/SettingsSection';
+import { ModulesCard } from '../components/settings/ModulesCard';
+import { useModuleEnabled } from '../hooks/useModules';
 
 export function Settings() {
   const t = useT();
   const { simpleMode, advancedMode } = useSettingsStore();
   const { data: sysInfo } = useSystemInfo();
+  const stagingModule = useModuleEnabled('staging');
+  const remoteAccessModule = useModuleEnabled('remote-access');
+  const wishesModule = useModuleEnabled('wishes');
 
   const { data: staging } = useStagingStatus();
   const stagingStart = useStagingStart();
@@ -54,7 +59,8 @@ export function Settings() {
     { id: 'general', label: t.settings.settingsNavGeneral, visible: true },
     { id: 'execution', label: t.settings.settingsNavExecution, visible: !simpleMode },
     { id: 'infrastructure', label: t.settings.settingsNavInfrastructure, visible: !simpleMode },
-    { id: 'environments', label: t.settings.settingsNavEnvironments, visible: advancedMode },
+    { id: 'environments', label: t.settings.settingsNavEnvironments, visible: advancedMode && stagingModule },
+    { id: 'modules', label: t.modules.navTitle, visible: true },
     { id: 'system', label: t.settings.settingsNavSystem, visible: true },
   ];
 
@@ -78,19 +84,19 @@ export function Settings() {
           {!simpleMode && (
             <SettingsSection id="execution" title={t.settings.settingsNavExecution} collapsible open={!!openSections['execution']} onToggle={() => toggleSection('execution')}>
               <ExecutionSettingsCard />
-              <WishSettingsCard />
+              {wishesModule && <WishSettingsCard />}
             </SettingsSection>
           )}
 
           {!simpleMode && (
             <SettingsSection id="infrastructure" title={t.settings.settingsNavInfrastructure} collapsible open={!!openSections['infrastructure']} onToggle={() => toggleSection('infrastructure')}>
-              <RemoteAccessCard />
+              {remoteAccessModule && <RemoteAccessCard />}
               <BackupCard />
               <NotificationsCard />
             </SettingsSection>
           )}
 
-          {advancedMode && (
+          {advancedMode && stagingModule && (
             <SettingsSection id="environments" title={t.settings.settingsNavEnvironments} collapsible open={!!openSections['environments']} onToggle={() => toggleSection('environments')}>
               <StagingCard
                 staging={staging}
@@ -128,6 +134,10 @@ export function Settings() {
               />
             </SettingsSection>
           )}
+
+          <SettingsSection id="modules" title={t.modules.navTitle}>
+            <ModulesCard />
+          </SettingsSection>
 
           <SettingsSection id="system" title={t.settings.settingsNavSystem} collapsible open={!!openSections['system']} onToggle={() => toggleSection('system')}>
             <SystemInfoCard />

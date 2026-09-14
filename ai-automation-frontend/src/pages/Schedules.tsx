@@ -13,6 +13,7 @@ import { useScheduleFilters } from '../hooks/useScheduleFilters';
 import { useScheduleForm } from '../hooks/useScheduleForm';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { useChains } from '../hooks/useChains';
+import { useModuleEnabled } from '../hooks/useModules';
 import { useT } from '../i18n';
 
 export function Schedules() {
@@ -20,6 +21,7 @@ export function Schedules() {
   const { data: schedules, isLoading, error, refetch } = useSchedules();
   const { data: workflows } = useWorkflows();
   const { data: chains } = useChains();
+  const chainsModule = useModuleEnabled('chains');
   const toggleSchedule = useToggleSchedule();
   const deleteSchedule = useDeleteSchedule();
   const { data: maintenanceData } = useMaintenanceMode();
@@ -119,7 +121,7 @@ export function Schedules() {
       {view === 'list' && schedules && schedules.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1">
-            {(['ALL', 'WORKFLOW', 'CHAIN'] as const).map(v => (
+            {(chainsModule ? (['ALL', 'WORKFLOW', 'CHAIN'] as const) : (['ALL', 'WORKFLOW'] as const)).map(v => (
               <button key={v} onClick={() => filters.setTargetTypeFilter(v)}
                 className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
                   filters.targetTypeFilter === v ? 'bg-accent text-white' : 'text-text-secondary hover:text-text hover:bg-surface-raised'
@@ -247,6 +249,7 @@ export function Schedules() {
         showVariables={scheduleForm.showVariables}
         workflows={workflows}
         chains={chains}
+        chainsEnabled={chainsModule}
         isLoading={scheduleForm.isSubmitting}
         isFormValid={scheduleForm.isFormValid}
         onClose={scheduleForm.closeModal}

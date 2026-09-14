@@ -6,6 +6,7 @@ import { useWorkflows, useExecuteWorkflow } from '../hooks/useWorkflows';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useAssistantStore } from '../stores/assistantStore';
 import { useLatestRunStatuses } from '../hooks/useLatestRunStatuses';
+import { useModuleEnabled } from '../hooks/useModules';
 import { buildHomeTiles, greetingKey } from '../utils/homeTiles';
 import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
 import { readContextSchema } from '../utils/contextSchema';
@@ -27,6 +28,7 @@ export function SimpleHome() {
   const latestStatus = useLatestRunStatuses();
   const setPendingInput = useAssistantStore((s) => s.setPendingInput);
   const setAssistantOpen = useAssistantStore((s) => s.setOpen);
+  const assistantModule = useModuleEnabled('assistant');
 
   const [assistantInput, setAssistantInput] = useState('');
   const [executeDialog, setExecuteDialog] = useState<{ open: boolean; workflow: Workflow | null; variables: string[] }>(
@@ -87,33 +89,35 @@ export function SimpleHome() {
       </div>
 
       {/* Assistant — the hero input */}
-      <form
-        onSubmit={(e) => { e.preventDefault(); submitAssistant(); }}
-        className="relative rounded-2xl p-[1.5px] shadow-[0_18px_50px_-30px_rgba(129,140,248,0.7)]"
-        style={{ background: 'linear-gradient(120deg, rgba(129,140,248,.55), rgba(56,189,248,.30) 40%, rgba(167,139,250,.45))' }}
-      >
-        <div className="flex items-center gap-3 bg-surface-raised rounded-[14px] px-4 py-3">
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-            style={{ background: 'linear-gradient(135deg, rgba(129,140,248,.25), rgba(56,189,248,.18))' }}
-          >
-            <Sparkles className="w-[18px] h-[18px]" style={{ color: '#aab4ff' }} />
+      {assistantModule && (
+        <form
+          onSubmit={(e) => { e.preventDefault(); submitAssistant(); }}
+          className="relative rounded-2xl p-[1.5px] shadow-[0_18px_50px_-30px_rgba(129,140,248,0.7)]"
+          style={{ background: 'linear-gradient(120deg, rgba(129,140,248,.55), rgba(56,189,248,.30) 40%, rgba(167,139,250,.45))' }}
+        >
+          <div className="flex items-center gap-3 bg-surface-raised rounded-[14px] px-4 py-3">
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: 'linear-gradient(135deg, rgba(129,140,248,.25), rgba(56,189,248,.18))' }}
+            >
+              <Sparkles className="w-[18px] h-[18px]" style={{ color: '#aab4ff' }} />
+            </div>
+            <input
+              value={assistantInput}
+              onChange={(e) => setAssistantInput(e.target.value)}
+              placeholder={t.simple.home.assistantPlaceholder}
+              className="flex-1 min-w-0 bg-transparent text-sm text-text placeholder:text-text-tertiary focus:outline-none"
+            />
+            <button
+              type="submit"
+              aria-label={t.simple.home.assistantLabel}
+              className="w-8 h-8 rounded-lg bg-accent text-white flex items-center justify-center shrink-0 hover:opacity-90 transition-opacity"
+            >
+              <ArrowUp className="w-4 h-4" />
+            </button>
           </div>
-          <input
-            value={assistantInput}
-            onChange={(e) => setAssistantInput(e.target.value)}
-            placeholder={t.simple.home.assistantPlaceholder}
-            className="flex-1 min-w-0 bg-transparent text-sm text-text placeholder:text-text-tertiary focus:outline-none"
-          />
-          <button
-            type="submit"
-            aria-label={t.simple.home.assistantLabel}
-            className="w-8 h-8 rounded-lg bg-accent text-white flex items-center justify-center shrink-0 hover:opacity-90 transition-opacity"
-          >
-            <ArrowUp className="w-4 h-4" />
-          </button>
-        </div>
-      </form>
+        </form>
+      )}
 
       {/* "How's it looking?" overview */}
       <SimpleOverview />

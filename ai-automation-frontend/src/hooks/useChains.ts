@@ -4,11 +4,14 @@ import { useToast } from './useToast';
 import { useT } from '../i18n';
 import type { WorkflowChain, ChainRun, CreateChainRequest, UpdateChainRequest, PageResponse } from '../types';
 import { TERMINAL_RUN_STATUSES } from '../types';
+import { useModuleEnabled } from './useModules';
 
 export function useChains() {
+  const moduleEnabled = useModuleEnabled('chains');
   return useQuery({
     queryKey: ['chains'],
     queryFn: () => api.get<WorkflowChain[]>('/chains'),
+    enabled: moduleEnabled,
   });
 }
 
@@ -21,6 +24,7 @@ export function useChain(id: string) {
 }
 
 export function useAllChainRuns(params: { page: number; size: number; status?: string; search?: string }) {
+  const moduleEnabled = useModuleEnabled('chains');
   const searchParams = new URLSearchParams({
     page: String(params.page),
     size: String(params.size),
@@ -38,14 +42,16 @@ export function useAllChainRuns(params: { page: number; size: number; status?: s
       return hasActiveRuns ? 5_000 : 30_000;
     },
     placeholderData: keepPreviousData,
+    enabled: moduleEnabled,
   });
 }
 
 export function useChainRuns(chainId: string) {
+  const moduleEnabled = useModuleEnabled('chains');
   return useQuery({
     queryKey: ['chains', chainId, 'runs'],
     queryFn: () => api.get<ChainRun[]>(`/chains/${chainId}/runs`),
-    enabled: !!chainId,
+    enabled: moduleEnabled && !!chainId,
   });
 }
 

@@ -1,12 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import type { TestingStatus, SyncResult, SyncPreview, SyncDefinitionsRequest } from '../types';
+import { useModuleEnabled } from './useModules';
 
 export function useTestingStatus() {
+  const moduleEnabled = useModuleEnabled('staging');
   return useQuery({
     queryKey: ['testing', 'status'],
     queryFn: () => api.get<TestingStatus>('/testing/status'),
     refetchInterval: 15_000,
+    enabled: moduleEnabled,
   });
 }
 

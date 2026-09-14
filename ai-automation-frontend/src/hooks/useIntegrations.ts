@@ -3,20 +3,24 @@ import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
 import type { IntegrationProviderInfo, TaskTarget } from '../types';
+import { useModuleEnabled } from './useModules';
 
 export function useIntegrations() {
+  const moduleEnabled = useModuleEnabled('integrations');
   return useQuery({
     queryKey: ['integrations'],
     queryFn: () => api.get<IntegrationProviderInfo[]>('/integrations'),
+    enabled: moduleEnabled,
   });
 }
 
 /** Selectable export targets for a task-capable provider (GitHub repos, …). */
 export function useTaskTargets(providerId: string, enabled: boolean) {
+  const moduleEnabled = useModuleEnabled('integrations');
   return useQuery({
     queryKey: ['task-targets', providerId],
     queryFn: () => api.get<TaskTarget[]>(`/integrations/${providerId}/task-targets`),
-    enabled: enabled && !!providerId,
+    enabled: moduleEnabled && enabled && !!providerId,
     staleTime: 60_000,
   });
 }

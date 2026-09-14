@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
+import { useModuleEnabled } from './useModules';
 
 export interface OnboardingProfile {
   id: string;
@@ -27,9 +28,11 @@ export interface OnboardingProfileHistory {
 }
 
 export function useOnboardingProfiles() {
+  const moduleEnabled = useModuleEnabled('onboarding-profiles');
   return useQuery({
     queryKey: ['onboarding-profiles'],
     queryFn: () => api.get<OnboardingProfile[]>('/onboarding-profiles'),
+    enabled: moduleEnabled,
   });
 }
 

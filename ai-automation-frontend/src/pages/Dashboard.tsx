@@ -17,6 +17,7 @@ import { IntegrationStatsCard } from '../components/dashboard/IntegrationStatsCa
 import { ModelStatsCard } from '../components/dashboard/ModelStatsCard';
 import { TodosWidget } from '../components/dashboard/TodosWidget';
 import { useDashboard } from '../hooks/useLearning';
+import { useModuleEnabled } from '../hooks/useModules';
 import { useProjects } from '../hooks/useProjects';
 import { useRemainingToday, useRemainingThisWeek } from '../hooks/useSchedules';
 import { useSystemInfo } from '../hooks/useSystem';
@@ -115,6 +116,7 @@ export function Dashboard() {
   const navigate = useNavigate();
   const now = useLiveClock();
   const { data: dashboard, isLoading: dashLoading, error, refetch } = useDashboard();
+  const integrationsModule = useModuleEnabled('integrations');
   const { data: projects } = useProjects();
   const { data: remainingToday } = useRemainingToday();
   const { data: remainingThisWeek } = useRemainingThisWeek();
@@ -218,7 +220,7 @@ export function Dashboard() {
         || (stats?.modelStats?.length ?? 0) > 0) && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           <ProviderStatsCard data={stats?.providerStats} />
-          <IntegrationStatsCard data={stats?.integrationStats} />
+          {integrationsModule && <IntegrationStatsCard data={stats?.integrationStats} />}
           <ModelStatsCard data={stats?.modelStats} />
         </div>
       )}

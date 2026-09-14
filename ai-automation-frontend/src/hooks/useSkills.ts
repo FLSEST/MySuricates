@@ -3,11 +3,14 @@ import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
 import type { Skill, Capability } from '../types';
+import { useModuleEnabled } from './useModules';
 
 export function useSkills() {
+  const moduleEnabled = useModuleEnabled('skills');
   return useQuery({
     queryKey: ['skills'],
     queryFn: () => api.get<Skill[]>('/skills'),
+    enabled: moduleEnabled,
   });
 }
 
