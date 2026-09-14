@@ -5,6 +5,7 @@ import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
+import com.automation.executor.StepAiMetadata;
 import com.automation.service.ai.AiProvider;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.ai.HostClaudeService.Turn;
@@ -258,7 +259,7 @@ public class AgenticBlockExecutor implements BlockExecutor {
         Map<String, Object> metadata = tokenTracker.buildFinalMetadata(
                 cfg.goal(), cfg.successCriteria(), iteration, goalAchieved, stopReason,
                 model, provider.getId());
-        metadata.put("aiRequest", aiRequestMetadata(provider.getId(), model, effort));
+        metadata.put(StepAiMetadata.AI_REQUEST, StepAiMetadata.aiRequest(provider.getId(), model, effort));
         result.setMetadata(metadata);
 
         context.setVariable("agentic_goal_achieved", goalAchieved);
@@ -271,14 +272,5 @@ public class AgenticBlockExecutor implements BlockExecutor {
                         "durationMs", result.getDurationMs()));
 
         return result;
-    }
-
-    /** Same shape as the {@code aiRequest} step metadata of host steps: the settings actually used. */
-    private static Map<String, Object> aiRequestMetadata(String providerId, String model, String effort) {
-        Map<String, Object> params = new LinkedHashMap<>();
-        params.put("provider", providerId);
-        if (model != null && !model.isBlank()) params.put("model", model);
-        if (effort != null && !effort.isBlank()) params.put("effort", effort);
-        return params;
     }
 }

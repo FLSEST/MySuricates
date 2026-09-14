@@ -5,6 +5,7 @@ import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
+import com.automation.executor.StepAiMetadata;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
 import lombok.RequiredArgsConstructor;
@@ -47,7 +48,9 @@ public class RetryBlockExecutor implements BlockExecutor {
                 .output("No retry attempts executed")
                 .build();
 
-        for (int attempt = 0; attempt <= Math.max(0, maxRetries); attempt++) {
+        int maxAttempts = Math.max(0, maxRetries) + 1;
+        int attempts = 0;
+        for (int attempt = 0; attempt < maxAttempts; attempt++) {
             if (context.shouldStop()) break;
 
             if (attempt > 0) {
@@ -61,6 +64,7 @@ public class RetryBlockExecutor implements BlockExecutor {
                 }
             }
 
+            attempts++;
             if (isShell) {
                 lastResult = commandExecutor.executeStepAsShell(
                         context.getProjectPath(),
@@ -87,10 +91,13 @@ public class RetryBlockExecutor implements BlockExecutor {
             }
 
             if (lastResult.getStatus() == StepStatus.COMPLETED) {
-                return lastResult;
+                break;
             }
         }
 
+        // Inner host/shell results keep their own metadata (aiRequest, provider); add the retry facts
+        StepAiMetadata.put(lastResult, "attempts", attempts);
+        StepAiMetadata.put(lastResult, "maxAttempts", maxAttempts);
         return lastResult;
     }
 

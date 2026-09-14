@@ -5,6 +5,7 @@ import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
+import com.automation.executor.StepAiMetadata;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
 import lombok.RequiredArgsConstructor;
@@ -53,7 +54,7 @@ public class ConditionalBlockExecutor implements BlockExecutor {
             conditionMet = exitCode == 0;
         } else {
             // Claude mode: ask AI to evaluate condition as TRUE/FALSE
-            String conditionResult = commandExecutor.executeOnHost(
+            var evaluation = commandExecutor.executeOnHost(
                     HostExecutionRequest.builder()
                             .projectPath(context.getProjectPath())
                             .command("Evaluate this condition and respond with ONLY the word TRUE or FALSE, nothing else: " + condition)
@@ -62,13 +63,16 @@ public class ConditionalBlockExecutor implements BlockExecutor {
                             .providerId(context.providerFor(block))
                             .effort(context.effortFor(block))
                             .build()
-            ).output();
-            String trimmed = conditionResult.trim().toUpperCase();
+            );
+            // First AI call of the block: carries provider/model even when no branch is executed
+            StepAiMetadata.carryAi(result, evaluation.metadata());
+            String trimmed = evaluation.output().trim().toUpperCase();
             conditionMet = trimmed.equals("TRUE") || trimmed.startsWith("TRUE");
         }
 
         String commandToExecute = conditionMet ? thenCommand : elseCommand;
         result.setInput("if (" + condition + ") → " + conditionMet);
+        StepAiMetadata.put(result, "conditionMet", conditionMet);
 
         if (commandToExecute != null) {
             String resolved = isShell
@@ -104,6 +108,7 @@ public class ConditionalBlockExecutor implements BlockExecutor {
             }
             result.setOutput(stepResult.getOutput());
             result.setStatus(stepResult.getStatus());
+            StepAiMetadata.carryAi(result, stepResult);
         } else {
             result.setOutput("No " + (conditionMet ? "then" : "else") + " branch defined, skipping");
             result.setStatus(StepStatus.SKIPPED);

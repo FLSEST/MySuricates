@@ -549,4 +549,38 @@ class CommandExecutorServiceTest {
                 "/etc/timezone:/etc/timezone:ro"
         );
     }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void executeOnHost_returnsProviderAndAiRequestMetadata() throws IOException {
+        when(aiProvider.executeAction(any())).thenReturn(new AiProvider.ActionResult("TRUE", 0, null));
+        when(aiProvider.getId()).thenReturn("CLAUDE");
+
+        CliSession.EnrichedCommandResult result = commandExecutorService.executeOnHost(
+                HostExecutionRequest.builder()
+                        .projectPath("/project")
+                        .command("Evaluate")
+                        .model("opus")
+                        .effort("medium")
+                        .allowedTools(List.of("Read"))
+                        .build());
+
+        assertThat(result.output()).isEqualTo("TRUE");
+        assertThat(result.metadata())
+                .containsEntry("provider", "CLAUDE")
+                .containsEntry("requestedModel", "opus")
+                .doesNotContainKey("aiSystemPrompt");
+        Map<String, Object> aiRequest = (Map<String, Object>) result.metadata().get("aiRequest");
+        assertThat(aiRequest)
+                .containsEntry("provider", "CLAUDE")
+                .containsEntry("model", "opus")
+                .containsEntry("effort", "medium")
+                .containsEntry("allowedTools", "Read");
+    }
+
+    @Test
+    void enrichedCommandResult_threeArgConstructor_hasEmptyMetadata() {
+        CliSession.EnrichedCommandResult result = new CliSession.EnrichedCommandResult("ok", 0, null);
+        assertThat(result.metadata()).isEmpty();
+    }
 }

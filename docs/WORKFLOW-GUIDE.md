@@ -1006,6 +1006,7 @@ Regeln:
 - Der `integration`-Block nutzt `provider` fuer den Integrations-Provider und ist kein KI-Block — dort wirkt kein Override.
 - Im Block-Editor der UI erscheinen die Felder „KI-Anbieter und Modell fuer diesen Block" nur bei KI-faehigen Block-Typen; die Modell-Vorschlaege kommen vom Host-Katalog des gewaehlten Anbieters (`GET /api/v1/system/ai-providers/{id}/models`), Freitext bleibt erlaubt.
 - Die tatsaechlich verwendeten Werte stehen im Step-Metadata der Run-Details: `aiRequest.provider`, `aiRequest.model`, `aiRequest.effort` (fuer `agentic` zusaetzlich top-level `provider`/`model`).
+- Wrapper-Bloecke (`retry`, `foreach`, `while`, `conditional`, `switch`, `skill-capability`) uebernehmen `aiRequest`, `provider` und `requestedModel` ihres **ersten inneren KI-Aufrufs** in ihren Sammel-Step (Anbieter und Modell sind pro Block konstant); die Run-Seite zeigt sie als Pills. Zusaetzliche Schluessel: `foreach` → `totalItems` + `items` (`{index, item, status, durationMs}`, max. 500, Item-Label auf 120 Zeichen gekuerzt), `while` → `iterationCount` + `iterations`, `retry` → `attempts` + `maxAttempts`, `conditional` → `conditionMet`, `switch` → `expression` + `matchedCase`. Reine Shell-Iterationen tragen kein `aiRequest`.
 
 ---
 

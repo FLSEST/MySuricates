@@ -732,4 +732,44 @@ class SwitchBlockExecutorTest {
         verify(commandExecutor).executeStepAsShell(anyString(), captor.capture(), anyInt(), anyInt());
         assertThat(captor.getValue().getConfig().get("command")).isEqualTo("echo 'x; id'");
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void execute_carriesAiRequestFromFirstNestedBlock() {
+        context.setVariable("status", "success");
+        StepResult blockResult = StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED).output("deployed").build();
+        blockResult.setMetadata(Map.of(
+                "aiRequest", Map.of("provider", "CLAUDE", "model", "opus"),
+                "provider", "CLAUDE", "requestedModel", "opus"));
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(blockResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "${status}");
+        config.put("cases", List.of(Map.of("value", "success", "blocks", List.of(
+                Map.of("type", "simple", "config", Map.of("command", "deploy app"))))));
+        BlockDefinition block = BlockDefinition.builder().type("switch").config(config).build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getMetadata())
+                .containsEntry("matchedCase", "success")
+                .containsEntry("expression", "success")
+                .containsEntry("provider", "CLAUDE");
+        assertThat((Map<String, Object>) result.getMetadata().get("aiRequest")).containsEntry("model", "opus");
+    }
+
+    @Test
+    void execute_noMatch_keepsExpressionAndMatchedCaseNoneInMutableMap() {
+        context.setVariable("status", "unknown");
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "${status}");
+        config.put("cases", List.of(Map.of("value", "success", "blocks", List.of(
+                Map.of("type", "simple", "config", Map.of("command", "deploy app"))))));
+        BlockDefinition block = BlockDefinition.builder().type("switch").config(config).build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getMetadata()).containsEntry("matchedCase", "none").containsEntry("expression", "unknown");
+        result.getMetadata().put("x", 1);
+    }
 }

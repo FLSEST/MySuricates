@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 import java.util.regex.Pattern;
 
@@ -16,7 +17,13 @@ public class CliSession implements Closeable {
 
     public record CommandResult(String output, int exitCode) {}
 
-    public record EnrichedCommandResult(String output, int exitCode, ClaudeJsonResponse parsed) {
+    public record EnrichedCommandResult(String output, int exitCode, ClaudeJsonResponse parsed,
+                                        Map<String, Object> metadata) {
+        /** Result without step metadata (container sessions, tests). */
+        public EnrichedCommandResult(String output, int exitCode, ClaudeJsonResponse parsed) {
+            this(output, exitCode, parsed, Map.of());
+        }
+
         public CommandResult toCommandResult() {
             return new CommandResult(output, exitCode);
         }

@@ -2,6 +2,7 @@ package com.automation.service.cli;
 
 import com.automation.entity.*;
 import com.automation.exception.WorkflowExecutionException;
+import com.automation.executor.StepAiMetadata;
 import com.automation.service.ai.AiProvider;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.cli.ShellCommandService.ShellResult;
@@ -139,7 +140,8 @@ public class CommandExecutorService {
                             request.systemPrompt(), request.projectPath(), request.timeoutSeconds(),
                             request.priority(), true, request.allowedTools(), request.disallowedTools(),
                             request.effort()));
-            return new CliSession.EnrichedCommandResult(result.text(), result.exitCode(), null);
+            return new CliSession.EnrichedCommandResult(result.text(), result.exitCode(), null,
+                    hostCallMetadata(request, provider, result));
         } catch (IOException e) {
             throw new WorkflowExecutionException(
                     "Failed to execute command on host (project: " + request.projectPath() + ")", e);
@@ -181,17 +183,7 @@ public class CommandExecutorService {
             step.setOutput(providerResult.text());
             step.setStatus(providerResult.exitCode() == 0 ? StepStatus.COMPLETED : StepStatus.FAILED);
 
-            Map<String, Object> meta = new LinkedHashMap<>(
-                    providerResult.metadata() != null ? providerResult.metadata().toMap() : Map.of());
-            if (request.model() != null && !request.model().isBlank()) {
-                meta.put("requestedModel", request.model());
-            }
-            meta.put("provider", provider.getId());
-            if (request.systemPrompt() != null && !request.systemPrompt().isBlank()) {
-                meta.put("aiSystemPrompt", request.systemPrompt());
-            }
-            meta.put("aiRequest", buildAiRequestMetadata(request, provider.getId()));
-            step.setMetadata(meta);
+            step.setMetadata(hostCallMetadata(request, provider, providerResult));
         } catch (Exception e) {
             log.error("Host step execution failed for project {}: {}", request.projectPath(), e.getMessage(), e);
             step.setOutput("Error: " + e.getMessage());
@@ -346,28 +338,20 @@ public class CommandExecutorService {
         return "INSTRUCTIONS:\n" + prefix + "\n---\nTASK:\n" + command;
     }
 
-    private Map<String, Object> buildAiRequestMetadata(HostExecutionRequest request, String providerId) {
-        Map<String, Object> params = new LinkedHashMap<>();
-        params.put("provider", providerId);
+    /** Step metadata of one host AI call: response metadata + requestedModel/provider/aiSystemPrompt/aiRequest. */
+    private Map<String, Object> hostCallMetadata(HostExecutionRequest request, AiProvider provider,
+                                                 AiProvider.ActionResult result) {
+        Map<String, Object> meta = new LinkedHashMap<>(
+                result.metadata() != null ? result.metadata().toMap() : Map.of());
         if (request.model() != null && !request.model().isBlank()) {
-            params.put("model", request.model());
+            meta.put("requestedModel", request.model());
         }
-        if (request.timeoutSeconds() != null) {
-            params.put("timeoutSeconds", request.timeoutSeconds());
+        meta.put("provider", provider.getId());
+        if (request.systemPrompt() != null && !request.systemPrompt().isBlank()) {
+            meta.put("aiSystemPrompt", request.systemPrompt());
         }
-        if (request.effort() != null && !request.effort().isBlank()) {
-            params.put("effort", request.effort());
-        }
-        if (request.priority()) {
-            params.put("priority", true);
-        }
-        if (request.allowedTools() != null && !request.allowedTools().isEmpty()) {
-            params.put("allowedTools", String.join(",", request.allowedTools()));
-        }
-        if (request.disallowedTools() != null && !request.disallowedTools().isEmpty()) {
-            params.put("disallowedTools", String.join(",", request.disallowedTools()));
-        }
-        return params;
+        meta.put(StepAiMetadata.AI_REQUEST, StepAiMetadata.aiRequest(request, provider.getId()));
+        return meta;
     }
 
     private String extractCommand(BlockDefinition block) {

@@ -5,6 +5,7 @@ import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
+import com.automation.executor.StepAiMetadata;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +13,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import static com.automation.config.ExecutionDefaults.SHELL_TIMEOUT_SECONDS;
@@ -45,6 +48,7 @@ public class WhileBlockExecutor implements BlockExecutor {
         aggregateResult.setInput("while loop (max " + maxIterations + " iterations)");
 
         StringBuilder outputs = new StringBuilder();
+        List<Map<String, Object>> recordedIterations = new ArrayList<>();
         int iteration = 0;
 
         while (iteration < maxIterations && !context.shouldStop()) {
@@ -61,7 +65,7 @@ public class WhileBlockExecutor implements BlockExecutor {
                         break;
                     }
                 } else {
-                    String conditionResult = commandExecutor.executeOnHost(
+                    var condition = commandExecutor.executeOnHost(
                             HostExecutionRequest.builder()
                                     .projectPath(context.getProjectPath())
                                     .command(resolvedCondition)
@@ -70,7 +74,10 @@ public class WhileBlockExecutor implements BlockExecutor {
                                     .providerId(context.providerFor(block))
                                     .effort(context.effortFor(block))
                                     .build()
-                    ).output();
+                    );
+                    // First AI call of the block: carries provider/model even if the body never runs
+                    StepAiMetadata.carryAi(aggregateResult, condition.metadata());
+                    String conditionResult = condition.output();
                     if ("false".equalsIgnoreCase(conditionResult.trim()) ||
                             "0".equals(conditionResult.trim()) ||
                             conditionResult.trim().isEmpty()) {
@@ -113,6 +120,14 @@ public class WhileBlockExecutor implements BlockExecutor {
 
             // recordOutput: in a tainted run the iteration output is shell-escaped downstream
             context.recordOutput(null, stepResult.getOutput());
+            StepAiMetadata.carryAi(aggregateResult, stepResult);
+            if (recordedIterations.size() < ForEachBlockExecutor.MAX_RECORDED_ITEMS) {
+                recordedIterations.add(Map.of(
+                        "index", iteration,
+                        "status", stepResult.getStatus().name(),
+                        "durationMs", stepResult.getDurationMs() != null ? stepResult.getDurationMs() : 0L
+                ));
+            }
 
             if (stepResult.getStatus() == StepStatus.FAILED) {
                 aggregateResult.setStatus(StepStatus.FAILED);
@@ -123,6 +138,8 @@ public class WhileBlockExecutor implements BlockExecutor {
         }
 
         aggregateResult.setOutput(outputs.toString().trim());
+        StepAiMetadata.put(aggregateResult, "iterationCount", recordedIterations.size());
+        StepAiMetadata.put(aggregateResult, "iterations", List.copyOf(recordedIterations));
         if (aggregateResult.getStatus() == null || aggregateResult.getStatus() == StepStatus.PENDING) {
             aggregateResult.setStatus(StepStatus.COMPLETED);
         }

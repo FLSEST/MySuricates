@@ -5,6 +5,7 @@ import { PathLinkedOutput } from './PathLinkedOutput';
 import { formatDuration } from '../../utils/formatTime';
 import type { StepResult } from '../../types';
 import type { ForEachState, ForEachItemState } from '../../hooks/useWebSocket';
+import { persistedForEachItems, persistedTotalItems, stepMetadataSummary } from '../workflow/stepMetadata';
 
 interface ForEachItemRowProps {
   item: ForEachItemState;
@@ -51,10 +52,14 @@ interface ForEachStepCardProps {
 export function ForEachStepCard({ step, forEachState }: ForEachStepCardProps) {
   const [expanded, setExpanded] = useState(false);
 
-  const completedItems = forEachState?.completedItems ?? 0;
-  const totalItems = forEachState?.totalItems ?? 0;
+  // Live WebSocket state while running; the persisted step metadata after a reload
+  const items = forEachState?.items ?? persistedForEachItems(step);
+  const completedItems = forEachState?.completedItems ?? items.filter((i) => i.status !== 'running').length;
+  const totalItems = forEachState?.totalItems ?? persistedTotalItems(step) ?? items.length;
+  const hasItemData = forEachState != null || items.length > 0;
   const progress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : null;
   const isRunning = step.status === 'RUNNING';
+  const { provider, model, requestedModel, showRequestedModel } = stepMetadataSummary(step);
 
   return (
     <div className="flex gap-3 py-3">
@@ -83,12 +88,32 @@ export function ForEachStepCard({ step, forEachState }: ForEachStepCardProps) {
           )}
         </div>
 
+        {(provider || model || showRequestedModel) && (
+          <div className="flex flex-wrap gap-2 mb-2">
+            {provider && (
+              <span className="px-2 py-0.5 rounded-full bg-surface-raised text-[11px] font-mono text-text-tertiary">
+                provider={provider}
+              </span>
+            )}
+            {model && (
+              <span className="px-2 py-0.5 rounded-full bg-surface-raised text-[11px] font-mono text-text">
+                model={model}
+              </span>
+            )}
+            {showRequestedModel && (
+              <span className="px-2 py-0.5 rounded-full bg-warning/10 text-[11px] font-mono text-warning">
+                requested={requestedModel}
+              </span>
+            )}
+          </div>
+        )}
+
         {step.input && (
           <p className="text-xs text-text-secondary font-mono mb-2 truncate">{step.input}</p>
         )}
 
         {/* Progress bar — shown during execution or when we have iteration data */}
-        {(forEachState || isRunning) && (
+        {(hasItemData || isRunning) && (
           <div className="mb-2">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs text-text-secondary flex items-center gap-1">
@@ -108,19 +133,19 @@ export function ForEachStepCard({ step, forEachState }: ForEachStepCardProps) {
           </div>
         )}
 
-        {/* Live iteration list — collapsible */}
-        {forEachState && forEachState.items.length > 0 && (
+        {/* Iteration list (live or persisted) — collapsible */}
+        {items.length > 0 && (
           <div>
             <button
               className="flex items-center gap-1 text-xs text-text-tertiary hover:text-text transition-colors mb-1"
               onClick={() => setExpanded(!expanded)}
             >
               {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-              {expanded ? 'Hide items' : `Show ${forEachState.items.length} items`}
+              {expanded ? 'Hide items' : `Show ${items.length} items`}
             </button>
             {expanded && (
               <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                {forEachState.items
+                {items
                   .slice()
                   .sort((a, b) => a.itemIndex - b.itemIndex)
                   .map((item) => (

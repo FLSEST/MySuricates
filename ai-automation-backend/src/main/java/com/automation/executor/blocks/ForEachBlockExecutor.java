@@ -5,6 +5,7 @@ import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
+import com.automation.executor.StepAiMetadata;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
 import com.automation.service.workflow.ExecutionBroadcaster;
@@ -19,11 +20,16 @@ import java.util.List;
 import java.util.Map;
 
 import static com.automation.config.ExecutionDefaults.SHELL_TIMEOUT_SECONDS;
+import static com.automation.executor.blocks.AgenticPromptBuilder.truncate;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class ForEachBlockExecutor implements BlockExecutor {
+
+    /** Upper bound for the per-item summary persisted in the step metadata (keeps the row small). */
+    static final int MAX_RECORDED_ITEMS = 500;
+    private static final int ITEM_LABEL_MAX_CHARS = 120;
 
     private final CommandExecutorService commandExecutor;
     private final ExecutionBroadcaster broadcaster;
@@ -73,6 +79,7 @@ public class ForEachBlockExecutor implements BlockExecutor {
         StringBuilder outputs = new StringBuilder();
         boolean anyFailed = false;
         List<String> failedItems = new ArrayList<>();
+        List<Map<String, Object>> recordedItems = new ArrayList<>();
         String runId = context.getWorkflowRunId();
         int stepIndex = aggregateResult.getStepIndex();
         int totalItems = items.size();
@@ -132,6 +139,15 @@ public class ForEachBlockExecutor implements BlockExecutor {
             ));
 
             outputs.append("[").append(item).append("]: ").append(itemResult.getOutput()).append("\n");
+            StepAiMetadata.carryAi(aggregateResult, itemResult);
+            if (recordedItems.size() < MAX_RECORDED_ITEMS) {
+                recordedItems.add(Map.of(
+                        "index", i,
+                        "item", truncate(item, ITEM_LABEL_MAX_CHARS),
+                        "status", itemResult.getStatus().name(),
+                        "durationMs", itemResult.getDurationMs() != null ? itemResult.getDurationMs() : 0L
+                ));
+            }
             if (failed) {
                 anyFailed = true;
                 failedItems.add(item);
@@ -141,10 +157,11 @@ public class ForEachBlockExecutor implements BlockExecutor {
         if (continueOnError && anyFailed) {
             outputs.append("\n[continue_on_error] ").append(failedItems.size()).append("/").append(totalItems)
                     .append(" items failed: ").append(String.join(", ", failedItems));
-            aggregateResult.getMetadata().put("failedItemCount", failedItems.size());
-            aggregateResult.getMetadata().put("failedItems", List.copyOf(failedItems));
-            aggregateResult.getMetadata().put("totalItems", totalItems);
+            StepAiMetadata.put(aggregateResult, "failedItemCount", failedItems.size());
+            StepAiMetadata.put(aggregateResult, "failedItems", List.copyOf(failedItems));
         }
+        StepAiMetadata.put(aggregateResult, "totalItems", totalItems);
+        StepAiMetadata.put(aggregateResult, "items", List.copyOf(recordedItems));
 
         aggregateResult.setOutput(outputs.toString().trim());
         aggregateResult.setStatus(anyFailed && !continueOnError ? StepStatus.FAILED : StepStatus.COMPLETED);

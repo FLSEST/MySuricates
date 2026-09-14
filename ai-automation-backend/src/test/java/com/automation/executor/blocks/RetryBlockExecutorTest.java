@@ -424,4 +424,43 @@ class RetryBlockExecutorTest {
         verify(commandExecutor).executeStepOnHost(argThat(req ->
                 "PI".equals(req.providerId()) && "anthropic/opus".equals(req.model())));
     }
+
+    @Test
+    void execute_recordsAttemptsAndMaxAttempts_keepingInnerAiMetadata() {
+        StepResult failed = StepResult.builder().stepIndex(0).status(StepStatus.FAILED).output("failed").build();
+        StepResult success = StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED).output("passed").build();
+        success.setMetadata(Map.of(
+                "aiRequest", Map.of("provider", "CLAUDE", "model", "opus"),
+                "provider", "CLAUDE", "requestedModel", "opus"));
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(failed, failed, success);
+
+        BlockDefinition block = BlockDefinition.builder().type("retry")
+                .config(new HashMap<>(Map.of("command", "npm test", "max_retries", 3, "delay", 0))).build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata())
+                .containsEntry("attempts", 3)
+                .containsEntry("maxAttempts", 4)
+                .containsEntry("provider", "CLAUDE")
+                .containsKey("aiRequest");
+        verify(commandExecutor, times(3)).executeStepOnHost(any(HostExecutionRequest.class));
+    }
+
+    @Test
+    void execute_shellMode_innerImmutableMetadata_doesNotThrow() {
+        StepResult shellFailed = StepResult.builder().stepIndex(0).status(StepStatus.FAILED).output("no").build();
+        shellFailed.setMetadata(Map.of("exitCode", 1, "executionMode", "shell"));
+        when(commandExecutor.executeStepAsShell(anyString(), any(BlockDefinition.class), anyInt(), anyInt()))
+                .thenReturn(shellFailed);
+
+        BlockDefinition block = BlockDefinition.builder().type("retry")
+                .config(new HashMap<>(Map.of("command", "false", "max_retries", 1, "delay", 0, "execution_mode", "shell"))).build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getMetadata()).containsEntry("attempts", 2).containsEntry("maxAttempts", 2).containsEntry("exitCode", 1);
+    }
 }

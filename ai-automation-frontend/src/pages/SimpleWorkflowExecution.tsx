@@ -19,20 +19,7 @@ import { useT } from '../i18n';
 import { formatDuration } from '../utils/formatTime';
 import { api } from '../api/client';
 import type { StepResult, PendingHumanInput } from '../types';
-
-function stepMetadataSummary(step: StepResult) {
-  const metadata = step.metadata ?? {};
-  const provider = typeof metadata.provider === 'string' ? metadata.provider : null;
-  const model = typeof metadata.model === 'string' ? metadata.model : null;
-  const requestedModel = typeof metadata.requestedModel === 'string' ? metadata.requestedModel : null;
-
-  return {
-    provider,
-    model,
-    requestedModel,
-    showRequestedModel: requestedModel != null && requestedModel !== model,
-  };
-}
+import { stepMetadataSummary } from '../components/workflow/stepMetadata';
 
 function StepCard({ step }: { step: StepResult }) {
   const { provider, model, requestedModel, showRequestedModel } = stepMetadataSummary(step);

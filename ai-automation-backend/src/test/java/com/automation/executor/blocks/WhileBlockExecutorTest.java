@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.HashMap;
 import java.util.Map;
 
+import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -598,5 +599,54 @@ class WhileBlockExecutorTest {
                 "PI".equals(req.providerId()) && "anthropic/opus".equals(req.model())));
         verify(commandExecutor).executeStepOnHost(argThat(req ->
                 "PI".equals(req.providerId()) && "anthropic/opus".equals(req.model())));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void execute_claudeMode_carriesAiRequestFromConditionWhenBodyNeverRuns() {
+        Map<String, Object> config = new HashMap<>();
+        config.put("command", "analyze code");
+        config.put("condition_command", "check condition");
+        config.put("execution_mode", "claude");
+        BlockDefinition block = BlockDefinition.builder().type("while").config(config).build();
+
+        when(commandExecutor.executeOnHost(argThat(req -> "check condition".equals(req.command()))))
+                .thenReturn(new CliSession.EnrichedCommandResult("false", 0, null, Map.of(
+                "aiRequest", Map.of("provider", "CLAUDE", "model", "opus"),
+                "provider", "CLAUDE", "requestedModel", "opus")));
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata()).containsEntry("provider", "CLAUDE").containsEntry("iterationCount", 0);
+        assertThat((Map<String, Object>) result.getMetadata().get("aiRequest")).containsEntry("model", "opus");
+        assertThat((List<Map<String, Object>>) result.getMetadata().get("iterations")).isEmpty();
+        verify(commandExecutor, never()).executeStepOnHost(any(HostExecutionRequest.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void execute_recordsIterationsIncludingFailedOne() {
+        Map<String, Object> config = new HashMap<>();
+        config.put("command", "analyze code");
+        config.put("max_iterations", 5);
+        config.put("execution_mode", "claude");
+        BlockDefinition block = BlockDefinition.builder().type("while").config(config).build();
+
+        StepResult ok = StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED).output("ok").durationMs(5L).build();
+        ok.setMetadata(Map.of(
+                "aiRequest", Map.of("provider", "CLAUDE", "model", "opus"),
+                "provider", "CLAUDE", "requestedModel", "opus"));
+        StepResult failed = StepResult.builder().stepIndex(2).status(StepStatus.FAILED).output("boom").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(ok, failed);
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getMetadata()).containsEntry("provider", "CLAUDE").containsEntry("iterationCount", 2);
+        List<Map<String, Object>> iterations = (List<Map<String, Object>>) result.getMetadata().get("iterations");
+        assertThat(iterations).hasSize(2);
+        assertThat(iterations.get(0)).containsEntry("index", 0).containsEntry("status", "COMPLETED").containsEntry("durationMs", 5L);
+        assertThat(iterations.get(1)).containsEntry("index", 1).containsEntry("status", "FAILED");
     }
 }

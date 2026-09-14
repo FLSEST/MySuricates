@@ -398,4 +398,28 @@ class SkillCapabilityBlockExecutorTest {
         verify(commandExecutor).executeOnHost(argThat(req ->
                 "PI".equals(req.providerId()) && "anthropic/opus".equals(req.model())));
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void execute_copiesProviderModelAndAiRequestFromHostCall() {
+        when(commandExecutor.executeOnHost(argThat(req -> req.command().contains("fact_check"))))
+                .thenReturn(new CliSession.EnrichedCommandResult("verified", 0, null, Map.of(
+                        "aiRequest", Map.of("provider", "CLAUDE", "model", "opus", "allowedTools", "Read,Grep"),
+                        "provider", "CLAUDE", "requestedModel", "opus", "inputTokens", 42)));
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("capability", "fact_check");
+        config.put("input", "The earth is round.");
+        BlockDefinition block = BlockDefinition.builder().type("skill-capability").config(config).build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata())
+                .containsEntry("provider", "CLAUDE")
+                .containsEntry("requestedModel", "opus")
+                .containsEntry("inputTokens", 42);
+        assertThat((Map<String, Object>) result.getMetadata().get("aiRequest")).containsEntry("allowedTools", "Read,Grep");
+        result.getMetadata().put("x", 1);
+    }
 }

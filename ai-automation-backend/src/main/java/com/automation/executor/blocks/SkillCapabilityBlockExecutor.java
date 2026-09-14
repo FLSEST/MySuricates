@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -135,9 +136,11 @@ public class SkillCapabilityBlockExecutor implements BlockExecutor {
                 reqBuilder.allowedTools(READ_ONLY_TOOLS);
             }
 
-            String response = commandExecutor.executeOnHost(reqBuilder.build()).output();
-            result.setOutput(response);
+            var response = commandExecutor.executeOnHost(reqBuilder.build());
+            result.setOutput(response.output());
             result.setStatus(StepStatus.COMPLETED);
+            // provider, requestedModel, aiRequest (incl. allowedTools) and response metadata of the host call
+            result.setMetadata(new LinkedHashMap<>(response.metadata()));
         } catch (Exception e) {
             result.setOutput("Capability execution failed: " + e.getMessage());
             result.setStatus(StepStatus.FAILED);

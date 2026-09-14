@@ -9,6 +9,7 @@ import { PathLinkedOutput } from '../shared/PathLinkedOutput';
 import { useT } from '../../i18n';
 import { formatDuration } from '../../utils/formatTime';
 import type { StepResult } from '../../types';
+import { stepMetadataSummary, wrapperFacts, formatMetadataValue } from './stepMetadata';
 
 const BLOCK_TYPE_ICONS: Record<string, React.ReactNode> = {
   shell: <Terminal className="w-3 h-3" />,
@@ -26,31 +27,12 @@ const BLOCK_TYPE_ICONS: Record<string, React.ReactNode> = {
   integration: <Plug className="w-3 h-3" />,
 };
 
-function stepMetadataSummary(step: StepResult) {
-  const metadata = step.metadata ?? {};
-  const provider = typeof metadata.provider === 'string' ? metadata.provider : null;
-  const model = typeof metadata.model === 'string' ? metadata.model : null;
-  const requestedModel = typeof metadata.requestedModel === 'string' ? metadata.requestedModel : null;
-  const aiSystemPrompt = typeof metadata.aiSystemPrompt === 'string' ? metadata.aiSystemPrompt : null;
-  const aiRequest = metadata.aiRequest && typeof metadata.aiRequest === 'object' && !Array.isArray(metadata.aiRequest)
-    ? (metadata.aiRequest as Record<string, unknown>)
-    : null;
-
-  return {
-    provider,
-    model,
-    requestedModel,
-    showRequestedModel: requestedModel != null && requestedModel !== model,
-    aiSystemPrompt,
-    aiRequest,
-  };
-}
-
 export function ExecutionStepCard({ step }: { step: StepResult }) {
   const t = useT();
   const [inputExpanded, setInputExpanded] = useState(false);
   const [systemPromptExpanded, setSystemPromptExpanded] = useState(false);
   const { provider, model, requestedModel, showRequestedModel, aiSystemPrompt, aiRequest } = stepMetadataSummary(step);
+  const facts = wrapperFacts(step);
   const systemPromptLineCount = aiSystemPrompt ? aiSystemPrompt.split('\n').length : 0;
   const aiRequestEntries = aiRequest
     ? Object.entries(aiRequest).filter(([, v]) => v !== null && v !== undefined && v !== '')
@@ -85,7 +67,7 @@ export function ExecutionStepCard({ step }: { step: StepResult }) {
             </span>
           )}
         </div>
-        {(provider || model || showRequestedModel) && (
+        {(provider || model || showRequestedModel || facts.length > 0) && (
           <div className="flex flex-wrap gap-2 mb-2">
             {provider && (
               <span className="px-2 py-0.5 rounded-full bg-surface-raised text-[11px] font-mono text-text-tertiary">
@@ -102,6 +84,11 @@ export function ExecutionStepCard({ step }: { step: StepResult }) {
                 requested={requestedModel}
               </span>
             )}
+            {facts.map(([key, value]) => (
+              <span key={key} className="px-2 py-0.5 rounded-full bg-surface-raised text-[11px] font-mono text-text-tertiary">
+                {key}={value}
+              </span>
+            ))}
           </div>
         )}
         {step.input && !inputExpanded && (
@@ -157,7 +144,7 @@ export function ExecutionStepCard({ step }: { step: StepResult }) {
                   {aiRequestEntries.map(([k, v]) => (
                     <li key={k} className="flex gap-2">
                       <span className="text-text-tertiary">{k}</span>
-                      <span className="text-text">{String(v)}</span>
+                      <span className="text-text">{formatMetadataValue(v)}</span>
                     </li>
                   ))}
                 </ul>

@@ -603,4 +603,59 @@ class ForEachBlockExecutorTest {
         verify(commandExecutor).executeStepOnHost(argThat(req ->
                 "PI".equals(req.providerId()) && "anthropic/opus".equals(req.model())));
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void execute_carriesAiRequestFromFirstItemAndRecordsItems() {
+        StepResult first = StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED).output("a").durationMs(10L).build();
+        first.setMetadata(Map.of(
+                "aiRequest", Map.of("provider", "CLAUDE", "model", "opus"),
+                "provider", "CLAUDE", "requestedModel", "opus"));
+        StepResult second = StepResult.builder().stepIndex(2).status(StepStatus.FAILED).output("b").build();
+        second.setMetadata(Map.of("aiRequest", Map.of("provider", "PI"), "provider", "PI"));
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(first, second);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("items", List.of("alpha", "x".repeat(200)));
+        config.put("command", "process {{ item }}");
+        config.put("continue_on_error", true);
+        BlockDefinition block = BlockDefinition.builder().type("foreach").config(config).build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata())
+                .containsEntry("provider", "CLAUDE")
+                .containsEntry("requestedModel", "opus")
+                .containsEntry("totalItems", 2)
+                .containsEntry("failedItemCount", 1);
+        assertThat((Map<String, Object>) result.getMetadata().get("aiRequest")).containsEntry("model", "opus");
+        List<Map<String, Object>> items = (List<Map<String, Object>>) result.getMetadata().get("items");
+        assertThat(items).hasSize(2);
+        assertThat(items.get(0)).containsEntry("index", 0).containsEntry("item", "alpha")
+                .containsEntry("status", "COMPLETED").containsEntry("durationMs", 10L);
+        assertThat(items.get(1)).containsEntry("status", "FAILED").containsEntry("durationMs", 0L);
+        String label = (String) items.get(1).get("item");
+        assertThat(label).hasSize(123).endsWith("...");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void execute_shellMode_recordsItemsWithoutAiRequest() {
+        StepResult shellStep = StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED).output("ok").build();
+        shellStep.setMetadata(Map.of("exitCode", 0, "executionMode", "shell"));
+        when(commandExecutor.executeStepAsShell(anyString(), any(BlockDefinition.class), anyInt(), anyInt()))
+                .thenReturn(shellStep);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("items", List.of("a", "b", "c"));
+        config.put("command", "echo {{ item }}");
+        config.put("execution_mode", "shell");
+        BlockDefinition block = BlockDefinition.builder().type("foreach").config(config).build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getMetadata()).doesNotContainKey("aiRequest").containsEntry("totalItems", 3);
+        assertThat((List<Map<String, Object>>) result.getMetadata().get("items")).hasSize(3);
+    }
 }

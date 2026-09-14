@@ -516,4 +516,47 @@ class ConditionalBlockExecutorTest {
 
         verify(commandExecutor).executeOnHost(argThat(req -> req.command().contains("branch is main; id")));
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void execute_recordsConditionMetAndCarriesAiRequestFromCondition() {
+        when(commandExecutor.executeOnHost(argThat(req -> req.command().contains("Evaluate"))))
+                .thenReturn(new CliSession.EnrichedCommandResult("TRUE", 0, null, Map.of(
+                "aiRequest", Map.of("provider", "CLAUDE", "model", "opus"),
+                "provider", "CLAUDE", "requestedModel", "opus")));
+        StepResult thenResult = StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED).output("deployed").build();
+        thenResult.setMetadata(Map.of("aiRequest", Map.of("provider", "PI"), "provider", "PI"));
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(thenResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("condition", "branch == 'main'");
+        config.put("then_command", "npm run deploy");
+        BlockDefinition block = BlockDefinition.builder().type("conditional").config(config).build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getOutput()).isEqualTo("deployed");
+        assertThat(result.getMetadata()).containsEntry("conditionMet", true).containsEntry("provider", "CLAUDE");
+        assertThat((Map<String, Object>) result.getMetadata().get("aiRequest")).containsEntry("model", "opus");
+    }
+
+    @Test
+    void execute_noBranch_skippedButCarriesAiRequestFromCondition() {
+        when(commandExecutor.executeOnHost(argThat(req -> req.command().contains("Evaluate"))))
+                .thenReturn(new CliSession.EnrichedCommandResult("FALSE", 0, null, Map.of(
+                "aiRequest", Map.of("provider", "CLAUDE", "model", "opus"),
+                "provider", "CLAUDE", "requestedModel", "opus")));
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("condition", "branch == 'main'");
+        config.put("then_command", "npm run deploy");
+        BlockDefinition block = BlockDefinition.builder().type("conditional").config(config).build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.SKIPPED);
+        assertThat(result.getMetadata()).containsEntry("conditionMet", false)
+                .containsEntry("provider", "CLAUDE").containsKey("aiRequest");
+        verify(commandExecutor, never()).executeStepOnHost(any(HostExecutionRequest.class));
+    }
 }

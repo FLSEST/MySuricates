@@ -5,6 +5,7 @@ import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
+import com.automation.executor.StepAiMetadata;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
 import lombok.RequiredArgsConstructor;
@@ -70,11 +71,8 @@ public class SwitchBlockExecutor implements BlockExecutor {
             log.info("Switch: no matching case for '{}'", resolvedExpression);
             result.setOutput("No matching case for: " + resolvedExpression);
             result.setStatus(StepStatus.COMPLETED);
-            result.setMetadata(Map.of(
-                    "blockType", "switch",
-                    "expression", resolvedExpression,
-                    "matchedCase", "none"
-            ));
+            StepAiMetadata.put(result, "expression", resolvedExpression);
+            StepAiMetadata.put(result, "matchedCase", "none");
             result.setCompletedAt(Instant.now());
             result.setDurationMs(result.getCompletedAt().toEpochMilli() - result.getStartedAt().toEpochMilli());
             return result;
@@ -91,6 +89,8 @@ public class SwitchBlockExecutor implements BlockExecutor {
 
             BlockDefinition nestedBlock = deserializeBlock(blockMap);
             StepResult blockResult = executeNestedBlock(nestedBlock, context);
+            // First nested AI block wins: provider/model of the case that ran
+            StepAiMetadata.carryAi(result, blockResult);
 
             if (blockResult.getOutput() != null) {
                 if (!outputs.isEmpty()) outputs.append("\n");
@@ -104,11 +104,8 @@ public class SwitchBlockExecutor implements BlockExecutor {
 
         result.setOutput(outputs.toString().trim());
         result.setStatus(anyFailed ? StepStatus.FAILED : StepStatus.COMPLETED);
-        result.setMetadata(Map.of(
-                "blockType", "switch",
-                "expression", resolvedExpression,
-                "matchedCase", matchedCase
-        ));
+        StepAiMetadata.put(result, "expression", resolvedExpression);
+        StepAiMetadata.put(result, "matchedCase", matchedCase);
         result.setCompletedAt(Instant.now());
         result.setDurationMs(result.getCompletedAt().toEpochMilli() - result.getStartedAt().toEpochMilli());
 
