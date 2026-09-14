@@ -1,6 +1,8 @@
 package com.automation.controller;
 
 import com.automation.dto.response.BrokenWorkflowResponse;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import com.automation.service.execution.WorkflowDebugService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,6 +14,7 @@ import java.util.List;
 /**
  * Workflow-Debug endpoints — back the /debug "what is currently broken" page.
  */
+@RequiresModule(ModuleCatalog.DEBUG)
 @RestController
 @RequestMapping("/api/v1/debug")
 @RequiredArgsConstructor

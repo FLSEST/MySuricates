@@ -3,6 +3,8 @@ package com.automation.controller;
 import com.automation.dto.response.IntegrationActionResponse;
 import com.automation.dto.response.IntegrationProviderResponse;
 import com.automation.entity.IntegrationConnection;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import com.automation.service.integration.IntegrationAction;
 import com.automation.service.integration.IntegrationOAuthService;
 import com.automation.service.integration.IntegrationProvider;
@@ -20,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+@RequiresModule(ModuleCatalog.INTEGRATIONS)
 @RestController
 @RequestMapping("/api/v1/integrations")
 @RequiredArgsConstructor

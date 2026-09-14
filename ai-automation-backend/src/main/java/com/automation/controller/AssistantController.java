@@ -5,6 +5,8 @@ import com.automation.dto.AssistantChatResponse;
 import com.automation.dto.response.AssistantSessionDetail;
 import com.automation.dto.response.AssistantSessionSummary;
 import com.automation.event.AssistantSessionUpdatedEvent;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import com.automation.service.AssistantService;
 import com.automation.service.AssistantSessionService;
 import com.automation.service.PageSuggestionService;
@@ -21,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@RequiresModule(ModuleCatalog.ASSISTANT)
 @RestController
 @RequestMapping("/api/v1/assistant")
 @RequiredArgsConstructor

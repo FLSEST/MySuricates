@@ -4,6 +4,8 @@ import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.dto.response.WorkflowResponse;
 import com.automation.entity.Workflow;
 import com.automation.mapper.WorkflowMapper;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import com.automation.service.export.ImportedWorkflow;
 import com.automation.service.export.ProcessFormatImporter;
 import com.automation.service.workflow.WorkflowService;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
  * {@link WorkflowController}). Eigener Controller, damit {@code WorkflowController} unter der
  * Ratchet-Decke bleibt. Spec: docs/plans/2026-07-13-bpmn-import-design.md.
  */
+@RequiresModule(ModuleCatalog.BPMN)
 @RestController
 @RequestMapping("/api/v1/workflows/import")
 @RequiredArgsConstructor

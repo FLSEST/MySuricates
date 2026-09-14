@@ -4,6 +4,8 @@ import com.automation.dto.request.SyncDefinitionsRequest;
 import com.automation.dto.response.SyncPreview;
 import com.automation.dto.response.SyncResult;
 import com.automation.dto.response.TestingStatusResponse;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import com.automation.service.staging.TestingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+@RequiresModule(ModuleCatalog.STAGING)
 @RestController
 @RequestMapping("/api/v1/testing")
 @RequiredArgsConstructor

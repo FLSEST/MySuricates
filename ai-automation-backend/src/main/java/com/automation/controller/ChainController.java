@@ -9,6 +9,8 @@ import com.automation.entity.ChainRun;
 import com.automation.entity.RunStatus;
 import com.automation.entity.WorkflowChain;
 import com.automation.mapper.ChainMapper;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import com.automation.service.chain.ChainExecutor;
 import com.automation.service.chain.ChainService;
 import jakarta.validation.Valid;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+@RequiresModule(ModuleCatalog.CHAINS)
 @RestController
 @RequestMapping("/api/v1/chains")
 @RequiredArgsConstructor

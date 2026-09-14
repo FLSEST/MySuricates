@@ -1,11 +1,14 @@
 package com.automation.controller;
 
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import com.automation.service.PageSuggestionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@RequiresModule(ModuleCatalog.ASSISTANT)
 @RestController
 @RequestMapping("/api/v1/assistant")
 @RequiredArgsConstructor

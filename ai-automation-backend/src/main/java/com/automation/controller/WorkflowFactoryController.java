@@ -4,6 +4,8 @@ import com.automation.dto.request.WorkflowFactoryRequest;
 import com.automation.dto.response.WorkflowFactoryResult;
 import com.automation.entity.Workflow;
 import com.automation.mapper.WorkflowMapper;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import com.automation.service.factory.FactoryTopicCatalog;
 import com.automation.service.factory.WorkflowFactoryService;
 import jakarta.validation.Valid;
@@ -16,6 +18,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+@RequiresModule(ModuleCatalog.FACTORY)
 @RestController
 @RequestMapping("/api/v1/factory")
 @RequiredArgsConstructor

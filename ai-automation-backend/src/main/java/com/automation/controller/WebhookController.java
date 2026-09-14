@@ -7,6 +7,8 @@ import com.automation.entity.WebhookTrigger;
 import com.automation.entity.WorkflowRun;
 import com.automation.mapper.WebhookMapper;
 import com.automation.mapper.WorkflowMapper;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import com.automation.security.WebhookRateLimiter;
 import com.automation.service.webhook.WebhookService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+@RequiresModule(ModuleCatalog.WEBHOOKS)
 @RestController
 @RequiredArgsConstructor
 public class WebhookController {

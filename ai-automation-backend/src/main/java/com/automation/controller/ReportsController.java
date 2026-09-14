@@ -1,6 +1,8 @@
 package com.automation.controller;
 
 import com.automation.config.ReportsConfig;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -18,6 +20,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Slf4j
+@RequiresModule(ModuleCatalog.AUDIT)
 @RestController
 @RequestMapping("/api/v1/reports")
 @RequiredArgsConstructor

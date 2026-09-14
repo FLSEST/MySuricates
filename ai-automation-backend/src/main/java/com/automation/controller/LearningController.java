@@ -2,6 +2,8 @@ package com.automation.controller;
 
 import com.automation.dto.response.DashboardResponse;
 import com.automation.dto.response.PlatformStatsResponse;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import com.automation.service.learning.LearningService;
 import com.automation.service.learning.PlatformStatsService;
 import jakarta.validation.constraints.Max;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+@RequiresModule(ModuleCatalog.LEARNING)
 @RestController
 @RequestMapping("/api/v1/learning")
 @RequiredArgsConstructor

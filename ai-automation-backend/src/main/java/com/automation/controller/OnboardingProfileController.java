@@ -6,6 +6,8 @@ import com.automation.dto.response.OnboardingProfileHistoryResponse;
 import com.automation.dto.response.OnboardingProfileResponse;
 import com.automation.entity.OnboardingProfile;
 import com.automation.mapper.OnboardingProfileMapper;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import com.automation.service.project.OnboardingProfileService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@RequiresModule(ModuleCatalog.ONBOARDING_PROFILES)
 @RestController
 @RequestMapping("/api/v1/onboarding-profiles")
 @RequiredArgsConstructor

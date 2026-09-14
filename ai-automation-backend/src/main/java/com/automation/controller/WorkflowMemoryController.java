@@ -4,6 +4,8 @@ import com.automation.dto.request.ExtractMemoryRequest;
 import com.automation.dto.request.UpdateMemoryRequest;
 import com.automation.dto.response.WorkflowMemoryResponse;
 import com.automation.mapper.WorkflowMemoryMapper;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import com.automation.service.memory.WorkflowMemoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +17,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+@RequiresModule(ModuleCatalog.MEMORY)
 @RestController
 @RequestMapping("/api/v1/workflows/{workflowId}/memory")
 @RequiredArgsConstructor

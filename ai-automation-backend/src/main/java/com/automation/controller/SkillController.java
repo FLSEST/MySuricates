@@ -6,6 +6,8 @@ import com.automation.dto.response.CapabilityResponse;
 import com.automation.dto.response.ExportSkillResponse;
 import com.automation.dto.response.SkillResponse;
 import com.automation.mapper.SkillMapper;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import com.automation.service.skill.SkillImportExportService;
 import com.automation.service.skill.SkillService;
 import jakarta.validation.Valid;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@RequiresModule(ModuleCatalog.SKILLS)
 @RestController
 @RequestMapping("/api/v1/skills")
 @RequiredArgsConstructor

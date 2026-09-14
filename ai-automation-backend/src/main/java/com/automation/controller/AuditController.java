@@ -4,6 +4,8 @@ import com.automation.dto.response.PageResponse;
 import com.automation.entity.AuditFindingStatus;
 import com.automation.entity.AuditSeverity;
 import com.automation.entity.GateStatus;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import com.automation.service.audit.AuditCenterService;
 import com.automation.service.audit.AuditCenterService.*;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@RequiresModule(ModuleCatalog.AUDIT)
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor

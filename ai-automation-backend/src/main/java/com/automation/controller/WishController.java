@@ -5,6 +5,8 @@ import com.automation.dto.request.WishRespondRequest;
 import com.automation.dto.response.WishResponse;
 import com.automation.entity.Wish;
 import com.automation.mapper.WishMapper;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import com.automation.service.wish.WishFulfillmentLoop;
 import com.automation.service.wish.WishService;
 import jakarta.validation.Valid;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+@RequiresModule(ModuleCatalog.WISHES)
 @RestController
 @RequestMapping("/api/v1/wishes")
 @RequiredArgsConstructor

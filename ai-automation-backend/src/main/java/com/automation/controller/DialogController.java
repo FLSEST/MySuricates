@@ -1,6 +1,8 @@
 package com.automation.controller;
 
 import com.automation.dto.response.WorkflowResponse;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import com.automation.service.conversion.DialogWorkflowSuggestion;
 import com.automation.service.dialog.DialogConversionService;
 import com.automation.service.dialog.DialogSessionScanner;
@@ -17,6 +19,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
+@RequiresModule(ModuleCatalog.DIALOG_IMPORT)
 @RestController
 @RequestMapping("/api/v1/dialog")
 @RequiredArgsConstructor

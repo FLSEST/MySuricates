@@ -12,6 +12,8 @@ import com.automation.dto.response.TodoOverviewResponse;
 import com.automation.dto.response.TodoResponse;
 import com.automation.mapper.TodoMapper;
 import com.automation.mapper.WorkflowMapper;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import com.automation.service.todo.TodoHygieneService;
 import com.automation.service.todo.TodoOverviewService;
 import com.automation.service.todo.TodoResolutionService;
@@ -82,6 +84,7 @@ public class TodoController {
     }
 
     @PostMapping("/{id}/export")
+    @RequiresModule(ModuleCatalog.INTEGRATIONS)
     public TodoExportResponse exportTodo(@PathVariable String id,
                                          @RequestBody(required = false) ExportTodoRequest request) {
         var ref = todoTrackerExportService.exportToTracker(id,

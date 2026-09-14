@@ -16,6 +16,8 @@ import com.automation.entity.WorkflowRun;
 import com.automation.entity.WorkflowVersion;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.mapper.WorkflowVersionMapper;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import com.automation.service.execution.ExecutionQueryService;
 import com.automation.service.project.ProjectService;
 import com.automation.service.learning.WorkflowSimilarityService;
@@ -126,6 +128,7 @@ public class WorkflowController {
     }
 
     @PostMapping("/{id}/repair")
+    @RequiresModule(ModuleCatalog.FACTORY)
     public ResponseEntity<Map<String, String>> repairWorkflow(@PathVariable String id) {
         // Verify workflow exists
         Workflow workflow = workflowService.findById(id);
@@ -144,6 +147,7 @@ public class WorkflowController {
     }
 
     @PostMapping("/{id}/skills")
+    @RequiresModule(ModuleCatalog.SKILLS)
     public ResponseEntity<WorkflowResponse> activateSkills(
             @PathVariable String id,
             @Valid @RequestBody ActivateSkillsRequest request) {
@@ -151,6 +155,7 @@ public class WorkflowController {
     }
 
     @DeleteMapping("/{id}/skills/{skillId}")
+    @RequiresModule(ModuleCatalog.SKILLS)
     public ResponseEntity<WorkflowResponse> deactivateSkill(@PathVariable String id, @PathVariable String skillId) {
         return ResponseEntity.ok(workflowMapper.toResponse(workflowService.deactivateSkill(id, skillId)));
     }
@@ -174,6 +179,7 @@ public class WorkflowController {
 
     /** Exportiert den Workflow als BPMN 2.0 XML (Spec: docs/plans/2026-07-09-bpmn-integration-design.md). */
     @GetMapping("/{id}/export/bpmn")
+    @RequiresModule(ModuleCatalog.BPMN)
     public ResponseEntity<String> exportWorkflowAsBpmn(@PathVariable String id) {
         Workflow workflow = workflowService.findByIdEager(id);
         String xml = bpmnExportAdapter.export(workflow);

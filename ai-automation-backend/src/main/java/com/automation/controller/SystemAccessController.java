@@ -1,6 +1,8 @@
 package com.automation.controller;
 
 import com.automation.dto.response.RemoteAccessResponse;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import com.automation.service.system.FileBrowserService;
 import com.automation.service.system.IntegrationSnippetService;
 import com.automation.service.system.TailscaleService;
@@ -26,18 +28,21 @@ public class SystemAccessController {
     private final IntegrationSnippetService integrationSnippetService;
 
     @PostMapping("/remote-access/enable")
+    @RequiresModule(ModuleCatalog.REMOTE_ACCESS)
     public ResponseEntity<RemoteAccessResponse> enableRemoteAccess() {
         RemoteAccessResponse response = tailscaleService.enable();
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/remote-access/disable")
+    @RequiresModule(ModuleCatalog.REMOTE_ACCESS)
     public ResponseEntity<Void> disableRemoteAccess() {
         tailscaleService.disable();
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("/remote-access/status")
+    @RequiresModule(ModuleCatalog.REMOTE_ACCESS)
     public ResponseEntity<RemoteAccessResponse> remoteAccessStatus() {
         RemoteAccessResponse response = tailscaleService.getStatus();
         return ResponseEntity.ok(response);

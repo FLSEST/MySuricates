@@ -4,12 +4,15 @@ import com.automation.dto.request.SyncDefinitionsRequest;
 import com.automation.dto.response.StagingStatusResponse;
 import com.automation.dto.response.SyncPreview;
 import com.automation.dto.response.SyncResult;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import com.automation.service.staging.StagingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+@RequiresModule(ModuleCatalog.STAGING)
 @RestController
 @RequestMapping("/api/v1/staging")
 @RequiredArgsConstructor

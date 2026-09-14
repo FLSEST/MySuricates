@@ -4,6 +4,8 @@ import com.automation.dto.request.InstallChainTemplateRequest;
 import com.automation.dto.response.ChainInstallResponse;
 import com.automation.dto.response.ChainTemplateResponse;
 import com.automation.entity.WorkflowChain;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import com.automation.service.chain.BuiltInChainTemplate;
 import com.automation.service.chain.ChainTemplateService;
 import jakarta.validation.Valid;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@RequiresModule(ModuleCatalog.CHAINS)
 @RestController
 @RequestMapping("/api/v1/chain-templates")
 @RequiredArgsConstructor
