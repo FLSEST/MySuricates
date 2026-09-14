@@ -7,6 +7,8 @@ const WorkflowDiagramTab = lazy(() => import('../components/workflow/WorkflowDia
 type DiagramSelection = import('../components/workflow/BpmnDiagramView').DiagramSelection;
 import { Card, CardHeader, Button, Spinner } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
+import { apiErrorMessage } from '../api/client';
+import { useToast } from '../hooks/useToast';
 import {
   useWorkflow, useWorkflows as useWorkflowsList, useWorkflowRuns, useUpdateWorkflow,
   useDeleteWorkflow, useExecuteWorkflow, useOptimizeWorkflow, useRepairWorkflow, useCreateWorkflow,
@@ -35,6 +37,7 @@ export function WorkflowDetail() {
   const { data: allWorkflows } = useWorkflowsList();
   const { data: projects } = useProjects();
   const updateWorkflow = useUpdateWorkflow();
+  const toast = useToast();
   const deleteWorkflow = useDeleteWorkflow();
   const executeWorkflow = useExecuteWorkflow();
   const optimizeWorkflow = useOptimizeWorkflow();
@@ -250,7 +253,10 @@ export function WorkflowDetail() {
     }
     updateWorkflow.mutate(
       { id: workflow.id, data },
-      { onSuccess: () => setShowOptimizeResult(false) }
+      {
+        onSuccess: () => setShowOptimizeResult(false),
+        onError: (err) => toast.error(apiErrorMessage(err, t.toast.workflowUpdateFailed)),
+      }
     );
   };
 

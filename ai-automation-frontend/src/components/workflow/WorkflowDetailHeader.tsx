@@ -98,6 +98,8 @@ export function WorkflowDetailHeader({
             icon={<Wrench className="w-4 h-4" />}
             onClick={onRepair}
             loading={repairLoading}
+            disabled={sealed}
+            title={sealed ? t.workflows.sealedLocked : undefined}
           >
             {repairLoading ? t.workflows.repairing : t.workflows.repair}
           </Button>
@@ -108,6 +110,8 @@ export function WorkflowDetailHeader({
           icon={<Wand2 className="w-4 h-4" />}
           onClick={onOptimize}
           loading={optimizeLoading}
+          disabled={sealed}
+          title={sealed ? t.workflows.sealedLocked : undefined}
         >
           {optimizeLoading ? t.workflows.optimizing : t.workflows.optimize}
         </Button>

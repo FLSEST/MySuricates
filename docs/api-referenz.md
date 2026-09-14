@@ -497,7 +497,7 @@ Optimierungsvorschlag für einen Workflow generieren (KI-basiert).
 
 Fehlgeschlagenen Workflow auf der Test-Instanz reparieren. Setzt voraus, dass der Workflow fehlgeschlagene Runs hat und die Test-Instanz gesund ist.
 
-**Response:** `202 Accepted` mit `{ "status": "repair_started", "workflowId": "...", "workflowName": "..." }`
+**Response:** `202 Accepted` mit `{ "status": "repair_started", "workflowId": "...", "workflowName": "..." }` — versiegelte Workflows: `409 WORKFLOW_SEALED`, bevor die Reparatur startet
 
 ### `POST /api/v1/workflows/{id}/skills`
 

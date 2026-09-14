@@ -142,6 +142,19 @@ class WorkflowControllerTest {
     }
 
     @Test
+    void repairWorkflow_sealed_returns409WithoutStartingTheRepair() throws Exception {
+        testWorkflow.setSealed(true);
+        when(workflowService.findById("wf-1")).thenReturn(testWorkflow);
+
+        mockMvc.perform(post("/api/v1/workflows/wf-1/repair"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("WORKFLOW_SEALED"))
+                .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("unseal it before repairing")));
+
+        verifyNoInteractions(autoRepairService);
+    }
+
+    @Test
     void createWorkflow_validRequest_returns201() throws Exception {
         when(workflowService.create(any(), eq(ChangeSource.USER))).thenReturn(testWorkflow);
         when(workflowMapper.toResponse(testWorkflow)).thenReturn(testResponse);

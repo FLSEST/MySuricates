@@ -487,7 +487,7 @@ Find similar workflows.
 
 Repair a failed workflow on the test instance. Requires that the workflow has failed runs and the test instance is healthy.
 
-**Response:** `202 Accepted` with `{ "status": "repair_started", "workflowId": "...", "workflowName": "..." }`
+**Response:** `202 Accepted` with `{ "status": "repair_started", "workflowId": "...", "workflowName": "..." }` — sealed workflows: `409 WORKFLOW_SEALED` before the repair starts
 
 ### `POST /api/v1/workflows/{id}/skills`
 

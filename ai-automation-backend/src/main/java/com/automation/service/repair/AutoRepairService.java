@@ -86,8 +86,8 @@ public class AutoRepairService {
         int maxRetries = resolveMaxRetries(workflow);
         long timeoutSeconds = resolveTimeoutSeconds(workflow);
 
-        if ("test".equals(mode) && !testingService.isHealthy()) {
-            log.debug("Auto-repair skipped: mode=test but test instance not healthy (workflow {})", workflowId);
+        if (workflow.isSealed() || ("test".equals(mode) && !testingService.isHealthy())) {
+            log.debug("Auto-repair skipped: workflow sealed, or mode=test but test instance not healthy (workflow {})", workflowId);
             return;
         }
 
@@ -164,8 +164,8 @@ public class AutoRepairService {
             try {
                 Workflow workflow = workflowService.findById(workflowId);
 
-                if (!force && !isAutoRepairEnabledForWorkflow(workflow)) {
-                    log.debug("Retroactive repair skipped for workflow '{}' (autoRepair not enabled)", workflow.getName());
+                if (workflow.isSealed() || (!force && !isAutoRepairEnabledForWorkflow(workflow))) {
+                    log.debug("Retroactive repair skipped for workflow '{}' (sealed or autoRepair not enabled)", workflow.getName());
                     continue;
                 }
 

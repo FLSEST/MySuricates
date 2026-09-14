@@ -16,6 +16,8 @@ import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.entity.WorkflowVersion;
+import com.automation.exception.ErrorCode;
+import com.automation.exception.HardeningException;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.mapper.WorkflowVersionMapper;
 import com.automation.modules.ModuleCatalog;
@@ -134,6 +136,11 @@ public class WorkflowController {
     public ResponseEntity<Map<String, String>> repairWorkflow(@PathVariable String id) {
         // Verify workflow exists
         Workflow workflow = workflowService.findById(id);
+        if (workflow.isSealed()) {
+            // Refuse before the async repair starts: it would call the AI and only then fail on saving
+            throw new HardeningException(ErrorCode.WORKFLOW_SEALED,
+                    "Workflow '" + workflow.getName() + "' is sealed — unseal it before repairing it");
+        }
 
         // Check for FAILED runs
         if (!executionQueryService.hasFailedRuns(id)) {

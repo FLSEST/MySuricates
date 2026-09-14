@@ -22,22 +22,25 @@ function workflow(overrides: Partial<Workflow> = {}): Workflow {
   };
 }
 
-function renderHeader(wf: Workflow) {
+function renderHeader(wf: Workflow, hasFailedRuns = false) {
   const noop = () => {};
   return renderWithProviders(
     <WorkflowDetailHeader workflow={wf} t={en} onNavigateBack={noop} onEdit={noop} onExecute={noop} onOptimize={noop}
       onRepair={noop} onClone={noop} onDelete={noop} executeLoading={false} optimizeLoading={false}
-      repairLoading={false} hasFailedRuns={false} />,
+      repairLoading={false} hasFailedRuns={hasFailedRuns} />,
   );
 }
 
 describe('WorkflowDetailHeader sealing', () => {
   it('shows the seal and locks edit and delete for a sealed workflow', () => {
-    renderHeader(workflow({ sealed: true, sealedHash: 'a'.repeat(64) }));
+    renderHeader(workflow({ sealed: true, sealedHash: 'a'.repeat(64) }), true);
 
     expect(screen.getByTestId('sealed-badge')).toHaveTextContent('Sealed');
     expect(screen.getByRole('button', { name: en.common.edit })).toBeDisabled();
     expect(screen.getByRole('button', { name: en.common.delete })).toBeDisabled();
+    // AI rewrites could not be saved anyway
+    expect(screen.getByRole('button', { name: new RegExp(en.workflows.repair) })).toBeDisabled();
+    expect(screen.getByRole('button', { name: new RegExp(en.workflows.optimize) })).toBeDisabled();
   });
 
   it('offers no seal toggle when the sealing module is off', async () => {

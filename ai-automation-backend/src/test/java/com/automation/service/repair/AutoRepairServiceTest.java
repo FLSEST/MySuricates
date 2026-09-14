@@ -86,6 +86,31 @@ class AutoRepairServiceTest {
     }
 
     @Test
+    void onWorkflowRunCompleted_skipsSealedWorkflowsBeforeAnyAiCall() {
+        var workflow = createWorkflow(Map.of("autoRepair", Map.of("enabled", true, "mode", "local")));
+        workflow.setSealed(true);
+        when(workflowService.findById("wf-1")).thenReturn(workflow);
+
+        var event = createEvent(RunStatus.FAILED, Map.of(),
+                Map.of("autoRepair", Map.of("enabled", true, "mode", "local")));
+        service.onWorkflowRunCompleted(event);
+
+        verifyNoInteractions(workflowFactoryService, workflowExecutor, activityLogService);
+    }
+
+    @Test
+    void repairAllFailed_skipsSealedWorkflowsEvenWhenForced() {
+        var sealed = createWorkflow(Map.of());
+        sealed.setSealed(true);
+        when(workflowRunRepository.findDistinctWorkflowIdsWithFailedRuns()).thenReturn(java.util.List.of("wf-1"));
+        when(workflowService.findById("wf-1")).thenReturn(sealed);
+
+        assertThat(service.repairAllFailed(true)).isZero();
+
+        verifyNoInteractions(workflowFactoryService, workflowExecutor);
+    }
+
+    @Test
     void onWorkflowRunCompleted_usesTestWhenAutoModeAndTestHealthy() throws Exception {
         var workflow = createWorkflow(Map.of("autoRepair", Map.of("enabled", true)));
         when(workflowService.findById("wf-1")).thenReturn(workflow);
