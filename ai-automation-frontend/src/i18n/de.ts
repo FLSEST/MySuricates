@@ -223,6 +223,7 @@ export const de: TranslationKeys = {
     showWidget: 'Einblenden',
     widgetNoData: 'Derzeit keine Daten – erscheint wieder, sobald welche da sind.',
     widgetFailed: 'Dieses Widget konnte nicht angezeigt werden.',
+    dataUnavailable: 'Dashboard-Daten nicht verfügbar:',
   },
   projects: {
     title: 'Projekte',

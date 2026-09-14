@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse, delay } from 'msw';
 import { server } from '../../test/server';
 import { renderWithProviders } from '../../test/utils';
 import { modulesFixture } from '../../test/modules';
@@ -128,5 +128,32 @@ describe('Dashboard layout', { timeout: 20_000 }, () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit dashboard' }));
     expect(slot('integration-stats')).toBeNull();
     expect(screen.queryByRole('button', { name: /Integrations/ })).not.toBeInTheDocument();
+  });
+
+  it('renders independent widgets while the dashboard data is still loading', async () => {
+    server.use(
+      http.get('/api/v1/learning/dashboard', async () => {
+        await delay('infinite');
+        return HttpResponse.json(DASHBOARD);
+      }),
+    );
+    renderWithProviders(<Dashboard />);
+
+    expect(await screen.findByText('Test Todo')).toBeInTheDocument();
+    expect(screen.getAllByTestId('widget-skeleton').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Recent Runs')).not.toBeInTheDocument();
+  });
+
+  it('shows a retry banner when the dashboard data fails and keeps other widgets usable', async () => {
+    server.use(
+      http.get('/api/v1/learning/dashboard', () => HttpResponse.json({ message: 'boom' }, { status: 500 })),
+    );
+    renderWithProviders(<Dashboard />);
+
+    expect(await screen.findByText(/Dashboard data unavailable/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(await screen.findByText('Test Todo')).toBeInTheDocument();
+    // No fake zeros without data.
+    expect(document.querySelector('[data-widget-id="stat-total-workflows"]')).toHaveTextContent('Total Workflows-');
   });
 });

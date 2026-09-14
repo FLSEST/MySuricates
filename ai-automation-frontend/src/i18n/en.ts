@@ -221,6 +221,7 @@ export const en = {
     showWidget: 'Show',
     widgetNoData: 'No data right now — shown again as soon as there is some.',
     widgetFailed: 'This widget could not be displayed.',
+    dataUnavailable: 'Dashboard data unavailable:',
   },
   projects: {
     title: 'Projects',
