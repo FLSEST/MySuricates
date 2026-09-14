@@ -61,10 +61,12 @@ The switching is handled by route wrapper components (e.g. `DashboardRoute`, `Wo
 
 The page renders the widgets from the registry `components/dashboard/widgetRegistry.ts`: stats, charts, todos, recent runs and quick actions.
 
-- **Widget = registry entry** `{ id, label, size, module?, component }`. The component loads its own data via query hooks. Prop-based cards that Insights uses with its own time range get a wrapper (`DashboardDataWidgets.tsx`). A widget that renders nothing drops out of the grid (`empty:hidden`).
+- **Widget = registry entry** `{ id, label, size, module?, multiple?, component }`. The component loads its own data via query hooks and receives `{ instanceId, config }` as props. Prop-based cards that Insights uses with its own time range get a wrapper (`DashboardDataWidgets.tsx`). A widget that renders nothing drops out of the grid (`empty:hidden`).
+- **Robust:** every widget sits in an error boundary (`WidgetFrame`) and shows a `WidgetSkeleton` while loading. If `/learning/dashboard` fails, a banner with retry appears; the other widgets stay usable.
+- **Instances:** a layout stores `WidgetInstance { instanceId, type, hidden?, size?, config? }`. Singleton widgets (default) are always present (`instanceId = type`); `multiple` widgets are only added explicitly with a config. `config` holds primitive values only.
 - **Size classes** `stat | chart | third | twoThirds | full` set the flex basis per breakpoint (`WIDGET_SIZE_CLASSES`). Rows with fewer widgets widen them instead of leaving gaps.
 - **"Edit dashboard"**: reorder by dragging the handle (keyboard works too), hide with the eye icon, "+ name" shows a widget again, "Reset". Widgets of disabled modules are missing here as well.
-- **New widget**: a component plus one registry entry. Existing customized layouts get it appended at the end. The `id` is persisted and must never be renamed.
+- **New widget**: a component plus a registry entry. Singletons are appended to customized layouts automatically. The `id` is persisted and must never be renamed (`widgetRegistry.test.ts` checks ids, labels, modules).
 
 ### Projects (`/projects`, `/projects/:id`)
 
@@ -314,7 +316,7 @@ No `tailwind.config.js` — configuration is done via `@theme inline` and `@cust
 | `useSidebarStore` | `collapsed`, `mobileOpen`, `toggle()`, `setCollapsed()`, `setMobileOpen()` | `localStorage: sidebar-state` (only `collapsed`) |
 | `useThemeStore` | `themeId`, `lastLightThemeId`, `lastDarkThemeId`, `overrides` (per theme id), `setTheme()`, `toggleAppearance()`, `setOverride()`, `resetOverrides()`, `apply()` | `localStorage: theme-settings` (version 1; migrates the old `mode` format) |
 | `useSettingsStore` | `apiKey`, `advancedMode`, `simpleMode`, `autoTodoDefault`, `autoRepairDefault`, `autoRepairMode`, `defaultAiProvider`, `assistantModel`, `suggestionsModel`, `suggestionsEnabled`, `sidebarItemOrder`, `sidebarHiddenItems`, `pinnedWorkflowIds`, `simpleOnboardingSeen` | `localStorage: app-settings` |
-| `useDashboardLayoutStore` | `activeViewId`, `views[]` (each view holds `widgets[]` with `id`, `hidden?`, `size?`; empty list = default layout), `setActiveViewWidgets()`, `resetActiveView()` | `localStorage: dashboard-layout` (version 1; validated on load via `sanitizeLayout`) |
+| `useDashboardLayoutStore` | `activeViewId`, `views[]` (each view holds `widgets[]` as `WidgetInstance`, optional `filter { projectId?, days? }`; empty list = default layout), `setActiveViewWidgets()`, `resetActiveView()` | `localStorage: dashboard-layout` (version 2; migrates v1, validated on load via `sanitizeLayout`) |
 | `useAssistantStore` | `open`, `sessions[]`, `activeSessionId`, `showHistory`, `panelWidth`, `panelHeight`, `pendingInput`, `pendingContext` | `localStorage: assistant-sessions` (sessions, panel size) |
 | `useI18nStore` | `locale: 'en'\|'de'`, `setLocale()` | `localStorage: i18n-locale` |
 | `useToastStore` | `toasts[]`, `addToast()`, `removeToast()` | None (ephemeral) |
