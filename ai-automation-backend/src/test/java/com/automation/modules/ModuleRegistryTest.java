@@ -5,6 +5,9 @@ import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.StandardEnvironment;
 import org.springframework.core.env.SystemEnvironmentPropertySource;
 
+import com.automation.exception.ErrorCode;
+import com.automation.exception.ModuleChangeException;
+
 import java.util.Arrays;
 import java.util.Map;
 
@@ -159,6 +162,91 @@ class ModuleRegistryTest {
         ModuleRegistry registry = ModuleRegistry.of(Map.of("chains", "true"), Map.of());
 
         assertThat(registry.summary()).isEqualTo("preset=core, enabled=[chains, provenance]");
+    }
+
+    // --- automation.modules.ui-editable ---------------------------------------------
+
+    private static ModuleRegistry editable(Map<String, String> modules) {
+        Map<String, String> entries = new java.util.HashMap<>(modules);
+        entries.put("ui-editable", "true");
+        return ModuleRegistry.of(entries, Map.of());
+    }
+
+    @Test
+    void uiEditableIsOffByDefaultAndNotAModuleName() {
+        assertThat(ModuleRegistry.of(Map.of(), Map.of()).uiEditable()).isFalse();
+        assertThat(ModuleRegistry.of(Map.of("ui-editable", "true"), Map.of()).uiEditable()).isTrue();
+        assertThatThrownBy(() -> ModuleRegistry.of(Map.of("ui-editable", "yes"), Map.of()))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("automation.modules.ui-editable");
+    }
+
+    @Test
+    void uiEditableBindsFromTheEnvironmentVariable() {
+        StandardEnvironment env = new StandardEnvironment();
+        env.getPropertySources().replace(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
+                new SystemEnvironmentPropertySource(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
+                        Map.of("AUTOMATION_MODULES_UI_EDITABLE", "true")));
+
+        assertThat(ModuleRegistry.fromEnvironment(env).uiEditable()).isTrue();
+    }
+
+    @Test
+    void uiOverridesAreRefusedUnlessUiEditable() {
+        ModuleRegistry registry = ModuleRegistry.of(Map.of(), Map.of());
+
+        assertThatThrownBy(() -> registry.applyUiOverrides(Map.of(ModuleCatalog.WEBHOOKS, true)))
+                .isInstanceOf(ModuleChangeException.class)
+                .satisfies(e -> assertThat(((ModuleChangeException) e).getCode()).isEqualTo(ErrorCode.MODULES_NOT_EDITABLE))
+                .hasMessageContaining("automation.modules.ui-editable=true");
+        assertThat(registry.isEnabled(ModuleCatalog.WEBHOOKS)).isFalse();
+    }
+
+    @Test
+    void uiOverrideWinsOverConfigurationAndTakesEffectImmediately() {
+        ModuleRegistry registry = editable(Map.of("preset", "full"));
+
+        registry.applyUiOverrides(Map.of(ModuleCatalog.WEBHOOKS, false, ModuleCatalog.CHAINS, true));
+
+        assertThat(registry.isEnabled(ModuleCatalog.WEBHOOKS)).isFalse();
+        assertThat(registry.status(ModuleCatalog.WEBHOOKS))
+                .isEqualTo(new ModuleRegistry.ModuleStatus(ModuleCatalog.WEBHOOKS, false, true, true));
+        // equal to the configured value ⇒ no override kept
+        assertThat(registry.uiOverrides()).containsOnlyKeys(ModuleCatalog.WEBHOOKS);
+        assertThat(registry.status(ModuleCatalog.CHAINS).overridden()).isFalse();
+    }
+
+    @Test
+    void hardeningSwitchesAreNeverUiEditable() {
+        ModuleRegistry registry = editable(Map.of());
+
+        assertThatThrownBy(() -> registry.applyUiOverrides(Map.of(ModuleCatalog.SEALING, true)))
+                .isInstanceOf(ModuleChangeException.class)
+                .satisfies(e -> assertThat(((ModuleChangeException) e).getCode()).isEqualTo(ErrorCode.INVALID_ARGUMENT))
+                .hasMessageContaining("automation.hardening.sealing");
+    }
+
+    @Test
+    void dependenciesAreCheckedAtRuntimeAndNothingIsApplied() {
+        ModuleRegistry registry = editable(Map.of());
+
+        assertThatThrownBy(() -> registry.applyUiOverrides(Map.of(ModuleCatalog.WISHES, true)))
+                .isInstanceOf(ModuleChangeException.class)
+                .satisfies(e -> assertThat(((ModuleChangeException) e).getCode()).isEqualTo(ErrorCode.STATE_CONFLICT))
+                .hasMessageContaining("enable 'chains' first");
+        assertThat(registry.isEnabled(ModuleCatalog.WISHES)).isFalse();
+
+        registry.applyUiOverrides(Map.of(ModuleCatalog.CHAINS, true, ModuleCatalog.WISHES, true));
+        assertThatThrownBy(() -> registry.applyUiOverrides(Map.of(ModuleCatalog.CHAINS, false, ModuleCatalog.WISHES, true)))
+                .hasMessageContaining("disable 'wishes'");
+        assertThat(registry.isEnabled(ModuleCatalog.CHAINS)).isTrue();
+    }
+
+    @Test
+    void summaryShowsUiOverridesWhenEditable() {
+        ModuleRegistry registry = editable(Map.of());
+        registry.applyUiOverrides(Map.of(ModuleCatalog.CHAINS, true));
+
+        assertThat(registry.summary()).isEqualTo("preset=core, ui-editable=true, ui-overrides=[chains=true], enabled=[chains, provenance]");
     }
 
     @Test

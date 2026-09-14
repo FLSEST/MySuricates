@@ -141,7 +141,8 @@ public enum ModuleCatalog {
     /** User-facing explanation why {@code what} (a block type, endpoint, tool) is unavailable. */
     public String disabledMessage(String what) {
         return what + " requires module '" + key + "', which is disabled on this instance — set "
-                + property() + "=true and restart";
+                + property() + "=true and restart" + (kind() == ModuleKind.FEATURE
+                ? " (or switch it on under Settings → Modules if automation.modules.ui-editable is true)" : "");
     }
 
     /** Environment variable form, e.g. {@code AUTOMATION_MODULES_REMOTE_ACCESS}. */

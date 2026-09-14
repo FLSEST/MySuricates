@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 
 @Service
 @Slf4j
@@ -18,16 +19,17 @@ public class TailscaleService {
 
     private static final int PROCESS_TIMEOUT_SECONDS = 30;
 
-    private final boolean enabled;
+    /** Read per call: the module can be switched at runtime (automation.modules.ui-editable). */
+    private final BooleanSupplier enabled;
 
     /** Remote access is the {@code remote-access} module (formerly {@code automation.tailscale.enabled}). */
     @Autowired
     public TailscaleService(ModuleRegistry modules) {
-        this(modules.isEnabled(ModuleCatalog.REMOTE_ACCESS));
+        this.enabled = () -> modules.isEnabled(ModuleCatalog.REMOTE_ACCESS);
     }
 
     TailscaleService(boolean enabled) {
-        this.enabled = enabled;
+        this.enabled = () -> enabled;
     }
 
     public RemoteAccessResponse enable() {
@@ -57,7 +59,7 @@ public class TailscaleService {
     }
 
     public RemoteAccessResponse getStatus() {
-        if (!enabled) {
+        if (!enabled.getAsBoolean()) {
             return new RemoteAccessResponse(false, null, null);
         }
 
@@ -76,11 +78,11 @@ public class TailscaleService {
     }
 
     public boolean isConfigEnabled() {
-        return enabled;
+        return enabled.getAsBoolean();
     }
 
     private void ensureEnabled() {
-        if (!enabled) {
+        if (!enabled.getAsBoolean()) {
             throw new IllegalStateException("Tailscale integration is disabled in configuration");
         }
     }

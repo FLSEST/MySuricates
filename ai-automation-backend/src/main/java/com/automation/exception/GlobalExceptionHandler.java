@@ -75,6 +75,12 @@ public class GlobalExceptionHandler {
         return respond(ex.getCode(), ex.getMessage());
     }
 
+    @ExceptionHandler(ModuleChangeException.class)
+    public ResponseEntity<ErrorResponse> handleModuleChange(ModuleChangeException ex) {
+        log.warn("Module switch refused [{}]: {}", ex.getCode(), ex.getMessage());
+        return respond(ex.getCode(), ex.getMessage());
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
         log.warn("Invalid argument: {}", ex.getMessage());

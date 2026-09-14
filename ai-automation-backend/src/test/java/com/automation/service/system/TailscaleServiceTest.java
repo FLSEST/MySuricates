@@ -56,6 +56,17 @@ class TailscaleServiceTest {
     }
 
     @Test
+    void followsRuntimeSwitchesOfTheRemoteAccessModule() {
+        var registry = com.automation.modules.ModuleRegistry.of(java.util.Map.of("ui-editable", "true"), java.util.Map.of());
+        TailscaleService service = new TailscaleService(registry);
+        assertThat(service.isConfigEnabled()).isFalse();
+
+        registry.applyUiOverrides(java.util.Map.of(com.automation.modules.ModuleCatalog.REMOTE_ACCESS, true));
+
+        assertThat(service.isConfigEnabled()).isTrue();
+    }
+
+    @Test
     void enable_whenEnabledButTailscaleNotInstalled_throwsTailscaleException() {
         assumeTrue(!isTailscaleInstalled(),
                 "Skipped: tailscale is installed on this system, so the command won't fail");

@@ -1,6 +1,7 @@
 package com.automation.config;
 
 import com.automation.modules.ModuleCatalog;
+import com.automation.modules.ModuleHandshakeGuard;
 import com.automation.modules.ModuleRegistry;
 import com.automation.security.WebSocketAuthInterceptor;
 import com.automation.websocket.TerminalWebSocketHandler;
@@ -27,13 +28,10 @@ public class RawWebSocketConfig implements WebSocketConfigurer {
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        // Terminal module off ⇒ the endpoint does not exist at all (handshake answers 404).
-        if (!modules.isEnabled(ModuleCatalog.TERMINAL)) {
-            log.info("Terminal WebSocket not registered — module 'terminal' is disabled");
-            return;
-        }
+        // Always registered: the module guard answers the handshake with 404 while 'terminal' is
+        // disabled, so a runtime switch (automation.modules.ui-editable) takes effect immediately.
         registry.addHandler(terminalWebSocketHandler, "/ws/terminal/**")
-                .addInterceptors(webSocketAuthInterceptor)
+                .addInterceptors(new ModuleHandshakeGuard(modules, ModuleCatalog.TERMINAL), webSocketAuthInterceptor)
                 .setAllowedOriginPatterns(allowedOrigins.split(","));
     }
 }

@@ -12,6 +12,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -50,6 +51,15 @@ class ModuleGuardIntegrationTest {
                 .andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/todos"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void runtimeSwitchesAreRefusedWithoutUiEditable() throws Exception {
+        mockMvc.perform(put("/api/v1/system/modules/webhooks")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{\"enabled\":true}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("MODULES_NOT_EDITABLE"));
+        mockMvc.perform(get("/api/v1/webhooks")).andExpect(status().isNotFound());
     }
 
     @Test

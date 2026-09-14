@@ -40,6 +40,7 @@ class ControllerModuleGateTest {
             "SystemAiProviderController",
             "SystemController",
             "SystemMaintenanceController",
+            "SystemModulesController",
             "SystemSettingsController",
             "TodoController",
             "TodoTriggerController",

@@ -84,10 +84,14 @@ class RawWebSocketConfigTest {
     }
 
     @Test
-    void should_addAuthInterceptor_when_registerWebSocketHandlersIsCalled() {
+    void should_addModuleGuardBeforeAuthInterceptor_when_registerWebSocketHandlersIsCalled() {
         config.registerWebSocketHandlers(registry);
 
-        verify(registration).addInterceptors(webSocketAuthInterceptor);
+        ArgumentCaptor<HandshakeInterceptor[]> captor = ArgumentCaptor.forClass(HandshakeInterceptor[].class);
+        verify(registration).addInterceptors(captor.capture());
+        assertThat(captor.getValue()).hasSize(2);
+        assertThat(captor.getValue()[0]).isInstanceOf(com.automation.modules.ModuleHandshakeGuard.class);
+        assertThat(captor.getValue()[1]).isSameAs(webSocketAuthInterceptor);
     }
 
     @Test
@@ -131,18 +135,21 @@ class RawWebSocketConfigTest {
 
         var inOrder = org.mockito.Mockito.inOrder(registry, registration);
         inOrder.verify(registry).addHandler(eq(terminalWebSocketHandler), eq("/ws/terminal/**"));
-        inOrder.verify(registration).addInterceptors(webSocketAuthInterceptor);
+        inOrder.verify(registration).addInterceptors(any(HandshakeInterceptor[].class));
         inOrder.verify(registration).setAllowedOriginPatterns(any(String[].class));
     }
 
     @Test
-    void should_notRegisterTerminalHandler_when_terminalModuleIsDisabled() {
+    void should_registerTerminalHandlerEvenWhenModuleIsDisabled_soRuntimeSwitchesWork() throws Exception {
         RawWebSocketConfig coreOnly = new RawWebSocketConfig(terminalWebSocketHandler, webSocketAuthInterceptor,
                 ModuleRegistry.of(Map.of(), Map.of()));
+        Field origins = RawWebSocketConfig.class.getDeclaredField("allowedOrigins");
+        origins.setAccessible(true);
+        origins.set(coreOnly, "http://localhost:3000");
 
         coreOnly.registerWebSocketHandlers(registry);
 
-        verifyNoInteractions(registry);
+        verify(registry).addHandler(eq(terminalWebSocketHandler), eq("/ws/terminal/**"));
     }
 
     // --- Helper ---

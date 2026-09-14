@@ -77,6 +77,12 @@ automation:
   # Katalog und Abhängigkeiten: com.automation.modules.ModuleCatalog, Settings → "Module & Härtung"
   modules:
     preset: ${AUTOMATION_MODULES_PRESET:core}
+    # true = Feature-Module lassen sich zusätzlich unter Settings → Module & Härtung schalten, sofort
+    # wirksam (gespeichert in app_settings, schlägt die Werte hier). Härtung bleibt immer Startkonfig.
+    # ACHTUNG: Dann kann jeder mit API-Key z. B. Webhooks (öffentlicher Endpunkt), Integrationen
+    # (Tokens), Remote-Zugriff oder das Run-Terminal (Host-Zugriff) einschalten. Für öffentlich
+    # erreichbare Instanzen aus lassen.
+    ui-editable: ${AUTOMATION_MODULES_UI_EDITABLE:false}
   # Optionale Workflow-Härtung — unabhängig vom Preset, gleiche Regeln (nur Startkonfig).
   # provenance (Default true) · sealing · require-sealed-for-unattended · webhook-signatures
   # hardening:
