@@ -17,7 +17,7 @@
     "todo-creating",
     "delta-based"
   ],
-  "model": "claude-opus-4-6",
+  "model": "opus",
   "instructions": "Du analysierst die Architektur des MySuricates-Projekts im DELTA-MODUS. Bekannte Patterns: @Lazy fuer SubWorkflow→WorkflowExecutor (beabsichtigt), SQLRestriction fuer Soft-Delete, HikariCP pool-size=1.",
   "blocks": [
     {

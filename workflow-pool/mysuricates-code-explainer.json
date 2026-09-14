@@ -2,7 +2,7 @@
   "name": "Code-Explainer",
   "icon": "📖",
   "description": "Wöchentlicher Delta-Begleiter: erklärt Änderungen seit dem letzten Lauf und warum sie so gebaut sind, pflegt einen Q&A-Katalog (Staleness via cited_files × git diff), generiert ein Verständnis-Quiz und rendert deterministische Struktur-Diagramme (Graphviz) plus AI-kuratierte Datenfluss-Diagramme in EINE selbstenthaltene HTML-Seite (explainer/index.html + archive/). Skripte: scripts/explainer/. Braucht Graphviz (dot) auf dem ausführenden Rechner.",
-  "model": "claude-opus-4-6",
+  "model": "opus",
   "defaultContext": {},
   "blocks": [
     {

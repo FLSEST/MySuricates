@@ -16,7 +16,7 @@
     "auto-fix",
     "todo-driven"
   ],
-  "model": "claude-opus-4-6",
+  "model": "opus",
   "instructions": "Du schreibst Tests fuer das MySuricates-Projekt. REGELN: 1) NUR Test-Dateien schreiben/aendern, NIEMALS Production-Code. 2) JUnit 5 + Mockito + AssertJ. 3) Bestehende Test-Patterns als Vorlage nutzen. 4) Nach dem Schreiben: mvn test -Dtest=NeuerTest ausfuehren.",
   "blocks": [
     {

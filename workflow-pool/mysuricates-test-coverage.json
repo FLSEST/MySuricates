@@ -18,7 +18,7 @@
     "delta-based",
     "continuous-improvement"
   ],
-  "model": "claude-opus-4-6",
+  "model": "opus",
   "instructions": "Du bist der Test-Coverage-Coach fuer MySuricates. Dein Job: JEDEN RUN einen konkreten naechsten Schritt empfehlen der die Coverage messbar verbessert. Stetige Annaeherung an 100%.",
   "blocks": [
     {

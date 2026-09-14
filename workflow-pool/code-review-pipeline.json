@@ -34,7 +34,7 @@
     }
   ],
   "instructions": "You are a senior code reviewer. Be thorough but constructive. Prioritize security and correctness over style.",
-  "model": "claude-sonnet-4-6",
+  "model": "sonnet",
   "version": "1.0.0",
   "author": "MySuricates",
   "defaultContext": {

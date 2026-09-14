@@ -17,7 +17,7 @@
     "todo-creating",
     "delta-based"
   ],
-  "model": "claude-opus-4-6",
+  "model": "opus",
   "instructions": "Du fuehrst ein Security-Audit des MySuricates-Projekts durch im DELTA-MODUS. Sei extrem praezise — falsche Security-Findings sind schaedlicher als fehlende. Bekannte Patterns: ProcessBuilder fuer Claude CLI (beabsichtigt), API-Key in localStorage (SPA, lokales Tool), Tailscale als aeussere Schutzschicht.",
   "blocks": [
     {

@@ -16,7 +16,7 @@
     "scorecard",
     "delta-based"
   ],
-  "model": "claude-opus-4-6",
+  "model": "opus",
   "instructions": "Du erstellst eine Gesundheits-Scorecard fuer MySuricates im DELTA-MODUS. 6 Dimensionen je 1-10. Objektiv und datengetrieben.",
   "blocks": [
     {

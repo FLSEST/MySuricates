@@ -16,7 +16,7 @@
     "auto-fix",
     "frontend"
   ],
-  "model": "claude-opus-4-6",
+  "model": "opus",
   "instructions": "Du arbeitest an den i18n-Dateien des MySuricates-Frontends. de.ts ist die primaere Sprache, en.ts die Uebersetzung. Beide muessen exakt die gleiche Key-Struktur haben. Aenderungen muessen TypeScript-kompatibel sein (export default Objekt-Literal).",
   "blocks": [
     {

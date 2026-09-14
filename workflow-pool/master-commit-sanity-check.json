@@ -37,7 +37,7 @@
     }
   ],
   "instructions": "Du bewertest direkte Commits auf master streng, aber nachvollziehbar. Prioritaet haben Build-Stabilitaet, Testluecken und riskante Aenderungsbereiche. Keine generischen Qualitaetsphrasen, sondern nur konkrete Beobachtungen aus den gelieferten Daten.",
-  "model": "claude-opus-4-6",
+  "model": "opus",
   "version": "1.0.0",
   "author": "Codex",
   "defaultContext": {

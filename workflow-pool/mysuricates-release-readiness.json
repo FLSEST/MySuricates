@@ -16,7 +16,7 @@
     "gate",
     "report"
   ],
-  "model": "claude-sonnet-4-6",
+  "model": "sonnet",
   "instructions": "Du erstellst einen Release-Bereitschafts-Report fuer MySuricates. Aggregiere Build-Status und offene Quality-TODOs und gib eine klare Release-Empfehlung.",
   "version": "1.2.0",
   "author": "MySuricates",

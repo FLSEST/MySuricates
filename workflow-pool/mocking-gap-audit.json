@@ -29,7 +29,7 @@
     }
   ],
   "instructions": "V2-Fokus: falsche Sicherheit durch Mocking, aber ohne rohe Mock-Zaehler zu ueberschaetzen. Trenne echte Bugs von heuristischen Testluecken und leite die kleinste wirksame Testform plus konkrete TODOs ab.",
-  "model": "claude-opus-4-6",
+  "model": "opus",
   "version": "2.0.0",
   "author": "Codex",
   "defaultContext": {
