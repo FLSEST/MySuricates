@@ -149,7 +149,7 @@ class WorkflowExecutorTest {
                 registry,
                 new BlockSkillContext(commandExecutorService),
                 new BlockStepRunner(stepResultRepository, broadcaster, new BlockOutputValidator(),
-                        activityLogService, containerRepository),
+                        activityLogService, containerRepository, mock(RunLiveLogService.class)),
                 new RunFinalizer(runRepository, broadcaster, eventPublisher),
                 runWorkspaceService,
                 new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), new WorkflowDefinitionHasher(), workflowVersionService, activityLogService)
@@ -1221,7 +1221,7 @@ class WorkflowExecutorTest {
                 executionRegistry,
                 new BlockSkillContext(commandExecutorService),
                 new BlockStepRunner(stepResultRepository, broadcaster, new BlockOutputValidator(),
-                        activityLogService, containerRepository),
+                        activityLogService, containerRepository, mock(RunLiveLogService.class)),
                 new RunFinalizer(runRepository, broadcaster, eventPublisher),
                 runWorkspaceService,
                 new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), new WorkflowDefinitionHasher(), workflowVersionService, activityLogService)

@@ -11,6 +11,9 @@ import com.automation.executor.ExecutionContext;
 import com.automation.repository.ContainerRepository;
 import com.automation.repository.StepResultRepository;
 import com.automation.service.activitylog.ActivityLogService;
+import com.automation.service.live.LiveLineKind;
+import com.automation.service.live.LiveOutput;
+import com.automation.service.live.LiveOutputSink;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
@@ -41,6 +45,7 @@ class BlockStepRunnerTest {
     @Mock private ActivityLogService activityLogService;
     @Mock private ContainerRepository containerRepository;
     @Mock private BlockExecutor blockExecutor;
+    @Mock private RunLiveLogService liveLog;
 
     private BlockStepRunner runner;
     private WorkflowRun run;
@@ -49,7 +54,7 @@ class BlockStepRunnerTest {
     @BeforeEach
     void setUp() {
         runner = new BlockStepRunner(stepResultRepository, broadcaster, new BlockOutputValidator(),
-                activityLogService, containerRepository);
+                activityLogService, containerRepository, liveLog);
         run = WorkflowRun.builder().id("run-1").status(RunStatus.RUNNING)
                 .startedAt(Instant.now()).steps(new ArrayList<>()).build();
         context = ExecutionContext.builder().workflowRunId("run-1").build();
@@ -291,5 +296,64 @@ class BlockStepRunnerTest {
         assertThat(context.resolveShellTemplate("{{ previous_output }} {{ step_0_output }}", false))
                 .isEqualTo("a | b a | b");
         assertThat(step.getContextDelta()).isNull();
+    }
+
+    // ── runStep: live output ───────────────────────────────────────────────
+
+    @Test
+    void startStep_placeholderCarriesTheBlockName() {
+        StepResult step = runner.startStep(run, 4, block("Build", null));
+
+        assertThat(step.getMetadata()).isEqualTo(Map.of("blockType", "simple", "blockName", "Build"));
+    }
+
+    @Test
+    void runStep_bindsTheStepSinkWhileExecuting_includingValidationRetries() {
+        List<String> lines = new ArrayList<>();
+        LiveOutputSink sink = (kind, text) -> lines.add(kind + ":" + text);
+        when(liveLog.sinkFor("run-1", 3)).thenReturn(sink);
+        BlockDefinition block = block("b", Map.of("contains", "OK", "retry_on_fail", true, "max_retries", 1));
+        List<LiveOutputSink> boundDuringExecute = new ArrayList<>();
+        when(blockExecutor.execute(eq(block), any())).thenAnswer(inv -> {
+            boundDuringExecute.add(LiveOutput.current());
+            LiveOutput.current().emit(LiveLineKind.LINE, "attempt " + boundDuringExecute.size());
+            return result(StepStatus.COMPLETED, boundDuringExecute.size() == 1 ? "nope" : "OK");
+        });
+        StepResult step = runner.startStep(run, 3, block);
+
+        runner.runStep(step, block, blockExecutor, context, run, null);
+
+        assertThat(boundDuringExecute).containsExactly(sink, sink);
+        assertThat(lines).containsExactly("LINE:attempt 1", "LINE:attempt 2");
+        assertThat(LiveOutput.current()).isSameAs(LiveOutputSink.NOOP);
+    }
+
+    @Test
+    void runStep_flushesLiveLinesBeforeTheFinalStepBroadcast() {
+        BlockDefinition block = block("b", null);
+        when(blockExecutor.execute(eq(block), any())).thenReturn(result(StepStatus.COMPLETED, "out"));
+        StepResult step = runner.startStep(run, 0, block);
+
+        runner.runStep(step, block, blockExecutor, context, run, null);
+
+        var order = inOrder(blockExecutor, liveLog, broadcaster, stepResultRepository);
+        order.verify(blockExecutor).execute(eq(block), any());
+        order.verify(liveLog).flush("run-1");
+        order.verify(broadcaster).broadcastStepResult("run-1", step);
+        order.verify(stepResultRepository).save(step);
+    }
+
+    @Test
+    void runStep_executorThrows_unbindsAndStillFlushes() {
+        when(liveLog.sinkFor("run-1", 0)).thenReturn((kind, text) -> {});
+        BlockDefinition block = block("b", null);
+        when(blockExecutor.execute(eq(block), any())).thenThrow(new IllegalStateException("executor crashed"));
+        StepResult step = runner.startStep(run, 0, block);
+
+        assertThatThrownBy(() -> runner.runStep(step, block, blockExecutor, context, run, null))
+                .hasMessage("executor crashed");
+
+        assertThat(LiveOutput.current()).isSameAs(LiveOutputSink.NOOP);
+        verify(liveLog).flush("run-1");
     }
 }

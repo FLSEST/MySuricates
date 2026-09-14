@@ -160,6 +160,16 @@ automation:
     # Ghost-Run-Watchdog: maximal tolerierte Zeit zwischen save(RUNNING) und register().
     # Muss laenger sein als der laengste legitime Semaphore-Wait + Container-Init.
     ghost-watchdog-stale-minutes: ${AUTOMATION_GHOST_WATCHDOG_STALE:30}
+  # Live-Output laufender Blöcke (Shell-Zeilen, KI-Tool-Aufrufe) im Run-Log; nur im Speicher (LiveLogConfig)
+  live-log:
+    enabled: ${AUTOMATION_LIVE_LOG_ENABLED:true}
+    max-line-length: 2000
+    buffer-lines: 1000
+    flush-interval-ms: 250
+    max-lines-per-flush: 200
+    max-chars-per-flush: 32000
+    retention-minutes: 10
+    max-buffered-runs: 20
   summarization:
     base-dir: ${AUTOMATION_SUMMARIZATION_DIR:${user.home}/.autotrigger/summarization}
     timeout-seconds: ${AUTOMATION_SUMMARIZATION_TIMEOUT:120}

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -24,16 +25,20 @@ public class ExecutionBroadcaster {
 
     public void broadcastStepResult(String runId, StepResult step) {
         try {
-            messagingTemplate.convertAndSend(
-                    "/topic/executions/" + runId + "/logs",
-                    Map.of(
-                            "stepIndex", step.getStepIndex(),
-                            "status", step.getStatus(),
-                            "input", step.getInput() != null ? step.getInput() : "",
-                            "output", step.getOutput() != null ? step.getOutput() : "",
-                            "durationMs", step.getDurationMs() != null ? step.getDurationMs() : 0
-                    )
-            );
+            Map<String, Object> message = new LinkedHashMap<>();
+            message.put("stepIndex", step.getStepIndex());
+            message.put("status", step.getStatus());
+            message.put("input", step.getInput() != null ? step.getInput() : "");
+            message.put("output", step.getOutput() != null ? step.getOutput() : "");
+            message.put("durationMs", step.getDurationMs() != null ? step.getDurationMs() : 0);
+            // Labels let log viewers without the workflow definition name the step.
+            Map<String, Object> metadata = step.getMetadata() != null ? step.getMetadata() : Map.of();
+            for (String label : new String[]{"blockType", "blockName"}) {
+                if (metadata.get(label) instanceof String value && !value.isBlank()) {
+                    message.put(label, value);
+                }
+            }
+            messagingTemplate.convertAndSend("/topic/executions/" + runId + "/logs", message);
         } catch (Exception e) {
             log.warn("Failed to broadcast step result: {}", e.getMessage());
         }
