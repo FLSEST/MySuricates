@@ -4,18 +4,19 @@
 
 Die Implementierung ist über Branch `fix/77fc07e3-run-workspace-isolation-integrated`
 in `main` integriert (Merge-Stand `b063748d`). Die zwischenzeitlichen Scheduler-,
-Shell-Escaping- und Gate-Korrekturen aus main sind erhalten. 51 der 52 betroffenen
+Shell-Escaping- und Gate-Korrekturen aus main sind erhalten. Alle 52 betroffenen
 installierten Workflows sind per REST unter denselben IDs migriert. Die sechs
 CS2BIM-Nachzügler gehören jetzt dazu. Acht Pool-Definitionen und neun Built-in-Templates
 sind angepasst; zwei absichtlich lokal ignorierte Pool-Dateien wurden nach Sicherung
 übernommen, ihre neutralen Varianten sind unter `scripts/workspace-isolation/pool-overrides`
 versioniert. Es wurde nichts gepusht.
 
-**Einzige offene Quellzuordnung:** Treasure Hunt Backend (`6f8ff410`). Der vorhandene
-Quellordner und seine Sicherungen besitzen keine Git-Historie; im GitHub-Konto wurde
-kein entsprechendes Backend-Repository gefunden. Die Zustimmung zur lokalen
-Initialversionierung ist angefragt. Bis dahin bleibt diese Definition unverändert;
-eine fremde oder künstlich erfundene Commit-Historie wird nicht als Projektstand ausgegeben.
+Treasure Hunt Backend (`6f8ff410`) ist nach ausdrücklicher Zustimmung des Nutzers lokal
+initial versioniert. Ausgangscommit: `9b8ff0bb64d98851364b360cfead9b43ae58f52f`.
+Quellcode, Maven-Konfiguration und Tests sind erfasst; `.env*`, Session-Verläufe,
+Build-Artefakte, Datenbanken und private Schlüssel bleiben ausgeschlossen. Die vorhandenen
+Dateiinhalte wurden nicht verändert und es wurde kein Remote eingerichtet.
+Das letzte Gate verwendet jetzt ebenfalls den beim Run-Start gepinnten lokalen Commit.
 
 ## Verbindliche Quellwahl
 
@@ -103,10 +104,19 @@ CS2BIM `b9c0d96a-0999-4b3b-8a29-60f59e211e5a`. Getestete integrierte JAR: SHA256
 - [x] Pool-Dateien einschließlich lokaler Varianten übernehmen und nach main mergen.
 - [x] Integrierten Stand gezielt und über die Testinstanz verifizieren.
 - [x] Dev auf die geprüfte JAR umgestellt (0 aktive Runs unmittelbar zuvor); Build-Zeitstempel `2026-09-14T09:19:27Z`. REST-Endkontrolle bestätigt 51 isolierte Policies und das unveränderte Treasure-Hunt-Gate.
-- [ ] Nach Zustimmung Treasure Hunt Backend initial versionieren oder vorhandenen Git-Checkout zuordnen, Gate isolieren und testen.
+- [x] Treasure Hunt Backend nach Zustimmung lokal initial versioniert, Gate migriert; Build und Tests in isolierter Kopie erfolgreich. Hashvergleich bestätigt unveränderte Originaldateien.
 
 Die Originaldefinitionen, Vorschläge und Protokolle liegen dauerhaft unter
 `~/.local/state/autotrigger-dev/workspace-migrations/77fc07e3-293ec589/` und
 `~/.local/state/autotrigger-dev/workspace-migrations/77fc07e3-final/`.
 Vor jedem Backend-Neustart werden aktive Runs geprüft; bei laufenden Runs ist nach
 AGENTS.md eine Freigabe erforderlich. Die vorherige Runtime wird zur Rückkehr aufbewahrt.
+
+Letzte Quellabnahme: Run `378f9f32-87e8-4be0-bd6b-9ba19af2c719` auf der Testinstanz
+prüft Maven-Paketierung und Tests des tatsächlichen Treasure-Hunt-Quellstands. Der
+Migrationsgenerator enthält jetzt auch dieses Projekt; es gibt keine blockierten Quellen mehr.
+
+Abschluss: 50 Treasure-Hunt-Tests ohne Fehler oder Skip. Der migrierte Live-Build-Gate-Run
+`05fa7bc0-c07d-4d00-afcb-d047684a0cf8` endet mit GREEN/COMPLETED auf dem gepinnten
+Ausgangscommit. Alle 52 betroffenen Definitionen sind damit migriert und die letzte
+Quellentscheidung ist umgesetzt. Nachweise liegen im genannten dauerhaften Migrationsarchiv.
