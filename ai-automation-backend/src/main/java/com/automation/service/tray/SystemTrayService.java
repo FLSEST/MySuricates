@@ -104,7 +104,7 @@ public class SystemTrayService {
     private boolean isSystemTraySupported() {
         try {
             return SystemTray.isSupported();
-        } catch (AWTError e) {
+        } catch (AWTError | LinkageError e) { // LinkageError: toolkit init fails when DISPLAY has no X server
             log.warn("SystemTray support check failed: {}", e.getMessage());
             return false;
         }

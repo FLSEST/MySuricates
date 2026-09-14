@@ -202,6 +202,34 @@ class SystemTrayServiceTest {
     }
 
     @Test
+    void isSystemTraySupported_returnsFalseWhenToolkitInitFails() throws Exception {
+        // DISPLAY set but no reachable X server (e.g. GitHub runner): the AWT toolkit's static
+        // initializer fails and surfaces as ExceptionInInitializerError / NoClassDefFoundError
+        // (LinkageError), not as AWTError. The helper must swallow that too and return false.
+        try (org.mockito.MockedStatic<java.awt.SystemTray> mocked = org.mockito.Mockito.mockStatic(java.awt.SystemTray.class)) {
+            mocked.when(java.awt.SystemTray::isSupported)
+                    .thenThrow(new ExceptionInInitializerError("Can't connect to X11 window server"));
+
+            java.lang.reflect.Method method = SystemTrayService.class.getDeclaredMethod("isSystemTraySupported");
+            method.setAccessible(true);
+            Object result = method.invoke(service);
+
+            assertThat(result).isEqualTo(false);
+        }
+    }
+
+    @Test
+    void initialize_doesNotThrowWhenToolkitInitFails() {
+        try (org.mockito.MockedStatic<java.awt.SystemTray> mocked = org.mockito.Mockito.mockStatic(java.awt.SystemTray.class)) {
+            mocked.when(java.awt.SystemTray::isSupported)
+                    .thenThrow(new NoClassDefFoundError("Could not initialize class sun.awt.X11.XToolkit"));
+            service.initialize();
+            service.refreshStatus();
+            service.cleanup();
+        }
+    }
+
+    @Test
     void initialize_doesNotThrowWhenSystemTrayCheckFails() {
         // Even if the underlying SystemTray.isSupported() throws AWTError, initialize()
         // must complete cleanly and leave the service in a non-initialized state.

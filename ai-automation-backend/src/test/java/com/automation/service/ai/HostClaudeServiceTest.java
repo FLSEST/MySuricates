@@ -284,7 +284,7 @@ class HostClaudeServiceTest {
         // Use a service that will execute a hanging process
         HostClaudeService service = new HostClaudeService(config, perms) {
             @Override
-            List<String> buildReasonCommand(String prompt, String systemPrompt, Integer maxTurns, String effort) {
+            List<String> buildReasonCommand(String prompt, String systemPrompt, String model, Integer maxTurns, String effort) {
                 // "sleep 60" will hang for 60s, well beyond 1s timeout
                 return List.of("sleep", "60");
             }
@@ -331,7 +331,7 @@ class HostClaudeServiceTest {
 
         HostClaudeService service = new HostClaudeService(config, perms) {
             @Override
-            List<String> buildReasonCommand(String prompt, String systemPrompt, Integer maxTurns, String effort) {
+            List<String> buildReasonCommand(String prompt, String systemPrompt, String model, Integer maxTurns, String effort) {
                 // "sleep 60" hangs for 60s, well beyond 2s override
                 return List.of("sleep", "60");
             }
@@ -354,7 +354,7 @@ class HostClaudeServiceTest {
 
         HostClaudeService service = new HostClaudeService(config, perms) {
             @Override
-            List<String> buildReasonCommand(String prompt, String systemPrompt, Integer maxTurns, String effort) {
+            List<String> buildReasonCommand(String prompt, String systemPrompt, String model, Integer maxTurns, String effort) {
                 return List.of("sleep", "60");
             }
         };

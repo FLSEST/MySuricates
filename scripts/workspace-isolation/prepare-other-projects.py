@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare external-project workspace migrations; missing Git sources remain blocked proposals."""
+"""Prepare external-project workspace migrations using the established local Git sources."""
 import argparse
 import copy
 import importlib.util
@@ -25,12 +25,12 @@ SOURCES = {
     '5bcced92': str(Path.home() / 'Entwicklung/IdeaProjects/treasure_hunt_app'),
     '221fa01c': str(Path.home() / 'Innofuse/{{ repo }}'),
     '083d4648': str(Path.home() / 'Entwicklung/IdeaProjects/treasure_hunt_app'),
+    '6f8ff410': str(Path.home() / 'Entwicklung/IdeaProjects/treasure_hunt_backend'),
     '65aafc3d': str(Path.home() / 'IdeaProjects/LeviPapaEins'),
 }
 cs_spec = importlib.util.spec_from_file_location('cs2bim', Path(__file__).with_name('prepare-cs2bim.py'))
 cs = importlib.util.module_from_spec(cs_spec)
 cs_spec.loader.exec_module(cs)
-BLOCKED = {'6f8ff410'}
 WRITERS = {'ed43db60', '1f983bd4', '24f76503', '221fa01c'}
 
 
@@ -57,9 +57,6 @@ def main():
         prefix = original['id'][:8]
         if prefix in cs.IDS:
             proposal = cs.migrate(original)
-        elif prefix in BLOCKED:
-            proposal = dict(id=original['id'], name=original['name'], ready=False, before=original,
-                            blockedReason='Configured source is missing or has no local Git commit; source selection requested.')
         elif prefix in SOURCES:
             source = SOURCES[prefix]
             update = {k: copy.deepcopy(v) for k, v in original.items() if k in m.FIELDS}
@@ -69,7 +66,11 @@ def main():
                           source_path=source, branch=prefix in WRITERS, install_npm=True)
             update['metadata'] = {**(update.get('metadata') or {}), 'workspace': policy}
             blocks = update['blocks']
-            if prefix in {'16ca3b62', 'fc22eb24', '2d1510a0'}:
+            if prefix == '6f8ff410':
+                policy['install_npm'] = False
+                blocks[:] = [m.check('backend_build', 'mvn -q clean package -DskipTests', 'backend-build')]
+                blocks[0]['config']['on_failure'] = 'stop'
+            elif prefix in {'16ca3b62', 'fc22eb24', '2d1510a0'}:
                 blocks[0]['config']['command'] = 'mkdir -p "{{ workspace_logs }}/archive"\n' + blocks[0]['config']['command']
                 for block in blocks:
                     cfg = block['config']
@@ -135,7 +136,7 @@ def main():
                     block['config']['on_failure'] = 'stop'
         (args.output / (original['id'] + '.json')).write_text(json.dumps(proposal, indent=2, ensure_ascii=False) + '\n')
         count += 1
-    print(count, 'external proposals (Treasure Hunt source still requires a local Git baseline)')
+    print(count, 'external proposals')
 
 
 if __name__ == '__main__': main()
