@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ChevronRight, Lock } from 'lucide-react';
-import { Card, CardHeader, Badge } from '../ui';
+import { Card, Badge } from '../ui';
 import type { BadgeVariant } from '../ui/Badge';
 import { ConfigSnippet } from './ConfigSnippet';
 import { useSystemModules } from '../../hooks/useModules';
@@ -27,7 +27,8 @@ export function ModulesCard() {
 
   return (
     <Card>
-      <CardHeader title={t.modules.title} subtitle={t.modules.subtitle} />
+      {/* The settings section already carries the title */}
+      <p className="text-sm text-text-secondary mb-4">{t.modules.subtitle}</p>
       <div className="space-y-5">
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="text-text-secondary">{t.modules.preset}:</span>

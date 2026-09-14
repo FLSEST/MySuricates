@@ -1771,7 +1771,6 @@ export const de: TranslationKeys = {
   },
   modules: {
     navTitle: 'Module & Härtung',
-    title: 'Module & Härtung',
     subtitle: 'Optionale Funktionen und Härtungs-Schalter, festgelegt beim Start des Backends.',
     preset: 'Preset',
     presets: {

@@ -1774,7 +1774,6 @@ export const en = {
   },
   modules: {
     navTitle: 'Modules & hardening',
-    title: 'Modules & hardening',
     subtitle: 'Optional features and hardening switches, decided when the backend starts.',
     preset: 'Preset',
     presets: {
