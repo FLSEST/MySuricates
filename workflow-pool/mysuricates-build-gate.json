@@ -38,8 +38,9 @@
       "type": "shell",
       "config": {
         "label": "Gate-Verdict",
-        "command": "# Prüfe ob das Ergebnis RED enthält\nPREV='{{ previous_output }}'\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Build Gate: FAILED'\n  echo 'gate_status: RED'\n  echo 'gate_category: mysuricates-build'\n  echo 'gate_description: MySuricates Build Gate fehlgeschlagen'\nelif echo \"$PREV\" | grep -qi 'gate_status: GREEN'; then\n  echo 'Build Gate: PASSED'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: mysuricates-build'\n  echo 'gate_description: MySuricates Build Gate bestanden'\nelse\n  echo 'Build Gate: UNVOLLSTAENDIG'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: mysuricates-build'\n  echo 'gate_description: Ergebnis unvollstaendig — kein Gate-Status im Report (KI-Block fehlgeschlagen oder unklar)'\nfi",
-        "timeout_seconds": 10
+        "command": "# Prüfe ob das Ergebnis RED enthält\nPREV={{ previous_output }}\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Build Gate: FAILED'\n  echo 'gate_status: RED'\n  echo 'gate_category: mysuricates-build'\n  echo 'gate_description: MySuricates Build Gate fehlgeschlagen'\nelif echo \"$PREV\" | grep -qi 'gate_status: GREEN'; then\n  echo 'Build Gate: PASSED'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: mysuricates-build'\n  echo 'gate_description: MySuricates Build Gate bestanden'\nelse\n  echo 'Build Gate: UNVOLLSTAENDIG'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: mysuricates-build'\n  echo 'gate_description: Ergebnis unvollstaendig — kein Gate-Status im Report (KI-Block fehlgeschlagen oder unklar)'\nfi",
+        "timeout_seconds": 10,
+        "shell_escape_variables": true
       }
     }
   ],

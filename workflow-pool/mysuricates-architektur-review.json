@@ -50,8 +50,9 @@
       "type": "shell",
       "config": {
         "label": "Gate-Verdict",
-        "command": "PREV='{{ previous_output }}'\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Architektur-Review: KRITISCH'\n  echo 'gate_status: RED'\n  echo 'gate_category: architecture'\n  echo 'gate_description: Kritische Architektur-Probleme'\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Architektur-Review: Verbesserungsbedarf'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: architecture'\n  echo 'gate_description: Architektur-Verbesserungen empfohlen'\nelif echo \"$PREV\" | grep -qi 'gate_status: GREEN'; then\n  echo 'Architektur-Review: OK'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: architecture'\n  echo 'gate_description: Architektur sauber'\nelse\n  echo 'Architektur-Review: UNVOLLSTAENDIG'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: architecture'\n  echo 'gate_description: Ergebnis unvollstaendig — kein Gate-Status im Report (KI-Block fehlgeschlagen oder unklar)'\nfi",
-        "timeout_seconds": 10
+        "command": "PREV={{ previous_output }}\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Architektur-Review: KRITISCH'\n  echo 'gate_status: RED'\n  echo 'gate_category: architecture'\n  echo 'gate_description: Kritische Architektur-Probleme'\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Architektur-Review: Verbesserungsbedarf'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: architecture'\n  echo 'gate_description: Architektur-Verbesserungen empfohlen'\nelif echo \"$PREV\" | grep -qi 'gate_status: GREEN'; then\n  echo 'Architektur-Review: OK'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: architecture'\n  echo 'gate_description: Architektur sauber'\nelse\n  echo 'Architektur-Review: UNVOLLSTAENDIG'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: architecture'\n  echo 'gate_description: Ergebnis unvollstaendig — kein Gate-Status im Report (KI-Block fehlgeschlagen oder unklar)'\nfi",
+        "timeout_seconds": 10,
+        "shell_escape_variables": true
       }
     }
   ],

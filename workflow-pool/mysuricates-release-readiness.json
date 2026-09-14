@@ -45,8 +45,9 @@
       "type": "shell",
       "config": {
         "label": "Gate-Verdict",
-        "command": "set -uo pipefail\nPREV='{{ previous_output }}'\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Release: BLOCKIERT'\n  echo 'gate_status: RED'\n  echo 'gate_category: release-readiness'\n  echo 'gate_description: Release blockiert — Voraussetzungen nicht erfuellt'\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Release: MIT VORBEHALT'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: release-readiness'\n  echo 'gate_description: Release moeglich mit Vorbehalten'\nelif echo \"$PREV\" | grep -qi 'gate_status: GREEN'; then\n  echo 'Release: FREIGEGEBEN'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: release-readiness'\n  echo 'gate_description: Release freigegeben'\nelse\n  echo 'Release: UNVOLLSTAENDIG'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: release-readiness'\n  echo 'gate_description: Ergebnis unvollstaendig — kein Gate-Status im Report (KI-Block fehlgeschlagen oder unklar)'\nfi",
-        "timeout_seconds": 10
+        "command": "set -uo pipefail\nPREV={{ previous_output }}\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Release: BLOCKIERT'\n  echo 'gate_status: RED'\n  echo 'gate_category: release-readiness'\n  echo 'gate_description: Release blockiert — Voraussetzungen nicht erfuellt'\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Release: MIT VORBEHALT'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: release-readiness'\n  echo 'gate_description: Release moeglich mit Vorbehalten'\nelif echo \"$PREV\" | grep -qi 'gate_status: GREEN'; then\n  echo 'Release: FREIGEGEBEN'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: release-readiness'\n  echo 'gate_description: Release freigegeben'\nelse\n  echo 'Release: UNVOLLSTAENDIG'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: release-readiness'\n  echo 'gate_description: Ergebnis unvollstaendig — kein Gate-Status im Report (KI-Block fehlgeschlagen oder unklar)'\nfi",
+        "timeout_seconds": 10,
+        "shell_escape_variables": true
       }
     }
   ]
