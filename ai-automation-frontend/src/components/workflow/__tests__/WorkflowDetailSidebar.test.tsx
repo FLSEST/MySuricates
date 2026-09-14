@@ -216,4 +216,21 @@ describe('WorkflowDetailSidebar', () => {
       )
     ).not.toThrow();
   });
+
+  describe('sealed workflow', () => {
+    it('locks the definition editors but keeps recent runs usable', () => {
+      render(<WorkflowDetailSidebar {...defaultProps}
+        workflow={buildWorkflow({ sealed: true, activatedSkillIds: ['s1'], activatedSkillNames: ['Skill'] })} />);
+
+      expect(screen.getByRole('button', { name: /edit/i })).toBeDisabled();
+      screen.getAllByRole('combobox').forEach((select) => expect(select).toBeDisabled());
+      expect(screen.getByRole('button', { name: /deactivate/i })).toBeDisabled();
+    });
+
+    it('leaves the editors enabled for unsealed workflows', () => {
+      render(<WorkflowDetailSidebar {...defaultProps} workflow={buildWorkflow()} />);
+
+      expect(screen.getByRole('button', { name: /edit/i })).toBeEnabled();
+    });
+  });
 });

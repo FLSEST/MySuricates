@@ -24,9 +24,11 @@ interface SortableBlockListProps {
   blocks: BlockDefinition[];
   onEditBlock: (index: number) => void;
   onRemoveBlock: (index: number) => void;
+  /** Sealed workflows: blocks cannot be reordered */
+  locked?: boolean;
 }
 
-export function SortableBlockList({ workflowId, blocks, onEditBlock, onRemoveBlock }: SortableBlockListProps) {
+export function SortableBlockList({ workflowId, blocks, onEditBlock, onRemoveBlock, locked = false }: SortableBlockListProps) {
   const updateWorkflow = useUpdateWorkflow();
   const toast = useToast();
   const t = useT();
@@ -70,7 +72,7 @@ export function SortableBlockList({ workflowId, blocks, onEditBlock, onRemoveBlo
   };
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+    <DndContext sensors={locked ? [] : sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
       <SortableContext items={items} strategy={verticalListSortingStrategy}>
         <div className="divide-y divide-border">
           {displayBlocks.map((block, idx) => (

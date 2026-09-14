@@ -356,6 +356,8 @@ export function WorkflowDetail() {
                       variant="secondary"
                       icon={<Plus className="w-4 h-4" />}
                       onClick={() => setShowAddBlock(true)}
+                      disabled={!!workflow.sealed}
+                      title={workflow.sealed ? t.workflows.sealedLocked : undefined}
                     >
                       {t.workflows.addBlock}
                     </Button>
@@ -367,12 +369,16 @@ export function WorkflowDetail() {
                   {t.workflows.noBlocks}
                 </div>
               ) : (
-                <SortableBlockList
-                  workflowId={workflow.id}
-                  blocks={workflow.blocks}
-                  onEditBlock={handleOpenEditBlock}
-                  onRemoveBlock={handleRemoveBlock}
-                />
+                // A sealed definition is read-only: no drag, edit or remove
+                <fieldset disabled={!!workflow.sealed} className="min-w-0" title={workflow.sealed ? t.workflows.sealedLocked : undefined}>
+                  <SortableBlockList
+                    workflowId={workflow.id}
+                    blocks={workflow.blocks}
+                    onEditBlock={workflow.sealed ? () => {} : handleOpenEditBlock}
+                    onRemoveBlock={handleRemoveBlock}
+                    locked={!!workflow.sealed}
+                  />
+                </fieldset>
               )}
             </Card>
           )}
