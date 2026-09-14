@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 public enum ErrorCode {
 
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "Resource not found"),
+    MODULE_DISABLED(HttpStatus.NOT_FOUND, "Module disabled"),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "Validation failed"),
     INVALID_ARGUMENT(HttpStatus.BAD_REQUEST, "Invalid argument"),
     WORKFLOW_EXECUTION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "Workflow execution failed"),

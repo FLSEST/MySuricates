@@ -35,6 +35,9 @@ spring:
     driver-class-name: org.sqlite.JDBC
 
 automation:
+  modules:
+    # Integration tests exercise every controller; single tests disable a module via @TestPropertySource.
+    preset: full
   security:
     enabled: false
   tray:

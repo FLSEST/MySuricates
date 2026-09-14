@@ -70,6 +70,17 @@ app:
   build-timestamp: @maven.build.timestamp@
 
 automation:
+  # Optionale Module — nur beim Start gelesen, bewusst nicht per REST umschaltbar.
+  # preset: core (nur Kern) | research (+ chains, assistant, learning, memory, audit, bpmn) | full (alles)
+  # Einzel-Override schlägt das Preset: automation.modules.<name>: true|false
+  #   (Env: AUTOMATION_MODULES_<NAME>, z. B. AUTOMATION_MODULES_REMOTE_ACCESS=true)
+  # Katalog und Abhängigkeiten: com.automation.modules.ModuleCatalog, Settings → "Module & Härtung"
+  modules:
+    preset: ${AUTOMATION_MODULES_PRESET:core}
+  # Optionale Workflow-Härtung — unabhängig vom Preset, gleiche Regeln (nur Startkonfig).
+  # provenance (Default true) · sealing · require-sealed-for-unattended · webhook-signatures
+  # hardening:
+  #   sealing: true
   discovery:
     auto-tagging-enabled: ${AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED:true}
     semantic-enabled: ${AUTOMATION_DISCOVERY_SEMANTIC_ENABLED:true}

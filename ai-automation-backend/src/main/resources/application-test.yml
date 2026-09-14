@@ -6,6 +6,8 @@ server:
   port: 8090
 
 automation:
+  modules:
+    preset: ${AUTOMATION_MODULES_PRESET:full}   # Test-Instanz prüft alle Features; öffentlicher Default ist core
   cors:
     allowed-origins: http://localhost:8090
   tray:
