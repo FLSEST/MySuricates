@@ -1,6 +1,8 @@
 package com.automation.service.health;
 
 import com.automation.entity.Todo;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.ModuleRegistry;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.service.staging.StagingService;
@@ -24,6 +26,7 @@ public class HealthAutoTodoService {
     private final TestingService testingService;
     private final TodoRepository todoRepository;
     private final ProjectRepository projectRepository;
+    private final ModuleRegistry modules;
 
     @Value("${automation.autopilot.project-id:}")
     private String autopilotProjectId;
@@ -33,6 +36,11 @@ public class HealthAutoTodoService {
 
     @Scheduled(fixedRate = 60_000, initialDelay = 30_000)
     public void checkInstanceHealth() {
+        // Without the staging module there are no stable/test instances to watch — probing
+        // them would only file "instance unhealthy" TODOs on every fresh clone.
+        if (!modules.isEnabled(ModuleCatalog.STAGING)) {
+            return;
+        }
         checkInstance("stable", stagingService.isHealthy(), previousStableHealthy, "Stable");
         checkInstance("test", testingService.isHealthy(), previousTestHealthy, "Test");
     }

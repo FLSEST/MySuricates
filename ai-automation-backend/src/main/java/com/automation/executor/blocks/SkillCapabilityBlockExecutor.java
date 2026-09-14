@@ -7,6 +7,8 @@ import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.ModuleRegistry;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
 import com.automation.service.skill.SkillService;
@@ -35,9 +37,14 @@ public class SkillCapabilityBlockExecutor implements BlockExecutor {
 
     private final CommandExecutorService commandExecutor;
     private final SkillService skillService;
+    private final ModuleRegistry modules;
 
     @Override
     public StepResult execute(BlockDefinition block, ExecutionContext context) {
+        if (!modules.isEnabled(ModuleCatalog.SKILLS)) {
+            throw new com.automation.exception.WorkflowExecutionException(
+                    ModuleCatalog.SKILLS.disabledMessage("Block type 'skill-capability'"));
+        }
         Map<String, Object> config = block.getConfig();
         String capabilityName = (String) config.get("capability");
         if (capabilityName == null) {

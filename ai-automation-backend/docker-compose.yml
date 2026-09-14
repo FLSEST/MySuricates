@@ -18,7 +18,8 @@ services:
       # im Log aus (docker compose logs backend | grep -i 'API KEY'). Eigenen Wert setzen:
       # AUTOMATION_API_KEY=... exportieren oder in eine .env neben dieser Datei schreiben.
       - AUTOMATION_API_KEY=${AUTOMATION_API_KEY:-}
-      - AUTOMATION_TAILSCALE_ENABLED=false
+      # Optionale Module: core (Default) | research | full; einzelne Module per AUTOMATION_MODULES_<NAME>=true
+      - AUTOMATION_MODULES_PRESET=${AUTOMATION_MODULES_PRESET:-core}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9090/api/v1/system/health"]

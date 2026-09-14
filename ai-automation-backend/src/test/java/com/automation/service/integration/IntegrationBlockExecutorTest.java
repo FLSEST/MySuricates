@@ -5,6 +5,7 @@ import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.executor.ExecutionContext;
 import com.automation.executor.blocks.IntegrationBlockExecutor;
+import com.automation.modules.ModuleRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,7 +36,22 @@ class IntegrationBlockExecutorTest {
 
     @BeforeEach
     void setUp() {
-        executor = new IntegrationBlockExecutor(registry, oAuthService, objectMapper);
+        executor = new IntegrationBlockExecutor(registry, oAuthService, objectMapper, ModuleRegistry.allEnabled());
+    }
+
+    @Test
+    void failsStepWithoutTouchingProvidersWhenIntegrationsModuleIsDisabled() {
+        IntegrationBlockExecutor coreOnly = new IntegrationBlockExecutor(registry, oAuthService, objectMapper,
+                ModuleRegistry.of(Map.of(), Map.of()));
+        BlockDefinition block = new BlockDefinition();
+        block.setType("integration");
+        block.setConfig(Map.of("provider", "github", "action", "list_issues"));
+
+        StepResult result = coreOnly.execute(block, createContext());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getOutput()).contains("module 'integrations'").contains("automation.modules.integrations=true");
+        verifyNoInteractions(registry, oAuthService);
     }
 
     @Test

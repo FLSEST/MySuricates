@@ -1,6 +1,7 @@
 package com.automation.service.health;
 
 import com.automation.entity.Todo;
+import com.automation.modules.ModuleRegistry;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.service.staging.StagingService;
@@ -32,8 +33,19 @@ class HealthAutoTodoServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new HealthAutoTodoService(stagingService, testingService, todoRepository, projectRepository);
+        service = new HealthAutoTodoService(stagingService, testingService, todoRepository, projectRepository,
+                ModuleRegistry.allEnabled());
         ReflectionTestUtils.setField(service, "autopilotProjectId", "test-project-uuid");
+    }
+
+    @Test
+    void checkInstanceHealth_stagingModuleDisabled_probesNothingAndCreatesNoTodo() {
+        HealthAutoTodoService coreOnly = new HealthAutoTodoService(stagingService, testingService, todoRepository,
+                projectRepository, ModuleRegistry.of(java.util.Map.of(), java.util.Map.of()));
+
+        coreOnly.checkInstanceHealth();
+
+        verifyNoInteractions(stagingService, testingService, todoRepository);
     }
 
     @Test

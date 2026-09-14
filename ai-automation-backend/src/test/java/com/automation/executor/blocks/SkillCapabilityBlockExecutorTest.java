@@ -8,6 +8,7 @@ import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.exception.WorkflowExecutionException;
 import com.automation.executor.ExecutionContext;
+import com.automation.modules.ModuleRegistry;
 import com.automation.service.cli.CliSession;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
@@ -15,7 +16,6 @@ import com.automation.service.skill.SkillService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -38,13 +38,13 @@ class SkillCapabilityBlockExecutorTest {
     @Mock
     private SkillService skillService;
 
-    @InjectMocks
     private SkillCapabilityBlockExecutor executor;
 
     private ExecutionContext context;
 
     @BeforeEach
     void setUp() {
+        executor = new SkillCapabilityBlockExecutor(commandExecutor, skillService, ModuleRegistry.allEnabled());
         context = ExecutionContext.builder()
                 .containerId("container-1")
                 .workflowRunId("run-1")
@@ -56,6 +56,21 @@ class SkillCapabilityBlockExecutorTest {
     void supports_skillCapabilityType() {
         assertThat(executor.supports("skill-capability")).isTrue();
         assertThat(executor.supports("simple")).isFalse();
+    }
+
+    @Test
+    void execute_skillsModuleDisabled_failsBeforeAnyCliCall() {
+        SkillCapabilityBlockExecutor coreOnly = new SkillCapabilityBlockExecutor(commandExecutor, skillService,
+                ModuleRegistry.of(Map.of(), Map.of()));
+        BlockDefinition block = BlockDefinition.builder()
+                .type("skill-capability")
+                .config(new HashMap<>(Map.of("capability", "fact_check")))
+                .build();
+
+        assertThatThrownBy(() -> coreOnly.execute(block, context))
+                .isInstanceOf(WorkflowExecutionException.class)
+                .hasMessageContaining("module 'skills'");
+        verifyNoInteractions(commandExecutor, skillService);
     }
 
     @Test

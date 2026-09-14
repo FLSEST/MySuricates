@@ -3,6 +3,7 @@ package com.automation.service.memory;
 import com.automation.entity.RunStatus;
 import com.automation.entity.WorkflowMemory;
 import com.automation.event.WorkflowRunCompletedEvent;
+import com.automation.modules.ModuleRegistry;
 import com.automation.repository.WorkflowMemoryRepository;
 import com.automation.repository.WorkflowRunRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,7 +31,19 @@ class AutoMemoryExtractionListenerTest {
 
     @BeforeEach
     void setUp() {
-        listener = new AutoMemoryExtractionListener(memoryService, memoryRepository, runRepository);
+        listener = new AutoMemoryExtractionListener(memoryService, memoryRepository, runRepository,
+                ModuleRegistry.allEnabled());
+    }
+
+    @Test
+    void onCompleted_memoryModuleDisabled_skipsEvenWhenWorkflowOptsIn() throws Exception {
+        var coreOnly = new AutoMemoryExtractionListener(memoryService, memoryRepository, runRepository,
+                ModuleRegistry.of(Map.of(), Map.of()));
+        var event = createEvent(RunStatus.COMPLETED, Map.of("autoMemoryExtraction", true));
+
+        coreOnly.onWorkflowRunCompleted(event);
+
+        verifyNoInteractions(memoryService, memoryRepository, runRepository);
     }
 
     @Test

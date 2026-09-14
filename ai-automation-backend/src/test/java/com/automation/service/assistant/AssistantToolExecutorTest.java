@@ -6,6 +6,7 @@ import com.automation.entity.Todo;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowChain;
 import com.automation.entity.WorkflowRun;
+import com.automation.modules.ModuleRegistry;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.chain.ChainService;
 import com.automation.service.todo.TodoService;
@@ -48,7 +49,7 @@ class AssistantToolExecutorTest {
                 new AssistantWorkflowTools(workflowService, workflowExecutor, mapper),
                 new AssistantChainTools(chainService, mapper),
                 mapper, registry,
-                new AssistantToolValidator(mapper), guardrailsConfig, activityLogService);
+                new AssistantToolValidator(mapper), guardrailsConfig, activityLogService, ModuleRegistry.allEnabled());
     }
 
     /**
@@ -208,6 +209,24 @@ class AssistantToolExecutorTest {
 
         assertThat(result).contains("✓");
         assertThat(result).contains("Chain created");
+    }
+
+    @Test
+    void executeTools_createChain_chainsModuleDisabled_rejectedWithoutCreating() {
+        ObjectMapper mapper = new ObjectMapper();
+        executor = new AssistantToolExecutor(
+                new AssistantTodoTools(todoService, mapper),
+                new AssistantWorkflowTools(workflowService, workflowExecutor, mapper),
+                new AssistantChainTools(chainService, mapper),
+                mapper, registry,
+                new AssistantToolValidator(mapper), guardrailsConfig, activityLogService,
+                ModuleRegistry.of(java.util.Map.of("assistant", "true"), java.util.Map.of()));
+
+        String input = "<tool type=\"create_chain\">{\"name\": \"My Chain\", \"entries\": [{\"workflowId\": \"wf-1\"}]}</tool>";
+        String result = runAllTools(input);
+
+        assertThat(result).contains("module 'chains'").doesNotContain("✓");
+        verifyNoInteractions(chainService);
     }
 
     @Test

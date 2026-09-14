@@ -1,6 +1,8 @@
 package com.automation.service.assistant.context;
 
 import com.automation.entity.WorkflowChain;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.ModuleRegistry;
 import com.automation.repository.WorkflowChainRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,9 +18,13 @@ public class ChainsIndexSection implements AssistantContextSection {
     private static final int MAX_ENTRIES = 15;
 
     private final WorkflowChainRepository chainRepository;
+    private final ModuleRegistry modules;
 
     @Override
     public void append(StringBuilder sb, boolean compact) {
+        if (!modules.isEnabled(ModuleCatalog.CHAINS)) {
+            return; // don't advertise chains the assistant cannot create or start
+        }
         try {
             List<WorkflowChain> chains = chainRepository.findAll();
             if (chains.isEmpty()) {

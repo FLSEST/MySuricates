@@ -1,5 +1,6 @@
 package com.automation.config;
 
+import com.automation.modules.ModuleRegistry;
 import com.automation.security.WebSocketAuthInterceptor;
 import com.automation.websocket.TerminalWebSocketHandler;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,12 +17,14 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 import org.springframework.web.socket.server.HandshakeInterceptor;
 
 import java.lang.reflect.Field;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,7 +46,7 @@ class RawWebSocketConfigTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        config = new RawWebSocketConfig(terminalWebSocketHandler, webSocketAuthInterceptor);
+        config = new RawWebSocketConfig(terminalWebSocketHandler, webSocketAuthInterceptor, ModuleRegistry.allEnabled());
         setAllowedOrigins("http://localhost:3000,http://localhost:5173");
         lenient().when(registry.addHandler(any(), any(String[].class))).thenReturn(registration);
         lenient().when(registration.addInterceptors(any(HandshakeInterceptor[].class))).thenReturn(registration);
@@ -130,6 +133,16 @@ class RawWebSocketConfigTest {
         inOrder.verify(registry).addHandler(eq(terminalWebSocketHandler), eq("/ws/terminal/**"));
         inOrder.verify(registration).addInterceptors(webSocketAuthInterceptor);
         inOrder.verify(registration).setAllowedOriginPatterns(any(String[].class));
+    }
+
+    @Test
+    void should_notRegisterTerminalHandler_when_terminalModuleIsDisabled() {
+        RawWebSocketConfig coreOnly = new RawWebSocketConfig(terminalWebSocketHandler, webSocketAuthInterceptor,
+                ModuleRegistry.of(Map.of(), Map.of()));
+
+        coreOnly.registerWebSocketHandlers(registry);
+
+        verifyNoInteractions(registry);
     }
 
     // --- Helper ---

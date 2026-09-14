@@ -106,8 +106,6 @@ automation:
       requests-per-minute: ${AUTOMATION_RATE_LIMIT_RPM:120}
   activity-log:
     max-request-bytes: ${AUTOMATION_ACTIVITY_LOG_MAX_BYTES:65536}
-  tailscale:
-    enabled: ${AUTOMATION_TAILSCALE_ENABLED:true}
   ai:
     default-provider: ${AUTOMATION_AI_DEFAULT_PROVIDER:CLAUDE}
   host-claude:

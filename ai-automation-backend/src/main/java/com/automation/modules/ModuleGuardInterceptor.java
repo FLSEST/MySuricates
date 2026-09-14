@@ -34,8 +34,8 @@ public class ModuleGuardInterceptor implements HandlerInterceptor {
             return true;
         }
         ModuleCatalog module = requirement.value();
-        ErrorResponse body = ErrorResponse.of(ErrorCode.MODULE_DISABLED, "Module '" + module.key()
-                + "' is disabled on this instance; enable via " + module.property() + "=true and restart");
+        ErrorResponse body = ErrorResponse.of(ErrorCode.MODULE_DISABLED,
+                module.disabledMessage(request.getMethod() + " " + request.getRequestURI()));
         response.setStatus(ErrorCode.MODULE_DISABLED.getHttpStatus().value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");

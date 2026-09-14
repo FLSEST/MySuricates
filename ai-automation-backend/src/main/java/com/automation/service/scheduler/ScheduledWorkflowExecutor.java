@@ -7,6 +7,8 @@ import com.automation.entity.WorkflowRun;
 import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.ScheduledWorkflow.ScheduleType;
 import com.automation.entity.ScheduledWorkflow.TargetType;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.ModuleRegistry;
 import com.automation.repository.ChainRunRepository;
 import com.automation.repository.ScheduledWorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
@@ -37,6 +39,7 @@ public class ScheduledWorkflowExecutor {
     private final ChainExecutor chainExecutor;
     private final ActivityLogService activityLogService;
     private final Clock clock;
+    private final ModuleRegistry modules;
 
     /**
      * Execute a scheduled workflow/chain.
@@ -93,6 +96,12 @@ public class ScheduledWorkflowExecutor {
         // Without this, a failing execute() leaves nextRunAt in the past, causing an infinite
         // retry loop on the next @Scheduled tick.
         try {
+            if (scheduled.getTargetType() == TargetType.CHAIN && !modules.isEnabled(ModuleCatalog.CHAINS)) {
+                // Schedules created while chains were enabled; skip (the finally still advances nextRunAt)
+                log.warn("Schedule {} skipped — {}", scheduleId,
+                        ModuleCatalog.CHAINS.disabledMessage("Chain schedule '" + scheduled.getTargetName() + "'"));
+                return Optional.empty();
+            }
             if (scheduled.getTargetType() == TargetType.CHAIN && scheduled.getChain() != null) {
                 ChainRun run = chainExecutor.execute(scheduled.getChain(), scheduled.getInputContext(), scheduleId);
                 return Optional.ofNullable(run).map(r -> new ScheduledRunRef(r.getId(), TargetType.CHAIN));

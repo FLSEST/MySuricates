@@ -71,7 +71,8 @@ class AssistantContextBuilderTest {
         SchedulesContextSection schedulesSection = new SchedulesContextSection(scheduledWorkflowRepository);
         SkillsIndexSection skillsSection = new SkillsIndexSection(skillRepository);
         IntegrationsIndexSection integrationsSection = new IntegrationsIndexSection(integrationRegistry, integrationConnectionRepository);
-        ChainsIndexSection chainsSection = new ChainsIndexSection(workflowChainRepository);
+        ChainsIndexSection chainsSection = new ChainsIndexSection(workflowChainRepository,
+                com.automation.modules.ModuleRegistry.allEnabled());
         BlockTypesIndexSection blockTypesSection = new BlockTypesIndexSection();
         FailedWorkflowsContextSection failedWorkflowsSection = new FailedWorkflowsContextSection(workflowDebugService);
         ProjectsContextSection projectsSection = new ProjectsContextSection(projectRepository);

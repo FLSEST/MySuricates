@@ -136,6 +136,12 @@ public enum ModuleCatalog {
         return kind().propertyPrefix() + "." + key;
     }
 
+    /** User-facing explanation why {@code what} (a block type, endpoint, tool) is unavailable. */
+    public String disabledMessage(String what) {
+        return what + " requires module '" + key + "', which is disabled on this instance — set "
+                + property() + "=true and restart";
+    }
+
     /** Environment variable form, e.g. {@code AUTOMATION_MODULES_REMOTE_ACCESS}. */
     public String envVar() {
         return property().replace('.', '_').replace('-', '_').toUpperCase(Locale.ROOT);

@@ -3,6 +3,8 @@ package com.automation.service.memory;
 import com.automation.entity.RunStatus;
 import com.automation.entity.WorkflowMemory;
 import com.automation.event.WorkflowRunCompletedEvent;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.ModuleRegistry;
 import com.automation.repository.WorkflowMemoryRepository;
 import com.automation.repository.WorkflowRunRepository;
 import lombok.RequiredArgsConstructor;
@@ -29,10 +31,14 @@ public class AutoMemoryExtractionListener {
     private final WorkflowMemoryService memoryService;
     private final WorkflowMemoryRepository memoryRepository;
     private final WorkflowRunRepository runRepository;
+    private final ModuleRegistry modules;
 
     @Async
     @EventListener
     public void onWorkflowRunCompleted(WorkflowRunCompletedEvent event) {
+        // Memory module off ⇒ no AI extraction calls, whatever the workflow metadata says
+        if (!modules.isEnabled(ModuleCatalog.MEMORY)) return;
+
         // Only trigger on successful runs
         if (event.getStatus() != RunStatus.COMPLETED) return;
 

@@ -2,8 +2,10 @@ package com.automation.service.system;
 
 import com.automation.dto.response.RemoteAccessResponse;
 import com.automation.exception.TailscaleException;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.ModuleRegistry;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -18,8 +20,13 @@ public class TailscaleService {
 
     private final boolean enabled;
 
-    public TailscaleService(
-            @Value("${automation.tailscale.enabled:false}") boolean enabled) {
+    /** Remote access is the {@code remote-access} module (formerly {@code automation.tailscale.enabled}). */
+    @Autowired
+    public TailscaleService(ModuleRegistry modules) {
+        this(modules.isEnabled(ModuleCatalog.REMOTE_ACCESS));
+    }
+
+    TailscaleService(boolean enabled) {
         this.enabled = enabled;
     }
 

@@ -5,6 +5,8 @@ import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.ModuleRegistry;
 import com.automation.service.integration.IntegrationOAuthService;
 import com.automation.service.integration.IntegrationProvider;
 import com.automation.service.integration.IntegrationRegistry;
@@ -25,6 +27,7 @@ public class IntegrationBlockExecutor implements BlockExecutor {
     private final IntegrationRegistry registry;
     private final IntegrationOAuthService oAuthService;
     private final ObjectMapper objectMapper;
+    private final ModuleRegistry modules;
 
     @Override
     public boolean supports(String blockType) {
@@ -33,6 +36,9 @@ public class IntegrationBlockExecutor implements BlockExecutor {
 
     @Override
     public StepResult execute(BlockDefinition block, ExecutionContext context) {
+        if (!modules.isEnabled(ModuleCatalog.INTEGRATIONS)) {
+            return errorResult(context, ModuleCatalog.INTEGRATIONS.disabledMessage("Block type 'integration'"));
+        }
         Map<String, Object> config = block.getConfig();
         String providerId = (String) config.get("provider");
         String action = (String) config.get("action");

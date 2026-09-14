@@ -2,6 +2,7 @@ package com.automation.service.assistant.context;
 
 import com.automation.entity.ChainEntry;
 import com.automation.entity.WorkflowChain;
+import com.automation.modules.ModuleRegistry;
 import com.automation.repository.WorkflowChainRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,9 +12,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -25,7 +28,18 @@ class ChainsIndexSectionTest {
 
     @BeforeEach
     void setUp() {
-        section = new ChainsIndexSection(chainRepository);
+        section = new ChainsIndexSection(chainRepository, ModuleRegistry.allEnabled());
+    }
+
+    @Test
+    void chainsModuleDisabled_appendsNothingAndSkipsRepository() {
+        var coreOnly = new ChainsIndexSection(chainRepository, ModuleRegistry.of(Map.of("assistant", "true"), Map.of()));
+        StringBuilder sb = new StringBuilder();
+
+        coreOnly.append(sb, false);
+
+        assertThat(sb).isEmpty();
+        verifyNoInteractions(chainRepository);
     }
 
     private WorkflowChain chain(String id, String name, String desc, int entryCount) {

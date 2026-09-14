@@ -2,6 +2,8 @@ package com.automation.service.assistant;
 
 import com.automation.config.AssistantGuardrailsConfig;
 import com.automation.entity.ActivityLog.LogCategory;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.ModuleRegistry;
 import com.automation.service.activitylog.ActivityLogService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -66,6 +68,7 @@ public class AssistantToolExecutor {
     private final AssistantToolValidator toolValidator;
     private final AssistantGuardrailsConfig guardrailsConfig;
     private final ActivityLogService activityLogService;
+    private final ModuleRegistry modules;
 
     /** Timestamps of confirmed mutating executions within the rolling rate-limit window. */
     private final Deque<Instant> mutationTimestamps = new ArrayDeque<>();
@@ -134,7 +137,9 @@ public class AssistantToolExecutor {
                 case "delete_workflow"    -> workflowTools.deleteWorkflow(payload);
                 case "start_workflow"     -> workflowTools.startWorkflow(payload);
                 case "cancel_run"         -> workflowTools.cancelRun(payload);
-                case "create_chain"       -> chainTools.createChain(payload);
+                case "create_chain"       -> modules.isEnabled(ModuleCatalog.CHAINS)
+                        ? chainTools.createChain(payload)
+                        : "⚠ " + ModuleCatalog.CHAINS.disabledMessage("create_chain");
                 default -> "[Unknown tool: " + tool.type() + "]";
             };
         }

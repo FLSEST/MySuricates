@@ -6,6 +6,7 @@ import com.automation.entity.ScheduledWorkflow.ScheduleType;
 import com.automation.entity.ScheduledWorkflow.TargetType;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowChain;
+import com.automation.modules.ModuleRegistry;
 import com.automation.repository.ChainRunRepository;
 import com.automation.repository.ScheduledWorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
@@ -56,6 +57,9 @@ class ScheduledWorkflowExecutorTest {
     // build nextRunAt/endDate relative to real Instant.now(), so the clock must track real time.
     @Spy
     private Clock clock = Clock.systemDefaultZone();
+
+    @Spy
+    private ModuleRegistry modules = ModuleRegistry.allEnabled();
 
     @InjectMocks
     private ScheduledWorkflowExecutor executor;
@@ -211,6 +215,32 @@ class ScheduledWorkflowExecutorTest {
         executor.executeSingleSchedule("sched-chain-ghost");
 
         verify(chainExecutor, never()).execute(any(), any());
+    }
+
+    @Test
+    void executeSingleSchedule_chainTargetWithChainsModuleDisabled_skipsButAdvancesSchedule() {
+        var coreOnly = new ScheduledWorkflowExecutor(scheduledRepository, workflowRunRepository, chainRunRepository,
+                workflowExecutor, chainExecutor, activityLogService, clock, ModuleRegistry.of(Map.of(), Map.of()));
+        WorkflowChain chain = WorkflowChain.builder().id("chain-1").name("Nightly Chain").build();
+        ScheduledWorkflow scheduled = ScheduledWorkflow.builder()
+                .id("sched-chain-off")
+                .chain(chain)
+                .targetType(TargetType.CHAIN)
+                .conflictBehavior(ScheduledWorkflow.ConflictBehavior.OVERLAP)
+                .cronExpression("0 0 * * * *")
+                .scheduleType(ScheduleType.CRON)
+                .enabled(true)
+                .nextRunAt(Instant.now().minusSeconds(60))
+                .inputContext(Map.of())
+                .build();
+        when(scheduledRepository.findByIdWithWorkflowSkills("sched-chain-off")).thenReturn(Optional.of(scheduled));
+        when(scheduledRepository.findById("sched-chain-off")).thenReturn(Optional.of(scheduled));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(coreOnly.executeSingleSchedule("sched-chain-off")).isEmpty();
+
+        verifyNoInteractions(chainExecutor);
+        verify(scheduledRepository).save(argThat(sw -> ((ScheduledWorkflow) sw).getLastRunAt() != null));
     }
 
     @Test
