@@ -111,3 +111,28 @@ Der aktualisierte Export erfasst fünf weitere Security-Audits mit gemeinsamem Q
 Die ursprünglichen Definitionen, Vorschläge und das Migrationsprotokoll liegen dauerhaft unter
 `~/.local/state/autotrigger-dev/workspace-migrations/77fc07e3-293ec589/`.
 Die vorherige Runtime-JAR bleibt erhalten. Änderungen wurden nicht committed oder gepusht.
+
+## Fortsetzung: Integration und verbleibende Quellen
+
+- [x] Vollständig getesteten Kernstand committen (098bed37).
+- [x] main-Korrektur bfdae654 integrieren; technische Checks mit YELLOW bei unvollständigen Reports kombinieren (468027f7).
+- [x] CS2BIM-Herkunft bestätigen und dauerhaften Checkout von FLSEST/cs2bim, Branch dev, unter ~/.mysuricates/sources/cs2bim anlegen (HEAD bd8ffe4).
+- [x] Sechs CS2BIM-Definitionen migriert; reale Quelle via source_path isoliert getestet (Run b1564969-8f7d-49af-b1b1-7399007e3b4a).
+- [ ] Treasure Hunt Backend: kein Git in Quelle oder Backups und kein passendes GitHub-Repository; Zustimmung zur lokalen Initialversionierung angefragt.
+- [ ] Pool-Varianten übernehmen, gezielte Regressionen prüfen, Arbeitsbranch lokal nach main mergen.
+- [ ] Runtime/REST-Endstand und TODO dokumentieren.
+
+Der CS2BIM-Upstream-Sync darf entsprechend seinem Zweck einen Upstream-Merge auf seinem
+eigenen Run-Branch vorbereiten. Er verändert und pusht keinen Ausgangsbranch.
+
+CS2BIM-Nachträge: 13 Python-Tests einschließlich Migration und Gate-Fallback grün;
+gezielte Java-Template-/Quellgrößen-Tests grün. Kein Plattform-Java-Code seit dem vollständig
+getesteten Runtime-Build verändert. Git-Quellordner CS2BIM: erster dauerhafter Checkout ist
+HEAD bd8ffe447d6e3e6aa6c1243ab0d27843996fdd9c; künftige Runs pinnen dessen lokalen HEAD, ohne
+bei jedem Run automatisch Remote-Änderungen nachzuladen.
+
+Der Hygiene-Hook löste unter Git-Worktrees die Repository-Wurzel falsch auf. Das Gate
+ermittelt sie jetzt aus seinem festen Skriptpfad und bricht bei fehlenden Regeln ab.
+Die Migrationsskripte verwenden den lokalen Home-Pfad statt persönlicher Pfadliterale.
+Die zwei absichtlich lokal ignorierten Pool-Dateien bleiben lokal; ihre neutralisierten
+Varianten sind unter scripts/workspace-isolation/pool-overrides versioniert.

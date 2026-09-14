@@ -16,10 +16,11 @@
 # Usage:  bash scripts/ci/public-hygiene.sh [--tracked|--worktree|--staged]
 # Exit:   0 = sauber (bzw. nur Warnungen), 1 = Verstöße
 #
-set -uo pipefail
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
+# Git hooks may export GIT_WORK_TREE=.; resolve from this script, not hook-relative Git state.
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 
 # shellcheck source=../lib/hygiene-rules.sh

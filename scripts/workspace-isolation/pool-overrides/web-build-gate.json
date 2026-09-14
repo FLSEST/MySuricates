@@ -46,9 +46,7 @@
   ],
   "version": "1.1.1",
   "author": "MySuricates",
-  "defaultContext": {
-    "project_path": "/home/flo/Entwicklung/IdeaProjects/treasure_hunt_web"
-  },
+  "defaultContext": {},
   "metadata": {
     "workspace": {
       "mode": "isolated",

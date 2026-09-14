@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 import re
 
-SOURCE = '/home/flo/Entwicklung/tools/autotrigger'
+SOURCE = str(Path.home() / 'Entwicklung/tools/autotrigger')
 COMMIT = dict(mode='isolated', source='commit', install_npm=True)
 WRITERS = {'47a410c1', 'd29a75fa', 'aad88aa3', 'c8e19e46', 'adac163d', 'a3357beb',
            '24f8fce0', '954a01bd', '8eaa2a16', '4b3d1bb8', '1e728887'}

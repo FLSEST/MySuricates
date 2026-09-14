@@ -12,22 +12,25 @@ m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
 
 SOURCES = {
-    '16ca3b62': '/home/flo/Entwicklung/tools/swiss_job_automation',
-    'fc22eb24': '/home/flo/Entwicklung/tools/swiss_job_automation',
-    '2d1510a0': '/home/flo/Entwicklung/tools/swiss_job_automation',
-    'ed43db60': '/home/flo/Entwicklung/Test-externe-Anbieter/Mainzelliste/mainzelliste',
-    '1f983bd4': '/home/flo/Entwicklung/Test-externe-Anbieter/Mainzelliste/mainzelliste',
-    '24f76503': '/home/flo/Entwicklung/Test-externe-Anbieter/Mainzelliste/mainzelliste',
-    '52d9877a': '/home/flo/Entwicklung/IdeaProjects/treasure_hunt_web',
-    '6d8628b8': '/home/flo/Entwicklung/IdeaProjects/treasure_hunt_web',
-    '2ce37430': '/home/flo/Entwicklung/IdeaProjects/treasure_hunt_web',
-    '9f9b1b78': '/home/flo/Entwicklung/IdeaProjects/treasure_hunt_web',
-    '5bcced92': '/home/flo/Entwicklung/IdeaProjects/treasure_hunt_app',
-    '221fa01c': '/home/flo/Innofuse/{{ repo }}',
-    '083d4648': '/home/flo/Entwicklung/IdeaProjects/treasure_hunt_app',
-    '65aafc3d': '/home/flo/IdeaProjects/LeviPapaEins',
+    '16ca3b62': str(Path.home() / 'Entwicklung/tools/swiss_job_automation'),
+    'fc22eb24': str(Path.home() / 'Entwicklung/tools/swiss_job_automation'),
+    '2d1510a0': str(Path.home() / 'Entwicklung/tools/swiss_job_automation'),
+    'ed43db60': str(Path.home() / 'Entwicklung/Test-externe-Anbieter/Mainzelliste/mainzelliste'),
+    '1f983bd4': str(Path.home() / 'Entwicklung/Test-externe-Anbieter/Mainzelliste/mainzelliste'),
+    '24f76503': str(Path.home() / 'Entwicklung/Test-externe-Anbieter/Mainzelliste/mainzelliste'),
+    '52d9877a': str(Path.home() / 'Entwicklung/IdeaProjects/treasure_hunt_web'),
+    '6d8628b8': str(Path.home() / 'Entwicklung/IdeaProjects/treasure_hunt_web'),
+    '2ce37430': str(Path.home() / 'Entwicklung/IdeaProjects/treasure_hunt_web'),
+    '9f9b1b78': str(Path.home() / 'Entwicklung/IdeaProjects/treasure_hunt_web'),
+    '5bcced92': str(Path.home() / 'Entwicklung/IdeaProjects/treasure_hunt_app'),
+    '221fa01c': str(Path.home() / 'Innofuse/{{ repo }}'),
+    '083d4648': str(Path.home() / 'Entwicklung/IdeaProjects/treasure_hunt_app'),
+    '65aafc3d': str(Path.home() / 'IdeaProjects/LeviPapaEins'),
 }
-BLOCKED = {'47d94629', '47a44aa6', '48279673', '0bfed42c', '5a9c64b8', 'dcd1ba43', '6f8ff410'}
+cs_spec = importlib.util.spec_from_file_location('cs2bim', Path(__file__).with_name('prepare-cs2bim.py'))
+cs = importlib.util.module_from_spec(cs_spec)
+cs_spec.loader.exec_module(cs)
+BLOCKED = {'6f8ff410'}
 WRITERS = {'ed43db60', '1f983bd4', '24f76503', '221fa01c'}
 
 
@@ -38,7 +41,7 @@ def rewrite(value, source):
     value = value.replace(source.rstrip('/'), '{{ execution_path }}').replace('{{ project_path }}', '{{ execution_path }}')
     for name in ['cv_config_run.json', 'mainzelliste-bulk-test-sync.env', 'mainzelliste-targeted-test-sync.env']:
         value = value.replace('/tmp/' + name, '{{ workspace_logs }}/' + name)
-    value = value.replace('JOB_ARCHIVE_DIR=/home/flo/dokumente', 'JOB_ARCHIVE_DIR="{{ workspace_logs }}/archive"')
+    value = value.replace('JOB_ARCHIVE_DIR=' + str(Path.home() / 'dokumente'), 'JOB_ARCHIVE_DIR="{{ workspace_logs }}/archive"')
     value = value.replace('$HOME/dokumente/CVs_', '{{ workspace_logs }}/archive/CVs_')
     return value
 
@@ -52,7 +55,9 @@ def main():
     count = 0
     for original in json.loads(args.export.read_text()):
         prefix = original['id'][:8]
-        if prefix in BLOCKED:
+        if prefix in cs.IDS:
+            proposal = cs.migrate(original)
+        elif prefix in BLOCKED:
             proposal = dict(id=original['id'], name=original['name'], ready=False, before=original,
                             blockedReason='Configured source is missing or has no local Git commit; source selection requested.')
         elif prefix in SOURCES:
@@ -89,8 +94,8 @@ def main():
                 blocks[0] = m.check('preview_build', 'npm ci --no-audit --no-fund\nnpm run build', 'web-preview')
             elif prefix == '083d4648':
                 policy['additional_sources'] = {
-                    'schweizerbahn': '/home/flo/Entwicklung/IdeaProjects/Schweizerbahn_hunts',
-                    'deutschland': '/home/flo/Entwicklung/IdeaProjects/Test_Deutsche_Geschichte_Deutschlandticket'}
+                    'schweizerbahn': str(Path.home() / 'Entwicklung/IdeaProjects/Schweizerbahn_hunts'),
+                    'deutschland': str(Path.home() / 'Entwicklung/IdeaProjects/Test_Deutsche_Geschichte_Deutschlandticket')}
                 blocks[:] = [m.check('flutter_' + label,
                     'cd "{{ ' + variable + ' }}"\nflutter pub get\nflutter test', 'flutter-' + label)
                     for label, variable in [('treasure_hunt', 'execution_path'),
@@ -130,7 +135,7 @@ def main():
                     block['config']['on_failure'] = 'stop'
         (args.output / (original['id'] + '.json')).write_text(json.dumps(proposal, indent=2, ensure_ascii=False) + '\n')
         count += 1
-    print(count, 'external proposals (7 await valid local Git sources)')
+    print(count, 'external proposals (Treasure Hunt source still requires a local Git baseline)')
 
 
 if __name__ == '__main__': main()
