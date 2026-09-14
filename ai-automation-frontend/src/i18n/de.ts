@@ -561,6 +561,9 @@ export const de: TranslationKeys = {
       duration: 'Dauer',
       rate: 'Bewertung:',
       waitingSteps: 'Warte auf Schritte...',
+      waitingForLogs: 'Warte auf Logs...',
+      jumpToLatest: 'Zu den neuesten Zeilen',
+      linesSkipped: '… {count} Zeilen übersprungen',
       stepNumber: 'Schritt {n}',
       stepKind: {
         ai: 'KI',
