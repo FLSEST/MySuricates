@@ -70,7 +70,7 @@ class RunLiveLogServiceTest {
     }
 
     private void emit(int stepIndex, String... texts) {
-        LiveOutputSink sink = service.sinkFor(RUN, stepIndex);
+        LiveOutputSink sink = service.sinkFor(RUN, stepIndex, null);
         for (String text : texts) sink.emit(LiveLineKind.LINE, text);
     }
 
@@ -90,16 +90,16 @@ class RunLiveLogServiceTest {
 
     @Test
     void sinkIsNoop_whenDisabledOrWithoutRunId() {
-        assertThat(service.sinkFor(null, 0)).isSameAs(LiveOutputSink.NOOP);
+        assertThat(service.sinkFor(null, 0, null)).isSameAs(LiveOutputSink.NOOP);
         config.setEnabled(false);
-        assertThat(service.sinkFor(RUN, 0)).isSameAs(LiveOutputSink.NOOP);
-        assertThat(service.sinkFor(RUN, 0).isActive()).isFalse();
+        assertThat(service.sinkFor(RUN, 0, null)).isSameAs(LiveOutputSink.NOOP);
+        assertThat(service.sinkFor(RUN, 0, null).isActive()).isFalse();
     }
 
     @Test
     void appendAssignsMonotonicSeq_andSanitizesText() {
         config.setMaxLineLength(10);
-        LiveOutputSink sink = service.sinkFor(RUN, 2);
+        LiveOutputSink sink = service.sinkFor(RUN, 2, null);
         sink.emit(LiveLineKind.TOOL, "[31mrot[0m");
         sink.emit(LiveLineKind.LINE, "0123456789abcdef");
         sink.emit(LiveLineKind.TEXT, "tab\tbleibt");
@@ -209,6 +209,16 @@ class RunLiveLogServiceTest {
     // ── snapshot ───────────────────────────────────────────────────────────
 
     @Test
+    void snapshotCarriesTheBlockNamesOfStepsWithLiveLines() {
+        service.sinkFor(RUN, 0, "Build").emit(LiveLineKind.LINE, "a");
+        service.sinkFor(RUN, 3, "  ").emit(LiveLineKind.LINE, "b");
+        service.sinkFor(RUN, 4, "Pruefen").emit(LiveLineKind.TOOL, "c");
+
+        assertThat(service.snapshot(RUN, -1).stepNames()).containsExactlyInAnyOrderEntriesOf(Map.of(0, "Build", 4, "Pruefen"));
+        assertThat(service.snapshot("other", -1).stepNames()).isEmpty();
+    }
+
+    @Test
     void snapshotFiltersByAfterSeq_andReportsUnavailableRuns() {
         emit(0, "a", "b", "c");
 
@@ -287,11 +297,11 @@ class RunLiveLogServiceTest {
     @Test
     void maxBufferedRuns_evictsFinishedBuffersBeforeRunningOnes() {
         config.setMaxBufferedRuns(2);
-        service.sinkFor("running", 0).emit(LiveLineKind.LINE, "x");
-        service.sinkFor("finished", 0).emit(LiveLineKind.LINE, "y");
+        service.sinkFor("running", 0, null).emit(LiveLineKind.LINE, "x");
+        service.sinkFor("finished", 0, null).emit(LiveLineKind.LINE, "y");
         service.onRunCompleted(completed("finished"));
 
-        service.sinkFor("new", 0).emit(LiveLineKind.LINE, "z");
+        service.sinkFor("new", 0, null).emit(LiveLineKind.LINE, "z");
 
         assertThat(service.bufferedRunCount()).isEqualTo(2);
         assertThat(service.snapshot("finished", -1).available()).isFalse();
@@ -319,7 +329,7 @@ class RunLiveLogServiceTest {
     @Test
     void concurrentAppends_produceUniqueContiguousSeqs() throws InterruptedException {
         config.setBufferLines(10_000);
-        LiveOutputSink sink = service.sinkFor(RUN, 0);
+        LiveOutputSink sink = service.sinkFor(RUN, 0, null);
         CountDownLatch start = new CountDownLatch(1);
         List<Thread> threads = IntStream.range(0, 4).mapToObj(t -> Thread.ofPlatform().start(() -> {
             try { start.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
@@ -345,7 +355,7 @@ class RunLiveLogServiceTest {
             return null;
         }).when(template).convertAndSend(eq(TOPIC), any(Object.class));
 
-        LiveOutputSink sink = service.sinkFor(RUN, 0);
+        LiveOutputSink sink = service.sinkFor(RUN, 0, null);
         Thread producer = Thread.ofPlatform().start(() -> {
             for (int i = 0; i < 5000; i++) sink.emit(LiveLineKind.LINE, "l" + i);
         });

@@ -147,7 +147,12 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string,
         if (liveOutput) {
           api.get<LiveLogSnapshot>(`/executions/${runId}/live-log?afterSeq=-1`)
             .then((snapshot) => {
-              if (!disposed && snapshot?.available && snapshot.bufferId) applyLive(snapshot.bufferId, snapshot.lines);
+              if (disposed || !snapshot?.available || !snapshot.bufferId) return;
+              // Steps whose start message was missed (reload, late open) still get their block name.
+              for (const [index, name] of Object.entries(snapshot.stepNames ?? {})) {
+                if (!stepContext.labels.has(Number(index))) stepContext.labels.set(Number(index), name);
+              }
+              applyLive(snapshot.bufferId, snapshot.lines);
             })
             .catch(() => { /* replay is best effort — live batches still arrive */ })
             .finally(() => {

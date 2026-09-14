@@ -70,7 +70,7 @@ public class BlockStepRunner {
         // starts streams into the live log under this step's index, nested blocks included.
         StepResult result;
         try {
-            result = LiveOutput.bind(liveLog.sinkFor(run.getId(), step.getStepIndex()),
+            result = LiveOutput.bind(liveLog.sinkFor(run.getId(), step.getStepIndex(), block.getName()),
                     () -> executeValidated(step, block, executor, context, run));
         } finally {
             liveLog.flush(run.getId()); // live lines must reach the client before the final step message

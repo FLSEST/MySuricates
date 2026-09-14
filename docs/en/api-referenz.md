@@ -817,6 +817,7 @@ Query: `afterSeq` (default `-1` = everything). Without a buffer `200` with `avai
   "firstSeq": 0,
   "lastSeq": 2,
   "skipped": 0,
+  "stepNames": { "0": "Build" },
   "lines": [
     { "seq": 1, "stepIndex": 0, "kind": "tool", "text": "Bash: mvn test", "ts": 1757844005000 },
     { "seq": 2, "stepIndex": 0, "kind": "tool_result", "text": "↳ 1.2 KB", "ts": 1757844009000 }
@@ -824,7 +825,7 @@ Query: `afterSeq` (default `-1` = everything). Without a buffer `200` with `avai
 }
 ```
 
-`kind`: `line` (raw line), `text`, `tool`, `tool_result`, `tool_error`, `result`, `system`.
+`kind`: `line` (raw line), `text`, `tool`, `tool_result`, `tool_error`, `result`, `system`. `stepNames`: block names of steps with buffered lines (key = `stepIndex`).
 
 ### `POST /api/v1/executions/{id}/todos/approve`
 

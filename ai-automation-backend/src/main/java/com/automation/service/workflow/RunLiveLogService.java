@@ -40,7 +40,7 @@ public class RunLiveLogService {
     public record LiveLine(long seq, int stepIndex, String kind, String text, long ts) {}
 
     public record Snapshot(String runId, String bufferId, boolean available, long firstSeq, long lastSeq,
-                           long skipped, List<LiveLine> lines) {}
+                           long skipped, Map<Integer, String> stepNames, List<LiveLine> lines) {}
 
     static final String MESSAGE_TYPE = "live_output";
     private static final long EVICTION_PERIOD_SECONDS = 60;
@@ -73,19 +73,22 @@ public class RunLiveLogService {
         this.scheduler = scheduler;
     }
 
-    /** Sink for the block running as {@code stepIndex} of {@code runId}; NOOP when live logs are off. */
-    public LiveOutputSink sinkFor(String runId, int stepIndex) {
+    /** Sink for the block {@code blockName} running as {@code stepIndex} of {@code runId}; NOOP when live logs are off. */
+    public LiveOutputSink sinkFor(String runId, int stepIndex, String blockName) {
         if (!config.isEnabled() || runId == null) {
             return LiveOutputSink.NOOP;
         }
-        return (kind, text) -> append(runId, stepIndex, kind, text);
+        return (kind, text) -> append(runId, stepIndex, blockName, kind, text);
     }
 
-    void append(String runId, int stepIndex, LiveLineKind kind, String text) {
+    void append(String runId, int stepIndex, String blockName, LiveLineKind kind, String text) {
         RunLiveLogBuffer buffer = buffers.get(runId);
         if (buffer == null) {
             makeRoomForNewBuffer();
             buffer = buffers.computeIfAbsent(runId, id -> new RunLiveLogBuffer(config.getBufferLines(), clock.millis()));
+        }
+        if (blockName != null && !blockName.isBlank()) {
+            buffer.nameStep(stepIndex, blockName);
         }
         buffer.append(stepIndex, kind.wire(), sanitize(text), clock.millis());
         if (buffer.flushScheduled.compareAndSet(false, true)) {
@@ -124,12 +127,12 @@ public class RunLiveLogService {
     public Snapshot snapshot(String runId, long afterSeq) {
         RunLiveLogBuffer buffer = buffers.get(runId);
         if (buffer == null) {
-            return new Snapshot(runId, null, false, 0, -1, 0, List.of());
+            return new Snapshot(runId, null, false, 0, -1, 0, Map.of(), List.of());
         }
         long firstSeq = buffer.firstSeq();
         List<LiveLine> lines = buffer.since(afterSeq);
         long skipped = Math.max(0, firstSeq - Math.max(0, afterSeq + 1));
-        return new Snapshot(runId, buffer.bufferId, true, firstSeq, buffer.lastSeq(), skipped, lines);
+        return new Snapshot(runId, buffer.bufferId, true, firstSeq, buffer.lastSeq(), skipped, buffer.stepNames(), lines);
     }
 
     @EventListener

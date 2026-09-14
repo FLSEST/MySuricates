@@ -828,6 +828,7 @@ Laufende). Query: `afterSeq` (Default `-1` = alles). Ohne Puffer `200` mit `avai
   "firstSeq": 0,
   "lastSeq": 2,
   "skipped": 0,
+  "stepNames": { "0": "Build" },
   "lines": [
     { "seq": 1, "stepIndex": 0, "kind": "tool", "text": "Bash: mvn test", "ts": 1757844005000 },
     { "seq": 2, "stepIndex": 0, "kind": "tool_result", "text": "↳ 1.2 KB", "ts": 1757844009000 }
@@ -835,7 +836,7 @@ Laufende). Query: `afterSeq` (Default `-1` = alles). Ohne Puffer `200` mit `avai
 }
 ```
 
-`kind`: `line` (Rohzeile), `text`, `tool`, `tool_result`, `tool_error`, `result`, `system`.
+`kind`: `line` (Rohzeile), `text`, `tool`, `tool_result`, `tool_error`, `result`, `system`. `stepNames`: Blocknamen der Steps mit gepufferten Zeilen (Schlüssel = `stepIndex`).
 
 ### `POST /api/v1/executions/{id}/todos/approve`
 

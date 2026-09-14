@@ -37,9 +37,10 @@ export function createStepLogContext(): StepLogContext {
   return { labels: new Map(), liveSteps: new Set() };
 }
 
+/** 1-based like the step cards ("Schritt 1"), so a log line and its card match. */
 export function stepLabel(stepIndex: number, ctx: StepLogContext): string {
   const name = ctx.labels.get(stepIndex);
-  return name ? `Step ${stepIndex} · ${name}` : `Step ${stepIndex}`;
+  return name ? `Step ${stepIndex + 1} · ${name}` : `Step ${stepIndex + 1}`;
 }
 
 function formatDuration(ms: number): string {
@@ -83,16 +84,16 @@ export function eventToEntry(
     return entry(data.type === 'agentic_error' ? 'ERROR' : 'INFO', message);
   }
   if (isApprovalRequired(data)) {
-    return entry('WARN', `[Step ${data.stepIndex}] Approval required: ${data.question}`);
+    return entry('WARN', `[${stepLabel(data.stepIndex, ctx)}] Approval required: ${data.question}`);
   }
   if (isApprovalResolved(data)) {
-    return entry('INFO', `[Step ${data.stepIndex}] Approval resolved: ${data.answer}`);
+    return entry('INFO', `[${stepLabel(data.stepIndex, ctx)}] Approval resolved: ${data.answer}`);
   }
   if (isHumanInputRequired(data)) {
-    return entry('WARN', `[Step ${data.stepIndex}] Human input required: ${data.prompt}`);
+    return entry('WARN', `[${stepLabel(data.stepIndex, ctx)}] Human input required: ${data.prompt}`);
   }
   if (isHumanInputResolved(data)) {
-    return entry('INFO', `[Step ${data.stepIndex}] Human input received: ${data.answer}`);
+    return entry('INFO', `[${stepLabel(data.stepIndex, ctx)}] Human input received: ${data.answer}`);
   }
   if (isStatusMessage(data)) {
     return entry('INFO',

@@ -17,16 +17,16 @@ describe('eventToEntry', () => {
     expect(map({ type: 'agentic_acted', stepIndex: 0, iteration: 2, action: 'x', output: '', exitCode: 1 }).message)
       .toBe('[Agentic #2] Action executed (exit: 1)');
     expect(map({ type: 'approval_required', blockId: 'b', question: 'Go?', options: [], stepIndex: 3 }))
-      .toMatchObject({ level: 'WARN', message: '[Step 3] Approval required: Go?' });
+      .toMatchObject({ level: 'WARN', message: '[Step 4] Approval required: Go?' });
     expect(map({ type: 'status', runId: 'r', status: 'FAILED' }).message).toBe('Run status: FAILED');
   });
 
   it('maps step messages with labels, keeping the output when nothing streamed', () => {
     const ctx = createStepLogContext();
     expect(map({ stepIndex: 0, status: 'RUNNING', input: '', output: '', durationMs: 0, blockName: 'Scan' }, ctx))
-      .toMatchObject({ message: '[Step 0 · Scan] started', stepIndex: 0, stepLabel: 'Step 0 · Scan' });
+      .toMatchObject({ message: '[Step 1 · Scan] started', stepIndex: 0, stepLabel: 'Step 1 · Scan' });
     expect(map({ stepIndex: 0, status: 'FAILED', input: 'in', output: 'boom', durationMs: 5 }, ctx))
-      .toMatchObject({ level: 'ERROR', message: '[Step 0 · Scan] boom' });
+      .toMatchObject({ level: 'ERROR', message: '[Step 1 · Scan] boom' });
   });
 
   it('closes a step that streamed live lines with status and duration', () => {
@@ -34,7 +34,7 @@ describe('eventToEntry', () => {
     liveLinesToEntries('b', [{ seq: 0, stepIndex: 2, kind: 'line', text: 'x', ts: 0 }], ctx);
 
     expect(map({ stepIndex: 2, status: 'COMPLETED', input: '', output: 'long', durationMs: 850 }, ctx).message)
-      .toBe('[Step 2] COMPLETED (850ms)');
+      .toBe('[Step 3] COMPLETED (850ms)');
   });
 
   it('falls back to the raw JSON for unknown typed messages', () => {
@@ -55,7 +55,7 @@ describe('liveLinesToEntries', () => {
 
     expect(entries).toEqual([{
       id: 'live-buf-7', timestamp: NOW, level: 'ERROR', message: '↳ error · 3 B',
-      kind: 'tool_error', stepIndex: 1, stepLabel: 'Step 1',
+      kind: 'tool_error', stepIndex: 1, stepLabel: 'Step 2',
     }]);
   });
 });

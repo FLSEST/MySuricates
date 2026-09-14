@@ -332,7 +332,7 @@ describe('useExecutionWebSocket', () => {
 
     await waitFor(() => expect(result.current.logs).toHaveLength(2));
     expect(result.current.logs.map((l) => l.id)).toEqual(['live-buf-1-0', 'live-buf-1-1']);
-    expect(result.current.logs[0]).toMatchObject({ kind: 'tool', stepIndex: 2, message: 'line 0', stepLabel: 'Step 2' });
+    expect(result.current.logs[0]).toMatchObject({ kind: 'tool', stepIndex: 2, message: 'line 0', stepLabel: 'Step 3' });
   });
 
   it('ignores duplicate seqs and resets de-duplication when the bufferId changes', async () => {
@@ -363,6 +363,15 @@ describe('useExecutionWebSocket', () => {
 
     await waitFor(() => expect(result.current.logs.map((l) => l.message)).toEqual(
       ['line 0', 'line 1', 'line 2', 'line 3', 'line 4']));
+  });
+
+  it('labels replayed lines with the step names from the snapshot', async () => {
+    mockApiGet.mockResolvedValue({ runId: 'run-1', bufferId: 'buf-1', available: true, firstSeq: 0, lastSeq: 0, skipped: 0,
+      stepNames: { '0': 'Build' }, lines: liveBatch('buf-1', [0], 0).lines });
+    const { result } = renderHook(() => useExecutionWebSocket('run-1', 'wf-1'), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.logs).toHaveLength(1));
+    expect(result.current.logs[0].stepLabel).toBe('Step 1 · Build');
   });
 
   it('keeps working when the replay request fails', async () => {
@@ -410,8 +419,8 @@ describe('useExecutionWebSocket', () => {
     act(() => sendMessage({ stepIndex: 1, status: 'COMPLETED', input: 'mvn', output: 'huge output', durationMs: 65_000, blockName: 'Build' }));
 
     await waitFor(() => expect(result.current.logs.map((l) => l.message)).toEqual(
-      ['[Step 1 · Build] started', 'line 0', '[Step 1 · Build] COMPLETED (1m 5s)']));
-    expect(result.current.logs[1].stepLabel).toBe('Step 1 · Build');
+      ['[Step 2 · Build] started', 'line 0', '[Step 2 · Build] COMPLETED (1m 5s)']));
+    expect(result.current.logs[1].stepLabel).toBe('Step 2 · Build');
   });
 
   it('renders command and container messages instead of "[Step undefined]"', async () => {

@@ -311,7 +311,7 @@ class BlockStepRunnerTest {
     void runStep_bindsTheStepSinkWhileExecuting_includingValidationRetries() {
         List<String> lines = new ArrayList<>();
         LiveOutputSink sink = (kind, text) -> lines.add(kind + ":" + text);
-        when(liveLog.sinkFor("run-1", 3)).thenReturn(sink);
+        when(liveLog.sinkFor("run-1", 3, "b")).thenReturn(sink);
         BlockDefinition block = block("b", Map.of("contains", "OK", "retry_on_fail", true, "max_retries", 1));
         List<LiveOutputSink> boundDuringExecute = new ArrayList<>();
         when(blockExecutor.execute(eq(block), any())).thenAnswer(inv -> {
@@ -345,7 +345,7 @@ class BlockStepRunnerTest {
 
     @Test
     void runStep_executorThrows_unbindsAndStillFlushes() {
-        when(liveLog.sinkFor("run-1", 0)).thenReturn((kind, text) -> {});
+        when(liveLog.sinkFor("run-1", 0, "b")).thenReturn((kind, text) -> {});
         BlockDefinition block = block("b", null);
         when(blockExecutor.execute(eq(block), any())).thenThrow(new IllegalStateException("executor crashed"));
         StepResult step = runner.startStep(run, 0, block);

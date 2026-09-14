@@ -100,7 +100,7 @@ class ExecutionControllerTest {
     @Test
     void getLiveLog_returnsSnapshotOfBufferedLines() throws Exception {
         when(runLiveLogService.snapshot("run-1", 4)).thenReturn(new RunLiveLogService.Snapshot(
-                "run-1", "buf-1", true, 3, 5, 0,
+                "run-1", "buf-1", true, 3, 5, 0, Map.of(2, "Build"),
                 List.of(new RunLiveLogService.LiveLine(5, 2, "tool", "Bash: mvn test", 1_700_000_000_000L))));
 
         mockMvc.perform(get("/api/v1/executions/run-1/live-log").param("afterSeq", "4"))
@@ -109,6 +109,7 @@ class ExecutionControllerTest {
                 .andExpect(jsonPath("$.bufferId").value("buf-1"))
                 .andExpect(jsonPath("$.firstSeq").value(3))
                 .andExpect(jsonPath("$.lastSeq").value(5))
+                .andExpect(jsonPath("$.stepNames.2").value("Build"))
                 .andExpect(jsonPath("$.lines[0].seq").value(5))
                 .andExpect(jsonPath("$.lines[0].stepIndex").value(2))
                 .andExpect(jsonPath("$.lines[0].kind").value("tool"))
@@ -119,7 +120,7 @@ class ExecutionControllerTest {
     @Test
     void getLiveLog_withoutBuffer_returnsUnavailableInsteadOf404() throws Exception {
         when(runLiveLogService.snapshot("run-9", -1)).thenReturn(
-                new RunLiveLogService.Snapshot("run-9", null, false, 0, -1, 0, List.of()));
+                new RunLiveLogService.Snapshot("run-9", null, false, 0, -1, 0, Map.of(), List.of()));
 
         mockMvc.perform(get("/api/v1/executions/run-9/live-log"))
                 .andExpect(status().isOk())

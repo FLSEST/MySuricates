@@ -193,6 +193,8 @@ export interface LiveLogSnapshot {
   firstSeq: number;
   lastSeq: number;
   skipped: number;
+  /** Block names of steps with buffered lines (keys are step indices). */
+  stepNames?: Record<string, string>;
   lines: LiveLine[];
 }
 

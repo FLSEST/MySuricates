@@ -4,7 +4,9 @@ import com.automation.service.workflow.RunLiveLogService.LiveLine;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
@@ -27,6 +29,8 @@ final class RunLiveLogBuffer {
 
     private final int capacity;
     private final ArrayDeque<LiveLine> ring;
+    /** Block names per step index, so a replaying client can label lines of steps it never saw start. */
+    private final Map<Integer, String> stepNames = new HashMap<>();
     private long nextSeq;
     private long lastSentSeq = -1;
     private long lastActivityMillis;
@@ -36,6 +40,14 @@ final class RunLiveLogBuffer {
         this.capacity = Math.max(1, capacity);
         this.ring = new ArrayDeque<>(Math.min(this.capacity, 1024));
         this.lastActivityMillis = nowMillis;
+    }
+
+    synchronized void nameStep(int stepIndex, String blockName) {
+        stepNames.putIfAbsent(stepIndex, blockName);
+    }
+
+    synchronized Map<Integer, String> stepNames() {
+        return Map.copyOf(stepNames);
     }
 
     synchronized void append(int stepIndex, String kind, String text, long nowMillis) {
