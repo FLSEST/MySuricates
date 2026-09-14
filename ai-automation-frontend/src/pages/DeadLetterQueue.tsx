@@ -16,9 +16,9 @@ import { formatRelativeTime } from '../utils/formatTime';
 const PAGE_SIZE = 20;
 
 const statusBadgeStyle: Record<DeadLetterStatus, string> = {
-  OPEN: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-  RETRIED: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-  DISCARDED: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300',
+  OPEN: 'bg-danger-subtle text-danger',
+  RETRIED: 'bg-info-subtle text-info',
+  DISCARDED: 'bg-surface-hover text-text-secondary',
 };
 
 export function DeadLetterQueue() {

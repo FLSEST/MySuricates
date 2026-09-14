@@ -25,6 +25,12 @@
   --color-warning-subtle: #3d2e14;
   --color-danger: #e07272;
   --color-danger-subtle: #3d1f1f;
+  --color-ai: #b58ee8;
+  --color-ai-subtle: #362d34;
+  --color-human: #56c2b0;
+  --color-human-subtle: #2a332d;
+  --color-info: #6aa6e0;
+  --color-info-subtle: #2c3033;
   --color-sidebar: #1a1614;
   --color-sidebar-border: #342b23;
   --color-sidebar-hover: #252019;
@@ -63,6 +69,12 @@
 
   --color-danger: var(--color-danger);
   --color-danger-subtle: var(--color-danger-subtle);
+  --color-ai: var(--color-ai);
+  --color-ai-subtle: var(--color-ai-subtle);
+  --color-human: var(--color-human);
+  --color-human-subtle: var(--color-human-subtle);
+  --color-info: var(--color-info);
+  --color-info-subtle: var(--color-info-subtle);
 
   --color-sidebar: var(--color-sidebar);
   --color-sidebar-border: var(--color-sidebar-border);

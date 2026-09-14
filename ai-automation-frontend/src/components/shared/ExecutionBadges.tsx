@@ -3,9 +3,10 @@ import type { BlockDefinition } from '../../types';
 import { getExecutionModes, type ExecutionMode } from './executionModes';
 
 const modeConfig: Record<ExecutionMode, { icon: typeof Terminal; label: string; color: string }> = {
-  shell: { icon: Terminal, label: 'Shell', color: 'text-emerald-500' },
-  ai: { icon: Brain, label: 'AI', color: 'text-violet-400' },
-  approval: { icon: ShieldCheck, label: 'Approval', color: 'text-amber-400' },
+  // Same roles as the step cards: shell is the neutral normal case, AI and approval (a person) are coloured.
+  shell: { icon: Terminal, label: 'Shell', color: 'text-text-secondary' },
+  ai: { icon: Brain, label: 'AI', color: 'text-ai' },
+  approval: { icon: ShieldCheck, label: 'Approval', color: 'text-human' },
 };
 
 export function ExecutionBadges({ blocks, className = '' }: { blocks: BlockDefinition[]; className?: string }) {

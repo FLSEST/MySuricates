@@ -32,12 +32,12 @@ const BLOCK_TYPE_ICONS: Record<BlockType, ReactNode> = {
   'todo-close': <ListChecks className={ICON} />,
 };
 
-// Theme tokens only, so every theme applies: AI takes the accent, the rest stays neutral in graded
-// contrast (human > deterministic > unknown); icon and label carry the distinction on top.
+// Theme tokens only, so every theme applies: AI and human have their own role colours; deterministic
+// stays neutral on purpose (the normal case — colour marks what is special), unknown is dashed.
 const KIND_STYLES: Record<StepKind, { stripe: string; chip: string; icon: ReactNode }> = {
   ai: {
-    stripe: 'border-l-accent',
-    chip: 'bg-accent-subtle text-accent border-accent/30',
+    stripe: 'border-l-ai',
+    chip: 'bg-ai-subtle text-ai border-ai/30',
     icon: <Bot className={ICON} />,
   },
   deterministic: {
@@ -46,8 +46,8 @@ const KIND_STYLES: Record<StepKind, { stripe: string; chip: string; icon: ReactN
     icon: <Cog className={ICON} />,
   },
   human: {
-    stripe: 'border-l-text-secondary',
-    chip: 'bg-surface-hover text-text border-text-secondary/50',
+    stripe: 'border-l-human',
+    chip: 'bg-human-subtle text-human border-human/30',
     icon: <User className={ICON} />,
   },
   unknown: {

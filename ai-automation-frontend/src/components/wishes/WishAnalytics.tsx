@@ -48,7 +48,7 @@ export function WishAnalytics() {
                 value={`${completionRate}%`}
               />
               <StatCard
-                icon={<Loader2 className="w-4 h-4 text-blue-500" />}
+                icon={<Loader2 className="w-4 h-4 text-info" />}
                 label={t.wishes.inProgressWishes}
                 value={String(wishStats.inProgress)}
               />

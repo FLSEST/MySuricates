@@ -25,7 +25,7 @@ function contrast(a: string, b: string): number {
 }
 
 const SURFACES: Key[] = ['--color-surface', '--color-surface-secondary', '--color-surface-raised'];
-const STATUS = ['accent', 'success', 'warning', 'danger'] as const;
+const STATUS = ['accent', 'success', 'warning', 'danger', 'ai', 'human', 'info'] as const;
 
 describe('theme registry', () => {
   it('has unique ids and names', () => {
@@ -69,7 +69,7 @@ describe.each(THEMES)('theme $id', (theme) => {
     for (const bg of SURFACES) expectContrast('--color-text-tertiary', bg, 3);
   });
 
-  it('keeps accent and status colors readable as text', () => {
+  it('keeps accent, status and role colors readable as text', () => {
     for (const name of STATUS) {
       for (const bg of SURFACES) expectContrast(`--color-${name}`, bg, 4.5);
       expectContrast(`--color-${name}`, `--color-${name}-subtle`, 4.5);
