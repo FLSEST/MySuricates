@@ -8,6 +8,8 @@ export interface StepMessage {
   input: string;
   output: string;
   durationMs: number;
+  blockType?: string;
+  blockName?: string;
 }
 
 export interface StatusMessage {
@@ -163,7 +165,54 @@ export interface ForEachState {
   items: ForEachItemState[];
 }
 
-export type WsMessage = StepMessage | StatusMessage | ApprovalRequiredMessage | ApprovalResolvedMessage | HumanInputRequiredMessage | HumanInputResolvedMessage | AgenticMessage | ForEachMessage;
+// Live output of running blocks (batched by the backend, see RunLiveLogService)
+export type LiveLineKind = 'line' | 'text' | 'tool' | 'tool_result' | 'tool_error' | 'result' | 'system';
+
+export interface LiveLine {
+  seq: number;
+  stepIndex: number;
+  kind: LiveLineKind;
+  text: string;
+  /** epoch millis */
+  ts: number;
+}
+
+export interface LiveOutputMessage {
+  type: 'live_output';
+  runId: string;
+  bufferId: string;
+  lines: LiveLine[];
+  skipped: number;
+}
+
+/** Response of GET /executions/{id}/live-log */
+export interface LiveLogSnapshot {
+  runId: string;
+  bufferId: string | null;
+  available: boolean;
+  firstSeq: number;
+  lastSeq: number;
+  skipped: number;
+  lines: LiveLine[];
+}
+
+export interface CommandMessage {
+  type: 'command';
+  runId: string;
+  input: string;
+  output: string;
+  timestamp?: string;
+}
+
+export interface ContainerMessage {
+  type: 'container_starting' | 'container_started' | 'container_skipped';
+  runId: string;
+  message?: string;
+  containerId?: string;
+  timestamp?: string;
+}
+
+export type WsMessage = StepMessage | StatusMessage | ApprovalRequiredMessage | ApprovalResolvedMessage | HumanInputRequiredMessage | HumanInputResolvedMessage | AgenticMessage | ForEachMessage | LiveOutputMessage | CommandMessage | ContainerMessage;
 
 export interface PendingApproval {
   blockId: string;
@@ -200,6 +249,23 @@ export function isAgenticMessage(data: WsMessage): data is AgenticMessage {
 
 export function isForEachMessage(data: WsMessage): data is ForEachMessage {
   return 'type' in data && typeof data.type === 'string' && data.type.startsWith('foreach_');
+}
+
+/** Step placeholder or finished step — the only message without a `type`. */
+export function isStepMessage(data: WsMessage): data is StepMessage {
+  return !('type' in data) && typeof (data as StepMessage).stepIndex === 'number';
+}
+
+export function isLiveOutputMessage(data: WsMessage): data is LiveOutputMessage {
+  return 'type' in data && data.type === 'live_output';
+}
+
+export function isCommandMessage(data: WsMessage): data is CommandMessage {
+  return 'type' in data && data.type === 'command';
+}
+
+export function isContainerMessage(data: WsMessage): data is ContainerMessage {
+  return 'type' in data && typeof data.type === 'string' && data.type.startsWith('container_');
 }
 
 // ── Reducer functions ────────────────────────────────────────────────────

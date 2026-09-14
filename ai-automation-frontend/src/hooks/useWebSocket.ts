@@ -2,21 +2,34 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
+import { api } from '../api/client';
 import { useSettingsStore } from '../stores/settingsStore';
 import type { AgenticState, PendingHumanInput } from '../types';
-import type { WsMessage, ForEachState, PendingApproval } from '../types/websocket';
+import type { WsMessage, ForEachState, PendingApproval, LiveLine, LiveLogSnapshot } from '../types/websocket';
 import {
   isStatusMessage, isApprovalRequired, isApprovalResolved,
   isHumanInputRequired, isHumanInputResolved, isAgenticMessage, isForEachMessage,
+  isLiveOutputMessage, isStepMessage,
   handleForEachMessage, handleAgenticMessage,
 } from '../types/websocket';
+import {
+  appendCapped, createStepLogContext, eventToEntry, liveLinesToEntries, skippedMarker,
+  type ExecutionLogEntry,
+} from './executionLogEntries';
 
 export type { ForEachItemState, ForEachState, PendingApproval } from '../types/websocket';
+export type { ExecutionLogEntry } from './executionLogEntries';
 
-const MAX_LOG_ENTRIES = 500;
+const TERMINAL_STATUSES = ['COMPLETED', 'FAILED', 'CANCELLED'];
 
-export function useExecutionWebSocket(runId: string | null, workflowId?: string) {
-  const [logs, setLogs] = useState<Array<{ timestamp: string; level: string; message: string }>>([]);
+export interface ExecutionWebSocketOptions {
+  /** Stream block output and replay buffered lines on connect (default true). */
+  liveOutput?: boolean;
+}
+
+export function useExecutionWebSocket(runId: string | null, workflowId?: string, options: ExecutionWebSocketOptions = {}) {
+  const liveOutput = options.liveOutput ?? true;
+  const [logs, setLogs] = useState<ExecutionLogEntry[]>([]);
   const [connected, setConnected] = useState(false);
   const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null);
   const [pendingHumanInput, setPendingHumanInput] = useState<PendingHumanInput | null>(null);
@@ -31,15 +44,36 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string)
   const queryClientRef = useRef(queryClient);
   useEffect(() => { queryClientRef.current = queryClient; }, [queryClient]);
 
-  const appendLog = useCallback((entry: { timestamp: string; level: string; message: string }) => {
-    setLogs((prev) => {
-      const next = [...prev, entry];
-      return next.length > MAX_LOG_ENTRIES ? next.slice(-MAX_LOG_ENTRIES) : next;
-    });
+  const appendEntries = useCallback((entries: ExecutionLogEntry[]) => {
+    if (entries.length > 0) setLogs((prev) => appendCapped(prev, entries));
   }, []);
 
   useEffect(() => {
     if (!runId) return;
+
+    let disposed = false;
+    const stepContext = createStepLogContext();
+    const live = { bufferId: null as string | null, lastSeq: -1 };
+    let eventCounter = 0;
+    const nextId = () => `evt-${eventCounter++}`;
+
+    /** Appends lines newer than the last seen one; a gap becomes a "lines skipped" marker. */
+    const applyLive = (bufferId: string, lines: LiveLine[]) => {
+      if (live.bufferId !== bufferId) {
+        live.bufferId = bufferId;
+        live.lastSeq = -1;
+      }
+      const fresh = lines.filter((line) => line.seq > live.lastSeq);
+      const first = fresh[0];
+      const last = fresh[fresh.length - 1];
+      if (!first || !last) return;
+      const entries: ExecutionLogEntry[] = [];
+      const missing = first.seq - (live.lastSeq + 1);
+      if (missing > 0) entries.push(skippedMarker(bufferId, first.seq, missing));
+      entries.push(...liveLinesToEntries(bufferId, fresh, stepContext));
+      live.lastSeq = last.seq;
+      appendEntries(entries);
+    };
 
     const apiKey = useSettingsStore.getState().apiKey;
     const wsUrl = `${window.location.origin}/ws${apiKey ? `?apiKey=${apiKey}` : ''}`;
@@ -49,39 +83,25 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string)
       reconnectDelay: 5000,
       onConnect: () => {
         setConnected(true);
+        // Live batches arriving while the replay request is pending wait for it, so lines stay ordered.
+        let replaying = liveOutput;
+        const queued: { bufferId: string; lines: LiveLine[] }[] = [];
+
         client.subscribe(`/topic/executions/${runId}/logs`, (message) => {
           try {
             const data = JSON.parse(message.body) as WsMessage;
 
+            if (isLiveOutputMessage(data)) {
+              if (!liveOutput) return;
+              if (replaying) queued.push(data);
+              else applyLive(data.bufferId, data.lines);
+              return;
+            }
+
             if (isForEachMessage(data)) {
               handleForEachMessage(data, setForEachStates);
-              const pct = data.type === 'foreach_item_completed'
-                ? `${Math.round(((data.itemIndex + 1) / data.totalItems) * 100)}%`
-                : '';
-              const status = data.type === 'foreach_item_completed' ? ` [${data.status}]` : '';
-              appendLog({
-                timestamp: new Date().toISOString(),
-                level: data.type === 'foreach_item_completed' && data.status === 'FAILED' ? 'ERROR' : 'INFO',
-                message: data.type === 'foreach_item_started'
-                  ? `[forEach] Starting item ${data.itemIndex + 1}/${data.totalItems}: ${data.item}`
-                  : `[forEach] ${data.itemIndex + 1}/${data.totalItems} (${pct})${status}: ${data.item}`,
-              });
             } else if (isAgenticMessage(data)) {
               handleAgenticMessage(data, setAgenticStates);
-
-              // Also add to logs for log viewer
-              const logLevel = data.type === 'agentic_error' ? 'ERROR' : 'INFO';
-              const logMsg =
-                data.type === 'agentic_started' ? `[Agentic] Goal: ${data.goal}`
-                : data.type === 'agentic_reasoned' ? `[Agentic #${data.iteration}] Reasoning complete`
-                : data.type === 'agentic_acted' ? `[Agentic #${data.iteration}] Action executed (exit: ${data.exitCode})`
-                : data.type === 'agentic_goal_achieved' ? `[Agentic] Goal achieved: ${data.summary}`
-                : data.type === 'agentic_goal_impossible' ? `[Agentic] Goal impossible: ${data.summary}`
-                : data.type === 'agentic_completed' ? `[Agentic] Completed (${data.totalIterations} iterations, goal: ${data.goalAchieved})`
-                : data.type === 'agentic_error' ? `[Agentic #${data.iteration}] Error: ${data.error}`
-                : `[Agentic] ${data.type}`;
-
-              appendLog({ timestamp: new Date().toISOString(), level: logLevel, message: logMsg });
             } else if (isApprovalRequired(data)) {
               setPendingApproval({
                 blockId: data.blockId,
@@ -89,18 +109,8 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string)
                 options: data.options,
                 stepIndex: data.stepIndex,
               });
-              appendLog({
-                timestamp: new Date().toISOString(),
-                level: 'WARN',
-                message: `[Step ${data.stepIndex}] Approval required: ${data.question}`,
-              });
             } else if (isApprovalResolved(data)) {
               setPendingApproval(null);
-              appendLog({
-                timestamp: new Date().toISOString(),
-                level: 'INFO',
-                message: `[Step ${data.stepIndex}] Approval resolved: ${data.answer}`,
-              });
             } else if (isHumanInputRequired(data)) {
               setPendingHumanInput({
                 blockId: data.blockId,
@@ -113,48 +123,38 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string)
                 variableName: data.variableName,
                 stepIndex: data.stepIndex,
               });
-              appendLog({
-                timestamp: new Date().toISOString(),
-                level: 'WARN',
-                message: `[Step ${data.stepIndex}] Human input required: ${data.prompt}`,
-              });
             } else if (isHumanInputResolved(data)) {
               setPendingHumanInput(null);
-              appendLog({
-                timestamp: new Date().toISOString(),
-                level: 'INFO',
-                message: `[Step ${data.stepIndex}] Human input received: ${data.answer}`,
-              });
-            } else if (isStatusMessage(data)) {
+            } else if (isStatusMessage(data) && TERMINAL_STATUSES.includes(data.status)) {
               // Clear pending dialogs on terminal status
-              if (['COMPLETED', 'FAILED', 'CANCELLED'].includes(data.status)) {
-                setPendingApproval(null);
-                setPendingHumanInput(null);
-              }
-              appendLog({
-                timestamp: new Date().toISOString(),
-                level: 'INFO',
-                message: `Run status: ${data.status}${data.stepsCompleted != null ? ` (${data.stepsCompleted} steps completed)` : ''}`,
-              });
-            } else {
-              appendLog({
-                timestamp: new Date().toISOString(),
-                level: data.status === 'FAILED' ? 'ERROR' : 'INFO',
-                message: `[Step ${data.stepIndex}] ${data.output || data.input}`,
-              });
+              setPendingApproval(null);
+              setPendingHumanInput(null);
             }
+            appendEntries([eventToEntry(data, nextId(), stepContext)]);
 
             // Invalidate run queries on step updates and terminal status changes
             const shouldRefetch =
-              (isStatusMessage(data) && ['COMPLETED', 'FAILED', 'CANCELLED'].includes(data.status)) ||
-              (!isStatusMessage(data) && !isAgenticMessage(data) && !isApprovalRequired(data) && !isApprovalResolved(data) && !isHumanInputRequired(data) && !isHumanInputResolved(data) && 'stepIndex' in data);
+              (isStatusMessage(data) && TERMINAL_STATUSES.includes(data.status)) ||
+              isStepMessage(data) || isForEachMessage(data);
             if (shouldRefetch && workflowIdRef.current) {
               queryClientRef.current.invalidateQueries({ queryKey: ['workflows', workflowIdRef.current, 'runs'] });
             }
           } catch {
-            appendLog({ timestamp: new Date().toISOString(), level: 'INFO', message: message.body });
+            appendEntries([{ id: nextId(), timestamp: new Date().toISOString(), level: 'INFO', message: message.body }]);
           }
         });
+
+        if (liveOutput) {
+          api.get<LiveLogSnapshot>(`/executions/${runId}/live-log?afterSeq=-1`)
+            .then((snapshot) => {
+              if (!disposed && snapshot?.available && snapshot.bufferId) applyLive(snapshot.bufferId, snapshot.lines);
+            })
+            .catch(() => { /* replay is best effort — live batches still arrive */ })
+            .finally(() => {
+              replaying = false;
+              if (!disposed) queued.splice(0).forEach((batch) => applyLive(batch.bufferId, batch.lines));
+            });
+        }
       },
       onDisconnect: () => setConnected(false),
       onStompError: () => setConnected(false),
@@ -164,10 +164,13 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string)
     client.activate();
 
     return () => {
+      disposed = true;
       client.deactivate();
       clientRef.current = null;
+      // A different run must not inherit this run's lines.
+      setLogs([]);
     };
-  }, [runId, appendLog]);
+  }, [runId, liveOutput, appendEntries]);
 
   const clearLogs = useCallback(() => setLogs([]), []);
 
