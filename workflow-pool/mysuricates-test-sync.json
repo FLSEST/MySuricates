@@ -68,6 +68,15 @@
         "timeout_seconds": 120,
         "command": "Fasse das Ergebnis in maximal 5 Zeilen zusammen:\n\n{{ previous_output }}\n\n- Welche Klasse wurde getestet\n- Wie viele Test-Methoden geschrieben\n- Ob Tests bestanden\n- Ob ein Commit erstellt wurde\n\ngate_status: GREEN wenn Test besteht und committed, YELLOW wenn Test besteht aber nicht committed, RED wenn Test fehlschlaegt"
       }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "label": "Gate-Verdict",
+        "command": "PREV={{ previous_output }}\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Test-Sync: FEHLGESCHLAGEN'\n  echo 'gate_status: RED'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Test konnte nicht geschrieben werden'\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Test-Sync: TEILWEISE'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Test geschrieben, manuelle Pruefung empfohlen'\nelif echo \"$PREV\" | grep -qi 'gate_status: GREEN'; then\n  echo 'Test-Sync: ERFOLGREICH'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Test geschrieben, verifiziert und committed'\nelse\n  echo 'Test-Sync: UNVOLLSTAENDIG'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Ergebnis unvollstaendig — kein Gate-Status im Report (KI-Block fehlgeschlagen oder unklar)'\nfi",
+        "timeout_seconds": 10,
+        "shell_escape_variables": true
+      }
     }
   ],
   "version": "3.0.0",

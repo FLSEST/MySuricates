@@ -82,6 +82,14 @@ public class ScheduleSkipPolicy {
                 "Schedule skipped (system suspend/resume): " + scheduled.getTargetName(), extra);
     }
 
+    /** Skip a schedule forward because its occurrence fell into a period the backend was stopped. */
+    public void skipScheduleForColdStart(ScheduledWorkflow scheduled, Instant now, Instant startedAt) {
+        Map<String, Object> extra = new HashMap<>();
+        extra.put("backendStartedAt", startedAt.toString());
+        skipSchedule(scheduled, now, "cold-start",
+                "Schedule skipped (backend was stopped): " + scheduled.getTargetName(), extra);
+    }
+
     /**
      * Advance a schedule past {@code until} without firing it, and record an ActivityLog entry.
      * CRON schedules move to their next occurrence after {@code until}; ONCE/DELAYED schedules that

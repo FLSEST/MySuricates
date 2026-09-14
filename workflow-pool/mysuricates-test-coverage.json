@@ -50,8 +50,9 @@
       "type": "shell",
       "config": {
         "label": "Gate-Verdict",
-        "command": "PREV='{{ previous_output }}'\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Coverage-Coach: KRITISCH'\n  echo 'gate_status: RED'\n  echo 'gate_category: test-coverage'\n  echo 'gate_description: Test-Abdeckung kritisch'\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Coverage-Coach: Verbesserungsbedarf'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: test-coverage'\n  echo 'gate_description: Test-Abdeckung ausbaufaehig'\nelse\n  echo 'Coverage-Coach: OK'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: test-coverage'\n  echo 'gate_description: Test-Abdeckung ausreichend'\nfi",
-        "timeout_seconds": 10
+        "command": "PREV={{ previous_output }}\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Coverage-Coach: KRITISCH'\n  echo 'gate_status: RED'\n  echo 'gate_category: test-coverage'\n  echo 'gate_description: Test-Abdeckung kritisch'\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Coverage-Coach: Verbesserungsbedarf'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: test-coverage'\n  echo 'gate_description: Test-Abdeckung ausbaufaehig'\nelif echo \"$PREV\" | grep -qi 'gate_status: GREEN'; then\n  echo 'Coverage-Coach: OK'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: test-coverage'\n  echo 'gate_description: Test-Abdeckung ausreichend'\nelse\n  echo 'Coverage-Coach: UNVOLLSTAENDIG'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: test-coverage'\n  echo 'gate_description: Ergebnis unvollstaendig — kein Gate-Status im Report (KI-Block fehlgeschlagen oder unklar)'\nfi",
+        "timeout_seconds": 10,
+        "shell_escape_variables": true
       }
     }
   ],

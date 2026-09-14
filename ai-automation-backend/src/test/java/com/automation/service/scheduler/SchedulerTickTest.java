@@ -41,15 +41,18 @@ class SchedulerTickTest {
     private final Clock clock = Clock.fixed(FIXED_NOW, ZoneId.of("UTC"));
 
     private SchedulerTick tick;
+    private CatchUpQueue catchUpQueue;
 
     private Workflow testWorkflow;
     private ScheduledWorkflow testScheduled;
 
     @BeforeEach
     void setUp() {
+        catchUpQueue = new CatchUpQueue(activityLogService);
         tick = new SchedulerTick(scheduledRepository, scheduledExecutor, activityLogService, schedulerConfig,
                 maintenanceMode, suspendState,
-                new ScheduleSkipPolicy(schedulerConfig, scheduledRepository, activityLogService), clock);
+                new ScheduleSkipPolicy(schedulerConfig, scheduledRepository, activityLogService),
+                catchUpQueue, clock);
 
         testWorkflow = Workflow.builder()
                 .id("wf-1")
@@ -106,7 +109,6 @@ class SchedulerTickTest {
 
         when(scheduledRepository.findDueSchedules(any(Instant.class))).thenReturn(List.of(sched1, sched2));
         doThrow(new RuntimeException("fail")).when(scheduledExecutor).executeSingleSchedule("s1");
-        doNothing().when(scheduledExecutor).executeSingleSchedule("s2");
 
         tick.checkAndExecuteScheduled();
 
@@ -354,6 +356,140 @@ class SchedulerTickTest {
 
         verify(scheduledExecutor).executeSingleSchedule("sched-1");
         verify(suspendState, never()).recordResume(any(), anyLong());
+    }
+
+    // ---- Cold start (first tick of the JVM) and sequential catch-up ------------------------------
+
+    private ScheduledWorkflow cronSchedule(String id, Instant nextRunAt, boolean catchUp) {
+        return ScheduledWorkflow.builder()
+                .id(id).workflow(testWorkflow).cronExpression("0 0 * * * *")
+                .scheduleType(ScheduleType.CRON).enabled(true)
+                .nextRunAt(nextRunAt).catchUpOnResume(catchUp).build();
+    }
+
+    @Test
+    void coldStart_missedScheduleWithoutFlag_isSkippedForwardNotFired() {
+        // First tick: no previous tick; backend came up 10 minutes ago; occurrence was due 1h ago.
+        ReflectionTestUtils.setField(tick, "startedAt", FIXED_NOW.minus(10, ChronoUnit.MINUTES));
+        ScheduledWorkflow missed = cronSchedule("missed", FIXED_NOW.minus(1, ChronoUnit.HOURS), false);
+        when(schedulerConfig.getResumeGraceMinutes()).thenReturn(5L);
+        when(scheduledRepository.findDueSchedules(FIXED_NOW)).thenReturn(List.of(missed));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        tick.checkAndExecuteScheduled();
+
+        verify(scheduledExecutor, never()).executeSingleSchedule(any());
+        assertThat(missed.getNextRunAt()).isAfterOrEqualTo(FIXED_NOW);
+        verify(suspendState, never()).recordResume(any(), anyLong());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> metadata = ArgumentCaptor.forClass(Map.class);
+        verify(activityLogService).log(eq(LogLevel.INFO), eq(LogCategory.SCHEDULE),
+                eq("Schedule skipped (backend was stopped): Test Workflow"), eq("SchedulerService"),
+                eq("missed"), metadata.capture());
+        assertThat(metadata.getValue()).containsEntry("reason", "cold-start").containsKey("backendStartedAt");
+        verify(activityLogService).warn(eq(LogCategory.SCHEDULE),
+                contains("Cold start detected"), eq("SchedulerService"));
+    }
+
+    @Test
+    void coldStart_occurrenceDueAfterStart_firesNormally() {
+        ReflectionTestUtils.setField(tick, "startedAt", FIXED_NOW.minus(10, ChronoUnit.MINUTES));
+        ScheduledWorkflow regular = cronSchedule("regular", FIXED_NOW.minusSeconds(30), false);
+        when(schedulerConfig.getResumeGraceMinutes()).thenReturn(5L);
+        when(scheduledRepository.findDueSchedules(FIXED_NOW)).thenReturn(List.of(regular));
+
+        tick.checkAndExecuteScheduled();
+
+        verify(scheduledExecutor).executeSingleSchedule("regular");
+        verify(scheduledRepository, never()).save(any());
+        verify(activityLogService, never()).warn(any(), contains("Cold start"), any());
+    }
+
+    @Test
+    void coldStart_flaggedSchedules_areCaughtUpOneAfterAnother() {
+        ReflectionTestUtils.setField(tick, "startedAt", FIXED_NOW.minus(10, ChronoUnit.MINUTES));
+        ScheduledWorkflow first = cronSchedule("first", FIXED_NOW.minus(3, ChronoUnit.HOURS), true);
+        ScheduledWorkflow second = cronSchedule("second", FIXED_NOW.minus(2, ChronoUnit.HOURS), true);
+        var runFirst = new ScheduledWorkflowExecutor.ScheduledRunRef("run-first", ScheduledWorkflow.TargetType.WORKFLOW);
+        when(schedulerConfig.getResumeGraceMinutes()).thenReturn(5L);
+        // Listed in reverse order on purpose: the queue must sort by original due time.
+        when(scheduledRepository.findDueSchedules(any())).thenReturn(List.of(second, first));
+        when(scheduledExecutor.executeSingleSchedule("first")).thenReturn(java.util.Optional.of(runFirst));
+
+        // Tick 1 (cold start): only the earliest missed schedule starts.
+        tick.checkAndExecuteScheduled();
+        verify(scheduledExecutor).executeSingleSchedule("first");
+        verify(scheduledExecutor, never()).executeSingleSchedule("second");
+        verify(scheduledRepository, never()).save(any());
+        assertThat(catchUpQueue.snapshot().active().scheduleId()).isEqualTo("first");
+        assertThat(catchUpQueue.snapshot().pending()).extracting(CatchUpQueue.Pending::scheduleId).containsExactly("second");
+
+        // Tick 2 (normal): first still running → second waits, and the regular path must not fire it
+        // even though the repository still lists it as due.
+        ReflectionTestUtils.setField(tick, "lastTickAt", FIXED_NOW.minusSeconds(60));
+        when(scheduledExecutor.isFinished(runFirst)).thenReturn(false);
+        tick.checkAndExecuteScheduled();
+        verify(scheduledExecutor, never()).executeSingleSchedule("second");
+
+        // Tick 3: first finished → second starts.
+        ReflectionTestUtils.setField(tick, "lastTickAt", FIXED_NOW.minusSeconds(60));
+        when(scheduledExecutor.isFinished(runFirst)).thenReturn(true);
+        when(scheduledExecutor.executeSingleSchedule("second"))
+                .thenReturn(java.util.Optional.of(new ScheduledWorkflowExecutor.ScheduledRunRef("run-second", ScheduledWorkflow.TargetType.WORKFLOW)));
+        tick.checkAndExecuteScheduled();
+        verify(scheduledExecutor).executeSingleSchedule("second");
+        assertThat(catchUpQueue.snapshot().pending()).isEmpty();
+        verify(activityLogService).warn(eq(LogCategory.SCHEDULE),
+                contains("2 missed schedule(s): 0 skipped forward, 2 queued"), eq("SchedulerService"));
+    }
+
+    @Test
+    void coldStart_duringSkipUntilPause_skipsEvenFlaggedSchedules() {
+        ReflectionTestUtils.setField(tick, "startedAt", FIXED_NOW.minus(10, ChronoUnit.MINUTES));
+        Instant skipUntil = FIXED_NOW.plus(2, ChronoUnit.HOURS);
+        ScheduledWorkflow flagged = cronSchedule("flagged", FIXED_NOW.minus(1, ChronoUnit.HOURS), true);
+        when(schedulerConfig.getResumeGraceMinutes()).thenReturn(5L);
+        when(schedulerConfig.getSkipUntil()).thenReturn(skipUntil.toString());
+        when(scheduledRepository.findDueSchedules(FIXED_NOW)).thenReturn(List.of(flagged));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        tick.checkAndExecuteScheduled();
+
+        verify(scheduledExecutor, never()).executeSingleSchedule(any());
+        assertThat(catchUpQueue.isEmpty()).isTrue();
+        assertThat(flagged.getNextRunAt()).isAfterOrEqualTo(skipUntil);
+    }
+
+    @Test
+    void coldStart_resumeDetectionDisabled_firesEverythingDue() {
+        // resume-grace-minutes = 0 disables both resume and cold-start handling (legacy behaviour).
+        ScheduledWorkflow missed = cronSchedule("missed", FIXED_NOW.minus(1, ChronoUnit.HOURS), false);
+        when(schedulerConfig.getResumeGraceMinutes()).thenReturn(0L);
+        when(scheduledRepository.findDueSchedules(FIXED_NOW)).thenReturn(List.of(missed));
+
+        tick.checkAndExecuteScheduled();
+
+        verify(scheduledExecutor).executeSingleSchedule("missed");
+    }
+
+    @Test
+    void resumeAfterSuspend_flaggedSchedules_goThroughTheSameSequentialQueue() {
+        ReflectionTestUtils.setField(tick, "lastTickAt", FIXED_NOW.minus(3, ChronoUnit.HOURS));
+        ScheduledWorkflow a = cronSchedule("a", FIXED_NOW.minus(2, ChronoUnit.HOURS), true);
+        ScheduledWorkflow b = cronSchedule("b", FIXED_NOW.minus(1, ChronoUnit.HOURS), true);
+        when(schedulerConfig.getResumeGraceMinutes()).thenReturn(5L);
+        when(scheduledRepository.findDueSchedules(FIXED_NOW)).thenReturn(List.of(a, b));
+        when(scheduledExecutor.executeSingleSchedule("a"))
+                .thenReturn(java.util.Optional.of(new ScheduledWorkflowExecutor.ScheduledRunRef("run-a", ScheduledWorkflow.TargetType.WORKFLOW)));
+
+        tick.checkAndExecuteScheduled();
+
+        verify(scheduledExecutor).executeSingleSchedule("a");
+        verify(scheduledExecutor, never()).executeSingleSchedule("b");
+        verify(suspendState).recordResume(eq(FIXED_NOW), anyLong());
+        verify(activityLogService).warn(eq(LogCategory.SCHEDULE),
+                contains("System resume detected (paused ~180 min) — 2 missed schedule(s): 0 skipped forward, 2 queued"),
+                eq("SchedulerService"));
     }
 
     @Test

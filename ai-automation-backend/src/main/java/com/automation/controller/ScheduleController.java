@@ -10,6 +10,7 @@ import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.mapper.ChainMapper;
 import com.automation.mapper.ScheduleMapper;
 import com.automation.mapper.WorkflowMapper;
+import com.automation.service.scheduler.CatchUpQueue;
 import com.automation.service.scheduler.SchedulerMaintenanceMode;
 import com.automation.service.scheduler.SchedulerService;
 import com.automation.service.scheduler.UpcomingRunsCalculator;
@@ -31,6 +32,7 @@ public class ScheduleController {
 
     private final SchedulerService schedulerService;
     private final SchedulerMaintenanceMode maintenanceMode;
+    private final CatchUpQueue catchUpQueue;
     private final UpcomingRunsCalculator upcomingRunsCalculator;
     private final ScheduleMapper scheduleMapper;
     private final WorkflowMapper workflowMapper;
@@ -134,6 +136,12 @@ public class ScheduleController {
     public ResponseEntity<Void> deleteSchedule(@PathVariable String id) {
         schedulerService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /** Sequential catch-up queue: the missed occurrence currently running and the ones waiting. */
+    @GetMapping("/catch-up")
+    public CatchUpQueue.Snapshot getCatchUpQueue() {
+        return catchUpQueue.snapshot();
     }
 
     @GetMapping("/maintenance")

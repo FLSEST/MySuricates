@@ -69,6 +69,15 @@
         "timeout_seconds": 900,
         "command": "Erstelle den Release-Bereitschafts-Report fuer MySuricates.\n\n## Build- und Versionsinfo\nVersion: {{ step_0_output }}\nBackend: {{ step_1_output }}\nFrontend: {{ step_2_output }}\n\n## Offene TODOs (alle Projekte)\n{{ open_todos }}\n\n## Vorheriger Report (zur Trend-Analyse)\n{{ previous_report }}\n\n## Format des Reports\n\n### Release-Bereitschaft MySuricates\n**Version**: [aus POM]\n**Datum**: [heute]\n**Bewertung**: FREIGEGEBEN / MIT VORBEHALT / BLOCKIERT\n\n### Build-Status\n| Komponente | Status |\n|------------|--------|\n| Backend (mvn compile) | |\n| Frontend (npm run build) | |\n| Git Tag | |\n| Letzter Commit | |\n\n### Offene Quality-TODOs\nGruppiere die offenen TODOs aus der Liste oben nach Kategorie/Tag:\n\n| Kategorie/Tag | Anzahl | Hoechste Prioritaet |\n|---------------|--------|---------------------|\n| audit:test-coverage / testing | | |\n| audit:arch-debt / architektur | | |\n| audit:security / security | | |\n| performance | | |\n| backend (Bugs) | | |\n\n### Release-Entscheidung\n- **FREIGEGEBEN**: Build OK, keine HIGH TODOs in Quality-Kategorien\n- **MIT VORBEHALT**: Build OK, einige HIGH TODOs (max. 5)\n- **BLOCKIERT**: Build fehlschlaegt ODER >5 HIGH TODOs ODER kritische Security-TODOs offen\n\n### Voraussetzungen fuer Release (falls nicht FREIGEGEBEN)\n1. [Was muss noch erledigt werden — konkrete TODO-IDs nennen]\n\nAm Ende genau diese Zeilen ausgeben:\n\ngate_status: GREEN wenn FREIGEGEBEN, YELLOW wenn MIT VORBEHALT, RED wenn BLOCKIERT\ngate_category: release-readiness\ngate_description: Release [Version] — [FREIGEGEBEN/MIT VORBEHALT/BLOCKIERT]"
       }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "label": "Gate-Verdict",
+        "command": "set -uo pipefail\nPREV={{ previous_output }}\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Release: BLOCKIERT'\n  echo 'gate_status: RED'\n  echo 'gate_category: release-readiness'\n  echo 'gate_description: Release blockiert — Voraussetzungen nicht erfuellt'\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Release: MIT VORBEHALT'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: release-readiness'\n  echo 'gate_description: Release moeglich mit Vorbehalten'\nelif echo \"$PREV\" | grep -qi 'gate_status: GREEN'; then\n  echo 'Release: FREIGEGEBEN'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: release-readiness'\n  echo 'gate_description: Release freigegeben'\nelse\n  echo 'Release: UNVOLLSTAENDIG'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: release-readiness'\n  echo 'gate_description: Ergebnis unvollstaendig — kein Gate-Status im Report (KI-Block fehlgeschlagen oder unklar)'\nfi",
+        "timeout_seconds": 10,
+        "shell_escape_variables": true
+      }
     }
   ],
   "metadata": {

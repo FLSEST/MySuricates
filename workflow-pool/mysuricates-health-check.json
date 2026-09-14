@@ -85,6 +85,15 @@
         "timeout_seconds": 120,
         "command": "Fasse in maximal 5 Zeilen zusammen:\n\n{{ previous_output }}\n\n- Gesamtscore und Trend\n- Beste und schlechteste Dimension\n- Wichtigste Empfehlung\n\ngate_status: GREEN wenn >7, YELLOW wenn 5-7, RED wenn <5"
       }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "label": "Gate-Verdict",
+        "command": "PREV={{ previous_output }}\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Health Check: KRITISCH'\n  echo 'gate_status: RED'\n  echo 'gate_category: project-health'\n  echo 'gate_description: Gesundheit kritisch'\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Health Check: Verbesserungsbedarf'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: project-health'\n  echo 'gate_description: Gesundheit ausbaufaehig'\nelif echo \"$PREV\" | grep -qi 'gate_status: GREEN'; then\n  echo 'Health Check: GUT'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: project-health'\n  echo 'gate_description: Gesundheit gut'\nelse\n  echo 'Health Check: UNVOLLSTAENDIG'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: project-health'\n  echo 'gate_description: Ergebnis unvollstaendig — kein Gate-Status im Report (KI-Block fehlgeschlagen oder unklar)'\nfi",
+        "timeout_seconds": 10,
+        "shell_escape_variables": true
+      }
     }
   ],
   "version": "4.0.0",

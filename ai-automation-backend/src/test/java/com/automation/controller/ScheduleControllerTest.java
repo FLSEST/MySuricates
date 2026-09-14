@@ -13,6 +13,7 @@ import com.automation.mapper.ChainMapper;
 import com.automation.mapper.ScheduleMapper;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.service.activitylog.ActivityLogService;
+import com.automation.service.scheduler.CatchUpQueue;
 import com.automation.service.scheduler.SchedulerMaintenanceMode;
 import com.automation.service.scheduler.SchedulerService;
 import com.automation.service.system.ApiKeyService;
@@ -51,6 +52,8 @@ class ScheduleControllerTest {
     private SchedulerService schedulerService;
     @MockitoBean
     private SchedulerMaintenanceMode maintenanceMode;
+    @MockitoBean
+    private CatchUpQueue catchUpQueue;
     @MockitoBean
     private com.automation.service.scheduler.UpcomingRunsCalculator upcomingRunsCalculator;
     @MockitoBean
@@ -399,5 +402,29 @@ class ScheduleControllerTest {
                 .andExpect(jsonPath("$.enabled").value(true));
 
         verify(maintenanceMode).setEnabled(true);
+    }
+
+    @Test
+    void getCatchUpQueue_returnsActiveAndPending() throws Exception {
+        var active = new CatchUpQueue.Active("s-1", "Nightly", "run-1", java.time.Instant.parse("2026-09-14T08:00:00Z"));
+        var pending = new CatchUpQueue.Pending("s-2", "Radar", java.time.Instant.parse("2026-09-14T04:00:00Z"));
+        when(catchUpQueue.snapshot()).thenReturn(new CatchUpQueue.Snapshot(active, java.util.List.of(pending)));
+
+        mockMvc.perform(get("/api/v1/schedules/catch-up"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active.scheduleId").value("s-1"))
+                .andExpect(jsonPath("$.active.runId").value("run-1"))
+                .andExpect(jsonPath("$.pending[0].scheduleId").value("s-2"))
+                .andExpect(jsonPath("$.pending[0].targetName").value("Radar"));
+    }
+
+    @Test
+    void getCatchUpQueue_empty() throws Exception {
+        when(catchUpQueue.snapshot()).thenReturn(new CatchUpQueue.Snapshot(null, java.util.List.of()));
+
+        mockMvc.perform(get("/api/v1/schedules/catch-up"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").doesNotExist())
+                .andExpect(jsonPath("$.pending").isEmpty());
     }
 }

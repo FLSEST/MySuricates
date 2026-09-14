@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
-import type { ScheduledWorkflow, CreateScheduleRequest, UpdateScheduleRequest, CalendarDataResponse, UpcomingScheduleData, ScheduleRunsResponse } from '../types';
+import type { ScheduledWorkflow, CreateScheduleRequest, UpdateScheduleRequest, CalendarDataResponse, UpcomingScheduleData, ScheduleRunsResponse, CatchUpQueueStatus } from '../types';
 
 export function useSchedules() {
   return useQuery({
@@ -27,6 +27,15 @@ export function useSetMaintenanceMode() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['schedules', 'maintenance'] });
     },
+  });
+}
+
+/** Missed occurrences being caught up one after another (empty most of the time). */
+export function useCatchUpQueue() {
+  return useQuery({
+    queryKey: ['schedules', 'catch-up'],
+    queryFn: () => api.get<CatchUpQueueStatus>('/schedules/catch-up'),
+    refetchInterval: 30_000,
   });
 }
 

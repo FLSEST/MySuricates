@@ -1,7 +1,9 @@
 package com.automation.service.scheduler;
 
 import com.automation.entity.ActivityLog.LogCategory;
+import com.automation.entity.ChainRun;
 import com.automation.entity.RunStatus;
+import com.automation.entity.WorkflowRun;
 import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.ScheduledWorkflow.ScheduleType;
 import com.automation.entity.ScheduledWorkflow.TargetType;
@@ -21,6 +23,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -46,7 +49,7 @@ public class ScheduledWorkflowExecutor {
      * Schedule metadata reads/writes use their own short-lived repository transactions, and
      * workflow execution manages its own transaction scope internally.
      */
-    public void executeSingleSchedule(String scheduleId) {
+    public Optional<ScheduledRunRef> executeSingleSchedule(String scheduleId) {
         // Use JOIN FETCH query to eagerly load workflow.activatedSkills within the repository's
         // own transaction. Plain findById() leaves the JPA session closed, causing
         // LazyInitializationException when WorkflowExecutor.execute() accesses activatedSkills.
@@ -55,7 +58,7 @@ public class ScheduledWorkflowExecutor {
         if (scheduled == null || !scheduled.isEnabled()
                 || scheduled.getNextRunAt() == null
                 || scheduled.getNextRunAt().isAfter(Instant.now(clock))) {
-            return;
+            return Optional.empty();
         }
 
         // Ghost-run protection: skip if the target already has a RUNNING execution.
@@ -66,7 +69,7 @@ public class ScheduledWorkflowExecutor {
                         scheduled.getWorkflow().getId(), RunStatus.RUNNING)) {
                     log.warn("Schedule {} skipped — workflow '{}' already has a RUNNING execution",
                             scheduleId, scheduled.getWorkflow().getName());
-                    return;
+                    return Optional.empty();
                 }
             }
             if (scheduled.getTargetType() == TargetType.CHAIN && scheduled.getChain() != null) {
@@ -74,7 +77,7 @@ public class ScheduledWorkflowExecutor {
                         scheduled.getChain().getId(), RunStatus.RUNNING)) {
                     log.warn("Schedule {} skipped — chain '{}' already has a RUNNING execution",
                             scheduleId, scheduled.getChain().getName());
-                    return;
+                    return Optional.empty();
                 }
             }
         }
@@ -91,18 +94,36 @@ public class ScheduledWorkflowExecutor {
         // retry loop on the next @Scheduled tick.
         try {
             if (scheduled.getTargetType() == TargetType.CHAIN && scheduled.getChain() != null) {
-                chainExecutor.execute(scheduled.getChain(), scheduled.getInputContext(), scheduleId);
+                ChainRun run = chainExecutor.execute(scheduled.getChain(), scheduled.getInputContext(), scheduleId);
+                return Optional.ofNullable(run).map(r -> new ScheduledRunRef(r.getId(), TargetType.CHAIN));
             } else if (scheduled.getWorkflow() != null) {
-                workflowExecutor.execute(scheduled.getWorkflow(), scheduled.getInputContext(), scheduleId, null);
+                WorkflowRun run = workflowExecutor.execute(scheduled.getWorkflow(), scheduled.getInputContext(), scheduleId, null);
+                return Optional.ofNullable(run).map(r -> new ScheduledRunRef(r.getId(), TargetType.WORKFLOW));
             } else {
                 log.error("Schedule {} has no valid target", scheduled.getId());
-                return;
+                return Optional.empty();
             }
         } finally {
             // Short write transaction for schedule metadata update
             updateScheduleAfterRun(scheduleId, scheduled.getScheduleType(),
                     scheduled.getCronExpression());
         }
+    }
+
+    /**
+     * Handle on the run a schedule started, so the caller (the catch-up queue) can wait for it
+     * to reach a terminal state before starting the next one. Execution itself is asynchronous.
+     */
+    public record ScheduledRunRef(String runId, TargetType targetType) {}
+
+    /** True once the referenced run is no longer PENDING/RUNNING/PAUSED (or no longer exists). */
+    public boolean isFinished(ScheduledRunRef ref) {
+        if (ref == null || ref.runId() == null) return true;
+        Optional<RunStatus> status = ref.targetType() == TargetType.CHAIN
+                ? chainRunRepository.findById(ref.runId()).map(ChainRun::getStatus)
+                : workflowRunRepository.findById(ref.runId()).map(WorkflowRun::getStatus);
+        return status.map(s -> s != RunStatus.PENDING && s != RunStatus.RUNNING && s != RunStatus.PAUSED)
+                .orElse(true);
     }
 
     @Transactional

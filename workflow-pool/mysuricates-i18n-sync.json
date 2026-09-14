@@ -66,6 +66,15 @@
         "timeout_seconds": 120,
         "command": "Fasse das i18n-Sync-Ergebnis in maximal 5 Zeilen zusammen:\n\n{{ previous_output }}\n\n- Wurden Keys ergaenzt? Wenn ja, wie viele und in welcher Datei?\n- Build-Ergebnis\n- Zeilen-Differenz zwischen de.ts und en.ts\n\nAm Ende GENAU diese Zeile:\ngate_status: GREEN wenn Build OK und Differenz < 5, YELLOW wenn Differenz > 5, RED wenn Build fehlgeschlagen"
       }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "label": "Gate-Verdict",
+        "command": "PREV={{ previous_output }}\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'i18n Sync: FAILED'\n  echo 'gate_status: RED'\n  echo 'gate_category: i18n-sync'\n  echo 'gate_description: i18n-Sync fehlgeschlagen'\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'i18n Sync: Differenz vorhanden'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: i18n-sync'\n  echo 'gate_description: i18n-Dateien haben groessere Differenz'\nelif echo \"$PREV\" | grep -qi 'gate_status: GREEN'; then\n  echo 'i18n Sync: OK'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: i18n-sync'\n  echo 'gate_description: i18n-Dateien synchron'\nelse\n  echo 'i18n Sync: UNVOLLSTAENDIG'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: i18n-sync'\n  echo 'gate_description: Ergebnis unvollstaendig — kein Gate-Status im Report (KI-Block fehlgeschlagen oder unklar)'\nfi",
+        "timeout_seconds": 10,
+        "shell_escape_variables": true
+      }
     }
   ],
   "version": "1.1.0",

@@ -7,7 +7,8 @@ import { CalendarView } from '../components/schedule/CalendarView';
 import { ScheduleFormModal } from '../components/schedule/ScheduleFormModal';
 import { ScheduleRunsPanel } from '../components/schedule/ScheduleRunsPanel';
 import { useScheduleColumns } from '../components/schedule/scheduleColumns';
-import { useSchedules, useToggleSchedule, useDeleteSchedule, useMaintenanceMode, useSetMaintenanceMode } from '../hooks/useSchedules';
+import { CatchUpQueueBanner } from '../components/schedule/CatchUpQueueBanner';
+import { useSchedules, useToggleSchedule, useDeleteSchedule, useMaintenanceMode, useSetMaintenanceMode, useCatchUpQueue } from '../hooks/useSchedules';
 import { useScheduleFilters } from '../hooks/useScheduleFilters';
 import { useScheduleForm } from '../hooks/useScheduleForm';
 import { useWorkflows } from '../hooks/useWorkflows';
@@ -22,6 +23,7 @@ export function Schedules() {
   const toggleSchedule = useToggleSchedule();
   const deleteSchedule = useDeleteSchedule();
   const { data: maintenanceData } = useMaintenanceMode();
+  const { data: catchUpQueue } = useCatchUpQueue();
   const setMaintenance = useSetMaintenanceMode();
   const isMaintenanceMode = maintenanceData?.enabled ?? false;
 
@@ -108,6 +110,10 @@ export function Schedules() {
           <span className="text-sm font-medium">{t.schedules.maintenanceModeActive}</span>
         </div>
       )}
+
+      {/* Sequential catch-up after resume / cold start */}
+      <CatchUpQueueBanner queue={catchUpQueue} />
+
 
       {/* Filter bar (list view only) */}
       {view === 'list' && schedules && schedules.length > 0 && (
