@@ -24,7 +24,7 @@
       "name": "backend_tests",
       "config": {
         "description": "backend_tests",
-        "command": "cd \"{{ execution_path }}/ai-automation-backend\"\nmvn -q test",
+        "command": "cd \"{{ execution_path }}/ai-automation-backend\"\nLOGDIR=\"{{ workspace_logs }}\"\ncase \"$LOGDIR\" in ''|*'{{'*) LOGDIR=\"$(mktemp -d)\";; esac\nmkdir -p \"$LOGDIR\"\nLOG=\"$LOGDIR/backend-tests.log\"\nRC=0\nmvn -q test > \"$LOG\" 2>&1 || RC=$?\necho \"mvn test: exit $RC (Log: $LOG, $(wc -l < \"$LOG\") Zeilen)\"\ncat target/surefire-reports/*.txt 2>/dev/null | grep -h '^Tests run:' \\\n  | awk -F'[:,]' '{r+=$2; f+=$4; e+=$6; s+=$8} END {printf \"Surefire: %d Tests, %d Failures, %d Errors, %d Skipped\\n\", r, f, e, s}'\nif [ \"$RC\" -ne 0 ]; then\n  echo '--- fehlgeschlagene Testklassen ---'\n  grep -l 'FAILURE\\|ERROR' target/surefire-reports/*.txt 2>/dev/null | xargs -rn1 basename | sed 's/\\.txt$//' | head -n 20\n  echo '--- Log-Ende ohne Stacktrace-Zeilen (40 Zeilen) ---'\n  grep -v '^[[:space:]]*at ' \"$LOG\" | tail -n 40\nfi\nexit $RC",
         "checked_command": true,
         "check_category": "backend-test-failure",
         "timeout_seconds": 1800,
@@ -41,7 +41,7 @@
       "name": "frontend_build",
       "config": {
         "description": "frontend_build",
-        "command": "cd \"{{ execution_path }}/ai-automation-frontend\"\nnpm run build",
+        "command": "cd \"{{ execution_path }}/ai-automation-frontend\"\nLOGDIR=\"{{ workspace_logs }}\"\ncase \"$LOGDIR\" in ''|*'{{'*) LOGDIR=\"$(mktemp -d)\";; esac\nmkdir -p \"$LOGDIR\"\nLOG=\"$LOGDIR/frontend-build.log\"\nRC=0\nnpm run build > \"$LOG\" 2>&1 || RC=$?\necho \"npm run build: exit $RC (Log: $LOG)\"\nif [ \"$RC\" -ne 0 ]; then tail -n 40 \"$LOG\"; else tail -n 8 \"$LOG\"; fi\nexit $RC",
         "checked_command": true,
         "check_category": "frontend-build-failure",
         "timeout_seconds": 1800,
@@ -53,7 +53,7 @@
       "name": "frontend_lint",
       "config": {
         "description": "frontend_lint",
-        "command": "cd \"{{ execution_path }}/ai-automation-frontend\"\nnpm run lint",
+        "command": "cd \"{{ execution_path }}/ai-automation-frontend\"\nRC=0\nOUT=$(npm run lint 2>&1) || RC=$?\necho \"npm run lint: exit $RC\"\nprintf '%s\\n' \"$OUT\" | tail -n 40\nexit $RC",
         "checked_command": true,
         "check_category": "frontend-lint-failure",
         "timeout_seconds": 1800,
