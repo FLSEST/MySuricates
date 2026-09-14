@@ -8,8 +8,6 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
 import java.nio.charset.StandardCharsets;
 
 @Slf4j
@@ -19,7 +17,7 @@ public class TerminalSession {
     private final DockerClient dockerClient;
     private final String containerId;
     private final String execId;
-    private final PipedOutputStream stdinWriter;
+    private final TerminalStdinStream stdin = new TerminalStdinStream();
     private volatile boolean destroyed = false;
 
     public TerminalSession(WebSocketSession wsSession, DockerClient dockerClient, String containerId) {
@@ -37,20 +35,10 @@ public class TerminalSession {
                 .exec();
         this.execId = execCreate.getId();
 
-        // Set up piped streams for stdin
-        PipedInputStream pipedIn = new PipedInputStream();
-        PipedOutputStream pipedOut;
-        try {
-            pipedOut = new PipedOutputStream(pipedIn);
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to create piped streams", e);
-        }
-        this.stdinWriter = pipedOut;
-
         // Start exec with TTY and stream output to WebSocket
         dockerClient.execStartCmd(execId)
                 .withTty(true)
-                .withStdIn(pipedIn)
+                .withStdIn(stdin)
                 .exec(new ResultCallback.Adapter<Frame>() {
                     @Override
                     public void onNext(Frame frame) {
@@ -87,8 +75,7 @@ public class TerminalSession {
     public void write(String data) {
         if (destroyed) return;
         try {
-            stdinWriter.write(data.getBytes(StandardCharsets.UTF_8));
-            stdinWriter.flush();
+            stdin.write(data.getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
             log.warn("Failed to write to terminal stdin: {}", e.getMessage());
         }
@@ -108,11 +95,7 @@ public class TerminalSession {
     public void destroy() {
         if (destroyed) return;
         destroyed = true;
-        try {
-            stdinWriter.close();
-        } catch (IOException e) {
-            log.debug("Error closing stdin writer: {}", e.getMessage());
-        }
+        stdin.close();
         log.info("Terminal session destroyed for container {}", containerId);
     }
 }

@@ -9,10 +9,18 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.socket.WebSocketSession;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -71,6 +79,45 @@ class TerminalSessionTest {
         void write_sendsDataToStdin() {
             // write should not throw — data goes to the piped stream
             session.write("ls -la\n");
+        }
+
+        @Test
+        void write_fromShortLivedThreads_stillReachesStdinAfterIdle() throws Exception {
+            // Regression 774fa9dc: with spring.threads.virtual.enabled every WebSocket message runs on a
+            // fresh virtual thread. PipedInputStream declared the pipe broken ~2 s after that writer
+            // thread ended, which killed docker-java's stdin pump ("Pipe broken") and rejected every
+            // further keystroke with "Read end dead".
+            ArgumentCaptor<InputStream> stdin = ArgumentCaptor.forClass(InputStream.class);
+            verify(execStartCmd).withStdIn(stdin.capture());
+            ByteArrayOutputStream received = new ByteArrayOutputStream();
+            AtomicReference<IOException> pumpError = new AtomicReference<>();
+            Thread pump = new Thread(() -> {
+                byte[] buf = new byte[1024];
+                int n;
+                try {
+                    while ((n = stdin.getValue().read(buf)) != -1) {
+                        synchronized (received) {
+                            received.write(buf, 0, n);
+                        }
+                    }
+                } catch (IOException e) {
+                    pumpError.set(e);
+                }
+            });
+            pump.setDaemon(true);
+            pump.start();
+
+            Thread.ofVirtual().start(() -> session.write("ls\n")).join();
+            Thread.sleep(3_000);
+            Thread.ofVirtual().start(() -> session.write("pwd\n")).join();
+            session.destroy();
+            pump.join(5_000);
+
+            assertThat(pumpError.get()).isNull();
+            assertThat(pump.isAlive()).isFalse();
+            synchronized (received) {
+                assertThat(received.toString(StandardCharsets.UTF_8)).isEqualTo("ls\npwd\n");
+            }
         }
 
         @Test
