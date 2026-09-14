@@ -50,7 +50,7 @@
       "type": "shell",
       "config": {
         "label": "Gate-Verdict",
-        "command": "PREV='{{ previous_output }}'\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Performance: KRITISCH'\n  echo 'gate_status: RED'\n  echo 'gate_category: performance'\n  echo 'gate_description: Kritische Performance-Engpaesse'\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Performance: Optimierungsbedarf'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: performance'\n  echo 'gate_description: Performance-Optimierungen empfohlen'\nelse\n  echo 'Performance: OK'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: performance'\n  echo 'gate_description: Performance akzeptabel'\nfi",
+        "command": "PREV='{{ previous_output }}'\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Performance: KRITISCH'\n  echo 'gate_status: RED'\n  echo 'gate_category: performance'\n  echo 'gate_description: Kritische Performance-Engpaesse'\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Performance: Optimierungsbedarf'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: performance'\n  echo 'gate_description: Performance-Optimierungen empfohlen'\nelif echo \"$PREV\" | grep -qi 'gate_status: GREEN'; then\n  echo 'Performance: OK'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: performance'\n  echo 'gate_description: Performance akzeptabel'\nelse\n  echo 'Performance: UNVOLLSTAENDIG'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: performance'\n  echo 'gate_description: Ergebnis unvollstaendig — kein Gate-Status im Report (KI-Block fehlgeschlagen oder unklar)'\nfi",
         "timeout_seconds": 10
       }
     }

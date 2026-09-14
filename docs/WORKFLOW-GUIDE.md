@@ -826,6 +826,8 @@ fi
 
 Wenn mehrere Bloecke Gates emittieren, gewinnt der hoechste Schweregrad (RED > YELLOW > GREEN).
 
+**Gate-Verdict nach KI-Bloecken: Fallback nie GREEN.** Ein Shell-Block, der den `gate_status` aus dem Output eines Simple-/Agentic-Blocks parst, darf im `else`-Zweig nicht GREEN melden — sonst wird ein leerer, abgebrochener oder als `UNKNOWN` markierter KI-Report zum gruenen Gate (gesehen 2026-09-13, Security-Audit ohne Codezugriff). Muster: RED → RED, YELLOW → YELLOW, explizites GREEN → GREEN, sonst YELLOW mit `gate_description: Ergebnis unvollstaendig — kein Gate-Status im Report`. Deterministische Build-Gates (Exit-Code entscheidet) duerfen weiter `else → GREEN` nutzen.
+
 **`run.metadata.gate_summary`** aggregiert zusaetzlich alle geparsten Gates des Runs:
 
 ```json
