@@ -30,6 +30,7 @@ Das Feld `details` wird nur bei Bedarf mitgeliefert (`@JsonInclude(NON_NULL)`).
 |---|---|
 | `RESOURCE_NOT_FOUND` | 404 |
 | `MODULE_DISABLED` | 404 |
+| `MODULES_NOT_EDITABLE` | 403 |
 | `VALIDATION_FAILED` | 400 |
 | `INVALID_ARGUMENT` | 400 |
 | `WORKFLOW_EXECUTION_FAILED` | 500 |
@@ -1816,18 +1817,34 @@ System-Capabilities abrufen (API-Version, App-Version, verfügbare Routen und Bl
 ```json
 {
   "preset": "core",
+  "modulesUiEditable": false,
   "modules": [
     {
       "name": "webhooks", "kind": "feature", "enabled": false,
       "tier": "advanced", "maturity": "stable", "risks": ["network"], "requires": [],
       "property": "automation.modules.webhooks", "envVar": "AUTOMATION_MODULES_WEBHOOKS",
-      "description": "Inbound webhook triggers that start workflows from outside."
+      "description": "Inbound webhook triggers that start workflows from outside.",
+      "configured": false, "overridden": false
     }
   ]
 }
 ```
 
-Nur lesend — Module lassen sich nicht per API umschalten. Endpunkte deaktivierter Module antworten mit `404` und `{"code": "MODULE_DISABLED"}`.
+Endpunkte deaktivierter Module antworten mit `404` und `{"code": "MODULE_DISABLED"}`. `configured` ist der Wert aus der Startkonfiguration, `overridden` zeigt einen Schalter aus den Settings.
+
+### `PUT /api/v1/system/modules/{name}`
+
+Funktionsmodul zur Laufzeit schalten — nur mit `automation.modules.ui-editable: true`, wirkt sofort und bleibt über Neustarts erhalten. Protokolliert einen `SECURITY`-Eintrag.
+
+**Request:** `{ "enabled": true }`
+
+**Response:** `{ "preset": "core", "uiEditable": true, "modules": [ … ] }` (Modul-Einträge wie oben)
+
+**Fehler:** `403 MODULES_NOT_EDITABLE` (Schalter aus), `400 INVALID_ARGUMENT` (Härtungs-Schalter — nur per Startkonfiguration), `409 STATE_CONFLICT` (Abhängigkeit, z. B. `wishes` braucht `chains`), `404` (unbekanntes Modul)
+
+### `DELETE /api/v1/system/modules/{name}/override`
+
+Schalter aus den Settings entfernen: Das Modul folgt wieder der Startkonfiguration. Gleiche Response und Fehler wie `PUT`.
 
 ### `GET /api/v1/system/ai-providers/PI/catalog`
 

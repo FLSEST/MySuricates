@@ -75,7 +75,9 @@ vorhandene Datei bleibt unangetastet):
 
 Später einzelne Module freischalten: in derselben Datei z. B. `automation.modules.webhooks: true`
 ergänzen und das Backend neu starten. Welche Module es gibt, mit Reifegrad und fertigem Snippet,
-zeigt **Settings → Module & Härtung**. Umschalten in der Oberfläche ist bewusst nicht möglich.
+zeigt **Settings → Module & Härtung**. Umschalten direkt in der Oberfläche geht nur, wenn die Datei
+`automation.modules.ui-editable: true` enthält — dann kann das jeder mit API-Key, also nur auf nicht öffentlich
+erreichbaren Instanzen einschalten.
 
 Fehlt ein Pflicht-Tool, bricht das Skript mit einer klaren Liste + Install-Befehlen ab. Nach dem
 Installieren einfach `./scripts/setup.sh` erneut ausführen.

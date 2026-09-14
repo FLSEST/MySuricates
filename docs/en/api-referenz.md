@@ -28,6 +28,7 @@ The `details` field is only included when needed (`@JsonInclude(NON_NULL)`).
 |---|---|
 | `RESOURCE_NOT_FOUND` | 404 |
 | `MODULE_DISABLED` | 404 |
+| `MODULES_NOT_EDITABLE` | 403 |
 | `VALIDATION_FAILED` | 400 |
 | `INVALID_ARGUMENT` | 400 |
 | `WORKFLOW_EXECUTION_FAILED` | 500 |
@@ -1805,18 +1806,34 @@ Retrieve system capabilities (API version, app version, available routes and blo
 ```json
 {
   "preset": "core",
+  "modulesUiEditable": false,
   "modules": [
     {
       "name": "webhooks", "kind": "feature", "enabled": false,
       "tier": "advanced", "maturity": "stable", "risks": ["network"], "requires": [],
       "property": "automation.modules.webhooks", "envVar": "AUTOMATION_MODULES_WEBHOOKS",
-      "description": "Inbound webhook triggers that start workflows from outside."
+      "description": "Inbound webhook triggers that start workflows from outside.",
+      "configured": false, "overridden": false
     }
   ]
 }
 ```
 
-Read-only — modules cannot be switched via the API. Endpoints of disabled modules answer `404` with `{"code": "MODULE_DISABLED"}`.
+Endpoints of disabled modules answer `404` with `{"code": "MODULE_DISABLED"}`. `configured` is the value from the startup configuration, `overridden` marks a switch made in the settings.
+
+### `PUT /api/v1/system/modules/{name}`
+
+Switch a feature module at runtime — only with `automation.modules.ui-editable: true`; applies immediately and survives restarts. Logs a `SECURITY` entry.
+
+**Request:** `{ "enabled": true }`
+
+**Response:** `{ "preset": "core", "uiEditable": true, "modules": [ … ] }` (module entries as above)
+
+**Errors:** `403 MODULES_NOT_EDITABLE` (switch off), `400 INVALID_ARGUMENT` (hardening switch — startup configuration only), `409 STATE_CONFLICT` (dependency, e.g. `wishes` needs `chains`), `404` (unknown module)
+
+### `DELETE /api/v1/system/modules/{name}/override`
+
+Remove the settings switch: the module follows the startup configuration again. Same response and errors as `PUT`.
 
 ### `GET /api/v1/system/ai-providers/PI/catalog`
 

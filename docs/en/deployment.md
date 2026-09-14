@@ -128,6 +128,7 @@ Test instance on port 8090 (uses `docker/Dockerfile.stable` as build base):
 | `AUTOMATION_RATE_LIMIT_RPM` | `120` | Requests per minute (also configurable at runtime, 10–10,000) |
 | `AUTOMATION_MODULES_PRESET` | `core` | Optional modules at startup: `core`, `research` or `full` (see [Module System](architektur.md#module-system-startup-configuration)) |
 | `AUTOMATION_MODULES_<NAME>` | (preset) | Switch a single module, e.g. `AUTOMATION_MODULES_REMOTE_ACCESS=true` — wins over the preset |
+| `AUTOMATION_MODULES_UI_EDITABLE` | `false` | `true` = feature modules can also be switched in the settings (applies immediately). Anyone with the API key can then turn on e.g. webhooks or the terminal — keep it off on publicly reachable instances |
 | `AUTOMATION_HARDENING_<NAME>` | `provenance`: `true`, others `false` | Hardening flags `PROVENANCE`, `SEALING` (requires provenance), `REQUIRE_SEALED_FOR_UNATTENDED` (requires sealing), `WEBHOOK_SIGNATURES` (requires module webhooks) — see [Workflow Hardening](architektur.md#workflow-hardening-optional) |
 | `AUTOMATION_HOST_CLAUDE_TIMEOUT` | `300` | Global Claude CLI timeout in seconds (declared in `application.yml`) |
 | `AUTOMATION_HOST_CLAUDE_MAX_TOKENS` | (empty) | Optional per-call token limit for Claude CLI |

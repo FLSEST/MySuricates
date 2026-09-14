@@ -77,7 +77,9 @@ is left untouched):
 
 To unlock single modules later, add e.g. `automation.modules.webhooks: true` to the same file and
 restart the backend. **Settings → Modules & hardening** lists every module with its maturity and a
-ready-made snippet. Switching modules from the UI is deliberately not possible.
+ready-made snippet. Switching modules directly in the UI only works if the file contains
+`automation.modules.ui-editable: true` — then anyone with the API key can do it, so only enable that on
+instances that are not publicly reachable.
 
 If a required tool is missing, the script aborts with a clear list of missing items and install
 commands. Simply run `./scripts/setup.sh` again after installing.

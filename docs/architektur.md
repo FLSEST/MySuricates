@@ -54,7 +54,7 @@ Dev startet Stable und Test bei Boot automatisch, wenn ein Snapshot vorhanden is
 
 ## Module-System (Startkonfiguration)
 
-Neben dem immer aktiven Kern (Workflows, Runs, Projekte, TODOs mit TodoTrigger, Schedules, Activity/DLQ, Gates, Pool, Templates, Docs, Settings) gibt es **optionale Module**. Sie werden **nur beim Start** festgelegt und sind bewusst **nicht per REST umschaltbar**: Wer ein Modul einschalten will, braucht Schreibzugriff auf die Konfiguration des Hosts und einen Neustart. Ein geleakter API-Key kann damit keine Netzwerk-, Zugangsdaten- oder Host-Zugriffs-Funktion reaktivieren.
+Neben dem immer aktiven Kern (Workflows, Runs, Projekte, TODOs mit TodoTrigger, Schedules, Activity/DLQ, Gates, Pool, Templates, Docs, Settings) gibt es **optionale Module**. Sie werden **beim Start** festgelegt und sind im Default **nicht per REST umschaltbar**: Wer ein Modul einschalten will, braucht Schreibzugriff auf die Konfiguration des Hosts und einen Neustart. Ein geleakter API-Key kann damit keine Netzwerk-, Zugangsdaten- oder Host-Zugriffs-Funktion reaktivieren. Wer das auf einer nicht öffentlich erreichbaren Instanz bequemer haben will, erlaubt das Schalten in der Oberfläche mit `automation.modules.ui-editable: true` (siehe unten).
 
 **Konfiguration** — Preset plus Einzel-Override, Override schlägt Preset:
 
@@ -63,6 +63,7 @@ automation:
   modules:
     preset: core        # core (Default) | research | full
     webhooks: true      # einzelnes Modul zusätzlich an
+    ui-editable: false  # true = Funktionsmodule zusätzlich in den Settings schaltbar (Default false)
   hardening:
     sealing: true       # Härtungs-Flags sind vom Preset unabhängig
 ```
@@ -81,10 +82,18 @@ Env-Form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_
 **Durchsetzung**
 
 - `@RequiresModule` an Controller-Klassen oder einzelnen Handlern; `ModuleGuardInterceptor` (als `MappedInterceptor`-Bean, damit `@WebMvcTest`-Slices keine Registry brauchen) antwortet für deaktivierte Module mit **404 `MODULE_DISABLED`** — auch am öffentlichen Webhook-Trigger.
-- Hintergrundpfade prüfen `ModuleRegistry` direkt: `integration`-/`skill-capability`-Blöcke schlagen mit klarer Meldung fehl, `/ws/terminal` wird nicht registriert, Auto-Memory, Audit-Ingestion, Staging-Health-Checks und Chain-Schedules laufen nicht, Auto-Repair hängt per `@EventListener(condition = ModuleConditions.FACTORY)` am Modul.
+- Hintergrundpfade prüfen `ModuleRegistry` direkt: `integration`-/`skill-capability`-Blöcke schlagen mit klarer Meldung fehl, `/ws/terminal` lehnt den Handshake ab (`ModuleHandshakeGuard`), Auto-Memory, Audit-Ingestion, Staging-Health-Checks und Chain-Schedules laufen nicht, Auto-Repair hängt per `@EventListener(condition = ModuleConditions.FACTORY)` am Modul.
 - Unbekannte Modulnamen, ungültige Werte und unerfüllte Abhängigkeiten (`requires`) **brechen den Start ab** — nichts schaltet sich selbst ein.
 - `ControllerModuleGateTest` erzwingt, dass jeder Controller einem Modul zugeordnet oder bewusst als Kern gelistet ist.
-- `GET /api/v1/system/capabilities` liefert `preset` und `modules[]`; das Frontend blendet damit Navigation, Routen (Seite „Modul deaktiviert“ mit Snippet) und Widgets aus. **Settings → Module & Härtung** zeigt alles nur lesend mit YAML-/Env-Snippet.
+- `GET /api/v1/system/capabilities` liefert `preset`, `modulesUiEditable` und `modules[]` (mit `configured`/`overridden`); das Frontend blendet damit Navigation, Routen (Seite „Modul deaktiviert“ mit Snippet) und Widgets aus. **Settings → Module & Härtung** zeigt alles mit YAML-/Env-Snippet.
+
+**Schalten in der Oberfläche (optional)** — Mit `automation.modules.ui-editable: true` (Env `AUTOMATION_MODULES_UI_EDITABLE`) bekommt jedes Funktionsmodul in den Settings einen Schalter:
+
+- Die Änderung wirkt **sofort** (`ModuleRegistry` ist zur Laufzeit veränderbar; alle Prüfungen laufen pro Aufruf, der Terminal-WebSocket prüft je Handshake, `TailscaleService` je Aufruf) und bleibt über Neustarts erhalten (`app_settings` → `modules.ui-overrides`).
+- UI-Werte gehen der Konfigurationsdatei vor; ein Wert gleich dem Config-Wert wird nicht gespeichert, „Auf Konfiguration zurücksetzen“ entfernt ihn. Abhängigkeiten (`requires`) werden wie beim Start geprüft (409 mit Hinweis, was vorher nötig ist). Passen gespeicherte Werte nach einer Config-Änderung nicht mehr, werden sie beim Start übersprungen statt den Start abzubrechen.
+- Jede Änderung erzeugt einen WARN-`SECURITY`-Eintrag im Activity-Log. Ist der Schalter aus, antworten `PUT/DELETE /api/v1/system/modules/…` mit **403 `MODULES_NOT_EDITABLE`**, gespeicherte UI-Werte werden ignoriert.
+- **Härtungs-Schalter bleiben immer Startkonfiguration** (400): Sie schützen gegen genau den Aufrufer, der den API-Key hat.
+- Abwägung: Mit `ui-editable` kann jeder mit API-Key Webhooks (öffentlicher Endpunkt), Integrationen (Tokens), Fernzugriff oder das Run-Terminal (Host-Zugriff) einschalten — für öffentlich erreichbare Instanzen aus lassen. Laufende Runs, die einen Block eines gerade abgeschalteten Moduls erreichen, schlagen mit der bekannten Meldung fehl.
 
 ## Workflow-Härtung (optional)
 
