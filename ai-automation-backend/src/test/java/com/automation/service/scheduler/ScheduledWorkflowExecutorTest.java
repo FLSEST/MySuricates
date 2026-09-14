@@ -319,4 +319,59 @@ class ScheduledWorkflowExecutorTest {
         verify(scheduledRepository, never()).save(any());
     }
 
+    @Test
+    void executeSingleSchedule_returnsRunReference_forWorkflow() {
+        ScheduledWorkflow scheduled = ScheduledWorkflow.builder()
+                .id("sched-ref").workflow(testWorkflow).cronExpression("0 0 * * * *")
+                .scheduleType(ScheduleType.CRON).enabled(true)
+                .nextRunAt(Instant.now().minusSeconds(60)).inputContext(Map.of()).build();
+        when(scheduledRepository.findByIdWithWorkflowSkills("sched-ref")).thenReturn(Optional.of(scheduled));
+        when(scheduledRepository.findById("sched-ref")).thenReturn(Optional.of(scheduled));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(workflowRunRepository.existsByWorkflowIdAndStatus(eq("wf-1"), eq(RunStatus.RUNNING))).thenReturn(false);
+        when(workflowExecutor.execute(eq(testWorkflow), any(), eq("sched-ref"), isNull()))
+                .thenReturn(com.automation.entity.WorkflowRun.builder().id("run-42").build());
+
+        Optional<ScheduledWorkflowExecutor.ScheduledRunRef> ref = executor.executeSingleSchedule("sched-ref");
+
+        assertThat(ref).isPresent();
+        assertThat(ref.get().runId()).isEqualTo("run-42");
+        assertThat(ref.get().targetType()).isEqualTo(TargetType.WORKFLOW);
+    }
+
+    @Test
+    void executeSingleSchedule_returnsEmpty_whenGhostRunProtectionSkips() {
+        ScheduledWorkflow scheduled = ScheduledWorkflow.builder()
+                .id("sched-busy").workflow(testWorkflow).cronExpression("0 0 * * * *")
+                .scheduleType(ScheduleType.CRON).enabled(true)
+                .nextRunAt(Instant.now().minusSeconds(60)).inputContext(Map.of()).build();
+        when(scheduledRepository.findByIdWithWorkflowSkills("sched-busy")).thenReturn(Optional.of(scheduled));
+        when(workflowRunRepository.existsByWorkflowIdAndStatus(eq("wf-1"), eq(RunStatus.RUNNING))).thenReturn(true);
+
+        assertThat(executor.executeSingleSchedule("sched-busy")).isEmpty();
+        verify(workflowExecutor, never()).execute(any(), any(), any(), any());
+    }
+
+    @Test
+    void isFinished_reflectsRunStatus() {
+        var ref = new ScheduledWorkflowExecutor.ScheduledRunRef("run-1", TargetType.WORKFLOW);
+        when(workflowRunRepository.findById("run-1"))
+                .thenReturn(Optional.of(com.automation.entity.WorkflowRun.builder().id("run-1").status(RunStatus.RUNNING).build()));
+        assertThat(executor.isFinished(ref)).isFalse();
+
+        when(workflowRunRepository.findById("run-1"))
+                .thenReturn(Optional.of(com.automation.entity.WorkflowRun.builder().id("run-1").status(RunStatus.COMPLETED).build()));
+        assertThat(executor.isFinished(ref)).isTrue();
+
+        // Unknown run (deleted meanwhile) must not block the queue forever.
+        when(workflowRunRepository.findById("run-1")).thenReturn(Optional.empty());
+        assertThat(executor.isFinished(ref)).isTrue();
+
+        var chainRef = new ScheduledWorkflowExecutor.ScheduledRunRef("chain-1", TargetType.CHAIN);
+        when(chainRunRepository.findById("chain-1"))
+                .thenReturn(Optional.of(com.automation.entity.ChainRun.builder().id("chain-1").status(RunStatus.PAUSED).build()));
+        assertThat(executor.isFinished(chainRef)).isFalse();
+        assertThat(executor.isFinished(null)).isTrue();
+    }
+
 }

@@ -76,6 +76,9 @@ export const handlers = [
       { id: 'sc1', workflowId: 'w1', workflowName: 'Test Workflow', cronExpression: '0 0 * * *', enabled: true, createdAt: '2025-01-01T00:00:00Z' },
     ]),
   ),
+  http.get(`${BASE}/schedules/catch-up`, () =>
+    HttpResponse.json({ active: null, pending: [] }),
+  ),
   http.get(`${BASE}/schedules/maintenance`, () =>
     HttpResponse.json({ enabled: false }),
   ),

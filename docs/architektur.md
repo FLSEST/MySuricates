@@ -81,7 +81,7 @@ com.automation
 │   ├── project/         ProjectService, ProjectStatusReconciler, ContainerService (+ DockerContainerGateway, DockerOrphanReconciler), ProjectContextService, PathValidator, OnboardingProfileService, ProjectOnboardingService
 │   ├── workflow/        WorkflowExecutor (+ ExecutionContextFactory, BlockSkillContext, BlockStepRunner, RunCompletionHandler, RunFinalizer, WorkflowContextDataService), WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService, GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
 │   ├── skill/           SkillService, SkillImportExportService, SkillRegistry, CapabilityRegistry
-│   ├── scheduler/       SchedulerService (+ SchedulerTick, SchedulerMaintenanceMode, UpcomingRunsCalculator, ScheduleSkipPolicy, ScheduleDefinitionParser), ScheduledWorkflowExecutor, SuspendState
+│   ├── scheduler/       SchedulerService (+ SchedulerTick, SchedulerMaintenanceMode, UpcomingRunsCalculator, ScheduleSkipPolicy, ScheduleDefinitionParser, CatchUpQueue), ScheduledWorkflowExecutor, SuspendState
 │   ├── webhook/         WebhookService, GitWebhookPayloadParser
 │   ├── learning/        LearningService, AgenticLearningService, ExecutionInsightsService, WorkflowStatsService, WorkflowSimilarityService, BlockTypesBackfillService, MetadataExtractor, PlatformStatsService
 │   ├── system/          ApiKeyService, DatabaseBackupService, ExecutionSettingsService (+ ExecutionSettingKeys), SystemIdentityService, TailscaleService, FileBrowserService, IntegrationSnippetService, SystemSettingsService
@@ -314,6 +314,17 @@ Vorgefertigte Chain-Definitionen, die sich aus bestehenden Workflow-Templates zu
 - `ChainTemplateService` — verwaltet Built-in Chain Templates (`BuiltInChainTemplate` Records)
 - `ChainTemplateController` — `/api/v1/chain-templates` mit List, Get, Install-Endpunkten
 - Install: Erstellt eine neue Chain (ggf. mit zugehörigen Workflows) in einem Zielprojekt
+
+## Scheduler: verpasste Termine (Standby und Kaltstart)
+
+Der Scheduler ist ein 60-s-Tick im Backend (`SchedulerTick`); ohne laufendes Backend startet nichts. Für Termine, die während einer Lücke fällig wurden, gilt seit 2026-09-14 **eine** Regel, unabhängig davon, ob die JVM eingefroren war (Standby, erkannt als Tick-Lücke > `automation.scheduler.resume-grace-minutes`) oder der Prozess gar nicht lief (Kaltstart, erkannt am ersten Tick; Referenz ist die Startzeit des Backends, Termine danach sind normale Fälligkeit):
+
+- **Ohne Opt-in** wird der Termin übersprungen und der Zeitplan auf sein nächstes Vorkommen gesetzt (`ScheduleSkipPolicy`, Activity-Log „Schedule skipped (system suspend/resume)" bzw. „(backend was stopped)").
+- **Mit Opt-in** — pro Zeitplan `catchUpOnResume` oder global `scheduler-catch-up-on-resume` (Settings-UI) — wandert der Termin in die `CatchUpQueue`. Sie startet die Einträge **nacheinander** in der Reihenfolge der ursprünglichen Fälligkeit: der nächste erst, wenn der vorherige Nachhol-Run einen Endzustand erreicht hat (`ScheduledWorkflowExecutor.isFinished`). Wartende Einträge behalten ihren alten `nextRunAt`, werden vom normalen Tick aber ausgeklammert. Ein Eintrag, den der Executor ablehnt (Ziel läuft bereits, Zeitplan inzwischen deaktiviert), blockiert die Warteschlange nicht.
+- Eine aktive `skip-until`-Pause gewinnt: dann wird auch mit Opt-in nichts nachgeholt.
+- Die Warteschlange ist bewusst nicht persistent: nach einem Neustart sind dieselben Termine wieder fällig und werden vom Kaltstart-Pfad erneut eingereiht — nichts geht verloren, nichts läuft doppelt.
+- Sichtbarkeit: eine WARN-Zeile im Activity-Log pro Ereignis („Cold start detected … N missed schedule(s): X skipped forward, Y queued for sequential catch-up"), `GET /api/v1/schedules/catch-up` (laufender und wartende Einträge) und ein Banner auf der Schedules-Seite.
+- `resume-grace-minutes: 0` schaltet beide Erkennungen ab (Altverhalten: alles Fällige startet sofort).
 
 ## Completion Triggers (V39)
 

@@ -438,6 +438,12 @@ export interface CalendarDataResponse {
 
 // ── Upcoming Schedule ────────────────────────────────────
 
+/** Sequential catch-up queue of missed schedule occurrences (GET /schedules/catch-up). */
+export interface CatchUpQueueStatus {
+  active: { scheduleId: string; targetName: string; runId: string; startedAt: string } | null;
+  pending: { scheduleId: string; targetName: string; missedAt: string | null }[];
+}
+
 export interface UpcomingScheduleData {
   count: number;
   schedules: Array<{
