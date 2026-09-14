@@ -53,6 +53,18 @@ class WebhookMapperTest {
             assertThat(response.lastTriggeredAt()).isEqualTo(now);
             assertThat(response.triggerCount()).isEqualTo(12);
             assertThat(response.createdAt()).isEqualTo(now);
+            assertThat(response.signatureRequired()).isFalse();
+        }
+
+        @Test
+        void signatureRequiredWhenASecretIsStored_withoutExposingIt() {
+            WebhookTrigger webhook = WebhookTrigger.builder().id("wh-9").secretToken("token")
+                    .workflow(Workflow.builder().id("wf-1").name("WF").build()).signingSecretEnc("ciphertext").build();
+
+            WebhookTriggerResponse response = mapper.toResponse(webhook);
+
+            assertThat(response.signatureRequired()).isTrue();
+            assertThat(response.toString()).doesNotContain("ciphertext");
         }
 
         @Test

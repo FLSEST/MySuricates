@@ -15,7 +15,7 @@ class ErrorCodeTest {
 
     @Test
     void should_containAllExpectedValues_when_enumValuesQueried() {
-        assertThat(ErrorCode.values()).hasSize(18)
+        assertThat(ErrorCode.values()).hasSize(20)
                 .containsExactly(
                         ErrorCode.RESOURCE_NOT_FOUND,
                         ErrorCode.MODULE_DISABLED,
@@ -27,6 +27,8 @@ class ErrorCodeTest {
                         ErrorCode.STATE_CONFLICT,
                         ErrorCode.WORKFLOW_SEALED,
                         ErrorCode.WORKFLOW_TAMPERED,
+                        ErrorCode.UNATTENDED_REQUIRES_SEAL,
+                        ErrorCode.WEBHOOK_SIGNATURE_INVALID,
                         ErrorCode.NO_TASK_TARGET,
                         ErrorCode.PROVIDER_NOT_CONNECTED,
                         ErrorCode.PROVIDER_NOT_TASK_CAPABLE,
@@ -67,6 +69,8 @@ class ErrorCodeTest {
         assertThat(ErrorCode.STATE_CONFLICT.getHttpStatus().is4xxClientError()).isTrue();
         assertThat(ErrorCode.WORKFLOW_SEALED.getHttpStatus().is4xxClientError()).isTrue();
         assertThat(ErrorCode.WORKFLOW_TAMPERED.getHttpStatus().is4xxClientError()).isTrue();
+        assertThat(ErrorCode.UNATTENDED_REQUIRES_SEAL.getHttpStatus().is4xxClientError()).isTrue();
+        assertThat(ErrorCode.WEBHOOK_SIGNATURE_INVALID.getHttpStatus().is4xxClientError()).isTrue();
         assertThat(ErrorCode.METHOD_NOT_ALLOWED.getHttpStatus().is4xxClientError()).isTrue();
         assertThat(ErrorCode.NO_TASK_TARGET.getHttpStatus().is4xxClientError()).isTrue();
         assertThat(ErrorCode.PROVIDER_NOT_CONNECTED.getHttpStatus().is4xxClientError()).isTrue();
@@ -96,6 +100,8 @@ class ErrorCodeTest {
                 Arguments.of(ErrorCode.STATE_CONFLICT, HttpStatus.CONFLICT, "State conflict"),
                 Arguments.of(ErrorCode.WORKFLOW_SEALED, HttpStatus.CONFLICT, "Workflow is sealed"),
                 Arguments.of(ErrorCode.WORKFLOW_TAMPERED, HttpStatus.CONFLICT, "Sealed workflow definition was modified"),
+                Arguments.of(ErrorCode.UNATTENDED_REQUIRES_SEAL, HttpStatus.FORBIDDEN, "Unattended runs require a sealed workflow"),
+                Arguments.of(ErrorCode.WEBHOOK_SIGNATURE_INVALID, HttpStatus.UNAUTHORIZED, "Missing or invalid webhook signature"),
                 Arguments.of(ErrorCode.NO_TASK_TARGET, HttpStatus.BAD_REQUEST, "No task export target configured"),
                 Arguments.of(ErrorCode.PROVIDER_NOT_CONNECTED, HttpStatus.CONFLICT, "Integration provider not connected"),
                 Arguments.of(ErrorCode.PROVIDER_NOT_TASK_CAPABLE, HttpStatus.BAD_REQUEST, "Integration provider cannot receive tasks"),

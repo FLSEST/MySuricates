@@ -346,6 +346,31 @@ class ChainExecutorTest {
         Map<String, Object> secondContext = contextCaptor.getAllValues().get(1);
         assertThat(secondContext).containsEntry("previous_chain_output", "first-output");
         assertThat(secondContext).containsEntry("env", "test");
+        assertThat(secondContext).containsEntry(TriggerSource.PARENT_CONTEXT_KEY, "MANUAL");
+    }
+
+    @Test
+    void entryRunsCarryTheChainOriginAndIgnoreASpoofedInput() {
+        setupSynchronousExecutor();
+        Project project = Project.builder().id("proj-1").name("Test Project").build();
+        Workflow wf1 = Workflow.builder().id("wf-1").name("WF1").project(project).build();
+        Workflow wf2 = Workflow.builder().id("wf-2").name("WF2").project(project).build();
+        when(workflowService.findByIdEager("wf-1")).thenReturn(wf1);
+        when(workflowService.findByIdEager("wf-2")).thenReturn(wf2);
+        WorkflowRun wfRun1 = WorkflowRun.builder().id("wfr-1").status(RunStatus.RUNNING).build();
+        WorkflowRun wfRun2 = WorkflowRun.builder().id("wfr-2").status(RunStatus.RUNNING).build();
+        when(workflowExecutor.execute(eq(wf1), any(), eq(TriggerSource.CHAIN))).thenReturn(wfRun1);
+        when(workflowExecutor.execute(eq(wf2), any(), eq(TriggerSource.CHAIN))).thenReturn(wfRun2);
+        when(workflowRunRepository.findById("wfr-1")).thenReturn(Optional.of(WorkflowRun.builder().id("wfr-1").status(RunStatus.COMPLETED).build()));
+        when(workflowRunRepository.findById("wfr-2")).thenReturn(Optional.of(WorkflowRun.builder().id("wfr-2").status(RunStatus.COMPLETED).build()));
+
+        chainExecutor.execute(testChain, Map.of(TriggerSource.PARENT_CONTEXT_KEY, "MANUAL"), "schedule-1");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> contextCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(workflowExecutor, times(2)).execute(any(Workflow.class), contextCaptor.capture(), eq(TriggerSource.CHAIN));
+        assertThat(contextCaptor.getAllValues())
+                .allSatisfy(ctx -> assertThat(ctx).containsEntry(TriggerSource.PARENT_CONTEXT_KEY, "SCHEDULE"));
     }
 
     @Test

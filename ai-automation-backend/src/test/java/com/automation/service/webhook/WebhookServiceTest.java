@@ -26,6 +26,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -48,6 +50,12 @@ class WebhookServiceTest {
 
     @Mock
     private ActivityLogService activityLogService;
+
+    @Mock
+    private WebhookSignatureVerifier signatureVerifier;
+
+    @Mock
+    private com.automation.service.integration.IntegrationEncryptionService encryptionService;
 
     @InjectMocks
     private WebhookService webhookService;
@@ -208,7 +216,7 @@ class WebhookServiceTest {
 
         webhookService.regenerateToken("wh-1");
 
-        assertThatThrownBy(() -> webhookService.trigger(oldToken, Map.of(), new org.springframework.http.HttpHeaders()))
+        assertThatThrownBy(() -> webhookService.trigger(oldToken, json(Map.of()), new org.springframework.http.HttpHeaders()))
                 .isInstanceOf(com.automation.exception.ResourceNotFoundException.class);
     }
 
@@ -245,7 +253,7 @@ class WebhookServiceTest {
         when(workflowExecutor.execute(any(), any(), eq(TriggerSource.WEBHOOK))).thenReturn(expectedRun);
 
         Map<String, Object> payload = Map.of("action", "deploy");
-        WorkflowRun result = webhookService.trigger("abc123token", payload, HttpHeaders.EMPTY);
+        WorkflowRun result = webhookService.trigger("abc123token", json(payload), HttpHeaders.EMPTY);
 
         assertThat(result.getId()).isEqualTo("run-1");
 
@@ -264,7 +272,7 @@ class WebhookServiceTest {
         when(webhookRepository.findBySecretToken("abc123token")).thenReturn(Optional.of(testWebhook));
         when(workflowExecutor.execute(any(), any(), eq(TriggerSource.WEBHOOK))).thenReturn(WorkflowRun.builder().id("run-1").build());
 
-        webhookService.trigger("abc123token", Map.of("env", "prod"), HttpHeaders.EMPTY);
+        webhookService.trigger("abc123token", json(Map.of("env", "prod")), HttpHeaders.EMPTY);
 
         verify(workflowExecutor).execute(eq(testWorkflow), argThat(ctx ->
                 "prod".equals(ctx.get("env")) && "false".equals(ctx.get("debug"))
@@ -311,7 +319,7 @@ class WebhookServiceTest {
         when(gitPayloadParser.parse(any(), any())).thenReturn(Map.of("git_branch", "main", "env", "ignored"));
         when(workflowExecutor.execute(any(), any(), eq(TriggerSource.WEBHOOK))).thenReturn(WorkflowRun.builder().id("run-1").build());
 
-        webhookService.trigger("abc123token", Map.of("action", "deploy"), HttpHeaders.EMPTY);
+        webhookService.trigger("abc123token", json(Map.of("action", "deploy")), HttpHeaders.EMPTY);
 
         verify(workflowExecutor).execute(eq(testWorkflow), argThat(ctx -> {
             Object untrusted = ctx.get(com.automation.executor.ExecutionContext.UNTRUSTED_KEYS_VARIABLE);
@@ -326,10 +334,66 @@ class WebhookServiceTest {
         when(webhookRepository.findBySecretToken("abc123token")).thenReturn(Optional.of(testWebhook));
 
         assertThatThrownBy(() -> webhookService.trigger("abc123token",
-                Map.of(com.automation.executor.ExecutionContext.UNTRUSTED_KEYS_VARIABLE, java.util.List.of()), HttpHeaders.EMPTY))
+                json(Map.of(com.automation.executor.ExecutionContext.UNTRUSTED_KEYS_VARIABLE, java.util.List.of())), HttpHeaders.EMPTY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("reserved");
 
         verify(workflowExecutor, never()).execute(any(), any(), eq(TriggerSource.WEBHOOK));
+    }
+
+    // --- signatures ---
+
+    @Test
+    void trigger_checksTheSignatureOnTheRawBytesBeforeParsing() {
+        when(webhookRepository.findBySecretToken("abc123token")).thenReturn(Optional.of(testWebhook));
+        byte[] notEvenJson = "garbage".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        doThrow(new com.automation.exception.HardeningException(
+                com.automation.exception.ErrorCode.WEBHOOK_SIGNATURE_INVALID, "bad signature"))
+                .when(signatureVerifier).verify(testWebhook, notEvenJson, HttpHeaders.EMPTY);
+
+        assertThatThrownBy(() -> webhookService.trigger("abc123token", notEvenJson, HttpHeaders.EMPTY))
+                .isInstanceOf(com.automation.exception.HardeningException.class);
+
+        verify(workflowExecutor, never()).execute(any(), any(), any(TriggerSource.class));
+        verify(webhookRepository, never()).incrementTriggerCount(any(), any());
+    }
+
+    @Test
+    void trigger_nonObjectJson_isRejected() {
+        when(webhookRepository.findBySecretToken("abc123token")).thenReturn(Optional.of(testWebhook));
+
+        assertThatThrownBy(() -> webhookService.trigger("abc123token", "[1,2]".getBytes(), HttpHeaders.EMPTY))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("JSON object");
+    }
+
+    @Test
+    void generateSigningSecret_storesOnlyTheCiphertextAndReturnsThePlaintextOnce() {
+        when(webhookRepository.findById("wh-1")).thenReturn(Optional.of(testWebhook));
+        when(encryptionService.encrypt(anyString())).thenAnswer(inv -> "enc:" + inv.getArgument(0));
+
+        String secret = webhookService.generateSigningSecret("wh-1");
+
+        assertThat(secret).matches("[0-9a-f]{64}");
+        assertThat(testWebhook.getSigningSecretEnc()).isEqualTo("enc:" + secret);
+        verify(webhookRepository).save(testWebhook);
+        verify(activityLogService).warn(eq(LogCategory.SECURITY), contains("signing secret set"), eq("WebhookService"), eq("wh-1"));
+    }
+
+    @Test
+    void removeSigningSecret_clearsIt() {
+        testWebhook.setSigningSecretEnc("enc:abc");
+        when(webhookRepository.findById("wh-1")).thenReturn(Optional.of(testWebhook));
+        when(webhookRepository.save(any(WebhookTrigger.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(webhookService.removeSigningSecret("wh-1").getSigningSecretEnc()).isNull();
+    }
+
+    private static byte[] json(Object payload) {
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsBytes(payload);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException(e);
+        }
     }
 }

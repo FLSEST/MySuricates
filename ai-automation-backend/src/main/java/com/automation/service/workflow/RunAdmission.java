@@ -20,6 +20,10 @@ import java.util.Map;
  * Single gate every workflow run passes before its run row exists (called by
  * {@link WorkflowExecutor}). Records provenance — the definition hash and the matching version —
  * and refuses runs that violate a hardening rule. A refused run leaves no run row behind.
+ *
+ * <p>Rules, in order: a sealed definition must match its seal (always); with
+ * {@code automation.hardening.require-sealed-for-unattended} an unattended run — or a chain /
+ * sub-workflow run whose origin is unattended or unknown — needs a sealed workflow.
  */
 @Slf4j
 @Component
@@ -41,6 +45,9 @@ public class RunAdmission {
     public Ticket admit(Workflow workflow, TriggerSource source, Map<String, Object> inputContext) {
         // Seals are checked regardless of the switches: a seal must not lapse because a flag changed.
         String hash = workflow.isSealed() ? verifySeal(workflow, source) : null;
+        if (!workflow.isSealed() && modules.isEnabled(ModuleCatalog.REQUIRE_SEALED_FOR_UNATTENDED)) {
+            requireAttended(workflow, source, inputContext);
+        }
         if (!modules.isEnabled(ModuleCatalog.PROVENANCE)) {
             return Ticket.none();
         }
@@ -56,6 +63,23 @@ public class RunAdmission {
             log.warn("Could not compute definition hash for workflow {} ({}): {}", workflow.getId(), source, e.getMessage());
             return Ticket.none();
         }
+    }
+
+    private void requireAttended(Workflow workflow, TriggerSource source, Map<String, Object> inputContext) {
+        TriggerSource effective = source.effective(inputContext);
+        if (effective != null && !effective.unattended()) {
+            return;
+        }
+        String origin = effective != null ? effective.name() : "unknown";
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("triggerSource", source.name());
+        metadata.put("effectiveSource", origin);
+        activityLog.log(LogLevel.WARN, LogCategory.SECURITY,
+                "Run refused — unattended run (" + origin + ") of unsealed workflow '" + workflow.getName() + "'",
+                "RunAdmission", workflow.getId(), metadata, workflow.getId());
+        throw new HardeningException(ErrorCode.UNATTENDED_REQUIRES_SEAL,
+                "Workflow '" + workflow.getName() + "' was not started: unattended runs (" + origin
+                        + ") require a sealed workflow (automation.hardening.require-sealed-for-unattended)");
     }
 
     /** Returns the verified hash or refuses the run (fail closed: an unverifiable seal is a broken seal). */

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Webhook, Plus, Trash2, RefreshCw } from 'lucide-react';
+import { Webhook, Plus, Trash2, RefreshCw, KeyRound, ShieldCheck, ShieldOff } from 'lucide-react';
 import { Card, Button, Input, Select, Modal, ModalFooter, Spinner, Table, Toggle, Badge } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
@@ -10,10 +10,13 @@ import {
   useToggleWebhook,
   useDeleteWebhook,
   useRegenerateWebhookToken,
+  useGenerateWebhookSecret,
+  useRemoveWebhookSecret,
 } from '../hooks/useWebhooks';
 import { useWorkflows } from '../hooks/useWorkflows';
+import { useModuleEnabled } from '../hooks/useModules';
 import { useT } from '../i18n';
-import type { WebhookTrigger, CreateWebhookRequest } from '../types';
+import type { WebhookTrigger, CreateWebhookRequest, WebhookSigningSecret } from '../types';
 
 export function Webhooks() {
   const t = useT();
@@ -23,6 +26,9 @@ export function Webhooks() {
   const toggleWebhook = useToggleWebhook();
   const deleteWebhook = useDeleteWebhook();
   const regenerateToken = useRegenerateWebhookToken();
+  const generateSecret = useGenerateWebhookSecret();
+  const removeSecret = useRemoveWebhookSecret();
+  const signaturesModule = useModuleEnabled('webhook-signatures');
 
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<CreateWebhookRequest>({ workflowId: '' });
@@ -31,8 +37,10 @@ export function Webhooks() {
   const [revealedWebhook, setRevealedWebhook] = useState<WebhookTrigger | null>(null);
   // Pending destructive action awaiting confirmation in the project Modal (no window.confirm).
   const [confirmAction, setConfirmAction] = useState<
-    { kind: 'regenerate' | 'delete'; webhook: WebhookTrigger } | null
+    { kind: ConfirmKind; webhook: WebhookTrigger } | null
   >(null);
+  // Signing secret right after it was set — like the token, shown exactly once
+  const [revealedSecret, setRevealedSecret] = useState<WebhookSigningSecret | null>(null);
 
   const handleCreate = () => {
     createWebhook.mutate(form, {
@@ -44,10 +52,23 @@ export function Webhooks() {
     });
   };
 
+  const setSigningSecret = (webhook: WebhookTrigger, onDone?: () => void) => {
+    generateSecret.mutate(webhook.id, {
+      onSuccess: (secret) => {
+        onDone?.();
+        setRevealedSecret(secret);
+      },
+    });
+  };
+
   const runConfirmedAction = () => {
     if (!confirmAction) return;
     const { kind, webhook } = confirmAction;
-    if (kind === 'regenerate') {
+    if (kind === 'rotateSecret') {
+      setSigningSecret(webhook, () => setConfirmAction(null));
+    } else if (kind === 'removeSecret') {
+      removeSecret.mutate(webhook.id, { onSuccess: () => setConfirmAction(null) });
+    } else if (kind === 'regenerate') {
       regenerateToken.mutate(webhook.id, {
         onSuccess: (regenerated) => {
           setConfirmAction(null);
@@ -101,6 +122,18 @@ export function Webhooks() {
       ),
     },
     {
+      key: 'signature',
+      header: t.webhooks.signature,
+      render: (w: WebhookTrigger) => (w.signatureRequired ? (
+        <span title={t.webhooks.signedHint} data-testid="webhook-signed">
+          <Badge variant="success"><ShieldCheck className="w-3 h-3" />{t.webhooks.signed}</Badge>
+        </span>
+      ) : (
+        <span className="text-xs text-text-tertiary">{t.webhooks.unsigned}</span>
+      )),
+      width: '120px',
+    },
+    {
       key: 'triggers',
       header: t.webhooks.triggerCount,
       render: (w: WebhookTrigger) => (
@@ -124,6 +157,36 @@ export function Webhooks() {
       header: '',
       render: (w: WebhookTrigger) => (
         <div className="flex items-center gap-1">
+          {signaturesModule && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (w.signatureRequired) {
+                  setConfirmAction({ kind: 'rotateSecret', webhook: w });
+                } else {
+                  setSigningSecret(w);
+                }
+              }}
+              className="p-1.5 rounded-lg text-text-tertiary hover:text-accent transition-colors"
+              aria-label={w.signatureRequired ? t.webhooks.rotateSecret : t.webhooks.setSecret}
+              title={w.signatureRequired ? t.webhooks.rotateSecret : t.webhooks.setSecret}
+            >
+              <KeyRound className="w-4 h-4" />
+            </button>
+          )}
+          {signaturesModule && w.signatureRequired && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setConfirmAction({ kind: 'removeSecret', webhook: w });
+              }}
+              className="p-1.5 rounded-lg text-text-tertiary hover:text-danger transition-colors"
+              aria-label={t.webhooks.removeSecret}
+              title={t.webhooks.removeSecret}
+            >
+              <ShieldOff className="w-4 h-4" />
+            </button>
+          )}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -147,7 +210,7 @@ export function Webhooks() {
           </button>
         </div>
       ),
-      width: '80px',
+      width: signaturesModule ? '140px' : '80px',
     },
   ];
 
@@ -229,21 +292,21 @@ export function Webhooks() {
       <Modal
         open={confirmAction !== null}
         onClose={() => setConfirmAction(null)}
-        title={confirmAction?.kind === 'delete' ? t.common.delete : t.webhooks.regenerate}
+        title={confirmAction ? CONFIRM_TEXT[confirmAction.kind](t).title : ''}
         size="sm"
         footer={
           <ModalFooter
             onCancel={() => setConfirmAction(null)}
             onAction={runConfirmedAction}
             cancelLabel={t.common.cancel}
-            actionLabel={confirmAction?.kind === 'delete' ? t.common.delete : t.webhooks.regenerate}
+            actionLabel={confirmAction ? CONFIRM_TEXT[confirmAction.kind](t).title : ''}
             actionVariant="danger"
-            actionLoading={regenerateToken.isPending || deleteWebhook.isPending}
+            actionLoading={regenerateToken.isPending || deleteWebhook.isPending || generateSecret.isPending || removeSecret.isPending}
           />
         }
       >
         <p className="text-sm text-text-secondary">
-          {confirmAction?.kind === 'delete' ? t.webhooks.deleteConfirm : t.webhooks.regenerateConfirm}
+          {confirmAction && CONFIRM_TEXT[confirmAction.kind](t).text}
         </p>
         {confirmAction && (
           <p className="text-xs font-mono text-text-tertiary mt-3 break-all">{confirmAction.webhook.webhookUrl}</p>
@@ -287,6 +350,38 @@ export function Webhooks() {
           </div>
         )}
       </Modal>
+
+      {/* One-time signing secret reveal */}
+      <Modal
+        open={revealedSecret !== null}
+        onClose={() => setRevealedSecret(null)}
+        title={t.webhooks.secretShownOnce}
+        footer={<Button onClick={() => setRevealedSecret(null)}>{t.common.close}</Button>}
+      >
+        {revealedSecret && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-mono text-xs text-text break-all" data-testid="webhook-secret">
+                {revealedSecret.secret}
+              </span>
+              <CopyButton text={revealedSecret.secret} />
+            </div>
+            <p className="text-sm text-text-secondary">{t.webhooks.secretShownOnceHint}</p>
+            <code className="block font-mono text-xs text-text bg-surface-secondary rounded-lg px-3 py-2 break-all">
+              {revealedSecret.header}: sha256=&lt;hex&gt;
+            </code>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
+
+type ConfirmKind = 'regenerate' | 'delete' | 'rotateSecret' | 'removeSecret';
+
+const CONFIRM_TEXT: Record<ConfirmKind, (t: ReturnType<typeof useT>) => { title: string; text: string }> = {
+  regenerate: (t) => ({ title: t.webhooks.regenerate, text: t.webhooks.regenerateConfirm }),
+  delete: (t) => ({ title: t.common.delete, text: t.webhooks.deleteConfirm }),
+  rotateSecret: (t) => ({ title: t.webhooks.rotateSecret, text: t.webhooks.rotateSecretConfirm }),
+  removeSecret: (t) => ({ title: t.webhooks.removeSecret, text: t.webhooks.removeSecretConfirm }),
+};

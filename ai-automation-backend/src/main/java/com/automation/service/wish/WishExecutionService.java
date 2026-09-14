@@ -62,7 +62,7 @@ public class WishExecutionService {
 
         if (wish.getGeneratedChainId() != null) {
             WorkflowChain chain = chainService.findById(wish.getGeneratedChainId());
-            ChainRun chainRun = chainExecutor.execute(chain, Map.of());
+            ChainRun chainRun = chainExecutor.execute(chain, Map.of(), null, TriggerSource.WISH);
             wish.setCurrentRunId(chainRun.getId());
             WishStatusHelper.updateCurrentIterationEntry(wish, "runId", chainRun.getId());
             wishRepository.save(wish);

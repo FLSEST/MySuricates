@@ -1,6 +1,7 @@
 package com.automation.controller;
 
 import com.automation.dto.request.CreateWebhookRequest;
+import com.automation.dto.response.WebhookSigningSecretResponse;
 import com.automation.dto.response.WebhookTriggerResponse;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.entity.WebhookTrigger;
@@ -11,6 +12,7 @@ import com.automation.modules.ModuleCatalog;
 import com.automation.modules.RequiresModule;
 import com.automation.security.WebhookRateLimiter;
 import com.automation.service.webhook.WebhookService;
+import com.automation.service.webhook.WebhookSignatureVerifier;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +22,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RequiresModule(ModuleCatalog.WEBHOOKS)
 @RestController
@@ -81,6 +82,20 @@ public class WebhookController {
         return toResponseWithUrl(webhookService.regenerateToken(id), request, TokenVisibility.REVEAL);
     }
 
+    /** Creates or rotates the signing secret; the response is the only place it is ever shown. */
+    @RequiresModule(ModuleCatalog.WEBHOOK_SIGNATURES)
+    @PostMapping("/api/v1/webhooks/{id}/secret")
+    public WebhookSigningSecretResponse generateSigningSecret(@PathVariable String id) {
+        return new WebhookSigningSecretResponse(webhookService.generateSigningSecret(id), WebhookSignatureVerifier.HEADER);
+    }
+
+    @RequiresModule(ModuleCatalog.WEBHOOK_SIGNATURES)
+    @DeleteMapping("/api/v1/webhooks/{id}/secret")
+    public ResponseEntity<Void> removeSigningSecret(@PathVariable String id) {
+        webhookService.removeSigningSecret(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @DeleteMapping("/api/v1/webhooks/{id}")
     public ResponseEntity<Void> deleteWebhook(@PathVariable String id) {
         webhookService.delete(id);
@@ -93,12 +108,12 @@ public class WebhookController {
     public ResponseEntity<WorkflowRunResponse> triggerWebhook(
             @PathVariable String token,
             @RequestHeader HttpHeaders headers,
-            @RequestBody(required = false) Map<String, Object> payload,
+            @RequestBody(required = false) byte[] rawBody,
             HttpServletRequest request) {
         if (!webhookRateLimiter.tryAcquire(request)) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
         }
-        WorkflowRun run = webhookService.trigger(token, payload, headers);
+        WorkflowRun run = webhookService.trigger(token, rawBody, headers);
         return ResponseEntity.ok(workflowMapper.toRunResponse(run));
     }
 
@@ -126,7 +141,8 @@ public class WebhookController {
                 mapped.id(), mapped.workflowId(), mapped.workflowName(),
                 displayToken, webhookUrl, reveal, mapped.enabled(),
                 mapped.description(), mapped.defaultContext(),
-                mapped.lastTriggeredAt(), mapped.triggerCount(), mapped.createdAt()
+                mapped.lastTriggeredAt(), mapped.triggerCount(), mapped.createdAt(),
+                mapped.signatureRequired()
         );
     }
 

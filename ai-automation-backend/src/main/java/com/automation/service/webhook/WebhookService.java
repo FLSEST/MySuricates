@@ -10,13 +10,18 @@ import com.automation.repository.WebhookTriggerRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.executor.ExecutionContext;
 import com.automation.service.activitylog.ActivityLogService;
+import com.automation.service.integration.IntegrationEncryptionService;
 import com.automation.service.workflow.WorkflowExecutor;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.*;
@@ -28,6 +33,8 @@ import java.util.Base64;
 public class WebhookService {
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final TypeReference<Map<String, Object>> PAYLOAD_TYPE = new TypeReference<>() {};
 
     private final WebhookTriggerRepository webhookRepository;
     private final WorkflowRepository workflowRepository;
@@ -35,6 +42,8 @@ public class WebhookService {
     private final com.automation.service.workflow.WorkflowService workflowService;
     private final GitWebhookPayloadParser gitPayloadParser;
     private final ActivityLogService activityLogService;
+    private final WebhookSignatureVerifier signatureVerifier;
+    private final IntegrationEncryptionService encryptionService;
 
     @Transactional(readOnly = true)
     public List<WebhookTrigger> findAll() {
@@ -96,6 +105,33 @@ public class WebhookService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
     }
 
+    /**
+     * Creates or rotates the webhook's signing secret. The plaintext is returned exactly once;
+     * the database only holds the encrypted form.
+     */
+    @Transactional
+    public String generateSigningSecret(String id) {
+        WebhookTrigger webhook = findById(id);
+        byte[] secretBytes = new byte[32];
+        SECURE_RANDOM.nextBytes(secretBytes);
+        String secret = HexFormat.of().formatHex(secretBytes);
+        webhook.setSigningSecretEnc(encryptionService.encrypt(secret));
+        webhookRepository.save(webhook);
+        activityLogService.warn(LogCategory.SECURITY,
+                "Webhook signing secret set for workflow: " + webhook.getWorkflow().getName(), "WebhookService", id);
+        return secret;
+    }
+
+    @Transactional
+    public WebhookTrigger removeSigningSecret(String id) {
+        WebhookTrigger webhook = findById(id);
+        webhook.setSigningSecretEnc(null);
+        WebhookTrigger saved = webhookRepository.save(webhook);
+        activityLogService.warn(LogCategory.SECURITY,
+                "Webhook signing secret removed for workflow: " + webhook.getWorkflow().getName(), "WebhookService", id);
+        return saved;
+    }
+
     @Transactional
     public WebhookTrigger enable(String id) {
         WebhookTrigger webhook = findById(id);
@@ -123,15 +159,19 @@ public class WebhookService {
      * Merges provided payload with default context.
      * Git provider headers (X-GitHub-Event, X-Gitlab-Event, X-Gitea-Event) are used
      * to auto-extract standardized {@code git_*} context variables from the payload.
+     * The body arrives as raw bytes: a signature (if the webhook has a secret) covers exactly
+     * what the sender signed, so it is checked before the JSON is parsed.
      */
     @Transactional
-    public WorkflowRun trigger(String token, Map<String, Object> payload, HttpHeaders headers) {
+    public WorkflowRun trigger(String token, byte[] rawBody, HttpHeaders headers) {
         WebhookTrigger webhook = webhookRepository.findBySecretToken(token)
                 .orElseThrow(() -> new ResourceNotFoundException("WebhookTrigger", "token"));
 
         if (!webhook.isEnabled()) {
             throw new IllegalStateException("Webhook trigger is disabled");
         }
+        signatureVerifier.verify(webhook, rawBody, headers != null ? headers : HttpHeaders.EMPTY);
+        Map<String, Object> payload = parsePayload(rawBody);
 
         // Merge default context with payload (payload overrides)
         Map<String, Object> context = new HashMap<>(webhook.getDefaultContext());
@@ -172,5 +212,16 @@ public class WebhookService {
         activityLogService.info(LogCategory.WEBHOOK, "Webhook triggered: " + workflow.getName(), "WebhookService", run.getId(), workflow.getId());
 
         return run;
+    }
+
+    private static Map<String, Object> parsePayload(byte[] rawBody) {
+        if (rawBody == null || new String(rawBody, StandardCharsets.UTF_8).isBlank()) {
+            return null;
+        }
+        try {
+            return JSON.readValue(rawBody, PAYLOAD_TYPE);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Webhook payload must be a JSON object");
+        }
     }
 }

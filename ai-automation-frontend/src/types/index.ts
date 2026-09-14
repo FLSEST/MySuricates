@@ -488,6 +488,14 @@ export interface WebhookTrigger {
   triggerCount: number;
   lastTriggeredAt: string | null;
   createdAt: string;
+  /** Calls must carry an HMAC-SHA256 signature (the secret itself is never returned) */
+  signatureRequired?: boolean;
+}
+
+/** Freshly generated signing secret — returned exactly once */
+export interface WebhookSigningSecret {
+  secret: string;
+  header: string;
 }
 
 export interface CreateWebhookRequest {

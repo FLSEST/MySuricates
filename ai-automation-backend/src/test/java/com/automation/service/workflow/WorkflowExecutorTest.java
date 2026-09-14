@@ -152,7 +152,7 @@ class WorkflowExecutorTest {
                         activityLogService, containerRepository),
                 new RunFinalizer(runRepository, broadcaster, eventPublisher),
                 runWorkspaceService,
-                new RunAdmission(ModuleRegistry.allEnabled(), new WorkflowDefinitionHasher(), workflowVersionService, activityLogService)
+                new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), new WorkflowDefinitionHasher(), workflowVersionService, activityLogService)
         );
 
         testProject = Project.builder()
@@ -1224,7 +1224,7 @@ class WorkflowExecutorTest {
                         activityLogService, containerRepository),
                 new RunFinalizer(runRepository, broadcaster, eventPublisher),
                 runWorkspaceService,
-                new RunAdmission(ModuleRegistry.allEnabled(), new WorkflowDefinitionHasher(), workflowVersionService, activityLogService)
+                new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), new WorkflowDefinitionHasher(), workflowVersionService, activityLogService)
         );
     }
 

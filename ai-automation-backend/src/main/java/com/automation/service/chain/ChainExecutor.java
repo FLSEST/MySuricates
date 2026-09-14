@@ -64,6 +64,13 @@ public class ChainExecutor {
     }
 
     public ChainRun execute(WorkflowChain chain, Map<String, Object> inputContext, String triggeredByScheduleId) {
+        return execute(chain, inputContext, triggeredByScheduleId,
+                triggeredByScheduleId != null ? TriggerSource.SCHEDULE : TriggerSource.MANUAL);
+    }
+
+    /** @param startedBy what started the chain; its entry runs inherit it for the unattended-run policy */
+    public ChainRun execute(WorkflowChain chain, Map<String, Object> inputContext, String triggeredByScheduleId,
+                            TriggerSource startedBy) {
         ChainRun run = ChainRun.builder()
                 .chain(chain)
                 .status(RunStatus.RUNNING)
@@ -79,7 +86,7 @@ public class ChainExecutor {
 
         activityLogService.info(LogCategory.EXECUTION, "Chain execution started: " + chain.getName(), "ChainExecutor", runId, null);
 
-        virtualThreadExecutor.submit(() -> executeEntries(runId, chain, inputContext));
+        virtualThreadExecutor.submit(() -> executeEntries(runId, chain, inputContext, startedBy));
 
         return run;
     }
@@ -91,7 +98,7 @@ public class ChainExecutor {
         }
     }
 
-    private void executeEntries(String runId, WorkflowChain chain, Map<String, Object> inputContext) {
+    private void executeEntries(String runId, WorkflowChain chain, Map<String, Object> inputContext, TriggerSource startedBy) {
         ChainRun run = chainRunRepository.findById(runId).orElseThrow();
         AtomicBoolean cancelled = activeCancellations.get(runId);
 
@@ -157,6 +164,7 @@ public class ChainExecutor {
                 // Always set it (empty string for the first entry) so {{ previous_chain_output }}
                 // resolves instead of leaking the literal placeholder to the LLM.
                 context.put("previous_chain_output", previousOutput != null ? previousOutput : "");
+                context.put(TriggerSource.PARENT_CONTEXT_KEY, startedBy.name()); // never taken from the input
 
                 run.getEntryRuns().add(runEntry);
                 chainRunRepository.save(run);

@@ -84,7 +84,7 @@ class RunAdmissionTest {
         Workflow broken = Workflow.builder().id("wf-x").blocks(new ArrayList<>()).activatedSkills(null).build();
         when(versionService.findVersionIdByHash(anyString(), any())).thenThrow(new IllegalStateException("db down"));
 
-        RunAdmission.Ticket ticket = new RunAdmission(ModuleRegistry.allEnabled(), hasher, versionService, activityLog)
+        RunAdmission.Ticket ticket = new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), hasher, versionService, activityLog)
                 .admit(broken, TriggerSource.WEBHOOK, Map.of());
 
         assertThat(ticket.definitionHash()).isNull();
@@ -117,6 +117,59 @@ class RunAdmissionTest {
         verify(activityLog).log(eq(LogLevel.ERROR), eq(LogCategory.SECURITY), anyString(), eq("RunAdmission"), eq("wf-1"),
                 argThat(meta -> "WEBHOOK".equals(meta.get("triggerSource")) && hasher.hash(wf).equals(meta.get("actualHash"))),
                 eq("wf-1"));
+    }
+
+    private RunAdmission policyOn() {
+        return new RunAdmission(ModuleRegistry.of(Map.of(),
+                Map.of("sealing", "true", "require-sealed-for-unattended", "true")), hasher, versionService, activityLog);
+    }
+
+    @Test
+    void unattendedRunOfUnsealedWorkflowIsRefusedWhenThePolicyIsOn() {
+        assertThatThrownBy(() -> policyOn().admit(workflow(), TriggerSource.SCHEDULE, Map.of()))
+                .isInstanceOf(HardeningException.class)
+                .satisfies(e -> assertThat(((HardeningException) e).getCode()).isEqualTo(ErrorCode.UNATTENDED_REQUIRES_SEAL))
+                .hasMessageContaining("SCHEDULE");
+        verify(activityLog).log(eq(LogLevel.WARN), eq(LogCategory.SECURITY), anyString(), eq("RunAdmission"), eq("wf-1"),
+                argThat(meta -> "SCHEDULE".equals(meta.get("effectiveSource"))), eq("wf-1"));
+        verifyNoInteractions(versionService);
+    }
+
+    @Test
+    void attendedRunsAndSealedWorkflowsPassThePolicy() {
+        when(versionService.findVersionIdByHash(anyString(), anyString())).thenReturn(Optional.empty());
+        RunAdmission admission = policyOn();
+
+        assertThat(admission.admit(workflow(), TriggerSource.MANUAL, Map.of()).definitionHash()).hasSize(64);
+        Workflow sealed = workflow();
+        sealed.setSealed(true);
+        sealed.setSealedHash(hasher.hash(sealed));
+        assertThat(admission.admit(sealed, TriggerSource.WEBHOOK, Map.of()).definitionHash()).isEqualTo(sealed.getSealedHash());
+        verifyNoInteractions(activityLog);
+    }
+
+    @Test
+    void policyOffLetsUnattendedRunsOfUnsealedWorkflowsThrough() {
+        when(versionService.findVersionIdByHash(anyString(), anyString())).thenReturn(Optional.empty());
+
+        new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), hasher, versionService, activityLog)
+                .admit(workflow(), TriggerSource.TODO_TRIGGER, Map.of());
+
+        verifyNoInteractions(activityLog);
+    }
+
+    @Test
+    void chainAndSubWorkflowRunsInheritTheirOrigin_unknownCountsAsUnattended() {
+        when(versionService.findVersionIdByHash(anyString(), anyString())).thenReturn(Optional.empty());
+        RunAdmission admission = policyOn();
+
+        admission.admit(workflow(), TriggerSource.CHAIN, Map.of(TriggerSource.PARENT_CONTEXT_KEY, "MANUAL"));
+        assertThatThrownBy(() -> admission.admit(workflow(), TriggerSource.SUB_WORKFLOW,
+                Map.of(TriggerSource.PARENT_CONTEXT_KEY, "WEBHOOK"))).isInstanceOf(HardeningException.class);
+        assertThatThrownBy(() -> admission.admit(workflow(), TriggerSource.CHAIN, Map.of()))
+                .isInstanceOf(HardeningException.class).hasMessageContaining("unknown");
+        assertThatThrownBy(() -> admission.admit(workflow(), TriggerSource.CHAIN,
+                Map.of(TriggerSource.PARENT_CONTEXT_KEY, "SUB_WORKFLOW"))).isInstanceOf(HardeningException.class);
     }
 
     @Test

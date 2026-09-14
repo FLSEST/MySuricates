@@ -37,6 +37,9 @@ public class WebhookTrigger {
 
     private String description;
 
+    /** Encrypted HMAC signing secret; when set, trigger calls must carry a valid signature. */
+    private String signingSecretEnc;
+
     @Convert(converter = JsonMapConverter.class)
     @Column(columnDefinition = "text")
     @Builder.Default

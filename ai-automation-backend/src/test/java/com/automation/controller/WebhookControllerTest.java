@@ -346,6 +346,61 @@ class WebhookControllerTest {
     }
 
     @Test
+    void triggerWebhook_passesTheRawBodyBytesUnchanged() throws Exception {
+        WorkflowRun run = WorkflowRun.builder().id("run-1").status(RunStatus.RUNNING).build();
+        when(webhookService.trigger(eq("abc123token"), any(), any())).thenReturn(run);
+        String body = "{ \"action\" :  \"deploy\" }";
+
+        mockMvc.perform(post("/api/v1/webhook/trigger/abc123token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Signature", "sha256=00")
+                        .content(body))
+                .andExpect(status().isOk());
+
+        verify(webhookService).trigger(eq("abc123token"), org.mockito.AdditionalMatchers.aryEq(body.getBytes(java.nio.charset.StandardCharsets.UTF_8)),
+                argThat((org.springframework.http.HttpHeaders h) -> "sha256=00".equals(h.getFirst("X-Signature"))));
+    }
+
+    @Test
+    void triggerWebhook_invalidSignature_returns401() throws Exception {
+        when(webhookService.trigger(eq("abc123token"), any(), any())).thenThrow(new com.automation.exception.HardeningException(
+                com.automation.exception.ErrorCode.WEBHOOK_SIGNATURE_INVALID, "Missing or invalid X-Signature header"));
+
+        mockMvc.perform(post("/api/v1/webhook/trigger/abc123token").content("{}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("WEBHOOK_SIGNATURE_INVALID"));
+    }
+
+    @Test
+    void generateSigningSecret_returnsTheSecretOnce() throws Exception {
+        when(webhookService.generateSigningSecret("wh-1")).thenReturn("ab".repeat(32));
+
+        mockMvc.perform(post("/api/v1/webhooks/wh-1/secret"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.secret").value("ab".repeat(32)))
+                .andExpect(jsonPath("$.header").value("X-Signature"));
+    }
+
+    @Test
+    void removeSigningSecret_returns204() throws Exception {
+        mockMvc.perform(delete("/api/v1/webhooks/wh-1/secret"))
+                .andExpect(status().isNoContent());
+
+        verify(webhookService).removeSigningSecret("wh-1");
+    }
+
+    @Test
+    void responsesExposeWhetherASignatureIsRequired() throws Exception {
+        WebhookTriggerResponse signed = new WebhookTriggerResponse("wh-1", "wf-1", "Test Workflow", "abc123def456ghi789jkl012mno345pq",
+                null, false, true, "Test webhook", new HashMap<>(), null, 5, null, true);
+        when(webhookMapper.toResponse(any(WebhookTrigger.class))).thenReturn(signed);
+        when(webhookService.findById("wh-1")).thenReturn(testWebhook);
+
+        mockMvc.perform(get("/api/v1/webhooks/wh-1"))
+                .andExpect(jsonPath("$.signatureRequired").value(true));
+    }
+
+    @Test
     void triggerWebhook_noBody_returnsOk() throws Exception {
         WorkflowRun run = WorkflowRun.builder().id("run-1").status(RunStatus.RUNNING).build();
         WorkflowRunResponse runResponse = new WorkflowRunResponse(

@@ -16,6 +16,8 @@ public enum ErrorCode {
     STATE_CONFLICT(HttpStatus.CONFLICT, "State conflict"),
     WORKFLOW_SEALED(HttpStatus.CONFLICT, "Workflow is sealed"),
     WORKFLOW_TAMPERED(HttpStatus.CONFLICT, "Sealed workflow definition was modified"),
+    UNATTENDED_REQUIRES_SEAL(HttpStatus.FORBIDDEN, "Unattended runs require a sealed workflow"),
+    WEBHOOK_SIGNATURE_INVALID(HttpStatus.UNAUTHORIZED, "Missing or invalid webhook signature"),
     NO_TASK_TARGET(HttpStatus.BAD_REQUEST, "No task export target configured"),
     PROVIDER_NOT_CONNECTED(HttpStatus.CONFLICT, "Integration provider not connected"),
     PROVIDER_NOT_TASK_CAPABLE(HttpStatus.BAD_REQUEST, "Integration provider cannot receive tasks"),

@@ -182,7 +182,7 @@ class WebhookTriggerTest {
 
         WebhookTrigger trigger = new WebhookTrigger(
                 "trigger-id", workflow, "secret-token-xyz",
-                true, "Deploy webhook", context,
+                true, "Deploy webhook", "encrypted-signing-secret", context,
                 lastTriggered, 5L, created, updated
         );
 
@@ -191,6 +191,7 @@ class WebhookTriggerTest {
         assertThat(trigger.getSecretToken()).isEqualTo("secret-token-xyz");
         assertThat(trigger.isEnabled()).isTrue();
         assertThat(trigger.getDescription()).isEqualTo("Deploy webhook");
+        assertThat(trigger.getSigningSecretEnc()).isEqualTo("encrypted-signing-secret");
         assertThat(trigger.getDefaultContext()).containsEntry("env", "prod");
         assertThat(trigger.getLastTriggeredAt()).isEqualTo(lastTriggered);
         assertThat(trigger.getTriggerCount()).isEqualTo(5L);

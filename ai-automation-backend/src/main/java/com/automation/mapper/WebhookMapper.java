@@ -13,5 +13,6 @@ public interface WebhookMapper {
     @Mapping(source = "workflow.name", target = "workflowName")
     @Mapping(target = "webhookUrl", ignore = true)
     @Mapping(target = "tokenVisible", ignore = true)
+    @Mapping(target = "signatureRequired", expression = "java(webhook.getSigningSecretEnc() != null)")
     WebhookTriggerResponse toResponse(WebhookTrigger webhook);
 }

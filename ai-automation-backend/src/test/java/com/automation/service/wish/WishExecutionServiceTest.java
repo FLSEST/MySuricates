@@ -63,7 +63,7 @@ class WishExecutionServiceTest {
             WorkflowChain chain = WorkflowChain.builder().id("chain-1").build();
             ChainRun chainRun = ChainRun.builder().id("run-1").status(RunStatus.COMPLETED).build();
             when(chainService.findById("chain-1")).thenReturn(chain);
-            when(chainExecutor.execute(eq(chain), any())).thenReturn(chainRun);
+            when(chainExecutor.execute(eq(chain), any(), isNull(), eq(com.automation.entity.TriggerSource.WISH))).thenReturn(chainRun);
             lenient().when(chainRunRepository.findById("run-1")).thenReturn(Optional.of(chainRun));
             when(wishRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             when(wishRepository.findById("w-1")).thenReturn(Optional.of(wish));
@@ -71,7 +71,7 @@ class WishExecutionServiceTest {
             service.execute(wish, neverCancelled);
 
             assertThat(wish.getCurrentRunId()).isEqualTo("run-1");
-            verify(chainExecutor).execute(eq(chain), any());
+            verify(chainExecutor).execute(eq(chain), any(), isNull(), eq(com.automation.entity.TriggerSource.WISH));
             // Final status should be EVALUATING
             assertThat(wish.getStatus()).isEqualTo(WishStatus.EVALUATING);
         }

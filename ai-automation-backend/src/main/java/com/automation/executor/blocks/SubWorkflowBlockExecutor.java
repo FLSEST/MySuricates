@@ -91,6 +91,12 @@ public class SubWorkflowBlockExecutor implements BlockExecutor {
             List<String> newParentIds = new ArrayList<>(parentIds);
             newParentIds.add(workflowId);
             childContext.put("__parent_workflow_ids", newParentIds);
+            TriggerSource origin = TriggerSource.effectiveOfRun(context.getVariables());
+            if (origin != null) {
+                childContext.put(TriggerSource.PARENT_CONTEXT_KEY, origin.name());
+            } else {
+                childContext.remove(TriggerSource.PARENT_CONTEXT_KEY); // unknown origin counts as unattended
+            }
             // Taint travels into the child run: its shell blocks escape the same values
             childContext.putAll(context.exportTaint());
 

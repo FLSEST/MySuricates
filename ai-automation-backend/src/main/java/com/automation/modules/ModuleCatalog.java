@@ -74,9 +74,11 @@ public enum ModuleCatalog {
             "Seal workflows: sealed definitions reject edits and refuse to run if tampered with."),
     REQUIRE_SEALED_FOR_UNATTENDED("require-sealed-for-unattended", HARDENING, EXPERIMENTAL, false, Set.of(),
             List.of("sealing"),
-            "Schedules, webhooks and TODO triggers may only start sealed workflows."),
+            "Unattended runs (schedules, webhooks, triggers, auto-repair, wishes and the chains or "
+                    + "sub-workflows they start) only start sealed workflows."),
     WEBHOOK_SIGNATURES("webhook-signatures", HARDENING, EXPERIMENTAL, false, Set.of(), List.of("webhooks"),
-            "Optional HMAC-SHA256 signature per webhook (X-Signature header).");
+            "Per-webhook HMAC-SHA256 signing secret (X-Signature). A stored secret is always enforced; "
+                    + "the switch gates setting and removing it.");
 
     private final String key;
     private final ModuleTier tier;

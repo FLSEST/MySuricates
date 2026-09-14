@@ -58,6 +58,8 @@ class ControllerModuleGateTest {
             Map.entry("SystemAccessController#disableRemoteAccess", ModuleCatalog.REMOTE_ACCESS),
             Map.entry("SystemAccessController#remoteAccessStatus", ModuleCatalog.REMOTE_ACCESS),
             Map.entry("SystemMaintenanceController#repairAllFailed", ModuleCatalog.FACTORY),
+            Map.entry("WebhookController#generateSigningSecret", ModuleCatalog.WEBHOOK_SIGNATURES),
+            Map.entry("WebhookController#removeSigningSecret", ModuleCatalog.WEBHOOK_SIGNATURES),
             // Dashboard, platform stats and run rating stay core — the core dashboard reads them
             Map.entry("LearningController#getWorkflowStats", ModuleCatalog.LEARNING),
             Map.entry("LearningController#getStepAnalytics", ModuleCatalog.LEARNING),

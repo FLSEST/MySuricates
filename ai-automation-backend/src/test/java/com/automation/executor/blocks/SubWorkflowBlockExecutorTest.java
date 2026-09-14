@@ -209,6 +209,31 @@ class SubWorkflowBlockExecutorTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void execute_childInheritsTheParentsEffectiveOrigin() {
+        // parent is a chain entry started by a schedule
+        context.getVariables().put("trigger_source", "CHAIN");
+        context.getVariables().put(TriggerSource.PARENT_CONTEXT_KEY, "SCHEDULE");
+        Workflow subWorkflow = Workflow.builder().id("sub-wf-1").name("Sub Workflow").build();
+        when(workflowService.findById("sub-wf-1")).thenReturn(subWorkflow);
+        WorkflowRun subRun = WorkflowRun.builder().id("sub-run-1").workflow(subWorkflow).status(RunStatus.COMPLETED).build();
+        when(workflowExecutor.execute(eq(subWorkflow), any(Map.class), eq(TriggerSource.SUB_WORKFLOW))).thenReturn(subRun);
+        when(runRepository.findById("sub-run-1")).thenReturn(Optional.of(subRun));
+        BlockDefinition block = BlockDefinition.builder().type("sub-workflow")
+                .config(new HashMap<>(Map.of("workflow_id", "sub-wf-1"))).build();
+
+        executor.execute(block, context);
+        context.getVariables().put("trigger_source", "bogus");
+        executor.execute(block, context);
+
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(workflowExecutor, org.mockito.Mockito.times(2)).execute(eq(subWorkflow), captor.capture(), eq(TriggerSource.SUB_WORKFLOW));
+        assertThat(captor.getAllValues().get(0)).containsEntry(TriggerSource.PARENT_CONTEXT_KEY, "SCHEDULE");
+        // unreadable origin: the key is dropped so the child counts as unattended
+        assertThat(captor.getAllValues().get(1)).doesNotContainKey(TriggerSource.PARENT_CONTEXT_KEY);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void execute_taintedParent_handsTheTaintToTheChild() {
         context.setUntrustedVariable("branch", "main; id");
         context.recordOutput("scan", "out");
