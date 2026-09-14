@@ -15,9 +15,10 @@ class ErrorCodeTest {
 
     @Test
     void should_containAllExpectedValues_when_enumValuesQueried() {
-        assertThat(ErrorCode.values()).hasSize(15)
+        assertThat(ErrorCode.values()).hasSize(16)
                 .containsExactly(
                         ErrorCode.RESOURCE_NOT_FOUND,
+                        ErrorCode.MODULE_DISABLED,
                         ErrorCode.VALIDATION_FAILED,
                         ErrorCode.INVALID_ARGUMENT,
                         ErrorCode.WORKFLOW_EXECUTION_FAILED,
@@ -58,6 +59,7 @@ class ErrorCodeTest {
     @Test
     void should_mapToClientErrorStatus_when_clientErrorCodeUsed() {
         assertThat(ErrorCode.RESOURCE_NOT_FOUND.getHttpStatus().is4xxClientError()).isTrue();
+        assertThat(ErrorCode.MODULE_DISABLED.getHttpStatus().is4xxClientError()).isTrue();
         assertThat(ErrorCode.VALIDATION_FAILED.getHttpStatus().is4xxClientError()).isTrue();
         assertThat(ErrorCode.INVALID_ARGUMENT.getHttpStatus().is4xxClientError()).isTrue();
         assertThat(ErrorCode.STATE_CONFLICT.getHttpStatus().is4xxClientError()).isTrue();
@@ -81,6 +83,7 @@ class ErrorCodeTest {
     private static Stream<Arguments> errorCodeMappings() {
         return Stream.of(
                 Arguments.of(ErrorCode.RESOURCE_NOT_FOUND, HttpStatus.NOT_FOUND, "Resource not found"),
+                Arguments.of(ErrorCode.MODULE_DISABLED, HttpStatus.NOT_FOUND, "Module disabled"),
                 Arguments.of(ErrorCode.VALIDATION_FAILED, HttpStatus.BAD_REQUEST, "Validation failed"),
                 Arguments.of(ErrorCode.INVALID_ARGUMENT, HttpStatus.BAD_REQUEST, "Invalid argument"),
                 Arguments.of(ErrorCode.WORKFLOW_EXECUTION_FAILED, HttpStatus.INTERNAL_SERVER_ERROR, "Workflow execution failed"),
