@@ -118,6 +118,10 @@ export interface Workflow {
   effort: string | null;
   /** SHA-256 of the current definition (detail responses with provenance on) */
   definitionHash?: string | null;
+  /** Sealed definitions reject changes and refuse to run if modified (automation.hardening.sealing) */
+  sealed?: boolean;
+  sealedHash?: string | null;
+  sealedAt?: string | null;
   metadata?: WorkflowMetadata;
   defaultContext?: Record<string, string>;
   testStatus?: 'UNTESTED' | 'PASSED' | 'FAILED';

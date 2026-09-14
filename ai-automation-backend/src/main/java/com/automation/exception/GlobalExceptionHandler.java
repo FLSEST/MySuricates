@@ -69,6 +69,12 @@ public class GlobalExceptionHandler {
         return respond(ex.getCode(), ex.getMessage());
     }
 
+    @ExceptionHandler(HardeningException.class)
+    public ResponseEntity<ErrorResponse> handleHardening(HardeningException ex) {
+        log.warn("Hardening rule [{}]: {}", ex.getCode(), ex.getMessage());
+        return respond(ex.getCode(), ex.getMessage());
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
         log.warn("Invalid argument: {}", ex.getMessage());

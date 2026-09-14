@@ -6,6 +6,7 @@ import {
   Bell,
   FlaskConical,
   Cloud,
+  Lock,
   Workflow as WorkflowFlowIcon,
 } from 'lucide-react';
 import { useT } from '../../i18n';
@@ -82,6 +83,11 @@ export function WorkflowRow({
         </div>
       ) : (
         <span className="text-sm truncate flex-1">{workflow.name}</span>
+      )}
+      {!selectMode && workflow.sealed && (
+        <span title={t.workflows.sealedHint} className="shrink-0" data-testid="row-sealed">
+          <Lock className="w-3 h-3 text-accent" />
+        </span>
       )}
       {!selectMode && !!workflow.metadata?.autoTodo?.enabled && (
         <Bell className="w-3 h-3 text-accent/50 shrink-0" />

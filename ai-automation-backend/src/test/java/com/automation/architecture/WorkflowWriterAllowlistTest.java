@@ -37,6 +37,8 @@ class WorkflowWriterAllowlistTest {
             // staging module: test status (label) and pull of instructions/model from the test
             // instance; the pull is detected as an UNTRACKED version on the next tracked change
             "com/automation/service/staging/TestingService.java", 2,
+            // seal flag and sealed hash — protects the definition, does not change it
+            "com/automation/service/workflow/WorkflowSealService.java", 2,
             // stable_synced_at marker (label)
             "com/automation/service/staging/InstanceSyncHelper.java", 1,
             "com/automation/repository/WorkflowRepository.java", 1);

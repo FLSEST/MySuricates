@@ -224,14 +224,15 @@ public class WorkflowController {
         if (!version.getWorkflowId().equals(id)) {
             throw new com.automation.exception.ResourceNotFoundException("WorkflowVersion", versionId);
         }
+        WorkflowSnapshot snapshot;
         try {
-            WorkflowSnapshot snapshot = objectMapper.readValue(version.getSnapshot(), WorkflowSnapshot.class);
-            Workflow restored = workflowService.restoreFromSnapshot(
-                    id, snapshot, "Restored from version " + version.getVersionNumber());
-            return ResponseEntity.ok(workflowMapper.toResponse(restored));
+            snapshot = objectMapper.readValue(version.getSnapshot(), WorkflowSnapshot.class);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
         }
+        // outside the catch: a sealed workflow must answer 409 WORKFLOW_SEALED, not a bare 500
+        Workflow restored = workflowService.restoreFromSnapshot(id, snapshot, "Restored from version " + version.getVersionNumber());
+        return ResponseEntity.ok(workflowMapper.toResponse(restored));
     }
 
     @PostMapping("/import")

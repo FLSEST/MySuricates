@@ -37,8 +37,52 @@ public record WorkflowResponse(
         boolean tagsUserEdited,
         String effort,
         /** SHA-256 of the current definition (single-workflow responses with provenance on; null in lists). */
-        String definitionHash
+        String definitionHash,
+        boolean sealed,
+        String sealedHash,
+        Instant sealedAt
 ) {
+    /** Backwards-compat constructor for call-sites written before sealing existed. */
+    public WorkflowResponse(
+            String id,
+            String projectId,
+            String projectName,
+            String projectSubtitle,
+            String projectDescription,
+            String name,
+            String description,
+            String icon,
+            List<BlockDefinition> blocks,
+            String version,
+            Map<String, Object> metadata,
+            List<String> activatedSkillIds,
+            List<String> activatedSkillNames,
+            long runCount,
+            String instructions,
+            String model,
+            String provider,
+            String templateId,
+            Map<String, Object> defaultContext,
+            String testStatus,
+            Instant lastTestedAt,
+            Instant createdAt,
+            Instant updatedAt,
+            Instant stableSyncedAt,
+            List<String> tags,
+            String category,
+            Instant tagsGeneratedAt,
+            boolean tagsUserEdited,
+            String effort,
+            String definitionHash
+    ) {
+        this(id, projectId, projectName, projectSubtitle, projectDescription,
+                name, description, icon, blocks, version, metadata,
+                activatedSkillIds, activatedSkillNames, runCount,
+                instructions, model, provider, templateId, defaultContext,
+                testStatus, lastTestedAt, createdAt, updatedAt, stableSyncedAt,
+                tags, category, tagsGeneratedAt, tagsUserEdited, effort, definitionHash, false, null, null);
+    }
+
     /** Backwards-compat constructor for call-sites written before definition hashes existed. */
     public WorkflowResponse(
             String id,

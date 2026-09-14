@@ -401,7 +401,8 @@ export function WorkflowDetailPanel({
         <Button icon={<Play className="w-4 h-4" />} onClick={onExecute}>
           {t.workflows.execute}
         </Button>
-        <Button variant="secondary" icon={<Pencil className="w-4 h-4" />} onClick={onEdit}>
+        <Button variant="secondary" icon={<Pencil className="w-4 h-4" />} onClick={onEdit} disabled={!!workflow.sealed}
+          title={workflow.sealed ? t.workflows.sealedLocked : undefined}>
           {t.common.edit}
         </Button>
         <Button

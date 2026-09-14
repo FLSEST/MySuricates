@@ -14,6 +14,8 @@ public enum ErrorCode {
     CONTAINER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Container error"),
     STAGING_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Staging error"),
     STATE_CONFLICT(HttpStatus.CONFLICT, "State conflict"),
+    WORKFLOW_SEALED(HttpStatus.CONFLICT, "Workflow is sealed"),
+    WORKFLOW_TAMPERED(HttpStatus.CONFLICT, "Sealed workflow definition was modified"),
     NO_TASK_TARGET(HttpStatus.BAD_REQUEST, "No task export target configured"),
     PROVIDER_NOT_CONNECTED(HttpStatus.CONFLICT, "Integration provider not connected"),
     PROVIDER_NOT_TASK_CAPABLE(HttpStatus.BAD_REQUEST, "Integration provider cannot receive tasks"),

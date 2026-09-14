@@ -5,6 +5,8 @@ import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.ActivityLog.LogLevel;
 import com.automation.entity.ChangeSource;
 import com.automation.entity.Workflow;
+import com.automation.exception.ErrorCode;
+import com.automation.exception.HardeningException;
 import com.automation.service.activitylog.ActivityLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -41,6 +43,12 @@ public class WorkflowMutationGateway {
         if (before != null && changedFields.isEmpty()) {
             return; // labels only (name, tags, …) — not a new definition
         }
+        if (saved.isSealed()) {
+            // Runs inside the caller's transaction: throwing rolls the change back. Holds even when the
+            // sealing switch is off later — turning the switch off must not silently unseal anything.
+            throw new HardeningException(ErrorCode.WORKFLOW_SEALED, "Workflow '" + saved.getName()
+                    + "' is sealed — unseal it before changing " + String.join(", ", changedFields));
+        }
         String afterHash = hasher.hash(after);
         String beforeHash = before == null ? null : hasher.hash(before);
         if (beforeHash != null && !describedByNewestVersion(saved.getId(), beforeHash)) {
@@ -60,6 +68,14 @@ public class WorkflowMutationGateway {
         activityLog.log(LogLevel.INFO, LogCategory.SYSTEM,
                 "Workflow definition " + (before == null ? "created" : "changed") + " by " + source.key() + ": " + saved.getName(),
                 "WorkflowMutationGateway", saved.getId(), metadata, saved.getId());
+    }
+
+    /** Guard for operations that remove or replace a workflow as a whole (delete). */
+    public void requireUnsealed(Workflow workflow, String operation) {
+        if (workflow.isSealed()) {
+            throw new HardeningException(ErrorCode.WORKFLOW_SEALED,
+                    "Workflow '" + workflow.getName() + "' is sealed — unseal it before " + operation);
+        }
     }
 
     private boolean describedByNewestVersion(String workflowId, String hash) {

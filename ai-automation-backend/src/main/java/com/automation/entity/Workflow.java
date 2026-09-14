@@ -120,6 +120,17 @@ public class Workflow {
     @Column(name = "stable_synced_at")
     private Instant stableSyncedAt;
 
+    /** Sealed definitions reject changes and refuse to run if their hash no longer matches {@link #sealedHash}. */
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean sealed = false;
+
+    @Column(name = "sealed_hash")
+    private String sealedHash;
+
+    @Column(name = "sealed_at")
+    private Instant sealedAt;
+
     @CreatedDate
     @Column(updatable = false)
     private Instant createdAt;

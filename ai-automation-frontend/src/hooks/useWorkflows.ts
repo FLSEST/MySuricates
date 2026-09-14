@@ -165,6 +165,22 @@ export function useUpdateWorkflow() {
   });
 }
 
+/** Seal (lock=true) or unseal a workflow. Only offered when the sealing module is enabled. */
+export function useSealWorkflow() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
+  return useMutation({
+    mutationFn: ({ id, lock }: { id: string; lock: boolean }) =>
+      api.post<Workflow>(`/workflows/${id}/${lock ? 'seal' : 'unseal'}`),
+    onSuccess: (_, { lock }) => {
+      qc.invalidateQueries({ queryKey: ['workflows'] });
+      toast.success(lock ? t.workflows.sealedToast : t.workflows.unsealedToast);
+    },
+    onError: (err) => toast.error(apiErrorMessage(err, t.workflows.sealFailed)),
+  });
+}
+
 export function useDeleteWorkflow() {
   const qc = useQueryClient();
   const toast = useToast();

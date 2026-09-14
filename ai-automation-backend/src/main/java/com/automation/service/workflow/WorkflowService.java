@@ -214,6 +214,7 @@ public class WorkflowService {
     @Transactional
     public void delete(String id) {
         Workflow workflow = findById(id);
+        mutations.requireUnsealed(workflow, "deleting it");
         workflow.setDeletedAt(java.time.Instant.now());
         workflowRepository.save(workflow);
         log.info("Soft-deleted workflow: {} ({})", workflow.getName(), workflow.getId());

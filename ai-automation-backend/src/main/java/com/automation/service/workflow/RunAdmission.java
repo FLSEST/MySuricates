@@ -1,19 +1,25 @@
 package com.automation.service.workflow;
 
+import com.automation.entity.ActivityLog.LogCategory;
+import com.automation.entity.ActivityLog.LogLevel;
 import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
+import com.automation.exception.ErrorCode;
+import com.automation.exception.HardeningException;
 import com.automation.modules.ModuleCatalog;
 import com.automation.modules.ModuleRegistry;
+import com.automation.service.activitylog.ActivityLogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
  * Single gate every workflow run passes before its run row exists (called by
  * {@link WorkflowExecutor}). Records provenance — the definition hash and the matching version —
- * and is where the optional hardening policies (sealing, unattended runs) refuse runs.
+ * and refuses runs that violate a hardening rule. A refused run leaves no run row behind.
  */
 @Slf4j
 @Component
@@ -30,13 +36,18 @@ public class RunAdmission {
     private final ModuleRegistry modules;
     private final WorkflowDefinitionHasher hasher;
     private final WorkflowVersionService versionService;
+    private final ActivityLogService activityLog;
 
     public Ticket admit(Workflow workflow, TriggerSource source, Map<String, Object> inputContext) {
+        // Seals are checked regardless of the switches: a seal must not lapse because a flag changed.
+        String hash = workflow.isSealed() ? verifySeal(workflow, source) : null;
         if (!modules.isEnabled(ModuleCatalog.PROVENANCE)) {
             return Ticket.none();
         }
         try {
-            String hash = hasher.hash(workflow);
+            if (hash == null) {
+                hash = hasher.hash(workflow);
+            }
             String versionId = versionService.findVersionIdByHash(workflow.getId(), hash).orElse(null);
             return new Ticket(hash, versionId);
         } catch (RuntimeException e) {
@@ -45,5 +56,31 @@ public class RunAdmission {
             log.warn("Could not compute definition hash for workflow {} ({}): {}", workflow.getId(), source, e.getMessage());
             return Ticket.none();
         }
+    }
+
+    /** Returns the verified hash or refuses the run (fail closed: an unverifiable seal is a broken seal). */
+    private String verifySeal(Workflow workflow, TriggerSource source) {
+        String actual;
+        try {
+            actual = hasher.hash(workflow);
+        } catch (RuntimeException e) {
+            throw refuse(workflow, source, null, "its definition could not be verified (" + e.getMessage() + ")");
+        }
+        if (!actual.equals(workflow.getSealedHash())) {
+            throw refuse(workflow, source, actual, "its definition no longer matches the seal");
+        }
+        return actual;
+    }
+
+    private HardeningException refuse(Workflow workflow, TriggerSource source, String actualHash, String reason) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("expectedHash", workflow.getSealedHash());
+        metadata.put("actualHash", actualHash);
+        metadata.put("triggerSource", source.name());
+        activityLog.log(LogLevel.ERROR, LogCategory.SECURITY,
+                "Run refused — sealed workflow '" + workflow.getName() + "': " + reason,
+                "RunAdmission", workflow.getId(), metadata, workflow.getId());
+        return new HardeningException(ErrorCode.WORKFLOW_TAMPERED,
+                "Sealed workflow '" + workflow.getName() + "' was not started: " + reason);
     }
 }

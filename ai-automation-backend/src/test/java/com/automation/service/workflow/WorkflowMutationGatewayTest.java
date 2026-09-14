@@ -7,6 +7,8 @@ import com.automation.entity.BlockDefinition;
 import com.automation.entity.ChangeSource;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowVersion;
+import com.automation.exception.ErrorCode;
+import com.automation.exception.HardeningException;
 import com.automation.service.activitylog.ActivityLogService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -115,6 +118,30 @@ class WorkflowMutationGatewayTest {
         gateway.record(workflow, before, ChangeSource.USER, null);
 
         verify(versions).saveVersion(eq("wf-1"), eq(before), anyString(), eq(ChangeSource.UNTRACKED), any());
+    }
+
+    @Test
+    void sealedWorkflowRejectsDefinitionChangesButAllowsLabels() {
+        workflow.setSealed(true);
+        WorkflowSnapshot before = WorkflowSnapshot.from(workflow);
+        workflow.setName("Renamed");
+        gateway.record(workflow, before, ChangeSource.USER, null); // label only: fine
+
+        workflow.setInstructions("sneaky");
+        assertThatThrownBy(() -> gateway.record(workflow, before, ChangeSource.ASSISTANT, null))
+                .isInstanceOf(HardeningException.class)
+                .hasMessageContaining("sealed").hasMessageContaining("instructions")
+                .satisfies(e -> assertThat(((HardeningException) e).getCode()).isEqualTo(ErrorCode.WORKFLOW_SEALED));
+        verifyNoInteractions(versions);
+    }
+
+    @Test
+    void requireUnsealedBlocksDeleteOfSealedWorkflows() {
+        gateway.requireUnsealed(workflow, "deleting it"); // unsealed: no-op
+        workflow.setSealed(true);
+
+        assertThatThrownBy(() -> gateway.requireUnsealed(workflow, "deleting it"))
+                .isInstanceOf(HardeningException.class).hasMessageContaining("deleting it");
     }
 
     @SuppressWarnings("unchecked")

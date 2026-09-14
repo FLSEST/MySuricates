@@ -1,9 +1,9 @@
 import {
-  ArrowLeft, Play, Pencil, Wand2, Wrench, Copy, Download, FileCode2, Trash2,
+  ArrowLeft, Play, Pencil, Wand2, Wrench, Copy, Download, FileCode2, Trash2, Lock, LockOpen,
 } from 'lucide-react';
 import { Button } from '../ui';
 import type { Workflow } from '../../types';
-import { exportWorkflow } from '../../hooks/useWorkflows';
+import { exportWorkflow, useSealWorkflow } from '../../hooks/useWorkflows';
 import { fetchWorkflowBpmn } from '../../api/client';
 import { downloadBlob } from '../../utils/downloadFile';
 import { useToast } from '../../hooks/useToast';
@@ -43,6 +43,14 @@ export function WorkflowDetailHeader({
   const toast = useToast();
   const factoryModule = useModuleEnabled('factory');
   const bpmnModule = useModuleEnabled('bpmn');
+  const sealingModule = useModuleEnabled('sealing');
+  const sealWorkflow = useSealWorkflow();
+  const sealed = !!workflow.sealed;
+  const toggleSeal = () => {
+    if (confirm(sealed ? t.workflows.unsealConfirm : t.workflows.sealConfirm)) {
+      sealWorkflow.mutate({ id: workflow.id, lock: !sealed });
+    }
+  };
 
   const handleBpmnExport = async () => {
     try {
@@ -67,6 +75,16 @@ export function WorkflowDetailHeader({
         <div className="flex items-center gap-3">
           <span className="text-2xl">{workflow.icon || '📋'}</span>
           <h1 className="text-2xl font-bold text-text truncate">{workflow.name}</h1>
+          {sealed && (
+            <span
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 text-accent text-xs font-medium shrink-0"
+              title={t.workflows.sealedHint}
+              data-testid="sealed-badge"
+            >
+              <Lock className="w-3 h-3" />
+              {t.workflows.sealed}
+            </span>
+          )}
         </div>
         {workflow.description && (
           <p className="text-sm text-text-secondary mt-0.5">{workflow.description}</p>
@@ -100,7 +118,19 @@ export function WorkflowDetailHeader({
         >
           {t.workflows.execute}
         </Button>
-        <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} onClick={onEdit} title={t.common.edit} aria-label={t.common.edit} />
+        <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} onClick={onEdit} disabled={sealed}
+          title={sealed ? t.workflows.sealedLocked : t.common.edit} aria-label={t.common.edit} />
+        {sealingModule && (
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={sealed ? <LockOpen className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+            onClick={toggleSeal}
+            loading={sealWorkflow.isPending}
+            title={sealed ? t.workflows.unseal : t.workflows.seal}
+            aria-label={sealed ? t.workflows.unseal : t.workflows.seal}
+          />
+        )}
         <Button
           variant="ghost"
           size="sm"
@@ -130,7 +160,8 @@ export function WorkflowDetailHeader({
             aria-label={t.workflows.exportBpmn}
           />
         )}
-        <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4" />} onClick={onDelete} title={t.common.delete} aria-label={t.common.delete} />
+        <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4" />} onClick={onDelete} disabled={sealed}
+          title={sealed ? t.workflows.sealedLocked : t.common.delete} aria-label={t.common.delete} />
       </div>
     </div>
   );
