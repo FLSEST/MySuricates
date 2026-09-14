@@ -523,7 +523,8 @@ Alle Versionen eines Workflows auflisten (paginiert).
       "workflowId": "workflow-uuid",
       "versionNumber": 3,
       "snapshot": { ... },
-      "changeSource": "USER",
+      "changeSource": "assistant",
+      "definitionHash": "3f1c…e9",
       "changeMessage": "Prompt angepasst",
       "createdAt": "2025-01-15T10:00:00Z"
     }

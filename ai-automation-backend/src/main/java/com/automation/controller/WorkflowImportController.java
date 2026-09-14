@@ -2,6 +2,7 @@ package com.automation.controller;
 
 import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.dto.response.WorkflowResponse;
+import com.automation.entity.ChangeSource;
 import com.automation.entity.Workflow;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.modules.ModuleCatalog;
@@ -46,7 +47,7 @@ public class WorkflowImportController {
         CreateWorkflowRequest request = new CreateWorkflowRequest(
                 projectId, imported.name(), null, null, imported.blocks(),
                 null, null, null, null, null, null, null, null, null);
-        Workflow workflow = workflowService.create(request);
+        Workflow workflow = workflowService.create(request, ChangeSource.BPMN_IMPORT);
         return ResponseEntity.status(HttpStatus.CREATED).body(workflowMapper.toResponse(workflow));
     }
 }

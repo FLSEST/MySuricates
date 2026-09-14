@@ -2,6 +2,7 @@ package com.automation.service.assistant;
 
 import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.dto.request.UpdateWorkflowRequest;
+import com.automation.entity.ChangeSource;
 import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
@@ -39,13 +40,13 @@ class AssistantWorkflowToolsTest {
 
     @Test
     void createWorkflow_exactSuccessLine_andDefaultIcon() {
-        when(workflowService.create(any())).thenReturn(Workflow.builder().id("wf-1").name("Daily").build());
+        when(workflowService.create(any(), eq(ChangeSource.ASSISTANT))).thenReturn(Workflow.builder().id("wf-1").name("Daily").build());
 
         String r = tools.createWorkflow("{\"projectId\":\"p\",\"name\":\"Daily\"}");
 
         assertThat(r).isEqualTo("✓ Workflow created: \"Daily\" (ID: wf-1)");
         ArgumentCaptor<CreateWorkflowRequest> req = ArgumentCaptor.forClass(CreateWorkflowRequest.class);
-        verify(workflowService).create(req.capture());
+        verify(workflowService).create(req.capture(), eq(ChangeSource.ASSISTANT));
         assertThat(req.getValue().icon()).isEqualTo("⚡");
         assertThat(req.getValue().blocks()).isEmpty();
         assertThat(req.getValue().metadata()).isNull();
@@ -58,18 +59,18 @@ class AssistantWorkflowToolsTest {
                 .isEqualTo("⚠ create_workflow: projectId and name are required fields.");
         assertThat(tools.createWorkflow("{\"projectId\":\"p\",\"name\":\" \"}"))
                 .isEqualTo("⚠ create_workflow: projectId and name are required fields.");
-        verify(workflowService, never()).create(any());
+        verify(workflowService, never()).create(any(), eq(ChangeSource.ASSISTANT));
     }
 
     @Test
     void updateWorkflow_exactSuccessLine_andNullIconWhenAbsent() {
-        when(workflowService.update(eq("wf-1"), any())).thenReturn(Workflow.builder().id("wf-1").name("Renamed").build());
+        when(workflowService.update(eq("wf-1"), any(), eq(ChangeSource.ASSISTANT))).thenReturn(Workflow.builder().id("wf-1").name("Renamed").build());
 
         String r = tools.updateWorkflow("{\"workflowId\":\"wf-1\",\"name\":\"Renamed\"}");
 
         assertThat(r).isEqualTo("✓ Workflow updated: \"Renamed\" (ID: wf-1)");
         ArgumentCaptor<UpdateWorkflowRequest> req = ArgumentCaptor.forClass(UpdateWorkflowRequest.class);
-        verify(workflowService).update(eq("wf-1"), req.capture());
+        verify(workflowService).update(eq("wf-1"), req.capture(), eq(ChangeSource.ASSISTANT));
         assertThat(req.getValue().icon()).isNull();
         assertThat(req.getValue().blocks()).isNull();
     }

@@ -265,4 +265,15 @@ class WorkflowSnapshotTest {
 
         assertThat(a.differs(b)).isTrue();
     }
+
+    // --- changedFields() ---
+
+    @Test
+    void changedFields_namesEveryDifferingExecutableField() {
+        WorkflowSnapshot a = new WorkflowSnapshot(List.of(), "i", "m", "p", Map.of(), Map.of(), List.of("s"), "low");
+        WorkflowSnapshot b = new WorkflowSnapshot(List.of(), "i2", "m", "p2", Map.of("k", 1), Map.of(), List.of(), "high");
+
+        assertThat(a.changedFields(b)).containsExactly("instructions", "provider", "metadata", "activatedSkillIds", "effort");
+        assertThat(a.changedFields(a)).isEmpty();
+    }
 }

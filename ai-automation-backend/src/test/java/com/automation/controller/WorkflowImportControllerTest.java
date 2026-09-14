@@ -4,6 +4,7 @@ import com.automation.config.RateLimitConfig;
 import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.dto.response.WorkflowResponse;
 import com.automation.entity.BlockDefinition;
+import com.automation.entity.ChangeSource;
 import com.automation.entity.Workflow;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.mapper.WorkflowMapper;
@@ -27,6 +28,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import static org.mockito.ArgumentMatchers.eq;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -57,7 +59,7 @@ class WorkflowImportControllerTest {
         block.setConfig(Map.of("command", "ls"));
         Workflow created = Workflow.builder().id("new-1").name("Importiert").build();
         when(bpmnImportAdapter.importFrom("<definitions/>")).thenReturn(new ImportedWorkflow("Importiert", List.of(block)));
-        when(workflowService.create(any())).thenReturn(created);
+        when(workflowService.create(any(), eq(ChangeSource.BPMN_IMPORT))).thenReturn(created);
         when(workflowMapper.toResponse(created)).thenReturn(new WorkflowResponse(
                 "new-1", "proj-1", "Projekt", null, null, "Importiert", null,
                 null, List.of(), "1.0.0", Map.of(), List.of(), List.of(), 0L,
@@ -70,7 +72,7 @@ class WorkflowImportControllerTest {
                 .andExpect(jsonPath("$.name").value("Importiert"));
 
         ArgumentCaptor<CreateWorkflowRequest> captor = ArgumentCaptor.forClass(CreateWorkflowRequest.class);
-        verify(workflowService).create(captor.capture());
+        verify(workflowService).create(captor.capture(), eq(ChangeSource.BPMN_IMPORT));
         assertThat(captor.getValue().projectId()).isEqualTo("proj-1");
         assertThat(captor.getValue().name()).isEqualTo("Importiert");
         assertThat(captor.getValue().blocks()).hasSize(1);
@@ -88,7 +90,7 @@ class WorkflowImportControllerTest {
                 .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"))
                 .andExpect(jsonPath("$.error").value("Diese BPMN stammt nicht aus MySuricates"));
 
-        verify(workflowService, never()).create(any());
+        verify(workflowService, never()).create(any(), eq(ChangeSource.BPMN_IMPORT));
     }
 
     @Test
@@ -98,6 +100,6 @@ class WorkflowImportControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"));
 
-        verify(workflowService, never()).create(any());
+        verify(workflowService, never()).create(any(), eq(ChangeSource.BPMN_IMPORT));
     }
 }

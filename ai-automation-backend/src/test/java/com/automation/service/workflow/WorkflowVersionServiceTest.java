@@ -1,8 +1,7 @@
 package com.automation.service.workflow;
 
 import com.automation.dto.WorkflowSnapshot;
-import com.automation.entity.BlockDefinition;
-import com.automation.entity.Workflow;
+import com.automation.entity.ChangeSource;
 import com.automation.entity.WorkflowVersion;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.WorkflowVersionRepository;
@@ -38,199 +37,59 @@ class WorkflowVersionServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new WorkflowVersionService(versionRepository, objectMapper, new WorkflowDefinitionHasher());
+        service = new WorkflowVersionService(versionRepository, objectMapper);
     }
 
     @Nested
-    class SnapshotBeforeUpdate {
+    class SaveVersion {
+
+        private final WorkflowSnapshot snapshot = new WorkflowSnapshot(
+                List.of(), "changed instructions", "claude-sonnet-4-6", "CLAUDE", Map.of("k", "v"), Map.of(), List.of());
 
         @Test
-        void noChanges_returnsEmpty() {
-            Workflow workflow = Workflow.builder().id("wf-1")
-                    .blocks(List.of()).instructions("do stuff").model("claude-sonnet-4-6")
-                    .build();
-            WorkflowSnapshot incoming = WorkflowSnapshot.from(workflow);
+        void numbersAfterTheHighestExistingVersion() {
+            when(versionRepository.maxVersionNumber("wf-1")).thenReturn(7);
 
-            Optional<Integer> result = service.snapshotBeforeUpdate(workflow, incoming, "user", "test");
-
-            assertThat(result).isEmpty();
-            verify(versionRepository, never()).save(any());
-        }
-
-        @Test
-        void withChanges_savesSnapshotAndReturnsVersion() {
-            Workflow workflow = Workflow.builder().id("wf-1")
-                    .blocks(List.of()).instructions("old instructions").model("claude-sonnet-4-6")
-                    .build();
-            WorkflowSnapshot incoming = new WorkflowSnapshot(
-                    List.of(), "new instructions", "claude-sonnet-4-6", null, Map.of(), Map.of(), List.of());
-
-            when(versionRepository.countByWorkflowId("wf-1")).thenReturn(3);
-
-            Optional<Integer> result = service.snapshotBeforeUpdate(workflow, incoming, "user", "Updated instructions");
-
-            assertThat(result).contains(4); // 3 + 1
+            int number = service.saveVersion("wf-1", snapshot, "hash-1", ChangeSource.ASSISTANT, "via tool");
 
             ArgumentCaptor<WorkflowVersion> captor = ArgumentCaptor.forClass(WorkflowVersion.class);
             verify(versionRepository).save(captor.capture());
             WorkflowVersion saved = captor.getValue();
-            assertThat(saved.getWorkflowId()).isEqualTo("wf-1");
-            assertThat(saved.getVersionNumber()).isEqualTo(4);
-            assertThat(saved.getChangeSource()).isEqualTo("user");
-            assertThat(saved.getChangeMessage()).isEqualTo("Updated instructions");
-            assertThat(saved.getSnapshot()).contains("old instructions");
+            assertThat(number).isEqualTo(8);
+            assertThat(saved.getVersionNumber()).isEqualTo(8);
+            assertThat(saved.getChangeSource()).isEqualTo("assistant");
+            assertThat(saved.getChangeMessage()).isEqualTo("via tool");
+            assertThat(saved.getDefinitionHash()).isEqualTo("hash-1");
         }
 
         @Test
-        void firstVersion_returnsOne() {
-            Workflow workflow = Workflow.builder().id("wf-1")
-                    .blocks(List.of()).instructions("old").model("m1")
-                    .build();
-            WorkflowSnapshot incoming = new WorkflowSnapshot(
-                    List.of(), "new", "m1", null, Map.of(), Map.of(), List.of());
+        void firstVersionIsOne() {
+            when(versionRepository.maxVersionNumber("wf-1")).thenReturn(0);
 
-            when(versionRepository.countByWorkflowId("wf-1")).thenReturn(0);
-
-            Optional<Integer> result = service.snapshotBeforeUpdate(workflow, incoming, "api", null);
-
-            assertThat(result).contains(1);
+            assertThat(service.saveVersion("wf-1", snapshot, "h", ChangeSource.USER, null)).isEqualTo(1);
         }
 
         @Test
-        void modelChange_detected() {
-            Workflow workflow = Workflow.builder().id("wf-1")
-                    .blocks(List.of()).model("claude-sonnet-4-6")
-                    .build();
-            WorkflowSnapshot incoming = new WorkflowSnapshot(
-                    List.of(), null, "claude-opus-4-6", null, Map.of(), Map.of(), List.of());
+        void savedSnapshotRoundTrips() throws Exception {
+            when(versionRepository.maxVersionNumber("wf-1")).thenReturn(0);
 
-            when(versionRepository.countByWorkflowId("wf-1")).thenReturn(0);
+            service.saveVersion("wf-1", snapshot, "h", ChangeSource.USER, null);
 
-            Optional<Integer> result = service.snapshotBeforeUpdate(workflow, incoming, "user", null);
-
-            assertThat(result).isPresent();
-            verify(versionRepository).save(any());
+            ArgumentCaptor<WorkflowVersion> captor = ArgumentCaptor.forClass(WorkflowVersion.class);
+            verify(versionRepository).save(captor.capture());
+            WorkflowSnapshot restored = objectMapper.readValue(captor.getValue().getSnapshot(), WorkflowSnapshot.class);
+            assertThat(restored.differs(snapshot)).isFalse();
         }
 
         @Test
-        void blocksChange_detected() {
-            BlockDefinition block = new BlockDefinition();
-            block.setType("simple");
-            Workflow workflow = Workflow.builder().id("wf-1")
-                    .blocks(List.of(block))
-                    .build();
-            WorkflowSnapshot incoming = new WorkflowSnapshot(
-                    List.of(), null, null, null, Map.of(), Map.of(), List.of());
-
-            when(versionRepository.countByWorkflowId("wf-1")).thenReturn(0);
-
-            Optional<Integer> result = service.snapshotBeforeUpdate(workflow, incoming, "user", null);
-
-            assertThat(result).isPresent();
-        }
-
-        @Test
-        void providerChange_detected() {
-            Workflow workflow = Workflow.builder().id("wf-1")
-                    .blocks(List.of()).model("claude-sonnet-4-6").provider("CLAUDE")
-                    .build();
-            WorkflowSnapshot incoming = new WorkflowSnapshot(
-                    List.of(), null, "claude-sonnet-4-6", "CODEX", Map.of(), Map.of(), List.of());
-
-            when(versionRepository.countByWorkflowId("wf-1")).thenReturn(0);
-
-            Optional<Integer> result = service.snapshotBeforeUpdate(workflow, incoming, "user", null);
-
-            assertThat(result).isPresent();
-            verify(versionRepository).save(any());
-        }
-
-        @Test
-        void metadataChange_detected() {
-            Workflow workflow = Workflow.builder().id("wf-1")
-                    .blocks(List.of()).build();
-            WorkflowSnapshot incoming = new WorkflowSnapshot(
-                    List.of(), null, null, null, Map.of("key", "value"), Map.of(), List.of());
-
-            when(versionRepository.countByWorkflowId("wf-1")).thenReturn(0);
-
-            Optional<Integer> result = service.snapshotBeforeUpdate(workflow, incoming, "user", null);
-
-            assertThat(result).isPresent();
-            verify(versionRepository).save(any());
-        }
-
-        @Test
-        void defaultContextChange_detected() {
-            Workflow workflow = Workflow.builder().id("wf-1")
-                    .blocks(List.of()).build();
-            WorkflowSnapshot incoming = new WorkflowSnapshot(
-                    List.of(), null, null, null, Map.of(), Map.of("ctxKey", "ctxVal"), List.of());
-
-            when(versionRepository.countByWorkflowId("wf-1")).thenReturn(0);
-
-            Optional<Integer> result = service.snapshotBeforeUpdate(workflow, incoming, "user", null);
-
-            assertThat(result).isPresent();
-            verify(versionRepository).save(any());
-        }
-
-        @Test
-        void activatedSkillsChange_detected() {
-            Workflow workflow = Workflow.builder().id("wf-1")
-                    .blocks(List.of()).build();
-            WorkflowSnapshot incoming = new WorkflowSnapshot(
-                    List.of(), null, null, null, Map.of(), Map.of(), List.of("skill-1"));
-
-            when(versionRepository.countByWorkflowId("wf-1")).thenReturn(0);
-
-            Optional<Integer> result = service.snapshotBeforeUpdate(workflow, incoming, "user", null);
-
-            assertThat(result).isPresent();
-            verify(versionRepository).save(any());
-        }
-
-        @Test
-        void serializationFailure_swallowedButReturnsVersion() throws Exception {
+        void unserialisableSnapshotFailsLoudInsteadOfLeavingAGap() throws Exception {
             ObjectMapper failingMapper = mock(ObjectMapper.class);
             when(failingMapper.writeValueAsString(any())).thenThrow(new JsonProcessingException("boom") {});
-            WorkflowVersionService failingService = new WorkflowVersionService(versionRepository, failingMapper, new WorkflowDefinitionHasher());
+            WorkflowVersionService failingService = new WorkflowVersionService(versionRepository, failingMapper);
 
-            Workflow workflow = Workflow.builder().id("wf-1")
-                    .blocks(List.of()).instructions("old").build();
-            WorkflowSnapshot incoming = new WorkflowSnapshot(
-                    List.of(), "new", null, null, Map.of(), Map.of(), List.of());
-
-            when(versionRepository.countByWorkflowId("wf-1")).thenReturn(0);
-
-            Optional<Integer> result = failingService.snapshotBeforeUpdate(workflow, incoming, "user", null);
-
-            assertThat(result).contains(1);
+            assertThatThrownBy(() -> failingService.saveVersion("wf-1", snapshot, "h", ChangeSource.USER, null))
+                    .isInstanceOf(IllegalStateException.class);
             verify(versionRepository, never()).save(any());
-        }
-
-        @Test
-        void savedSnapshot_isRestorableViaRoundTrip() throws Exception {
-            Workflow workflow = Workflow.builder().id("wf-1")
-                    .blocks(List.of()).instructions("original instructions")
-                    .model("claude-sonnet-4-6").provider("CLAUDE")
-                    .metadata(Map.of("k", "v"))
-                    .build();
-            WorkflowSnapshot stateBefore = WorkflowSnapshot.from(workflow);
-
-            WorkflowSnapshot incoming = new WorkflowSnapshot(
-                    List.of(), "changed instructions", "claude-sonnet-4-6", "CLAUDE",
-                    Map.of("k", "v"), Map.of(), List.of());
-
-            when(versionRepository.countByWorkflowId("wf-1")).thenReturn(0);
-            service.snapshotBeforeUpdate(workflow, incoming, "user", null);
-
-            ArgumentCaptor<WorkflowVersion> captor = ArgumentCaptor.forClass(WorkflowVersion.class);
-            verify(versionRepository).save(captor.capture());
-            WorkflowVersion saved = captor.getValue();
-
-            WorkflowSnapshot restored = objectMapper.readValue(saved.getSnapshot(), WorkflowSnapshot.class);
-            assertThat(restored.differs(stateBefore)).isFalse();
         }
     }
 

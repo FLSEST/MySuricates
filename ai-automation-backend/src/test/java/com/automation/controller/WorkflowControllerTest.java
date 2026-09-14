@@ -143,7 +143,7 @@ class WorkflowControllerTest {
 
     @Test
     void createWorkflow_validRequest_returns201() throws Exception {
-        when(workflowService.create(any())).thenReturn(testWorkflow);
+        when(workflowService.create(any(), eq(ChangeSource.USER))).thenReturn(testWorkflow);
         when(workflowMapper.toResponse(testWorkflow)).thenReturn(testResponse);
 
         String body = """
@@ -195,7 +195,7 @@ class WorkflowControllerTest {
 
     @Test
     void updateWorkflow_validRequest_returnsOk() throws Exception {
-        when(workflowService.update(eq("wf-1"), any())).thenReturn(testWorkflow);
+        when(workflowService.update(eq("wf-1"), any(), eq(ChangeSource.USER))).thenReturn(testWorkflow);
         when(workflowMapper.toResponse(testWorkflow)).thenReturn(testResponse);
 
         String body = """

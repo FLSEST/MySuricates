@@ -5,6 +5,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -20,6 +21,9 @@ public interface WorkflowVersionRepository extends JpaRepository<WorkflowVersion
     int countByWorkflowId(String workflowId);
 
     Optional<WorkflowVersion> findTopByWorkflowIdAndDefinitionHashOrderByVersionNumberDesc(String workflowId, String definitionHash);
+
+    @Query("select coalesce(max(v.versionNumber), 0) from WorkflowVersion v where v.workflowId = :workflowId")
+    int maxVersionNumber(@Param("workflowId") String workflowId);
 
     @Query("select v.id from WorkflowVersion v where v.definitionHash is null")
     List<String> findIdsWithoutDefinitionHash();

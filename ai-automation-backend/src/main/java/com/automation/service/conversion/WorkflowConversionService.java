@@ -228,7 +228,7 @@ public class WorkflowConversionService {
                 null
         );
 
-        Workflow created = workflowService.create(request);
+        Workflow created = workflowService.create(request, ChangeSource.CONVERSION);
         return workflowMapper.toResponse(created);
     }
 

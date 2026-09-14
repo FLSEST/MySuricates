@@ -69,13 +69,13 @@ class WishDecomposeServiceTest {
                     ],"needsClarification":false}""";
             when(aiProvider.reason(any())).thenReturn(new AiProvider.ReasoningResult(json, null));
             Workflow created = Workflow.builder().id("wf-1").name("My WF").build();
-            when(workflowService.create(any())).thenReturn(created);
+            when(workflowService.create(any(), eq(ChangeSource.WISH))).thenReturn(created);
             lenient().when(workflowFactoryService.verifyAndFix(anyString(), anyInt()))
                     .thenReturn(new WorkflowFactoryService.FactoryTestResult("OK", null, null));
 
             service.decompose(wish);
 
-            verify(workflowService).create(any());
+            verify(workflowService).create(any(), eq(ChangeSource.WISH));
             assertThat(wish.getGeneratedWorkflowIds()).contains("wf-1");
             assertThat(wish.getStatus()).isEqualTo(WishStatus.AWAITING_DECOMPOSE_APPROVAL);
             assertThat(wish.getIterationCount()).isEqualTo(1);
@@ -92,7 +92,7 @@ class WishDecomposeServiceTest {
             when(aiProvider.reason(any())).thenReturn(new AiProvider.ReasoningResult(json, null));
             Workflow wf1 = Workflow.builder().id("wf-1").name("WF1").build();
             Workflow wf2 = Workflow.builder().id("wf-2").name("WF2").build();
-            when(workflowService.create(any())).thenReturn(wf1, wf2);
+            when(workflowService.create(any(), eq(ChangeSource.WISH))).thenReturn(wf1, wf2);
             WorkflowChain chain = WorkflowChain.builder().id("chain-1").build();
             when(chainService.create(any())).thenReturn(chain);
             lenient().when(workflowFactoryService.verifyAndFix(anyString(), anyInt()))
@@ -100,7 +100,7 @@ class WishDecomposeServiceTest {
 
             service.decompose(wish);
 
-            verify(workflowService, times(2)).create(any());
+            verify(workflowService, times(2)).create(any(), eq(ChangeSource.WISH));
             verify(chainService).create(any());
             assertThat(wish.getGeneratedChainId()).isEqualTo("chain-1");
             assertThat(wish.getGeneratedWorkflowIds()).hasSize(2);
@@ -118,7 +118,7 @@ class WishDecomposeServiceTest {
                     ],"needsClarification":false}""";
             when(aiProvider.reason(any())).thenReturn(new AiProvider.ReasoningResult(json, null));
             Workflow created = Workflow.builder().id("wf-1").name("My WF").build();
-            when(workflowService.create(any())).thenReturn(created);
+            when(workflowService.create(any(), eq(ChangeSource.WISH))).thenReturn(created);
             lenient().when(workflowFactoryService.verifyAndFix(anyString(), anyInt()))
                     .thenReturn(new WorkflowFactoryService.FactoryTestResult("OK", null, null));
 
@@ -139,7 +139,7 @@ class WishDecomposeServiceTest {
 
             assertThat(wish.getStatus()).isEqualTo(WishStatus.AWAITING_CLARIFICATION);
             assertThat(wish.getMetadata()).containsEntry("clarificationQuestion", "Which database?");
-            verify(workflowService, never()).create(any());
+            verify(workflowService, never()).create(any(), eq(ChangeSource.WISH));
         }
 
         @Test
@@ -151,7 +151,7 @@ class WishDecomposeServiceTest {
                     .thenReturn(new AiProvider.ReasoningResult(
                             "{\"workflows\":[{\"name\":\"WF\",\"blocks\":[]}],\"needsClarification\":false}", null));
             Workflow wf = Workflow.builder().id("wf-1").name("WF").build();
-            when(workflowService.create(any())).thenReturn(wf);
+            when(workflowService.create(any(), eq(ChangeSource.WISH))).thenReturn(wf);
             lenient().when(workflowFactoryService.verifyAndFix(anyString(), anyInt()))
                     .thenReturn(new WorkflowFactoryService.FactoryTestResult("OK", null, null));
 
@@ -166,7 +166,7 @@ class WishDecomposeServiceTest {
             Wish wish = createWish("w-1");
             String json = "{\"workflows\":[{\"name\":\"WF\",\"blocks\":[]}],\"needsClarification\":false}";
             when(aiProvider.reason(any())).thenReturn(new AiProvider.ReasoningResult(json, null));
-            when(workflowService.create(any())).thenReturn(Workflow.builder().id("wf-1").build());
+            when(workflowService.create(any(), eq(ChangeSource.WISH))).thenReturn(Workflow.builder().id("wf-1").build());
             lenient().when(workflowFactoryService.verifyAndFix(anyString(), anyInt()))
                     .thenReturn(new WorkflowFactoryService.FactoryTestResult("OK", null, null));
 
@@ -189,7 +189,7 @@ class WishDecomposeServiceTest {
             when(promptBuilder.inferModelFromBlocks(any(), eq("analyze vulnerabilities")))
                     .thenReturn("claude-opus-4-6");
             Workflow wf = Workflow.builder().id("wf-1").build();
-            when(workflowService.create(any())).thenReturn(wf);
+            when(workflowService.create(any(), eq(ChangeSource.WISH))).thenReturn(wf);
             lenient().when(workflowFactoryService.verifyAndFix(anyString(), anyInt()))
                     .thenReturn(new WorkflowFactoryService.FactoryTestResult("OK", null, null));
 
@@ -197,7 +197,7 @@ class WishDecomposeServiceTest {
 
             ArgumentCaptor<com.automation.dto.request.CreateWorkflowRequest> captor =
                     ArgumentCaptor.forClass(com.automation.dto.request.CreateWorkflowRequest.class);
-            verify(workflowService).create(captor.capture());
+            verify(workflowService).create(captor.capture(), eq(ChangeSource.WISH));
             assertThat(captor.getValue().model()).isEqualTo("claude-opus-4-6");
         }
     }
@@ -213,7 +213,7 @@ class WishDecomposeServiceTest {
                       {"type":"shell","config":{"command":"echo hi"}}
                     ]}],"needsClarification":false}""";
             when(aiProvider.reason(any())).thenReturn(new AiProvider.ReasoningResult(json, null));
-            when(workflowService.create(any())).thenReturn(Workflow.builder().id("wf-1").build());
+            when(workflowService.create(any(), eq(ChangeSource.WISH))).thenReturn(Workflow.builder().id("wf-1").build());
             lenient().when(workflowFactoryService.verifyAndFix(anyString(), anyInt()))
                     .thenReturn(new WorkflowFactoryService.FactoryTestResult("OK", null, null));
 
@@ -221,7 +221,7 @@ class WishDecomposeServiceTest {
 
             ArgumentCaptor<com.automation.dto.request.CreateWorkflowRequest> captor =
                     ArgumentCaptor.forClass(com.automation.dto.request.CreateWorkflowRequest.class);
-            verify(workflowService).create(captor.capture());
+            verify(workflowService).create(captor.capture(), eq(ChangeSource.WISH));
             BlockDefinition block = captor.getValue().blocks().get(0);
             assertThat(block.getConfig()).containsEntry("timeout_seconds", wishConfig.getDefaultShellTimeoutSeconds());
         }
@@ -234,7 +234,7 @@ class WishDecomposeServiceTest {
                       {"type":"agentic","config":{"goal":"do stuff"}}
                     ]}],"needsClarification":false}""";
             when(aiProvider.reason(any())).thenReturn(new AiProvider.ReasoningResult(json, null));
-            when(workflowService.create(any())).thenReturn(Workflow.builder().id("wf-1").build());
+            when(workflowService.create(any(), eq(ChangeSource.WISH))).thenReturn(Workflow.builder().id("wf-1").build());
             lenient().when(workflowFactoryService.verifyAndFix(anyString(), anyInt()))
                     .thenReturn(new WorkflowFactoryService.FactoryTestResult("OK", null, null));
 
@@ -242,7 +242,7 @@ class WishDecomposeServiceTest {
 
             ArgumentCaptor<com.automation.dto.request.CreateWorkflowRequest> captor =
                     ArgumentCaptor.forClass(com.automation.dto.request.CreateWorkflowRequest.class);
-            verify(workflowService).create(captor.capture());
+            verify(workflowService).create(captor.capture(), eq(ChangeSource.WISH));
             Map<String, Object> config = captor.getValue().blocks().get(0).getConfig();
             assertThat(config).containsEntry("timeout_seconds", wishConfig.getDefaultAgenticTimeoutSeconds());
             assertThat(config).containsEntry("iteration_timeout_seconds", wishConfig.getDefaultAgenticIterationTimeoutSeconds());
@@ -257,7 +257,7 @@ class WishDecomposeServiceTest {
                       {"type":"shell","config":{"command":"slow","timeout_seconds":1200}}
                     ]}],"needsClarification":false}""";
             when(aiProvider.reason(any())).thenReturn(new AiProvider.ReasoningResult(json, null));
-            when(workflowService.create(any())).thenReturn(Workflow.builder().id("wf-1").build());
+            when(workflowService.create(any(), eq(ChangeSource.WISH))).thenReturn(Workflow.builder().id("wf-1").build());
             lenient().when(workflowFactoryService.verifyAndFix(anyString(), anyInt()))
                     .thenReturn(new WorkflowFactoryService.FactoryTestResult("OK", null, null));
 
@@ -265,7 +265,7 @@ class WishDecomposeServiceTest {
 
             ArgumentCaptor<com.automation.dto.request.CreateWorkflowRequest> captor =
                     ArgumentCaptor.forClass(com.automation.dto.request.CreateWorkflowRequest.class);
-            verify(workflowService).create(captor.capture());
+            verify(workflowService).create(captor.capture(), eq(ChangeSource.WISH));
             assertThat(captor.getValue().blocks().get(0).getConfig())
                     .containsEntry("timeout_seconds", 1200);
         }

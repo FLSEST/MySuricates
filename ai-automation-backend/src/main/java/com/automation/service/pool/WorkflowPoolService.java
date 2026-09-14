@@ -8,6 +8,7 @@ import com.automation.dto.request.UpdateWorkflowRequest;
 import com.automation.dto.response.ExportToPoolResponse;
 import com.automation.dto.response.PoolWorkflowEntry;
 import com.automation.entity.BlockDefinition;
+import com.automation.entity.ChangeSource;
 import com.automation.entity.Workflow;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ProjectRepository;
@@ -105,9 +106,9 @@ public class WorkflowPoolService {
                 UpdateWorkflowRequest updateRequest = new UpdateWorkflowRequest(
                         resolvedName, description, entry.icon(), entry.blocks(),
                         entry.instructions(), entry.model(), null, entry.metadata(),
-                        mergedContext, "pool-install", "Pool install: " + poolId
+                        mergedContext, "Pool install: " + poolId
                 );
-                Workflow updated = workflowService.update(existing.get().getId(), updateRequest);
+                Workflow updated = workflowService.update(existing.get().getId(), updateRequest, ChangeSource.POOL_INSTALL);
                 log.info("Updated pool workflow '{}' in-place: workflow '{}' ({})", poolId, updated.getName(), updated.getId());
                 return new InstallResult(updated, false);
             }
@@ -129,7 +130,7 @@ public class WorkflowPoolService {
                 entry.version()
         );
 
-        Workflow workflow = workflowService.create(createRequest);
+        Workflow workflow = workflowService.create(createRequest, ChangeSource.POOL_INSTALL);
         log.info("Installed pool workflow '{}' as new workflow '{}' ({})", poolId, workflow.getName(), workflow.getId());
         return new InstallResult(workflow, true);
     }

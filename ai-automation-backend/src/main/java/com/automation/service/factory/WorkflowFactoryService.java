@@ -94,7 +94,7 @@ public class WorkflowFactoryService {
                 List.of(), instructions, null, null, null, metadata, defaultContext, null
         );
 
-        Workflow workflow = workflowService.create(createRequest);
+        Workflow workflow = workflowService.create(createRequest, com.automation.entity.ChangeSource.FACTORY);
         log.info("Factory: created workflow '{}' ({})", workflow.getName(), workflow.getId());
         return workflow;
     }
@@ -295,7 +295,7 @@ public class WorkflowFactoryService {
             var updateRequest = new com.automation.dto.request.UpdateWorkflowRequest(
                     null, null, null, fixedBlocks, null, null, null, null, null
             );
-            workflowService.update(workflow.getId(), updateRequest);
+            workflowService.update(workflow.getId(), updateRequest, com.automation.entity.ChangeSource.FACTORY);
             log.info("Factory: auto-fixed workflow '{}' with {} blocks", workflow.getName(), fixedBlocks.size());
         }
     }

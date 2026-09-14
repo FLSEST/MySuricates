@@ -3,6 +3,7 @@ package com.automation.dto.request;
 import com.automation.entity.BlockDefinition;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -21,11 +22,10 @@ class UpdateWorkflowRequestTest {
     private static final Map<String, Object> DEFAULT_CONTEXT = Map.of("ctx", "val");
 
     @Test
-    void should_storeAllFields_when_constructedWithCanonicalConstructor() {
+    void should_storeAllFields_when_constructedWithChangeMessage() {
         var request = new UpdateWorkflowRequest(
                 NAME, DESCRIPTION, ICON, BLOCKS, INSTRUCTIONS,
-                MODEL, PROVIDER, METADATA, DEFAULT_CONTEXT,
-                "USER", "Updated name");
+                MODEL, PROVIDER, METADATA, DEFAULT_CONTEXT, "Updated name");
 
         assertThat(request.name()).isEqualTo(NAME);
         assertThat(request.description()).isEqualTo(DESCRIPTION);
@@ -36,64 +36,43 @@ class UpdateWorkflowRequestTest {
         assertThat(request.provider()).isEqualTo(PROVIDER);
         assertThat(request.metadata()).isEqualTo(METADATA);
         assertThat(request.defaultContext()).isEqualTo(DEFAULT_CONTEXT);
-        assertThat(request.changeSource()).isEqualTo("USER");
         assertThat(request.changeMessage()).isEqualTo("Updated name");
+        assertThat(request.tags()).isNull();
+        assertThat(request.category()).isNull();
+        assertThat(request.effort()).isNull();
     }
 
     @Test
-    void should_setChangeSourceAndChangeMessageToNull_when_usingConvenienceConstructor() {
+    void should_leaveChangeMessageNull_when_usingConvenienceConstructor() {
         var request = new UpdateWorkflowRequest(
                 NAME, DESCRIPTION, ICON, BLOCKS, INSTRUCTIONS,
                 MODEL, PROVIDER, METADATA, DEFAULT_CONTEXT);
 
-        assertThat(request.changeSource()).isNull();
+        assertThat(request.name()).isEqualTo(NAME);
+        assertThat(request.defaultContext()).isEqualTo(DEFAULT_CONTEXT);
         assertThat(request.changeMessage()).isNull();
     }
 
     @Test
-    void should_storeRemainingFields_when_usingConvenienceConstructor() {
-        var request = new UpdateWorkflowRequest(
-                NAME, DESCRIPTION, ICON, BLOCKS, INSTRUCTIONS,
-                MODEL, PROVIDER, METADATA, DEFAULT_CONTEXT);
-
-        assertThat(request.name()).isEqualTo(NAME);
-        assertThat(request.description()).isEqualTo(DESCRIPTION);
-        assertThat(request.icon()).isEqualTo(ICON);
-        assertThat(request.blocks()).isEqualTo(BLOCKS);
-        assertThat(request.instructions()).isEqualTo(INSTRUCTIONS);
-        assertThat(request.model()).isEqualTo(MODEL);
-        assertThat(request.provider()).isEqualTo(PROVIDER);
-        assertThat(request.metadata()).isEqualTo(METADATA);
-        assertThat(request.defaultContext()).isEqualTo(DEFAULT_CONTEXT);
+    void should_notCarryAChangeSource_becauseTheServerDecidesWhoChangedAWorkflow() {
+        assertThat(Arrays.stream(UpdateWorkflowRequest.class.getRecordComponents()).map(c -> c.getName()))
+                .doesNotContain("changeSource");
     }
 
     @Test
     void should_acceptNullFields_when_fieldsAreOptional() {
-        var request = new UpdateWorkflowRequest(
-                null, null, null, null, null,
-                null, null, null, null, null, null);
+        var request = new UpdateWorkflowRequest(null, null, null, null, null, null, null, null, null, null);
 
         assertThat(request.name()).isNull();
-        assertThat(request.description()).isNull();
-        assertThat(request.icon()).isNull();
         assertThat(request.blocks()).isNull();
-        assertThat(request.instructions()).isNull();
-        assertThat(request.model()).isNull();
-        assertThat(request.provider()).isNull();
         assertThat(request.metadata()).isNull();
-        assertThat(request.defaultContext()).isNull();
-        assertThat(request.changeSource()).isNull();
         assertThat(request.changeMessage()).isNull();
     }
 
     @Test
     void should_beEqual_when_allFieldsMatch() {
-        var a = new UpdateWorkflowRequest(
-                NAME, DESCRIPTION, ICON, BLOCKS, INSTRUCTIONS,
-                MODEL, PROVIDER, METADATA, DEFAULT_CONTEXT, "USER", "msg");
-        var b = new UpdateWorkflowRequest(
-                NAME, DESCRIPTION, ICON, BLOCKS, INSTRUCTIONS,
-                MODEL, PROVIDER, METADATA, DEFAULT_CONTEXT, "USER", "msg");
+        var a = new UpdateWorkflowRequest(NAME, DESCRIPTION, ICON, BLOCKS, INSTRUCTIONS, MODEL, PROVIDER, METADATA, DEFAULT_CONTEXT, "msg");
+        var b = new UpdateWorkflowRequest(NAME, DESCRIPTION, ICON, BLOCKS, INSTRUCTIONS, MODEL, PROVIDER, METADATA, DEFAULT_CONTEXT, "msg");
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -101,38 +80,16 @@ class UpdateWorkflowRequestTest {
 
     @Test
     void should_notBeEqual_when_namesDiffer() {
-        var a = new UpdateWorkflowRequest(
-                "Workflow A", DESCRIPTION, ICON, BLOCKS, INSTRUCTIONS,
-                MODEL, PROVIDER, METADATA, DEFAULT_CONTEXT);
-        var b = new UpdateWorkflowRequest(
-                "Workflow B", DESCRIPTION, ICON, BLOCKS, INSTRUCTIONS,
-                MODEL, PROVIDER, METADATA, DEFAULT_CONTEXT);
-
-        assertThat(a).isNotEqualTo(b);
-    }
-
-    @Test
-    void should_notBeEqual_when_changeSourceDiffers() {
-        var a = new UpdateWorkflowRequest(
-                NAME, DESCRIPTION, ICON, BLOCKS, INSTRUCTIONS,
-                MODEL, PROVIDER, METADATA, DEFAULT_CONTEXT, "USER", "msg");
-        var b = new UpdateWorkflowRequest(
-                NAME, DESCRIPTION, ICON, BLOCKS, INSTRUCTIONS,
-                MODEL, PROVIDER, METADATA, DEFAULT_CONTEXT, "SYSTEM", "msg");
+        var a = new UpdateWorkflowRequest("Workflow A", DESCRIPTION, ICON, BLOCKS, INSTRUCTIONS, MODEL, PROVIDER, METADATA, DEFAULT_CONTEXT);
+        var b = new UpdateWorkflowRequest("Workflow B", DESCRIPTION, ICON, BLOCKS, INSTRUCTIONS, MODEL, PROVIDER, METADATA, DEFAULT_CONTEXT);
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_containFieldNamesInToString() {
-        var request = new UpdateWorkflowRequest(
-                NAME, DESCRIPTION, ICON, BLOCKS, INSTRUCTIONS,
-                MODEL, PROVIDER, METADATA, DEFAULT_CONTEXT, "USER", "Changed");
+        var request = new UpdateWorkflowRequest(NAME, DESCRIPTION, ICON, BLOCKS, INSTRUCTIONS, MODEL, PROVIDER, METADATA, DEFAULT_CONTEXT, "Changed");
 
-        String str = request.toString();
-        assertThat(str).contains("name");
-        assertThat(str).contains("description");
-        assertThat(str).contains("changeSource");
-        assertThat(str).contains("changeMessage");
+        assertThat(request.toString()).contains("name").contains("description").contains("changeMessage");
     }
 }

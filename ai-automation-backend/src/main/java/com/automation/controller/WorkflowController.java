@@ -11,6 +11,7 @@ import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.WorkflowResponse;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.dto.response.WorkflowVersionResponse;
+import com.automation.entity.ChangeSource;
 import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
@@ -67,7 +68,7 @@ public class WorkflowController {
 
     @PostMapping
     public ResponseEntity<WorkflowResponse> createWorkflow(@Valid @RequestBody CreateWorkflowRequest request) {
-        var workflow = workflowService.create(request);
+        var workflow = workflowService.create(request, ChangeSource.USER);
         return ResponseEntity.status(HttpStatus.CREATED).body(workflowMapper.toResponse(workflow));
     }
 
@@ -78,7 +79,7 @@ public class WorkflowController {
 
     @PutMapping("/{id}")
     public ResponseEntity<WorkflowResponse> updateWorkflow(@PathVariable String id, @RequestBody UpdateWorkflowRequest request) {
-        return ResponseEntity.ok(workflowMapper.toResponse(workflowService.update(id, request)));
+        return ResponseEntity.ok(workflowMapper.toResponse(workflowService.update(id, request, ChangeSource.USER)));
     }
 
     @DeleteMapping("/{id}")
@@ -254,10 +255,9 @@ public class WorkflowController {
                         null,
                         null,
                         null,
-                        "import",
                         "Imported workflow update"
                 );
-                var updated = workflowService.update(existing.get().getId(), updateRequest);
+                var updated = workflowService.update(existing.get().getId(), updateRequest, ChangeSource.IMPORT);
                 return ResponseEntity.ok(workflowMapper.toResponse(updated));
             }
         }
@@ -277,7 +277,7 @@ public class WorkflowController {
                 request.defaultContext(),
                 null
         );
-        var workflow = workflowService.create(createRequest);
+        var workflow = workflowService.create(createRequest, ChangeSource.IMPORT);
         return ResponseEntity.status(HttpStatus.CREATED).body(workflowMapper.toResponse(workflow));
     }
 

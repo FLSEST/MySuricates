@@ -3,6 +3,7 @@ package com.automation.service.chain;
 import com.automation.dto.request.CreateChainRequest;
 import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.entity.BlockDefinition;
+import com.automation.entity.ChangeSource;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowChain;
 import com.automation.entity.WorkflowTemplate;
@@ -101,7 +102,7 @@ class ChainTemplateServiceTest {
         @Test
         void install_validTemplate_createsWorkflowsAndChain() {
             when(workflowTemplateService.findById(any())).thenReturn(mockWfTemplate);
-            when(workflowService.create(any())).thenAnswer(inv -> {
+            when(workflowService.create(any(), eq(ChangeSource.CHAIN_TEMPLATE))).thenAnswer(inv -> {
                 CreateWorkflowRequest req = inv.getArgument(0);
                 return Workflow.builder().id("wf-" + req.name()).name(req.name()).build();
             });
@@ -113,7 +114,7 @@ class ChainTemplateServiceTest {
 
             assertThat(result.getId()).isEqualTo("chain-1");
             verify(workflowTemplateService, times(2)).findById(any());
-            verify(workflowService, times(2)).create(any());
+            verify(workflowService, times(2)).create(any(), eq(ChangeSource.CHAIN_TEMPLATE));
             verify(chainService).create(chainRequestCaptor.capture());
 
             CreateChainRequest chainReq = chainRequestCaptor.getValue();
@@ -124,7 +125,7 @@ class ChainTemplateServiceTest {
         @Test
         void install_threeEntryTemplate_createsThreeWorkflows() {
             when(workflowTemplateService.findById(any())).thenReturn(mockWfTemplate);
-            when(workflowService.create(any())).thenAnswer(inv -> {
+            when(workflowService.create(any(), eq(ChangeSource.CHAIN_TEMPLATE))).thenAnswer(inv -> {
                 CreateWorkflowRequest req = inv.getArgument(0);
                 return Workflow.builder().id("wf-" + req.name()).name(req.name()).build();
             });
@@ -134,13 +135,13 @@ class ChainTemplateServiceTest {
             // code-health-chain has 3 entries
             chainTemplateService.install("code-health-chain", "proj-1", "Custom Name");
 
-            verify(workflowService, times(3)).create(any());
+            verify(workflowService, times(3)).create(any(), eq(ChangeSource.CHAIN_TEMPLATE));
         }
 
         @Test
         void install_withCustomChainName_usesCustomName() {
             when(workflowTemplateService.findById(any())).thenReturn(mockWfTemplate);
-            when(workflowService.create(any())).thenReturn(
+            when(workflowService.create(any(), eq(ChangeSource.CHAIN_TEMPLATE))).thenReturn(
                     Workflow.builder().id("wf-1").name("Test").build());
             when(chainService.create(any())).thenReturn(
                     WorkflowChain.builder().id("chain-1").name("My Chain").build());
@@ -154,7 +155,7 @@ class ChainTemplateServiceTest {
         @Test
         void install_withNullChainName_usesTemplateName() {
             when(workflowTemplateService.findById(any())).thenReturn(mockWfTemplate);
-            when(workflowService.create(any())).thenReturn(
+            when(workflowService.create(any(), eq(ChangeSource.CHAIN_TEMPLATE))).thenReturn(
                     Workflow.builder().id("wf-1").name("Test").build());
             when(chainService.create(any())).thenReturn(
                     WorkflowChain.builder().id("chain-1").name("CI/CD Pipeline").build());
@@ -168,7 +169,7 @@ class ChainTemplateServiceTest {
         @Test
         void install_withBlankChainName_usesTemplateName() {
             when(workflowTemplateService.findById(any())).thenReturn(mockWfTemplate);
-            when(workflowService.create(any())).thenReturn(
+            when(workflowService.create(any(), eq(ChangeSource.CHAIN_TEMPLATE))).thenReturn(
                     Workflow.builder().id("wf-1").name("Test").build());
             when(chainService.create(any())).thenReturn(
                     WorkflowChain.builder().id("chain-1").name("CI/CD Pipeline").build());
@@ -182,14 +183,14 @@ class ChainTemplateServiceTest {
         @Test
         void install_passesCorrectProjectId() {
             when(workflowTemplateService.findById(any())).thenReturn(mockWfTemplate);
-            when(workflowService.create(any())).thenReturn(
+            when(workflowService.create(any(), eq(ChangeSource.CHAIN_TEMPLATE))).thenReturn(
                     Workflow.builder().id("wf-1").name("Test").build());
             when(chainService.create(any())).thenReturn(
                     WorkflowChain.builder().id("chain-1").build());
 
             chainTemplateService.install("ci-cd-pipeline-chain", "proj-42", null);
 
-            verify(workflowService, times(2)).create(workflowRequestCaptor.capture());
+            verify(workflowService, times(2)).create(workflowRequestCaptor.capture(), eq(ChangeSource.CHAIN_TEMPLATE));
             for (CreateWorkflowRequest req : workflowRequestCaptor.getAllValues()) {
                 assertThat(req.projectId()).isEqualTo("proj-42");
             }

@@ -4,6 +4,7 @@ import com.automation.config.FactoryConfig;
 import com.automation.dto.request.WorkflowFactoryRequest;
 import com.automation.dto.response.WorkflowFactoryResult;
 import com.automation.entity.BlockDefinition;
+import com.automation.entity.ChangeSource;
 import com.automation.entity.Project;
 import com.automation.entity.Workflow;
 import com.automation.exception.ResourceNotFoundException;
@@ -104,7 +105,7 @@ class WorkflowFactoryServiceTest {
 
         Workflow createdWorkflow = Workflow.builder()
                 .id("wf-1").name("Code Review").project(testProject).build();
-        when(workflowService.create(any())).thenReturn(createdWorkflow);
+        when(workflowService.create(any(), eq(ChangeSource.FACTORY))).thenReturn(createdWorkflow);
 
         WorkflowFactoryRequest request = new WorkflowFactoryRequest(
                 "Code review workflow", "Reviews code", "CODE", "proj-1",
@@ -113,7 +114,7 @@ class WorkflowFactoryServiceTest {
         Workflow result = factoryService.generateWorkflow(request);
 
         assertThat(result.getName()).isEqualTo("Code Review");
-        verify(workflowService).create(any());
+        verify(workflowService).create(any(), eq(ChangeSource.FACTORY));
     }
 
     @Test
@@ -132,7 +133,7 @@ class WorkflowFactoryServiceTest {
         when(claudeGenerator.generate(anyString(), anyString(), eq(600))).thenReturn(claudeResponse);
 
         Workflow createdWorkflow = Workflow.builder().id("wf-1").name("Deploy").project(testProject).build();
-        when(workflowService.create(any())).thenReturn(createdWorkflow);
+        when(workflowService.create(any(), eq(ChangeSource.FACTORY))).thenReturn(createdWorkflow);
 
         WorkflowFactoryRequest request = new WorkflowFactoryRequest(
                 "Deploy", null, null, "proj-1", null, false, false, 2, null);
@@ -140,7 +141,7 @@ class WorkflowFactoryServiceTest {
         Workflow result = factoryService.generateWorkflow(request);
 
         assertThat(result).isNotNull();
-        verify(workflowService).create(any());
+        verify(workflowService).create(any(), eq(ChangeSource.FACTORY));
     }
 
     @Test
@@ -176,7 +177,7 @@ class WorkflowFactoryServiceTest {
         when(codexGenerator.generate(anyString(), anyString(), eq(600))).thenReturn(codexResponse);
 
         Workflow createdWorkflow = Workflow.builder().id("wf-1").name("Codex WF").project(testProject).build();
-        when(workflowService.create(any())).thenReturn(createdWorkflow);
+        when(workflowService.create(any(), eq(ChangeSource.FACTORY))).thenReturn(createdWorkflow);
 
         WorkflowFactoryRequest request = new WorkflowFactoryRequest(
                 "Test", null, null, "proj-1", null, false, false, 2, null);
@@ -196,7 +197,7 @@ class WorkflowFactoryServiceTest {
         when(codexGenerator.generate(anyString(), anyString(), eq(600))).thenReturn(codexResponse);
 
         Workflow createdWorkflow = Workflow.builder().id("wf-1").name("Test").project(testProject).build();
-        when(workflowService.create(any())).thenReturn(createdWorkflow);
+        when(workflowService.create(any(), eq(ChangeSource.FACTORY))).thenReturn(createdWorkflow);
 
         WorkflowFactoryRequest request = new WorkflowFactoryRequest(
                 "Test", null, null, "proj-1", null, false, false, 2, "CODEX");
@@ -231,7 +232,7 @@ class WorkflowFactoryServiceTest {
         when(workflowService.create(argThat(req ->
                 req.defaultContext().containsKey("branch") &&
                 req.defaultContext().containsKey("test_var")
-        ))).thenReturn(createdWorkflow);
+        ), eq(ChangeSource.FACTORY))).thenReturn(createdWorkflow);
 
         WorkflowFactoryRequest request = new WorkflowFactoryRequest(
                 "Test", null, null, "proj-1",
@@ -243,7 +244,7 @@ class WorkflowFactoryServiceTest {
         verify(workflowService).create(argThat(req ->
                 req.defaultContext().get("test_var").equals("test_value") &&
                 req.defaultContext().get("branch").equals("main")
-        ));
+        ), eq(ChangeSource.FACTORY));
     }
 
     @Test
@@ -258,7 +259,7 @@ class WorkflowFactoryServiceTest {
                 req.metadata() != null &&
                 Boolean.TRUE.equals(req.metadata().get("factoryGenerated")) &&
                 "Test topic".equals(req.metadata().get("factoryTopic"))
-        ))).thenReturn(createdWorkflow);
+        ), eq(ChangeSource.FACTORY))).thenReturn(createdWorkflow);
 
         WorkflowFactoryRequest request = new WorkflowFactoryRequest(
                 "Test topic", null, "CODE", "proj-1", null, false, false, 2, null);
@@ -267,7 +268,7 @@ class WorkflowFactoryServiceTest {
 
         verify(workflowService).create(argThat(req ->
                 req.metadata().get("factoryCategory").equals("CODE")
-        ));
+        ), eq(ChangeSource.FACTORY));
     }
 
     // ── runFactory ─────────────────────────────────────
@@ -280,7 +281,7 @@ class WorkflowFactoryServiceTest {
         when(claudeGenerator.generate(anyString(), anyString(), eq(600))).thenReturn(claudeResponse);
 
         Workflow workflow = Workflow.builder().id("wf-1").name("Pipeline WF").project(testProject).build();
-        when(workflowService.create(any())).thenReturn(workflow);
+        when(workflowService.create(any(), eq(ChangeSource.FACTORY))).thenReturn(workflow);
 
         // Deploy & verify succeeds
         JsonNode completedRun = objectMapper.createObjectNode()
@@ -309,7 +310,7 @@ class WorkflowFactoryServiceTest {
         when(claudeGenerator.generate(anyString(), anyString(), eq(600))).thenReturn(claudeResponse);
 
         Workflow workflow = Workflow.builder().id("wf-1").name("Fail WF").project(testProject).build();
-        when(workflowService.create(any())).thenReturn(workflow);
+        when(workflowService.create(any(), eq(ChangeSource.FACTORY))).thenReturn(workflow);
 
         // Deploy & verify fails
         JsonNode failedRun = objectMapper.createObjectNode()
@@ -336,7 +337,7 @@ class WorkflowFactoryServiceTest {
         when(claudeGenerator.generate(anyString(), anyString(), eq(600))).thenReturn(claudeResponse);
 
         Workflow workflow = Workflow.builder().id("wf-1").name("Promote WF").project(testProject).build();
-        when(workflowService.create(any())).thenReturn(workflow);
+        when(workflowService.create(any(), eq(ChangeSource.FACTORY))).thenReturn(workflow);
 
         JsonNode completedRun = objectMapper.createObjectNode().put("status", "COMPLETED");
         when(testingService.syncDefinitions()).thenReturn(null);
@@ -485,7 +486,7 @@ class WorkflowFactoryServiceTest {
         verify(workflowService).update(eq("wf-1"), argThat(req ->
                 req.blocks() != null && req.blocks().size() == 1
                         && "echo fixed".equals(req.blocks().get(0).getConfig().get("command"))
-                        && req.name() == null && req.description() == null));
+                        && req.name() == null && req.description() == null), eq(ChangeSource.FACTORY));
     }
 
     @Test
@@ -500,7 +501,7 @@ class WorkflowFactoryServiceTest {
         assertThat(workflow.getBlocks().get(0).getRequiredCapabilities()).containsExactly("docker", "web");
         verify(workflowService).update(eq("wf-1"), argThat(req ->
                 req.blocks() != null && req.blocks().size() == 1
-                        && List.of("docker", "web").equals(req.blocks().get(0).getRequiredCapabilities())));
+                        && List.of("docker", "web").equals(req.blocks().get(0).getRequiredCapabilities())), eq(ChangeSource.FACTORY));
     }
 
     @Test
@@ -524,7 +525,7 @@ class WorkflowFactoryServiceTest {
         factoryService.autoFixWorkflow(workflow, "err");
 
         assertThat(workflow.getBlocks().get(0).getConfig()).containsEntry("command", "exit 1");
-        verify(workflowService, never()).update(anyString(), any());
+        verify(workflowService, never()).update(anyString(), any(), eq(ChangeSource.FACTORY));
     }
 
     @Test

@@ -213,7 +213,7 @@ class WorkflowConversionServiceTest {
                 .id("new-wf")
                 .name("My Workflow")
                 .build();
-        when(workflowService.create(any())).thenReturn(createdWorkflow);
+        when(workflowService.create(any(), eq(ChangeSource.CONVERSION))).thenReturn(createdWorkflow);
 
         WorkflowResponse expectedResponse = new WorkflowResponse(
                 "new-wf", "proj-1", "Project", null, null, "My Workflow",
@@ -227,7 +227,7 @@ class WorkflowConversionServiceTest {
 
         ArgumentCaptor<com.automation.dto.request.CreateWorkflowRequest> captor =
                 ArgumentCaptor.forClass(com.automation.dto.request.CreateWorkflowRequest.class);
-        verify(workflowService).create(captor.capture());
+        verify(workflowService).create(captor.capture(), eq(ChangeSource.CONVERSION));
 
         var request = captor.getValue();
         assertThat(request.projectId()).isEqualTo("proj-1");

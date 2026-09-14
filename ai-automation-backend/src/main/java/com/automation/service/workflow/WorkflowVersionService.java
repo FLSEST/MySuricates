@@ -1,10 +1,11 @@
 package com.automation.service.workflow;
 
 import com.automation.dto.WorkflowSnapshot;
-import com.automation.entity.Workflow;
+import com.automation.entity.ChangeSource;
 import com.automation.entity.WorkflowVersion;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.WorkflowVersionRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,27 +22,32 @@ public class WorkflowVersionService {
 
     private final WorkflowVersionRepository versionRepository;
     private final ObjectMapper objectMapper;
-    private final WorkflowDefinitionHasher hasher;
 
     /**
-     * Creates a snapshot of the workflow's current state BEFORE an update.
-     * Must be called within the same @Transactional as the update.
+     * Writes a version row for {@code snapshot}. Numbering is {@code MAX(version_number) + 1}, so gaps
+     * never produce duplicates. Must run inside the transaction of the change it records.
      *
-     * @return the new version number, or empty if nothing changed
+     * @return the new version number
      */
-    public Optional<Integer> snapshotBeforeUpdate(Workflow workflow, WorkflowSnapshot incomingState,
-                                                   String changeSource, String changeMessage) {
-        WorkflowSnapshot currentState = WorkflowSnapshot.from(workflow);
-
-        if (!currentState.differs(incomingState)) {
-            log.debug("No versioned fields changed for workflow {}, skipping snapshot", workflow.getId());
-            return Optional.empty();
+    public int saveVersion(String workflowId, WorkflowSnapshot snapshot, String definitionHash,
+                           ChangeSource source, String changeMessage) {
+        String json;
+        try {
+            json = objectMapper.writeValueAsString(snapshot);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Workflow snapshot of " + workflowId + " is not serialisable", e);
         }
-
-        int nextVersion = versionRepository.countByWorkflowId(workflow.getId()) + 1;
-
-        saveSnapshot(workflow.getId(), nextVersion, currentState, changeSource, changeMessage);
-        return Optional.of(nextVersion);
+        int versionNumber = versionRepository.maxVersionNumber(workflowId) + 1;
+        versionRepository.save(WorkflowVersion.builder()
+                .workflowId(workflowId)
+                .versionNumber(versionNumber)
+                .snapshot(json)
+                .definitionHash(definitionHash)
+                .changeSource(source.key())
+                .changeMessage(changeMessage)
+                .build());
+        log.info("Saved workflow version {} for workflow {} (source: {})", versionNumber, workflowId, source.key());
+        return versionNumber;
     }
 
     public Page<WorkflowVersion> findByWorkflowId(String workflowId, Pageable pageable) {
@@ -65,25 +71,5 @@ public class WorkflowVersionService {
     public Optional<String> findVersionIdByHash(String workflowId, String definitionHash) {
         return versionRepository.findTopByWorkflowIdAndDefinitionHashOrderByVersionNumberDesc(workflowId, definitionHash)
                 .map(WorkflowVersion::getId);
-    }
-
-    private void saveSnapshot(String workflowId, int versionNumber,
-                              WorkflowSnapshot snapshot, String changeSource, String changeMessage) {
-        try {
-            String json = objectMapper.writeValueAsString(snapshot);
-            WorkflowVersion version = WorkflowVersion.builder()
-                    .workflowId(workflowId)
-                    .versionNumber(versionNumber)
-                    .snapshot(json)
-                    .changeSource(changeSource)
-                    .changeMessage(changeMessage)
-                    .definitionHash(hasher.hash(snapshot))
-                    .build();
-            versionRepository.save(version);
-            log.info("Saved workflow version {} for workflow {} (source: {})",
-                    versionNumber, workflowId, changeSource);
-        } catch (Exception e) {
-            log.error("Failed to serialize workflow snapshot for {}", workflowId, e);
-        }
     }
 }

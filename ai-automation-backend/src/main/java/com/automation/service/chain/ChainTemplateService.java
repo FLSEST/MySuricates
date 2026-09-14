@@ -3,6 +3,7 @@ package com.automation.service.chain;
 import com.automation.dto.request.ChainEntryRequest;
 import com.automation.dto.request.CreateChainRequest;
 import com.automation.dto.request.CreateWorkflowRequest;
+import com.automation.entity.ChangeSource;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowChain;
 import com.automation.entity.WorkflowTemplate;
@@ -164,7 +165,7 @@ public class ChainTemplateService {
                     null,
                     null,
                     null
-            ));
+            ), ChangeSource.CHAIN_TEMPLATE);
 
             entries.add(new ChainEntryRequest(
                     workflow.getId(),

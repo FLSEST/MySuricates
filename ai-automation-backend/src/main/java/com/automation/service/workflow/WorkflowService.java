@@ -3,7 +3,7 @@ package com.automation.service.workflow;
 import com.automation.dto.WorkflowSnapshot;
 import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.dto.request.UpdateWorkflowRequest;
-import com.automation.entity.BlockDefinition;
+import com.automation.entity.ChangeSource;
 import com.automation.entity.Project;
 import com.automation.entity.Skill;
 import com.automation.entity.Workflow;
@@ -35,7 +35,7 @@ public class WorkflowService {
     private final ProjectRepository projectRepository;
     private final SkillRepository skillRepository;
     private final ActivityLogService activityLogService;
-    private final WorkflowVersionService workflowVersionService;
+    private final WorkflowMutationGateway mutations;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
@@ -65,7 +65,7 @@ public class WorkflowService {
     }
 
     @Transactional
-    public Workflow create(CreateWorkflowRequest request) {
+    public Workflow create(CreateWorkflowRequest request, ChangeSource source) {
         Project project = projectRepository.findById(request.projectId())
                 .orElseThrow(() -> new ResourceNotFoundException("Project", request.projectId()));
         BlockNameRules.rejectReservedNames(request.blocks());
@@ -102,6 +102,7 @@ public class WorkflowService {
         }
 
         Workflow saved = workflowRepository.save(workflow);
+        mutations.record(saved, null, source, null);
         log.info("Created workflow: {} ({})", saved.getName(), saved.getId());
         activityLogService.info(LogCategory.SYSTEM, "Workflow created: " + saved.getName(), "WorkflowService", saved.getId(), saved.getId());
         eventPublisher.publishEvent(new WorkflowContentChangedEvent(saved.getId()));
@@ -109,13 +110,9 @@ public class WorkflowService {
     }
 
     @Transactional
-    public Workflow update(String id, UpdateWorkflowRequest request) {
+    public Workflow update(String id, UpdateWorkflowRequest request, ChangeSource source) {
         Workflow workflow = findById(id);
-
-        // Snapshot before update (only if execution-relevant fields changed)
-        WorkflowSnapshot incomingSnapshot = computeIncomingSnapshot(workflow, request);
-        String changeSource = request.changeSource() != null ? request.changeSource() : "user";
-        workflowVersionService.snapshotBeforeUpdate(workflow, incomingSnapshot, changeSource, request.changeMessage());
+        WorkflowSnapshot before = WorkflowSnapshot.from(workflow);
 
         if (request.name() != null) {
             workflow.setName(request.name());
@@ -166,6 +163,7 @@ public class WorkflowService {
                 || request.blocks() != null;
 
         Workflow saved = workflowRepository.save(workflow);
+        mutations.record(saved, before, source, request.changeMessage());
         log.info("Updated workflow: {} ({})", saved.getName(), saved.getId());
         activityLogService.info(LogCategory.SYSTEM, "Workflow updated: " + saved.getName(), "WorkflowService", saved.getId(), saved.getId());
         if (contentChanged) {
@@ -177,9 +175,7 @@ public class WorkflowService {
     @Transactional
     public Workflow restoreFromSnapshot(String id, WorkflowSnapshot snapshot, String changeMessage) {
         Workflow workflow = findById(id);
-
-        // Snapshot current state before restore
-        workflowVersionService.snapshotBeforeUpdate(workflow, snapshot, "user", changeMessage);
+        WorkflowSnapshot before = WorkflowSnapshot.from(workflow);
 
         // Set ALL versioned fields unconditionally (including null)
         workflow.setBlocks(snapshot.blocks() != null ? snapshot.blocks() : new ArrayList<>());
@@ -191,33 +187,10 @@ public class WorkflowService {
         workflow.setDefaultContext(snapshot.defaultContext() != null ? new HashMap<>(snapshot.defaultContext()) : new HashMap<>());
 
         Workflow saved = workflowRepository.save(workflow);
+        mutations.record(saved, before, ChangeSource.RESTORE, changeMessage);
         log.info("Restored workflow: {} ({}) from snapshot", saved.getName(), saved.getId());
         activityLogService.info(LogCategory.SYSTEM, "Workflow restored: " + saved.getName(), "WorkflowService", saved.getId(), saved.getId());
         return saved;
-    }
-
-    private WorkflowSnapshot computeIncomingSnapshot(Workflow current, UpdateWorkflowRequest request) {
-        List<BlockDefinition> blocks = request.blocks() != null ? request.blocks() : current.getBlocks();
-        String instructions = request.instructions() != null ? request.instructions() : current.getInstructions();
-        String model = request.model() != null ? request.model() : current.getModel();
-        String provider = request.provider() != null ? request.provider() : current.getProvider();
-        String effort = request.effort() != null ? normalizeEffort(request.effort()) : current.getEffort();
-
-        Map<String, Object> metadata;
-        if (request.metadata() != null) {
-            metadata = new HashMap<>(current.getMetadata());
-            metadata.putAll(request.metadata());
-        } else {
-            metadata = current.getMetadata();
-        }
-
-        Map<String, Object> defaultContext = request.defaultContext() != null
-                ? request.defaultContext() : current.getDefaultContext();
-
-        List<String> skillIds = current.getActivatedSkills().stream()
-                .map(Skill::getId).toList();
-
-        return new WorkflowSnapshot(blocks, instructions, model, provider, metadata, defaultContext, skillIds, effort);
     }
 
     /** Blank clears the level (null); invalid values are rejected with 400. */
@@ -250,6 +223,7 @@ public class WorkflowService {
     @Transactional
     public Workflow activateSkills(String workflowId, List<String> skillIds) {
         Workflow workflow = findById(workflowId);
+        WorkflowSnapshot before = WorkflowSnapshot.from(workflow);
         List<Skill> skills = skillRepository.findAllById(skillIds);
 
         // Avoid duplicates
@@ -260,13 +234,18 @@ public class WorkflowService {
                 .filter(s -> !existingIds.contains(s.getId()))
                 .forEach(workflow.getActivatedSkills()::add);
 
-        return workflowRepository.save(workflow);
+        Workflow saved = workflowRepository.save(workflow);
+        mutations.record(saved, before, ChangeSource.USER, null);
+        return saved;
     }
 
     @Transactional
     public Workflow deactivateSkill(String workflowId, String skillId) {
         Workflow workflow = findById(workflowId);
+        WorkflowSnapshot before = WorkflowSnapshot.from(workflow);
         workflow.getActivatedSkills().removeIf(s -> s.getId().equals(skillId));
-        return workflowRepository.save(workflow);
+        Workflow saved = workflowRepository.save(workflow);
+        mutations.record(saved, before, ChangeSource.USER, null);
+        return saved;
     }
 }

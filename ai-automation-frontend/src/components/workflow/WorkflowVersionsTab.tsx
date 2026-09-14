@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { History, RotateCcw, ChevronDown, ChevronRight, User, Bot, Download, Globe } from 'lucide-react';
+import { History, RotateCcw, ChevronDown, ChevronRight, User, Bot, Download, Globe, Sparkles, Link2, Undo2, AlertTriangle } from 'lucide-react';
 import { useWorkflowVersions, useRestoreWorkflowVersion } from '../../hooks/useWorkflowVersions';
 import { useT, useI18nStore } from '../../i18n';
 import { formatRelativeTime } from '../../utils/formatTime';
@@ -12,6 +12,15 @@ const SOURCE_ICONS: Record<string, typeof User> = {
   import: Download,
   api: Globe,
   system: History,
+  assistant: Sparkles,
+  factory: Bot,
+  wish: Sparkles,
+  dialog: Download,
+  conversion: Bot,
+  'chain-template': Link2,
+  'bpmn-import': Download,
+  restore: Undo2,
+  untracked: AlertTriangle,
 };
 
 const SOURCE_COLORS: Record<string, string> = {
@@ -21,6 +30,15 @@ const SOURCE_COLORS: Record<string, string> = {
   import: 'bg-green-500/20 text-green-400',
   api: 'bg-cyan-500/20 text-cyan-400',
   system: 'bg-gray-500/20 text-gray-400',
+  assistant: 'bg-purple-500/20 text-purple-400',
+  factory: 'bg-purple-500/20 text-purple-400',
+  wish: 'bg-purple-500/20 text-purple-400',
+  dialog: 'bg-green-500/20 text-green-400',
+  conversion: 'bg-purple-500/20 text-purple-400',
+  'chain-template': 'bg-green-500/20 text-green-400',
+  'bpmn-import': 'bg-green-500/20 text-green-400',
+  restore: 'bg-blue-500/20 text-blue-400',
+  untracked: 'bg-amber-500/20 text-amber-400',
 };
 
 export default function WorkflowVersionsTab({ workflowId, currentHash }: { workflowId: string; currentHash?: string | null }) {

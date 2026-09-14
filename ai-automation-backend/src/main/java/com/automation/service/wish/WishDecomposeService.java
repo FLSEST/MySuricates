@@ -143,7 +143,7 @@ public class WishDecomposeService {
                         null
                 );
 
-                Workflow created = workflowService.create(req);
+                Workflow created = workflowService.create(req, ChangeSource.WISH);
                 workflowIds.add(created.getId());
                 log.info("Wish {}: Created workflow '{}' ({})", wish.getId(), name, created.getId());
             }

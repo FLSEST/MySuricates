@@ -92,7 +92,7 @@ public class DialogConversionService {
                 null
         );
 
-        var created = workflowService.create(request);
+        var created = workflowService.create(request, com.automation.entity.ChangeSource.DIALOG);
         return workflowMapper.toResponse(created);
     }
 

@@ -3,6 +3,7 @@ package com.automation.service.assistant;
 import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.dto.request.UpdateWorkflowRequest;
 import com.automation.entity.BlockDefinition;
+import com.automation.entity.ChangeSource;
 import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
@@ -67,7 +68,7 @@ public class AssistantWorkflowTools {
                     metadata, defaultContext,
                     null  // version
             );
-            Workflow created = workflowService.create(request);
+            Workflow created = workflowService.create(request, ChangeSource.ASSISTANT);
             return "✓ Workflow created: \"" + created.getName() + "\" (ID: " + created.getId() + ")";
         } catch (Exception e) {
             log.warn("Assistant create_workflow tool failed. Payload: {}", json, e);
@@ -102,7 +103,7 @@ public class AssistantWorkflowTools {
                     null, // provider
                     metadata, defaultContext
             );
-            Workflow updated = workflowService.update(workflowId, request);
+            Workflow updated = workflowService.update(workflowId, request, ChangeSource.ASSISTANT);
             return "✓ Workflow updated: \"" + updated.getName() + "\" (ID: " + workflowId + ")";
         } catch (Exception e) {
             log.warn("Assistant update_workflow tool failed. Payload: {}", json, e);

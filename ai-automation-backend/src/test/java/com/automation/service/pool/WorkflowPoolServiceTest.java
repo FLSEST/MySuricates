@@ -3,6 +3,7 @@ package com.automation.service.pool;
 import com.automation.config.WorkflowPoolConfig;
 import com.automation.dto.request.InstallPoolWorkflowRequest;
 import com.automation.dto.response.PoolWorkflowEntry;
+import com.automation.entity.ChangeSource;
 import com.automation.entity.Workflow;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ProjectRepository;
@@ -19,6 +20,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.eq;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -197,13 +199,13 @@ class WorkflowPoolServiceTest {
                 .id("wf-1")
                 .name("Test Flow")
                 .build();
-        when(workflowService.create(any())).thenReturn(mockWorkflow);
+        when(workflowService.create(any(), eq(ChangeSource.POOL_INSTALL))).thenReturn(mockWorkflow);
 
         InstallPoolWorkflowRequest request = new InstallPoolWorkflowRequest("proj-1", null, null);
         WorkflowPoolService.InstallResult result = poolService.install("test-flow", request);
 
         assertThat(result.workflow().getId()).isEqualTo("wf-1");
-        verify(workflowService).create(any());
+        verify(workflowService).create(any(), eq(ChangeSource.POOL_INSTALL));
     }
 
     @Test
@@ -216,12 +218,12 @@ class WorkflowPoolServiceTest {
                 .id("wf-1")
                 .name("Custom Name")
                 .build();
-        when(workflowService.create(any())).thenReturn(mockWorkflow);
+        when(workflowService.create(any(), eq(ChangeSource.POOL_INSTALL))).thenReturn(mockWorkflow);
 
         InstallPoolWorkflowRequest request = new InstallPoolWorkflowRequest("proj-1", "Custom Name", null);
         poolService.install("test-flow", request);
 
-        verify(workflowService).create(argThat(req -> req.name().equals("Custom Name")));
+        verify(workflowService).create(argThat(req -> req.name().equals("Custom Name")), eq(ChangeSource.POOL_INSTALL));
     }
 
     @Test

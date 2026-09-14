@@ -24,6 +24,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,7 +43,7 @@ class WorkflowServiceTest {
     private ActivityLogService activityLogService;
 
     @Mock
-    private WorkflowVersionService workflowVersionService;
+    private WorkflowMutationGateway mutations;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -122,11 +123,11 @@ class WorkflowServiceTest {
             return w;
         });
 
-        Workflow result = workflowService.create(request);
+        Workflow result = workflowService.create(request, ChangeSource.USER);
 
         assertThat(result.getName()).isEqualTo("New Workflow");
         assertThat(result.getProject().getId()).isEqualTo("proj-1");
-        assertThat(result.getBlocks()).hasSize(1);
+        assertThat(result.getBlocks()).hasSize(1);        verify(mutations).record(result, null, ChangeSource.USER, null);
     }
 
     @Test
@@ -141,7 +142,7 @@ class WorkflowServiceTest {
                 .thenReturn(List.of(skill1, skill2));
         when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Workflow result = workflowService.create(request);
+        Workflow result = workflowService.create(request, ChangeSource.USER);
 
         assertThat(result.getActivatedSkills()).hasSize(2);
     }
@@ -151,7 +152,7 @@ class WorkflowServiceTest {
         var request = new CreateWorkflowRequest("unknown", "Name", null, null, List.of(), null, null, null, null, null, null, null, null);
         when(projectRepository.findById("unknown")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> workflowService.create(request))
+        assertThatThrownBy(() -> workflowService.create(request, ChangeSource.USER))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Project");
     }
@@ -162,10 +163,33 @@ class WorkflowServiceTest {
         when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
 
         var request = new UpdateWorkflowRequest("Updated Name", null, null, null, null, null, null, null, null);
-        Workflow result = workflowService.update("wf-1", request);
+        Workflow result = workflowService.update("wf-1", request, ChangeSource.USER);
 
         assertThat(result.getName()).isEqualTo("Updated Name");
         assertThat(result.getDescription()).isEqualTo("A test workflow"); // unchanged
+    }
+
+    @Test
+    void update_recordsTheChangeWithThePreStateAndTheCallersSource() {
+        when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(testWorkflow));
+        when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
+        com.automation.dto.WorkflowSnapshot before = com.automation.dto.WorkflowSnapshot.from(testWorkflow);
+
+        var request = new UpdateWorkflowRequest(null, null, null, null, "new instructions", null, null, null, null, "why");
+        Workflow result = workflowService.update("wf-1", request, ChangeSource.ASSISTANT);
+
+        verify(mutations).record(result, before, ChangeSource.ASSISTANT, "why");
+    }
+
+    @Test
+    void restore_isRecordedAsRestore() {
+        when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(testWorkflow));
+        when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
+        var snapshot = new com.automation.dto.WorkflowSnapshot(List.of(), "restored", null, null, Map.of(), Map.of(), List.of());
+
+        Workflow result = workflowService.restoreFromSnapshot("wf-1", snapshot, "Restored from version 2");
+
+        verify(mutations).record(eq(result), any(), eq(ChangeSource.RESTORE), eq("Restored from version 2"));
     }
 
     // --- effort ---
@@ -177,7 +201,7 @@ class WorkflowServiceTest {
         when(projectRepository.findById("proj-1")).thenReturn(Optional.of(testProject));
         when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Workflow result = workflowService.create(request);
+        Workflow result = workflowService.create(request, ChangeSource.USER);
 
         assertThat(result.getEffort()).isEqualTo("high");
     }
@@ -188,7 +212,7 @@ class WorkflowServiceTest {
                 null, null, null, null, null, null, null, "turbo");
         when(projectRepository.findById("proj-1")).thenReturn(Optional.of(testProject));
 
-        assertThatThrownBy(() -> workflowService.create(request))
+        assertThatThrownBy(() -> workflowService.create(request, ChangeSource.USER))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("effort");
     }
@@ -199,12 +223,12 @@ class WorkflowServiceTest {
         when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
 
         var set = new UpdateWorkflowRequest(null, null, null, null, null, null, null,
-                null, null, null, null, null, null, "xhigh");
-        assertThat(workflowService.update("wf-1", set).getEffort()).isEqualTo("xhigh");
+                null, null, null, null, null, "xhigh");
+        assertThat(workflowService.update("wf-1", set, ChangeSource.USER).getEffort()).isEqualTo("xhigh");
 
         var clear = new UpdateWorkflowRequest(null, null, null, null, null, null, null,
-                null, null, null, null, null, null, "");
-        assertThat(workflowService.update("wf-1", clear).getEffort()).isNull();
+                null, null, null, null, null, "");
+        assertThat(workflowService.update("wf-1", clear, ChangeSource.USER).getEffort()).isNull();
     }
 
     @Test
@@ -214,7 +238,7 @@ class WorkflowServiceTest {
         when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
 
         var request = new UpdateWorkflowRequest("New Name", null, null, null, null, null, null, null, null);
-        assertThat(workflowService.update("wf-1", request).getEffort()).isEqualTo("medium");
+        assertThat(workflowService.update("wf-1", request, ChangeSource.USER).getEffort()).isEqualTo("medium");
     }
 
     @Test
@@ -222,8 +246,8 @@ class WorkflowServiceTest {
         when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(testWorkflow));
 
         var request = new UpdateWorkflowRequest(null, null, null, null, null, null, null,
-                null, null, null, null, null, null, "banana");
-        assertThatThrownBy(() -> workflowService.update("wf-1", request))
+                null, null, null, null, null, "banana");
+        assertThatThrownBy(() -> workflowService.update("wf-1", request, ChangeSource.USER))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -268,7 +292,7 @@ class WorkflowServiceTest {
             return w;
         });
 
-        Workflow result = workflowService.create(request);
+        Workflow result = workflowService.create(request, ChangeSource.USER);
 
         assertThat(result.getDefaultContext()).containsEntry("branch", "main");
         assertThat(result.getDefaultContext()).containsEntry("env", "staging");
@@ -282,7 +306,7 @@ class WorkflowServiceTest {
 
         var request = new UpdateWorkflowRequest(null, null, null, null, null, null, null, null,
                 Map.of("branch", "develop"));
-        Workflow result = workflowService.update("wf-1", request);
+        Workflow result = workflowService.update("wf-1", request, ChangeSource.USER);
 
         assertThat(result.getDefaultContext()).containsEntry("branch", "develop");
         assertThat(result.getDefaultContext()).doesNotContainKey("env"); // replaced, not merged

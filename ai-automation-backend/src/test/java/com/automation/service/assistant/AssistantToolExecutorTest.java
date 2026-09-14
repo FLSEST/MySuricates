@@ -2,6 +2,7 @@ package com.automation.service.assistant;
 
 import com.automation.config.AssistantGuardrailsConfig;
 import com.automation.entity.ActivityLog.LogCategory;
+import com.automation.entity.ChangeSource;
 import com.automation.entity.Todo;
 import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
@@ -128,7 +129,7 @@ class AssistantToolExecutorTest {
     @Test
     void executeTools_createWorkflow_success() {
         Workflow created = Workflow.builder().id("wf-123").name("Test Workflow").build();
-        when(workflowService.create(any())).thenReturn(created);
+        when(workflowService.create(any(), eq(ChangeSource.ASSISTANT))).thenReturn(created);
 
         String input = "<tool type=\"create_workflow\">{\"projectId\": \"p1\", \"name\": \"Test Workflow\"}</tool>";
         String result = runAllTools(input);
@@ -270,14 +271,14 @@ class AssistantToolExecutorTest {
     @Test
     void executeTools_updateWorkflow_success() {
         Workflow updated = Workflow.builder().id("wf-1").name("Updated WF").build();
-        when(workflowService.update(eq("wf-1"), any())).thenReturn(updated);
+        when(workflowService.update(eq("wf-1"), any(), eq(ChangeSource.ASSISTANT))).thenReturn(updated);
 
         String input = "<tool type=\"update_workflow\">{\"workflowId\": \"wf-1\", \"name\": \"Updated WF\"}</tool>";
         String result = runAllTools(input);
 
         assertThat(result).contains("✓");
         assertThat(result).contains("updated");
-        verify(workflowService).update(eq("wf-1"), any());
+        verify(workflowService).update(eq("wf-1"), any(), eq(ChangeSource.ASSISTANT));
     }
 
     @Test
@@ -403,7 +404,7 @@ class AssistantToolExecutorTest {
     @Test
     void executeTools_createWorkflow_mapsBlocksMetadataAndDefaultContext() {
         Workflow created = Workflow.builder().id("wf-123").name("Deploy Flow").build();
-        when(workflowService.create(any())).thenReturn(created);
+        when(workflowService.create(any(), eq(ChangeSource.ASSISTANT))).thenReturn(created);
 
         String input = """
                 <tool type="create_workflow">{
@@ -429,13 +430,13 @@ class AssistantToolExecutorTest {
                         && "echo hi".equals(req.blocks().get(0).getConfig().get("command"))
                         && "assistant".equals(req.metadata().get("source"))
                         && "main".equals(req.defaultContext().get("branch"))
-        ));
+        ), eq(ChangeSource.ASSISTANT));
     }
 
     @Test
     void executeTools_updateWorkflow_mapsBlocksMetadataAndDefaultContext() {
         Workflow updated = Workflow.builder().id("wf-1").name("Deploy Flow").build();
-        when(workflowService.update(eq("wf-1"), any())).thenReturn(updated);
+        when(workflowService.update(eq("wf-1"), any(), eq(ChangeSource.ASSISTANT))).thenReturn(updated);
 
         String input = """
                 <tool type="update_workflow">{
@@ -457,7 +458,7 @@ class AssistantToolExecutorTest {
                         && "Deploy now".equals(req.blocks().get(0).getConfig().get("command"))
                         && "ops".equals(req.metadata().get("owner"))
                         && "prod".equals(req.defaultContext().get("env"))
-        ));
+        ), eq(ChangeSource.ASSISTANT));
     }
 
     @Test
@@ -607,7 +608,7 @@ class AssistantToolExecutorTest {
 
         assertThat(result.success()).isFalse();
         assertThat(result.message()).contains("⚠").contains("quantum-magic");
-        verify(workflowService, never()).create(any());
+        verify(workflowService, never()).create(any(), eq(ChangeSource.ASSISTANT));
     }
 
     @Test
