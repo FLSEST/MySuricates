@@ -10,7 +10,7 @@ interface WidgetFrameProps {
 }
 
 interface WidgetFrameState {
-  error: Error | null;
+  hasError: boolean;
 }
 
 /**
@@ -19,18 +19,18 @@ interface WidgetFrameState {
  * still collapses widgets that render nothing.
  */
 export class WidgetFrame extends Component<WidgetFrameProps, WidgetFrameState> {
-  state: WidgetFrameState = { error: null };
+  state: WidgetFrameState = { hasError: false };
 
-  static getDerivedStateFromError(error: Error): WidgetFrameState {
-    return { error };
+  static getDerivedStateFromError(): WidgetFrameState {
+    return { hasError: true };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo) {
+  componentDidCatch(error: unknown, info: ErrorInfo) {
     reportErrorToBackend(error, info.componentStack);
   }
 
   render() {
-    if (!this.state.error) return this.props.children;
+    if (!this.state.hasError) return this.props.children;
     const t = getTranslations();
     return (
       <div
@@ -44,7 +44,7 @@ export class WidgetFrame extends Component<WidgetFrameProps, WidgetFrameState> {
         <p className="text-xs text-text-secondary">{t.dashboard.widgetFailed}</p>
         <button
           type="button"
-          onClick={() => this.setState({ error: null })}
+          onClick={() => this.setState({ hasError: false })}
           className="mt-1 inline-flex items-center gap-1 text-xs text-accent hover:text-accent-hover"
         >
           <RotateCcw className="h-3 w-3" />

@@ -12,6 +12,10 @@ function Flaky() {
   return <p>Widget content</p>;
 }
 
+function ThrowsNull() {
+  throw null;
+}
+
 beforeAll(() => {
   // React logs caught render errors; keep the test output readable.
   vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -53,5 +57,16 @@ describe('WidgetFrame', () => {
     shouldThrow = false;
     const { container } = render(<WidgetFrame label="X"><Flaky /></WidgetFrame>);
     expect(container.innerHTML).toBe('<p>Widget content</p>');
+  });
+
+  it('contains a widget that throws a non-Error value', () => {
+    render(
+      <>
+        <WidgetFrame label="Runs Over Time"><ThrowsNull /></WidgetFrame>
+        <p>Neighbour</p>
+      </>,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Runs Over Time');
+    expect(screen.getByText('Neighbour')).toBeInTheDocument();
   });
 });
