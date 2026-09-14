@@ -134,8 +134,10 @@ describe('WorkflowExecution', () => {
 
     it('shows completed step with success icon and output', () => {
       cy.contains('Step 1').should('be.visible');
-      // Block type badge
-      cy.contains('simple').should('be.visible');
+      // Kind chip + translated block type badge
+      cy.get('#exec-step-0 [data-step-kind="ai"]').should('exist');
+      cy.get('#exec-step-0').contains('AI').should('be.visible');
+      cy.get('#exec-step-0').contains('Simple Command').should('be.visible');
       // Step output
       cy.contains('Analysis complete: 0 issues found').should('be.visible');
       // Duration is shown (formatDuration: 5200ms -> "5.2s")
@@ -144,7 +146,9 @@ describe('WorkflowExecution', () => {
 
     it('shows failed step with error message', () => {
       cy.contains('Step 2').should('be.visible');
-      cy.contains('shell').should('be.visible');
+      cy.get('#exec-step-1 [data-step-kind="deterministic"]').should('exist');
+      cy.get('#exec-step-1').contains('Deterministic').should('be.visible');
+      cy.get('#exec-step-1').contains('Shell Command').should('be.visible');
       cy.contains('Process exited with code 1').should('be.visible');
     });
 
@@ -242,10 +246,10 @@ describe('WorkflowExecution', () => {
     });
 
     it('shows block type badges on each step', () => {
-      // Both block types should be visible as badges
+      // Both block types should be visible as translated badges
       cy.get('.divide-y').within(() => {
-        cy.contains('simple').should('exist');
-        cy.contains('shell').should('exist');
+        cy.contains('Simple Command').should('exist');
+        cy.contains('Shell Command').should('exist');
       });
     });
   });

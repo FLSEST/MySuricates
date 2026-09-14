@@ -26,7 +26,9 @@ class StepResultResponseTest {
                 Instant.parse("2025-01-01T10:00:00Z"),
                 Instant.parse("2025-01-01T10:00:05Z"),
                 5000L,
-                metadata
+                metadata,
+                "shell",
+                "Build"
         );
     }
 
@@ -49,12 +51,14 @@ class StepResultResponseTest {
             assertThat(response.metadata())
                     .containsEntry("retries", 2)
                     .containsEntry("provider", "anthropic");
+            assertThat(response.blockType()).isEqualTo("shell");
+            assertThat(response.blockName()).isEqualTo("Build");
         }
 
         @Test
         void should_allow_null_optional_fields() {
             StepResultResponse response = new StepResultResponse(
-                    null, 0, null, null, null, null, null, null, null);
+                    null, 0, null, null, null, null, null, null, null, null, null);
 
             assertThat(response.id()).isNull();
             assertThat(response.input()).isNull();
@@ -64,13 +68,15 @@ class StepResultResponseTest {
             assertThat(response.completedAt()).isNull();
             assertThat(response.durationMs()).isNull();
             assertThat(response.metadata()).isNull();
+            assertThat(response.blockType()).isNull();
+            assertThat(response.blockName()).isNull();
         }
 
         @Test
         void should_handle_large_duration_values() {
             StepResultResponse response = new StepResultResponse(
                     "x", 999, "i", "o", StepStatus.COMPLETED,
-                    Instant.EPOCH, Instant.EPOCH, Long.MAX_VALUE, Map.of());
+                    Instant.EPOCH, Instant.EPOCH, Long.MAX_VALUE, Map.of(), null, null);
 
             assertThat(response.durationMs()).isEqualTo(Long.MAX_VALUE);
             assertThat(response.stepIndex()).isEqualTo(999);
@@ -101,7 +107,7 @@ class StepResultResponseTest {
             StepResultResponse a = sample();
             StepResultResponse b = new StepResultResponse(
                     "other", a.stepIndex(), a.input(), a.output(), a.status(),
-                    a.startedAt(), a.completedAt(), a.durationMs(), a.metadata());
+                    a.startedAt(), a.completedAt(), a.durationMs(), a.metadata(), a.blockType(), a.blockName());
 
             assertThat(a).isNotEqualTo(b);
         }
@@ -116,7 +122,7 @@ class StepResultResponseTest {
             if (other == null) return; // Enum hat nur einen Wert
             StepResultResponse b = new StepResultResponse(
                     a.id(), a.stepIndex(), a.input(), a.output(), other,
-                    a.startedAt(), a.completedAt(), a.durationMs(), a.metadata());
+                    a.startedAt(), a.completedAt(), a.durationMs(), a.metadata(), a.blockType(), a.blockName());
 
             assertThat(a).isNotEqualTo(b);
         }

@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import {
-  Brain, Terminal, CheckCircle2, AlertCircle, Clock, ChevronDown, ChevronRight,
+  Brain, Terminal, CheckCircle2, AlertCircle, ChevronDown, ChevronRight,
   Target, Loader2, XCircle, ShieldQuestion,
 } from 'lucide-react';
 import { Badge } from '../ui';
 import { PathLinkedOutput } from './PathLinkedOutput';
 import { useT } from '../../i18n';
-import { formatDuration } from '../../utils/formatTime';
 /* Badge used in IterationCard, custom span for agentic badge in main card */
 import type { StepResult, AgenticState, AgenticIteration } from '../../types';
+import { StepCardFrame, StepCardHeader } from '../workflow/StepCardChrome';
 
 function IterationCard({ iter }: { iter: AgenticIteration }) {
   const [expanded, setExpanded] = useState(false);
@@ -113,7 +113,7 @@ export function AgenticStepCard({ step, agenticState }: AgenticStepCardProps) {
   const maxIterations = agenticState?.maxIterations ?? 0;
 
   return (
-    <div className="flex gap-3 py-3">
+    <StepCardFrame step={step}>
       <div className="pt-0.5">
         {goalAchieved === true ? (
           <CheckCircle2 className="w-5 h-5 text-success" />
@@ -132,19 +132,16 @@ export function AgenticStepCard({ step, agenticState }: AgenticStepCardProps) {
 
       <div className="flex-1 min-w-0">
         {/* Header */}
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-xs font-mono text-text-tertiary">Step {step.stepIndex + 1}</span>
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700/30">
-            <Brain className="w-3 h-3" />
-            {t.workflows.execution.agentic.title}
-          </span>
-          {step.durationMs != null && (
-            <span className="text-xs text-text-tertiary flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              {formatDuration(step.durationMs)}
+        <StepCardHeader
+          step={step}
+          className="mb-2"
+          badge={
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700/30">
+              <Brain className="w-3 h-3" />
+              {t.workflows.execution.agentic.title}
             </span>
-          )}
-        </div>
+          }
+        />
 
         {/* Goal */}
         {agenticState?.goal && (
@@ -229,6 +226,6 @@ export function AgenticStepCard({ step, agenticState }: AgenticStepCardProps) {
           </pre>
         )}
       </div>
-    </div>
+    </StepCardFrame>
   );
 }

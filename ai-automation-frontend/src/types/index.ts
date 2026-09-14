@@ -320,7 +320,9 @@ export type TriggerSource =
 export interface StepResult {
   id: string;
   stepIndex: number;
-  blockType: string;
+  /** Lifted from `metadata.blockType` by the backend; read it via `stepBlockType(step)` (older backends omit it). */
+  blockType?: string | null;
+  blockName?: string | null;
   input: string;
   output: string;
   status: StepStatus;

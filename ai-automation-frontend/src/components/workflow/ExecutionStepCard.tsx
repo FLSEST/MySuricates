@@ -1,31 +1,10 @@
 import { useState } from 'react';
-import {
-  Clock, CheckCircle2, AlertCircle,
-  Terminal, Sparkles, Brain, Repeat, GitBranch, RefreshCw, ShieldCheck, Layers,
-  MessageSquare, Route, RotateCcw, Wrench, Plug,
-} from 'lucide-react';
-import { Badge } from '../ui';
+import { CheckCircle2, AlertCircle } from 'lucide-react';
 import { PathLinkedOutput } from '../shared/PathLinkedOutput';
 import { useT } from '../../i18n';
-import { formatDuration } from '../../utils/formatTime';
 import type { StepResult } from '../../types';
 import { stepMetadataSummary, wrapperFacts, formatMetadataValue } from './stepMetadata';
-
-const BLOCK_TYPE_ICONS: Record<string, React.ReactNode> = {
-  shell: <Terminal className="w-3 h-3" />,
-  simple: <Sparkles className="w-3 h-3" />,
-  agentic: <Brain className="w-3 h-3" />,
-  foreach: <Repeat className="w-3 h-3" />,
-  conditional: <GitBranch className="w-3 h-3" />,
-  while: <RefreshCw className="w-3 h-3" />,
-  approval: <ShieldCheck className="w-3 h-3" />,
-  'sub-workflow': <Layers className="w-3 h-3" />,
-  'human-input': <MessageSquare className="w-3 h-3" />,
-  switch: <Route className="w-3 h-3" />,
-  retry: <RotateCcw className="w-3 h-3" />,
-  'skill-capability': <Wrench className="w-3 h-3" />,
-  integration: <Plug className="w-3 h-3" />,
-};
+import { StepCardFrame, StepCardHeader } from './StepCardChrome';
 
 export function ExecutionStepCard({ step }: { step: StepResult }) {
   const t = useT();
@@ -39,7 +18,7 @@ export function ExecutionStepCard({ step }: { step: StepResult }) {
     : [];
 
   return (
-    <div className="flex gap-3 py-3">
+    <StepCardFrame step={step}>
       <div className="pt-0.5">
         {step.status === 'COMPLETED' ? (
           <CheckCircle2 className="w-5 h-5 text-success" />
@@ -52,21 +31,7 @@ export function ExecutionStepCard({ step }: { step: StepResult }) {
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-xs font-mono text-text-tertiary">Step {step.stepIndex + 1}</span>
-          <Badge variant={step.status === 'COMPLETED' ? 'success' : step.status === 'FAILED' ? 'danger' : 'default'}>
-            <span className="inline-flex items-center gap-1">
-              {BLOCK_TYPE_ICONS[step.blockType]}
-              {step.blockType}
-            </span>
-          </Badge>
-          {step.durationMs != null && (
-            <span className="text-xs text-text-tertiary flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              {formatDuration(step.durationMs)}
-            </span>
-          )}
-        </div>
+        <StepCardHeader step={step} />
         {(provider || model || showRequestedModel || facts.length > 0) && (
           <div className="flex flex-wrap gap-2 mb-2">
             {provider && (
@@ -95,7 +60,7 @@ export function ExecutionStepCard({ step }: { step: StepResult }) {
           <p
             className="text-xs text-text-secondary font-mono mb-1 truncate cursor-pointer hover:text-text transition-colors"
             onClick={() => setInputExpanded(true)}
-            title="Klicken zum Aufklappen"
+            title={t.workflows.execution.stepInput.clickToExpand}
           >{step.input}</p>
         )}
         {step.input && inputExpanded && (
@@ -105,7 +70,7 @@ export function ExecutionStepCard({ step }: { step: StepResult }) {
                 type="button"
                 onClick={() => setInputExpanded(false)}
                 className="text-[11px] uppercase tracking-wide text-text-tertiary hover:text-text mb-1"
-                title="Klicken zum Einklappen"
+                title={t.workflows.execution.stepInput.clickToCollapse}
               >
                 {t.workflows.execution.stepInput.command}
               </button>
@@ -161,6 +126,6 @@ export function ExecutionStepCard({ step }: { step: StepResult }) {
           <p className="text-xs text-danger mt-1">{step.error}</p>
         )}
       </div>
-    </div>
+    </StepCardFrame>
   );
 }

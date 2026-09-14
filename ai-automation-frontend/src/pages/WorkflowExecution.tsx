@@ -25,6 +25,7 @@ import {
 import { type RunStatus, type DiagramSelection } from '../components/workflow/BpmnDiagramView';
 import { ExecutionDiagramPanel } from '../components/workflow/ExecutionDiagramPanel';
 import { ExecutionStepCard } from '../components/workflow/ExecutionStepCard';
+import { stepBlockType } from '../components/workflow/stepMetadata';
 import { ExecutionRerunButton } from '../components/workflow/ExecutionRerunButton';
 import { useCreateTodo } from '../hooks/useTodos';
 import { useExecutionWebSocket } from '../hooks/useWebSocket';
@@ -139,7 +140,7 @@ export function WorkflowExecution() {
   const handleCreateFailedTodo = () => {
     if (!run) return;
     const failedStep = run.steps?.find(s => s.status === 'FAILED');
-    const stepInfo = failedStep ? `Step ${failedStep.stepIndex + 1} (${failedStep.blockType})` : null;
+    const stepInfo = failedStep ? `Step ${failedStep.stepIndex + 1} (${stepBlockType(failedStep)})` : null;
 
     const descParts: string[] = [];
     descParts.push(`**Workflow:** ${workflow?.name || run.workflowName}`);
@@ -434,9 +435,9 @@ export function WorkflowExecution() {
                 id={`exec-step-${step.stepIndex}`}
                 className={stepHighlight?.index === step.stepIndex ? 'ring-2 ring-accent ring-inset rounded-lg bg-accent/5' : ''}
               >
-                {step.blockType === 'agentic' ? (
+                {stepBlockType(step) === 'agentic' ? (
                   <AgenticStepCard step={step} agenticState={agenticStates.get(step.stepIndex)} />
-                ) : step.blockType === 'foreach' ? (
+                ) : stepBlockType(step) === 'foreach' ? (
                   <ForEachStepCard step={step} forEachState={forEachStates.get(step.stepIndex)} />
                 ) : (
                   <ExecutionStepCard step={step} />
@@ -537,7 +538,7 @@ export function WorkflowExecution() {
       )}
 
       {/* Agentic-to-Workflow Conversion */}
-      {run.status === 'COMPLETED' && conversionModule && run.steps.some(s => s.blockType === 'agentic') && (
+      {run.status === 'COMPLETED' && conversionModule && run.steps.some(s => stepBlockType(s) === 'agentic') && (
         <ConversionSuggestion runId={runId!} />
       )}
 

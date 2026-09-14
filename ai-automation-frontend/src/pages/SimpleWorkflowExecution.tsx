@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Pause, Play, XCircle, Clock, CheckCircle2, AlertCircle,
+  ArrowLeft, Pause, Play, XCircle, CheckCircle2, AlertCircle,
 } from 'lucide-react';
-import { Card, CardHeader, Button, Spinner, Badge } from '../components/ui';
+import { Card, CardHeader, Button, Spinner } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ErrorState } from '../components/shared/ErrorState';
 import { ApprovalDialog } from '../components/shared/ApprovalDialog';
@@ -20,12 +20,13 @@ import { formatDuration } from '../utils/formatTime';
 import { api } from '../api/client';
 import type { StepResult, PendingHumanInput } from '../types';
 import { stepMetadataSummary } from '../components/workflow/stepMetadata';
+import { StepCardFrame, StepCardHeader } from '../components/workflow/StepCardChrome';
 
 function StepCard({ step }: { step: StepResult }) {
   const { provider, model, requestedModel, showRequestedModel } = stepMetadataSummary(step);
 
   return (
-    <div className="flex gap-3 py-3">
+    <StepCardFrame step={step}>
       <div className="pt-0.5">
         {step.status === 'COMPLETED' ? (
           <CheckCircle2 className="w-5 h-5 text-success" />
@@ -38,18 +39,7 @@ function StepCard({ step }: { step: StepResult }) {
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-xs font-mono text-text-tertiary">Step {step.stepIndex + 1}</span>
-          <Badge variant={step.status === 'COMPLETED' ? 'success' : step.status === 'FAILED' ? 'danger' : 'default'}>
-            {step.blockType}
-          </Badge>
-          {step.durationMs != null && (
-            <span className="text-xs text-text-tertiary flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              {formatDuration(step.durationMs)}
-            </span>
-          )}
-        </div>
+        <StepCardHeader step={step} />
         {(provider || model || showRequestedModel) && (
           <div className="flex flex-wrap gap-2 mb-2">
             {provider && (
@@ -78,7 +68,7 @@ function StepCard({ step }: { step: StepResult }) {
           <p className="text-xs text-danger mt-1">{step.error}</p>
         )}
       </div>
-    </div>
+    </StepCardFrame>
   );
 }
 

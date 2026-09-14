@@ -89,7 +89,14 @@ public abstract class WorkflowMapper {
 
     public abstract List<WorkflowRunResponse> toRunResponseList(List<WorkflowRun> runs);
 
+    @Mapping(target = "blockType", expression = "java(metadataString(step, \"blockType\"))")
+    @Mapping(target = "blockName", expression = "java(metadataString(step, \"blockName\"))")
     public abstract StepResultResponse toStepResponse(StepResult step);
+
+    protected String metadataString(StepResult step, String key) {
+        Map<String, Object> metadata = step.getMetadata();
+        return metadata != null && metadata.get(key) instanceof String value ? value : null;
+    }
 
     protected String safeWorkflowId(WorkflowRun run) {
         try {

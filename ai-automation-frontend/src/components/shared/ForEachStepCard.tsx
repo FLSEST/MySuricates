@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { CheckCircle2, AlertCircle, Clock, ChevronDown, ChevronRight, List } from 'lucide-react';
+import { CheckCircle2, AlertCircle, ChevronDown, ChevronRight, List } from 'lucide-react';
 import { Badge } from '../ui';
 import { PathLinkedOutput } from './PathLinkedOutput';
-import { formatDuration } from '../../utils/formatTime';
 import type { StepResult } from '../../types';
 import type { ForEachState, ForEachItemState } from '../../hooks/useWebSocket';
 import { persistedForEachItems, persistedTotalItems, stepMetadataSummary } from '../workflow/stepMetadata';
+import { StepCardFrame, StepCardHeader } from '../workflow/StepCardChrome';
 
 interface ForEachItemRowProps {
   item: ForEachItemState;
@@ -62,7 +62,7 @@ export function ForEachStepCard({ step, forEachState }: ForEachStepCardProps) {
   const { provider, model, requestedModel, showRequestedModel } = stepMetadataSummary(step);
 
   return (
-    <div className="flex gap-3 py-3">
+    <StepCardFrame step={step}>
       <div className="pt-0.5">
         {step.status === 'COMPLETED' ? (
           <CheckCircle2 className="w-5 h-5 text-success" />
@@ -75,18 +75,7 @@ export function ForEachStepCard({ step, forEachState }: ForEachStepCardProps) {
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-xs font-mono text-text-tertiary">Step {step.stepIndex + 1}</span>
-          <Badge variant={step.status === 'COMPLETED' ? 'success' : step.status === 'FAILED' ? 'danger' : 'default'}>
-            forEach
-          </Badge>
-          {step.durationMs != null && (
-            <span className="text-xs text-text-tertiary flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              {formatDuration(step.durationMs)}
-            </span>
-          )}
-        </div>
+        <StepCardHeader step={step} />
 
         {(provider || model || showRequestedModel) && (
           <div className="flex flex-wrap gap-2 mb-2">
@@ -163,6 +152,6 @@ export function ForEachStepCard({ step, forEachState }: ForEachStepCardProps) {
           </pre>
         )}
       </div>
-    </div>
+    </StepCardFrame>
   );
 }

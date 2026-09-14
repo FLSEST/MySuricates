@@ -1,6 +1,49 @@
 import type { StepResult } from '../../types';
 import type { ForEachItemState } from '../../types/websocket';
 
+/** Block type of a step: top-level field, else `metadata.blockType` (older backends only persist it there). */
+export function stepBlockType(step: StepResult): string {
+  if (step.blockType) return step.blockType;
+  const fromMetadata = step.metadata?.blockType;
+  return typeof fromMetadata === 'string' ? fromMetadata : '';
+}
+
+/** Block name of a step: top-level field, else `metadata.blockName`; null for unnamed blocks. */
+export function stepBlockName(step: StepResult): string | null {
+  if (step.blockName) return step.blockName;
+  const fromMetadata = step.metadata?.blockName;
+  return typeof fromMetadata === 'string' && fromMetadata ? fromMetadata : null;
+}
+
+/**
+ * What decided the step's outcome: an AI call, fixed logic, or a person. `unknown` is a wrapper whose result
+ * metadata is not there (still running, or a run from before wrappers recorded it) — no guessing.
+ */
+export type StepKind = 'ai' | 'deterministic' | 'human' | 'unknown';
+
+const HUMAN_BLOCK_TYPES = new Set(['approval', 'human-input']);
+/** Blocks that always call the AI — used while their AI metadata is not written yet (running, failed early). */
+const ALWAYS_AI_BLOCK_TYPES = new Set(['simple', 'agentic', 'skill-capability']);
+const WRAPPER_BLOCK_TYPES = new Set(['foreach', 'while', 'retry', 'conditional', 'switch']);
+/** Keys every finished wrapper writes; together with a missing `aiRequest` they prove no inner AI call ran. */
+const WRAPPER_RESULT_KEYS = ['totalItems', 'iterationCount', 'attempts', 'conditionMet', 'matchedCase'];
+
+/**
+ * Classifies a step by what actually ran: wrappers (foreach, while, retry, conditional, switch) count as AI only
+ * when an inner AI call happened — the backend then carries `aiRequest` (older runs: `provider`) onto the step.
+ */
+export function stepKind(step: StepResult): StepKind {
+  const blockType = stepBlockType(step);
+  if (HUMAN_BLOCK_TYPES.has(blockType)) return 'human';
+  const { provider, aiRequest } = stepMetadataSummary(step);
+  if (aiRequest || provider || ALWAYS_AI_BLOCK_TYPES.has(blockType)) return 'ai';
+  if (WRAPPER_BLOCK_TYPES.has(blockType)) {
+    const metadata = step.metadata ?? {};
+    return WRAPPER_RESULT_KEYS.some((key) => metadata[key] !== undefined) ? 'deterministic' : 'unknown';
+  }
+  return 'deterministic';
+}
+
 /**
  * Provider/model facts of a step, read from the persisted step metadata.
  * Host steps write them directly; wrapper blocks (foreach, while, conditional, switch, retry,

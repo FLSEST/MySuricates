@@ -14,5 +14,9 @@ public record StepResultResponse(
         Instant startedAt,
         Instant completedAt,
         Long durationMs,
-        Map<String, Object> metadata
+        Map<String, Object> metadata,
+        /** Lifted from {@code metadata.blockType}; the entity has no own column. */
+        String blockType,
+        /** Lifted from {@code metadata.blockName}; null for unnamed blocks. */
+        String blockName
 ) {}
