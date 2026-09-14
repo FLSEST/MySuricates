@@ -379,7 +379,7 @@ export function WorkflowDetail() {
 
           {activeTab === 'versions' && (
             <Suspense fallback={<div className="py-8 text-center text-text-secondary">{t.common.loading}</div>}>
-              <WorkflowVersionsTab workflowId={workflow.id} />
+              <WorkflowVersionsTab workflowId={workflow.id} currentHash={workflow.definitionHash} />
             </Suspense>
           )}
 

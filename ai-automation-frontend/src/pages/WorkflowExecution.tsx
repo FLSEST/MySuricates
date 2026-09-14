@@ -14,6 +14,7 @@ import { ApprovalDialog } from '../components/shared/ApprovalDialog';
 import { HumanInputDialog } from '../components/shared/HumanInputDialog';
 import { AgenticStepCard } from '../components/shared/AgenticStepCard';
 import { ForEachStepCard } from '../components/shared/ForEachStepCard';
+import { CopyButton } from '../components/shared/CopyButton';
 import { InsightsPanel } from '../components/shared/InsightsPanel';
 import { ConversionSuggestion } from '../components/shared/ConversionSuggestion';
 import {
@@ -315,6 +316,26 @@ export function WorkflowExecution() {
           </div>
         )}
       </div>
+
+      {/* Provenance: what started the run and which definition it executed */}
+      {(run.triggerSource || run.definitionHash) && (
+        <div className="flex flex-wrap items-center gap-2 text-xs" data-testid="run-provenance">
+          {run.triggerSource && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised">
+              <span className="text-text-secondary">{t.workflows.triggeredBy}</span>
+              <span className="text-text font-medium">{t.workflows.triggerSources[run.triggerSource]}</span>
+            </span>
+          )}
+          {run.definitionHash && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised font-mono"
+                  title={t.workflows.definitionHashHint}>
+              <span className="text-text-secondary">{t.workflows.definitionHash}</span>
+              <span className="text-text">{run.definitionHash.slice(0, 12)}</span>
+              <CopyButton text={run.definitionHash} />
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Input Variables */}
       {run.inputContext && Object.keys(run.inputContext).length > 0 && (

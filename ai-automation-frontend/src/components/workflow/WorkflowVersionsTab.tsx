@@ -23,7 +23,7 @@ const SOURCE_COLORS: Record<string, string> = {
   system: 'bg-gray-500/20 text-gray-400',
 };
 
-export default function WorkflowVersionsTab({ workflowId }: { workflowId: string }) {
+export default function WorkflowVersionsTab({ workflowId, currentHash }: { workflowId: string; currentHash?: string | null }) {
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
   const [page, setPage] = useState(0);
@@ -87,6 +87,17 @@ export default function WorkflowVersionsTab({ workflowId }: { workflowId: string
                 <SourceIcon className="w-3 h-3" />
                 {sourceLabels[v.changeSource as keyof typeof sourceLabels] ?? v.changeSource}
               </span>
+
+              {v.definitionHash && (
+                <span className="font-mono text-[11px] text-text-tertiary flex-shrink-0" title={v.definitionHash}>
+                  {v.definitionHash.slice(0, 8)}
+                </span>
+              )}
+              {currentHash && v.definitionHash === currentHash && (
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-success-subtle text-success flex-shrink-0">
+                  {t.workflows.versionCurrent}
+                </span>
+              )}
 
               {v.changeMessage && (
                 <span className="text-sm text-text-secondary truncate flex-1">

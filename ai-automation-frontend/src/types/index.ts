@@ -116,6 +116,8 @@ export interface Workflow {
   model: string | null;
   provider: string | null;
   effort: string | null;
+  /** SHA-256 of the current definition (detail responses with provenance on) */
+  definitionHash?: string | null;
   metadata?: WorkflowMetadata;
   defaultContext?: Record<string, string>;
   testStatus?: 'UNTESTED' | 'PASSED' | 'FAILED';
@@ -157,6 +159,7 @@ export interface WorkflowVersion {
   changeSource: string;
   changeMessage: string | null;
   createdAt: string;
+  definitionHash?: string | null;
 }
 
 // ── Workflow Template ────────────────────────────────────
@@ -299,7 +302,16 @@ export interface WorkflowRun {
   metadata: Record<string, unknown>;
   inputContext?: Record<string, unknown>;
   triggeredByScheduleId?: string | null;
+  /** SHA-256 of the executed definition (provenance); null for old runs or provenance off */
+  definitionHash?: string | null;
+  definitionVersionId?: string | null;
+  triggerSource?: TriggerSource | null;
 }
+
+export type TriggerSource =
+  | 'MANUAL' | 'RETRY' | 'RESUME' | 'TODO_RESOLUTION' | 'ASSISTANT'
+  | 'SCHEDULE' | 'WEBHOOK' | 'TODO_TRIGGER' | 'COMPLETION_TRIGGER' | 'AUTO_REPAIR' | 'WISH'
+  | 'CHAIN' | 'SUB_WORKFLOW';
 
 export interface StepResult {
   id: string;
