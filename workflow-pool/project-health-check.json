@@ -35,7 +35,7 @@
     }
   ],
   "instructions": "Be objective and data-driven. Provide actionable recommendations for each finding.",
-  "model": "claude-sonnet-4-6",
+  "model": "sonnet",
   "version": "1.0.0",
   "author": "MySuricates",
   "defaultContext": {

@@ -138,14 +138,23 @@ Fuehrt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 > `"shell_escape_variables": true`. Shell-Blöcke erhalten sonst keine Umgebungsvariablen.
 
 > **Nicht vertrauenswuerdige Variablen:** Alles, was ein Webhook-Aufrufer liefert (Payload-Felder und
-> die daraus abgeleiteten `git_*`-Felder), landet in Shell-Befehlen (`shell`, `foreach`, `while`, `retry`
-> im Shell-Modus) grundsaetzlich in Single-Quotes — auch ohne `shell_escape_variables`. Solche
+> die daraus abgeleiteten `git_*`-Felder), landet in Shell-Befehlen (`shell`, `foreach`, `while`, `retry`,
+> `conditional` und in `switch` verschachtelte Bloecke, jeweils im Shell-Modus) grundsaetzlich in Single-Quotes — auch ohne `shell_escape_variables`. Solche
 > Platzhalter deshalb **unquoted** schreiben (`git checkout {{ git_branch }}`, nicht `"{{ git_branch }}"`),
 > sonst stehen die Quotes doppelt. **Und das ist nicht nur Kosmetik: in eigenen Quotes ist das
 > Escaping wirkungslos.** Beim Wert `x; id` wird `PREV='{{ previous_output }}'` zu
 > `PREV=''x; id''` — die Shell fuehrt das als `PREV=x` **und danach** `id` aus. Einen untrusted
 > oder getainteten Platzhalter deshalb nie in Quotes setzen, sondern immer ohne Quotes schreiben
-> (`PREV={{ previous_output }}`). Werte aus `defaultContext` und System-Variablen bleiben roh.
+> (`PREV={{ previous_output }}`) **und den Block mit `"shell_escape_variables": true` versehen** —
+> ohne Taint kommt der Wert sonst roh, und ein mehrzeiliger Output zerlegt den Befehl. Unquoted plus
+> Escape-Option ist die einzige Form, die in beiden Faellen stimmt; der Test `TemplateHygieneGateTest`
+> erzwingt sie fuer Built-in-Templates und den Pool. Werte aus `defaultContext` und System-Variablen
+> bleiben ohne die Option roh.
+>
+> **Unbelegte Workflow-Variablen:** Bleibt eine Variable unbelegt, steht ihr Platzhalter woertlich im
+> Befehl; unquoted waere `SOURCE_DIR={{ source_dir }}` dann ein Shell-Fehler. Idiom:
+> `set -- {{ source_dir }}; SOURCE_DIR="$*"` — belegt liefert es den escapten Wert, unbelegt den
+> woertlichen Platzhalter, den man wie bisher mit `[ "$SOURCE_DIR" = "{{ source_dir }}" ]` erkennt.
 
 > **Taint-Propagation auf Block-Ausgaben:** In einem webhook-getriggerten Run — und in jedem daraus
 > gestarteten Sub-Workflow sowie nach einem Resume — werden auch `{{ previous_output }}`,
@@ -160,7 +169,7 @@ Fuehrt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 > Werte werden von der run-level Taint-Propagation oben NICHT erfasst (sie stammen nicht aus dem
 > aktuellen Run und tragen keinen `__untrusted_*`-Marker) und sind in Shell-Bloecken trotzdem wie
 > fremde/unvertrauenswuerdige Daten zu behandeln — also ebenfalls unquoted schreiben oder explizit
-> escapen (offenes TODO 1e77e717).
+> escapen (offenes TODO c2634caa).
 
 ```json
 {

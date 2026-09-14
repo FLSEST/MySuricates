@@ -16,7 +16,7 @@
     "auto-fix",
     "frontend"
   ],
-  "model": "claude-opus-4-6",
+  "model": "opus",
   "instructions": "Du arbeitest an den i18n-Dateien des MySuricates-Frontends. de.ts ist die primaere Sprache, en.ts die Uebersetzung. Beide muessen exakt die gleiche Key-Struktur haben. Aenderungen muessen TypeScript-kompatibel sein (export default Objekt-Literal).\n\nRun-Isolation: Arbeite ausschliesslich in {{ execution_path }}. Der Originalpfad {{ project_path }} identifiziert das Projekt und darf nicht beschrieben werden. Keine automatischen Merges, Pushes oder Wechsel auf main/master. Aenderungen bleiben auf dem Run-Branch zur expliziten Uebernahme. Bei einem fehlgeschlagenen technischen Check darf ein Report keinen Erfolg behaupten. Gepruefter Commit: {{ workspace_source_sha }}; Logs: {{ workspace_logs }}.",
   "blocks": [
     {

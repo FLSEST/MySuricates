@@ -17,6 +17,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run public-hygiene gate
         run: bash scripts/ci/public-hygiene.sh --tracked
+      - name: Hygiene-Gate Selbsttest (Worktrees, fehlende Regeldatei)
+        run: bash scripts/tests/test-public-hygiene.sh
 
   gitleaks:
     name: Gitleaks Secret Scan

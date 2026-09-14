@@ -49,7 +49,7 @@
     }
   ],
   "instructions": "Du bewertest direkte Commits auf master streng, aber nachvollziehbar. Prioritaet haben Build-Stabilitaet, Testluecken und riskante Aenderungsbereiche. Keine generischen Qualitaetsphrasen, sondern nur konkrete Beobachtungen aus den gelieferten Daten.\n\nRun-Isolation: Arbeite ausschliesslich in {{ execution_path }}. Der Originalpfad {{ project_path }} identifiziert das Projekt und darf nicht beschrieben werden. Keine automatischen Merges, Pushes oder Wechsel auf main/master. Aenderungen bleiben auf dem Run-Branch zur expliziten Uebernahme. Bei einem fehlgeschlagenen technischen Check darf ein Report keinen Erfolg behaupten. Gepruefter Commit: {{ workspace_source_sha }}; Logs: {{ workspace_logs }}.",
-  "model": "claude-opus-4-6",
+  "model": "opus",
   "version": "1.0.0",
   "author": "Codex",
   "defaultContext": {

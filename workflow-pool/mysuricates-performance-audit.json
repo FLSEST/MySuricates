@@ -17,7 +17,7 @@
     "todo-creating",
     "delta-based"
   ],
-  "model": "claude-opus-4-6",
+  "model": "opus",
   "instructions": "Du analysierst die Performance der MySuricates-Plattform im DELTA-MODUS. Bewerte nur gemessene Signale und trenne main_thread_log_lines strikt von non_main_runtime_log_lines: [main] ist ein Rauschindikator, aber kein Beweis fuer Test- oder Produktionsverkehr. Melde DB-Groesse nur zusammen mit page_count, freelist_pages, reclaimable_bytes und dbstat-Objektgroessen; eine grosse Datei allein ist kein Finding. Step-Outputs werden ausschliesslich als aggregierte Byte-Anzahl je Workflow bewertet, nie anhand ihres Inhalts. Gib keine Lognachrichten, Step-Inhalte, Kontexte, Zugangsdaten oder Secrets wieder. Bekannte Patterns: SQLite pool-size=1 (beabsichtigt), Claude CLI 5min Timeout (extern), TerminalPanel 329KB (xterm, korrekt lazy-loaded).",
   "blocks": [
     {

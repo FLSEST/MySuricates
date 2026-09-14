@@ -89,7 +89,7 @@ hint_for() {
     node:dnf)    echo "sudo dnf install -y nodejs npm   # bei <20: NodeSource-Repo nutzen" ;;
     node:pacman) echo "sudo pacman -S --noconfirm nodejs npm" ;;
     node:zypper) echo "sudo zypper install -y nodejs20 npm20" ;;
-    node:*)      echo "Node.js 20+ installieren — https://nodejs.org (oder nvm)" ;;
+    node:*)      echo "Node.js 20.19+ (oder 22.12+/24+) installieren — https://nodejs.org (oder nvm)" ;;
 
     git:apt)    echo "sudo apt-get install -y git" ;;
     git:dnf)    echo "sudo dnf install -y git" ;;
@@ -189,17 +189,24 @@ else
   need_build maven "Maven (3.6.3+, 3.9+ empfohlen) fehlt — oder den Wrapper ai-automation-backend/mvnw nutzen"
 fi
 
-# --- Node 20+ ---
+# --- Node 20.19+ / 22.12+ / 24+ (Vite 7 und jsdom verlangen das; 21 und 23 sind ausgeschlossen) ---
+node_supported() {  # $1 = version ohne v
+  local major minor
+  major="${1%%.*}"; minor="${1#*.}"; minor="${minor%%.*}"
+  [[ "$major" =~ ^[0-9]+$ && "$minor" =~ ^[0-9]+$ ]] || return 1
+  { [ "$major" -eq 20 ] && [ "$minor" -ge 19 ]; } \
+    || { [ "$major" -eq 22 ] && [ "$minor" -ge 12 ]; } \
+    || [ "$major" -ge 24 ]
+}
 if have node; then
   NODE_VER="$(node -v 2>/dev/null | tr -d 'v')"
-  NODE_MAJOR="${NODE_VER%%.*}"
-  if [[ "$NODE_MAJOR" =~ ^[0-9]+$ ]] && [ "$NODE_MAJOR" -ge 20 ]; then
+  if node_supported "$NODE_VER"; then
     ok "Node ${NODE_VER}"
   else
-    need_build node "Node ${NODE_VER:-?} gefunden, benötigt wird 20+"
+    need_build node "Node ${NODE_VER:-?} gefunden, benötigt wird 20.19+, 22.12+ oder 24+"
   fi
 else
-  need_build node "Node.js (20+) fehlt"
+  need_build node "Node.js (20.19+, 22.12+ oder 24+) fehlt"
 fi
 
 # --- npm 10+ ---

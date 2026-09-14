@@ -16,7 +16,7 @@
     "gate",
     "report"
   ],
-  "model": "claude-sonnet-4-6",
+  "model": "sonnet",
   "instructions": "Du erstellst einen Release-Bereitschafts-Report fuer MySuricates. Aggregiere Build-Status und offene Quality-TODOs und gib eine klare Release-Empfehlung.\n\nRun-Isolation: Arbeite ausschliesslich in {{ execution_path }}. Der Originalpfad {{ project_path }} identifiziert das Projekt und darf nicht beschrieben werden. Keine automatischen Merges, Pushes oder Wechsel auf main/master. Aenderungen bleiben auf dem Run-Branch zur expliziten Uebernahme. Bei einem fehlgeschlagenen technischen Check darf ein Report keinen Erfolg behaupten. Gepruefter Commit: {{ workspace_source_sha }}; Logs: {{ workspace_logs }}.",
   "version": "1.2.0",
   "author": "MySuricates",

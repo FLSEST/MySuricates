@@ -11,7 +11,7 @@
   },
   "category": "CODE",
   "sortOrder": 45,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "model": "sonnet",
   "instructions": "Du bist ein automatischer TypeScript/React-Code-Fixer. Deine Aufgabe ist es, Findings aus statischer Analyse sicher zu beheben.\n\nSICHERHEITSREGELN:\n- IMMER auf eigenem Branch arbeiten, nie auf main\n- Ein Commit pro Fix (atomar, reviewbar, revertierbar)\n- Keine Breaking Changes an exportierten APIs/Interfaces\n- Keine Dateien loeschen die noch importiert werden\n- Bei Unsicherheit: Fix ueberspringen statt riskieren\n- Lint, Build und Tests muessen nach allen Fixes bestehen\n\nTYPESCRIPT-SPEZIFISCH:\n- `any` nur durch spezifischen Typ ersetzen wenn er eindeutig ableitbar ist\n- Unused imports entfernen, aber benutzte Type-Imports behalten\n- ESLint auto-fixable Rules bevorzugt mit `--fix` beheben\n- React Hooks Dependencies nur aendern wenn die Logik klar ist\n- CSS/Tailwind Klassen nicht umsortieren (koennte Spezifitaet aendern)\n- i18n: Falls de.ts und en.ts existieren, BEIDE aktualisieren\n\nCOMMIT-KONVENTIONEN:\n- fix: <beschreibung>\n- refactor: <beschreibung>\n- style: <beschreibung> — fuer Formatting\n- chore: <beschreibung> — fuer Dependency-Updates\nArbeitsverzeichnis fuer diesen Run ist {{ execution_path }}. Verwende ausschliesslich diesen Run-Workspace fuer Builds und Code-Aenderungen. {{ project_path }} identifiziert nur das Originalprojekt. Kein automatischer Merge oder Push; Ergebnisse zur separaten Uebernahme behalten.",
   "blocks": [
@@ -65,9 +65,10 @@
       "config": {
         "timeout_seconds": 600,
         "on_failure": "continue",
-        "command": "set -euo pipefail\nSOURCE_DIR=\"{{ source_dir }}\"\nVERIFY_CMD=\"{{ verify_command }}\"\nif [ -z \"$SOURCE_DIR\" ] || [ \"$SOURCE_DIR\" = \"{{ source_dir }}\" ]; then SOURCE_DIR=\".\"; fi\n\necho '=== Verification ==='\n\nif echo '{{ previous_output }}' | grep -q 'NO_FIXES_NEEDED'; then\n  echo 'VERIFICATION_PASSED (no fixes to verify)'\n  exit 0\nfi\n\n# Custom verify command\nif [ -n \"$VERIFY_CMD\" ] && [ \"$VERIFY_CMD\" != \"{{ verify_command }}\" ]; then\n  echo \"Running custom verification: $VERIFY_CMD\"\n  if eval \"$VERIFY_CMD\"; then\n    echo 'VERIFICATION_PASSED'\n  else\n    echo 'VERIFICATION_FAILED'; exit 1\n  fi\n  exit 0\nfi\n\n# Find package.json directory\nPKG_DIR=\".\"\nif [ -f \"$SOURCE_DIR/../package.json\" ]; then\n  PKG_DIR=$(cd \"$SOURCE_DIR/..\" && pwd)\nelif [ -f \"$SOURCE_DIR/package.json\" ]; then\n  PKG_DIR=$(cd \"$SOURCE_DIR\" && pwd)\nfi\n\ncd \"$PKG_DIR\"\nPASSED=true\n\n# Lint\nHAS_LINT=$(node -e \"const p=require('./package.json'); process.exit(p.scripts&&p.scripts.lint?0:1)\" 2>/dev/null && echo yes || echo no)\nif [ \"$HAS_LINT\" = \"yes\" ]; then\n  echo '--- npm run lint ---'\n  if ! npm run lint 2>&1 | tail -20; then PASSED=false; fi\nfi\n\n# Build\nHAS_BUILD=$(node -e \"const p=require('./package.json'); process.exit(p.scripts&&p.scripts.build?0:1)\" 2>/dev/null && echo yes || echo no)\nif [ \"$HAS_BUILD\" = \"yes\" ]; then\n  echo '--- npm run build ---'\n  if ! npm run build 2>&1 | tail -20; then PASSED=false; fi\nfi\n\n# Test\nHAS_TEST=$(node -e \"const p=require('./package.json'); process.exit(p.scripts&&p.scripts.test?0:1)\" 2>/dev/null && echo yes || echo no)\nif [ \"$HAS_TEST\" = \"yes\" ]; then\n  echo '--- npm test ---'\n  if ! npm test 2>&1 | tail -20; then PASSED=false; fi\nfi\n\nif [ \"$PASSED\" = \"true\" ]; then\n  echo 'VERIFICATION_PASSED'\nelse\n  echo 'VERIFICATION_FAILED'; exit 1\nfi",
+        "command": "set -euo pipefail\nSOURCE_DIR=\"{{ source_dir }}\"\nVERIFY_CMD=\"{{ verify_command }}\"\nif [ -z \"$SOURCE_DIR\" ] || [ \"$SOURCE_DIR\" = \"{{ source_dir }}\" ]; then SOURCE_DIR=\".\"; fi\n\necho '=== Verification ==='\n\nif echo {{ previous_output }} | grep -q 'NO_FIXES_NEEDED'; then\n  echo 'VERIFICATION_PASSED (no fixes to verify)'\n  exit 0\nfi\n\n# Custom verify command\nif [ -n \"$VERIFY_CMD\" ] && [ \"$VERIFY_CMD\" != \"{{ verify_command }}\" ]; then\n  echo \"Running custom verification: $VERIFY_CMD\"\n  if eval \"$VERIFY_CMD\"; then\n    echo 'VERIFICATION_PASSED'\n  else\n    echo 'VERIFICATION_FAILED'; exit 1\n  fi\n  exit 0\nfi\n\n# Find package.json directory\nPKG_DIR=\".\"\nif [ -f \"$SOURCE_DIR/../package.json\" ]; then\n  PKG_DIR=$(cd \"$SOURCE_DIR/..\" && pwd)\nelif [ -f \"$SOURCE_DIR/package.json\" ]; then\n  PKG_DIR=$(cd \"$SOURCE_DIR\" && pwd)\nfi\n\ncd \"$PKG_DIR\"\nPASSED=true\n\n# Lint\nHAS_LINT=$(node -e \"const p=require('./package.json'); process.exit(p.scripts&&p.scripts.lint?0:1)\" 2>/dev/null && echo yes || echo no)\nif [ \"$HAS_LINT\" = \"yes\" ]; then\n  echo '--- npm run lint ---'\n  if ! npm run lint 2>&1 | tail -20; then PASSED=false; fi\nfi\n\n# Build\nHAS_BUILD=$(node -e \"const p=require('./package.json'); process.exit(p.scripts&&p.scripts.build?0:1)\" 2>/dev/null && echo yes || echo no)\nif [ \"$HAS_BUILD\" = \"yes\" ]; then\n  echo '--- npm run build ---'\n  if ! npm run build 2>&1 | tail -20; then PASSED=false; fi\nfi\n\n# Test\nHAS_TEST=$(node -e \"const p=require('./package.json'); process.exit(p.scripts&&p.scripts.test?0:1)\" 2>/dev/null && echo yes || echo no)\nif [ \"$HAS_TEST\" = \"yes\" ]; then\n  echo '--- npm test ---'\n  if ! npm test 2>&1 | tail -20; then PASSED=false; fi\nfi\n\nif [ \"$PASSED\" = \"true\" ]; then\n  echo 'VERIFICATION_PASSED'\nelse\n  echo 'VERIFICATION_FAILED'; exit 1\nfi",
         "checked_command": true,
-        "check_category": "fix-verification"
+        "check_category": "fix-verification",
+        "shell_escape_variables": true
       },
       "requiredCapabilities": []
     },
@@ -76,8 +77,9 @@
       "config": {
         "else_command": "echo \"Verification failed; retain the run workspace for review.\"\nexit 1",
         "execution_mode": "shell",
-        "condition": "echo '{{ previous_output }}' | grep -q 'VERIFICATION_PASSED'",
-        "then_command": "echo 'All checks passed. Ready for PR.'"
+        "condition": "echo {{ previous_output }} | grep -q 'VERIFICATION_PASSED'",
+        "then_command": "echo 'All checks passed. Ready for PR.'",
+        "shell_escape_variables": true
       },
       "requiredCapabilities": []
     },

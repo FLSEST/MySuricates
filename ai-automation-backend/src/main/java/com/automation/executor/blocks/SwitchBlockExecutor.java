@@ -187,7 +187,11 @@ public class SwitchBlockExecutor implements BlockExecutor {
                 ? ((Number) nestedConfig.get("timeout_seconds")).intValue()
                 : null;
 
-        String command = context.resolveTemplate((String) nestedConfig.get("command"));
+        // Shell-Bloecke: Taint-Escaping wie im ShellBlockExecutor (untrusted immer, alles bei Option)
+        boolean escapeVariables = Boolean.TRUE.equals(nestedConfig.get("shell_escape_variables"));
+        String command = isShell
+                ? context.resolveShellTemplate((String) nestedConfig.get("command"), escapeVariables)
+                : context.resolveTemplate((String) nestedConfig.get("command"));
 
         if (isShell) {
             return commandExecutor.executeStepAsShell(

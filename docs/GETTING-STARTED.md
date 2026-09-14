@@ -24,7 +24,7 @@ und wird nur für Container-Execution-Workflow-Blöcke gebraucht.
 |---|---|---|---|
 | Java (JDK) | 21+ | ✅ | Backend bauen/starten |
 | Maven | — | ⬜ optional | Wrapper `ai-automation-backend/mvnw` ist dabei und lädt Maven 3.9.9 selbst (nur Java + curl nötig) |
-| Node.js | 20+ | ✅ | Frontend (Version in `ai-automation-frontend/.nvmrc` → `nvm use`) |
+| Node.js | 20.19+, 22.12+ oder 24+ | ✅ | Frontend (Version in `ai-automation-frontend/.nvmrc` → `nvm use`) |
 | npm | 10+ | ✅ | Frontend-Deps |
 | git, curl | aktuell | ✅ | Basis |
 | **Claude-Account + `claude` CLI** | aktuell | ✅ für KI | AI-Workflows laufen über `claude` auf dem Host |
@@ -176,7 +176,7 @@ Passwort — SSL aus mit dem Default bleibt weiterhin erlaubt.
 | Java zu alt (`benötigt 21+`) | JDK 21 installieren (apt: `openjdk-21-jdk`, sonst https://adoptium.net) |
 | `claude: command not found` | `npm install -g @anthropic-ai/claude-code` + `claude login` |
 | AI-Block schlägt fehl, „nicht eingeloggt" | `claude login` ausführen |
-| Port 9090 / 3000 belegt | belegenden Prozess beenden (`lsof -i :9090`) oder `AUTOMATION_PORT` setzen |
+| Port 9090 / 3000 belegt | belegenden Prozess beenden (`lsof -i :9090`). Das Start-Skript setzt 9090/3000 voraus; andere Ports nur beim manuellen Start: Backend `AUTOMATION_PORT=9190`, Frontend `VITE_API_BASE_URL=http://localhost:9190/api/v1 VITE_WS_BASE_URL=ws://localhost:9190 npm run dev -- --port 3100` |
 | Frontend startet, aber Skript meldet „nicht erreichbar" | behoben — das Start-Skript prüft jetzt HTTP **und** HTTPS |
 | Container-Block schlägt fehl | Docker installieren/starten (Abschnitt 6) |
 | `permission denied` auf Docker-Socket | `sudo usermod -aG docker $USER`, dann neu einloggen |

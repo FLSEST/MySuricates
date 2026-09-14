@@ -24,7 +24,8 @@
   }, {
     "type" : "foreach",
     "config" : {
-      "items_command" : "echo '{{ step_0_output }}' | python3 -c 'import sys; [print(line.strip()) for line in sys.stdin if line.strip()]'",
+      "shell_escape_variables" : true,
+      "items_command" : "echo {{ step_0_output }} | python3 -c 'import sys; [print(line.strip()) for line in sys.stdin if line.strip()]'",
       "variable_name" : "current_feature",
       "blocks" : [ {
         "type" : "sub-workflow",

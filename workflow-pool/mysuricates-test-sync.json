@@ -16,7 +16,7 @@
     "auto-fix",
     "todo-driven"
   ],
-  "model": "claude-opus-4-6",
+  "model": "opus",
   "instructions": "Du schreibst Tests fuer das MySuricates-Projekt. REGELN: 1) NUR Test-Dateien schreiben/aendern, NIEMALS Production-Code. 2) JUnit 5 + Mockito + AssertJ. 3) Bestehende Test-Patterns als Vorlage nutzen. 4) Nach dem Schreiben: mvn test -Dtest=NeuerTest ausfuehren.\n\nRun-Isolation: Arbeite ausschliesslich in {{ execution_path }}. Der Originalpfad {{ project_path }} identifiziert das Projekt und darf nicht beschrieben werden. Keine automatischen Merges, Pushes oder Wechsel auf main/master. Aenderungen bleiben auf dem Run-Branch zur expliziten Uebernahme. Bei einem fehlgeschlagenen technischen Check darf ein Report keinen Erfolg behaupten. Gepruefter Commit: {{ workspace_source_sha }}; Logs: {{ workspace_logs }}.",
   "blocks": [
     {

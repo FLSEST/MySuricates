@@ -16,7 +16,7 @@
     "scorecard",
     "delta-based"
   ],
-  "model": "claude-opus-4-6",
+  "model": "opus",
   "instructions": "Du erstellst eine Gesundheits-Scorecard fuer MySuricates im DELTA-MODUS. 6 Dimensionen je 1-10. Objektiv und datengetrieben.\n\nRun-Isolation: Arbeite ausschliesslich in {{ execution_path }}. Der Originalpfad {{ project_path }} identifiziert das Projekt und darf nicht beschrieben werden. Keine automatischen Merges, Pushes oder Wechsel auf main/master. Aenderungen bleiben auf dem Run-Branch zur expliziten Uebernahme. Bei einem fehlgeschlagenen technischen Check darf ein Report keinen Erfolg behaupten. Gepruefter Commit: {{ workspace_source_sha }}; Logs: {{ workspace_logs }}.",
   "blocks": [
     {

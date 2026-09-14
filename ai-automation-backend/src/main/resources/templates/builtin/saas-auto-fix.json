@@ -46,8 +46,9 @@
   }, {
     "type" : "shell",
     "config" : {
+      "shell_escape_variables" : true,
       "timeout_seconds" : 60,
-      "command" : "set -euo pipefail\nRESULT='{{ previous_output }}'\nif echo \"$RESULT\" | grep -qE 'AUTO_FIX_ABORTED|AUTO_FIX_FAILED'; then\n  echo 'GATE_RED'\nelse\n  echo 'GATE_GREEN'\nfi"
+      "command" : "set -euo pipefail\nRESULT={{ previous_output }}\nif echo \"$RESULT\" | grep -qE 'AUTO_FIX_ABORTED|AUTO_FIX_FAILED'; then\n  echo 'GATE_RED'\nelse\n  echo 'GATE_GREEN'\nfi"
     },
     "requiredCapabilities" : [ ]
   } ]

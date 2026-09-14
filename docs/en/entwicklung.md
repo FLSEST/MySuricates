@@ -8,7 +8,7 @@
 |---|---|---|
 | Java (JDK) | 21+ | `java --version` |
 | Maven | optional (wrapper `mvnw` included) | `./mvnw --version` |
-| Node.js | 20+ (`.nvmrc`) | `node --version` |
+| Node.js | 20.19+, 22.12+ or 24+ (`.nvmrc`) | `node --version` |
 | npm | 10+ | `npm --version` |
 | Docker | 24+ (optional) | `docker --version` |
 
