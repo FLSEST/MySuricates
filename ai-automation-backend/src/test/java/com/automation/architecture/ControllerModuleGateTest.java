@@ -31,6 +31,7 @@ class ControllerModuleGateTest {
             "DeadLetterController",
             "DocsController",
             "ExecutionController",
+            "LearningController",
             "NotificationController",
             "ProjectController",
             "ScheduleController",
@@ -47,15 +48,26 @@ class ControllerModuleGateTest {
             "WorkflowTemplateController");
 
     /** Method-level assignments inside core controllers — pinned so they cannot be dropped unnoticed. */
-    private static final Map<String, ModuleCatalog> METHOD_MODULES = Map.of(
-            "TodoController#exportTodo", ModuleCatalog.INTEGRATIONS,
-            "WorkflowController#exportWorkflowAsBpmn", ModuleCatalog.BPMN,
-            "WorkflowController#repairWorkflow", ModuleCatalog.FACTORY,
-            "WorkflowController#activateSkills", ModuleCatalog.SKILLS,
-            "WorkflowController#deactivateSkill", ModuleCatalog.SKILLS,
-            "SystemAccessController#enableRemoteAccess", ModuleCatalog.REMOTE_ACCESS,
-            "SystemAccessController#disableRemoteAccess", ModuleCatalog.REMOTE_ACCESS,
-            "SystemAccessController#remoteAccessStatus", ModuleCatalog.REMOTE_ACCESS);
+    private static final Map<String, ModuleCatalog> METHOD_MODULES = Map.ofEntries(
+            Map.entry("TodoController#exportTodo", ModuleCatalog.INTEGRATIONS),
+            Map.entry("WorkflowController#exportWorkflowAsBpmn", ModuleCatalog.BPMN),
+            Map.entry("WorkflowController#repairWorkflow", ModuleCatalog.FACTORY),
+            Map.entry("WorkflowController#activateSkills", ModuleCatalog.SKILLS),
+            Map.entry("WorkflowController#deactivateSkill", ModuleCatalog.SKILLS),
+            Map.entry("SystemAccessController#enableRemoteAccess", ModuleCatalog.REMOTE_ACCESS),
+            Map.entry("SystemAccessController#disableRemoteAccess", ModuleCatalog.REMOTE_ACCESS),
+            Map.entry("SystemAccessController#remoteAccessStatus", ModuleCatalog.REMOTE_ACCESS),
+            Map.entry("SystemMaintenanceController#repairAllFailed", ModuleCatalog.FACTORY),
+            // Dashboard, platform stats and run rating stay core — the core dashboard reads them
+            Map.entry("LearningController#getWorkflowStats", ModuleCatalog.LEARNING),
+            Map.entry("LearningController#getStepAnalytics", ModuleCatalog.LEARNING),
+            Map.entry("LearningController#getOptimizationSuggestions", ModuleCatalog.LEARNING),
+            Map.entry("LearningController#getSimilarWorkflows", ModuleCatalog.LEARNING),
+            Map.entry("LearningController#getAgenticStrategyHistory", ModuleCatalog.LEARNING),
+            Map.entry("LearningController#getAgenticAnalytics", ModuleCatalog.LEARNING),
+            Map.entry("LearningController#getToolPatterns", ModuleCatalog.LEARNING),
+            Map.entry("LearningController#getExecutionInsights", ModuleCatalog.LEARNING),
+            Map.entry("LearningController#getRunInsights", ModuleCatalog.LEARNING));
 
     @Test
     void everyControllerIsCoreOrAssignedToAModule() {

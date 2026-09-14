@@ -61,7 +61,7 @@ public class AutoRepairService {
     }
 
     @Async
-    @EventListener
+    @EventListener(condition = com.automation.modules.ModuleConditions.FACTORY) // no factory module ⇒ no AI auto-fix
     public void onWorkflowRunCompleted(WorkflowRunCompletedEvent event) {
         if (event.getStatus() != RunStatus.FAILED) {
             return;

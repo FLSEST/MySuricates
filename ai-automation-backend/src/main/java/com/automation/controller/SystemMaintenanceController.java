@@ -1,5 +1,7 @@
 package com.automation.controller;
 
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import com.automation.service.repair.AutoRepairService;
 import com.automation.service.system.DatabaseBackupService;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ public class SystemMaintenanceController {
     private final DatabaseBackupService databaseBackupService;
 
     @PostMapping("/repair-failed")
+    @RequiresModule(ModuleCatalog.FACTORY)
     public ResponseEntity<Map<String, Object>> repairAllFailed(
             @RequestParam(defaultValue = "false") boolean force) {
         int queued = autoRepairService.repairAllFailed(force);

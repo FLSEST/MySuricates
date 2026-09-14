@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
-@RequiresModule(ModuleCatalog.LEARNING)
+/** Dashboard, platform stats and run rating are core; analytics belong to the learning module. */
 @RestController
 @RequestMapping("/api/v1/learning")
 @RequiredArgsConstructor
@@ -37,46 +37,55 @@ public class LearningController {
     }
 
     @GetMapping("/workflows/{workflowId}/stats")
+    @RequiresModule(ModuleCatalog.LEARNING)
     public Map<String, Object> getWorkflowStats(@PathVariable String workflowId) {
         return learningService.getWorkflowStats(workflowId);
     }
 
     @GetMapping("/workflows/{workflowId}/step-analytics")
+    @RequiresModule(ModuleCatalog.LEARNING)
     public List<Map<String, Object>> getStepAnalytics(@PathVariable String workflowId) {
         return learningService.getStepAnalytics(workflowId);
     }
 
     @GetMapping("/workflows/{workflowId}/suggestions")
+    @RequiresModule(ModuleCatalog.LEARNING)
     public List<Map<String, Object>> getOptimizationSuggestions(@PathVariable String workflowId) {
         return learningService.getOptimizationSuggestions(workflowId);
     }
 
     @GetMapping("/workflows/{workflowId}/similar")
+    @RequiresModule(ModuleCatalog.LEARNING)
     public List<Map<String, Object>> getSimilarWorkflows(@PathVariable String workflowId) {
         return learningService.getSimilarWorkflows(workflowId);
     }
 
     @GetMapping("/workflows/{workflowId}/agentic-history")
+    @RequiresModule(ModuleCatalog.LEARNING)
     public List<Map<String, Object>> getAgenticStrategyHistory(@PathVariable String workflowId) {
         return learningService.getAgenticStrategyHistory(workflowId);
     }
 
     @GetMapping("/workflows/{workflowId}/agentic-analytics")
+    @RequiresModule(ModuleCatalog.LEARNING)
     public Map<String, Object> getAgenticAnalytics(@PathVariable String workflowId) {
         return learningService.getAgenticAnalytics(workflowId);
     }
 
     @GetMapping("/workflows/{workflowId}/tool-patterns")
+    @RequiresModule(ModuleCatalog.LEARNING)
     public Map<String, Object> getToolPatterns(@PathVariable String workflowId) {
         return learningService.getToolPatterns(workflowId);
     }
 
     @GetMapping("/workflows/{workflowId}/execution-insights")
+    @RequiresModule(ModuleCatalog.LEARNING)
     public Map<String, Object> getExecutionInsights(@PathVariable String workflowId) {
         return learningService.getExecutionInsights(workflowId);
     }
 
     @GetMapping("/runs/{runId}/insights")
+    @RequiresModule(ModuleCatalog.LEARNING)
     public Map<String, Object> getRunInsights(@PathVariable String runId) {
         return learningService.getRunInsights(runId);
     }
