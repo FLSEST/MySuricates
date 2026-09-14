@@ -59,10 +59,12 @@ Die Umschaltung erfolgt über Route-Wrapper-Komponenten (z.B. `DashboardRoute`, 
 
 ### Dashboard (`/`)
 
-- 4 Stat-Cards: Aktive Projekte, Workflows, Runs heute, Erfolgsrate
-- 2 Recharts-Diagramme: Runs-Verlauf (AreaChart), Erfolgsrate (AreaChart)
-- Liste der letzten Runs (klickbar → Execution-Seite)
-- Top-Workflows nach Ausführungsanzahl
+Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegistry.ts`: Kennzahlen, Diagramme, Todos, letzte Runs und Schnellaktionen.
+
+- **Widget = Registry-Eintrag** `{ id, label, size, module?, component }`. Die Komponente lädt ihre Daten selbst über Query-Hooks. Prop-basierte Karten, die Insights mit eigenem Zeitraum nutzt, bekommen einen Wrapper (`DashboardDataWidgets.tsx`). Rendert ein Widget nichts, fällt sein Slot weg (`empty:hidden`).
+- **Größenklassen** `stat | chart | third | twoThirds | full` bestimmen die Flex-Basis pro Breakpoint (`WIDGET_SIZE_CLASSES`). Zeilen mit weniger Widgets verbreitern diese, statt Lücken zu lassen.
+- **„Dashboard bearbeiten"**: Sortieren per Drag & Drop am Griff (auch per Tastatur), Ausblenden mit dem Auge, „+ Name" blendet wieder ein, „Zurücksetzen". Widgets abgeschalteter Module fehlen auch hier.
+- **Neues Widget**: Komponente plus ein Registry-Eintrag. Bestehende angepasste Layouts bekommen es automatisch ans Ende. Die `id` ist persistiert und darf nie umbenannt werden.
 
 ### Projects (`/projects`, `/projects/:id`)
 
@@ -312,6 +314,7 @@ Kein `tailwind.config.js` — die Konfiguration erfolgt über `@theme inline` un
 | `useSidebarStore` | `collapsed`, `mobileOpen`, `toggle()`, `setCollapsed()`, `setMobileOpen()` | `localStorage: sidebar-state` (nur `collapsed`) |
 | `useThemeStore` | `themeId`, `lastLightThemeId`, `lastDarkThemeId`, `overrides` (je Theme-ID), `setTheme()`, `toggleAppearance()`, `setOverride()`, `resetOverrides()`, `apply()` | `localStorage: theme-settings` (Version 1; migriert das alte `mode`-Format) |
 | `useSettingsStore` | `apiKey`, `advancedMode`, `simpleMode`, `autoTodoDefault`, `autoRepairDefault`, `autoRepairMode`, `defaultAiProvider`, `assistantModel`, `suggestionsModel`, `suggestionsEnabled`, `sidebarItemOrder`, `sidebarHiddenItems`, `pinnedWorkflowIds`, `simpleOnboardingSeen` | `localStorage: app-settings` |
+| `useDashboardLayoutStore` | `activeViewId`, `views[]` (je Ansicht `widgets[]` mit `id`, `hidden?`, `size?`; leere Liste = Standard-Layout), `setActiveViewWidgets()`, `resetActiveView()` | `localStorage: dashboard-layout` (Version 1; beim Laden per `sanitizeLayout` validiert) |
 | `useAssistantStore` | `open`, `sessions[]`, `activeSessionId`, `showHistory`, `panelWidth`, `panelHeight`, `pendingInput`, `pendingContext` | `localStorage: assistant-sessions` (Sessions, Panel-Größe) |
 | `useI18nStore` | `locale: 'en'\|'de'`, `setLocale()` | `localStorage: i18n-locale` |
 | `useToastStore` | `toasts[]`, `addToast()`, `removeToast()` | Kein (flüchtig) |
