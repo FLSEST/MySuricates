@@ -40,8 +40,9 @@ public class ShellCommandService {
         log.debug("Shell execute (workDir: {}, timeout: {}s): {}", workingDirectory, timeoutSeconds,
                 command.length() > 200 ? command.substring(0, 200) + "..." : command);
 
+        Process proc = null;
         try {
-            Process proc = pb.start();
+            proc = pb.start();
 
             if (processCallback != null) {
                 processCallback.accept(proc);
@@ -49,8 +50,9 @@ public class ShellCommandService {
 
             // Read output in background thread to prevent pipe deadlock
             ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
+            Process running = proc;
             Thread reader = Thread.ofVirtual().start(() -> {
-                try (InputStream is = proc.getInputStream()) {
+                try (InputStream is = running.getInputStream()) {
                     is.transferTo(outputBuffer);
                 } catch (IOException ignored) {
                     // Process destroyed — expected on timeout or cancel
@@ -60,12 +62,13 @@ public class ShellCommandService {
             boolean finished = proc.waitFor(timeoutSeconds, TimeUnit.SECONDS);
 
             if (!finished) {
+                proc.descendants().forEach(ProcessHandle::destroyForcibly);
                 proc.destroyForcibly();
                 proc.waitFor(2, TimeUnit.SECONDS);
                 reader.join(2000);
                 long durationMs = System.currentTimeMillis() - start;
                 log.warn("Shell command timed out after {}s: {}", timeoutSeconds, command);
-                return new ShellResult("Command timed out after " + timeoutSeconds + " seconds", 124, durationMs);
+                return new ShellResult(outputBuffer.toString() + "\nCommand timed out after " + timeoutSeconds + " seconds", 124, durationMs);
             }
 
             reader.join(5000);
@@ -86,6 +89,11 @@ public class ShellCommandService {
             Thread.currentThread().interrupt();
             long durationMs = System.currentTimeMillis() - start;
             return new ShellResult("Command interrupted", 130, durationMs);
+        } finally {
+            if (proc != null && proc.isAlive()) {
+                proc.descendants().forEach(ProcessHandle::destroyForcibly);
+                proc.destroyForcibly();
+            }
         }
     }
 }

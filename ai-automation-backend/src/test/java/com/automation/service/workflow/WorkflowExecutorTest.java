@@ -103,6 +103,9 @@ class WorkflowExecutorTest {
     @Mock
     private SystemIdentityService systemIdentity;
 
+    @Mock
+    private RunWorkspaceService runWorkspaceService;
+
     private WorkflowExecutor workflowExecutor;
     private WorkflowExecutionRegistry registry;
 
@@ -146,7 +149,8 @@ class WorkflowExecutorTest {
                 new BlockSkillContext(commandExecutorService),
                 new BlockStepRunner(stepResultRepository, broadcaster, new BlockOutputValidator(),
                         activityLogService, containerRepository),
-                new RunFinalizer(runRepository, broadcaster, eventPublisher)
+                new RunFinalizer(runRepository, broadcaster, eventPublisher),
+                runWorkspaceService
         );
 
         testProject = Project.builder()
@@ -765,6 +769,42 @@ class WorkflowExecutorTest {
     }
 
     @Test
+    void resumeBeforeFirstCompletedStep_keepsRunAndOriginalWorkspacePolicy() {
+        WorkflowRun interrupted = WorkflowRun.builder().id("run-1").workflow(testWorkflow)
+                .workflowName("Test Workflow").status(RunStatus.INTERRUPTED).startedAt(Instant.now())
+                .metadata(new HashMap<>(Map.of("workspace", Map.of("sourceCommit", "original"),
+                        "workspacePolicy", Map.of("mode", "isolated", "source", "commit"))))
+                .build();
+        // The current definition no longer enables isolation; persisted run policy must win.
+        testWorkflow.setMetadata(Map.of());
+        when(runRepository.findById("run-1")).thenReturn(Optional.of(interrupted));
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-1")).thenReturn(List.of());
+        when(runWorkspaceService.prepare(eq(interrupted), eq(testProject), anyMap(), any(), eq(true)))
+                .thenReturn(testProject);
+        when(simpleBlockExecutor.execute(any(), any()))
+                .thenReturn(StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build());
+
+        WorkflowRun resumed = workflowExecutor.resumeFromStep("run-1");
+
+        assertThat(resumed.getId()).isEqualTo("run-1");
+        verify(runWorkspaceService).prepare(eq(interrupted), eq(testProject),
+                argThat(meta -> RunWorkspaceService.enabled(meta)), any(), eq(true));
+        verify(containerService, never()).createAndStartContainer(any());
+        assertThat(captureLastSavedRun().getStatus()).isEqualTo(RunStatus.COMPLETED);
+    }
+
+    @Test
+    void cancellationDuringLastStepWinsOverProcessFailure() {
+        testWorkflow.setBlocks(List.of(testWorkflow.getBlocks().getFirst()));
+        when(simpleBlockExecutor.execute(any(), any())).thenAnswer(inv -> {
+            ((ExecutionContext) inv.getArgument(1)).cancel();
+            return StepResult.builder().stepIndex(0).status(StepStatus.FAILED).output("terminated").build();
+        });
+        workflowExecutor.execute(testWorkflow, Map.of());
+        assertThat(captureLastSavedRun().getStatus()).isEqualTo(RunStatus.CANCELLED);
+    }
+
+    @Test
     void execute_containerStartFails_continuesWithHostExecution() {
         // Both getDockerContainerId and createAndStartContainer fail
         when(containerService.getDockerContainerId(any()))
@@ -1165,7 +1205,8 @@ class WorkflowExecutorTest {
                 new BlockSkillContext(commandExecutorService),
                 new BlockStepRunner(stepResultRepository, broadcaster, new BlockOutputValidator(),
                         activityLogService, containerRepository),
-                new RunFinalizer(runRepository, broadcaster, eventPublisher)
+                new RunFinalizer(runRepository, broadcaster, eventPublisher),
+                runWorkspaceService
         );
     }
 

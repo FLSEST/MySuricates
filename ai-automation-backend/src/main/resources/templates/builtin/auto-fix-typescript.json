@@ -1,86 +1,105 @@
 {
-  "id" : "auto-fix-typescript",
-  "icon" : "\uD83D\uDFE6",
-  "name" : {
-    "en" : "Auto-Fix TypeScript",
-    "de" : "Auto-Fix TypeScript"
+  "id": "auto-fix-typescript",
+  "icon": "🟦",
+  "name": {
+    "en": "Auto-Fix TypeScript",
+    "de": "Auto-Fix TypeScript"
   },
-  "description" : {
-    "en" : "Scan TypeScript/React projects for lint/type/security issues, auto-fix safely, verify, and submit as PR",
-    "de" : "TypeScript/React-Projekte auf Lint-/Typ-/Sicherheitsprobleme scannen, sicher auto-fixen, verifizieren und als PR einreichen"
+  "description": {
+    "en": "Scan TypeScript/React projects for lint/type/security issues, auto-fix safely, verify, and submit as PR",
+    "de": "TypeScript/React-Projekte auf Lint-/Typ-/Sicherheitsprobleme scannen, sicher auto-fixen, verifizieren und als PR einreichen"
   },
-  "category" : "CODE",
-  "sortOrder" : 45,
-  "version" : "1.0.0",
-  "model" : "sonnet",
-  "instructions" : "Du bist ein automatischer TypeScript/React-Code-Fixer. Deine Aufgabe ist es, Findings aus statischer Analyse sicher zu beheben.\n\nSICHERHEITSREGELN:\n- IMMER auf eigenem Branch arbeiten, nie auf main\n- Ein Commit pro Fix (atomar, reviewbar, revertierbar)\n- Keine Breaking Changes an exportierten APIs/Interfaces\n- Keine Dateien loeschen die noch importiert werden\n- Bei Unsicherheit: Fix ueberspringen statt riskieren\n- Lint, Build und Tests muessen nach allen Fixes bestehen\n\nTYPESCRIPT-SPEZIFISCH:\n- `any` nur durch spezifischen Typ ersetzen wenn er eindeutig ableitbar ist\n- Unused imports entfernen, aber benutzte Type-Imports behalten\n- ESLint auto-fixable Rules bevorzugt mit `--fix` beheben\n- React Hooks Dependencies nur aendern wenn die Logik klar ist\n- CSS/Tailwind Klassen nicht umsortieren (koennte Spezifitaet aendern)\n- i18n: Falls de.ts und en.ts existieren, BEIDE aktualisieren\n\nCOMMIT-KONVENTIONEN:\n- fix: <beschreibung>\n- refactor: <beschreibung>\n- style: <beschreibung> — fuer Formatting\n- chore: <beschreibung> — fuer Dependency-Updates",
-  "blocks" : [ {
-    "type" : "shell",
-    "config" : {
-      "on_failure" : "abort",
-      "command" : "set -euo pipefail\nREPO_URL=\"{{ repo_url }}\"\nBASE_BRANCH=\"{{ base_branch }}\"\nSOURCE_DIR=\"{{ source_dir }}\"\nif [ -z \"$BASE_BRANCH\" ] || [ \"$BASE_BRANCH\" = \"{{ base_branch }}\" ]; then BASE_BRANCH=\"main\"; fi\nif [ -z \"$SOURCE_DIR\" ] || [ \"$SOURCE_DIR\" = \"{{ source_dir }}\" ]; then SOURCE_DIR=\".\"; fi\n\necho '=== Git Safety Check ==='\nif ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then\n  echo 'ERROR: Not a git repository!' && exit 1\nfi\n\nif [ -n \"$(git status --porcelain)\" ]; then\n  echo 'ERROR: Working tree is dirty! Commit or stash changes first.'\n  git status --short\n  exit 1\nfi\n\ngit checkout \"$BASE_BRANCH\" && git pull --ff-only origin \"$BASE_BRANCH\" 2>/dev/null || true\n\nBASE_COMMIT=$(git rev-parse HEAD)\nFIX_BRANCH=\"fix/typescript-autofix-$(date +%Y%m%d-%H%M%S)\"\n\necho \"=== Creating branch: $FIX_BRANCH ===\"\ngit checkout -b \"$FIX_BRANCH\"\n\necho \"BASE_COMMIT=$BASE_COMMIT\"\necho \"BASE_BRANCH=$BASE_BRANCH\"\necho \"FIX_BRANCH=$FIX_BRANCH\"\necho \"SOURCE_DIR=$SOURCE_DIR\"\necho 'Git setup complete. Ready for scanning.'"
+  "category": "CODE",
+  "sortOrder": 45,
+  "version": "1.0.1",
+  "model": "sonnet",
+  "instructions": "Du bist ein automatischer TypeScript/React-Code-Fixer. Deine Aufgabe ist es, Findings aus statischer Analyse sicher zu beheben.\n\nSICHERHEITSREGELN:\n- IMMER auf eigenem Branch arbeiten, nie auf main\n- Ein Commit pro Fix (atomar, reviewbar, revertierbar)\n- Keine Breaking Changes an exportierten APIs/Interfaces\n- Keine Dateien loeschen die noch importiert werden\n- Bei Unsicherheit: Fix ueberspringen statt riskieren\n- Lint, Build und Tests muessen nach allen Fixes bestehen\n\nTYPESCRIPT-SPEZIFISCH:\n- `any` nur durch spezifischen Typ ersetzen wenn er eindeutig ableitbar ist\n- Unused imports entfernen, aber benutzte Type-Imports behalten\n- ESLint auto-fixable Rules bevorzugt mit `--fix` beheben\n- React Hooks Dependencies nur aendern wenn die Logik klar ist\n- CSS/Tailwind Klassen nicht umsortieren (koennte Spezifitaet aendern)\n- i18n: Falls de.ts und en.ts existieren, BEIDE aktualisieren\n\nCOMMIT-KONVENTIONEN:\n- fix: <beschreibung>\n- refactor: <beschreibung>\n- style: <beschreibung> — fuer Formatting\n- chore: <beschreibung> — fuer Dependency-Updates\nArbeitsverzeichnis fuer diesen Run ist {{ execution_path }}. Verwende ausschliesslich diesen Run-Workspace fuer Builds und Code-Aenderungen. {{ project_path }} identifiziert nur das Originalprojekt. Kein automatischer Merge oder Push; Ergebnisse zur separaten Uebernahme behalten.",
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "on_failure": "stop",
+        "command": "git status --short\ngit log -1 --oneline\necho \"Run-Branch: $(git branch --show-current)\"",
+        "workspace": {
+          "mode": "isolated",
+          "source": "commit",
+          "install_npm": true,
+          "branch": true
+        }
+      },
+      "requiredCapabilities": []
     },
-    "requiredCapabilities" : [ ]
-  }, {
-    "type" : "shell",
-    "config" : {
-      "timeout_seconds" : 300,
-      "on_failure" : "continue",
-      "command" : "set -uo pipefail\nSOURCE_DIR=\"{{ source_dir }}\"\nif [ -z \"$SOURCE_DIR\" ] || [ \"$SOURCE_DIR\" = \"{{ source_dir }}\" ]; then SOURCE_DIR=\".\"; fi\n\n# Find package.json directory (may be in source_dir or parent)\nPKG_DIR=\".\"\nif [ -f \"$SOURCE_DIR/../package.json\" ]; then\n  PKG_DIR=$(cd \"$SOURCE_DIR/..\" && pwd)\nelif [ -f \"$SOURCE_DIR/package.json\" ]; then\n  PKG_DIR=$(cd \"$SOURCE_DIR\" && pwd)\nfi\n\necho '=== TypeScript Code Scan ==='\ncd \"$PKG_DIR\"\n\necho ''\necho '--- ESLint ---'\nif [ -f package.json ]; then\n  HAS_LINT=$(node -e \"const p=require('./package.json'); process.exit(p.scripts&&p.scripts.lint?0:1)\" 2>/dev/null && echo yes || echo no)\n  if [ \"$HAS_LINT\" = \"yes\" ]; then\n    npm run lint 2>&1 || true\n  else\n    echo 'No lint script in package.json'\n    if [ -f eslint.config.js ] || [ -f .eslintrc.js ] || [ -f .eslintrc.json ]; then\n      npx eslint \"$SOURCE_DIR\" --ext .ts,.tsx 2>&1 | tail -50 || true\n    fi\n  fi\nfi\n\necho ''\necho '--- TypeScript Compiler ---'\nif [ -f tsconfig.json ]; then\n  npx tsc --noEmit 2>&1 | tail -50 || true\nelse\n  echo 'No tsconfig.json found'\nfi\n\necho ''\necho '--- npm audit ---'\nnpm audit --audit-level=moderate 2>&1 | tail -30 || true\n\necho ''\necho '=== Scan Complete ==='"
+    {
+      "type": "shell",
+      "config": {
+        "timeout_seconds": 300,
+        "on_failure": "continue",
+        "command": "set -uo pipefail\nSOURCE_DIR=\"{{ source_dir }}\"\nif [ -z \"$SOURCE_DIR\" ] || [ \"$SOURCE_DIR\" = \"{{ source_dir }}\" ]; then SOURCE_DIR=\".\"; fi\n\n# Find package.json directory (may be in source_dir or parent)\nPKG_DIR=\".\"\nif [ -f \"$SOURCE_DIR/../package.json\" ]; then\n  PKG_DIR=$(cd \"$SOURCE_DIR/..\" && pwd)\nelif [ -f \"$SOURCE_DIR/package.json\" ]; then\n  PKG_DIR=$(cd \"$SOURCE_DIR\" && pwd)\nfi\n\necho '=== TypeScript Code Scan ==='\ncd \"$PKG_DIR\"\n\necho ''\necho '--- ESLint ---'\nif [ -f package.json ]; then\n  HAS_LINT=$(node -e \"const p=require('./package.json'); process.exit(p.scripts&&p.scripts.lint?0:1)\" 2>/dev/null && echo yes || echo no)\n  if [ \"$HAS_LINT\" = \"yes\" ]; then\n    npm run lint 2>&1 || true\n  else\n    echo 'No lint script in package.json'\n    if [ -f eslint.config.js ] || [ -f .eslintrc.js ] || [ -f .eslintrc.json ]; then\n      npx eslint \"$SOURCE_DIR\" --ext .ts,.tsx 2>&1 | tail -50 || true\n    fi\n  fi\nfi\n\necho ''\necho '--- TypeScript Compiler ---'\nif [ -f tsconfig.json ]; then\n  npx tsc --noEmit 2>&1 | tail -50 || true\nelse\n  echo 'No tsconfig.json found'\nfi\n\necho ''\necho '--- npm audit ---'\nnpm audit --audit-level=moderate 2>&1 | tail -30 || true\n\necho ''\necho '=== Scan Complete ==='"
+      },
+      "requiredCapabilities": []
     },
-    "requiredCapabilities" : [ ]
-  }, {
-    "type" : "simple",
-    "config" : {
-      "timeout_seconds" : 600,
-      "command" : "Analysiere die Scan-Ergebnisse und erstelle einen strukturierten Fix-Plan.\n\nSCAN-ERGEBNISSE:\n{{ previous_output }}\n\nDOMAIN-KONTEXT:\n{{ domain_context }}\n\nAUFGABE:\n1. Extrahiere alle Findings aus ESLint, TypeScript Compiler und npm audit\n2. Klassifiziere jedes Finding:\n\n   AUTO_FIXABLE (sicher automatisch behebbar):\n   - Unused imports / variables (entfernen)\n   - Missing return types bei offensichtlichem Typ\n   - `any` → spezifischer Typ (nur wenn eindeutig ableitbar)\n   - ESLint auto-fixable Rules (prefer-const, no-var, eqeqeq, etc.)\n   - Fehlende Semicolons / Formatting nach Projekt-Konventionen\n   - Unused variables die mit _ prefixed werden koennen\n   - Triviale TypeScript strict-mode Fixes (missing null checks bei offensichtlichen Stellen)\n   - console.log Entfernung (wenn nicht absichtlich)\n\n   MANUAL_REVIEW (zu komplex/riskant):\n   - React Hook Dependencies die Logik aendern koennten\n   - API-Interface/Type-Aenderungen die andere Dateien betreffen\n   - Complex type assertions / generics\n   - Architektur-Refactorings\n   - npm audit Findings die Major-Updates erfordern\n\n   INFORMATIONAL:\n   - Warnungen ohne konkreten Fix\n\n3. Sortiere AUTO_FIXABLE: Imports → Types → ESLint-Fixes → Code-Fixes\n4. Gib den Fix-Plan aus:\n\nFIX_PLAN:\n1. [AUTO_FIXABLE] <Datei>:<Zeile> — <Rule/Code> — <Was zu tun ist>\n2. ...\n\nSKIPPED (MANUAL_REVIEW):\n- <Datei>: <Grund>\n\nSKIPPED (INFORMATIONAL):\n- <Beschreibung>\n\nFalls keine Findings: FIX_PLAN: EMPTY - Keine fixbaren Findings gefunden."
+    {
+      "type": "simple",
+      "config": {
+        "timeout_seconds": 600,
+        "command": "Analysiere die Scan-Ergebnisse und erstelle einen strukturierten Fix-Plan.\n\nSCAN-ERGEBNISSE:\n{{ previous_output }}\n\nDOMAIN-KONTEXT:\n{{ domain_context }}\n\nAUFGABE:\n1. Extrahiere alle Findings aus ESLint, TypeScript Compiler und npm audit\n2. Klassifiziere jedes Finding:\n\n   AUTO_FIXABLE (sicher automatisch behebbar):\n   - Unused imports / variables (entfernen)\n   - Missing return types bei offensichtlichem Typ\n   - `any` → spezifischer Typ (nur wenn eindeutig ableitbar)\n   - ESLint auto-fixable Rules (prefer-const, no-var, eqeqeq, etc.)\n   - Fehlende Semicolons / Formatting nach Projekt-Konventionen\n   - Unused variables die mit _ prefixed werden koennen\n   - Triviale TypeScript strict-mode Fixes (missing null checks bei offensichtlichen Stellen)\n   - console.log Entfernung (wenn nicht absichtlich)\n\n   MANUAL_REVIEW (zu komplex/riskant):\n   - React Hook Dependencies die Logik aendern koennten\n   - API-Interface/Type-Aenderungen die andere Dateien betreffen\n   - Complex type assertions / generics\n   - Architektur-Refactorings\n   - npm audit Findings die Major-Updates erfordern\n\n   INFORMATIONAL:\n   - Warnungen ohne konkreten Fix\n\n3. Sortiere AUTO_FIXABLE: Imports → Types → ESLint-Fixes → Code-Fixes\n4. Gib den Fix-Plan aus:\n\nFIX_PLAN:\n1. [AUTO_FIXABLE] <Datei>:<Zeile> — <Rule/Code> — <Was zu tun ist>\n2. ...\n\nSKIPPED (MANUAL_REVIEW):\n- <Datei>: <Grund>\n\nSKIPPED (INFORMATIONAL):\n- <Beschreibung>\n\nFalls keine Findings: FIX_PLAN: EMPTY - Keine fixbaren Findings gefunden."
+      },
+      "requiredCapabilities": []
     },
-    "requiredCapabilities" : [ ]
-  }, {
-    "type" : "agentic",
-    "config" : {
-      "max_iterations" : 25,
-      "max_total_tokens" : 400000,
-      "iteration_timeout_seconds" : 600,
-      "goal" : "Arbeite den Fix-Plan aus dem vorherigen Schritt ab und committe jeden Fix einzeln.\n\nFIX-PLAN:\n{{ previous_output }}\n\nREGELN:\n1. Nur [AUTO_FIXABLE] Eintraege abarbeiten\n2. Falls FIX_PLAN EMPTY: 'NO_FIXES_NEEDED' ausgeben und beenden\n3. Ein Commit pro Fix — atomare Git-History\n4. Commit-Format: 'fix: <was behoben>' / 'style: <formatting>' / 'refactor: <was refactored>'\n5. SICHERHEIT:\n   - Keine exportierten Interfaces/Types aendern die in anderen Dateien importiert werden\n   - Keine Dateien loeschen die noch importiert werden — pruefe Imports\n   - React Hooks: Nur Dependencies aendern wenn die Logik eindeutig korrekt bleibt\n   - i18n: Falls de.ts und en.ts existieren, BEIDE synchron halten\n   - Bei Unsicherheit: Fix ueberspringen als SKIPPED\n6. WICHTIG: Jede ACTION wird von einem SEPARATEN Agenten ausgefuehrt.\n   Jede ACTION MUSS enthalten:\n   - ABSOLUTE Dateipfade\n   - Vollstaendigen Kontext was zu aendern ist\n   - Nach der Aenderung: git add <datei> && git commit -m '<message>'\n\nAUSGABE am Ende:\nFIXES_APPLIED:\n1. <Datei> — <Commit-Hash> — <Beschreibung>\n\nFIXES_SKIPPED:\n- <Datei> — <Grund>\n\nTOTAL: X Fixes applied, Y skipped",
-      "max_repeated_actions" : 3,
-      "success_criteria" : "Alle AUTO_FIXABLE Issues wurden als einzelne Commits committed oder begruendet uebersprungen.",
-      "total_timeout_seconds" : 5400,
-      "require_approval" : false
+    {
+      "type": "agentic",
+      "config": {
+        "max_iterations": 25,
+        "max_total_tokens": 400000,
+        "iteration_timeout_seconds": 600,
+        "goal": "Arbeite den Fix-Plan aus dem vorherigen Schritt ab und committe jeden Fix einzeln.\n\nFIX-PLAN:\n{{ previous_output }}\n\nREGELN:\n1. Nur [AUTO_FIXABLE] Eintraege abarbeiten\n2. Falls FIX_PLAN EMPTY: 'NO_FIXES_NEEDED' ausgeben und beenden\n3. Ein Commit pro Fix — atomare Git-History\n4. Commit-Format: 'fix: <was behoben>' / 'style: <formatting>' / 'refactor: <was refactored>'\n5. SICHERHEIT:\n   - Keine exportierten Interfaces/Types aendern die in anderen Dateien importiert werden\n   - Keine Dateien loeschen die noch importiert werden — pruefe Imports\n   - React Hooks: Nur Dependencies aendern wenn die Logik eindeutig korrekt bleibt\n   - i18n: Falls de.ts und en.ts existieren, BEIDE synchron halten\n   - Bei Unsicherheit: Fix ueberspringen als SKIPPED\n6. WICHTIG: Jede ACTION wird von einem SEPARATEN Agenten ausgefuehrt.\n   Jede ACTION MUSS enthalten:\n   - ABSOLUTE Dateipfade\n   - Vollstaendigen Kontext was zu aendern ist\n   - Nach der Aenderung: git add <datei> && git commit -m '<message>'\n\nAUSGABE am Ende:\nFIXES_APPLIED:\n1. <Datei> — <Commit-Hash> — <Beschreibung>\n\nFIXES_SKIPPED:\n- <Datei> — <Grund>\n\nTOTAL: X Fixes applied, Y skipped",
+        "max_repeated_actions": 3,
+        "success_criteria": "Alle AUTO_FIXABLE Issues wurden als einzelne Commits committed oder begruendet uebersprungen.",
+        "total_timeout_seconds": 5400,
+        "require_approval": false
+      },
+      "requiredCapabilities": []
     },
-    "requiredCapabilities" : [ ]
-  }, {
-    "type" : "shell",
-    "config" : {
-      "timeout_seconds" : 600,
-      "on_failure" : "continue",
-      "command" : "set -euo pipefail\nSOURCE_DIR=\"{{ source_dir }}\"\nVERIFY_CMD=\"{{ verify_command }}\"\nif [ -z \"$SOURCE_DIR\" ] || [ \"$SOURCE_DIR\" = \"{{ source_dir }}\" ]; then SOURCE_DIR=\".\"; fi\n\necho '=== Verification ==='\n\nif echo '{{ previous_output }}' | grep -q 'NO_FIXES_NEEDED'; then\n  echo 'VERIFICATION_PASSED (no fixes to verify)'\n  exit 0\nfi\n\n# Custom verify command\nif [ -n \"$VERIFY_CMD\" ] && [ \"$VERIFY_CMD\" != \"{{ verify_command }}\" ]; then\n  echo \"Running custom verification: $VERIFY_CMD\"\n  if eval \"$VERIFY_CMD\"; then\n    echo 'VERIFICATION_PASSED'\n  else\n    echo 'VERIFICATION_FAILED'\n  fi\n  exit 0\nfi\n\n# Find package.json directory\nPKG_DIR=\".\"\nif [ -f \"$SOURCE_DIR/../package.json\" ]; then\n  PKG_DIR=$(cd \"$SOURCE_DIR/..\" && pwd)\nelif [ -f \"$SOURCE_DIR/package.json\" ]; then\n  PKG_DIR=$(cd \"$SOURCE_DIR\" && pwd)\nfi\n\ncd \"$PKG_DIR\"\nPASSED=true\n\n# Lint\nHAS_LINT=$(node -e \"const p=require('./package.json'); process.exit(p.scripts&&p.scripts.lint?0:1)\" 2>/dev/null && echo yes || echo no)\nif [ \"$HAS_LINT\" = \"yes\" ]; then\n  echo '--- npm run lint ---'\n  if ! npm run lint 2>&1 | tail -20; then PASSED=false; fi\nfi\n\n# Build\nHAS_BUILD=$(node -e \"const p=require('./package.json'); process.exit(p.scripts&&p.scripts.build?0:1)\" 2>/dev/null && echo yes || echo no)\nif [ \"$HAS_BUILD\" = \"yes\" ]; then\n  echo '--- npm run build ---'\n  if ! npm run build 2>&1 | tail -20; then PASSED=false; fi\nfi\n\n# Test\nHAS_TEST=$(node -e \"const p=require('./package.json'); process.exit(p.scripts&&p.scripts.test?0:1)\" 2>/dev/null && echo yes || echo no)\nif [ \"$HAS_TEST\" = \"yes\" ]; then\n  echo '--- npm test ---'\n  if ! npm test 2>&1 | tail -20; then PASSED=false; fi\nfi\n\nif [ \"$PASSED\" = \"true\" ]; then\n  echo 'VERIFICATION_PASSED'\nelse\n  echo 'VERIFICATION_FAILED'\nfi"
+    {
+      "type": "shell",
+      "config": {
+        "timeout_seconds": 600,
+        "on_failure": "continue",
+        "command": "set -euo pipefail\nSOURCE_DIR=\"{{ source_dir }}\"\nVERIFY_CMD=\"{{ verify_command }}\"\nif [ -z \"$SOURCE_DIR\" ] || [ \"$SOURCE_DIR\" = \"{{ source_dir }}\" ]; then SOURCE_DIR=\".\"; fi\n\necho '=== Verification ==='\n\nif echo '{{ previous_output }}' | grep -q 'NO_FIXES_NEEDED'; then\n  echo 'VERIFICATION_PASSED (no fixes to verify)'\n  exit 0\nfi\n\n# Custom verify command\nif [ -n \"$VERIFY_CMD\" ] && [ \"$VERIFY_CMD\" != \"{{ verify_command }}\" ]; then\n  echo \"Running custom verification: $VERIFY_CMD\"\n  if eval \"$VERIFY_CMD\"; then\n    echo 'VERIFICATION_PASSED'\n  else\n    echo 'VERIFICATION_FAILED'; exit 1\n  fi\n  exit 0\nfi\n\n# Find package.json directory\nPKG_DIR=\".\"\nif [ -f \"$SOURCE_DIR/../package.json\" ]; then\n  PKG_DIR=$(cd \"$SOURCE_DIR/..\" && pwd)\nelif [ -f \"$SOURCE_DIR/package.json\" ]; then\n  PKG_DIR=$(cd \"$SOURCE_DIR\" && pwd)\nfi\n\ncd \"$PKG_DIR\"\nPASSED=true\n\n# Lint\nHAS_LINT=$(node -e \"const p=require('./package.json'); process.exit(p.scripts&&p.scripts.lint?0:1)\" 2>/dev/null && echo yes || echo no)\nif [ \"$HAS_LINT\" = \"yes\" ]; then\n  echo '--- npm run lint ---'\n  if ! npm run lint 2>&1 | tail -20; then PASSED=false; fi\nfi\n\n# Build\nHAS_BUILD=$(node -e \"const p=require('./package.json'); process.exit(p.scripts&&p.scripts.build?0:1)\" 2>/dev/null && echo yes || echo no)\nif [ \"$HAS_BUILD\" = \"yes\" ]; then\n  echo '--- npm run build ---'\n  if ! npm run build 2>&1 | tail -20; then PASSED=false; fi\nfi\n\n# Test\nHAS_TEST=$(node -e \"const p=require('./package.json'); process.exit(p.scripts&&p.scripts.test?0:1)\" 2>/dev/null && echo yes || echo no)\nif [ \"$HAS_TEST\" = \"yes\" ]; then\n  echo '--- npm test ---'\n  if ! npm test 2>&1 | tail -20; then PASSED=false; fi\nfi\n\nif [ \"$PASSED\" = \"true\" ]; then\n  echo 'VERIFICATION_PASSED'\nelse\n  echo 'VERIFICATION_FAILED'; exit 1\nfi",
+        "checked_command": true,
+        "check_category": "fix-verification"
+      },
+      "requiredCapabilities": []
     },
-    "requiredCapabilities" : [ ]
-  }, {
-    "type" : "conditional",
-    "config" : {
-      "else_command" : "set -euo pipefail\necho '=== Verification failed — attempting rollback ==='\nBASE_BRANCH=\"{{ base_branch }}\"\nif [ -z \"$BASE_BRANCH\" ] || [ \"$BASE_BRANCH\" = \"{{ base_branch }}\" ]; then BASE_BRANCH=\"main\"; fi\n\nSOURCE_DIR=\"{{ source_dir }}\"\nif [ -z \"$SOURCE_DIR\" ] || [ \"$SOURCE_DIR\" = \"{{ source_dir }}\" ]; then SOURCE_DIR=\".\"; fi\nPKG_DIR=\".\"\nif [ -f \"$SOURCE_DIR/../package.json\" ]; then\n  PKG_DIR=$(cd \"$SOURCE_DIR/..\" && pwd)\nelif [ -f \"$SOURCE_DIR/package.json\" ]; then\n  PKG_DIR=$(cd \"$SOURCE_DIR\" && pwd)\nfi\n\nMAX_REVERTS=5\nREVERTED=0\nwhile [ $REVERTED -lt $MAX_REVERTS ]; do\n  if [ $(git rev-list --count ${BASE_BRANCH}..HEAD) -le 0 ]; then break; fi\n  echo \"Reverting commit: $(git log -1 --oneline)\"\n  git revert HEAD --no-edit\n  REVERTED=$((REVERTED + 1))\n  RETEST_OK=true\n  cd \"$PKG_DIR\"\n  HAS_BUILD=$(node -e \"const p=require('./package.json'); process.exit(p.scripts&&p.scripts.build?0:1)\" 2>/dev/null && echo yes || echo no)\n  if [ \"$HAS_BUILD\" = \"yes\" ]; then\n    npm run build 2>&1 | tail -5 || RETEST_OK=false\n  fi\n  HAS_LINT=$(node -e \"const p=require('./package.json'); process.exit(p.scripts&&p.scripts.lint?0:1)\" 2>/dev/null && echo yes || echo no)\n  if [ \"$HAS_LINT\" = \"yes\" ]; then\n    npm run lint 2>&1 | tail -5 || RETEST_OK=false\n  fi\n  cd - >/dev/null\n  if [ \"$RETEST_OK\" = \"true\" ]; then\n    echo \"Verification passed after reverting $REVERTED commit(s).\"\n    echo \"PARTIAL_FIX: Reverted $REVERTED breaking commit(s). Remaining commits are safe.\"\n    break\n  fi\ndone\nif [ \"$RETEST_OK\" != \"true\" ]; then\n  echo \"PARTIAL_FIX: Reverted $REVERTED commits but verification still fails. Manual review needed.\"\nfi\necho ''\necho '=== Remaining commits ==='\ngit log --oneline | head -20",
-      "execution_mode" : "shell",
-      "condition" : "echo '{{ previous_output }}' | grep -q 'VERIFICATION_PASSED'",
-      "then_command" : "echo 'All checks passed. Ready for PR.'"
+    {
+      "type": "conditional",
+      "config": {
+        "else_command": "echo \"Verification failed; retain the run workspace for review.\"\nexit 1",
+        "execution_mode": "shell",
+        "condition": "echo '{{ previous_output }}' | grep -q 'VERIFICATION_PASSED'",
+        "then_command": "echo 'All checks passed. Ready for PR.'"
+      },
+      "requiredCapabilities": []
     },
-    "requiredCapabilities" : [ ]
-  }, {
-    "type" : "approval",
-    "config" : {
-      "options" : [ "Yes", "No", "Abort" ],
-      "timeout_minutes" : 60,
-      "variable_name" : "pr_decision",
-      "question" : "## TypeScript Auto-Fix Ergebnis\n\n{{ previous_output }}\n\n### Optionen:\n- **Yes**: Push + Pull Request erstellen\n- **No**: Branch lokal behalten fuer manuelle Review\n- **Abort**: Branch loeschen und zurueck zu main"
+    {
+      "type": "approval",
+      "config": {
+        "options": [
+          "Review"
+        ],
+        "timeout_minutes": 60,
+        "variable_name": "pr_decision",
+        "question": "Review der Run-Ergebnisse bestaetigen. Uebernahme, Push und PR erfolgen danach separat."
+      },
+      "requiredCapabilities": []
     },
-    "requiredCapabilities" : [ ]
-  }, {
-    "type" : "shell",
-    "config" : {
-      "on_failure" : "continue",
-      "command" : "set -euo pipefail\nDECISION=\"{{ pr_decision }}\"\nBASE_BRANCH=\"{{ base_branch }}\"\nif [ -z \"$BASE_BRANCH\" ] || [ \"$BASE_BRANCH\" = \"{{ base_branch }}\" ]; then BASE_BRANCH=\"main\"; fi\nFIX_BRANCH=$(git branch --show-current)\n\necho \"Decision: $DECISION\"\necho \"Branch: $FIX_BRANCH\"\n\ncase \"$DECISION\" in\n  Yes|yes)\n    COMMIT_COUNT=$(git rev-list --count ${BASE_BRANCH}..HEAD 2>/dev/null || echo 0)\n    if [ \"$COMMIT_COUNT\" -eq 0 ]; then\n      echo 'No commits to push. Nothing to do.'\n      exit 0\n    fi\n    echo \"=== Pushing $COMMIT_COUNT commits ===\"\n    git push -u origin \"$FIX_BRANCH\"\n    \n    FIXES=$(git log --oneline ${BASE_BRANCH}..HEAD | sed 's/^/- /')\n    \n    PR_TITLE=\"fix(typescript): Auto-fix lint/type findings\"\n    PR_BODY=\"## Summary\\n\\nAutomated TypeScript/React code fixes from static analysis.\\n\\n## Changes\\n\\n$FIXES\\n\\n## Verification\\n\\nESLint + tsc + tests passed after applying fixes.\\n\\n---\\n_Generated by MySuricates Auto-Fix TypeScript Pipeline_\"\n    \n    echo \"=== Creating Pull Request ===\"\n    PR_URL=$(gh pr create --base \"$BASE_BRANCH\" --title \"$PR_TITLE\" --body \"$(echo -e \"$PR_BODY\")\" 2>&1)\n    echo \"PR created: $PR_URL\"\n    ;;\n  No|no)\n    echo \"Branch '$FIX_BRANCH' kept locally.\"\n    echo \"To review: git checkout $FIX_BRANCH\"\n    echo \"To push later: git push -u origin $FIX_BRANCH\"\n    ;;\n  Abort|abort)\n    echo '=== Aborting — cleaning up ==='\n    git checkout \"$BASE_BRANCH\"\n    git branch -D \"$FIX_BRANCH\"\n    echo \"Branch $FIX_BRANCH deleted. Back on $BASE_BRANCH.\"\n    ;;\n  *)\n    echo \"Unknown decision: $DECISION. Branch kept locally.\"\n    ;;\nesac"
-    },
-    "requiredCapabilities" : [ ]
-  } ]
+    {
+      "type": "shell",
+      "config": {
+        "on_failure": "continue",
+        "command": "git status --short\ngit log --oneline \"{{ workspace_source_sha }}..HEAD\"\necho \"Review workspace: {{ execution_path }}\""
+      },
+      "requiredCapabilities": []
+    }
+  ]
 }

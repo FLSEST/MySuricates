@@ -66,6 +66,19 @@ class RunCompletionHandlerTest {
     }
 
     @Test
+    void failedTechnicalCheckRemainsVisibleAfterContinuingToOptimisticReport() {
+        WorkflowRun run = run(RunStatus.RUNNING, "gate_status: RED", "gate_status: GREEN");
+        run.getSteps().getFirst().setStatus(StepStatus.FAILED);
+        run.getSteps().getFirst().setMetadata(Map.of("checkedCommand", true, "exitCode", 7));
+
+        handler.complete(run, ctx, "wf-1", "Demo", "template-1", "proj-1");
+
+        assertThat(run.getStatus()).isEqualTo(RunStatus.COMPLETED_WITH_ERRORS);
+        assertThat(ctx.getRunMetadata()).containsEntry("gate_status", "RED");
+        verifyNoInteractions(templateVerificationService);
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void complete_highestGateWins_andSummaryAggregatesAllGates() {
         WorkflowRun run = run(RunStatus.RUNNING,

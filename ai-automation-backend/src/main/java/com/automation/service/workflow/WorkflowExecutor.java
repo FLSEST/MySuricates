@@ -52,6 +52,7 @@ public class WorkflowExecutor {
     private final BlockSkillContext skillContext;
     private final BlockStepRunner stepRunner;
     private final RunFinalizer finalizer;
+    private final RunWorkspaceService workspaces;
 
     // Active execution tracking is delegated to WorkflowExecutionRegistry
 
@@ -85,7 +86,7 @@ public class WorkflowExecutor {
         }
         return new WorkflowSnapshot(workflow.getProject(), blocks, skills, workflow.getInstructions(),
                 workflow.getModel(), workflow.getProvider(), workflow.getEffort(),
-                Map.copyOf(workflow.getMetadata()), workflow.getTemplateId(), blockSkillLookup);
+                RunWorkspaceService.policy(workflow.getMetadata(), blocks), workflow.getTemplateId(), blockSkillLookup);
     }
 
     public WorkflowRun execute(Workflow workflow, Map<String, Object> inputContext) {
@@ -174,6 +175,9 @@ public class WorkflowExecutor {
         ExecutionContext context = null;
         boolean semaphoreAcquired = false;
         try {
+            run = runRepository.findById(runId).orElseThrow();
+            workflowMeta = RunWorkspaceService.policyForRun(run, workflowMeta);
+            if (!executionRegistry.cancelRequested(runId)) workspaces.pinSource(run, project, workflowMeta, inputContext);
             executionSemaphore.acquire();
             semaphoreAcquired = true;
             run = runRepository.findById(runId).orElseThrow();
@@ -190,15 +194,17 @@ public class WorkflowExecutor {
                 return;
             }
 
-            String containerId = ensureContainerRunning(project, runId);
+            boolean isolated = RunWorkspaceService.enabled(workflowMeta);
+            String containerId = isolated ? null : RunContainerPreparation.ensureRunning(project, runId, containerService, broadcaster);
 
             context = executionContextFactory.create(new ExecutionContextFactory.ContextSeed(
                     runId, workflowId, workflowName, project, containerId, inputContext,
                     instructions, model, provider, effort, resumePreviousOutput));
 
             executionRegistry.promote(runId, context);
-
-            executionContextFactory.writeProjectContextFiles(project, workflowId, skills);
+            Project executionProject = isolated
+                    ? workspaces.prepare(run, project, workflowMeta, context, run.getMetadata().containsKey("workspace")) : project;
+            executionContextFactory.writeProjectContextFiles(executionProject, workflowId, skills);
 
             for (BlockDefinition block : blocks) {
                 if (context.shouldStop()) {
@@ -209,7 +215,7 @@ public class WorkflowExecutor {
                 waitWhilePaused(run, context);
 
                 // Per-block skill context: merge block-level skills with workflow-level skills
-                boolean hasBlockSkills = skillContext.applyForBlock(block, project, skills, blockSkillLookup);
+                boolean hasBlockSkills = skillContext.applyForBlock(block, executionProject, skills, blockSkillLookup);
 
                 BlockExecutor executor = findExecutor(block.getType());
 
@@ -220,7 +226,7 @@ public class WorkflowExecutor {
                 if (stepIndex < skipToStepIndex) {
                     // Restore baseline skill context if this block had extra skills
                     if (hasBlockSkills) {
-                        skillContext.restore(project, skills);
+                        skillContext.restore(executionProject, skills);
                     }
                     continue;
                 }
@@ -230,7 +236,12 @@ public class WorkflowExecutor {
 
                 // Restore baseline skill context after a block with extra skills
                 if (hasBlockSkills) {
-                    skillContext.restore(project, skills);
+                    skillContext.restore(executionProject, skills);
+                }
+
+                if (context.shouldStop()) {
+                    run.setStatus(RunStatus.CANCELLED);
+                    break;
                 }
 
                 if (step.getStatus() == StepStatus.FAILED && block.shouldStopOnFailure()) {
@@ -246,9 +257,16 @@ public class WorkflowExecutor {
 
             completionHandler.complete(run, context, workflowId, workflowName, templateId, project.getId());
 
+        } catch (java.util.concurrent.CancellationException e) {
+            if (run != null) run.setStatus(RunStatus.CANCELLED);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            failRun(runId, "Interrupted while waiting for execution slot");
+            if (run != null) {
+                run.setStatus(executionRegistry.cancelRequested(runId) ? RunStatus.CANCELLED : RunStatus.FAILED);
+                run.setError(Map.of("message", "Interrupted while waiting for execution slot"));
+            } else {
+                failRun(runId, "Interrupted while waiting for execution slot");
+            }
             return;
         } catch (Throwable t) {
             // Throwable, not Exception: an Error (NoClassDefFoundError from a build rewriting
@@ -380,12 +398,12 @@ public class WorkflowExecutor {
                 .filter(s -> s.getStatus() == StepStatus.COMPLETED)
                 .toList();
 
-        if (completedSteps.isEmpty()) {
+        if (completedSteps.isEmpty() && !run.getMetadata().containsKey("workspace")) {
             log.info("Resume requested for run {} but no completed steps found — falling back to full retry", runId);
             return execute(run.getWorkflow(), run.getInputContext());
         }
 
-        int resumeFromIndex = completedSteps.get(completedSteps.size() - 1).getStepIndex() + 1;
+        int resumeFromIndex = completedSteps.isEmpty() ? 0 : completedSteps.getLast().getStepIndex() + 1;
 
         // Reconstruct context: inputContext + step outputs from DB + accumulated user vars (contextDelta)
         Map<String, Object> reconstructed = new HashMap<>(run.getInputContext() != null ? run.getInputContext() : Map.of());
@@ -506,33 +524,4 @@ public class WorkflowExecutor {
                         "No executor found for block type: " + blockType));
     }
 
-    private String ensureContainerRunning(Project project, String runId) {
-        // Try to get existing running container
-        try {
-            return containerService.getDockerContainerId(project);
-        } catch (Exception e) {
-            log.warn("No running container for project {} ({}), attempting to start one...",
-                    project.getName(), e.getMessage());
-        }
-
-        // Try to start a new container
-        try {
-            broadcaster.broadcastLogMessage(runId, "container_starting",
-                    Map.of("message", "Container wird gestartet für Projekt: " + project.getName()));
-
-            Container container = containerService.createAndStartContainer(project);
-
-            broadcaster.broadcastLogMessage(runId, "container_started",
-                    Map.of("message", "Container gestartet", "containerId", container.getDockerContainerId()));
-
-            return container.getDockerContainerId();
-        } catch (Exception e) {
-            // Container creation failed — continue without container (host-based execution still works)
-            log.warn("Failed to start container for project {} — continuing with host-based execution: {}",
-                    project.getName(), e.getMessage());
-            broadcaster.broadcastLogMessage(runId, "container_skipped",
-                    Map.of("message", "Container konnte nicht gestartet werden, Ausführung erfolgt auf dem Host"));
-            return null;
-        }
-    }
 }

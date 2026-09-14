@@ -1,45 +1,57 @@
 {
-  "id" : "code-quality",
-  "icon" : "\uD83E\uDDEA",
-  "name" : {
-    "en" : "Code Quality",
-    "de" : "Code-Qualität"
+  "id": "code-quality",
+  "icon": "🧪",
+  "name": {
+    "en": "Code Quality",
+    "de": "Code-Qualität"
   },
-  "description" : {
-    "en" : "Git status, lint, test with retry, and build",
-    "de" : "Git-Status, Lint, Test mit Wiederholung und Build"
+  "description": {
+    "en": "Git status, lint, test with retry, and build",
+    "de": "Git-Status, Lint, Test mit Wiederholung und Build"
   },
-  "category" : "CODE",
-  "sortOrder" : 0,
-  "version" : "1.0.0",
-  "model" : null,
-  "instructions" : "Fuehre die Code-Qualitaetspruefungen der Reihe nach aus. Bei Fehlern gib klare Fehlermeldungen aus.",
-  "blocks" : [ {
-    "type" : "shell",
-    "config" : {
-      "command" : "git status"
+  "category": "CODE",
+  "sortOrder": 0,
+  "version": "1.0.1",
+  "model": null,
+  "instructions": "Fuehre die Code-Qualitaetspruefungen der Reihe nach aus. Bei Fehlern gib klare Fehlermeldungen aus.\nArbeitsverzeichnis fuer diesen Run ist {{ execution_path }}. Verwende ausschliesslich diesen Run-Workspace fuer Builds und Code-Aenderungen. {{ project_path }} identifiziert nur das Originalprojekt. Kein automatischer Merge oder Push; Ergebnisse zur separaten Uebernahme behalten.",
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "command": "git status",
+        "workspace": {
+          "mode": "isolated",
+          "source": "commit",
+          "install_npm": true
+        }
+      },
+      "requiredCapabilities": []
     },
-    "requiredCapabilities" : [ ]
-  }, {
-    "type" : "shell",
-    "config" : {
-      "command" : "npm run lint"
+    {
+      "type": "shell",
+      "config": {
+        "command": "npm run lint",
+        "checked_command": true
+      },
+      "requiredCapabilities": []
     },
-    "requiredCapabilities" : [ ]
-  }, {
-    "type" : "retry",
-    "config" : {
-      "execution_mode" : "shell",
-      "delay" : 5,
-      "max_retries" : 3,
-      "command" : "npm test"
+    {
+      "type": "retry",
+      "config": {
+        "execution_mode": "shell",
+        "delay": 5,
+        "max_retries": 3,
+        "command": "npm test"
+      },
+      "requiredCapabilities": []
     },
-    "requiredCapabilities" : [ ]
-  }, {
-    "type" : "shell",
-    "config" : {
-      "command" : "npm run build"
-    },
-    "requiredCapabilities" : [ ]
-  } ]
+    {
+      "type": "shell",
+      "config": {
+        "command": "npm run build",
+        "checked_command": true
+      },
+      "requiredCapabilities": []
+    }
+  ]
 }

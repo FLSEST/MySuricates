@@ -37,6 +37,9 @@ public class ShellBlockExecutor implements BlockExecutor {
         // Untrusted variables (webhook payloads) are always escaped; shell_escape_variables escapes everything.
         boolean escapeVariables = Boolean.TRUE.equals(config.get("shell_escape_variables"));
         String command = context.resolveShellTemplate(rawCommand.toString(), escapeVariables);
+        if (Boolean.TRUE.equals(config.get("checked_command"))) {
+            command = "set -e -o pipefail\n" + command;
+        }
         int timeout = ((Number) config.getOrDefault("timeout_seconds", SHELL_TIMEOUT_SECONDS)).intValue();
 
         StepResult step = new StepResult();
@@ -53,8 +56,15 @@ public class ShellBlockExecutor implements BlockExecutor {
         String executionMode;
 
         if (containerImage != null && !containerImage.isBlank()) {
-            result = containerShellService.execute(command, context.getProjectPath(), timeout,
-                    containerImage, mountDockerSocket, extraMounts);
+            if (context.getRunMetadata().containsKey("workspace")) {
+                command = command.replace(context.getProjectPath(), "/workspace");
+                step.setInput(command);
+                result = containerShellService.execute(command, context.getProjectPath(), timeout,
+                        containerImage, mountDockerSocket, extraMounts, context::shouldStop);
+            } else {
+                result = containerShellService.execute(command, context.getProjectPath(), timeout,
+                        containerImage, mountDockerSocket, extraMounts);
+            }
             executionMode = "container:" + containerImage;
         } else {
             result = shellService.execute(command, context.getProjectPath(), timeout, proc -> {
@@ -68,15 +78,24 @@ public class ShellBlockExecutor implements BlockExecutor {
         String output = result.exitCode() != 0
                 ? result.output() + "\n\n[RECOVERY] " + buildRecoveryHint(result.exitCode(), command)
                 : result.output();
+        if (Boolean.TRUE.equals(config.get("checked_command"))) {
+            String category = String.valueOf(config.getOrDefault("check_category", "build-check"))
+                    .replaceAll("[^a-zA-Z0-9_-]", "-");
+            output = "gate_status: " + (result.exitCode() == 0 ? "GREEN" : "RED")
+                    + "\ngate_category: " + category
+                    + "\ngate_description: Command exit " + result.exitCode() + "\n\n" + output;
+        }
         step.setOutput(output);
         step.setStatus(result.exitCode() == 0 ? StepStatus.COMPLETED : StepStatus.FAILED);
         step.setCompletedAt(Instant.now());
         step.setDurationMs(result.durationMs());
         step.setMetadata(Map.of(
                 "exitCode", result.exitCode(),
+                "checkedCommand", Boolean.TRUE.equals(config.get("checked_command")),
                 "executionMode", executionMode
         ));
 
+        WorkspaceCheckEvidence.record(context, step, result);
         return step;
     }
 

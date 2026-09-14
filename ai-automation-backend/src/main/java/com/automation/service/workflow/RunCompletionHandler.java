@@ -102,13 +102,16 @@ public class RunCompletionHandler {
             log.info("Parsed {} todo_item markers from workflow {}", allTodoItems.size(), workflowName);
         }
 
+        boolean failedChecks = run.getSteps().stream().anyMatch(step ->
+                step.getStatus() == com.automation.entity.StepStatus.FAILED && step.getMetadata() != null
+                        && Boolean.TRUE.equals(step.getMetadata().get("checkedCommand")));
         if (run.getStatus() == RunStatus.RUNNING) {
-            run.setStatus(RunStatus.COMPLETED);
+            run.setStatus(failedChecks ? RunStatus.COMPLETED_WITH_ERRORS : RunStatus.COMPLETED);
         }
 
         if (run.getStatus() == RunStatus.COMPLETED || run.getStatus() == RunStatus.COMPLETED_WITH_ERRORS) {
             // Record template verification if workflow was created from a template
-            if (templateId != null && !templateId.isBlank()) {
+            if (!failedChecks && templateId != null && !templateId.isBlank()) {
                 try {
                     templateVerificationService.recordSuccessfulRun(workflowId, templateId, projectId, run.getId());
                 } catch (Exception e) {

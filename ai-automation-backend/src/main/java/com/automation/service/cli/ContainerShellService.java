@@ -9,16 +9,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 /** Executes shell commands in ephemeral Docker containers via "docker run --rm". */
 @Service
@@ -107,13 +103,18 @@ public class ContainerShellService {
     public ShellResult execute(String command, String projectPath, int timeoutSeconds,
                                String containerImage, boolean mountDockerSocket,
                                List<String> extraMounts) {
+        return execute(command, projectPath, timeoutSeconds, containerImage, mountDockerSocket, extraMounts, () -> false);
+    }
+
+    public ShellResult execute(String command, String projectPath, int timeoutSeconds,
+                               String containerImage, boolean mountDockerSocket,
+                               List<String> extraMounts, java.util.function.BooleanSupplier cancelled) {
         if (!imageAllowlist.isAllowed(containerImage)) {
             String msg = "Container image not allowed by automation.execution.allowed-container-images: " + containerImage;
             activityLogService.warn(LogCategory.SECURITY, msg, "ContainerShellService", null);
             return new ShellResult(msg, 125, 0);
         }
 
-        long start = System.currentTimeMillis();
 
         boolean effectiveMount = mountDockerSocket && allowDockerSocketMount;
         if (mountDockerSocket && !allowDockerSocketMount) {
@@ -136,51 +137,7 @@ public class ContainerShellService {
                 containerImage, projectPath, timeoutSeconds,
                 command.length() > 200 ? command.substring(0, 200) + "..." : command);
 
-        try {
-            ProcessBuilder pb = new ProcessBuilder(dockerCmd);
-            pb.redirectErrorStream(true);
-
-            Process proc = pb.start();
-
-            ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
-            Thread reader = Thread.ofVirtual().start(() -> {
-                try (InputStream is = proc.getInputStream()) {
-                    is.transferTo(outputBuffer);
-                } catch (IOException ignored) {
-                    // Process destroyed — expected on timeout
-                }
-            });
-
-            boolean finished = proc.waitFor(timeoutSeconds, TimeUnit.SECONDS);
-
-            if (!finished) {
-                proc.destroyForcibly();
-                proc.waitFor(2, TimeUnit.SECONDS);
-                reader.join(2000);
-                long durationMs = System.currentTimeMillis() - start;
-                log.warn("Container command timed out after {}s (image: {})", timeoutSeconds, containerImage);
-                return new ShellResult("Command timed out after " + timeoutSeconds + " seconds", 124, durationMs);
-            }
-
-            reader.join(5000);
-            String output = outputBuffer.toString().trim();
-            int exitCode = proc.exitValue();
-            long durationMs = System.currentTimeMillis() - start;
-
-            if (exitCode != 0) {
-                log.debug("Container command exited with code {} (image: {})", exitCode, containerImage);
-            }
-
-            return new ShellResult(output, exitCode, durationMs);
-        } catch (IOException e) {
-            long durationMs = System.currentTimeMillis() - start;
-            log.error("Container command failed: {}", e.getMessage());
-            return new ShellResult("Error: " + e.getMessage(), 1, durationMs);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            long durationMs = System.currentTimeMillis() - start;
-            return new ShellResult("Command interrupted", 130, durationMs);
-        }
+        return ContainerCommandProcess.execute(dockerCmd, timeoutSeconds, cancelled);
     }
 
     /**

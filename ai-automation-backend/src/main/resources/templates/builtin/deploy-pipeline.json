@@ -1,39 +1,49 @@
 {
-  "id" : "deploy-pipeline",
-  "icon" : "\uD83D\uDE80",
-  "name" : {
-    "en" : "Deploy Pipeline",
-    "de" : "Deploy-Pipeline"
+  "id": "deploy-pipeline",
+  "icon": "🚀",
+  "name": {
+    "en": "Deploy Pipeline",
+    "de": "Deploy-Pipeline"
   },
-  "description" : {
-    "en" : "Conditional test, build, and deploy",
-    "de" : "Bedingter Test, Build und Deployment"
+  "description": {
+    "en": "Conditional test, build, and deploy",
+    "de": "Bedingter Test, Build und Deployment"
   },
-  "category" : "CODE",
-  "sortOrder" : 2,
-  "version" : "1.0.0",
-  "model" : null,
-  "instructions" : "Fuehre die Deploy-Pipeline aus. Stoppe bei fehlgeschlagenen Tests.",
-  "blocks" : [ {
-    "type" : "conditional",
-    "config" : {
-      "else_command" : "echo \"No tests\"",
-      "execution_mode" : "shell",
-      "condition" : "test -f package.json",
-      "then_command" : "npm test"
+  "category": "CODE",
+  "sortOrder": 2,
+  "version": "1.0.1",
+  "model": null,
+  "instructions": "Fuehre die Deploy-Pipeline aus. Stoppe bei fehlgeschlagenen Tests.\nArbeitsverzeichnis fuer diesen Run ist {{ execution_path }}. Verwende ausschliesslich diesen Run-Workspace fuer Builds und Code-Aenderungen. {{ project_path }} identifiziert nur das Originalprojekt. Kein automatischer Merge oder Push; Ergebnisse zur separaten Uebernahme behalten.",
+  "blocks": [
+    {
+      "type": "conditional",
+      "config": {
+        "else_command": "echo \"No tests\"",
+        "execution_mode": "shell",
+        "condition": "test -f package.json",
+        "then_command": "npm test",
+        "workspace": {
+          "mode": "isolated",
+          "source": "commit",
+          "install_npm": true
+        }
+      },
+      "requiredCapabilities": []
     },
-    "requiredCapabilities" : [ ]
-  }, {
-    "type" : "shell",
-    "config" : {
-      "command" : "npm run build"
+    {
+      "type": "shell",
+      "config": {
+        "command": "npm run build",
+        "checked_command": true
+      },
+      "requiredCapabilities": []
     },
-    "requiredCapabilities" : [ ]
-  }, {
-    "type" : "shell",
-    "config" : {
-      "command" : "npm run deploy"
-    },
-    "requiredCapabilities" : [ ]
-  } ]
+    {
+      "type": "shell",
+      "config": {
+        "command": "npm run deploy"
+      },
+      "requiredCapabilities": []
+    }
+  ]
 }

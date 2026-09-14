@@ -19,10 +19,42 @@
   "blocks": [
     {
       "type": "shell",
+      "name": "backend_tests",
       "config": {
-        "label": "Alle Checks ausführen",
-        "command": "BASE={{ project_path }}\nRESULTS=\"\"\n\n# --- Backend Build + Tests ---\necho '========================================'\necho '  BACKEND: Maven clean package'\necho '========================================'\ncd \"$BASE/ai-automation-backend\"\nMVN_OUT=$(mvn clean package -q 2>&1)\nMVN_EXIT=$?\necho \"$MVN_OUT\" | tail -20\necho \"\"\nif [ $MVN_EXIT -ne 0 ]; then\n  echo 'BACKEND: FAILED'\n  RESULTS=\"$RESULTS\\nBACKEND=RED\"\n  # Extract the key error line\n  ERROR_LINE=$(echo \"$MVN_OUT\" | grep '\\[ERROR\\]' | grep -v 'Help\\|Re-run\\|To see\\|For more' | head -3)\n  echo \"Fehler: $ERROR_LINE\"\nelse\n  echo 'BACKEND: OK'\n  RESULTS=\"$RESULTS\\nBACKEND=GREEN\"\nfi\n\n# --- Frontend Lint ---\necho \"\"\necho '========================================'\necho '  FRONTEND: ESLint'\necho '========================================'\ncd \"$BASE/ai-automation-frontend\"\nLINT_OUT=$(npm run lint 2>&1)\nLINT_EXIT=$?\nWARNINGS=$(echo \"$LINT_OUT\" | grep -oE '[0-9]+ warning' | head -1 || echo '0 warnings')\nERRORS=$(echo \"$LINT_OUT\" | grep -oE '[0-9]+ error' | head -1 || echo '0 errors')\necho \"$WARNINGS, $ERRORS\"\nif [ $LINT_EXIT -ne 0 ]; then\n  echo 'LINT: FAILED'\n  RESULTS=\"$RESULTS\\nLINT=RED\"\n  echo \"$LINT_OUT\" | grep 'error ' | head -5\nelse\n  echo 'LINT: OK (Warnings sind OK)'\n  RESULTS=\"$RESULTS\\nLINT=GREEN\"\nfi\n\n# --- Frontend Build ---\necho \"\"\necho '========================================'\necho '  FRONTEND: Vite Build (tsc + vite)'\necho '========================================'\ncd \"$BASE/ai-automation-frontend\"\nnpm run build 2>&1 | tail -5\nBUILD_EXIT=$?\nif [ $BUILD_EXIT -ne 0 ]; then\n  echo 'BUILD: FAILED'\n  RESULTS=\"$RESULTS\\nBUILD=RED\"\nelse\n  echo 'BUILD: OK'\n  RESULTS=\"$RESULTS\\nBUILD=GREEN\"\nfi\n\n# --- Zusammenfassung ---\necho \"\"\necho '========================================'\necho '  ZUSAMMENFASSUNG'\necho '========================================'\necho \"Backend (Maven):  $([ $MVN_EXIT -eq 0 ] && echo 'OK' || echo 'FAILED')\"\necho \"Frontend (Lint):  $([ $LINT_EXIT -eq 0 ] && echo 'OK' || echo 'FAILED') ($WARNINGS)\"\necho \"Frontend (Build): $([ $BUILD_EXIT -eq 0 ] && echo 'OK' || echo 'FAILED')\"\n\nif echo -e \"$RESULTS\" | grep -q 'RED'; then\n  echo \"\"\n  echo 'VERDICT: RED'\nelse\n  echo \"\"\n  echo 'VERDICT: GREEN'\nfi",
-        "timeout_seconds": 600,
+        "description": "backend_tests",
+        "command": "cd \"{{ execution_path }}/ai-automation-backend\"\nmvn -q clean package",
+        "checked_command": true,
+        "check_category": "backend-test-failure",
+        "timeout_seconds": 1800,
+        "on_failure": "continue",
+        "workspace": {
+          "mode": "isolated",
+          "source": "commit",
+          "install_npm": true
+        }
+      }
+    },
+    {
+      "type": "shell",
+      "name": "frontend_build",
+      "config": {
+        "description": "frontend_build",
+        "command": "cd \"{{ execution_path }}/ai-automation-frontend\"\nnpm run build",
+        "checked_command": true,
+        "check_category": "frontend-build-failure",
+        "timeout_seconds": 1800,
+        "on_failure": "continue"
+      }
+    },
+    {
+      "type": "shell",
+      "name": "frontend_lint",
+      "config": {
+        "description": "frontend_lint",
+        "command": "cd \"{{ execution_path }}/ai-automation-frontend\"\nnpm run lint",
+        "checked_command": true,
+        "check_category": "frontend-lint-failure",
+        "timeout_seconds": 1800,
         "on_failure": "continue"
       }
     },
@@ -31,15 +63,7 @@
       "config": {
         "label": "Ergebnis erklären",
         "timeout_seconds": 120,
-        "command": "Analysiere das Build-Gate-Ergebnis und gib eine knappe, klare Zusammenfassung:\n\n{{ previous_output }}\n\nRegeln:\n- Maximal 5 Zeilen\n- Bei VERDICT: GREEN → Kurze Bestätigung dass alles OK ist\n- Bei VERDICT: RED → Erkläre WAS genau fehlgeschlagen ist und WAS der wahrscheinliche Fix ist\n- Keine Wiederholung der vollen Logs\n- Kein Markdown, kein Fließtext — stichpunktartig\n\nAm Ende GENAU diese Zeile (nicht in Markdown):\ngate_status: GREEN oder RED (je nach VERDICT oben)"
-      }
-    },
-    {
-      "type": "shell",
-      "config": {
-        "label": "Gate-Verdict",
-        "command": "# Prüfe ob das Ergebnis RED enthält\nPREV='{{ previous_output }}'\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Build Gate: FAILED'\n  echo 'gate_status: RED'\n  echo 'gate_category: mysuricates-build'\n  echo 'gate_description: MySuricates Build Gate fehlgeschlagen'\nelse\n  echo 'Build Gate: PASSED'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: mysuricates-build'\n  echo 'gate_description: MySuricates Build Gate bestanden'\nfi",
-        "timeout_seconds": 10
+        "command": "Fasse Backend {{ step_0_output }}, Frontend Build {{ step_1_output }} und Lint {{ step_2_output }} zusammen. Uebernimm technische Ergebnisse unveraendert; keine eigenen Gate-Marker."
       }
     }
   ],
@@ -50,6 +74,12 @@
     "autoTodo": {
       "enabled": true,
       "mode": "auto"
+    },
+    "workspace": {
+      "mode": "isolated",
+      "source": "commit",
+      "install_npm": true
     }
-  }
+  },
+  "instructions": "\n\nRun-Isolation: Arbeite ausschliesslich in {{ execution_path }}. Der Originalpfad {{ project_path }} identifiziert das Projekt und darf nicht beschrieben werden. Keine automatischen Merges, Pushes oder Wechsel auf main/master. Aenderungen bleiben auf dem Run-Branch zur expliziten Uebernahme. Bei einem fehlgeschlagenen technischen Check darf ein Report keinen Erfolg behaupten. Gepruefter Commit: {{ workspace_source_sha }}; Logs: {{ workspace_logs }}."
 }

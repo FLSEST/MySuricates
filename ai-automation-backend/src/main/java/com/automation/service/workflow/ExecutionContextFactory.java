@@ -66,6 +66,7 @@ public class ExecutionContextFactory {
         context.setProjectPath(project.getPath());
         Set<String> untrustedKeys = reservedNames(inputContext, ExecutionContext.UNTRUSTED_KEYS_VARIABLE);
         inputContext.forEach((name, value) -> {
+            if (name.startsWith("execution_path_")) return;
             if (untrustedKeys.contains(name)) {
                 context.setUntrustedVariable(name, value);
             } else {
@@ -87,6 +88,10 @@ public class ExecutionContextFactory {
         context.setVariable("workflow_name", workflowName != null ? workflowName : "");
         context.setVariable("project_id", project.getId() != null ? project.getId() : "");
         context.setVariable("project_path", project.getPath() != null ? project.getPath() : "");
+        context.setVariable("execution_path", project.getPath() != null ? project.getPath() : "");
+        for (String reserved : List.of("workspace_path", "workspace_logs", "workspace_source_sha")) {
+            context.setVariable(reserved, "");
+        }
         context.setVariable("model", model != null ? model : "");
         context.setVariable("provider", provider != null ? provider : "");
         context.setVariable("effort", effort != null ? effort : "");

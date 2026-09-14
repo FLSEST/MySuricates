@@ -17,22 +17,28 @@
     "todo-driven"
   ],
   "model": "claude-opus-4-6",
-  "instructions": "Du schreibst Tests fuer das MySuricates-Projekt. REGELN: 1) NUR Test-Dateien schreiben/aendern, NIEMALS Production-Code. 2) JUnit 5 + Mockito + AssertJ. 3) Bestehende Test-Patterns als Vorlage nutzen. 4) Nach dem Schreiben: mvn test -Dtest=NeuerTest ausfuehren.",
+  "instructions": "Du schreibst Tests fuer das MySuricates-Projekt. REGELN: 1) NUR Test-Dateien schreiben/aendern, NIEMALS Production-Code. 2) JUnit 5 + Mockito + AssertJ. 3) Bestehende Test-Patterns als Vorlage nutzen. 4) Nach dem Schreiben: mvn test -Dtest=NeuerTest ausfuehren.\n\nRun-Isolation: Arbeite ausschliesslich in {{ execution_path }}. Der Originalpfad {{ project_path }} identifiziert das Projekt und darf nicht beschrieben werden. Keine automatischen Merges, Pushes oder Wechsel auf main/master. Aenderungen bleiben auf dem Run-Branch zur expliziten Uebernahme. Bei einem fehlgeschlagenen technischen Check darf ein Report keinen Erfolg behaupten. Gepruefter Commit: {{ workspace_source_sha }}; Logs: {{ workspace_logs }}.",
   "blocks": [
     {
       "type": "shell",
       "config": {
         "label": "TODO-Kontext laden",
-        "command": "BASE={{ project_path }}\n\necho '========================================'\necho '  AUFGABE'\necho '========================================'\necho 'TODO-Titel: {{ todo_title }}'\necho 'TODO-Beschreibung: {{ todo_description }}'\necho ''\n\necho '========================================'\necho '  ZIEL-KLASSE ANALYSIEREN'\necho '========================================'\n# Versuche die Klasse aus dem TODO-Titel zu extrahieren\nCLASS_NAME=$(echo '{{ todo_title }}' | grep -oE '[A-Z][a-zA-Z]+' | head -1)\necho \"Erkannte Klasse: $CLASS_NAME\"\n\n# Finde die Source-Datei\nSRC=$(find \"$BASE/ai-automation-backend/src/main/java\" -name \"${CLASS_NAME}.java\" 2>/dev/null | head -1)\nif [ -n \"$SRC\" ]; then\n  echo \"Source: $SRC\"\n  echo \"LOC: $(wc -l < \"$SRC\")\"\n  echo ''\n  echo '--- Public Methoden ---'\n  grep -n 'public ' \"$SRC\" | grep -v 'class \\|interface ' | head -20\nelse\n  echo \"Source NICHT GEFUNDEN fuer: $CLASS_NAME\"\n  # Breitere Suche\n  echo '--- Aehnliche Dateien ---'\n  find \"$BASE/ai-automation-backend/src/main/java\" -name \"*${CLASS_NAME}*\" 2>/dev/null | head -5\n  find \"$BASE/ai-automation-frontend/src\" -name \"*${CLASS_NAME}*\" 2>/dev/null | head -5\nfi\n\n# Prüfe ob schon ein Test existiert\nTEST=$(find \"$BASE/ai-automation-backend/src/test/java\" -name \"${CLASS_NAME}Test.java\" -o -name \"${CLASS_NAME}Tests.java\" 2>/dev/null | head -1)\nif [ -n \"$TEST\" ]; then\n  echo ''\n  echo \"Existierender Test: $TEST\"\n  echo \"Test LOC: $(wc -l < \"$TEST\")\"\n  echo \"Test-Methoden: $(grep -c '@Test' \"$TEST\")\"\nelse\n  echo ''\n  echo 'Kein existierender Test'\nfi\n\necho ''\necho '========================================'\necho '  REFERENZ-TESTS (gleiches Package)'\necho '========================================'\nif [ -n \"$SRC\" ]; then\n  PKG_DIR=$(dirname \"$SRC\" | sed 's|src/main/java|src/test/java|')\n  if [ -d \"$PKG_DIR\" ]; then\n    ls \"$PKG_DIR\"/*Test.java 2>/dev/null | head -3 | while read tf; do\n      echo \"Referenz: $(basename $tf) ($(grep -c '@Test' \"$tf\") tests)\"\n    done\n  else\n    echo '(kein Test-Package vorhanden)'\n  fi\nfi",
+        "command": "BASE={{ execution_path }}\n\necho '========================================'\necho '  AUFGABE'\necho '========================================'\necho 'TODO-Titel: {{ todo_title }}'\necho 'TODO-Beschreibung: {{ todo_description }}'\necho ''\n\necho '========================================'\necho '  ZIEL-KLASSE ANALYSIEREN'\necho '========================================'\n# Versuche die Klasse aus dem TODO-Titel zu extrahieren\nCLASS_NAME=$(echo '{{ todo_title }}' | grep -oE '[A-Z][a-zA-Z]+' | head -1)\necho \"Erkannte Klasse: $CLASS_NAME\"\n\n# Finde die Source-Datei\nSRC=$(find \"$BASE/ai-automation-backend/src/main/java\" -name \"${CLASS_NAME}.java\" 2>/dev/null | head -1)\nif [ -n \"$SRC\" ]; then\n  echo \"Source: $SRC\"\n  echo \"LOC: $(wc -l < \"$SRC\")\"\n  echo ''\n  echo '--- Public Methoden ---'\n  grep -n 'public ' \"$SRC\" | grep -v 'class \\|interface ' | head -20\nelse\n  echo \"Source NICHT GEFUNDEN fuer: $CLASS_NAME\"\n  # Breitere Suche\n  echo '--- Aehnliche Dateien ---'\n  find \"$BASE/ai-automation-backend/src/main/java\" -name \"*${CLASS_NAME}*\" 2>/dev/null | head -5\n  find \"$BASE/ai-automation-frontend/src\" -name \"*${CLASS_NAME}*\" 2>/dev/null | head -5\nfi\n\n# Prüfe ob schon ein Test existiert\nTEST=$(find \"$BASE/ai-automation-backend/src/test/java\" -name \"${CLASS_NAME}Test.java\" -o -name \"${CLASS_NAME}Tests.java\" 2>/dev/null | head -1)\nif [ -n \"$TEST\" ]; then\n  echo ''\n  echo \"Existierender Test: $TEST\"\n  echo \"Test LOC: $(wc -l < \"$TEST\")\"\n  echo \"Test-Methoden: $(grep -c '@Test' \"$TEST\")\"\nelse\n  echo ''\n  echo 'Kein existierender Test'\nfi\n\necho ''\necho '========================================'\necho '  REFERENZ-TESTS (gleiches Package)'\necho '========================================'\nif [ -n \"$SRC\" ]; then\n  PKG_DIR=$(dirname \"$SRC\" | sed 's|src/main/java|src/test/java|')\n  if [ -d \"$PKG_DIR\" ]; then\n    ls \"$PKG_DIR\"/*Test.java 2>/dev/null | head -3 | while read tf; do\n      echo \"Referenz: $(basename $tf) ($(grep -c '@Test' \"$tf\") tests)\"\n    done\n  else\n    echo '(kein Test-Package vorhanden)'\n  fi\nfi",
         "timeout_seconds": 15,
-        "on_failure": "continue"
+        "on_failure": "continue",
+        "workspace": {
+          "mode": "isolated",
+          "source": "working-tree",
+          "install_npm": true,
+          "branch": true
+        }
       }
     },
     {
       "type": "agentic",
       "config": {
         "label": "Test schreiben (Opus)",
-        "goal": "Schreibe einen Test fuer die Klasse aus dem TODO.\n\nKONTEXT:\n{{ previous_output }}\n\nOFFENE TODOS (fuer Kontext):\n{{ open_todos }}\n\nVORGEHEN:\n1. Lies die Source-Datei vollstaendig\n2. Falls ein Test existiert: Lies ihn und ergaenze fehlende Test-Methoden\n3. Falls kein Test existiert: Lies 1-2 Referenz-Tests im gleichen Package als Vorlage\n4. Schreibe den Test:\n   - JUnit 5 (@Test, @BeforeEach, @ExtendWith(MockitoExtension.class))\n   - @Mock fuer alle Dependencies, @InjectMocks fuer die Ziel-Klasse\n   - Naming: should_<expected>_when_<condition>\n   - AssertJ Assertions (assertThat)\n   - Mindestens: Happy-Path + Error-Path fuer jede wichtige public Methode\n   - Edge Cases fuer kritische Logik\n5. Fuehre den Test aus: cd {{ project_path }}/ai-automation-backend && mvn test -Dtest=\"<TestName>\" -q\n6. Falls der Test fehlschlaegt: Korrigiere und erneut ausfuehren\n7. Wenn der Test besteht: git add + git commit mit Message 'test: Add tests for <ClassName>'\n\nWICHTIG:\n- Absolute Pfade: {{ project_path }}/...\n- NUR Test-Dateien erstellen/aendern, NIEMALS Production-Code\n- Falls die Klasse nicht gefunden wird: Melde Fehler und beende\n- Falls mvn test nach 3 Versuchen nicht besteht: Aenderungen verwerfen (git checkout), Fehler melden",
+        "goal": "Schreibe einen Test fuer die Klasse aus dem TODO.\n\nKONTEXT:\n{{ previous_output }}\n\nOFFENE TODOS (fuer Kontext):\n{{ open_todos }}\n\nVORGEHEN:\n1. Lies die Source-Datei vollstaendig\n2. Falls ein Test existiert: Lies ihn und ergaenze fehlende Test-Methoden\n3. Falls kein Test existiert: Lies 1-2 Referenz-Tests im gleichen Package als Vorlage\n4. Schreibe den Test:\n   - JUnit 5 (@Test, @BeforeEach, @ExtendWith(MockitoExtension.class))\n   - @Mock fuer alle Dependencies, @InjectMocks fuer die Ziel-Klasse\n   - Naming: should_<expected>_when_<condition>\n   - AssertJ Assertions (assertThat)\n   - Mindestens: Happy-Path + Error-Path fuer jede wichtige public Methode\n   - Edge Cases fuer kritische Logik\n5. Fuehre den Test aus: cd {{ execution_path }}/ai-automation-backend && mvn test -Dtest=\"<TestName>\" -q\n6. Falls der Test fehlschlaegt: Korrigiere und erneut ausfuehren\n7. Wenn der Test besteht: git add + git commit mit Message 'test: Add tests for <ClassName>'\n\nWICHTIG:\n- Absolute Pfade: {{ execution_path }}/...\n- NUR Test-Dateien erstellen/aendern, NIEMALS Production-Code\n- Falls die Klasse nicht gefunden wird: Melde Fehler und beende\n- Falls mvn test nach 3 Versuchen nicht besteht: Aenderungen verwerfen (git checkout), Fehler melden",
         "timeout_seconds": 900,
         "max_iterations": 15,
         "max_total_tokens": 250000,
@@ -45,10 +51,13 @@
     },
     {
       "type": "shell",
+      "name": "backend_tests",
       "config": {
-        "label": "Neuen Test verifizieren",
-        "command": "cd {{ project_path }}/ai-automation-backend\n\necho '--- Letzter Commit ---'\ngit log -1 --oneline\n\n# Finde den neuen Test aus dem letzten Commit\nNEW_TEST=$(git diff --name-only HEAD~1 2>/dev/null | grep 'Test.java' | head -1 | xargs -r basename -s .java)\n\nif [ -z \"$NEW_TEST\" ]; then\n  echo 'Kein neuer Test im letzten Commit gefunden'\n  echo 'gate_status: RED'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Kein Test geschrieben'\nelse\n  echo \"Pruefe neuen Test: $NEW_TEST\"\n  mvn test -Dtest=\"$NEW_TEST\" -q 2>&1 | tail -10\n  TEST_EXIT=$?\n\n  if [ $TEST_EXIT -ne 0 ]; then\n    echo \"FEHLER: $NEW_TEST besteht nicht\"\n    echo 'gate_status: RED'\n    echo 'gate_category: test-sync'\n    echo \"gate_description: Neuer Test $NEW_TEST fehlgeschlagen\"\n  else\n    echo \"$NEW_TEST besteht\"\n    echo 'gate_status: GREEN'\n    echo 'gate_category: test-sync'\n    echo \"gate_description: $NEW_TEST geschrieben und verifiziert\"\n  fi\nfi",
-        "timeout_seconds": 600,
+        "description": "backend_tests",
+        "command": "cd \"{{ execution_path }}/ai-automation-backend\"\nmvn -q test",
+        "checked_command": true,
+        "check_category": "test-sync",
+        "timeout_seconds": 1800,
         "on_failure": "continue"
       }
     },
@@ -59,14 +68,6 @@
         "timeout_seconds": 120,
         "command": "Fasse das Ergebnis in maximal 5 Zeilen zusammen:\n\n{{ previous_output }}\n\n- Welche Klasse wurde getestet\n- Wie viele Test-Methoden geschrieben\n- Ob Tests bestanden\n- Ob ein Commit erstellt wurde\n\ngate_status: GREEN wenn Test besteht und committed, YELLOW wenn Test besteht aber nicht committed, RED wenn Test fehlschlaegt"
       }
-    },
-    {
-      "type": "shell",
-      "config": {
-        "label": "Gate-Verdict",
-        "command": "PREV='{{ previous_output }}'\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Test-Sync: FEHLGESCHLAGEN'\n  echo 'gate_status: RED'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Test konnte nicht geschrieben werden'\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Test-Sync: TEILWEISE'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Test geschrieben, manuelle Pruefung empfohlen'\nelse\n  echo 'Test-Sync: ERFOLGREICH'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Test geschrieben, verifiziert und committed'\nfi",
-        "timeout_seconds": 10
-      }
     }
   ],
   "version": "3.0.0",
@@ -74,5 +75,13 @@
   "defaultContext": {
     "todo_title": "",
     "todo_description": ""
+  },
+  "metadata": {
+    "workspace": {
+      "mode": "isolated",
+      "source": "working-tree",
+      "install_npm": true,
+      "branch": true
+    }
   }
 }

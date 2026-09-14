@@ -17,13 +17,54 @@
     "delta-based"
   ],
   "model": "claude-opus-4-6",
-  "instructions": "Du erstellst eine Gesundheits-Scorecard fuer MySuricates im DELTA-MODUS. 6 Dimensionen je 1-10. Objektiv und datengetrieben.",
+  "instructions": "Du erstellst eine Gesundheits-Scorecard fuer MySuricates im DELTA-MODUS. 6 Dimensionen je 1-10. Objektiv und datengetrieben.\n\nRun-Isolation: Arbeite ausschliesslich in {{ execution_path }}. Der Originalpfad {{ project_path }} identifiziert das Projekt und darf nicht beschrieben werden. Keine automatischen Merges, Pushes oder Wechsel auf main/master. Aenderungen bleiben auf dem Run-Branch zur expliziten Uebernahme. Bei einem fehlgeschlagenen technischen Check darf ein Report keinen Erfolg behaupten. Gepruefter Commit: {{ workspace_source_sha }}; Logs: {{ workspace_logs }}.",
   "blocks": [
+    {
+      "type": "shell",
+      "name": "backend_tests",
+      "config": {
+        "description": "backend_tests",
+        "command": "cd \"{{ execution_path }}/ai-automation-backend\"\nmvn -q test",
+        "checked_command": true,
+        "check_category": "backend-test-failure",
+        "timeout_seconds": 1800,
+        "on_failure": "continue",
+        "workspace": {
+          "mode": "isolated",
+          "source": "commit",
+          "install_npm": true
+        }
+      }
+    },
+    {
+      "type": "shell",
+      "name": "frontend_build",
+      "config": {
+        "description": "frontend_build",
+        "command": "cd \"{{ execution_path }}/ai-automation-frontend\"\nnpm run build",
+        "checked_command": true,
+        "check_category": "frontend-build-failure",
+        "timeout_seconds": 1800,
+        "on_failure": "continue"
+      }
+    },
+    {
+      "type": "shell",
+      "name": "frontend_lint",
+      "config": {
+        "description": "frontend_lint",
+        "command": "cd \"{{ execution_path }}/ai-automation-frontend\"\nnpm run lint",
+        "checked_command": true,
+        "check_category": "frontend-lint-failure",
+        "timeout_seconds": 1800,
+        "on_failure": "continue"
+      }
+    },
     {
       "type": "shell",
       "config": {
         "label": "Health-Metriken sammeln",
-        "command": "BASE={{ project_path }}\n\necho '========================================'\necho '  BUILD-STATUS'\necho '========================================'\ncd \"$BASE/ai-automation-backend\" && mvn compile -q 2>&1 && echo 'Backend: KOMPILIERT' || echo 'Backend: FEHLER'\ncd \"$BASE/ai-automation-frontend\" && npm run build --silent 2>&1 | tail -3 && echo 'Frontend: KOMPILIERT' || echo 'Frontend: FEHLER'\n\necho ''\necho '========================================'\necho '  CODE-METRIKEN'\necho '========================================'\nSRC=$(find \"$BASE/ai-automation-backend/src/main/java\" -name '*.java' | wc -l)\nTST=$(find \"$BASE/ai-automation-backend/src/test/java\" -name '*Test*.java' 2>/dev/null | wc -l)\nFE=$(find \"$BASE/ai-automation-frontend/src\" \\( -name '*.ts' -o -name '*.tsx' \\) -not -path '*/node_modules/*' | wc -l)\necho \"Backend: $SRC Sources, $TST Tests ($(python3 -c \"print(f'{$TST/$SRC*100:.1f}')\" 2>/dev/null || echo '?')%)\"\necho \"Frontend: $FE Files\"\necho \"God Classes (>300 LOC): $(find \"$BASE/ai-automation-backend/src/main/java\" -name '*.java' -exec wc -l {} + 2>/dev/null | awk '$1>300{c++}END{print c+0}')\"\n\necho ''\necho '========================================'\necho '  GIT (letzte 7 Tage)'\necho '========================================'\ncd \"$BASE\"\necho \"Commits: $(git log --since='7 days ago' --oneline | wc -l)\"\ngit log --since='7 days ago' --pretty=format:'%h %s' | head -5\n\necho ''\necho '========================================'\necho '  DEPENDENCIES'\necho '========================================'\ncd \"$BASE/ai-automation-frontend\" && npm audit --audit-level=high 2>&1 | tail -5 || echo '(npm audit nicht verfuegbar)'\n\necho ''\necho '========================================'\necho '  SYSTEM'\necho '========================================'\ncurl -s http://localhost:9090/actuator/health 2>/dev/null | python3 -c \"import json,sys; d=json.load(sys.stdin); print(f'Backend: {d.get(\\\"status\\\",\\\"?\\\")}')\" || echo 'Backend: NICHT ERREICHBAR'",
+        "command": "BASE=\"{{ execution_path }}\"\necho '  CODE-METRIKEN'\necho '========================================'\nSRC=$(find \"$BASE/ai-automation-backend/src/main/java\" -name '*.java' | wc -l)\nTST=$(find \"$BASE/ai-automation-backend/src/test/java\" -name '*Test*.java' 2>/dev/null | wc -l)\nFE=$(find \"$BASE/ai-automation-frontend/src\" \\( -name '*.ts' -o -name '*.tsx' \\) -not -path '*/node_modules/*' | wc -l)\necho \"Backend: $SRC Sources, $TST Tests ($(python3 -c \"print(f'{$TST/$SRC*100:.1f}')\" 2>/dev/null || echo '?')%)\"\necho \"Frontend: $FE Files\"\necho \"God Classes (>300 LOC): $(find \"$BASE/ai-automation-backend/src/main/java\" -name '*.java' -exec wc -l {} + 2>/dev/null | awk '$1>300{c++}END{print c+0}')\"\n\necho ''\necho '========================================'\necho '  GIT (letzte 7 Tage)'\necho '========================================'\ncd \"$BASE\"\necho \"Commits: $(git log --since='7 days ago' --oneline | wc -l)\"\ngit log --since='7 days ago' --pretty=format:'%h %s' | head -5\n\necho ''\necho '========================================'\necho '  DEPENDENCIES'\necho '========================================'\ncd \"$BASE/ai-automation-frontend\" && npm audit --audit-level=high 2>&1 | tail -5 || echo '(npm audit nicht verfuegbar)'\n\necho ''\necho '========================================'\necho '  SYSTEM'\necho '========================================'\ncurl -s http://localhost:9090/actuator/health 2>/dev/null | python3 -c \"import json,sys; d=json.load(sys.stdin); print(f'Backend: {d.get(\\\"status\\\",\\\"?\\\")}')\" || echo 'Backend: NICHT ERREICHBAR'",
         "timeout_seconds": 120,
         "on_failure": "continue"
       }
@@ -33,7 +74,7 @@
       "config": {
         "label": "Delta-Analyse + Scorecard (Opus)",
         "timeout_seconds": 900,
-        "command": "Du erstellst die Gesundheits-Scorecard fuer MySuricates.\n\nAKTUELLE METRIKEN:\n{{ previous_output }}\n\nLETZTER REPORT:\n{{ previous_report }}\n\nOFFENE TODOS:\n{{ open_todos }}\n\nWORKFLOW GEAENDERT: {{ workflow_changed_since_last_run }}\n\n---\n\nMODUS:\nFalls KEIN letzter Report: VOLLE BEWERTUNG.\nSonst: DELTA — Scores vergleichen, Trend zeigen.\n\n6 DIMENSIONEN (je 1-10):\n1. **Build-Stabilitaet** (20%): Kompiliert Backend+Frontend? Tests bestanden?\n2. **Test-Abdeckung** (20%): Test-to-Source-Ratio, Qualitaet\n3. **Code-Komplexitaet** (15%): God Classes, LOC-Verteilung\n4. **Dependency-Gesundheit** (15%): npm audit, aktuelle Versionen\n5. **Dokumentation** (15%): CLAUDE.md, WORKFLOW-GUIDE.md aktuell?\n6. **Architektur** (15%): Schichtentrennung, Kopplung\n\nFORMAT:\n\n### MySuricates Health — {{ workflow_name }}\n**Modus**: [VOLL / DELTA]\n**Gesamtscore: X.X / 10**\n\n| Dimension | Score | Trend | Handlungsbedarf |\n|-----------|-------|-------|-----------------|\n| Build | X/10 | ↑↓→ | |\n| Tests | X/10 | | |\n| Komplexitaet | X/10 | | |\n| Dependencies | X/10 | | |\n| Dokumentation | X/10 | | |\n| Architektur | X/10 | | |\n\n### Top-3 Handlungsempfehlungen\n1. ...\n\ngate_status: GREEN wenn >7.0, YELLOW wenn 5.0-7.0, RED wenn <5.0\ngate_category: project-health\ngate_description: Score X.X/10, Trend <besser/schlechter/gleich>\n\nSTRUKTURIERTES AUDIT-ERGEBNIS (VERBINDLICH):\nDer Markdown-Report darf im Delta-Modus Aenderungen hervorheben. Das strukturierte Finding-Array muss dagegen IMMER den vollstaendigen, aktuell noch bestehenden Finding-Snapshot enthalten, auch bekannte Findings. Nur nachweislich nicht mehr vorhandene Findings weglassen. Keine todo_item-Zeilen ausgeben; TODOs werden aus den strukturierten Findings verwaltet.\n\nSchliesse die Antwort mit genau einem versteckten Envelope ab (gueltiges JSON, keine Markdown-Code-Fence):\n<!-- mysuricates:audit-result:v1\n{\"snapshotComplete\":true,\"findings\":[{\"ruleKey\":\"stabile-regel-id\",\"subject\":\"stabile-datei-komponente-oder-metrik\",\"severity\":\"CRITICAL|HIGH|MEDIUM|LOW\",\"title\":\"Kurztitel\",\"description\":\"konkretes Problem und empfohlene Behebung\",\"evidence\":\"Datei:Zeile, Messwert oder reproduzierbarer Nachweis\",\"tags\":[\"backend\"]}]}\n-->\nWenn es keine Findings gibt, findings als leeres Array ausgeben. ruleKey und subject muessen zwischen Runs stabil bleiben; Titeltexte duerfen sich aendern."
+        "command": "Du erstellst die Gesundheits-Scorecard fuer MySuricates.\n\nAKTUELLE METRIKEN:\nBackend: {{ step_0_output }}\nFrontend Build: {{ step_1_output }}\nFrontend Lint: {{ step_2_output }}\nMetriken: {{ step_3_output }}\n\nLETZTER REPORT:\n{{ previous_report }}\n\nOFFENE TODOS:\n{{ open_todos }}\n\nWORKFLOW GEAENDERT: {{ workflow_changed_since_last_run }}\n\n---\n\nMODUS:\nFalls KEIN letzter Report: VOLLE BEWERTUNG.\nSonst: DELTA — Scores vergleichen, Trend zeigen.\n\n6 DIMENSIONEN (je 1-10):\n1. **Build-Stabilitaet** (20%): Kompiliert Backend+Frontend? Tests bestanden?\n2. **Test-Abdeckung** (20%): Test-to-Source-Ratio, Qualitaet\n3. **Code-Komplexitaet** (15%): God Classes, LOC-Verteilung\n4. **Dependency-Gesundheit** (15%): npm audit, aktuelle Versionen\n5. **Dokumentation** (15%): CLAUDE.md, WORKFLOW-GUIDE.md aktuell?\n6. **Architektur** (15%): Schichtentrennung, Kopplung\n\nFORMAT:\n\n### MySuricates Health — {{ workflow_name }}\n**Modus**: [VOLL / DELTA]\n**Gesamtscore: X.X / 10**\n\n| Dimension | Score | Trend | Handlungsbedarf |\n|-----------|-------|-------|-----------------|\n| Build | X/10 | ↑↓→ | |\n| Tests | X/10 | | |\n| Komplexitaet | X/10 | | |\n| Dependencies | X/10 | | |\n| Dokumentation | X/10 | | |\n| Architektur | X/10 | | |\n\n### Top-3 Handlungsempfehlungen\n1. ...\n\ngate_status: GREEN wenn >7.0, YELLOW wenn 5.0-7.0, RED wenn <5.0\ngate_category: project-health\ngate_description: Score X.X/10, Trend <besser/schlechter/gleich>\n\nSTRUKTURIERTES AUDIT-ERGEBNIS (VERBINDLICH):\nDer Markdown-Report darf im Delta-Modus Aenderungen hervorheben. Das strukturierte Finding-Array muss dagegen IMMER den vollstaendigen, aktuell noch bestehenden Finding-Snapshot enthalten, auch bekannte Findings. Nur nachweislich nicht mehr vorhandene Findings weglassen. Keine todo_item-Zeilen ausgeben; TODOs werden aus den strukturierten Findings verwaltet.\n\nSchliesse die Antwort mit genau einem versteckten Envelope ab (gueltiges JSON, keine Markdown-Code-Fence):\n<!-- mysuricates:audit-result:v1\n{\"snapshotComplete\":true,\"findings\":[{\"ruleKey\":\"stabile-regel-id\",\"subject\":\"stabile-datei-komponente-oder-metrik\",\"severity\":\"CRITICAL|HIGH|MEDIUM|LOW\",\"title\":\"Kurztitel\",\"description\":\"konkretes Problem und empfohlene Behebung\",\"evidence\":\"Datei:Zeile, Messwert oder reproduzierbarer Nachweis\",\"tags\":[\"backend\"]}]}\n-->\nWenn es keine Findings gibt, findings als leeres Array ausgeben. ruleKey und subject muessen zwischen Runs stabil bleiben; Titeltexte duerfen sich aendern."
       },
       "name": "report"
     },
@@ -43,14 +84,6 @@
         "label": "Ergebnis erklären",
         "timeout_seconds": 120,
         "command": "Fasse in maximal 5 Zeilen zusammen:\n\n{{ previous_output }}\n\n- Gesamtscore und Trend\n- Beste und schlechteste Dimension\n- Wichtigste Empfehlung\n\ngate_status: GREEN wenn >7, YELLOW wenn 5-7, RED wenn <5"
-      }
-    },
-    {
-      "type": "shell",
-      "config": {
-        "label": "Gate-Verdict",
-        "command": "PREV='{{ previous_output }}'\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Health Check: KRITISCH'\n  echo 'gate_status: RED'\n  echo 'gate_category: project-health'\n  echo 'gate_description: Gesundheit kritisch'\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Health Check: Verbesserungsbedarf'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: project-health'\n  echo 'gate_description: Gesundheit ausbaufaehig'\nelse\n  echo 'Health Check: GUT'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: project-health'\n  echo 'gate_description: Gesundheit gut'\nfi",
-        "timeout_seconds": 10
       }
     }
   ],
@@ -63,6 +96,11 @@
       "category": "health",
       "reportBlock": "report",
       "schemaVersion": 1
+    },
+    "workspace": {
+      "mode": "isolated",
+      "source": "commit",
+      "install_npm": true
     }
   }
 }

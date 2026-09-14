@@ -17,7 +17,7 @@
     "report"
   ],
   "model": "claude-sonnet-4-6",
-  "instructions": "Du erstellst einen Release-Bereitschafts-Report fuer MySuricates. Aggregiere Build-Status und offene Quality-TODOs und gib eine klare Release-Empfehlung.",
+  "instructions": "Du erstellst einen Release-Bereitschafts-Report fuer MySuricates. Aggregiere Build-Status und offene Quality-TODOs und gib eine klare Release-Empfehlung.\n\nRun-Isolation: Arbeite ausschliesslich in {{ execution_path }}. Der Originalpfad {{ project_path }} identifiziert das Projekt und darf nicht beschrieben werden. Keine automatischen Merges, Pushes oder Wechsel auf main/master. Aenderungen bleiben auf dem Run-Branch zur expliziten Uebernahme. Bei einem fehlgeschlagenen technischen Check darf ein Report keinen Erfolg behaupten. Gepruefter Commit: {{ workspace_source_sha }}; Logs: {{ workspace_logs }}.",
   "version": "1.2.0",
   "author": "MySuricates",
   "defaultContext": {
@@ -28,8 +28,37 @@
       "type": "shell",
       "config": {
         "label": "Build-Status und Versionsinfo sammeln",
-        "command": "set -uo pipefail\ncommand -v mvn >/dev/null 2>&1 || { echo 'WARN: mvn nicht verfuegbar — Backend-Compile-Check uebersprungen'; MVN_MISSING=1; }\ncommand -v npm >/dev/null 2>&1 || { echo 'WARN: npm nicht verfuegbar — Frontend-Build-Check uebersprungen'; NPM_MISSING=1; }\ncommand -v git >/dev/null 2>&1 || { echo 'WARN: git nicht verfuegbar — Versionsinfo unvollstaendig'; GIT_MISSING=1; }\ncd '{{ project_path }}' || { echo 'project_path nicht erreichbar: {{ project_path }}'; echo 'gate_status: RED'; echo 'gate_category: release-readiness'; echo 'gate_description: project_path nicht erreichbar'; exit 1; }\n\necho '=== Aktuelle Version ==='\nVERSION=$(grep '<version>' ai-automation-backend/pom.xml | head -1 | sed 's/.*<version>\\(.*\\)<\\/version>/\\1/' | tr -d ' ' || echo '?')\nif [ -z \"${GIT_MISSING:-}\" ]; then\n  TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo 'kein Tag')\n  LAST_COMMIT=$(git log -1 --pretty=format:'%h %s (%cr)' 2>/dev/null || echo '?')\nelse\n  TAG='?'\n  LAST_COMMIT='?'\nfi\necho \"POM Version: $VERSION\"\necho \"Letzter Tag: $TAG\"\necho \"Letzter Commit: $LAST_COMMIT\"\necho ''\n\necho '=== Quick Build Check ==='\nif [ -z \"${MVN_MISSING:-}\" ]; then\n  cd '{{ project_path }}/ai-automation-backend'\n  mvn compile -q 2>&1 >/dev/null && echo 'Backend: KOMPILIERT' || echo 'Backend: FEHLER'\n  cd '{{ project_path }}'\nelse\n  echo 'Backend: SKIPPED (mvn fehlt)'\nfi\nif [ -z \"${NPM_MISSING:-}\" ]; then\n  cd '{{ project_path }}/ai-automation-frontend'\n  npm run build --silent 2>&1 >/dev/null && echo 'Frontend: KOMPILIERT' || echo 'Frontend: FEHLER'\n  cd '{{ project_path }}'\nelse\n  echo 'Frontend: SKIPPED (npm fehlt)'\nfi",
+        "command": "set -uo pipefail\ncommand -v mvn >/dev/null 2>&1 || { echo 'WARN: mvn nicht verfuegbar — Backend-Compile-Check uebersprungen'; MVN_MISSING=1; }\ncommand -v npm >/dev/null 2>&1 || { echo 'WARN: npm nicht verfuegbar — Frontend-Build-Check uebersprungen'; NPM_MISSING=1; }\ncommand -v git >/dev/null 2>&1 || { echo 'WARN: git nicht verfuegbar — Versionsinfo unvollstaendig'; GIT_MISSING=1; }\ncd '{{ execution_path }}' || { echo 'project_path nicht erreichbar: {{ execution_path }}'; echo 'gate_status: RED'; echo 'gate_category: release-readiness'; echo 'gate_description: project_path nicht erreichbar'; exit 1; }\n\necho '=== Aktuelle Version ==='\nVERSION=$(grep '<version>' ai-automation-backend/pom.xml | head -1 | sed 's/.*<version>\\(.*\\)<\\/version>/\\1/' | tr -d ' ' || echo '?')\nif [ -z \"${GIT_MISSING:-}\" ]; then\n  TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo 'kein Tag')\n  LAST_COMMIT=$(git log -1 --pretty=format:'%h %s (%cr)' 2>/dev/null || echo '?')\nelse\n  TAG='?'\n  LAST_COMMIT='?'\nfi\necho \"POM Version: $VERSION\"\necho \"Letzter Tag: $TAG\"\necho \"Letzter Commit: $LAST_COMMIT\"\necho ''\n\n",
         "timeout_seconds": 600,
+        "on_failure": "continue",
+        "workspace": {
+          "mode": "isolated",
+          "source": "commit",
+          "install_npm": true
+        }
+      }
+    },
+    {
+      "type": "shell",
+      "name": "backend_tests",
+      "config": {
+        "description": "backend_tests",
+        "command": "cd \"{{ execution_path }}/ai-automation-backend\"\nmvn -q test",
+        "checked_command": true,
+        "check_category": "backend-test-failure",
+        "timeout_seconds": 1800,
+        "on_failure": "continue"
+      }
+    },
+    {
+      "type": "shell",
+      "name": "frontend_build",
+      "config": {
+        "description": "frontend_build",
+        "command": "cd \"{{ execution_path }}/ai-automation-frontend\"\nnpm run build",
+        "checked_command": true,
+        "check_category": "frontend-build-failure",
+        "timeout_seconds": 1800,
         "on_failure": "continue"
       }
     },
@@ -38,16 +67,15 @@
       "config": {
         "label": "Release-Report erstellen",
         "timeout_seconds": 900,
-        "command": "Erstelle den Release-Bereitschafts-Report fuer MySuricates.\n\n## Build- und Versionsinfo\n{{ previous_output }}\n\n## Offene TODOs (alle Projekte)\n{{ open_todos }}\n\n## Vorheriger Report (zur Trend-Analyse)\n{{ previous_report }}\n\n## Format des Reports\n\n### Release-Bereitschaft MySuricates\n**Version**: [aus POM]\n**Datum**: [heute]\n**Bewertung**: FREIGEGEBEN / MIT VORBEHALT / BLOCKIERT\n\n### Build-Status\n| Komponente | Status |\n|------------|--------|\n| Backend (mvn compile) | |\n| Frontend (npm run build) | |\n| Git Tag | |\n| Letzter Commit | |\n\n### Offene Quality-TODOs\nGruppiere die offenen TODOs aus der Liste oben nach Kategorie/Tag:\n\n| Kategorie/Tag | Anzahl | Hoechste Prioritaet |\n|---------------|--------|---------------------|\n| audit:test-coverage / testing | | |\n| audit:arch-debt / architektur | | |\n| audit:security / security | | |\n| performance | | |\n| backend (Bugs) | | |\n\n### Release-Entscheidung\n- **FREIGEGEBEN**: Build OK, keine HIGH TODOs in Quality-Kategorien\n- **MIT VORBEHALT**: Build OK, einige HIGH TODOs (max. 5)\n- **BLOCKIERT**: Build fehlschlaegt ODER >5 HIGH TODOs ODER kritische Security-TODOs offen\n\n### Voraussetzungen fuer Release (falls nicht FREIGEGEBEN)\n1. [Was muss noch erledigt werden — konkrete TODO-IDs nennen]\n\nAm Ende genau diese Zeilen ausgeben:\n\ngate_status: GREEN wenn FREIGEGEBEN, YELLOW wenn MIT VORBEHALT, RED wenn BLOCKIERT\ngate_category: release-readiness\ngate_description: Release [Version] — [FREIGEGEBEN/MIT VORBEHALT/BLOCKIERT]"
-      }
-    },
-    {
-      "type": "shell",
-      "config": {
-        "label": "Gate-Verdict",
-        "command": "set -uo pipefail\nPREV='{{ previous_output }}'\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Release: BLOCKIERT'\n  echo 'gate_status: RED'\n  echo 'gate_category: release-readiness'\n  echo 'gate_description: Release blockiert — Voraussetzungen nicht erfuellt'\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Release: MIT VORBEHALT'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: release-readiness'\n  echo 'gate_description: Release moeglich mit Vorbehalten'\nelse\n  echo 'Release: FREIGEGEBEN'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: release-readiness'\n  echo 'gate_description: Release freigegeben'\nfi",
-        "timeout_seconds": 10
+        "command": "Erstelle den Release-Bereitschafts-Report fuer MySuricates.\n\n## Build- und Versionsinfo\nVersion: {{ step_0_output }}\nBackend: {{ step_1_output }}\nFrontend: {{ step_2_output }}\n\n## Offene TODOs (alle Projekte)\n{{ open_todos }}\n\n## Vorheriger Report (zur Trend-Analyse)\n{{ previous_report }}\n\n## Format des Reports\n\n### Release-Bereitschaft MySuricates\n**Version**: [aus POM]\n**Datum**: [heute]\n**Bewertung**: FREIGEGEBEN / MIT VORBEHALT / BLOCKIERT\n\n### Build-Status\n| Komponente | Status |\n|------------|--------|\n| Backend (mvn compile) | |\n| Frontend (npm run build) | |\n| Git Tag | |\n| Letzter Commit | |\n\n### Offene Quality-TODOs\nGruppiere die offenen TODOs aus der Liste oben nach Kategorie/Tag:\n\n| Kategorie/Tag | Anzahl | Hoechste Prioritaet |\n|---------------|--------|---------------------|\n| audit:test-coverage / testing | | |\n| audit:arch-debt / architektur | | |\n| audit:security / security | | |\n| performance | | |\n| backend (Bugs) | | |\n\n### Release-Entscheidung\n- **FREIGEGEBEN**: Build OK, keine HIGH TODOs in Quality-Kategorien\n- **MIT VORBEHALT**: Build OK, einige HIGH TODOs (max. 5)\n- **BLOCKIERT**: Build fehlschlaegt ODER >5 HIGH TODOs ODER kritische Security-TODOs offen\n\n### Voraussetzungen fuer Release (falls nicht FREIGEGEBEN)\n1. [Was muss noch erledigt werden — konkrete TODO-IDs nennen]\n\nAm Ende genau diese Zeilen ausgeben:\n\ngate_status: GREEN wenn FREIGEGEBEN, YELLOW wenn MIT VORBEHALT, RED wenn BLOCKIERT\ngate_category: release-readiness\ngate_description: Release [Version] — [FREIGEGEBEN/MIT VORBEHALT/BLOCKIERT]"
       }
     }
-  ]
+  ],
+  "metadata": {
+    "workspace": {
+      "mode": "isolated",
+      "source": "commit",
+      "install_npm": true
+    }
+  }
 }
