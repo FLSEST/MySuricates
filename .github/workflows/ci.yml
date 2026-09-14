@@ -19,6 +19,8 @@ jobs:
         run: bash scripts/ci/public-hygiene.sh --tracked
       - name: Hygiene-Gate Selbsttest (Worktrees, fehlende Regeldatei)
         run: bash scripts/tests/test-public-hygiene.sh
+      - name: Setup-Modul-Preset Selbsttest
+        run: bash scripts/tests/test-module-preset.sh
 
   gitleaks:
     name: Gitleaks Secret Scan

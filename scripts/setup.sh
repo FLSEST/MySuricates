@@ -14,8 +14,12 @@
 #   ./scripts/setup.sh --install      # fehlende Tools per Paketmanager installieren (apt: voll, sonst Hinweise)
 #   ./scripts/setup.sh --start        # nach erfolgreichem Setup direkt starten
 #   ./scripts/setup.sh --show-key     # API-Key voll anzeigen (Default: maskiert)
+#   ./scripts/setup.sh --preset core  # Modul-Preset ohne Rückfrage: core | research | full
 #   ./scripts/setup.sh --install --start
 #   ./scripts/setup.sh --help
+#
+# Das Modul-Preset landet in ai-automation-backend/config/application.yml — nur wenn die
+# Datei noch nicht existiert. Ohne --preset wird im Terminal gefragt, sonst gilt core.
 #
 # set -e bewusst NICHT: der Checker probiert absichtlich evtl. fehlende Tools.
 set -uo pipefail
@@ -24,22 +28,32 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 BACKEND_DIR="${REPO_ROOT}/ai-automation-backend"
 FRONTEND_DIR="${REPO_ROOT}/ai-automation-frontend"
+# shellcheck source=lib/module-preset.sh
+source "${SCRIPT_DIR}/lib/module-preset.sh"
 
 DO_INSTALL=0
 DO_START=0
 SHOW_KEY=0
-for arg in "$@"; do
-  case "$arg" in
+PRESET=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
     --install) DO_INSTALL=1 ;;
     --start)   DO_START=1 ;;
     --show-key) SHOW_KEY=1 ;;
+    --preset)  PRESET="${2:-}"; shift ;;
+    --preset=*) PRESET="${1#--preset=}" ;;
     -h|--help)
-      sed -n '2,18p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+      sed -n '2,22p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
-    *) echo "Unbekannte Option: $arg (siehe --help)" >&2; exit 2 ;;
+    *) echo "Unbekannte Option: $1 (siehe --help)" >&2; exit 2 ;;
   esac
+  shift
 done
+if [ -n "$PRESET" ] && ! module_preset_valid "$PRESET"; then
+  echo "Unbekanntes Preset: $PRESET (erlaubt: ${MODULE_PRESETS})" >&2
+  exit 2
+fi
 
 # ---------------------------------------------------------------------------
 # Ausgabe-Helfer (Farben nur im TTY)
@@ -313,6 +327,30 @@ if ( cd "$BACKEND_DIR" && "$MVN_CMD" -q -DskipTests test-compile ); then
 else
   fail "Backend-Kompilierung fehlgeschlagen — siehe Ausgabe oben"
   exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# Module (nur beim Start gelesen, nie per API umschaltbar)
+# ---------------------------------------------------------------------------
+head2 "Module"
+LOCAL_CONFIG="${BACKEND_DIR}/config/application.yml"
+if [ -e "$LOCAL_CONFIG" ]; then
+  ok "config/application.yml vorhanden — Modul-Konfiguration bleibt unverändert"
+  [ -n "$PRESET" ] && warn "--preset ${PRESET} ignoriert; Preset dort unter automation.modules.preset anpassen"
+else
+  if [ -z "$PRESET" ]; then
+    if [[ -t 0 && -t 1 ]]; then
+      PRESET="$(module_preset_prompt core)"
+    else
+      PRESET="core"
+    fi
+  fi
+  if module_preset_write "$LOCAL_CONFIG" "$PRESET"; then
+    ok "Modul-Preset ${C_BLD}${PRESET}${C_RST} → ai-automation-backend/config/application.yml"
+    echo "      Später ändern: Datei bearbeiten und Backend neu starten (Übersicht: Settings → Module & Härtung)"
+  else
+    warn "config/application.yml konnte nicht geschrieben werden — Backend startet mit Preset core"
+  fi
 fi
 
 # ---------------------------------------------------------------------------
