@@ -1,52 +1,85 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
+  LAYOUT_LIMITS,
+  addWidgetInstance,
   createDefaultLayout,
+  createInstanceId,
+  migrateLayout,
   moveWidget,
-  normalizePlacements,
+  normalizeWidgets,
+  removeWidgetInstance,
   sanitizeLayout,
   setWidgetHidden,
+  updateWidgetConfig,
+  type WidgetInstance,
+  type WidgetTypeInfo,
 } from '../dashboardLayout';
 import { useDashboardLayoutStore } from '../../../stores/dashboardLayoutStore';
 
-const IDS = ['a', 'b', 'c', 'd'];
+const TYPES: WidgetTypeInfo[] = [{ id: 'a' }, { id: 'b' }, { id: 'note', multiple: true }, { id: 'c' }];
+const single = (id: string, extra: Partial<WidgetInstance> = {}): WidgetInstance => ({ instanceId: id, type: id, ...extra });
 
-describe('normalizePlacements', () => {
-  it('returns every known widget in registry order for an empty (default) list', () => {
-    expect(normalizePlacements([], IDS)).toEqual([{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }]);
+describe('normalizeWidgets', () => {
+  it('returns all singleton widgets in registry order for an empty (default) list, never multi widgets', () => {
+    expect(normalizeWidgets([], TYPES)).toEqual([single('a'), single('b'), single('c')]);
   });
 
-  it('keeps the stored order, drops unknown and duplicate ids and appends new widgets', () => {
-    const stored = [{ id: 'c', hidden: true }, { id: 'removed' }, { id: 'a' }, { id: 'c' }];
-    expect(normalizePlacements(stored, IDS)).toEqual([
-      { id: 'c', hidden: true }, { id: 'a' }, { id: 'b' }, { id: 'd' },
+  it('keeps the stored order, drops unknown types and duplicates, appends missing singletons', () => {
+    const stored: WidgetInstance[] = [
+      single('c', { hidden: true }),
+      { instanceId: 'gone', type: 'removed-widget' },
+      { instanceId: 'note-1', type: 'note', config: { text: 'x' } },
+      single('a'),
+      single('c'),
+      { instanceId: 'a-copy', type: 'a' },
+      { instanceId: 'note-1', type: 'note' },
+      { instanceId: 'note-2', type: 'note' },
+    ];
+    expect(normalizeWidgets(stored, TYPES)).toEqual([
+      single('c', { hidden: true }),
+      { instanceId: 'note-1', type: 'note', config: { text: 'x' } },
+      single('a'),
+      { instanceId: 'note-2', type: 'note' },
+      single('b'),
     ]);
   });
 });
 
 describe('moveWidget', () => {
-  const placements = [{ id: 'a' }, { id: 'b', hidden: true }, { id: 'c' }, { id: 'd' }];
+  const widgets = [single('a'), single('b', { hidden: true }), single('c'), { instanceId: 'note-1', type: 'note' }];
 
-  it('moves a widget onto the position of another one, across hidden widgets', () => {
-    expect(moveWidget(placements, 'a', 'c').map((p) => p.id)).toEqual(['b', 'c', 'a', 'd']);
-    expect(moveWidget(placements, 'd', 'a').map((p) => p.id)).toEqual(['d', 'a', 'b', 'c']);
-  });
-
-  it('keeps flags of the moved widget', () => {
-    expect(moveWidget(placements, 'b', 'd')[3]).toEqual({ id: 'b', hidden: true });
+  it('moves an instance onto the position of another one, across hidden widgets', () => {
+    expect(moveWidget(widgets, 'a', 'c').map((w) => w.instanceId)).toEqual(['b', 'c', 'a', 'note-1']);
+    expect(moveWidget(widgets, 'note-1', 'a').map((w) => w.instanceId)).toEqual(['note-1', 'a', 'b', 'c']);
   });
 
   it('returns the list unchanged for unknown ids or a drop onto itself', () => {
-    expect(moveWidget(placements, 'x', 'a')).toBe(placements);
-    expect(moveWidget(placements, 'a', 'x')).toBe(placements);
-    expect(moveWidget(placements, 'a', 'a')).toBe(placements);
+    expect(moveWidget(widgets, 'x', 'a')).toBe(widgets);
+    expect(moveWidget(widgets, 'a', 'x')).toBe(widgets);
+    expect(moveWidget(widgets, 'a', 'a')).toBe(widgets);
   });
 });
 
-describe('setWidgetHidden', () => {
-  it('sets and clears the hidden flag without touching other widgets', () => {
-    const hidden = setWidgetHidden([{ id: 'a' }, { id: 'b', size: 'full' }], 'b', true);
-    expect(hidden).toEqual([{ id: 'a' }, { id: 'b', size: 'full', hidden: true }]);
-    expect(setWidgetHidden(hidden, 'b', false)).toEqual([{ id: 'a' }, { id: 'b', size: 'full' }]);
+describe('instance operations', () => {
+  it('sets and clears the hidden flag of one instance only', () => {
+    const hidden = setWidgetHidden([single('a'), single('b', { size: 'full' })], 'b', true);
+    expect(hidden).toEqual([single('a'), single('b', { size: 'full', hidden: true })]);
+    expect(setWidgetHidden(hidden, 'b', false)).toEqual([single('a'), single('b', { size: 'full' })]);
+  });
+
+  it('adds, reconfigures and removes multi instances', () => {
+    const added = addWidgetInstance([single('a')], 'note', { text: 'hello' }, 'note-abc');
+    expect(added).toEqual([single('a'), { instanceId: 'note-abc', type: 'note', config: { text: 'hello' } }]);
+    const updated = updateWidgetConfig(added, 'note-abc', { text: 'bye', pinned: true });
+    expect(updated[1]).toEqual({ instanceId: 'note-abc', type: 'note', config: { text: 'bye', pinned: true } });
+    expect(removeWidgetInstance(updated, 'note-abc')).toEqual([single('a')]);
+  });
+
+  it('creates instance ids that are valid, type-prefixed and unique', () => {
+    const first = createInstanceId('workflow-status');
+    const second = createInstanceId('workflow-status');
+    expect(first).toMatch(/^workflow-status-[0-9a-f]{8}$/);
+    expect(first).not.toBe(second);
   });
 });
 
@@ -58,19 +91,70 @@ describe('sanitizeLayout', () => {
     },
   );
 
-  it('filters invalid placements and sizes and repairs the active view id', () => {
+  it('keeps valid instances, config primitives and filters; drops everything else', () => {
     const layout = sanitizeLayout({
       activeViewId: 'missing',
-      views: [{
-        id: 'ops',
-        name: 'Ops',
-        widgets: [{ id: 'a', hidden: true, size: 'huge' }, { hidden: true }, 'b', { id: 'c', size: 'full', hidden: 'yes' }],
-      }],
+      views: [
+        {
+          id: 'ops',
+          name: 'Ops',
+          filter: { projectId: '00000000-0000-0000-0000-000000000000', days: 7, extra: 'x' },
+          widgets: [
+            { instanceId: 'a', type: 'a', hidden: true, size: 'huge' },
+            { instanceId: 'note-1', type: 'note', config: { text: 'hi', count: 3, on: false, nested: { x: 1 }, list: [1], bad: Infinity } },
+            { instanceId: 'Bad Id', type: 'a' },
+            { type: 'a' },
+            'b',
+            { instanceId: 'c', type: 'c', hidden: 'yes', config: { '<script>': 'x', long: 'x'.repeat(LAYOUT_LIMITS.configString + 1) } },
+          ],
+        },
+        { id: 'ops', name: 'duplicate id', widgets: [] },
+        { id: 'plan', name: 'P'.repeat(200), filter: { days: 0 }, widgets: [] },
+      ],
     });
     expect(layout).toEqual({
       activeViewId: 'ops',
-      views: [{ id: 'ops', name: 'Ops', widgets: [{ id: 'a', hidden: true }, { id: 'c', size: 'full' }] }],
+      views: [
+        {
+          id: 'ops',
+          name: 'Ops',
+          filter: { projectId: '00000000-0000-0000-0000-000000000000', days: 7 },
+          widgets: [
+            { instanceId: 'a', type: 'a', hidden: true },
+            { instanceId: 'note-1', type: 'note', config: { text: 'hi', count: 3, on: false } },
+            { instanceId: 'c', type: 'c' },
+          ],
+        },
+        { id: 'plan', name: 'P'.repeat(LAYOUT_LIMITS.nameLength), widgets: [] },
+      ],
     });
+  });
+});
+
+describe('migrateLayout', () => {
+  const v1 = {
+    activeViewId: 'default',
+    views: [{ id: 'default', name: '', widgets: [{ id: 'quick-actions' }, { id: 'stat-version', hidden: true, size: 'full' }] }],
+  };
+
+  it('turns v1 placements into v2 singleton instances', () => {
+    expect(sanitizeLayout(migrateLayout(v1, 1))).toEqual({
+      activeViewId: 'default',
+      views: [{
+        id: 'default',
+        name: '',
+        widgets: [
+          { instanceId: 'quick-actions', type: 'quick-actions' },
+          { instanceId: 'stat-version', type: 'stat-version', hidden: true, size: 'full' },
+        ],
+      }],
+    });
+  });
+
+  it('leaves current-version data and non-objects untouched', () => {
+    const v2 = { activeViewId: 'default', views: [] };
+    expect(migrateLayout(v2, 2)).toBe(v2);
+    expect(migrateLayout('garbage', 1)).toBe('garbage');
   });
 });
 
@@ -83,31 +167,39 @@ describe('dashboardLayoutStore', () => {
   it('updates and resets only the active view', () => {
     useDashboardLayoutStore.setState({
       activeViewId: 'ops',
-      views: [{ id: 'default', name: '', widgets: [{ id: 'a' }] }, { id: 'ops', name: 'Ops', widgets: [] }],
+      views: [{ id: 'default', name: '', widgets: [single('a')] }, { id: 'ops', name: 'Ops', widgets: [] }],
     });
 
-    useDashboardLayoutStore.getState().setActiveViewWidgets([{ id: 'b', hidden: true }]);
+    useDashboardLayoutStore.getState().setActiveViewWidgets([single('b', { hidden: true })]);
     expect(useDashboardLayoutStore.getState().views).toEqual([
-      { id: 'default', name: '', widgets: [{ id: 'a' }] },
-      { id: 'ops', name: 'Ops', widgets: [{ id: 'b', hidden: true }] },
+      { id: 'default', name: '', widgets: [single('a')] },
+      { id: 'ops', name: 'Ops', widgets: [single('b', { hidden: true })] },
     ]);
 
     useDashboardLayoutStore.getState().resetActiveView();
     expect(useDashboardLayoutStore.getState().views[1]?.widgets).toEqual([]);
-    expect(useDashboardLayoutStore.getState().views[0]?.widgets).toEqual([{ id: 'a' }]);
+    expect(useDashboardLayoutStore.getState().views[0]?.widgets).toEqual([single('a')]);
   });
 
-  it('persists the layout without the actions', () => {
-    useDashboardLayoutStore.getState().setActiveViewWidgets([{ id: 'a', hidden: true }]);
-    const stored = JSON.parse(localStorage.getItem('dashboard-layout') ?? '{}');
-    expect(stored).toEqual({
-      version: 1,
-      state: { activeViewId: 'default', views: [{ id: 'default', name: '', widgets: [{ id: 'a', hidden: true }] }] },
+  it('persists version 2 without the actions', () => {
+    useDashboardLayoutStore.getState().setActiveViewWidgets([single('a', { hidden: true })]);
+    expect(JSON.parse(localStorage.getItem('dashboard-layout') ?? '{}')).toEqual({
+      version: 2,
+      state: { activeViewId: 'default', views: [{ id: 'default', name: '', widgets: [single('a', { hidden: true })] }] },
     });
   });
 
+  it('migrates a stored v1 layout on rehydrate', async () => {
+    localStorage.setItem('dashboard-layout', JSON.stringify({
+      version: 1,
+      state: { activeViewId: 'default', views: [{ id: 'default', name: '', widgets: [{ id: 'quick-actions' }] }] },
+    }));
+    await useDashboardLayoutStore.persist.rehydrate();
+    expect(useDashboardLayoutStore.getState().views[0]?.widgets).toEqual([single('quick-actions')]);
+  });
+
   it('rehydrates a corrupt stored layout as the default', async () => {
-    localStorage.setItem('dashboard-layout', JSON.stringify({ version: 1, state: { views: 'garbage' } }));
+    localStorage.setItem('dashboard-layout', JSON.stringify({ version: 2, state: { views: 'garbage' } }));
     await useDashboardLayoutStore.persist.rehydrate();
     const { activeViewId, views } = useDashboardLayoutStore.getState();
     expect({ activeViewId, views }).toEqual(createDefaultLayout());

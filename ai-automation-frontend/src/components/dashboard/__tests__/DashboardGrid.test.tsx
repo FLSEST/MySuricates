@@ -14,8 +14,8 @@ function Fine() {
 }
 
 const widgets: ResolvedWidget[] = [
-  { def: { id: 'boom', label: () => 'Broken widget', size: 'chart', component: Boom }, placement: { id: 'boom' } },
-  { def: { id: 'fine', label: () => 'Fine', size: 'chart', component: Fine }, placement: { id: 'fine' } },
+  { def: { id: 'boom', label: () => 'Broken widget', size: 'chart', component: Boom }, instance: { instanceId: 'boom', type: 'boom' } },
+  { def: { id: 'fine', label: () => 'Fine', size: 'chart', component: Fine }, instance: { instanceId: 'fine', type: 'fine' } },
 ];
 
 beforeAll(() => {
