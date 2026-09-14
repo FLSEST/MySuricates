@@ -1,138 +1,112 @@
 # Run-Workspaces — Umsetzung zu TODO 77fc07e3
 
-Arbeitsbranch: `fix/77fc07e3-run-workspace-isolation-integrated`.
-Implementierung und Builds erfolgen im separaten Checkout `/tmp/mysuricates-run-isolation-integrated`.
+## Stand am 14.09.2026
+
+Die Implementierung ist über Branch `fix/77fc07e3-run-workspace-isolation-integrated`
+in `main` integriert (Merge-Stand `b063748d`). Die zwischenzeitlichen Scheduler-,
+Shell-Escaping- und Gate-Korrekturen aus main sind erhalten. 51 der 52 betroffenen
+installierten Workflows sind per REST unter denselben IDs migriert. Die sechs
+CS2BIM-Nachzügler gehören jetzt dazu. Acht Pool-Definitionen und neun Built-in-Templates
+sind angepasst; zwei absichtlich lokal ignorierte Pool-Dateien wurden nach Sicherung
+übernommen, ihre neutralen Varianten sind unter `scripts/workspace-isolation/pool-overrides`
+versioniert. Es wurde nichts gepusht.
+
+**Einzige offene Quellzuordnung:** Treasure Hunt Backend (`6f8ff410`). Der vorhandene
+Quellordner und seine Sicherungen besitzen keine Git-Historie; im GitHub-Konto wurde
+kein entsprechendes Backend-Repository gefunden. Die Zustimmung zur lokalen
+Initialversionierung ist angefragt. Bis dahin bleibt diese Definition unverändert;
+eine fremde oder künstlich erfundene Commit-Historie wird nicht als Projektstand ausgegeben.
 
 ## Verbindliche Quellwahl
 
 Geplante Build- und Health-Checks prüfen den letzten lokalen Commit beim Run-Start.
-Die Ausführung hält dessen SHA vor dem Warten auf den Parallelitätsslot fest.
-Workflows, die ausdrücklich uncommittete Änderungen prüfen oder Tests dafür schreiben,
-verwenden eine eingefrorene Kopie des Arbeitsstands. Ändert sich die Quelle während
-Kopie und Kontrollmessung, schlägt die Vorbereitung fehl.
+Dessen SHA wird vor dem Warten auf einen Ausführungsslot festgehalten. Workflows,
+die ausdrücklich uncommittete Änderungen prüfen oder dafür Tests schreiben, verwenden
+eine eingefrorene Kopie des Arbeitsstands. Ändert sich die Quelle während der Kopie,
+schlägt die Vorbereitung fehl; es gibt keinen Rückfall auf das Originalverzeichnis.
 
-## Ausführung
+CS2BIM verwendet den dauerhaft angelegten Checkout `~/.mysuricates/sources/cs2bim`
+(Herkunft `FLSEST/cs2bim`, Branch `dev`, initialer HEAD
+`bd8ffe447d6e3e6aa6c1243ab0d27843996fdd9c`). Runs laden keine Remote-Änderungen automatisch
+in diesen Quellordner. Der ausdrücklich dafür vorgesehene Upstream-Sync darf einen
+Merge von upstream/develop auf seinem privaten Run-Branch vorbereiten; er verändert
+und pusht keinen Ausgangsbranch.
 
-Workflow-Metadaten aktivieren die Isolation explizit:
+## Ausführung und Konfiguration
 
 ```json
 {"workspace":{"mode":"isolated","source":"commit","install_npm":true}}
 ```
 
-`source: working-tree` übernimmt zusätzlich den aktuellen Diff und geeignete neue Dateien.
-`branch: true` erstellt `fix/workflow-<run-id>` im eigenen Klon.
-`source_path` erlaubt eine andere physische Git-Quelle als den Projektpfad.
-`allow_working_tree_target: true` erlaubt bei `git_target: WORKTREE` den Arbeitsstand.
-Templates ohne Metadata-Feld können dieselbe Policy unter `config.workspace` des ersten
-Blocks transportieren. Workflow-Metadaten haben Vorrang.
+- `source: working-tree` übernimmt zusätzlich Diff und geeignete neue Dateien.
+- `branch: true` erstellt `fix/workflow-<run-id>` im unabhängigen Klon.
+- `source_path` bezeichnet die physische Git-Quelle unabhängig von der Projektidentität.
+- `additional_sources: {alias: "/pfad/zum/repo"}` pinnt weitere Repositories; deren
+  Run-Pfade stehen unter `execution_path_<alias>` bereit.
+- `allow_working_tree_target: true` erlaubt bei `git_target: WORKTREE` einen Arbeitsstand.
+- Templates ohne Metadata-Feld transportieren die Policy in `config.workspace` des ersten
+  Blocks. Workflow-Metadaten haben Vorrang.
 
-Der private Speicher liegt standardmäßig unter `~/.mysuricates/workspaces/<project>/<run>`;
-`automation.run-workspace.root` überschreibt die Wurzel. `repo` ist ein unabhängiger lokaler
-Git-Klon ohne gemeinsam benutzte Arbeitsdateien oder Git-Index. `workspace.json` hält SHA,
-Quellpfad, Snapshot-Hash und Ausführungspfad fest. Ein vorhandener Run wird niemals
-zurückgesetzt. Fortsetzen lädt seinen vorhandenen Workspace; ein Retry ist ein neuer Run.
-Der lokale Clone hat eine gesperrte Push-URL, damit ein Agent nicht versehentlich in den
-Original-Checkout pusht. Eine spätere Übernahme bleibt eine explizite Handlung.
+Der Speicher liegt unter `~/.mysuricates/workspaces/<project>/<run>` und ist über
+`automation.run-workspace.root` konfigurierbar. Separate Klone teilen weder Arbeitsdateien
+noch Git-Index. `workspace.json` hält SHA, Quellpfad, Snapshot-Hash und Run-Pfade fest.
+Resume verwendet dieselbe Kopie ohne Reset; Retry erzeugt einen neuen Run. Die Push-URL
+des lokalen Klons ist gesperrt. Fixes bleiben zur ausdrücklichen Übernahme erhalten.
 
-`project_path` bleibt die Projektidentität. `execution_path` ist der tatsächliche CWD für
-Shell, AI und Kontextdateien; `workspace_logs` und `workspace_source_sha` stehen für Reports
-bereit. Fest kodierte Quellpfade müssen deshalb auch in Workflow-Definitionen ersetzt werden.
-Dies ist eine Trennung von Arbeitsverzeichnissen, keine Sicherheits-Sandbox gegen beliebige
-Shell-Befehle mit absoluten Pfaden.
+`project_path` bleibt die Projektidentität. `execution_path` ist der tatsächliche CWD
+für Shell, AI, Skills und Kontextdateien. Absolute Eingaben innerhalb einer Quelle werden
+auf deren Kopie abgebildet, einschließlich ihrer Kennzeichnung als nicht vertrauenswürdig.
+`workspace_logs` und `workspace_source_sha` dienen als nachvollziehbare Report-Bezüge.
+Dies ist Arbeitsverzeichnis-Isolation, keine Sicherheits-Sandbox gegen beliebige absolute
+Shell-Pfade. Container erhalten die Run-Kopie unter `/workspace`; Abbruch entfernt den
+zugehörigen Container und stoppt den Prozessbaum.
 
-## Technische Checks
+## Checks, Nachweise und Aufbewahrung
 
-Shell-Config `checked_command: true` setzt `set -e -o pipefail`. Der tatsächliche Exitcode
-bestimmt den technischen Gate-Marker; `check_category` benennt den Check. Getrennte Schritte
-für Backend-Tests, Frontend-Build und Lint behalten getrennte Ergebnisse, auch bei
-`on_failure: continue`. Reports können einen technischen roten Gate-Marker nicht überstimmen
-(die vorhandene Run-Auswertung verwendet die höchste Schwere aller Schritte).
-`logs/step-<index>.log` bewahrt die vom Shell-Service erfasste Ausgabe; absichtliches `tail`
-im eigentlichen Befehl muss bei der Migration entfernt werden, sonst fehlen frühere Zeilen.
+`checked_command: true` aktiviert `set -e -o pipefail`; der tatsächliche Exitcode bestimmt
+das technische Gate. Backend, Frontend und Lint laufen als unabhängige Checks. Ein
+fortgesetzter fehlgeschlagener Check führt zu `COMPLETED_WITH_ERRORS`; ein optimistischer
+AI-Bericht kann das technische RED nicht überschreiben. Die Pool-Auswertung behält
+YELLOW für unvollständige oder unbekannte Report-Ergebnisse. Output-Platzhalter werden
+im Shell-Kontext ohne zusätzliche Quotes und mit aktiviertem Escaping verwendet.
 
-## Migrationsstand und nächste Abnahme
+`logs/step-<index>.log` hält die erfasste Ausgabe fest. CS2BIM-Verifikationen bewahren zusätzlich
+getrennte Dependency-, Security-, Lint-, Typ- und Test-Logs. Gemeinsame temporäre Python-
+Umgebungen und Installationen in die Systemumgebung entfallen.
 
-Die Vorschlagsgeneratoren erfassen 52 installierte Workflows: 31 eigene und 21 externe.
-45 Vorschläge sind für die Validierung vorbereitet. Sieben bleiben unverändert, solange die
-lokalen Git-Quellen für CS2BIM und Treasure Hunt Backend fehlen. Die Migration ersetzt
-Definitionen per REST unter derselben ID; Schedules und Trigger bleiben zugeordnet.
-`apply-migration.py` prüft die getestete JAR-Version und unveränderte Ausgangsdefinitionen,
-sichert die Originale und prüft die PUT-Antwort. Der gesamte Ablauf wurde auf Test validiert.
-Am 14.09. wurden alle 45 vorbereiteten Definitionen lokal per REST migriert und anschließend
-gegen die gespeicherten Policies geprüft. Die sieben blockierten Definitionen sind unverändert.
-
-Sechs versionierte Pool-Dateien und neun Built-in-Templates sind angepasst. Zwei weitere
-lokal ignorierte Pool-Dateien liegen als prüfbare Varianten unter
-`scripts/workspace-isolation/pool-overrides`. Die Templates behalten Fixes zur manuellen
-Übernahme; sie pushen oder mergen nicht automatisch. `on_failure: stop` ersetzt das bislang
-wirkungslos verwendete `abort` in den betroffenen Definitionen.
-
-Mehrere Repositories werden über `additional_sources: {alias: "/pfad/zum/repo"}` pro Run
-gepinnt und separat geklont. Der jeweilige Pfad steht als `execution_path_<alias>` bereit.
-Absolute Eingabepfade innerhalb der Quelle werden auf die Kopie umgeschrieben; Projektidentität
-und die Kennzeichnung nicht vertrauenswürdiger Eingaben bleiben erhalten.
-
-`prune-workspaces.py` arbeitet standardmäßig lesend und entfernt nur ausdrücklich ausgewählte,
-alte, unveränderte, erfolgreich abgeschlossene eigene Repository-Kopien. Logs, Manifeste,
-Fix-Branches und Fehlerfälle bleiben erhalten; zusätzliche Repository-Slots werden derzeit
-konservativ behalten. `prepare-backend-runtime.sh` baut ein unveränderliches JAR aus einer
-isolierten Kopie. Der inzwischen auf main vorhandene Runtime-/IDE-Schutz wird mitgeführt.
-
-Die geprüfte JAR läuft auf Dev (:9090), Build-Zeitstempel `2026-09-13T20:49:53Z`.
-Offen sind die sieben fehlenden Quellpfade sowie der gemeinsame Commit/Merge des Arbeitsbranches.
-Die Pool-Dateien einschließlich der beiden lokalen Overrides sind im Arbeitsbranch vorbereitet;
-ihre Übernahme in den Haupt-Checkout steht mit dem Merge noch aus. Vor einem Neustart müssen laufende Runs geprüft werden; bei aktiven
-Runs verlangt AGENTS.md die Freigabe des Nutzers.
+`prune-workspaces.py` arbeitet standardmäßig lesend. Es entfernt auf ausdrücklichen Aufruf
+nur alte, erfolgreiche, unveränderte eigene Commit-Kopien nach API-Abgleich. Auch ein sauberer
+Arbeitsbaum mit neuem Fix-Commit bleibt erhalten. Logs, Manifeste, Fehlerfälle, Fix-Branches
+und zusätzliche Repository-Slots werden konservativ aufbewahrt.
 
 ## Verifikation
 
-Python-Verhaltenstests: `python3 -m unittest discover -s ai-automation-backend/src/test/python -v`.
-Sie verwenden ausschließlich temporäre Git-Repositories und prüfen parallele Runs, dirty
-Snapshots, Commit-Pinning, Resume, fehlende Workspaces und Pfadgrenzen.
-Java-Regressionstests decken Context/Executor, Prozessregistrierung, Shell-Exitcodes und
-Workspace-Persistenz ab. Der Gesamtplan ist erst nach der operativen Migration abgeschlossen.
+- Vollständige Backend-Baseline: 7.063 Tests, keine Fehler, ein übersprungener Test.
+- Nach Integration der neuen main-Änderungen: 219 gezielte Java-Tests ohne Fehler
+  (Executor, Scheduler, Escaping, Templates und Quellgrößen).
+- 13 Python-Tests ohne Fehler; 11 Hygiene-Hook-Prüfungen bestanden.
+- Erneute API-/Docker-Abnahme: parallele Commit-Kopien, Dirty-Snapshots, unveränderte
+  Originale, Exitcodes 7/127, Log-Erhalt, Container-Mount und vollständiger Abbruch,
+  drei Repository-Quellen sowie die reale CS2BIM-Quelle.
+- Self-Care-Fehlersimulation: alle drei Checks laufen (7/3/0); ein optimistischer
+  Report lässt den Run RED und `COMPLETED_WITH_ERRORS`.
 
-Stand nach Integration: Basis `293ec589`; vorherige Arbeitsstände bleiben als Sicherung erhalten.
+Aktuelle Testnachweise: Self Care `90743f88-e387-4342-a426-c775bb315a44`, Container-Abbruch
+`a4649f87-9a9e-4b6e-8d9e-f790049fbfaf`, drei Quellen `c1e78069-6932-4de7-86e2-6cadb7aadc9f`,
+CS2BIM `b9c0d96a-0999-4b3b-8a29-60f59e211e5a`. Getestete integrierte JAR: SHA256-Präfix
+`2c610bfa8098`.
 
-Auf einer eigenen Testinstanz wurden parallele Commit-Snapshots, Dirty-Snapshots,
-Exitcodes 7/127, Log-Erhalt, reale Docker-Mounts und Container-Abbruch verifiziert.
-Drei Repository-Quellen liefern getrennte Workspaces und korrekte gepinnte SHAs;
-die Originaldateien bleiben unverändert. Eine Self-Care-Simulation führt alle drei
-Checks trotz Fehlern aus und bleibt bei optimistischem Abschlussbericht RED mit
-`COMPLETED_WITH_ERRORS`. Die REST-Migration wurde einschließlich Backup und ID-Erhalt geprüft.
-Alle genannten API-Prüfungen wurden auf dem integrierten JAR erneut erfolgreich ausgeführt.
-JAR-SHA256: `3c6767667fd5` (Präfix). Self-Care-Nachweis: `f90e9258-5307-4214-9a43-6121aecfd7c2`;
-Container-Abbruch: `6cc9eab0-f53d-4d20-8e21-f75633573002`; drei Quellen: `169114f5-3899-4dea-bdf3-088d0a1458f6`.
+## Abschlussplan
 
-Gesamtsuite auf Basis 293ec589: 7.063 Tests, 0 Fehler, 1 übersprungen.
-Der aktualisierte Export erfasst fünf weitere Security-Audits mit gemeinsamem QA-Checkout;
-164 Shell-Befehle der 45 vorbereiteten Definitionen sind mit Platzhalterwerten syntaktisch geprüft.
+- [x] Kernimplementierung committen und aktuelle main-Korrekturen integrieren.
+- [x] Sechs CS2BIM-Quellen zuordnen, Definitionen migrieren und echte Quelle testen.
+- [x] Pool-Dateien einschließlich lokaler Varianten übernehmen und nach main mergen.
+- [x] Integrierten Stand gezielt und über die Testinstanz verifizieren.
+- [x] Dev auf die geprüfte JAR umgestellt (0 aktive Runs unmittelbar zuvor); Build-Zeitstempel `2026-09-14T09:19:27Z`. REST-Endkontrolle bestätigt 51 isolierte Policies und das unveränderte Treasure-Hunt-Gate.
+- [ ] Nach Zustimmung Treasure Hunt Backend initial versionieren oder vorhandenen Git-Checkout zuordnen, Gate isolieren und testen.
 
-Die ursprünglichen Definitionen, Vorschläge und das Migrationsprotokoll liegen dauerhaft unter
-`~/.local/state/autotrigger-dev/workspace-migrations/77fc07e3-293ec589/`.
-Die vorherige Runtime-JAR bleibt erhalten. Änderungen wurden nicht committed oder gepusht.
-
-## Fortsetzung: Integration und verbleibende Quellen
-
-- [x] Vollständig getesteten Kernstand committen (098bed37).
-- [x] main-Korrektur bfdae654 integrieren; technische Checks mit YELLOW bei unvollständigen Reports kombinieren (468027f7).
-- [x] CS2BIM-Herkunft bestätigen und dauerhaften Checkout von FLSEST/cs2bim, Branch dev, unter ~/.mysuricates/sources/cs2bim anlegen (HEAD bd8ffe4).
-- [x] Sechs CS2BIM-Definitionen migriert; reale Quelle via source_path isoliert getestet (Run b1564969-8f7d-49af-b1b1-7399007e3b4a).
-- [ ] Treasure Hunt Backend: kein Git in Quelle oder Backups und kein passendes GitHub-Repository; Zustimmung zur lokalen Initialversionierung angefragt.
-- [ ] Pool-Varianten übernehmen, gezielte Regressionen prüfen, Arbeitsbranch lokal nach main mergen.
-- [ ] Runtime/REST-Endstand und TODO dokumentieren.
-
-Der CS2BIM-Upstream-Sync darf entsprechend seinem Zweck einen Upstream-Merge auf seinem
-eigenen Run-Branch vorbereiten. Er verändert und pusht keinen Ausgangsbranch.
-
-CS2BIM-Nachträge: 13 Python-Tests einschließlich Migration und Gate-Fallback grün;
-gezielte Java-Template-/Quellgrößen-Tests grün. Kein Plattform-Java-Code seit dem vollständig
-getesteten Runtime-Build verändert. Git-Quellordner CS2BIM: erster dauerhafter Checkout ist
-HEAD bd8ffe447d6e3e6aa6c1243ab0d27843996fdd9c; künftige Runs pinnen dessen lokalen HEAD, ohne
-bei jedem Run automatisch Remote-Änderungen nachzuladen.
-
-Der Hygiene-Hook löste unter Git-Worktrees die Repository-Wurzel falsch auf. Das Gate
-ermittelt sie jetzt aus seinem festen Skriptpfad und bricht bei fehlenden Regeln ab.
-Die Migrationsskripte verwenden den lokalen Home-Pfad statt persönlicher Pfadliterale.
-Die zwei absichtlich lokal ignorierten Pool-Dateien bleiben lokal; ihre neutralisierten
-Varianten sind unter scripts/workspace-isolation/pool-overrides versioniert.
+Die Originaldefinitionen, Vorschläge und Protokolle liegen dauerhaft unter
+`~/.local/state/autotrigger-dev/workspace-migrations/77fc07e3-293ec589/` und
+`~/.local/state/autotrigger-dev/workspace-migrations/77fc07e3-final/`.
+Vor jedem Backend-Neustart werden aktive Runs geprüft; bei laufenden Runs ist nach
+AGENTS.md eine Freigabe erforderlich. Die vorherige Runtime wird zur Rückkehr aufbewahrt.
