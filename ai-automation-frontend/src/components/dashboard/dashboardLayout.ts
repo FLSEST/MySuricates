@@ -5,12 +5,14 @@
  * Singleton widgets (the default) exist once per view with instanceId === type. Missing ones are
  * appended, so an empty list means "default layout" and widgets from a later release show up in
  * customized layouts; hidden singletons stay in the list with `hidden: true`.
- * Widgets registered with `multiple` are only added explicitly, with a config, and are removed
- * instead of hidden.
+ * Widgets registered with `multiple` are only added explicitly, with a config; they can also be
+ * removed, in addition to being hidden.
  *
  * Everything here is plain data — no markup, no URLs to load, no code. The same shape is
  * validated again by the backend once layouts are stored there.
  */
+
+import { generateId } from '../../utils/uuid';
 
 export const LAYOUT_FORMAT_VERSION = 2;
 
@@ -79,7 +81,7 @@ export function createDefaultLayout(): DashboardLayout {
 }
 
 export function createInstanceId(type: string): string {
-  return `${type}-${crypto.randomUUID().slice(0, 8)}`;
+  return `${type}-${generateId().slice(0, 8)}`;
 }
 
 /**

@@ -31,7 +31,7 @@ export interface DashboardWidgetDef {
   size: WidgetSize;
   /** Hidden entirely when the backend reports the module disabled. */
   module?: ModuleName;
-  /** Can be added several times with its own config; never added automatically, removed instead of hidden. */
+  /** Can be added several times with its own config; never added automatically, can also be removed (not only hidden). */
   multiple?: boolean;
   /**
    * Loads its own data. May render nothing (e.g. no data yet) — the grid then collapses its slot.

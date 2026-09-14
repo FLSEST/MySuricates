@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   LAYOUT_LIMITS,
   addWidgetInstance,
@@ -80,6 +80,15 @@ describe('instance operations', () => {
     const second = createInstanceId('workflow-status');
     expect(first).toMatch(/^workflow-status-[0-9a-f]{8}$/);
     expect(first).not.toBe(second);
+  });
+
+  it('creates instance ids in a non-secure context, where crypto.randomUUID is undefined', () => {
+    vi.stubGlobal('crypto', { getRandomValues: globalThis.crypto.getRandomValues.bind(globalThis.crypto) });
+    try {
+      expect(createInstanceId('workflow-status')).toMatch(/^workflow-status-[0-9a-f]{8}$/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 
