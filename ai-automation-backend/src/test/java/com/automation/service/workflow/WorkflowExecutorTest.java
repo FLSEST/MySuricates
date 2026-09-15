@@ -1719,6 +1719,26 @@ class WorkflowExecutorTest {
         throw new AssertionError("run did not reach a terminal status within " + AWAIT_SECONDS + "s; last status was " + last);
     }
 
+    /**
+     * The executor saves the terminal status first and only then unregisters the run and releases the
+     * permit (in its finally block). Tests running on real threads must therefore wait for the
+     * release instead of asserting it right after {@link #awaitTerminalStatus}.
+     */
+    private static void awaitCondition(java.util.function.BooleanSupplier condition, String what) {
+        long deadline = System.nanoTime() + java.time.Duration.ofSeconds(AWAIT_SECONDS).toNanos();
+        while (!condition.getAsBoolean()) {
+            if (System.nanoTime() >= deadline) {
+                throw new AssertionError(what + " did not happen within " + AWAIT_SECONDS + "s");
+            }
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError("interrupted while waiting for " + what, e);
+            }
+        }
+    }
+
     private static void awaitLatch(CountDownLatch latch, String what) {
         try {
             assertThat(latch.await(AWAIT_SECONDS, TimeUnit.SECONDS)).as(what).isTrue();
@@ -1843,8 +1863,8 @@ class WorkflowExecutorTest {
         verify(simpleBlockExecutor, never()).execute(any(), any());
         verify(containerService, never()).getDockerContainerId(any());
         verify(stepResultRepository, never()).save(any());
-        assertThat(liveRegistry.isRunActive("run-1")).isFalse();
-        assertThat(singleSlot.availablePermits()).isEqualTo(1);
+        awaitCondition(() -> !liveRegistry.isRunActive("run-1") && singleSlot.availablePermits() == 1,
+                "run unregistered and permit released");
     }
 
     @Test
@@ -1938,7 +1958,7 @@ class WorkflowExecutorTest {
                 .isZero();
         containerStartMayFinish.countDown();
         awaitTerminalStatus(stored);
-        assertThat(singleSlot.availablePermits()).isEqualTo(1);
+        awaitCondition(() -> singleSlot.availablePermits() == 1, "permit released after the run finished");
     }
 
     @Test
