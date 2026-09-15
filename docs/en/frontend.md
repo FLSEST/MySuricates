@@ -66,6 +66,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - **Instances:** a layout stores `WidgetInstance { instanceId, type, hidden?, size?, config? }`. Singleton widgets (default) are added automatically (`instanceId = type`); `multiple` widgets are only added explicitly with a config. `config` holds primitive values only.
 - **Size classes** `stat | chart | third | twoThirds | full` set the flex basis per breakpoint (`WIDGET_SIZE_CLASSES`). Rows with fewer widgets widen them instead of leaving gaps.
 - **"Edit dashboard"**: reorder by dragging the handle (keyboard works too), hide with the eye icon, "+ name" shows a widget again, "Reset". Widgets of disabled modules are missing here as well.
+- **History & sync:** When editing ends, `useDashboardLayoutSync` saves a snapshot of all views to `/api/v1/dashboard/layouts` (hash dedupe, retention as a setting). On load the dashboard takes a newer server state as long as nothing changed locally; otherwise a banner asks. "History" in edit mode: restore, name, take a single view, set the device name. Layouts from a newer app version are neither loaded nor overwritten.
 - **New widget**: a component plus a registry entry. Singletons are appended to customized layouts automatically. The `id` is persisted and must never be renamed (`widgetRegistry.test.ts` checks ids, labels, modules).
 
 ### Projects (`/projects`, `/projects/:id`)
@@ -317,7 +318,8 @@ No `tailwind.config.js` — configuration is done via `@theme inline` and `@cust
 | `useSidebarStore` | `collapsed`, `mobileOpen`, `toggle()`, `setCollapsed()`, `setMobileOpen()` | `localStorage: sidebar-state` (only `collapsed`) |
 | `useThemeStore` | `themeId`, `lastLightThemeId`, `lastDarkThemeId`, `overrides` (per theme id), `setTheme()`, `toggleAppearance()`, `setOverride()`, `resetOverrides()`, `apply()` | `localStorage: theme-settings` (version 1; migrates the old `mode` format) |
 | `useSettingsStore` | `apiKey`, `advancedMode`, `simpleMode`, `autoTodoDefault`, `autoRepairDefault`, `autoRepairMode`, `defaultAiProvider`, `assistantModel`, `suggestionsModel`, `suggestionsEnabled`, `sidebarItemOrder`, `sidebarHiddenItems`, `pinnedWorkflowIds`, `simpleOnboardingSeen` | `localStorage: app-settings` |
-| `useDashboardLayoutStore` | `activeViewId`, `views[]` (each view holds `widgets[]` as `WidgetInstance`, optional `filter { projectId?, days? }`; empty list = default layout), `setActiveViewWidgets()`, `resetActiveView()` | `localStorage: dashboard-layout` (version 2; migrates v1, validated on load via `sanitizeLayout`) |
+| `useDashboardLayoutStore` | `activeViewId`, `views[]` (each view holds `widgets[]` as `WidgetInstance`, optional `filter { projectId?, days? }`; empty list = default layout), `setActiveViewWidgets()`, `resetActiveView()`, `applyRemoteLayout()`, `upsertView()` | `localStorage: dashboard-layout` (version 2; migrates v1, validated on load via `sanitizeLayout`) |
+| `useDashboardSyncStore` | `deviceLabel`, `baseVersionId`, `dirty`, `setDeviceLabel()`, `markDirty()`, `markSynced()` | `localStorage: dashboard-sync` (version 1) |
 | `useAssistantStore` | `open`, `sessions[]`, `activeSessionId`, `showHistory`, `panelWidth`, `panelHeight`, `pendingInput`, `pendingContext` | `localStorage: assistant-sessions` (sessions, panel size) |
 | `useI18nStore` | `locale: 'en'\|'de'`, `setLocale()` | `localStorage: i18n-locale` |
 | `useToastStore` | `toasts[]`, `addToast()`, `removeToast()` | None (ephemeral) |

@@ -2192,6 +2192,58 @@ Rate a run (1-5 stars).
 
 ---
 
+## Dashboard Layouts
+
+History of the dashboard layout (all views), shared across devices. The frontend saves a snapshot when editing ends. Unnamed versions are trimmed to the newest `dashboard-layout-retention-count` (default 100, see `/system/execution-config`); named ones are kept.
+
+### `GET /api/v1/dashboard/layouts`
+
+Versions, newest first, **without** the layout content.
+
+**Query parameters:** `page` (default: 0), `size` (default: 20, at most 100)
+
+**Response:** `PageResponse<DashboardLayoutVersionSummary>`
+
+```json
+{
+  "content": [
+    { "id": "version-uuid", "createdAt": "2026-09-15T10:00:00Z", "deviceLabel": "Browser 3f2a",
+      "name": null, "formatVersion": 2, "viewCount": 1, "contentHash": "9b1c…" }
+  ],
+  "page": 0, "size": 20, "totalElements": 1, "totalPages": 1
+}
+```
+
+### `GET /api/v1/dashboard/layouts/{id}`
+
+One version with content: the fields above plus `layout` (`{ "activeViewId": …, "views": [ … ] }`).
+
+### `POST /api/v1/dashboard/layouts`
+
+Saves a snapshot. Body at most 256 KiB; unknown fields → 400.
+
+```json
+{
+  "deviceLabel": "Browser 3f2a",
+  "formatVersion": 2,
+  "baseVersionId": "version-uuid",
+  "force": false,
+  "layout": { "activeViewId": "default",
+              "views": [ { "id": "default", "name": "", "widgets": [ { "instanceId": "todos", "type": "todos" } ] } ] }
+}
+```
+
+- **201** new version; **200** content identical to the newest version (no new row).
+- **409 `STATE_CONFLICT`**: the newest version is not `baseVersionId` — another device saved. `"force": true` saves anyway.
+- **413**: body larger than `automation.dashboard.layout.max-request-bytes` (default 262144).
+- Limits as in the frontend (`LAYOUT_LIMITS`): ≤ 20 views, ≤ 100 widgets per view, ids `^[a-z0-9][a-z0-9-]*$` with ≤ 80 characters, names ≤ 80, `config` only string (≤ 500) / number / boolean with ≤ 20 keys `^[a-zA-Z][a-zA-Z0-9]{0,39}$`, `filter.days` 1–365.
+
+### `PATCH /api/v1/dashboard/layouts/{id}`
+
+Body `{ "name": "before the rework" }` names a version (1–80 characters), `{ "name": null }` removes the name. Named versions are never deleted automatically.
+
+---
+
 ## Chains
 
 ### `GET /api/v1/chains`

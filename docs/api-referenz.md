@@ -2206,6 +2206,58 @@ Einen Run bewerten (1-5 Sterne).
 
 ---
 
+## Dashboard-Layouts
+
+Verlauf des Dashboard-Layouts (alle Ansichten), geräteübergreifend. Das Frontend speichert beim Beenden der Bearbeitung einen Snapshot. Unbenannte Versionen werden auf die neuesten `dashboard-layout-retention-count` gekürzt (Default 100, siehe `/system/execution-config`), benannte bleiben.
+
+### `GET /api/v1/dashboard/layouts`
+
+Versionen, neueste zuerst, **ohne** Layout-Inhalt.
+
+**Query-Parameter:** `page` (Standard: 0), `size` (Standard: 20, höchstens 100)
+
+**Response:** `PageResponse<DashboardLayoutVersionSummary>`
+
+```json
+{
+  "content": [
+    { "id": "version-uuid", "createdAt": "2026-09-15T10:00:00Z", "deviceLabel": "Browser 3f2a",
+      "name": null, "formatVersion": 2, "viewCount": 1, "contentHash": "9b1c…" }
+  ],
+  "page": 0, "size": 20, "totalElements": 1, "totalPages": 1
+}
+```
+
+### `GET /api/v1/dashboard/layouts/{id}`
+
+Eine Version mit Inhalt: Felder wie oben plus `layout` (`{ "activeViewId": …, "views": [ … ] }`).
+
+### `POST /api/v1/dashboard/layouts`
+
+Speichert einen Snapshot. Body höchstens 256 KiB; unbekannte Felder → 400.
+
+```json
+{
+  "deviceLabel": "Browser 3f2a",
+  "formatVersion": 2,
+  "baseVersionId": "version-uuid",
+  "force": false,
+  "layout": { "activeViewId": "default",
+              "views": [ { "id": "default", "name": "", "widgets": [ { "instanceId": "todos", "type": "todos" } ] } ] }
+}
+```
+
+- **201** neue Version; **200** Inhalt identisch mit der neuesten Version (keine neue Zeile).
+- **409 `STATE_CONFLICT`**: Die neueste Version ist nicht `baseVersionId` — ein anderes Gerät hat gespeichert. `"force": true` speichert trotzdem.
+- **413**: Body größer als `automation.dashboard.layout.max-request-bytes` (Default 262144).
+- Grenzen wie im Frontend (`LAYOUT_LIMITS`): ≤ 20 Ansichten, ≤ 100 Widgets je Ansicht, IDs `^[a-z0-9][a-z0-9-]*$` mit ≤ 80 Zeichen, Namen ≤ 80, `config` nur string (≤ 500) / Zahl / boolean mit ≤ 20 Keys `^[a-zA-Z][a-zA-Z0-9]{0,39}$`, `filter.days` 1–365.
+
+### `PATCH /api/v1/dashboard/layouts/{id}`
+
+Body `{ "name": "vor dem Umbau" }` benennt eine Version (1–80 Zeichen), `{ "name": null }` entfernt den Namen. Benannte Versionen werden nie automatisch gelöscht.
+
+---
+
 ## Chains
 
 ### `GET /api/v1/chains`
