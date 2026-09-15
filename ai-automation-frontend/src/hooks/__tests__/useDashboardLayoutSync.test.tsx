@@ -332,6 +332,30 @@ describe('useDashboardLayoutSync', () => {
     expect(useDashboardLayoutStore.getState().activeViewId).toBe('ops');
   });
 
+  it('adoptView activates an appended view even when the save is deduped to the same version id', async () => {
+    useDashboardSyncStore.setState({ baseVersionId: 'v2' });
+    const oldLayout = {
+      activeViewId: 'default',
+      views: [
+        { id: 'default', name: '', widgets: [] },
+        { id: 'ops', name: 'Ops', widgets: [{ instanceId: 'todos', type: 'todos' }] },
+      ],
+    };
+    const calls = serve({
+      latest: () => summary('v2'),
+      versions: { v1: { ...summary('v1', { viewCount: 2 }), layout: oldLayout } },
+      // The backend dedups: the saved content already matches the latest version, same id back.
+      onPost: () => HttpResponse.json(summary('v2'), { status: 201 }),
+    });
+    const { result } = renderHook(() => useDashboardLayoutSync(), { wrapper });
+
+    await act(() => result.current.adoptView('v1', 'ops'));
+
+    expect(useDashboardLayoutStore.getState().views.map((v) => v.id)).toEqual(['default', 'ops']);
+    expect(calls).toContain('post');
+    expect(useDashboardLayoutStore.getState().activeViewId).toBe('ops');
+  });
+
   it('keeps an edit made while a save is in flight as a local change', async () => {
     customizeLocally();
     useDashboardSyncStore.setState({ baseVersionId: 'v1', dirty: true });

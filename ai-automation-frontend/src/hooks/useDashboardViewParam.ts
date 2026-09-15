@@ -37,7 +37,19 @@ export function useDashboardViewParam() {
 
   // Link → view: on load and whenever the parameter itself changes.
   useEffect(() => {
-    if (requested === handledRequest.current) return;
+    if (requested === handledRequest.current) {
+      // The raw URL param itself is not new — but with a data router, navigate() commits in a
+      // transition: a synchronous store update (e.g. the pending link resolving below, or "Use
+      // that version") can render, and even correct the URL again, before an earlier queued
+      // correction actually lands, so this can still be a *stale* echo of that earlier correction
+      // arriving late. If the URL still doesn't match the active view and nothing is pending
+      // resolution, poke it again rather than trusting that a matching `requested` means "done".
+      const active = useDashboardLayoutStore.getState().activeViewId;
+      if (requested !== null && requested !== active && !pendingLink.current) {
+        setSearchParams((prev) => withView(prev, active), { replace: true });
+      }
+      return;
+    }
     handledRequest.current = requested;
     if (requested === null) {
       pendingLink.current = null;
@@ -54,11 +66,14 @@ export function useDashboardViewParam() {
     }
   }, [requested, setSearchParams]);
 
-  // A pending link resolves once the store gains its view — unless the user switched meanwhile.
+  // A pending link resolves once the store gains its view — unless the user switched meanwhile. A
+  // remote layout that drops the remembered view entirely (so `applyRemoteLayout` falls back to its
+  // own first view) is not a user switch either — the link still resolves if it can.
   useEffect(() => {
     const pending = pendingLink.current;
     if (!pending) return;
-    if (activeViewId !== pending.sinceActiveId) {
+    const rememberedViewStillThere = views.some((v) => v.id === pending.sinceActiveId);
+    if (activeViewId !== pending.sinceActiveId && rememberedViewStillThere) {
       pendingLink.current = null;
       return;
     }

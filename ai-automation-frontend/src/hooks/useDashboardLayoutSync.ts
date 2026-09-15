@@ -232,10 +232,12 @@ export function useDashboardLayoutSync() {
         notify('warning', t.dashboard.history.adoptViewLimit.replace('{max}', () => String(LAYOUT_LIMITS.views)));
         return;
       }
-      const baseBefore = useDashboardSyncStore.getState().baseVersionId;
       await persistSnapshot(false);
-      // Appended (did not exist locally) and the save actually went through — show the user the result.
-      if (!local && useDashboardSyncStore.getState().baseVersionId !== baseBefore) {
+      // Appended (did not exist locally) and the save actually went through — show the user the
+      // result. `dirty` is the save's success signal (not `baseVersionId`, which a save deduped to
+      // an already-current version leaves unchanged even though it succeeded): editing is locked
+      // while busy, so nothing else could have marked the layout dirty again in between.
+      if (!local && !useDashboardSyncStore.getState().dirty) {
         useDashboardLayoutStore.getState().setActiveView(viewId);
       }
     })),
