@@ -28,6 +28,7 @@ class ControllerModuleGateTest {
     private static final Set<String> CORE_CONTROLLERS = Set.of(
             "ActivityLogController",
             "CompletionTriggerController",
+            "DashboardLayoutController",
             "DeadLetterController",
             "DocsController",
             "ExecutionController",

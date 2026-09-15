@@ -80,31 +80,43 @@ export function createDefaultLayout(): DashboardLayout {
   };
 }
 
+/** True when the layout differs from the untouched default (used to decide whether local changes exist). */
+export function isCustomizedLayout(layout: DashboardLayout): boolean {
+  return layout.views.length > 1
+    || layout.views.some((view) => view.widgets.length > 0 || view.name !== '' || view.filter !== undefined);
+}
+
 export function createInstanceId(type: string): string {
   return `${type}-${generateId().slice(0, 8)}`;
 }
 
 /**
- * Drops instances of unknown types, duplicate instance ids and second instances of singletons,
- * then appends missing singletons in registry order. Multi widgets are never appended.
+ * Drops instances of unknown types, duplicate instance ids, singletons stored under another id and
+ * multi instances that use a singleton's id, then appends missing singletons in registry order.
+ * Multi widgets are never appended.
  */
 export function normalizeWidgets(widgets: readonly WidgetInstance[], types: readonly WidgetTypeInfo[]): WidgetInstance[] {
   const typesById = new Map(types.map((type) => [type.id, type]));
+  const singletonIds = new Set(types.filter((type) => !type.multiple).map((type) => type.id));
   const seenInstances = new Set<string>();
   const seenSingletons = new Set<string>();
   const result: WidgetInstance[] = [];
   for (const widget of widgets) {
     const type = typesById.get(widget.type);
     if (!type || seenInstances.has(widget.instanceId)) continue;
-    if (!type.multiple) {
-      if (seenSingletons.has(type.id)) continue;
+    if (type.multiple) {
+      // Would otherwise block that singleton forever.
+      if (singletonIds.has(widget.instanceId)) continue;
+    } else {
+      // Singletons are addressed by their type; anything else is edited or corrupt data.
+      if (widget.instanceId !== type.id || seenSingletons.has(type.id)) continue;
       seenSingletons.add(type.id);
     }
     seenInstances.add(widget.instanceId);
     result.push(widget);
   }
   for (const type of types) {
-    if (type.multiple || seenSingletons.has(type.id) || seenInstances.has(type.id)) continue;
+    if (type.multiple || seenSingletons.has(type.id)) continue;
     result.push({ instanceId: type.id, type: type.id });
   }
   return result;
@@ -131,13 +143,22 @@ export function setWidgetHidden(widgets: WidgetInstance[], instanceId: string, h
   });
 }
 
+/**
+ * Appends an instance of a `multiple` widget. Returns the list unchanged for unknown or singleton
+ * types and for an instance id that is already used or equals a widget type.
+ */
 export function addWidgetInstance(
   widgets: WidgetInstance[],
+  types: readonly WidgetTypeInfo[],
   type: string,
   config: WidgetConfig,
   instanceId: string = createInstanceId(type),
 ): WidgetInstance[] {
-  return [...widgets, { instanceId, type, config }];
+  if (!types.find((t) => t.id === type)?.multiple) return widgets;
+  if (types.some((t) => t.id === instanceId) || widgets.some((w) => w.instanceId === instanceId)) return widgets;
+  const instance: WidgetInstance = { instanceId, type };
+  if (Object.keys(config).length > 0) instance.config = config;
+  return [...widgets, instance];
 }
 
 export function removeWidgetInstance(widgets: WidgetInstance[], instanceId: string): WidgetInstance[] {
@@ -145,7 +166,12 @@ export function removeWidgetInstance(widgets: WidgetInstance[], instanceId: stri
 }
 
 export function updateWidgetConfig(widgets: WidgetInstance[], instanceId: string, config: WidgetConfig): WidgetInstance[] {
-  return widgets.map((w) => (w.instanceId === instanceId ? { ...w, config } : w));
+  return widgets.map((w) => {
+    if (w.instanceId !== instanceId) return w;
+    if (Object.keys(config).length > 0) return { ...w, config };
+    const { config: _omit, ...rest } = w;
+    return rest;
+  });
 }
 
 /**
@@ -219,6 +245,16 @@ function sanitizeFilter(value: unknown): DashboardViewFilter | undefined {
   return Object.keys(filter).length > 0 ? filter : undefined;
 }
 
+/** Drops invalid entries and later duplicates of an instance id (the backend rejects duplicates). */
+function uniqueInstances(instances: (WidgetInstance | null)[]): WidgetInstance[] {
+  const seen = new Set<string>();
+  return instances.filter((w): w is WidgetInstance => {
+    if (w === null || seen.has(w.instanceId)) return false;
+    seen.add(w.instanceId);
+    return true;
+  });
+}
+
 function sanitizeView(value: unknown): DashboardView | null {
   if (!value || typeof value !== 'object') return null;
   const { id, name, widgets, filter } = value as Record<string, unknown>;
@@ -226,9 +262,7 @@ function sanitizeView(value: unknown): DashboardView | null {
   const view: DashboardView = {
     id,
     name: typeof name === 'string' ? name.slice(0, LAYOUT_LIMITS.nameLength) : '',
-    widgets: Array.isArray(widgets)
-      ? widgets.map(sanitizeInstance).filter((w): w is WidgetInstance => w !== null).slice(0, LAYOUT_LIMITS.widgetsPerView)
-      : [],
+    widgets: Array.isArray(widgets) ? uniqueInstances(widgets.map(sanitizeInstance)).slice(0, LAYOUT_LIMITS.widgetsPerView) : [],
   };
   const cleanFilter = sanitizeFilter(filter);
   if (cleanFilter) view.filter = cleanFilter;
