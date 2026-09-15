@@ -45,6 +45,6 @@ final class TextNormalizeStage implements CompressionStage {
         }
         while (!out.isEmpty() && out.getLast().isEmpty()) out.removeLast();
         String result = String.join("\n", out);
-        return new StageResult(result, CompressionNumbers.chars(input.length() - result.length()));
+        return new StageResult(result, CompressionNumbers.signedChars(result.length() - input.length()));
     }
 }

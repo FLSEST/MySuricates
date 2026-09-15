@@ -48,10 +48,11 @@ public final class StageChain {
         String text = input;
         List<Map<String, Object>> metadata = new ArrayList<>();
         List<String> notes = new ArrayList<>();
-        for (Step step : steps) {
+        for (int i = 0; i < steps.size(); i++) {
+            Step step = steps.get(i);
             guard.checkDeadline();
             int inChars = text.length();
-            StageResult result = step.stage().apply(text, step.config(), guard);
+            StageResult result = apply(step, i + 1, text, guard);
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("op", step.stage().op());
             m.put("inChars", inChars);
@@ -62,5 +63,16 @@ public final class StageChain {
             text = result.output();
         }
         return new Outcome(text, metadata, notes);
+    }
+
+    /** Runs one stage; its errors name the stage position and op ("Stufe 2 (lines.filter): …"). */
+    private static StageResult apply(Step step, int position, String text, RegexGuard guard) {
+        try {
+            return step.stage().apply(text, step.config(), guard);
+        } catch (CompressionException e) {
+            String prefix = "Stufe " + position;
+            if (e.getMessage() != null && e.getMessage().startsWith(prefix)) throw e;
+            throw new CompressionException(prefix + " (" + step.stage().op() + "): " + e.getMessage());
+        }
     }
 }

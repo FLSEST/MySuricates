@@ -32,7 +32,7 @@ public final class TextTruncateStage implements CompressionStage {
     public StageResult apply(String input, Map<String, Object> config, RegexGuard guard) {
         int max = StageConfig.intValue(config, "max_chars", null, 100, 1_000_000, StageConfig.where(op()));
         String out = truncate(input, max, keep(config));
-        return new StageResult(out, out.length() < input.length() ? CompressionNumbers.chars(input.length() - out.length()) : null);
+        return new StageResult(out, out.length() < input.length() ? CompressionNumbers.signedChars(out.length() - input.length()) : null);
     }
 
     private static Keep keep(Map<String, Object> config) {

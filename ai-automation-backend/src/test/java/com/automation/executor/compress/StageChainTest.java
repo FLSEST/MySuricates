@@ -36,6 +36,26 @@ class StageChainTest {
     }
 
     @Test
+    void run_stageError_namesPositionAndOp_keepsOriginalText() {
+        var steps = StageChain.parse(List.of(
+                Map.of("op", "text.normalize"),
+                Map.of("op", "lines.replace", "pattern", "a", "replacement", "$9")));
+
+        assertThatThrownBy(() -> StageChain.run(steps, "a", RegexGuard.startingNow(Duration.ofSeconds(5))))
+                .isInstanceOf(CompressionException.class)
+                .hasMessageStartingWith("Stufe 2 (lines.replace): Stufe lines.replace: ungültige Ersetzung '$9'");
+    }
+
+    @Test
+    void run_timeoutInStage_namesPosition() {
+        var steps = StageChain.parse(List.of(Map.of("op", "lines.filter", "include", List.of("^((a+)+)+$"))));
+
+        assertThatThrownBy(() -> StageChain.run(steps, "a".repeat(40) + "!", RegexGuard.startingNow(Duration.ofMillis(200))))
+                .isInstanceOf(CompressionException.class)
+                .hasMessage("Stufe 1 (lines.filter): Zeitlimit überschritten — regulärer Ausdruck zu aufwendig oder Eingabe zu groß");
+    }
+
+    @Test
     void parse_jsonStageAfterTextStage_isConfigError() {
         assertThatThrownBy(() -> StageChain.parse(List.of(
                 Map.of("op", "json.to_lines", "template", "{a}"),

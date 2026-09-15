@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/** json.sort — stable sort of an array by a field; numbers numerically, else lexicographically; missing values last. */
+/** json.sort — stable sort of an array by a field; numbers first and numerically, else lexicographically; missing values last. */
 final class JsonSortStage implements CompressionStage {
 
     @Override
@@ -57,11 +57,17 @@ final class JsonSortStage implements CompressionStage {
         };
     }
 
+    /** Total order: missing last (also for desc); among present values numbers before other values, numbers numerically, others by text. */
     private static int compare(JsonNode a, JsonNode b, boolean desc) {
         boolean missingA = JsonPaths.missing(a);
         boolean missingB = JsonPaths.missing(b);
         if (missingA || missingB) return missingA == missingB ? 0 : (missingA ? 1 : -1);
-        int r = a.isNumber() && b.isNumber() ? Double.compare(a.asDouble(), b.asDouble()) : a.asText().compareTo(b.asText());
+        int r;
+        if (a.isNumber() != b.isNumber()) {
+            r = a.isNumber() ? -1 : 1;
+        } else {
+            r = a.isNumber() ? Double.compare(a.asDouble(), b.asDouble()) : a.asText().compareTo(b.asText());
+        }
         return desc ? -r : r;
     }
 }

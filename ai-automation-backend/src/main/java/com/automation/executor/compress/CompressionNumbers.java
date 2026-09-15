@@ -16,6 +16,11 @@ public final class CompressionNumbers {
         return "−" + fmt(removed) + " Zeichen";
     }
 
+    /** Length change of a stage: "−N Zeichen" when it shrank (or stayed equal), "+N Zeichen" when it grew. */
+    public static String signedChars(long delta) {
+        return delta > 0 ? "+" + fmt(delta) + " Zeichen" : chars(-delta);
+    }
+
     public static String lines(long removed) {
         return "−" + fmt(removed) + " Zeilen";
     }

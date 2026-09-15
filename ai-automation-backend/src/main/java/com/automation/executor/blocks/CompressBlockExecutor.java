@@ -52,10 +52,9 @@ public class CompressBlockExecutor implements BlockExecutor {
             result.setStatus(StepStatus.COMPLETED);
             result.setMetadata(CompressionOutput.metadata(src, out, maxChars, outcome.stageMetadata()));
         } catch (CompressionException e) {
-            result.setInput("compress: " + config.get("source"));
-            result.setOutput("Komprimierung fehlgeschlagen: " + e.getMessage());
-            result.setStatus(StepStatus.FAILED);
-            result.setMetadata(new HashMap<>(Map.of("derivedOutput", true, "error", e.getMessage())));
+            fail(result, config, e.getMessage());
+        } catch (RuntimeException e) {
+            fail(result, config, e.getClass().getSimpleName() + ": " + e.getMessage());
         }
         result.setCompletedAt(Instant.now());
         result.setDurationMs(Duration.between(result.getStartedAt(), result.getCompletedAt()).toMillis());
@@ -65,5 +64,12 @@ public class CompressBlockExecutor implements BlockExecutor {
     @Override
     public boolean supports(String blockType) {
         return "compress".equals(blockType);
+    }
+
+    private static void fail(StepResult result, Map<String, Object> config, String error) {
+        result.setInput("compress: " + config.get("source"));
+        result.setOutput("Komprimierung fehlgeschlagen: " + error);
+        result.setStatus(StepStatus.FAILED);
+        result.setMetadata(new HashMap<>(Map.of("derivedOutput", true, "error", error)));
     }
 }

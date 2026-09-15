@@ -51,6 +51,28 @@ class JsonStagesTest {
     }
 
     @Test
+    void sort_mixedValues_isTotal_numbersFirst_missingLast() {
+        String mixed = "[{\"v\":\"b\"},{\"v\":10},{\"v\":\"a\"},{\"v\":2},{}]";
+
+        String asc = new JsonSortStage().apply(mixed, Map.of("by", "v"), guard).output();
+        String desc = new JsonSortStage().apply(mixed, Map.of("by", "v", "order", "desc"), guard).output();
+
+        assertThat(asc).isEqualTo("[{\"v\":2},{\"v\":10},{\"v\":\"a\"},{\"v\":\"b\"},{}]");
+        assertThat(desc).isEqualTo("[{\"v\":\"b\"},{\"v\":\"a\"},{\"v\":10},{\"v\":2},{}]");
+        // numeric text between numbers made the old comparator cyclic (10 < "15" < 2 < 10)
+        assertThat(new JsonSortStage().apply("[{\"v\":2},{\"v\":\"15\"},{\"v\":10}]", Map.of("by", "v"), guard).output())
+                .isEqualTo("[{\"v\":2},{\"v\":10},{\"v\":\"15\"}]");
+    }
+
+    @Test
+    void select_outputLongerThanInput_noteShowsGrowth() {
+        StageResult r = new JsonSelectStage().apply("{\"a\":1e2}", Map.of("paths", List.of("a")), guard);
+
+        assertThat(r.output()).isEqualTo("{\"a\":100.0}");
+        assertThat(r.note()).isEqualTo("+2 Zeichen").doesNotContain("−-");
+    }
+
+    @Test
     void toLines_missingFieldIsEmpty_numbersAndObjectsRendered() {
         StageResult r = new JsonToLinesStage().apply("[{\"n\":5,\"o\":{\"k\":1}},{}]", Map.of("template", "{n}|{o}|{fehlt}"), guard);
 

@@ -32,7 +32,21 @@ public final class RegexGuard {
     }
 
     public boolean find(Pattern pattern, String line) {
-        return pattern.matcher(new DeadlineCharSequence(head(line), deadlineNanos)).find();
+        String head = head(line);
+        try {
+            return pattern.matcher(new DeadlineCharSequence(head, deadlineNanos)).find();
+        } catch (StackOverflowError e) {
+            throw tooDeep(line);
+        }
+    }
+
+    public boolean matches(Pattern pattern, String line) {
+        String head = head(line);
+        try {
+            return pattern.matcher(new DeadlineCharSequence(head, deadlineNanos)).matches();
+        } catch (StackOverflowError e) {
+            throw tooDeep(line);
+        }
     }
 
     public boolean findAny(List<Pattern> patterns, String line) {
@@ -44,7 +58,12 @@ public final class RegexGuard {
 
     public String replaceAll(Pattern pattern, String line, String replacement) {
         String head = head(line);
-        String replaced = pattern.matcher(new DeadlineCharSequence(head, deadlineNanos)).replaceAll(replacement);
+        String replaced;
+        try {
+            replaced = pattern.matcher(new DeadlineCharSequence(head, deadlineNanos)).replaceAll(replacement);
+        } catch (StackOverflowError e) {
+            throw tooDeep(line);
+        }
         return line.length() > head.length() ? replaced + line.substring(head.length()) : replaced;
     }
 
@@ -62,11 +81,33 @@ public final class RegexGuard {
         return line.length() > MAX_MATCH_CHARS ? line.substring(0, safeCut(line, MAX_MATCH_CHARS)) : line;
     }
 
+    private static CompressionException tooDeep(String line) {
+        return new CompressionException("Muster zu tief verschachtelt für Zeile mit " + CompressionNumbers.fmt(line.length()) + " Zeichen");
+    }
+
     static CompressionException timeout() {
         return new CompressionException("Zeitlimit überschritten — regulärer Ausdruck zu aufwendig oder Eingabe zu groß");
     }
 
-    private record DeadlineCharSequence(String text, long deadline) implements CharSequence {
+    /**
+     * Checks the deadline every 1,024 {@code charAt} calls — not by index, so backtracking on short lines or
+     * near a line end is caught too. Sub-sequences share the parent's call counter.
+     */
+    private static final class DeadlineCharSequence implements CharSequence {
+        private final String text;
+        private final long deadline;
+        private final int[] calls;
+
+        DeadlineCharSequence(String text, long deadline) {
+            this(text, deadline, new int[1]);
+        }
+
+        private DeadlineCharSequence(String text, long deadline, int[] calls) {
+            this.text = text;
+            this.deadline = deadline;
+            this.calls = calls;
+        }
+
         @Override
         public int length() {
             return text.length();
@@ -74,13 +115,13 @@ public final class RegexGuard {
 
         @Override
         public char charAt(int index) {
-            if ((index & 0x3FF) == 0 && System.nanoTime() > deadline) throw timeout();
+            if ((++calls[0] & 0x3FF) == 0 && System.nanoTime() > deadline) throw timeout();
             return text.charAt(index);
         }
 
         @Override
         public CharSequence subSequence(int start, int end) {
-            return new DeadlineCharSequence(text.substring(start, end), deadline);
+            return new DeadlineCharSequence(text.substring(start, end), deadline, calls);
         }
 
         @Override

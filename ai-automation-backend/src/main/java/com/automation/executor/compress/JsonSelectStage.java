@@ -66,7 +66,7 @@ final class JsonSelectStage implements CompressionStage {
                 : root.isArray() ? JsonPaths.MAPPER.createArrayNode() : JsonPaths.MAPPER.createObjectNode();
         String out = JsonPaths.write(result);
         List<String> missing = paths.stream().map(Path::raw).filter(r -> !matched.contains(r)).toList();
-        String note = missing.isEmpty() ? CompressionNumbers.chars(input.length() - out.length())
+        String note = missing.isEmpty() ? CompressionNumbers.signedChars(out.length() - input.length())
                 : "Pfad nicht gefunden: " + String.join(", ", missing);
         return new StageResult(out, note);
     }

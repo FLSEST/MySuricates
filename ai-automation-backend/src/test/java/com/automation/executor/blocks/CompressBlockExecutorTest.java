@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class CompressBlockExecutorTest {
 
@@ -154,6 +156,30 @@ class CompressBlockExecutorTest {
         assertThat(invalid.getOutput()).contains("unbekannte Operation 'nope'");
         assertThat(noSource.getOutput()).contains("'source' fehlt");
         assertThat(unknown.getMetadata()).containsEntry("derivedOutput", true);
+    }
+
+    @Test
+    void emptyContent_isShownAsLeer() {
+        ExecutionContext ctx = contextWithShellSource("backend_tests", StepStatus.COMPLETED, 0, "a\nb");
+
+        StepResult r = executor.execute(block(Map.of("source", "backend_tests",
+                "stages", List.of(Map.of("op", "lines.filter", "include", List.of("ERROR"))))), ctx);
+
+        assertThat(r.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(r.getOutput()).endsWith("\n\n(leer)");
+    }
+
+    @Test
+    void unexpectedRuntimeException_isFailedWithSameShape() {
+        ExecutionContext ctx = mock(ExecutionContext.class);
+        when(ctx.getSourceSteps()).thenThrow(new IllegalStateException("kaputt"));
+
+        StepResult r = executor.execute(block(Map.of("source", "backend_tests", "stages", List.of(Map.of("op", "text.normalize")))), ctx);
+
+        assertThat(r.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(r.getOutput()).isEqualTo("Komprimierung fehlgeschlagen: IllegalStateException: kaputt");
+        assertThat(r.getMetadata()).containsEntry("derivedOutput", true).containsKey("error");
+        assertThat(r.getCompletedAt()).isNotNull();
     }
 
     @Test

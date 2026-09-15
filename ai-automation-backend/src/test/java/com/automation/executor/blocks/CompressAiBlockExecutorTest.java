@@ -26,6 +26,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -126,7 +127,63 @@ class CompressAiBlockExecutorTest {
 
         assertThat(r.getStatus()).isEqualTo(StepStatus.FAILED);
         assertThat(r.getOutput()).contains("KI-Komprimierung fehlgeschlagen").doesNotContain("x".repeat(100));
-        assertThat(r.getMetadata()).containsEntry("derivedOutput", true);
+        assertThat(r.getMetadata()).containsEntry("derivedOutput", true).containsKey("aiRequest");
+    }
+
+    @Test
+    void blockModelEffortAndProvider_reachTheRequest() {
+        when(commandExecutor.executeStepOnHost(any())).thenReturn(aiAnswer(StepStatus.COMPLETED, "kurz"));
+
+        executor.execute(block(Map.of("source", "backend_tests", "model", "haiku", "effort", "low", "provider", "CLAUDE")), ctx);
+
+        ArgumentCaptor<HostExecutionRequest> captor = ArgumentCaptor.forClass(HostExecutionRequest.class);
+        verify(commandExecutor).executeStepOnHost(captor.capture());
+        assertThat(captor.getValue().model()).isEqualTo("haiku");
+        assertThat(captor.getValue().effort()).isEqualTo("low");
+        assertThat(captor.getValue().providerId()).isEqualTo("CLAUDE");
+    }
+
+    @Test
+    void blankAnswer_isFailed_keepsAiMetadata() {
+        when(commandExecutor.executeStepOnHost(any())).thenReturn(aiAnswer(StepStatus.COMPLETED, "  \n "));
+
+        StepResult r = executor.execute(block(Map.of("source", "backend_tests")), ctx);
+
+        assertThat(r.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(r.getOutput()).isEqualTo("KI-Komprimierung fehlgeschlagen: KI lieferte keine Antwort");
+        assertThat(r.getMetadata()).containsEntry("derivedOutput", true).containsKey("aiRequest").doesNotContainKey("compression");
+    }
+
+    @Test
+    void aiFailure_outputIsNullSafeAndCappedTo2000Chars() {
+        String prefix = "KI-Komprimierung fehlgeschlagen: ";
+        when(commandExecutor.executeStepOnHost(any())).thenReturn(aiAnswer(StepStatus.FAILED, "E".repeat(9_000) + "ENDE"));
+
+        StepResult longFailure = executor.execute(block(Map.of("source", "backend_tests")), ctx);
+
+        assertThat(longFailure.getOutput()).startsWith(prefix).endsWith("ENDE").contains("Zeichen ausgelassen");
+        assertThat(longFailure.getOutput().length()).isLessThanOrEqualTo(prefix.length() + 2_000);
+
+        when(commandExecutor.executeStepOnHost(any())).thenReturn(aiAnswer(StepStatus.FAILED, null));
+
+        StepResult nullFailure = executor.execute(block(Map.of("source", "backend_tests")), ctx);
+
+        assertThat(nullFailure.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(nullFailure.getOutput()).startsWith(prefix).doesNotContain("null");
+    }
+
+    @Test
+    void unexpectedRuntimeException_afterCall_isFailed_keepsAiMetadata() {
+        StepResult broken = mock(StepResult.class);
+        when(broken.getMetadata()).thenReturn(new HashMap<>(Map.of("aiRequest", Map.of("provider", "CLAUDE"))));
+        when(broken.getStatus()).thenThrow(new IllegalStateException("kaputt"));
+        when(commandExecutor.executeStepOnHost(any())).thenReturn(broken);
+
+        StepResult r = executor.execute(block(Map.of("source", "backend_tests")), ctx);
+
+        assertThat(r.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(r.getOutput()).isEqualTo("Komprimierung fehlgeschlagen: IllegalStateException: kaputt");
+        assertThat(r.getMetadata()).containsEntry("derivedOutput", true).containsKey("error").containsKey("aiRequest");
     }
 
     @Test

@@ -12,6 +12,7 @@ import com.automation.executor.compress.CompressionNumbers;
 import com.automation.executor.compress.CompressionOutput;
 import com.automation.executor.compress.CompressionSources;
 import com.automation.executor.compress.StageConfig;
+import com.automation.executor.compress.TextTruncateStage;
 import com.automation.service.ai.AiProvider;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.cli.CommandExecutorService;
@@ -20,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -40,6 +42,7 @@ public class CompressAiBlockExecutor implements BlockExecutor {
 
     static final int DEFAULT_MAX_CHARS = 4_000;
     private static final int HEADER_RESERVE = 300;
+    private static final int MAX_AI_ERROR_CHARS = 2_000;
 
     private final CommandExecutorService commandExecutor;
     private final AiProviderRegistry providers;
@@ -51,6 +54,7 @@ public class CompressAiBlockExecutor implements BlockExecutor {
         int stepIndex = context.nextStepIndex();
         Instant started = Instant.now();
         StepResult result;
+        Map<String, Object> aiMetadata = Map.of();
         try {
             int maxChars = StageConfig.intValue(config, "max_chars", DEFAULT_MAX_CHARS, 500, 200_000, "compress-ai");
             String instruction = StageConfig.string(config, "instruction", "", "compress-ai");
@@ -85,22 +89,24 @@ public class CompressAiBlockExecutor implements BlockExecutor {
             } finally {
                 cleanupWorkdir(workdir);
             }
-            Map<String, Object> metadata = new HashMap<>(ai.getMetadata() != null ? ai.getMetadata() : Map.of());
+            if (ai.getMetadata() != null) aiMetadata = ai.getMetadata();
+            Map<String, Object> metadata = new HashMap<>(aiMetadata);
             String input = "compress-ai " + src.label() + " (" + CompressionNumbers.fmt(src.text().length()) + " Zeichen): "
                     + (instruction.isBlank() ? "(Standard-Zusammenfassung)" : instruction);
-            if (ai.getStatus() != StepStatus.COMPLETED) {
+            String answer = ai.getOutput() == null ? "" : ai.getOutput().strip();
+            if (ai.getStatus() != StepStatus.COMPLETED || answer.isEmpty()) {
                 metadata.put("derivedOutput", true);
-                result = finished(stepIndex, started, input, "KI-Komprimierung fehlgeschlagen: " + ai.getOutput(), StepStatus.FAILED, metadata);
+                result = finished(stepIndex, started, input, aiFailureOutput(ai), StepStatus.FAILED, metadata);
             } else {
                 CompressionOutput.Assembled out = CompressionOutput.assemble(src,
-                        "Zusammenfassung: KI (" + provider.getId() + ")", ai.getOutput() == null ? "" : ai.getOutput().strip(), maxChars);
+                        "Zusammenfassung: KI (" + provider.getId() + ")", answer, maxChars);
                 metadata.putAll(CompressionOutput.metadata(src, out, maxChars, null));
                 result = finished(stepIndex, started, input, out.text(), StepStatus.COMPLETED, metadata);
             }
         } catch (CompressionException e) {
-            result = finished(stepIndex, started, "compress-ai: " + config.get("source"),
-                    "Komprimierung fehlgeschlagen: " + e.getMessage(), StepStatus.FAILED,
-                    new HashMap<>(Map.of("derivedOutput", true, "error", e.getMessage())));
+            result = failed(stepIndex, started, config, e.getMessage(), aiMetadata);
+        } catch (RuntimeException e) {
+            result = failed(stepIndex, started, config, e.getClass().getSimpleName() + ": " + e.getMessage(), aiMetadata);
         }
         return result;
     }
@@ -108,6 +114,23 @@ public class CompressAiBlockExecutor implements BlockExecutor {
     @Override
     public boolean supports(String blockType) {
         return "compress-ai".equals(blockType);
+    }
+
+    /** Failed call: its (tail-capped) error text; a completed call without text is a failure too. */
+    private static String aiFailureOutput(StepResult ai) {
+        String prefix = "KI-Komprimierung fehlgeschlagen: ";
+        if (ai.getStatus() == StepStatus.COMPLETED) return prefix + "KI lieferte keine Antwort";
+        String output = ai.getOutput() == null || ai.getOutput().isBlank() ? "keine Ausgabe" : ai.getOutput();
+        return prefix + TextTruncateStage.truncate(output, MAX_AI_ERROR_CHARS, TextTruncateStage.Keep.TAIL);
+    }
+
+    private static StepResult failed(int stepIndex, Instant started, Map<String, Object> config, String error,
+                                     Map<String, Object> aiMetadata) {
+        Map<String, Object> metadata = new HashMap<>(aiMetadata);
+        metadata.put("derivedOutput", true);
+        metadata.put("error", error);
+        return finished(stepIndex, started, "compress-ai: " + config.get("source"),
+                "Komprimierung fehlgeschlagen: " + error, StepStatus.FAILED, metadata);
     }
 
     private static StepResult finished(int stepIndex, Instant started, String input, String output, StepStatus status,
@@ -141,7 +164,7 @@ public class CompressAiBlockExecutor implements BlockExecutor {
                     // best effort — a leftover temp dir must not fail the step
                 }
             });
-        } catch (IOException ignored) {
+        } catch (IOException | UncheckedIOException ignored) {
             // best effort — a leftover temp dir must not fail the step
         }
     }

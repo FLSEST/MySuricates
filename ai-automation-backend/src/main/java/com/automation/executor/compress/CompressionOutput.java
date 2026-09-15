@@ -11,6 +11,8 @@ import java.util.Map;
 public final class CompressionOutput {
 
     public static final int MIN_BODY_CHARS = 200;
+    /** Shown instead of empty content (spec § 5.1); not counted as content characters. */
+    static final String EMPTY_BODY = "(leer)";
 
     public record Assembled(String text, int inChars, int outChars, boolean capped) {
     }
@@ -21,7 +23,7 @@ public final class CompressionOutput {
     public static Assembled assemble(CompressionSources.Resolved src, String detailLine, String body, int maxChars) {
         int in = src.text().length();
         String header = header(src, in, body.length());
-        String full = header + "\n" + detailLine + "\n\n" + body;
+        String full = header + "\n" + detailLine + "\n\n" + (body.isEmpty() ? EMPTY_BODY : body);
         if (full.length() <= maxChars) return new Assembled(full, in, body.length(), false);
 
         // Reserve for the worst case: header and cap note computed with the uncut length (digits only shrink).

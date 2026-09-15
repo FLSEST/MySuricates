@@ -52,6 +52,22 @@ class MarkdownSectionStageTest {
     }
 
     @Test
+    void headingMatch_isGuardedByTheDeadline() {
+        RegexGuard expired = RegexGuard.startingNow(Duration.ZERO);
+        String costlyHeading = "# x" + " ".repeat(900) + "y";
+
+        assertThatThrownBy(() -> new MarkdownSectionStage().apply(costlyHeading, Map.of("headings", List.of("zzz"), "level", 6), expired))
+                .isInstanceOf(CompressionException.class).hasMessageContaining("Zeitlimit");
+    }
+
+    @Test
+    void headingTitle_dropsClosingHashesAndSpaces() {
+        StageResult r = new MarkdownSectionStage().apply("## Fazit ##  \ntext\n# Anderes", Map.of("headings", List.of("^Fazit$")), guard);
+
+        assertThat(r.output()).isEqualTo("## Fazit ##  \ntext");
+    }
+
+    @Test
     void validation() {
         assertThatThrownBy(() -> new MarkdownSectionStage().validate(Map.of("headings", List.of())))
                 .isInstanceOf(CompressionException.class).hasMessageContaining("headings");

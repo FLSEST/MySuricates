@@ -3,7 +3,6 @@ package com.automation.executor.compress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -45,18 +44,15 @@ final class MarkdownSectionStage implements CompressionStage {
         int matched = 0;
         boolean fence = false;
         for (String line : input.split("\n", -1)) {
-            if (!fence && line.startsWith("#") && line.length() <= 1000) {
-                Matcher m = HEADING.matcher(line);
-                if (m.matches()) {
-                    int lvl = m.group(1).length();
-                    if (keepLevel > 0 && lvl <= keepLevel) keepLevel = 0;
-                    if (level == null || lvl == level) {
-                        total++;
-                        if (keepLevel == 0 && guard.findAny(headings, m.group(2))) {
-                            keepLevel = lvl;
-                            matched++;
-                            if (!out.isEmpty()) out.add("");
-                        }
+            if (!fence && line.startsWith("#") && line.length() <= 1000 && guard.matches(HEADING, line)) {
+                int lvl = headingLevel(line);
+                if (keepLevel > 0 && lvl <= keepLevel) keepLevel = 0;
+                if (level == null || lvl == level) {
+                    total++;
+                    if (keepLevel == 0 && guard.findAny(headings, headingTitle(line, lvl))) {
+                        keepLevel = lvl;
+                        matched++;
+                        if (!out.isEmpty()) out.add("");
                     }
                 }
             }
@@ -67,6 +63,32 @@ final class MarkdownSectionStage implements CompressionStage {
         String note = matched == 0 ? "kein passender Abschnitt"
                 : CompressionNumbers.fmt(matched) + " von " + CompressionNumbers.fmt(total) + " Abschnitten";
         return new StageResult(String.join("\n", out), note);
+    }
+
+    /** Number of leading '#' — only called after HEADING matched, so 1..6. */
+    private static int headingLevel(String line) {
+        int level = 0;
+        while (level < line.length() && line.charAt(level) == '#') level++;
+        return level;
+    }
+
+    /**
+     * HEADING's title group without a second, unguarded regex run: text after the '#' run and its whitespace,
+     * minus trailing whitespace, closing '#'s and the whitespace before them — the same result as the lazy group.
+     */
+    private static String headingTitle(String line, int level) {
+        int start = level;
+        while (start < line.length() && isRegexSpace(line.charAt(start))) start++;
+        int end = line.length();
+        while (end > start && isRegexSpace(line.charAt(end - 1))) end--;
+        while (end > start && line.charAt(end - 1) == '#') end--;
+        while (end > start && isRegexSpace(line.charAt(end - 1))) end--;
+        return line.substring(start, end);
+    }
+
+    /** Java regex {@code \s} without UNICODE_CHARACTER_CLASS: {@code [ \t\n\x0B\f\r]}. */
+    private static boolean isRegexSpace(char c) {
+        return c == ' ' || c == '\t' || c == '\n' || c == 0x0B || c == '\f' || c == '\r';
     }
 
     private List<Pattern> headings(Map<String, Object> config) {
