@@ -1,9 +1,10 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Pencil, Trash2, Link2, Terminal, Zap } from 'lucide-react';
+import { GripVertical, Pencil, Trash2, Link2, Terminal, Zap, Shrink } from 'lucide-react';
 import { Badge } from '../ui';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useT } from '../../i18n';
+import { compressedSourcesUsed, compressionSummary, isCompressionBlock } from './compression';
 import type { BlockDefinition, BlockType } from '../../types';
 import type { BadgeVariant } from '../ui/Badge';
 
@@ -25,6 +26,8 @@ const blockTypeVariant: Record<BlockType, BadgeVariant> = {
   'todo-create': 'default',
   'todo-update': 'default',
   'todo-close': 'default',
+  compress: 'accent',
+  'compress-ai': 'success',
 };
 
 interface SortableBlockProps {
@@ -33,9 +36,10 @@ interface SortableBlockProps {
   block: BlockDefinition;
   onEdit: (index: number) => void;
   onRemove: (index: number) => void;
+  allBlocks?: BlockDefinition[];
 }
 
-export function SortableBlock({ id, index, block, onEdit, onRemove }: SortableBlockProps) {
+export function SortableBlock({ id, index, block, onEdit, onRemove, allBlocks = [] }: SortableBlockProps) {
   const t = useT();
   const advancedMode = useSettingsStore((s) => s.advancedMode);
   const {
@@ -85,10 +89,21 @@ export function SortableBlock({ id, index, block, onEdit, onRemove }: SortableBl
             </span>
           )}
         </div>
+        {compressedSourcesUsed(block, allBlocks).map((name) => (
+          <span key={name} className="inline-flex items-center gap-0.5 rounded-full bg-info-subtle px-1.5 text-[10px] text-info">
+            <Shrink className="w-3 h-3" />
+            {t.workflows.compression.usesCompressed}: {name}
+          </span>
+        ))}
         {advancedMode ? (
           <pre className="text-xs text-text-secondary font-mono bg-surface rounded-lg p-3 mt-2 overflow-x-auto">
             {JSON.stringify(block.config, null, 2)}
           </pre>
+        ) : isCompressionBlock(block.type) ? (
+          <p className="text-sm text-text-secondary truncate flex items-center gap-1.5">
+            <Shrink className="w-3.5 h-3.5 text-info shrink-0" />
+            <code className="font-mono text-xs">{compressionSummary(block.type, block.config, t.workflows.compression.ai)}</code>
+          </p>
         ) : block.type === 'shell' ? (
           <p className="text-sm text-text-secondary truncate flex items-center gap-1.5">
             <Terminal className="w-3.5 h-3.5 text-accent shrink-0" />

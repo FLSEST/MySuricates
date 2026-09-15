@@ -170,6 +170,7 @@ export function WorkflowDetail() {
     'skill-capability': 'capability', 'sub-workflow': 'workflow_id',
     conditional: 'condition', switch: 'expression', foreach: 'variable_name',
     while: 'condition_command', document: 'file_path',
+    compress: 'source', 'compress-ai': 'source',
   };
 
   /** Ermittelt aus einer Diagramm-Auswahl den JSON-Suchtext, auf den der Editor springen soll. */

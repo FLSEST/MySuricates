@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import {
   Clock, Terminal, Sparkles, Brain, Repeat, GitBranch, RefreshCw, ShieldCheck, Layers,
   MessageSquare, Route, RotateCcw, Wrench, Plug, FileText, ListPlus, SquarePen, ListChecks,
-  Bot, Cog, User, CircleHelp,
+  Bot, Cog, User, CircleHelp, Shrink,
 } from 'lucide-react';
 import { Badge } from '../ui';
 import { useT } from '../../i18n';
@@ -30,6 +30,8 @@ const BLOCK_TYPE_ICONS: Record<BlockType, ReactNode> = {
   'todo-create': <ListPlus className={ICON} />,
   'todo-update': <SquarePen className={ICON} />,
   'todo-close': <ListChecks className={ICON} />,
+  compress: <Shrink className={ICON} />,
+  'compress-ai': <Shrink className={ICON} />,
 };
 
 // Theme tokens only, so every theme applies: AI and human have their own role colours; deterministic

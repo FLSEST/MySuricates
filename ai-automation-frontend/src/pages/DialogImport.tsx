@@ -25,6 +25,7 @@ const blockTypeVariant: Record<string, BadgeVariant> = {
   shell: 'accent', 'sub-workflow': 'accent',
   approval: 'warning', 'human-input': 'warning',
   retry: 'default', foreach: 'default', while: 'default', conditional: 'default',
+  compress: 'accent', 'compress-ai': 'success',
 };
 
 // ── Hilfsfunktionen ──────────────────────────────────────
