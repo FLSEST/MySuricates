@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
 import { useThemeAppearance } from '../../stores/themeStore';
+import { ensureLocalMonaco } from './monacoSetup';
 
 interface MonacoEditorProps {
   value: string;
@@ -45,6 +46,14 @@ export function MonacoEditor({
 }: MonacoEditorProps) {
   const appearance = useThemeAppearance();
   const editorRef = useRef<MonacoEditorInstance | null>(null);
+  // Monaco comes from our bundle (no CDN, see monacoSetup) — mount the editor only once it is configured
+  const [monacoReady, setMonacoReady] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    ensureLocalMonaco().then(() => { if (active) setMonacoReady(true); });
+    return () => { active = false; };
+  }, []);
 
   const doReveal = () => {
     const editor = editorRef.current;
@@ -85,15 +94,19 @@ export function MonacoEditor({
 
   return (
     <div className="rounded-lg border border-border overflow-hidden">
-      <Editor
-        height={height}
-        language={language}
-        theme={appearance === 'dark' ? 'vs-dark' : 'light'}
-        value={value}
-        onChange={(val) => onChange?.(val ?? '')}
-        onMount={handleMount}
-        options={{ readOnly }}
-      />
+      {monacoReady ? (
+        <Editor
+          height={height}
+          language={language}
+          theme={appearance === 'dark' ? 'vs-dark' : 'light'}
+          value={value}
+          onChange={(val) => onChange?.(val ?? '')}
+          onMount={handleMount}
+          options={{ readOnly }}
+        />
+      ) : (
+        <div style={{ height }} aria-busy="true" />
+      )}
     </div>
   );
 }

@@ -35,6 +35,8 @@ export default defineConfig(() => {
         workbox: {
           navigateFallback: '/index.html',
           navigateFallbackDenylist: [/^\/api/, /^\/ws/],
+          // Monaco (editor core > 2 MiB, language workers) loads on first use, not at PWA install
+          globIgnores: ['**/monaco-*.js', '**/*.worker-*.js'],
         },
         manifest: {
           name: 'MySuricates',
@@ -88,6 +90,8 @@ export default defineConfig(() => {
             ws: ['@stomp/stompjs', 'sockjs-client'],
             markdown: ['react-markdown', 'remark-gfm'],
             dnd: ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
+            // lazily imported by components/shared/monacoSetup.ts — named so the PWA can skip precaching it
+            monaco: ['monaco-editor/esm/vs/editor/edcore.main.js'],
           },
         },
       },

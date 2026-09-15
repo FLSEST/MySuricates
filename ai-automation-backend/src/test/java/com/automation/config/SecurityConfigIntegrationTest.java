@@ -137,12 +137,15 @@ class SecurityConfigIntegrationTest {
         mockMvc.perform(get("/api/v1/system/health"))
                 .andExpect(header().string("Content-Security-Policy",
                         "default-src 'self'; " +
-                        "script-src 'self' https://cdn.jsdelivr.net; " +
+                        "script-src 'self'; " +
                         "worker-src 'self' blob:; " +
-                        "connect-src 'self' ws: wss: https://cdn.jsdelivr.net; " +
-                        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
-                        "font-src 'self' data: https://cdn.jsdelivr.net; " +
-                        "img-src 'self' data:"));
+                        "connect-src 'self' ws: wss:; " +
+                        "style-src 'self' 'unsafe-inline'; " +
+                        "font-src 'self' data:; " +
+                        "img-src 'self' data:"))
+                // no public CDN in any directive (script gadgets) — Monaco ships with the bundle
+                .andExpect(header().string("Content-Security-Policy", org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("jsdelivr"))));
     }
 
     @Test

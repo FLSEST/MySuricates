@@ -17,9 +17,11 @@ import { ModalFooter } from '../components/ui/ModalFooter';
 import { Spinner } from '../components/ui/Spinner';
 import { Plus, Trash2, RotateCcw, Save, BookOpen, Clock, Shield } from 'lucide-react';
 import { useI18nStore } from '../i18n';
+import { ensureLocalMonaco } from '../components/shared/monacoSetup';
 
+// Monaco from our own bundle, never the CDN (see monacoSetup)
 const MonacoEditor = lazy(() =>
-  import('@monaco-editor/react').then(m => ({ default: m.default }))
+  ensureLocalMonaco().then(() => import('@monaco-editor/react')).then(m => ({ default: m.default }))
 );
 
 function resolveProfileName(profile: OnboardingProfile, locale: string): string {
