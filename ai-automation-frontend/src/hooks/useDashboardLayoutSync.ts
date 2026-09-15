@@ -7,16 +7,20 @@ import { useDashboardLayoutStore } from '../stores/dashboardLayoutStore';
 import { useDashboardSyncStore } from '../stores/dashboardSyncStore';
 import {
   LAYOUT_FORMAT_VERSION,
+  LAYOUT_LIMITS,
   isCustomizedLayout,
+  layoutContentKey,
   migrateLayout,
   sanitizeLayout,
   type DashboardLayout,
 } from '../components/dashboard/dashboardLayout';
 import {
   DASHBOARD_LAYOUT_VERSIONS_KEY,
+  exceedsLayoutRequestLimit,
   fetchDashboardLayoutVersion,
   fetchLatestDashboardLayoutVersion,
   saveDashboardLayoutVersion,
+  type SaveDashboardLayoutRequest,
 } from './useDashboardLayoutVersions';
 import type { DashboardLayoutVersion, DashboardLayoutVersionSummary } from '../types';
 
@@ -64,7 +68,8 @@ async function applyVersion(id: string): Promise<boolean> {
 
 /**
  * Keeps the per-browser dashboard layout in step with the version history on the server (spec E1).
- * Reads store state directly so the actions never work with a stale render snapshot.
+ * Reads store state directly so the actions never work with a stale render snapshot. The active
+ * view is chosen per device and never counts as a difference.
  */
 export function useDashboardLayoutSync() {
   const queryClient = useQueryClient();
@@ -94,9 +99,9 @@ export function useDashboardLayoutSync() {
         if (hasLocalLayoutChanges()) {
           // The local layout was never actually changed against this version's content (e.g. a
           // customized layout that happens to match what another device just saved) — no real
-          // conflict, just adopt its id as the base.
+          // conflict, just adopt its id as the base. Only the active view may differ.
           const remoteLayout = layoutFromVersion(version);
-          if (remoteLayout && JSON.stringify(remoteLayout) === JSON.stringify(currentLayout())) {
+          if (remoteLayout && layoutContentKey(remoteLayout) === layoutContentKey(currentLayout())) {
             useDashboardSyncStore.getState().markSynced(version.id);
             return;
           }
@@ -127,18 +132,18 @@ export function useDashboardLayoutSync() {
     const { deviceLabel, baseVersionId } = useDashboardSyncStore.getState();
     // Captured up front: an edit made while the request is in flight must not be reported as saved.
     const layout = currentLayout();
+    const request: SaveDashboardLayoutRequest = { deviceLabel, formatVersion: LAYOUT_FORMAT_VERSION, layout, baseVersionId, force };
+    if (exceedsLayoutRequestLimit(request)) {
+      // The server would reject it with a bare 413 — say what is wrong and keep the changes unsaved.
+      notify('error', getTranslations().dashboard.sync.tooLarge);
+      return;
+    }
     try {
-      const saved = await saveDashboardLayoutVersion({
-        deviceLabel,
-        formatVersion: LAYOUT_FORMAT_VERSION,
-        layout,
-        baseVersionId,
-        force,
-      });
+      const saved = await saveDashboardLayoutVersion(request);
       useDashboardSyncStore.getState().markSynced(saved.id);
-      if (JSON.stringify(currentLayout()) !== JSON.stringify(layout)) {
+      if (layoutContentKey(currentLayout()) !== layoutContentKey(layout)) {
         // Something changed the layout after it was captured above — the base moved, but that
-        // change itself is still unsaved.
+        // change itself is still unsaved. Switching the active view is not such a change.
         useDashboardSyncStore.getState().markDirty();
       }
       setConflict(null);
@@ -162,7 +167,8 @@ export function useDashboardLayoutSync() {
   /** Chains onto any save already in flight so it reads the baseVersionId that one just set. */
   const persistSnapshot = (force: boolean): Promise<void> => {
     const chained = saveChain.current.then(() => doPersistSnapshot(force));
-    saveChain.current = chained;
+    // The chain only orders saves: one that failed unexpectedly must not block every later save.
+    saveChain.current = chained.catch(() => undefined);
     return chained;
   };
 
@@ -196,14 +202,27 @@ export function useDashboardLayoutSync() {
       await persistSnapshot(true);
     })),
     adoptView: (versionId: string, viewId: string) => run(() => loadAndThen(async () => {
+      const t = getTranslations();
       const layout = layoutFromVersion(await fetchDashboardLayoutVersion(versionId));
       if (!layout) {
-        notify('warning', getTranslations().dashboard.sync.newerFormat);
+        notify('warning', t.dashboard.sync.newerFormat);
         return;
       }
       const view = layout.views.find((v) => v.id === viewId);
-      if (!view) return;
-      useDashboardLayoutStore.getState().upsertView(view);
+      if (!view) {
+        notify('warning', t.dashboard.history.adoptViewMissing);
+        return;
+      }
+      const local = useDashboardLayoutStore.getState().views.find((v) => v.id === viewId);
+      // Replacing a view can be undone from the history — unless this device has unsaved changes.
+      if (local && hasLocalLayoutChanges()) {
+        const name = local.name || t.dashboard.history.defaultViewName;
+        if (!window.confirm(t.dashboard.history.adoptViewConfirm.replace('{name}', () => name))) return;
+      }
+      if (!useDashboardLayoutStore.getState().upsertView(view)) {
+        notify('warning', t.dashboard.history.adoptViewLimit.replace('{max}', () => String(LAYOUT_LIMITS.views)));
+        return;
+      }
       await persistSnapshot(false);
     })),
   };

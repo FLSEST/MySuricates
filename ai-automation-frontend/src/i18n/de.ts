@@ -231,6 +231,7 @@ export const de: TranslationKeys = {
       saveFailed: 'Dashboard-Layout konnte nicht gespeichert werden',
       loadFailed: 'Dashboard-Layout konnte nicht geladen werden',
       newerFormat: 'Diese Dashboard-Version stammt aus einer neueren App-Version und kann hier nicht geladen werden.',
+      tooLarge: 'Das Dashboard-Layout ist zu groß zum Speichern (höchstens 256 KiB). Entferne Widgets oder Ansichten und versuche es erneut.',
     },
     history: {
       open: 'Verlauf',
@@ -254,6 +255,9 @@ export const de: TranslationKeys = {
       noViews: 'Diese Version enthält keine Ansichten, die diese App-Version lesen kann.',
       newer: 'Neuer',
       older: 'Älter',
+      adoptViewConfirm: 'Auf diesem Gerät gibt es ungespeicherte Dashboard-Änderungen. Die Ansicht „{name}“ durch die aus dieser Version ersetzen?',
+      adoptViewMissing: 'Diese Version enthält diese Ansicht nicht.',
+      adoptViewLimit: 'Das Dashboard hat schon {max} Ansichten. Lösche eine, bevor du eine weitere übernimmst.',
     },
   },
   projects: {

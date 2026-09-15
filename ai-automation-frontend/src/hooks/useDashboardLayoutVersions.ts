@@ -31,6 +31,14 @@ export function saveDashboardLayoutVersion(request: SaveDashboardLayoutRequest):
   return api.post<DashboardLayoutVersionSummary>(BASE, request);
 }
 
+/** Default of automation.dashboard.layout.max-request-bytes (DashboardLayoutSizeLimitFilter). */
+export const MAX_LAYOUT_REQUEST_BYTES = 262_144;
+
+/** True when the server's size filter would reject this save request (UTF-8 bytes of the JSON body). */
+export function exceedsLayoutRequestLimit(request: SaveDashboardLayoutRequest): boolean {
+  return new TextEncoder().encode(JSON.stringify(request)).length > MAX_LAYOUT_REQUEST_BYTES;
+}
+
 export function useDashboardLayoutVersions(page: number, size = 20, enabled = true) {
   return useQuery({
     queryKey: [...DASHBOARD_LAYOUT_VERSIONS_KEY, page, size],

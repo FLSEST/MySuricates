@@ -229,6 +229,7 @@ export const en = {
       saveFailed: 'Could not save the dashboard layout',
       loadFailed: 'Could not load the dashboard layout',
       newerFormat: 'This dashboard version comes from a newer app version and cannot be loaded here.',
+      tooLarge: 'The dashboard layout is too large to save (at most 256 KiB). Remove widgets or views and try again.',
     },
     history: {
       open: 'History',
@@ -252,6 +253,9 @@ export const en = {
       noViews: 'This version has no views this app version can read.',
       newer: 'Newer',
       older: 'Older',
+      adoptViewConfirm: 'This device has unsaved dashboard changes. Replace the view “{name}” with the one from this version?',
+      adoptViewMissing: 'This version does not contain that view.',
+      adoptViewLimit: 'The dashboard already has {max} views. Delete one before taking another.',
     },
   },
   projects: {

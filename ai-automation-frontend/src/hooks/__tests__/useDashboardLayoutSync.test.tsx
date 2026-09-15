@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -79,7 +79,10 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  vi.restoreAllMocks();
+});
 afterAll(() => server.close());
 beforeEach(() => {
   localStorage.clear();
@@ -416,5 +419,170 @@ describe('useDashboardLayoutSync', () => {
 
     expect(result.current.conflict).toBeNull();
     expect(useToastStore.getState().toasts.some((t) => t.type === 'error')).toBe(true);
+  });
+
+  it('ignores the active view when comparing a never-synced layout with the server', async () => {
+    const views = [
+      { id: 'default', name: '', widgets: [] },
+      { id: 'ops', name: 'Ops', widgets: localWidgets },
+    ];
+    useDashboardLayoutStore.setState({ activeViewId: 'ops', views });
+    serve({
+      latest: () => summary('v2', { viewCount: 2 }),
+      versions: { v2: { ...summary('v2', { viewCount: 2 }), layout: { activeViewId: 'default', views } } },
+    });
+
+    const { result } = renderHook(() => useDashboardLayoutSync(), { wrapper });
+
+    await waitFor(() => expect(useDashboardSyncStore.getState().baseVersionId).toBe('v2'));
+    expect(result.current.conflict).toBeNull();
+    expect(useDashboardLayoutStore.getState().activeViewId).toBe('ops');
+  });
+
+  it('keeps the active view of this device when it loads a newer server layout', async () => {
+    useDashboardLayoutStore.setState({
+      activeViewId: 'ops',
+      views: [{ id: 'default', name: '', widgets: [] }, { id: 'ops', name: 'Ops', widgets: [] }],
+    });
+    useDashboardSyncStore.setState({ baseVersionId: 'v1', dirty: false });
+    const remote = {
+      activeViewId: 'default',
+      views: [{ id: 'default', name: '', widgets: localWidgets }, { id: 'ops', name: 'Betrieb', widgets: [] }],
+    };
+    serve({ latest: () => summary('v2', { viewCount: 2 }), versions: { v2: { ...summary('v2', { viewCount: 2 }), layout: remote } } });
+
+    renderHook(() => useDashboardLayoutSync(), { wrapper });
+
+    await waitFor(() => expect(useDashboardSyncStore.getState().baseVersionId).toBe('v2'));
+    expect(useDashboardLayoutStore.getState().activeViewId).toBe('ops');
+    expect(useDashboardLayoutStore.getState().views[1]?.name).toBe('Betrieb');
+  });
+
+  it('does not count a view switch during a save as an unsaved change', async () => {
+    useDashboardLayoutStore.setState({
+      views: [{ id: 'default', name: '', widgets: localWidgets }, { id: 'ops', name: 'Ops', widgets: [] }],
+    });
+    useDashboardSyncStore.setState({ baseVersionId: 'v1', dirty: true });
+    const { promise: postGate, release } = gate();
+    const calls = serve({
+      latest: () => summary('v1'),
+      beforePost: postGate,
+      onPost: () => HttpResponse.json(summary('v3'), { status: 201 }),
+    });
+    const { result } = renderHook(() => useDashboardLayoutSync(), { wrapper });
+
+    const savePromise = act(() => result.current.saveSnapshot());
+    await waitFor(() => expect(calls).toContain('post'));
+    useDashboardLayoutStore.getState().setActiveView('ops');
+    release();
+    await savePromise;
+
+    expect(useDashboardSyncStore.getState()).toMatchObject({ baseVersionId: 'v3', dirty: false });
+  });
+
+  it('does not send a layout larger than the server accepts and says why', async () => {
+    const bigConfig = Object.fromEntries(Array.from({ length: 6 }, (_, i) => [`text${i}`, 'x'.repeat(500)]));
+    useDashboardLayoutStore.setState({
+      views: [{
+        id: 'default',
+        name: '',
+        widgets: Array.from({ length: 100 }, (_, i) => ({ instanceId: `note-${i}`, type: 'note', config: bigConfig })),
+      }],
+    });
+    useDashboardSyncStore.setState({ baseVersionId: 'v1', dirty: true });
+    const calls = serve({ latest: () => summary('v1') });
+    const { result } = renderHook(() => useDashboardLayoutSync(), { wrapper });
+
+    await act(() => result.current.saveSnapshot());
+
+    expect(calls).not.toContain('post');
+    expect(useToastStore.getState().toasts.map((t) => t.message)).toContain(
+      'The dashboard layout is too large to save (at most 256 KiB). Remove widgets or views and try again.',
+    );
+    expect(useDashboardSyncStore.getState()).toMatchObject({ baseVersionId: 'v1', dirty: true });
+  });
+
+  it('keeps later saves working after a save failed unexpectedly', async () => {
+    customizeLocally();
+    useDashboardSyncStore.setState({ baseVersionId: 'v1', dirty: true });
+    let posts = 0;
+    const calls = serve({
+      latest: () => summary('v1'),
+      onPost: () => {
+        posts += 1;
+        return posts === 1
+          ? HttpResponse.json({ error: 'save failed' }, { status: 500 })
+          : HttpResponse.json(summary('v3'), { status: 201 });
+      },
+    });
+    const originalAddToast = useToastStore.getState().addToast;
+    // Reporting the first failure throws, so that save's promise rejects — it must not poison the chain.
+    useToastStore.setState({
+      addToast: () => {
+        throw new Error('toast failed');
+      },
+    });
+    const { result } = renderHook(() => useDashboardLayoutSync(), { wrapper });
+
+    try {
+      await act(() => result.current.saveSnapshot());
+    } catch {
+      // Expected: the failing toast made this save reject.
+    } finally {
+      useToastStore.setState({ addToast: originalAddToast });
+    }
+    await act(() => result.current.saveSnapshot());
+
+    expect(calls.filter((call) => call === 'post')).toHaveLength(2);
+    expect(useDashboardSyncStore.getState()).toMatchObject({ baseVersionId: 'v3', dirty: false });
+  });
+
+  it('asks before replacing an existing view while this device has unsaved changes', async () => {
+    useDashboardLayoutStore.setState({
+      views: [{ id: 'default', name: '', widgets: [] }, { id: 'ops', name: 'Ops', widgets: localWidgets }],
+    });
+    useDashboardSyncStore.setState({ baseVersionId: 'v2', dirty: true });
+    const oldLayout = {
+      activeViewId: 'default',
+      views: [{ id: 'default', name: '', widgets: [] }, { id: 'ops', name: 'Ops', widgets: remoteLayout.views[0]!.widgets }],
+    };
+    const calls = serve({ latest: () => summary('v2'), versions: { v1: { ...summary('v1', { viewCount: 2 }), layout: oldLayout } } });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const { result } = renderHook(() => useDashboardLayoutSync(), { wrapper });
+
+    await act(() => result.current.adoptView('v1', 'ops'));
+
+    expect(confirm).toHaveBeenCalledWith('This device has unsaved dashboard changes. Replace the view “Ops” with the one from this version?');
+    expect(useDashboardLayoutStore.getState().views[1]?.widgets).toEqual(localWidgets);
+    expect(calls).not.toContain('post');
+
+    await act(() => result.current.adoptView('v1', 'ops'));
+
+    expect(useDashboardLayoutStore.getState().views[1]?.widgets).toEqual(remoteLayout.views[0]?.widgets);
+    expect(calls).toContain('post');
+  });
+
+  it('reports a missing view and the view limit instead of silently doing nothing', async () => {
+    useDashboardSyncStore.setState({ baseVersionId: 'v2' });
+    const oldLayout = {
+      activeViewId: 'default',
+      views: [{ id: 'default', name: '', widgets: [] }, { id: 'ops', name: 'Ops', widgets: [] }],
+    };
+    const calls = serve({ latest: () => summary('v2'), versions: { v1: { ...summary('v1', { viewCount: 2 }), layout: oldLayout } } });
+    const { result } = renderHook(() => useDashboardLayoutSync(), { wrapper });
+
+    await act(() => result.current.adoptView('v1', 'plan'));
+    expect(useToastStore.getState().toasts.map((t) => t.message)).toContain('This version does not contain that view.');
+
+    useDashboardLayoutStore.setState({
+      activeViewId: 'v0',
+      views: Array.from({ length: 20 }, (_, i) => ({ id: `v${i}`, name: '', widgets: [] })),
+    });
+    await act(() => result.current.adoptView('v1', 'ops'));
+
+    expect(useToastStore.getState().toasts.map((t) => t.message))
+      .toContain('The dashboard already has 20 views. Delete one before taking another.');
+    expect(useDashboardLayoutStore.getState().views).toHaveLength(20);
+    expect(calls).not.toContain('post');
   });
 });
