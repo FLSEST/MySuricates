@@ -2,10 +2,10 @@ package com.automation.service.dashboard;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.io.UncheckedIOException;
@@ -23,11 +23,15 @@ import java.util.regex.Pattern;
  * Strict server-side check of a dashboard layout snapshot (spec E1). Mirrors LAYOUT_LIMITS in the
  * frontend's dashboardLayout.ts, but rejects instead of dropping: the frontend sanitizes before
  * sending, so anything invalid here is a bug or a forged request. The layout comes back as
- * canonical JSON (fixed key order, defaults omitted) so equal layouts hash equally.
+ * canonical JSON (fixed key order, defaults omitted) so equal layouts hash equally. A private
+ * mapper is used on purpose so Spring's Jackson customisation can never change a hash.
  */
 @Component
-@RequiredArgsConstructor
 public class DashboardLayoutValidator {
+
+    private static final JsonMapper CANONICAL = JsonMapper.builder()
+            .disable(SerializationFeature.INDENT_OUTPUT)
+            .build();
 
     static final Set<Integer> SUPPORTED_FORMAT_VERSIONS = Set.of(2);
     static final int MAX_VIEWS = 20;
@@ -46,8 +50,6 @@ public class DashboardLayoutValidator {
     private static final Set<String> VIEW_FIELDS = Set.of("id", "name", "widgets", "filter");
     private static final Set<String> WIDGET_FIELDS = Set.of("instanceId", "type", "hidden", "size", "config");
     private static final Set<String> FILTER_FIELDS = Set.of("projectId", "days");
-
-    private final ObjectMapper objectMapper;
 
     public ValidatedLayoutSave validateSave(JsonNode body) {
         requireObject(body, "body");
@@ -90,7 +92,7 @@ public class DashboardLayoutValidator {
             throw invalid("layout.views must be an array with 1 to " + MAX_VIEWS + " views");
         }
         String activeViewId = requiredId(layout.get("activeViewId"), "layout.activeViewId");
-        ObjectNode out = objectMapper.createObjectNode();
+        ObjectNode out = CANONICAL.createObjectNode();
         out.put("activeViewId", activeViewId);
         ArrayNode outViews = out.putArray("views");
         Set<String> viewIds = new HashSet<>();
@@ -110,7 +112,7 @@ public class DashboardLayoutValidator {
     private ObjectNode canonicalView(JsonNode view, String path) {
         requireObject(view, path);
         requireOnlyFields(view, VIEW_FIELDS, path);
-        ObjectNode out = objectMapper.createObjectNode();
+        ObjectNode out = CANONICAL.createObjectNode();
         out.put("id", requiredId(view.get("id"), path + ".id"));
         JsonNode name = view.get("name");
         if (name == null || !name.isTextual() || name.textValue().length() > MAX_NAME_LENGTH) {
@@ -143,7 +145,7 @@ public class DashboardLayoutValidator {
     private ObjectNode canonicalFilter(JsonNode filter, String path) {
         requireObject(filter, path);
         requireOnlyFields(filter, FILTER_FIELDS, path);
-        ObjectNode out = objectMapper.createObjectNode();
+        ObjectNode out = CANONICAL.createObjectNode();
         JsonNode projectId = filter.get("projectId");
         if (projectId != null && !projectId.isNull()) {
             out.put("projectId", requiredId(projectId, path + ".projectId"));
@@ -161,7 +163,7 @@ public class DashboardLayoutValidator {
     private ObjectNode canonicalWidget(JsonNode widget, String path) {
         requireObject(widget, path);
         requireOnlyFields(widget, WIDGET_FIELDS, path);
-        ObjectNode out = objectMapper.createObjectNode();
+        ObjectNode out = CANONICAL.createObjectNode();
         out.put("instanceId", requiredId(widget.get("instanceId"), path + ".instanceId"));
         out.put("type", requiredId(widget.get("type"), path + ".type"));
         JsonNode hidden = widget.get("hidden");
@@ -197,10 +199,10 @@ public class DashboardLayoutValidator {
         }
         Map<String, JsonNode> sorted = new TreeMap<>();
         config.fields().forEachRemaining(entry -> sorted.put(entry.getKey(), entry.getValue()));
-        ObjectNode out = objectMapper.createObjectNode();
+        ObjectNode out = CANONICAL.createObjectNode();
         sorted.forEach((key, value) -> {
             if (!CONFIG_KEY.matcher(key).matches()) {
-                throw invalid(path + " has an invalid key: " + key);
+                throw invalid(path + " has an invalid key: " + echo(key));
             }
             if (value.isTextual() && value.textValue().length() <= MAX_CONFIG_STRING) {
                 out.put(key, value.textValue());
@@ -209,7 +211,7 @@ public class DashboardLayoutValidator {
             } else if (value.isNumber() && Double.isFinite(value.doubleValue())) {
                 out.set(key, value);
             } else {
-                throw invalid(path + "." + key + " must be a string (at most " + MAX_CONFIG_STRING
+                throw invalid(path + "." + echo(key) + " must be a string (at most " + MAX_CONFIG_STRING
                         + " characters), a finite number or a boolean");
             }
         });
@@ -225,9 +227,17 @@ public class DashboardLayoutValidator {
     private static void requireOnlyFields(JsonNode node, Set<String> allowed, String path) {
         node.fieldNames().forEachRemaining(field -> {
             if (!allowed.contains(field)) {
-                throw invalid(path + " has an unknown field: " + field);
+                throw invalid(path + " has an unknown field: " + echo(field));
             }
         });
+    }
+
+    /** A client-supplied name, safe to put into a log line: control characters replaced, capped at 40 chars. */
+    private static String echo(String raw) {
+        String truncated = raw.length() > 40 ? raw.substring(0, 40) + "…" : raw;
+        StringBuilder sanitized = new StringBuilder(truncated.length());
+        truncated.chars().forEach(c -> sanitized.append(Character.isISOControl(c) ? '?' : (char) c));
+        return sanitized.toString();
     }
 
     private static String requiredId(JsonNode node, String path) {
@@ -252,7 +262,7 @@ public class DashboardLayoutValidator {
 
     private String write(JsonNode node) {
         try {
-            return objectMapper.writeValueAsString(node);
+            return CANONICAL.writeValueAsString(node);
         } catch (JsonProcessingException e) {
             throw new UncheckedIOException(e);
         }

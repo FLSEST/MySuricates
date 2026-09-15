@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class DashboardLayoutValidatorTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private final DashboardLayoutValidator validator = new DashboardLayoutValidator(MAPPER);
+    private final DashboardLayoutValidator validator = new DashboardLayoutValidator();
 
     private static ObjectNode validBody() {
         try {
@@ -111,6 +111,8 @@ class DashboardLayoutValidatorTest {
                 Arguments.of("deviceLabel is required", (Consumer<ObjectNode>) b -> b.remove("deviceLabel")),
                 Arguments.of("deviceLabel must have 1 to 80 characters",
                         (Consumer<ObjectNode>) b -> b.put("deviceLabel", "Lap\ntop")),
+                Arguments.of("deviceLabel must have 1 to 80 characters",
+                        (Consumer<ObjectNode>) b -> b.put("deviceLabel", "x".repeat(81))),
                 Arguments.of("force must be a boolean", (Consumer<ObjectNode>) b -> b.put("force", "yes")),
                 Arguments.of("layout must be an object", (Consumer<ObjectNode>) b -> b.remove("layout")),
                 Arguments.of("layout.views must be an array with 1 to 20 views",
@@ -163,6 +165,33 @@ class DashboardLayoutValidatorTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageStartingWith("Invalid dashboard layout: ")
                 .hasMessageContaining(expectedMessagePart);
+    }
+
+    @Test
+    void echoes_client_supplied_names_safely() {
+        ObjectNode body = validBody();
+        body.put("bad\nname" + "x".repeat(100), 1);
+
+        assertThatThrownBy(() -> validator.validateSave(body))
+                .isInstanceOf(IllegalArgumentException.class)
+                .satisfies(e -> {
+                    String message = e.getMessage();
+                    assertThat(message).doesNotContain("\n");
+                    assertThat(message.length()).isLessThan(200);
+                });
+    }
+
+    @Test
+    void keeps_hidden_true_and_places_a_non_empty_filter_between_name_and_widgets() {
+        ObjectNode body = validBody();
+        widget(body, 0).put("hidden", true);
+        view(body, 0).putObject("filter").put("days", 7).put("projectId", "project-a");
+
+        String content = validator.validateSave(body).canonicalContent();
+
+        assertThat(content).contains(
+                "\"name\":\"\",\"filter\":{\"projectId\":\"project-a\",\"days\":7},\"widgets\":["
+                        + "{\"instanceId\":\"todos\",\"type\":\"todos\",\"hidden\":true}");
     }
 
     @Test
