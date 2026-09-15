@@ -3,6 +3,7 @@ package com.automation.service.system;
 import com.automation.concurrency.DynamicSemaphore;
 import com.automation.config.AssistantGuardrailsConfig;
 import com.automation.config.ChainConfig;
+import com.automation.config.DashboardLayoutConfig;
 import com.automation.config.FactoryConfig;
 import com.automation.config.HostClaudeConfig;
 import com.automation.config.RateLimitConfig;
@@ -53,6 +54,7 @@ public class ExecutionSettingsService {
     private final FactoryConfig factoryConfig;
     private final WishConfig wishConfig;
     private final RunRetentionConfig runRetentionConfig;
+    private final DashboardLayoutConfig dashboardLayoutConfig;
     private final ModelCatalogService modelCatalogService;
 
     /** Canonical key → runtime setter, in the order the DB overrides are applied at startup. */
@@ -76,6 +78,7 @@ public class ExecutionSettingsService {
             FactoryConfig factoryConfig,
             WishConfig wishConfig,
             RunRetentionConfig runRetentionConfig,
+            DashboardLayoutConfig dashboardLayoutConfig,
             ModelCatalogService modelCatalogService) {
         this.appSettingsRepository = appSettingsRepository;
         this.executionSemaphore = executionSemaphore;
@@ -94,6 +97,7 @@ public class ExecutionSettingsService {
         this.factoryConfig = factoryConfig;
         this.wishConfig = wishConfig;
         this.runRetentionConfig = runRetentionConfig;
+        this.dashboardLayoutConfig = dashboardLayoutConfig;
         this.modelCatalogService = modelCatalogService;
         this.appliers = buildAppliers();
     }
@@ -119,6 +123,7 @@ public class ExecutionSettingsService {
         m.put("todo-hygiene-max-per-run", v -> todoHygieneConfig.setMaxPerRun(Integer.parseInt(v)));
         m.put("run-retention-days", v -> runRetentionConfig.setRetentionDays(Integer.parseInt(v)));
         m.put("run-retention-max-per-night", v -> runRetentionConfig.setMaxPerNight(Integer.parseInt(v)));
+        m.put("dashboard-layout-retention-count", v -> dashboardLayoutConfig.setRetentionCount(Integer.parseInt(v)));
         m.put("todo-watchdog-enabled", v -> todoGhostWatchdogConfig.setEnabled(Integer.parseInt(v) == 1));
         m.put("todo-watchdog-stale-hours", v -> todoGhostWatchdogConfig.setStaleHours(Integer.parseInt(v)));
         m.put("assistant-max-actions-per-hour", v -> assistantGuardrailsConfig.setMaxActionsPerHour(Integer.parseInt(v)));
@@ -180,6 +185,7 @@ public class ExecutionSettingsService {
         result.put("todoHygieneMaxPerRun", todoHygieneConfig.getMaxPerRun());
         result.put("runRetentionDays", runRetentionConfig.getRetentionDays());
         result.put("runRetentionMaxPerNight", runRetentionConfig.getMaxPerNight());
+        result.put("dashboardLayoutRetentionCount", dashboardLayoutConfig.getRetentionCount());
         result.put("todoWatchdogEnabled", todoGhostWatchdogConfig.isEnabled() ? 1 : 0);
         result.put("todoWatchdogStaleHours", todoGhostWatchdogConfig.getStaleHours());
         result.put("assistantMaxActionsPerHour", assistantGuardrailsConfig.getMaxActionsPerHour());

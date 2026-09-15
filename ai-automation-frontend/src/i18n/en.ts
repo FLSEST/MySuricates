@@ -1064,6 +1064,8 @@ export const en = {
     runRetentionDaysHint: 'Finished runs including step outputs are deleted nightly after this many days (0 = off, max 730). Runs with an audit report are kept. Default: 90.',
     runRetentionMaxPerNight: 'Run deletions per night',
     runRetentionMaxPerNightHint: 'Upper bound of runs deleted per nightly pass, oldest first (10–5000). Default: 200.',
+    dashboardLayoutRetentionCount: 'Dashboard layout versions kept',
+    dashboardLayoutRetentionCountHint: 'Unnamed versions kept in the dashboard history; older ones are deleted on save. Named versions are always kept (1–1000). Default: 100.',
     wishSettings: 'Wish Settings',
     wishSettingsSubtitle: 'Timeouts for automatic wish fulfillment.',
     wishTotalTimeoutMinutes: 'Wishes: total timeout (min)',

@@ -227,6 +227,7 @@ export interface ExecutionConfig {
   factoryTimeoutSeconds: number;
   runRetentionDays?: number;
   runRetentionMaxPerNight?: number;
+  dashboardLayoutRetentionCount?: number;
   wishTotalTimeoutMinutes?: number;
   wishWorkflowWaitMinutes?: number;
   wishDefaultShellTimeoutSeconds?: number;

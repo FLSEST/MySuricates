@@ -1066,6 +1066,8 @@ export const de: TranslationKeys = {
     runRetentionDaysHint: 'Abgeschlossene Runs samt Step-Ausgaben werden nach so vielen Tagen nächtlich gelöscht (0 = aus, max. 730). Runs mit Audit-Report bleiben. Default: 90.',
     runRetentionMaxPerNight: 'Run-Löschungen pro Nacht',
     runRetentionMaxPerNightHint: 'Obergrenze gelöschter Runs pro nächtlichem Lauf, älteste zuerst (10–5000). Default: 200.',
+    dashboardLayoutRetentionCount: 'Aufbewahrte Dashboard-Versionen',
+    dashboardLayoutRetentionCountHint: 'Unbenannte Versionen im Dashboard-Verlauf; ältere werden beim Speichern gelöscht. Benannte Versionen bleiben immer (1–1000). Default: 100.',
     wishSettings: 'Wünsche-Einstellungen',
     wishSettingsSubtitle: 'Timeouts für die automatische Wunscherfüllung.',
     wishTotalTimeoutMinutes: 'Wünsche: Gesamt-Timeout (min)',

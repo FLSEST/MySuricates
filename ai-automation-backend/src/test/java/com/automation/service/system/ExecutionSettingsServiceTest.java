@@ -12,6 +12,7 @@ import com.automation.config.AssistantGuardrailsConfig;
 import com.automation.config.TodoGhostWatchdogConfig;
 import com.automation.config.TodoHygieneConfig;
 import com.automation.config.RunRetentionConfig;
+import com.automation.config.DashboardLayoutConfig;
 import com.automation.config.WishConfig;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.ai.HostClaudeService;
@@ -52,6 +53,7 @@ class ExecutionSettingsServiceTest {
     private FactoryConfig factoryConfig;
     private WishConfig wishConfig;
     private RunRetentionConfig runRetentionConfig;
+    private DashboardLayoutConfig dashboardLayoutConfig;
     private ExecutionSettingsService service;
 
     @BeforeEach
@@ -69,13 +71,14 @@ class ExecutionSettingsServiceTest {
         factoryConfig = new FactoryConfig();
         wishConfig = new WishConfig();
         runRetentionConfig = new RunRetentionConfig();
+        dashboardLayoutConfig = new DashboardLayoutConfig();
 
         service = new ExecutionSettingsService(
                 appSettingsRepository, executionSemaphore,
                 hostClaudeService, hostClaudeConfig, chainConfig,
                 rateLimitConfig, executionRegistry, containerShellService,
                 schedulerConfig, todoHygieneConfig, todoGhostWatchdogConfig, assistantGuardrailsConfig, taskCommandConfig,
-                summarizationConfig, factoryConfig, wishConfig, runRetentionConfig, modelCatalogService
+                summarizationConfig, factoryConfig, wishConfig, runRetentionConfig, dashboardLayoutConfig, modelCatalogService
         );
     }
 
@@ -518,6 +521,17 @@ class ExecutionSettingsServiceTest {
 
         ExecutionSettingKeys.BOUNDS.forEach((key, bounds) ->
                 verify(appSettingsRepository).set(key, String.valueOf(bounds[0])));
+    }
+
+    @Test
+    void init_appliesDashboardLayoutRetentionFromDb() {
+        when(appSettingsRepository.get(anyString())).thenReturn(Optional.empty());
+        when(appSettingsRepository.get("dashboard-layout-retention-count")).thenReturn(Optional.of("42"));
+
+        service.init();
+
+        assertThat(dashboardLayoutConfig.getRetentionCount()).isEqualTo(42);
+        assertThat(service.getCurrentSettings()).containsEntry("dashboardLayoutRetentionCount", 42);
     }
 
     @Test

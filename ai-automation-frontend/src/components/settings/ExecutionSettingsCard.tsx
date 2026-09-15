@@ -32,6 +32,7 @@ interface FormState {
   factoryTimeoutSeconds: number;
   runRetentionDays: number;
   runRetentionMaxPerNight: number;
+  dashboardLayoutRetentionCount: number;
 }
 
 const DEFAULT_FORM: FormState = {
@@ -50,6 +51,7 @@ const DEFAULT_FORM: FormState = {
   factoryTimeoutSeconds: 600,
   runRetentionDays: 90,
   runRetentionMaxPerNight: 200,
+  dashboardLayoutRetentionCount: 100,
 };
 
 function toFormState(config: NonNullable<ReturnType<typeof useExecutionConfig>['data']>): FormState {
@@ -69,6 +71,7 @@ function toFormState(config: NonNullable<ReturnType<typeof useExecutionConfig>['
     factoryTimeoutSeconds: config.factoryTimeoutSeconds ?? 600,
     runRetentionDays: config.runRetentionDays ?? 90,
     runRetentionMaxPerNight: config.runRetentionMaxPerNight ?? 200,
+    dashboardLayoutRetentionCount: config.dashboardLayoutRetentionCount ?? 100,
   };
 }
 
@@ -97,7 +100,8 @@ export function ExecutionSettingsCard() {
     form.summarizationTimeoutSeconds !== (config.summarizationTimeoutSeconds ?? 120) ||
     form.factoryTimeoutSeconds !== (config.factoryTimeoutSeconds ?? 600) ||
     form.runRetentionDays !== (config.runRetentionDays ?? 90) ||
-    form.runRetentionMaxPerNight !== (config.runRetentionMaxPerNight ?? 200)
+    form.runRetentionMaxPerNight !== (config.runRetentionMaxPerNight ?? 200) ||
+    form.dashboardLayoutRetentionCount !== (config.dashboardLayoutRetentionCount ?? 100)
   );
 
   const fields: FieldConfig[] = [
@@ -114,6 +118,7 @@ export function ExecutionSettingsCard() {
     { key: 'factoryTimeout', label: t.settings.factoryTimeoutSeconds, hint: t.settings.factoryTimeoutSecondsHint, min: 60, max: 3600, configKey: 'factoryTimeoutSeconds' },
     { key: 'runRetentionDays', label: t.settings.runRetentionDays, hint: t.settings.runRetentionDaysHint, min: 0, max: 730, configKey: 'runRetentionDays' },
     { key: 'runRetentionMaxPerNight', label: t.settings.runRetentionMaxPerNight, hint: t.settings.runRetentionMaxPerNightHint, min: 10, max: 5000, configKey: 'runRetentionMaxPerNight' },
+    { key: 'dashboardLayoutRetentionCount', label: t.settings.dashboardLayoutRetentionCount, hint: t.settings.dashboardLayoutRetentionCountHint, min: 1, max: 1000, configKey: 'dashboardLayoutRetentionCount' },
   ];
 
   const handleSave = () => {
@@ -133,6 +138,7 @@ export function ExecutionSettingsCard() {
       factoryTimeoutSeconds: form.factoryTimeoutSeconds,
       runRetentionDays: form.runRetentionDays,
       runRetentionMaxPerNight: form.runRetentionMaxPerNight,
+      dashboardLayoutRetentionCount: form.dashboardLayoutRetentionCount,
     });
   };
 
