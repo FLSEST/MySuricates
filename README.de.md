@@ -43,7 +43,7 @@ an diesem Tag in einem isolierten Worktree:
 | Backend | Java 21 / Spring Boot 3.4, rund 52 000 Zeilen, 38 REST-Controller, 68 Flyway-Migrationen |
 | Frontend | React 19 / TypeScript, rund 48 000 Zeilen |
 | Tests | Backend 7 633 (0 Fehler, 1 uebersprungen), Frontend 496 |
-| Bausteine | 17 Block-Typen, 66 Workflow-Templates, 19 Built-in Skills, 7 Integrations-Provider |
+| Bausteine | 19 Block-Typen, 66 Workflow-Templates, 19 Built-in Skills, 7 Integrations-Provider |
 
 Die Testzahlen sind ein datierter Befund. Dass sie es bleiben, prueft seit dem 2026-09-12 die CI:
 sie faehrt beide Suiten bei jedem Push, zusaetzlich zu Hygiene-Gate und Secret-Scan. Ein externer
